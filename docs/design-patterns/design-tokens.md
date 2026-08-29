@@ -86,8 +86,6 @@ Unusual compared to Tailwind's own convention: Tailwind's default breakpoints ar
 
 ## 10. Plugins
 
-- `tailwind-scrollbar` — themeable scrollbar styling utilities.
-- `tailwindcss-rtl` — right-to-left layout utilities (relevant if/when PostGear adds RTL-language i18n support; PRD marks i18n as P2).
+- `tailwind-scrollbar` (`^4.0.0`, installed) — themeable scrollbar styling utilities.
+- ~~`tailwindcss-rtl`~~ — **dropped** (2026-08-29): no Tailwind v4 release exists (tops out at `0.9.0`, no v4 peer dependency declared), discovered when it broke `npm install`'s dependency resolution entirely. Removed rather than forced past, since RTL/i18n is already P2 scope in the PRD — revisit when i18n work actually starts, either with a newer plugin by then or a hand-rolled `[dir="rtl"]` stylesheet.
 - A small inline plugin adding two custom variants: `child` (`& > *`) and `child-hover` (`& > *:hover`) — lets you style direct children conditionally without extra wrapper classes.
-
-Both `tailwind-scrollbar` and `tailwindcss-rtl` have been added to `apps/web/package.json`'s devDependencies, but `npm install` hasn't been run yet as part of this documentation pass — required before `packages/config/tailwind.css`'s `@plugin` directives will actually resolve.

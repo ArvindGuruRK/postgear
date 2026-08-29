@@ -4,3 +4,5 @@
 // - Pin creation (image, video)
 // - Board management
 // - Analytics retrieval
+
+export {};

@@ -6,3 +6,5 @@
 // ...
 
 console.log('TODO: PostGear API Server Entry Point');
+
+export {};

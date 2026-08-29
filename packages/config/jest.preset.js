@@ -16,4 +16,9 @@ module.exports = {
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts'],
   coverageDirectory: 'coverage',
+  // Jest exits 1 on zero test files by default — correct for a mature
+  // codebase (an empty test dir usually means a broken glob), wrong for a
+  // pre-Sprint-0 scaffold where no test files exist anywhere yet. Remove
+  // once every package has at least one real test.
+  passWithNoTests: true,
 };

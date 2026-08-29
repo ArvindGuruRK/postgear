@@ -21,7 +21,9 @@ PostGear's apps install `tailwindcss@^4.0.0`, which moved theme configuration fr
 | `apps/web/src/app/globals.css` | `@import "tailwindcss"` + imports `colors.css` and `tailwind.css` | ✅ Wired |
 | `apps/web/postcss.config.js` | `@tailwindcss/postcss` plugin registration (v4's replacement for the old `tailwindcss` + `autoprefixer` PostCSS setup) | ✅ Created |
 
-**Remaining before this actually renders** (tracked in [Sprint 1](../sprint-documents/sprint-01-foundation-and-data-model.md)): `npm install` needs to actually run so `@tailwindcss/postcss`, `tailwind-scrollbar`, and `tailwindcss-rtl` (added to `apps/web/package.json`'s devDependencies) are present in `node_modules` — that hasn't been run yet as part of this documentation pass. And something in the app shell needs to apply a `dark` or `light` class to a root element, since the color variables in `colors.css` only resolve once one of those is present (see `design-tokens.md` §1).
+**Status**: `npm install` has run and succeeded. `tailwindcss-rtl` was dropped along the way — it has no Tailwind v4 release at all and broke dependency resolution outright; see `design-tokens.md` §10 for why that's an acceptable loss (RTL/i18n is P2 in the PRD). `tailwind-scrollbar` was bumped to `^4.0.0`, which does support v4.
+
+**Still remaining before this actually renders**: something in the app shell needs to apply a `dark` or `light` class to a root element, since the color variables in `colors.css` only resolve once one of those is present (see `design-tokens.md` §1). That's a Sprint 0/Sprint 1 implementation task, not a dependency problem.
 
 ## Ground rule for using these tokens in new components
 

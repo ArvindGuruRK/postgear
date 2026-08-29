@@ -16,8 +16,17 @@
  * docs/sprint-documents/sprint-01-foundation-and-data-model.md):
  *   - `@tailwindcss/postcss` installed + a `postcss.config.js` using it
  *     (see apps/web/postcss.config.js, added alongside this file).
- *   - `tailwind-scrollbar` and `tailwindcss-rtl` installed (the `@plugin`
- *     directives below will fail to resolve otherwise).
+ *   - `tailwind-scrollbar@^4.0.0` installed (the `@plugin` directive below
+ *     will fail to resolve otherwise).
+ *
+ * DROPPED (2026-08-29, discovered during `npm install`): the original
+ * Postiz config also used `tailwindcss-rtl`, but it has no Tailwind v4
+ * release at all (tops out at 0.9.0, no v4 peer dependency, effectively
+ * unmaintained for v4) — installing it broke dependency resolution
+ * entirely. Removed rather than forced past, since RTL/i18n is already P2
+ * scope in the PRD. Revisit if/when i18n work actually starts — by then a
+ * v4-compatible RTL plugin may exist, or this can be hand-rolled with a few
+ * `[dir="rtl"]` CSS rules instead of a whole plugin.
  */
 
 /* ── Theme mapping ──────────────────────────────────────────────────────
@@ -256,4 +265,4 @@
 
 /* ── Third-party plugins ──────────────────────────────────────────────── */
 @plugin "tailwind-scrollbar";
-@plugin "tailwindcss-rtl";
+/* tailwindcss-rtl dropped — see header comment. */
