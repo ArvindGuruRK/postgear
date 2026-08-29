@@ -1,0 +1,17 @@
+# GitHub Actions CI Pipeline
+# TODO: Implement lint, type-check, unit & integration tests
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: Setup Node.js, install dependencies, run lint, type-check, tests

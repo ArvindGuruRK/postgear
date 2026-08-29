@@ -1,0 +1,8 @@
+# Kubernetes Manifests / Helm Charts
+# TODO: Add Kubernetes deployment, service, and ingress manifests for production deployment
+# - Web deployment & service
+# - API deployment & service
+# - Worker deployment
+# - Ingress / Load balancer
+# - ConfigMaps & Secrets
+# - HPA (Horizontal Pod Autoscaler)

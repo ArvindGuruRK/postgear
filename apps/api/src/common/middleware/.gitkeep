@@ -1,0 +1,2 @@
+// Middleware — Tenant Context Extraction, Rate-Limiting, Audit Logger
+// TODO: Implement tenant ID extraction, request rate limiting, audit trail logging

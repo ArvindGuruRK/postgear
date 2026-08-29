@@ -1,0 +1,259 @@
+/**
+ * PostGear shared Tailwind v4 theme — CSS-first config, replacing the old
+ * v3-style `tailwind.config.js` in this package (kept only as a deprecated
+ * stub — see that file). Token *values* still come from
+ * packages/ui/src/styles/colors.css (imported separately, before this file,
+ * by whatever app consumes it) — this file only maps them into Tailwind's
+ * theme namespace so utility classes like `bg-primary` / `shadow-menu` /
+ * `animate-fadeIn` get generated.
+ *
+ * Usage (e.g. in apps/web/src/app/globals.css):
+ *   @import "tailwindcss";
+ *   @import "../../../../packages/ui/src/styles/colors.css";
+ *   @import "../../../../packages/config/tailwind.css";
+ *
+ * Still needed before this actually builds (tracked in
+ * docs/sprint-documents/sprint-01-foundation-and-data-model.md):
+ *   - `@tailwindcss/postcss` installed + a `postcss.config.js` using it
+ *     (see apps/web/postcss.config.js, added alongside this file).
+ *   - `tailwind-scrollbar` and `tailwindcss-rtl` installed (the `@plugin`
+ *     directives below will fail to resolve otherwise).
+ */
+
+/* ── Theme mapping ──────────────────────────────────────────────────────
+   `@theme inline` (rather than plain `@theme`) is used deliberately: it
+   tells Tailwind to reference these CSS variables live at paint time
+   instead of baking in a value at build time. That's what makes the
+   `.dark`/`.light` class-swap in colors.css keep working — a plain
+   `@theme` block would freeze each color to whichever value was active
+   when Tailwind's build ran. */
+@theme inline {
+  /* Core semantic colors */
+  --color-primary: var(--color-primary);
+  --color-secondary: var(--color-secondary);
+  --color-textColor: var(--new-btn-text);
+  --color-third: var(--color-third);
+  --color-forth: var(--color-forth);
+  --color-fifth: var(--color-fifth);
+  --color-sixth: var(--color-sixth);
+  --color-seventh: var(--color-seventh);
+  --color-gray: var(--color-gray);
+  --color-input: var(--color-input);
+  --color-inputText: var(--color-input-text);
+  --color-tableBorder: var(--color-table-border);
+  --color-modalCustom: var(--color-modalCustom);
+
+  /* Numbered legacy palette (see docs/design-patterns/design-tokens.md §4) */
+  --color-customColor1: var(--color-custom1);
+  --color-customColor2: var(--color-custom2);
+  --color-customColor3: var(--color-custom3);
+  --color-customColor4: var(--color-custom4);
+  --color-customColor5: var(--color-custom5);
+  --color-customColor6: var(--color-custom6);
+  --color-customColor7: var(--color-custom7);
+  --color-customColor8: var(--color-custom8);
+  --color-customColor9: var(--color-custom9);
+  --color-customColor10: var(--color-custom10);
+  --color-customColor11: var(--color-custom11);
+  --color-customColor12: var(--color-custom12);
+  --color-customColor13: var(--color-custom13);
+  --color-customColor14: var(--color-custom14);
+  --color-customColor15: var(--color-custom15);
+  --color-customColor16: var(--color-custom16);
+  --color-customColor17: var(--color-custom17);
+  --color-customColor18: var(--color-custom18);
+  --color-customColor19: var(--color-custom19);
+  --color-customColor20: var(--color-custom20);
+  --color-customColor21: var(--color-custom21);
+  --color-customColor22: var(--color-custom22);
+  --color-customColor23: var(--color-custom23);
+  --color-customColor24: var(--color-custom24);
+  --color-customColor25: var(--color-custom25);
+  --color-customColor26: var(--color-custom26);
+  --color-customColor27: var(--color-custom27);
+  --color-customColor28: var(--color-custom28);
+  --color-customColor29: var(--color-custom29);
+  --color-customColor30: var(--color-custom30);
+  --color-customColor31: var(--color-custom31);
+  --color-customColor32: var(--color-custom32);
+  --color-customColor33: var(--color-custom33);
+  --color-customColor34: var(--color-custom34);
+  --color-customColor35: var(--color-custom35);
+  --color-customColor36: var(--color-custom36);
+  --color-customColor37: var(--color-custom37);
+  --color-customColor38: var(--color-custom38);
+  --color-customColor39: var(--color-custom39);
+  --color-customColor40: var(--color-custom40);
+  --color-customColor41: var(--color-custom41);
+  --color-customColor42: var(--color-custom42);
+  --color-customColor43: var(--color-custom43);
+  --color-customColor44: var(--color-custom44);
+  --color-customColor45: var(--color-custom45);
+  --color-customColor46: var(--color-custom46);
+  --color-customColor47: var(--color-custom47);
+  --color-customColor48: var(--color-custom48);
+  --color-customColor49: var(--color-custom49);
+  --color-customColor50: var(--color-custom50);
+  --color-customColor51: var(--color-custom51);
+  --color-customColor52: var(--color-custom52);
+  --color-customColor53: var(--color-custom53);
+  --color-customColor54: var(--color-custom54);
+  --color-customColor55: var(--color-custom55);
+
+  /* "new-*" surface & interaction layer (docs/design-patterns/design-tokens.md §2) */
+  --color-newBgColor: var(--new-bgColor);
+  --color-newBackdrop: var(--new-back-drop);
+  --color-newSep: var(--new-sep);
+  --color-newBorder: var(--new-border);
+  --color-newBgColorInner: var(--new-bgColorInner);
+  --color-newBgLineColor: var(--new-bgLineColor);
+  --color-textItemFocused: var(--new-textItemFocused);
+  --color-textItemBlur: var(--new-textItemBlur);
+  --color-boxFocused: var(--new-boxFocused);
+  /* v4 note: v3 needed `rgb(var(--x) / <alpha-value>)` so opacity modifiers
+     (e.g. bg-newTextColor/50) worked. v4 supports opacity modifiers on any
+     color value natively via color-mix(), so the plain var() is enough. */
+  --color-newTextColor: rgb(var(--new-textColor));
+  --color-blockSeparator: var(--new-blockSeparator);
+  --color-btnSimple: var(--new-btn-simple);
+  --color-btnText: var(--new-btn-text);
+  --color-btnPrimary: var(--new-btn-primary);
+  --color-ai: var(--new-ai-btn);
+  --color-boxHover: var(--new-box-hover);
+  --color-newTableBorder: var(--new-table-border);
+  --color-newTableHeader: var(--new-table-header);
+  --color-newTableText: var(--new-table-text);
+  --color-newTableTextFocused: var(--new-table-text-focused);
+  --color-newColColor: var(--new-col-color);
+  --color-newSettings: var(--new-settings);
+  --color-menuDots: var(--new-menu-dots);
+  --color-menuDotsHover: var(--new-menu-hover);
+  --color-bigStrip: var(--new-big-strips);
+  --color-popup: var(--popup-color);
+  --color-borderPreview: var(--border-preview);
+
+  /* Platform brand colors — never rebrand these, see rebrand-plan.md */
+  --color-bgLinkedin: var(--linkedin-bg);
+  --color-bgFacebook: var(--facebook-bg);
+  --color-bgInstagram: var(--instagram-bg);
+  --color-bgTiktokItem: var(--tiktok-item-bg);
+  --color-bgTiktokItemIcon: var(--tiktok-item-icon-bg);
+  --color-bgYoutube: var(--youtube-bg);
+  --color-bgCommentFacebook: var(--facebook-bg-comment);
+  --color-textLinkedin: var(--linkedin-text);
+  --color-borderLinkedin: var(--linkedin-border);
+  --color-youtubeButton: var(--youtube-button);
+  --color-youtubeBgAction: var(--youtube-action-color);
+  --color-youtubeSvg: var(--youtube-svg-border);
+
+  /* Typography */
+  --font-sans: 'Helvetica Neue', ui-sans-serif, system-ui, sans-serif;
+
+  /* Layout */
+  --grid-template-columns-13: repeat(13, minmax(0, 1fr));
+
+  /* Neubrutalism structural tokens (Sprint 0) — see
+     docs/sprint-documents/sprint-00-design-system.md and the header comment
+     in packages/ui/src/styles/colors.css for what's deliberately NOT here
+     yet (the comic accent palette). */
+  --color-ink: var(--color-ink);
+  --shadow-brutalSm: var(--shadow-brutal-sm);
+  --shadow-brutalMd: var(--shadow-brutal-md);
+  --shadow-brutalLg: var(--shadow-brutal-lg);
+  --shadow-brutalPressed: var(--shadow-brutal-pressed);
+
+  /* Shadows (soft/blurred — Postiz's original SaaS look; superseded by the
+     brutal-* shadows above for anything in the new design language, kept
+     here only for whatever hasn't been migrated yet) */
+  --shadow-menu: var(--menu-shadow);
+  --shadow-previewShadow: var(--preview-box-shadow);
+  --shadow-yellow: 0 0 60px 20px #6b6237;
+  --shadow-yellowToast: 0px 0px 50px rgba(252, 186, 3, 0.3);
+  --shadow-greenToast: 0px 0px 50px rgba(60, 124, 90, 0.3);
+  --drop-shadow-glow: 0 0 6px rgba(250, 204, 21, 0.6),
+    0 0 12px rgba(250, 204, 21, 0.5), 0 0 24px rgba(250, 204, 21, 0.4);
+
+  /* Animations — each name here needs a matching @keyframes below */
+  --animate-fade: fadeOut 0.5s ease-in-out;
+  --animate-normalFadeIn: normalFadeIn 0.5s ease-in-out;
+  --animate-fadeIn: normalFadeIn 0.2s ease-in-out forwards;
+  --animate-normalFadeOut: normalFadeOut 0.5s linear 5s forwards;
+  --animate-overflow: overFlow 0.5s ease-in-out forwards;
+  --animate-overflowReverse: overFlowReverse 0.5s ease-in-out forwards;
+  --animate-fadeDown: fadeDown 4s ease-in-out forwards;
+  --animate-normalFadeDown: normalFadeDown 0.5s ease-in-out forwards;
+  --animate-newMessages: newMessages 1s ease-in-out 4s forwards;
+  /* --animate-marqueeUp / --animate-marqueeDown deliberately omitted: the
+     v3 config referenced keyframes `marquee-up`/`marquee-down` that were
+     never found in the audited Postiz files (likely defined in a CSS file
+     outside tailwind.config.cjs) — add both here and below once located,
+     rather than guessing their motion. */
+}
+
+/* ── Keyframes (must live outside @theme, referenced by --animate-* above) ── */
+@keyframes fadeOut {
+  0% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes normalFadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes normalFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes overFlow {
+  0%, 99% { overflow: hidden; }
+  100% { overflow: visible; }
+}
+@keyframes overFlowReverse {
+  0%, 99% { overflow: visible; }
+  100% { overflow: hidden; }
+}
+@keyframes fadeDown {
+  0% { opacity: 0; margin-top: -30px; }
+  10% { opacity: 1; margin-top: 0; }
+  85% { opacity: 1; margin-top: 0; }
+  90% { opacity: 1; margin-top: 10px; }
+  100% { opacity: 0; margin-top: -30px; }
+}
+@keyframes normalFadeDown {
+  0% { opacity: 0; transform: translateY(-30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes newMessages {
+  0% { background-color: var(--color-seventh); font-weight: bold; }
+  99% { background-color: var(--color-third); font-weight: bold; }
+  100% { background-color: var(--color-third); font-weight: normal; }
+}
+
+/* ── Dark mode variant ──────────────────────────────────────────────────
+   Replaces v3's `darkMode: 'class'`. Only needed if PostGear also writes
+   `dark:` utility classes directly (separate from the colors.css variable
+   swap, which works regardless of this). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Custom breakpoint variants ─────────────────────────────────────────
+   v3's `screens` here were max-width "raw" queries — the OPPOSITE of
+   Tailwind's own min-width-based sm:/md:/lg:. `--breakpoint-*` in v4 only
+   generates min-width variants, so these are ported as @custom-variant
+   instead. Usage stays the same: `mobile:hidden` applies at max-width
+   1025px and below (desktop-first override), not "1025px and up". */
+@custom-variant mobile (@media (max-width: 1025px));
+@custom-variant tablet (@media (max-width: 1300px));
+@custom-variant iconBreak (@media (max-width: 1560px));
+@custom-variant maxMedia (@media (max-width: 1400px));
+@custom-variant minCustom (@media (min-height: 800px));
+@custom-variant custom (@media (max-height: 800px));
+@custom-variant xs (@media (max-width: 401px));
+
+/* ── Child-selector variants ─────────────────────────────────────────────
+   Replaces the small inline JS plugin in the v3 config (addVariant calls) —
+   v4 makes this a one-line CSS declaration instead of a JS plugin function. */
+@custom-variant child (& > *);
+@custom-variant child-hover (& > *:hover);
+
+/* ── Third-party plugins ──────────────────────────────────────────────── */
+@plugin "tailwind-scrollbar";
+@plugin "tailwindcss-rtl";

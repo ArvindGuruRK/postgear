@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.npm
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Turbo
+.turbo/
+
+# Prisma
+packages/db/prisma/migrations/**/migration_lock.toml
+
+# Docker volumes
+postgres_data/
+redis_data/
+minio_data/
+
+# Misc
+*.tgz
+.cache/

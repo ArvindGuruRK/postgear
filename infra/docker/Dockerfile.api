@@ -1,0 +1,6 @@
+# Dockerfile for PostGear API (Node.js)
+# TODO: Implement multi-stage Docker build for the API server
+
+# FROM node:20-alpine AS builder
+# WORKDIR /app
+# ...

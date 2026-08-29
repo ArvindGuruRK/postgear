@@ -1,0 +1,2 @@
+// Auth Module — Auth Service, JWT Strategy, OAuth Callbacks
+// TODO: Implement JWT authentication, OAuth2 providers (Google, GitHub), session management

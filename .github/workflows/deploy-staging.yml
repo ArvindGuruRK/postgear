@@ -1,0 +1,15 @@
+# Staging & Production Deployment Pipeline
+# TODO: Implement staging and production deployment
+
+name: Deploy Staging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: Build Docker images, push to registry, deploy to staging

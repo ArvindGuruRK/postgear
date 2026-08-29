@@ -1,0 +1,2 @@
+// Billing Module — Stripe Checkout Sessions, Portal & Webhooks
+// TODO: Implement Stripe checkout, customer portal, webhook handlers, plan enforcement

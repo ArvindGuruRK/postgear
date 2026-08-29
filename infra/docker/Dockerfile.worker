@@ -1,0 +1,6 @@
+# Dockerfile for PostGear Worker (Temporal + BullMQ)
+# TODO: Implement multi-stage Docker build for the worker process
+
+# FROM node:20-alpine AS builder
+# WORKDIR /app
+# ...

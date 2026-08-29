@@ -1,0 +1,21 @@
+/* globals.css — Design Tokens & Tailwind v4 Entry Point */
+
+/* Tailwind v4: a single import replaces v3's @tailwind base/components/utilities. */
+@import 'tailwindcss';
+
+/* Design tokens (colors/CSS variables) imported from Postiz — see
+   packages/ui/src/styles/colors.css and docs/design-patterns/. */
+@import '../../../../packages/ui/src/styles/colors.css';
+
+/* Theme mapping (@theme, @custom-variant, @plugin) — see that file's header
+   comment for the full explanation of the v3→v4 conversion. */
+@import '../../../../packages/config/tailwind.css';
+
+/* Still needed before this actually renders (Sprint 1 tooling task, see
+   docs/sprint-documents/sprint-01-foundation-and-data-model.md):
+     - `@tailwindcss/postcss` and `tailwind-scrollbar`/`tailwindcss-rtl`
+       installed (see apps/web/package.json and apps/web/postcss.config.js).
+     - Something in the app shell applying `class="dark"` or `class="light"`
+       to a root element, since colors.css's variables only resolve once one
+       of those classes is present on an ancestor (see
+       docs/design-patterns/design-tokens.md §1). */
