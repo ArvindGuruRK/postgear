@@ -46,7 +46,7 @@ export function PlanCard({
           <span className="font-display text-4xl tracking-wide text-ink">{price}</span>
           <span className="font-sans text-sm text-ink opacity-60">{period}</span>
         </div>
-        {description && <p className="font-sans text-sm text-ink opacity-70">{description}</p>}
+        {description && <p className="font-sans text-sm font-medium text-ink opacity-70">{description}</p>}
       </CardHeader>
       <CardContent className="flex-1">
         <ul className="flex flex-col gap-2">

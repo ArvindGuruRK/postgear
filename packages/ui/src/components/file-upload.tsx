@@ -72,7 +72,7 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
         >
           <Upload className="h-8 w-8 text-ink" strokeWidth={2.5} />
           <p className="font-display text-sm uppercase tracking-wide text-ink">{label}</p>
-          {helperText && <p className="font-sans text-xs text-ink opacity-70">{helperText}</p>}
+          {helperText && <p className="font-sans text-xs font-medium text-ink opacity-70">{helperText}</p>}
         </button>
         <input
           id={inputId}

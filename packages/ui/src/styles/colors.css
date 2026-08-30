@@ -304,6 +304,28 @@
        interaction" recipe in the Sprint 0 doc. Shadow collapses to nothing
        as the element visually moves into the space it occupied. */
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
+    /* Button-only hover "lift" (added 2026-08-30, per direct product
+       feedback referencing the Sentry-style pushable-button feel already
+       prototyped on Button2 — see --shadow-brutal-btn-hover below).
+       Deliberately tiny — a first pass at 2px read as "too high" — grows
+       shadow-brutal-md's diagonal offset by just 1px on each axis; paired
+       in button.tsx with hover:-translate-x-px hover:-translate-y-px so
+       the shadow's far corner stays anchored at the same page position
+       while the button visibly, barely rises off it. No fill/color change
+       on hover (moved to :active instead, alongside the existing press
+       translate — see design-system-rules.md §6/§8). Scoped to Button. */
+    --shadow-brutal-md-hover: 5px 5px 0 var(--color-outline);
+    /* Button-only "pushable" shadow (added 2026-08-30, per a comic
+       component-sheet reference) — bottom-offset only, reading as a solid
+       ink base the button sits on top of, not the diagonal offset every
+       other brutal-shadow surface (Card/Dialog/Input/etc.) uses. Hover
+       grows the offset (button looks like it lifts off its base); press
+       collapses back to --shadow-brutal-pressed (button sinks flush).
+       Deliberately scoped to Button — see button.tsx and
+       design-system-rules.md §6/§8 for why this doesn't replace the
+       diagonal family everywhere else. */
+    --shadow-brutal-btn: 0 4px 0 var(--color-outline);
+    --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
   }
   .light {
     --color-ink: #0a0a0a;
@@ -312,6 +334,9 @@
     --shadow-brutal-md: 4px 4px 0 var(--color-outline);
     --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
+    --shadow-brutal-md-hover: 5px 5px 0 var(--color-outline);
+    --shadow-brutal-btn: 0 4px 0 var(--color-outline);
+    --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
   }
 }
 
@@ -334,12 +359,25 @@
    #ffd100 (via --color-brutal-secondary below), accent stays Palette C's
    orange #ff6b35 (via --color-brutal-accent below). Danger and ai were
    never pulled from Palette C (scoped request: "only primary and
-   secondary/accent") — they keep their Palette A values (--new-ai-btn,
-   --color-brutal-danger below). Fill colors are deliberately flat across
-   .dark/.light — comic colors don't invert with the theme, only ink/
-   backgrounds do — so these live outside the .dark/.light blocks above.
-   Secondary/danger/accent get dedicated tokens below since nothing in the
-   inherited Postiz layer named them.
+   secondary/accent") — they kept their Palette A values (--new-ai-btn,
+   --color-brutal-danger) at the time. Fill colors are deliberately flat
+   across .dark/.light — comic colors don't invert with the theme, only
+   ink/backgrounds do — so these live outside the .dark/.light blocks
+   above. Secondary/danger/accent get dedicated tokens below since nothing
+   in the inherited Postiz layer named them.
+
+   ADDENDUM (2026-08-30, later revision): --color-actionAi reassigned from
+   the pink --new-ai-btn to a dedicated violet, --color-brutal-ai below —
+   direct product decision to give the AI-powered surfaces (Ask AI button,
+   ai Badge/Alert/Toast variants) their own violet identity distinct from
+   the rest of the palette, referencing a purple-violet swatch supplied as
+   a screenshot. --new-ai-btn's pink hex is untouched and still defined
+   above (kept per this file's "don't delete inherited values" policy) —
+   it's simply no longer what the "ai" semantic slot points to; still
+   pairs with --color-on-action-light (black) since the swap only changed
+   the fill hue, and per-contrast-calculation black still narrowly beats
+   white on this violet (4.80:1 vs 4.38:1 — WCAG AA normal text needs
+   4.5:1, so black is the only one that actually clears it).
 
    Text-on-fill is fixed, NOT aliased to --color-ink, and is paired to the
    VARIANT NAME in each component (not derived from the hue automatically)
@@ -355,6 +393,11 @@
   --color-brutal-secondary: #ffd100;
   --color-brutal-danger: #e63946;
   --color-brutal-accent: #ff6b35;
+  /* AI-powered surfaces only (Button/Button2/Badge/Alert/Toast "ai"
+     variant) — see the ADDENDUM above for why this replaced --new-ai-btn
+     pink as the "ai" semantic's fill. Pairs with --color-on-action-light
+     (black text), same as secondary/danger/accent/success. */
+  --color-brutal-ai: #7c5cfc;
   /* Added for Feedback/Data-Display components (Alert success, EmptyState/
      SuccessState, StatusIndicator) that need a semantic "success" color the
      original Task 1 palette never named. Same flat/saturated/non-theme-

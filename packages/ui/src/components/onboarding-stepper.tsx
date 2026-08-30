@@ -43,7 +43,7 @@ export function OnboardingStepper({ className, steps, currentStep, ...props }: O
             )}
             <div className="flex flex-col items-center text-center">
               <span className="font-display text-xs uppercase tracking-wide text-ink">{step.label}</span>
-              {step.description && <span className="font-sans text-xs text-ink opacity-60">{step.description}</span>}
+              {step.description && <span className="font-sans text-xs font-medium text-ink opacity-60">{step.description}</span>}
             </div>
           </li>
         );

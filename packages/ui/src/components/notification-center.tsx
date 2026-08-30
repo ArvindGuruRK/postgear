@@ -69,7 +69,7 @@ export function NotificationCenter({
               >
                 <span className="font-sans text-sm font-semibold text-ink">{notification.title}</span>
                 {notification.description && (
-                  <span className="font-sans text-xs text-ink opacity-70">{notification.description}</span>
+                  <span className="font-sans text-xs font-medium text-ink opacity-70">{notification.description}</span>
                 )}
                 {notification.timestamp && (
                   <span className="font-sans text-xs text-ink opacity-50">{notification.timestamp}</span>

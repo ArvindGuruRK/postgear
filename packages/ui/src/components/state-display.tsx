@@ -38,7 +38,7 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
         </div>
       )}
       <p className="font-display text-lg uppercase tracking-wide text-ink">{title}</p>
-      {description && <p className="max-w-sm font-sans text-sm text-ink opacity-70">{description}</p>}
+      {description && <p className="max-w-sm font-sans text-sm font-medium text-ink opacity-70">{description}</p>}
       {action && (
         <Button variant={action.variant ?? 'primary'} size="sm" onClick={action.onClick} className="mt-2">
           {action.label}

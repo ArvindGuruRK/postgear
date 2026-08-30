@@ -9,6 +9,8 @@ import {
   CardTitle,
   Container,
   Grid,
+  Heading,
+  Panel,
   Stack,
   Text,
 } from '@postgear/ui';
@@ -66,6 +68,20 @@ export function LayoutSection() {
             </Button>
           </CardFooter>
         </Card>
+      </Row>
+      <Row label="Panel (comic frame — marketing/onboarding, not app UI)">
+        <Panel className="max-w-sm p-6">
+          <Heading level="h4">You&apos;re all set!</Heading>
+          <Text size="sm" className="mt-1">
+            Your first channel is connected. Time to schedule a post.
+          </Text>
+        </Panel>
+        <Panel halftone className="max-w-sm p-6">
+          <Heading level="h4">Halftone variant</Heading>
+          <Text size="sm" className="mt-1">
+            Same frame, with the bg-halftone texture layered on top.
+          </Text>
+        </Panel>
       </Row>
     </Section>
   );

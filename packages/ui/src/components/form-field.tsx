@@ -27,7 +27,7 @@ export const FormHelperText = forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn('font-sans text-xs text-ink opacity-70', className)} {...props} />
+  <p ref={ref} className={cn('font-sans text-xs font-medium text-ink opacity-70', className)} {...props} />
 ));
 FormHelperText.displayName = 'FormHelperText';
 

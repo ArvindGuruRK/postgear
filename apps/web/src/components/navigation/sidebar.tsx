@@ -10,35 +10,72 @@ export interface SidebarItem {
   active?: boolean;
 }
 
-export function Sidebar({ items, footer }: { items: SidebarItem[]; footer?: ReactNode }) {
+function NavTile({ label, href, icon: Icon, active }: SidebarItem) {
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r-4 border-outline bg-secondary">
-      <div className="flex h-16 shrink-0 items-center border-b-4 border-outline px-6">
-        <span className="font-display text-2xl tracking-wide text-ink">PostGear</span>
+    <Link
+      href={href}
+      title={label}
+      className={cn(
+        'flex w-16 flex-col items-center gap-1 rounded-md border-2 border-transparent px-2 py-1.5',
+        'outline-none transition-[transform,box-shadow] duration-100',
+        'hover:border-outline hover:bg-primary',
+        'active:translate-x-[1px] active:translate-y-[1px]',
+        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+        active &&
+          'border-outline bg-actionPrimary shadow-brutalSm hover:bg-actionPrimary active:shadow-brutalPressed',
+      )}
+    >
+      <Icon
+        className={cn('h-5 w-5 shrink-0', active ? 'text-onActionPrimary' : 'text-ink')}
+        strokeWidth={2.5}
+      />
+      <span
+        className={cn(
+          'line-clamp-2 w-full text-center font-display text-[10px] leading-[1.15] uppercase tracking-wide',
+          active ? 'text-onActionPrimary' : 'text-ink',
+        )}
+      >
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+export function Sidebar({
+  items,
+  brand = 'P',
+  bottomItem,
+}: {
+  items: SidebarItem[];
+  /** Monogram (or any short node) shown in the brand tile at the top of the rail. */
+  brand?: ReactNode;
+  /** Pinned to the bottom of the rail, below the scrollable nav list (e.g. Settings). */
+  bottomItem?: SidebarItem;
+}) {
+  return (
+    <aside className="flex h-full w-20 shrink-0 flex-col items-center border-r-4 border-outline bg-secondary">
+      <div className="flex h-16 w-full shrink-0 items-center justify-center border-b-4 border-outline">
+        <div className="flex h-11 w-11 items-center justify-center rounded-md border-2 border-outline bg-actionPrimary shadow-brutalSm">
+          <span className="font-display text-xl text-onActionPrimary">{brand}</span>
+        </div>
       </div>
+
       <nav
         className={cn(
-          'flex flex-1 flex-col gap-1 overflow-y-auto p-3',
+          'flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto py-2',
           'pg-scrollbar pg-scrollbar-secondary',
         )}
       >
-        {items.map(({ label, href, icon: Icon, active }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              'flex items-center gap-3 border-2 border-transparent px-3 py-2.5 font-sans text-sm font-medium text-ink',
-              'hover:border-outline hover:bg-primary',
-              active &&
-                'border-outline bg-actionPrimary text-onActionPrimary shadow-brutalSm hover:bg-actionPrimary',
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" strokeWidth={2.5} />
-            {label}
-          </Link>
+        {items.map((item) => (
+          <NavTile key={item.href} {...item} />
         ))}
       </nav>
-      {footer ? <div className="border-t-4 border-outline p-3">{footer}</div> : null}
+
+      {bottomItem && (
+        <div className="flex w-full shrink-0 items-center justify-center border-t-4 border-outline py-2">
+          <NavTile {...bottomItem} />
+        </div>
+      )}
     </aside>
   );
 }

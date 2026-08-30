@@ -192,6 +192,13 @@
   --shadow-brutalMd: var(--shadow-brutal-md);
   --shadow-brutalLg: var(--shadow-brutal-lg);
   --shadow-brutalPressed: var(--shadow-brutal-pressed);
+  /* Button-only diagonal hover "lift" — see the comment above
+     --shadow-brutal-md-hover in colors.css. */
+  --shadow-brutalMdHover: var(--shadow-brutal-md-hover);
+  /* Button2-only vertical "pushable" shadow — see the comment above
+     --shadow-brutal-btn in colors.css. */
+  --shadow-brutalBtn: var(--shadow-brutal-btn);
+  --shadow-brutalBtnHover: var(--shadow-brutal-btn-hover);
 
   /* Comic accent action colors (Sprint 0 Task 1 — locked, Palette A). See
      the header comment above --color-brutal-* in colors.css for why
@@ -200,7 +207,9 @@
   --color-actionPrimaryHover: var(--color-seventh);
   --color-actionSecondary: var(--color-brutal-secondary);
   --color-actionDanger: var(--color-brutal-danger);
-  --color-actionAi: var(--new-ai-btn);
+  /* Violet, not the inherited pink --new-ai-btn — see the ADDENDUM above
+     --color-brutal-ai in colors.css. */
+  --color-actionAi: var(--color-brutal-ai);
   --color-actionAccent: var(--color-brutal-accent);
   --color-actionSuccess: var(--color-brutal-success);
   --color-onActionPrimary: var(--color-on-action-primary);
@@ -334,3 +343,21 @@
    combined both. See the `.pg-scrollbar*` classes in apps/web's
    globals.css for the hand-rolled replacement every scroll container now
    uses instead. tailwindcss-rtl dropped too — see header comment above. */
+
+/* ── Halftone texture utility ─────────────────────────────────────────────
+   Decorative-only dot pattern for "full comic treatment" surfaces
+   (marketing, onboarding, empty states) per design-system-rules.md §15 —
+   never on dense data surfaces. Not a color/shadow token because it's a
+   background-image pattern, not a single value, so it lives here as a
+   real utility class instead of a `@theme` entry. Dot color is derived
+   from --color-outline via color-mix rather than a fixed rgba, so it stays
+   correct in both themes without needing its own .dark/.light values.
+   Layers on top of whatever background-color the element already has —
+   apply alongside bg-primary/bg-secondary, not instead of it. */
+@utility bg-halftone {
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--color-outline) 22%, transparent) 1.5px,
+    transparent 1.5px
+  );
+  background-size: 10px 10px;
+}
