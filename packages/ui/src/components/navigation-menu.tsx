@@ -59,22 +59,44 @@ export const NavigationMenuTrigger = forwardRef<
 ));
 NavigationMenuTrigger.displayName = NavigationMenuPrimitive.Trigger.displayName;
 
+/**
+ * No border/bg/shadow here — the Viewport below already renders that chrome
+ * as a single shared surface all Content panels animate inside. Content
+ * previously duplicated the same border-4/shadow-brutalLg/bg-secondary,
+ * producing two offset bordered boxes stacked on top of each other (visible
+ * as a thick double outline with an overlapping second card edge).
+ */
 export const NavigationMenuContent = forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
 >(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.Content
+  <NavigationMenuPrimitive.Content ref={ref} className={cn('w-full p-2 sm:w-72', className)} {...props} />
+));
+NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
+
+/**
+ * Styled as a selectable row (same shape as DropdownMenuItem: full-width,
+ * padded, solid hover/active fill) instead of bare inline text — a mega-menu
+ * link list should read as a menu, not a stack of underlined hyperlinks.
+ */
+export const NavigationMenuLink = forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Link>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Link>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Link
     ref={ref}
     className={cn(
-      'w-full rounded-lg border-4 border-outline bg-secondary p-4 shadow-brutalLg sm:w-96',
+      'flex cursor-pointer select-none items-center rounded-md px-3 py-2 outline-none transition-colors',
+      'font-sans text-sm text-ink',
+      'hover:bg-actionPrimary hover:text-onActionPrimary',
+      'focus-visible:bg-actionPrimary focus-visible:text-onActionPrimary',
+      'data-[active]:bg-actionPrimary data-[active]:text-onActionPrimary',
       className,
     )}
     {...props}
   />
 ));
-NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
-
-export const NavigationMenuLink = NavigationMenuPrimitive.Link;
+NavigationMenuLink.displayName = NavigationMenuPrimitive.Link.displayName;
 
 export const NavigationMenuViewport = forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Viewport>,

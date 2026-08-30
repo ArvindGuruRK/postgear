@@ -11,6 +11,7 @@ import {
   Skeleton,
   Spinner,
   SuccessState,
+  ToastAction,
   useToast,
 } from '@postgear/ui';
 import { Inbox, Sparkles, TriangleAlert } from 'lucide-react';
@@ -52,6 +53,36 @@ export function FeedbackSection() {
           }
         >
           AI
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() =>
+            toast({
+              title: 'Event has been created',
+              description: 'Sunday, December 03, 2023 at 9:00 AM',
+              action: <ToastAction altText="Undo">Undo</ToastAction>,
+            })
+          }
+        >
+          With Undo
+        </Button>
+      </Row>
+      <Row label="Toasts (fire several to see the stack)">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            toast({ title: 'Post scheduled', description: 'Goes live tomorrow at 9:00 AM.' });
+            toast({ title: 'Draft saved', description: 'Picks up where you left off.' });
+            toast({
+              title: 'Event has been created',
+              description: 'Sunday, December 03, 2023 at 9:00 AM',
+              action: <ToastAction altText="Undo">Undo</ToastAction>,
+            });
+          }}
+        >
+          Fire 3
         </Button>
       </Row>
       <Row label="Alert">

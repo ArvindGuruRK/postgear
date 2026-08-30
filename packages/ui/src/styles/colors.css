@@ -395,9 +395,19 @@
   --color-brutal-accent: #ff6b35;
   /* AI-powered surfaces only (Button/Button2/Badge/Alert/Toast "ai"
      variant) — see the ADDENDUM above for why this replaced --new-ai-btn
-     pink as the "ai" semantic's fill. Pairs with --color-on-action-light
-     (black text), same as secondary/danger/accent/success. */
-  --color-brutal-ai: #7c5cfc;
+     pink as the "ai" semantic's fill.
+
+     SECOND ADDENDUM (2026-08-31): darkened from the original #7c5cfc to
+     this shade, and switched its paired text from black to white (see
+     --color-on-action-ai below), per direct product feedback that black
+     text read flat on the AI accent and white looked more consistent with
+     how other products brand AI surfaces. Contrast-checked, not eyeballed:
+     white-on-#7c5cfc was 4.38:1 — under WCAG AA's 4.5:1 for normal text —
+     while black-on-#7c5cfc passed at only 4.52:1. Rather than ship a
+     failing contrast or keep a razor-thin pass, this value is ~5% darker
+     (imperceptible as a color shift) so white clears AA with real margin
+     (4.90:1) instead of barely scraping by. */
+  --color-brutal-ai: #7657ef;
   /* Added for Feedback/Data-Display components (Alert success, EmptyState/
      SuccessState, StatusIndicator) that need a semantic "success" color the
      original Task 1 palette never named. Same flat/saturated/non-theme-
@@ -407,4 +417,8 @@
   --color-brutal-success: #22c55e;
   --color-on-action-primary: #ffffff;
   --color-on-action-light: #0a0a0a;
+  /* ai's own on-color, split off from --color-on-action-light in the
+     2026-08-31 addendum above — every other comic accent (secondary/danger/
+     accent/success) still pairs with black and is unaffected. */
+  --color-on-action-ai: #ffffff;
 }

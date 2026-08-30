@@ -214,6 +214,10 @@
   --color-actionSuccess: var(--color-brutal-success);
   --color-onActionPrimary: var(--color-on-action-primary);
   --color-onActionLight: var(--color-on-action-light);
+  /* ai's own on-color (white) — see the 2026-08-31 addendum above
+     --color-brutal-ai in colors.css for why it split off from
+     --color-on-action-light. */
+  --color-onActionAi: var(--color-on-action-ai);
 
   /* Shadows (soft/blurred — Postiz's original SaaS look; superseded by the
      brutal-* shadows above for anything in the new design language, kept
@@ -243,6 +247,14 @@
   --animate-accordionUp: accordionUp 0.2s ease-out;
   --animate-collapsibleDown: collapsibleDown 0.2s ease-out;
   --animate-collapsibleUp: collapsibleUp 0.2s ease-out;
+  /* Toast stack enter/exit (Sprint 0 extension) — paired with the stacking
+     transform/opacity Toaster computes per-item in JS (see toaster.tsx);
+     these only own the moment a toast is inserted/removed, not the
+     depth-shift transition between stack positions (that's a plain
+     `transition` on toast.tsx's own classes, so it can animate smoothly
+     whenever a toast's computed depth changes on every render). */
+  --animate-toastIn: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-toastOut: toastSlideOut 0.2s ease-in forwards;
   /* --animate-marqueeUp / --animate-marqueeDown deliberately omitted: the
      v3 config referenced keyframes `marquee-up`/`marquee-down` that were
      never found in the audited Postiz files (likely defined in a CSS file
@@ -302,6 +314,14 @@
 @keyframes collapsibleUp {
   from { height: var(--radix-collapsible-content-height); }
   to { height: 0; }
+}
+@keyframes toastSlideIn {
+  0% { transform: translateY(16px) scale(0.96); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes toastSlideOut {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(6px) scale(0.9); opacity: 0; }
 }
 
 /* ── Dark mode variant ──────────────────────────────────────────────────

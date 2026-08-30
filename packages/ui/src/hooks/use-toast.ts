@@ -7,7 +7,12 @@ import * as React from 'react';
 import type { ToastActionElement, ToastProps } from '../components/toast';
 
 const TOAST_LIMIT = 3;
-const TOAST_REMOVE_DELAY = 5000;
+// Just past toastSlideOut's 0.2s exit animation (see tailwind.css) — long
+// enough for the close animation to finish, short enough that a just-closed
+// toast stops occupying a stack slot almost immediately. Used to sit at
+// 5000ms, which let closed-but-not-yet-removed toasts count against
+// TOAST_LIMIT and bump still-open ones out of the array early.
+const TOAST_REMOVE_DELAY = 300;
 
 type ToasterToast = ToastProps & {
   id: string;

@@ -18,7 +18,7 @@ const buttonVariants = cva(
         primary: 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover',
         secondary: 'bg-actionSecondary text-onActionLight active:brightness-95',
         danger: 'bg-actionDanger text-onActionLight active:brightness-90',
-        ai: 'bg-actionAi text-onActionLight active:brightness-90',
+        ai: 'bg-actionAi text-onActionAi active:brightness-90',
       },
       size: {
         sm: 'h-9 px-4 text-xs',

@@ -11,7 +11,7 @@ const alertVariants = cva(
         success: 'bg-actionSuccess text-onActionLight',
         danger: 'bg-actionDanger text-onActionLight',
         warning: 'bg-actionAccent text-onActionLight',
-        ai: 'bg-actionAi text-onActionLight',
+        ai: 'bg-actionAi text-onActionAi',
       },
     },
     defaultVariants: {

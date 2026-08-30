@@ -81,16 +81,10 @@ export function NavigationSection() {
             <NavigationMenuItem>
               <NavigationMenuTrigger>Product</NavigationMenuTrigger>
               <NavigationMenuContent>
-                <div className="flex flex-col gap-2">
-                  <NavigationMenuLink href="#" className="font-sans text-sm text-ink hover:underline">
-                    Calendar
-                  </NavigationMenuLink>
-                  <NavigationMenuLink href="#" className="font-sans text-sm text-ink hover:underline">
-                    Analytics
-                  </NavigationMenuLink>
-                  <NavigationMenuLink href="#" className="font-sans text-sm text-ink hover:underline">
-                    SEO Analyzer
-                  </NavigationMenuLink>
+                <div className="flex flex-col">
+                  <NavigationMenuLink href="#">Calendar</NavigationMenuLink>
+                  <NavigationMenuLink href="#">Analytics</NavigationMenuLink>
+                  <NavigationMenuLink href="#">SEO Analyzer</NavigationMenuLink>
                 </div>
               </NavigationMenuContent>
             </NavigationMenuItem>

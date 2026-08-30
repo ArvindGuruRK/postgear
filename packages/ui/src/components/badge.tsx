@@ -10,7 +10,7 @@ const badgeVariants = cva(
         primary: 'bg-actionPrimary text-onActionPrimary',
         secondary: 'bg-actionSecondary text-onActionLight',
         danger: 'bg-actionDanger text-onActionLight',
-        ai: 'bg-actionAi text-onActionLight',
+        ai: 'bg-actionAi text-onActionAi',
         accent: 'bg-actionAccent text-onActionLight',
         outline: 'bg-transparent text-ink',
       },

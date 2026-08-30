@@ -8,16 +8,19 @@ import { cn } from '../lib/utils';
 
 export const ToastProvider = ToastPrimitive.Provider;
 
+/**
+ * Every Toast shares this single grid cell (see `col-start-1 row-start-1` in
+ * toastVariants below) instead of stacking as separate flex rows — that's
+ * what lets several toasts visually overlap into a card deck, with Toaster
+ * computing each one's depth offset/scale/opacity as a plain inline style.
+ */
 export const ToastViewport = forwardRef<
   React.ElementRef<typeof ToastPrimitive.Viewport>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Viewport>
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Viewport
     ref={ref}
-    className={cn(
-      'fixed bottom-0 right-0 z-[100] flex w-full max-w-sm flex-col gap-3 p-6',
-      className,
-    )}
+    className={cn('fixed bottom-0 right-0 z-[100] grid w-full max-w-sm p-6', className)}
     {...props}
   />
 ));
@@ -25,15 +28,18 @@ ToastViewport.displayName = ToastPrimitive.Viewport.displayName;
 
 const toastVariants = cva(
   [
-    'relative flex w-full items-start justify-between gap-3 rounded-md border-2 border-outline p-4 shadow-brutalMd',
-    'font-sans text-sm',
+    'relative col-start-1 row-start-1 flex w-full items-center justify-between gap-3 self-end',
+    'rounded-md border-2 border-outline p-4 shadow-brutalMd',
+    'font-sans text-sm will-change-transform',
+    'transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+    'data-[state=open]:animate-toastIn data-[state=closed]:animate-toastOut',
   ],
   {
     variants: {
       variant: {
         default: 'bg-secondary text-ink',
         danger: 'bg-actionDanger text-onActionLight',
-        ai: 'bg-actionAi text-onActionLight',
+        ai: 'bg-actionAi text-onActionAi',
       },
     },
     defaultVariants: {
@@ -84,7 +90,10 @@ export const ToastAction = forwardRef<
   <ToastPrimitive.Action
     ref={ref}
     className={cn(
-      'shrink-0 border-2 border-outline bg-secondary px-3 py-1.5 font-display text-xs uppercase tracking-wide text-ink',
+      'shrink-0 rounded-md border-2 border-outline bg-secondary px-3 py-1.5 shadow-brutalSm',
+      'font-display text-xs uppercase tracking-wide text-ink transition-[transform,box-shadow] duration-100',
+      'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
+      'active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutalPressed',
       'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
       className,
     )}
