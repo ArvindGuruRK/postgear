@@ -355,6 +355,13 @@
   --color-brutal-secondary: #ffd100;
   --color-brutal-danger: #e63946;
   --color-brutal-accent: #ff6b35;
+  /* Added for Feedback/Data-Display components (Alert success, EmptyState/
+     SuccessState, StatusIndicator) that need a semantic "success" color the
+     original Task 1 palette never named. Same flat/saturated/non-theme-
+     varying treatment as the rest of this block, and pairs with
+     --color-on-action-light (black text) — verified by contrast, same as
+     secondary/danger/accent, not eyeballed. */
+  --color-brutal-success: #22c55e;
   --color-on-action-primary: #ffffff;
   --color-on-action-light: #0a0a0a;
 }

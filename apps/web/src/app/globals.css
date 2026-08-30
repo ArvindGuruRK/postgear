@@ -11,6 +11,84 @@
    comment for the full explanation of the v3→v4 conversion. */
 @import '../../../../packages/config/tailwind.css';
 
+/* ── App scrollbar (single source of truth) ──────────────────────────────
+   NOT built on the `tailwind-scrollbar` plugin's scrollbar-thumb- and
+   scrollbar-track- color utilities, even though that plugin was still
+   installed and `@plugin`-registered when this was written (since removed
+   — see packages/config/tailwind.css). Tailwind v4 core ships its OWN
+   native utilities of those exact names (https://tailwindcss.com/docs/scrollbar-color),
+   and because this app's `outline` color token happens to match the
+   plugin's class-name pattern too, both a core-generated AND a
+   plugin-generated `.scrollbar-thumb-outline` rule exist side by side in
+   the compiled CSS — and `tailwind-merge` (built against core's utility
+   list, which has no notion of the plugin's extra `-rounded-*` variant)
+   folds `scrollbar-thumb-rounded-full` into the SAME "scrollbar thumb
+   color" class group as `scrollbar-thumb-outline`, so `cn()` silently
+   drops the color utility whenever both are combined. Confirmed live: a
+   sidebar `<nav>` rendered with `scrollbar-thumb-outline` and
+   `scrollbar-track-secondary` simply absent from its class attribute,
+   `getComputedStyle(...).scrollbarColor` reading back `auto` — the
+   browser's unstyled native scrollbar (light/gray) showing through, which
+   is what made it look wrong specifically in dark mode. Plain,
+   twMerge-unrecognized class names here sidestep both the collision and
+   the merge bug, and additionally let the thumb be a specific pixel width
+   (10px — a hair wider than the plugin's 8px "thin") since the *standard*
+   `scrollbar-width` property only has thin/auto/none keywords to choose
+   from — nothing in between without the `::-webkit-scrollbar` pixel
+   escape hatch used here.
+
+   Thumb color is `--color-gray` (#8c8c8c), not `--color-ink`/`--color-
+   outline` — both of those are near-black in dark mode by design (ink for
+   text, outline for borders/shadows against the lighter --color-secondary
+   surface), so a thumb painted in either color sits at almost the same
+   luminance as this dark page's own --color-primary background and reads
+   as basically invisible — confirmed by a screenshot of the live page
+   where the track was there but no thumb was visible against it. --color-
+   gray is flat (identical hex in both .light/.dark), so it holds a real
+   value against both a near-black and a pale-cream track — that's the
+   trait an interactive scrollbar handle actually needs, not theme-
+   inversion. */
+.pg-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray) var(--pg-scrollbar-track, var(--color-primary));
+}
+.pg-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.pg-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--color-gray);
+  border-radius: 9999px;
+}
+.pg-scrollbar::-webkit-scrollbar-track {
+  background-color: var(--pg-scrollbar-track, var(--color-primary));
+  border-radius: 9999px;
+}
+.pg-scrollbar-primary {
+  --pg-scrollbar-track: var(--color-primary);
+}
+.pg-scrollbar-secondary {
+  --pg-scrollbar-track: var(--color-secondary);
+}
+
+/* ── Single scroll surface ──────────────────────────────────────────────
+   AppShell (apps/web/src/components/navigation/app-shell.tsx) renders
+   `h-screen overflow-hidden` and puts the only intended scroll region on
+   its `<main>`, styled via the `tailwind-scrollbar` plugin (thin, themed
+   thumb/track). Without this reset, `html`/`body` have no fixed height, so
+   a page a hair taller than 100vh (rounding, a stray margin, etc.) makes
+   the document itself scroll too — the browser's unstyled native
+   scrollbar, appearing only once you scroll past where `<main>`'s own
+   content ends. Locking html/body to the viewport removes that second
+   scrollbar entirely, leaving the single themed one everywhere. */
+@layer base {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
 /* Still needed before this actually renders (Sprint 1 tooling task, see
    docs/sprint-documents/sprint-01-foundation-and-data-model.md):
      - `@tailwindcss/postcss` and `tailwind-scrollbar`/`tailwindcss-rtl`

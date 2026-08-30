@@ -15,22 +15,21 @@
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
+    "@postgear/config": "*",
+    "@postgear/ui": "*",
     "next": "16.3.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@postgear/ui": "*",
-    "@postgear/config": "*"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "@types/react": "^19.0.0",
-    "@types/node": "^20.9.0",
-    "tailwindcss": "^4.0.0",
     "@tailwindcss/postcss": "^4.0.0",
-    "postcss": "^8.4.0",
-    "tailwind-scrollbar": "^4.0.0",
-    "jest-environment-jsdom": "^29.7.0",
+    "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.5.0"
+    "@types/node": "^20.9.0",
+    "@types/react": "^19.0.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.5.0"
   }
 }

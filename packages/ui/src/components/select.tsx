@@ -66,7 +66,7 @@ export const SelectLabel = forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn('px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-ink opacity-60', className)}
+    className={cn('px-3 py-1.5 font-display text-xs uppercase tracking-wide text-ink opacity-60', className)}
     {...props}
   />
 ));

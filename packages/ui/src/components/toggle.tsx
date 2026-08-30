@@ -21,7 +21,7 @@ export const Toggle = forwardRef<
   >
     <SwitchPrimitive.Thumb
       className={cn(
-        'block h-5 w-5 rounded-sm border-2 border-outline bg-outline transition-transform duration-100',
+        'block h-5 w-5 rounded-full border-2 border-outline bg-outline transition-transform duration-100',
         'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0',
       )}
     />

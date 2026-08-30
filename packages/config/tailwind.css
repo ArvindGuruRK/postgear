@@ -202,6 +202,7 @@
   --color-actionDanger: var(--color-brutal-danger);
   --color-actionAi: var(--new-ai-btn);
   --color-actionAccent: var(--color-brutal-accent);
+  --color-actionSuccess: var(--color-brutal-success);
   --color-onActionPrimary: var(--color-on-action-primary);
   --color-onActionLight: var(--color-on-action-light);
 
@@ -226,6 +227,13 @@
   --animate-fadeDown: fadeDown 4s ease-in-out forwards;
   --animate-normalFadeDown: normalFadeDown 0.5s ease-in-out forwards;
   --animate-newMessages: newMessages 1s ease-in-out 4s forwards;
+  /* Accordion/Collapsible expand-collapse (Sprint 0 extension) — each Radix
+     primitive exposes its own content-height custom property scoped to its
+     own element, so these can't share one keyframe pair. */
+  --animate-accordionDown: accordionDown 0.2s ease-out;
+  --animate-accordionUp: accordionUp 0.2s ease-out;
+  --animate-collapsibleDown: collapsibleDown 0.2s ease-out;
+  --animate-collapsibleUp: collapsibleUp 0.2s ease-out;
   /* --animate-marqueeUp / --animate-marqueeDown deliberately omitted: the
      v3 config referenced keyframes `marquee-up`/`marquee-down` that were
      never found in the audited Postiz files (likely defined in a CSS file
@@ -270,6 +278,22 @@
   99% { background-color: var(--color-third); font-weight: bold; }
   100% { background-color: var(--color-third); font-weight: normal; }
 }
+@keyframes accordionDown {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordionUp {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+@keyframes collapsibleDown {
+  from { height: 0; }
+  to { height: var(--radix-collapsible-content-height); }
+}
+@keyframes collapsibleUp {
+  from { height: var(--radix-collapsible-content-height); }
+  to { height: 0; }
+}
 
 /* ── Dark mode variant ──────────────────────────────────────────────────
    Replaces v3's `darkMode: 'class'`. Only needed if PostGear also writes
@@ -298,5 +322,15 @@
 @custom-variant child-hover (& > *:hover);
 
 /* ── Third-party plugins ──────────────────────────────────────────────── */
-@plugin "tailwind-scrollbar";
-/* tailwindcss-rtl dropped — see header comment. */
+/* `tailwind-scrollbar` dropped (2026-08-30): Tailwind v4 core now ships its
+   own native scrollbar-thumb- and scrollbar-track- color utilities
+   (https://tailwindcss.com/docs/scrollbar-color), colliding by name with
+   this plugin's own utilities whenever a color token matches one of the
+   plugin's class suffixes (this app's `outline` token did) — two separate
+   `.scrollbar-thumb-outline` rules end up in the compiled CSS, and
+   `tailwind-merge` (built against core's utility list, not the plugin's)
+   folds the plugin's `-rounded-*` variant into core's color class group,
+   silently dropping the color utility out of any `cn(...)` call that
+   combined both. See the `.pg-scrollbar*` classes in apps/web's
+   globals.css for the hand-rolled replacement every scroll container now
+   uses instead. tailwindcss-rtl dropped too — see header comment above. */
