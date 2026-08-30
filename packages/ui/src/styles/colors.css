@@ -28,8 +28,8 @@
     --new-blockSeparator: #272626;
     --new-btn-simple: #313030;
     --new-btn-text: #ffffff;
-    --new-btn-primary: #612bd3;
-    --new-ai-btn: #d82d7e;
+    --new-btn-primary: #1d4ed8;
+    --new-ai-btn: #ff2e93;
     --new-box-hover: #201f1f;
     --new-table-border: #2b2b2b;
     --new-table-header: #1e1d1d;
@@ -72,8 +72,8 @@
     --new-blockSeparator: #f2f2f4;
     --new-btn-simple: #eceef1;
     --new-btn-text: #0e0e0e;
-    --new-btn-primary: #612bd3;
-    --new-ai-btn: #d82d7e;
+    --new-btn-primary: #1d4ed8;
+    --new-ai-btn: #ff2e93;
     --new-box-hover: #f4f6f8;
     --new-table-border: #e7e9eb;
     --new-table-header: #f5f7f9;
@@ -112,14 +112,14 @@
 
 :root {
   .dark {
-    --color-primary: #0e0e0e;
-    --color-secondary: #090b13;
+    --color-primary: #121212;
+    --color-secondary: #2a2a2a;
     --color-text: #ffffff;
-    --color-third: #080b13;
-    --color-forth: #612ad5;
+    --color-third: #2a2a2a;
+    --color-forth: #1d4ed8;
     --color-fifth: var(--new-bgLineColor);
     --color-sixth: var(--new-table-header);
-    --color-seventh: #7236f1;
+    --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
     --color-input: var(--new-table-header);
     --color-input-text: #64748b;
@@ -182,14 +182,14 @@
     --color-modalCustom: #000000;
   }
   .light {
-    --color-primary: #f0f2f4;
+    --color-primary: #fff8e7;
     --color-secondary: #fff;
     --color-text: #000;
-    --color-third: white;
-    --color-forth: #612ad5;
+    --color-third: #fff;
+    --color-forth: #1d4ed8;
     --color-fifth: var(--new-bgLineColor);
     --color-sixth: var(--new-table-header);
-    --color-seventh: #7236f1;
+    --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
     --color-input: var(--new-table-header);
     --color-input-text: #64748b;
@@ -256,32 +256,105 @@
 /* ── Neubrutalism / comic-style structural tokens (Sprint 0) ────────────
    See docs/sprint-documents/sprint-00-design-system.md for the full design
    direction. Deliberately structural-only: border widths and radii already
-   have suitable extremes in Tailwind's own defaults (border-0/2/4/8,
-   rounded-none/rounded-full), so the only real gaps are an "ink" outline
-   color and a hard (unblurred, offset) shadow scale — Tailwind's default
-   shadow scale is all soft/blurred, which is the opposite of what this
-   style needs.
+   have suitable values in Tailwind's own defaults (border-0/2/4/8,
+   rounded-md/xl/2xl/full — moderately rounded per the 2026-08-30 revision,
+   not the original sharp rounded-none), so the only real gaps are an "ink"
+   outline color and a hard (unblurred, offset) shadow scale — Tailwind's
+   default shadow scale is all soft/blurred, which is the opposite of what
+   this style needs.
 
    NOT included here yet, by design: the actual comic accent palette (the
    bold red/yellow/blue set). That's an open decision meant to be
    prototyped visually — on a real button, in-browser or via the `design`
    skill's canvas — before being locked into a variable value. Don't guess
    at hex values here; update this block once that decision is made. */
+/* --shadow-brutal-* below is nested in the SAME .dark/.light blocks as
+   --color-ink/--color-outline, not declared separately on a bare :root —
+   a var() reference inside a :root-level declaration fails to resolve,
+   because these variables only exist starting at .dark/.light (a
+   descendant of :root), and a custom property can't see a descendant's
+   value. Nesting here puts every declaration in the same scope so the
+   reference actually resolves (found by every shadow rendering as `none`
+   in-browser despite the utility classes compiling correctly).
+
+   --color-ink vs --color-outline (added 2026-08-30, dark-mode revision):
+   these used to be the same variable doing double duty as both the
+   border/shadow accent AND the general text/icon foreground color — fine
+   in light mode (black works for both), but in dark mode that meant every
+   border and shadow was near-white, reading as a stark black-and-white
+   scheme rather than a softer grayscale one (per a reference screenshot:
+   gray surfaces on a black page, with a dark/black border and shadow, not
+   a bright white one). --color-ink keeps doing text/icon duty (still
+   flips near-black/near-white so text stays readable against the surface
+   color in both themes). --color-outline is the new, SEPARATE border +
+   shadow color: identical to ink in light mode (no visual change there),
+   but stays dark in dark mode instead of inverting to white — it reads as
+   a visible outline against the lighter gray surface (see --color-secondary
+   below) while keeping the offset shadow subtle/moody against the near-
+   black page, matching the reference rather than the light mode's loud
+   comic pop. */
 :root {
   .dark {
     --color-ink: #f5f5f5;
+    --color-outline: #050505;
+    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-md: 4px 4px 0 var(--color-outline);
+    --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
+    /* Applied on :active alongside a translate(2px, 2px) — see the "press
+       interaction" recipe in the Sprint 0 doc. Shadow collapses to nothing
+       as the element visually moves into the space it occupied. */
+    --shadow-brutal-pressed: 0 0 0 var(--color-outline);
   }
   .light {
     --color-ink: #0a0a0a;
+    --color-outline: #0a0a0a;
+    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-md: 4px 4px 0 var(--color-outline);
+    --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
+    --shadow-brutal-pressed: 0 0 0 var(--color-outline);
   }
 }
 
+/* ── Neubrutalism comic accent palette — LOCKED 2026-08-30, revised twice
+   same day ──────────────────────────────────────────────────────────────
+   Prototyped as 3 candidates on real Button/Badge/Card via a design canvas
+   (light + dark, 2 typefaces). History: Palette A (blue primary) selected
+   first → primary/secondary manually swapped to yellow-primary/blue-
+   secondary on feedback → superseded by pulling primary/secondary/accent
+   directly from Palette C's own hex values instead of hand-tuning A's
+   (yellow-primary #ffd100/blue-secondary #1d4ed8/orange-accent #ff6b35) →
+   FINAL: reverted back to blue-primary/yellow-secondary — dense, all-day
+   surfaces (dashboards, calendars, analytics tables) hold up better under
+   a calmer blue as the dominant color than under yellow at that volume,
+   and blue-primary keeps the more conventional white-on-primary button
+   text pairing instead of forcing black-on-primary everywhere. Landed on
+   Palette C's specific blue/yellow hex values (not Palette A's) since
+   those were already in place when this last swap happened: primary is
+   blue #1d4ed8 (via --color-forth/--new-btn-primary), secondary is yellow
+   #ffd100 (via --color-brutal-secondary below), accent stays Palette C's
+   orange #ff6b35 (via --color-brutal-accent below). Danger and ai were
+   never pulled from Palette C (scoped request: "only primary and
+   secondary/accent") — they keep their Palette A values (--new-ai-btn,
+   --color-brutal-danger below). Fill colors are deliberately flat across
+   .dark/.light — comic colors don't invert with the theme, only ink/
+   backgrounds do — so these live outside the .dark/.light blocks above.
+   Secondary/danger/accent get dedicated tokens below since nothing in the
+   inherited Postiz layer named them.
+
+   Text-on-fill is fixed, NOT aliased to --color-ink, and is paired to the
+   VARIANT NAME in each component (not derived from the hue automatically)
+   — so swapping which color a variant points to also means swapping which
+   on-action token that variant's text/icon color uses: primary now pairs
+   with --color-on-action-primary (white — blue needs white text) and
+   secondary now pairs with --color-on-action-light (black — yellow needs
+   black text, white fails contrast). Danger/ai/accent are unaffected and
+   still pair with --color-on-action-light. Confirmed by contrast
+   calculation, not eyeballed. Because these fills don't invert with the
+   theme, the text sitting on them can't either. */
 :root {
-  --shadow-brutal-sm: 2px 2px 0 var(--color-ink);
-  --shadow-brutal-md: 4px 4px 0 var(--color-ink);
-  --shadow-brutal-lg: 6px 6px 0 var(--color-ink);
-  /* Applied on :active alongside a translate(2px, 2px) — see the "press
-     interaction" recipe in the Sprint 0 doc. Shadow collapses to nothing
-     as the element visually moves into the space it occupied. */
-  --shadow-brutal-pressed: 0 0 0 var(--color-ink);
+  --color-brutal-secondary: #ffd100;
+  --color-brutal-danger: #e63946;
+  --color-brutal-accent: #ff6b35;
+  --color-on-action-primary: #ffffff;
+  --color-on-action-light: #0a0a0a;
 }

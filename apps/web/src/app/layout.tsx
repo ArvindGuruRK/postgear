@@ -1,11 +1,43 @@
-// Root Application Shell — layout.tsx
-// TODO: Implement root layout with providers, fonts, metadata, and global styles
+import { Toaster } from '@postgear/ui';
+import type { Metadata } from 'next';
+import { Bangers, Plus_Jakarta_Sans } from 'next/font/google';
+import type { ReactNode } from 'react';
+import './globals.css';
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // TODO: Wrap with theme providers, auth session, toast notifications
-  return null;
+const bangers = Bangers({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-display',
+  display: 'swap',
+});
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+export const metadata: Metadata = {
+  title: 'PostGear',
+  description: 'AI-Powered Social Media Management & SEO Platform',
+};
+
+// Runs before paint (see colors.css: `.dark`/`.light` are descendant
+// selectors of `:root`, so the class must land on `<body>`, not `<html>`,
+// for the CSS custom properties to resolve at all) — a plain inline script
+// is the standard no-flash pattern since next-themes-style tooling isn't in
+// scope for this sprint.
+const NO_FLASH_THEME_SCRIPT = `(function(){try{var t=window.localStorage.getItem('postgear-theme')||'light';document.body.classList.add(t);}catch(e){document.body.classList.add('light');}})();`;
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en" className={`${bangers.variable} ${plusJakartaSans.variable}`}>
+      <body suppressHydrationWarning>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static no-flash theme script, no user input */}
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }} />
+        {children}
+        <Toaster />
+      </body>
+    </html>
+  );
 }

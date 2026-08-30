@@ -1,34 +1,42 @@
 # Rebrand Plan — From Postiz's Palette to PostGear's Own
 
-> **Superseded (2026-08-29)** by [`../sprint-documents/sprint-00-design-system.md`](../sprint-documents/sprint-00-design-system.md): PostGear has committed to a Neubrutalism + comic-book visual direction, which is a bigger change than the "swap the accent color, keep the rest" plan this document originally described — Postiz's soft/blurred shadows and muted palette are being replaced in philosophy, not just in hue. What's still accurate below: the *mechanism* (values-only change through `colors.css`, because components consume semantic names) and the note that platform brand colors never get touched. Treat the specific color guidance below as superseded until Sprint 0's actual palette (its Task 1) is locked.
+> **Superseded (2026-08-29)** by [`../sprint-documents/sprint-00-design-system.md`](../sprint-documents/sprint-00-design-system.md): PostGear has committed to a Neubrutalism + comic-book visual direction, which is a bigger change than the "swap the accent color, keep the rest" plan this document originally described — Postiz's soft/blurred shadows and muted palette were replaced in philosophy, not just in hue. What's still accurate below: the *mechanism* (values-only change through `colors.css`, because components consume semantic names) and the note that platform brand colors never get touched.
 >
-> Status: **not started, deliberately deferred**. This document exists so that when you're ready to decide PostGear's actual brand colors, the mechanical part (how to apply them without breaking components) is already figured out. See [`design-tokens.md`](design-tokens.md) for what every token means.
+> Status: **locked 2026-08-30 (Sprint 0)**. Three candidate palettes were prototyped visually (real Button/Badge/Card, light + dark, two typefaces) via a design canvas; **"Classic Comic Primary" (Palette A, blue-forward)** was selected over a red-forward and a yellow-forward candidate. See [`design-tokens.md`](design-tokens.md) for what every token means and `packages/ui/src/styles/colors.css` for the actual values now in place.
 
 ## Why a values-only change is possible
 
 Because every component consumes semantic Tailwind utility names (`bg-primary`, `text-forth`, `bg-btnPrimary`) rather than hardcoded hex values, and those utility names resolve through `packages/config/tailwind.css`'s `@theme inline` block to CSS variables defined once in `packages/ui/src/styles/colors.css` — rebranding is, in principle, a matter of editing values in **one file** (`colors.css`), not hunting through every component. This only holds as long as new PostGear components keep following that discipline (see the ground rule in `README.md`).
 
-## What actually needs to change
+## What actually changed
 
-Not everything — most of the token system (backgrounds, borders, table styling, shadows, breakpoints, animations) is brand-neutral UI plumbing and can stay exactly as imported. The tokens that actually carry Postiz's brand identity and are worth deliberately deciding on:
+Not everything — most of the token system (backgrounds, borders, table styling, breakpoints, animations) is brand-neutral UI plumbing and stayed exactly as imported. The tokens that carry PostGear's actual brand identity, now locked:
 
-| Token(s) | Current value | Role |
+| Token(s) | Value | Role |
 |---|---|---|
-| `--color-forth`, `--color-seventh` | `#612ad5`, `#7236f1` (purple) | Primary brand accent — buttons, active states, links |
-| `--new-btn-primary` | `#612bd3` (same purple family) | Primary button background — should move in lockstep with the accent above |
-| `--new-ai-btn` | `#d82d7e` (pink) | AI-feature accent — decide whether PostGear wants a distinct "this is AI" color (recommended — it's a useful UX signal) or to fold it into the primary accent |
-| `fontFamily.sans` | `Helvetica Neue` | Typeface — not a considered brand choice on Postiz's part, worth deciding fresh rather than inheriting by default |
-| Favicon/logo assets (`apps/web/public/{favicon.ico,logo.svg}`) | placeholder stubs already in the repo | Out of scope for this document, but part of the same overall rebrand effort |
+| `--color-forth`, `--new-btn-primary` | `#2b4fe0` (blue) | Primary action color — buttons, active nav states, links |
+| `--color-seventh` | `#4a63e8` (lighter blue) | Primary hover tint |
+| `--new-ai-btn` | `#ff2e93` (pink) | AI-feature accent — kept **distinct** from primary (the recommended option): a useful "this is an AI action" signal |
+| `--color-brutal-secondary` | `#ffc700` (yellow) | Secondary action color (new token — nothing in the inherited Postiz layer named this role) |
+| `--color-brutal-danger` | `#e63946` (red) | Danger action color (new token) |
+| `--color-brutal-accent` | `#00c2cb` (cyan) | Occasional accent (badges, focus ring) (new token) |
+| `--color-primary` (page bg) | `#fff8e7` light / `#121212` dark | Warm paper light mode, near-black dark mode — replaces Postiz's cool gray |
+| `--color-secondary`/`--color-third` (surface bg) | `#ffffff` light / `#1a1a1a` dark | Card/dialog surface — one consistent tone instead of three near-duplicate dark grays |
+| `--font-display` (new) | Bangers (via `next/font/google`) | Headings, buttons, comic-accent chrome |
+| `fontFamily.sans` | `Helvetica Neue` (unchanged) | Body copy, dense data — deliberately kept plain for legibility |
 
-**Explicitly not touched by a rebrand pass**: the platform brand colors (`bgLinkedin`, `bgFacebook`, `bgInstagram`, `bgYoutube`, etc.) — these represent the *target platform's* brand in preview cards, not PostGear's own, and should stay accurate to each platform regardless of PostGear's palette.
+**Text-on-fill is a fixed pair, not theme-aware**: `--color-on-action-primary` (`#ffffff`) for the primary blue only; `--color-on-action-light` (`#0a0a0a`) for every other fill (secondary, danger, ai, accent). Comic fill colors don't invert between light/dark — only backgrounds and the `--color-ink` border/shadow color do — so the text sitting on a fill can't be aliased to `--color-ink` either; that was confirmed by an actual contrast calculation, not eyeballed (white-on-red and white-on-pink both fail WCAG AA at button text sizes; black text on every non-primary fill clears it comfortably).
 
-## Recommended sequencing
+Favicon/logo assets (`apps/web/public/{favicon.ico,logo.svg}`) remain out of scope for this document.
 
-1. **Don't do this now.** Finish Sprint 1's remaining tooling step first (`npm install` so `@tailwindcss/postcss` and the two Tailwind plugins are actually present, per `README.md`) so the imported tokens are actually rendering — you need to *see* the current purple-and-pink scheme working end-to-end before judging what to change it to.
-2. **Pick PostGear's brand accent(s) deliberately** — this is a product/brand decision, not an engineering one. Come back to this document when that decision is made.
-3. **Apply the change in `packages/ui/src/styles/colors.css` only** — update `--color-forth`, `--color-seventh`, `--new-btn-primary`, and (if decided) `--new-ai-btn`, in both the `.dark` and `.light` blocks. Do not touch `packages/config/tailwind.css` for a pure color change — the utility-name-to-variable mapping doesn't need to change, only the variable values.
-4. **Sweep for hardcoded exceptions**: grep the (future) `apps/web/src` for raw hex codes or Tailwind's default color classes (`purple-600`, `bg-[#612ad5]`, etc.) that might have been written directly instead of through the token system — these would silently not update. This matters most for anything ported while studying Postiz's UI components per the sprint documents; carry over the *pattern*, not a pasted color value.
-5. **Re-verify contrast/accessibility** on both light and dark variants after the swap — Postiz's current values were presumably contrast-checked for their own palette; a new accent color needs the same check (WCAG AA minimum for text-on-background pairs).
+**Explicitly not touched**: the platform brand colors (`bgLinkedin`, `bgFacebook`, `bgInstagram`, `bgYoutube`, etc.) — these represent the *target platform's* brand in preview cards, not PostGear's own, and stay accurate to each platform regardless of PostGear's palette.
+
+## What was done
+
+1. Three candidate palettes were prototyped on real Button/Badge/Card components (light + dark, two typeface candidates — Bangers vs. Archivo Black) via a design canvas, rather than guessing hex values from a document.
+2. Palette A ("Classic Comic Primary," blue-forward) was picked over a red-forward and a yellow-forward candidate.
+3. The change was applied in `packages/ui/src/styles/colors.css` (existing tokens updated in both `.dark`/`.light` blocks, new `--color-brutal-*`/`--color-on-action-*` tokens added for roles nothing in the inherited layer named) and mapped into Tailwind utilities (`actionPrimary`, `actionSecondary`, `actionDanger`, `actionAi`, `actionAccent`, `onActionPrimary`, `onActionLight`, `font-display`) in `packages/config/tailwind.css`.
+4. Contrast was verified by calculation (not eyeballed) for every text-on-fill pairing — see the "Text-on-fill" note above.
 
 ## Non-goals for now
 

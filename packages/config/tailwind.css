@@ -29,6 +29,18 @@
  * `[dir="rtl"]` CSS rules instead of a whole plugin.
  */
 
+/* ── Extra content source ────────────────────────────────────────────────
+   Tailwind v4's automatic content detection walks from the importing app's
+   own directory (e.g. apps/web) and does not cross into a sibling npm
+   workspace package. `packages/ui/src` is where every actual component
+   className lives (Button/Badge/etc. — `packages/ui`'s own package.json
+   has no build step consuming this), so without this directive any
+   utility class used ONLY inside packages/ui (not also incidentally typed
+   out in apps/web source) never gets generated — found by a component
+   rendering with no background at all despite its token resolving fine.
+   Path is relative to this file. */
+@source "../ui/src";
+
 /* ── Theme mapping ──────────────────────────────────────────────────────
    `@theme inline` (rather than plain `@theme`) is used deliberately: it
    tells Tailwind to reference these CSS variables live at paint time
@@ -155,21 +167,43 @@
   --color-youtubeBgAction: var(--youtube-action-color);
   --color-youtubeSvg: var(--youtube-svg-border);
 
-  /* Typography */
-  --font-sans: 'Helvetica Neue', ui-sans-serif, system-ui, sans-serif;
+  /* Typography — both faces load via `next/font/google` in
+     apps/web/src/app/layout.tsx, each exposing its real custom property
+     (name + fallback stack) through its `variable` option; these lines just
+     plug that runtime value into Tailwind's theme so `font-sans`/
+     `font-display` become usable utility classes — not circular references.
+     Body/data copy: Plus Jakarta Sans (was Helvetica Neue — a rebrand
+     decision, not the original Postiz choice). Headings/buttons: Bangers. */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
 
   /* Layout */
   --grid-template-columns-13: repeat(13, minmax(0, 1fr));
 
   /* Neubrutalism structural tokens (Sprint 0) — see
      docs/sprint-documents/sprint-00-design-system.md and the header comment
-     in packages/ui/src/styles/colors.css for what's deliberately NOT here
-     yet (the comic accent palette). */
+     in packages/ui/src/styles/colors.css. */
   --color-ink: var(--color-ink);
+  /* Border/shadow accent — separate from --color-ink (text/icon color) so
+     dark mode can keep borders/shadows dark instead of inverting to white;
+     see the header comment above --color-outline in colors.css. */
+  --color-outline: var(--color-outline);
   --shadow-brutalSm: var(--shadow-brutal-sm);
   --shadow-brutalMd: var(--shadow-brutal-md);
   --shadow-brutalLg: var(--shadow-brutal-lg);
   --shadow-brutalPressed: var(--shadow-brutal-pressed);
+
+  /* Comic accent action colors (Sprint 0 Task 1 — locked, Palette A). See
+     the header comment above --color-brutal-* in colors.css for why
+     text-on-fill is a fixed pair rather than theme-aware. */
+  --color-actionPrimary: var(--color-forth);
+  --color-actionPrimaryHover: var(--color-seventh);
+  --color-actionSecondary: var(--color-brutal-secondary);
+  --color-actionDanger: var(--color-brutal-danger);
+  --color-actionAi: var(--new-ai-btn);
+  --color-actionAccent: var(--color-brutal-accent);
+  --color-onActionPrimary: var(--color-on-action-primary);
+  --color-onActionLight: var(--color-on-action-light);
 
   /* Shadows (soft/blurred — Postiz's original SaaS look; superseded by the
      brutal-* shadows above for anything in the new design language, kept
