@@ -35,3 +35,18 @@ export function Row({ label, children }: { label: string; children: ReactNode })
 export function SubHeading({ children }: { children: ReactNode }) {
   return <h3 className="font-display text-lg tracking-wide text-ink">{children}</h3>;
 }
+
+/**
+ * Dev-only annotation: prints the exact Tailwind utility classes (and, by
+ * extension, the design tokens they resolve to — --font-display/--font-sans,
+ * --color-ink, etc.) backing the specimen it sits under. Lets the one
+ * developer on this project point at any sample in /dev and know which
+ * class to reach for.
+ */
+export function Spec({ children }: { children: ReactNode }) {
+  return (
+    <code className="w-fit rounded bg-ink/5 px-1.5 py-0.5 font-mono text-[11px] leading-none text-ink opacity-60">
+      {children}
+    </code>
+  );
+}
