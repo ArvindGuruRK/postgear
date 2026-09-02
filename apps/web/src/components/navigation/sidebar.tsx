@@ -31,7 +31,7 @@ function NavTile({
         'outline-none transition-[transform,box-shadow] duration-100',
         'hover:border-outline hover:bg-primary',
         'active:translate-x-[1px] active:translate-y-[1px]',
-        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         collapsed ? 'w-16 flex-col gap-1 px-2 py-1.5' : 'w-full gap-3 px-3 py-2.5',
         active &&
           'border-outline bg-actionPrimary shadow-brutalSm hover:bg-actionPrimary active:shadow-brutalPressed',
@@ -101,7 +101,7 @@ export function Sidebar({
     'group flex items-center justify-center rounded-md border-2 border-outline',
     'outline-none transition-[transform,box-shadow] duration-100',
     'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-    'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+    'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
   );
 
   return (

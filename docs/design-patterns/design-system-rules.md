@@ -6,15 +6,27 @@ Companion to [`design-tokens.md`](design-tokens.md) (the raw token catalog) and 
 
 Two font families, both loaded via `next/font/google` in `apps/web/src/app/layout.tsx` and exposed as `font-sans` / `font-display`:
 
-- `font-display` (Bangers) — headings, buttons, labels, dialog/card/menu chrome, anything meant to feel bold/comic. Used via `<Heading>`/`<Text>` (`typography.tsx`) or directly on custom chrome.
-- `font-sans` (Plus Jakarta Sans) — body copy, form values, and **table/data content — including table column headers**. Dense data surfaces (Table, DataTable) are a deliberate exception to the "chrome uses font-display" rule below: the comic display font never appears inside a data grid, only on the chrome around it (Toolbar, PageHeader), per the sprint doc's "restrained treatment" rule for dense surfaces (§15).
+- `font-display` (Bangers) — headings, buttons, dialog/card/menu chrome, anything meant to feel bold/comic. Used via `<Heading>`/`<Text>` (`typography.tsx`) or directly on custom chrome.
+- `font-sans` (Plus Jakarta Sans) — body copy, **every part of a form control (see the form-control rule below)**, and **table/data content — including table column headers**. Dense data surfaces (Table, DataTable) are a deliberate exception to the "chrome uses font-display" rule below: the comic display font never appears inside a data grid, only on the chrome around it (Toolbar, PageHeader), per the sprint doc's "restrained treatment" rule for dense surfaces (§15).
 
 `Heading` levels (`level` prop, `as` prop to decouple visual size from semantic tag): `h1` `text-5xl md:text-6xl`, `h2` `text-3xl md:text-4xl` (default), `h3` `text-2xl md:text-3xl`, `h4` `text-lg md:text-xl`. None of these are uppercase by default — compare to Label, which *is* uppercase; headings read the copy as written, chrome shouts.
 
 `Text` sizes: `xs` `sm` `md` (default) `lg`, with `weight` (`normal`/`medium`/`bold`) and `muted` (opacity-70) as independent axes. **Default `weight` is `medium`** (added 2026-08-30) — plain `font-normal` (400) read as thin next to the system's bold labels/chrome (Badge, table headers, Row-style labels) and thick borders/shadows; `font-medium` (500) is a real weight of the loaded Plus Jakarta Sans variable font, not synthetic. This cascades to every dedicated `*Description`/helper-text component too (`CardDescription`, `AlertDescription`, `DialogDescription`, `AlertDialogDescription`, `SheetDescription`, `FormHelperText`, `FileUpload`'s helper text, `StateDisplay`'s description, `PlanCard`'s description, `NotificationCenter`'s item description, `OnboardingStepper`'s step description, `TimelineDescription`) — all bumped to `font-medium` alongside `Text`'s default. Deliberately **not** applied to `TimelineTimestamp`, notification timestamps, or any dense/tabular/interactive-control text (Table/DataTable cells, Select/Combobox/DropdownMenu/ContextMenu item text, Calendar day cells, Tooltip) — those stay at `font-normal` per the restrained-density rule in §15; this is a prose-body-copy change, not a system-wide weight bump.
 
+**Form controls use `font-sans` end to end** (product decision, 2026-09-02 — this section previously said the opposite and listed Label/FormLabel among the `font-display` roles). A form control is read while typing, so its label, its value, its placeholder, its helper text and its error message are all the body face. `Label`/`FormLabel` is:
+
+```
+font-sans text-sm font-bold text-ink
+```
+
+Sentence case — **not** `uppercase`, **not** `tracking-wide`. Shouting is for chrome you *act on* (Button, Tabs, Badge, NavigationMenu); a label names the box you type in and shouldn't compete with it. `font-bold` (700) is a real weight of the Plus Jakarta Sans variable font and carries the presence Bangers' single heavy weight used to.
+
+This is the same treatment as the specimen captions in the `/dev/components` playground (`Row` in `shared.tsx`) — deliberately identical, so what the playground shows is what a form ships. **Check the playground before styling a form control**; if a new control needs its own label markup instead of rendering `<Label>` (as `FileUpload` does, because its label sits inside a `<button>`), copy these exact classes and say why in a comment.
+
+The boundary: menu group headings (`DropdownMenuLabel`, `SelectLabel`, `CommandMenu` group headings) stay `font-display`. They're menu chrome that happens to live near a form control, not labels for one — they name a *group of options*, not an input.
+
 **Rules that keep drifting, watch for all three when adding a component:**
-1. "Header/title" roles (Card/Dialog/AlertDialog/Sheet title, Alert title, Label/FormLabel, Dropdown/Select/ContextMenu/Command group label, Timeline/StatCard/notification headings, etc.) must explicitly set `font-display` — it is never inherited for free, and a few of these (DropdownMenuLabel, SelectLabel) shipped without it and silently rendered in `font-sans` until caught.
+1. "Header/title" roles (Card/Dialog/AlertDialog/Sheet title, Alert title, Dropdown/Select/ContextMenu/Command group label, Timeline/StatCard/notification headings, etc.) must explicitly set `font-display` — it is never inherited for free, and a few of these (DropdownMenuLabel, SelectLabel) shipped without it and silently rendered in `font-sans` until caught. **Form-control labels are not in this list** — see the form-control rule above.
 2. **`Badge` is the one deliberate exception**: `text-xs font-bold uppercase` in `font-sans`, not `font-display` — this was tried both ways and `font-sans` is the confirmed, intentional choice, not an oversight. Don't "fix" it to `font-display` again.
 3. Never combine `font-display` with `font-bold`. Bangers loads a single weight; asking the browser for a heavier one triggers synthetic/faux-bold, which can render distinctly enough from the rest of the system's `font-display` text that it reads as a *different typeface* at a glance, not just a different weight (this is what was actually wrong with `Label` at one point, not a missing font-family). `font-sans` elements (Badge, Table headers) don't have this problem — Plus Jakarta Sans ships real weights, so `font-bold` there is safe and expected.
 
@@ -130,6 +142,8 @@ Not `next-themes`, not Tailwind's `dark:` variant convention (though the variant
 `strokeWidth={2.5}` (most icons-next-to-text) or `{3}` (small indicator icons — checkmarks, chevrons, close buttons) — heavier than lucide's default `2`, matching the chunky brutalist line weight. Icons sit in a `flex items-center gap-2` (or `gap-1.5` for tighter chrome) row with their text sibling — never absolutely positioned unless the icon is decorating an input (Search icon in `SearchInput`, Calendar icon in `DatePicker`), in which case it's `absolute left-3 top-1/2 -translate-y-1/2` with the input's `pl-10` making room.
 
 ## 14. Form layout
+
+Every part of a form control is `font-sans` — see the form-control typography rule in §1 before styling one.
 
 `FormField` (`flex flex-col gap-2`) wraps `FormLabel` + the control + optional `FormHelperText` **or** `FormErrorMessage` (never both at once — helper text disappears once a field has an error, the error message replaces it). `FormLabel` supports a `required` prop that appends a `text-actionDanger` asterisk rather than an separate "(required)" text. Labels sit above their control, never inline to the left — this is a single-column form system, matching the existing Input/Select/Checkbox call sites.
 

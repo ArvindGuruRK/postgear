@@ -60,7 +60,7 @@ export function DataTable<TData, TValue>({
                         onClick={header.column.getToggleSortingHandler()}
                         className={cn(
                           'flex items-center gap-1.5 outline-none',
-                          'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+                          'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
                         )}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}

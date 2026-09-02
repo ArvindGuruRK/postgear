@@ -28,9 +28,10 @@ export default defineConfig({
   ],
   webServer: {
     command: `npm run dev --workspace=@postgear/web -- --port ${PORT}`,
-    // `/` is a 404 in this app, which Playwright reads as "nothing running"
-    // and then tries to start a duplicate server — probe a real route.
-    url: `${BASE_URL}/dev/components`,
+    // Probe a terminal route rather than `/`: `/` is a redirect to /login
+    // (see apps/web/src/app/page.tsx), and a readiness probe that has to
+    // follow a redirect is a slower, flakier signal than one that doesn't.
+    url: `${BASE_URL}/login`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

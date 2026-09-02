@@ -36,7 +36,7 @@ export function NotificationCenter({
           className={cn(
             'relative flex h-10 w-10 items-center justify-center rounded-md border-2 border-outline bg-secondary shadow-brutalSm outline-none',
             'transition-[transform,box-shadow] duration-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-            'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             className,
           )}
         >

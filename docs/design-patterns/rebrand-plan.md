@@ -14,18 +14,19 @@ Not everything — most of the token system (backgrounds, borders, table styling
 
 | Token(s) | Value | Role |
 |---|---|---|
-| `--color-forth`, `--new-btn-primary` | `#2b4fe0` (blue) | Primary action color — buttons, active nav states, links |
-| `--color-seventh` | `#4a63e8` (lighter blue) | Primary hover tint |
-| `--new-ai-btn` | `#ff2e93` (pink) | AI-feature accent — kept **distinct** from primary (the recommended option): a useful "this is an AI action" signal |
-| `--color-brutal-secondary` | `#ffc700` (yellow) | Secondary action color (new token — nothing in the inherited Postiz layer named this role) |
+| `--color-forth` | `#1d4ed8` (blue) | Primary action color — buttons, active nav states, links |
+| `--color-seventh` | `#3d5fe0` (lighter blue) | Primary hover tint |
+| `--color-brutal-ai` | `#7657ef` (violet) | AI-feature accent — kept **distinct** from primary: a useful "this is an AI action" signal. Replaced the inherited pink `--new-ai-btn` (`#ff2e93`), which is gone as of the 2026-09-02 prune |
+| `--color-brutal-secondary` | `#ffd100` (yellow) | Secondary action color (new token — nothing in the inherited Postiz layer named this role) |
 | `--color-brutal-danger` | `#e63946` (red) | Danger action color (new token) |
-| `--color-brutal-accent` | `#00c2cb` (cyan) | Occasional accent (badges, focus ring) (new token) |
+| `--color-brutal-accent` | `#ff6b35` (orange) | Occasional accent — badges, highlights (new token) |
+| `--color-focus-ring` | `#d6440f` light / `#ff6b35` dark | Focus indicator. Split off from the accent on 2026-09-02 so the light theme could darken it enough to clear WCAG's 3:1 for focus indicators — see design-tokens.md §5 |
 | `--color-primary` (page bg) | `#fff8e7` light / `#121212` dark | Warm paper light mode, near-black dark mode — replaces Postiz's cool gray |
-| `--color-secondary`/`--color-third` (surface bg) | `#ffffff` light / `#1a1a1a` dark | Card/dialog surface — one consistent tone instead of three near-duplicate dark grays |
+| `--color-secondary` (surface bg) | `#ffffff` light / `#2a2a2a` dark | Card/dialog surface — one consistent tone instead of three near-duplicate dark grays |
 | `--font-display` (new) | Bangers (via `next/font/google`) | Headings, buttons, comic-accent chrome |
-| `fontFamily.sans` | `Helvetica Neue` (unchanged) | Body copy, dense data — deliberately kept plain for legibility |
+| `--font-sans` | Plus Jakarta Sans (via `next/font/google`) | Body copy, dense data — deliberately kept plain for legibility |
 
-**Text-on-fill is a fixed pair, not theme-aware**: `--color-on-action-primary` (`#ffffff`) for the primary blue only; `--color-on-action-light` (`#0a0a0a`) for every other fill (secondary, danger, ai, accent). Comic fill colors don't invert between light/dark — only backgrounds and the `--color-ink` border/shadow color do — so the text sitting on a fill can't be aliased to `--color-ink` either; that was confirmed by an actual contrast calculation, not eyeballed (white-on-red and white-on-pink both fail WCAG AA at button text sizes; black text on every non-primary fill clears it comfortably).
+**Text-on-fill is a fixed pair, not theme-aware**: `--color-on-action-primary` (`#ffffff`) for the primary blue, `--color-on-action-ai` (`#ffffff`) for the AI violet, and `--color-on-action-light` (`#0a0a0a`) for every other fill (secondary, danger, accent, success). Comic fill colors don't invert between light/dark — only backgrounds and the `--color-ink` border/shadow color do — so the text sitting on a fill can't be aliased to `--color-ink` either; that was confirmed by an actual contrast calculation, not eyeballed (white-on-red and white-on-pink both fail WCAG AA at button text sizes; black text on every non-primary fill clears it comfortably).
 
 Favicon/logo assets (`apps/web/public/{favicon.ico,logo.svg}`) remain out of scope for this document.
 

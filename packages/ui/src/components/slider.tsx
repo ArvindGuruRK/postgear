@@ -30,7 +30,7 @@ export const Slider = forwardRef<
           key={index}
           className={cn(
             'block h-5 w-5 rounded-full border-2 border-outline bg-secondary shadow-brutalSm',
-            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             'disabled:pointer-events-none disabled:opacity-50',
           )}
         />

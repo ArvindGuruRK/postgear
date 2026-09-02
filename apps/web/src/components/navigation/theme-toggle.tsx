@@ -48,7 +48,7 @@ export function ThemeToggle() {
         'outline-none transition-[transform,box-shadow] duration-100',
         'hover:bg-actionPrimary',
         'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       )}
     >
       <Sun

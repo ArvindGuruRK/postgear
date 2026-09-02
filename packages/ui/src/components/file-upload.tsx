@@ -66,12 +66,18 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
           onClick={() => document.getElementById(inputId)?.click()}
           className={cn(
             'flex w-full flex-col items-center justify-center gap-2 p-8 text-center outline-none',
-            'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-actionPrimary/5',
           )}
         >
           <Upload className="h-8 w-8 text-ink" strokeWidth={2.5} />
-          <p className="font-display text-sm uppercase tracking-wide text-ink">{label}</p>
+          {/* Same treatment as Label (label.tsx) — this is a form control's
+              label, so it follows the form-control typography rule in
+              design-system-rules.md §1, not the display-face chrome rule.
+              Written out rather than rendered as <Label> because it sits
+              inside the drop-zone <button>, where a real <label> element
+              would be nested-interactive markup. */}
+          <p className="font-sans text-sm font-bold text-ink">{label}</p>
           {helperText && <p className="font-sans text-xs font-medium text-ink opacity-70">{helperText}</p>}
         </button>
         <input

@@ -12,7 +12,7 @@ export const Toggle = forwardRef<
     ref={ref}
     className={cn(
       'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-outline bg-secondary p-0.5',
-      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       'disabled:cursor-not-allowed disabled:opacity-50',
       'data-[state=checked]:bg-actionPrimary',
       className,

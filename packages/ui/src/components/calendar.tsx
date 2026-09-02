@@ -8,7 +8,7 @@ export type CalendarProps = DayPickerProps;
 const navButtonClasses = cn(
   'flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-secondary shadow-brutalSm',
   'transition-[transform,box-shadow] duration-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-  'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+  'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
   'disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none',
 );
 
@@ -54,7 +54,7 @@ export function Calendar({
           'outline-none transition-[transform,background-color,box-shadow] duration-100',
           'hover:bg-actionPrimary/20',
           'active:translate-x-[1px] active:translate-y-[1px]',
-          'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+          'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         ),
         today: '[&>button]:font-bold [&>button]:text-actionPrimary',
         selected:

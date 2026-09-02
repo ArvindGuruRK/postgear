@@ -83,11 +83,28 @@ A component isn't done until all of these hold — this is what actually makes "
 
 ## Sprint 0 Definition of Done
 
-- [ ] Palette locked (Task 1) and applied to `colors.css`.
-- [ ] All Phase A primitives (Task 2) built, passing the component DoD, visible in the playground route.
-- [ ] All Phase B compositional components (Task 3) built, passing the component DoD.
-- [ ] `docs/design-patterns/rebrand-plan.md` updated (or explicitly superseded) to reflect the actual palette decision made here, instead of the earlier "just swap the accent" assumption.
-- [ ] At least one full screen (a good candidate: the login/register pages [Sprint 2](sprint-02-auth-and-organizations.md) needs anyway) built entirely from `packages/ui` components, with zero one-off styled markup, as a smoke test that the system actually holds together end to end.
+**Closed 2026-09-02.** All five items met; see "Closeout notes" below for what the final pass changed.
+
+- [x] Palette locked (Task 1) and applied to `colors.css`.
+- [x] All Phase A primitives (Task 2) built, passing the component DoD, visible in the playground route.
+- [x] All Phase B compositional components (Task 3) built, passing the component DoD.
+- [x] `docs/design-patterns/rebrand-plan.md` updated (or explicitly superseded) to reflect the actual palette decision made here, instead of the earlier "just swap the accent" assumption.
+- [x] At least one full screen (a good candidate: the login/register pages [Sprint 2](sprint-02-auth-and-organizations.md) needs anyway) built entirely from `packages/ui` components, with zero one-off styled markup, as a smoke test that the system actually holds together end to end.
+
+## Closeout notes (2026-09-02)
+
+An audit against this document found the component-level discipline in good shape — 75 components, zero hardcoded colors, one reused focus treatment, exact light/dark token parity, every text-on-fill pair passing WCAG AA — and four things outstanding. All four were fixed:
+
+1. **The smoke-test screen didn't exist.** All 14 auth and dashboard pages were `return null` stubs, *and so were the three layouts*, so even the app-shell chrome built in Task 4 had never rendered. Built out all three auth screens (`/login`, `/register`, `/reset-password`) purely from `packages/ui`, and wired `AppShell` into the org layout via a small client wrapper (`dashboard-shell.tsx`) so the layouts themselves stay server components. The dashboard feature pages remain stubs by design — those belong to their own sprints — so an org route renders the shell around an empty canvas.
+2. **The focus ring failed WCAG in light mode.** It reused `actionAccent`, which reaches only 2.68:1 against the light page. Split out `--color-focus-ring` (theme-scoped: `#d6440f` light, `#ff6b35` dark) and repointed all 39 uses. `e2e/auth.spec.ts` asserts the computed color so it can't silently regress.
+3. **`/` 404'd and the error screens were unstyled Next.js defaults.** Added `page.tsx` (redirects to `/login` until Sprint 2 has a session to route on), `not-found.tsx`, `error.tsx` and `global-error.tsx`, all built from the design system.
+4. **`rebrand-plan.md` had drifted** — four documented hex values no longer matched `colors.css`. Synced, and `design-tokens.md` was rewritten against the live system.
+
+Two further fixes came out of the screens actually rendering for the first time: `body { overflow: hidden }` (added for the app shell's single-scroll design) was trapping every non-shell page — the register form's submit button was unreachable on a short viewport — and `<body>` never painted `--color-primary`, so the 404 rendered on browser white. Both are now scoped correctly in `globals.css`.
+
+**Also done, not a DoD item:** the token system was pruned from 154 theme entries to 39 (129 CSS variables to 36). The removed tokens were inherited from Postiz and superseded by this sprint's system, but every one was still a *working* utility class — `bg-customColor7` compiled fine and painted the old palette. See design-tokens.md §10.
+
+**Left open for Sprint 1 to decide:** no Next.js-specific linting runs (Biome covers the rest), and the design system has no unit tests. Neither is a DoD item. `Button` and `Button2` both stay — that's a settled product decision, not an open exploration: Button2's vertical base is for modals, dialogs and slide-over sheets, whose own diagonal shadow would otherwise compete with Button's. See the note at the top of `button2.tsx`.
 
 ## Open Decisions (deliberately left for execution, not pre-decided here)
 

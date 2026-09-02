@@ -85,15 +85,33 @@
   html,
   body {
     height: 100%;
+  }
+
+  /* The page ground and default text color. Set here rather than on a
+     wrapper so every route — including not-found.tsx and error.tsx, which
+     render outside any route group's layout — sits on the theme's own
+     background instead of the browser's white (found by the 404 page
+     rendering on white paper in light mode). Resolves because the no-flash
+     script in layout.tsx puts `.light`/`.dark` on <body> itself. */
+  body {
+    background-color: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  /* Scoped to the app shell, NOT applied globally (2026-09-02): the shell
+     owns a single scroll surface on its own <main>, but `overflow: hidden`
+     on <body> also silently traps every page that ISN'T the shell — the
+     register form is taller than a short viewport, and with a hidden body
+     its submit button became unreachable. `:has()` keeps the shell's
+     behaviour exactly as it was while letting ordinary pages scroll. */
+  body:has([data-app-shell]) {
     overflow: hidden;
   }
 }
 
-/* Still needed before this actually renders (Sprint 1 tooling task, see
-   docs/sprint-documents/sprint-01-foundation-and-data-model.md):
-     - `@tailwindcss/postcss` and `tailwind-scrollbar`/`tailwindcss-rtl`
-       installed (see apps/web/package.json and apps/web/postcss.config.js).
-     - Something in the app shell applying `class="dark"` or `class="light"`
-       to a root element, since colors.css's variables only resolve once one
-       of those classes is present on an ancestor (see
-       docs/design-patterns/design-tokens.md §1). */
+/* The setup this file once listed as outstanding is all in place as of
+   Sprint 0's close: `@tailwindcss/postcss` is installed and wired through
+   postcss.config.js, the two plugins that were listed were dropped rather
+   than installed (see packages/config/tailwind.css for why), and the theme
+   class that colors.css's variables depend on is applied to <body> by the
+   no-flash script in layout.tsx. */

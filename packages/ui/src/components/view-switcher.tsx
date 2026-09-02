@@ -39,7 +39,7 @@ export function ViewSwitcher({ options, value, onValueChange, className }: ViewS
             onClick={() => onValueChange(option.value)}
             className={cn(
               'flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
-              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
               isActive ? 'bg-actionPrimary text-onActionPrimary' : 'text-ink hover:bg-actionPrimary/10',
             )}
           >

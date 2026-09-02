@@ -8,7 +8,7 @@ export const Link = forwardRef<HTMLAnchorElement, LinkProps>(({ className, ...pr
     ref={ref}
     className={cn(
       'font-sans font-semibold text-actionPrimary underline decoration-2 underline-offset-4',
-      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       'hover:text-actionPrimaryHover',
       className,
     )}

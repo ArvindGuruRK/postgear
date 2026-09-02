@@ -31,7 +31,7 @@ export const BreadcrumbLink = forwardRef<HTMLAnchorElement, React.ComponentProps
       ref={ref}
       className={cn(
         'font-medium opacity-70 outline-none hover:opacity-100 hover:underline',
-        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         className,
       )}
       {...props}

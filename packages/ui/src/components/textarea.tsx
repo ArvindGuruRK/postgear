@@ -6,7 +6,7 @@ const textareaVariants = cva(
   [
     'flex min-h-[6rem] w-full rounded-md border-2 border-outline bg-secondary p-4 text-ink shadow-brutalSm',
     'font-sans text-sm placeholder:text-ink placeholder:opacity-50',
-    'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+    'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
     'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
   ],
   {

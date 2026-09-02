@@ -7,9 +7,17 @@ import { cn } from '../lib/utils';
  * under the button) instead of Button's diagonal shadow-brutalMd, per a
  * comic component-sheet reference: hover grows the base (lift), press
  * collapses it flush (sink). Kept as its own component rather than a
- * Button variant/rewrite — this is a parallel exploration sitting next to
- * Button in the showcase for comparison, not a replacement. See
- * --shadow-brutal-btn* in colors.css and design-system-rules.md §6/§8.
+ * Button variant/rewrite. See --shadow-brutal-btn* in colors.css and
+ * design-system-rules.md §6/§8.
+ *
+ * WHEN TO USE WHICH (product decision, confirmed 2026-09-02 — this is not an
+ * unresolved exploration, so don't "consolidate" the two components):
+ *   - Button  — the default everywhere. Its diagonal shadow matches the
+ *     diagonal offset every other surface (Card/Dialog/Input) uses.
+ *   - Button2 — inside modals, dialogs, and right-hand slide-over sheets.
+ *     Those surfaces already carry their own diagonal shadow, so a second
+ *     diagonal stacked on top reads as visual noise; the vertical base
+ *     stays legible against them.
  *
  * Hover is shadow/transform only, no fill change (matches Button's same
  * fix, 2026-08-30) — the color change moved to :active so it reads as
@@ -22,7 +30,7 @@ const button2Variants = cva(
     'shadow-brutalBtn transition-[transform,box-shadow] duration-100',
     'hover:-translate-y-0.5 hover:shadow-brutalBtnHover',
     'active:translate-y-1 active:shadow-brutalPressed',
-    'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+    'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
     'disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
   ],
   {

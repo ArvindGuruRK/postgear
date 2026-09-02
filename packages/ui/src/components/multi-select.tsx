@@ -68,7 +68,7 @@ export function MultiSelect({
           className={cn(
             'flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-md border-2 border-outline bg-secondary px-3 py-2',
             'font-sans text-sm text-ink shadow-brutalSm',
-            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             disabled ? 'cursor-not-allowed opacity-50 shadow-none' : 'cursor-pointer',
             className,
           )}
@@ -105,7 +105,7 @@ export function MultiSelect({
           placeholder={searchPlaceholder}
           className={cn(
             'mb-2 w-full rounded-md border-2 border-outline bg-secondary px-3 py-2 font-sans text-sm text-ink',
-            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
           )}
         />
         <div className="max-h-56 overflow-y-auto pg-scrollbar pg-scrollbar-secondary">

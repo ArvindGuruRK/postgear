@@ -33,7 +33,7 @@ export const AccordionTrigger = forwardRef<
         'flex flex-1 items-center justify-between gap-2 px-4 py-3 text-left',
         'font-display text-sm uppercase tracking-wide text-ink outline-none',
         'bg-secondary transition-colors duration-150 hover:bg-primary',
-        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         // The divider belongs to the header, not the sliding panel, so the
         // card reads as one surface growing downward rather than a separate
         // block sliding out from under a lid. The border is always present and

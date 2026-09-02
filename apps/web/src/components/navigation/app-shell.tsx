@@ -16,7 +16,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-primary">
+    <div data-app-shell className="flex h-screen w-full overflow-hidden bg-primary">
       <Sidebar items={navItems} bottomItem={sidebarBottomItem} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar title={pageTitle} orgSwitcher={<OrgSwitcher />} />

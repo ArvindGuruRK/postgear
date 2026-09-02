@@ -36,7 +36,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             aria-label="Clear search"
             className={cn(
               'absolute right-3 top-1/2 -translate-y-1/2 text-ink opacity-50 outline-none hover:opacity-100',
-              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             )}
           >
             <X className="h-4 w-4" strokeWidth={2.5} />

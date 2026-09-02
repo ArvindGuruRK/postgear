@@ -2,13 +2,32 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "plugins": [{ "name": "next" }],
+    // Next.js owns the build; `tsc` here is type-checking only. Without this the
+    // root config's outDir/declaration/sourceMap settings emit into ../../dist.
+    "noEmit": true,
+    "allowJs": true,
     "baseUrl": ".",
+    // `paths` replaces (never merges with) the root config's map, so every alias
+    // this app resolves has to be listed here. Only workspace packages declared
+    // in package.json belong in this list.
     "paths": {
       "@/*": ["./src/*"],
       "@postgear/ui": ["../../packages/ui/src"],
-      "@postgear/config": ["../../packages/config"]
+      "@postgear/ui/*": ["../../packages/ui/src/*"],
+      "@postgear/config/*": ["../../packages/config/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  // `.next/dev/types` holds the generated route types in dev, `.next/types` on
+  // build. Both are needed: TypeScript's `**/*.ts` wildcard skips dot-directories,
+  // so the generated page/layout validator is only checked when listed explicitly.
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  // Do not exclude `.next` here — it would filter out the generated types above.
   "exclude": ["node_modules"]
 }

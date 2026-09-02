@@ -30,7 +30,7 @@ export const TabsTrigger = forwardRef<
     className={cn(
       'inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2',
       'font-display text-xs uppercase tracking-wide text-ink transition-colors',
-      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       'disabled:pointer-events-none disabled:opacity-50',
       'data-[state=active]:bg-actionPrimary data-[state=active]:text-onActionPrimary',
       'data-[state=inactive]:hover:bg-actionPrimary/10',
@@ -48,7 +48,7 @@ export const TabsContent = forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      'mt-4 outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+      'mt-4 outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       className,
     )}
     {...props}

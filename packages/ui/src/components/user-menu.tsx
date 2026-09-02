@@ -39,7 +39,7 @@ export function UserMenu({ name, email, avatarUrl, items }: UserMenuProps) {
         <button
           type="button"
           aria-label="Open user menu"
-          className="rounded-full outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent"
+          className="rounded-full outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
         >
           <Avatar size="sm">
             {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}

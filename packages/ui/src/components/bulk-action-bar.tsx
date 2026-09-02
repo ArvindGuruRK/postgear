@@ -32,7 +32,7 @@ export function BulkActionBar({
         aria-label="Clear selection"
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-secondary outline-none',
-          'hover:opacity-80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+          'hover:opacity-80 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         )}
       >
         <X className="h-3.5 w-3.5" strokeWidth={3} />

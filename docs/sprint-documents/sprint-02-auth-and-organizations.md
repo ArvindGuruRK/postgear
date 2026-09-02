@@ -41,11 +41,20 @@ Target locations (per `project_structure.md`): `apps/api/src/modules/auth/`, `ap
 - `RolesGuard` in `apps/api/src/common/guards/` checking `UserOrganization.role` against a `@Roles(...)` decorator on each route. Start hand-rolled; only reach for a CASL-style ability system if a concrete PostGear feature needs attribute-level (not just role-level) checks.
 
 ### Task 5 — Frontend
-- `apps/web/src/app/(auth)/{login,register,reset-password}` pages.
+- `apps/web/src/app/(auth)/{login,register,reset-password}` pages — **built in Sprint 0** as the design system's smoke test, in `packages/ui` components with no one-off markup. The forms are deliberately inert; this task wires them up rather than building them.
 - Org switcher component + `[orgId]` route param already scaffolded under `apps/web/src/app/(dashboard)/[orgId]/`.
+
+### Task 6 — Post-signup onboarding flow (product decision, 2026-09-03)
+Signup collects credentials only — the register form deliberately has no organization/workspace field. Creating the workspace happens here instead, in a real onboarding flow modelled on how established SaaS products do it: a short guided sequence on first sign-in that names the workspace, connects a first channel, and then drops the user into the product.
+
+- Sequence: **create workspace → connect first channel → land in the app.** The channel step must be skippable — a user who can't finish an OAuth handshake right now still needs to reach the dashboard. Channel connection itself is [Sprint 3](sprint-03-social-integrations.md); this flow just launches it, and degrades to "skip for now" until that sprint lands.
+- `OnboardingStepper` already exists in `packages/ui` (Sprint 0) — compose it, don't build new stepper chrome.
+- **Two separate route gates, not one**: "not authenticated → `/login`" belongs in the `(dashboard)` group layout; "authenticated but not onboarded → `/onboarding`" sits between that and the `[orgId]` layout, since an un-onboarded user has no org id to route with.
+- A `User` with **zero `UserOrganization` rows is a valid, persistable state** for the whole duration of this flow. Nothing may assume otherwise — see the data-model consequences recorded in [Sprint 1, Task 3a](sprint-01-foundation-and-data-model.md), including where "onboarding complete" is stored and the fact that the seed only covers the already-onboarded happy path.
 
 ## Definition of Done
 - [ ] Register → activate → login → logout works end-to-end via password auth.
+- [ ] A brand-new user is routed into the onboarding flow, creates a workspace, can skip the channel step, and lands in the dashboard — and a user who abandons onboarding midway can sign back in without hitting an error page.
 - [ ] Google and GitHub OAuth login both work and correctly attach to an existing user by email or create a new one.
 - [ ] A user in two orgs can switch between them and API calls scope correctly to the active org.
 - [ ] A `USER`-role member is blocked (403) from an `ADMIN`-only route by the guard.

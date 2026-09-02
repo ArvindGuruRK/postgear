@@ -32,7 +32,7 @@ export function SettingsNav({
             href={item.href}
             className={cn(
               'flex items-center gap-2 rounded-md border-2 px-3 py-2 font-sans text-sm font-medium outline-none transition-colors',
-              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
               isActive
                 ? 'border-outline bg-actionPrimary text-onActionPrimary shadow-brutalSm'
                 : 'border-transparent text-ink hover:bg-actionPrimary/10',

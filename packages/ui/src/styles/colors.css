@@ -1,49 +1,27 @@
 /**
- * PostGear design tokens — imported verbatim from Postiz's frontend
- * (postiz-app-main/apps/frontend/src/app/colors.scss) as the starting visual
- * foundation, per an explicit product decision (2026-08-29): reskin later by
- * changing values here, not by rebuilding the token system from scratch.
+ * PostGear design tokens. Originally imported verbatim from Postiz's frontend
+ * (postiz-app-main/apps/frontend/src/app/colors.scss) as a starting visual
+ * foundation; Sprint 0 replaced that look with its own Neubrutalism system
+ * rather than reskinning it.
+ *
+ * PRUNED 2026-09-02 (Sprint 0 close): 129 variables → 36. Everything the new
+ * design language had superseded was removed — the `--color-customN` palette
+ * (55 entries), the `--new-*` surface layer, the soft/blurred shadows, and the
+ * unused legacy semantics. That retires this file's earlier "don't delete
+ * inherited values" policy: values kept only in case Postiz's look came back
+ * are dead weight now that it definitively hasn't. What remains is the live
+ * system plus the platform brand colors, which Sprint 3's channel UI needs.
+ * git history has the original if a value ever needs recovering.
  *
  * Do not rename variables casually — every name below is consumed by
  * Tailwind's theme mapping (see packages/config/tailwind.css, `@theme inline`)
  * and by hand-written CSS across the app. Renaming requires updating both.
  *
- * See docs/design-patterns/ for what each token group means and the
- * rebrand plan for swapping these values to PostGear's own brand palette.
+ * See docs/design-patterns/design-tokens.md for what each token group means.
  */
 
 :root {
   .dark {
-    --new-back-drop: #000;
-    --new-settings: #242323;
-    --new-border: #252525;
-    --new-bgColor: #0e0e0e;
-    --new-bgColorInner: #1a1919;
-    --new-sep: #454444;
-    --new-bgLineColor: #212121;
-    --new-textItemFocused: #1a1919;
-    --new-textItemBlur: #999999;
-    --new-boxFocused: #fff;
-    --new-textColor: 255 255 255;
-    --new-blockSeparator: #272626;
-    --new-btn-simple: #313030;
-    --new-btn-text: #ffffff;
-    --new-btn-primary: #1d4ed8;
-    --new-ai-btn: #ff2e93;
-    --new-box-hover: #201f1f;
-    --new-table-border: #2b2b2b;
-    --new-table-header: #1e1d1d;
-    --new-table-text: #9c9c9c;
-    --new-table-text-focused: #fc69ff;
-    --new-small-strips: #191818;
-    --new-big-strips: #161515;
-    --new-col-color: #2c2b2b;
-    --new-menu-dots: #696868;
-    --new-menu-hover: #fff;
-    --menu-shadow: 0 8px 30px 0 rgba(0, 0, 0, 0.5);
-    --popup-color: rgba(65, 64, 66, 0.3);
-    --border-preview: transparent;
-    --preview-box-shadow: none;
     --linkedin-border: #2e3438;
     --linkedin-bg: #1b1f23;
     --linkedin-text: #c6c7c8;
@@ -58,43 +36,6 @@
     --youtube-svg-border: #A0A0A0;
   }
   .light {
-    --new-back-drop: #2d1b57;
-    --new-settings: #eceef1;
-    --new-sep: #d5d9dd;
-    --new-border: #eaecee;
-    --new-bgColor: #f0f2f4;
-    --new-bgColorInner: #ffffff;
-    --new-bgLineColor: #e7e9eb;
-    --new-textItemFocused: #3900b2;
-    --new-textItemBlur: #777b7f;
-    --new-boxFocused: #ebe8ff;
-    --new-textColor: 14 14 14;
-    --new-blockSeparator: #f2f2f4;
-    --new-btn-simple: #eceef1;
-    --new-btn-text: #0e0e0e;
-    --new-btn-primary: #1d4ed8;
-    --new-ai-btn: #ff2e93;
-    --new-box-hover: #f4f6f8;
-    --new-table-border: #e7e9eb;
-    --new-table-header: #f5f7f9;
-    --new-table-text: #777b7f;
-    --new-table-text-focused: #fc69ff;
-    --new-small-strips: #191818;
-    --new-big-strips: #f5f7f9;
-    --new-col-color: #eff1f3;
-    --new-menu-dots: #696868;
-    --new-menu-hover: #000;
-    --menu-shadow: -22px 83px 24px 0 rgba(55, 52, 75, 0),
-      -14px 53px 22px 0 rgba(55, 52, 75, 0.01),
-      -8px 30px 19px 0 rgba(55, 52, 75, 0.05),
-      -3px 13px 14px 0 rgba(55, 52, 75, 0.09),
-      -1px 3px 8px 0 rgba(55, 52, 75, 0.1);
-    --popup-color: rgba(55, 37, 97, 0.2);
-    --border-preview: #f1f0f3;
-    --preview-box-shadow: 0 386px 108px 0 rgba(38, 32, 64, 0),
-      0 247px 99px 0 rgba(38, 32, 64, 0.01),
-      0 139px 83px 0 rgba(38, 32, 64, 0.03),
-      0 62px 62px 0 rgba(38, 32, 64, 0.04), 0 15px 34px 0 rgba(38, 32, 64, 0.05);
     --linkedin-border: #e9e5df;
     --linkedin-bg: #fff;
     --linkedin-text: #707070;
@@ -114,142 +55,16 @@
   .dark {
     --color-primary: #121212;
     --color-secondary: #2a2a2a;
-    --color-text: #ffffff;
-    --color-third: #2a2a2a;
     --color-forth: #1d4ed8;
-    --color-fifth: var(--new-bgLineColor);
-    --color-sixth: var(--new-table-header);
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
-    --color-input: var(--new-table-header);
-    --color-input-text: #64748b;
-    --color-table-border: var(--new-table-border);
-    --color-custom1: #324264;
-    --color-custom2: #141c2c;
-    --color-custom3: #0b0f1c;
-    --color-custom4: #8155dd;
-    --color-custom5: #e9e9f1;
-    --color-custom6: var(--new-bgLineColor);
-    --color-custom7: #7950f2;
-    --color-custom8: var(--new-btn-simple);
-    --color-custom9: #354258;
-    --color-custom10: #e4b895;
-    --color-custom11: #8b90ff;
-    --color-custom12: #b7c1ff;
-    --color-custom13: #ffac30;
-    --color-custom14: #576a9a;
-    --color-custom15: #0a0a0a;
-    --color-custom16: #121a2d;
-    --color-custom17: #d3d3d3;
-    --color-custom18: #aaaaaa;
-    --color-custom19: #f97066;
-    --color-custom20: #121b2c;
-    --color-custom21: #506490;
-    --color-custom22: #b91c1c;
-    --color-custom23: #000000;
-    --color-custom24: #eaff00;
-    --color-custom25: #2e3336;
-    --color-custom26: #1d9bf0;
-    --color-custom27: #71767b;
-    --color-custom28: #b69dec;
-    --color-custom29: #291259;
-    --color-custom30: #5826c2;
-    --color-custom31: #0f1727;
-    --color-custom32: #181818;
-    --color-custom33: #f2f2f2;
-    --color-custom34: #334155;
-    --color-custom35: #242424;
-    --color-custom36: #6b6b6b;
-    --color-custom37: #0b1416;
-    --color-custom38: #d9d9d9;
-    --color-custom39: #ffffff;
-    --color-custom40: #0e0e0e;
-    --color-custom41: #cebdf2;
-    --color-custom42: #32d583;
-    --color-custom43: #425379;
-    --color-custom44: #283450;
-    --color-custom45: #832ad5;
-    --color-custom46: #658dac;
-    --color-custom47: #182034;
-    --color-custom48: #080b14;
-    --color-custom49: #0a0b14;
-    --color-custom50: #262373;
-    --color-custom51: #4f46e5;
-    --color-custom52: #eaeef2;
-    --color-custom53: #7c7d86;
-    --color-custom54: #afb8c1;
-    --color-custom55: #1b263b;
-    --color-modalCustom: #000000;
   }
   .light {
     --color-primary: #fff8e7;
     --color-secondary: #fff;
-    --color-text: #000;
-    --color-third: #fff;
     --color-forth: #1d4ed8;
-    --color-fifth: var(--new-bgLineColor);
-    --color-sixth: var(--new-table-header);
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
-    --color-input: var(--new-table-header);
-    --color-input-text: #64748b;
-    --color-table-border: #efefef;
-    --color-custom1: #324264;
-    --color-custom2: #f8f8f8;
-    --color-custom3: #fff;
-    --color-custom4: #8155dd;
-    --color-custom5: #e9e9f1;
-    --color-custom6: var(--new-bgLineColor);
-    --color-custom7: #7950f2;
-    --color-custom8: var(--new-btn-simple);
-    --color-custom9: #354258;
-    --color-custom10: #e4b895;
-    --color-custom11: #8b90ff;
-    --color-custom12: #b7c1ff;
-    --color-custom13: #ffac30;
-    --color-custom14: #576a9a;
-    --color-custom15: #0a0a0a;
-    --color-custom16: #121a2d;
-    --color-custom17: #000;
-    --color-custom18: #000;
-    --color-custom19: #f97066;
-    --color-custom20: #f5f5f5;
-    --color-custom21: #506490;
-    --color-custom22: #b91c1c;
-    --color-custom23: #f5f5f5;
-    --color-custom24: #eaff00;
-    --color-custom25: #2e3336;
-    --color-custom26: #1d9bf0;
-    --color-custom27: #71767b;
-    --color-custom28: #b69dec;
-    --color-custom29: #291259;
-    --color-custom30: #efefef;
-    --color-custom31: #e0e0e0;
-    --color-custom32: #181818;
-    --color-custom33: #f2f2f2;
-    --color-custom34: #334155;
-    --color-custom35: #242424;
-    --color-custom36: #6b6b6b;
-    --color-custom37: #0b1416;
-    --color-custom38: #d9d9d9;
-    --color-custom39: #000;
-    --color-custom40: #fff;
-    --color-custom41: #cebdf2;
-    --color-custom42: #32d583;
-    --color-custom43: #425379;
-    --color-custom44: #283450;
-    --color-custom45: #832ad5;
-    --color-custom46: #658dac;
-    --color-custom47: #182034;
-    --color-custom48: #fff;
-    --color-custom49: #0a0b14;
-    --color-custom50: #262373;
-    --color-custom51: #4f46e5;
-    --color-custom52: #eaeef2;
-    --color-custom53: #7c7d86;
-    --color-custom54: #afb8c1;
-    --color-custom55: #d5d7e1;
-    --color-modalCustom: transparent;
   }
 }
 
@@ -263,11 +78,8 @@
    default shadow scale is all soft/blurred, which is the opposite of what
    this style needs.
 
-   NOT included here yet, by design: the actual comic accent palette (the
-   bold red/yellow/blue set). That's an open decision meant to be
-   prototyped visually — on a real button, in-browser or via the `design`
-   skill's canvas — before being locked into a variable value. Don't guess
-   at hex values here; update this block once that decision is made. */
+   The comic accent palette that this block once deferred is locked and
+   lives in its own block further down — see the LOCKED 2026-08-30 comment. */
 /* --shadow-brutal-* below is nested in the SAME .dark/.light blocks as
    --color-ink/--color-outline, not declared separately on a bare :root —
    a var() reference inside a :root-level declaration fails to resolve,
@@ -297,6 +109,16 @@
   .dark {
     --color-ink: #f5f5f5;
     --color-outline: #050505;
+    /* Focus ring (added 2026-09-02, Sprint 0 close). Theme-scoped because
+       one value can't clear WCAG 2.1 SC 1.4.11's 3:1 on both grounds: the
+       ring used to reuse --color-brutal-accent (#ff6b35), which manages
+       6.61:1 on this near-black page but only 2.68:1 on light mode's warm
+       paper — a ring 36 components share, effectively invisible in the
+       theme most people use. Dark mode keeps the bright accent; .light
+       darkens it (see below). Not aliased to --color-brutal-accent so that
+       token stays free to change as a fill without silently breaking the
+       focus indicator. */
+    --color-focus-ring: #ff6b35;
     /* Countdown/scoreboard plate (Sprint 0 extension) — a fixed dark plate
        with yellow digits in BOTH themes, so it can't be expressed with
        --color-ink (which inverts to near-white in dark and would leave
@@ -338,6 +160,12 @@
   .light {
     --color-ink: #0a0a0a;
     --color-outline: #0a0a0a;
+    /* Darkened from the accent's #ff6b35 — see the .dark block above. This
+       shade clears 3:1 against all three surfaces the ring actually touches:
+       4.23:1 on the warm paper page, 4.47:1 on white cards, and 4.42:1
+       against the ink border it sits 2px outside of. Kept in the same orange
+       family so the focus treatment still reads as one idea across themes. */
+    --color-focus-ring: #d6440f;
     /* See the --color-plate comment in the .dark block above. */
     --color-plate: #0a0a0a;
     --color-on-plate: var(--color-brutal-secondary);
@@ -366,25 +194,23 @@
    text pairing instead of forcing black-on-primary everywhere. Landed on
    Palette C's specific blue/yellow hex values (not Palette A's) since
    those were already in place when this last swap happened: primary is
-   blue #1d4ed8 (via --color-forth/--new-btn-primary), secondary is yellow
-   #ffd100 (via --color-brutal-secondary below), accent stays Palette C's
-   orange #ff6b35 (via --color-brutal-accent below). Danger and ai were
-   never pulled from Palette C (scoped request: "only primary and
-   secondary/accent") — they kept their Palette A values (--new-ai-btn,
-   --color-brutal-danger) at the time. Fill colors are deliberately flat
+   blue #1d4ed8 (via --color-forth), secondary is yellow #ffd100 (via
+   --color-brutal-secondary below), accent stays Palette C's orange #ff6b35
+   (via --color-brutal-accent below). Danger and ai were never pulled from
+   Palette C (scoped request: "only primary and secondary/accent") — they
+   kept their Palette A values at the time. Fill colors are deliberately flat
    across .dark/.light — comic colors don't invert with the theme, only
    ink/backgrounds do — so these live outside the .dark/.light blocks
    above. Secondary/danger/accent get dedicated tokens below since nothing
    in the inherited Postiz layer named them.
 
    ADDENDUM (2026-08-30, later revision): --color-actionAi reassigned from
-   the pink --new-ai-btn to a dedicated violet, --color-brutal-ai below —
+   the inherited pink (--new-ai-btn, #ff2e93, since deleted in the
+   2026-09-02 prune) to a dedicated violet, --color-brutal-ai below —
    direct product decision to give the AI-powered surfaces (Ask AI button,
    ai Badge/Alert/Toast variants) their own violet identity distinct from
    the rest of the palette, referencing a purple-violet swatch supplied as
-   a screenshot. --new-ai-btn's pink hex is untouched and still defined
-   above (kept per this file's "don't delete inherited values" policy) —
-   it's simply no longer what the "ai" semantic slot points to; still
+   a screenshot. It still
    pairs with --color-on-action-light (black) since the swap only changed
    the fill hue, and per-contrast-calculation black still narrowly beats
    white on this violet (4.80:1 vs 4.38:1 — WCAG AA normal text needs

@@ -35,7 +35,7 @@ export function DatePicker({
           className={cn(
             'flex h-11 w-full items-center gap-2 rounded-md border-2 border-outline bg-secondary px-4',
             'font-sans text-sm text-ink shadow-brutalSm',
-            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
             className,
           )}

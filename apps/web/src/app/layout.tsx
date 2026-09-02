@@ -1,5 +1,5 @@
 import { Toaster } from '@postgear/ui';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Bangers, Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
 import './globals.css';
@@ -18,8 +18,25 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'PostGear',
+  // `template` lets each route set a short `title` ("Sign in") and get
+  // "Sign in · PostGear" in the tab; `default` covers routes that set none.
+  title: {
+    default: 'PostGear',
+    template: '%s · PostGear',
+  },
   description: 'AI-Powered Social Media Management & SEO Platform',
+  applicationName: 'PostGear',
+};
+
+// Matches the page background in each theme so mobile browser chrome doesn't
+// sit against a color the app never uses. Values come from --color-primary in
+// packages/ui/src/styles/colors.css; they're literals here because the browser
+// reads this meta tag before any stylesheet resolves.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fff8e7' },
+    { media: '(prefers-color-scheme: dark)', color: '#121212' },
+  ],
 };
 
 // Runs before paint (see colors.css: `.dark`/`.light` are descendant

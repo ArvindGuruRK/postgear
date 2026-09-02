@@ -144,7 +144,7 @@ export function DateRangePicker({
           className={cn(
             'flex h-11 w-full items-center gap-2 rounded-md border-2 border-outline bg-secondary px-4',
             'font-sans text-sm text-ink shadow-brutalSm',
-            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+            'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
             className,
           )}
@@ -172,7 +172,7 @@ export function DateRangePicker({
                     'rounded-md border-2 border-transparent px-3 py-1.5 text-left',
                     'font-sans text-sm text-ink outline-none transition-colors duration-100',
                     'hover:border-outline hover:bg-primary',
-                    'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+                    'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
                     activePreset === preset.label &&
                       'border-outline bg-actionPrimary text-onActionPrimary shadow-brutalSm hover:bg-actionPrimary',
                   )}

@@ -43,7 +43,7 @@ export const NavigationMenuTrigger = forwardRef<
     className={cn(
       'group inline-flex items-center gap-1 rounded-md border-2 border-outline bg-secondary px-4 py-2',
       'font-display text-xs uppercase tracking-wide text-ink shadow-brutalSm transition-[transform,box-shadow] duration-100',
-      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       'data-[state=open]:bg-actionPrimary data-[state=open]:text-onActionPrimary',
       className,
     )}
