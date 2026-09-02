@@ -1,3 +1,5 @@
+'use client';
+
 import type { LucideIcon } from 'lucide-react';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
@@ -38,9 +40,16 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
         </div>
       )}
       <p className="font-display text-lg uppercase tracking-wide text-ink">{title}</p>
-      {description && <p className="max-w-sm font-sans text-sm font-medium text-ink opacity-70">{description}</p>}
+      {description && (
+        <p className="max-w-sm font-sans text-sm font-medium text-ink opacity-70">{description}</p>
+      )}
       {action && (
-        <Button variant={action.variant ?? 'primary'} size="sm" onClick={action.onClick} className="mt-2">
+        <Button
+          variant={action.variant ?? 'primary'}
+          size="sm"
+          onClick={action.onClick}
+          className="mt-2"
+        >
           {action.label}
         </Button>
       )}
@@ -49,17 +58,17 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
 );
 StateDisplay.displayName = 'StateDisplay';
 
-export const EmptyState = forwardRef<HTMLDivElement, Omit<StateDisplayProps, 'tone'>>((props, ref) => (
-  <StateDisplay ref={ref} tone="neutral" {...props} />
-));
+export const EmptyState = forwardRef<HTMLDivElement, Omit<StateDisplayProps, 'tone'>>(
+  (props, ref) => <StateDisplay ref={ref} tone="neutral" {...props} />,
+);
 EmptyState.displayName = 'EmptyState';
 
-export const ErrorState = forwardRef<HTMLDivElement, Omit<StateDisplayProps, 'tone'>>((props, ref) => (
-  <StateDisplay ref={ref} tone="danger" {...props} />
-));
+export const ErrorState = forwardRef<HTMLDivElement, Omit<StateDisplayProps, 'tone'>>(
+  (props, ref) => <StateDisplay ref={ref} tone="danger" {...props} />,
+);
 ErrorState.displayName = 'ErrorState';
 
-export const SuccessState = forwardRef<HTMLDivElement, Omit<StateDisplayProps, 'tone'>>((props, ref) => (
-  <StateDisplay ref={ref} tone="success" {...props} />
-));
+export const SuccessState = forwardRef<HTMLDivElement, Omit<StateDisplayProps, 'tone'>>(
+  (props, ref) => <StateDisplay ref={ref} tone="success" {...props} />,
+);
 SuccessState.displayName = 'SuccessState';

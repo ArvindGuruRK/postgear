@@ -1,3 +1,5 @@
+'use client';
+
 import { X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -8,7 +10,13 @@ export interface BulkActionBarProps extends React.HTMLAttributes<HTMLDivElement>
 }
 
 /** A floating bar meant to appear once `count > 0` (e.g. rendered fixed/sticky above a data table). */
-export function BulkActionBar({ className, count, onClear, actions, ...props }: BulkActionBarProps) {
+export function BulkActionBar({
+  className,
+  count,
+  onClear,
+  actions,
+  ...props
+}: BulkActionBarProps) {
   if (count === 0) return null;
   return (
     <div
@@ -29,7 +37,9 @@ export function BulkActionBar({ className, count, onClear, actions, ...props }: 
       >
         <X className="h-3.5 w-3.5" strokeWidth={3} />
       </button>
-      <span className="font-display text-sm uppercase tracking-wide text-ink">{count} selected</span>
+      <span className="font-display text-sm uppercase tracking-wide text-ink">
+        {count} selected
+      </span>
       {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
     </div>
   );

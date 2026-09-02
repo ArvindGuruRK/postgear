@@ -1,3 +1,5 @@
+'use client';
+
 import { Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Badge } from './badge';
@@ -34,7 +36,11 @@ export function PlanCard({
 }: PlanCardProps) {
   return (
     <Card
-      className={cn('flex flex-col', highlighted && 'border-actionPrimary shadow-brutalLg', className)}
+      className={cn(
+        'flex flex-col',
+        highlighted && 'border-actionPrimary shadow-brutalLg',
+        className,
+      )}
       {...props}
     >
       <CardHeader className="gap-3">
@@ -46,7 +52,9 @@ export function PlanCard({
           <span className="font-display text-4xl tracking-wide text-ink">{price}</span>
           <span className="font-sans text-sm text-ink opacity-60">{period}</span>
         </div>
-        {description && <p className="font-sans text-sm font-medium text-ink opacity-70">{description}</p>}
+        {description && (
+          <p className="font-sans text-sm font-medium text-ink opacity-70">{description}</p>
+        )}
       </CardHeader>
       <CardContent className="flex-1">
         <ul className="flex flex-col gap-2">
@@ -59,7 +67,11 @@ export function PlanCard({
         </ul>
       </CardContent>
       <CardFooter>
-        <Button variant={actionVariant ?? (highlighted ? 'primary' : 'secondary')} className="w-full" onClick={onAction}>
+        <Button
+          variant={actionVariant ?? (highlighted ? 'primary' : 'secondary')}
+          className="w-full"
+          onClick={onAction}
+        >
           {actionLabel}
         </Button>
       </CardFooter>
