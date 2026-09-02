@@ -44,7 +44,7 @@ export function ThemeToggle() {
       suppressHydrationWarning
       className={cn(
         'group relative flex h-9 w-9 shrink-0 items-center justify-center',
-        'rounded-md border-2 border-outline bg-primary shadow-brutalSm',
+        'rounded-md border-2 border-outline bg-secondary shadow-brutalSm',
         'outline-none transition-[transform,box-shadow] duration-100',
         'hover:bg-actionPrimary',
         'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',

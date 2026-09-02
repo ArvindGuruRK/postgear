@@ -13,7 +13,10 @@ export const AccordionItem = forwardRef<
 >(({ className, ...props }, ref) => (
   <AccordionPrimitive.Item
     ref={ref}
-    className={cn('overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-brutalSm', className)}
+    className={cn(
+      'overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-brutalSm',
+      className,
+    )}
     {...props}
   />
 ));
@@ -29,7 +32,14 @@ export const AccordionTrigger = forwardRef<
       className={cn(
         'flex flex-1 items-center justify-between gap-2 px-4 py-3 text-left',
         'font-display text-sm uppercase tracking-wide text-ink outline-none',
+        'bg-secondary transition-colors duration-150 hover:bg-primary',
         'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent',
+        // The divider belongs to the header, not the sliding panel, so the
+        // card reads as one surface growing downward rather than a separate
+        // block sliding out from under a lid. The border is always present and
+        // only changes color — toggling its width would resize the header by
+        // 2px mid-animation and make the open/close jump.
+        'border-b-2 border-transparent data-[state=open]:rounded-b-none data-[state=open]:border-outline',
         '[&[data-state=open]>svg]:rotate-180',
         className,
       )}
@@ -48,10 +58,13 @@ export const AccordionContent = forwardRef<
 >(({ className, children, ...props }, ref) => (
   <AccordionPrimitive.Content
     ref={ref}
-    className="overflow-hidden font-sans text-sm text-ink data-[state=closed]:animate-accordionUp data-[state=open]:animate-accordionDown"
+    className={cn(
+      'overflow-hidden bg-secondary font-sans text-sm text-ink',
+      'data-[state=closed]:animate-accordionUp data-[state=open]:animate-accordionDown',
+    )}
     {...props}
   >
-    <div className={cn('border-t-2 border-outline px-4 py-3 opacity-90', className)}>{children}</div>
+    <div className={cn('px-4 py-3 opacity-90', className)}>{children}</div>
   </AccordionPrimitive.Content>
 ));
 AccordionContent.displayName = AccordionPrimitive.Content.displayName;

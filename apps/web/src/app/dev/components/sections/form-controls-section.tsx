@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Calendar,
   Checkbox,
   Combobox,
   type ComboboxOption,
@@ -26,8 +27,8 @@ import {
   Textarea,
   Toggle,
 } from '@postgear/ui';
-import type { DateRange } from 'react-day-picker';
 import { useState } from 'react';
+import type { DateRange } from 'react-day-picker';
 import { Row, Section } from '../shared';
 
 const PLATFORM_OPTIONS: ComboboxOption[] = [
@@ -147,6 +148,21 @@ export function FormControlsSection() {
       </Row>
       <Row label="Date Range Picker">
         <DateRangePicker value={dateRange} onValueChange={setDateRange} className="w-64" />
+      </Row>
+      <Row label="Calendar">
+        <div className="flex flex-wrap gap-6">
+          <div className="rounded-lg border-4 border-outline bg-secondary p-2 shadow-brutalMd">
+            <Calendar mode="single" selected={date} onSelect={setDate} />
+          </div>
+          <div className="rounded-lg border-4 border-outline bg-secondary p-2 shadow-brutalMd">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={setDateRange}
+              numberOfMonths={2}
+            />
+          </div>
+        </div>
       </Row>
       <Row label="File Upload">
         <FileUpload
