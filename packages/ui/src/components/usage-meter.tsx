@@ -16,11 +16,13 @@ export function UsageMeter({ className, label, value, max, unit = '', ...props }
     <div className={cn('flex flex-col gap-2', className)} {...props}>
       <div className="flex items-center justify-between font-sans text-sm text-ink">
         <span className="font-semibold">{label}</span>
-        <span className={cn('opacity-70', isNearLimit && 'font-semibold text-actionDanger opacity-100')}>
+        <span
+          className={cn('opacity-70', isNearLimit && 'font-semibold text-actionDanger opacity-100')}
+        >
           {value.toLocaleString()} / {max.toLocaleString()} {unit}
         </span>
       </div>
-      <Progress value={percent} className={isNearLimit ? '[&>div]:bg-actionDanger' : undefined} />
+      <Progress value={percent} tone={isNearLimit ? 'danger' : 'primary'} />
     </div>
   );
 }

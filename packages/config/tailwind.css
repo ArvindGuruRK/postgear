@@ -212,6 +212,10 @@
   --color-actionAi: var(--color-brutal-ai);
   --color-actionAccent: var(--color-brutal-accent);
   --color-actionSuccess: var(--color-brutal-success);
+  /* Countdown plate + its digit color — theme-scoped in colors.css because
+     the plate stays dark in both themes; see the comment there. */
+  --color-plate: var(--color-plate);
+  --color-onPlate: var(--color-on-plate);
   --color-onActionPrimary: var(--color-on-action-primary);
   --color-onActionLight: var(--color-on-action-light);
   /* ai's own on-color (white) — see the 2026-08-31 addendum above
@@ -243,8 +247,15 @@
   /* Accordion/Collapsible expand-collapse (Sprint 0 extension) — each Radix
      primitive exposes its own content-height custom property scoped to its
      own element, so these can't share one keyframe pair. */
-  --animate-accordionDown: accordionDown 0.2s ease-out;
-  --animate-accordionUp: accordionUp 0.2s ease-out;
+  /* Progress fill's barber-pole crawl (Sprint 0 extension). The distance
+     matches bg-stripes' 16px band period measured along a -45deg axis
+     (16 * sqrt(2) = 22.63px), so the loop is seamless — any other value
+     visibly jumps once per cycle. */
+  --animate-progressStripes: progressStripes 1s linear infinite;
+  /* One tile's digit changing on a countdown tick. */
+  --animate-digitTick: digitTick 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+  --animate-accordionDown: accordionDown 0.25s cubic-bezier(0.33, 1, 0.68, 1);
+  --animate-accordionUp: accordionUp 0.2s cubic-bezier(0.32, 0, 0.67, 0);
   --animate-collapsibleDown: collapsibleDown 0.2s ease-out;
   --animate-collapsibleUp: collapsibleUp 0.2s ease-out;
   /* Toast stack enter/exit (Sprint 0 extension) — paired with the stacking
@@ -299,13 +310,22 @@
   99% { background-color: var(--color-third); font-weight: bold; }
   100% { background-color: var(--color-third); font-weight: normal; }
 }
+@keyframes progressStripes {
+  from { background-position: 0 0; }
+  to { background-position: 22.63px 0; }
+}
+@keyframes digitTick {
+  0% { transform: translateY(-45%); opacity: 0; }
+  60% { transform: translateY(6%); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
 @keyframes accordionDown {
-  from { height: 0; }
-  to { height: var(--radix-accordion-content-height); }
+  from { height: 0; opacity: 0; }
+  to { height: var(--radix-accordion-content-height); opacity: 1; }
 }
 @keyframes accordionUp {
-  from { height: var(--radix-accordion-content-height); }
-  to { height: 0; }
+  from { height: var(--radix-accordion-content-height); opacity: 1; }
+  to { height: 0; opacity: 0; }
 }
 @keyframes collapsibleDown {
   from { height: 0; }
@@ -374,6 +394,20 @@
    correct in both themes without needing its own .dark/.light values.
    Layers on top of whatever background-color the element already has —
    apply alongside bg-primary/bg-secondary, not instead of it. */
+/* Diagonal barber-pole banding for filled bars (Sprint 0 extension). Sits on
+   top of the element's own background-color — pair it with bg-actionPrimary
+   or any other fill, never on its own. The 8px/16px bands give a 16px period
+   along the gradient axis; --animate-progressStripes scrolls it by exactly
+   16*sqrt(2)px so the loop is seamless. Derived from --color-outline so one
+   utility works on every fill color and in both themes. */
+@utility bg-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--color-outline) 28%, transparent) 0 8px,
+    transparent 8px 16px
+  );
+}
+
 @utility bg-halftone {
   background-image: radial-gradient(
     color-mix(in srgb, var(--color-outline) 22%, transparent) 1.5px,

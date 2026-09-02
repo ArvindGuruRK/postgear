@@ -20,6 +20,7 @@ export * from './components/combobox';
 export * from './components/command-menu';
 export * from './components/container';
 export * from './components/context-menu';
+export * from './components/countdown';
 export * from './components/data-table';
 export * from './components/date-picker';
 export * from './components/date-range-picker';

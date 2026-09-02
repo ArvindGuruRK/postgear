@@ -297,6 +297,14 @@
   .dark {
     --color-ink: #f5f5f5;
     --color-outline: #050505;
+    /* Countdown/scoreboard plate (Sprint 0 extension) — a fixed dark plate
+       with yellow digits in BOTH themes, so it can't be expressed with
+       --color-ink (which inverts to near-white in dark and would leave
+       yellow-on-white digits). Dark mode drops to pure black so the plate
+       still reads as recessed against the #121212 page, the same way every
+       other dark-mode surface separates by value rather than by border. */
+    --color-plate: #000000;
+    --color-on-plate: var(--color-brutal-secondary);
     --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
     --shadow-brutal-md: 4px 4px 0 var(--color-outline);
     --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
@@ -330,6 +338,9 @@
   .light {
     --color-ink: #0a0a0a;
     --color-outline: #0a0a0a;
+    /* See the --color-plate comment in the .dark block above. */
+    --color-plate: #0a0a0a;
+    --color-on-plate: var(--color-brutal-secondary);
     --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
     --shadow-brutal-md: 4px 4px 0 var(--color-outline);
     --shadow-brutal-lg: 6px 6px 0 var(--color-outline);

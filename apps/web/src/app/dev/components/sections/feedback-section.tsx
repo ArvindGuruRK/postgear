@@ -5,6 +5,7 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
+  Countdown,
   EmptyState,
   ErrorState,
   Progress,
@@ -15,10 +16,17 @@ import {
   useToast,
 } from '@postgear/ui';
 import { Inbox, Sparkles, TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
 import { Row, Section } from '../shared';
 
 export function FeedbackSection() {
   const { toast } = useToast();
+  // Lazy initialisers so each target is fixed at mount rather than recomputed
+  // on every render (which would restart the countdown's tick animation).
+  const [launchTarget] = useState(
+    () => new Date(Date.now() + 3 * 86_400_000 + 7 * 3_600_000 + 42 * 60_000 + 18_000),
+  );
+  const [urgentTarget] = useState(() => new Date(Date.now() + 45 * 60_000));
 
   return (
     <Section
@@ -28,7 +36,9 @@ export function FeedbackSection() {
       <Row label="Toasts (fire one)">
         <Button
           size="sm"
-          onClick={() => toast({ title: 'Post scheduled', description: 'Goes live tomorrow at 9:00 AM.' })}
+          onClick={() =>
+            toast({ title: 'Post scheduled', description: 'Goes live tomorrow at 9:00 AM.' })
+          }
         >
           Default
         </Button>
@@ -49,7 +59,11 @@ export function FeedbackSection() {
           size="sm"
           variant="ai"
           onClick={() =>
-            toast({ variant: 'ai', title: 'AI caption ready', description: 'Review it before it goes live.' })
+            toast({
+              variant: 'ai',
+              title: 'AI caption ready',
+              description: 'Review it before it goes live.',
+            })
           }
         >
           AI
@@ -103,15 +117,32 @@ export function FeedbackSection() {
             <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.5} />
             <div>
               <AlertTitle>Approaching limit</AlertTitle>
-              <AlertDescription>You&apos;ve used 90% of this month&apos;s AI credits.</AlertDescription>
+              <AlertDescription>
+                You&apos;ve used 90% of this month&apos;s AI credits.
+              </AlertDescription>
             </div>
           </Alert>
         </div>
       </Row>
       <Row label="Progress">
-        <div className="flex w-56 flex-col gap-3">
+        <div className="flex w-80 flex-col gap-4">
+          {/* One flat fill per bar, straight off the locked action palette. */}
+          <Progress value={77} size="lg" tone="danger" label="77% sold!" />
+          <Progress value={64} size="lg" label="64% booked" />
           <Progress value={35} />
-          <Progress value={80} />
+          <Progress value={80} tone="success" label="80%" />
+          <Progress value={48} tone="accent" label="48%" />
+          <Progress value={12} size="sm" tone="ai" label="12%" />
+          {/* Stripes off — the plain fill the rest of the app already uses. */}
+          <Progress value={60} striped={false} animated={false} />
+        </div>
+      </Row>
+      <Row label="Countdown">
+        <div className="flex flex-col gap-5">
+          <Countdown to={launchTarget} size="lg" />
+          <Countdown to={launchTarget} size="md" />
+          {/* Under the default 1h threshold, so every tile shows the urgent state. */}
+          <Countdown to={urgentTarget} size="sm" />
         </div>
       </Row>
       <Row label="Spinner">
@@ -127,9 +158,21 @@ export function FeedbackSection() {
         </div>
       </Row>
       <Row label="Empty / Error / Success State">
-        <EmptyState icon={Inbox} title="No posts yet" description="Schedule your first post to see it here." />
-        <ErrorState icon={TriangleAlert} title="Couldn't load analytics" description="Check your connection and try again." />
-        <SuccessState icon={Sparkles} title="Channel connected" description="You're ready to schedule posts." />
+        <EmptyState
+          icon={Inbox}
+          title="No posts yet"
+          description="Schedule your first post to see it here."
+        />
+        <ErrorState
+          icon={TriangleAlert}
+          title="Couldn't load analytics"
+          description="Check your connection and try again."
+        />
+        <SuccessState
+          icon={Sparkles}
+          title="Channel connected"
+          description="You're ready to schedule posts."
+        />
       </Row>
     </Section>
   );
