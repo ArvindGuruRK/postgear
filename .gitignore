@@ -47,3 +47,8 @@ minio_data/
 # Misc
 *.tgz
 .cache/
+
+# Playwright
+e2e/.results/
+playwright-report/
+test-results/
