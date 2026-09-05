@@ -54,7 +54,7 @@ PostGear/
 │   └── k8s/                     # Helm charts / Kubernetes manifests (Production)
 ├── scripts/
 │   ├── bootstrap.sh             # Automatic local environment setup script
-│   ├── db-seed.ts               # Local DB mock data populator
+│   ├── (db seeding lives in packages/db/prisma/seeds/index.ts)
 │   └── generate-keys.ts         # RSA/AES key pair generator for auth & encryption
 ├── .env.example                 # Comprehensive environment variable definitions
 ├── .gitignore

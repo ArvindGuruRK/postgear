@@ -7,12 +7,26 @@
  *
  * Idempotent by design (fixed ids + upsert) — safe to re-run.
  */
-import { PrismaClient, Provider, Role, SubscriptionTier, Period } from '@prisma/client';
+import { Period, PrismaClient, Provider, Role, SubscriptionTier } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 const DEMO_ORG_ID = 'seed-demo-org';
 const DEMO_USER_ID = 'seed-demo-user';
+
+/**
+ * A second user that deliberately belongs to **no** organization.
+ *
+ * Sprint 1 Task 3a locked in that signup collects credentials only, and the
+ * workspace is created afterward in a real onboarding flow. That makes
+ * "authenticated but not onboarded" a genuine, persistable state — and the
+ * classic way this pattern breaks is a query that assumes every user has at
+ * least one `UserOrganization`, crashing on the first post-login page load.
+ *
+ * Seeding this row means the un-onboarded path is reproducible from a plain
+ * `npm run db:seed` instead of something each developer has to hand-craft.
+ */
+const ONBOARDING_USER_ID = 'seed-onboarding-user';
 
 async function main() {
   const organization = await prisma.organization.upsert({
@@ -33,10 +47,18 @@ async function main() {
       providerName: Provider.LOCAL,
       name: 'Demo Admin',
       isSuperAdmin: true,
-      // `timezone` is a required Int on this schema (Postiz stores it this
-      // way too) — using 0 for UTC as a placeholder; confirm the intended
-      // convention (offset minutes vs. an IANA-name lookup index) once
-      // Sprint 2's auth/profile module actually reads or writes it.
+      // Convention confirmed (Sprint 1): `timezone` is the user's **UTC
+      // offset in minutes**, not an IANA-zone index. Postiz's client sends
+      // `String(dayjs.tz().utcOffset())`, and dayjs's `utcOffset()` returns
+      // minutes — so 0 = UTC, -300 = US Eastern (EST), 330 = IST.
+      //
+      // Worth knowing before Sprint 2's profile UI writes this: an offset is
+      // strictly less information than a zone name. It cannot survive a DST
+      // transition on its own, so a user scheduled at "9am local" via a stored
+      // offset drifts by an hour twice a year. Sprint 5's scheduler is where
+      // that actually bites; if it needs DST correctness, add a nullable
+      // `timezoneName` (IANA string) alongside this field rather than
+      // reinterpreting it.
       timezone: 0,
       // `password` deliberately left unset — there's no working login flow
       // yet (Sprint 2). Set it via bcrypt once that lands, don't store a
@@ -70,10 +92,28 @@ async function main() {
     },
   });
 
+  // No `userOrganization` row is created for this user, on purpose — see the
+  // comment on ONBOARDING_USER_ID. The schema already permits it:
+  // `User.organizations` is a to-many relation with no minimum cardinality,
+  // so zero rows needs no migration, only queries that don't assume otherwise.
+  const onboardingUser = await prisma.user.upsert({
+    where: { id: ONBOARDING_USER_ID },
+    update: {},
+    create: {
+      id: ONBOARDING_USER_ID,
+      email: 'onboarding@postgear.local',
+      providerName: Provider.LOCAL,
+      name: 'Needs Onboarding',
+      timezone: 0,
+    },
+  });
+
   console.log('Seed complete:', {
     organizationId: organization.id,
     userId: user.id,
     email: user.email,
+    unOnboardedUserId: onboardingUser.id,
+    unOnboardedEmail: onboardingUser.email,
   });
 }
 

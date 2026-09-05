@@ -2,6 +2,7 @@
 
 > **PRD Coverage**: Section 5.12 (Platform & Infrastructure) — foundational slice only; the rest of 5.12 (rate limiting, Sentry, health checks) lands in [Sprint 8](sprint-08-billing-notifications-api-launch.md).
 > **Depends on**: nothing — this is the starting point.
+> **Completion checklist**: [sprint-01-completion-checklist.md](../sprint-completion-checklists/sprint-01-completion-checklist.md) — what shipped, what was already done, and how to test each item.
 > **Reference repo**: `D:\rk-personal-projects\postiz-app-main` (study only — see [README](README.md) for the ground rule on not copying files/folders).
 
 ## Sprint Goal
@@ -56,8 +57,8 @@ No redesign needed — the schema already in `packages/db/prisma/schema.prisma` 
 
 ### Task 4 — Seed & bootstrap scripts
 - Done: `packages/db/prisma/seeds/index.ts` seeds a demo `Organization` + `User` + `UserOrganization` (role `ADMIN`) + a `STANDARD`-tier `Subscription`, idempotently (fixed ids + upsert). `npm run db:seed` (root) and `npm run db:reset` (root — runs `prisma migrate reset`, which auto-invokes the seed via the `"prisma": {"seed": ...}` field in `packages/db/package.json`) both work once `npm install` has run. The old disconnected `scripts/db-seed.ts` stub is now a deprecation note pointing here — delete it once you've confirmed nothing else references that path.
-- Two things the seed script left as placeholders, worth resolving early: `User.timezone` was set to `0` without confirming what convention this schema actually expects for that field (offset minutes vs. something else) — check before Sprint 2's profile UI reads/writes it; and `User.password` was left unset since there's no working login flow yet — set it via bcrypt once Sprint 2 lands.
-- Flesh out `scripts/generate-keys.ts` to emit the AES key + JWT secret for local `.env`.
+- **`User.timezone` convention — resolved (Sprint 1).** It is a **UTC offset in minutes**, not an IANA-zone index: Postiz's client sends `String(dayjs.tz().utcOffset())`, and dayjs's `utcOffset()` returns minutes. So the seed's `0` is correct for UTC (`-300` = US Eastern, `330` = IST). Caveat carried into `SCHEMA_NOTES.md`: an offset can't represent DST, so a "9am local" schedule stored this way drifts an hour twice a year — if Sprint 5's scheduler needs DST correctness, add a nullable `timezoneName` alongside rather than reinterpreting this field. `User.password` is still deliberately unset — set it via bcrypt once Sprint 2's login flow lands.
+- Done: `scripts/generate-keys.ts` emits the AES key + JWT/NextAuth secrets. `npm run generate:keys` prints them; `npm run generate:keys -- --write` patches `.env` in place (line-targeted regex, so comments and ordering survive). It runs via `scripts/tsconfig.json` rather than an inline `--compiler-options` flag — the quoting in that flag does not survive `npm run` on Windows.
 
 ### Environment & local stack — done, with one real gotcha worth knowing
 `.env` is created (copied from `.env.example`, whose defaults already matched `docker-compose.yml`'s Postgres/Redis/MinIO credentials exactly). `docker compose up` brings up all three cleanly.
@@ -71,9 +72,13 @@ No redesign needed — the schema already in `packages/db/prisma/schema.prisma` 
 - [x] `npm install` at root completes cleanly (installs Biome, Jest, the Tailwind v4 plugin packages, Testing Library, etc. across all workspaces).
 - [x] `npm run db:generate` + `npm run db:migrate` run clean against the inherited schema — verified against a real local Postgres instance, not just dry-validated.
 - [x] `npm run db:seed` populates the demo org/user/subscription without error, and re-running it doesn't create duplicates — verified by direct row-count check after a second run.
-- [ ] `SCHEMA_NOTES.md` still needs writing (Task 3's documentation half, distinct from the schema itself working).
+- [x] `SCHEMA_NOTES.md` written (`packages/db/prisma/SCHEMA_NOTES.md`) — MVP-active vs. dormant model tables, the conventions to follow when adding models (including two the inherited file breaks itself: `uuid` vs `cuid`, `organizationId` vs `orgId`), non-obvious field meanings, the encryption boundary, and the zero-organization user state.
 - [x] `npm run validate` (lint + typecheck + test across every workspace via Turborepo) passes clean on an empty/stub codebase (28/28 tasks) — confirms the tooling itself works before any real feature code is written.
-- [ ] CI runs `npm run validate` + `prisma validate` on every PR (not yet created — `.github/workflows/ci.yml` is still a TODO stub).
+- [x] CI runs `npm run validate` + `prisma validate` on every PR (`.github/workflows/ci.yml`, real steps replacing the TODO stub). Deliberately **not** gating on `npm run format:check` yet: Sprint 0's UI files predate Biome's formatter and report 86 diffs, so the gate would fail every PR for unrelated reasons. Clear it with `npm run format` in one dedicated commit, then uncomment the step.
+- [x] AES-256-GCM encryption helper exists (`packages/db/src/crypto.ts`) with 26 passing unit tests — the repo's first real test suite. Used by Sprint 3, not yet wired to `Integration`.
+- [x] `scripts/generate-keys.ts` emits real `ENCRYPTION_KEY_AES256` / `JWT_SECRET` / `NEXTAUTH_SECRET` values (`npm run generate:keys`, `-- --write` to patch `.env` in place). The disconnected `scripts/db-seed.ts` stub is deleted and `project_structure.md`'s reference to it updated.
+- [x] `packages/db` exports a real Prisma client singleton and typed re-exports (`client.ts`/`types.ts` were `export {}` stubs).
+- [x] Task 3a's zero-organization state is proven, not just asserted: the seed now also creates `onboarding@postgear.local` with no `UserOrganization` row, verified by direct row-count query.
 
 ## Risks
 - Because the schema is inherited rather than purpose-built, a few field names will feel like they carry Postiz's history (e.g. `Integration` for "channel", `token`/`refreshToken` instead of more explicit names) — resist the urge to rename them defensively; renaming a live schema's fields is real migration churn for cosmetic gain. Add clarifying comments in the schema file instead where a name might confuse a future reader.

@@ -16,7 +16,9 @@ test('sign in renders its fields and routes on to the other auth screens', async
   await page.goto('/login');
 
   await expect(page.getByLabel('Email')).toBeVisible();
-  await expect(page.getByLabel('Password')).toBeVisible();
+  // By id, not getByLabel('Password'): the field's own reveal toggle is
+  // labelled "Show password", which that accessible-name lookup also matches.
+  await expect(page.locator('#password')).toBeVisible();
 
   await page.getByRole('link', { name: 'Create an account' }).click();
   await expect(page).toHaveURL(/\/register$/);
@@ -30,6 +32,24 @@ test('sign in renders its fields and routes on to the other auth screens', async
 
   await page.getByRole('link', { name: 'Forgot password?' }).click();
   await expect(page).toHaveURL(/\/reset-password$/);
+});
+
+test('the password reveal toggle swaps the field type without losing the value', async ({
+  page,
+}) => {
+  await page.goto('/login');
+
+  const field = page.locator('#password');
+  await field.fill('correct horse battery staple');
+  await expect(field).toHaveAttribute('type', 'password');
+
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(field).toHaveAttribute('type', 'text');
+  await expect(field).toHaveValue('correct horse battery staple');
+
+  await page.getByRole('button', { name: 'Hide password' }).click();
+  await expect(field).toHaveAttribute('type', 'password');
+  await expect(field).toHaveValue('correct horse battery staple');
 });
 
 test('the focus ring uses the darkened light-mode colour', async ({ page }) => {
@@ -66,6 +86,22 @@ test('form labels use the body face, not the display face', async ({ page }) => 
     expect(style.weight).toBe('700');
     expect(style.transform).toBe('none');
   }
+});
+
+test('the auth shell drops the illustration panel when there is no room for it', async ({
+  page,
+}) => {
+  // The panel is decorative, so it is the half that goes on a narrow viewport
+  // rather than squeezing the form beside it (design-system-rules.md 11).
+  const panel = page.getByRole('complementary');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/login');
+  await expect(panel).toBeVisible();
+
+  await page.setViewportSize({ width: 640, height: 900 });
+  await expect(panel).toBeHidden();
+  await expect(page.locator('#password')).toBeVisible();
 });
 
 test('an unknown route renders the styled 404, not a bare Next.js page', async ({ page }) => {

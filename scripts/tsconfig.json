@@ -1,0 +1,25 @@
+{
+  // Config for the standalone maintenance scripts in this folder, which run
+  // under ts-node rather than through a bundler.
+  //
+  // The root config targets ESNext/bundler for the apps; ts-node needs real
+  // CommonJS output. `node16` (not the older `node`) is deliberate: `node` —
+  // now aliased as `node10` — is deprecated in TypeScript 6, and an editor
+  // running a newer TypeScript than this workspace will flag it and offer an
+  // `ignoreDeprecations` quick-fix whose value the pinned CLI compiler then
+  // rejects outright. `node16` avoids that whole loop.
+  //
+  // With no `"type": "module"` in the root package.json, `module: node16`
+  // resolves .ts files here as CommonJS, which is what ts-node wants.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}
