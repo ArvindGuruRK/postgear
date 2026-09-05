@@ -15,6 +15,7 @@ import {
   Input,
   MultiSelect,
   type MultiSelectOption,
+  PasswordInput,
   RadioGroup,
   RadioGroupItem,
   SearchInput,
@@ -66,6 +67,9 @@ export function FormControlsSection() {
       <Row label="Textarea">
         <Textarea placeholder="Post caption…" className="w-64" rows={3} />
         <Textarea placeholder="Error state" variant="error" className="w-64" rows={3} />
+      </Row>
+      <Row label="Password Input">
+        <PasswordInput placeholder="Enter your password" className="w-64" />
       </Row>
       <Row label="Search Input">
         <SearchInput

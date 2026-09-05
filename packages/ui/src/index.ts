@@ -42,6 +42,7 @@ export * from './components/onboarding-stepper';
 export * from './components/page-header';
 export * from './components/pagination';
 export * from './components/panel';
+export * from './components/password-input';
 export * from './components/plan-card';
 export * from './components/popover';
 export * from './components/progress';
