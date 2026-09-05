@@ -25,6 +25,7 @@
     "db:seed": "npm run seed --workspace=packages/db",
     "db:studio": "npm run studio --workspace=packages/db",
     "db:reset": "npm run migrate:reset --workspace=packages/db",
+    "generate:keys": "ts-node --project scripts/tsconfig.json scripts/generate-keys.ts",
     "clean": "turbo run clean && rm -rf node_modules",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
@@ -35,6 +36,7 @@
     "@types/jest": "^29.5.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.0",
+    "ts-node": "^10.9.0",
     "turbo": "^2.0.0",
     "typescript": "^5.5.0"
   },

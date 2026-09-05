@@ -1,17 +1,61 @@
-# GitHub Actions CI Pipeline
-# TODO: Implement lint, type-check, unit & integration tests
-
+# PostGear CI — the same gate you run locally as `npm run validate`, plus a
+# schema check. Deliberately minimal: this is a pre-launch solo project, so
+# there is no Sonar / coverage-gate / i18n-lock stage to replicate.
 name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [master, main, develop]
+
+# A new push to the same PR cancels the in-flight run instead of queueing
+# behind it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # `prisma validate` parses schema.prisma, which references env("DATABASE_URL").
+  # It never opens a connection, so any syntactically valid URL satisfies it.
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgear_db?schema=public
 
 jobs:
-  ci:
+  validate:
+    name: Lint, typecheck & test
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      # TODO: Setup Node.js, install dependencies, run lint, type-check, tests
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci` (not `install`) so the lockfile is authoritative and a
+      # drifted package-lock.json fails here rather than in production.
+      - name: Install dependencies
+        run: npm ci
+
+      # Must run before typecheck: packages/db re-exports types from
+      # @prisma/client, which does not exist until the client is generated.
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema packages/db/prisma/schema.prisma
+
+      # turbo run lint typecheck test, across every workspace.
+      - name: Validate
+        run: npm run validate
+
+# Deliberately NOT gating on `npm run format:check` yet: the Sprint 0 UI files
+# predate Biome's formatter being run over them and currently report 86
+# formatting diffs. Adding the gate now would fail every PR for reasons
+# unrelated to its changes. Clear the backlog with `npm run format` in one
+# dedicated commit, then add this step back:
+#
+#      - name: Check formatting
+#        run: npm run format:check
