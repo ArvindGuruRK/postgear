@@ -1,7 +1,7 @@
 # Sprint 2 — Authentication, Organizations & RBAC
 
 > **PRD Coverage**: Section 5.1 (Authentication & User Management), Section 5.11 (Organization & Team Module).
-> **Depends on**: [Sprint 1](sprint-01-foundation-and-data-model.md) (schema for `User`, `Organization`, `Member`).
+> **Depends on**: [Sprint 1](sprint-01-foundation-and-data-model.md) (schema for `User`, `Organization`, `UserOrganization` — there is no `Member` table; see [SCHEMA_NOTES](../../packages/db/prisma/SCHEMA_NOTES.md)).
 > **Reference repo**: `D:\rk-personal-projects\postiz-app-main` (study only).
 
 ## Sprint Goal
@@ -53,11 +53,32 @@ Signup collects credentials only — the register form deliberately has no organ
 - A `User` with **zero `UserOrganization` rows is a valid, persistable state** for the whole duration of this flow. Nothing may assume otherwise — see the data-model consequences recorded in [Sprint 1, Task 3a](sprint-01-foundation-and-data-model.md), including where "onboarding complete" is stored and the fact that the seed only covers the already-onboarded happy path.
 
 ## Definition of Done
-- [ ] Register → activate → login → logout works end-to-end via password auth.
-- [ ] A brand-new user is routed into the onboarding flow, creates a workspace, can skip the channel step, and lands in the dashboard — and a user who abandons onboarding midway can sign back in without hitting an error page.
-- [ ] Google and GitHub OAuth login both work and correctly attach to an existing user by email or create a new one.
-- [ ] A user in two orgs can switch between them and API calls scope correctly to the active org.
-- [ ] A `USER`-role member is blocked (403) from an `ADMIN`-only route by the guard.
+
+> **Completion checklist**: [sprint-02-completion-checklist.md](../sprint-completion-checklists/sprint-02-completion-checklist.md) — what shipped, what was already there, and a test command for every item.
+
+- [x] Register → activate → login → logout works end-to-end via password auth.
+- [x] A brand-new user is routed into the onboarding flow, creates a workspace, can skip the channel step, and lands in the dashboard — and a user who abandons onboarding midway can sign back in without hitting an error page. The flow grew from the doc's three steps to **five**, with a five-question survey persisted to a new `OnboardingResponse` model (product decision, 2026-09-05).
+- [x] Google and GitHub OAuth login both work and correctly attach to an existing user by email or create a new one. **Verified structurally, not against live provider apps** — see [Known gaps](../sprint-completion-checklists/sprint-02-completion-checklist.md#known-gaps).
+- [x] A user in two orgs can switch between them and API calls scope correctly to the active org.
+- [x] A `USER`-role member is blocked (403) from an `ADMIN`-only route by the guard.
+
+### Added beyond the original scope
+
+Four security requirements were folded in, all designed into the new code rather than retrofitted:
+
+- [x] **Server-side validation and sanitization** on every auth field, with Zod. Passwords are deliberately exempt from sanitization — see `apps/api/src/common/sanitize.ts` for why.
+- [x] **Rate limiting, progressive delay and account lockout** — 10 logins/IP/minute in Redis, 5 consecutive failures → a 15-minute lock held in Postgres, and a capped exponential delay.
+- [x] **argon2id password storage** (not bcrypt as this doc originally specified), with transparent rehash-on-login for legacy formats and an audit script.
+- [x] **A single non-leaking auth message catalogue**, enforced by a unit test that fails if any message gains an account-enumerating phrase.
+
+### Deviations from this document, and why
+
+| This doc said | What shipped | Why |
+|---|---|---|
+| bcrypt | **argon2id** | Memory-hard; resists GPU cracking in a way bcrypt's fixed 4 KiB working set does not. |
+| Onboarding: workspace → channel → app | **Five steps**, incl. a five-question survey | Product decision, 2026-09-05: a real SaaS onboarding, with the answers persisted. |
+| Gate 2 "sits between" the `(dashboard)` and `[orgId]` layouts | Gate 2 is the **first statement in `[orgId]/layout.tsx`**, with `/onboarding` a sibling of `[orgId]` | Same effect — `/onboarding` clears gate 1 and never reaches gate 2 — without moving eleven existing page files into a new route group. |
+| (unstated) | No `middleware.ts` | Next 16 renamed it `proxy.ts` and recommends avoiding it. Both gates are layout-based, which cannot be bypassed and keeps one authoritative check instead of two that can disagree. |
 
 ## Risks
 - Don't let RBAC design balloon into a full permissions engine this early — three roles, route-level checks, ship it. Revisit only if a real PostGear feature (e.g. agency mode) demands finer granularity.

@@ -100,12 +100,62 @@ model User {
   sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
 
+  // --- Sprint 2: auth lifecycle -------------------------------------------
+  // Tokens are stored as SHA-256 hashes, never as the value mailed to the
+  // user. A database leak therefore yields no usable activation or reset
+  // link. Compare with `safeCompare()` from packages/db/src/crypto.ts.
+  activationTokenHash         String?   @unique
+  activationTokenExpiresAt    DateTime?
+  passwordResetTokenHash      String?   @unique
+  passwordResetTokenExpiresAt DateTime?
+  passwordChangedAt           DateTime?
+
+  // Account lockout lives in Postgres rather than Redis on purpose: a Redis
+  // restart or eviction must not be a lockout bypass. The per-IP request
+  // throttle is the ephemeral half and does live in Redis.
+  failedLoginAttempts Int       @default(0)
+  lastFailedLoginAt   DateTime?
+  lockedUntil         DateTime?
+
+  // --- Sprint 2: onboarding ------------------------------------------------
+  // `onboardingStep` is 1-based and matches OnboardingStepper's `currentStep`.
+  // It exists so an abandoned flow resumes where it stopped; a derived
+  // "has >= 1 UserOrganization" check cannot express that, because creating
+  // the workspace is only step 1 of 5.
+  onboardingStep        Int                 @default(1)
+  onboardingCompletedAt DateTime?
+  onboarding            OnboardingResponse?
+
   @@unique([email, providerName])
   @@index([lastReadNotifications])
   @@index([inviteId])
   @@index([account])
   @@index([lastOnline])
   @@index([pictureId])
+  @@index([lockedUntil])
+}
+
+/// The five onboarding survey answers, one row per user.
+///
+/// Deliberately NOT tenant-scoped: these are collected before the workspace
+/// exists (step 1 creates it, steps 2-5 run after), so the row keys on
+/// `userId`. Every answer column is nullable so a half-finished flow persists
+/// rather than being all-or-nothing.
+model OnboardingResponse {
+  id                 String              @id @default(uuid())
+  userId             String              @unique
+  user               User                @relation(fields: [userId], references: [id])
+  role               OnboardingRole?
+  teamSize           OnboardingTeamSize?
+  primaryGoal        OnboardingGoal?
+  postingFrequency   PostingFrequency?
+  referralSource     ReferralSource?
+  /// Platforms the user said they intend to post to, captured on the channel
+  /// step. Free-form strings rather than an enum because the channel list is
+  /// Sprint 3's to define and will grow.
+  interestedChannels String[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model UserOrganization {
@@ -458,6 +508,56 @@ enum Role {
   SUPERADMIN
   ADMIN
   USER
+}
+
+// --- Sprint 2: onboarding survey ------------------------------------------
+// One enum per question, so the answer set is enforced by the database rather
+// than only by the Zod schema in front of it. Values that begin with a digit
+// are prefixed (SIZE_2_10) because Prisma enum members cannot start with one.
+
+/// Q1 — "What best describes you?"
+enum OnboardingRole {
+  SOLO_CREATOR
+  AGENCY
+  IN_HOUSE_TEAM
+  SMALL_BUSINESS
+  OTHER
+}
+
+/// Q2 — "How big is your team?"
+enum OnboardingTeamSize {
+  JUST_ME
+  SIZE_2_10
+  SIZE_11_50
+  SIZE_51_200
+  SIZE_200_PLUS
+}
+
+/// Q3 — "What do you most want from PostGear?"
+enum OnboardingGoal {
+  GROW_AUDIENCE
+  SAVE_TIME
+  BETTER_CONTENT
+  TRACK_PERFORMANCE
+  TEAM_COLLAB
+}
+
+/// Q4 — "How often do you post today?"
+enum PostingFrequency {
+  DAILY
+  FEW_TIMES_WEEK
+  WEEKLY
+  MONTHLY
+  NOT_YET
+}
+
+/// Q5 — "How did you hear about us?"
+enum ReferralSource {
+  SEARCH
+  SOCIAL
+  FRIEND
+  NEWSLETTER
+  OTHER
 }
 
 enum CreationMethod {

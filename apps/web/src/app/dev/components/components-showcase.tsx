@@ -1,6 +1,8 @@
 'use client';
 
+import { UserMenu, WorkspaceSwitcher } from '@postgear/ui';
 import { BarChart3, Calendar, LayoutGrid, Palette, Search, Settings, Users } from 'lucide-react';
+import { useState } from 'react';
 import { AppShell } from '@/components/navigation/app-shell';
 import type { SidebarItem } from '@/components/navigation/sidebar';
 import { ButtonsSection } from './sections/buttons-section';
@@ -24,9 +26,41 @@ const NAV_ITEMS: SidebarItem[] = [
 
 const SETTINGS_ITEM: SidebarItem = { label: 'Settings', href: '#settings', icon: Settings };
 
+// Demo data for the two top-bar slots. The playground showcases the *UI
+// components* (WorkspaceSwitcher, UserMenu) rather than the app-wired
+// containers, which read a WorkspaceProvider that only exists inside
+// /[orgId]. Wiring those in directly is what made every playground route 500.
+const DEMO_WORKSPACES = [
+  { id: '1', name: 'Acme Media' },
+  { id: '2', name: 'Nova Studio' },
+];
+
 export function ComponentsShowcase() {
+  const [activeWorkspace, setActiveWorkspace] = useState(DEMO_WORKSPACES[0].id);
+
   return (
-    <AppShell navItems={NAV_ITEMS} sidebarBottomItem={SETTINGS_ITEM} pageTitle="Design System">
+    <AppShell
+      navItems={NAV_ITEMS}
+      sidebarBottomItem={SETTINGS_ITEM}
+      pageTitle="Design System"
+      orgSwitcher={
+        <WorkspaceSwitcher
+          workspaces={DEMO_WORKSPACES}
+          activeId={activeWorkspace}
+          onActiveChange={setActiveWorkspace}
+          label="Organizations"
+          createLabel="Create organization"
+          onCreate={() => {}}
+        />
+      }
+      accountMenu={
+        <UserMenu
+          name="Ada Lovelace"
+          email="ada@postgear.local"
+          items={[{ label: 'Log out', danger: true }]}
+        />
+      }
+    >
       <div className="mx-auto flex max-w-5xl flex-col gap-10 pb-16">
         <div>
           <h1 className="font-display text-4xl tracking-wide text-ink">Component Playground</h1>

@@ -15,7 +15,8 @@ UI and providers are still built fresh.
 
 It arrived with **48 models**, more than half of which PostGear's MVP will never
 touch. **27 were dropped** across two migrations — see
-[Deliberately removed](#deliberately-removed) — leaving **21**.
+[Deliberately removed](#deliberately-removed) — leaving **21**. Sprint 2 added
+one back (`OnboardingResponse`), so the file now holds **22**.
 
 Every model still in the file is either MVP-active or a deliberate, justified
 keep. If a table is here, it is here on purpose.
@@ -31,6 +32,7 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `Organization` | The tenant. Root of nearly every scoping query. | Sprint 2 |
 | `User` | An account. **Not** tenant-scoped — a user may belong to many orgs, or none. | Sprint 2 |
 | `UserOrganization` | The membership join table, carrying `role`. This is the name to use — do not invent a `Member`. | Sprint 2 |
+| `OnboardingResponse` | The five onboarding survey answers, one row per user. **Not** tenant-scoped — collected before the workspace exists. | Sprint 2 |
 | `Integration` | **A connected social channel.** The name is Postiz's history; read it as "channel" everywhere. Holds the encrypted OAuth `token`/`refreshToken`. | Sprint 3 |
 | `Post` | One row **per platform target**. A cross-posted batch is tied together by `group`; thread/reply chains by `parentPostId`. There is no separate `PostItem` table. | Sprint 4 |
 | `Media` | Uploaded images/video, S3/MinIO-backed. | Sprint 4 |
@@ -76,7 +78,7 @@ in the inherited file, so check before assuming.
    expect to look it up.
 
 3. **Soft delete is `deletedAt DateTime?`** and it is far more widespread than
-   it first appears — 11 of the 21 models carry it: `Comments`, `Customer`,
+   it first appears — 11 of the 22 models carry it: `Comments`, `Customer`,
    `Integration`, `Media`, `Notifications`, `OAuthApp`, `Post`,
    `Signatures`, `Subscription`, `Tags`,
    `Webhooks`. **Every read of these must filter `deletedAt: null`.** Prisma
@@ -97,8 +99,25 @@ in the inherited file, so check before assuming.
   correctness, add a nullable `timezoneName` (IANA string) *alongside* this
   field rather than reinterpreting it.
 - **`User` is unique on `[email, providerName]`, not on `email`.** The same
-  address can therefore exist once as `LOCAL` and again as `GOOGLE`. Auth code
-  in Sprint 2 must query on the pair, never on email alone.
+  address can therefore exist once as `LOCAL` and again as `GOOGLE`.
+  Sprint 2's auth code deliberately queries on **email alone** and reuses
+  whichever row it finds, so a person who signed up with a password and later
+  clicks "Sign in with Google" gets their existing account rather than a second
+  one. The constraint still permits the split; the application refuses to
+  create it. The safety condition is that both OAuth providers reject an
+  unverified address — without that, matching on email would be an
+  account-takeover path.
+- **The `User` auth-lifecycle columns hold hashes, not tokens.**
+  `activationTokenHash` and `passwordResetTokenHash` store the SHA-256 of the
+  value that was emailed, so a database leak yields nothing usable. SHA-256
+  rather than argon2 precisely because the column has to be searchable by
+  equality — the tokens are 32 bytes of CSPRNG output, so there is no
+  dictionary to slow down. (Contrast `Integration.token` below, where the
+  random IV makes equality search impossible.)
+- **Lockout state lives in Postgres, not Redis.** `failedLoginAttempts`,
+  `lastFailedLoginAt` and `lockedUntil` are on `User` so that restarting or
+  evicting Redis is not a lockout bypass. The per-IP request throttle is the
+  ephemeral half and does live in Redis.
 - **`Integration.token` / `refreshToken` are ciphertext**, not plaintext — see
   the next section.
 - **`Integration.internalId`** is the *provider's* account id, unique per org
@@ -155,10 +174,27 @@ Route protection is correspondingly **two gates, not one**:
    that layout and the `[orgId]` layout, since an un-onboarded user has no org
    id to route with.
 
-Still open for Sprint 2: where onboarding-completion lives. A derived check
-("has at least one `UserOrganization`") is free and needs no migration but
-cannot represent a partially-finished multi-step flow; a flag on `User` can.
-Decide once, not per-step.
+### Where onboarding-completion lives — decided (Sprint 2)
+
+**`User.onboardingCompletedAt` (nullable timestamp), alongside
+`User.onboardingStep` (1-based int) and a dedicated `OnboardingResponse` row.**
+
+The cheaper option — deriving it from "has at least one `UserOrganization`" —
+was rejected, and the reason is worth keeping because it is not obvious until
+the flow has more than one step. Onboarding is five steps, and **creating the
+workspace is step 1**. A derived check therefore flips to "onboarded" the
+instant step 1 completes: the route gate stops sending the user to
+`/onboarding`, and steps 2 through 5 become unreachable. Someone who closes the
+tab at step 3 would never be asked the rest.
+
+`onboardingStep` records the furthest point reached and only ever moves
+forward, so a resumed flow lands exactly where it stopped rather than
+restarting or being inferred. `onboardingCompletedAt` is what route gate 2
+actually tests.
+
+The zero-organization state is unchanged and still real: it now spans from
+"account created" to the end of step 1, rather than to the end of the whole
+flow.
 
 ## Deliberately removed
 

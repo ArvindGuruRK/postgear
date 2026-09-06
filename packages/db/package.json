@@ -23,7 +23,8 @@
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
-    "@prisma/client": "^5.0.0"
+    "@prisma/client": "^5.0.0",
+    "argon2": "^0.41.1"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",

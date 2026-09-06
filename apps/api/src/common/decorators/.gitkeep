@@ -1,2 +1,0 @@
-// Decorators — Custom Nest/Express Parameter Decorators
-// TODO: Implement @CurrentUser, @CurrentOrg, @Roles decorators

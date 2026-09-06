@@ -1,17 +1,31 @@
-import {
-  Avatar,
-  AvatarFallback,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-} from '@postgear/ui';
+import { Input } from '@postgear/ui';
 import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ThemeToggle } from './theme-toggle';
 
-export function TopBar({ title, orgSwitcher }: { title: string; orgSwitcher?: ReactNode }) {
+/**
+ * `orgSwitcher` and `accountMenu` are slots rather than imports.
+ *
+ * Both of their real implementations read workspace context that only exists
+ * inside `[orgId]/layout.tsx`. Importing them here would make the entire app
+ * shell unrenderable anywhere else — which is exactly what happened to the
+ * design-system playground at /dev/components when AccountMenu was wired in
+ * directly: every showcase route 500'd with "useWorkspace must be used inside
+ * a WorkspaceProvider".
+ *
+ * As slots, the chrome stays context-free and each caller supplies whatever it
+ * can: the dashboard passes the live components, the playground passes demo
+ * ones.
+ */
+export function TopBar({
+  title,
+  orgSwitcher,
+  accountMenu,
+}: {
+  title: string;
+  orgSwitcher?: ReactNode;
+  accountMenu?: ReactNode;
+}) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b-4 border-outline bg-secondary px-6">
       {orgSwitcher}
@@ -25,18 +39,7 @@ export function TopBar({ title, orgSwitcher }: { title: string; orgSwitcher?: Re
           <Input placeholder="Search…" className="w-64 pl-9" size="sm" />
         </div>
         <ThemeToggle />
-        <DropdownMenu>
-          <DropdownMenuTrigger className="outline-none">
-            <Avatar size="sm">
-              <AvatarFallback>PG</AvatarFallback>
-            </Avatar>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Log out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {accountMenu}
       </div>
     </header>
   );

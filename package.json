@@ -2,7 +2,7 @@
   "name": "postgear",
   "version": "0.0.1",
   "private": true,
-  "description": "PostGear \u2014 AI-Powered Social Media Management & SEO Platform",
+  "description": "PostGear — AI-Powered Social Media Management & SEO Platform",
   "packageManager": "npm@11.17.0",
   "workspaces": [
     "apps/*",
@@ -27,8 +27,11 @@
     "db:reset": "npm run migrate:reset --workspace=packages/db",
     "generate:keys": "ts-node --project scripts/tsconfig.json scripts/generate-keys.ts",
     "clean": "turbo run clean && rm -rf node_modules",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "dotenv -e .env -- playwright test",
+    "test:e2e:ui": "dotenv -e .env -- playwright test --ui",
+    "dev:api": "npm run dev --workspace=@postgear/api",
+    "dev:api:e2e": "dotenv -e .env -v LOGIN_RATE_LIMIT_PER_MIN=500 -v LOCKOUT_THRESHOLD=50 -- ts-node-dev --respawn --transpile-only --project apps/api/tsconfig.json apps/api/src/main.ts",
+    "audit:passwords": "dotenv -e .env -- ts-node --project scripts/tsconfig.json scripts/audit-password-hashes.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

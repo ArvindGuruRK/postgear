@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
+import { OrgSwitcher } from './org-switcher';
 import type { SidebarItem } from './sidebar';
 
 // Client wrapper around AppShell so [orgId]/layout.tsx can stay a server
@@ -56,7 +58,16 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
     : (NAV.find((item) => pathname === `${base}/${item.segment}`)?.label ?? 'Dashboard');
 
   return (
-    <AppShell navItems={navItems} sidebarBottomItem={settingsItem} pageTitle={pageTitle}>
+    <AppShell
+      navItems={navItems}
+      sidebarBottomItem={settingsItem}
+      pageTitle={pageTitle}
+      // Both of these read WorkspaceProvider, which [orgId]/layout.tsx sets up
+      // above this component. They are passed here rather than imported by
+      // AppShell so the shell stays renderable without a workspace.
+      orgSwitcher={<OrgSwitcher />}
+      accountMenu={<AccountMenu />}
+    >
       {children}
     </AppShell>
   );

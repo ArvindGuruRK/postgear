@@ -1,33 +1,33 @@
-import {
-  Button,
-  FormField,
-  FormLabel,
-  Heading,
-  Input,
-  Link,
-  PasswordInput,
-  Separator,
-  Stack,
-  Text,
-} from '@postgear/ui';
+import { Heading, Link, Stack, Text } from '@postgear/ui';
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
+import { LoginForm } from '@/components/auth/login-form';
+import { OAuthButtons } from '@/components/auth/oauth-buttons';
+import { getSession } from '@/lib/session';
 
 export const metadata: Metadata = {
   title: 'Sign in',
 };
 
-// Sprint 0's Definition-of-Done smoke test: a complete screen assembled purely
-// from @postgear/ui, with no one-off styled markup — only layout utilities.
+// The page stays a server component so it can export `metadata` — a client
+// component cannot. The interactive parts are two small client islands.
 //
-// No <Card> here: the two-panel shell in ../layout.tsx is this form's surface,
-// and nesting a bordered card inside a bordered panel frames the same content
-// twice. See that file.
-//
-// The form is deliberately inert. Sprint 2 owns credential auth and the OAuth
-// handshake; wiring a fake submit here would be worse than leaving it obviously
-// unwired. Note there is no submit button by design — a form that posts to its
-// own URL would put a typed password in the query string.
-export default function LoginPage() {
+// LoginForm reads `useSearchParams` (to surface ?error=oauth from a failed
+// handshake), which Next requires to sit inside a Suspense boundary or the
+// whole route opts out of static rendering with a build-time error.
+export default async function LoginPage() {
+  // The inverse of route gate 1: a signed-in visitor who navigates back here
+  // is sent to `/`, which routes them on to their workspace or to onboarding.
+  //
+  // This lives on the page rather than in (auth)/layout.tsx on purpose. The
+  // same group holds /verify and /reset-password/[token], and a signed-in user
+  // clicking a confirmation link from their email must still reach those — a
+  // layout-level redirect would bounce them away from their own reset link.
+  if (await getSession()) {
+    redirect('/');
+  }
+
   return (
     <Stack gap="lg">
       <Stack gap="xs">
@@ -35,63 +35,11 @@ export default function LoginPage() {
         <Text muted>Welcome back. Pick up where your queue left off.</Text>
       </Stack>
 
-      <form>
-        <Stack gap="md">
-          <FormField>
-            <FormLabel htmlFor="email" required>
-              Email
-            </FormLabel>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@company.com"
-            />
-          </FormField>
+      <Suspense fallback={null}>
+        <LoginForm />
+      </Suspense>
 
-          <FormField>
-            <Stack direction="row" justify="between" align="center" gap="sm">
-              <FormLabel htmlFor="password" required>
-                Password
-              </FormLabel>
-              <Link href="/reset-password" className="text-xs">
-                Forgot password?
-              </Link>
-            </Stack>
-            <PasswordInput
-              id="password"
-              name="password"
-              autoComplete="current-password"
-              placeholder="Enter your password"
-            />
-          </FormField>
-
-          <Button size="lg" className="w-full">
-            Sign in
-          </Button>
-        </Stack>
-      </form>
-
-      <Stack direction="row" align="center" gap="sm">
-        <Separator className="flex-1" />
-        <Text size="xs" muted>
-          OR
-        </Text>
-        <Separator className="flex-1" />
-      </Stack>
-
-      {/* Side by side rather than stacked: the panel is a fixed-width column,
-          and two full-width secondary buttons under a full-width primary one
-          read as three equal choices instead of one plus two alternates. */}
-      <Stack direction="row" gap="sm">
-        <Button variant="secondary" className="flex-1">
-          Google
-        </Button>
-        <Button variant="secondary" className="flex-1">
-          GitHub
-        </Button>
-      </Stack>
+      <OAuthButtons />
 
       <Stack direction="row" gap="xs" justify="center" align="center">
         <Text size="sm" muted>

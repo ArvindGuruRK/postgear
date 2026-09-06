@@ -2,7 +2,40 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+
+    // No `rootDir`. `@postgear/db` is consumed as TypeScript source (its
+    // package.json points `main` at src/index.ts), so it is part of this
+    // program while living outside apps/api — which any `rootDir` under
+    // apps/api makes an error (TS6059). Letting tsc infer the common root
+    // instead puts emitted output at dist/apps/api/src/, which is why the
+    // `start` script points there.
+
+    // NestJS cannot run under the root config. Three deliberate overrides:
+    //
+    // 1. `module`/`moduleResolution` — the root targets a bundler
+    //    (ESNext + "bundler") because apps/web is compiled by Next. Nest runs
+    //    the emitted JS directly under Node, so it needs real CommonJS.
+    // 2. The decorator flags — Nest's entire DI system is decorator-driven,
+    //    and `emitDecoratorMetadata` is what lets it infer constructor
+    //    parameter types at runtime. Without it every provider fails to
+    //    resolve with a "Nest can't resolve dependencies" error at boot.
+    // 3. `strictPropertyInitialization` — injected properties and DTO fields
+    //    are assigned by the framework, not in a constructor the compiler can
+    //    see. The rest of `strict` stays on.
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictPropertyInitialization": false,
+
+    // ts-jest and ts-node-dev both resolve @postgear/* through these.
+    "baseUrl": "../..",
+    "paths": {
+      "@postgear/db": ["packages/db/src"],
+      "@postgear/social-core": ["packages/social-core/src"],
+      "@postgear/seo-engine": ["packages/seo-engine/src"],
+      "@postgear/ai-engine": ["packages/ai-engine/src"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

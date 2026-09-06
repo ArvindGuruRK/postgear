@@ -4,8 +4,10 @@ import { AuthIllustration } from '@/components/auth/auth-illustration';
 import { ThemeToggle } from '@/components/navigation/theme-toggle';
 
 // Unauthenticated shell: a two-panel split — form on the left, illustration on
-// the right. Sprint 2 adds the "already signed in → redirect to the dashboard"
-// guard here, once there is a session to check.
+// the right. The "already signed in → go to the app" guard lives on the login
+// and register pages rather than here: /verify and /reset-password/[token] are
+// in this same group, and a signed-in user must still be able to open a
+// confirmation or reset link from their email.
 //
 // The split replaces the centered-card shell this file used to render, so the
 // three auth screens no longer wrap themselves in <Card>: the left panel IS

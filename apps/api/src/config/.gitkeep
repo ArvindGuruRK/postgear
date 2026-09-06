@@ -1,2 +1,0 @@
-// App Configuration — Env Validation via Zod
-// TODO: Implement Zod schema for environment variable validation and typed config export
