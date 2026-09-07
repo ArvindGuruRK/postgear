@@ -111,3 +111,29 @@ export function serverApi<T>(path: string, options: ApiOptions = {}): Promise<T>
 export function oauthStartUrl(provider: 'google' | 'facebook'): string {
   return `${BROWSER_API_URL}/auth/oauth/${provider}`;
 }
+
+/**
+ * Where the browser should navigate to connect a social channel.
+ *
+ * Separate from `oauthStartUrl` above, which is sign-in and stays narrowly
+ * typed to the two login providers. This is a different flow against a
+ * different set of platforms: signing in identifies a person, connecting a
+ * channel authorizes PostGear to publish somewhere. Sharing one helper would
+ * mean widening the login provider union to include platforms nobody can sign
+ * in with.
+ *
+ * A full navigation for the same reason as sign-in: the consent screen is a
+ * page the user has to see, and the callback has to arrive as a top-level
+ * request for the `sameSite: 'lax'` session cookie to be sent.
+ *
+ * `reconnect` carries PostGear's own channel id — never the platform's account
+ * id — so the API can verify the user re-authorized the same account rather
+ * than silently swapping a different one into an existing channel.
+ */
+export function channelConnectUrl(provider: string, reconnectChannelId?: string): string {
+  const base = `${BROWSER_API_URL}/channels/connect/${encodeURIComponent(provider)}`;
+
+  return reconnectChannelId
+    ? `${base}?reconnect=${encodeURIComponent(reconnectChannelId)}`
+    : base;
+}

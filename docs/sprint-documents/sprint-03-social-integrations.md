@@ -45,10 +45,34 @@ Implement against the contract, replacing the current stub `index.ts` files unde
 - `apps/web/src/app/(dashboard)/[orgId]/channels/page.tsx`: connected-channel list, health indicator (token expiring/expired), disconnect action.
 
 ## Definition of Done
-- [ ] A user can connect at least X, Instagram/Facebook, LinkedIn, and YouTube via real OAuth and see the account appear in the channel list.
-- [ ] A test post can be published to each connected MVP platform through the provider's `post()` implementation.
-- [ ] Tokens are stored encrypted in the DB (verify by inspecting a raw row — it must not be plaintext).
-- [ ] Disconnecting a channel revokes/clears stored credentials.
+
+> **Completion checklist**: [sprint-03-completion-checklist.md](../sprint-completion-checklists/sprint-03-completion-checklist.md) — what shipped, a test command for every item, and the known gaps.
+
+- [~] A user can connect at least X, Instagram/Facebook, LinkedIn, and YouTube via real OAuth and see the account appear in the channel list. **Built for eight providers and verifiable up to the platform redirect; no live consent screen has been completed** because no developer apps are registered — see [Known gaps](../sprint-completion-checklists/sprint-03-completion-checklist.md#known-gaps).
+- [~] A test post can be published to each connected MVP platform through the provider's `post()` implementation. **`POST /channels/:id/test-post` reaches every provider's `post()`; it needs a live channel to exercise.** Media publishing depends on Sprint 4's media library, so only text posts are exercisable.
+- [x] Tokens are stored encrypted in the DB — verified by inspecting a raw row: every `token` begins `v1:` and is unreadable.
+- [x] Disconnecting a channel revokes/clears stored credentials — remote revocation is attempted best-effort, the columns are then emptied, and the row is soft-deleted.
+
+### Added beyond the original scope
+
+- [x] **TikTok and Pinterest**, which this document marked P1 "only if the timeline allows".
+- [x] **Two-phase connect** for the five providers where OAuth authorizes a user but a page, account, channel or board must still be chosen — with one configuration surface shared by the fresh-connect and resume-later paths.
+- [x] **A reconnect identity guard**: re-authorizing a *different* account than the channel being repaired is refused, rather than silently swapping credentials.
+- [x] **Queued posts are moved to `DRAFT` on disconnect**, and the confirmation dialog states how many will be affected.
+- [x] **The codebase's first repository layer**, which is what makes the encryption boundary a structural property rather than a convention.
+- [x] **A latent multi-tenant bug fixed**: the API scopes on the `pg_org` cookie while the URL names the workspace, and nothing kept them in step on direct navigation. Channels was the first page to fetch workspace-scoped data and so the first to expose it.
+
+### Deviations from this document, and why
+
+| This doc said | What shipped | Why |
+|---|---|---|
+| X uses "OAuth2 PKCE" like the reference | **OAuth 2.0 PKCE — but the reference does not** | Its current `XProvider` is OAuth 1.0a with HMAC request signing and non-expiring tokens. PKCE was chosen anyway: it issues refresh tokens, so it actually exercises this sprint's refresh goal, and it removes the `twitter-api-v2` dependency. |
+| The reference "confirms AES-256 encrypt-before-write at the persistence boundary" | **Written from scratch** | It does not. Its token columns hold **plaintext**; its encryption helper is used for one unrelated column, called from a controller, decrypted inside providers, and is CBC with a fixed IV derived from `JWT_SECRET` via MD5. There was nothing to follow. |
+| Token cryptography lives in `integration.manager.ts` | **In `channels.repository.ts`** | That TODO was a stale stub. The registry never touches a database; the boundary belongs where plaintext stops. |
+| Five P0 providers | **Eight** | TikTok and Pinterest were the documented stretch; the contract absorbed them without change, which was the point of designing it first. |
+| (unstated) | **Queued posts drafted, not deleted, on disconnect** | The reference silently deletes every scheduled post for the channel with no warning and no undo. Drafting preserves the user's writing and stops the calendar claiming they are still scheduled. |
+| (unstated) | **`needs_setup` and `needs_reconnect` shown differently** | The reference gives both an identical badge. Same symptom, different fixes — a user who cannot tell them apart cannot act. |
 
 ## Risks
-- Each platform's OAuth app review process (especially Meta) can take days-to-weeks for production access — start those app registrations in parallel with this sprint's coding, not after.
+- Each platform's OAuth app review process (especially Meta) can take days-to-weeks for production access — start those app registrations in parallel with this sprint's coding, not after. **This is now the critical path**: the code is done, and four Definition-of-Done items cannot close until an app exists to connect against.
+- **Placeholder credentials look configured.** `isConfigured()` can only check that a value is present, so a handshake started with `.env.example` defaults reaches the platform and is rejected there. Validating credentials at boot would mean calling every platform on startup; the trade is deliberate but worth knowing when a connect attempt fails unhelpfully.

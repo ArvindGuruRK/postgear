@@ -1,7 +1,13 @@
 import { notFound, redirect } from 'next/navigation';
 import { DashboardShell } from '@/components/navigation/dashboard-shell';
+import { SyncActiveWorkspace } from '@/components/navigation/sync-active-workspace';
 import { serverApi } from '@/lib/api';
-import { getSession, getSessionCookieHeader, hasCompletedOnboarding } from '@/lib/session';
+import {
+  getActiveOrgId,
+  getSession,
+  getSessionCookieHeader,
+  hasCompletedOnboarding,
+} from '@/lib/session';
 import { WorkspaceProvider } from '@/components/navigation/workspace-provider';
 import type { Organization } from '@/types/workspace';
 
@@ -46,6 +52,14 @@ export default async function OrgLayout({ children, params }: LayoutProps<'/[org
     notFound();
   }
 
+  // The API scopes workspace-owned requests on the `pg_org` cookie, not on this
+  // segment. Arriving by bookmark, by shared link, or as a user in more than
+  // one workspace (where login sets no default) leaves the two disagreeing —
+  // and every page that fetches workspace data then renders someone else's, or
+  // nothing at all. See `SyncActiveWorkspace` for why the fix lives on the
+  // client.
+  const needsWorkspaceSync = (await getActiveOrgId()) !== active.id;
+
   return (
     <WorkspaceProvider
       organizations={organizations}
@@ -53,6 +67,7 @@ export default async function OrgLayout({ children, params }: LayoutProps<'/[org
       role={active.role}
       user={{ name: session.name, email: session.email }}
     >
+      {needsWorkspaceSync ? <SyncActiveWorkspace orgId={active.id} /> : null}
       <DashboardShell orgId={orgId}>{children}</DashboardShell>
     </WorkspaceProvider>
   );

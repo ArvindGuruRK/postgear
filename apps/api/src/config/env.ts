@@ -29,6 +29,19 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(MIN_SECRET_LENGTH, `JWT_SECRET must be >= ${MIN_SECRET_LENGTH} chars`),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
+  // Required, not optional. Sprint 1 built `packages/db/src/crypto.ts` around
+  // this key and Sprint 3 made it load-bearing: it is what encrypts
+  // `Integration.token` / `refreshToken` at the repository boundary. Absent, the
+  // API would boot happily and then fail the first time anyone connects a
+  // channel — validating it here turns that into a startup error naming the fix.
+  // Generate with `npm run generate:keys`.
+  ENCRYPTION_KEY_AES256: z
+    .string()
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      'ENCRYPTION_KEY_AES256 must be 32 bytes as 64 hex characters — run `npm run generate:keys`',
+    ),
+
   AUTH_COOKIE_NAME: z.string().default('pg_session'),
   ORG_COOKIE_NAME: z.string().default('pg_org'),
 
@@ -41,6 +54,28 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   FACEBOOK_CLIENT_ID: z.string().optional(),
   FACEBOOK_CLIENT_SECRET: z.string().optional(),
+
+  // Social *channel* credentials (Sprint 3). All optional, on the same
+  // reasoning as the login providers above: a developer with no platform apps
+  // registered still gets a working API, and the connect UI renders those
+  // providers disabled with a reason rather than pretending they don't exist.
+  //
+  // Note FACEBOOK_APP_* is a *different Meta app* from FACEBOOK_CLIENT_* above.
+  // Login needs only public_profile/email; publishing needs review-gated scopes
+  // like pages_manage_posts. Sharing one app would put sign-in behind Meta's
+  // app review, so a rejection there would take down authentication too.
+  X_TWITTER_CLIENT_ID: z.string().optional(),
+  X_TWITTER_CLIENT_SECRET: z.string().optional(),
+  FACEBOOK_APP_ID: z.string().optional(),
+  FACEBOOK_APP_SECRET: z.string().optional(),
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  YOUTUBE_CLIENT_ID: z.string().optional(),
+  YOUTUBE_CLIENT_SECRET: z.string().optional(),
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+  PINTEREST_APP_ID: z.string().optional(),
+  PINTEREST_APP_SECRET: z.string().optional(),
 
   LOGIN_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(10),
   LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),

@@ -132,8 +132,21 @@ in the inherited file, so check before assuming.
 
 `Integration.token` and `Integration.refreshToken` hold live OAuth credentials.
 They are encrypted **at the repository layer** with AES-256-GCM — see
-[`../src/crypto.ts`](../src/crypto.ts), built in Sprint 1 and wired up in
-Sprint 3.
+[`../src/crypto.ts`](../src/crypto.ts), built in Sprint 1 and **wired up in
+Sprint 3**.
+
+The repository is
+[`apps/api/src/modules/channels/channels.repository.ts`](../../../apps/api/src/modules/channels/channels.repository.ts),
+the first in the codebase. Two properties of it are worth knowing before writing
+another one:
+
+- **It selects explicitly, and the credential columns are not in the list.**
+  `listForOrg()` cannot leak a token even by accident, because it never reads
+  one. `getWithCredentials()` is the only method that decrypts, and exists for
+  publishing and refreshing alone.
+- **Disconnect empties the columns** rather than leaving live credentials in a
+  soft-deleted row. `token` is `NOT NULL`, so the cleared value is `''` — which
+  `decrypt()` would reject, and the repository handles explicitly.
 
 Repository-layer, specifically, so that:
 - callers above it always see plaintext and can never forget to decrypt;

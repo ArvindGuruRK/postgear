@@ -14,9 +14,7 @@
     "test:coverage": "jest --coverage",
     "clean": "rm -rf dist .turbo node_modules"
   },
-  "dependencies": {
-    "@postgear/db": "*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.5.0"
   }

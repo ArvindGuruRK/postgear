@@ -25,6 +25,13 @@ import {
   SubscriptionTier,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
+// The same helper the channels repository uses. Seeding through it rather than
+// writing placeholder strings is what makes the "inspect a raw row" check
+// meaningful.
+//
+// This import is why `prisma/seeds/tsconfig.json` exists — see the comment
+// there. Under the root ESNext config, ts-node cannot resolve it at all.
+import { encrypt } from '../../src/crypto';
 
 const prisma = new PrismaClient();
 
@@ -46,6 +53,23 @@ const MEMBER_USER_ID = 'seed-member-user';
  * `npm run db:seed` instead of something each developer has to hand-craft.
  */
 const ONBOARDING_USER_ID = 'seed-onboarding-user';
+
+/**
+ * Two connected channels (Sprint 3).
+ *
+ * Without these, every channels view can only ever render its empty state, and
+ * the encryption boundary can only be verified by connecting a real social
+ * account — which needs developer app registrations nobody has on a fresh
+ * clone. Seeding them makes the channel list, both health treatments, the
+ * disconnect flow and the "inspect a raw row" check all exercisable with zero
+ * platform credentials.
+ *
+ * The second row carries `refreshNeeded: true` on purpose: a healthy channel
+ * and a broken one look completely different in the UI, and shipping only the
+ * happy path is how the broken-state rendering goes untested.
+ */
+const DEMO_CHANNEL_ID = 'seed-channel-linkedin';
+const BROKEN_CHANNEL_ID = 'seed-channel-x';
 
 /**
  * The password every seeded account shares.
@@ -223,6 +247,12 @@ async function main() {
     },
   });
 
+  // The tokens are encrypted through the same helper the repository uses, not
+  // written as plaintext placeholders. That matters: the sprint's verification
+  // step is to inspect a raw row and confirm it is unreadable, and a seed that
+  // wrote plaintext would make that check pass or fail for the wrong reason.
+  const seededChannels = await seedChannels(organization.id);
+
   console.log('Seed complete:', {
     organizationId: organization.id,
     secondOrganizationId: secondOrganization.id,
@@ -230,7 +260,69 @@ async function main() {
     memberEmail: member.email,
     unOnboardedEmail: onboardingUser.email,
     password: SEED_PASSWORD,
+    channels: seededChannels,
   });
+}
+
+/**
+ * Two connected channels on the demo workspace — one healthy, one needing a
+ * reconnect. See the comment on DEMO_CHANNEL_ID for why both exist.
+ *
+ * Idempotent like everything else here: fixed ids and upsert, so re-running
+ * refreshes the rows rather than duplicating them.
+ */
+async function seedChannels(organizationId: string) {
+  const channels = [
+    {
+      id: DEMO_CHANNEL_ID,
+      internalId: 'seed-linkedin-account',
+      providerIdentifier: 'linkedin',
+      // Deliberately not "PostGear Demo": the demo organization is
+      // "PostGear Demo Org", and a channel name that is a substring of the
+      // workspace name makes every text-based assertion in the E2E suite
+      // ambiguous between the channel card and the workspace switcher.
+      name: 'Acme Marketing',
+      profile: 'acme-marketing',
+      refreshNeeded: false,
+      // Comfortably in the future, so this row reads as healthy rather than
+      // drifting into the "expiring" warning as the fixture ages.
+      tokenExpiration: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+    },
+    {
+      id: BROKEN_CHANNEL_ID,
+      internalId: 'seed-x-account',
+      providerIdentifier: 'x',
+      name: 'Acme on X',
+      profile: 'acme',
+      refreshNeeded: true,
+      tokenExpiration: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  for (const channel of channels) {
+    const shared = {
+      organizationId,
+      internalId: channel.internalId,
+      providerIdentifier: channel.providerIdentifier,
+      type: 'social',
+      name: channel.name,
+      profile: channel.profile,
+      token: encrypt(`seed-access-token-${channel.internalId}`),
+      refreshToken: encrypt(`seed-refresh-token-${channel.internalId}`),
+      tokenExpiration: channel.tokenExpiration,
+      refreshNeeded: channel.refreshNeeded,
+      inBetweenSteps: false,
+      deletedAt: null,
+    };
+
+    await prisma.integration.upsert({
+      where: { id: channel.id },
+      update: shared,
+      create: { id: channel.id, rootInternalId: channel.internalId, ...shared },
+    });
+  }
+
+  return channels.map((channel) => `${channel.providerIdentifier}:${channel.name}`);
 }
 
 main()

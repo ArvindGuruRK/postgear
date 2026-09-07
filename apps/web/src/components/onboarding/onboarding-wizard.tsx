@@ -14,7 +14,7 @@ import {
 } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, channelConnectUrl } from '@/lib/api';
 import {
   ABOUT_YOU_QUESTIONS,
   CHANNEL_OPTIONS,
@@ -23,6 +23,16 @@ import {
   REFERRAL_QUESTION,
 } from '@/lib/onboarding-questions';
 import { ChoiceGroup, MultiChoiceGroup } from './choice-group';
+
+/**
+ * The display name for a channel slug.
+ *
+ * `CHANNEL_OPTIONS` is the same list the Channels page's registry is keyed on,
+ * so the slug doubles as the provider identifier — no mapping table needed.
+ */
+function channelLabel(value: string): string {
+  return CHANNEL_OPTIONS.find((option) => option.value === value)?.label ?? 'a channel';
+}
 
 /**
  * The five-step onboarding wizard.
@@ -265,16 +275,42 @@ export function OnboardingWizard({
             }
           />
 
-          {/* Connecting a channel is Sprint 3's work. The affordance is shown
-              disabled rather than hidden so the flow reads as complete, and
-              "Continue" is always live beside it — the sprint requires that a
-              user who cannot finish an OAuth handshake still reaches the app. */}
+          {/* "Continue" stays live beside this: a user who cannot finish an
+              OAuth handshake right now must still reach the app, so connecting
+              is an offer and never a requirement.
+
+              This records the step *before* navigating, and deliberately does
+              not mark onboarding complete. OAuth leaves the app entirely, so
+              there is no half-finished wizard to come back to — but the last
+              survey question has not been asked yet, and completing early to
+              avoid an awkward return would silently discard it. Instead the
+              step is advanced to 5, so when the platform sends the user back
+              the second route gate returns them here to finish, with their
+              channel already connected.
+
+              The provider is the first platform they named above; the connect
+              endpoint resolves the workspace from the cookie set when they
+              created it at step 1. */}
           <Stack gap="sm">
-            <Button variant="secondary" disabled>
-              Connect a channel — coming in Sprint 3
+            <Button
+              variant="secondary"
+              disabled={pending || answers.interestedChannels.length === 0}
+              onClick={() =>
+                submit(async () => {
+                  await api('/onboarding/channels', {
+                    method: 'POST',
+                    body: { interestedChannels: answers.interestedChannels },
+                  });
+                  window.location.href = channelConnectUrl(answers.interestedChannels[0]);
+                }, 5)
+              }
+            >
+              Connect {answers.interestedChannels[0] ? channelLabel(answers.interestedChannels[0]) : 'a channel'} now
             </Button>
             <Text size="sm" muted>
-              You can connect accounts any time from the Channels page.
+              {answers.interestedChannels.length === 0
+                ? 'Pick a platform above to connect one now — or skip and do it later from the Channels page.'
+                : 'Or skip — you can connect accounts any time from the Channels page.'}
             </Text>
           </Stack>
 

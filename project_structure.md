@@ -196,21 +196,33 @@ packages/db/
 packages/social-core/
 ├── src/
 │   ├── abstract/
-│   │   └── social.abstract.ts   # Base TypeScript Abstract Interface Class
+│   │   ├── social.provider.interface.ts # The SocialProvider contract
+│   │   ├── social.abstract.ts   # Base class: fetch() with retry + typed errors
+│   │   └── errors.ts            # RefreshToken / BadBody / Retryable / NotEnoughScopes
 │   ├── providers/               # Social Network Implementation Modules
-│   │   ├── twitter/             # X (Twitter) API v2 Integration (OAuth2 PKCE)
+│   │   ├── twitter/             # X — API v2, OAuth 2.0 PKCE (identifier: 'x')
+│   │   ├── meta/                # Shared Graph API plumbing for the two below
 │   │   ├── instagram/           # Instagram Business Graph API
 │   │   ├── facebook/            # Facebook Pages API
-│   │   ├── linkedin/            # LinkedIn v2 Share & Assets API
+│   │   ├── linkedin/            # LinkedIn v2 — personal + page providers
 │   │   ├── youtube/             # YouTube Data API v3
-│   │   ├── tiktok/              # TikTok Content Posting API (v1)
+│   │   ├── tiktok/              # TikTok Content Posting API v2
 │   │   └── pinterest/           # Pinterest API v5
 │   ├── manager/
-│   │   └── integration.manager.ts # Integration Registry & Token Cryptography
+│   │   └── integration.manager.ts # Provider registry, keyed by identifier
 │   └── index.ts                 # Package Entry Point
 ├── package.json
 └── tsconfig.json
 ```
+
+> **Two corrections to the sketch above, made real in Sprint 3.** Token
+> cryptography is **not** in `integration.manager.ts` — it lives at the
+> persistence boundary, in `apps/api/src/modules/channels/channels.repository.ts`,
+> using the AES-256-GCM helper in `packages/db/src/crypto.ts`. A registry that
+> never touches a database has no business holding a key. And the folder is
+> `twitter/` while the provider identifier is `'x'`: the identifier is written to
+> `Integration.providerIdentifier`, so changing it later would be a migration,
+> whereas a folder name is cosmetic.
 
 ---
 

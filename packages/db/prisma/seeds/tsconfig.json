@@ -1,0 +1,27 @@
+{
+  // Config for the seeder, which runs under ts-node rather than through a
+  // bundler — the same problem `scripts/tsconfig.json` solves, for the same
+  // reason, and deliberately the same shape.
+  //
+  // The root config targets ESNext/bundler for the apps. Under that, ts-node
+  // hands relative imports to Node's ESM loader, which does no extensionless
+  // resolution and does not know how to map a `.js` specifier onto a `.ts`
+  // file — so importing anything from `packages/db/src` fails with
+  // ERR_MODULE_NOT_FOUND. `node16` with no `"type": "module"` in package.json
+  // resolves these files as CommonJS, which is what ts-node wants.
+  //
+  // This became necessary in Sprint 3, when the seed started importing the
+  // real `encrypt` helper so that seeded channel tokens are genuine ciphertext
+  // rather than plaintext placeholders.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../../src/**/*.ts"]
+}

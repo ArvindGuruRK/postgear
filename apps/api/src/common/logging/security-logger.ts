@@ -94,7 +94,17 @@ export type SecurityEvent =
   | 'activation.succeeded'
   | 'oauth.state_mismatch'
   | 'oauth.succeeded'
-  | 'rbac.denied';
+  | 'rbac.denied'
+  // Social channel connections (Sprint 3). Namespaced `channel.*` so they stay
+  // distinguishable from the `oauth.*` events above, which are sign-in: the two
+  // flows share a shape but fail for entirely different reasons.
+  | 'channel.oauth.state_mismatch'
+  | 'channel.oauth.membership_revoked'
+  | 'channel.oauth.reconnect_mismatch'
+  | 'channel.oauth.failed'
+  | 'channel.oauth.succeeded'
+  | 'channel.revoke.failed'
+  | 'channel.refresh.failed';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

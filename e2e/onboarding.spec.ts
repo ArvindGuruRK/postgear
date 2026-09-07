@@ -119,11 +119,14 @@ test.describe('the onboarding wizard', () => {
     await page.getByRole('button', { name: 'Continue' }).click();
 
     // Step 4 — channels. Selecting nothing turns Continue into "Skip for now".
-    // The sprint requires that a user who cannot finish an OAuth handshake
-    // still reaches the dashboard, so the connect button is disabled until
-    // Sprint 3 while the skip stays live.
+    //
+    // Sprint 3 made the connect button real, but it stays disabled until a
+    // platform is picked — there is nothing to connect otherwise. The skip path
+    // is what matters here and must never require an OAuth handshake: the
+    // sprint requires that a user who cannot complete one still reaches the
+    // dashboard.
     await expect(page.getByRole('heading', { name: 'Where do you post?' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Connect a channel/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Connect .* now/ })).toBeDisabled();
     await page.getByRole('button', { name: 'Skip for now' }).click();
 
     // Step 5 — Q5 referral
