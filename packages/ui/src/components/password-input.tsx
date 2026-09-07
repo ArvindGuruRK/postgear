@@ -32,7 +32,9 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ className, ...props }, ref) => {
     const [visible, setVisible] = useState(false);
     const label = visible ? 'Hide password' : 'Show password';
-    const ToggleIcon = visible ? EyeClosed : Eye;
+    // Icon reflects current state, not the click action: closed eye while
+    // masked (the default), open eye once revealed.
+    const ToggleIcon = visible ? Eye : EyeClosed;
 
     return (
       <div className="relative w-full">

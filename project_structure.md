@@ -443,8 +443,8 @@ NEXTAUTH_URL="http://localhost:3000"
 # OAUTH AUTHENTICATION PROVIDERS
 GOOGLE_CLIENT_ID="google-client-id"
 GOOGLE_CLIENT_SECRET="google-client-secret"
-GITHUB_CLIENT_ID="github-client-id"
-GITHUB_CLIENT_SECRET="github-client-secret"
+FACEBOOK_CLIENT_ID="facebook-client-id"
+FACEBOOK_CLIENT_SECRET="facebook-client-secret"
 
 # -----------------------------------------------------------------------------
 # SOCIAL PLATFORM OAUTH & API KEYS

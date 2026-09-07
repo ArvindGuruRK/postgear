@@ -39,8 +39,8 @@ const envSchema = z.object({
   // ProvidersManager reports a provider as unconfigured rather than crashing.
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GITHUB_CLIENT_ID: z.string().optional(),
-  GITHUB_CLIENT_SECRET: z.string().optional(),
+  FACEBOOK_CLIENT_ID: z.string().optional(),
+  FACEBOOK_CLIENT_SECRET: z.string().optional(),
 
   LOGIN_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(10),
   LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),

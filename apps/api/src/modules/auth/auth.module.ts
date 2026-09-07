@@ -5,7 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { LockoutService } from './lockout.service';
 import { PasswordService } from './password.service';
-import { GithubAuthProvider } from './providers/github.provider';
+import { FacebookAuthProvider } from './providers/facebook.provider';
 import { GoogleAuthProvider } from './providers/google.provider';
 import { ProvidersManager } from './providers/providers.manager';
 import { TokenService } from './token.service';
@@ -37,7 +37,7 @@ import { TokenService } from './token.service';
     TokenService,
     LockoutService,
     GoogleAuthProvider,
-    GithubAuthProvider,
+    FacebookAuthProvider,
     ProvidersManager,
   ],
   // JwtModule is re-exported so JwtAuthGuard — registered globally in

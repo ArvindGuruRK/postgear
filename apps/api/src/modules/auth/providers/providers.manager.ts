@@ -4,7 +4,7 @@ import type { Provider } from '@postgear/db';
 import { RedisService } from '../../redis/redis.service';
 import { OAUTH_STATE_TTL_SECONDS } from '../token.service';
 import { type AuthProvider, OAuthError } from './auth-provider.interface';
-import { GithubAuthProvider } from './github.provider';
+import { FacebookAuthProvider } from './facebook.provider';
 import { GoogleAuthProvider } from './google.provider';
 
 /**
@@ -35,12 +35,12 @@ export class ProvidersManager {
 
   constructor(
     google: GoogleAuthProvider,
-    github: GithubAuthProvider,
+    facebook: FacebookAuthProvider,
     private readonly redis: RedisService,
   ) {
     this.providers = new Map<string, AuthProvider>([
       ['google', google],
-      ['github', github],
+      ['facebook', facebook],
     ]);
   }
 
@@ -85,7 +85,7 @@ export class ProvidersManager {
    * header cannot replay it, because the second attempt finds nothing stored.
    *
    * It also checks that the state was issued for *this* provider, which closes
-   * a cross-provider mix-up where a state minted for GitHub is presented to
+   * a cross-provider mix-up where a state minted for Facebook is presented to
    * the Google callback.
    */
   async consumeState(name: string, state: string | undefined): Promise<boolean> {

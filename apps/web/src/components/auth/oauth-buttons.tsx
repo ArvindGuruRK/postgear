@@ -4,7 +4,7 @@ import { Button, Separator, Stack, Text } from '@postgear/ui';
 import { oauthStartUrl } from '@/lib/api';
 
 /**
- * The Google and GitHub buttons, shared by sign-in and sign-up.
+ * The Google and Facebook buttons, shared by sign-in and sign-up.
  *
  * A full page navigation rather than a `fetch`, because the provider's consent
  * screen is a page the user has to actually see, and the callback must return
@@ -40,10 +40,10 @@ export function OAuthButtons() {
           variant="secondary"
           className="flex-1"
           onClick={() => {
-            window.location.href = oauthStartUrl('github');
+            window.location.href = oauthStartUrl('facebook');
           }}
         >
-          GitHub
+          Facebook
         </Button>
       </Stack>
     </>

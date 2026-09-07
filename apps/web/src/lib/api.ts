@@ -108,6 +108,6 @@ export function serverApi<T>(path: string, options: ApiOptions = {}): Promise<T>
  * user has to see, and the callback needs to arrive as a top-level request so
  * the API's `sameSite: 'lax'` session cookie is accepted.
  */
-export function oauthStartUrl(provider: 'google' | 'github'): string {
+export function oauthStartUrl(provider: 'google' | 'facebook'): string {
   return `${BROWSER_API_URL}/auth/oauth/${provider}`;
 }

@@ -497,7 +497,7 @@ enum Period {
 
 enum Provider {
   LOCAL
-  GITHUB
+  FACEBOOK
   GOOGLE
   FARCASTER
   WALLET
