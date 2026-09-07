@@ -398,13 +398,18 @@ Expect **34 passed**, up from 28.
 All eight providers are implemented and the handshake is verifiable up to the
 platform redirect, but `.env` holds placeholder credentials, so no consent screen
 has been completed. What placeholders do *not* cover: the live token exchange,
-the exact response shapes, and the granted-scope strings. Close it by registering
-apps with callback
-`http://localhost:3001/channels/connect/<provider>/callback` — where
-`<provider>` is one of `x`, `linkedin`, `linkedin-page`, `facebook`,
-`instagram`, `youtube`, `tiktok`, `pinterest` — putting real credentials in
-`.env`, and connecting. Then reconnect the same channel with a *different*
-account to confirm the identity guard in 3.8 refuses it.
+the exact response shapes, and the granted-scope strings.
+
+**→ [docs/social-platform-setup.md](../social-platform-setup.md)** is the
+step-by-step guide for closing this — every portal, the exact scopes and
+environment variables, the callback URL per provider, and the platform-specific
+traps (Meta's business verification, LinkedIn's Community Management API
+approval, TikTok's private-until-audited posting, and the HTTPS-tunnel
+requirement several portals impose on redirect URIs).
+
+Start with **X**: it is the quickest to register and the only one that cleanly
+exercises PKCE plus a real refresh token. Then reconnect that channel with a
+*different* account to confirm the identity guard in 3.8 refuses it.
 
 **2. No real test post has been published.** `POST /channels/:id/test-post`
 exists and reaches each provider's `post()`, but it needs a live channel.
