@@ -23,7 +23,9 @@
  */
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
-import { SocialAbstract } from '../../abstract/social.abstract';
+import { SocialAbstract, sleep } from '../../abstract/social.abstract';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -49,6 +51,43 @@ const API_BASE = 'https://api.linkedin.com';
 const LINKEDIN_VERSION = '202601';
 
 const MAX_LENGTH = 3_000;
+
+/** LinkedIn's multi-image post takes between two and twenty images. */
+const MAX_IMAGES = 20;
+
+/**
+ * How long to let LinkedIn process uploaded images before referencing them.
+ *
+ * An image is accepted by the upload URL before it is usable, and a post that
+ * references it too early is rejected. A member token (`w_member_social`) is
+ * write-only for the Images API, so the status cannot be polled; a short fixed
+ * wait is the documented workaround, and it is the same for page tokens so the
+ * two providers share one path.
+ */
+const IMAGE_PROCESSING_DELAY_MS = 10_000;
+
+/**
+ * What this provider publishes (Sprint 4).
+ *
+ * Images: one, or a multi-image post of up to twenty. **No video** — LinkedIn
+ * accepts it, but its Videos API is a chunked multipart upload with a finalize
+ * step and an asynchronous processing poll that PostGear does not implement
+ * yet, so the composer refuses video rather than letting it be dropped at
+ * publish time. Later parts are comments, which carry text only.
+ */
+export const LINKEDIN_RULES: ProviderRules = {
+  maxLength: MAX_LENGTH,
+  lengthMethod: 'utf16',
+  thread: 'comments',
+  followUpMedia: false,
+  media: {
+    required: false,
+    maxItems: MAX_IMAGES,
+    maxImages: MAX_IMAGES,
+    maxVideos: 0,
+    allowMixed: false,
+  },
+};
 
 interface LinkedInTokenResponse {
   access_token: string;
@@ -78,14 +117,13 @@ export class LinkedInProvider extends SocialAbstract implements SocialProvider {
     return MAX_LENGTH;
   }
 
+  readonly rules = LINKEDIN_RULES;
+
+  /** Overridable so tests do not sit through LinkedIn's processing wait. */
+  protected imageProcessingDelayMs = IMAGE_PROCESSING_DELAY_MS;
+
   override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const media = post.media ?? [];
-      if (media.filter((item) => item.type === 'video').length > 0 && media.length > 1) {
-        return 'LinkedIn posts with a video can have only that one attachment.';
-      }
-    }
-    return true;
+    return checkAgainstRules(this, posts);
   }
 
   protected override handleErrors(body: string): HandledError | undefined {
@@ -232,6 +270,8 @@ export class LinkedInProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     post: PostDetails,
   ): Promise<PostResponse> {
+    const images = await this.uploadImages(channel, accessToken, post);
+
     const payload = {
       author: this.authorUrn(channel.internalId),
       commentary: this.escapeText(post.message),
@@ -241,6 +281,7 @@ export class LinkedInProvider extends SocialAbstract implements SocialProvider {
         targetEntities: [],
         thirdPartyDistributionChannels: [],
       },
+      ...this.contentFor(images),
       lifecycleState: 'PUBLISHED',
       isReshareDisabledByAuthor: false,
     };
@@ -267,6 +308,74 @@ export class LinkedInProvider extends SocialAbstract implements SocialProvider {
       postId,
       releaseURL: `https://www.linkedin.com/feed/update/${postId}`,
     };
+  }
+
+  /**
+   * Uploads a post's images and returns their URNs with alt text.
+   *
+   * Sprint 3 shipped `createPost` sending commentary alone, so an attached image
+   * was accepted by `checkValidity` and then silently dropped. The Images API
+   * is three steps: initialize an upload owned by the author, PUT the bytes to
+   * the URL it returns, then reference the returned `urn:li:image:` in the post.
+   * The owner must be the same URN as the post's author, which is why this goes
+   * through `authorUrn` and serves the page provider unchanged.
+   */
+  private async uploadImages(
+    channel: ChannelContext,
+    accessToken: string,
+    post: PostDetails,
+  ): Promise<{ id: string; altText?: string }[]> {
+    const images = (post.media ?? []).filter((item) => item.type === 'image');
+    const uploaded: { id: string; altText?: string }[] = [];
+
+    for (const image of images) {
+      const initialized = await this.fetchJson<{ value?: { uploadUrl?: string; image?: string } }>(
+        `${API_BASE}/rest/images?action=initializeUpload`,
+        {
+          method: 'POST',
+          headers: this.restHeaders(accessToken),
+          body: JSON.stringify({
+            initializeUploadRequest: { owner: this.authorUrn(channel.internalId) },
+          }),
+        },
+      );
+
+      const uploadUrl = initialized.value?.uploadUrl;
+      const urn = initialized.value?.image;
+
+      if (!uploadUrl || !urn) {
+        throw new BadBodyError('LinkedIn did not return an image upload URL.', this.identifier);
+      }
+
+      const source = await this.fetch(image.path);
+
+      await this.fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: await source.arrayBuffer(),
+      });
+
+      uploaded.push(image.alt ? { id: urn, altText: image.alt } : { id: urn });
+    }
+
+    if (uploaded.length > 0 && this.imageProcessingDelayMs > 0) {
+      await sleep(this.imageProcessingDelayMs);
+    }
+
+    return uploaded;
+  }
+
+  /** One image is `media`; two or more is `multiImage`. None adds nothing. */
+  private contentFor(images: { id: string; altText?: string }[]): Record<string, unknown> {
+    if (images.length === 0) {
+      return {};
+    }
+
+    if (images.length === 1) {
+      return { content: { media: images[0] } };
+    }
+
+    return { content: { multiImage: { images } } };
   }
 
   /** `urn:li:person:` here; the page provider overrides this. */

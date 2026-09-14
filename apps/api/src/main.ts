@@ -15,6 +15,10 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import type { Env } from './config/env';
+import { storageConfigFrom } from './modules/media/media.module';
+import { UPLOADS_ROUTE } from './modules/media/storage/local.storage';
+import { resolveUploadDirectory } from './modules/media/storage/storage.factory';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false });
@@ -43,6 +47,41 @@ async function bootstrap(): Promise<void> {
     // and login appears to succeed while leaving the user signed out.
     credentials: true,
   });
+
+  // A post is sent whole: every part of a thread, for every channel that has
+  // been customized, as structured documents. Express's 100 KB default is
+  // reached by an ordinary customized thread; 1 MB is roomy for any real post
+  // and still a hard cap. Every document inside is bounded again by its schema.
+  app.useBodyParser('json', { limit: '1mb' });
+
+  // Local-disk media (Sprint 4), served at /uploads when that backend is active.
+  //
+  // Public, like an S3 object: platforms fetch media without a session, and
+  // the random key is the access control. Registered as middleware, so it is
+  // answered before any guard runs — which is the point, not an oversight.
+  //
+  // Two headers are overridden for this route only:
+  // - `Cross-Origin-Resource-Policy: cross-origin`. Helmet's default,
+  //   `same-origin`, makes the browser refuse to render these images inside
+  //   the web app, which is a different origin (port 3000 vs 3001).
+  // - A `sandbox` CSP. Only sniffed images and video are ever stored here, but
+  //   if anything else were, it still could not run script on this origin.
+  const storage = storageConfigFrom(app.get<ConfigService<Env, true>>(ConfigService));
+
+  if (storage.provider === 'local') {
+    app.useStaticAssets(resolveUploadDirectory(storage.uploadDirectory), {
+      prefix: `${UPLOADS_ROUTE}/`,
+      index: false,
+      dotfiles: 'deny',
+      // Keys are never reused, so a cached copy can never be stale.
+      immutable: true,
+      maxAge: '365d',
+      setHeaders: (response) => {
+        response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      },
+    });
+  }
 
   // No global ValidationPipe. Nest's built-in one requires class-validator,
   // which this app does not use — every route body is validated by an explicit

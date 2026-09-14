@@ -18,6 +18,8 @@
  */
 import { BadBodyError, RetryableError } from '../../abstract/errors';
 import { sleep } from '../../abstract/social.abstract';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -32,6 +34,39 @@ import { GRAPH_BASE, MetaGraphProvider } from '../meta/meta.graph';
 
 const MAX_LENGTH = 2_200;
 const MAX_CAROUSEL_ITEMS = 10;
+
+/**
+ * What Instagram's Content Publishing API accepts.
+ *
+ * Three rules here are the classic silent failures, each taken from Meta's
+ * container documentation rather than guessed:
+ *
+ * - **No text-only posts.** Every post needs an image or a video.
+ * - **JPEG only.** The API fetches `image_url` itself and refuses PNG, GIF and
+ *   WebP. PostGear's media pipeline stores photos as JPEG, so this only bites on
+ *   an image that kept transparency and was therefore stored as PNG.
+ * - **Aspect ratio 4:5 to 1.91:1**, and at most 8 MB. A tall phone screenshot
+ *   is outside that range and is rejected when the container is created.
+ *
+ * Carousels mix images and video freely. Later parts become comments, which
+ * carry text only.
+ */
+export const INSTAGRAM_RULES: ProviderRules = {
+  maxLength: MAX_LENGTH,
+  lengthMethod: 'utf16',
+  thread: 'comments',
+  followUpMedia: false,
+  media: {
+    required: true,
+    maxItems: MAX_CAROUSEL_ITEMS,
+    maxImages: MAX_CAROUSEL_ITEMS,
+    maxVideos: MAX_CAROUSEL_ITEMS,
+    allowMixed: true,
+    imageMimeTypes: ['image/jpeg'],
+    maxImageBytes: 8 * 1024 * 1024,
+    imageAspectRatio: { min: 0.8, max: 1.91 },
+  },
+};
 
 /** Video containers are processed asynchronously; these bound the wait. */
 const CONTAINER_POLL_ATTEMPTS = 30;
@@ -64,19 +99,10 @@ export class InstagramProvider
     return MAX_LENGTH;
   }
 
-  override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const media = post.media ?? [];
+  readonly rules = INSTAGRAM_RULES;
 
-      // The one rule that catches people out: Instagram has no text-only post.
-      if (media.length === 0) {
-        return 'Instagram posts must include at least one image or video.';
-      }
-      if (media.length > MAX_CAROUSEL_ITEMS) {
-        return `Instagram carousels can have at most ${MAX_CAROUSEL_ITEMS} items.`;
-      }
-    }
-    return true;
+  override async checkValidity(posts: PostDetails[]): Promise<string | true> {
+    return checkAgainstRules(this, posts);
   }
 
   async authenticate(params: AuthenticateParams): Promise<AuthTokenDetails> {

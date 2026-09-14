@@ -14,6 +14,8 @@
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -34,6 +36,32 @@ const API_BASE = 'https://api.pinterest.com/v5';
 /** Pin descriptions cap at 800; titles at 100. */
 const MAX_LENGTH = 800;
 const MAX_TITLE_LENGTH = 100;
+
+/**
+ * What this provider publishes: one image per Pin, no threads.
+ *
+ * Video is declared unsupported because `createPin` cannot publish it. A
+ * Pinterest video Pin needs the bytes registered through the media upload API
+ * first, which returns the `video_id` that `media_source` expects — passing a
+ * URL where that id belongs is rejected. Until that flow exists, saying "no
+ * video" in the composer is the honest answer.
+ *
+ * No `title` rule: the provider truncates an over-long first line to 100
+ * characters rather than failing, and the preview shows the cut.
+ */
+export const PINTEREST_RULES: ProviderRules = {
+  maxLength: MAX_LENGTH,
+  lengthMethod: 'utf16',
+  thread: 'none',
+  followUpMedia: false,
+  media: {
+    required: true,
+    maxItems: 1,
+    maxImages: 1,
+    maxVideos: 0,
+    allowMixed: false,
+  },
+};
 
 interface PinterestTokenResponse {
   access_token: string;
@@ -74,18 +102,10 @@ export class PinterestProvider
     return MAX_LENGTH;
   }
 
-  override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const media = post.media ?? [];
+  readonly rules = PINTEREST_RULES;
 
-      if (media.length === 0) {
-        return 'A Pinterest Pin must include an image or video.';
-      }
-      if (media.length > 1) {
-        return 'A Pinterest Pin can have only one image or video.';
-      }
-    }
-    return true;
+  override async checkValidity(posts: PostDetails[]): Promise<string | true> {
+    return checkAgainstRules(this, posts);
   }
 
   protected override handleErrors(body: string): HandledError | undefined {

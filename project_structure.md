@@ -131,6 +131,7 @@ apps/api/
 │   │   ├── users/               # Profile Management & Notification Prefs
 │   │   ├── channels/            # Social Channel Connections & OAuth Token Handlers
 │   │   ├── posts/               # Post CRUD, Drafts, Threads & State Engine
+│   │   ├── media/               # Uploads, sharp compression, storage/ backends (local | S3)
 │   │   ├── scheduling/          # Slot Manager & Temporal Trigger Dispatcher
 │   │   ├── seo/                 # SEO Analysis Proxy Controller & History API
 │   │   ├── analytics/           # Performance Metrics Collector & Aggregator
@@ -198,7 +199,9 @@ packages/social-core/
 │   ├── abstract/
 │   │   ├── social.provider.interface.ts # The SocialProvider contract
 │   │   ├── social.abstract.ts   # Base class: fetch() with retry + typed errors
+│   │   ├── validity.ts          # checkValidity, once, from each provider's rules
 │   │   └── errors.ts            # RefreshToken / BadBody / Retryable / NotEnoughScopes
+│   ├── composer/                # Browser-safe: post document, render, length, rules, validate
 │   ├── providers/               # Social Network Implementation Modules
 │   │   ├── twitter/             # X — API v2, OAuth 2.0 PKCE (identifier: 'x')
 │   │   ├── meta/                # Shared Graph API plumbing for the two below
@@ -214,6 +217,20 @@ packages/social-core/
 ├── package.json
 └── tsconfig.json
 ```
+
+> **One addition, made in Sprint 4: `composer/` is a second entry point.** It
+> holds everything the post composer must agree with the publisher about — the
+> post document, its rendering to platform text, X's weighted length, declarative
+> `ProviderRules` and the one validator — with no Node imports and no provider
+> classes. `apps/web` imports it as `@postgear/social-core/composer` (a path alias
+> in its tsconfig) and never the package root, which would bundle the providers
+> and `node:crypto` into the browser. Each provider now declares `rules` beside
+> the code that publishes, and `/channels/providers` sends them to the composer,
+> so no platform rule is hardcoded in the UI.
+>
+> Storage-backend logic lives in `apps/api/src/modules/media/storage/`, not in a
+> package: only the API writes media, and the factory there picks local disk or
+> S3 from `STORAGE_PROVIDER`.
 
 > **Two corrections to the sketch above, made real in Sprint 3.** Token
 > cryptography is **not** in `integration.manager.ts` — it lives at the

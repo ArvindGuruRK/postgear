@@ -72,6 +72,17 @@ const DEMO_CHANNEL_ID = 'seed-channel-linkedin';
 const BROKEN_CHANNEL_ID = 'seed-channel-x';
 
 /**
+ * A third, healthy channel on a platform with very different rules (Sprint 4).
+ *
+ * The composer's whole job is showing one post against several platforms'
+ * rules at once. X counts weighted characters and threads natively; LinkedIn
+ * turns later parts into comments; Instagram refuses a post with no image and
+ * accepts JPEG only. With all three seeded, every one of those behaviours is
+ * visible in a fresh workspace without connecting anything.
+ */
+const INSTAGRAM_CHANNEL_ID = 'seed-channel-instagram';
+
+/**
  * The password every seeded account shares.
  *
  * A known value in a local seed is fine and useful; the point of hashing it
@@ -296,6 +307,16 @@ async function seedChannels(organizationId: string) {
       profile: 'acme',
       refreshNeeded: true,
       tokenExpiration: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    },
+    {
+      id: INSTAGRAM_CHANNEL_ID,
+      internalId: 'seed-instagram-account',
+      providerIdentifier: 'instagram',
+      name: 'Acme Studio',
+      profile: 'acme.studio',
+      refreshNeeded: false,
+      // Page-scoped Meta tokens are long-lived; a far expiry keeps it healthy.
+      tokenExpiration: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
     },
   ];
 

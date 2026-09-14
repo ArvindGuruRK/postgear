@@ -109,6 +109,56 @@
   }
 }
 
+/* ── Composer editor (Sprint 4) ───────────────────────────────────────────
+   TipTap renders plain semantic HTML into a contenteditable, and Tailwind's
+   preflight strips the browser's list bullets and heading sizes from it, so
+   the editing surface restores exactly the formatting the post document can
+   hold — nothing more. Restrained, per design-system-rules.md §15: this is a
+   dense text surface, so no display face and no brutal shadow on the text.
+   `.is-editor-empty` and `data-placeholder` are set by TipTap's Placeholder
+   extension on an empty first paragraph. */
+.pg-editor .ProseMirror {
+  min-height: 7rem;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+.pg-editor .ProseMirror p {
+  margin: 0;
+}
+.pg-editor .ProseMirror h2 {
+  margin: 0.25rem 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+.pg-editor .ProseMirror ul,
+.pg-editor .ProseMirror ol {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+.pg-editor .ProseMirror ul {
+  list-style: disc;
+}
+.pg-editor .ProseMirror ol {
+  list-style: decimal;
+}
+.pg-editor .ProseMirror a {
+  color: var(--color-forth);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.pg-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-ink);
+  opacity: 0.5;
+}
+
 /* The setup this file once listed as outstanding is all in place as of
    Sprint 0's close: `@tailwindcss/postcss` is installed and wired through
    postcss.config.js, the two plugins that were listed were dropped rather

@@ -44,7 +44,7 @@ export class ApiError extends Error {
 }
 
 export interface ApiOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   /** Server-side only: the cookie header to forward. */
   cookie?: string;
@@ -99,6 +99,71 @@ export function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
  */
 export function serverApi<T>(path: string, options: ApiOptions = {}): Promise<T> {
   return request<T>(SERVER_API_URL, path, options);
+}
+
+/**
+ * Uploads one file as multipart form data, reporting progress.
+ *
+ * `XMLHttpRequest` rather than `fetch`, for one reason: `fetch` has no upload
+ * progress event, and a 200 MB video with no progress bar looks exactly like a
+ * frozen page. Credentials travel the same way as `api()` — the session cookie,
+ * via `withCredentials`.
+ *
+ * No `Content-Type` is set: the browser writes the multipart boundary itself,
+ * and a hand-set header would omit it.
+ */
+export function uploadFile<T>(
+  path: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    const form = new FormData();
+    form.append('file', file);
+
+    request.open('POST', `${BROWSER_API_URL}${path}`);
+    request.withCredentials = true;
+
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(event.loaded / event.total);
+      }
+    };
+
+    request.onload = () => {
+      let payload: Record<string, unknown> = {};
+
+      try {
+        payload = request.responseText
+          ? (JSON.parse(request.responseText) as Record<string, unknown>)
+          : {};
+      } catch {
+        // A proxy's HTML error page; the status below still says what happened.
+      }
+
+      if (request.status >= 200 && request.status < 300) {
+        resolve(payload as T);
+        return;
+      }
+
+      reject(
+        new ApiError(
+          typeof payload.error === 'string'
+            ? payload.error
+            : request.status === 413
+              ? 'That file is too large.'
+              : 'The upload failed. Please try again.',
+          request.status,
+        ),
+      );
+    };
+
+    request.onerror = () =>
+      reject(new ApiError('The upload was interrupted. Check your connection and try again.', 0));
+
+    request.send(form);
+  });
 }
 
 /**

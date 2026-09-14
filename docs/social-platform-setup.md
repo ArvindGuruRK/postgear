@@ -67,6 +67,30 @@ Restart the API afterwards. Getting this wrong is the single most common way to
 lose an hour here: the consent screen appears, and the platform then refuses the
 redirect because the URI does not match the registration.
 
+## Media has to be reachable from the internet, too (Sprint 4)
+
+Connecting a channel only needs the callback to reach PostGear. **Publishing an
+image or video** needs more: Instagram, Facebook, Pinterest and TikTok do not
+accept uploaded bytes from PostGear — they are handed the media library's URL
+and fetch the file themselves. With the default `STORAGE_PROVIDER=local` that URL is
+`<API_URL>/uploads/…`, which `localhost` makes unreachable to them, and the post
+fails at the platform with a fetch error rather than in PostGear.
+
+Two ways to make it work:
+
+- **A tunnel** — the one set up above. Media URLs are built from `API_URL`, so
+  pointing it at the tunnel hostname makes uploads fetchable as well. Fine for
+  testing.
+- **An S3-compatible bucket** with public read — what production needs anyway.
+  Set `STORAGE_PROVIDER=s3` and the `S3_*` variables in `.env.example`, with
+  `S3_PUBLIC_URL` as the bucket's public address.
+
+X, LinkedIn and YouTube download the file inside PostGear and upload the bytes,
+so they only need PostGear itself to reach the URL. **TikTok is the strictest:**
+its `PULL_FROM_URL` upload only accepts a domain verified in the TikTok developer
+portal, which in practice means a bucket or CDN on a domain you own — a
+throwaway tunnel hostname will not do.
+
 ---
 
 ## 1. Meta — Facebook Pages + Instagram (start first, longest lead time)

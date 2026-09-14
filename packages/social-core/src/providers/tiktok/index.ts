@@ -14,6 +14,8 @@
 import { BadBodyError, RetryableError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract, sleep } from '../../abstract/social.abstract';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -31,6 +33,25 @@ const REVOKE_URL = 'https://open.tiktokapis.com/v2/oauth/revoke/';
 const API_BASE = 'https://open.tiktokapis.com/v2';
 
 const MAX_LENGTH = 2_200;
+
+/**
+ * One video per post, no threads. TikTok's photo mode is a separate API this
+ * provider does not call, so images are declared unsupported rather than
+ * accepted and dropped.
+ */
+export const TIKTOK_RULES: ProviderRules = {
+  maxLength: MAX_LENGTH,
+  lengthMethod: 'utf16',
+  thread: 'none',
+  followUpMedia: false,
+  media: {
+    required: true,
+    maxItems: 1,
+    maxImages: 0,
+    maxVideos: 1,
+    allowMixed: false,
+  },
+};
 
 const STATUS_POLL_ATTEMPTS = 30;
 const STATUS_POLL_INTERVAL_MS = 5_000;
@@ -58,15 +79,10 @@ export class TikTokProvider extends SocialAbstract implements SocialProvider {
     return MAX_LENGTH;
   }
 
-  override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const videos = (post.media ?? []).filter((item) => item.type === 'video');
+  readonly rules = TIKTOK_RULES;
 
-      if (videos.length !== 1) {
-        return 'A TikTok post must have exactly one video.';
-      }
-    }
-    return true;
+  override async checkValidity(posts: PostDetails[]): Promise<string | true> {
+    return checkAgainstRules(this, posts);
   }
 
   protected override handleErrors(body: string): HandledError | undefined {

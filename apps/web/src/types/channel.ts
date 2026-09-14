@@ -10,6 +10,7 @@
  * The API's channel list is selected without the credential columns, so this
  * type has nothing to leave out.
  */
+import type { ProviderRules } from '@postgear/social-core/composer';
 
 /**
  * A channel's state, in the order the user needs to act on it.
@@ -62,6 +63,11 @@ export interface ProviderSummary {
    */
   configured: boolean;
   requiresEntitySelection: boolean;
+  /**
+   * What the provider can publish (Sprint 4) — the same object its
+   * `checkValidity` enforces, so the composer never hardcodes a platform rule.
+   */
+  rules: ProviderRules;
 }
 
 /** One page, organization, YouTube channel or board to point a channel at. */

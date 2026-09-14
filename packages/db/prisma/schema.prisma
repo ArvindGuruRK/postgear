@@ -173,6 +173,12 @@ model UserOrganization {
   @@index([disabled])
 }
 
+/// An uploaded image or video in a workspace's media library (Sprint 4).
+///
+/// `path` and `thumbnail` are **storage keys** (`2026/09/<hex>.jpg`), not URLs.
+/// The public URL is built at read time by the configured storage backend, so
+/// moving from local disk to S3, or changing the API's public address, does not
+/// orphan every row. `fileSize` is the size *after* compression.
 model Media {
   id                 String              @id @default(uuid())
   name               String
@@ -187,6 +193,14 @@ model Media {
   thumbnail          String?
   alt                String?
   thumbnailTimestamp Int?
+  // --- Sprint 4: what platform rules need to know --------------------------
+  // Recorded at upload so the composer can enforce Instagram's JPEG-only and
+  // 4:5–1.91:1 rules, and render previews at the right shape, without
+  // downloading the file again. Nullable: rows from before this migration have
+  // none, and every rule that reads them skips when a value is unknown.
+  mimeType           String?
+  width              Int?
+  height             Int?
   organization       Organization        @relation(fields: [organizationId], references: [id])
   userPicture        User[]
   oauthApps          OAuthApp[]

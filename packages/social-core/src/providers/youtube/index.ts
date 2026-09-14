@@ -18,6 +18,8 @@
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -40,6 +42,26 @@ const UPLOAD_BASE = 'https://www.googleapis.com/upload/youtube/v3';
 /** YouTube's description limit. Titles are capped separately at 100. */
 const MAX_LENGTH = 5_000;
 const MAX_TITLE_LENGTH = 100;
+
+/**
+ * One video per upload, no threads, and a title YouTube validates strictly:
+ * at most 100 characters, and `<` or `>` rejected outright rather than escaped.
+ * The title is the first line of the post unless one is set explicitly.
+ */
+export const YOUTUBE_RULES: ProviderRules = {
+  maxLength: MAX_LENGTH,
+  lengthMethod: 'utf16',
+  thread: 'none',
+  followUpMedia: false,
+  media: {
+    required: true,
+    maxItems: 1,
+    maxImages: 0,
+    maxVideos: 1,
+    allowMixed: false,
+  },
+  title: { maxLength: MAX_TITLE_LENGTH, forbiddenCharacters: ['<', '>'] },
+};
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -80,27 +102,10 @@ export class YouTubeProvider
     return MAX_LENGTH;
   }
 
+  readonly rules = YOUTUBE_RULES;
+
   override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const videos = (post.media ?? []).filter((item) => item.type === 'video');
-
-      if (videos.length !== 1) {
-        return 'A YouTube post must have exactly one video.';
-      }
-
-      const title = this.titleFor(post);
-
-      if (title.length > MAX_TITLE_LENGTH) {
-        return `YouTube titles are limited to ${MAX_TITLE_LENGTH} characters.`;
-      }
-
-      // YouTube rejects these outright in titles rather than escaping them.
-      if (title.includes('<') || title.includes('>')) {
-        return 'YouTube titles cannot contain < or > characters.';
-      }
-    }
-
-    return true;
+    return checkAgainstRules(this, posts);
   }
 
   protected override handleErrors(body: string): HandledError | undefined {

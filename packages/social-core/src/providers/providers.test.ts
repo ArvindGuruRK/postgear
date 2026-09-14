@@ -7,6 +7,7 @@
  * token exchange; a refresh that drops a rotated token disconnects the channel
  * permanently on the *next* refresh.
  */
+import { validatePost } from '../composer/validate';
 import { IntegrationManager } from '../manager/integration.manager';
 import { FacebookProvider } from './facebook';
 import { InstagramProvider } from './instagram';
@@ -343,5 +344,239 @@ describe('IntegrationManager', () => {
     // These two connect in a single hop.
     expect(needsSetup('x')).toBe(false);
     expect(needsSetup('linkedin')).toBe(false);
+  });
+});
+
+describe('publishing rules (Sprint 4)', () => {
+  const providers = new IntegrationManager().list();
+
+  it('sends every provider’s rules with the provider list, for the composer', () => {
+    for (const summary of providers) {
+      expect(summary.rules.maxLength).toBeGreaterThan(0);
+      expect(['replies', 'comments', 'none']).toContain(summary.rules.thread);
+    }
+  });
+
+  it('declares a static limit that matches maxLength() for a standard account', () => {
+    const manager = new IntegrationManager();
+
+    for (const { identifier } of providers) {
+      const provider = manager.find(identifier);
+      expect(provider?.rules.maxLength).toBe(provider?.maxLength());
+    }
+  });
+
+  it('enforces in checkValidity exactly what the rules say, with the same message', async () => {
+    const manager = new IntegrationManager();
+
+    for (const { identifier } of providers) {
+      const provider = manager.find(identifier);
+
+      if (!provider) {
+        throw new Error(`missing ${identifier}`);
+      }
+
+      const tooLong = 'a'.repeat(provider.rules.maxLength + 1);
+      const kind = provider.rules.media.maxImages > 0 ? ('image' as const) : ('video' as const);
+      const media = provider.rules.media.required ? [{ type: kind, path: 'https://e.test/m' }] : [];
+      const result = await provider.checkValidity([{ id: 'p1', message: tooLong, media }]);
+
+      expect(result).toBe(
+        validatePost(provider.rules, [{ text: tooLong, media }], { providerName: provider.name })[0]
+          ?.message,
+      );
+      expect(result).toMatch(/allows/);
+    }
+  });
+
+  it('lets an X Premium account past the standard 280 at publish time', async () => {
+    const message = 'a'.repeat(300);
+
+    await expect(new XProvider().checkValidity([{ id: 'p1', message }])).resolves.toMatch(/280/);
+    await expect(
+      new XProvider().checkValidity([{ id: 'p1', message, settings: { premium: true } }]),
+    ).resolves.toBe(true);
+  });
+
+  it('counts X length the way X does, not by string length', async () => {
+    // 140 CJK characters weigh 280 — full, but not over.
+    await expect(
+      new XProvider().checkValidity([{ id: 'p1', message: '字'.repeat(140) }]),
+    ).resolves.toBe(true);
+    await expect(
+      new XProvider().checkValidity([{ id: 'p1', message: '字'.repeat(141) }]),
+    ).resolves.toMatch(/282/);
+  });
+
+  it('refuses video where the provider cannot publish it, rather than dropping it later', async () => {
+    const withVideo = [
+      {
+        id: 'p1',
+        message: 'hi',
+        media: [{ type: 'video' as const, path: 'https://e.test/v.mp4' }],
+      },
+    ];
+
+    await expect(new LinkedInProvider().checkValidity(withVideo)).resolves.toMatch(
+      /can't publish video to LinkedIn/,
+    );
+    await expect(new PinterestProvider().checkValidity(withVideo)).resolves.toMatch(
+      /can't publish video to Pinterest/,
+    );
+  });
+
+  it('holds Instagram to JPEG and its aspect ratio when the library knows them', async () => {
+    const withImage = (extra: Record<string, unknown>) => [
+      {
+        id: 'p1',
+        message: 'hi',
+        media: [{ type: 'image' as const, path: 'https://e.test/i', ...extra }],
+      },
+    ];
+    const instagram = new InstagramProvider();
+
+    await expect(
+      instagram.checkValidity(withImage({ mimeType: 'image/jpeg', width: 1080, height: 1080 })),
+    ).resolves.toBe(true);
+    await expect(instagram.checkValidity(withImage({ mimeType: 'image/png' }))).resolves.toMatch(
+      /JPEG/,
+    );
+    await expect(
+      instagram.checkValidity(withImage({ width: 1080, height: 2340 })),
+    ).resolves.toMatch(/4:5/);
+  });
+
+  it('refuses a second part on platforms with no thread structure', async () => {
+    const video = [{ type: 'video' as const, path: 'https://e.test/v.mp4' }];
+
+    await expect(
+      new YouTubeProvider().checkValidity([
+        { id: 'p1', message: 'title', media: video },
+        { id: 'p2', message: 'more', media: video },
+      ]),
+    ).resolves.toMatch(/multi-part/);
+  });
+});
+
+describe('LinkedIn image publishing (Sprint 4)', () => {
+  /** The processing wait is real in production and pointless in a unit test. */
+  class InstantLinkedIn extends LinkedInProvider {
+    protected override imageProcessingDelayMs = 0;
+  }
+
+  class InstantLinkedInPage extends LinkedInPageProvider {
+    protected override imageProcessingDelayMs = 0;
+  }
+
+  const channel = {
+    id: 'ch_1',
+    internalId: 'member-1',
+    rootInternalId: 'member-1',
+    providerIdentifier: 'linkedin',
+    name: 'Demo',
+  };
+
+  function mockUploads(count: number) {
+    for (let index = 0; index < count; index++) {
+      fetchMock
+        .mockResolvedValueOnce(
+          json({
+            value: { uploadUrl: `https://upload.test/${index}`, image: `urn:li:image:${index}` },
+          }),
+        )
+        .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])))
+        .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    }
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, { status: 201, headers: { 'x-restli-id': 'urn:li:share:99' } }),
+    );
+  }
+
+  function postBody(): Record<string, unknown> {
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/rest/posts'));
+
+    if (!call) {
+      throw new Error('LinkedIn post was never created');
+    }
+
+    return JSON.parse(String((call[1] as RequestInit).body));
+  }
+
+  it('uploads an image and attaches it, rather than posting the text alone', async () => {
+    mockUploads(1);
+
+    const [result] = await new InstantLinkedIn().post(channel, 'token', [
+      {
+        id: 'p1',
+        message: 'hello',
+        media: [{ type: 'image', path: 'https://media.test/a.jpg', alt: 'A chart' }],
+      },
+    ]);
+
+    expect(result.postId).toBe('urn:li:share:99');
+
+    const [initUrl, initInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(initUrl).toContain('/rest/images?action=initializeUpload');
+    expect(JSON.parse(String(initInit.body))).toEqual({
+      initializeUploadRequest: { owner: 'urn:li:person:member-1' },
+    });
+
+    // The bytes come from the media library's public URL and go to LinkedIn's.
+    expect(fetchMock.mock.calls[1][0]).toBe('https://media.test/a.jpg');
+    expect(fetchMock.mock.calls[2][0]).toBe('https://upload.test/0');
+    expect((fetchMock.mock.calls[2][1] as RequestInit).method).toBe('PUT');
+
+    expect(postBody().content).toEqual({ media: { id: 'urn:li:image:0', altText: 'A chart' } });
+  });
+
+  it('attaches two or more images as a multi-image post', async () => {
+    mockUploads(2);
+
+    await new InstantLinkedIn().post(channel, 'token', [
+      {
+        id: 'p1',
+        message: 'two',
+        media: [
+          { type: 'image', path: 'https://media.test/a.jpg' },
+          { type: 'image', path: 'https://media.test/b.jpg' },
+        ],
+      },
+    ]);
+
+    expect(postBody().content).toEqual({
+      multiImage: { images: [{ id: 'urn:li:image:0' }, { id: 'urn:li:image:1' }] },
+    });
+  });
+
+  it('adds no content block to a text-only post', async () => {
+    mockUploads(0);
+
+    await new InstantLinkedIn().post(channel, 'token', [{ id: 'p1', message: 'just text' }]);
+
+    expect(postBody()).not.toHaveProperty('content');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uploads a page’s images as owned by the organization that posts them', async () => {
+    mockUploads(1);
+
+    await new InstantLinkedInPage().post(
+      { ...channel, internalId: 'org-7', providerIdentifier: 'linkedin-page' },
+      'token',
+      [
+        {
+          id: 'p1',
+          message: 'hello',
+          media: [{ type: 'image', path: 'https://media.test/a.jpg' }],
+        },
+      ],
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).initializeUploadRequest.owner).toBe(
+      'urn:li:organization:org-7',
+    );
+    expect(postBody().author).toBe('urn:li:organization:org-7');
   });
 });

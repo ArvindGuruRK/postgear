@@ -20,6 +20,7 @@
  */
 import { ProviderError, ProviderNotConfiguredError } from '../abstract/errors';
 import type { SocialProvider } from '../abstract/social.provider.interface';
+import type { ProviderRules } from '../composer/rules';
 import { FacebookProvider } from '../providers/facebook';
 import { InstagramProvider } from '../providers/instagram';
 import { LinkedInPageProvider, LinkedInProvider } from '../providers/linkedin';
@@ -42,6 +43,11 @@ export interface ProviderSummary {
   configured: boolean;
   /** True when connecting takes a second step to choose a page/channel/board. */
   requiresEntitySelection: boolean;
+  /**
+   * What the provider can publish (Sprint 4). Plain data, so it survives the
+   * trip to the browser, where the composer validates against it live.
+   */
+  rules: ProviderRules;
 }
 
 export class IntegrationManager {
@@ -95,6 +101,7 @@ export class IntegrationManager {
       name: provider.name,
       configured: provider.isConfigured(),
       requiresEntitySelection: 'listEntities' in provider,
+      rules: provider.rules,
     }));
   }
 

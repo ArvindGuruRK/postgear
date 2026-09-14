@@ -15,8 +15,17 @@
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@postgear/config": "*",
+    "@postgear/social-core": "*",
     "@postgear/ui": "*",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extensions": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "next": "16.3.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

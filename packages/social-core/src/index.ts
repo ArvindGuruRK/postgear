@@ -13,4 +13,8 @@
 export * from './abstract/errors';
 export * from './abstract/social.abstract';
 export * from './abstract/social.provider.interface';
+export * from './abstract/validity';
+// Also importable on its own as `@postgear/social-core/composer`, which is how
+// the browser gets it without the providers. See composer/index.ts.
+export * from './composer';
 export * from './manager/integration.manager';

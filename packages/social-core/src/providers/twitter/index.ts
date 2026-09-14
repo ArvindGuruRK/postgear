@@ -23,6 +23,8 @@
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -43,8 +45,31 @@ const UPLOAD_URL = 'https://api.x.com/2/media/upload';
 const STANDARD_MAX_LENGTH = 280;
 const PREMIUM_MAX_LENGTH = 25_000;
 
-/** X allows up to four images, or exactly one video/GIF — never a mix. */
-const MAX_IMAGES = 4;
+const MB = 1024 * 1024;
+
+/**
+ * What X accepts, per its media upload documentation: up to four images, or
+ * one GIF, or one video — never a mix. Images up to 5 MB, animated GIFs up to
+ * 15 MB, video up to 512 MB. Every part of a thread can carry its own media,
+ * because each part is a real post replying to the one before.
+ */
+export const X_RULES: ProviderRules = {
+  maxLength: STANDARD_MAX_LENGTH,
+  lengthMethod: 'x-weighted',
+  thread: 'replies',
+  followUpMedia: true,
+  media: {
+    required: false,
+    maxItems: 4,
+    maxImages: 4,
+    maxVideos: 1,
+    allowMixed: false,
+    gifCountsAsVideo: true,
+    maxImageBytes: 5 * MB,
+    maxGifBytes: 15 * MB,
+    maxVideoBytes: 512 * MB,
+  },
+};
 
 interface XTokenResponse {
   access_token: string;
@@ -83,24 +108,10 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     return this.asBoolean(settings?.premium) ? PREMIUM_MAX_LENGTH : STANDARD_MAX_LENGTH;
   }
 
+  readonly rules = X_RULES;
+
   override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const media = post.media ?? [];
-      const videos = media.filter((item) => item.type === 'video');
-      const images = media.filter((item) => item.type === 'image');
-
-      if (videos.length > 0 && images.length > 0) {
-        return 'X posts can have images or one video, not both.';
-      }
-      if (videos.length > 1) {
-        return 'X posts can have at most one video.';
-      }
-      if (images.length > MAX_IMAGES) {
-        return `X posts can have at most ${MAX_IMAGES} images.`;
-      }
-    }
-
-    return true;
+    return checkAgainstRules(this, posts);
   }
 
   /**

@@ -8,8 +8,10 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { MailModule } from './modules/mail/mail.module';
+import { MediaModule } from './modules/media/media.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OrgModule } from './modules/org/org.module';
+import { PostsModule } from './modules/posts/posts.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -48,6 +50,8 @@ import { UsersModule } from './modules/users/users.module';
     OrgModule,
     OnboardingModule,
     ChannelsModule,
+    MediaModule,
+    PostsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

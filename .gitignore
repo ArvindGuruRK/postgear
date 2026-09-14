@@ -44,6 +44,9 @@ postgres_data/
 redis_data/
 minio_data/
 
+# Local media uploads (Sprint 4, STORAGE_PROVIDER=local)
+apps/api/uploads/
+
 # Misc
 *.tgz
 .cache/

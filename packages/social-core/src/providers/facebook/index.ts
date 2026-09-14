@@ -8,6 +8,8 @@
  * unlike the user token they do not expire on their own.
  */
 import { BadBodyError } from '../../abstract/errors';
+import { checkAgainstRules } from '../../abstract/validity';
+import type { ProviderRules } from '../../composer/rules';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
@@ -22,6 +24,29 @@ import { GRAPH_BASE, MetaGraphProvider } from '../meta/meta.graph';
 
 /** Facebook's own limit is far higher, but posts this long are already unreadable. */
 const MAX_LENGTH = 63_206;
+
+/**
+ * What this provider publishes.
+ *
+ * `allowMixed: false` describes `createPost` below, not Facebook: when a video
+ * is attached it publishes through the `/videos` edge, which carries the video
+ * alone, and any photos alongside it would be silently dropped. The ten-photo
+ * cap keeps a multi-photo post to a size the unpublished-upload fan-out below
+ * handles comfortably. Later parts become comments, which carry text only.
+ */
+export const FACEBOOK_RULES: ProviderRules = {
+  maxLength: MAX_LENGTH,
+  lengthMethod: 'utf16',
+  thread: 'comments',
+  followUpMedia: false,
+  media: {
+    required: false,
+    maxItems: 10,
+    maxImages: 10,
+    maxVideos: 1,
+    allowMixed: false,
+  },
+};
 
 export class FacebookProvider
   extends MetaGraphProvider
@@ -41,17 +66,10 @@ export class FacebookProvider
     return MAX_LENGTH;
   }
 
+  readonly rules = FACEBOOK_RULES;
+
   override async checkValidity(posts: PostDetails[]): Promise<string | true> {
-    for (const post of posts) {
-      const media = post.media ?? [];
-      if (media.filter((item) => item.type === 'video').length > 1) {
-        return 'Facebook posts can have at most one video.';
-      }
-      if (!post.message.trim() && media.length === 0) {
-        return 'A Facebook post needs text or an attachment.';
-      }
-    }
-    return true;
+    return checkAgainstRules(this, posts);
   }
 
   async authenticate(params: AuthenticateParams): Promise<AuthTokenDetails> {

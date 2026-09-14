@@ -104,7 +104,14 @@ export type SecurityEvent =
   | 'channel.oauth.failed'
   | 'channel.oauth.succeeded'
   | 'channel.revoke.failed'
-  | 'channel.refresh.failed';
+  | 'channel.refresh.failed'
+  // Media uploads (Sprint 4). A file whose bytes are not what its name claims
+  // is the classic way to smuggle HTML or SVG onto a public origin, so every
+  // refusal is recorded even though most are an honest wrong-file pick.
+  | 'media.upload_rejected'
+  // Posts (Sprint 4). An edit that references another workspace's media, or a
+  // channel it cannot see, is either a stale client or a probe.
+  | 'post.foreign_reference';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

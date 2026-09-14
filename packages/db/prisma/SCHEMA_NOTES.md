@@ -34,11 +34,11 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `UserOrganization` | The membership join table, carrying `role`. This is the name to use — do not invent a `Member`. | Sprint 2 |
 | `OnboardingResponse` | The five onboarding survey answers, one row per user. **Not** tenant-scoped — collected before the workspace exists. | Sprint 2 |
 | `Integration` | **A connected social channel.** The name is Postiz's history; read it as "channel" everywhere. Holds the encrypted OAuth `token`/`refreshToken`. | Sprint 3 |
-| `Post` | One row **per platform target**. A cross-posted batch is tied together by `group`; thread/reply chains by `parentPostId`. There is no separate `PostItem` table. | Sprint 4 |
-| `Media` | Uploaded images/video, S3/MinIO-backed. | Sprint 4 |
-| `Tags` / `TagsPosts` | Post labelling and its join table. | Sprint 4 |
-| `Sets` | Saved groupings of channels, for "post to my usual five". | Sprint 4 |
-| `Signatures` | Reusable sign-off blocks appended to post content. | Sprint 4 |
+| `Post` | One row **per platform target per thread part**. A cross-posted batch is tied together by `group`; thread/reply chains by `parentPostId`. There is no separate `PostItem` table. See [How a post is stored](#how-a-post-is-stored-sprint-4). | Sprint 4 |
+| `Media` | Uploaded images/video — local disk in development, any S3-compatible store in production. | Sprint 4 |
+| `Tags` / `TagsPosts` | Post labelling and its join table. | Not yet — PRD P1. Sprint 4 did not need it. |
+| `Sets` | Saved groupings of channels, for "post to my usual five". | Not yet — PRD P2. |
+| `Signatures` | Reusable sign-off blocks appended to post content. | Not yet — PRD P2. |
 | `Errors` | Publish-failure records, surfaced in the queue UI. | Sprint 5 |
 | `Notifications` | In-app notification feed. | Sprint 5 |
 | `Subscription` | Billing plan + `totalChannels` entitlement. Gates channel connection. | Sprint 8 |
@@ -126,7 +126,68 @@ in the inherited file, so check before assuming.
   builds thread/reply chains. Both are needed to reconstruct what a user
   thinks of as "one post".
 - **`Post.state`** is the `State` enum — `QUEUE`, `PUBLISHED`, `ERROR`,
-  `DRAFT` — driving the queue and calendar views.
+  `DRAFT` — driving the queue and calendar views. The schema's default is
+  `QUEUE`; the composer always writes the state explicitly, and a person can
+  only ever set `DRAFT` or `QUEUE`. See `apps/api/src/modules/posts/post-state.ts`
+  for the transition table.
+
+## How a post is stored (Sprint 4)
+
+What a person calls "a post" is a **group**: one `Post` row for every channel
+it targets, times every part of its thread, all sharing one `group` UUID minted
+before the first row is written. Within one channel, each part points at the
+part before it through `parentPostId`, so a channel's thread is a chain from
+the row whose `parentPostId` is null.
+
+```
+group g ─┬─ X:        part 1 ← part 2 ← part 3
+         └─ LinkedIn: part 1 ← part 2 ← part 3
+```
+
+Four columns carry more than their names say:
+
+- **`Post.content` is a JSON document, not text or HTML** — the TipTap/ProseMirror
+  shape defined in `packages/social-core/src/composer/document.ts`, restricted
+  by the API's schema to paragraphs, one heading level, lists, bold, italic,
+  links and line breaks. Read it with `parseDocument()`, which also accepts plain
+  text from any other writer; get platform text with `renderPlainText()`. Never
+  render it as HTML — nothing in PostGear does.
+- **`Post.image` is a JSON array of media references, `[{"id": "<Media.id>"}]`**,
+  and never a URL. The file behind an id is looked up when the post is read or
+  published, so moving storage or changing the API's address does not strand
+  every saved post. An id whose `Media` row has since been deleted is reported
+  as a removed attachment, not silently dropped.
+- **`Post.settings` is `{"customized": boolean}`** on the root row of each
+  channel: whether that channel has its own content or follows the shared post.
+  Provider-specific options (a YouTube title, a Pinterest link) belong beside it
+  when they are built.
+- **Rows are matched by position on edit, never by an id from the client.**
+  Saving a thread updates each channel's rows in chain order, creates rows for
+  new parts and soft-deletes surplus ones. The root row of each channel keeps its
+  id through every edit and reorder, which is what Sprint 5's publish workflow
+  can key on.
+
+The whole group is written in one **serializable** transaction, and a save must
+carry the `updatedAt` it loaded: a save from a stale copy is refused with a
+409 rather than overwriting a newer one.
+
+## How media is stored (Sprint 4)
+
+- **`Media.path` and `Media.thumbnail` are storage keys** (`2026/09/<32 hex>.jpg`),
+  not URLs. The configured backend turns a key into a public URL at read time.
+  Keys are 128 random bits and never reused, which is what lets objects be served
+  publicly with year-long immutable caching.
+- **`Media.fileSize` is the stored size, after compression** — the upload's
+  original size is not kept.
+- **`mimeType`, `width` and `height`** (added in
+  `20260914074756_sprint4_media_metadata`) are read from the stored file, so
+  platform rules such as Instagram's JPEG-only and 4:5–1.91:1 limits can be
+  checked without downloading it again. Video records its `mimeType` but no
+  dimensions — PostGear does not probe video files yet.
+- **`Media.name` is display text** from the original filename, cleaned of paths
+  and control characters. It is never used to build a key or a path.
+- **`Media.type` is `image` or `video`.** An animated GIF is an `image` with
+  `mimeType` `image/gif`.
 
 ## The encryption boundary
 

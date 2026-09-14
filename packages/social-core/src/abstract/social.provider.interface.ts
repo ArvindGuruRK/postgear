@@ -25,6 +25,8 @@
  * stubs are noise now.
  */
 
+import type { ProviderRules } from '../composer/rules';
+
 /** Where OAuth should send the browser back to. Built by the API, not the provider. */
 export type RedirectUri = string;
 
@@ -152,10 +154,23 @@ export interface SupportsEntitySelection {
 
 export interface MediaDescriptor {
   type: 'image' | 'video';
-  /** A URL or path the provider can read. Sprint 4 owns where these come from. */
+  /**
+   * A public URL the provider can fetch — and that the *platform* can fetch,
+   * since Instagram, Facebook, Pinterest and TikTok pull media from it themselves.
+   * Built from `Media.path` by the API's storage backend.
+   */
   path: string;
   alt?: string;
   thumbnail?: string;
+  /**
+   * What the media library knows about the file (Sprint 4). Optional because a
+   * caller may not have them; each one that is present lets `checkValidity`
+   * enforce the matching rule before the platform refuses the upload.
+   */
+  mimeType?: string;
+  bytes?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface PostDetails {
@@ -202,14 +217,28 @@ export interface SocialProvider extends SocialAuthenticator, SocialPublisher {
   /** False when the client id or secret is missing, so the UI can say why. */
   isConfigured(): boolean;
 
-  /** Character limit for a single post. */
+  /**
+   * Character limit for a single post.
+   *
+   * Kept alongside `rules.maxLength` because it can depend on the account: an X
+   * Premium account is allowed far more than the 280 in its static rules.
+   */
   maxLength(settings?: Record<string, unknown>): number;
+
+  /**
+   * What this provider can publish, as data (Sprint 4).
+   *
+   * Sent to the browser so the composer validates against exactly what the
+   * provider will do — see `composer/rules.ts` for why this is declarative.
+   */
+  readonly rules: ProviderRules;
 
   /**
    * Platform rules a post must satisfy before it is worth attempting.
    *
    * Returns `true`, or a message explaining what is wrong. Catching this here
-   * turns a remote rejection into a local, specific error.
+   * turns a remote rejection into a local, specific error. Every provider
+   * implements it by running `rules` through the shared composer validator.
    */
   checkValidity(posts: PostDetails[]): Promise<string | true>;
 }
