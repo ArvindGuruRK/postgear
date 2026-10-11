@@ -106,7 +106,20 @@ unreadable. (Harmless here: you would just reconnect the channel.)
 
 ## 3. Start the app
 
-Three terminals, all in the project folder.
+**One command does it all:**
+
+```powershell
+npm run dev
+```
+
+That brings up the Docker services (`docker compose up -d` runs first, so
+Docker Desktop must be open), then starts the API (:3001), the worker and the
+website (:3000) together through Turborepo, with each one's log prefixed by
+its name. Ctrl+C stops all three; the containers keep running until
+`docker compose down`.
+
+If you prefer one process per terminal — for example to restart only the
+worker — the three pieces are:
 
 **Terminal 1: API (port 3001)**
 

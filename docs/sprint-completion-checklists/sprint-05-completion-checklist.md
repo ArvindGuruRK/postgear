@@ -30,13 +30,14 @@ npm run db:migrate            # no new migration: Post.error / releaseURL and th
 npm run db:seed               # now also seeds four posts in four states
 ```
 
-Then, in **three** terminals:
+Then, in one terminal:
 
 ```bash
-npm run dev:api               # API on :3001
-npm run dev:worker            # the publisher — new
-npm run dev                   # web on :3000
+npm run dev                   # docker compose up -d, then API (:3001), worker and web (:3000) together
 ```
+
+or one process per terminal: `npm run dev:api`, `npm run dev:worker` (new),
+`npm run dev --workspace=@postgear/web`.
 
 The Temporal web UI is at <http://localhost:8233>: every scheduled post is a
 workflow there, with its timer, signals and retries laid out.
