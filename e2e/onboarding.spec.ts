@@ -54,12 +54,13 @@ test.describe('route gates', () => {
 
   test('an onboarded user signing in lands in their workspace', async ({ page }) => {
     await signIn(page, 'member@postgear.local', SEED_PASSWORD);
-    await expect(page).toHaveURL(/\/seed-demo-org\/calendar$/, { timeout: 20_000 });
+    // `(\?|$)`: since Sprint 5 the calendar rewrites its URL to `?view=&date=` on load.
+    await expect(page).toHaveURL(/\/seed-demo-org\/calendar(\?|$)/, { timeout: 20_000 });
   });
 
   test('a signed-in user is bounced off the login page', async ({ page }) => {
     await signIn(page, 'member@postgear.local', SEED_PASSWORD);
-    await expect(page).toHaveURL(/\/calendar$/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/calendar(\?|$)/, { timeout: 20_000 });
 
     await page.goto('/login');
     await expect(page).not.toHaveURL(/\/login$/);
@@ -77,7 +78,7 @@ test.describe('route gates', () => {
 
   test('a workspace the user does not belong to renders the 404', async ({ page }) => {
     await signIn(page, 'member@postgear.local', SEED_PASSWORD);
-    await expect(page).toHaveURL(/\/calendar$/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/calendar(\?|$)/, { timeout: 20_000 });
 
     // member@ is only in seed-demo-org. Tenant isolation, from the outside.
     await page.goto('/seed-second-org/calendar');
@@ -134,7 +135,7 @@ test.describe('the onboarding wizard', () => {
     await page.getByText('Search engine', { exact: true }).click();
     await page.getByRole('button', { name: 'Finish setup' }).click();
 
-    await expect(page).toHaveURL(/\/[^/]+\/calendar$/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/[^/]+\/calendar(\?|$)/, { timeout: 20_000 });
     // The app shell — which gate 2 was keeping this user out of a moment ago.
     await expect(page.locator('aside').first()).toBeVisible();
   });
@@ -206,7 +207,7 @@ test('signing out returns the user to the login screen and revokes the session',
   page,
 }) => {
   await signIn(page, 'member@postgear.local', SEED_PASSWORD);
-  await expect(page).toHaveURL(/\/calendar$/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/calendar(\?|$)/, { timeout: 20_000 });
 
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await page.getByRole('menuitem', { name: 'Log out' }).click();

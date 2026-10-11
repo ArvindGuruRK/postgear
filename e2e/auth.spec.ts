@@ -67,9 +67,16 @@ test('the focus ring uses the darkened light-mode colour', async ({ page }) => {
 
   const outline = await page
     .getByLabel('Email')
-    .evaluate((el) => getComputedStyle(el).outlineColor);
+    .evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { color: style.outlineColor, style: style.outlineStyle, width: style.outlineWidth };
+    });
 
-  expect(outline).toBe('rgb(214, 68, 15)');
+  expect(outline.color).toBe('rgb(214, 68, 15)');
+  // The ring has to actually paint: a width and color with `outline-style:
+  // none` is what the bare Tailwind v4 `outline` utility produced before.
+  expect(outline.style).toBe('solid');
+  expect(outline.width).toBe('3px');
 });
 
 test('form labels use the body face, not the display face', async ({ page }) => {

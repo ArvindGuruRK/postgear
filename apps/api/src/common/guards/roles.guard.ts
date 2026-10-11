@@ -98,7 +98,10 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    if (user.isSuperAdmin) {
+    // A superadmin bypasses the *role* check, never the workspace one: with no
+    // active workspace there is nothing for `@CurrentOrg()` to hand a handler,
+    // and the handler would fall over on `org.id`.
+    if (user.isSuperAdmin && request.activeOrg) {
       return true;
     }
 

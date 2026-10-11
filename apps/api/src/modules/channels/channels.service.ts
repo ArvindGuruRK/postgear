@@ -22,6 +22,7 @@ import {
   supportsEntitySelection,
 } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
+import { SchedulingService } from '../scheduling/scheduling.service';
 import { type ChannelHandshake, ChannelOAuthService } from './channel-oauth.service';
 import {
   type ChannelSummary,
@@ -53,6 +54,7 @@ export class ChannelsService {
     private readonly repository: ChannelsRepository,
     private readonly oauth: ChannelOAuthService,
     private readonly config: ConfigService,
+    private readonly scheduling: SchedulingService,
   ) {}
 
   /** Every provider, with whether it can actually be connected right now. */
@@ -205,6 +207,10 @@ export class ChannelsService {
         isReconnect: Boolean(handshake.reconnectChannelId),
       });
 
+      // A fresh token comes with a fresh expiry; the refresh loop (Sprint 5)
+      // is started, or woken to read the new date.
+      await this.scheduling.ensureTokenRefresh(channel.id, handshake.orgId);
+
       const query = channel.inBetweenSteps
         ? `?setup=${channel.id}`
         : `?connected=${encodeURIComponent(channel.name)}`;
@@ -246,7 +252,7 @@ export class ChannelsService {
 
     const entity = await provider.selectEntity(channel.token, entityId);
 
-    return this.repository.completeEntitySelection({
+    const completed = await this.repository.completeEntitySelection({
       orgId,
       id: channelId,
       entityId: entity.id,
@@ -258,6 +264,10 @@ export class ChannelsService {
       // endpoints actually accept.
       token: entity.accessToken,
     });
+
+    await this.scheduling.ensureTokenRefresh(completed.id, orgId);
+
+    return completed;
   }
 
   async updateSettings(params: {
@@ -316,7 +326,13 @@ export class ChannelsService {
       }
     }
 
-    return this.repository.disconnect(orgId, id);
+    const result = await this.repository.disconnect(orgId, id);
+
+    // Their rows are drafts now; the workflows waiting on them have nothing
+    // to publish and are told so rather than left to discover it.
+    await this.scheduling.cancelPublish(result.draftedRootIds);
+
+    return { draftedPosts: result.draftedPosts };
   }
 
   /**
@@ -369,6 +385,9 @@ export class ChannelsService {
           expiresIn: refreshed.expiresIn,
         });
       }
+
+      // The scheduled refresh loop re-reads the new expiry.
+      await this.scheduling.ensureTokenRefresh(id, orgId);
 
       return true;
     } catch (error) {

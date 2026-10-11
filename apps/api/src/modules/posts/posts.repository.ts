@@ -47,6 +47,11 @@ export interface PostRow {
   content: string;
   image: string | null;
   settings: string | null;
+  /** The platform's id and permalink, once published (Sprint 5). */
+  releaseId: string | null;
+  releaseURL: string | null;
+  /** The worker's publish status JSON, on a chain's root row — see `@postgear/scheduling`. */
+  error: string | null;
   createdAt: Date;
   updatedAt: Date;
   integration: {
@@ -75,6 +80,34 @@ export interface GroupWrite {
 
 export type ReplaceOutcome = 'saved' | 'not_found' | 'locked' | 'conflict';
 
+/** The root row of one channel's chain — what the scheduler's workflow is keyed on. */
+export interface ChainRoot {
+  id: string;
+  integrationId: string;
+  state: State;
+}
+
+export interface QueueQuery {
+  orgId: string;
+  states?: State[];
+  channelId?: string;
+  from?: Date;
+  to?: Date;
+  sort: 'asc' | 'desc';
+  page: number;
+  pageSize: number;
+}
+
+export type RescheduleOutcome =
+  | { outcome: 'saved'; roots: ChainRoot[] }
+  | { outcome: 'not_found' }
+  | { outcome: 'locked' };
+
+export type PublishNowOutcome =
+  | { outcome: 'saved'; roots: ChainRoot[] }
+  | { outcome: 'not_found' }
+  | { outcome: 'not_queued' };
+
 const ROW_SELECT = {
   id: true,
   group: true,
@@ -85,6 +118,9 @@ const ROW_SELECT = {
   content: true,
   image: true,
   settings: true,
+  releaseId: true,
+  releaseURL: true,
+  error: true,
   createdAt: true,
   updatedAt: true,
   integration: {
@@ -105,6 +141,10 @@ const ROW_SELECT = {
  * it and the second would silently erase the first. Postgres aborts one of two
  * conflicting serializable transactions, and that abort becomes a 409.
  */
+/** How many times a create is retried after a serialization failure. */
+const CREATE_ATTEMPTS = 3;
+const CREATE_RETRY_DELAY_MS = 50;
+
 const WRITE_OPTIONS = {
   isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
   // A full thread across many channels is hundreds of statements.
@@ -160,11 +200,29 @@ export class PostsRepository {
   }
 
   async createGroup(write: GroupWrite): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      for (const channel of write.channels) {
-        await this.writeChain(tx, write, channel, []);
+    // Serializable transactions can abort each other even when they touch
+    // different rows (Postgres takes predicate locks on the index ranges the
+    // chain writes scan). For a *create* nothing was read that could be stale,
+    // so the right answer is simply to try again.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          for (const channel of write.channels) {
+            await this.writeChain(tx, write, channel, []);
+          }
+        }, WRITE_OPTIONS);
+        return;
+      } catch (error) {
+        const serializationFailure =
+          error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+
+        if (!serializationFailure || attempt >= CREATE_ATTEMPTS) {
+          throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, CREATE_RETRY_DELAY_MS * attempt));
       }
-    }, WRITE_OPTIONS);
+    }
   }
 
   /**
@@ -274,6 +332,206 @@ export class PostsRepository {
   }
 
   /**
+   * The root row of each channel's chain in a group.
+   *
+   * These ids are what the publish workflows are keyed on, so the service
+   * reads them around every write: after a save to start or wake workflows,
+   * before a delete or a channel removal to cancel them.
+   */
+  async findRoots(orgId: string, group: string): Promise<ChainRoot[]> {
+    return prisma.post.findMany({
+      where: { organizationId: orgId, group, deletedAt: null, parentPostId: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, integrationId: true, state: true },
+    });
+  }
+
+  /**
+   * Every row of every group with a root scheduled inside the range.
+   *
+   * By root rather than by any row because a thread's parts share the root's
+   * date and the calendar shows a post once, not once per part.
+   */
+  async listCalendar(params: { orgId: string; from: Date; to: Date }): Promise<PostRow[]> {
+    const groups = await prisma.post.findMany({
+      where: {
+        organizationId: params.orgId,
+        deletedAt: null,
+        parentPostId: null,
+        publishDate: { gte: params.from, lte: params.to },
+      },
+      distinct: ['group'],
+      select: { group: true },
+      // A month of a very busy workspace. Past this the view would be unreadable
+      // anyway; the queue list pages.
+      take: 1_000,
+    });
+
+    if (groups.length === 0) {
+      return [];
+    }
+
+    return prisma.post.findMany({
+      where: {
+        organizationId: params.orgId,
+        deletedAt: null,
+        group: { in: groups.map((entry) => entry.group) },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: ROW_SELECT,
+    });
+  }
+
+  /**
+   * One page of groups for the queue, ordered by publish time.
+   *
+   * Filters apply to root rows: a group is listed when any of its channels
+   * matches, so "failed" shows a post that published to one channel and failed
+   * on another — which is exactly the post that needs attention.
+   */
+  async listQueue(query: QueueQuery): Promise<{ rows: PostRow[]; total: number }> {
+    const where: Prisma.PostWhereInput = {
+      organizationId: query.orgId,
+      deletedAt: null,
+      parentPostId: null,
+      ...(query.states && query.states.length > 0 ? { state: { in: query.states } } : {}),
+      ...(query.channelId ? { integrationId: query.channelId } : {}),
+      ...(query.from || query.to
+        ? {
+            publishDate: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [page, all] = await Promise.all([
+      prisma.post.groupBy({
+        by: ['group'],
+        where,
+        _min: { publishDate: true },
+        // The group id breaks ties, so two posts at the same minute cannot
+        // swap places between one page and the next.
+        orderBy: [{ _min: { publishDate: query.sort } }, { group: 'asc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      prisma.post.groupBy({ by: ['group'], where }),
+    ]);
+
+    if (page.length === 0) {
+      return { rows: [], total: all.length };
+    }
+
+    const rows = await prisma.post.findMany({
+      where: {
+        organizationId: query.orgId,
+        deletedAt: null,
+        group: { in: page.map((entry) => entry.group) },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: ROW_SELECT,
+    });
+
+    return { rows, total: all.length };
+  }
+
+  /**
+   * Moves a group's unpublished channels to a new publish time.
+   *
+   * Every row of those channels moves — a thread's parts share the root's
+   * date — and a channel that had failed goes back to the queue, since a new
+   * time is a new attempt. Channels already published stay exactly where they
+   * are: they are out there. A group with nothing left to move is `locked`.
+   */
+  async reschedule(params: {
+    orgId: string;
+    group: string;
+    publishDate: Date;
+  }): Promise<RescheduleOutcome> {
+    return prisma.$transaction(async (tx) => {
+      const rows = await tx.post.findMany({
+        where: { organizationId: params.orgId, group: params.group, deletedAt: null },
+        select: { id: true, integrationId: true, state: true, parentPostId: true },
+      });
+
+      if (rows.length === 0) {
+        return { outcome: 'not_found' };
+      }
+
+      const movable = rows.filter((row) => row.state !== State.PUBLISHED);
+
+      if (movable.length === 0) {
+        return { outcome: 'locked' };
+      }
+
+      await tx.post.updateMany({
+        where: { id: { in: movable.map((row) => row.id) }, organizationId: params.orgId },
+        data: { publishDate: params.publishDate },
+      });
+
+      await tx.post.updateMany({
+        where: {
+          id: { in: movable.map((row) => row.id) },
+          organizationId: params.orgId,
+          state: State.ERROR,
+        },
+        data: { state: State.QUEUE, error: null },
+      });
+
+      return {
+        outcome: 'saved',
+        roots: movable
+          .filter((row) => row.parentPostId === null)
+          .map((row) => ({
+            id: row.id,
+            integrationId: row.integrationId,
+            state: row.state === State.ERROR ? State.QUEUE : row.state,
+          })),
+      };
+    }, WRITE_OPTIONS);
+  }
+
+  /**
+   * Brings a group's unpublished channels forward to now.
+   *
+   * Queued and failed channels are moved to the current time and re-queued;
+   * channels already published are left as they are, so "post now" on a group
+   * that half-succeeded retries only the half that did not.
+   */
+  async publishNow(params: { orgId: string; group: string }): Promise<PublishNowOutcome> {
+    return prisma.$transaction(async (tx) => {
+      const rows = await tx.post.findMany({
+        where: { organizationId: params.orgId, group: params.group, deletedAt: null },
+        select: { id: true, integrationId: true, state: true, parentPostId: true },
+      });
+
+      if (rows.length === 0) {
+        return { outcome: 'not_found' };
+      }
+
+      const pending = rows.filter((row) => row.state === State.QUEUE || row.state === State.ERROR);
+
+      if (pending.length === 0) {
+        return { outcome: 'not_queued' };
+      }
+
+      await tx.post.updateMany({
+        where: { id: { in: pending.map((row) => row.id) }, organizationId: params.orgId },
+        data: { publishDate: new Date(), state: State.QUEUE, error: null },
+      });
+
+      return {
+        outcome: 'saved',
+        roots: pending
+          .filter((row) => row.parentPostId === null)
+          .map((row) => ({ id: row.id, integrationId: row.integrationId, state: State.QUEUE })),
+      };
+    }, WRITE_OPTIONS);
+  }
+
+  /**
    * Writes one channel's parts as a chain, reusing `existingIds` by position.
    *
    * Every live row has its `parentPostId` rewritten, so the chain is correct
@@ -297,6 +555,9 @@ export class PostsRepository {
         state: write.state,
         publishDate: write.publishDate,
         parentPostId: previousId,
+        // A save is a new version; whatever the worker recorded about the old
+        // one — a failure, a retry in progress — no longer describes it.
+        error: null,
       };
 
       const reusedId = existingIds[index];

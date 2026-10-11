@@ -181,7 +181,7 @@ function ToolbarButton({
       className={cn(
         'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
         'outline-none hover:border-outline hover:bg-actionPrimary/10',
-        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+        'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         'disabled:pointer-events-none disabled:opacity-50',
         pressed && 'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary',
       )}
@@ -261,7 +261,7 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
             className={cn(
               'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
               'outline-none hover:border-outline hover:bg-actionPrimary/10',
-              'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+              'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
               'disabled:pointer-events-none disabled:opacity-50',
               active &&
                 'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary',

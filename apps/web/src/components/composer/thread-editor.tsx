@@ -181,7 +181,7 @@ function SortablePart({
           type="button"
           ref={setActivatorNodeRef}
           aria-label={`Drag to reorder ${label}`}
-          className="flex h-8 w-6 cursor-grab touch-none items-center justify-center rounded-sm text-ink outline-none active:cursor-grabbing focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+          className="flex h-8 w-6 cursor-grab touch-none items-center justify-center rounded-sm text-ink outline-none active:cursor-grabbing focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
           {...attributes}
           {...listeners}
         >
@@ -275,7 +275,7 @@ function SortablePart({
                 onClick={() =>
                   dispatch({ type: 'detachMedia', scope, key: part.key, mediaId: item.id })
                 }
-                className="absolute end-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing"
+                className="absolute end-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing"
               >
                 <X className="h-3 w-3" strokeWidth={3} />
               </button>
@@ -338,7 +338,7 @@ function IconButton({
       className={cn(
         'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
         'outline-none hover:border-outline hover:bg-actionPrimary/10',
-        'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+        'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         'disabled:pointer-events-none disabled:opacity-40',
       )}
     >

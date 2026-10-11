@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "ts-node-dev --respawn src/index.ts",
+    "dev": "dotenv -e ../../.env -- ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/apps/worker/src/index.js",
     "lint": "biome lint ./src",
     "lint:fix": "biome check --write ./src",
     "typecheck": "tsc --noEmit",
@@ -15,14 +15,23 @@
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
+    "@postgear/ai-engine": "*",
     "@postgear/db": "*",
-    "@postgear/social-core": "*",
+    "@postgear/scheduling": "*",
     "@postgear/seo-engine": "*",
-    "@postgear/ai-engine": "*"
+    "@postgear/social-core": "*",
+    "@temporalio/activity": "^1.24.0",
+    "@temporalio/client": "^1.24.0",
+    "@temporalio/common": "^1.24.0",
+    "@temporalio/worker": "^1.24.0",
+    "@temporalio/workflow": "^1.24.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
+    "@temporalio/testing": "^1.24.0",
     "@types/node": "^20.0.0",
-    "ts-node-dev": "^2.0.0"
+    "dotenv-cli": "^7.4.4",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.0"
   }
 }

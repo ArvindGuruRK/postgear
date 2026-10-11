@@ -363,16 +363,34 @@ export class ChannelsRepository {
    * writing survives, the calendar stops claiming they are scheduled, and
    * nothing silently fails at publish time.
    */
-  async disconnect(orgId: string, id: string): Promise<{ draftedPosts: number }> {
+  async disconnect(
+    orgId: string,
+    id: string,
+  ): Promise<{ draftedPosts: number; draftedRootIds: string[] }> {
     return prisma.$transaction(async (tx) => {
-      const drafted = await tx.post.updateMany({
+      // The queued roots, read before they are drafted: each has a publish
+      // workflow waiting on it that the service tells to stop (Sprint 5).
+      const roots = await tx.post.findMany({
         where: {
           integrationId: id,
           organizationId: orgId,
           state: State.QUEUE,
+          parentPostId: null,
           deletedAt: null,
         },
-        data: { state: State.DRAFT },
+        select: { id: true },
+      });
+
+      // Failed rows go back to drafts too: "Retry now" on a channel that no
+      // longer exists would only queue a post nothing can publish.
+      const drafted = await tx.post.updateMany({
+        where: {
+          integrationId: id,
+          organizationId: orgId,
+          state: { in: [State.QUEUE, State.ERROR] },
+          deletedAt: null,
+        },
+        data: { state: State.DRAFT, error: null },
       });
 
       await tx.integration.updateMany({
@@ -387,7 +405,7 @@ export class ChannelsRepository {
         },
       });
 
-      return { draftedPosts: drafted.count };
+      return { draftedPosts: drafted.count, draftedRootIds: roots.map((root) => root.id) };
     });
   }
 

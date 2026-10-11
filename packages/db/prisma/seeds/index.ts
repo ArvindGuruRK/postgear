@@ -263,6 +263,7 @@ async function main() {
   // step is to inspect a raw row and confirm it is unreadable, and a seed that
   // wrote plaintext would make that check pass or fail for the wrong reason.
   const seededChannels = await seedChannels(organization.id);
+  const seededPosts = await seedPosts(organization.id);
 
   console.log('Seed complete:', {
     organizationId: organization.id,
@@ -272,7 +273,149 @@ async function main() {
     unOnboardedEmail: onboardingUser.email,
     password: SEED_PASSWORD,
     channels: seededChannels,
+    posts: seededPosts,
   });
+}
+
+/**
+ * Four posts in four states (Sprint 5), so the calendar and the queue have
+ * something to show — and every treatment they have — on a fresh clone:
+ *
+ * - a thread **queued** for tomorrow morning on LinkedIn and X;
+ * - one **published** yesterday on LinkedIn, with a permalink;
+ * - one **failed** two days ago on X, for the same reason the X channel is
+ *   seeded broken (it needs reconnecting);
+ * - a **draft** parked next week.
+ *
+ * Fixed ids and upsert, so re-seeding resets them rather than piling up. The
+ * group ids are UUIDs because the API only answers for groups shaped like the
+ * ones it mints. Content is the composer's document JSON written out by hand,
+ * since the seed must not depend on an app package.
+ */
+async function seedPosts(organizationId: string) {
+  const at = (daysFromNow: number, hour: number, minute = 0) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  };
+
+  const doc = (text: string) =>
+    JSON.stringify({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+    });
+
+  const rows: Array<{
+    id: string;
+    group: string;
+    integrationId: string;
+    parentPostId?: string;
+    state: 'DRAFT' | 'QUEUE' | 'PUBLISHED' | 'ERROR';
+    publishDate: Date;
+    content: string;
+    releaseId?: string;
+    releaseURL?: string;
+    error?: string;
+  }> = [
+    // Queued thread, tomorrow 10:00: LinkedIn (one part) and X (two parts).
+    {
+      id: 'seed-post-queued-linkedin',
+      group: '11111111-1111-4111-8111-111111111111',
+      integrationId: DEMO_CHANNEL_ID,
+      state: 'QUEUE',
+      publishDate: at(1, 10),
+      content: doc('Tomorrow we open the doors on the new PostGear calendar. Drag a post, change its day.'),
+    },
+    {
+      id: 'seed-post-queued-x',
+      group: '11111111-1111-4111-8111-111111111111',
+      integrationId: BROKEN_CHANNEL_ID,
+      state: 'QUEUE',
+      publishDate: at(1, 10),
+      content: doc('Tomorrow we open the doors on the new PostGear calendar. Drag a post, change its day.'),
+    },
+    {
+      id: 'seed-post-queued-x-2',
+      group: '11111111-1111-4111-8111-111111111111',
+      integrationId: BROKEN_CHANNEL_ID,
+      parentPostId: 'seed-post-queued-x',
+      state: 'QUEUE',
+      publishDate: at(1, 10),
+      content: doc('Second part of the thread: every scheduled post survives a restart.'),
+    },
+    // Published yesterday on LinkedIn.
+    {
+      id: 'seed-post-published-linkedin',
+      group: '22222222-2222-4222-8222-222222222222',
+      integrationId: DEMO_CHANNEL_ID,
+      state: 'PUBLISHED',
+      publishDate: at(-1, 9, 30),
+      content: doc('Yesterday: the first post PostGear published on its own schedule.'),
+      releaseId: 'urn:li:share:seed-7001',
+      releaseURL: 'https://www.linkedin.com/feed/update/urn:li:share:seed-7001',
+    },
+    // Failed two days ago on X: the channel needs reconnecting.
+    {
+      id: 'seed-post-failed-x',
+      group: '33333333-3333-4333-8333-333333333333',
+      integrationId: BROKEN_CHANNEL_ID,
+      state: 'ERROR',
+      publishDate: at(-2, 16),
+      content: doc('This one never made it: the X connection had expired.'),
+      error: JSON.stringify({
+        kind: 'failed',
+        reason: 'needs_reconnect',
+        message: 'Acme on X needs reconnecting before PostGear can publish to it.',
+        attempts: 1,
+        failedAt: at(-2, 16).toISOString(),
+      }),
+    },
+    // A draft parked next week, on both healthy channels.
+    {
+      id: 'seed-post-draft-linkedin',
+      group: '44444444-4444-4444-8444-444444444444',
+      integrationId: DEMO_CHANNEL_ID,
+      state: 'DRAFT',
+      publishDate: at(7, 11),
+      content: doc('Draft: ideas for next week. Not queued yet, so nothing publishes it.'),
+    },
+    {
+      id: 'seed-post-draft-instagram',
+      group: '44444444-4444-4444-8444-444444444444',
+      integrationId: INSTAGRAM_CHANNEL_ID,
+      state: 'DRAFT',
+      publishDate: at(7, 11),
+      content: doc('Draft: ideas for next week. Not queued yet, so nothing publishes it.'),
+    },
+  ];
+
+  for (const row of rows) {
+    const data = {
+      organizationId,
+      integrationId: row.integrationId,
+      group: row.group,
+      state: row.state,
+      publishDate: row.publishDate,
+      content: row.content,
+      image: '[]',
+      settings: JSON.stringify({ customized: false }),
+      parentPostId: row.parentPostId ?? null,
+      releaseId: row.releaseId ?? null,
+      releaseURL: row.releaseURL ?? null,
+      error: row.error ?? null,
+      creationMethod: 'WEB' as const,
+      deletedAt: null,
+    };
+
+    await prisma.post.upsert({
+      where: { id: row.id },
+      update: data,
+      create: { id: row.id, ...data },
+    });
+  }
+
+  return rows.map((row) => `${row.state}:${row.id}`);
 }
 
 /**

@@ -197,7 +197,47 @@ export const listPostsQuerySchema = z
   })
   .strict();
 
+/** The longest span a calendar request may cover: a month view plus its padding weeks. */
+export const MAX_CALENDAR_DAYS = 62;
+
+/**
+ * Sprint 5: a date range for the calendar. Bounded, because an unbounded range
+ * is a request for every post the workspace has ever had.
+ */
+export const calendarQuerySchema = z
+  .object({
+    from: z.string().datetime({ offset: true }),
+    to: z.string().datetime({ offset: true }),
+  })
+  .strict()
+  .refine((query) => {
+    const span = new Date(query.to).getTime() - new Date(query.from).getTime();
+    return span >= 0 && span <= MAX_CALENDAR_DAYS * 24 * 60 * 60 * 1_000;
+  }, 'The range must run forwards and cover at most 62 days');
+
+/** Sprint 5: the queue list's filters, paging and order. */
+export const queueQuerySchema = z
+  .object({
+    state: z.enum(['DRAFT', 'QUEUE', 'PUBLISHED', 'ERROR']).optional(),
+    channelId: z.string().min(1).max(64).optional(),
+    from: z.string().datetime({ offset: true }).optional(),
+    to: z.string().datetime({ offset: true }).optional(),
+    sort: z.enum(['asc', 'desc']).default('asc'),
+    page: z.coerce.number().int().min(1).max(10_000).default(1),
+  })
+  .strict();
+
+/** Sprint 5: a new publish time for a whole post. */
+export const rescheduleSchema = z
+  .object({
+    publishDate: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
 export type PostPartInput = z.infer<typeof postPartSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type UpdatePostInput = z.infer<typeof updatePostSchema>;
 export type ListPostsQuery = z.infer<typeof listPostsQuerySchema>;
+export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
+export type QueueQuery = z.infer<typeof queueQuerySchema>;
+export type RescheduleInput = z.infer<typeof rescheduleSchema>;

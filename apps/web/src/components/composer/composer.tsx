@@ -84,6 +84,8 @@ interface ComposerProps {
   providers: ProviderSummary[];
   initialPost: PostDetail | null;
   initialMedia: MediaItem | null;
+  /** An ISO time to start a new post at — the calendar's "click a slot". */
+  initialPublishAt?: string | null;
   /** Set when `?group=` named a post that could not be loaded. */
   loadError: string | null;
 }
@@ -99,6 +101,7 @@ export function Composer({
   providers,
   initialPost,
   initialMedia,
+  initialPublishAt = null,
   loadError,
 }: ComposerProps) {
   const router = useRouter();
@@ -119,6 +122,7 @@ export function Composer({
       media: initialMedia,
       availableChannelIds: new Set(channels.map((channel) => channel.id)),
       now: new Date(),
+      publishAt: initialPublishAt ? new Date(initialPublishAt) : null,
     }),
   );
 

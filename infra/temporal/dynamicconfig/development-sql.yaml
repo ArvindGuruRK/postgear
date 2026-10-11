@@ -1,0 +1,9 @@
+# Temporal server dynamic config for the local docker-compose stack.
+#
+# PostGear addresses every workflow by a deterministic id (see
+# packages/scheduling/src/workflows.ts), so it needs no custom search
+# attributes and no Elasticsearch — the SQL visibility store that
+# `temporalio/auto-setup` creates in the shared Postgres is enough.
+limit.maxIDLength:
+  - value: 255
+    constraints: {}

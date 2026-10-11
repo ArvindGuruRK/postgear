@@ -246,8 +246,12 @@
 }
 
 @utility bg-halftone {
+  /* Dots mixed from --color-ink rather than --color-outline (2026-10-11):
+     outline stays near-black in dark mode by design, which made the dots
+     vanish against the dark surface; ink flips with the theme, so the
+     texture reads in both. */
   background-image: radial-gradient(
-    color-mix(in srgb, var(--color-outline) 22%, transparent) 1.5px,
+    color-mix(in srgb, var(--color-ink) 18%, transparent) 1.5px,
     transparent 1.5px
   );
   background-size: 10px 10px;

@@ -29,6 +29,7 @@ jest.mock('@postgear/db', () => ({
       updateMany: jest.fn(),
     },
     post: {
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn(),
       count: jest.fn(),
     },
@@ -41,7 +42,7 @@ import { ChannelsRepository } from './channels.repository';
 
 type PrismaMock = {
   integration: Record<'findMany' | 'findFirst' | 'upsert' | 'update' | 'updateMany', jest.Mock>;
-  post: Record<'updateMany' | 'count', jest.Mock>;
+  post: Record<'findMany' | 'updateMany' | 'count', jest.Mock>;
   $transaction: jest.Mock;
 };
 
@@ -307,7 +308,7 @@ describe('ChannelsRepository', () => {
       expect(result.draftedPosts).toBe(3);
 
       const postUpdate = prismaMock.post.updateMany.mock.calls[0][0];
-      expect(postUpdate.where.state).toBe('QUEUE');
+      expect(postUpdate.where.state).toEqual({ in: ['QUEUE', 'ERROR'] });
       expect(postUpdate.data.state).toBe('DRAFT');
 
       const { data } = prismaMock.integration.updateMany.mock.calls[0][0];

@@ -66,7 +66,7 @@ export function PreviewPanel({
                     onClick={() => setChosen(report.channel.id)}
                     className={cn(
                       'flex items-center gap-1.5 rounded-full border-2 border-outline py-0.5 pe-2.5 ps-0.5 font-sans text-xs font-bold',
-                      'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                      'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
                       selected
                         ? 'bg-actionPrimary text-onActionPrimary'
                         : 'bg-secondary text-ink hover:bg-actionPrimary/10',

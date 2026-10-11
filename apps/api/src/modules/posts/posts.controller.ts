@@ -25,10 +25,16 @@ import { type ActiveOrg, CurrentOrg } from '../../common/decorators/current-org.
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../common/pipes/zod-validation.pipe';
 import {
+  type CalendarQuery,
+  calendarQuerySchema,
   type CreatePostInput,
   createPostSchema,
   type ListPostsQuery,
   listPostsQuerySchema,
+  type QueueQuery,
+  queueQuerySchema,
+  type RescheduleInput,
+  rescheduleSchema,
   type UpdatePostInput,
   updatePostSchema,
 } from './dto/posts.schema';
@@ -46,6 +52,27 @@ export class PostsController {
     @Query(new ZodQuery(listPostsQuerySchema, 'posts/list')) query: ListPostsQuery,
   ) {
     return { posts: await this.posts.list(org.id, query.state) };
+  }
+
+  // The two literal routes are declared before `:group` — Nest matches in
+  // declaration order, and "calendar" would otherwise be read as a group id.
+
+  /** Sprint 5: every post scheduled inside a range, for the calendar. */
+  @Get('calendar')
+  async calendar(
+    @CurrentOrg() org: ActiveOrg,
+    @Query(new ZodQuery(calendarQuerySchema, 'posts/calendar')) query: CalendarQuery,
+  ) {
+    return { posts: await this.posts.calendar(org.id, query) };
+  }
+
+  /** Sprint 5: the queue, paged and filtered. */
+  @Get('queue')
+  async queue(
+    @CurrentOrg() org: ActiveOrg,
+    @Query(new ZodQuery(queueQuerySchema, 'posts/queue')) query: QueueQuery,
+  ) {
+    return this.posts.queue(org.id, query);
   }
 
   @Get(':group')
@@ -76,5 +103,22 @@ export class PostsController {
   async remove(@CurrentOrg() org: ActiveOrg, @Param('group') group: string) {
     await this.posts.remove(org.id, group);
     return { message: POST_MESSAGES.DELETED };
+  }
+
+  /** Sprint 5: moves the whole post to a new time (drag-and-drop lands here). */
+  @Put(':group/schedule')
+  async reschedule(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('group') group: string,
+    @Body(new ZodBody(rescheduleSchema, 'posts/reschedule')) dto: RescheduleInput,
+  ) {
+    return { post: await this.posts.reschedule(org.id, group, new Date(dto.publishDate)) };
+  }
+
+  /** Sprint 5: publishes a queued or failed post right away. */
+  @Post(':group/publish-now')
+  @HttpCode(HttpStatus.OK)
+  async publishNow(@CurrentOrg() org: ActiveOrg, @Param('group') group: string) {
+    return { post: await this.posts.publishNow(org.id, group) };
   }
 }

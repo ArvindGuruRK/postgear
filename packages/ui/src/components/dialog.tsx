@@ -34,7 +34,7 @@ export const DialogContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
+        'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2',
         'rounded-lg border-4 border-outline bg-secondary p-6 shadow-brutalLg',
         'outline-none',
         className,
@@ -45,7 +45,7 @@ export const DialogContent = forwardRef<
       <DialogPrimitive.Close
         className={cn(
           'absolute right-4 top-4 rounded-sm border-2 border-outline bg-secondary p-1',
-          'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+          'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         )}
       >
         <X className="h-4 w-4 text-ink" strokeWidth={3} />

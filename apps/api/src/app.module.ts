@@ -13,6 +13,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OrgModule } from './modules/org/org.module';
 import { PostsModule } from './modules/posts/posts.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { UsersModule } from './modules/users/users.module';
 
 /**
@@ -49,6 +50,7 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     OrgModule,
     OnboardingModule,
+    SchedulingModule,
     ChannelsModule,
     MediaModule,
     PostsModule,

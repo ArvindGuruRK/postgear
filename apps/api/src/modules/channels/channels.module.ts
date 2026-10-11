@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 import { ChannelOAuthService } from './channel-oauth.service';
 import { ChannelsController } from './channels.controller';
 import { ChannelsRepository } from './channels.repository';
@@ -15,6 +16,7 @@ import { ChannelsService } from './channels.service';
  * that decides whether credentials reach the database encrypted.
  */
 @Module({
+  imports: [SchedulingModule],
   controllers: [ChannelsController],
   providers: [ChannelsService, ChannelsRepository, ChannelOAuthService],
   exports: [ChannelsService, ChannelsRepository],

@@ -2,7 +2,28 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+
+    // No `rootDir`, for the reason apps/api gives: `@postgear/db`,
+    // `@postgear/social-core` and `@postgear/scheduling` are consumed as
+    // TypeScript source and live outside this directory, so tsc infers the
+    // common root and emits to dist/apps/worker/src/ — which is where the
+    // `start` script points.
+
+    // The worker runs its emitted JavaScript directly under Node, and
+    // Temporal's workflow bundler reads these sources with its own loader, so
+    // like the API it needs real CommonJS rather than the root's bundler-style
+    // ESNext.
+    "module": "commonjs",
+    "moduleResolution": "node",
+
+    "baseUrl": "../..",
+    "paths": {
+      "@postgear/db": ["packages/db/src"],
+      "@postgear/scheduling": ["packages/scheduling/src"],
+      "@postgear/social-core": ["packages/social-core/src"],
+      "@postgear/seo-engine": ["packages/seo-engine/src"],
+      "@postgear/ai-engine": ["packages/ai-engine/src"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

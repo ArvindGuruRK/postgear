@@ -72,7 +72,7 @@ export function ChannelPicker({
               className={cn(
                 'flex items-center gap-2 rounded-full border-2 border-outline py-1 pe-3 ps-1 font-sans text-sm font-bold text-ink',
                 'outline-none transition-[transform,box-shadow] duration-100',
-                'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 isSelected
                   ? 'bg-actionPrimary text-onActionPrimary shadow-brutalPressed'

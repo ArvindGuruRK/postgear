@@ -148,7 +148,7 @@ function PostList({
               href={`/${orgId}/composer?group=${post.group}`}
               onClick={onOpen}
               aria-current={post.group === currentGroup ? 'page' : undefined}
-              className="flex flex-col gap-1 rounded-md border-2 border-outline bg-secondary p-3 text-ink shadow-brutalSm outline-none hover:bg-actionPrimary/10 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing aria-[current=page]:bg-actionPrimary/10"
+              className="flex flex-col gap-1 rounded-md border-2 border-outline bg-secondary p-3 text-ink shadow-brutalSm outline-none hover:bg-actionPrimary/10 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing aria-[current=page]:bg-actionPrimary/10"
             >
               <span className="line-clamp-2 font-sans text-sm font-medium">
                 {post.preview || <span className="opacity-60">Empty post</span>}

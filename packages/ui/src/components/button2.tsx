@@ -30,7 +30,7 @@ const button2Variants = cva(
     'shadow-brutalBtn transition-[transform,box-shadow] duration-100',
     'hover:-translate-y-0.5 hover:shadow-brutalBtnHover',
     'active:translate-y-1 active:shadow-brutalPressed',
-    'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
     'disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
   ],
   {

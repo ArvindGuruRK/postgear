@@ -16,6 +16,7 @@ import { State } from '@postgear/db';
 import { documentFromText } from '@postgear/social-core';
 import type { ChannelsService, ChannelView } from '../channels/channels.service';
 import type { MediaService, MediaView } from '../media/media.service';
+import type { SchedulingService } from '../scheduling/scheduling.service';
 import type { CreatePostInput } from './dto/posts.schema';
 import type { PostRow, PostsRepository } from './posts.repository';
 import { parseCustomized, parseImageIds, PostsService } from './posts.service';
@@ -76,11 +77,21 @@ describe('PostsService', () => {
   let repository: jest.Mocked<
     Pick<
       PostsRepository,
-      'createGroup' | 'replaceGroup' | 'findGroup' | 'deleteGroup' | 'listRecentGroups'
+      | 'createGroup'
+      | 'replaceGroup'
+      | 'findGroup'
+      | 'deleteGroup'
+      | 'listRecentGroups'
+      | 'findRoots'
+      | 'listCalendar'
+      | 'listQueue'
+      | 'reschedule'
+      | 'publishNow'
     >
   >;
   let channels: { list: jest.Mock };
   let media: { findViews: jest.Mock };
+  let scheduling: { schedulePublish: jest.Mock; cancelPublish: jest.Mock; publishNow: jest.Mock };
   let service: PostsService;
 
   beforeEach(() => {
@@ -90,6 +101,16 @@ describe('PostsService', () => {
       findGroup: jest.fn(),
       deleteGroup: jest.fn(),
       listRecentGroups: jest.fn(),
+      findRoots: jest.fn().mockResolvedValue([]),
+      listCalendar: jest.fn().mockResolvedValue([]),
+      listQueue: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
+      reschedule: jest.fn(),
+      publishNow: jest.fn(),
+    };
+    scheduling = {
+      schedulePublish: jest.fn().mockResolvedValue(true),
+      cancelPublish: jest.fn().mockResolvedValue(true),
+      publishNow: jest.fn().mockResolvedValue(true),
     };
     channels = {
       list: jest.fn().mockResolvedValue([
@@ -114,6 +135,7 @@ describe('PostsService', () => {
       repository as unknown as PostsRepository,
       channels as unknown as ChannelsService,
       media as unknown as MediaService,
+      scheduling as unknown as SchedulingService,
     );
 
     // `create` re-reads the group it wrote.
@@ -131,6 +153,9 @@ describe('PostsService', () => {
       content: JSON.stringify(documentFromText('Hello')),
       image: '[]',
       settings: '{"customized":false}',
+      releaseId: null,
+      releaseURL: null,
+      error: null,
       createdAt: new Date('2026-09-14T10:00:00Z'),
       updatedAt: new Date('2026-09-14T10:00:00Z'),
       integration: {
@@ -342,6 +367,108 @@ describe('PostsService', () => {
         NotFoundException,
       );
       expect(repository.findGroup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rescheduling and publishing now (Sprint 5)', () => {
+    const root = (state: State) => ({ id: 'root_x', integrationId: 'ch_x', state });
+
+    it('refuses to move a queued post into the past, and tells the person to use Post now', async () => {
+      repository.findRoots.mockResolvedValue([root(State.QUEUE)]);
+
+      await expect(
+        service.reschedule('org_1', GROUP, new Date(Date.now() - 60_000)),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(repository.reschedule).not.toHaveBeenCalled();
+    });
+
+    it('lets a draft sit anywhere, and wakes the scheduler only for queued roots', async () => {
+      repository.findRoots.mockResolvedValue([root(State.DRAFT)]);
+      repository.reschedule.mockResolvedValue({ outcome: 'saved', roots: [root(State.DRAFT)] });
+
+      await service.reschedule('org_1', GROUP, new Date('2020-01-01T09:00:00Z'));
+
+      expect(repository.reschedule).toHaveBeenCalledWith(
+        expect.objectContaining({ orgId: 'org_1', group: GROUP }),
+      );
+      expect(scheduling.schedulePublish).toHaveBeenCalledWith([]);
+      expect(scheduling.cancelPublish).toHaveBeenCalledWith(['root_x']);
+    });
+
+    it('re-queues a failed post at the new time and starts its workflow', async () => {
+      repository.findRoots.mockResolvedValue([root(State.ERROR)]);
+      repository.reschedule.mockResolvedValue({ outcome: 'saved', roots: [root(State.QUEUE)] });
+
+      await service.reschedule('org_1', GROUP, new Date(future()));
+
+      expect(scheduling.schedulePublish).toHaveBeenCalledWith([
+        { postId: 'root_x', organizationId: 'org_1' },
+      ]);
+    });
+
+    it('reports a fully published post as locked', async () => {
+      repository.findRoots.mockResolvedValue([root(State.PUBLISHED)]);
+      repository.reschedule.mockResolvedValue({ outcome: 'locked' });
+
+      await expect(service.reschedule('org_1', GROUP, new Date(future()))).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('publishes now by re-queueing the pending channels and signalling each root', async () => {
+      repository.publishNow.mockResolvedValue({
+        outcome: 'saved',
+        roots: [root(State.QUEUE), { id: 'root_li', integrationId: 'ch_li', state: State.QUEUE }],
+      });
+
+      await service.publishNow('org_1', GROUP);
+
+      expect(scheduling.publishNow).toHaveBeenCalledWith([
+        { postId: 'root_x', organizationId: 'org_1' },
+        { postId: 'root_li', organizationId: 'org_1' },
+      ]);
+    });
+
+    it('refuses to publish a draft now', async () => {
+      repository.publishNow.mockResolvedValue({ outcome: 'not_queued' });
+
+      await expect(service.publishNow('org_1', GROUP)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(scheduling.publishNow).not.toHaveBeenCalled();
+    });
+
+    it('cancels the workflows of channels a save drops, and of a deleted post', async () => {
+      repository.findRoots
+        .mockResolvedValueOnce([
+          root(State.QUEUE),
+          { id: 'root_li', integrationId: 'ch_li', state: State.QUEUE },
+        ])
+        .mockResolvedValueOnce([root(State.QUEUE)]);
+
+      await service.update('org_1', GROUP, {
+        ...input({ state: 'QUEUE' }),
+        expectedUpdatedAt: new Date().toISOString(),
+      });
+
+      expect(scheduling.cancelPublish).toHaveBeenCalledWith(['root_li']);
+      expect(scheduling.schedulePublish).toHaveBeenCalledWith([
+        { postId: 'root_x', organizationId: 'org_1' },
+      ]);
+
+      repository.findRoots.mockResolvedValueOnce([root(State.QUEUE)]);
+      repository.deleteGroup.mockResolvedValue('deleted');
+      await service.remove('org_1', GROUP);
+      expect(scheduling.cancelPublish).toHaveBeenLastCalledWith(['root_x']);
+    });
+
+    it('still saves when the scheduler cannot be reached', async () => {
+      scheduling.schedulePublish.mockResolvedValue(false);
+      repository.findRoots.mockResolvedValue([root(State.QUEUE)]);
+
+      await expect(service.create('org_1', input({ state: 'QUEUE' }))).resolves.toMatchObject({
+        group: expect.any(String),
+      });
     });
   });
 

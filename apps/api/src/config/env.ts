@@ -107,6 +107,13 @@ const envSchema = z
     // path-style whenever a custom endpoint is set.
     S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).optional(),
 
+    // The scheduler (Sprint 5). The API only *talks* to Temporal — starting and
+    // signalling workflows — and does so best-effort, so an unreachable server
+    // degrades to a logged warning rather than a failed save. The worker
+    // (`apps/worker`) reads the same two variables.
+    TEMPORAL_HOST: z.string().min(1).default('localhost:7233'),
+    TEMPORAL_NAMESPACE: z.string().min(1).default('default'),
+
     LOGIN_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(10),
     LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),
     LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),

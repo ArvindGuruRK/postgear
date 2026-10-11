@@ -86,6 +86,7 @@ export function ButtonsSection() {
           <Badge variant="danger">Past due</Badge>
           <Badge variant="ai">AI Powered</Badge>
           <Badge variant="accent">New</Badge>
+          <Badge variant="success">Published</Badge>
           <Badge variant="outline">Draft</Badge>
         </Row>
       </Section>

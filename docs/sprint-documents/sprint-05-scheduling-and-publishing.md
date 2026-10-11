@@ -40,11 +40,33 @@ Target locations: `apps/worker/src/{workflows,activities}/` (Temporal, already s
 - `apps/web/src/app/(dashboard)/[orgId]/calendar/page.tsx` + `apps/web/src/components/calendar/`: month/week/day views, drag-and-drop reschedule (calls the reschedule endpoint, which internally re-signals or restarts the workflow with the new time), queue list view.
 
 ## Definition of Done
-- [ ] A post scheduled for 2+ minutes out publishes automatically without any process being kept alive by the browser/client.
-- [ ] Killing and restarting the worker process mid-wait does not lose or duplicate the scheduled post.
-- [ ] A simulated 429 response triggers a visible retry with backoff instead of an immediate failure state.
-- [ ] "Post Now" on a queued post publishes within seconds.
-- [ ] Drag-and-drop reschedule on the calendar updates the actual publish time.
+
+> **Completion checklist**: [sprint-05-completion-checklist.md](../sprint-completion-checklists/sprint-05-completion-checklist.md) — what shipped, a test command for every item, the live evidence for each DoD line, and the known gaps.
+
+- [x] A post scheduled for 2+ minutes out publishes automatically without any process being kept alive by the browser/client. **Verified live**: the timer is a Temporal durable timer; the post published on time with no browser open.
+- [x] Killing and restarting the worker process mid-wait does not lose or duplicate the scheduled post. **Verified live**: the worker was killed with two timers due while it was down; on restart both posts published within seconds, a third at its time, each exactly once.
+- [x] A simulated 429 response triggers a visible retry with backoff instead of an immediate failure state. **Verified live**: `[simulate:429x2]` showed "Retrying · attempt 1 of 5", then attempt 2 after 30 s, then Published after a further 60 s — the policy in `@postgear/scheduling`.
+- [x] "Post Now" on a queued post publishes within seconds. **Verified live** (~3 s), including the branch where one channel's token is dead and ends as "needs reconnecting" while the other publishes.
+- [x] Drag-and-drop reschedule on the calendar updates the actual publish time. Browser test: `calendar.spec.ts` › *drag-and-drop moves a post to another day and the API records the new time*.
+
+### Added beyond the original scope
+
+- [x] **A pure contract package, `@postgear/scheduling`** — workflow and signal names, deterministic ids, the retry policy as data, and the publish-status JSON — so the API and the worker never import each other.
+- [x] **Per-channel publish status in the UI**: "Scheduled / Publishing / Retrying (attempt n of 5, next try 10:32) / Published / Failed (why)", with partial outcomes ("Published to 1 of 2 channels") on the calendar card, the queue row and the detail dialog.
+- [x] **A scheduler status pill** on both pages: online / no worker running / unreachable — the one failure that leaves no trace in the data.
+- [x] **Publish simulation** (`PUBLISH_SIMULATION=true`) with `[simulate:…]` directives, so the whole engine can be exercised without a developer app; refused in production.
+- [x] **A maintenance workflow** that reconciles every queued row and refreshable channel every fifteen minutes, so a scheduler outage during a save delays a post rather than losing it.
+- [x] **Reschedule dialog with the channels' configured posting times** as one-click suggestions; a clicked calendar slot opens the composer at that time (`?at=`).
+- [x] **Four seeded posts in four states**, so the calendar and queue show every treatment on a fresh clone.
+
+### Deviations from this document, and why
+
+| This doc said | What shipped | Why |
+|---|---|---|
+| Versioned workflow function names | One version, with the versioning rule written at the top of `post-publish.workflow.ts` | No publish logic has changed yet; the discipline is documented where the next change will be made |
+| The reference's `poke` signal, and terminate-and-restart on edit found by search attribute | `wake` / `publishNow` / `cancel` signals against a deterministic id per channel root row | The workflow re-reads the row after every wake, so reschedule, delete and disconnect are each one idempotent `signalWithStart`; no listing, no terminate race, no Elasticsearch |
+| Study the reference calendar (react-dnd, dayjs) | dnd-kit (already a dependency) and hand-written local-time date maths | One drag library in the app; `startOfWeek` is not worth a date library on the page |
 
 ## Risks
-- Temporal has a real operational learning curve (worker deployment, task queues, versioning discipline) — budget extra time here if this is your first time running it. The payoff (no missed posts on restart) is exactly PostGear's core reliability promise, so it's worth the investment rather than falling back to a plain cron/BullMQ approach.
+- Temporal has a real operational learning curve (worker deployment, task queues, versioning discipline) — budget extra time here if this is your first time running it. The payoff (no missed posts on restart) is exactly PostGear's core reliability promise, so it's worth the investment rather than falling back to a plain cron/BullMQ approach. **Outcome**: the `auto-setup` image in docker-compose plus one task queue was enough; the worker waits for Temporal at boot, and the first real logic change is the moment to introduce a second named workflow version.
+- **Nothing has reached a real platform through the scheduler yet.** The engine was proven against the stand-in; the first connected channel (LinkedIn, per docs/local-testing-guide.md) is where `PUBLISH_SIMULATION=false` gets its first real run.

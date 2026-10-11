@@ -164,7 +164,7 @@ function CarouselButton({
       onClick={onClick}
       className={cn(
         'absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-secondary/90 text-ink',
-        'outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+        'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         className,
       )}
     >

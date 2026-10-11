@@ -111,7 +111,7 @@ export function PreviewText({
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="ms-1 font-semibold opacity-70 outline-none hover:underline focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+            className="ms-1 font-semibold opacity-70 outline-none hover:underline focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
           >
             {moreLabel}
           </button>

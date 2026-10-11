@@ -93,7 +93,7 @@ The one interaction recipe, reused verbatim across Button, Input, Select, Checkb
   - This is scoped to `Button`/`Button2` only; nothing else in the "reused verbatim" list above (Input, Select, Checkbox, etc.) touches its shadow on hover, and their hover color change stays on `hover:`, not `active:`.
 
 **`Button2`'s interaction** (see §6): same hover-is-shadow-only / color-moves-to-active fix as `Button` above (also 2026-08-30 — the pink hover flash was still showing on Button2 after the first Button-only pass). Since its shadow is bottom-only, `hover` grows the offset (`shadow-brutalBtn` → `shadow-brutalBtnHover`) plus `-translate-y-0.5`, with no `hover:bg-*`/`hover:brightness-*`. `active` carries the fill-color change (`active:bg-actionPrimaryHover`, `active:brightness-95`, `active:brightness-90`) and moves the full offset (`translate-y-1`, not half) since there's no horizontal component to split, collapsing to `shadow-brutalPressed` same as everywhere else. This exact recipe (bottom-only shadow, vertical-only lift) is scoped to `Button2` only.
-- **Focus** — one focus-ring treatment, identical everywhere: `outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-actionAccent`. Never `focus:` (mouse clicks shouldn't show it) — always `focus-visible:`.
+- **Focus** — one focus-ring treatment, identical everywhere: `outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing`. **`outline-solid`, not the bare `outline`** (corrected 2026-10-11): under Tailwind v4, `outline-none` sets `--tw-outline-style: none` and the bare `outline` utility only re-reads that variable, so the ring compiled with a 3px width and the right color and *no style* — invisible on every component since Sprint 0. `outline-solid` sets the style itself. Never `focus:` (mouse clicks shouldn't show it) — always `focus-visible:`.
 - **Loading** — preserve dimensions, don't reflow. `Spinner` sits in place of an icon/label at the same size; `Skeleton` occupies the same footprint as the content it's replacing (`animate-pulse rounded-md bg-outline/10`, deliberately borderless — a loading placeholder isn't a bordered surface).
 
 ## 9. Disabled states
@@ -163,6 +163,34 @@ Durations/easings actually in use — don't add a new one without a reason:
 - `duration-300 ease-out` — Progress bar fill.
 - `animate-fadeIn` (0.2s) — overlay/content entrance for Dialog, AlertDialog, Sheet, Popover, HoverCard, Tooltip. The only entrance animation in the system; nothing slides, scales, or bounces in — brutalism reads as *snap into place*, not *ease in*.
 - `animate-accordionDown`/`Up`, `animate-collapsibleDown`/`Up` — height-based expand/collapse (0.2s ease-out), added in this pass since Radix Accordion/Collapsible need a real `height` keyframe (not just opacity) to animate smoothly; each references its own primitive's `--radix-*-content-height` custom property, so they can't be merged into one pair.
+
+## 16a. Scheduling surfaces (Sprint 5)
+
+The calendar grid and the queue list are **dense data surfaces** under §15, and
+the two pages are the first place several rules meet at once; what was decided:
+
+- **Status is one vocabulary.** `apps/web/src/components/posts/post-status.ts`
+  maps the four `State` values plus the worker's publish status onto six tones —
+  draft, scheduled, publishing, retrying, published, failed — each with a fixed
+  Badge variant: `outline`, `primary`, `accent`, `accent`, `success`, `danger`.
+  Every card, row and dialog reads it; no screen invents its own mapping.
+- **`Badge` has a `success` variant** (`bg-actionSuccess text-onActionLight`),
+  added for "Published". It is the one unambiguously good outcome the scheduler
+  reports and has to read as such next to a `danger` badge.
+- **State on a card is a colored start edge** (`border-s-4` in the tone's
+  action color), not a filled card. A grid of filled cards is noise; an edge
+  reads at a glance and keeps the text on `bg-secondary` legible in both themes.
+- **The grid has no brutal shadow; its cards have `shadow-brutalSm`.** The chrome
+  around it — toolbar, view switcher, range heading in `font-display` — carries
+  the full treatment. Slot cells are `border-2 border-outline`; past slots get
+  `bg-halftone`, the texture already in the system, rather than a new gray.
+- **Drop target** is `bg-actionPrimary/15` plus a dashed `outline-actionPrimary`:
+  the primary action color saying "this is where it goes", not a new color.
+- **Drag handle is a separate grip**, not the whole card. The card body is a
+  button that opens the post; Space/Enter must open, not start a drag.
+- **Per-channel status dots** on stacked avatars (`ChannelStack`) use the tone
+  colors above; one post to three channels is one card, and the dots are how a
+  partial outcome fits in its corner.
 
 ## 17. Token extension policy
 

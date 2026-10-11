@@ -88,7 +88,7 @@ export function MediaTile({ item, selected, onToggle, actions }: MediaTileProps)
         className={cn(
           frame,
           'block w-full outline-none transition-[transform,box-shadow] duration-100',
-          'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+          'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         )}
       >
         {preview}

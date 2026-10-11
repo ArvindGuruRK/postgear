@@ -17,15 +17,21 @@ placeholders.
 
 | Works in the browser | Not available yet |
 |---|---|
-| Login with the seeded demo account | **Publishing a post from the UI.** The composer saves drafts and queue entries, but nothing sends them out yet. |
-| Composer: editor, per-platform previews, character counters, threads, media attach | The Queue page (empty placeholder) |
-| Media library: upload, preview, delete | Analytics, SEO analyzer, AI copilot |
+| Login with the seeded demo account | Analytics, SEO analyzer, AI copilot |
+| Composer: editor, per-platform previews, character counters, threads, media attach | Recurring posts, RSS auto-posting, bulk scheduling |
+| Media library: upload, preview, delete | In-app notifications (rows are written; the bell is Sprint 8) |
 | Save a draft, "Add to queue", reopen drafts | |
+| **Calendar** (Sprint 5): month/week/day, drag a post to reschedule, click a slot to compose | |
+| **Queue** (Sprint 5): every post in order, filters, Post now / Reschedule / Retry / Delete | |
+| **Scheduled publishing** (Sprint 5): a queued post goes out at its time, retries on rate limits, flags a dead token | |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
-The only way to publish a real post today is the API's test-post endpoint
-(section 7).
+Since Sprint 5 the queue actually publishes — through the **worker** process
+(section 3). Locally, with `PUBLISH_SIMULATION="true"` in `.env`, it publishes
+to a stand-in so the seeded fake channels work end to end; set it to `"false"`
+once you have connected a real account (section 6) and want real posts. The
+API's test-post endpoint (section 7) still exists for a one-off manual post.
 
 ### What costs money and what does not
 
@@ -100,7 +106,7 @@ unreadable. (Harmless here: you would just reconnect the channel.)
 
 ## 3. Start the app
 
-Two terminals, both in the project folder.
+Three terminals, all in the project folder.
 
 **Terminal 1: API (port 3001)**
 
@@ -111,7 +117,19 @@ npm run dev:api
 Wait for it to say it is listening. Any `.env` problem appears here, with the
 variable named.
 
-**Terminal 2: website (port 3000)**
+**Terminal 2: worker (the publisher, Sprint 5)**
+
+```powershell
+npm run dev:worker
+```
+
+It waits for Temporal (from `docker compose up -d`; the Temporal UI is at
+<http://localhost:8233>), bundles its workflows, then says it is polling
+`postgear-publishing`. With `PUBLISH_SIMULATION="true"` it warns that posts go
+to a stand-in. Without a worker running, nothing publishes — the Calendar and
+Queue pages show "No worker running" in their status pill so you can tell.
+
+**Terminal 3: website (port 3000)**
 
 ```powershell
 npm run dev --workspace=@postgear/web
@@ -154,8 +172,30 @@ Open **<http://localhost:3000/seed-demo-org/composer>**.
    or 1 video; LinkedIn: up to 20 images and no video yet).
 6. **Save draft**, reload the page, then reopen it from the drafts list. It
    should still be there.
-7. **Add to queue** with a future date. It saves as queued. It will not
-   actually publish yet.
+7. **Add to queue** with a time a couple of minutes away. Then open the
+   **Queue** page and watch: "Scheduled" becomes "Publishing" at the time, then
+   "Published" with a link (to the stand-in's URL when simulating).
+
+### The scheduler (Sprint 5)
+Open **<http://localhost:3000/seed-demo-org/calendar>** and
+**<http://localhost:3000/seed-demo-org/queue>**. The seed gives you a queued
+thread for tomorrow, a published post, a failed one and a draft.
+
+- **Drag** the queued card to another day or hour. The toast confirms and the
+  API's time changes; the Temporal UI shows the workflow woken.
+- Click a card → **Post now**. Within seconds the LinkedIn channel is
+  Published; the X channel fails with "Channel needs reconnecting", because the
+  seeded X account is deliberately broken. That is the dead-token branch.
+- Write a post whose text contains `[simulate:429x2]` and Post now. The queue
+  shows "Retrying · attempt 1 of 5", then attempt 2 after 30 seconds, then
+  Published a minute later. `[simulate:400]` fails at once as "Rejected by the
+  platform"; `[simulate:429]` (no `x`) gives up after five attempts.
+  `[simulate:401]` runs the dead-token branch and leaves that seeded channel
+  flagged "Reconnect" until you re-seed, so try it on a post to Acme on X,
+  which is seeded broken anyway.
+- Stop the worker (Ctrl+C in its terminal) while a post is minutes away, start
+  it again after the time has passed: the post publishes once, immediately.
+- Hover an empty slot and click **+** to open the composer at that time.
 
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.

@@ -66,7 +66,7 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
           onClick={() => document.getElementById(inputId)?.click()}
           className={cn(
             'flex w-full flex-col items-center justify-center gap-2 p-8 text-center outline-none',
-            'focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+            'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-actionPrimary/5',
           )}
         >

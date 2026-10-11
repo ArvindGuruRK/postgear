@@ -12,6 +12,10 @@ const badgeVariants = cva(
         danger: 'bg-actionDanger text-onActionLight',
         ai: 'bg-actionAi text-onActionAi',
         accent: 'bg-actionAccent text-onActionLight',
+        // Added in Sprint 5 for "Published": the one outcome the scheduler
+        // reports that is unambiguously good, and it needs to read as such next
+        // to a danger badge. Same green / black-on-fill pair as Alert's success.
+        success: 'bg-actionSuccess text-onActionLight',
         outline: 'bg-transparent text-ink',
       },
     },

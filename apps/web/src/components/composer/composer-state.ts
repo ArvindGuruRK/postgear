@@ -148,15 +148,27 @@ export function initialComposerState(options: {
   /** Ids of channels that can still be targeted. */
   availableChannelIds: Set<string>;
   now: Date;
+  /**
+   * A time to start a new post at — the calendar's "click a slot" (Sprint 5).
+   * Ignored for a reopened post, which has its own, and when it is in the past.
+   */
+  publishAt?: Date | null;
 }): ComposerState {
   const { post } = options;
 
   if (!post) {
+    const requested =
+      options.publishAt &&
+      !Number.isNaN(options.publishAt.getTime()) &&
+      options.publishAt.getTime() > options.now.getTime()
+        ? toLocalInputValue(options.publishAt)
+        : null;
+
     return {
       group: null,
       updatedAt: null,
       savedState: null,
-      publishAt: defaultPublishAt(options.now),
+      publishAt: requested ?? defaultPublishAt(options.now),
       shared: [newPart(emptyDocument(), options.media ? [options.media] : [])],
       selected: [],
       custom: {},

@@ -8,6 +8,7 @@
  *
  * `?group=` reopens a saved post. `?media=` starts a new post with a library
  * item attached, which is how the media library's "Use in a post" arrives.
+ * `?at=` starts a new post at a given time — the calendar's clicked slot.
  *
  * ## Why the island's key is a fresh id per render
  *
@@ -42,6 +43,10 @@ export default async function ComposerPage({
   const query = await searchParams;
   const group = single(query.group);
   const mediaId = group ? null : single(query.media);
+  // `?at=` is the calendar handing over a clicked slot (Sprint 5). Anything
+  // unparseable is ignored rather than failing the page.
+  const at = group ? null : single(query.at);
+  const publishAt = at && !Number.isNaN(Date.parse(at)) ? new Date(at).toISOString() : null;
   const cookie = await getSessionCookieHeader();
 
   const [{ channels }, { providers }, post, media] = await Promise.all([
@@ -76,6 +81,7 @@ export default async function ComposerPage({
       providers={providers}
       initialPost={post.post}
       initialMedia={media}
+      initialPublishAt={publishAt}
       loadError={post.error}
     />
   );
