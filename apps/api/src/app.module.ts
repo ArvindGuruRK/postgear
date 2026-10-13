@@ -5,6 +5,7 @@ import { validateEnv } from './config/env';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -54,6 +55,7 @@ import { UsersModule } from './modules/users/users.module';
     ChannelsModule,
     MediaModule,
     PostsModule,
+    AiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -111,7 +111,10 @@ export type SecurityEvent =
   | 'media.upload_rejected'
   // Posts (Sprint 4). An edit that references another workspace's media, or a
   // channel it cannot see, is either a stale client or a probe.
-  | 'post.foreign_reference';
+  | 'post.foreign_reference'
+  // AI generation (Sprint 6). A generation aimed at a channel this workspace
+  // cannot see is the same stale-client-or-probe question as a post's.
+  | 'ai.foreign_reference';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

@@ -11,13 +11,25 @@ import {
   Progress,
   Skeleton,
   Spinner,
+  StageTracker,
   SuccessState,
   ToastAction,
+  TypingIndicator,
   useToast,
 } from '@postgear/ui';
 import { Inbox, Sparkles, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
-import { Row, Section } from '../shared';
+import { Row, Section, Spec } from '../shared';
+
+// One stage per status so every colour is visible side by side; the real
+// pipeline (research → classify → hook → content → image) is the same shape.
+const PIPELINE_STAGES = [
+  { id: 'research', label: 'Research', status: 'skipped', detail: 'No TAVILY_API_KEY' },
+  { id: 'classify', label: 'Classify', status: 'done', detail: 'Product update' },
+  { id: 'hook', label: 'Hook', status: 'failed', detail: 'Model timed out' },
+  { id: 'content', label: 'Content', status: 'active', detail: 'Writing 3 parts…' },
+  { id: 'image', label: 'Image', status: 'pending' },
+] as const;
 
 export function FeedbackSection() {
   const { toast } = useToast();
@@ -149,6 +161,29 @@ export function FeedbackSection() {
         <Spinner size="sm" />
         <Spinner size="md" />
         <Spinner size="lg" />
+      </Row>
+      <Row label="Typing Indicator">
+        <TypingIndicator />
+        <Spec>
+          h-2 w-2 rounded-full bg-ink animate-pulse, staggered 0 / 150 / 300ms, role=status
+        </Spec>
+      </Row>
+      <Row label="Stage Tracker (horizontal — all five statuses; stacks below sm)">
+        <div className="flex w-full flex-col gap-3">
+          <StageTracker stages={PIPELINE_STAGES} />
+          <Spec>
+            badge h-9 w-9 rounded-full border-2 border-outline font-display · pending bg-secondary ·
+            active bg-actionAi + Spinner · done bg-actionSuccess · skipped border-dashed opacity-60
+            · failed bg-actionDanger · connectors bg-outline
+          </Spec>
+        </div>
+      </Row>
+      <Row label="Stage Tracker (vertical)">
+        <StageTracker orientation="vertical" stages={PIPELINE_STAGES} className="w-72" />
+        <Spec>
+          label font-display text-xs uppercase tracking-wide · detail font-sans text-xs font-medium
+          opacity-70
+        </Spec>
       </Row>
       <Row label="Skeleton">
         <div className="flex w-56 flex-col gap-2">

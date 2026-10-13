@@ -20,7 +20,7 @@ import {
 } from '@postgear/ui';
 import { Grid3x3, LayoutList, LogOut, Settings, User } from 'lucide-react';
 import { useState } from 'react';
-import { Row, Section } from '../shared';
+import { Row, Section, Spec } from '../shared';
 
 const DEMO_WORKSPACES = [
   { id: '1', name: 'Acme Media' },
@@ -193,6 +193,19 @@ export function SaasPatternsSection() {
         <div className="flex w-64 flex-col gap-4">
           <UsageMeter label="Scheduled posts" value={82} max={100} />
           <UsageMeter label="AI credits" value={950} max={1000} unit="credits" />
+          {/* Sprint 6: the feature's own colour below the limit, one quiet line under the bar. */}
+          <UsageMeter
+            label="AI credits"
+            value={340}
+            max={1000}
+            unit="credits"
+            tone="ai"
+            caption="Resets 1 Nov · Growth"
+          />
+          <Spec>
+            tone=ai caption · danger still takes over at 90% · caption font-sans text-xs font-medium
+            opacity-70
+          </Spec>
         </div>
       </Row>
       <Row label="Settings Navigation">

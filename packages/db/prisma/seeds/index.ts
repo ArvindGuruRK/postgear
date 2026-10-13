@@ -264,6 +264,7 @@ async function main() {
   // wrote plaintext would make that check pass or fail for the wrong reason.
   const seededChannels = await seedChannels(organization.id);
   const seededPosts = await seedPosts(organization.id);
+  const seededCredits = await seedAiCredits(organization.id);
 
   console.log('Seed complete:', {
     organizationId: organization.id,
@@ -274,7 +275,58 @@ async function main() {
     password: SEED_PASSWORD,
     channels: seededChannels,
     posts: seededPosts,
+    aiCredits: seededCredits,
   });
+}
+
+/**
+ * Every `Credits.type` the AI module writes (Sprint 6): a charge per kind,
+ * and its refund. Duplicated from `apps/api/src/modules/ai/credits/
+ * credits.policy.ts` because packages/db must not depend on an app; if the
+ * two drift the meter simply shows a different number, nothing breaks.
+ */
+const AI_LEDGER_TYPES = [
+  'generate_post',
+  'generate_image',
+  'copilot_message',
+  'refund:generate_post',
+  'refund:generate_image',
+  'refund:copilot_message',
+];
+
+/**
+ * A few AI credit ledger rows on the demo workspace (Sprint 6), so the
+ * credits meter has something to show on a fresh clone: 23 of the STANDARD
+ * tier's 100 used, with one refund in the history so that treatment exists.
+ *
+ * `Credits` rows have no natural key to upsert on, so idempotency is delete
+ * then create: every AI-typed row for this workspace is replaced, and rows of
+ * any other type are left alone. Dated inside the current cycle (the seeded
+ * subscription's day of the month, this month), so they count.
+ */
+async function seedAiCredits(organizationId: string) {
+  await prisma.credits.deleteMany({
+    where: { organizationId, type: { in: AI_LEDGER_TYPES } },
+  });
+
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
+
+  const rows = [
+    { type: 'generate_post', credits: 5, createdAt: minutesAgo(180) },
+    { type: 'generate_post', credits: 15, createdAt: minutesAgo(120) },
+    // The image of that second generation failed and was returned.
+    { type: 'refund:generate_image', credits: -10, createdAt: minutesAgo(119) },
+    { type: 'generate_image', credits: 10, createdAt: minutesAgo(90) },
+    { type: 'copilot_message', credits: 1, createdAt: minutesAgo(30) },
+    { type: 'copilot_message', credits: 1, createdAt: minutesAgo(20) },
+    { type: 'copilot_message', credits: 1, createdAt: minutesAgo(10) },
+  ];
+
+  await prisma.credits.createMany({
+    data: rows.map((row) => ({ organizationId, ...row })),
+  });
+
+  return { rows: rows.length, used: rows.reduce((sum, row) => sum + row.credits, 0) };
 }
 
 /**

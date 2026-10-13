@@ -15,8 +15,14 @@
  *   classic cause of "logged in in the browser, logged out in the layout".
  */
 
-/** Browser-visible; must be inlined at build time, hence the NEXT_PUBLIC_ prefix. */
-const BROWSER_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+/**
+ * Browser-visible; must be inlined at build time, hence the NEXT_PUBLIC_ prefix.
+ *
+ * Exported (Sprint 6) for `sse.ts`, the one other place the browser opens a
+ * connection to the API: a streamed response cannot go through `api()`, which
+ * reads the whole body before returning.
+ */
+export const BROWSER_API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 /**
  * Server-side base URL. Separate from the browser one because in a container

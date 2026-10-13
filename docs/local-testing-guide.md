@@ -17,13 +17,14 @@ placeholders.
 
 | Works in the browser | Not available yet |
 |---|---|
-| Login with the seeded demo account | Analytics, SEO analyzer, AI copilot |
+| Login with the seeded demo account | Analytics, SEO analyzer |
 | Composer: editor, per-platform previews, character counters, threads, media attach | Recurring posts, RSS auto-posting, bulk scheduling |
 | Media library: upload, preview, delete | In-app notifications (rows are written; the bell is Sprint 8) |
 | Save a draft, "Add to queue", reopen drafts | |
 | **Calendar** (Sprint 5): month/week/day, drag a post to reschedule, click a slot to compose | |
 | **Queue** (Sprint 5): every post in order, filters, Post now / Reschedule / Retry / Delete | |
 | **Scheduled publishing** (Sprint 5): a queued post goes out at its time, retries on rate limits, flags a dead token | |
+| **AI Copilot** (Sprint 6): generate a post from a topic (research → hook → copy → image), chat with an assistant that can list channels and draft posts, AI credits | |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
@@ -32,6 +33,13 @@ Since Sprint 5 the queue actually publishes — through the **worker** process
 to a stand-in so the seeded fake channels work end to end; set it to `"false"`
 once you have connected a real account (section 6) and want real posts. The
 API's test-post endpoint (section 7) still exists for a one-off manual post.
+
+Since Sprint 6 the AI Copilot works the same way: with `AI_SIMULATION="true"`
+in `.env` the model, the web research and the image generator are replaced by
+deterministic stand-ins, so every screen, the credit metering and the
+tool-calling assistant can be exercised with no API key and at no cost
+(section 5c). Set it to `"false"` and fill in `OPENAI_API_KEY` (and optionally
+`TAVILY_API_KEY`) for real generations.
 
 ### What costs money and what does not
 
@@ -210,6 +218,59 @@ thread for tomorrow, a published post, a failed one and a draft.
   it again after the time has passed: the post publishes once, immediately.
 - Hover an empty slot and click **+** to open the composer at that time.
 
+### 5c. The AI Copilot (Sprint 6)
+
+Add this to `.env` and restart the API (`.env` is read only at start):
+
+```env
+AI_SIMULATION="true"
+```
+
+`.env.example` used to ship `OPENAI_API_KEY="sk-proj-openai-api-key"` and a
+similar Tavily placeholder. The API now recognises those exact placeholder
+strings and treats them as *unset* (it logs a warning naming the variable), so
+you do not have to delete them — but without `AI_SIMULATION="true"` the AI page
+will say it is not configured.
+
+Open **<http://localhost:3000/seed-demo-org/ai-copilot>**.
+
+**Generate a post.** Type a topic ("three things we learned launching our
+newsletter"), pick a voice (*Personal* writes as "I", *Company* writes as "we"),
+a format, optionally the hero image, and at least one channel. The button says
+what it costs ("Generate · 5 credits", 15 with an image). Watch the stage
+tracker: research → classify → hook → content → image. The result shows the
+category, the hook, the parts with their character counts against the strictest
+selected platform, the sources it was "backed by" (canned ones in simulation),
+and the image. **Open in composer** saves it as a draft for those channels and
+opens the composer on it; the image is attached to part 1.
+
+- Pick *Acme on X* and a long format: every part stays under X's 280
+  characters, because the pipeline is told the strictest limit.
+- Switch the voice and regenerate: the same topic reads as "I…" or "we…".
+- Press **Stop** mid-way: the run is cancelled and nothing more is charged.
+
+**Chat with the copilot.** Switch to the *Copilot* tab and ask *"What channels
+do I have connected?"* — the assistant calls its `list_channels` tool (you see
+the tool activity row) and answers with the three seeded channels. Then try
+*"Write a LinkedIn post about our spring sale and save it as a draft"* and
+*"Generate an image of a sunrise over a city skyline"*. A drafted post appears
+with an **Open in composer** link; a generated image appears in the media
+library. Each message costs 1 credit; the tools that generate cost 5 and 10.
+
+**Credits.** The meter at the top shows the cycle's usage (the seed starts the
+demo workspace at 23 of 100, the STANDARD tier's monthly allowance) and the
+reset date. Use them up — or temporarily lower the allowance in
+`apps/api/src/modules/ai/credits/credits.policy.ts` — and the Generate button
+disables with an explanation; the API answers **402**. Credits are charged
+before a generation and refunded when it fails before producing anything.
+
+Without `AI_SIMULATION`, with a real `OPENAI_API_KEY`: everything above is the
+same, except the copy is written by `gpt-4.1-mini` (set `AI_MODEL` to change
+it), images by DALL-E 3, and research runs only when `TAVILY_API_KEY` is set —
+otherwise the research stage reads "skipped" and the post is written from the
+model's own knowledge. A rejected key shows up in the UI as a configuration
+problem, not as a user error, and nothing is charged for it.
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 
@@ -381,6 +442,8 @@ A real upload needs a video and is not worth testing from the UI yet.
 | Platform greyed out in the connect dialog | Keys not read. Restart the API. |
 | Redirect or callback error on the platform | The registered URL must exactly equal `<API_URL>/channels/connect/<provider>/callback` |
 | "Your connection has expired" | Token invalid. Use **Reconnect**. |
+| AI page says "not configured" | Neither `AI_SIMULATION="true"` nor a real `OPENAI_API_KEY` is set (the `.env.example` placeholder does not count). Restart the API after editing. |
+| AI page says you are out of credits | The demo workspace's monthly allowance (100) is used up; re-seed with `npm run db:seed` to reset the ledger. |
 
 ---
 

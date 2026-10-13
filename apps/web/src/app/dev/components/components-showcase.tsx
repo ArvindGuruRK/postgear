@@ -5,6 +5,7 @@ import { BarChart3, Calendar, LayoutGrid, Palette, Search, Settings, Users } fro
 import { useState } from 'react';
 import { AppShell } from '@/components/navigation/app-shell';
 import type { SidebarItem } from '@/components/navigation/sidebar';
+import { AiSection } from './sections/ai-section';
 import { ButtonsSection } from './sections/buttons-section';
 import { DataDisplaySection } from './sections/data-display-section';
 import { FeedbackSection } from './sections/feedback-section';
@@ -80,6 +81,7 @@ export function ComponentsShowcase() {
         <FeedbackSection />
         <DataDisplaySection />
         <SaasPatternsSection />
+        <AiSection />
       </div>
     </AppShell>
   );

@@ -64,7 +64,20 @@ export interface UploadedFileInput {
   originalname: string;
 }
 
+/** Bytes produced inside the API — an AI image (Sprint 6) — rather than uploaded. */
+export interface GeneratedFileInput {
+  data: Buffer;
+  /** What the producer believes it made. The bytes are sniffed anyway. */
+  mimeType: string;
+  name: string;
+  /** Alt text: the (possibly rewritten) prompt the image was made from. */
+  alt?: string | null;
+}
+
 const MAX_NAME_LENGTH = 200;
+
+/** Alt text is shown to screen readers, not read as an essay. */
+const MAX_ALT_LENGTH = 1_000;
 
 @Injectable()
 export class MediaService {
@@ -177,6 +190,68 @@ export class MediaService {
       throw error;
     } finally {
       await rm(file.path, { force: true }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Stores an image the API itself produced — the AI engine's hero image or
+   * the copilot's `generate_image` (Sprint 6) — as an ordinary library item.
+   *
+   * Runs the same sequence as `upload` from step 1: the bytes are sniffed
+   * rather than trusted (a provider that says "PNG" and sends something else
+   * is treated exactly like a browser that does), compressed and stripped by
+   * `processImage`, stored under random keys, and recorded — with the stored
+   * objects removed again if the row write fails. The differences are what an
+   * upload has and a generation does not: there is no temp file, no size limit
+   * (the generator's output is bounded by its own parameters, and the decoder's
+   * pixel limit still applies), and there *is* alt text, because the prompt is
+   * the one honest description of the picture.
+   */
+  async saveGenerated(orgId: string, file: GeneratedFileInput): Promise<MediaView> {
+    const sniffed = sniffMedia(file.data.subarray(0, SNIFF_BYTES));
+
+    if (sniffed?.kind !== 'image') {
+      securityLogger.log('media.upload_rejected', { orgId, reason: 'generated_not_image' });
+      throw new UnsupportedMediaTypeException(MEDIA_MESSAGES.UNSUPPORTED);
+    }
+
+    const storedKeys: string[] = [];
+
+    try {
+      const processed = await processImage(file.data, sniffed);
+      const key = createMediaKey(processed.extension);
+      const thumbnailKey = thumbnailKeyFor(key);
+
+      await this.storage.put(key, processed.data, processed.mimeType);
+      storedKeys.push(key);
+      await this.storage.put(thumbnailKey, processed.thumbnail, CONTENT_TYPES.webp);
+      storedKeys.push(thumbnailKey);
+
+      const name = displayName(file.name);
+      const record = await this.repository.create({
+        orgId,
+        name,
+        originalName: name,
+        path: key,
+        thumbnail: thumbnailKey,
+        type: 'image',
+        mimeType: processed.mimeType,
+        fileSize: processed.data.length,
+        width: processed.width,
+        height: processed.height,
+        alt: file.alt ? stripControlChars(file.alt).trim().slice(0, MAX_ALT_LENGTH) || null : null,
+      });
+
+      return this.toView(record);
+    } catch (error) {
+      await this.removeQuietly(storedKeys);
+
+      if (error instanceof UnreadableImageError) {
+        securityLogger.log('media.upload_rejected', { orgId, reason: error.message });
+        throw new UnprocessableEntityException(MEDIA_MESSAGES.UNREADABLE);
+      }
+
+      throw error;
     }
   }
 

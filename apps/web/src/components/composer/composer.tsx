@@ -51,7 +51,7 @@ import {
   Text,
   useToast,
 } from '@postgear/ui';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
@@ -296,6 +296,10 @@ export function Composer({
           description="Write once, adjust per channel, and see it the way each platform will show it."
           actions={
             <>
+              <Link href={`/${orgId}/ai-copilot`} className={buttonVariants({ variant: 'ai' })}>
+                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+                Generate with AI
+              </Link>
               <DraftsButton onClick={() => setDraftsOpen(true)} />
               {state.group ? (
                 <Link

@@ -37,6 +37,8 @@ export interface CreateMediaInput {
   fileSize: number;
   width: number | null;
   height: number | null;
+  /** Alt text. Uploads have none yet; an AI image (Sprint 6) keeps its prompt here. */
+  alt?: string | null;
 }
 
 const MEDIA_SELECT = {
@@ -67,6 +69,7 @@ export class MediaRepository {
         fileSize: input.fileSize,
         width: input.width,
         height: input.height,
+        alt: input.alt ?? null,
       },
       select: MEDIA_SELECT,
     });

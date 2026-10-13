@@ -15,6 +15,14 @@ import { z } from 'zod';
 /** Anything shorter is not a credible HMAC key for HS256. */
 const MIN_SECRET_LENGTH = 32;
 
+/** Reads an empty or whitespace-only variable as absent, so a schema default applies. */
+function blankAsUnset<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    schema,
+  );
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -114,6 +122,27 @@ const envSchema = z
     TEMPORAL_HOST: z.string().min(1).default('localhost:7233'),
     TEMPORAL_NAMESPACE: z.string().min(1).default('default'),
 
+    // The AI engine (Sprint 6). Both keys optional: without an OpenAI key the
+    // `/ai/*` routes answer 503 and the UI explains, rather than the API
+    // refusing to boot for a feature a self-hoster may not want. Without a
+    // Tavily key, generation runs unresearched and says so.
+    //
+    // `AI_SIMULATION=true` replaces the model, the research and the image
+    // provider with deterministic stand-ins so every screen, credit rule and
+    // test runs without a key or a bill — the same idea as the worker's
+    // `PUBLISH_SIMULATION`. Refused in production below: a simulated post
+    // looks real enough to be published by mistake.
+    // See `modules/ai/engine/engine.config.ts` for how the mode is chosen.
+    //
+    // `.env.example` ships these as empty strings, which dotenv passes through
+    // as `""` rather than leaving them unset — so a blank is read as "use the
+    // default" here, or a fresh clone would fail to boot on the model name.
+    OPENAI_API_KEY: z.string().optional(),
+    TAVILY_API_KEY: z.string().optional(),
+    AI_MODEL: blankAsUnset(z.string().min(1).default('gpt-4.1-mini')),
+    AI_IMAGE_MODEL: blankAsUnset(z.string().min(1).default('dall-e-3')),
+    AI_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+
     LOGIN_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(10),
     LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),
     LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
@@ -128,6 +157,16 @@ const envSchema = z
     SMTP_FROM: z.string().default('PostGear <no-reply@postgear.local>'),
   })
   .superRefine((env, context) => {
+    // Simulated AI output must never reach a real audience. In production the
+    // flag is a misconfiguration, and one worth dying for at boot.
+    if (env.NODE_ENV === 'production' && env.AI_SIMULATION === 'true') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AI_SIMULATION'],
+        message: 'AI_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+
     // S3 settings are optional individually but required together. Checked here
     // so a half-configured deploy fails at boot, naming every missing variable,
     // rather than on the first upload.

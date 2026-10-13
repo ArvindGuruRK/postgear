@@ -192,6 +192,45 @@ the two pages are the first place several rules meet at once; what was decided:
   colors above; one post to three channels is one card, and the dots are how a
   partial outcome fits in its corner.
 
+## 16b. AI surfaces (Sprint 6)
+
+The AI studio (`/[orgId]/ai-copilot`) is the first screen where the model's
+output sits next to the user's own words, and the one place the comic accents
+the Sprint 0 doc reserved for "success moments" get used in product UI; what
+was decided:
+
+- **`actionAi` violet marks what the model produced, nothing else.** The
+  assistant's hook (`SpeechBubble variant="ai"`), the category `Badge
+  variant="ai"`, the AI avatar, the Generate/Send `Button variant="ai"`, the
+  active stage on the tracker, and the credits meter (`UsageMeter tone="ai"`)
+  — each is either model output or the act of asking for it. A violet surface
+  that holds something the user typed is a bug.
+- **The user's own messages stay `primary`** (`SpeechBubble variant="primary"
+  tail="right"`), the same blue as every other thing they do. The assistant's
+  conversational replies are `default` with `tail="left"` and a Sparkles
+  avatar; violet is for the artefact (the hook, the draft), not the chatter
+  around it.
+- **Generated post parts are restrained cards** (§15). A thread is numbered
+  `Card`s with a per-part character count against the channel limit, in
+  `font-sans`, no halftone, no tail: this is the composer's content, and it
+  has to be read and edited, not admired. The comic treatment goes on the
+  chrome around it (the hook bubble, the badge, the actions).
+- **The speech bubble is the sanctioned comic accent, for chat only.**
+  `SpeechBubble` exists for message lists; it is not a Card or an Alert
+  substitute, and a tail on anything that isn't a turn in a conversation is
+  decoration the system doesn't want. Its tail is a rotated bordered square
+  so the outline stays continuous; give a tailed bubble `mb-2` (or a list
+  `gap-*`) so the tail doesn't sit on the next bubble.
+- **`StageTracker`'s status colours are the Sprint 5 tone vocabulary**
+  (§16a), not a new set: done is `success`, failed is `danger`, the running
+  stage is `ai`, pending is the plain surface, and skipped is that surface
+  with a dashed outline at `opacity-60` — "didn't run" is an absence, not an
+  outcome. Each `<li>` carries `data-testid="ai-stage"` / `data-stage` /
+  `data-status` so tests read the status, not the colour.
+- **`TypingIndicator` adds no keyframe.** Three `bg-ink` dots on Tailwind's
+  `animate-pulse` with staggered delays, still under `motion-reduce`; the
+  system's motion budget (§16) is unchanged.
+
 ## 17. Token extension policy
 
 Every rule above resolves to a token, not a literal value. When a genuinely new need comes up (this pass added `--color-brutal-success` for semantic success states, and the four accordion/collapsible keyframes for expand animation) — extend `colors.css` + `tailwind.css` following the existing pattern (flat non-theme-varying color in the same block as `brutal-secondary`/`brutal-danger`/`brutal-accent`; a new `@keyframes` + `--animate-*` entry next to the existing ones) and document *why* in a comment, the same way every existing token is documented. Never inline a one-off hex/pixel value inside a component file to route around this.
