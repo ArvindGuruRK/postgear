@@ -18,19 +18,30 @@
  * `orgId` is in every `where`, as everywhere else in this codebase.
  */
 import { Injectable } from '@nestjs/common';
-import { Prisma, prisma, type SubscriptionTier } from '@postgear/db';
-import { AI_LEDGER_TYPES, type AiCreditType, refundTypeFor } from './credits.policy';
+import { Prisma, prisma } from '@postgear/db';
+import { AI_LEDGER_TYPES, type AiCreditType, refundTypeFor, type SubscriptionLike } from './credits.policy';
 
 /** What the cycle and the tier are computed from. */
 export interface BillingContext {
   workspaceName: string;
   organizationCreatedAt: Date;
-  subscription: {
-    subscriptionTier: SubscriptionTier;
-    createdAt: Date;
-    deletedAt: Date | null;
-  } | null;
+  subscription: SubscriptionLike | null;
 }
+
+/** The subscription columns the entitlement rule reads (Sprint 8's plan table). */
+export const SUBSCRIPTION_ENTITLEMENT_SELECT = {
+  subscriptionTier: true,
+  status: true,
+  period: true,
+  trialEndsAt: true,
+  currentPeriodEnd: true,
+  cancelAt: true,
+  deletedAt: true,
+  isLifetime: true,
+  scheduledTier: true,
+  scheduledPeriod: true,
+  createdAt: true,
+} as const;
 
 export type ChargeOutcome =
   | { outcome: 'charged'; used: number }
@@ -49,7 +60,7 @@ export class CreditsRepository {
       select: {
         name: true,
         createdAt: true,
-        subscription: { select: { subscriptionTier: true, createdAt: true, deletedAt: true } },
+        subscription: { select: SUBSCRIPTION_ENTITLEMENT_SELECT },
       },
     });
 

@@ -23,6 +23,12 @@
  * February 28 and then March 31 — never skipping a month.
  */
 import type { SubscriptionTier } from '@postgear/db';
+import {
+  allowanceFor as planAllowanceFor,
+  PLAN_ORDER,
+  resolveEntitlement,
+  type SubscriptionLike as PlanSubscriptionLike,
+} from '../../billing/plans';
 
 export const AI_CREDIT_COSTS = {
   generate_post: 5,
@@ -52,16 +58,21 @@ export const AI_LEDGER_TYPES: readonly string[] = [
   ...AI_CREDIT_TYPES.map(refundTypeFor),
 ];
 
-/** `NONE` is a workspace with no active subscription: a small trial allowance. */
+/**
+ * `NONE` is a workspace with no live entitlement — no subscription, an expired
+ * trial, a cancelled plan — and gets the FREE plan's allowance. The name
+ * predates Sprint 8's plan table and is kept because the web app and every
+ * stream event carry it; it maps to `PlanTier` `FREE`.
+ */
 export type AiTier = 'NONE' | SubscriptionTier;
 
-export const AI_CREDIT_ALLOWANCE: Record<AiTier, number> = {
-  NONE: 25,
-  STANDARD: 100,
-  PRO: 500,
-  TEAM: 2000,
-  ULTIMATE: 10000,
-};
+/**
+ * Derived from the plan table (Sprint 8) — `billing/plans.ts` is the single
+ * source of truth, and this module holds no numbers of its own.
+ */
+export const AI_CREDIT_ALLOWANCE: Record<AiTier, number> = Object.fromEntries(
+  PLAN_ORDER.map((tier) => [tier === 'FREE' ? 'NONE' : tier, planAllowanceFor(tier)]),
+) as Record<AiTier, number>;
 
 /** Below this share of the allowance the UI warns (user story 5.5). */
 export const LOW_CREDITS_FRACTION = 0.2;
@@ -78,19 +89,27 @@ export interface AiCredits {
   costs: typeof AI_CREDIT_COSTS;
 }
 
-/** What the tier is read from: the subscription row, or its absence. */
-export interface SubscriptionLike {
-  subscriptionTier: SubscriptionTier;
+/**
+ * What the tier is read from: the subscription row, or its absence. The
+ * columns the plan table's entitlement rule needs, plus `createdAt` for the
+ * cycle anchor.
+ */
+export interface SubscriptionLike extends PlanSubscriptionLike {
   createdAt: Date;
-  deletedAt: Date | null;
 }
 
-export function tierOf(subscription: SubscriptionLike | null): AiTier {
-  return subscription && subscription.deletedAt === null ? subscription.subscriptionTier : 'NONE';
+/**
+ * The tier a workspace is entitled to now. Delegates to the plan table's
+ * `resolveEntitlement` (Sprint 8), so a trial that has run out or a plan
+ * that was cancelled drops to the FREE allowance without a job flipping it.
+ */
+export function tierOf(subscription: SubscriptionLike | null, now: Date = new Date()): AiTier {
+  const entitlement = resolveEntitlement(subscription, now);
+  return entitlement.tier === 'FREE' ? 'NONE' : entitlement.tier;
 }
 
 export function allowanceFor(tier: AiTier): number {
-  return AI_CREDIT_ALLOWANCE[tier];
+  return planAllowanceFor(tier === 'NONE' ? 'FREE' : tier);
 }
 
 /** What `POST /ai/generate` charges up front. */

@@ -23,6 +23,29 @@ function blankAsUnset<T extends z.ZodTypeAny>(schema: T) {
   );
 }
 
+/**
+ * The `.env.example` placeholders for the Stripe keys. A fresh clone carries
+ * them verbatim, and a placeholder must read as "no key" — the same rule the
+ * AI module applies to `sk-proj-openai-api-key` — so the billing module
+ * reports *unconfigured* rather than failing its first Stripe call.
+ */
+export const STRIPE_PLACEHOLDERS: readonly string[] = [
+  'sk_test_stripe_secret_key',
+  'whsec_stripe_webhook_signing_secret',
+  'pk_test_stripe_publishable_key',
+];
+
+/** Blank or a known placeholder → absent. */
+function placeholderAsUnset<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (value) =>
+      typeof value === 'string' && (value.trim() === '' || STRIPE_PLACEHOLDERS.includes(value.trim()))
+        ? undefined
+        : value,
+    schema,
+  );
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -176,6 +199,51 @@ const envSchema = z
     LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),
     LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
 
+    // Billing (Sprint 8). The mode is chosen like the AI engine's:
+    //   BILLING_SIMULATION=true → no Stripe; checkout, plan changes and
+    //     cancellation synthesise the Stripe events and run them through the
+    //     real webhook handler, so every screen and the idempotency table are
+    //     exercised with no account. Refused in production below.
+    //   a real STRIPE_SECRET_KEY → Stripe (test-mode keys are free).
+    //   neither → unconfigured: /billing/status says so, checkout answers 503.
+    // The `.env.example` placeholders are read as unset (see STRIPE_PLACEHOLDERS).
+    // See `modules/billing/billing.config.ts` for how the mode is chosen.
+    BILLING_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    STRIPE_SECRET_KEY: placeholderAsUnset(z.string().min(1).optional()),
+    STRIPE_WEBHOOK_SECRET: placeholderAsUnset(z.string().min(1).optional()),
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: placeholderAsUnset(z.string().min(1).optional()),
+    // Optional: pin real Stripe price ids instead of the inline `price_data`
+    // the plan table builds. Needed only if the Stripe billing portal should
+    // offer plan switching, which requires dashboard-defined prices.
+    STRIPE_PRICE_STANDARD_MONTHLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_STANDARD_YEARLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_PRO_MONTHLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_PRO_YEARLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_TEAM_MONTHLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_TEAM_YEARLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_ULTIMATE_MONTHLY: blankAsUnset(z.string().min(1).optional()),
+    STRIPE_PRICE_ULTIMATE_YEARLY: blankAsUnset(z.string().min(1).optional()),
+    // How long the no-card trial lasts. 0 disables trials.
+    BILLING_TRIAL_DAYS: blankAsUnset(z.coerce.number().int().min(0).max(90).default(14)),
+
+    // Rate limiting (Sprint 8). Both Redis-backed when REDIS_URL is set and
+    // per-process otherwise, like the login throttle. The per-IP ceiling
+    // covers every route; the per-key ceiling covers the public API, where a
+    // 429 carries Retry-After because the caller is a program.
+    RATE_LIMIT_PER_MIN: blankAsUnset(z.coerce.number().int().positive().default(300)),
+    API_RATE_LIMIT_PER_MIN: blankAsUnset(z.coerce.number().int().positive().default(60)),
+
+    // Outbound webhooks (Sprint 8). A webhook URL is fetched server-side, so
+    // it goes through the same SSRF guard as the SEO crawler. Local testing
+    // needs a receiver on localhost, which that guard refuses; this lets it
+    // through. Refused in production below.
+    WEBHOOK_ALLOW_PRIVATE_URLS: blankAsUnset(z.enum(['true', 'false']).default('false')),
+
+    // Error tracking (Sprint 8). Absent DSN = no Sentry at all, which is the
+    // local default; traces stay off unless asked for.
+    SENTRY_DSN: blankAsUnset(z.string().url().optional()),
+    SENTRY_TRACES_SAMPLE_RATE: blankAsUnset(z.coerce.number().min(0).max(1).default(0)),
+
     // Absent SMTP_HOST selects the console transport, which prints the mail to
     // stdout. That is the sprint's "stub the send" — a real transport is a
     // config change, not a code change.
@@ -205,6 +273,34 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: [env.ANALYTICS_SIMULATION === 'true' ? 'ANALYTICS_SIMULATION' : 'PUBLISH_SIMULATION'],
         message: 'Simulation flags cannot be "true" when NODE_ENV=production',
+      });
+    }
+
+    // A simulated subscription is a free plan nobody paid for, and a webhook
+    // allowed to reach the private network is an SSRF hole; neither belongs on
+    // a real deployment (Sprint 8).
+    if (env.NODE_ENV === 'production' && env.BILLING_SIMULATION === 'true') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BILLING_SIMULATION'],
+        message: 'BILLING_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+    if (env.NODE_ENV === 'production' && env.WEBHOOK_ALLOW_PRIVATE_URLS === 'true') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['WEBHOOK_ALLOW_PRIVATE_URLS'],
+        message: 'WEBHOOK_ALLOW_PRIVATE_URLS cannot be "true" when NODE_ENV=production',
+      });
+    }
+    // Stripe needs both halves: a secret key to call it and a signing secret
+    // to believe what it sends back. One without the other is a deploy that
+    // can sell a plan it never activates.
+    if (Boolean(env.STRIPE_SECRET_KEY) !== Boolean(env.STRIPE_WEBHOOK_SECRET)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [env.STRIPE_SECRET_KEY ? 'STRIPE_WEBHOOK_SECRET' : 'STRIPE_SECRET_KEY'],
+        message: 'STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set together',
       });
     }
 

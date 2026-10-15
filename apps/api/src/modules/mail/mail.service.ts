@@ -161,14 +161,32 @@ export class MailService {
   }
 
   /**
+   * A plain-text message assembled by a caller (Sprint 8: notification and
+   * billing emails). Lines are joined with newlines; nothing is HTML, so
+   * nothing a channel name or a provider error contains can become markup.
+   *
+   * Unlike the auth messages above this **reports** the outcome, because the
+   * notifications dispatcher records whether a row's email went out.
+   */
+  async sendPlain(to: string, subject: string, lines: string[]): Promise<boolean> {
+    return this.send({ to, subject, text: lines.join('\n') });
+  }
+
+  /** The absolute URL of a path in the web app, for links in mail. */
+  linkTo(path: string): string {
+    return `${this.webUrl}${path.startsWith('/') ? path : `/${path}`}`;
+  }
+
+  /**
    * Sends, or prints.
    *
    * Never throws. A mail failure must not roll back the operation that
    * triggered it — a user whose account was created successfully should not
    * see a 500 because the SMTP server was briefly unreachable. The failure is
-   * logged at error level so it is visible in monitoring.
+   * logged at error level so it is visible in monitoring. Returns whether the
+   * message went out (printing counts).
    */
-  private async send(message: MailMessage): Promise<void> {
+  private async send(message: MailMessage): Promise<boolean> {
     if (!this.transporter) {
       this.logger.log(
         [
@@ -181,17 +199,19 @@ export class MailService {
           '───────────────────────────────────────────────────',
         ].join('\n'),
       );
-      return;
+      return true;
     }
 
     try {
       await this.transporter.sendMail({ from: this.from, ...message });
+      return true;
     } catch (error) {
       this.logger.error(
         `Failed to send "${message.subject}" to ${message.to}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      return false;
     }
   }
 }

@@ -18,6 +18,7 @@ export function AppShell({
   pageTitle,
   orgSwitcher,
   accountMenu,
+  notifications,
   children,
 }: {
   navItems: SidebarItem[];
@@ -25,13 +26,19 @@ export function AppShell({
   pageTitle: string;
   orgSwitcher?: ReactNode;
   accountMenu?: ReactNode;
+  notifications?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div data-app-shell className="flex h-screen w-full overflow-hidden bg-primary">
       <Sidebar items={navItems} bottomItem={sidebarBottomItem} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar title={pageTitle} orgSwitcher={orgSwitcher} accountMenu={accountMenu} />
+        <TopBar
+          title={pageTitle}
+          orgSwitcher={orgSwitcher}
+          accountMenu={accountMenu}
+          notifications={notifications}
+        />
         <main className={cn('flex-1 overflow-y-auto p-6', 'pg-scrollbar pg-scrollbar-primary')}>
           {children}
         </main>
