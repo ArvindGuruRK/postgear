@@ -5,11 +5,13 @@
  * bundler erases — so nothing here, Prisma included, is ever pulled into the
  * workflow sandbox.
  */
+import { createAnalyticsActivities } from './analytics.activities';
 import type { ActivityDeps } from './deps';
 import { createIntegrationActivities } from './integration.activities';
 import { createMaintenanceActivities } from './maintenance.activities';
 import { createPublishActivities } from './publish.activities';
 
+export type { AnalyticsSchedule, AnalyticsSyncResult } from './analytics.activities';
 export type { ActivityDeps } from './deps';
 export type { IntegrationSchedule } from './integration.activities';
 export type { ReconcileReport } from './maintenance.activities';
@@ -24,6 +26,7 @@ export function createActivities(deps: ActivityDeps) {
   return {
     ...createPublishActivities(deps),
     ...createIntegrationActivities(deps),
+    ...createAnalyticsActivities(deps),
     ...createMaintenanceActivities(deps),
   };
 }

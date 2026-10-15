@@ -9,7 +9,9 @@
 
 // Model row types.
 export type {
+  AnalyticsSync,
   Announcement,
+  ChannelMetricSnapshot,
   Comments,
   Credits,
   Customer,
@@ -23,6 +25,8 @@ export type {
   OnboardingResponse,
   Organization,
   Post,
+  PostMetricSnapshot,
+  SEOAudit,
   Sets,
   Signatures,
   Subscription,
@@ -37,6 +41,7 @@ export type {
 // Prisma's own namespace, for input types (`Prisma.PostCreateInput`),
 // transaction clients, and `Prisma.PrismaClientKnownRequestError`.
 export {
+  AnalyticsSyncStatus,
   AnnouncementColor,
   CreationMethod,
   OnboardingGoal,
@@ -48,6 +53,7 @@ export {
   Provider,
   ReferralSource,
   Role,
+  SEOAuditStatus,
   ShortLinkPreference,
   State,
   SubscriptionTier,

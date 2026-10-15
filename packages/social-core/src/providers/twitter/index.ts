@@ -20,21 +20,35 @@
  * optimisation — miss it once and the channel is permanently disconnected.
  */
 
+import {
+  asCount,
+  clampDays,
+  dayKey,
+  isNotFound,
+  type MetricEntry,
+  sumByDay,
+  todayKey,
+  windowStart,
+} from '../../abstract/analytics';
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
+import {
+  type AuthenticateParams,
+  type AuthTokenDetails,
+  type ChannelContext,
+  type ChannelMetricPoint,
+  EMPTY_POST_METRICS,
+  type GeneratedAuthUrl,
+  type PostDetails,
+  type PostMetrics,
+  type PostResponse,
+  type RedirectUri,
+  type SocialAnalytics,
+  type SocialProvider,
+} from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import type {
-  AuthenticateParams,
-  AuthTokenDetails,
-  ChannelContext,
-  GeneratedAuthUrl,
-  PostDetails,
-  PostResponse,
-  RedirectUri,
-  SocialProvider,
-} from '../../abstract/social.provider.interface';
 
 const AUTHORIZE_URL = 'https://x.com/i/oauth2/authorize';
 const TOKEN_URL = 'https://api.x.com/2/oauth2/token';
@@ -85,7 +99,31 @@ interface XUser {
   profile_image_url?: string;
 }
 
-export class XProvider extends SocialAbstract implements SocialProvider {
+/** The counters X attaches to a post under `tweet.fields=public_metrics`. */
+interface XPublicMetrics {
+  impression_count?: number;
+  like_count?: number;
+  reply_count?: number;
+  retweet_count?: number;
+  quote_count?: number;
+  bookmark_count?: number;
+}
+
+interface XTweet {
+  id: string;
+  created_at?: string;
+  public_metrics?: XPublicMetrics;
+}
+
+/**
+ * Pages of the account's timeline read per sync. A hundred posts a page and
+ * five pages covers a channel posting several times a day for the whole
+ * ninety-day window; past that the oldest days are simply absent, which is
+ * what the interface promises for days the platform did not report.
+ */
+const MAX_TIMELINE_PAGES = 5;
+
+export class XProvider extends SocialAbstract implements SocialProvider, SocialAnalytics {
   readonly identifier = 'x';
   readonly name = 'X';
   readonly usesPkce = true;
@@ -347,6 +385,124 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     }
 
     return ids;
+  }
+
+  /**
+   * Followers today, and the window's posts summed into the day each went
+   * out — see `abstract/analytics.ts` for why that is the series X allows.
+   * `impressions` is X's own impression count; `engagements` is every
+   * interaction it counts: likes, replies, reposts, quotes and bookmarks.
+   */
+  async channelAnalytics(
+    channel: ChannelContext,
+    accessToken: string,
+    days: number,
+  ): Promise<ChannelMetricPoint[]> {
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const entries: MetricEntry[] = [];
+
+    const me = await this.fetchJson<{ data?: { public_metrics?: { followers_count?: number } } }>(
+      `${API_BASE}/users/me?user.fields=public_metrics`,
+      { headers },
+    );
+
+    if (me.data?.public_metrics?.followers_count !== undefined) {
+      entries.push({
+        metric: 'followers',
+        date: todayKey(),
+        value: asCount(me.data.public_metrics.followers_count),
+      });
+    }
+
+    const startTime = windowStart(clampDays(days)).toISOString();
+    let paginationToken: string | undefined;
+
+    for (let page = 0; page < MAX_TIMELINE_PAGES; page += 1) {
+      const params = new URLSearchParams({
+        max_results: '100',
+        start_time: startTime,
+        'tweet.fields': 'public_metrics,created_at',
+      });
+
+      if (paginationToken) {
+        params.set('pagination_token', paginationToken);
+      }
+
+      const timeline = await this.fetchJson<{ data?: XTweet[]; meta?: { next_token?: string } }>(
+        `${API_BASE}/users/${encodeURIComponent(channel.internalId)}/tweets?${params.toString()}`,
+        { headers },
+      );
+
+      for (const tweet of timeline.data ?? []) {
+        const date = dayKey(tweet.created_at ?? '');
+
+        if (!date) {
+          continue;
+        }
+
+        const metrics = this.postMetricsOf(tweet.public_metrics ?? {});
+        entries.push(
+          { metric: 'impressions', date, value: metrics.impressions },
+          { metric: 'likes', date, value: metrics.likes },
+          { metric: 'comments', date, value: metrics.comments },
+          { metric: 'shares', date, value: metrics.shares },
+          {
+            metric: 'engagements',
+            date,
+            value: metrics.likes + metrics.comments + metrics.shares + metrics.saves,
+          },
+        );
+      }
+
+      paginationToken = timeline.meta?.next_token;
+
+      if (!paginationToken) {
+        break;
+      }
+    }
+
+    return sumByDay(entries);
+  }
+
+  /**
+   * One post's lifetime counters. X answers a deleted post two ways — a 404,
+   * or a 200 whose body has `errors` and no `data` — and both mean "gone".
+   */
+  async postAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null> {
+    let response: { data?: { public_metrics?: XPublicMetrics } };
+
+    try {
+      response = await this.fetchJson(
+        `${API_BASE}/tweets/${encodeURIComponent(platformPostId)}?tweet.fields=public_metrics`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
+
+    if (!response.data) {
+      return null;
+    }
+
+    return this.postMetricsOf(response.data.public_metrics ?? {});
+  }
+
+  private postMetricsOf(metrics: XPublicMetrics): PostMetrics {
+    return {
+      ...EMPTY_POST_METRICS,
+      impressions: asCount(metrics.impression_count),
+      likes: asCount(metrics.like_count),
+      comments: asCount(metrics.reply_count),
+      shares: asCount(metrics.retweet_count) + asCount(metrics.quote_count),
+      saves: asCount(metrics.bookmark_count),
+    };
   }
 
   private async exchange(params: Record<string, string>): Promise<XTokenResponse> {

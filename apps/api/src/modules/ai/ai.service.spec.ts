@@ -5,18 +5,18 @@
  */
 import { ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import type { GenerateEvent, GenerateResult } from '@postgear/ai-engine';
-import { AI_MESSAGES } from './ai.messages';
-import { AiService, type StreamSink, summarizeChannels } from './ai.service';
 import type { ChannelsService, ChannelView } from '../channels/channels.service';
 import type { PostsService } from '../posts/posts.service';
+import { AI_MESSAGES } from './ai.messages';
+import { AiService, type StreamSink, summarizeChannels } from './ai.service';
 import type { AiCredits } from './credits/credits.policy';
 import {
   type CreditContext,
   type CreditsService,
   PaymentRequiredException,
 } from './credits/credits.service';
-import type { AiEngine } from './engine/engine.types';
 import type { GenerateInput } from './dto/ai.schema';
+import type { AiEngine } from './engine/engine.types';
 
 const RESETS_AT = new Date('2026-11-13T00:00:00Z');
 
@@ -50,7 +50,7 @@ function credits(used: number): AiCredits {
     resetsAt: RESETS_AT.toISOString(),
     tier: 'STANDARD',
     low: false,
-    costs: { generate_post: 5, generate_image: 10, copilot_message: 1 },
+    costs: { generate_post: 5, generate_image: 10, copilot_message: 1, seo_advice: 3 },
   };
 }
 
@@ -140,6 +140,7 @@ describe('AiService', () => {
       imagesEnabled: true,
       createPipeline: jest.fn().mockReturnValue(pipeline),
       createCopilot: jest.fn().mockReturnValue(agent),
+      createSeoAdvisor: jest.fn().mockReturnValue(null),
       generateImage: jest.fn(),
     };
     ledger = {
@@ -151,18 +152,16 @@ describe('AiService', () => {
       refund: jest.fn().mockResolvedValue(undefined),
     };
     channels = {
-      list: jest
-        .fn()
-        .mockResolvedValue([
-          channel({}),
-          channel({
-            id: 'ch_x',
-            providerIdentifier: 'x',
-            providerName: 'X',
-            name: 'Acme on X',
-            health: 'needs_reconnect',
-          }),
-        ]),
+      list: jest.fn().mockResolvedValue([
+        channel({}),
+        channel({
+          id: 'ch_x',
+          providerIdentifier: 'x',
+          providerName: 'X',
+          name: 'Acme on X',
+          health: 'needs_reconnect',
+        }),
+      ]),
       listProviders: jest.fn().mockReturnValue([
         { identifier: 'x', rules: { maxLength: 280 } },
         { identifier: 'linkedin', rules: { maxLength: 3000 } },

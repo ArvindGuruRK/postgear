@@ -41,6 +41,19 @@
  * (the reference keeps `postWorkflowV101` … `V105` for this reason) rather than
  * editing this one; runs in flight keep executing the code they started with.
  */
+
+import {
+  CANCEL_SIGNAL,
+  NON_RETRYABLE_PUBLISH_FAILURES,
+  type PostPublishInput,
+  type PostPublishOutcome,
+  PUBLISH_FAILURE_TYPES,
+  PUBLISH_NOW_SIGNAL,
+  PUBLISH_RETRY_POLICY,
+  type PublishFailureReason,
+  type PublishSkipReason,
+  WAKE_SIGNAL,
+} from '@postgear/scheduling';
 import {
   ActivityCancellationType,
   ActivityFailure,
@@ -53,18 +66,6 @@ import {
   proxyActivities,
   setHandler,
 } from '@temporalio/workflow';
-import {
-  CANCEL_SIGNAL,
-  NON_RETRYABLE_PUBLISH_FAILURES,
-  PUBLISH_FAILURE_TYPES,
-  PUBLISH_NOW_SIGNAL,
-  PUBLISH_RETRY_POLICY,
-  type PostPublishInput,
-  type PostPublishOutcome,
-  type PublishFailureReason,
-  type PublishSkipReason,
-  WAKE_SIGNAL,
-} from '@postgear/scheduling';
 import type { Activities, PublishResult } from '../activities';
 
 export const wakeSignal = defineSignal(WAKE_SIGNAL);

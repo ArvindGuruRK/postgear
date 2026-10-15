@@ -13,8 +13,9 @@
  *   own `ImageSink` into the media library;
  *
  * then {@link createContentPipeline} and {@link createCopilotAgent} take
- * those seams and the API's tools. Everything the API programs against is
- * re-exported from `./types`.
+ * those seams and the API's tools, and {@link createSeoAdvisor} (Sprint 7)
+ * takes the model alone. Everything the API programs against is re-exported
+ * from `./types`.
  */
 import {
   createContentPipeline as buildContentPipeline,
@@ -24,6 +25,10 @@ import {
   createCopilotAgent as buildCopilotAgent,
   type CopilotAgentDeps,
 } from './agents/copilot.agent';
+import {
+  createSeoAdvisor as buildSeoAdvisor,
+  type SeoAdvisorDeps,
+} from './agents/seo-advisor.agent';
 import {
   createOpenAiModelClient as buildOpenAiModelClient,
   type OpenAiModelClientOptions,
@@ -47,10 +52,17 @@ import type {
   ModelClient,
   ResearchCache,
   ResearchProvider,
+  SeoAdvisor,
 } from './types';
 
 export type { ContentPipelineDeps, ContentPipelineLogger } from './agents/content.agent';
 export type { CopilotAgentDeps } from './agents/copilot.agent';
+export {
+  normaliseAdvice,
+  SEO_ADVICE_MAX_RETURNED,
+  type SeoAdvisorDeps,
+  type SeoAdvisorLogger,
+} from './agents/seo-advisor.agent';
 export {
   classifyError,
   isRetryableKind,
@@ -61,6 +73,13 @@ export {
   withTimeout,
 } from './model/resilience';
 export { type PartLimits, partLimits } from './prompts/content';
+export {
+  buildSeoAdvicePrompt,
+  formatFindingLine,
+  parseFindingLine,
+  SEO_ADVICE_MAX_RECOMMENDATIONS,
+  seoAdviceSchema,
+} from './prompts/seo-advice';
 export { researchCacheKey } from './tools/tavily-search.tool';
 export * from './types';
 
@@ -74,6 +93,11 @@ export function createContentPipeline(deps: ContentPipelineDeps): ContentPipelin
 
 export function createCopilotAgent(deps: CopilotAgentDeps): CopilotAgent {
   return buildCopilotAgent(deps);
+}
+
+/** The SEO analyzer's advice (Sprint 7): one structured call over the audit's findings. */
+export function createSeoAdvisor(deps: SeoAdvisorDeps): SeoAdvisor {
+  return buildSeoAdvisor(deps);
 }
 
 export function createOpenAiModelClient(options: OpenAiModelOptions): ModelClient {

@@ -19,6 +19,8 @@ export const SCHEDULING_TASK_QUEUE = 'postgear-publishing';
 export const POST_PUBLISH_WORKFLOW = 'postPublishWorkflow';
 export const TOKEN_REFRESH_WORKFLOW = 'tokenRefreshWorkflow';
 export const MAINTENANCE_WORKFLOW = 'maintenanceWorkflow';
+/** Sprint 7: keeps one channel's metrics current — a daily pull, or on demand. */
+export const ANALYTICS_SYNC_WORKFLOW = 'analyticsSyncWorkflow';
 
 /** Wakes a waiting publish or refresh workflow so it re-reads the database. */
 export const WAKE_SIGNAL = 'wake';
@@ -26,6 +28,8 @@ export const WAKE_SIGNAL = 'wake';
 export const PUBLISH_NOW_SIGNAL = 'publishNow';
 /** Ends a waiting publish workflow — the post left the queue. */
 export const CANCEL_SIGNAL = 'cancel';
+/** Sprint 7: tells a waiting analytics workflow to pull metrics now rather than at its next slot. */
+export const SYNC_NOW_SIGNAL = 'syncNow';
 
 export const MAINTENANCE_WORKFLOW_ID = 'maintenance';
 
@@ -35,6 +39,11 @@ export function publishWorkflowId(postId: string): string {
 
 export function tokenRefreshWorkflowId(integrationId: string): string {
   return `token-refresh:${integrationId}`;
+}
+
+/** Sprint 7: one analytics workflow per channel, keyed like the refresh loop. */
+export function analyticsSyncWorkflowId(integrationId: string): string {
+  return `analytics-sync:${integrationId}`;
 }
 
 export interface PostPublishInput {
@@ -47,6 +56,34 @@ export interface TokenRefreshInput {
   integrationId: string;
   organizationId: string;
 }
+
+/** Sprint 7: the analytics workflow's input — the same two ids as a refresh. */
+export interface AnalyticsSyncInput {
+  integrationId: string;
+  organizationId: string;
+}
+
+/**
+ * How many days of channel metrics a sync asks the platform for. 90 covers
+ * the longest range the Analytics page offers; a daily sync re-reads the
+ * whole window so a platform that revises recent days is reflected.
+ */
+export const ANALYTICS_SYNC_WINDOW_DAYS = 90;
+
+/** How many published posts per channel a sync reads metrics for, newest first. */
+export const ANALYTICS_SYNC_MAX_POSTS = 50;
+
+/**
+ * Why an analytics workflow ended without a sync. Mirrors the refresh
+ * loop's reasons: the workflow exits and the maintenance reconcile starts a
+ * new one once the channel is usable again.
+ */
+export type AnalyticsSyncSkipReason =
+  | 'gone'
+  | 'needs_reconnect'
+  | 'not_set_up'
+  | 'disabled'
+  | 'unsupported';
 
 /** Why a publish workflow ended without publishing. */
 export type PublishSkipReason = 'deleted' | 'not_queued' | 'not_root' | 'channel_gone';

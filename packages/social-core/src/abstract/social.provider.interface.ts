@@ -20,9 +20,11 @@
  *
  * ## What is deliberately absent
  *
- * No analytics methods (Sprint 7), no per-provider settings DTOs, no plug or
- * automation decorators. An optional method is cheap to add later; seven no-op
- * stubs are noise now.
+ * No per-provider settings DTOs, no plug or automation decorators. Analytics
+ * (Sprint 7) is a separate optional capability, `SocialAnalytics`, the way
+ * entity selection is: a provider implements it when its platform exposes
+ * metrics, and callers narrow with `supportsAnalytics` instead of checking
+ * for an undefined method.
  */
 
 import type { ProviderRules } from '../composer/rules';
@@ -248,4 +250,118 @@ export function supportsEntitySelection(
   provider: SocialProvider,
 ): provider is SocialProvider & SupportsEntitySelection {
   return typeof (provider as Partial<SupportsEntitySelection>).listEntities === 'function';
+}
+
+// ---------------------------------------------------------------------------
+// Analytics (Sprint 7, PRD 5.6)
+// ---------------------------------------------------------------------------
+
+/**
+ * The metrics PostGear stores per channel per day. Every platform exposes a
+ * different subset; a provider returns the ones it has and omits the rest.
+ *
+ * - `followers` is a *level* (the count on that day), everything else is a
+ *   *flow* (what happened on that day). The analytics module sums flows over
+ *   a range and reads the latest level.
+ * - `engagements` is the platform's own total where it has one (LinkedIn's
+ *   `engagement`, Facebook's `page_post_engagements`); otherwise the sync
+ *   derives it as likes + comments + shares + saves.
+ */
+export type ChannelMetricName =
+  | 'followers'
+  | 'impressions'
+  | 'reach'
+  | 'engagements'
+  | 'likes'
+  | 'comments'
+  | 'shares'
+  | 'clicks'
+  | 'views';
+
+export const CHANNEL_METRIC_NAMES: readonly ChannelMetricName[] = [
+  'followers',
+  'impressions',
+  'reach',
+  'engagements',
+  'likes',
+  'comments',
+  'shares',
+  'clicks',
+  'views',
+] as const;
+
+export function isChannelMetricName(value: unknown): value is ChannelMetricName {
+  return typeof value === 'string' && (CHANNEL_METRIC_NAMES as readonly string[]).includes(value);
+}
+
+/** One metric on one UTC day. */
+export interface ChannelMetricPoint {
+  metric: ChannelMetricName;
+  /** `YYYY-MM-DD`, UTC. */
+  date: string;
+  value: number;
+}
+
+/** A published post's lifetime counters. Zero where the platform has no such thing. */
+export interface PostMetrics {
+  likes: number;
+  comments: number;
+  shares: number;
+  clicks: number;
+  impressions: number;
+  saves: number;
+  views: number;
+}
+
+export const EMPTY_POST_METRICS: Readonly<PostMetrics> = Object.freeze({
+  likes: 0,
+  comments: 0,
+  shares: 0,
+  clicks: 0,
+  impressions: 0,
+  saves: 0,
+  views: 0,
+});
+
+/** The engagement total the leaderboard ranks by, when the platform reports no total of its own. */
+export function engagementsOf(metrics: PostMetrics): number {
+  return metrics.likes + metrics.comments + metrics.shares + metrics.saves;
+}
+
+/**
+ * Implemented by providers whose platform exposes metrics.
+ *
+ * Both methods throw the same error classes as publishing — `RefreshTokenError`
+ * for a dead token, `NotEnoughScopesError` for a permission the account never
+ * granted, `RetryableError` for a platform having a bad minute — so the worker
+ * branches on them exactly as the publish activity does.
+ */
+export interface SocialAnalytics {
+  /**
+   * Daily channel metrics for the last `days` days, ending today (UTC).
+   * Missing days and metrics the platform does not expose are simply absent.
+   */
+  channelAnalytics(
+    channel: ChannelContext,
+    accessToken: string,
+    days: number,
+  ): Promise<ChannelMetricPoint[]>;
+
+  /**
+   * Lifetime metrics for one published post, by the platform's post id (the
+   * `releaseId` Sprint 5 stores). Null when the platform no longer has the
+   * post (deleted on the platform) — not an error.
+   */
+  postAnalytics?(
+    channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null>;
+}
+
+/** Narrowing helper — providers with metrics implement `channelAnalytics`. */
+export function supportsAnalytics(
+  provider: SocialProvider | SocialAnalytics,
+): provider is SocialProvider & SocialAnalytics {
+  return typeof (provider as Partial<SocialAnalytics>).channelAnalytics === 'function';
 }

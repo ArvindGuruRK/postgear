@@ -114,7 +114,17 @@ export type SecurityEvent =
   | 'post.foreign_reference'
   // AI generation (Sprint 6). A generation aimed at a channel this workspace
   // cannot see is the same stale-client-or-probe question as a post's.
-  | 'ai.foreign_reference';
+  | 'ai.foreign_reference'
+  // The SEO analyzer (Sprint 7) fetches a user-supplied URL server-side, which
+  // is the textbook SSRF surface. Every URL refused by the private-network
+  // guard is recorded: a few are typos, a run of them is someone mapping the
+  // network behind the API.
+  | 'seo.unsafe_url'
+  | 'seo.audit_failed'
+  // Analytics (Sprint 7): a request naming a channel or post outside the
+  // workspace, and a sync the worker could not complete.
+  | 'analytics.foreign_reference'
+  | 'analytics.sync_failed';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

@@ -15,23 +15,36 @@
  * in a `Location` header, then a PUT of the bytes to that URL. That is the whole
  * protocol, which is why `googleapis` is not a dependency here.
  */
+import {
+  asCount,
+  clampDays,
+  dayKey,
+  type MetricEntry,
+  sumByDay,
+  todayKey,
+  windowStart,
+} from '../../abstract/analytics';
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
+import {
+  type AuthenticateParams,
+  type AuthTokenDetails,
+  type ChannelContext,
+  type ChannelMetricPoint,
+  EMPTY_POST_METRICS,
+  type GeneratedAuthUrl,
+  type PostDetails,
+  type PostMetrics,
+  type PostResponse,
+  type ProviderEntity,
+  type RedirectUri,
+  type SocialAnalytics,
+  type SocialProvider,
+  type SupportsEntitySelection,
+} from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import type {
-  AuthenticateParams,
-  AuthTokenDetails,
-  ChannelContext,
-  GeneratedAuthUrl,
-  PostDetails,
-  PostResponse,
-  ProviderEntity,
-  RedirectUri,
-  SocialProvider,
-  SupportsEntitySelection,
-} from '../../abstract/social.provider.interface';
 
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -77,12 +90,33 @@ interface YouTubeChannel {
     customUrl?: string;
     thumbnails?: { default?: { url?: string } };
   };
-  statistics?: { subscriberCount?: string };
+  statistics?: { subscriberCount?: string; viewCount?: string };
+  contentDetails?: { relatedPlaylists?: { uploads?: string } };
 }
+
+/** The Data API returns every counter as a decimal string. */
+interface YouTubeVideoStatistics {
+  viewCount?: string;
+  likeCount?: string;
+  commentCount?: string;
+}
+
+interface YouTubeVideo {
+  id: string;
+  snippet?: { publishedAt?: string };
+  statistics?: YouTubeVideoStatistics;
+}
+
+/**
+ * Pages of the uploads playlist read per sync — fifty videos each. Two pages
+ * is a hundred uploads, more than a channel posts in ninety days; the read
+ * stops early anyway once it reaches a video older than the window.
+ */
+const MAX_UPLOAD_PAGES = 2;
 
 export class YouTubeProvider
   extends SocialAbstract
-  implements SocialProvider, SupportsEntitySelection
+  implements SocialProvider, SupportsEntitySelection, SocialAnalytics
 {
   readonly identifier = 'youtube';
   readonly name = 'YouTube';
@@ -320,6 +354,146 @@ export class YouTubeProvider
       id: post.id,
       postId: uploaded.id,
       releaseURL: `https://www.youtube.com/watch?v=${uploaded.id}`,
+    };
+  }
+
+  /**
+   * Subscribers today, and the window's uploads summed into the day each
+   * was published — the same series X gives, for the same reason (see
+   * `abstract/analytics.ts`). The channel's lifetime `viewCount` is
+   * deliberately not recorded as a daily `views` flow: summing a lifetime
+   * figure over a range would be nonsense.
+   *
+   * Uploads are read through the channel's uploads playlist rather than
+   * `search?forMine=true`, which answers for the Google account's default
+   * channel and so is wrong for a brand channel — the common case for a
+   * business.
+   */
+  async channelAnalytics(
+    channel: ChannelContext,
+    accessToken: string,
+    days: number,
+  ): Promise<ChannelMetricPoint[]> {
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const entries: MetricEntry[] = [];
+
+    const channels = await this.fetchJson<{ items?: YouTubeChannel[] }>(
+      `${API_BASE}/channels?part=statistics,contentDetails&id=${encodeURIComponent(channel.internalId)}`,
+      { headers },
+    );
+    const details = channels.items?.[0];
+
+    if (details?.statistics?.subscriberCount !== undefined) {
+      entries.push({
+        metric: 'followers',
+        date: todayKey(),
+        value: asCount(details.statistics.subscriberCount),
+      });
+    }
+
+    const uploads = details?.contentDetails?.relatedPlaylists?.uploads;
+
+    if (!uploads) {
+      return sumByDay(entries);
+    }
+
+    const since = windowStart(clampDays(days)).getTime();
+    const videoIds: string[] = [];
+    let pageToken: string | undefined;
+
+    for (let page = 0; page < MAX_UPLOAD_PAGES; page += 1) {
+      const params = new URLSearchParams({
+        part: 'contentDetails',
+        playlistId: uploads,
+        maxResults: '50',
+      });
+
+      if (pageToken) {
+        params.set('pageToken', pageToken);
+      }
+
+      const playlist = await this.fetchJson<{
+        items?: { contentDetails?: { videoId?: string; videoPublishedAt?: string } }[];
+        nextPageToken?: string;
+      }>(`${API_BASE}/playlistItems?${params.toString()}`, { headers });
+
+      let reachedWindowStart = false;
+
+      for (const item of playlist.items ?? []) {
+        const publishedAt = Date.parse(item.contentDetails?.videoPublishedAt ?? '');
+
+        // The playlist is newest first, so the first video before the window
+        // means everything after it is too.
+        if (Number.isFinite(publishedAt) && publishedAt < since) {
+          reachedWindowStart = true;
+          break;
+        }
+
+        if (item.contentDetails?.videoId) {
+          videoIds.push(item.contentDetails.videoId);
+        }
+      }
+
+      pageToken = playlist.nextPageToken;
+
+      if (reachedWindowStart || !pageToken) {
+        break;
+      }
+    }
+
+    if (videoIds.length === 0) {
+      return sumByDay(entries);
+    }
+
+    // `videos.list` takes up to fifty ids a call.
+    for (let index = 0; index < videoIds.length; index += 50) {
+      const batch = videoIds.slice(index, index + 50);
+      const videos = await this.fetchJson<{ items?: YouTubeVideo[] }>(
+        `${API_BASE}/videos?part=statistics,snippet&id=${batch.map(encodeURIComponent).join(',')}`,
+        { headers },
+      );
+
+      for (const video of videos.items ?? []) {
+        const date = dayKey(video.snippet?.publishedAt ?? '');
+
+        if (!date) {
+          continue;
+        }
+
+        const metrics = this.videoMetricsOf(video.statistics ?? {});
+        entries.push(
+          { metric: 'views', date, value: metrics.views },
+          { metric: 'likes', date, value: metrics.likes },
+          { metric: 'comments', date, value: metrics.comments },
+          { metric: 'engagements', date, value: metrics.likes + metrics.comments },
+        );
+      }
+    }
+
+    return sumByDay(entries);
+  }
+
+  /** One video's lifetime counters. A video YouTube no longer lists is gone. */
+  async postAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null> {
+    const videos = await this.fetchJson<{ items?: YouTubeVideo[] }>(
+      `${API_BASE}/videos?part=statistics&id=${encodeURIComponent(platformPostId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    const video = videos.items?.[0];
+
+    return video ? this.videoMetricsOf(video.statistics ?? {}) : null;
+  }
+
+  private videoMetricsOf(statistics: YouTubeVideoStatistics): PostMetrics {
+    return {
+      ...EMPTY_POST_METRICS,
+      views: asCount(statistics.viewCount),
+      likes: asCount(statistics.likeCount),
+      comments: asCount(statistics.commentCount),
     };
   }
 

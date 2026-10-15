@@ -7,23 +7,51 @@
  * page-scoped tokens are what the publishing endpoints actually accept, and
  * unlike the user token they do not expire on their own.
  */
+import { asCount, clampDays, sumByDay, windowStart } from '../../abstract/analytics';
 import { BadBodyError } from '../../abstract/errors';
+import {
+  type AuthenticateParams,
+  type AuthTokenDetails,
+  type ChannelContext,
+  type ChannelMetricName,
+  type ChannelMetricPoint,
+  EMPTY_POST_METRICS,
+  type PostDetails,
+  type PostMetrics,
+  type PostResponse,
+  type ProviderEntity,
+  type SocialAnalytics,
+  type SocialProvider,
+  type SupportsEntitySelection,
+} from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import type {
-  AuthenticateParams,
-  AuthTokenDetails,
-  ChannelContext,
-  PostDetails,
-  PostResponse,
-  ProviderEntity,
-  SocialProvider,
-  SupportsEntitySelection,
-} from '../../abstract/social.provider.interface';
-import { GRAPH_BASE, MetaGraphProvider } from '../meta/meta.graph';
+import {
+  GRAPH_BASE,
+  type GraphInsight,
+  graphInsightEntries,
+  isGraphMissingObject,
+  MetaGraphProvider,
+} from '../meta/meta.graph';
 
 /** Facebook's own limit is far higher, but posts this long are already unreadable. */
 const MAX_LENGTH = 63_206;
+
+/**
+ * Page insights are read from a newer Graph version than publishing uses.
+ * Meta retired the `page_impressions*` family and replaced it with the media
+ * view metrics, which exist only from v23.0; publishing stays on the pinned
+ * `GRAPH_BASE` so this change cannot alter what a post does.
+ */
+const INSIGHTS_BASE = 'https://graph.facebook.com/v23.0';
+
+/** Page insight names → PostGear metrics. `page_follows` is the follower level on that day. */
+const PAGE_INSIGHTS: Record<string, ChannelMetricName> = {
+  page_follows: 'followers',
+  page_post_engagements: 'engagements',
+  page_total_media_view_unique: 'reach',
+  page_media_view: 'impressions',
+};
 
 /**
  * What this provider publishes.
@@ -50,7 +78,7 @@ export const FACEBOOK_RULES: ProviderRules = {
 
 export class FacebookProvider
   extends MetaGraphProvider
-  implements SocialProvider, SupportsEntitySelection
+  implements SocialProvider, SupportsEntitySelection, SocialAnalytics
 {
   readonly identifier = 'facebook';
   readonly name = 'Facebook';
@@ -250,6 +278,64 @@ export class FacebookProvider
     );
 
     return this.toResponse(post.id, response.id);
+  }
+
+  /**
+   * The Page's daily insights: follower level, post engagements, and the
+   * media views that replaced impressions and reach in Graph v23.
+   */
+  async channelAnalytics(
+    channel: ChannelContext,
+    accessToken: string,
+    days: number,
+  ): Promise<ChannelMetricPoint[]> {
+    const params = new URLSearchParams({
+      metric: Object.keys(PAGE_INSIGHTS).join(','),
+      period: 'day',
+      since: String(Math.floor(windowStart(clampDays(days)).getTime() / 1_000)),
+      until: String(Math.floor(Date.now() / 1_000)),
+      access_token: accessToken,
+    });
+
+    const response = await this.fetchJson<{ data?: GraphInsight[] }>(
+      `${INSIGHTS_BASE}/${encodeURIComponent(channel.internalId)}/insights?${params.toString()}`,
+    );
+
+    return sumByDay(graphInsightEntries(response.data ?? [], PAGE_INSIGHTS));
+  }
+
+  /** One post's reactions, comments, shares and impressions, in a single Graph call. */
+  async postAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null> {
+    const params = new URLSearchParams({
+      fields: 'likes.summary(true),comments.summary(true),shares,insights.metric(post_impressions)',
+      access_token: accessToken,
+    });
+
+    try {
+      const post = await this.fetchJson<{
+        likes?: { summary?: { total_count?: number } };
+        comments?: { summary?: { total_count?: number } };
+        shares?: { count?: number };
+        insights?: { data?: GraphInsight[] };
+      }>(`${INSIGHTS_BASE}/${encodeURIComponent(platformPostId)}?${params.toString()}`);
+
+      return {
+        ...EMPTY_POST_METRICS,
+        likes: asCount(post.likes?.summary?.total_count),
+        comments: asCount(post.comments?.summary?.total_count),
+        shares: asCount(post.shares?.count),
+        impressions: asCount(post.insights?.data?.[0]?.values?.[0]?.value),
+      };
+    } catch (error) {
+      if (isGraphMissingObject(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   private toResponse(postDetailsId: string, publishedId: string | undefined): PostResponse {

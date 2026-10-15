@@ -28,6 +28,8 @@ export const AI_CREDIT_COSTS = {
   generate_post: 5,
   generate_image: 10,
   copilot_message: 1,
+  /** Sprint 7: the SEO analyzer's AI advice — one structured call over the audit. */
+  seo_advice: 3,
 } as const;
 
 export type AiCreditType = keyof typeof AI_CREDIT_COSTS;

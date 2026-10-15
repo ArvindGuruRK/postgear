@@ -21,13 +21,13 @@
  * the workflow records them through a separate, retried activity rather than
  * publishing a second time.
  */
-import { ApplicationFailure, Context } from '@temporalio/activity';
+
 import { decryptNullable, prisma, State } from '@postgear/db';
 import {
   backoffAfterAttempt,
+  type PostPublishInput,
   PUBLISH_FAILURE_TYPES,
   PUBLISH_RETRY_POLICY,
-  type PostPublishInput,
   type PublishFailureReason,
   type PublishSkipReason,
   parsePublishStatus,
@@ -43,12 +43,13 @@ import {
   RefreshTokenError,
   RetryableError,
 } from '@postgear/social-core';
+import { ApplicationFailure, Context } from '@temporalio/activity';
 import {
   buildPostDetails,
   orderChain,
   parseImageIds,
-  previousAttemptInFlight,
   previewOf,
+  previousAttemptInFlight,
 } from '../lib/publish-details';
 import type { ActivityDeps } from './deps';
 

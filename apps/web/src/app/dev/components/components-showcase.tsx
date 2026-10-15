@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { AppShell } from '@/components/navigation/app-shell';
 import type { SidebarItem } from '@/components/navigation/sidebar';
 import { AiSection } from './sections/ai-section';
+import { AnalyticsSection } from './sections/analytics-section';
 import { ButtonsSection } from './sections/buttons-section';
 import { DataDisplaySection } from './sections/data-display-section';
 import { FeedbackSection } from './sections/feedback-section';
@@ -80,6 +81,7 @@ export function ComponentsShowcase() {
         <OverlaysSection />
         <FeedbackSection />
         <DataDisplaySection />
+        <AnalyticsSection />
         <SaasPatternsSection />
         <AiSection />
       </div>

@@ -11,21 +11,26 @@
  * That is not a bug to debug later: an unaudited app appears to work perfectly
  * while nothing it posts is publicly visible.
  */
+import { asCount, sumByDay, todayKey } from '../../abstract/analytics';
 import { BadBodyError, RetryableError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract, sleep } from '../../abstract/social.abstract';
+import {
+  type AuthenticateParams,
+  type AuthTokenDetails,
+  type ChannelContext,
+  type ChannelMetricPoint,
+  EMPTY_POST_METRICS,
+  type GeneratedAuthUrl,
+  type PostDetails,
+  type PostMetrics,
+  type PostResponse,
+  type RedirectUri,
+  type SocialAnalytics,
+  type SocialProvider,
+} from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import type {
-  AuthenticateParams,
-  AuthTokenDetails,
-  ChannelContext,
-  GeneratedAuthUrl,
-  PostDetails,
-  PostResponse,
-  RedirectUri,
-  SocialProvider,
-} from '../../abstract/social.provider.interface';
 
 const AUTHORIZE_URL = 'https://www.tiktok.com/v2/auth/authorize/';
 const TOKEN_URL = 'https://open.tiktokapis.com/v2/oauth/token/';
@@ -64,12 +69,16 @@ interface TikTokTokenResponse {
   scope?: string;
 }
 
-export class TikTokProvider extends SocialAbstract implements SocialProvider {
+export class TikTokProvider extends SocialAbstract implements SocialProvider, SocialAnalytics {
   readonly identifier = 'tiktok';
   readonly name = 'TikTok';
   readonly usesPkce = true;
 
-  readonly scopes = ['user.info.basic', 'video.publish', 'video.upload'];
+  // `video.list` (Sprint 7) is what lets a published video's counters be
+  // read back. A channel connected before it was asked for answers those
+  // reads with `scope_not_authorized` until it is reconnected; the sync
+  // records that per post rather than failing the channel.
+  readonly scopes = ['user.info.basic', 'video.publish', 'video.upload', 'video.list'];
 
   isConfigured(): boolean {
     return Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET);
@@ -294,6 +303,69 @@ export class TikTokProvider extends SocialAbstract implements SocialProvider {
       'TikTok is still processing this video. PostGear will check again.',
       this.identifier,
     );
+  }
+
+  /**
+   * The follower level today, and nothing else: TikTok's user info also
+   * carries a lifetime `likes_count`, which is not a daily flow and so is
+   * not recorded as one. Per-day figures come only from its Research API,
+   * which ordinary apps are not admitted to.
+   */
+  async channelAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    _days: number,
+  ): Promise<ChannelMetricPoint[]> {
+    const response = await this.fetchJson<{
+      data?: { user?: { follower_count?: number } };
+    }>(`${API_BASE}/user/info/?fields=follower_count,likes_count`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    const followers = response.data?.user?.follower_count;
+
+    return sumByDay(
+      followers === undefined
+        ? []
+        : [{ metric: 'followers', date: todayKey(), value: asCount(followers) }],
+    );
+  }
+
+  /** One video's counters, through the Display API's query by id. */
+  async postAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null> {
+    const response = await this.fetchJson<{
+      data?: {
+        videos?: {
+          id?: string;
+          like_count?: number;
+          comment_count?: number;
+          share_count?: number;
+          view_count?: number;
+        }[];
+      };
+    }>(`${API_BASE}/video/query/?fields=id,like_count,comment_count,share_count,view_count`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters: { video_ids: [platformPostId] } }),
+    });
+
+    const video = response.data?.videos?.[0];
+
+    if (!video) {
+      return null;
+    }
+
+    return {
+      ...EMPTY_POST_METRICS,
+      likes: asCount(video.like_count),
+      comments: asCount(video.comment_count),
+      shares: asCount(video.share_count),
+      views: asCount(video.view_count),
+    };
   }
 
   private async exchange(params: Record<string, string>): Promise<TikTokTokenResponse> {

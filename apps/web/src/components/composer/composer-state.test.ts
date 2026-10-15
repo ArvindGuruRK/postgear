@@ -334,6 +334,7 @@ describe('buildReport', () => {
     name: 'X',
     configured: true,
     requiresEntitySelection: false,
+    analytics: true,
     rules: {
       maxLength: 280,
       lengthMethod: 'x-weighted',

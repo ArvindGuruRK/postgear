@@ -32,6 +32,8 @@ import * as argon2 from 'argon2';
 // This import is why `prisma/seeds/tsconfig.json` exists — see the comment
 // there. Under the root ESNext config, ts-node cannot resolve it at all.
 import { encrypt } from '../../src/crypto';
+import { seedAnalytics } from './analytics.seed';
+import { seedSeoAudits } from './seo.seed';
 
 const prisma = new PrismaClient();
 
@@ -265,6 +267,27 @@ async function main() {
   const seededChannels = await seedChannels(organization.id);
   const seededPosts = await seedPosts(organization.id);
   const seededCredits = await seedAiCredits(organization.id);
+  // Sprint 7: ninety days of metrics for the two healthy channels (none for
+  // the broken X channel, which needs reconnecting), three snapshots of the
+  // published post, and three runs of one URL plus one failed audit so the
+  // SEO history has a trend to draw.
+  const seededAnalytics = await seedAnalytics(
+    prisma,
+    organization.id,
+    [
+      { id: DEMO_CHANNEL_ID, providerIdentifier: 'linkedin' },
+      { id: BROKEN_CHANNEL_ID, providerIdentifier: 'x' },
+      { id: INSTAGRAM_CHANNEL_ID, providerIdentifier: 'instagram' },
+    ],
+    [
+      {
+        id: 'seed-post-published-linkedin',
+        integrationId: DEMO_CHANNEL_ID,
+        publishDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+    ],
+  );
+  const seededSeo = await seedSeoAudits(prisma, organization.id);
 
   console.log('Seed complete:', {
     organizationId: organization.id,
@@ -276,6 +299,8 @@ async function main() {
     channels: seededChannels,
     posts: seededPosts,
     aiCredits: seededCredits,
+    analytics: seededAnalytics,
+    seoAudits: seededSeo,
   });
 }
 
@@ -289,9 +314,11 @@ const AI_LEDGER_TYPES = [
   'generate_post',
   'generate_image',
   'copilot_message',
+  'seo_advice',
   'refund:generate_post',
   'refund:generate_image',
   'refund:copilot_message',
+  'refund:seo_advice',
 ];
 
 /**

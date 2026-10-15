@@ -11,23 +11,37 @@
  *
  * Pinterest also requires a media URL on every Pin: there is no text-only Pin.
  */
+import {
+  asCount,
+  clampDays,
+  dayKey,
+  isNotFound,
+  type MetricEntry,
+  sumByDay,
+  todayKey,
+  windowStart,
+} from '../../abstract/analytics';
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
+import {
+  type AuthenticateParams,
+  type AuthTokenDetails,
+  type ChannelContext,
+  type ChannelMetricPoint,
+  EMPTY_POST_METRICS,
+  type GeneratedAuthUrl,
+  type PostDetails,
+  type PostMetrics,
+  type PostResponse,
+  type ProviderEntity,
+  type RedirectUri,
+  type SocialAnalytics,
+  type SocialProvider,
+  type SupportsEntitySelection,
+} from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import type {
-  AuthenticateParams,
-  AuthTokenDetails,
-  ChannelContext,
-  GeneratedAuthUrl,
-  PostDetails,
-  PostResponse,
-  ProviderEntity,
-  RedirectUri,
-  SocialProvider,
-  SupportsEntitySelection,
-} from '../../abstract/social.provider.interface';
 
 const AUTHORIZE_URL = 'https://www.pinterest.com/oauth/';
 const TOKEN_URL = 'https://api.pinterest.com/v5/oauth/token';
@@ -78,9 +92,23 @@ interface PinterestBoard {
   privacy?: string;
 }
 
+/** One day of account analytics, as `user_account/analytics` buckets it. */
+interface PinterestDailyMetrics {
+  date?: string;
+  /** `READY` once Pinterest has finished the day; anything else is provisional. */
+  data_status?: string;
+  metrics?: Record<string, number>;
+}
+
+/**
+ * Pinterest's analytics windows are bounded by its own calendar: a Pin's
+ * figures can be asked for at most ninety days back.
+ */
+const PIN_ANALYTICS_DAYS = 90;
+
 export class PinterestProvider
   extends SocialAbstract
-  implements SocialProvider, SupportsEntitySelection
+  implements SocialProvider, SupportsEntitySelection, SocialAnalytics
 {
   readonly identifier = 'pinterest';
   readonly name = 'Pinterest';
@@ -274,6 +302,107 @@ export class PinterestProvider
       postId: response.id,
       releaseURL: `https://www.pinterest.com/pin/${response.id}/`,
     };
+  }
+
+  /**
+   * The account's follower level and its daily analytics. A `SAVE` is a Pin
+   * re-pinned to someone else's board — Pinterest's form of a share — so it
+   * is recorded as `shares`; `ENGAGEMENT` is Pinterest's own total.
+   */
+  async channelAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    days: number,
+  ): Promise<ChannelMetricPoint[]> {
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const entries: MetricEntry[] = [];
+
+    const account = await this.fetchJson<{ follower_count?: number }>(`${API_BASE}/user_account`, {
+      headers,
+    });
+
+    if (account.follower_count !== undefined) {
+      entries.push({
+        metric: 'followers',
+        date: todayKey(),
+        value: asCount(account.follower_count),
+      });
+    }
+
+    const params = new URLSearchParams({
+      start_date: dayKey(windowStart(clampDays(days))),
+      end_date: todayKey(),
+      metric_types: 'IMPRESSION,ENGAGEMENT,PIN_CLICK,SAVE',
+    });
+
+    const analytics = await this.fetchJson<{ all?: { daily_metrics?: PinterestDailyMetrics[] } }>(
+      `${API_BASE}/user_account/analytics?${params.toString()}`,
+      { headers },
+    );
+
+    for (const day of analytics.all?.daily_metrics ?? []) {
+      const date = day.date ? dayKey(day.date) : '';
+
+      if (!date || !day.metrics) {
+        continue;
+      }
+
+      entries.push(
+        { metric: 'impressions', date, value: asCount(day.metrics.IMPRESSION) },
+        { metric: 'engagements', date, value: asCount(day.metrics.ENGAGEMENT) },
+        { metric: 'clicks', date, value: asCount(day.metrics.PIN_CLICK) },
+        { metric: 'shares', date, value: asCount(day.metrics.SAVE) },
+      );
+    }
+
+    return sumByDay(entries);
+  }
+
+  /** One Pin's totals over the longest window Pinterest allows. */
+  async postAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null> {
+    const params = new URLSearchParams({
+      start_date: dayKey(windowStart(PIN_ANALYTICS_DAYS)),
+      end_date: todayKey(),
+      metric_types: 'IMPRESSION,PIN_CLICK,OUTBOUND_CLICK,SAVE',
+    });
+
+    try {
+      const analytics = await this.fetchJson<{
+        all?: {
+          lifetime_metrics?: Record<string, number>;
+          daily_metrics?: PinterestDailyMetrics[];
+        };
+      }>(`${API_BASE}/pins/${encodeURIComponent(platformPostId)}/analytics?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      // The lifetime block is the answer; summing the days is the fallback
+      // for an account whose response carries only those.
+      const totals =
+        analytics.all?.lifetime_metrics ??
+        (analytics.all?.daily_metrics ?? []).reduce<Record<string, number>>((sum, day) => {
+          for (const [key, value] of Object.entries(day.metrics ?? {})) {
+            sum[key] = (sum[key] ?? 0) + asCount(value);
+          }
+          return sum;
+        }, {});
+
+      return {
+        ...EMPTY_POST_METRICS,
+        impressions: asCount(totals.IMPRESSION),
+        clicks: asCount(totals.PIN_CLICK) + asCount(totals.OUTBOUND_CLICK),
+        saves: asCount(totals.SAVE),
+      };
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   private async exchange(params: Record<string, string>): Promise<PinterestTokenResponse> {

@@ -23,6 +23,7 @@ import type {
   CopilotContext,
   CopilotTool,
   SavedImage,
+  SeoAdvisor,
 } from '@postgear/ai-engine';
 
 export type AiMode = 'openai' | 'simulation' | 'unconfigured';
@@ -67,6 +68,12 @@ export interface AiEngine {
     tools: AnyCopilotTool[],
     context: CopilotContext,
   ): CopilotAgent | null;
+
+  /**
+   * The SEO analyzer's advisor (Sprint 7). Null when unconfigured, in which
+   * case the analyzer shows the evaluators' rule-based findings instead.
+   */
+  createSeoAdvisor(scope: EngineScope): SeoAdvisor | null;
 
   /**
    * One image, generated and saved to the workspace's media library. Rejects

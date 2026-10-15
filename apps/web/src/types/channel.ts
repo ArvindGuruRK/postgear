@@ -68,6 +68,8 @@ export interface ProviderSummary {
    * `checkValidity` enforces, so the composer never hardcodes a platform rule.
    */
   rules: ProviderRules;
+  /** The platform exposes metrics PostGear can read (Sprint 7). */
+  analytics: boolean;
 }
 
 /** One page, organization, YouTube channel or board to point a channel at. */

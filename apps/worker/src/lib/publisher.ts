@@ -29,7 +29,7 @@
  * Validation still runs against the **real** provider's rules, so a simulated
  * channel refuses exactly what the real one would.
  */
-import { Context } from '@temporalio/activity';
+
 import {
   type AuthTokenDetails,
   BadBodyError,
@@ -43,6 +43,7 @@ import {
   RetryableError,
   type SocialProvider,
 } from '@postgear/social-core';
+import { Context } from '@temporalio/activity';
 import type { WorkerEnv } from '../config/env';
 
 /** The slice of a provider the publish and refresh activities use. */

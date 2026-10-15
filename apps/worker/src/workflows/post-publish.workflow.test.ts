@@ -6,10 +6,11 @@
  * and what is recorded. The time-skipping server fast-forwards every timer, so
  * an hour-long wait and a four-minute backoff cost milliseconds here.
  */
+
+import { PUBLISH_FAILURE_TYPES, PUBLISH_RETRY_POLICY } from '@postgear/scheduling';
 import { ApplicationFailure } from '@temporalio/common';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { Worker } from '@temporalio/worker';
-import { PUBLISH_FAILURE_TYPES, PUBLISH_RETRY_POLICY } from '@postgear/scheduling';
 import type { Activities } from '../activities';
 import {
   cancelSignal,
@@ -35,6 +36,8 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     markPublishFailed: jest.fn(),
     loadIntegrationSchedule: jest.fn(),
     refreshChannelToken: jest.fn(),
+    loadAnalyticsSchedule: jest.fn(),
+    syncChannelAnalytics: jest.fn(),
     reconcileSchedules: jest.fn(),
     ...overrides,
   };
@@ -476,15 +479,13 @@ describe('postPublishWorkflow during the publish phase', () => {
         .fn()
         .mockRejectedValue(nonRetryable(PUBLISH_FAILURE_TYPES.refreshToken, 'expired')),
       // Every attempt of the refresh activity fails with a transient error.
-      refreshChannelToken: jest
-        .fn()
-        .mockRejectedValue(
-          ApplicationFailure.create({
-            type: 'Transient',
-            message: 'platform down',
-            nonRetryable: true,
-          }),
-        ),
+      refreshChannelToken: jest.fn().mockRejectedValue(
+        ApplicationFailure.create({
+          type: 'Transient',
+          message: 'platform down',
+          nonRetryable: true,
+        }),
+      ),
     });
 
     const outcome = await withWorker(activities, () =>

@@ -19,6 +19,7 @@
 import { z } from 'zod';
 import { decodeToolResult } from '../prompts/copilot';
 import { readBlock, readField } from '../prompts/fields';
+import { parseFindingLine, SEO_ADVICE_MAX_SUMMARY_CHARS } from '../prompts/seo-advice';
 import { type Pronouns, pronounsFor } from '../prompts/tone';
 import {
   AI_CATEGORIES,
@@ -29,6 +30,8 @@ import {
   type ModelToolCall,
   type ModelToolSpec,
   type PostFormat,
+  type SeoAdviceFinding,
+  type SeoAdviceOutput,
   type Tone,
 } from '../types';
 import { providerError, throwIfAborted } from './resilience';
@@ -552,12 +555,96 @@ function readSources(user: string): Array<{ title: string; snippet: string }> {
   return sources;
 }
 
+// ---------------------------------------------------------------------------
+// SEO advice: the findings, read back and ranked, under a verdict (Sprint 7)
+// ---------------------------------------------------------------------------
+
+const SEVERITY_ORDER = { critical: 0, warning: 1, info: 2 } as const;
+
+/** The findings of an advice prompt, in the order the real model is asked to return them. */
+export function readFindings(user: string): SeoAdviceFinding[] {
+  const body = readBlock(user, 'Findings');
+  if (!body) return [];
+  const findings: SeoAdviceFinding[] = [];
+  for (const line of body.split('\n')) {
+    const finding = parseFindingLine(line);
+    if (finding) findings.push(finding);
+  }
+  return findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+}
+
+/** A page with nothing to fix still gets one recommendation, because the schema asks for one. */
+const NOTHING_TO_FIX: SeoAdviceFinding = {
+  id: 'keep-monitoring',
+  severity: 'info',
+  category: 'technical',
+  title: 'Keep the page healthy',
+  issue:
+    'Every check passed, so there is nothing to repair. Rankings still move as competitors and search engines change.',
+  fix: 'Re-run the analysis after each significant change to the page, and once a month otherwise.',
+  impact: 'low',
+  checkId: null,
+  docsUrl: 'https://developers.google.com/search/docs/fundamentals/seo-starter-guide',
+};
+
+/**
+ * One deterministic paragraph: the score and grade, the count per severity
+ * and the top critical item. Written as prose a person can read, because
+ * the simulation is what every screen is demonstrated with.
+ */
+export function composeSeoSummary(
+  url: string | null,
+  score: string | null,
+  grade: string | null,
+  findings: SeoAdviceFinding[],
+): string {
+  const counts = { critical: 0, warning: 0, info: 0 };
+  for (const finding of findings) counts[finding.severity] += 1;
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const subject = url ? shorten(url, 80) : 'The page';
+  const verdict = score
+    ? `${subject} scores ${score}${grade ? ` (grade ${grade})` : ''}.`
+    : `${subject} has been audited.`;
+  const tally =
+    findings.length === 0
+      ? 'Every check passed, so this is about staying there rather than catching up.'
+      : `The audit raised ${plural(findings.length, 'finding')}: ${counts.critical} critical, ${counts.warning} warning and ${counts.info} informational.`;
+  const top = findings.find((finding) => finding.severity === 'critical');
+  const priority = top
+    ? `Start with "${top.title}": ${top.issue.length > 0 ? top.issue : 'it blocks ranking until it is fixed.'}`
+    : findings.length > 0
+      ? `Nothing blocks indexing; work through the warnings first, starting with "${findings[0].title}".`
+      : 'Re-run the analysis after the next change to the page to keep the trend honest.';
+  const summary = `${verdict} ${tally} ${priority}`.replace(/\s+/g, ' ').trim();
+  // `shorten` drops the closing full stop; a verdict should keep its own.
+  return summary.length <= SEO_ADVICE_MAX_SUMMARY_CHARS
+    ? summary
+    : `${shorten(summary, SEO_ADVICE_MAX_SUMMARY_CHARS - 1)}`;
+}
+
+function simulateSeoAdvice(user: string): SeoAdviceOutput {
+  const findings = readFindings(user);
+  const recommendations = findings.length > 0 ? findings : [NOTHING_TO_FIX];
+  return {
+    summary: composeSeoSummary(
+      readField(user, 'URL'),
+      readField(user, 'Score'),
+      readField(user, 'Grade'),
+      findings,
+    ),
+    recommendations: recommendations.map((finding) => ({ ...finding })),
+  };
+}
+
 function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   const keys = schemaKeys(schema);
   const brief = readBlock(user, 'Brief') ?? user;
   const picker = new Picker(hashText(user));
   const workspaceName = readField(user, 'Workspace');
 
+  if (keys.includes('summary') && keys.includes('recommendations')) {
+    return simulateSeoAdvice(user);
+  }
   if (keys.includes('category')) {
     return { category: classifyTopic(brief) };
   }

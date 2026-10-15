@@ -22,6 +22,7 @@ describe('credits policy', () => {
     expect(generateCost(false)).toBe(5);
     expect(generateCost(true)).toBe(15);
     expect(AI_CREDIT_COSTS.copilot_message).toBe(1);
+    expect(AI_CREDIT_COSTS.seo_advice).toBe(3);
   });
 
   it('names a refund after what it refunds, and counts both in the ledger', () => {
@@ -30,9 +31,11 @@ describe('credits policy', () => {
       'generate_post',
       'generate_image',
       'copilot_message',
+      'seo_advice',
       'refund:generate_post',
       'refund:generate_image',
       'refund:copilot_message',
+      'refund:seo_advice',
     ]);
   });
 

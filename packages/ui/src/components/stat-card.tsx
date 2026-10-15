@@ -8,31 +8,42 @@ export interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string | number;
   icon?: LucideIcon;
   trend?: { value: string; direction: 'up' | 'down' };
+  /**
+   * One quiet line under the number (Sprint 7) — "No change", "No previous
+   * period", "12 posts". A trend is a move; a caption is what the number
+   * cannot say by itself. Both may show at once.
+   */
+  caption?: React.ReactNode;
 }
 
 export const StatCard = forwardRef<HTMLDivElement, StatCardProps>(
-  ({ className, label, value, icon: Icon, trend, ...props }, ref) => (
+  ({ className, label, value, icon: Icon, trend, caption, ...props }, ref) => (
     <Card ref={ref} className={cn('flex flex-col gap-2 p-6', className)} {...props}>
       <div className="flex items-center justify-between">
         <p className="font-display text-xs uppercase tracking-wide text-ink opacity-60">{label}</p>
         {Icon && <Icon className="h-5 w-5 text-ink opacity-60" strokeWidth={2.5} />}
       </div>
-      <p className="font-display text-3xl tracking-wide text-ink">{value}</p>
-      {trend && (
-        <span
-          className={cn(
-            'inline-flex w-fit items-center gap-1 font-sans text-xs font-semibold',
-            trend.direction === 'up' ? 'text-actionSuccess' : 'text-actionDanger',
+      <p className="font-display text-3xl tracking-wide text-ink tabular-nums">{value}</p>
+      {trend || caption != null ? (
+        <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs">
+          {trend && (
+            <span
+              className={cn(
+                'inline-flex w-fit items-center gap-1 font-semibold',
+                trend.direction === 'up' ? 'text-actionSuccess' : 'text-actionDanger',
+              )}
+            >
+              {trend.direction === 'up' ? (
+                <ArrowUp className="h-3.5 w-3.5" strokeWidth={3} />
+              ) : (
+                <ArrowDown className="h-3.5 w-3.5" strokeWidth={3} />
+              )}
+              {trend.value}
+            </span>
           )}
-        >
-          {trend.direction === 'up' ? (
-            <ArrowUp className="h-3.5 w-3.5" strokeWidth={3} />
-          ) : (
-            <ArrowDown className="h-3.5 w-3.5" strokeWidth={3} />
-          )}
-          {trend.value}
-        </span>
-      )}
+          {caption != null && <span className="font-medium text-ink opacity-60">{caption}</span>}
+        </div>
+      ) : null}
     </Card>
   ),
 );

@@ -143,6 +143,35 @@ const envSchema = z
     AI_IMAGE_MODEL: blankAsUnset(z.string().min(1).default('dall-e-3')),
     AI_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
 
+    // Analytics (Sprint 7). The worker does the syncing and reads the same
+    // variable; the API only needs to know so `/analytics/*` can say the
+    // numbers are a stand-in's. Blank means "follow PUBLISH_SIMULATION": a
+    // deployment publishing to a stand-in has no real metrics to read either.
+    // Refused in production below, like the other two simulation flags.
+    ANALYTICS_SIMULATION: blankAsUnset(z.enum(['true', 'false']).optional()),
+    PUBLISH_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+
+    // The SEO analyzer (Sprint 7). Every value has a safe default so a fresh
+    // clone analyses a URL with no setup; see `modules/seo/seo.config.ts`.
+    //
+    // A crawl is a server-side fetch of a user-supplied URL, so the limits
+    // here are load-bearing: the timeout is the sprint's hard 30 s ceiling,
+    // the concurrency cap keeps a burst of analyses from exhausting the
+    // process, and the user agent identifies the crawler honestly.
+    SEO_CRAWL_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(60_000).default(30_000),
+    SEO_MAX_CONCURRENT_AUDITS: z.coerce.number().int().min(1).max(10).default(2),
+    // `auto` uses a headless browser when one can launch and falls back to a
+    // plain HTML fetch; `off` never launches one (a small host without
+    // Chromium); `on` fails the crawl rather than silently degrading.
+    SEO_BROWSER: blankAsUnset(z.enum(['auto', 'on', 'off']).default('auto')),
+    SEO_USER_AGENT: blankAsUnset(
+      z.string().min(1).default('Mozilla/5.0 (compatible; PostGearBot/1.0; +https://postgear.rkay.in/bot)'),
+    ),
+    // Optional. With a key, the authority score comes from Open PageRank's
+    // backlink index; without one it is estimated from on-page signals and
+    // the UI says so.
+    OPEN_PAGERANK_API_KEY: blankAsUnset(z.string().min(1).optional()),
+
     LOGIN_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(10),
     LOCKOUT_THRESHOLD: z.coerce.number().int().positive().default(5),
     LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
@@ -164,6 +193,18 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['AI_SIMULATION'],
         message: 'AI_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+
+    // Stand-in metrics on a real deployment would be a dashboard of fiction.
+    if (
+      env.NODE_ENV === 'production' &&
+      (env.ANALYTICS_SIMULATION === 'true' || env.PUBLISH_SIMULATION === 'true')
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [env.ANALYTICS_SIMULATION === 'true' ? 'ANALYTICS_SIMULATION' : 'PUBLISH_SIMULATION'],
+        message: 'Simulation flags cannot be "true" when NODE_ENV=production',
       });
     }
 
@@ -191,6 +232,20 @@ const envSchema = z
   });
 
 export type Env = z.infer<typeof envSchema>;
+
+/**
+ * Whether analytics come from a stand-in. `ANALYTICS_SIMULATION` decides when
+ * set; otherwise simulated publishing implies simulated analytics, since the
+ * seeded channels a simulated publisher posts to hold no real credentials to
+ * read metrics with. The worker applies the same rule (`apps/worker/src/config/env.ts`).
+ */
+export function analyticsSimulated(
+  env: Pick<Env, 'ANALYTICS_SIMULATION' | 'PUBLISH_SIMULATION'>,
+): boolean {
+  return env.ANALYTICS_SIMULATION === undefined
+    ? env.PUBLISH_SIMULATION === 'true'
+    : env.ANALYTICS_SIMULATION === 'true';
+}
 
 /**
  * Validates `process.env`. Passed to Nest's ConfigModule as its `validate`

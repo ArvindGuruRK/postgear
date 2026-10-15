@@ -231,6 +231,46 @@ was decided:
   `animate-pulse` with staggered delays, still under `motion-reduce`; the
   system's motion budget (§16) is unchanged.
 
+## 16c. Analytics and score surfaces (Sprint 7)
+
+The Analytics dashboard (`/[orgId]/analytics`) and the SEO analyzer
+(`/[orgId]/seo-analyzer`) are the system's first charts and the densest data
+surfaces it has; what was decided:
+
+- **Charts are SVG from tokens, not a library.** `TrendChart`, `Sparkline`,
+  `BarList`, `ScoreGauge` and `ScoreBar` (`packages/ui`) draw with
+  `stroke-action*` / `fill-action*` and `stroke-outline`; no gradient, no
+  blur, no eased curve. A line is a 3 px miter-joined stroke; its area is
+  the same colour at 15 %; a reading cursor is a bordered square. Axis and
+  tooltip text is `font-sans`; only the headline number of a gauge or a
+  stat card is `font-display`. This is §15's restrained profile applied to
+  a plot: the chrome around the chart (the card, the range tabs, the
+  toolbar) carries the treatment, the plot does not.
+- **Score tones are one scale.** `toneForScore()` bands a 0–100 reading as
+  `success` (≥ 80), `secondary` (≥ 70), `accent` (≥ 60), `danger`; the
+  gauge, the bars and the grade badges all read it, so a 58 is red wherever
+  it appears. `Progress` gained a `secondary` tone for the yellow band.
+- **Severity reuses the Sprint 5 vocabulary.** Critical is `danger`, warning
+  is `accent`, info is `primary` — the same three badges the queue uses for
+  failed / retrying / scheduled. Nothing on these screens introduces a
+  colour.
+- **Violet marks the model's advice only** (§16b). The AI summary of an SEO
+  audit sits in a `SpeechBubble variant="ai"` with a `Badge variant="ai"`
+  naming the model; rule-based findings, which no model wrote, get a plain
+  `Text` and an `outline` badge. The crawl facts, the scores and the checks
+  are never violet.
+- **Comparisons are an arrow and a word, not a colour wash.** Above / below /
+  even against an average is `ArrowUp` success, `ArrowDown` danger, `Minus`
+  muted, with the average spelled out ("vs avg 1,204"). A table row is never
+  filled by its outcome; a status edge or a badge says it.
+- **Every chart is readable without a pointer.** `TrendChart` is a focusable
+  figure; arrow keys move the cursor and the tooltip is a `role="status"`
+  live region. A `Sparkline` is `aria-hidden` because the numbers sit beside
+  it. Tables keep their numbers as text, so nothing is only in a picture.
+- **Stand-in data says so.** When metrics come from `ANALYTICS_SIMULATION`
+  or authority is estimated, a one-line `Alert`/hint names the flag or the
+  missing provider; the screen never looks more real than its data.
+
 ## 17. Token extension policy
 
 Every rule above resolves to a token, not a literal value. When a genuinely new need comes up (this pass added `--color-brutal-success` for semantic success states, and the four accordion/collapsible keyframes for expand animation) — extend `colors.css` + `tailwind.css` following the existing pattern (flat non-theme-varying color in the same block as `brutal-secondary`/`brutal-danger`/`brutal-accent`; a new `@keyframes` + `--animate-*` entry next to the existing ones) and document *why* in a comment, the same way every existing token is documented. Never inline a one-off hex/pixel value inside a component file to route around this.

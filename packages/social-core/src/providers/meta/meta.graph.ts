@@ -24,12 +24,14 @@
  * reconnect. That is the honest behaviour rather than a refresh that silently
  * never works.
  */
-import { BadBodyError } from '../../abstract/errors';
+import { asCount, dayKey, type MetricEntry } from '../../abstract/analytics';
+import { BadBodyError, ProviderError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract } from '../../abstract/social.abstract';
 import type {
   AuthenticateParams,
   AuthTokenDetails,
+  ChannelMetricName,
   GeneratedAuthUrl,
   ProviderEntity,
   RedirectUri,
@@ -39,6 +41,70 @@ import type {
 export const GRAPH_VERSION = 'v21.0';
 export const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const DIALOG_URL = `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`;
+
+/** One metric of a Graph `insights` response, in either of the shapes it takes. */
+export interface GraphInsight {
+  name?: string;
+  period?: string;
+  /** `period=day`: one entry per day, each closed at `end_time`. */
+  values?: { value?: unknown; end_time?: string }[];
+  /** `metric_type=total_value`: one figure for the whole `since`–`until` span. */
+  total_value?: { value?: unknown };
+}
+
+/**
+ * The day a daily insight value belongs to.
+ *
+ * Graph closes each day's bucket at `end_time`, which is midnight *Pacific*
+ * expressed in UTC — `07:00Z` or `08:00Z` on the following calendar day. So
+ * the value is the previous day's, and stepping back twelve hours before
+ * taking the UTC date lands on it whichever side of daylight saving it is.
+ */
+export function graphInsightDay(endTime: string): string {
+  // Graph writes the offset as `+0000`; the colon form is what every engine parses.
+  const closed = Date.parse(endTime.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+  return Number.isNaN(closed) ? '' : dayKey(closed - 12 * 60 * 60_000);
+}
+
+/** Daily insight values mapped onto PostGear's metric names; unmapped metrics are ignored. */
+export function graphInsightEntries(
+  insights: GraphInsight[],
+  mapping: Record<string, ChannelMetricName>,
+): MetricEntry[] {
+  const entries: MetricEntry[] = [];
+
+  for (const insight of insights) {
+    const metric = insight.name ? mapping[insight.name] : undefined;
+
+    if (!metric) {
+      continue;
+    }
+
+    for (const bucket of insight.values ?? []) {
+      const date = bucket.end_time ? graphInsightDay(bucket.end_time) : '';
+
+      if (date) {
+        entries.push({ metric, date, value: asCount(bucket.value) });
+      }
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Whether Graph said the object is gone. Meta answers a deleted post with a
+ * `GraphMethodException` ("Object with ID … does not exist"), not a 404, so
+ * the status alone cannot tell a removed post from a malformed request.
+ */
+export function isGraphMissingObject(error: unknown): boolean {
+  return (
+    error instanceof ProviderError &&
+    (error.status === 404 ||
+      error.providerBody.includes('GraphMethodException') ||
+      error.providerBody.includes('does not exist'))
+  );
+}
 
 export interface MetaPage {
   id: string;

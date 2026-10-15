@@ -21,23 +21,37 @@
  * `rootInternalId`, which is what lets the refresh path update all of them from
  * one new token — see the sibling fan-out in the channels repository.
  */
+import {
+  asCount,
+  clampDays,
+  dayKey,
+  isNotFound,
+  type MetricEntry,
+  sumByDay,
+  todayKey,
+  windowStart,
+} from '../../abstract/analytics';
 import { BadBodyError } from '../../abstract/errors';
 import type { HandledError } from '../../abstract/social.abstract';
 import { SocialAbstract, sleep } from '../../abstract/social.abstract';
+import {
+  type AuthenticateParams,
+  type AuthTokenDetails,
+  type ChannelContext,
+  type ChannelMetricPoint,
+  EMPTY_POST_METRICS,
+  type GeneratedAuthUrl,
+  type PostDetails,
+  type PostMetrics,
+  type PostResponse,
+  type ProviderEntity,
+  type RedirectUri,
+  type SocialAnalytics,
+  type SocialProvider,
+  type SupportsEntitySelection,
+} from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import type {
-  AuthenticateParams,
-  AuthTokenDetails,
-  ChannelContext,
-  GeneratedAuthUrl,
-  PostDetails,
-  PostResponse,
-  ProviderEntity,
-  RedirectUri,
-  SocialProvider,
-  SupportsEntitySelection,
-} from '../../abstract/social.provider.interface';
 
 const AUTHORIZE_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
@@ -426,15 +440,38 @@ export class LinkedInProvider extends SocialAbstract implements SocialProvider {
   }
 }
 
+/** One day of a page's share statistics, as the Community Management API buckets them. */
+interface LinkedInShareStatisticsElement {
+  timeRange?: { start?: number; end?: number };
+  totalShareStatistics?: {
+    impressionCount?: number;
+    uniqueImpressionsCount?: number;
+    clickCount?: number;
+    likeCount?: number;
+    commentCount?: number;
+    shareCount?: number;
+    /** A ratio — interactions over impressions — not a count. See `channelAnalytics`. */
+    engagement?: number;
+  };
+}
+
 /**
  * LinkedIn company pages.
  *
  * Same OAuth grant, different author URN and an extra step: the user picks
  * which of the organizations they administer this channel represents.
+ *
+ * ## Analytics live here, not on the personal provider
+ *
+ * LinkedIn exposes statistics for organizations only. A member's own posts
+ * have no follower count and no impression series an app can read, so the
+ * personal provider deliberately does not implement `SocialAnalytics` and
+ * the Analytics page says so, rather than showing an empty chart as if the
+ * numbers were zero.
  */
 export class LinkedInPageProvider
   extends LinkedInProvider
-  implements SocialProvider, SupportsEntitySelection
+  implements SocialProvider, SupportsEntitySelection, SocialAnalytics
 {
   override readonly identifier = 'linkedin-page';
   override readonly name = 'LinkedIn Page';
@@ -496,6 +533,102 @@ export class LinkedInPageProvider
     // LinkedIn issues no page-scoped token — the member token carries the
     // organization permissions — so the caller keeps the existing credential.
     return chosen;
+  }
+
+  /**
+   * The page's follower count today, and its share statistics by day.
+   *
+   * Followers come from `networkSizes`, which is a level. The follower
+   * statistics endpoint reports *gains* per day, and a gain series with no
+   * starting level cannot be turned into one, so it is not read. The share
+   * statistics' `engagement` field is a ratio (interactions ÷ impressions),
+   * so `engagements` is its numerator — clicks, likes, comments and shares
+   * summed — which is what the rest of the app expects a count to be.
+   */
+  async channelAnalytics(
+    channel: ChannelContext,
+    accessToken: string,
+    days: number,
+  ): Promise<ChannelMetricPoint[]> {
+    const urn = this.authorUrn(channel.internalId);
+    const headers = this.restHeaders(accessToken);
+    const entries: MetricEntry[] = [];
+
+    const size = await this.fetchJson<{ firstDegreeSize?: number }>(
+      `${API_BASE}/rest/networkSizes/${encodeURIComponent(urn)}?edgeType=CompanyFollowedByMember`,
+      { headers },
+    );
+
+    if (size.firstDegreeSize !== undefined) {
+      entries.push({ metric: 'followers', date: todayKey(), value: asCount(size.firstDegreeSize) });
+    }
+
+    const start = windowStart(clampDays(days)).getTime();
+    const end = Date.now();
+    // Rest.li 2.0 parses the parentheses itself; percent-encoding them is
+    // what produces LinkedIn's unhelpful "invalid timeIntervals".
+    const timeIntervals = `(timeRange:(start:${start},end:${end}),timeGranularityType:DAY)`;
+
+    const statistics = await this.fetchJson<{ elements?: LinkedInShareStatisticsElement[] }>(
+      `${API_BASE}/rest/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodeURIComponent(urn)}&timeIntervals=${timeIntervals}`,
+      { headers },
+    );
+
+    for (const element of statistics.elements ?? []) {
+      const date = element.timeRange?.start === undefined ? '' : dayKey(element.timeRange.start);
+      const totals = element.totalShareStatistics;
+
+      if (!date || !totals) {
+        continue;
+      }
+
+      const clicks = asCount(totals.clickCount);
+      const likes = asCount(totals.likeCount);
+      const comments = asCount(totals.commentCount);
+      const shares = asCount(totals.shareCount);
+
+      entries.push(
+        { metric: 'impressions', date, value: asCount(totals.impressionCount) },
+        { metric: 'reach', date, value: asCount(totals.uniqueImpressionsCount) },
+        { metric: 'clicks', date, value: clicks },
+        { metric: 'likes', date, value: likes },
+        { metric: 'comments', date, value: comments },
+        { metric: 'shares', date, value: shares },
+        { metric: 'engagements', date, value: clicks + likes + comments + shares },
+      );
+    }
+
+    return sumByDay(entries);
+  }
+
+  /** Likes and comments on one post, from its social actions summary. */
+  async postAnalytics(
+    _channel: ChannelContext,
+    accessToken: string,
+    platformPostId: string,
+  ): Promise<PostMetrics | null> {
+    try {
+      const actions = await this.fetchJson<{
+        likesSummary?: { totalLikes?: number };
+        commentsSummary?: { totalFirstLevelComments?: number; aggregatedTotalComments?: number };
+      }>(`${API_BASE}/rest/socialActions/${encodeURIComponent(platformPostId)}`, {
+        headers: this.restHeaders(accessToken),
+      });
+
+      return {
+        ...EMPTY_POST_METRICS,
+        likes: asCount(actions.likesSummary?.totalLikes),
+        comments: asCount(
+          actions.commentsSummary?.aggregatedTotalComments ??
+            actions.commentsSummary?.totalFirstLevelComments,
+        ),
+      };
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   protected override authorUrn(internalId: string): string {

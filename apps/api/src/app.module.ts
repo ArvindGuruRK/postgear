@@ -6,6 +6,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AiModule } from './modules/ai/ai.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -15,6 +16,7 @@ import { OrgModule } from './modules/org/org.module';
 import { PostsModule } from './modules/posts/posts.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
+import { SeoModule } from './modules/seo/seo.module';
 import { UsersModule } from './modules/users/users.module';
 
 /**
@@ -56,6 +58,8 @@ import { UsersModule } from './modules/users/users.module';
     MediaModule,
     PostsModule,
     AiModule,
+    AnalyticsModule,
+    SeoModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -11,15 +11,17 @@
  * from `docker compose up -d`; waits for it rather than crashing if it is still
  * coming up.
  */
-import { Worker } from '@temporalio/worker';
-import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
+
 import {
   MAINTENANCE_WORKFLOW,
   MAINTENANCE_WORKFLOW_ID,
   SCHEDULING_TASK_QUEUE,
 } from '@postgear/scheduling';
+import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
+import { Worker } from '@temporalio/worker';
 import { createActivities } from './activities';
 import { loadWorkerEnv } from './config/env';
+import { createAnalyticsSource } from './lib/analytics-source';
 import { mediaUrlBuilder } from './lib/media-url';
 import { createPublisher } from './lib/publisher';
 import { Semaphore } from './lib/semaphore';
@@ -35,10 +37,16 @@ const MAX_CONCURRENT_ACTIVITIES = 64;
 async function main(): Promise<void> {
   const env = loadWorkerEnv();
   const publisher = createPublisher(env);
+  const analytics = createAnalyticsSource(env);
 
   if (publisher.simulated) {
     console.warn(
       '[worker] PUBLISH_SIMULATION=true — posts are published to a stand-in, not to real platforms.',
+    );
+  }
+  if (analytics.simulated) {
+    console.warn(
+      '[worker] ANALYTICS_SIMULATION=true — channel and post metrics come from a stand-in, not from the platforms.',
     );
   }
 
@@ -60,6 +68,7 @@ async function main(): Promise<void> {
     activities: createActivities({
       env,
       publisher,
+      analytics,
       publishGate: new Semaphore(env.WORKER_MAX_CONCURRENT_PUBLISHES),
       temporalClient,
       publicUrl: mediaUrlBuilder(env),

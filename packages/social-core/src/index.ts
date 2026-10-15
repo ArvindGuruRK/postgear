@@ -10,6 +10,7 @@
  * reference to a specific platform class. Adding or renaming a provider then
  * stays an internal change.
  */
+export * from './abstract/analytics';
 export * from './abstract/errors';
 export * from './abstract/social.abstract';
 export * from './abstract/social.provider.interface';

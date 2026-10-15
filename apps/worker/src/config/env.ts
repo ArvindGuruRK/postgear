@@ -49,7 +49,24 @@ const envSchema = z
      * quietly "publish" everything to nowhere.
      */
     PUBLISH_SIMULATION: z.enum(['true', 'false']).default('false'),
+
+    /**
+     * Read channel and post metrics from a stand-in instead of the platforms
+     * (Sprint 7). Unset means "the same as PUBLISH_SIMULATION": the seeded
+     * channels a simulated publisher posts to have no real credentials to
+     * read metrics with either. Refused in production for the same reason.
+     */
+    ANALYTICS_SIMULATION: z
+      .preprocess(
+        (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+        z.enum(['true', 'false']).optional(),
+      )
+      .optional(),
   })
+  .transform((env) => ({
+    ...env,
+    ANALYTICS_SIMULATION: (env.ANALYTICS_SIMULATION ?? env.PUBLISH_SIMULATION) as 'true' | 'false',
+  }))
   .superRefine((env, context) => {
     if (env.STORAGE_PROVIDER === 's3' && !env.S3_PUBLIC_URL) {
       context.addIssue({
@@ -64,6 +81,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['PUBLISH_SIMULATION'],
         message: 'PUBLISH_SIMULATION cannot be enabled in production',
+      });
+    }
+
+    if (env.ANALYTICS_SIMULATION === 'true' && env.NODE_ENV === 'production') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ANALYTICS_SIMULATION'],
+        message: 'ANALYTICS_SIMULATION cannot be enabled in production',
       });
     }
   });

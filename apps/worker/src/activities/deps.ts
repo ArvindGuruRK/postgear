@@ -8,12 +8,15 @@
  */
 import type { Client } from '@temporalio/client';
 import type { WorkerEnv } from '../config/env';
+import type { AnalyticsSource } from '../lib/analytics-source';
 import type { Publisher } from '../lib/publisher';
 import type { Semaphore } from '../lib/semaphore';
 
 export interface ActivityDeps {
   env: WorkerEnv;
   publisher: Publisher;
+  /** Where channel and post metrics are read from (Sprint 7) — see lib/analytics-source.ts. */
+  analytics: AnalyticsSource;
   /** Rations the platform calls themselves — see lib/semaphore.ts. */
   publishGate: Semaphore;
   /** Lazily provided so the publish activities need no Temporal client at all. */

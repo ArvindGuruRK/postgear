@@ -7,6 +7,7 @@
  * outside Temporal's own patched versions. `@postgear/scheduling` is pure for
  * exactly this reason; activities reach the outside world.
  */
+export { analyticsSyncWorkflow } from './analytics-sync.workflow';
 export { maintenanceWorkflow } from './maintenance.workflow';
 export { postPublishWorkflow } from './post-publish.workflow';
 export { tokenRefreshWorkflow } from './token-refresh.workflow';

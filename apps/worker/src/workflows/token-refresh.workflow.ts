@@ -15,6 +15,8 @@
  * The loop ends when a refresh fails: the activity has flagged the channel as
  * needing reconnection, and reconnecting starts a new run with the new token.
  */
+
+import { type TokenRefreshInput, WAKE_SIGNAL } from '@postgear/scheduling';
 import {
   condition,
   continueAsNew,
@@ -23,7 +25,6 @@ import {
   proxyActivities,
   setHandler,
 } from '@temporalio/workflow';
-import { type TokenRefreshInput, WAKE_SIGNAL } from '@postgear/scheduling';
 import type { Activities } from '../activities';
 
 export const wakeSignal = defineSignal(WAKE_SIGNAL);

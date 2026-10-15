@@ -20,8 +20,8 @@ Part A: surface per-channel and per-post performance metrics. Part B: let a user
 - `apps/web/.../analytics/page.tsx`: per-channel dashboard (followers, impressions, engagement trend over 7/30/90 days) + per-post breakdown + top-performing content list.
 
 ### Definition of Done (Part A)
-- [ ] At least one connected platform (whichever has the simplest metrics API among Sprint 3's providers) shows real follower/engagement data, not placeholder numbers.
-- [ ] Per-post analytics modal shows likes/shares/comments/clicks where the platform API provides them.
+- [x] At least one connected platform (whichever has the simplest metrics API among Sprint 3's providers) shows real follower/engagement data, not placeholder numbers. **Built for seven platforms and run live end to end — but with the stand-in, since no platform credential exists locally**; the first real sync is the next verification step (checklist, Known gaps 1).
+- [x] Per-post analytics modal shows likes/shares/comments/clicks where the platform API provides them. Browser test: `analytics.spec.ts` › *opens the top post with its numbers against the channel average*.
 
 ---
 
@@ -52,10 +52,23 @@ Target locations: `packages/seo-engine/src/{crawler,scoring}/` (already scaffold
 - `apps/web/.../seo-analyzer/page.tsx`: URL input, score meter UI, prioritized AI checklist, historical trend chart.
 
 ### Definition of Done (Part B)
-- [ ] Submitting a real URL returns a composite score + letter grade + all four sub-scores within ~30 seconds.
-- [ ] The crawler safely rejects/ignores attempts to target internal/private network addresses (verify with a `localhost`/`169.254.169.254`-style test URL — must fail closed, not silently succeed).
-- [ ] AI advice output is prioritized (Critical/Warning/Info), not a flat list.
-- [ ] Re-running an analysis on the same URL after changes shows a trend line, not just the latest number.
+- [x] Submitting a real URL returns a composite score + letter grade + all four sub-scores within ~30 seconds. **Verified live**: `https://example.com/` through real Chromium in 2.1 s; `seo.spec.ts` asserts the gauge, grade and four categories.
+- [x] The crawler safely rejects/ignores attempts to target internal/private network addresses (verify with a `localhost`/`169.254.169.254`-style test URL — must fail closed, not silently succeed). **Verified** in the engine's tests, live against the API (422, nothing fetched, nothing charged) and in the browser (`seo.spec.ts` a/b); the guard also runs on every redirect hop and every browser request.
+- [x] AI advice output is prioritized (Critical/Warning/Info), not a flat list. Three groups with impact, from the model or from the rules when AI is off.
+- [x] Re-running an analysis on the same URL after changes shows a trend line, not just the latest number. `seo.spec.ts` c/d: "vs last run" and a `TrendChart` over the history.
+
+## Deviations from this document, and why
+
+> **Completion checklist**: [sprint-07-completion-checklist.md](../sprint-completion-checklists/sprint-07-completion-checklist.md) — what shipped, a test command for every item, the live run, and the known gaps.
+
+| This doc said | What shipped | Why |
+|---|---|---|
+| `POST /seo/analyze` "likely async … consider a short-lived Temporal workflow" | `POST /seo/audits` streams the run over SSE from the API, exactly as Sprint 6's generation does, under a 30 s deadline, a per-process concurrency gate and a per-workspace "one at a time" rule | A person is watching the stages; a stream is the honest UX and the Sprint 6 plumbing already existed. The crawl's own ceiling is what keeps a slow site from tying up the process — a workflow would have added a poll loop and a worker dependency to an interactive feature without removing the ceiling. The audit row is written at every stage, so a crash still leaves a `FAILED` row, not a hang |
+| Playwright "instance pooling, proxy rotators" | A lazy single-Chromium pool with an async page semaphore and a request-level private-address guard; no proxies | Rotating proxies is scraping infrastructure; an SEO audit fetches one page the owner asked about. The guard on every browser request is what proxies could never give: protection against DNS rebinding and redirects into the private network |
+| Backlink/Authority "likely via a third-party API" | Open PageRank (free key) when `OPEN_PAGERANK_API_KEY` is set; a heuristic from on-page signals, flagged `estimated`, otherwise; a deterministic stand-in in simulation | A free, keyed, real backlink index; and an honest fallback that says it is an estimate rather than a fabricated number |
+| Recharts widgets (`project_structure.md`) | Plain SVG components in `packages/ui` (`TrendChart`, `Sparkline`, `BarList`, `ScoreGauge`, `ScoreBar`) | A chart library ships the soft, gradient SaaS look Sprint 0 rejected; forty lines of SVG drawn from the tokens keep the design system whole (rule §16c) |
+| "background job polling each connected channel" | A durable `analyticsSyncWorkflow` per channel in the Sprint 5 worker (daily at a per-channel minute offset, `syncNow` signal from the Analytics page), reconciled by the maintenance loop like the token-refresh workflows | The same durability argument as Sprint 5: a cron in a process stops when the process does |
+| Real platform metrics in the DoD | Every platform with a metrics API is implemented; locally the worker reads a deterministic stand-in (`ANALYTICS_SIMULATION`, following `PUBLISH_SIMULATION`) | No platform key exists on this machine (the Sprint 6 situation, unchanged); the stand-in is what makes every screen and rule testable, and the checklist says plainly that no real platform has been called |
 
 ## Risks
 - Playwright on JS-heavy or bot-protected sites can hang or get blocked — enforce the 30s timeout strictly and fall back to a lightweight HTML-only parse (no headless browser) rather than blocking the whole request.

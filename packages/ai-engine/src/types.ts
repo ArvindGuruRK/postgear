@@ -261,6 +261,90 @@ export interface CopilotAgent {
 }
 
 // ---------------------------------------------------------------------------
+// The SEO advisor (Sprint 7)
+// ---------------------------------------------------------------------------
+
+/**
+ * The advisor's vocabulary mirrors `@postgear/seo-engine`'s `SeoRecommendation`
+ * rather than importing it: this package must stay free of the engine (which
+ * drives a headless browser), and the API is where the two shapes meet.
+ */
+export type SeoAdviceSeverity = 'critical' | 'warning' | 'info';
+
+export const SEO_ADVICE_SEVERITIES: readonly SeoAdviceSeverity[] = [
+  'critical',
+  'warning',
+  'info',
+] as const;
+
+export type SeoAdviceCategory = 'onPage' | 'technical' | 'content' | 'backlink';
+
+export const SEO_ADVICE_CATEGORIES: readonly SeoAdviceCategory[] = [
+  'onPage',
+  'technical',
+  'content',
+  'backlink',
+] as const;
+
+export type SeoAdviceImpact = 'high' | 'medium' | 'low';
+
+export const SEO_ADVICE_IMPACTS: readonly SeoAdviceImpact[] = ['high', 'medium', 'low'] as const;
+
+/** One rule-based finding the evaluators produced, as the model is shown it. */
+export interface SeoAdviceFinding {
+  id: string;
+  severity: SeoAdviceSeverity;
+  category: SeoAdviceCategory;
+  title: string;
+  issue: string;
+  fix: string;
+  impact: SeoAdviceImpact;
+  /** The evaluator check this finding came from, when there is one. */
+  checkId: string | null;
+  docsUrl: string | null;
+}
+
+export interface SeoAdviceRequest {
+  url: string;
+  /** 0–100. */
+  overall: number;
+  grade: string;
+  /** The audit in prose, from the engine's `summariseForAdvice`. */
+  digest: string;
+  /** The rule-based findings; the model prioritises and rewrites them, it does not replace them. */
+  findings: SeoAdviceFinding[];
+}
+
+export interface SeoAdviceRecommendation {
+  id: string;
+  severity: SeoAdviceSeverity;
+  category: SeoAdviceCategory;
+  title: string;
+  /** What is wrong and why it matters. */
+  issue: string;
+  /** What to change, concretely. */
+  fix: string;
+  impact: SeoAdviceImpact;
+  /** A `checkId` from the request's findings, or null: the advisor never invents one. */
+  checkId: string | null;
+  docsUrl: string | null;
+}
+
+export interface SeoAdviceOutput {
+  summary: string;
+  /** Sorted critical → warning → info, de-duplicated by id, at most twelve. */
+  recommendations: SeoAdviceRecommendation[];
+}
+
+export interface SeoAdvisor {
+  /**
+   * One structured model call. Rejects with an {@link AiProviderError}; an
+   * abort surfaces as kind `aborted`.
+   */
+  advise(request: SeoAdviceRequest, options?: { signal?: AbortSignal }): Promise<SeoAdviceOutput>;
+}
+
+// ---------------------------------------------------------------------------
 // The model seam
 // ---------------------------------------------------------------------------
 

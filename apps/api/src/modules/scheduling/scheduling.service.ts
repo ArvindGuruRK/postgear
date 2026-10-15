@@ -22,8 +22,9 @@
  */
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Client, Connection, WorkflowNotFoundError } from '@temporalio/client';
 import {
+  ANALYTICS_SYNC_WORKFLOW,
+  analyticsSyncWorkflowId,
   CANCEL_SIGNAL,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
@@ -31,15 +32,23 @@ import {
   publishWorkflowId,
   type RetryPolicyValues,
   SCHEDULING_TASK_QUEUE,
+  SYNC_NOW_SIGNAL,
   TOKEN_REFRESH_WORKFLOW,
   tokenRefreshWorkflowId,
   WAKE_SIGNAL,
 } from '@postgear/scheduling';
+import { Client, Connection, WorkflowNotFoundError } from '@temporalio/client';
 import type { Env } from '../../config/env';
 
 /** A post row the scheduler should be told about: the root row of one channel's chain. */
 export interface ScheduledRoot {
   postId: string;
+  organizationId: string;
+}
+
+/** A channel whose analytics loop should be started, or told to sync now (Sprint 7). */
+export interface AnalyticsChannel {
+  integrationId: string;
   organizationId: string;
 }
 
@@ -145,6 +154,35 @@ export class SchedulingService implements OnModuleDestroy {
         signal: WAKE_SIGNAL,
         signalArgs: [],
       });
+    });
+  }
+
+  /**
+   * Sprint 7: asks each channel's analytics loop to sync now, starting the
+   * loop if it is not running. The same idempotent `signalWithStart` as a
+   * publish: a running loop is signalled, a missing one is started and then
+   * signalled, and the loop itself holds repeated requests to one sync per
+   * two minutes.
+   */
+  async syncAnalyticsNow(channels: AnalyticsChannel[]): Promise<boolean> {
+    if (channels.length === 0) {
+      return true;
+    }
+
+    return this.attempt('analytics sync', async (client) => {
+      await Promise.all(
+        channels.map((channel) =>
+          client.workflow.signalWithStart(ANALYTICS_SYNC_WORKFLOW, {
+            workflowId: analyticsSyncWorkflowId(channel.integrationId),
+            taskQueue: SCHEDULING_TASK_QUEUE,
+            args: [
+              { integrationId: channel.integrationId, organizationId: channel.organizationId },
+            ],
+            signal: SYNC_NOW_SIGNAL,
+            signalArgs: [],
+          }),
+        ),
+      );
     });
   }
 

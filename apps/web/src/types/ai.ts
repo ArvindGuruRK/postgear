@@ -137,6 +137,8 @@ export interface AiCredits {
     generate_post: number;
     generate_image: number;
     copilot_message: number;
+    /** Sprint 7: AI advice on an SEO audit. */
+    seo_advice: number;
   };
 }
 

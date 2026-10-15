@@ -10,6 +10,9 @@ const TONE = {
   success: { fill: 'bg-actionSuccess', on: 'text-onActionLight' },
   accent: { fill: 'bg-actionAccent', on: 'text-onActionLight' },
   ai: { fill: 'bg-actionAi', on: 'text-onActionAi' },
+  // Sprint 7: the "fair" band of a score (ScoreBar/ScoreGauge), yellow between
+  // the green and the orange.
+  secondary: { fill: 'bg-actionSecondary', on: 'text-onActionLight' },
 } as const;
 
 const SIZE = {

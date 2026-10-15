@@ -19,7 +19,7 @@
  * dispatches by name. Adding a provider is one line here.
  */
 import { ProviderError, ProviderNotConfiguredError } from '../abstract/errors';
-import type { SocialProvider } from '../abstract/social.provider.interface';
+import { type SocialProvider, supportsAnalytics } from '../abstract/social.provider.interface';
 import type { ProviderRules } from '../composer/rules';
 import { FacebookProvider } from '../providers/facebook';
 import { InstagramProvider } from '../providers/instagram';
@@ -48,6 +48,12 @@ export interface ProviderSummary {
    * trip to the browser, where the composer validates against it live.
    */
   rules: ProviderRules;
+  /**
+   * True when the platform exposes metrics PostGear can read (Sprint 7). A
+   * channel on a platform without them is listed on the Analytics page with
+   * a reason rather than silently missing.
+   */
+  analytics: boolean;
 }
 
 export class IntegrationManager {
@@ -102,6 +108,7 @@ export class IntegrationManager {
       configured: provider.isConfigured(),
       requiresEntitySelection: 'listEntities' in provider,
       rules: provider.rules,
+      analytics: supportsAnalytics(provider),
     }));
   }
 

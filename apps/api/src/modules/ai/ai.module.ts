@@ -24,6 +24,10 @@ import { AI_ENGINE } from './engine/engine.types';
  * The engine is a provider behind a token, built once from the environment,
  * so the service never knows which mode it has and a test hands it a fake —
  * the same pattern as the scheduling module's Temporal connection.
+ *
+ * The engine and the credit ledger are exported (Sprint 7): the SEO analyzer
+ * asks the same model for its advice and pays for it from the same cycle, so
+ * there is one engine and one ledger in the process, not one per feature.
  */
 @Module({
   imports: [ChannelsModule, MediaModule, PostsModule],
@@ -39,5 +43,6 @@ import { AI_ENGINE } from './engine/engine.types';
         createAiEngine({ config, redis, media }),
     },
   ],
+  exports: [CreditsService, AI_ENGINE],
 })
 export class AiModule {}

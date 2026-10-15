@@ -17,7 +17,7 @@ placeholders.
 
 | Works in the browser | Not available yet |
 |---|---|
-| Login with the seeded demo account | Analytics, SEO analyzer |
+| Login with the seeded demo account | |
 | Composer: editor, per-platform previews, character counters, threads, media attach | Recurring posts, RSS auto-posting, bulk scheduling |
 | Media library: upload, preview, delete | In-app notifications (rows are written; the bell is Sprint 8) |
 | Save a draft, "Add to queue", reopen drafts | |
@@ -25,6 +25,8 @@ placeholders.
 | **Queue** (Sprint 5): every post in order, filters, Post now / Reschedule / Retry / Delete | |
 | **Scheduled publishing** (Sprint 5): a queued post goes out at its time, retries on rate limits, flags a dead token | |
 | **AI Copilot** (Sprint 6): generate a post from a topic (research → hook → copy → image), chat with an assistant that can list channels and draft posts, AI credits | |
+| **Analytics** (Sprint 7): per-channel followers, impressions, engagement over 7/30/90 days, cross-channel comparison, top posts, per-post breakdown, CSV export | PDF export, scheduled SEO re-audits, competitor comparison |
+| **SEO Analyzer** (Sprint 7): enter any public URL, get a 0–100 score with a grade, four sub-scores, prioritised fixes, and a score trend over time | |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
@@ -270,6 +272,75 @@ it), images by DALL-E 3, and research runs only when `TAVILY_API_KEY` is set —
 otherwise the research stage reads "skipped" and the post is written from the
 model's own knowledge. A rejected key shows up in the UI as a configuration
 problem, not as a user error, and nothing is charged for it.
+
+### 5d. Analytics (Sprint 7)
+
+Nothing to add to `.env`: with `PUBLISH_SIMULATION="true"` the worker also
+reads metrics from a stand-in (`ANALYTICS_SIMULATION` follows it unless you
+set it yourself), and the seed gives the demo workspace 90 days of numbers.
+
+Open **<http://localhost:3000/seed-demo-org/analytics>**.
+
+- The four cards at the top (Followers, Impressions, Engagements, Engagement
+  rate) show the last 30 days with the change against the 30 days before.
+  Switch the range to **7** or **90** — the URL follows (`?range=7`), so a
+  view can be bookmarked.
+- **Trend** draws one line per channel; hover a day, or focus the chart and
+  use the arrow keys, to read the values.
+- **Channels** compares every channel side by side. *Acme Marketing* and
+  *Acme Studio* are synced; *Acme on X* says **Needs reconnect**, because
+  the seeded X token is dead and a dead token cannot read metrics either.
+  Click a row to filter the whole page to that channel.
+- **Top posts** ranks published posts by engagement. Open one to see its
+  likes, comments, shares, clicks and impressions next to the channel's
+  average, with an up/down arrow for above/below. **Create similar** opens
+  the AI Copilot with the post as the topic.
+- **Sync now** asks the worker to pull fresh metrics for every channel; the
+  status pill on the right says whether a worker is there to do it. With the
+  worker running (and `PUBLISH_SIMULATION="true"`), the stand-in returns a
+  slightly different series each day, so re-syncing moves the numbers.
+  Without one, the pill says so and the seeded numbers stay.
+- **Export CSV** downloads the daily metrics and the top posts for the range.
+
+The worker also syncs on its own: once a day per channel, at a minute offset
+that depends on the channel, so a fleet never hits a platform at the same
+second. Real platform metrics need a connected account on a platform with
+a metrics API (X, LinkedIn pages, Facebook pages, Instagram, YouTube) and
+`PUBLISH_SIMULATION="false"` (or `ANALYTICS_SIMULATION="false"`); a personal
+LinkedIn profile has no metrics API, and the page says **Not supported** for
+it rather than showing zeros.
+
+### 5e. The SEO Analyzer (Sprint 7)
+
+Nothing to add to `.env`. The crawler is free: it fetches the page itself,
+with a headless Chromium when one is installed (`npx playwright install
+chromium` — the e2e suite already installed it) and a plain HTML fetch
+otherwise. AI advice uses the same `AI_SIMULATION`/`OPENAI_API_KEY` setting
+as the copilot and costs 3 credits per audit; without either, the advice is
+the rule-based findings and the page says so.
+
+Open **<http://localhost:3000/seed-demo-org/seo-analyzer>**.
+
+- Type `https://example.com/` and press **Analyze**. Watch the stages:
+  validate → crawl → score → advise. Within thirty seconds you get a score
+  out of 100 with a letter grade, four sub-scores (on-page 30 %, technical
+  30 %, content 25 %, authority 15 %), the crawl facts, and the fixes grouped
+  **Critical / Warning / Info**. The **Breakdown** tabs list every check.
+- Try `http://localhost:3000` or `http://169.254.169.254/`: the analyzer
+  refuses before fetching anything — private and internal addresses are
+  blocked on purpose (that is the SSRF guard the sprint required), and the
+  refusal is logged by the API as `seo.unsafe_url`.
+- Analyze the same URL again: the result says how the score moved since
+  the last run, and **History** on the right draws the score over time
+  (the seed already has three runs of `example.com` and one failed audit
+  of `nonexistent.invalid` so the trend is visible before you run anything).
+- Click a history row to reopen that audit; **Re-run** fills the form.
+- **Authority** is estimated from on-page signals unless
+  `OPEN_PAGERANK_API_KEY` is set (a free key from Open PageRank turns it into
+  a real backlink-index reading); the tab says which.
+- Only one analysis per workspace runs at a time and the API process runs
+  at most `SEO_MAX_CONCURRENT_AUDITS` (default 2); a third request answers
+  **429 busy** rather than queueing forever.
 
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.

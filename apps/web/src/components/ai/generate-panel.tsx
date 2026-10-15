@@ -15,12 +15,13 @@
  */
 import { Alert, EmptyState } from '@postgear/ui';
 import { Sparkles } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { streamEvents } from '@/lib/sse';
 import type { AiCredits, AiStatus, GenerateRequestBody, GenerateStreamEvent } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
-import { GenerateForm } from './generate-form';
+import { GenerateForm, TOPIC_MAX } from './generate-form';
 import { GenerateProgress } from './generate-progress';
 import { GenerateResult } from './generate-result';
 import {
@@ -55,8 +56,12 @@ export function GeneratePanel({
   workspaceName: string;
   onCredits: (credits: AiCredits) => void;
 }) {
+  const searchParams = useSearchParams();
   const [values, setValues] = useState<GenerateRequestBody>(() => ({
     ...EMPTY_VALUES,
+    // Sprint 7: the analytics leaderboard's "Create similar" lands here with
+    // the post it wants more of as `?topic=`. Bounded to what the API accepts.
+    topic: (searchParams.get('topic') ?? '').slice(0, TOPIC_MAX),
     // One connected channel is the obvious choice; pre-pick it.
     channelIds:
       channels.filter((channel) => channel.health === 'connected').length === 1

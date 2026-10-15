@@ -36,6 +36,11 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  // Sprint 7
+  channelMetrics      ChannelMetricSnapshot[]
+  postMetrics         PostMetricSnapshot[]
+  analyticsSyncs      AnalyticsSync[]
+  seoAudits           SEOAudit[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -281,6 +286,10 @@ model Integration {
   organization          Organization           @relation(fields: [organizationId], references: [id])
   webhooks              IntegrationsWebhooks[]
   posts                 Post[]
+  // Sprint 7
+  channelMetrics        ChannelMetricSnapshot[]
+  postMetrics           PostMetricSnapshot[]
+  analyticsSync         AnalyticsSync?
 
   @@unique([organizationId, internalId])
   @@index([rootInternalId])
@@ -359,6 +368,8 @@ model Post {
   parentPost                 Post?                     @relation("parentPostId", fields: [parentPostId], references: [id])
   childrenPost               Post[]                    @relation("parentPostId")
   tags                       TagsPosts[]
+  // Sprint 7
+  metrics                    PostMetricSnapshot[]
 
   @@index([group])
   @@index([deletedAt])
@@ -601,4 +612,144 @@ model Announcement {
   description String
   color       AnnouncementColor @default(INFO)
   createdAt   DateTime          @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 7 — analytics (PRD 5.6) and SEO score prediction (PRD 5.7).
+//
+// PostGear's own models, added per Sprint 1's rule: uuid ids, `organizationId`
+// scoping, `createdAt`/`updatedAt`. All four hold *derived* data (platform
+// metrics, crawl results) that can be regenerated, so they cascade with the
+// rows they describe rather than carrying a soft delete; every read still
+// scopes on the organization.
+// ---------------------------------------------------------------------------
+
+/// One day of one metric for one channel, as the platform reported it.
+///
+/// Keyed on (channel, metric, day) so a re-sync overwrites rather than
+/// duplicates, and so a 90-day chart is one range query. `value` is a Float
+/// because a few platforms report averages (watch time, view percentage), and
+/// counts fit in it exactly up to 2^53.
+model ChannelMetricSnapshot {
+  id             String       @id @default(uuid())
+  organizationId String
+  integrationId  String
+  /// The UTC day the value belongs to.
+  date           DateTime     @db.Date
+  /// One of `CHANNEL_METRIC_NAMES` in @postgear/social-core.
+  metric         String
+  value          Float
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration    Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, metric, date])
+  @@index([organizationId, date])
+  @@index([integrationId, date])
+}
+
+/// A published post's lifetime metrics at the moment they were read.
+///
+/// Append-only: every sync adds a row, so a post's engagement can be shown
+/// over time and the latest row is "now". `postId` is the root row of one
+/// channel's chain (the row that carries `releaseId`), per posts.repository.ts.
+model PostMetricSnapshot {
+  id             String       @id @default(uuid())
+  organizationId String
+  postId         String
+  integrationId  String
+  capturedAt     DateTime     @default(now())
+  likes          Int          @default(0)
+  comments       Int          @default(0)
+  shares         Int          @default(0)
+  clicks         Int          @default(0)
+  impressions    Int          @default(0)
+  saves          Int          @default(0)
+  views          Int          @default(0)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  post           Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  integration    Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, capturedAt])
+  @@index([postId, capturedAt])
+  @@index([integrationId, capturedAt])
+}
+
+enum AnalyticsSyncStatus {
+  NEVER
+  OK
+  FAILED
+  UNSUPPORTED
+  NEEDS_RECONNECT
+  NEEDS_PERMISSIONS
+}
+
+/// Where one channel's metrics sync stands — written by the worker's
+/// analytics workflow, read by the Analytics page's status row.
+model AnalyticsSync {
+  id             String              @id @default(uuid())
+  organizationId String
+  integrationId  String              @unique
+  status         AnalyticsSyncStatus @default(NEVER)
+  lastSyncedAt   DateTime?
+  lastAttemptAt  DateTime?
+  /// A message already safe to show — never a provider response body.
+  lastError      String?
+  /// What the last successful sync wrote, for the status row.
+  channelDays    Int                 @default(0)
+  postsSynced    Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integration    Integration         @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+enum SEOAuditStatus {
+  PENDING
+  CRAWLING
+  SCORING
+  ADVISING
+  DONE
+  FAILED
+}
+
+/// One run of the SEO analyzer against one URL.
+///
+/// Written progressively as the run moves through its stages, so a crash
+/// mid-run leaves a row that says how far it got rather than nothing. The
+/// four sub-scores are columns so the history and trend queries never open
+/// the JSON; `auditData` holds the crawl and every check, `aiAdvice` the
+/// prioritised recommendations.
+model SEOAudit {
+  id             String         @id @default(uuid())
+  organizationId String
+  /// The URL as submitted, normalised (scheme, host lower-cased, no fragment).
+  targetUrl      String
+  /// Where the crawl ended up after redirects.
+  finalUrl       String?
+  status         SEOAuditStatus @default(PENDING)
+  /// Safe to show. Set only when `status` is FAILED.
+  failureReason  String?
+  overallScore   Int?
+  grade          String?
+  onPageScore    Int?
+  technicalScore Int?
+  contentScore   Int?
+  backlinkScore  Int?
+  /// "browser" (headless Chromium) or "html" (plain fetch fallback).
+  crawlMode      String?
+  durationMs     Int?
+  auditData      Json?
+  aiAdvice       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  completedAt    DateTime?
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, targetUrl, createdAt])
 }

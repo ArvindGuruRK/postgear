@@ -42,7 +42,7 @@ const credits = (used: number) => ({
   resetsAt: RESETS_AT.toISOString(),
   tier: 'STANDARD' as const,
   low: false,
-  costs: { generate_post: 5, generate_image: 10, copilot_message: 1 },
+  costs: { generate_post: 5, generate_image: 10, copilot_message: 1, seo_advice: 3 },
 });
 
 const result = {
@@ -107,18 +107,16 @@ describe('copilot tools', () => {
       },
       creditContext,
       channels: {
-        list: jest
-          .fn()
-          .mockResolvedValue([
-            channel({}),
-            channel({
-              id: 'ch_x',
-              name: 'Acme on X',
-              providerIdentifier: 'x',
-              providerName: 'X',
-              health: 'needs_reconnect',
-            }),
-          ]),
+        list: jest.fn().mockResolvedValue([
+          channel({}),
+          channel({
+            id: 'ch_x',
+            name: 'Acme on X',
+            providerIdentifier: 'x',
+            providerName: 'X',
+            health: 'needs_reconnect',
+          }),
+        ]),
       },
       posts: {
         create: jest.fn().mockResolvedValue({ group: '0b8f3f3e-8a1f-4c55-9a55-2f1f5d1c9e11' }),

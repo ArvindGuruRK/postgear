@@ -22,6 +22,7 @@ import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import {
   AiProviderError,
+  createSeoAdvisor as buildSeoAdvisor,
   type ContentPipeline,
   type CopilotAgent,
   type CopilotContext,
@@ -35,6 +36,7 @@ import {
   type ImageGenerator,
   type ModelClient,
   type ResearchProvider,
+  type SeoAdvisor,
   withResearchCache,
 } from '@postgear/ai-engine';
 import { redact } from '../../../common/logging/security-logger';
@@ -179,6 +181,14 @@ export function buildAiEngine(
       }
 
       return createCopilotAgent({ model, tools, context });
+    },
+
+    createSeoAdvisor(_scope: EngineScope): SeoAdvisor | null {
+      if (!model) {
+        return null;
+      }
+
+      return buildSeoAdvisor({ model, logger: engineLogger });
     },
 
     async generateImage(scope, prompt, options): Promise<GeneratedImageOutput> {

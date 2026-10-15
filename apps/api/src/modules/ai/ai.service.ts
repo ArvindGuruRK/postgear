@@ -39,7 +39,7 @@ import type {
   GenerateEvent,
 } from '@postgear/ai-engine';
 import { securityLogger } from '../../common/logging/security-logger';
-import { type ChannelView, ChannelsService } from '../channels/channels.service';
+import { ChannelsService, type ChannelView } from '../channels/channels.service';
 import { PostsService } from '../posts/posts.service';
 import { describeFailure, isAbortError } from './ai.errors';
 import { AI_MESSAGES } from './ai.messages';

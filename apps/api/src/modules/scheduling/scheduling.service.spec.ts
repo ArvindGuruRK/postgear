@@ -6,15 +6,17 @@
  * unreachable server is reported as `false` and logged rather than thrown.
  */
 import type { ConfigService } from '@nestjs/config';
-import { WorkflowNotFoundError } from '@temporalio/client';
 import {
+  ANALYTICS_SYNC_WORKFLOW,
   CANCEL_SIGNAL,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
   SCHEDULING_TASK_QUEUE,
+  SYNC_NOW_SIGNAL,
   TOKEN_REFRESH_WORKFLOW,
   WAKE_SIGNAL,
 } from '@postgear/scheduling';
+import { WorkflowNotFoundError } from '@temporalio/client';
 import type { Env } from '../../config/env';
 import { type SchedulingClient, SchedulingService } from './scheduling.service';
 
@@ -96,6 +98,31 @@ describe('SchedulingService', () => {
       signal: WAKE_SIGNAL,
       signalArgs: [],
     });
+  });
+
+  it('starts or nudges one analytics loop per channel with the sync-now signal (Sprint 7)', async () => {
+    const { client, raw } = fakeClient();
+    const service = new SchedulingService(config, async () => client);
+
+    await expect(
+      service.syncAnalyticsNow([
+        { integrationId: 'ch-1', organizationId: 'org-1' },
+        { integrationId: 'ch-2', organizationId: 'org-1' },
+      ]),
+    ).resolves.toBe(true);
+
+    expect(raw.workflow.signalWithStart).toHaveBeenCalledTimes(2);
+    expect(raw.workflow.signalWithStart).toHaveBeenCalledWith(ANALYTICS_SYNC_WORKFLOW, {
+      workflowId: 'analytics-sync:ch-1',
+      taskQueue: SCHEDULING_TASK_QUEUE,
+      args: [{ integrationId: 'ch-1', organizationId: 'org-1' }],
+      signal: SYNC_NOW_SIGNAL,
+      signalArgs: [],
+    });
+
+    // Nothing to ask for is not a failure.
+    await expect(service.syncAnalyticsNow([])).resolves.toBe(true);
+    expect(raw.workflow.signalWithStart).toHaveBeenCalledTimes(2);
   });
 
   it('reports false instead of throwing when Temporal is unreachable, then reconnects', async () => {
