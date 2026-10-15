@@ -12,7 +12,7 @@
  * scheduled weeks out would hit Temporal's history limit before its day came.
  */
 
-import { prisma, State } from '@postgear/db';
+import { prisma, State, WebhookDeliveryStatus } from '@postgear/db';
 import {
   ANALYTICS_SYNC_WORKFLOW,
   analyticsSyncWorkflowId,
@@ -21,6 +21,8 @@ import {
   SCHEDULING_TASK_QUEUE,
   TOKEN_REFRESH_WORKFLOW,
   tokenRefreshWorkflowId,
+  WEBHOOK_DELIVERY_WORKFLOW,
+  webhookDeliveryWorkflowId,
 } from '@postgear/scheduling';
 import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import type { ActivityDeps } from './deps';
@@ -30,8 +32,18 @@ export interface ReconcileReport {
   refreshableChannels: number;
   /** Sprint 7: live, set-up channels whose analytics loop was ensured. */
   analyticsChannels: number;
+  /** Sprint 8: pending webhook deliveries whose workflow was ensured. */
+  webhookDeliveries: number;
   failures: number;
 }
+
+/**
+ * A pending delivery younger than this is still being started by whoever
+ * created it; older than a day it is abandoned rather than resurrected (the
+ * event it reports is stale, and its retry policy would have ended by now).
+ */
+const DELIVERY_RECONCILE_MIN_AGE_MS = 60_000;
+const DELIVERY_RECONCILE_MAX_AGE_MS = 24 * 60 * 60_000;
 
 /** How many `signalWithStart` calls are in flight at once. */
 const CONCURRENCY = 10;
@@ -119,10 +131,41 @@ export function createMaintenanceActivities(deps: ActivityDeps) {
         }
       });
 
+      // Sprint 8: a delivery row is created in the same transaction as the
+      // outcome it reports, and its workflow is started best-effort after.
+      // Any row still PENDING a minute later with no workflow is started here.
+      const now = Date.now();
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: {
+          status: WebhookDeliveryStatus.PENDING,
+          createdAt: {
+            lt: new Date(now - DELIVERY_RECONCILE_MIN_AGE_MS),
+            gt: new Date(now - DELIVERY_RECONCILE_MAX_AGE_MS),
+          },
+          webhook: { deletedAt: null, disabled: false },
+        },
+        select: { id: true, organizationId: true },
+      });
+
+      await inBatches(deliveries, async (delivery) => {
+        try {
+          await client.workflow.start(WEBHOOK_DELIVERY_WORKFLOW, {
+            workflowId: webhookDeliveryWorkflowId(delivery.id),
+            taskQueue: SCHEDULING_TASK_QUEUE,
+            args: [{ deliveryId: delivery.id, organizationId: delivery.organizationId }],
+          });
+        } catch (error) {
+          if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+            failures += 1;
+          }
+        }
+      });
+
       return {
         queuedPosts: roots.length,
         refreshableChannels: channels.length,
         analyticsChannels: analyticsChannels.length,
+        webhookDeliveries: deliveries.length,
         failures,
       };
     },

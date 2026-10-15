@@ -1,3 +1,5 @@
+import { withSentryConfig } from '@sentry/nextjs';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // packages/ui and packages/social-core ship raw TypeScript source (no build
@@ -10,4 +12,16 @@ const nextConfig = {
   // - Environment variable exposure
 };
 
-export default nextConfig;
+/**
+ * Sentry's build wrapper (Sprint 8) instruments the server and client
+ * bundles so `instrumentation.ts` / `instrumentation-client.ts` can report.
+ * Source maps are not uploaded: that needs an org, a project and an auth
+ * token, none of which exist on the free local setup, and a build must not
+ * fail or warn for their absence. Add `org`, `project` and `SENTRY_AUTH_TOKEN`
+ * here when a release pipeline exists.
+ */
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  sourcemaps: { disable: true },
+  telemetry: false,
+});

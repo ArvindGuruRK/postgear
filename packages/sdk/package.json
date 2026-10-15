@@ -1,0 +1,25 @@
+{
+  "name": "@postgear/sdk",
+  "version": "0.1.0",
+  "description": "Node.js client for the PostGear public API (/v1) and a verifier for PostGear webhook signatures.",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome lint ./src",
+    "lint:fix": "biome check --write ./src",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

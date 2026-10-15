@@ -12,6 +12,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { DevelopersModule } from './modules/developers/developers.module';
+import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
 import { MediaModule } from './modules/media/media.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -73,6 +74,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     NotificationsModule,
     DevelopersModule,
     WebhooksModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -6,3 +6,4 @@
 export * from './client';
 export * from './crypto';
 export * from './types';
+export * from './webhook-signature';

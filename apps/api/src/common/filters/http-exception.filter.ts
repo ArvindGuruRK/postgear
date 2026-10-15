@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AUTH_MESSAGES } from '../../modules/auth/auth.messages';
+import { reportUnexpectedError } from '../sentry/sentry';
 
 /**
  * The single exit point for every error response.
@@ -33,7 +34,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
-    const request = host.switchToHttp().getRequest<{ method: string; url: string }>();
+    const request = host.switchToHttp().getRequest<{
+      method: string;
+      url: string;
+      user?: { id: string };
+      activeOrg?: { id: string };
+    }>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string = AUTH_MESSAGES.UNEXPECTED;
@@ -44,11 +50,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else {
       // Anything not deliberately thrown as an HttpException is a bug or a
       // driver-level failure. The client gets the generic string; the stack
-      // goes to the log, which is the only place it belongs.
+      // goes to the log, which is the only place it belongs — and to Sentry
+      // when a DSN is configured (Sprint 8), which is where a bug in
+      // production is actually seen.
       this.logger.error(
         `Unhandled ${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+      reportUnexpectedError(exception, {
+        method: request.method,
+        url: request.url,
+        userId: request.user?.id,
+        orgId: request.activeOrg?.id,
+      });
     }
 
     response.status(status).json({ error: message, statusCode: status });

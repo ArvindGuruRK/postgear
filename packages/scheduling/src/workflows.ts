@@ -31,6 +31,9 @@ export const CANCEL_SIGNAL = 'cancel';
 /** Sprint 7: tells a waiting analytics workflow to pull metrics now rather than at its next slot. */
 export const SYNC_NOW_SIGNAL = 'syncNow';
 
+/** Sprint 8: delivers one outbound webhook event to one receiver, with backoff. */
+export const WEBHOOK_DELIVERY_WORKFLOW = 'webhookDeliveryWorkflow';
+
 export const MAINTENANCE_WORKFLOW_ID = 'maintenance';
 
 export function publishWorkflowId(postId: string): string {
@@ -45,6 +48,59 @@ export function tokenRefreshWorkflowId(integrationId: string): string {
 export function analyticsSyncWorkflowId(integrationId: string): string {
   return `analytics-sync:${integrationId}`;
 }
+
+/**
+ * Sprint 8: one workflow per `WebhookDelivery` row. The row is created first
+ * (in the same transaction as the outcome it reports), so a `start` with this
+ * id is idempotent against the row, and the maintenance reconcile can start
+ * any delivery whose workflow never got going.
+ */
+export function webhookDeliveryWorkflowId(deliveryId: string): string {
+  return `webhook-delivery:${deliveryId}`;
+}
+
+export interface WebhookDeliveryInput {
+  deliveryId: string;
+  organizationId: string;
+}
+
+/** The events an outbound webhook can subscribe to (plus the test send). */
+export const WEBHOOK_EVENTS = ['post.published', 'post.failed'] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+export type WebhookDeliveryEvent = WebhookEvent | 'webhook.test';
+
+/**
+ * How a delivery is retried: 30 s, 2 min, 8 min, 32 min, 2 h — six attempts
+ * over roughly three hours, which covers a receiver's deploy or an outage
+ * without hammering it. The values are data so the API can describe them on
+ * the webhooks page and the worker enforce them, from one place.
+ */
+export const WEBHOOK_DELIVERY_RETRY_POLICY = {
+  initialIntervalMs: 30_000,
+  backoffCoefficient: 4,
+  maximumIntervalMs: 2 * 60 * 60_000,
+  maximumAttempts: 6,
+} as const;
+
+/** How long one delivery request may take before it counts as a failed attempt. */
+export const WEBHOOK_DELIVERY_TIMEOUT_MS = 10_000;
+
+/**
+ * `ApplicationFailure.type` values the delivery activity throws. `rejected`
+ * is a receiver that answered 4xx (other than 408/429): the request is wrong
+ * for it and retrying would not change that. Everything else is retried.
+ */
+export const WEBHOOK_FAILURE_TYPES = {
+  retryable: 'WebhookRetryable',
+  rejected: 'WebhookRejected',
+  /** The webhook was deleted or disabled, or the row is gone — nothing to do. */
+  skipped: 'WebhookSkipped',
+} as const;
+
+export const NON_RETRYABLE_WEBHOOK_FAILURES: string[] = [
+  WEBHOOK_FAILURE_TYPES.rejected,
+  WEBHOOK_FAILURE_TYPES.skipped,
+];
 
 export interface PostPublishInput {
   /** The root row of one channel's chain. */

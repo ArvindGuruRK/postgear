@@ -62,6 +62,17 @@ const envSchema = z
         z.enum(['true', 'false']).optional(),
       )
       .optional(),
+
+    /**
+     * Let outbound webhooks target localhost and private addresses (Sprint 8).
+     * The delivery sender runs the same SSRF guard as the SEO crawler on every
+     * send, which refuses exactly the receiver a developer runs on their own
+     * machine; this is the switch for that case only. Refused in production.
+     */
+    WEBHOOK_ALLOW_PRIVATE_URLS: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.enum(['true', 'false']).default('false'),
+    ),
   })
   .transform((env) => ({
     ...env,
@@ -89,6 +100,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['ANALYTICS_SIMULATION'],
         message: 'ANALYTICS_SIMULATION cannot be enabled in production',
+      });
+    }
+
+    if (env.WEBHOOK_ALLOW_PRIVATE_URLS === 'true' && env.NODE_ENV === 'production') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['WEBHOOK_ALLOW_PRIVATE_URLS'],
+        message: 'WEBHOOK_ALLOW_PRIVATE_URLS cannot be enabled in production',
       });
     }
   });
