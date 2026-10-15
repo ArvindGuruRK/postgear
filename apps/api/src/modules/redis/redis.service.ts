@@ -123,6 +123,18 @@ export class RedisService implements CounterStore, OnModuleDestroy {
     );
   }
 
+  /**
+   * The underlying ioredis client, or null without `REDIS_URL`.
+   *
+   * For the one consumer that needs a real client rather than a counter: the
+   * throttler's Redis store (Sprint 8), which runs its own Lua script. It is
+   * wrapped in `ResilientThrottlerStorage`, so the fail-open rule above still
+   * holds for it.
+   */
+  get rawClient(): Redis | null {
+    return this.client;
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.client?.quit().catch(() => undefined);
   }

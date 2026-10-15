@@ -21,7 +21,13 @@ import { UPLOADS_ROUTE } from './modules/media/storage/local.storage';
 import { resolveUploadDirectory } from './modules/media/storage/storage.factory';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: false,
+    // Keeps the unparsed body on `request.rawBody` (Sprint 8): Stripe signs
+    // the exact bytes it sent, and a re-serialised JSON object would never
+    // verify. Every other route still reads the parsed body as before.
+    rawBody: true,
+  });
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 

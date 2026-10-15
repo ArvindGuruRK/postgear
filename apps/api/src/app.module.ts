@@ -5,6 +5,7 @@ import { validateEnv } from './config/env';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { ThrottlingModule } from './common/throttling/throttling.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -52,6 +53,9 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
       ignoreEnvFile: true,
     }),
     RedisModule,
+    // Sprint 8: the per-address rate limit on every route, and the throttler
+    // store the public API's per-key limit shares.
+    ThrottlingModule,
     MailModule,
     AuthModule,
     UsersModule,
