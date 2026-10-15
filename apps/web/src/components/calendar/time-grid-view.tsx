@@ -106,7 +106,7 @@ export function TimeGridView({
                   </span>
                   <span
                     className={cn(
-                      'font-display text-lg leading-none tracking-wide',
+                      'type-heading text-lg leading-none',
                       !today && 'text-ink',
                     )}
                   >

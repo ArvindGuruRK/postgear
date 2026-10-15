@@ -62,7 +62,7 @@ export function ChannelCard({
           </Avatar>
           {/* The platform, as a corner sticker on the account's own avatar. */}
           <span
-            className="absolute -bottom-1 -end-1 rounded-full border-2 border-outline bg-surface px-1.5 py-0.5 font-display text-[10px] uppercase leading-none"
+            className="absolute -bottom-1 -end-1 rounded-full border-2 border-outline bg-surface px-1.5 py-0.5 type-label text-[10px] leading-none"
             aria-hidden="true"
           >
             {channel.providerName.slice(0, 2)}

@@ -51,7 +51,7 @@ export function CalendarToolbar() {
               </Button>
             </div>
             <h2
-              className="font-display text-xl tracking-wide text-ink"
+              className="type-heading text-xl text-ink"
               aria-live="polite"
               data-testid="calendar-range"
             >

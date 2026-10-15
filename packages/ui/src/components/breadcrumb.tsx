@@ -45,7 +45,7 @@ export const BreadcrumbPage = forwardRef<HTMLSpanElement, React.ComponentPropsWi
     <span
       ref={ref}
       aria-current="page"
-      className={cn('font-display uppercase tracking-wide text-ink', className)}
+      className={cn('type-ui text-ink', className)}
       {...props}
     />
   ),

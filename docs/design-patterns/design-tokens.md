@@ -71,10 +71,15 @@ These represent each target platform's own identity in post previews, not PostGe
 
 ## 7. Typography
 
-| Token | Utility | Face |
+One family for the whole platform (Sora — locked 2026-10-15), loaded once in `apps/web/src/app/fonts.ts` as `--font-brand`. Every token and utility below is defined in `apps/web/src/app/globals.css` ("Typography") — that file and `fonts.ts` are the only places a font, weight or tracking value is chosen.
+
+| Token | Utility | Role |
 |---|---|---|
-| `--font-sans` | `font-sans` | Plus Jakarta Sans — body copy, data, and **every part of a form control**: label, value, placeholder, helper text, error message |
-| `--font-display` | `font-display` | Bangers — headings, buttons, tabs, badges, dialog/card/menu chrome |
+| `--font-sans` (→ `--font-brand`) | `font-sans` | The family itself; inherited everywhere, so rarely written out |
+| `--type-heading-weight`, `--type-heading-tracking` | `type-heading` | Page/card/dialog/sheet titles, wordmark, big numbers |
+| `--type-ui-weight`, `--type-ui-tracking` | `type-ui` | Buttons, tabs, nav, menu chrome, names, step markers — sentence case |
+| `--type-label-weight`, `--type-label-tracking` | `type-label` | Small uppercase eyebrows naming a section or group |
+| `--type-body-weight` | (on `body`) | Body copy, data, and **every part of a form control** |
 
 Both load through `next/font/google` in the root layout, which is what actually defines the custom properties; the theme entries just plug that runtime value into Tailwind.
 

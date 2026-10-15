@@ -31,7 +31,7 @@ Alert.displayName = 'Alert';
 
 export const AlertTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h5 ref={ref} className={cn('font-display text-sm uppercase tracking-wide', className)} {...props} />
+    <h5 ref={ref} className={cn('type-label text-sm', className)} {...props} />
   ),
 );
 AlertTitle.displayName = 'AlertTitle';

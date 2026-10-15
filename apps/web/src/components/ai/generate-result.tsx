@@ -156,7 +156,7 @@ export function GenerateResult({
 
       {state.sources && state.sources.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <h3 className="font-display text-sm uppercase tracking-wide text-ink">
+          <h3 className="type-label text-sm text-ink">
             Backed by research
           </h3>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -226,7 +226,7 @@ function PartCard({
     <li data-testid="ai-result-part" data-index={index + 1}>
       <Card className="flex flex-col gap-3 border-2 p-4 shadow-brutalSm">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-display text-sm uppercase tracking-wide text-ink">
+          <span className="type-label text-sm text-ink">
             {total > 1 ? `Part ${index + 1} of ${total}` : 'Post'}
           </span>
           <span

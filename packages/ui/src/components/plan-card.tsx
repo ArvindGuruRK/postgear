@@ -49,7 +49,7 @@ export function PlanCard({
           {badge && <Badge variant={highlighted ? 'primary' : 'outline'}>{badge}</Badge>}
         </div>
         <div className="flex items-baseline gap-1">
-          <span className="font-display text-4xl tracking-wide text-ink">{price}</span>
+          <span className="type-heading text-4xl text-ink">{price}</span>
           <span className="font-sans text-sm text-ink opacity-60">{period}</span>
         </div>
         {description && (

@@ -1,21 +1,8 @@
 import { Toaster } from '@postgear/ui';
 import type { Metadata, Viewport } from 'next';
-import { Bangers, Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
+import { brandFont } from './fonts';
 import './globals.css';
-
-const bangers = Bangers({
-  subsets: ['latin'],
-  weight: '400',
-  variable: '--font-display',
-  display: 'swap',
-});
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   // `template` lets each route set a short `title` ("Sign in") and get
@@ -48,7 +35,7 @@ const NO_FLASH_THEME_SCRIPT = `(function(){try{var t=window.localStorage.getItem
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${bangers.variable} ${plusJakartaSans.variable}`}>
+    <html lang="en" className={brandFont.variable}>
       <body suppressHydrationWarning>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static no-flash theme script, no user input */}
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }} />

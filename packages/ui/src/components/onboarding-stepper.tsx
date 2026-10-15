@@ -25,7 +25,7 @@ export function OnboardingStepper({ className, steps, currentStep, ...props }: O
             <div
               aria-current={isActive ? 'step' : undefined}
               className={cn(
-                'relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-outline font-display text-sm',
+                'relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-outline type-ui text-sm',
                 isComplete || isActive
                   ? 'bg-actionPrimary text-onActionPrimary'
                   : 'bg-secondary text-ink/60',
@@ -42,7 +42,7 @@ export function OnboardingStepper({ className, steps, currentStep, ...props }: O
               />
             )}
             <div className="flex flex-col items-center text-center">
-              <span className="font-display text-xs uppercase tracking-wide text-ink">{step.label}</span>
+              <span className="type-label text-xs text-ink">{step.label}</span>
               {step.description && <span className="font-sans text-xs font-medium text-ink opacity-60">{step.description}</span>}
             </div>
           </li>

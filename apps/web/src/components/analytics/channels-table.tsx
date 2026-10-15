@@ -202,7 +202,7 @@ export function ChannelsTable({
       </TooltipProvider>
 
       <section aria-label="Engagement rate by channel" className="flex flex-col gap-3">
-        <h3 className="m-0 font-display text-sm uppercase tracking-wide text-ink opacity-70">
+        <h3 className="m-0 type-label text-sm text-ink opacity-70">
           Engagement rate by channel
         </h3>
         <BarList items={bars} emptyMessage="No channel has impressions in this range yet." />

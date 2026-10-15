@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
  * Restrained per design-system-rules.md §15 — a score is data. The arc has
  * hard ends (`butt` caps) and a thick stroke in the system's flat action
  * colours; the track is the outline at low opacity so it reads in both
- * themes; the number is `font-display` because it is the one thing on the
+ * themes; the number is `type-heading` because it is the one thing on the
  * screen meant to be read from across the room. No gradient, no glow.
  *
  * Tone follows the grade bands the analyzer uses (A/B good, C fair, D poor,
@@ -132,7 +132,7 @@ export const ScoreGauge = forwardRef<HTMLDivElement, ScoreGaugeProps>(
           ) : null}
         </svg>
         <div className="relative flex flex-col items-center leading-none">
-          <span className={cn('font-display tracking-wide text-ink', sizes.value)}>
+          <span className={cn('type-heading text-ink', sizes.value)}>
             {score === null ? '–' : score}
           </span>
           {grade ? (

@@ -71,7 +71,7 @@ function Tile({
       <div
         className={cn(
           'flex items-center justify-center overflow-hidden rounded-md border-2 border-outline shadow-brutalSm',
-          'font-display tabular-nums leading-none tracking-wide',
+          'type-heading tabular-nums leading-none',
           SIZE[size].tile,
           emphasised ? 'bg-actionDanger text-onActionLight' : 'bg-plate text-onPlate',
         )}
@@ -90,7 +90,7 @@ function Tile({
       {showLabel && (
         <span
           className={cn(
-            'font-display uppercase tracking-wide text-ink opacity-70',
+            'type-label text-ink opacity-70',
             SIZE[size].label,
           )}
         >

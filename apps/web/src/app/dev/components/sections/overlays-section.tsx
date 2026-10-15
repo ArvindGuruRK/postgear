@@ -121,7 +121,7 @@ export function OverlaysSection() {
             <Button variant="secondary">Quick edit</Button>
           </PopoverTrigger>
           <PopoverContent>
-            <p className="font-display text-sm uppercase tracking-wide text-ink">Post title</p>
+            <p className="type-label text-sm text-ink">Post title</p>
             <p className="mt-1 font-sans text-sm text-ink opacity-70">
               Edit the caption without leaving this view.
             </p>
@@ -149,7 +149,7 @@ export function OverlaysSection() {
             </span>
           </HoverCardTrigger>
           <HoverCardContent>
-            <p className="font-display text-sm uppercase tracking-wide text-ink">Jordan Miles</p>
+            <p className="type-label text-sm text-ink">Jordan Miles</p>
             <p className="mt-1 font-sans text-sm text-ink opacity-70">
               Content lead — connected 4 channels, 128 posts scheduled this quarter.
             </p>

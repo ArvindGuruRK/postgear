@@ -31,7 +31,7 @@ export const AccordionTrigger = forwardRef<
       ref={ref}
       className={cn(
         'flex flex-1 items-center justify-between gap-2 px-4 py-3 text-left',
-        'font-display text-sm uppercase tracking-wide text-ink outline-none',
+        'type-ui text-sm text-ink outline-none',
         'bg-secondary transition-colors duration-150 hover:bg-primary',
         'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         // The divider belongs to the header, not the sliding panel, so the

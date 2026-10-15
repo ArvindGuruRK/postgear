@@ -26,7 +26,7 @@ export function ChoiceGroup({
 }) {
   return (
     <fieldset>
-      <legend className="mb-3 font-display text-lg text-ink">{question.prompt}</legend>
+      <legend className="mb-3 type-heading text-lg text-ink">{question.prompt}</legend>
 
       <Stack gap="sm">
         {question.options.map((option) => {
@@ -101,7 +101,7 @@ export function MultiChoiceGroup({
 }) {
   return (
     <fieldset>
-      <legend className="mb-3 font-display text-lg text-ink">{prompt}</legend>
+      <legend className="mb-3 type-heading text-lg text-ink">{prompt}</legend>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {options.map((option) => {

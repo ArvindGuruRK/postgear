@@ -43,7 +43,7 @@ export function AuditProgress({ state, onRetry }: { state: SeoState; onRetry: ()
       aria-busy={state.phase === 'running'}
       className="flex flex-col gap-4 rounded-md border-2 border-outline bg-secondary p-4"
     >
-      <h2 className="font-display text-sm uppercase tracking-wide text-ink" aria-live="polite">
+      <h2 className="type-label text-sm text-ink" aria-live="polite">
         {heading}
       </h2>
 

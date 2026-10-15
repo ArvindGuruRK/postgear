@@ -29,7 +29,7 @@ TimelineItem.displayName = 'TimelineItem';
 
 export const TimelineTitle = forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('font-display text-sm uppercase tracking-wide text-ink', className)} {...props} />
+    <p ref={ref} className={cn('type-label text-sm text-ink', className)} {...props} />
   ),
 );
 TimelineTitle.displayName = 'TimelineTitle';

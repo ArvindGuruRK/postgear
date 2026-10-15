@@ -13,7 +13,7 @@ export function Section({
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="font-display text-3xl tracking-wide text-ink">{title}</h2>
+        <h2 className="type-heading text-3xl text-ink">{title}</h2>
         <p className="mt-1 max-w-2xl font-sans text-sm text-ink opacity-70">{description}</p>
       </div>
       <Card>
@@ -33,12 +33,12 @@ export function Row({ label, children }: { label: string; children: ReactNode })
 }
 
 export function SubHeading({ children }: { children: ReactNode }) {
-  return <h3 className="font-display text-lg tracking-wide text-ink">{children}</h3>;
+  return <h3 className="type-heading text-lg text-ink">{children}</h3>;
 }
 
 /**
  * Dev-only annotation: prints the exact Tailwind utility classes (and, by
- * extension, the design tokens they resolve to — --font-display/--font-sans,
+ * extension, the design tokens they resolve to — type-heading/--font-sans,
  * --color-ink, etc.) backing the specimen it sits under. Lets the one
  * developer on this project point at any sample in /dev and know which
  * class to reach for.

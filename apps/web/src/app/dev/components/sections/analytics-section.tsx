@@ -51,7 +51,7 @@ export function AnalyticsSection() {
         <ScoreGauge value={null} label="Pending" size="sm" />
         <Spec>
           role=meter · 240° arc, butt caps · stroke-actionSuccess ≥80 / actionSecondary ≥70 /
-          actionAccent ≥60 / actionDanger · number font-display
+          actionAccent ≥60 / actionDanger · number type-heading
         </Spec>
       </Row>
 

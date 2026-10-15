@@ -256,7 +256,7 @@ export function QueueView({
         <div className="flex flex-col gap-6" aria-busy={queue.loading}>
           {days.map((day) => (
             <section key={day.label} aria-label={day.label} className="flex flex-col gap-2">
-              <h2 className="font-display text-sm uppercase tracking-wide text-ink opacity-70">
+              <h2 className="type-label text-sm text-ink opacity-70">
                 {day.label}
               </h2>
               <ul className="m-0 flex list-none flex-col gap-2 p-0">

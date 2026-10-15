@@ -11,7 +11,7 @@ export default function NotFound() {
         <CardContent>
           <Stack gap="lg" align="center" className="py-10 text-center">
             <Stack gap="xs" align="center">
-              <span className="font-display text-8xl leading-none tracking-wide text-actionPrimary">
+              <span className="type-heading text-8xl leading-none text-actionPrimary">
                 404
               </span>
               <Heading as="h1" level="h2">

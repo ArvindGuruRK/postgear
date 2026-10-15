@@ -94,7 +94,7 @@ export const Progress = forwardRef<React.ElementRef<typeof ProgressPrimitive.Roo
           <span
             className={cn(
               'pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center',
-              'font-display uppercase tracking-wide',
+              'type-label',
               'transition-[width] duration-500 ease-out motion-reduce:transition-none',
               SIZE[size].label,
               labelInside ? TONE[tone].on : 'text-ink',

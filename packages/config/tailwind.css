@@ -129,14 +129,8 @@
   --color-youtubeBgAction: var(--youtube-action-color);
   --color-youtubeSvg: var(--youtube-svg-border);
 
-  /* Typography — both faces load via `next/font/google` in
-     apps/web/src/app/layout.tsx, each exposing its real custom property
-     (name + fallback stack) through its `variable` option; these lines just
-     plug that runtime value into Tailwind's theme so `font-sans`/
-     `font-display` become usable utility classes — not circular references.
-     Body/data copy: Plus Jakarta Sans. Headings/buttons: Bangers. */
-  --font-sans: var(--font-sans);
-  --font-display: var(--font-display);
+  /* Typography lives in apps/web/src/app/globals.css ("Typography"): one
+     font family plus the role tokens and `type-*` utilities built on it. */
 
   /* Animations — each name here needs a matching @keyframes below. */
   --animate-fadeIn: normalFadeIn 0.2s ease-in-out forwards;

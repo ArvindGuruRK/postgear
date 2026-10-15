@@ -8,7 +8,7 @@
  * row carries — "Create similar", which hands the post's text to the AI
  * studio as a topic, and the platform permalink — sit beside the button,
  * not inside it, because a link inside a button is reachable by neither
- * keyboard nor screen reader. The rank is `font-display` (it is chrome: a
+ * keyboard nor screen reader. The rank is `type-heading` (it is chrome: a
  * big number meant to be read from across the room); everything else in
  * the row is data and stays in the body face (§15).
  */
@@ -77,7 +77,7 @@ export function TopPosts({
                   )}
                 >
                   <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary font-display text-lg text-ink"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary type-heading text-lg text-ink"
                     aria-hidden="true"
                   >
                     {post.rank}

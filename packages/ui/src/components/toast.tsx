@@ -69,7 +69,7 @@ export const ToastTitle = forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Title
     ref={ref}
-    className={cn('font-display text-base tracking-wide', className)}
+    className={cn('type-heading text-base', className)}
     {...props}
   />
 ));
@@ -91,7 +91,7 @@ export const ToastAction = forwardRef<
     ref={ref}
     className={cn(
       'shrink-0 rounded-md border-2 border-outline bg-secondary px-3 py-1.5 shadow-brutalSm',
-      'font-display text-xs uppercase tracking-wide text-ink transition-[transform,box-shadow] duration-100',
+      'type-ui text-xs text-ink transition-[transform,box-shadow] duration-100',
       'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
       'active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutalPressed',
       'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',

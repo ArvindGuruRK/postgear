@@ -11,7 +11,7 @@ import { cn } from '../lib/utils';
 export const buttonVariants = cva(
   [
     'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap',
-    'rounded-md border-2 border-outline font-display uppercase tracking-wide',
+    'rounded-md border-2 border-outline type-ui',
     'shadow-brutalMd transition-[transform,box-shadow] duration-100',
     'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
     'active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutalPressed',

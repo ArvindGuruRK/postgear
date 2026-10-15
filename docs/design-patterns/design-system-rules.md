@@ -4,14 +4,20 @@ Companion to [`design-tokens.md`](design-tokens.md) (the raw token catalog) and 
 
 ## 1. Typography hierarchy
 
-Two font families, both loaded via `next/font/google` in `apps/web/src/app/layout.tsx` and exposed as `font-sans` / `font-display`:
+**One font family for the whole platform** (single-typeface system, 2026-10-15: **Sora**, replacing the earlier Bangers + Plus Jakarta Sans pair). It is loaded once in `apps/web/src/app/fonts.ts` (a Next.js font definitions file, imported by `layout.tsx` and `global-error.tsx`) and exposed as `--font-brand` → `font-sans`. The hierarchy comes from weight, size and case — not from a second face.
 
-- `font-display` (Bangers) — headings, buttons, dialog/card/menu chrome, anything meant to feel bold/comic. Used via `<Heading>`/`<Text>` (`typography.tsx`) or directly on custom chrome.
-- `font-sans` (Plus Jakarta Sans) — body copy, **every part of a form control (see the form-control rule below)**, and **table/data content — including table column headers**. Dense data surfaces (Table, DataTable) are a deliberate exception to the "chrome uses font-display" rule below: the comic display font never appears inside a data grid, only on the chrome around it (Toolbar, PageHeader), per the sprint doc's "restrained treatment" rule for dense surfaces (§15).
+Components never choose a weight or tracking for their chrome; they choose a **role** utility, defined with its tokens in `apps/web/src/app/globals.css` ("Typography"):
 
-`Heading` levels (`level` prop, `as` prop to decouple visual size from semantic tag): `h1` `text-5xl md:text-6xl`, `h2` `text-3xl md:text-4xl` (default), `h3` `text-2xl md:text-3xl`, `h4` `text-lg md:text-xl`. None of these are uppercase by default — compare to Label, which *is* uppercase; headings read the copy as written, chrome shouts.
+- `type-heading` — page/card/dialog/sheet titles, the wordmark, big numbers (stat values, scores, prices, ranks). Heaviest weight, slightly negative tracking, balanced wrapping. Used via `<Heading>` (`typography.tsx`) or directly on custom chrome.
+- `type-ui` — things you act on or scan: Button, Tabs, NavigationMenu, Breadcrumb, Accordion trigger, toast action, sidebar nav, names, avatar initials, step markers. Firm weight, **sentence case**.
+- `type-label` — small uppercase eyebrows that name a section or a group: section headings like "Breakdown", menu group labels, StatCard labels, step labels. Uppercase with positive tracking.
+- Body text — plain inherited text at `--type-body-weight`: body copy, **every part of a form control (see the form-control rule below)**, and **table/data content — including table column headers** (§15's restrained profile; the role utilities never appear inside a data grid, only on the chrome around it).
 
-`Text` sizes: `xs` `sm` `md` (default) `lg`, with `weight` (`normal`/`medium`/`bold`) and `muted` (opacity-70) as independent axes. **Default `weight` is `medium`** (added 2026-08-30) — plain `font-normal` (400) read as thin next to the system's bold labels/chrome (Badge, table headers, Row-style labels) and thick borders/shadows; `font-medium` (500) is a real weight of the loaded Plus Jakarta Sans variable font, not synthetic. This cascades to every dedicated `*Description`/helper-text component too (`CardDescription`, `AlertDescription`, `DialogDescription`, `AlertDialogDescription`, `SheetDescription`, `FormHelperText`, `FileUpload`'s helper text, `StateDisplay`'s description, `PlanCard`'s description, `NotificationCenter`'s item description, `OnboardingStepper`'s step description, `TimelineDescription`) — all bumped to `font-medium` alongside `Text`'s default. Deliberately **not** applied to `TimelineTimestamp`, notification timestamps, or any dense/tabular/interactive-control text (Table/DataTable cells, Select/Combobox/DropdownMenu/ContextMenu item text, Calendar day cells, Tooltip) — those stay at `font-normal` per the restrained-density rule in §15; this is a prose-body-copy change, not a system-wide weight bump.
+Trialling a different font means swapping the loader in `fonts.ts` and retuning the `--type-*` tokens in `globals.css` — no component changes. Never write `font-semibold tracking-tight` (or similar) by hand to make something look like a heading; use the role.
+
+`Heading` levels (`level` prop, `as` prop to decouple visual size from semantic tag): `h1` `text-5xl md:text-6xl`, `h2` `text-3xl md:text-4xl` (default), `h3` `text-2xl md:text-3xl`, `h4` `text-lg md:text-xl`. None of these are uppercase — headings read the copy as written.
+
+`Text` sizes: `xs` `sm` `md` (default) `lg`, with `weight` (`normal`/`medium`/`bold`) and `muted` (opacity-70) as independent axes. **Default `weight` is `medium`** (added 2026-08-30) — plain `font-normal` (400) read as thin next to the system's bold labels/chrome (Badge, table headers, Row-style labels) and thick borders/shadows; `font-medium` (500) is a real weight of the variable brand font, not synthetic. This cascades to every dedicated `*Description`/helper-text component too (`CardDescription`, `AlertDescription`, `DialogDescription`, `AlertDialogDescription`, `SheetDescription`, `FormHelperText`, `FileUpload`'s helper text, `StateDisplay`'s description, `PlanCard`'s description, `NotificationCenter`'s item description, `OnboardingStepper`'s step description, `TimelineDescription`) — all bumped to `font-medium` alongside `Text`'s default. Deliberately **not** applied to `TimelineTimestamp`, notification timestamps, or any dense/tabular/interactive-control text (Table/DataTable cells, Select/Combobox/DropdownMenu/ContextMenu item text, Calendar day cells, Tooltip) — those stay at `font-normal` per the restrained-density rule in §15; this is a prose-body-copy change, not a system-wide weight bump.
 
 **Form controls use `font-sans` end to end** (product decision, 2026-09-02 — this section previously said the opposite and listed Label/FormLabel among the `font-display` roles). A form control is read while typing, so its label, its value, its placeholder, its helper text and its error message are all the body face. `Label`/`FormLabel` is:
 
@@ -19,16 +25,16 @@ Two font families, both loaded via `next/font/google` in `apps/web/src/app/layou
 font-sans text-sm font-bold text-ink
 ```
 
-Sentence case — **not** `uppercase`, **not** `tracking-wide`. Shouting is for chrome you *act on* (Button, Tabs, Badge, NavigationMenu); a label names the box you type in and shouldn't compete with it. `font-bold` (700) is a real weight of the Plus Jakarta Sans variable font and carries the presence Bangers' single heavy weight used to.
+Sentence case — **not** `uppercase`, **not** `tracking-wide`, and no `type-*` role. A label names the box you type in and shouldn't compete with it. `font-bold` resolves through the theme's `--font-weight-bold`, a real weight of the variable brand font.
 
 This is the same treatment as the specimen captions in the `/dev/components` playground (`Row` in `shared.tsx`) — deliberately identical, so what the playground shows is what a form ships. **Check the playground before styling a form control**; if a new control needs its own label markup instead of rendering `<Label>` (as `FileUpload` does, because its label sits inside a `<button>`), copy these exact classes and say why in a comment.
 
-The boundary: menu group headings (`DropdownMenuLabel`, `SelectLabel`, `CommandMenu` group headings) stay `font-display`. They're menu chrome that happens to live near a form control, not labels for one — they name a *group of options*, not an input.
+The boundary: menu group headings (`DropdownMenuLabel`, `SelectLabel`, `CommandMenu` group headings) use `type-label`. They're menu chrome that happens to live near a form control, not labels for one — they name a *group of options*, not an input.
 
 **Rules that keep drifting, watch for all three when adding a component:**
-1. "Header/title" roles (Card/Dialog/AlertDialog/Sheet title, Alert title, Dropdown/Select/ContextMenu/Command group label, Timeline/StatCard/notification headings, etc.) must explicitly set `font-display` — it is never inherited for free, and a few of these (DropdownMenuLabel, SelectLabel) shipped without it and silently rendered in `font-sans` until caught. **Form-control labels are not in this list** — see the form-control rule above.
-2. **`Badge` is the one deliberate exception**: `text-xs font-bold uppercase` in `font-sans`, not `font-display` — this was tried both ways and `font-sans` is the confirmed, intentional choice, not an oversight. Don't "fix" it to `font-display` again.
-3. Never combine `font-display` with `font-bold`. Bangers loads a single weight; asking the browser for a heavier one triggers synthetic/faux-bold, which can render distinctly enough from the rest of the system's `font-display` text that it reads as a *different typeface* at a glance, not just a different weight (this is what was actually wrong with `Label` at one point, not a missing font-family). `font-sans` elements (Badge, Table headers) don't have this problem — Plus Jakarta Sans ships real weights, so `font-bold` there is safe and expected.
+1. "Header/title" roles (Card/Dialog/AlertDialog/Sheet title, Alert title, Dropdown/Select/ContextMenu/Command group label, Timeline/StatCard/notification headings, etc.) must explicitly set their role (`type-heading` or `type-label`) — it is never inherited for free, and a few of these (DropdownMenuLabel, SelectLabel) once shipped without one and silently rendered as body text until caught. **Form-control labels are not in this list** — see the form-control rule above.
+2. **`Badge` is the one deliberate exception**: `text-xs font-bold uppercase` as plain body text, not a role — this was tried both ways and is the confirmed, intentional choice, not an oversight.
+3. Don't stack raw weight/tracking/case utilities on top of a role (`type-heading font-bold`, `type-label tracking-wide`). If a role looks wrong, retune its token in `globals.css` so every instance moves together; if something genuinely needs a different treatment, it is a new role, added there.
 
 ## 2. Spacing scale
 
@@ -181,7 +187,7 @@ the two pages are the first place several rules meet at once; what was decided:
   action color), not a filled card. A grid of filled cards is noise; an edge
   reads at a glance and keeps the text on `bg-secondary` legible in both themes.
 - **The grid has no brutal shadow; its cards have `shadow-brutalSm`.** The chrome
-  around it — toolbar, view switcher, range heading in `font-display` — carries
+  around it — toolbar, view switcher, range heading in `type-heading` — carries
   the full treatment. Slot cells are `border-2 border-outline`; past slots get
   `bg-halftone`, the texture already in the system, rather than a new gray.
 - **Drop target** is `bg-actionPrimary/15` plus a dashed `outline-actionPrimary`:
@@ -243,7 +249,7 @@ surfaces it has; what was decided:
   blur, no eased curve. A line is a 3 px miter-joined stroke; its area is
   the same colour at 15 %; a reading cursor is a bordered square. Axis and
   tooltip text is `font-sans`; only the headline number of a gauge or a
-  stat card is `font-display`. This is §15's restrained profile applied to
+  stat card is `type-heading`. This is §15's restrained profile applied to
   a plot: the chrome around the chart (the card, the range tabs, the
   toolbar) carries the treatment, the plot does not.
 - **Score tones are one scale.** `toneForScore()` bands a 0–100 reading as

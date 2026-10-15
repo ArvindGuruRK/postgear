@@ -11,6 +11,62 @@
    comment for the full explanation of the v3→v4 conversion. */
 @import '../../../../packages/config/tailwind.css';
 
+/* ── Typography (single source of truth) ─────────────────────────────────
+   ONE family for the whole platform, loaded in src/app/fonts.ts and exposed
+   as --font-brand. Components never pick a weight or tracking for their
+   chrome; they pick a ROLE:
+
+     type-heading  page/card/dialog/sheet titles, wordmark, big numbers
+     type-ui       things you act on or scan: buttons, tabs, nav, menu
+                   chrome, names, step markers
+     type-label    small uppercase eyebrows that name a section or group
+
+   Body copy is plain inherited text at --type-body-weight. Trialling a
+   different font = swap the loader in fonts.ts and retune the tokens below;
+   nothing else in the codebase changes.
+
+   (Plain `font-medium`/`font-bold` on body text still exist — in Tailwind v4
+   those resolve through the theme's --font-weight-* scale, not fixed
+   numbers, so they follow this file too.) */
+@theme {
+  --font-sans: var(--font-brand), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  /* Sora: geometric, wide set, tall x-height, variable 100–800. Wide
+     geometric faces look loose at display sizes, so headings take the
+     tightest tracking of any face trialled and stay at bold (700) — Sora's
+     strokes are already heavy, 800 fills the round counters (o, e, a).
+     Controls tighten slightly for the same reason; the caps are wide on
+     their own, so eyebrows need less extra tracking than a grotesk. The
+     2–4px borders and hard shadows carry the brutalist weight. */
+  --type-heading-weight: 700;
+  --type-heading-tracking: -0.03em;
+  --type-ui-weight: 600;
+  --type-ui-tracking: -0.01em;
+  --type-label-weight: 600;
+  --type-label-tracking: 0.04em;
+  --type-body-weight: 400;
+}
+
+@utility type-heading {
+  font-weight: var(--type-heading-weight);
+  letter-spacing: var(--type-heading-tracking);
+  text-wrap: balance;
+}
+
+@utility type-ui {
+  font-weight: var(--type-ui-weight);
+  letter-spacing: var(--type-ui-tracking);
+}
+
+/* Caps need positive tracking to stay legible at 10–14px. */
+@utility type-label {
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
 /* ── App scrollbar (single source of truth) ──────────────────────────────
    NOT built on the `tailwind-scrollbar` plugin's scrollbar-thumb- and
    scrollbar-track- color utilities, even though that plugin was still
@@ -96,6 +152,7 @@
   body {
     background-color: var(--color-primary);
     color: var(--color-ink);
+    font-weight: var(--type-body-weight);
   }
 
   /* Scoped to the app shell, NOT applied globally (2026-09-02): the shell

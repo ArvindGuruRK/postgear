@@ -32,7 +32,9 @@ function NavTile({
         'hover:border-outline hover:bg-primary',
         'active:translate-x-[1px] active:translate-y-[1px]',
         'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-        collapsed ? 'w-16 flex-col gap-1 px-2 py-1.5' : 'w-full gap-3 px-3 py-2.5',
+        // Collapsed tile keeps its 64px footprint but only a hair of side
+        // padding, so labels get the full width instead of clipping.
+        collapsed ? 'w-16 flex-col gap-1 px-0.5 py-1.5' : 'w-full gap-3 px-3 py-2.5',
         active &&
           'border-outline bg-actionPrimary shadow-brutalSm hover:bg-actionPrimary active:shadow-brutalPressed',
       )}
@@ -48,8 +50,8 @@ function NavTile({
       <span
         className={cn(
           collapsed
-            ? 'line-clamp-2 w-full text-center font-display text-[10px] leading-[1.15] uppercase tracking-wide'
-            : 'truncate pr-0.5 font-display text-sm uppercase leading-[1.15] tracking-wide',
+            ? 'line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.2]'
+            : 'truncate pr-0.5 type-ui text-sm leading-[1.15]',
           active ? 'text-onActionPrimary' : 'text-ink',
         )}
       >
@@ -128,7 +130,7 @@ export function Sidebar({
             className={cn(toggleClasses, 'h-11 w-11 bg-actionPrimary shadow-brutalSm')}
           >
             {/* Monogram swaps to the expand affordance on hover/focus. */}
-            <span className="font-display text-xl text-onActionPrimary group-hover:hidden group-focus-visible:hidden">
+            <span className="type-heading text-xl text-onActionPrimary group-hover:hidden group-focus-visible:hidden">
               {brand}
             </span>
             <PanelLeftOpen
@@ -138,7 +140,7 @@ export function Sidebar({
           </button>
         ) : (
           <>
-            <span className="min-w-0 whitespace-nowrap pr-1 font-display text-2xl leading-none tracking-wide text-ink">
+            <span className="min-w-0 whitespace-nowrap pr-1 type-heading text-2xl leading-none text-ink">
               {brandLabel}
             </span>
             <button

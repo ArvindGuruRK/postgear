@@ -37,7 +37,7 @@ export function BulkActionBar({
       >
         <X className="h-3.5 w-3.5" strokeWidth={3} />
       </button>
-      <span className="font-display text-sm uppercase tracking-wide text-ink">
+      <span className="type-label text-sm text-ink">
         {count} selected
       </span>
       {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}

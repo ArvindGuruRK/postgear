@@ -16,7 +16,7 @@ export const AvatarGroup = forwardRef<HTMLDivElement, AvatarGroupProps>(
       <div ref={ref} className={cn('flex items-center -space-x-3', className)} {...props}>
         {visible}
         {overflow > 0 && (
-          <div className="z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 border-outline bg-secondary font-display text-xs text-ink">
+          <div className="z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 border-outline bg-secondary type-ui text-xs text-ink">
             +{overflow}
           </div>
         )}

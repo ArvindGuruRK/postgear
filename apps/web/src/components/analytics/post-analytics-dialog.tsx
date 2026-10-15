@@ -207,7 +207,7 @@ function ChannelMetrics({ channel, now }: { channel: PostChannelAnalytics; now: 
                 <dt className="font-sans text-[10px] font-bold uppercase tracking-wide text-ink opacity-60">
                   {POST_METRIC_LABELS[key]}
                 </dt>
-                <dd className="m-0 font-display text-xl tracking-wide text-ink tabular-nums">
+                <dd className="m-0 type-heading text-xl text-ink tabular-nums">
                   {formatMetric(metrics[key])}
                 </dd>
                 {average !== null ? (

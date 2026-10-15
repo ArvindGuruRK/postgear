@@ -81,7 +81,7 @@ test('the focus ring uses the darkened light-mode colour', async ({ page }) => {
 
 test('form labels use the body face, not the display face', async ({ page }) => {
   // Regression guard for a mistake made twice: form-control labels rendered in
-  // Bangers (font-display), then in Plus Jakarta but uppercase with wide
+  // Bangers (font-display), then in the body face but uppercase with wide
   // tracking — neither matching the specimen the playground has always shown.
   // design-system-rules.md §1 is the rule; this is the enforcement.
   await page.goto('/register');
@@ -89,10 +89,17 @@ test('form labels use the body face, not the display face', async ({ page }) => 
   for (const field of ['name', 'email', 'password']) {
     const style = await page.locator(`label[for="${field}"]`).evaluate((el) => {
       const s = getComputedStyle(el);
-      return { family: s.fontFamily, weight: s.fontWeight, transform: s.textTransform };
+      return {
+        family: s.fontFamily,
+        bodyFamily: getComputedStyle(document.body).fontFamily,
+        weight: s.fontWeight,
+        transform: s.textTransform,
+      };
     });
 
-    expect(style.family).toContain('Plus Jakarta Sans');
+    // Compared against <body> rather than a font name: the platform uses one
+    // family (src/app/fonts.ts), so a label must simply never diverge from it.
+    expect(style.family).toBe(style.bodyFamily);
     expect(style.weight).toBe('700');
     expect(style.transform).toBe('none');
   }

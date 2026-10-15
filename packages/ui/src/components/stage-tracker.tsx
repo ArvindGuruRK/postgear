@@ -117,7 +117,7 @@ export const StageTracker = forwardRef<HTMLOListElement, StageTrackerProps>(
                 <span className={cn(connector, !isFirst && 'bg-outline')} />
                 <span
                   className={cn(
-                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-outline font-display text-sm',
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-outline type-ui text-sm',
                     BADGE[stage.status],
                   )}
                 >
@@ -126,7 +126,7 @@ export const StageTracker = forwardRef<HTMLOListElement, StageTrackerProps>(
                 <span className={cn(connector, !isLast && 'bg-outline')} />
               </div>
               <div className={cn('flex min-w-0 flex-col justify-center py-3', row && 'sm:py-0')}>
-                <span className="font-display text-xs uppercase tracking-wide text-ink">
+                <span className="type-label text-xs text-ink">
                   {stage.label}
                   <span className="sr-only">, {STATUS_TEXT[stage.status]}</span>
                 </span>

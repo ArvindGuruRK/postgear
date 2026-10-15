@@ -11,19 +11,19 @@ export function FoundationsSection() {
         <div className="flex flex-col gap-3">
           <div>
             <Heading level="h1">Heading H1</Heading>
-            <Spec>font-display tracking-wide text-5xl md:text-6xl</Spec>
+            <Spec>type-heading text-5xl md:text-6xl</Spec>
           </div>
           <div>
             <Heading level="h2">Heading H2</Heading>
-            <Spec>font-display tracking-wide text-3xl md:text-4xl</Spec>
+            <Spec>type-heading text-3xl md:text-4xl</Spec>
           </div>
           <div>
             <Heading level="h3">Heading H3</Heading>
-            <Spec>font-display tracking-wide text-2xl md:text-3xl</Spec>
+            <Spec>type-heading text-2xl md:text-3xl</Spec>
           </div>
           <div>
             <Heading level="h4">Heading H4</Heading>
-            <Spec>font-display tracking-wide text-lg md:text-xl</Spec>
+            <Spec>type-heading text-lg md:text-xl</Spec>
           </div>
         </div>
       </Row>

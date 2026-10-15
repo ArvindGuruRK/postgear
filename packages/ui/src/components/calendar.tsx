@@ -30,7 +30,7 @@ export function Calendar({
         months: 'flex flex-col sm:flex-row gap-4',
         month: 'flex flex-col gap-3',
         month_caption: 'relative flex h-9 items-center justify-center',
-        caption_label: 'font-display text-sm uppercase tracking-wide text-ink',
+        caption_label: 'type-ui text-sm text-ink',
         // inset-x-2/top-2 matches the root's p-2 so the arrows line up with
         // the caption row rather than sitting in the padding. z-10 is required:
         // month_caption is `relative`, and a positioned later sibling paints

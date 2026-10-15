@@ -49,7 +49,7 @@ export function UserMenu({ name, email, avatarUrl, items }: UserMenuProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>
-          <span className="block font-display text-sm normal-case tracking-normal text-ink">{name}</span>
+          <span className="block type-ui text-sm text-ink">{name}</span>
           {email && (
             <span className="block font-sans text-xs font-normal normal-case tracking-normal opacity-60">
               {email}

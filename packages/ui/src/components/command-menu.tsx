@@ -85,8 +85,8 @@ export const CommandGroup = forwardRef<
     ref={ref}
     className={cn(
       'text-ink [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5',
-      '[&_[cmdk-group-heading]]:font-display [&_[cmdk-group-heading]]:text-xs',
-      '[&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:opacity-60',
+      '[&_[cmdk-group-heading]]:type-label [&_[cmdk-group-heading]]:text-xs',
+      '[&_[cmdk-group-heading]]:opacity-60',
       className,
     )}
     {...props}

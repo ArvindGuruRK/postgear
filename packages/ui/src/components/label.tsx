@@ -11,7 +11,7 @@ export const Label = forwardRef<
   <LabelPrimitive.Root
     ref={ref}
     className={cn(
-      // Body face, NOT font-display (changed 2026-09-02, product decision —
+      // Body text, NOT a type-* role (changed 2026-09-02, product decision —
       // design-system-rules.md §1 was updated in the same change and used to
       // say the opposite). Form controls are the one place the comic display
       // face doesn't belong: a label is read while typing, directly above

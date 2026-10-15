@@ -34,7 +34,7 @@ export const ScoreBar = forwardRef<HTMLDivElement, ScoreBarProps>(
         <div className="flex items-baseline justify-between gap-3 font-sans text-sm text-ink">
           <span className="font-bold">{label}</span>
           <span className="tabular-nums">
-            <span className="font-display text-lg tracking-wide">
+            <span className="type-heading text-lg">
               {value === null ? '–' : value}
             </span>
             {hint ? <span className="ms-2 text-xs font-medium opacity-70">{hint}</span> : null}

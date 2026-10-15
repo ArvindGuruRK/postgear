@@ -29,7 +29,7 @@ export function TopBar({
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b-4 border-outline bg-secondary px-6">
       {orgSwitcher}
-      <h1 className="font-display text-xl tracking-wide text-ink">{title}</h1>
+      <h1 className="type-heading text-xl text-ink">{title}</h1>
       <div className="ml-auto flex items-center gap-4">
         <div className="relative hidden sm:block">
           <Search

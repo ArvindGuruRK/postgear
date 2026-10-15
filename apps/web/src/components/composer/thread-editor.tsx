@@ -188,7 +188,7 @@ function SortablePart({
           <GripVertical className="h-4 w-4" strokeWidth={2.5} />
         </button>
 
-        <span className="font-display text-sm uppercase tracking-wide text-ink">{label}</span>
+        <span className="type-label text-sm text-ink">{label}</span>
 
         <div className="flex flex-wrap items-center gap-1.5">
           {reports.map((report) => {

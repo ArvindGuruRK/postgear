@@ -71,7 +71,7 @@ export function ScoreBreakdown({
   if (categories === null) {
     return running ? (
       <section aria-label="Breakdown" aria-busy="true" className="flex flex-col gap-3">
-        <h2 className="font-display text-sm uppercase tracking-wide text-ink">Breakdown</h2>
+        <h2 className="type-label text-sm text-ink">Breakdown</h2>
         <Skeleton className="h-11 w-full max-w-md" />
         <Skeleton className="h-40" />
       </section>
@@ -82,7 +82,7 @@ export function ScoreBreakdown({
 
   return (
     <section aria-label="Breakdown" className="flex flex-col gap-3">
-      <h2 className="font-display text-sm uppercase tracking-wide text-ink">Breakdown</h2>
+      <h2 className="type-label text-sm text-ink">Breakdown</h2>
       <Tabs defaultValue="onPage">
         <TabsList aria-label="Category" className="flex w-full flex-wrap sm:inline-flex sm:w-auto">
           {SEO_CATEGORIES.map((id) => (

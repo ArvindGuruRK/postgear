@@ -50,7 +50,7 @@ export function NotificationCenter({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="border-b-2 border-outline px-4 py-3">
-          <p className="font-display text-sm uppercase tracking-wide text-ink">Notifications</p>
+          <p className="type-label text-sm text-ink">Notifications</p>
         </div>
         <div className="max-h-80 overflow-y-auto pg-scrollbar pg-scrollbar-secondary">
           {notifications.length === 0 ? (

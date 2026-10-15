@@ -172,7 +172,7 @@ export function FeedbackSection() {
         <div className="flex w-full flex-col gap-3">
           <StageTracker stages={PIPELINE_STAGES} />
           <Spec>
-            badge h-9 w-9 rounded-full border-2 border-outline font-display · pending bg-secondary ·
+            badge h-9 w-9 rounded-full border-2 border-outline type-ui · pending bg-secondary ·
             active bg-actionAi + Spinner · done bg-actionSuccess · skipped border-dashed opacity-60
             · failed bg-actionDanger · connectors bg-outline
           </Spec>
@@ -181,7 +181,7 @@ export function FeedbackSection() {
       <Row label="Stage Tracker (vertical)">
         <StageTracker orientation="vertical" stages={PIPELINE_STAGES} className="w-72" />
         <Spec>
-          label font-display text-xs uppercase tracking-wide · detail font-sans text-xs font-medium
+          label type-label text-xs · detail font-sans text-xs font-medium
           opacity-70
         </Spec>
       </Row>

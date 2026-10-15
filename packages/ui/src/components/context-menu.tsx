@@ -130,7 +130,7 @@ export const ContextMenuLabel = forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Label
     ref={ref}
-    className={cn('px-3 py-1.5 font-display text-xs uppercase tracking-wide text-ink opacity-60', className)}
+    className={cn('px-3 py-1.5 type-label text-xs text-ink opacity-60', className)}
     {...props}
   />
 ));

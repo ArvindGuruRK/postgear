@@ -54,7 +54,7 @@ export function AuditResult({
     <section aria-label="Audit result" aria-busy={running} className="flex flex-col gap-6">
       {url ? (
         <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 className="m-0 truncate font-display text-2xl tracking-wide text-ink">
+          <h2 className="m-0 truncate type-heading text-2xl text-ink">
             {hostOf(url)}
           </h2>
           {pathOf(url) ? (

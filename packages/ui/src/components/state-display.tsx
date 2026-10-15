@@ -39,7 +39,7 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
           <Icon className="h-8 w-8" strokeWidth={2.5} />
         </div>
       )}
-      <p className="font-display text-lg uppercase tracking-wide text-ink">{title}</p>
+      <p className="type-heading text-lg text-ink">{title}</p>
       {description && (
         <p className="max-w-sm font-sans text-sm font-medium text-ink opacity-70">{description}</p>
       )}

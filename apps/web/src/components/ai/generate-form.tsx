@@ -298,7 +298,7 @@ function VoiceCard({
     >
       <RadioGroupItem id={id} value={value} className="mt-0.5" />
       <span className="flex flex-col gap-0.5">
-        <span className="font-display text-base tracking-wide text-ink">{title}</span>
+        <span className="type-heading text-base text-ink">{title}</span>
         <span className="font-sans text-xs font-medium text-ink opacity-70">{hint}</span>
       </span>
     </label>

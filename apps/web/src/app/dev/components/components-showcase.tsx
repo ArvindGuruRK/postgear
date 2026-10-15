@@ -65,7 +65,7 @@ export function ComponentsShowcase() {
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-10 pb-16">
         <div>
-          <h1 className="font-display text-4xl tracking-wide text-ink">Component Playground</h1>
+          <h1 className="type-heading text-4xl text-ink">Component Playground</h1>
           <p className="mt-2 max-w-2xl font-sans text-sm text-ink opacity-70">
             Every primitive in <code>@postgear/ui</code>, every variant, every state — light and
             dark. Flip the theme toggle in the top bar to check parity. Dev-only: excluded from

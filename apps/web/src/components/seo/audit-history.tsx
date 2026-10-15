@@ -125,7 +125,7 @@ export function AuditHistory({
             data-points={selected.trend.length}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <h3 className="m-0 font-display text-xs uppercase tracking-wide text-ink">
+              <h3 className="m-0 type-label text-xs text-ink">
                 Score over time
               </h3>
               <Text size="xs" muted as="span" className="truncate">
@@ -222,7 +222,7 @@ export function AuditHistory({
 
                       <span className="flex items-center justify-between gap-3">
                         <span className="flex items-baseline gap-2">
-                          <span className="font-display text-xl tracking-wide text-ink tabular-nums">
+                          <span className="type-heading text-xl text-ink tabular-nums">
                             {latest.overallScore === null ? '–' : Math.round(latest.overallScore)}
                           </span>
                           <span className="font-sans text-xs font-medium text-ink opacity-70">

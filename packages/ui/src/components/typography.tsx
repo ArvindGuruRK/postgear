@@ -2,7 +2,7 @@ import { type VariantProps, cva } from 'class-variance-authority';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
-const headingVariants = cva('font-display tracking-wide text-ink', {
+const headingVariants = cva('type-heading text-ink', {
   variants: {
     level: {
       h1: 'text-5xl md:text-6xl',
@@ -53,8 +53,8 @@ const textVariants = cva('font-sans text-ink', {
   },
   defaultVariants: {
     size: 'md',
-    // Slightly bolder than plain regular (400) by default — Plus Jakarta
-    // Sans is a real variable font, so font-medium (500) is a genuine
+    // Slightly bolder than plain regular (400) by default — the brand
+    // font (src/app/fonts.ts) is variable, so font-medium (500) is a genuine
     // loaded weight, not synthetic. Matches the confidence of the bold
     // label/chrome text (Badge, table headers, Row labels) it sits next
     // to. Dense data surfaces (Table/DataTable) deliberately don't use
