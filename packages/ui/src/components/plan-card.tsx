@@ -17,6 +17,12 @@ export interface PlanCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   actionLabel?: string;
   onAction?: () => void;
   actionVariant?: ButtonProps['variant'];
+  /**
+   * Sprint 8: the card for the plan a workspace is already on keeps its
+   * button, reading "Current plan", but it must not be pressable — the
+   * same for a member who may see the plans but not buy one.
+   */
+  actionDisabled?: boolean;
 }
 
 /** Covers both "Upgrade/Plan Card" and "Pricing Card" — same shape, different copy. */
@@ -32,6 +38,7 @@ export function PlanCard({
   actionLabel = 'Choose plan',
   onAction,
   actionVariant,
+  actionDisabled,
   ...props
 }: PlanCardProps) {
   return (
@@ -71,6 +78,7 @@ export function PlanCard({
           variant={actionVariant ?? (highlighted ? 'primary' : 'secondary')}
           className="w-full"
           onClick={onAction}
+          disabled={actionDisabled}
         >
           {actionLabel}
         </Button>

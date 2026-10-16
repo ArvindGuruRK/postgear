@@ -15,7 +15,7 @@ import { Suspense } from 'react';
 import { ChannelsView } from '@/components/channels/channels-view';
 import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
-import type { Channel, ProviderSummary } from '@/types/channel';
+import type { ChannelsResponse, ProviderSummary } from '@/types/channel';
 import type { Organization } from '@/types/workspace';
 
 export const metadata: Metadata = { title: 'Channels' };
@@ -25,9 +25,10 @@ export default async function ChannelsPage({ params }: PageProps<'/[orgId]/chann
   const cookie = await getSessionCookieHeader();
 
   // Fetched together — neither depends on the other, and two sequential
-  // round-trips would show an empty page for no reason.
-  const [{ channels }, { providers }, { organizations }] = await Promise.all([
-    serverApi<{ channels: Channel[] }>('/channels', { cookie }),
+  // round-trips would show an empty page for no reason. `/channels` carries
+  // the plan's channel limit beside the list (Sprint 8).
+  const [{ channels, limit }, { providers }, { organizations }] = await Promise.all([
+    serverApi<ChannelsResponse>('/channels', { cookie }),
     serverApi<{ providers: ProviderSummary[] }>('/channels/providers', { cookie }),
     serverApi<{ organizations: Organization[] }>('/orgs', { cookie }),
   ]);
@@ -43,7 +44,13 @@ export default async function ChannelsPage({ params }: PageProps<'/[orgId]/chann
     // params the OAuth callback redirects back with, and Next requires a
     // Suspense boundary around a client component that uses it.
     <Suspense>
-      <ChannelsView initialChannels={channels} providers={providers} canManage={canManage} />
+      <ChannelsView
+        orgId={orgId}
+        initialChannels={channels}
+        providers={providers}
+        canManage={canManage}
+        limit={limit}
+      />
     </Suspense>
   );
 }

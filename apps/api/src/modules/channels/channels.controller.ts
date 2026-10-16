@@ -44,6 +44,7 @@ import {
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
+import { ChannelLimitReachedError } from '../billing/entitlements.service';
 import { CHANNEL_MESSAGES } from './channels.messages';
 import { ChannelsService } from './channels.service';
 import {
@@ -79,13 +80,23 @@ export class ChannelsController {
     return { providers: this.channels.listProviders() };
   }
 
+  /**
+   * The channel list, with the plan's ceiling beside it (Sprint 8) so the
+   * page can say "3 of 5 channels" and disable Connect at the limit without
+   * a second request. `limit` is null only when there is no workspace.
+   */
   @Get()
   async list(@CurrentOrg() org: ActiveOrg | undefined) {
     if (!org) {
-      return { channels: [] };
+      return { channels: [], limit: null };
     }
 
-    return { channels: await this.channels.list(org.id) };
+    const [channels, limit] = await Promise.all([
+      this.channels.list(org.id),
+      this.channels.limit(org.id),
+    ]);
+
+    return { channels, limit };
   }
 
   /**
@@ -122,8 +133,11 @@ export class ChannelsController {
       });
 
       return response.redirect(url);
-    } catch {
-      return response.redirect(`${this.webUrl}/${org.id}/channels?error=channel_oauth`);
+    } catch (error) {
+      // At the plan's limit the person is sent back with a reason that points
+      // at billing, not the generic "could not connect" — nothing went wrong.
+      const code = error instanceof ChannelLimitReachedError ? 'channel_limit' : 'channel_oauth';
+      return response.redirect(`${this.webUrl}/${org.id}/channels?error=${code}`);
     }
   }
 

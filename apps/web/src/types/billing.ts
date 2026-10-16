@@ -74,6 +74,23 @@ export interface ChangePreview {
   periodEnd: string | null;
 }
 
+/** `GET /billing/plans`. */
+export interface PlansResponse {
+  plans: Plan[];
+  trialDays: number;
+}
+
+/** `GET /billing/change/preview`. */
+export interface ChangePreviewResponse {
+  preview: ChangePreview;
+}
+
+/** `{ tier, period }` — the body of checkout and change, the query of the preview. */
+export interface PlanSelection {
+  tier: PaidTier;
+  period: BillingPeriod;
+}
+
 export type CancelReason =
   | 'too_expensive'
   | 'missing_features'

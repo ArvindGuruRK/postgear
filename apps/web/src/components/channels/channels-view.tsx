@@ -1,11 +1,11 @@
 'use client';
 
-import { Alert, Button, EmptyState, Grid, PageHeader, Stack, Text } from '@postgear/ui';
+import { Alert, Button, EmptyState, Grid, Link as UiLink, PageHeader, Stack, Text } from '@postgear/ui';
 import { Radio } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { type MouseEvent, useMemo, useState } from 'react';
 import { channelConnectUrl } from '@/lib/api';
-import type { Channel, ProviderSummary } from '@/types/channel';
+import type { Channel, ChannelLimit, ProviderSummary } from '@/types/channel';
 import { ChannelCard } from './channel-card';
 import { isBroken } from './channel-health';
 import { ConnectChannelDialog } from './connect-channel-dialog';
@@ -14,9 +14,12 @@ import { FinishSetupDialog } from './finish-setup-dialog';
 import { PostingTimesDialog } from './posting-times-dialog';
 
 interface ChannelsViewProps {
+  orgId: string;
   initialChannels: Channel[];
   providers: ProviderSummary[];
   canManage: boolean;
+  /** The plan's ceiling (Sprint 8); null only when no workspace is active. */
+  limit: ChannelLimit | null;
 }
 
 /** Copy for the `?error=` codes the API's callback can redirect back with. */
@@ -26,11 +29,25 @@ const ERROR_MESSAGES: Record<string, string> = {
     'That is a different account from the one this channel uses. Sign in to the original account and try again.',
   unknown_provider: 'PostGear does not support that platform.',
   no_workspace: 'Select a workspace before connecting a channel.',
+  channel_limit:
+    'This workspace has reached its plan’s channel limit. Upgrade the plan to connect more channels.',
 };
 
-export function ChannelsView({ initialChannels, providers, canManage }: ChannelsViewProps) {
+export function ChannelsView({ orgId, initialChannels, providers, canManage, limit }: ChannelsViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const billingHref = `/${orgId}/settings/billing`;
+  // The plan's ceiling (Sprint 8). Enforced by the API where a channel is
+  // connected; reflected here so the button does not offer what would only
+  // bounce back with `?error=channel_limit`.
+  const atLimit = limit !== null && limit.used >= limit.max;
+
+  // The design system's `Link` is a plain anchor; routing through Next keeps
+  // the navigation client-side without copying its classes onto a NextLink.
+  function goToBilling(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    router.push(billingHref);
+  }
 
   const [connectOpen, setConnectOpen] = useState(false);
   const [setupChannel, setSetupChannel] = useState<Channel | null>(null);
@@ -77,14 +94,47 @@ export function ChannelsView({ initialChannels, providers, canManage }: Channels
         description="The social accounts PostGear can publish to."
         actions={
           canManage ? (
-            <Button onClick={() => setConnectOpen(true)}>Connect a channel</Button>
+            <Button onClick={() => setConnectOpen(true)} disabled={atLimit}>
+              Connect a channel
+            </Button>
           ) : undefined
         }
       />
 
+      {limit ? (
+        <Text
+          size="sm"
+          muted={!atLimit}
+          data-testid="channels-limit"
+          data-used={limit.used}
+          data-max={limit.max}
+          data-tier={limit.tier}
+        >
+          {limit.used} of {limit.max} {limit.max === 1 ? 'channel' : 'channels'} on the{' '}
+          {limit.tier === 'FREE' ? 'Free' : limit.tier.charAt(0) + limit.tier.slice(1).toLowerCase()}{' '}
+          plan.
+          {atLimit ? (
+            <>
+              {' '}
+              <UiLink href={billingHref} onClick={goToBilling}>
+                Upgrade the plan
+              </UiLink>{' '}
+              to connect more.
+            </>
+          ) : null}
+        </Text>
+      ) : null}
+
       {errorCode ? (
-        <Alert variant="danger">
-          {ERROR_MESSAGES[errorCode] ?? 'Something went wrong. Please try again.'}
+        <Alert variant="danger" className="flex-wrap">
+          <span>{ERROR_MESSAGES[errorCode] ?? 'Something went wrong. Please try again.'}</span>
+          {errorCode === 'channel_limit' ? (
+            // The alert is filled, so the link takes the fill's text colour
+            // rather than the primary blue it would wear on a plain surface.
+            <UiLink href={billingHref} onClick={goToBilling} className="text-onActionLight">
+              Go to billing
+            </UiLink>
+          ) : null}
         </Alert>
       ) : null}
 

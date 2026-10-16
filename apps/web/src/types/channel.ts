@@ -11,6 +11,7 @@
  * type has nothing to leave out.
  */
 import type { ProviderRules } from '@postgear/social-core/composer';
+import type { PlanTier } from './billing';
 
 /**
  * A channel's state, in the order the user needs to act on it.
@@ -49,6 +50,23 @@ export interface Channel {
   tokenExpiration: string | null;
   postingTimes: PostingTime[];
   createdAt: string;
+}
+
+/**
+ * The plan's channel ceiling, beside the list (Sprint 8). `max` is the
+ * plan's number, or a larger hand-granted entitlement; the Connect button
+ * is disabled once `used >= max`.
+ */
+export interface ChannelLimit {
+  used: number;
+  max: number;
+  tier: PlanTier;
+}
+
+/** `GET /channels`. `limit` is null only when no workspace is active. */
+export interface ChannelsResponse {
+  channels: Channel[];
+  limit: ChannelLimit | null;
 }
 
 export interface ProviderSummary {

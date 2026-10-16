@@ -1,5 +1,6 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Role, prisma } from '@postgear/db';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { MailService } from '../mail/mail.service';
 
 /**
@@ -26,7 +27,12 @@ export interface OrgSummary {
 
 @Injectable()
 export class OrgService {
-  constructor(private readonly mail: MailService) {}
+  private readonly logger = new Logger(OrgService.name);
+
+  constructor(
+    private readonly mail: MailService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   /**
    * Creates a workspace and makes the creator its ADMIN.
@@ -35,22 +41,40 @@ export class OrgService {
    * unreachable — nobody can list it, nobody can be invited to it, and it
    * cannot be deleted through any route. A partial failure here would leave
    * exactly that orphan.
+   *
+   * The trial (Sprint 8) starts *after* the transaction, best-effort: a
+   * workspace whose trial could not be written is still a workspace, and
+   * the billing page offers "Start free trial" for exactly that case.
+   * `EntitlementsService.startTrial` returns null when trials are off
+   * (`BILLING_TRIAL_DAYS=0`), which is not a failure.
    */
   async create(userId: string, name: string): Promise<OrgSummary> {
-    return prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({ data: { name } });
+    const organization = await prisma.$transaction(async (tx) => {
+      const created = await tx.organization.create({ data: { name } });
 
       await tx.userOrganization.create({
-        data: { userId, organizationId: organization.id, role: Role.ADMIN },
+        data: { userId, organizationId: created.id, role: Role.ADMIN },
       });
 
       return {
-        id: organization.id,
-        name: organization.name,
+        id: created.id,
+        name: created.name,
         role: Role.ADMIN,
-        createdAt: organization.createdAt,
+        createdAt: created.createdAt,
       };
     });
+
+    try {
+      await this.entitlements.startTrial(organization.id);
+    } catch (error) {
+      this.logger.warn(
+        `Workspace ${organization.id} was created but its trial could not be started: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    return organization;
   }
 
   /**

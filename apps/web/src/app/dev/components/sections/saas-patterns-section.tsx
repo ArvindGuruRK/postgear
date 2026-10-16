@@ -221,6 +221,8 @@ export function SaasPatternsSection() {
           features={['3 connected channels', '10 scheduled posts/mo', 'Basic analytics']}
           actionLabel="Current plan"
           actionVariant="secondary"
+          // Sprint 8: the plan a workspace is on cannot be chosen again.
+          actionDisabled
         />
         <PlanCard
           name="Growth"

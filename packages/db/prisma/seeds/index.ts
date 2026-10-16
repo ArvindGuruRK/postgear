@@ -246,15 +246,38 @@ async function main() {
     create: { userId: member.id, organizationId: organization.id, role: Role.USER },
   });
 
+  // Sprint 8: the billing tests change this row (upgrade, cancel, a scheduled
+  // downgrade), so re-seeding resets it to exactly the seed's state rather
+  // than leaving the last run's plan behind; the simulated Stripe events and
+  // billing notifications of the demo workspace go with it.
+  const seedSubscription = {
+    subscriptionTier: SubscriptionTier.STANDARD,
+    period: Period.MONTHLY,
+    totalChannels: 5,
+    status: 'ACTIVE' as const,
+    identifier: null,
+    cancelAt: null,
+    currentPeriodEnd: null,
+    trialEndsAt: null,
+    scheduledTier: null,
+    scheduledPeriod: null,
+    lastStripeEventAt: null,
+    deletedAt: null,
+  };
   await prisma.subscription.upsert({
     where: { organizationId: organization.id },
-    update: {},
-    create: {
-      organizationId: organization.id,
-      subscriptionTier: SubscriptionTier.STANDARD,
-      period: Period.MONTHLY,
-      totalChannels: 5,
-    },
+    update: seedSubscription,
+    create: { organizationId: organization.id, ...seedSubscription },
+  });
+  await prisma.organization.update({
+    where: { id: organization.id },
+    data: { paymentId: null, isTrailing: false },
+  });
+  await prisma.billingEvent.deleteMany({
+    where: { organizationId: organization.id, id: { startsWith: 'sim_' } },
+  });
+  await prisma.notifications.deleteMany({
+    where: { organizationId: organization.id, type: { startsWith: 'billing.' } },
   });
 
   // No `userOrganization` row is created for this user, on purpose — see the

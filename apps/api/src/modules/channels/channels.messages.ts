@@ -30,6 +30,12 @@ export const CHANNEL_MESSAGES = {
   REFRESHED: 'Channel reconnected',
   RECONNECT_REQUIRED: 'This channel needs to be reconnected.',
   SETUP_REQUIRED: 'Finish setting up this channel before posting to it.',
+  /**
+   * Sprint 8: the plan's channel ceiling, enforced where a channel is
+   * connected and nowhere else — existing channels keep publishing.
+   */
+  LIMIT_REACHED:
+    'This workspace has reached its plan’s channel limit. Upgrade the plan to connect more channels.',
 } as const;
 
 /** The `?error=` codes the callback can redirect with, and their copy. */
@@ -38,6 +44,7 @@ export const CHANNEL_ERROR_CODES = {
   wrong_account: CHANNEL_MESSAGES.WRONG_ACCOUNT,
   unknown_provider: CHANNEL_MESSAGES.PROVIDER_UNKNOWN,
   no_workspace: CHANNEL_MESSAGES.NO_WORKSPACE,
+  channel_limit: CHANNEL_MESSAGES.LIMIT_REACHED,
 } as const;
 
 export type ChannelErrorCode = keyof typeof CHANNEL_ERROR_CODES;
