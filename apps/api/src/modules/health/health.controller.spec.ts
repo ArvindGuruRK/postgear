@@ -2,7 +2,7 @@
  * The health route against a mocked database, and the Sentry test route's
  * two outcomes: a superadmin gets the deliberate error, anyone else a 403.
  */
-import { ForbiddenException, HttpException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 
 jest.mock('@postgear/db', () => ({ prisma: { $queryRaw: jest.fn() } }));
 jest.mock('../../common/sentry/sentry', () => ({ isSentryEnabled: () => false }));
@@ -37,7 +37,7 @@ describe('HealthController', () => {
     await expect(controller.health()).rejects.toMatchObject({
       status: 503,
       response: { status: 'degraded', checks: { database: 'down' } },
-    } satisfies Partial<HttpException> & { response: unknown });
+    });
   });
 
   it('throws the deliberate error for a superadmin and refuses everyone else', () => {

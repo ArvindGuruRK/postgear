@@ -12,6 +12,7 @@
  * member (to be refused by an ADMIN-only route) and a second organization (to
  * switch into).
  */
+import { createHash } from 'node:crypto';
 import {
   OnboardingGoal,
   OnboardingRole,
@@ -83,6 +84,25 @@ const BROKEN_CHANNEL_ID = 'seed-channel-x';
  * visible in a fresh workspace without connecting anything.
  */
 const INSTAGRAM_CHANNEL_ID = 'seed-channel-instagram';
+
+/**
+ * A known API key on the demo workspace (Sprint 8).
+ *
+ * The public API is called with a secret that is shown once at creation and
+ * stored only as a SHA-256 digest, so without a seeded key every e2e run and
+ * every manual check would have to create one through the UI first. This
+ * key's plaintext is fixed and documented here so `curl` works on a fresh
+ * clone:
+ *
+ *     Authorization: Bearer pg_seedDemoKey00000000000000000000000000000
+ *
+ * The secret has the production shape — `pg_` + 40 base64url characters —
+ * because the guard refuses anything else before it ever reaches the
+ * database. Only the digest and the 11-character prefix are stored, exactly
+ * as `apps/api/src/modules/developers/api-keys/api-key.crypto.ts` would.
+ */
+const DEMO_API_KEY_ID = 'seed-api-key-demo';
+const DEMO_API_KEY_SECRET = `pg_seedDemoKey${'0'.repeat(29)}`;
 
 /**
  * The password every seeded account shares.
@@ -267,6 +287,11 @@ async function main() {
   const seededChannels = await seedChannels(organization.id);
   const seededPosts = await seedPosts(organization.id);
   const seededCredits = await seedAiCredits(organization.id);
+  const seededApiKey = await seedApiKey(organization.id, user.id);
+  // Sprint 8: a few typed notifications so the bell has every treatment on a
+  // fresh clone — already emailed (or never meant to be), so the dispatcher
+  // sends nothing at boot.
+  const seededNotifications = await seedNotifications(organization.id);
   // Sprint 7: ninety days of metrics for the two healthy channels (none for
   // the broken X channel, which needs reconnecting), three snapshots of the
   // published post, and three runs of one URL plus one failed audit so the
@@ -299,9 +324,113 @@ async function main() {
     channels: seededChannels,
     posts: seededPosts,
     aiCredits: seededCredits,
+    apiKey: seededApiKey,
+    notifications: seededNotifications,
     analytics: seededAnalytics,
     seoAudits: seededSeo,
   });
+}
+
+/**
+ * The seeded API key — see DEMO_API_KEY_SECRET. Upserted on its fixed id,
+ * and `revokedAt` is reset on re-seed so a run that revoked it (the e2e suite
+ * does not, but a manual check might) gets it back.
+ */
+/**
+ * Three typed notifications on the demo workspace (Sprint 8): a published
+ * post with its permalink, a failed post pointing at the queue, and a channel
+ * needing reconnection — one per icon treatment the bell has. `emailStatus`
+ * is SENT or NONE so the API's outbox dispatcher never mails them at boot.
+ *
+ * Fixed ids and upsert, like everything else here; the demo admin's read
+ * cursor is left alone, so on a fresh clone all three are unread.
+ */
+async function seedNotifications(organizationId: string) {
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
+  const rows = [
+    {
+      id: 'seed-notification-published',
+      type: 'post.published',
+      title: 'Post published',
+      content: 'Published to Acme Marketing: Yesterday: the first post PostGear published on its own schedule.',
+      link: 'https://www.linkedin.com/feed/update/urn:li:share:seed-7001',
+      emailStatus: 'SENT' as const,
+      emailedAt: minutesAgo(24 * 60 - 1),
+      createdAt: minutesAgo(24 * 60),
+      meta: {
+        postId: 'seed-post-published-linkedin',
+        channelId: DEMO_CHANNEL_ID,
+        channelName: 'Acme Marketing',
+        provider: 'linkedin',
+        releaseURL: 'https://www.linkedin.com/feed/update/urn:li:share:seed-7001',
+      },
+    },
+    {
+      id: 'seed-notification-failed',
+      type: 'post.failed',
+      title: 'Post failed',
+      content: 'Could not publish to Acme on X: Acme on X needs reconnecting before PostGear can publish to it.',
+      link: `/${organizationId}/queue?state=ERROR`,
+      emailStatus: 'SENT' as const,
+      emailedAt: minutesAgo(2 * 24 * 60 - 1),
+      createdAt: minutesAgo(2 * 24 * 60),
+      meta: {
+        postId: 'seed-post-failed-x',
+        channelId: BROKEN_CHANNEL_ID,
+        channelName: 'Acme on X',
+        provider: 'x',
+        reason: 'needs_reconnect',
+        message: 'Acme on X needs reconnecting before PostGear can publish to it.',
+        attempts: 1,
+      },
+    },
+    {
+      id: 'seed-notification-reconnect',
+      type: 'channel.needs_reconnect',
+      title: 'Channel needs reconnecting',
+      content: 'Acme on X needs reconnecting before PostGear can publish to it.',
+      link: `/${organizationId}/channels`,
+      emailStatus: 'NONE' as const,
+      emailedAt: null,
+      createdAt: minutesAgo(2 * 24 * 60 + 5),
+      meta: { channelId: BROKEN_CHANNEL_ID, channelName: 'Acme on X', provider: 'x' },
+    },
+  ];
+
+  for (const row of rows) {
+    const { id, ...data } = row;
+    await prisma.notifications.upsert({
+      where: { id },
+      update: { ...data, organizationId, deletedAt: null },
+      create: { id, organizationId, ...data },
+    });
+  }
+
+  return rows.map((row) => `${row.type}:${row.id}`);
+}
+
+async function seedApiKey(organizationId: string, createdById: string) {
+  const keyHash = createHash('sha256').update(DEMO_API_KEY_SECRET, 'utf8').digest('hex');
+  const prefix = DEMO_API_KEY_SECRET.slice(0, 11);
+  const data = {
+    organizationId,
+    name: 'Seed demo key',
+    prefix,
+    keyHash,
+    createdById,
+    revokedAt: null,
+  };
+
+  await prisma.apiKey.upsert({
+    where: { id: DEMO_API_KEY_ID },
+    update: data,
+    create: { id: DEMO_API_KEY_ID, ...data },
+  });
+
+  // The prefix identifies the key without being it; the full secret is in
+  // the comment above, where a developer looks, not in the console output
+  // that ends up in CI logs.
+  return { id: DEMO_API_KEY_ID, prefix };
 }
 
 /**

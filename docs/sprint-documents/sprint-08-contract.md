@@ -256,6 +256,8 @@ interface PublicPost extends PublicPostSummary { parts: [{ text, media: [{ id, u
 
 Swagger: `GET /api/docs` (UI) and `GET /api/docs-json`, public, documenting `/v1` only, bearer scheme `apiKey`, schemas from the zod DTOs via `zod-to-json-schema`.
 
+*As built (2026-10-16):* `GET /v1/posts?state=` takes the lowercase `draft|queue|published|error` (case-insensitive) to match the create body; responses keep the uppercase `state`. In `POST /v1/posts`, a blank line in `text` becomes an **empty paragraph** rather than just a paragraph break, so `renderPlainText(textToDocument(text)) === text` and an integrator's spacing is published as sent. `/v1` validation errors name the failing field (`PublicZodBody`), unlike the app's own routes, whose field-hiding exists for the sign-in oracle. The throttle bucket is one per key across every `/v1` route. The seed installs the key `pg_seedDemoKey00000000000000000000000000000` on the demo workspace for local use.
+
 ### 5.4 Outbound webhooks (session, `ADMIN`)
 
 | Route | Body → Response |

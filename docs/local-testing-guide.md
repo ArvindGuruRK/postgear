@@ -465,12 +465,14 @@ Settings → **API keys**. Only admins can manage keys.
   button and a curl example. Close the dialog and it is gone for good; the
   list shows only the prefix.
 - The seed also installs a known key for the demo workspace so the public
-  API can be tried without the UI (the value is printed by `npm run
-  db:seed`; see `packages/db/prisma/seeds/index.ts`).
+  API can be tried without the UI:
+  `pg_seedDemoKey00000000000000000000000000000` (prefix `pg_seedDemo`; it
+  is re-created, un-revoked, by every `npm run db:seed`). A local-only
+  convenience — never seed one on a real deployment.
 - Call the API:
 
   ```powershell
-  $key = "pg_…"
+  $key = "pg_seedDemoKey00000000000000000000000000000"
   Invoke-RestMethod http://localhost:3001/v1/me -Headers @{ Authorization = "Bearer $key" }
   Invoke-RestMethod http://localhost:3001/v1/channels -Headers @{ Authorization = "Bearer $key" }
   Invoke-RestMethod http://localhost:3001/v1/posts -Method Post -Headers @{ Authorization = "Bearer $key" } `
@@ -481,7 +483,11 @@ Settings → **API keys**. Only admins can manage keys.
   The last one answers `201` with the post; it appears in the composer's
   drafts. Send `"state":"queue"` with a `publishAt` a minute ahead and the
   worker publishes it (to the stand-in, with `PUBLISH_SIMULATION`), and the
-  bell and any webhook (§5i) report it.
+  bell and any webhook (§5i) report it. In `text`, a newline is a line break
+  and a blank line an empty paragraph, so what you send is what is posted.
+  `GET /v1/posts?state=draft` filters (lowercase `draft|queue|published|error`,
+  twenty per page, `?page=2`). Unlike the app's own routes, a bad `/v1` body
+  names the field that failed — the caller is a program reading a terminal.
 - **Swagger**: <http://localhost:3001/api/docs> documents every `/v1` route;
   <http://localhost:3001/api/docs-json> is the OpenAPI file. Paste a key
   into **Authorize** to call routes from the page.
