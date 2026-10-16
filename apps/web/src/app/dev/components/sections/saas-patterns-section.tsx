@@ -27,9 +27,42 @@ const DEMO_WORKSPACES = [
   { id: '2', name: 'Nova Studio' },
 ];
 
+// Sprint 8: typed items pick an icon and tone; `href` marks an item as a link.
 const DEMO_NOTIFICATIONS = [
-  { id: '1', title: 'Post published', description: 'Q3 recap went live on LinkedIn.', timestamp: '2h ago', read: false },
-  { id: '2', title: 'Channel reconnected', description: 'TikTok token refreshed.', timestamp: 'Yesterday', read: true },
+  {
+    id: '1',
+    type: 'post.published',
+    title: 'Post published',
+    description: 'Q3 recap went live on LinkedIn.',
+    timestamp: '2h ago',
+    read: false,
+    href: 'https://www.linkedin.com/feed/update/example',
+  },
+  {
+    id: '2',
+    type: 'post.failed',
+    title: 'Post failed',
+    description: 'Could not publish to Acme on X: the connection has expired.',
+    timestamp: '3h ago',
+    read: false,
+    href: '/seed-demo-org/queue?state=ERROR',
+  },
+  {
+    id: '3',
+    type: 'channel.needs_reconnect',
+    title: 'Channel needs reconnecting',
+    description: 'Acme on X needs reconnecting before PostGear can publish to it.',
+    timestamp: 'Yesterday',
+    read: true,
+  },
+  {
+    id: '4',
+    type: 'billing.activated',
+    title: 'Plan activated',
+    description: 'Pro is active on this workspace.',
+    timestamp: '2 days ago',
+    read: true,
+  },
 ];
 
 const DEMO_ACTIVITY = [
@@ -167,6 +200,15 @@ export function SaasPatternsSection() {
       </Row>
       <Row label="Notification Center">
         <NotificationCenter notifications={DEMO_NOTIFICATIONS} />
+        <NotificationCenter
+          notifications={DEMO_NOTIFICATIONS}
+          unreadCount={12}
+          onMarkAllRead={() => {}}
+          footer={<span className="font-sans text-xs text-ink opacity-70">Notification settings</span>}
+        />
+        <NotificationCenter notifications={[]} loading />
+        <NotificationCenter notifications={[]} />
+        <Spec>Default · with a server count, mark-all-read and a footer · loading · empty</Spec>
       </Row>
       <Row label="Activity Feed">
         <ActivityFeed items={DEMO_ACTIVITY} className="w-80" />

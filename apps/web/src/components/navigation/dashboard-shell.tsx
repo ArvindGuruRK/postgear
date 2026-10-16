@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { NotificationBell } from '../notifications/notification-bell';
 import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
 import { OrgSwitcher } from './org-switcher';
@@ -67,6 +68,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
       // AppShell so the shell stays renderable without a workspace.
       orgSwitcher={<OrgSwitcher />}
       accountMenu={<AccountMenu />}
+      notifications={<NotificationBell />}
     >
       {children}
     </AppShell>

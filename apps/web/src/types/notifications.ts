@@ -42,3 +42,11 @@ export interface NotificationStreamEvent {
   notification: NotificationView;
   unread: number;
 }
+
+/** `event: ready`, the first frame on `GET /notifications/stream`. */
+export interface NotificationStreamReady {
+  unread: number;
+}
+
+/** The bell's view of its stream: opening, live, or waiting to reconnect. */
+export type NotificationConnectionState = 'connecting' | 'open' | 'closed';

@@ -27,6 +27,10 @@ placeholders.
 | **AI Copilot** (Sprint 6): generate a post from a topic (research → hook → copy → image), chat with an assistant that can list channels and draft posts, AI credits | |
 | **Analytics** (Sprint 7): per-channel followers, impressions, engagement over 7/30/90 days, cross-channel comparison, top posts, per-post breakdown, CSV export | PDF export, scheduled SEO re-audits, competitor comparison |
 | **SEO Analyzer** (Sprint 7): enter any public URL, get a 0–100 score with a grade, four sub-scores, prioritised fixes, and a score trend over time | |
+| **Billing** (Sprint 8): plans, a 14-day trial, subscribe / upgrade / downgrade / cancel — in simulation or against Stripe test mode | Coupons, lifetime deals |
+| **Notifications** (Sprint 8): the bell with live updates, "Mark all as read", email on a failed post (printed to the API console locally), email preferences | Weekly digest |
+| **API keys and the public API** (Sprint 8): create / rotate / revoke keys, `/v1` with Swagger docs at `/api/docs`, per-key rate limiting, the Node SDK | OAuth apps, Zapier/Make connectors |
+| **Outbound webhooks** (Sprint 8): signed deliveries on post published / failed, retries, a test send, delivery history | |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
@@ -342,6 +346,229 @@ Open **<http://localhost:3000/seed-demo-org/seo-analyzer>**.
   at most `SEO_MAX_CONCURRENT_AUDITS` (default 2); a third request answers
   **429 busy** rather than queueing forever.
 
+### 5f. Billing (Sprint 8)
+
+Two lines in `.env`, then restart the API (`.env` is read only at start):
+
+```env
+BILLING_SIMULATION="true"
+WEBHOOK_ALLOW_PRIVATE_URLS="true"
+```
+
+The first replaces Stripe with a stand-in: checkout, plan changes and
+cancellation synthesise the Stripe events and run them through the **same
+webhook handler** a real Stripe delivery hits, so the plan limits, the
+"activating" state and the idempotency table are all real. The old
+`.env.example` placeholders (`sk_test_stripe_secret_key`, …) are recognised
+and ignored, so you do not have to delete them. The second line is for §5i.
+
+Open **<http://localhost:3000/seed-demo-org/settings/billing>** (Settings in
+the sidebar, then **Billing**). The demo workspace is seeded on the
+**Standard** plan. Prices on this page are placeholders in
+`apps/api/src/modules/billing/plans.ts` — change them there.
+
+- The current-plan card shows the status badge, the next billing date and
+  two meters: channels used of the plan's limit, AI credits used this cycle.
+- **Change plan → Pro.** A preview says what would be charged today (in
+  simulation, the difference pro-rated to the day); confirm, watch
+  *Activating…* for a second or two, then the card says **Pro**. The channel
+  meter's limit moves from 5 to 15.
+- **Change plan → Standard** again: a downgrade is *scheduled* for the end
+  of the period and the card says so; the plan stays Pro until then.
+- **Cancel.** Pick a reason, type a note; the card shows "ends on <date>" and
+  a **Resume** button, and the API console prints the feedback email (it is
+  addressed to `SMTP_FROM`). Resume clears it.
+- **The channel limit.** On the Channels page the header says "3 of 5
+  channels". Connect channels until the limit (or lower a plan's `channels`
+  in `plans.ts` and restart): the Connect button disables with a link to
+  billing, and the connect route redirects back with the same message.
+- **The trial.** Create a new workspace (the organization switcher →
+  *Create organization*): it starts on a **14-day Pro trial** with no card,
+  the billing page shows the days left, and the AI credits meter shows
+  Pro's 500. `BILLING_TRIAL_DAYS` in `.env` changes the length (0 disables).
+- **Idempotency.** Every applied event is a row in `BillingEvent`:
+
+  ```powershell
+  docker exec postgear_postgres psql -U postgres -d postgear_db -c 'SELECT id, type, outcome FROM "BillingEvent" ORDER BY "createdAt" DESC LIMIT 5;'
+  ```
+
+**With real Stripe test-mode keys** (free, no card charged — test mode is a
+sandbox). Create a Stripe account, switch the dashboard to **Test mode**,
+then:
+
+1. Developers → API keys → copy the **Secret key** (`sk_test_…`) and the
+   **Publishable key** (`pk_test_…`).
+2. Install the Stripe CLI (`winget install stripe.stripe-cli` or
+   <https://stripe.com/docs/stripe-cli>), `stripe login`, then in its own
+   terminal:
+
+   ```powershell
+   stripe listen --forward-to localhost:3001/billing/webhook
+   ```
+
+   It prints a signing secret (`whsec_…`). That is the webhook secret for as
+   long as `stripe listen` runs.
+3. In `.env`:
+
+   ```env
+   BILLING_SIMULATION="false"
+   STRIPE_SECRET_KEY="sk_test_…"
+   STRIPE_WEBHOOK_SECRET="whsec_…"
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_…"
+   ```
+
+   Restart the API. `GET http://localhost:3001/billing/status` now says
+   `"mode": "stripe"`.
+4. On the billing page choose a plan: you land on Stripe Checkout. Pay with
+   the test card `4242 4242 4242 4242`, any future expiry, any CVC. Stripe
+   redirects back to the billing page with `?checkout=success`; the page
+   shows *Activating…* until `stripe listen` has forwarded
+   `checkout.session.completed` and the API has applied it, then the plan
+   changes. Nothing was charged: test mode never moves money.
+5. **Manage billing** opens the Stripe billing portal (test mode). Plan
+   switching inside the portal needs dashboard-defined prices — pin them
+   with the `STRIPE_PRICE_*` variables if you want that; the in-app Change
+   plan works without them.
+6. Replay an event to prove idempotency: `stripe events list --limit 1`,
+   then `stripe events resend <evt_id>`; the API answers
+   `{ "received": true, "duplicate": true }` and nothing changes.
+
+### 5g. Notifications (Sprint 8)
+
+Nothing to add to `.env`. With `SMTP_HOST` empty, every email is printed to
+the API console — that is the local mode, and it is how you see them.
+
+- The bell is in the top bar. It opens live over a server-sent event
+  stream; the badge is the unread count for this workspace only.
+- Make a post fail: open the composer, write a post whose text contains
+  `[simulate:400]`, add it to the queue for *Acme Marketing* a minute away
+  (or queue it and **Post now** from the Queue page). Within seconds — no
+  reload — the bell shows **Post failed**, and the API console prints the
+  email that would have gone to every member who has failure emails on
+  (`demo@postgear.local` and `member@postgear.local`), with the channel,
+  the reason and a link to the queue.
+- A post that publishes writes **Post published** the same way; the email
+  goes only to members with success emails on.
+- **Mark all as read** zeroes the badge; it is per person and per
+  workspace, so switching to *PostGear Second Org* has its own count.
+- Settings → **Notifications**: the two email preferences. Turn failure
+  emails off and fail another post: the bell still gets it, the console
+  prints no email for that user.
+- The dispatcher runs every 3 seconds in the API; its log lines say which
+  rows it claimed and sent.
+
+### 5h. API keys and the public API (Sprint 8)
+
+Settings → **API keys**. Only admins can manage keys.
+
+- **Create key**, name it: the secret (`pg_…`) is shown once with a Copy
+  button and a curl example. Close the dialog and it is gone for good; the
+  list shows only the prefix.
+- The seed also installs a known key for the demo workspace so the public
+  API can be tried without the UI (the value is printed by `npm run
+  db:seed`; see `packages/db/prisma/seeds/index.ts`).
+- Call the API:
+
+  ```powershell
+  $key = "pg_…"
+  Invoke-RestMethod http://localhost:3001/v1/me -Headers @{ Authorization = "Bearer $key" }
+  Invoke-RestMethod http://localhost:3001/v1/channels -Headers @{ Authorization = "Bearer $key" }
+  Invoke-RestMethod http://localhost:3001/v1/posts -Method Post -Headers @{ Authorization = "Bearer $key" } `
+    -ContentType "application/json" `
+    -Body '{"text":"Hello from the public API","channelIds":["seed-channel-linkedin"],"state":"draft"}'
+  ```
+
+  The last one answers `201` with the post; it appears in the composer's
+  drafts. Send `"state":"queue"` with a `publishAt` a minute ahead and the
+  worker publishes it (to the stand-in, with `PUBLISH_SIMULATION`), and the
+  bell and any webhook (§5i) report it.
+- **Swagger**: <http://localhost:3001/api/docs> documents every `/v1` route;
+  <http://localhost:3001/api/docs-json> is the OpenAPI file. Paste a key
+  into **Authorize** to call routes from the page.
+- **Rate limit**: the per-key ceiling is `API_RATE_LIMIT_PER_MIN` (60).
+  Loop 70 requests and the tail answers `429` with a `Retry-After` header:
+
+  ```powershell
+  1..70 | ForEach-Object { try { Invoke-RestMethod http://localhost:3001/v1/me -Headers @{ Authorization = "Bearer $key" } | Out-Null; "ok" } catch { $_.Exception.Response.StatusCode.value__ } } | Group-Object | Select-Object Name, Count
+  ```
+
+- **Rotate** keeps the name and revokes the old key the moment the new one
+  exists; **Revoke** makes the key answer `401` at once. Both are confirmed
+  in a dialog because live integrations break.
+- The SDK: `packages/sdk` (`README.md` has a receiver example). In a script
+  inside this repository:
+
+  ```ts
+  import { PostGear } from '@postgear/sdk';
+  const postgear = new PostGear({ apiKey: 'pg_…' });
+  console.log(await postgear.me());
+  ```
+
+### 5i. Outbound webhooks (Sprint 8)
+
+Needs the worker running (deliveries are Temporal workflows) and
+`WEBHOOK_ALLOW_PRIVATE_URLS="true"` in `.env`, because a receiver on this
+machine is exactly what the SSRF guard refuses otherwise. Without the
+flag, only public `https://` addresses are accepted — and the guard
+resolves the host and refuses private, link-local and loopback answers.
+
+Start a receiver in a fourth terminal (anything that prints requests):
+
+```powershell
+npx -y http-echo-server 4000
+```
+
+Settings → **Webhooks** → **Add webhook**: name it, URL
+`http://localhost:4000/postgear`, keep both events, leave channels empty
+(every channel). The **signing secret** (`whsec_…`) is shown once.
+
+- Kebab → **Send test**: the deliveries sheet opens; within a few seconds
+  the row says **Delivered · 200**, and the echo server shows a `POST` with
+  `X-PostGear-Event: webhook.test`, `X-PostGear-Delivery`,
+  `X-PostGear-Timestamp` and `X-PostGear-Signature: v1=…` — the HMAC-SHA256
+  of `"<timestamp>.<body>"` under the secret. `packages/sdk` verifies it
+  (`verifyWebhookSignature`), and the Playwright test
+  `e2e/webhooks.spec.ts` does exactly this against a receiver it hosts.
+- Now publish a post (Queue → **Post now** on the seeded queued post, or
+  `[simulate:400]` for a failure): the receiver gets `post.published` /
+  `post.failed` with the post, the channel and (for a failure) the reason.
+- Stop the receiver and send a test: the row says **Pending**, "attempt 1
+  failed: Connection refused; retrying", then retries at 30 s, 2 min,
+  8 min, 32 min, 2 h. Start the receiver again inside that window and the
+  next attempt delivers. After the sixth failure the row is **Failed** and
+  the bell gets a **Webhook delivery failed** notification (emailed to
+  admins).
+- **Rotate secret** shows a new one; the old stops verifying at once.
+  **Pause** keeps the hook but delivers nothing; **Delete** removes it.
+
+### 5j. Sentry (Sprint 8)
+
+Without a DSN nothing is sent anywhere — the local default. To see errors
+arrive, a free Sentry account is enough (the developer plan has an error
+quota that these tests will not dent):
+
+1. <https://sentry.io> → create a project per app, platform **NestJS** for
+   the API and **Next.js** for the web app (or one project for both).
+2. Copy each project's DSN into `.env`:
+
+   ```env
+   SENTRY_DSN="https://…@o…ingest.sentry.io/…"
+   NEXT_PUBLIC_SENTRY_DSN="https://…@o…ingest.sentry.io/…"
+   ```
+
+   Restart the API and the web app (`NEXT_PUBLIC_*` is inlined at start).
+3. API: signed in as the demo admin (a superadmin), open
+   <http://localhost:3001/health/sentry-test>. It answers `500` by design
+   and the event appears in the API project within a minute.
+   <http://localhost:3001/health> says `"sentry": true` when a DSN is set.
+4. Web: <http://localhost:3000/dev/sentry-test> has two buttons — one
+   throws in the browser, one inside a server function — and says whether
+   a DSN is configured.
+
+Traces are off (`SENTRY_TRACES_SAMPLE_RATE=0`); set `0.1` to sample
+performance data once there is a quota to spend. The `/dev/*` routes are
+excluded from production builds.
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 
@@ -515,6 +742,12 @@ A real upload needs a video and is not worth testing from the UI yet.
 | "Your connection has expired" | Token invalid. Use **Reconnect**. |
 | AI page says "not configured" | Neither `AI_SIMULATION="true"` nor a real `OPENAI_API_KEY` is set (the `.env.example` placeholder does not count). Restart the API after editing. |
 | AI page says you are out of credits | The demo workspace's monthly allowance (100) is used up; re-seed with `npm run db:seed` to reset the ledger. |
+| Billing page says "not configured" | Neither `BILLING_SIMULATION="true"` nor a real `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` pair is set (the placeholders do not count). Restart the API after editing. |
+| Checkout stays on "Activating…" | In Stripe mode, `stripe listen` is not running or forwards to the wrong port; the API never received the event. In simulation, the API log says what the synthetic event did. |
+| A webhook URL is refused as private | `WEBHOOK_ALLOW_PRIVATE_URLS` is not `"true"` — the guard refuses localhost on purpose. Set it and restart the API **and** the worker. |
+| Webhook deliveries stay Pending | The worker is not running (deliveries are Temporal workflows). Start it; the maintenance reconcile picks up anything older than a minute. |
+| `/v1` answers 429 | The per-key ceiling (`API_RATE_LIMIT_PER_MIN`, 60/min) or the per-address one (`RATE_LIMIT_PER_MIN`, 300/min). Wait for `Retry-After`. |
+| No notification email in the console | The member's preference is off (Settings → Notifications), or `SMTP_HOST` is set and mail went to a real server. The dispatcher's log line names the row and the outcome. |
 
 ---
 
