@@ -21,10 +21,13 @@ export function TopBar({
   title,
   orgSwitcher,
   accountMenu,
+  notifications,
 }: {
   title: string;
   orgSwitcher?: ReactNode;
   accountMenu?: ReactNode;
+  /** The notification bell (Sprint 8) — a slot for the same reason as the two above. */
+  notifications?: ReactNode;
 }) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b-4 border-outline bg-secondary px-6">
@@ -39,6 +42,7 @@ export function TopBar({
           <Input placeholder="Search…" className="w-64 pl-9" size="sm" />
         </div>
         <ThemeToggle />
+        {notifications}
         {accountMenu}
       </div>
     </header>

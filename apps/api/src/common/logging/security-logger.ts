@@ -124,7 +124,27 @@ export type SecurityEvent =
   // Analytics (Sprint 7): a request naming a channel or post outside the
   // workspace, and a sync the worker could not complete.
   | 'analytics.foreign_reference'
-  | 'analytics.sync_failed';
+  | 'analytics.sync_failed'
+  // Billing (Sprint 8). A webhook that fails its signature is either a
+  // misconfigured secret or someone forging payment events; a duplicate is
+  // Stripe's own replay and expected; a limit hit is a plan doing its job.
+  | 'billing.webhook_rejected'
+  | 'billing.webhook_duplicate'
+  | 'billing.webhook_failed'
+  | 'billing.limit_reached'
+  // Public API keys (Sprint 8). Every lifecycle change is recorded; a rejected
+  // key is logged by its prefix only, which identifies it without being it.
+  | 'apikey.created'
+  | 'apikey.rotated'
+  | 'apikey.revoked'
+  | 'apikey.rejected'
+  | 'api.throttled'
+  // Outbound webhooks (Sprint 8): a URL refused by the SSRF guard, and a
+  // delivery that exhausted its retries.
+  | 'webhook.unsafe_url'
+  | 'webhook.delivery_failed'
+  // Notifications (Sprint 8): an email the dispatcher could not send.
+  | 'notification.email_failed';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

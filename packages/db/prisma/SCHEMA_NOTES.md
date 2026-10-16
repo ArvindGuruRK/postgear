@@ -41,11 +41,15 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `Signatures` | Reusable sign-off blocks appended to post content. | Not yet — PRD P2. |
 | `Errors` | Publish-failure records, surfaced in the queue UI. | Sprint 5 |
 | `Notifications` | In-app notification feed. | Sprint 5 |
-| `Subscription` | Billing plan + `totalChannels` entitlement. Gates channel connection. | Sprint 8 |
+| `Subscription` | Billing plan + `totalChannels` entitlement. Gates channel connection. Sprint 8 added `status`, `currentPeriodEnd`, `trialEndsAt`, `scheduledTier`/`scheduledPeriod` and `lastStripeEventAt`; see [Sprint 8 additions](#sprint-8-additions). | Sprint 8 |
 | `Credits` | AI usage metering. | Sprint 6 |
-| `Customer` | Stripe customer mapping. Also doubles as a client-grouping label on `Integration`. | Sprint 8 |
-| `Webhooks` / `IntegrationsWebhooks` | Outbound webhooks and their channel scoping. | Sprint 8 |
-| `OAuthApp` / `OAuthAuthorization` | PostGear acting as an OAuth *provider* for its public API. | Sprint 8 |
+| `Customer` | **Not** the Stripe customer mapping — `Organization.paymentId` is. Kept as the client-grouping label on `Integration` (PRD "Agency mode", P1). | Not yet |
+| `Webhooks` / `IntegrationsWebhooks` | Outbound webhooks and their channel scoping. Sprint 8 added `secret` (ciphertext), `events` and `disabled`. | Sprint 8 |
+| `WebhookDelivery` | One attempt-series per event per hook (Sprint 8). | Sprint 8 |
+| `ApiKey` | Public API keys, hashed (Sprint 8). Replaces the inherited single `Organization.apiKey`, which stays unused. | Sprint 8 |
+| `BillingEvent` | Processed Stripe events, keyed on the event id (Sprint 8). | Sprint 8 |
+| `NotificationCursor` | Per-(user, workspace) read marker for the notification feed (Sprint 8). | Sprint 8 |
+| `OAuthApp` / `OAuthAuthorization` | PostGear acting as an OAuth *provider* for its public API. | Not yet — PRD P2. Sprint 8 built API keys instead. |
 
 ### Kept, though not yet used
 
@@ -225,6 +229,52 @@ Two consequences that will otherwise bite:
   permanently undecryptable and affected channels must be re-connected. Use
   `isEncrypted()` to distinguish already-encrypted rows from pre-encryption
   plaintext when backfilling.
+
+## Sprint 8 additions
+
+Migration `20261016120000_sprint8_billing_notifications_api`. Additive only:
+four tables, three enums, columns on three inherited models, nothing removed
+or renamed. The design is in
+[`docs/sprint-documents/sprint-08-contract.md`](../../../docs/sprint-documents/sprint-08-contract.md) §1.
+
+- **`Subscription`** is now live. `status` (`SubscriptionStatus`:
+  TRIALING / ACTIVE / PAST_DUE / CANCELED / INCOMPLETE), `currentPeriodEnd`,
+  `trialEndsAt`, `scheduledTier` + `scheduledPeriod` (a downgrade waiting for
+  the period end) and `lastStripeEventAt` (the ordering guard: an event older
+  than it is ignored). The inherited columns keep their meanings:
+  `identifier` is the Stripe subscription id, `cancelAt` the moment a
+  scheduled cancellation ends access, `totalChannels` the channel
+  entitlement; `Organization.paymentId` is the Stripe customer id and
+  `Organization.isTrailing` means a trial is live. **Entitlement is computed
+  on read** (`apps/api/src/modules/billing/plans.ts` → `resolveEntitlement`),
+  so an expired trial is FREE without any job flipping it.
+- **`BillingEvent`**: the primary key *is* the Stripe event id (`evt_…`, or
+  `sim_…` in simulation). Inserted inside the same transaction as the state
+  change, so a replayed event is a unique-constraint failure, not a second
+  application.
+- **`Notifications`** gained `type` (the catalogue in
+  `apps/api/src/modules/notifications/notifications.types.ts`), `title`,
+  `meta` (what an email needs beyond `content`) and `emailStatus`
+  (`NotificationEmailStatus`): the row is an **outbox** — whoever writes the
+  event sets `PENDING`, the API's dispatcher sends through the one mail path
+  and records the outcome. `NotificationCursor` is the read marker per
+  (user, workspace); no row means "unread is everything newer than the
+  membership". `User.lastReadNotifications` (inherited) is unused.
+- **`Webhooks`** gained `secret` (AES-256-GCM ciphertext of the HMAC signing
+  secret — the worker needs the plaintext to sign, so it cannot be a hash;
+  the UI sees it only at creation and rotation), `events` (a Postgres text
+  array) and `disabled`. **`WebhookDelivery`** holds one row per event per
+  hook, unique on `deliveryKey` (`<webhookId>:<event>:<subjectId>`) so a
+  retried activity never enqueues twice; the worker's delivery workflow owns
+  it from PENDING to DELIVERED or FAILED.
+- **`ApiKey`**: `keyHash` is the SHA-256 of a `pg_…` secret of 30 random
+  bytes, `prefix` the first 11 characters for identification, `revokedAt`
+  instead of deletion, `lastUsedAt` written at most once a minute. The
+  inherited `Organization.apiKey` (a single plaintext-equivalent key in the
+  reference) is left in place and unused.
+
+Every read of the new soft-deletable rows (`Webhooks`) still filters
+`deletedAt: null`; the new tables cascade with their organization.
 
 ## A user may legitimately belong to zero organizations
 

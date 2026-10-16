@@ -11,6 +11,8 @@
 export type {
   AnalyticsSync,
   Announcement,
+  ApiKey,
+  BillingEvent,
   ChannelMetricSnapshot,
   Comments,
   Credits,
@@ -19,6 +21,7 @@ export type {
   Integration,
   IntegrationsWebhooks,
   Media,
+  NotificationCursor,
   Notifications,
   OAuthApp,
   OAuthAuthorization,
@@ -34,6 +37,7 @@ export type {
   TagsPosts,
   User,
   UserOrganization,
+  WebhookDelivery,
   Webhooks,
 } from '@prisma/client';
 // Enums are re-exported as values, not just types — call sites need
@@ -44,6 +48,7 @@ export {
   AnalyticsSyncStatus,
   AnnouncementColor,
   CreationMethod,
+  NotificationEmailStatus,
   OnboardingGoal,
   OnboardingRole,
   OnboardingTeamSize,
@@ -56,7 +61,9 @@ export {
   SEOAuditStatus,
   ShortLinkPreference,
   State,
+  SubscriptionStatus,
   SubscriptionTier,
+  WebhookDeliveryStatus,
 } from '@prisma/client';
 
 /**

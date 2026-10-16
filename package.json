@@ -32,7 +32,7 @@
     "test:e2e:ui": "dotenv -e .env -- playwright test --ui",
     "dev:api": "npm run dev --workspace=@postgear/api",
     "dev:worker": "npm run dev --workspace=@postgear/worker",
-    "dev:api:e2e": "dotenv -e .env -v LOGIN_RATE_LIMIT_PER_MIN=500 -v LOCKOUT_THRESHOLD=50 -- ts-node-dev --respawn --transpile-only --project apps/api/tsconfig.json apps/api/src/main.ts",
+    "dev:api:e2e": "dotenv -e .env -v LOGIN_RATE_LIMIT_PER_MIN=500 -v LOCKOUT_THRESHOLD=50 -v RATE_LIMIT_PER_MIN=3000 -- ts-node-dev --respawn --transpile-only --project apps/api/tsconfig.json apps/api/src/main.ts",
     "audit:passwords": "dotenv -e .env -- ts-node --project scripts/tsconfig.json scripts/audit-password-hashes.ts"
   },
   "devDependencies": {

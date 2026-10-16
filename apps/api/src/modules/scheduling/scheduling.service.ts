@@ -36,8 +36,15 @@ import {
   TOKEN_REFRESH_WORKFLOW,
   tokenRefreshWorkflowId,
   WAKE_SIGNAL,
+  WEBHOOK_DELIVERY_WORKFLOW,
+  webhookDeliveryWorkflowId,
 } from '@postgear/scheduling';
-import { Client, Connection, WorkflowNotFoundError } from '@temporalio/client';
+import {
+  Client,
+  Connection,
+  WorkflowExecutionAlreadyStartedError,
+  WorkflowNotFoundError,
+} from '@temporalio/client';
 import type { Env } from '../../config/env';
 
 /** A post row the scheduler should be told about: the root row of one channel's chain. */
@@ -63,7 +70,7 @@ export interface SchedulerStatus {
 
 /** The minimal client surface this service uses — what a test substitutes. */
 export interface SchedulingClient {
-  workflow: Pick<Client['workflow'], 'signalWithStart' | 'getHandle'>;
+  workflow: Pick<Client['workflow'], 'signalWithStart' | 'getHandle' | 'start'>;
   workflowService: Pick<Client['workflowService'], 'describeTaskQueue'>;
   connection: { close(): Promise<void> };
 }
@@ -183,6 +190,29 @@ export class SchedulingService implements OnModuleDestroy {
           }),
         ),
       );
+    });
+  }
+
+  /**
+   * Sprint 8: starts the delivery workflow for a `WebhookDelivery` row the
+   * API created (a test send). Plain `start`, not a signal: the workflow has
+   * no signals, and a row that already has one is left exactly as it is.
+   * Best-effort like everything here — the worker's reconcile starts any
+   * delivery still PENDING a minute later.
+   */
+  async startWebhookDelivery(deliveryId: string, organizationId: string): Promise<boolean> {
+    return this.attempt('webhook delivery', async (client) => {
+      try {
+        await client.workflow.start(WEBHOOK_DELIVERY_WORKFLOW, {
+          workflowId: webhookDeliveryWorkflowId(deliveryId),
+          taskQueue: SCHEDULING_TASK_QUEUE,
+          args: [{ deliveryId, organizationId }],
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+          throw error;
+        }
+      }
     });
   }
 

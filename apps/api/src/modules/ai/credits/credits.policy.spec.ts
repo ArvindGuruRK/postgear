@@ -12,10 +12,29 @@ import {
   generateCost,
   isLow,
   refundTypeFor,
+  type SubscriptionLike,
   tierOf,
 } from './credits.policy';
 
 const utc = (iso: string) => new Date(iso);
+
+/** A live, active subscription row; override what a case is about. */
+function subscription(overrides: Partial<SubscriptionLike> = {}): SubscriptionLike {
+  return {
+    subscriptionTier: 'STANDARD',
+    status: 'ACTIVE',
+    period: 'MONTHLY',
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    cancelAt: null,
+    deletedAt: null,
+    isLifetime: false,
+    scheduledTier: null,
+    scheduledPeriod: null,
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
 
 describe('credits policy', () => {
   it('prices a generation by whether an image was asked for', () => {
@@ -48,11 +67,24 @@ describe('credits policy', () => {
       ULTIMATE: 10000,
     });
     expect(tierOf(null)).toBe('NONE');
-    expect(tierOf({ subscriptionTier: 'PRO', createdAt: new Date(), deletedAt: new Date() })).toBe(
+    expect(tierOf(subscription({ subscriptionTier: 'PRO', deletedAt: new Date() }))).toBe('NONE');
+    expect(tierOf(subscription({ subscriptionTier: 'TEAM' }))).toBe('TEAM');
+  });
+
+  it('reads the tier through the plan table: a trial counts until it ends, a cancellation until it takes effect', () => {
+    const now = utc('2026-10-20T12:00:00Z');
+    const trial = (trialEndsAt: string) =>
+      subscription({ subscriptionTier: 'PRO', status: 'TRIALING', trialEndsAt: utc(trialEndsAt) });
+
+    expect(tierOf(trial('2026-10-30'), now)).toBe('PRO');
+    expect(tierOf(trial('2026-10-19'), now)).toBe('NONE');
+    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'PAST_DUE' }), now)).toBe('TEAM');
+    expect(
+      tierOf(subscription({ subscriptionTier: 'TEAM', cancelAt: utc('2026-11-13') }), now),
+    ).toBe('TEAM');
+    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'CANCELED' }), now)).toBe('NONE');
+    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'INCOMPLETE' }), now)).toBe(
       'NONE',
-    );
-    expect(tierOf({ subscriptionTier: 'TEAM', createdAt: new Date(), deletedAt: null })).toBe(
-      'TEAM',
     );
   });
 

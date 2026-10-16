@@ -12,15 +12,31 @@ import { CreditsService, PaymentRequiredException } from './credits.service';
 
 const NOW = new Date('2026-10-20T12:00:00Z');
 
+/** A live, active subscription row, as the entitlement rule reads it (Sprint 8). */
+function subscription(
+  overrides: Partial<NonNullable<BillingContext['subscription']>> = {},
+): NonNullable<BillingContext['subscription']> {
+  return {
+    subscriptionTier: 'STANDARD',
+    status: 'ACTIVE',
+    period: 'MONTHLY',
+    trialEndsAt: null,
+    currentPeriodEnd: null,
+    cancelAt: null,
+    deletedAt: null,
+    isLifetime: false,
+    scheduledTier: null,
+    scheduledPeriod: null,
+    createdAt: new Date('2026-03-13T15:42:00Z'),
+    ...overrides,
+  };
+}
+
 function billing(overrides: Partial<BillingContext> = {}): BillingContext {
   return {
     workspaceName: 'PostGear Demo Org',
     organizationCreatedAt: new Date('2026-01-05T08:00:00Z'),
-    subscription: {
-      subscriptionTier: 'STANDARD',
-      createdAt: new Date('2026-03-13T15:42:00Z'),
-      deletedAt: null,
-    },
+    subscription: subscription(),
     ...overrides,
   };
 }
@@ -69,7 +85,7 @@ describe('CreditsService', () => {
     ['ULTIMATE', 10000],
   ] as const)('gives a %s workspace %i credits', async (tier, allowance) => {
     repository.findBillingContext.mockResolvedValue(
-      billing({ subscription: { subscriptionTier: tier, createdAt: NOW, deletedAt: null } }),
+      billing({ subscription: subscription({ subscriptionTier: tier, createdAt: NOW }) }),
     );
 
     expect((await service.summary('org_1', NOW)).allowance).toBe(allowance);
@@ -94,11 +110,11 @@ describe('CreditsService', () => {
   it('keeps a cancelled subscription as the anchor while dropping its tier', async () => {
     repository.findBillingContext.mockResolvedValue(
       billing({
-        subscription: {
+        subscription: subscription({
           subscriptionTier: 'PRO',
-          createdAt: new Date('2026-03-13T15:42:00Z'),
+          status: 'CANCELED',
           deletedAt: new Date('2026-09-01'),
-        },
+        }),
       }),
     );
 
@@ -111,11 +127,7 @@ describe('CreditsService', () => {
   it('clamps a day-31 anchor to the end of a shorter month', async () => {
     repository.findBillingContext.mockResolvedValue(
       billing({
-        subscription: {
-          subscriptionTier: 'STANDARD',
-          createdAt: new Date('2026-01-31T10:00:00Z'),
-          deletedAt: null,
-        },
+        subscription: subscription({ createdAt: new Date('2026-01-31T10:00:00Z') }),
       }),
     );
 

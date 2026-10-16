@@ -7,6 +7,10 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
 import { nameSchema, timezoneSchema } from '../auth/dto/common.schema';
+import {
+  type NotificationPreferencesInput,
+  notificationPreferencesSchema,
+} from '../notifications/dto/notifications.schema';
 
 /**
  * Profile reads and writes for the signed-in user.
@@ -65,4 +69,43 @@ export class UsersController {
 
     return { user };
   }
+
+  /**
+   * Email preferences for notifications (Sprint 8, contract §5.2): the
+   * inherited `sendSuccessEmails` / `sendFailureEmails` columns, which the
+   * notifications dispatcher reads to pick who a `post.published` or a
+   * `post.failed` mail goes to. Per user, not per workspace — the columns are
+   * the user's, and the dispatcher applies them in every workspace they are in.
+   */
+  @Get('me/notification-preferences')
+  async notificationPreferences(@CurrentUser() current: AuthenticatedUser) {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: current.id },
+      select: { sendSuccessEmails: true, sendFailureEmails: true },
+    });
+
+    return { preferences: toPreferences(user) };
+  }
+
+  @Patch('me/notification-preferences')
+  async updateNotificationPreferences(
+    @CurrentUser() current: AuthenticatedUser,
+    @Body(new ZodBody(notificationPreferencesSchema, 'users/notification-preferences'))
+    dto: NotificationPreferencesInput,
+  ) {
+    const user = await prisma.user.update({
+      where: { id: current.id },
+      data: {
+        ...(dto.successEmails !== undefined ? { sendSuccessEmails: dto.successEmails } : {}),
+        ...(dto.failureEmails !== undefined ? { sendFailureEmails: dto.failureEmails } : {}),
+      },
+      select: { sendSuccessEmails: true, sendFailureEmails: true },
+    });
+
+    return { preferences: toPreferences(user) };
+  }
+}
+
+function toPreferences(user: { sendSuccessEmails: boolean; sendFailureEmails: boolean }) {
+  return { successEmails: user.sendSuccessEmails, failureEmails: user.sendFailureEmails };
 }

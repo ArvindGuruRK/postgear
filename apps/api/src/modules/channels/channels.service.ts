@@ -22,6 +22,8 @@ import {
   supportsEntitySelection,
 } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
+import type { ChannelUsage } from '../billing/billing.types';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { type ChannelHandshake, ChannelOAuthService } from './channel-oauth.service';
 import {
@@ -46,6 +48,13 @@ export interface ChannelView extends ChannelSummary {
   providerName: string;
 }
 
+/** What `GET /channels` says about the plan's ceiling (Sprint 8). */
+export interface ChannelLimit {
+  used: number;
+  max: number;
+  tier: ChannelUsage['tier'];
+}
+
 @Injectable()
 export class ChannelsService {
   private readonly manager = new IntegrationManager();
@@ -55,11 +64,18 @@ export class ChannelsService {
     private readonly oauth: ChannelOAuthService,
     private readonly config: ConfigService,
     private readonly scheduling: SchedulingService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   /** Every provider, with whether it can actually be connected right now. */
   listProviders() {
     return this.manager.list();
+  }
+
+  /** Connected channels against the plan's limit, for the page's "n of m channels". */
+  async limit(orgId: string): Promise<ChannelLimit> {
+    const usage = await this.entitlements.channelUsage(orgId);
+    return { used: usage.used, max: usage.limit, tier: usage.tier };
   }
 
   async list(orgId: string): Promise<ChannelView[]> {
@@ -97,6 +113,11 @@ export class ChannelsService {
       if (!existing) {
         throw new NotFoundException('Channel not found');
       }
+    } else {
+      // The plan's ceiling (Sprint 8). Checked before the consent screen so a
+      // person is told now, not after signing in to a platform for nothing. A
+      // reconnect never adds a channel, so it is never refused here.
+      await this.entitlements.assertCanConnect(params.orgId);
     }
 
     const redirectUri = this.redirectUriFor(provider.identifier);
@@ -189,6 +210,18 @@ export class ChannelsService {
           return {
             path: `${handshake.returnPath}?error=wrong_account&provider=${provider.identifier}`,
           };
+        }
+      } else if (!(await this.hasRowFor(handshake.orgId, details.id))) {
+        // Re-checked here because the limit can have been reached between the
+        // handshake starting and the platform calling back — another admin
+        // connecting at the same time, or a plan that ended meanwhile. Only a
+        // genuinely new row counts: re-authorising an account that already
+        // has a row (live, or disconnected and about to be resurrected by
+        // the upsert) is a reconnect in all but name.
+        const { allowed } = await this.entitlements.checkConnect(handshake.orgId);
+
+        if (!allowed) {
+          return { path: `${handshake.returnPath}?error=channel_limit` };
         }
       }
 
@@ -459,6 +492,20 @@ export class ChannelsService {
       profile: channel.profile,
       additionalSettings: channel.additionalSettings,
     };
+  }
+
+  /**
+   * Whether a row — live or soft-deleted — already holds this platform id for
+   * the workspace. The upsert in `completeConnect` keys on exactly this pair,
+   * so "a row exists" is "no new channel will be created".
+   */
+  private async hasRowFor(orgId: string, internalId: string): Promise<boolean> {
+    const row = await prisma.integration.findFirst({
+      where: { organizationId: orgId, internalId: String(internalId) },
+      select: { id: true },
+    });
+
+    return row !== null;
   }
 
   /**

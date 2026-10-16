@@ -27,5 +27,8 @@ import { ANALYTICS_CLOCK, AnalyticsService } from './analytics.service';
     AnalyticsRepository,
     { provide: ANALYTICS_CLOCK, useValue: () => Date.now() },
   ],
+  // Sprint 8: `/v1/analytics/overview` in the developers module reads the
+  // same overview through the same service.
+  exports: [AnalyticsService],
 })
 export class AnalyticsModule {}

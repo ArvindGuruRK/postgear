@@ -277,6 +277,42 @@ surfaces it has; what was decided:
   or authority is estimated, a one-line `Alert`/hint names the flag or the
   missing provider; the screen never looks more real than its data.
 
+## 16d. Settings, billing and notification surfaces (Sprint 8)
+
+The settings section (`/[orgId]/settings/*`) and the bell are the first
+screens that show money, secrets and a live feed; what was decided:
+
+- **One settings layout.** `settings/layout.tsx` wraps every section in
+  `SettingsNav`; a page is a `PageHeader`, then its content, never its own
+  side nav or breadcrumb.
+- **Status is the Sprint 5 vocabulary again.** A subscription reads
+  `success` (active), `primary` (trialing), `accent` (canceling, past due's
+  grace), `danger` (payment failed), `outline` (none); a delivery reads
+  `success` / `accent` (pending) / `danger`; an API key `success` (live) /
+  `outline` (revoked). Nothing on these screens introduces a colour.
+- **A secret is shown once, in a warning `Alert`**, with a read-only `Input`
+  and a Copy `Button` — never in a table, a toast, or a tooltip. After the
+  dialog closes the secret is gone; the list shows a prefix or nothing. The
+  warning tone is for "this will not be shown again", not for danger.
+- **Plan cards are `PlanCard`**; the current plan is `highlighted` with a
+  `CURRENT` badge and a disabled action (`actionDisabled`). Usage is a
+  `UsageMeter` — channels `primary`, AI credits `ai` — with the limit's
+  origin as the caption.
+- **The bell is `NotificationCenter`**, in the top bar's `notifications`
+  slot. Items carry a `type` that picks a lucide icon and a tone
+  (`post.published` success, `post.failed` danger, `channel.needs_reconnect`
+  accent, `billing.*` ink, `webhook.failed` danger); the unread dot is the
+  danger badge; the panel's footer is a text link to the preferences. Content
+  is rendered as text — a channel name or a provider error can never become
+  markup.
+- **Dense lists stay restrained** (§15): the API-key, webhook and delivery
+  lists are `Table`s or bordered `li`s with no brutal shadow; the `sr-only`
+  header for an actions column sits in a `relative` cell so its absolute
+  box cannot widen the page.
+- **Pending is a state, not a spinner.** *Activating…* on the billing page
+  is a `Badge variant="accent"` with a line of copy, polled for a bounded
+  time, then either the new plan or an honest "still waiting" alert.
+
 ## 17. Token extension policy
 
 Every rule above resolves to a token, not a literal value. When a genuinely new need comes up (this pass added `--color-brutal-success` for semantic success states, and the four accordion/collapsible keyframes for expand animation) — extend `colors.css` + `tailwind.css` following the existing pattern (flat non-theme-varying color in the same block as `brutal-secondary`/`brutal-danger`/`brutal-accent`; a new `@keyframes` + `--animate-*` entry next to the existing ones) and document *why* in a comment, the same way every existing token is documented. Never inline a one-off hex/pixel value inside a component file to route around this.

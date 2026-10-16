@@ -22,7 +22,7 @@
  * publishing a second time.
  */
 
-import { decryptNullable, prisma, State } from '@postgear/db';
+import { decryptNullable, NotificationEmailStatus, prisma, State } from '@postgear/db';
 import {
   backoffAfterAttempt,
   type PostPublishInput,
@@ -30,7 +30,6 @@ import {
   PUBLISH_RETRY_POLICY,
   type PublishFailureReason,
   type PublishSkipReason,
-  parsePublishStatus,
   serializePublishStatus,
 } from '@postgear/scheduling';
 import {
@@ -51,6 +50,8 @@ import {
   previewOf,
   previousAttemptInFlight,
 } from '../lib/publish-details';
+import { enqueueWebhookDeliveries } from '../lib/webhook-payload';
+import { startWebhookDeliveries } from '../lib/webhook-start';
 import type { ActivityDeps } from './deps';
 
 export type PublishJob =
@@ -274,7 +275,7 @@ export function createPublishActivities(deps: ActivityDeps) {
       const releaseURL = results[0]?.releaseURL ?? null;
 
       try {
-        await writePublished(input, rows, results, integration.name, previewOf(details));
+        await writePublished(deps, input, rows, results, integration, root, previewOf(details));
         return { recorded: true, releaseURL, results };
       } catch (error) {
         // The post is out. Recording it is the workflow's job now, through an
@@ -297,10 +298,12 @@ export function createPublishActivities(deps: ActivityDeps) {
 
       const details = await renderChain(chain.rows, input.organizationId, deps.publicUrl);
       await writePublished(
+        deps,
         input,
         chain.rows,
         input.results,
-        chain.integration.name,
+        chain.integration,
+        chain.root,
         previewOf(details),
       );
     },
@@ -314,17 +317,22 @@ export function createPublishActivities(deps: ActivityDeps) {
       }
 
       const now = new Date();
+      const { root, rows, integration } = chain;
+      const details = await renderChain(rows, input.organizationId, deps.publicUrl).catch(() => []);
 
-      await prisma.$transaction([
-        prisma.post.updateMany({
+      // One transaction for the rows, the error record, the notification and
+      // the webhook deliveries (Sprint 8), so a crash between them cannot
+      // leave a failed post that nobody was told about.
+      const deliveryIds = await prisma.$transaction(async (tx) => {
+        await tx.post.updateMany({
           where: {
-            id: { in: chain.rows.map((row) => row.id) },
+            id: { in: rows.map((row) => row.id) },
             organizationId: input.organizationId,
           },
           data: { state: State.ERROR },
-        }),
-        prisma.post.update({
-          where: { id: chain.root.id },
+        });
+        await tx.post.update({
+          where: { id: root.id },
           data: {
             error: serializePublishStatus({
               kind: 'failed',
@@ -334,32 +342,67 @@ export function createPublishActivities(deps: ActivityDeps) {
               failedAt: now.toISOString(),
             }),
           },
-        }),
-        prisma.errors.create({
+        });
+        await tx.errors.create({
           data: {
             organizationId: input.organizationId,
-            postId: chain.root.id,
-            platform: chain.integration.providerIdentifier,
+            postId: root.id,
+            platform: integration.providerIdentifier,
             message: input.message,
             body: JSON.stringify({ reason: input.reason, attempts: input.attempts }),
           },
-        }),
-        prisma.notifications.create({
+        });
+        // Sprint 8: typed, titled, and queued for the API's email dispatcher,
+        // with what the mail needs in `meta` — see notifications.types.ts.
+        await tx.notifications.create({
           data: {
             organizationId: input.organizationId,
-            content: `Could not publish to ${chain.integration.name}: ${input.message}`,
+            type: 'post.failed',
+            title: 'Post failed',
+            content: `Could not publish to ${integration.name}: ${input.message}`,
             link: `/${input.organizationId}/queue?state=ERROR`,
+            emailStatus: NotificationEmailStatus.PENDING,
+            meta: {
+              postId: root.id,
+              group: root.group,
+              channelId: integration.id,
+              channelName: integration.name,
+              provider: integration.providerIdentifier,
+              reason: input.reason,
+              message: input.message,
+              attempts: input.attempts,
+            },
           },
-        }),
-        ...(input.reason === 'needs_reconnect'
-          ? [
-              prisma.integration.updateMany({
-                where: { id: chain.integration.id, organizationId: input.organizationId },
-                data: { refreshNeeded: true },
-              }),
-            ]
-          : []),
-      ]);
+        });
+        if (input.reason === 'needs_reconnect') {
+          await tx.integration.updateMany({
+            where: { id: integration.id, organizationId: input.organizationId },
+            data: { refreshNeeded: true },
+          });
+        }
+
+        return enqueueWebhookDeliveries(tx, {
+          organizationId: input.organizationId,
+          event: 'post.failed',
+          integrationId: integration.id,
+          subjectId: root.id,
+          post: {
+            id: root.group,
+            rootId: root.id,
+            state: 'ERROR',
+            publishAt: root.publishDate.toISOString(),
+            url: null,
+            preview: previewOf(details),
+            channel: { id: integration.id, name: integration.name, provider: integration.providerIdentifier },
+          },
+          error: { reason: input.reason, message: input.message, attempts: input.attempts },
+          now,
+        });
+      });
+
+      await startWebhookDeliveries(deps.temporalClient, input.organizationId, deliveryIds, (message, meta) =>
+        Context.current().log.warn(message, meta),
+      );
     },
   };
 }
@@ -414,8 +457,11 @@ const ROW_SELECT = {
  * repository rewrites `parentPostId` on every save, so following links from
  * the root is enough, and `orderChain` tolerates anything that is not.
  */
+/** The root row with what an outbound webhook needs to name the post (Sprint 8). */
+type RootRowRecord = ChainRowRecord & { group: string; publishDate: Date };
+
 async function loadChain(input: PostPublishInput): Promise<{
-  root: ChainRowRecord;
+  root: RootRowRecord;
   rows: ChainRowRecord[];
   integration: IntegrationRecord;
 } | null> {
@@ -424,6 +470,7 @@ async function loadChain(input: PostPublishInput): Promise<{
     select: {
       ...ROW_SELECT,
       group: true,
+      publishDate: true,
       integrationId: true,
       integration: {
         select: {
@@ -497,20 +544,28 @@ async function renderChain(
   return buildPostDetails(rows, new Map(media.map((item) => [item.id, item])), publicUrl);
 }
 
+/**
+ * Records a publish: the rows, the notification and the webhook deliveries
+ * (Sprint 8) in one transaction, then the delivery workflows best-effort.
+ */
 async function writePublished(
+  deps: ActivityDeps,
   input: PostPublishInput,
   rows: ChainRowRecord[],
   results: PostResponse[],
-  channelName: string,
+  integration: Pick<IntegrationRecord, 'id' | 'name' | 'providerIdentifier'>,
+  root: Pick<RootRowRecord, 'id' | 'group' | 'publishDate'>,
   preview: string,
 ): Promise<void> {
   const byRow = new Map(results.map((result) => [result.id, result]));
   const first = results[0];
+  const releaseURL = first?.releaseURL ?? null;
+  const now = new Date();
 
-  await prisma.$transaction([
-    ...rows.map((row) => {
+  const deliveryIds = await prisma.$transaction(async (tx) => {
+    for (const row of rows) {
       const result = byRow.get(row.id);
-      return prisma.post.updateMany({
+      await tx.post.updateMany({
         where: { id: row.id, organizationId: input.organizationId },
         data: {
           state: State.PUBLISHED,
@@ -518,15 +573,49 @@ async function writePublished(
           ...(result ? { releaseId: result.postId, releaseURL: result.releaseURL } : {}),
         },
       });
-    }),
-    prisma.notifications.create({
+    }
+    // Sprint 8: typed, titled, and queued for the API's email dispatcher.
+    await tx.notifications.create({
       data: {
         organizationId: input.organizationId,
-        content: `Published to ${channelName}${preview ? `: ${preview}` : ''}`,
-        link: first?.releaseURL ?? null,
+        type: 'post.published',
+        title: 'Post published',
+        content: `Published to ${integration.name}${preview ? `: ${preview}` : ''}`,
+        link: releaseURL,
+        emailStatus: NotificationEmailStatus.PENDING,
+        meta: {
+          postId: root.id,
+          group: root.group,
+          channelId: integration.id,
+          channelName: integration.name,
+          provider: integration.providerIdentifier,
+          releaseURL,
+          preview,
+        },
       },
-    }),
-  ]);
+    });
+
+    return enqueueWebhookDeliveries(tx, {
+      organizationId: input.organizationId,
+      event: 'post.published',
+      integrationId: integration.id,
+      subjectId: root.id,
+      post: {
+        id: root.group,
+        rootId: root.id,
+        state: 'PUBLISHED',
+        publishAt: root.publishDate.toISOString(),
+        url: releaseURL,
+        preview,
+        channel: { id: integration.id, name: integration.name, provider: integration.providerIdentifier },
+      },
+      now,
+    });
+  });
+
+  await startWebhookDeliveries(deps.temporalClient, input.organizationId, deliveryIds, (message, meta) =>
+    Context.current().log.warn(message, meta),
+  );
 }
 
 /**

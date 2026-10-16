@@ -11,3 +11,4 @@ export { analyticsSyncWorkflow } from './analytics-sync.workflow';
 export { maintenanceWorkflow } from './maintenance.workflow';
 export { postPublishWorkflow } from './post-publish.workflow';
 export { tokenRefreshWorkflow } from './token-refresh.workflow';
+export { webhookDeliveryWorkflow } from './webhook-delivery.workflow';

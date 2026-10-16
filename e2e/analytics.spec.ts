@@ -104,7 +104,8 @@ test.describe('analytics', () => {
       { timeout: 20_000 },
     );
 
-    const sync = page.getByRole('button', { name: 'Sync now' });
+    // `exact`: the status pill's own label mentions "Sync now" when nothing has synced yet.
+    const sync = page.getByRole('button', { name: 'Sync now', exact: true });
     await expect(sync).toBeEnabled();
     await sync.click();
 

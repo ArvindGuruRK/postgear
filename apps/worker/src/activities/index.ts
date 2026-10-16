@@ -10,6 +10,7 @@ import type { ActivityDeps } from './deps';
 import { createIntegrationActivities } from './integration.activities';
 import { createMaintenanceActivities } from './maintenance.activities';
 import { createPublishActivities } from './publish.activities';
+import { createWebhookActivities } from './webhook.activities';
 
 export type { AnalyticsSchedule, AnalyticsSyncResult } from './analytics.activities';
 export type { ActivityDeps } from './deps';
@@ -21,6 +22,7 @@ export type {
   PublishResult,
   RecordPublishedInput,
 } from './publish.activities';
+export type { DeliverWebhookResult, MarkWebhookDeliveryFailedInput } from './webhook.activities';
 
 export function createActivities(deps: ActivityDeps) {
   return {
@@ -28,6 +30,7 @@ export function createActivities(deps: ActivityDeps) {
     ...createIntegrationActivities(deps),
     ...createAnalyticsActivities(deps),
     ...createMaintenanceActivities(deps),
+    ...createWebhookActivities(deps),
   };
 }
 

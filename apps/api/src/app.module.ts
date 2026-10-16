@@ -5,12 +5,17 @@ import { validateEnv } from './config/env';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { ThrottlingModule } from './common/throttling/throttling.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
+import { DevelopersModule } from './modules/developers/developers.module';
+import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
 import { MediaModule } from './modules/media/media.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OrgModule } from './modules/org/org.module';
 import { PostsModule } from './modules/posts/posts.module';
@@ -18,6 +23,7 @@ import { RedisModule } from './modules/redis/redis.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { SeoModule } from './modules/seo/seo.module';
 import { UsersModule } from './modules/users/users.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
 /**
  * Root module.
@@ -48,6 +54,9 @@ import { UsersModule } from './modules/users/users.module';
       ignoreEnvFile: true,
     }),
     RedisModule,
+    // Sprint 8: the per-address rate limit on every route, and the throttler
+    // store the public API's per-key limit shares.
+    ThrottlingModule,
     MailModule,
     AuthModule,
     UsersModule,
@@ -60,6 +69,12 @@ import { UsersModule } from './modules/users/users.module';
     AiModule,
     AnalyticsModule,
     SeoModule,
+    // Sprint 8
+    BillingModule,
+    NotificationsModule,
+    DevelopersModule,
+    WebhooksModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

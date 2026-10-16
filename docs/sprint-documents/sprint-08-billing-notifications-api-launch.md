@@ -63,11 +63,28 @@ Users can subscribe/pay via Stripe with plan-based limits enforced, receive in-a
 - Load/E2E smoke test of the full path: signup → connect channel → compose → schedule → publish → billing checkout.
 
 ## Definition of Done
-- [ ] A real (test-mode) Stripe subscription can be purchased, upgraded, and cancelled, with plan limits (channel count, AI credits) actually enforced against Sprint 3/6 features.
-- [ ] A post failure triggers both an in-app notification and an email within seconds.
-- [ ] An external request with a valid API key can create a post via `/v1/posts` and receive a webhook when it publishes.
-- [ ] Rate limiting visibly blocks a rapid-fire request burst against a public endpoint.
-- [ ] Sentry captures a deliberately-thrown test error from both `apps/api` and `apps/web`.
+
+**Closed 2026-10-16** — in simulation. See the [completion checklist](../sprint-completion-checklists/sprint-08-completion-checklist.md) for the evidence per item and §8 there for the two things that still need an account you own.
+
+- [x] A real (test-mode) Stripe subscription can be purchased, upgraded, and cancelled, with plan limits (channel count, AI credits) actually enforced against Sprint 3/6 features. **Built and proven with `BILLING_SIMULATION`** — the synthetic events go through the same signature-verified, idempotent webhook handler a real delivery hits; the real Stripe client is unit-tested but has not been run against Stripe (no key on this machine). Browser test: `billing.spec.ts`.
+- [x] A post failure triggers both an in-app notification and an email within seconds. Browser test: `notifications.spec.ts › a post that fails arrives in the bell over the stream`; the email prints to the API console (the local mail mode).
+- [x] An external request with a valid API key can create a post via `/v1/posts` and receive a webhook when it publishes. Browser tests: `developers.spec.ts` and `webhooks.spec.ts` (a real receiver, a verified signature).
+- [x] Rate limiting visibly blocks a rapid-fire request burst against a public endpoint. Live: 65 calls → 49 × 200, 16 × 429 with `Retry-After`; `developers.spec.ts › burst`.
+- [x] Sentry captures a deliberately-thrown test error from both `apps/api` and `apps/web`. **Wired and tested up to the SDK call** (`GET /health/sentry-test`, `/dev/sentry-test`); no DSN on this machine, so no event has reached Sentry yet.
+
+## Deviations from this document, and why
+
+> **Build contract**: [sprint-08-contract.md](sprint-08-contract.md) — the shapes everything was built to, and §0 there for the Postiz study.
+
+| This doc said | What shipped | Why |
+|---|---|---|
+| "Decide whether … a proper `ApiKey` model" | An `ApiKey` table: hash, prefix, `lastUsedAt`, `revokedAt`, several per workspace | The inherited single plaintext-equivalent key cannot be rotated or revoked per integration |
+| Lifetime deals, discount/coupon system (P2 in the PRD) | Not built; `isLifetime` rows are honoured by the entitlement rule | P2, and both need Stripe dashboard objects to design against |
+| "WebSocket or SSE for the in-app notification dropdown" | SSE, through the Sprint 6 transport, on a GET | The transport existed; one more dependency for one direction of traffic is not worth it |
+| "Resend or SMTP/Nodemailer — pick one" | The existing Nodemailer `MailService`, with a plain-text `sendPlain`; console transport locally | Already there since Sprint 2; Resend is a config change on top of SMTP, not a feature |
+| "Outbound webhook config + dispatch on post published/failed events" | Signed (HMAC-SHA256, per-hook secret), delivered by a Temporal workflow per delivery with backoff, SSRF-guarded at save and send time, a delivery history | The reference sends unsigned, unchecked, unretried; the DoD says "receive a webhook", which a fire-and-forget fetch does not guarantee |
+| "Load/E2E smoke test of the full path: signup → connect channel → compose → schedule → publish → billing checkout" | The existing specs cover signup/onboarding, channels, composer, scheduling and publishing; billing has its own spec; no single spec strings them together | Connecting a channel needs a real OAuth consent screen no test can click through; each link of the chain is tested where it lives |
+| Plan tiers "FREE → STANDARD → PRO → TEAM → ULTIMATE" with numbers | As listed, with **placeholder prices** in `plans.ts` | A product decision for the owner; one file to change |
 
 ## Risks
-- Stripe webhook race conditions (delayed event vs. optimistic UI) — process webhooks idempotently keyed on Stripe's event ID, and let the UI show a "pending" state rather than assuming instant activation.
+- Stripe webhook race conditions (delayed event vs. optimistic UI) — process webhooks idempotently keyed on Stripe's event ID, and let the UI show a "pending" state rather than assuming instant activation. **Done**: `BillingEvent` keyed on the event id inside the transaction, `lastStripeEventAt` as the ordering guard, and an *Activating…* state that polls until the handler has applied the event.

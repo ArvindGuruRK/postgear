@@ -6,6 +6,8 @@
  * which is what lets the httpOnly session cookie set here be sent back by a
  * browser on :3000 without any proxying.
  */
+// First, before anything it instruments (Sprint 8). A no-op without SENTRY_DSN.
+import './instrument';
 import 'reflect-metadata';
 
 import { Logger } from '@nestjs/common';
@@ -17,11 +19,18 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import type { Env } from './config/env';
 import { storageConfigFrom } from './modules/media/media.module';
+import { setupOpenApi } from './modules/developers/openapi/setup-openapi';
 import { UPLOADS_ROUTE } from './modules/media/storage/local.storage';
 import { resolveUploadDirectory } from './modules/media/storage/storage.factory';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: false,
+    // Keeps the unparsed body on `request.rawBody` (Sprint 8): Stripe signs
+    // the exact bytes it sent, and a re-serialised JSON object would never
+    // verify. Every other route still reads the parsed body as before.
+    rawBody: true,
+  });
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
@@ -91,6 +100,7 @@ async function bootstrap(): Promise<void> {
   // second validation vocabulary for no gain.
 
   const port = config.get<number>('PORT', 3001);
+  setupOpenApi(app);
   await app.listen(port);
 
   logger.log(`API listening on http://localhost:${port}`);

@@ -90,6 +90,13 @@ export async function deleteUser(userId: string): Promise<void> {
     // that other tests depend on.
     const remaining = await prisma.userOrganization.count({ where: { organizationId } });
     if (remaining === 0) {
+      // Sprint 8: a new workspace starts a trial (`Subscription`) and is told
+      // so (`Notifications`); neither cascades from the organization, and a
+      // test may have added webhooks. Remove them first, in dependency order.
+      await prisma.integrationsWebhooks.deleteMany({ where: { webhook: { organizationId } } });
+      await prisma.webhooks.deleteMany({ where: { organizationId } });
+      await prisma.notifications.deleteMany({ where: { organizationId } });
+      await prisma.subscription.deleteMany({ where: { organizationId } });
       await prisma.organization.deleteMany({ where: { id: organizationId } });
     }
   }

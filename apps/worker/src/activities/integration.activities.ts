@@ -15,7 +15,7 @@
  * refresh bug); siblings of one grant share the new token; and a failure flips
  * `refreshNeeded`, which is the flag the UI reads to offer "Reconnect".
  */
-import { decryptNullable, encrypt, prisma } from '@postgear/db';
+import { decryptNullable, encrypt, NotificationEmailStatus, prisma } from '@postgear/db';
 import type { TokenRefreshInput } from '@postgear/scheduling';
 import { ProviderError, RetryableError } from '@postgear/social-core';
 import type { ActivityDeps } from './deps';
@@ -164,5 +164,73 @@ async function markRefreshNeeded(input: TokenRefreshInput): Promise<void> {
   await prisma.integration.updateMany({
     where: { id: input.integrationId, organizationId: input.organizationId, deletedAt: null },
     data: { refreshNeeded: true },
+  });
+
+  try {
+    await notifyReconnectNeeded(input);
+  } catch (error) {
+    // The flag is the write that matters; a missed notification is logged, not thrown.
+    console.warn(
+      JSON.stringify({
+        event: 'channel.reconnect_notification.failed',
+        orgId: input.organizationId,
+        channelId: input.integrationId,
+        reason: error instanceof Error ? error.message : 'unknown',
+      }),
+    );
+  }
+}
+
+/** A refresh loop re-runs on every wake-up; one reconnect prompt a day per channel is enough. */
+const RECONNECT_NOTICE_WINDOW_MS = 24 * 60 * 60_000;
+
+/**
+ * Tells the workspace a channel needs reconnecting (Sprint 8): a
+ * `channel.needs_reconnect` row the API's dispatcher emails to members with
+ * failure emails on, written at most once per channel per day.
+ */
+async function notifyReconnectNeeded(input: TokenRefreshInput): Promise<void> {
+  const channel = await prisma.integration.findFirst({
+    where: { id: input.integrationId, organizationId: input.organizationId },
+    select: { name: true, providerIdentifier: true },
+  });
+
+  if (!channel) {
+    return;
+  }
+
+  const content = `${channel.name} needs reconnecting before PostGear can publish to it.`;
+  const link = `/${input.organizationId}/channels`;
+
+  const recent = await prisma.notifications.findFirst({
+    where: {
+      organizationId: input.organizationId,
+      type: 'channel.needs_reconnect',
+      link,
+      content,
+      deletedAt: null,
+      createdAt: { gt: new Date(Date.now() - RECONNECT_NOTICE_WINDOW_MS) },
+    },
+    select: { id: true },
+  });
+
+  if (recent) {
+    return;
+  }
+
+  await prisma.notifications.create({
+    data: {
+      organizationId: input.organizationId,
+      type: 'channel.needs_reconnect',
+      title: 'Channel needs reconnecting',
+      content,
+      link,
+      emailStatus: NotificationEmailStatus.PENDING,
+      meta: {
+        channelId: input.integrationId,
+        channelName: channel.name,
+        provider: channel.providerIdentifier,
+      },
+    },
   });
 }

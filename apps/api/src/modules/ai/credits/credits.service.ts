@@ -65,7 +65,7 @@ export class CreditsService {
       throw new NotFoundException(AI_MESSAGES.WORKSPACE_NOT_FOUND);
     }
 
-    const tier = tierOf(billing.subscription);
+    const tier = tierOf(billing.subscription, now);
     // The subscription's day of the month when there is one; otherwise the
     // workspace's. A cancelled subscription keeps anchoring the cycle, so a
     // downgrade to the trial allowance does not also move the reset date.
