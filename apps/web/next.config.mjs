@@ -1,4 +1,5 @@
-import { withSentryConfig } from '@sentry/nextjs';
+// Sentry 11 exports the build helper from its own subpath, not the root.
+import { withSentryConfig } from '@sentry/nextjs/config';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

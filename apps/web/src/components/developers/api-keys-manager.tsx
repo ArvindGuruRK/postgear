@@ -159,7 +159,8 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
               <TableHead>Created</TableHead>
               <TableHead>Last used</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>
+              {/* `relative`: the sr-only label is absolutely positioned and must stay inside the cell, not widen the page. */}
+              <TableHead className="relative">
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>

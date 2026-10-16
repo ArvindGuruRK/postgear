@@ -211,7 +211,8 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
                   <TableHead>URL</TableHead>
                   <TableHead>Events</TableHead>
                   <TableHead>Last delivery</TableHead>
-                  <TableHead className="w-12">
+                  {/* `relative`: the sr-only label is absolutely positioned and must stay inside the cell. */}
+                  <TableHead className="relative w-12">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>

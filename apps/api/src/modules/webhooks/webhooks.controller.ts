@@ -44,6 +44,9 @@ export class WebhooksController {
       // worker reads it too.
       events: WEBHOOK_EVENTS,
       retryPolicy: WEBHOOK_DELIVERY_RETRY_POLICY,
+      // The URL policy is the API's setting; the page must not guess it from
+      // its own process environment.
+      allowPrivateUrls: this.webhooks.allowPrivateUrls,
     };
   }
 

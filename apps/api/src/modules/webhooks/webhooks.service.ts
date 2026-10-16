@@ -60,6 +60,11 @@ export class WebhooksService {
     this.allowPrivate = config.get('WEBHOOK_ALLOW_PRIVATE_URLS', { infer: true }) === 'true';
   }
 
+  /** Whether this deployment accepts http:// and private addresses (local testing). The page reads it from here, not from its own environment. */
+  get allowPrivateUrls(): boolean {
+    return this.allowPrivate;
+  }
+
   async list(orgId: string): Promise<WebhookView[]> {
     const rows = await this.repository.listForOrg(orgId);
     const latest = await this.repository.latestDeliveries(

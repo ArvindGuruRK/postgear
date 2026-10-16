@@ -129,9 +129,14 @@ test.describe('notifications', () => {
       .first();
     await expect(failed).toBeVisible({ timeout: DELIVERY_TIMEOUT });
     await expect(failed).toHaveAttribute('data-read', 'false');
-    await expect(bell).toHaveAttribute('data-unread', String(before + 1), {
-      timeout: DELIVERY_TIMEOUT,
-    });
+    // At least one more than before: the other specs running alongside
+    // (billing, developers) write their own notifications into this
+    // workspace, so an exact count would race with them.
+    await expect
+      .poll(async () => Number(await bell.getAttribute('data-unread')), {
+        timeout: DELIVERY_TIMEOUT,
+      })
+      .toBeGreaterThanOrEqual(before + 1);
 
     // The item leads to the failed tab of the queue.
     await failed.click();

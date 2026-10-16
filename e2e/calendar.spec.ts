@@ -106,7 +106,10 @@ test.describe('calendar', () => {
   }) => {
     await signIn(page);
     const from = atNoon(2);
-    const to = atNoon(3);
+    // The week starts on Monday (`startOfWeek`), so when `from` lands on a
+    // Sunday the next day is in another week and off the anchored grid; move
+    // the post back a day instead. Either way it is "another day".
+    const to = from.getDay() === 0 ? atNoon(1) : atNoon(3);
     const group = await createQueued(page, `E2E drag me ${Date.now()}`, from);
     created.groups.push(group);
 
