@@ -117,7 +117,7 @@ export function NotificationCenter({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between gap-3 border-b-2 border-outline px-4 py-3">
-          <p className="font-display text-sm uppercase tracking-wide text-ink">{title}</p>
+          <p className="type-label text-sm text-ink">{title}</p>
           {onMarkAllRead && (
             <button
               type="button"

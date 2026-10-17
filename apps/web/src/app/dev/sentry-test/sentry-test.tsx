@@ -34,7 +34,7 @@ export function SentryTest({ dsnConfigured }: { dsnConfigured: boolean }) {
 
   return (
     <Stack gap="lg" className="mx-auto max-w-2xl">
-      <h1 className="font-display text-4xl tracking-wide text-ink">Sentry test</h1>
+      <h1 className="type-heading text-4xl text-ink">Sentry test</h1>
       <Alert variant={dsnConfigured ? 'success' : 'warning'} data-testid="sentry-dsn-state">
         <AlertTitle>{dsnConfigured ? 'A DSN is configured' : 'No DSN configured'}</AlertTitle>
         <AlertDescription>
