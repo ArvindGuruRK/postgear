@@ -1,9 +1,11 @@
 'use client';
 
-import { Search, X } from 'lucide-react';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
+import { Search } from 'lucide-react';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 import { Input, type InputProps } from './input';
+import { MotionIcon } from './motion-icon';
 
 export interface SearchInputProps extends InputProps {
   onClear?: () => void;
@@ -39,7 +41,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             )}
           >
-            <X className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={XIcon} className="h-4 w-4" />
           </button>
         )}
       </div>

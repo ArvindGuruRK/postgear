@@ -8,8 +8,18 @@
  * real clipboard write with a fallback message when the browser refuses
  * (no secure context, no permission): the person can still select the text.
  */
-import { Alert, AlertDescription, AlertTitle, Button, Input, Stack, Text } from '@postgear/ui';
-import { Check, Copy } from 'lucide-react';
+import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Input,
+  MotionIcon,
+  Stack,
+  Text,
+} from '@postgear/ui';
+import { Check } from 'lucide-react';
 import { useState } from 'react';
 
 export function SecretPanel({
@@ -52,7 +62,7 @@ export function SecretPanel({
               {copied === 'copied' ? (
                 <Check className="h-4 w-4" strokeWidth={3} />
               ) : (
-                <Copy className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={CopyIcon} className="h-4 w-4" />
               )}
               {copied === 'copied' ? 'Copied' : 'Copy'}
             </Button>

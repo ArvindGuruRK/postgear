@@ -1,16 +1,19 @@
 'use client';
 
-import { cn } from '@postgear/ui';
+import { type AnimatedIcon, cn, useIconAnimation } from '@postgear/ui';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-export interface SidebarItem {
+interface SidebarItemBase {
   label: string;
   href: string;
-  icon: LucideIcon;
   active?: boolean;
 }
+
+/** Either a static lucide glyph or an animated one, never both. */
+export type SidebarItem = SidebarItemBase &
+  ({ icon: LucideIcon; animatedIcon?: never } | { animatedIcon: AnimatedIcon; icon?: never });
 
 /**
  * One rail entry: the icon above a short label, the reference's menu item.
@@ -19,13 +22,25 @@ export interface SidebarItem {
  * lines, and a rail of bare glyphs makes people hover to find Analytics.
  * The active entry takes the primary fill and a pressable shadow, the same
  * treatment as a pressed Button, so "where am I" reads from across the room.
+ *
+ * An animated icon plays from anywhere on the tile and on keyboard focus:
+ * see `useIconAnimation`.
  */
-function RailItem({ label, href, icon: Icon, active }: SidebarItem) {
+function RailItem({
+  label,
+  href,
+  icon: Icon,
+  animatedIcon: AnimatedRailIcon,
+  active,
+}: SidebarItem) {
+  const icon = useIconAnimation();
+
   return (
     <Link
       href={href}
       title={label}
       aria-current={active ? 'page' : undefined}
+      {...icon.triggers}
       className={cn(
         'flex w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 px-0.5 py-2',
         'outline-none transition-[transform,box-shadow,background-color] duration-100',
@@ -35,7 +50,18 @@ function RailItem({ label, href, icon: Icon, active }: SidebarItem) {
           : 'border-transparent text-ink hover:border-outline hover:bg-primary',
       )}
     >
-      <Icon className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+      {AnimatedRailIcon ? (
+        // The library fixes stroke-width="2" on the svg; CSS outranks the
+        // attribute, which keeps the animated set at the lucide set's weight.
+        <AnimatedRailIcon
+          ref={icon.ref}
+          aria-hidden
+          size={20}
+          className="!block h-5 w-5 shrink-0 [&_svg]:[stroke-width:2.25]"
+        />
+      ) : Icon ? (
+        <Icon className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+      ) : null}
       <span className="line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.15]">
         {label}
       </span>

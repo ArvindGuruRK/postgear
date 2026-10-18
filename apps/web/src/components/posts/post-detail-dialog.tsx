@@ -9,6 +9,11 @@
  * exactly the case this exists for. Actions: edit in the composer, publish
  * now, reschedule, delete; each only when the state allows it.
  */
+import { CalendarClockIcon } from '@animateicons/react/lucide/calendar-clock-icon';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { SendIcon } from '@animateicons/react/lucide/send-icon';
+import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Avatar,
   AvatarFallback,
@@ -21,9 +26,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  MotionIcon,
   Text,
 } from '@postgear/ui';
-import { CalendarClock, ExternalLink, PenSquare, Send, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { PlatformIcon, platformLabel } from '@/components/platforms/platform-icon';
 import type { PostSummary } from '@/types/post';
@@ -132,7 +137,12 @@ export function PostDetailDialog({
                         rel="noreferrer"
                         className="inline-flex w-fit items-center gap-1 font-sans text-xs font-bold text-ink underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
                       >
-                        <ExternalLink className="h-3 w-3" strokeWidth={3} />
+                        <MotionIcon
+                          icon={ExternalLinkIcon}
+                          size={12}
+                          strokeWidth={3}
+                          className="h-3 w-3"
+                        />
                         View on {channel.name}
                       </a>
                     ) : null}
@@ -147,7 +157,7 @@ export function PostDetailDialog({
               href={`/${orgId}/composer?group=${post.group}`}
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}
             >
-              <PenSquare className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
               {locked ? 'Open' : 'Edit'}
             </Link>
             {canMove ? (
@@ -157,13 +167,13 @@ export function PostDetailDialog({
                 onClick={() => onReschedule(post)}
                 disabled={busy}
               >
-                <CalendarClock className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={CalendarClockIcon} className="h-4 w-4" />
                 Reschedule
               </Button>
             ) : null}
             {canPublishNow ? (
               <Button size="sm" onClick={() => onPublishNow(post)} disabled={busy}>
-                <Send className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={SendIcon} className="h-4 w-4" />
                 {post.state === 'ERROR' ? 'Retry now' : 'Post now'}
               </Button>
             ) : null}
@@ -176,7 +186,7 @@ export function PostDetailDialog({
                 disabled={busy}
                 aria-label="Delete post"
               >
-                <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
               </Button>
             ) : null}
           </div>

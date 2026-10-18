@@ -12,8 +12,10 @@
  * big number meant to be read from across the room); everything else in
  * the row is data and stays in the body face (§15).
  */
-import { Card, cn, SectionHeader, Text } from '@postgear/ui';
-import { ExternalLink, Eye, Heart, MessageCircle, Share2, Sparkles } from 'lucide-react';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
+import { Card, cn, MotionIcon, SectionHeader, Text } from '@postgear/ui';
+import { Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { TopPost } from '@/types/analytics';
@@ -114,12 +116,17 @@ export function TopPosts({
                     href={`/${orgId}/ai-copilot?topic=${encodeURIComponent(post.preview.slice(0, 200))}`}
                     className={LINK}
                   >
-                    <Sparkles className="h-3 w-3" strokeWidth={3} />
+                    <MotionIcon icon={SparklesIcon} size={12} strokeWidth={3} className="h-3 w-3" />
                     Create similar
                   </Link>
                   {post.releaseURL ? (
                     <a href={post.releaseURL} target="_blank" rel="noreferrer" className={LINK}>
-                      <ExternalLink className="h-3 w-3" strokeWidth={3} />
+                      <MotionIcon
+                        icon={ExternalLinkIcon}
+                        size={12}
+                        strokeWidth={3}
+                        className="h-3 w-3"
+                      />
                       View on {post.providerName}
                     </a>
                   ) : null}

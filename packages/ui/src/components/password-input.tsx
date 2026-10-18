@@ -1,7 +1,10 @@
 'use client';
 
-import { Eye, EyeClosed } from 'lucide-react';
-import { forwardRef, useState } from 'react';
+import { EyeClosedIcon } from '@animateicons/react/lucide/eye-closed-icon';
+import { EyeIcon } from '@animateicons/react/lucide/eye-icon';
+import { forwardRef, useEffect, useRef, useState } from 'react';
+import { ANIMATED_ICON_CLASS } from '../lib/icon-animation';
+import { useIconAnimation } from '../lib/use-icon-animation';
 import { cn } from '../lib/utils';
 import { Input, type InputProps } from './input';
 
@@ -27,6 +30,10 @@ export interface PasswordInputProps extends Omit<InputProps, 'type'> {}
  * keyboard, but it is NOT a form control of its own: it carries no name and
  * flipping it only swaps `type` between `password` and `text`, which leaves
  * the typed value and the browser's autofill/manager behaviour untouched.
+ *
+ * The eyes are animated icons (`useIconAnimation`): they move on hover and
+ * keyboard focus, and the eye that appears on a toggle plays once, so the
+ * swap reads as the eye opening or closing rather than a glyph change.
  */
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ className, ...props }, ref) => {
@@ -34,7 +41,18 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
     const label = visible ? 'Hide password' : 'Show password';
     // Icon reflects current state, not the click action: closed eye while
     // masked (the default), open eye once revealed.
-    const ToggleIcon = visible ? Eye : EyeClosed;
+    const ToggleIcon = visible ? EyeIcon : EyeClosedIcon;
+    const icon = useIconAnimation();
+    const shown = useRef(visible);
+
+    useEffect(() => {
+      // Only a change plays the new eye: not the first render, nor
+      // StrictMode's second run of this effect.
+      if (shown.current !== visible) {
+        shown.current = visible;
+        icon.play();
+      }
+    }, [visible, icon.play]);
 
     return (
       <div className="relative w-full">
@@ -47,6 +65,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
+          {...icon.triggers}
           aria-label={label}
           title={label}
           className={cn(
@@ -54,7 +73,12 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
           )}
         >
-          <ToggleIcon className="h-5 w-5" strokeWidth={2.5} />
+          <ToggleIcon
+            ref={icon.ref}
+            aria-hidden
+            size={20}
+            className={cn('h-5 w-5', ANIMATED_ICON_CLASS)}
+          />
         </button>
       </div>
     );

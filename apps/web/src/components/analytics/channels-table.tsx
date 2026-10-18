@@ -17,11 +17,13 @@
  * channels as a `BarList` of engagement rate: the one number the table
  * cannot make comparable at a glance.
  */
+import { InfoIcon } from '@animateicons/react/lucide/info-icon';
 import {
   Badge,
   BarList,
   type BarListItem,
   cn,
+  MotionIcon,
   Sparkline,
   Table,
   TableBody,
@@ -34,7 +36,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@postgear/ui';
-import { Info } from 'lucide-react';
 import { useMemo } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { ChannelAnalytics } from '@/types/analytics';
@@ -148,7 +149,12 @@ export function ChannelsTable({
                           >
                             <Badge variant={badge.variant} data-standing={badge.label}>
                               {badge.label}
-                              <Info className="h-3 w-3" strokeWidth={3} />
+                              <MotionIcon
+                                icon={InfoIcon}
+                                size={12}
+                                strokeWidth={3}
+                                className="h-3 w-3"
+                              />
                             </Badge>
                           </button>
                         </TooltipTrigger>

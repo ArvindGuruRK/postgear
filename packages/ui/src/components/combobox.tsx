@@ -1,9 +1,11 @@
 'use client';
 
-import { Check, ChevronDown } from 'lucide-react';
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
+import { Check } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 export interface ComboboxOption {
@@ -69,7 +71,7 @@ export function Combobox({
           <span className={cn('truncate', !selected && 'opacity-50')}>
             {selected ? selected.label : placeholder}
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={3} />
+          <MotionIcon icon={ChevronDownIcon} className="h-4 w-4 shrink-0" strokeWidth={3} />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2">

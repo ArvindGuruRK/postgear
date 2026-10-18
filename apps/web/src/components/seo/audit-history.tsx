@@ -29,6 +29,7 @@
  * which the server does not share, so they render after mount; a skeleton
  * holds the space until then (see `use-mounted.ts`).
  */
+import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import {
   Badge,
   Button,
@@ -37,13 +38,14 @@ import {
   CardHeader,
   CardTitle,
   cn,
+  MotionIcon,
   Skeleton,
   Sparkline,
   Text,
   TrendChart,
   type TrendSeries,
 } from '@postgear/ui';
-import { History, RefreshCw } from 'lucide-react';
+import { History } from 'lucide-react';
 import type { SeoAuditSummary } from '@/types/seo';
 import { useMounted } from '../posts/use-mounted';
 import { formatRelative, gradeVariant, type SiteHistory } from './seo-view-model';
@@ -254,7 +256,7 @@ export function AuditHistory({
                       aria-label={`Re-run ${site.host}${site.path}`}
                       title="Re-run"
                     >
-                      <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
+                      <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
                       <span className="sr-only sm:not-sr-only">Re-run</span>
                     </Button>
                   </div>

@@ -1,10 +1,12 @@
 'use client';
 
+import { FileTextIcon } from '@animateicons/react/lucide/file-text-icon';
 import {
   Badge,
   Button,
   EmptyState,
   ErrorState,
+  MotionIcon,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -202,7 +204,7 @@ function PostList({
 export function DraftsButton({ onClick }: { onClick: () => void }) {
   return (
     <Button variant="secondary" size="sm" onClick={onClick}>
-      <FileText className="h-4 w-4" strokeWidth={2.5} />
+      <MotionIcon icon={FileTextIcon} className="h-4 w-4" />
       Saved posts
     </Button>
   );

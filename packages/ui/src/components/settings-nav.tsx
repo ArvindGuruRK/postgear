@@ -1,10 +1,14 @@
 import type { LucideIcon } from 'lucide-react';
+import type { AnimatedIcon } from '../lib/icon-animation';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export interface SettingsNavItem {
   label: string;
   href: string;
   icon?: LucideIcon;
+  /** Played as the link is hovered or reached by keyboard; wins over `icon`. */
+  animatedIcon?: AnimatedIcon;
 }
 
 export interface SettingsNavProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children'> {
@@ -41,7 +45,11 @@ export function SettingsNav({
                 : 'border-transparent text-ink hover:bg-actionPrimary/10',
             )}
           >
-            {Icon && <Icon className="h-4 w-4" strokeWidth={2.5} />}
+            {item.animatedIcon ? (
+              <MotionIcon icon={item.animatedIcon} className="h-4 w-4" />
+            ) : (
+              Icon && <Icon className="h-4 w-4" strokeWidth={2.5} />
+            )}
             {item.label}
           </LinkComponent>
         );

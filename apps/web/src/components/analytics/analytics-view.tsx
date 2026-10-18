@@ -31,6 +31,8 @@
  * which marks model output, and not a warning, which this is not: it is
  * the local setup working as intended.
  */
+import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
+import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import {
   Alert,
   Button,
@@ -38,6 +40,7 @@ import {
   cn,
   EmptyState,
   ErrorState,
+  MotionIcon,
   PageActions,
   SectionHeader,
   Select,
@@ -52,7 +55,7 @@ import {
   TabsTrigger,
   useToast,
 } from '@postgear/ui';
-import { BarChart3, Download, Plug, RefreshCw } from 'lucide-react';
+import { BarChart3, Plug } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
@@ -153,9 +156,9 @@ export function AnalyticsView({
         onClick={() => void syncNow()}
         disabled={requesting || analytics.syncing || channels.length === 0}
       >
-        <RefreshCw
+        <MotionIcon
+          icon={RefreshCwIcon}
           className={cn('h-4 w-4', analytics.syncing && 'animate-spin motion-reduce:animate-none')}
-          strokeWidth={2.5}
         />
         Sync now
       </Button>
@@ -165,7 +168,7 @@ export function AnalyticsView({
         onClick={exportCsv}
         disabled={!overview || !hasMetrics(overview)}
       >
-        <Download className="h-4 w-4" strokeWidth={2.5} />
+        <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
         Export CSV
       </Button>
     </div>

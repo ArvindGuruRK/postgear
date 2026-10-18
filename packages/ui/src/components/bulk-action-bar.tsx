@@ -1,7 +1,8 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export interface BulkActionBarProps extends React.HTMLAttributes<HTMLDivElement> {
   count: number;
@@ -35,11 +36,9 @@ export function BulkActionBar({
           'hover:opacity-80 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         )}
       >
-        <X className="h-3.5 w-3.5" strokeWidth={3} />
+        <MotionIcon icon={XIcon} size={14} className="h-3.5 w-3.5" strokeWidth={3} />
       </button>
-      <span className="type-label text-sm text-ink">
-        {count} selected
-      </span>
+      <span className="type-label text-sm text-ink">{count} selected</span>
       {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
     </div>
   );

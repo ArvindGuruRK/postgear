@@ -1,7 +1,10 @@
 'use client';
 
-import { cn, TooltipHint } from '@postgear/ui';
-import { CalendarDays, ChevronLeft, ChevronRight, List } from 'lucide-react';
+import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
+import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
+import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
+import { ListIcon } from '@animateicons/react/lucide/list-icon';
+import { cn, MotionIcon, TooltipHint } from '@postgear/ui';
 import Link from 'next/link';
 import { useCalendar } from './calendar-context';
 import { type CalendarView, rangeLabel } from './calendar-math';
@@ -61,7 +64,7 @@ export function CalendarToolbar() {
               'focus-visible:outline-offset-[-3px]',
             )}
           >
-            <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={ChevronLeftIcon} className="h-4 w-4" />
           </button>
         </TooltipHint>
         <span
@@ -82,7 +85,7 @@ export function CalendarToolbar() {
               'focus-visible:outline-offset-[-3px]',
             )}
           >
-            <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" />
           </button>
         </TooltipHint>
       </div>
@@ -119,7 +122,7 @@ export function CalendarToolbar() {
           <legend className="sr-only">Layout</legend>
           <TooltipHint label="Calendar view" side="bottom">
             <span aria-current="page" className={cn(SEGMENT(true), 'w-9')}>
-              <CalendarDays className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              <MotionIcon icon={CalendarDaysIcon} className="h-4 w-4" />
               <span className="sr-only">Calendar</span>
             </span>
           </TooltipHint>
@@ -129,7 +132,7 @@ export function CalendarToolbar() {
               aria-label="List"
               className={cn(SEGMENT(false), 'w-9')}
             >
-              <List className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={ListIcon} className="h-4 w-4" />
             </Link>
           </TooltipHint>
         </fieldset>

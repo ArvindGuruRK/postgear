@@ -1,6 +1,13 @@
 'use client';
 
-import { Avatar, AvatarFallback, AvatarImage, cn } from '@postgear/ui';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupItem,
+  AvatarImage,
+  cn,
+} from '@postgear/ui';
 import type { PostSummaryChannel } from '@/types/post';
 import { describeChannel, type PostTone } from './post-status';
 
@@ -15,11 +22,25 @@ const DOT: Record<PostTone, string> = {
 };
 
 /**
- * A post's channels as overlapping avatars, each with a status dot.
+ * For the row or card a stack sits on, when it tints on hover
+ * (`hover:bg-actionPrimary/10` on the surface): the avatars' rings follow the
+ * tint, so they keep reading as gaps rather than pale halos.
+ */
+export const CHANNEL_STACK_HOVER_RING =
+  'hover:[--pg-avatar-ring:color-mix(in_srgb,var(--color-actionPrimary)_10%,var(--color-secondary))]';
+
+/**
+ * A post's channels as an avatar group, each with a status dot.
  *
  * A post to three channels is one card on the calendar, so the per-channel
  * outcome has to fit in the corner of it: the dot is enough to see that two
- * went out and one did not, and the detail dialog says the rest.
+ * went out and one did not, the hover tooltip names the channel and its
+ * state, and the detail dialog says the rest.
+ *
+ * The stack always sits inside the card's own link or button, so its avatars
+ * are not focusable (`focusable={false}`) and it stays hidden from assistive
+ * tech, as before: the card's label is what is announced, and the queue row
+ * lists the channels by name beside the stack.
  */
 export function ChannelStack({
   channels,
@@ -36,48 +57,40 @@ export function ChannelStack({
   max?: number;
   className?: string;
 }) {
-  const shown = channels.slice(0, max);
-  const hidden = channels.length - shown.length;
-  const dimension = size === 'sm' ? 'h-6 w-6' : 'h-8 w-8';
-
   return (
-    <span className={cn('flex items-center', className)} aria-hidden="true">
-      {shown.map((channel, index) => {
-        const tone = describeChannel(channel, publishDate, now).tone;
+    <AvatarGroup
+      max={max}
+      size={size === 'sm' ? 'xs' : 'sm'}
+      focusable={false}
+      aria-hidden="true"
+      className={className}
+    >
+      {channels.map((channel) => {
+        const shown = describeChannel(channel, publishDate, now);
 
         return (
-          <span
+          <AvatarGroupItem
             key={channel.channelId}
-            className={cn('relative', index > 0 && '-ms-2')}
-            title={`${channel.name} · ${describeChannel(channel, publishDate, now).label}`}
+            name={channel.name}
+            label={`${channel.name} - ${shown.label}`}
           >
-            <Avatar size="sm" className={cn(dimension, 'border-2')}>
+            <Avatar>
               {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-              <AvatarFallback className={size === 'sm' ? 'text-[9px]' : 'text-[11px]'}>
+              {/* Seeded by id: two channels can share a name (a person's profile and their Page). */}
+              <AvatarFallback colorSeed={channel.channelId}>
                 {channel.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <span
               className={cn(
                 'absolute -end-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border border-outline',
-                DOT[tone],
+                DOT[shown.tone],
                 channel.disconnected && 'opacity-40',
               )}
             />
-          </span>
+          </AvatarGroupItem>
         );
       })}
-      {hidden > 0 ? (
-        <span
-          className={cn(
-            '-ms-2 flex items-center justify-center rounded-full border-2 border-outline bg-secondary font-sans font-bold text-ink',
-            dimension,
-            size === 'sm' ? 'text-[9px]' : 'text-[11px]',
-          )}
-        >
-          +{hidden}
-        </span>
-      ) : null}
-    </span>
+    </AvatarGroup>
   );
 }

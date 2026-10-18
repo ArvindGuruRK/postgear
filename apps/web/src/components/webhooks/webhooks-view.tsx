@@ -9,6 +9,9 @@
  * treatment. Secrets appear in exactly two places, the create dialog and
  * the rotate result, and nowhere else.
  */
+import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { HistoryIcon } from '@animateicons/react/lucide/history-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
   Alert,
   Badge,
@@ -21,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  MotionIcon,
   PageActions,
   Stack,
   Table,
@@ -32,7 +36,7 @@ import {
   Text,
   toast,
 } from '@postgear/ui';
-import { History, MoreHorizontal, Plus, Webhook as WebhookIcon } from 'lucide-react';
+import { Webhook as WebhookIcon } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import type { Channel } from '@/types/channel';
@@ -41,7 +45,7 @@ import { ConfirmWebhookDialog, type WebhookConfirmKind } from './confirm-webhook
 import { DeliveriesSheet } from './deliveries-sheet';
 import { SecretPanel } from './secret-panel';
 import { WebhookDialog } from './webhook-dialog';
-import { EVENT_LABELS, describeLastDelivery, deliveryTone, shortUrl } from './webhooks-view-model';
+import { deliveryTone, describeLastDelivery, EVENT_LABELS, shortUrl } from './webhooks-view-model';
 
 export interface WebhooksViewProps {
   initialWebhooks: WebhookView[] | null;
@@ -151,7 +155,7 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
             }}
             data-testid="webhook-add"
           >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={PlusIcon} className="h-4 w-4" />
             Add webhook
           </Button>
         </PageActions>
@@ -267,12 +271,12 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="secondary" size="sm" aria-label={`Actions for ${webhook.name}`}>
-                            <MoreHorizontal className="h-4 w-4" strokeWidth={2.5} />
+                            <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onSelect={() => setHistory(webhook)}>
-                            <History className="h-4 w-4" strokeWidth={2.5} />
+                            <MotionIcon icon={HistoryIcon} className="h-4 w-4" />
                             Deliveries
                           </DropdownMenuItem>
                           {canManage ? (

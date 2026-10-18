@@ -1,5 +1,7 @@
 'use client';
 
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,7 @@ import {
   HoverCardTrigger,
   Kbd,
   KbdGroup,
+  MotionIcon,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -48,7 +51,6 @@ import {
   TooltipHint,
   TooltipTrigger,
 } from '@postgear/ui';
-import { MoreVertical, Sparkles } from 'lucide-react';
 import { Row, Section } from '../shared';
 
 export function OverlaysSection() {
@@ -104,7 +106,7 @@ export function OverlaysSection() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary">
-              <MoreVertical className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
               Actions
             </Button>
           </DropdownMenuTrigger>
@@ -163,7 +165,7 @@ export function OverlaysSection() {
         </TooltipHint>
         <TooltipHint label="Generate with AI">
           <Button variant="ai" size="sm" className="w-9 px-0" aria-label="Generate with AI">
-            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
           </Button>
         </TooltipHint>
         <TooltipHint label="This plan’s channel limit is reached" disabled>

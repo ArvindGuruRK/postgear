@@ -12,9 +12,9 @@
  * low opacity with a dashed edge: the system's "this is where it goes"
  * treatment, not a new color.
  */
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { useDroppable } from '@dnd-kit/core';
-import { cn } from '@postgear/ui';
-import { Plus } from 'lucide-react';
+import { cn, MotionIcon } from '@postgear/ui';
 import type { ReactNode } from 'react';
 import type { SlotTime } from './calendar-math';
 
@@ -98,7 +98,7 @@ export function CalendarSlot({
                 'opacity-0 transition-opacity group-hover/slot:opacity-100',
               )}
             >
-              <Plus className="h-4 w-4" strokeWidth={3} />
+              <MotionIcon icon={PlusIcon} strokeWidth={3} className="h-4 w-4" />
             </span>
           )}
         </button>

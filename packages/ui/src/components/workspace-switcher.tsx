@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronsUpDown, Plus } from 'lucide-react';
+import { ChevronsUpDownIcon } from '@animateicons/react/lucide/chevrons-up-down-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { cn } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import {
@@ -11,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './dropdown-menu';
+import { MotionIcon } from './motion-icon';
 
 export interface WorkspaceOption {
   id: string;
@@ -54,7 +56,7 @@ export function WorkspaceSwitcher({
           <AvatarFallback>{active?.name.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
         {active?.name}
-        <ChevronsUpDown className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
+        <MotionIcon icon={ChevronsUpDownIcon} size={14} className="h-3.5 w-3.5 opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[14rem]">
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
@@ -68,7 +70,7 @@ export function WorkspaceSwitcher({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2" onSelect={onCreate}>
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={PlusIcon} className="h-4 w-4" />
               {createLabel}
             </DropdownMenuItem>
           </>

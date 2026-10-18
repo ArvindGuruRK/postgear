@@ -12,6 +12,7 @@
  * The clipboard call can fail (an insecure origin, a denied permission)
  * and then the only honest thing is to say so and leave the text selectable.
  */
+import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
 import {
   Alert,
   AlertDescription,
@@ -19,11 +20,12 @@ import {
   FormField,
   FormLabel,
   Input,
+  MotionIcon,
   Stack,
   Text,
   toast,
 } from '@postgear/ui';
-import { Check, Copy, TriangleAlert } from 'lucide-react';
+import { Check, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { curlExample } from './api-keys-view-model';
 
@@ -44,8 +46,6 @@ export function SecretPanel({ secret, apiUrl }: SecretPanelProps) {
       toast({ title: "Couldn't copy", description: 'Select the key and copy it by hand.' });
     }
   }
-
-  const CopyIcon = copied ? Check : Copy;
 
   return (
     <Stack gap="md">
@@ -70,7 +70,11 @@ export function SecretPanel({ secret, apiUrl }: SecretPanelProps) {
             aria-describedby="api-key-secret-hint"
           />
           <Button type="button" variant="secondary" onClick={copy} className="shrink-0">
-            <CopyIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+            {copied ? (
+              <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+            ) : (
+              <MotionIcon icon={CopyIcon} className="h-4 w-4" />
+            )}
             {copied ? 'Copied' : 'Copy'}
           </Button>
         </div>

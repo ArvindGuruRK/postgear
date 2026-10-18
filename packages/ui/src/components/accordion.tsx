@@ -1,9 +1,10 @@
 'use client';
 
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
-import { ChevronDown } from 'lucide-react';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export const Accordion = AccordionPrimitive.Root;
 
@@ -30,7 +31,7 @@ export const AccordionTrigger = forwardRef<
     <AccordionPrimitive.Trigger
       ref={ref}
       className={cn(
-        'flex flex-1 items-center justify-between gap-2 px-4 py-3 text-left',
+        'group/accordion flex flex-1 items-center justify-between gap-2 px-4 py-3 text-left',
         'type-ui text-sm text-ink outline-none',
         'bg-secondary transition-colors duration-150 hover:bg-primary',
         'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
@@ -40,13 +41,16 @@ export const AccordionTrigger = forwardRef<
         // only changes color: toggling its width would resize the header by
         // 2px mid-animation and make the open/close jump.
         'border-b-2 border-transparent data-[state=open]:rounded-b-none data-[state=open]:border-outline',
-        '[&[data-state=open]>svg]:rotate-180',
         className,
       )}
       {...props}
     >
       {children}
-      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" strokeWidth={3} />
+      <MotionIcon
+        icon={ChevronDownIcon}
+        className="h-4 w-4 shrink-0 transition-[rotate] duration-200 group-data-[state=open]/accordion:rotate-180"
+        strokeWidth={3}
+      />
     </AccordionPrimitive.Trigger>
   </AccordionPrimitive.Header>
 ));

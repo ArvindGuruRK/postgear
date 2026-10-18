@@ -1,5 +1,5 @@
-import { Badge, Button, Button2 } from '@postgear/ui';
-import { Sparkles } from 'lucide-react';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
+import { Badge, Button, Button2, MotionIcon } from '@postgear/ui';
 import { Row, Section } from '../shared';
 
 export function ButtonsSection() {
@@ -29,7 +29,7 @@ export function ButtonsSection() {
         </Row>
         <Row label="AI">
           <Button variant="ai">
-            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
             Ask AI
           </Button>
           <Button variant="ai" disabled>
@@ -62,7 +62,7 @@ export function ButtonsSection() {
         </Row>
         <Row label="AI">
           <Button2 variant="ai">
-            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
             Ask AI
           </Button2>
           <Button2 variant="ai" disabled>
@@ -73,7 +73,10 @@ export function ButtonsSection() {
           <Button2 className="pointer-events-none translate-y-1 shadow-brutalPressed">
             Connect Channel
           </Button2>
-          <Button2 variant="secondary" className="pointer-events-none translate-y-1 shadow-brutalPressed">
+          <Button2
+            variant="secondary"
+            className="pointer-events-none translate-y-1 shadow-brutalPressed"
+          >
             Schedule Post
           </Button2>
         </Row>

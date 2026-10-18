@@ -18,6 +18,7 @@
  * advice costs when it is on, and is disabled with the reset date when the
  * balance cannot cover it, since the API would answer 402 anyway.
  */
+import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import {
   Alert,
   AlertTitle,
@@ -28,9 +29,10 @@ import {
   FormHelperText,
   FormLabel,
   Input,
+  MotionIcon,
   Text,
 } from '@postgear/ui';
-import { Code2, Globe, Search, Square } from 'lucide-react';
+import { Code2, Globe, Square } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { AiCredits } from '@/types/ai';
 import type { SeoStatus } from '@/types/seo';
@@ -126,7 +128,7 @@ export function AnalyzeForm({
               disabled={running || cannotAfford}
               className="flex-1 sm:flex-none"
             >
-              <Search className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={SearchIcon} className="h-4 w-4" />
               {running
                 ? 'Analyzing…'
                 : cost > 0

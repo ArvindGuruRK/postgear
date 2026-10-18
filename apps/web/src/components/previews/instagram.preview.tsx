@@ -1,15 +1,9 @@
 'use client';
 
-import { cn } from '@postgear/ui';
-import {
-  Bookmark,
-  ChevronLeft,
-  ChevronRight,
-  Heart,
-  MessageCircle,
-  MoreHorizontal,
-  Send,
-} from 'lucide-react';
+import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
+import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
+import { cn, MotionIcon } from '@postgear/ui';
+import { Bookmark, Heart, MessageCircle, MoreHorizontal, Send } from 'lucide-react';
 import { useState } from 'react';
 import { CommentList } from './comment-list';
 import {
@@ -83,7 +77,7 @@ export function InstagramPreview({
                   onClick={() => setIndex(current - 1)}
                   className="start-2"
                 >
-                  <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
+                  <MotionIcon icon={ChevronLeftIcon} className="h-4 w-4" />
                 </CarouselButton>
               ) : null}
               {current < media.length - 1 ? (
@@ -92,7 +86,7 @@ export function InstagramPreview({
                   onClick={() => setIndex(current + 1)}
                   className="end-2"
                 >
-                  <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
+                  <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" />
                 </CarouselButton>
               ) : null}
             </>

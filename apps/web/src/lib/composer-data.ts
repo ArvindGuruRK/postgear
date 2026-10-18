@@ -4,10 +4,11 @@
  * publishing rules, and, when the URL names them, the post being edited and
  * the library item being attached.
  *
- * Shared by the two ways the composer opens (UI revamp, 2026-10-19): the
- * full page at `/[orgId]/composer`, and the same route intercepted as a modal
- * over whatever page the person was on (`[orgId]/@modal/(.)composer`). One
- * loader, so the two can never disagree about what a URL means.
+ * Shared by the two ways the composer modal opens (UI revamp, 2026-10-19):
+ * intercepted over whatever page the person was on
+ * (`[orgId]/@modal/(.)composer`), and over the calendar on a reload or a
+ * shared link (`[orgId]/@modal/composer`). One loader, so the two can never
+ * disagree about what a URL means.
  *
  * - `?group=` reopens a saved post.
  * - `?media=` starts a new post with a library item attached: the media
@@ -15,6 +16,7 @@
  * - `?at=` starts a new post at a given time: the calendar's clicked slot.
  */
 import { ApiError, serverApi } from '@/lib/api';
+import { composerRequest } from '@/lib/composer-request';
 import { getSessionCookieHeader } from '@/lib/session';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
@@ -28,6 +30,8 @@ export interface ComposerData {
   publishAt: string | null;
   /** Set when `?group=` named a post that could not be loaded. */
   loadError: string | null;
+  /** What this URL asked for, normalized as read here: see `composerRequest`. */
+  request: string;
 }
 
 function single(value: string | string[] | undefined): string | null {
@@ -75,5 +79,6 @@ export async function loadComposer(
     media,
     publishAt,
     loadError: post.error,
+    request: composerRequest({ group, media: mediaId, at: publishAt }),
   };
 }

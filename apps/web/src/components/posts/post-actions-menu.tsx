@@ -1,5 +1,10 @@
 'use client';
 
+import { CalendarClockIcon } from '@animateicons/react/lucide/calendar-clock-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
+import { SendIcon } from '@animateicons/react/lucide/send-icon';
+import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Button,
   DropdownMenu,
@@ -7,8 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  MotionIcon,
 } from '@postgear/ui';
-import { CalendarClock, MoreVertical, PenSquare, Send, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { PostSummary } from '@/types/post';
 import { hasPublishedChannel } from './post-status';
@@ -43,23 +48,23 @@ export function PostActionsMenu({
           aria-label="Post actions"
           className="w-9 shrink-0 px-0"
         >
-          <MoreVertical className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => router.push(`/${orgId}/composer?group=${post.group}`)}>
-          <PenSquare className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
           {locked ? 'Open in composer' : 'Edit in composer'}
         </DropdownMenuItem>
         {canPublishNow ? (
           <DropdownMenuItem onSelect={() => onPublishNow(post)}>
-            <Send className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={SendIcon} className="h-4 w-4" />
             {post.state === 'ERROR' ? 'Retry now' : 'Post now'}
           </DropdownMenuItem>
         ) : null}
         {canMove ? (
           <DropdownMenuItem onSelect={() => onReschedule(post)}>
-            <CalendarClock className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={CalendarClockIcon} className="h-4 w-4" />
             Reschedule
           </DropdownMenuItem>
         ) : null}
@@ -67,7 +72,7 @@ export function PostActionsMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => onDelete(post)}>
-              <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
               Delete
             </DropdownMenuItem>
           </>

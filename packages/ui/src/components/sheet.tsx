@@ -1,10 +1,11 @@
 'use client';
 
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { type VariantProps, cva } from 'class-variance-authority';
-import { X } from 'lucide-react';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
@@ -44,25 +45,30 @@ export interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
-export const SheetContent = forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, SheetContentProps>(
-  ({ side, className, children, ...props }, ref) => (
-    <SheetPortal>
-      <SheetOverlay />
-      <DialogPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-        {children}
-        <DialogPrimitive.Close
-          className={cn(
-            'absolute right-4 top-4 rounded-md border-2 border-outline bg-secondary p-1',
-            'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-          )}
-        >
-          <X className="h-4 w-4 text-ink" strokeWidth={3} />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
-    </SheetPortal>
-  ),
-);
+export const SheetContent = forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  SheetContentProps
+>(({ side, className, children, ...props }, ref) => (
+  <SheetPortal>
+    <SheetOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(sheetVariants({ side }), className)}
+      {...props}
+    >
+      {children}
+      <DialogPrimitive.Close
+        className={cn(
+          'absolute right-4 top-4 rounded-md border-2 border-outline bg-secondary p-1',
+          'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+        )}
+      >
+        <MotionIcon icon={XIcon} className="h-4 w-4 text-ink" strokeWidth={3} />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    </DialogPrimitive.Content>
+  </SheetPortal>
+));
 SheetContent.displayName = DialogPrimitive.Content.displayName;
 
 export const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (

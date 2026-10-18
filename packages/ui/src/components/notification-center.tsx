@@ -1,5 +1,6 @@
 'use client';
 
+import { BellIcon } from '@animateicons/react/lucide/bell-icon';
 import {
   Bell,
   CheckCircle2,
@@ -11,7 +12,9 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ANIMATED_ICON_CLASS } from '../lib/icon-animation';
 import { pressSm } from '../lib/press';
+import { useIconAnimation } from '../lib/use-icon-animation';
 import { cn } from '../lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 import { Skeleton } from './skeleton';
@@ -92,6 +95,7 @@ export function NotificationCenter({
   title = 'Notifications',
 }: NotificationCenterProps) {
   const unread = unreadCount ?? notifications.filter((notification) => !notification.read).length;
+  const bell = useIconAnimation();
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -105,6 +109,7 @@ export function NotificationCenter({
             aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
             data-testid="notification-bell"
             data-unread={unread}
+            {...bell.triggers}
             className={cn(
               // 36px, the theme toggle's size, so the top bar's tiles match.
               'relative flex h-9 w-9 items-center justify-center rounded-md border-2 border-outline bg-secondary outline-none',
@@ -113,7 +118,12 @@ export function NotificationCenter({
               className,
             )}
           >
-            <Bell className="h-4 w-4 text-ink" strokeWidth={2.5} />
+            <BellIcon
+              ref={bell.ref}
+              aria-hidden
+              size={16}
+              className={cn('h-4 w-4 text-ink', ANIMATED_ICON_CLASS)}
+            />
             {unread > 0 && (
               <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-outline bg-actionDanger px-1 font-sans text-[10px] font-bold text-onActionLight">
                 {badgeText(unread)}

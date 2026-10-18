@@ -1,5 +1,10 @@
 'use client';
 
+import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
+import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
+import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Avatar,
   AvatarFallback,
@@ -13,10 +18,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  MotionIcon,
   Stack,
   Text,
 } from '@postgear/ui';
-import { Clock, MoreVertical, Plug, RefreshCw, Trash2 } from 'lucide-react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Channel } from '@/types/channel';
 import { CHANNEL_HEALTH } from './channel-health';
@@ -123,27 +128,27 @@ export function ChannelCard({
                 aria-label={`Manage ${channel.name}`}
                 className="shrink-0"
               >
-                <MoreVertical className="h-4 w-4" />
+                <MotionIcon icon={EllipsisVerticalIcon} strokeWidth={2} className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => onEditTimes(channel)}>
-                <Clock className="me-2 h-4 w-4" />
+                <MotionIcon icon={ClockIcon} strokeWidth={2} className="me-2 h-4 w-4" />
                 Edit posting times
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onReconnect(channel)}>
-                <RefreshCw className="me-2 h-4 w-4" />
+                <MotionIcon icon={RefreshCwIcon} strokeWidth={2} className="me-2 h-4 w-4" />
                 Reconnect
               </DropdownMenuItem>
               {channel.inBetweenSteps ? (
                 <DropdownMenuItem onSelect={() => onFinishSetup(channel)}>
-                  <Plug className="me-2 h-4 w-4" />
+                  <MotionIcon icon={PlugIcon} strokeWidth={2} className="me-2 h-4 w-4" />
                   Finish setup
                 </DropdownMenuItem>
               ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => onDisconnect(channel)}>
-                <Trash2 className="me-2 h-4 w-4" />
+                <MotionIcon icon={Trash2Icon} strokeWidth={2} className="me-2 h-4 w-4" />
                 Disconnect
               </DropdownMenuItem>
             </DropdownMenuContent>

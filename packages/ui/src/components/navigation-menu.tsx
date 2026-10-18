@@ -1,9 +1,10 @@
 'use client';
 
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import * as NavigationMenuPrimitive from '@radix-ui/react-navigation-menu';
-import { ChevronDown } from 'lucide-react';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export const NavigationMenu = forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Root>,
@@ -50,10 +51,11 @@ export const NavigationMenuTrigger = forwardRef<
     {...props}
   >
     {children}
-    <ChevronDown
-      className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180"
+    <MotionIcon
+      icon={ChevronDownIcon}
+      size={14}
+      className="h-3.5 w-3.5 transition-[rotate] duration-200 group-data-[state=open]:rotate-180"
       strokeWidth={3}
-      aria-hidden="true"
     />
   </NavigationMenuPrimitive.Trigger>
 ));
@@ -70,7 +72,11 @@ export const NavigationMenuContent = forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
 >(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.Content ref={ref} className={cn('w-full p-2 sm:w-72', className)} {...props} />
+  <NavigationMenuPrimitive.Content
+    ref={ref}
+    className={cn('w-full p-2 sm:w-72', className)}
+    {...props}
+  />
 ));
 NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
 

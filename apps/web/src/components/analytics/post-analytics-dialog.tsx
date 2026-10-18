@@ -16,6 +16,7 @@
  * for even. A channel whose metrics are null says "Not synced yet" rather
  * than a grid of zeros.
  */
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import {
   Badge,
   cn,
@@ -25,11 +26,12 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorState,
+  MotionIcon,
   Skeleton,
   Text,
   TrendChart,
 } from '@postgear/ui';
-import { ArrowDown, ArrowUp, ExternalLink, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, api } from '@/lib/api';
@@ -249,7 +251,7 @@ function ChannelMetrics({ channel, now }: { channel: PostChannelAnalytics; now: 
             rel="noreferrer"
             className="inline-flex items-center gap-1 rounded-sm font-bold underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
           >
-            <ExternalLink className="h-3 w-3" strokeWidth={3} />
+            <MotionIcon icon={ExternalLinkIcon} size={12} strokeWidth={3} className="h-3 w-3" />
             View on {channel.providerName}
           </a>
         ) : null}

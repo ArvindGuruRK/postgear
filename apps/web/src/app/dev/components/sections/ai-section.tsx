@@ -1,6 +1,15 @@
 'use client';
 
-import { Avatar, AvatarFallback, Badge, Button, SpeechBubble, TypingIndicator } from '@postgear/ui';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
+import {
+  Avatar,
+  AvatarFallback,
+  Badge,
+  Button,
+  MotionIcon,
+  SpeechBubble,
+  TypingIndicator,
+} from '@postgear/ui';
 import { Sparkles } from 'lucide-react';
 import { Row, Section, Spec } from '../shared';
 
@@ -60,7 +69,7 @@ export function AiSection() {
           <div className="flex items-center gap-3">
             <TypingIndicator />
             <Button size="sm" variant="ai">
-              <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
               Generate
             </Button>
           </div>

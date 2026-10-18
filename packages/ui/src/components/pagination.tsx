@@ -1,8 +1,11 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
+import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
+import { MoreHorizontal } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './button';
+import { MotionIcon } from './motion-icon';
 
 export interface PaginationProps extends Omit<React.ComponentPropsWithoutRef<'nav'>, 'onChange'> {
   page: number;
@@ -11,7 +14,11 @@ export interface PaginationProps extends Omit<React.ComponentPropsWithoutRef<'na
   siblingCount?: number;
 }
 
-function getPageRange(page: number, pageCount: number, siblingCount: number): Array<number | 'ellipsis'> {
+function getPageRange(
+  page: number,
+  pageCount: number,
+  siblingCount: number,
+): Array<number | 'ellipsis'> {
   const totalVisible = siblingCount * 2 + 5;
   if (pageCount <= totalVisible) {
     return Array.from({ length: pageCount }, (_, i) => i + 1);
@@ -45,12 +52,15 @@ export function Pagination({
         onClick={() => onPageChange(page - 1)}
         className="w-9 px-0"
       >
-        <ChevronLeft className="h-4 w-4" strokeWidth={3} />
+        <MotionIcon icon={ChevronLeftIcon} className="h-4 w-4" strokeWidth={3} />
       </Button>
       {pages.map((p, index) =>
         p === 'ellipsis' ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: at most two stable ellipsis positions
-          <span key={`ellipsis-${index}`} className="flex h-9 w-9 items-center justify-center text-ink opacity-50">
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: at most two stable ellipsis positions
+            key={`ellipsis-${index}`}
+            className="flex h-9 w-9 items-center justify-center text-ink opacity-50"
+          >
             <MoreHorizontal className="h-4 w-4" strokeWidth={3} />
           </span>
         ) : (
@@ -74,7 +84,7 @@ export function Pagination({
         onClick={() => onPageChange(page + 1)}
         className="w-9 px-0"
       >
-        <ChevronRight className="h-4 w-4" strokeWidth={3} />
+        <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" strokeWidth={3} />
       </Button>
     </nav>
   );

@@ -1,7 +1,15 @@
 'use client';
 
-import { cn, pressSm, TooltipHint, toast } from '@postgear/ui';
-import { Moon, Sun } from 'lucide-react';
+import { MoonIcon } from '@animateicons/react/lucide/moon-icon';
+import { SunIcon } from '@animateicons/react/lucide/sun-icon';
+import {
+  ANIMATED_ICON_CLASS,
+  cn,
+  pressSm,
+  TooltipHint,
+  toast,
+  useIconAnimation,
+} from '@postgear/ui';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { APPEARANCE_EVENT, currentAppearance, setAppearance } from '@/lib/appearance';
@@ -23,9 +31,13 @@ import { APPEARANCE_EVENT, currentAppearance, setAppearance } from '@/lib/appear
  * `saveToAccount` (the dashboard top bar) also saves the mode to the account,
  * in the background; the auth pages have no account to save to, so there the
  * choice lives in this browser's cookie only.
+ *
+ * Both glyphs are animated icons played from the button (`useIconAnimation`);
+ * the hidden one plays too, unseen, which keeps the two in step.
  */
 export function ThemeToggle({ saveToAccount = false }: { saveToAccount?: boolean }) {
   const [isDark, setIsDark] = useState(false);
+  const icon = useIconAnimation();
 
   useEffect(() => {
     setIsDark(document.body.classList.contains('dark'));
@@ -54,14 +66,19 @@ export function ThemeToggle({ saveToAccount = false }: { saveToAccount?: boolean
   }
 
   const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-  const iconBase =
-    'absolute h-4 w-4 text-ink transition-[transform,opacity] duration-200 ease-out group-hover:text-onActionPrimary';
+  // `rotate` and `scale`, not `transform`: Tailwind v4's rotate-* and scale-*
+  // set those properties, so a `transform` transition would snap the swap.
+  const iconBase = cn(
+    'absolute h-4 w-4 text-ink transition-[rotate,scale,opacity] duration-200 ease-out group-hover:text-onActionPrimary',
+    ANIMATED_ICON_CLASS,
+  );
 
   return (
     <TooltipHint label={label} side="bottom">
       <button
         type="button"
         onClick={toggle}
+        {...icon.triggers}
         aria-label={label}
         data-testid="theme-toggle"
         suppressHydrationWarning
@@ -73,21 +90,25 @@ export function ThemeToggle({ saveToAccount = false }: { saveToAccount?: boolean
           'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         )}
       >
-        <Sun
+        <SunIcon
+          ref={icon.ref}
+          aria-hidden
+          size={16}
           className={cn(
             iconBase,
             'rotate-0 scale-100 opacity-100',
             'dark:-rotate-90 dark:scale-0 dark:opacity-0',
           )}
-          strokeWidth={2.5}
         />
-        <Moon
+        <MoonIcon
+          ref={icon.ref}
+          aria-hidden
+          size={16}
           className={cn(
             iconBase,
             'rotate-90 scale-0 opacity-0',
             'dark:rotate-0 dark:scale-100 dark:opacity-100',
           )}
-          strokeWidth={2.5}
         />
       </button>
     </TooltipHint>

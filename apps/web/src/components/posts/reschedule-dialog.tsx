@@ -9,8 +9,10 @@
  * on the Channels page, so they are usually what is wanted) and a free field
  * for anything else.
  */
+import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
 import {
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -22,10 +24,9 @@ import {
   FormHelperText,
   FormLabel,
   Input,
+  MotionIcon,
   Text,
-  cn,
 } from '@postgear/ui';
-import { Clock } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toLocalInputValue } from '@/components/composer/composer-state';
 import type { Channel } from '@/types/channel';
@@ -146,7 +147,7 @@ export function RescheduleDialog({
                           : 'bg-secondary text-ink shadow-brutalSm hover:bg-actionPrimary/10',
                       )}
                     >
-                      <Clock className="h-3 w-3" strokeWidth={3} />
+                      <MotionIcon icon={ClockIcon} size={12} strokeWidth={3} className="h-3 w-3" />
                       {formatClock(at)}
                     </button>
                   );

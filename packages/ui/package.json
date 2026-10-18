@@ -15,8 +15,7 @@
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "@animateicons/react": "^0.12.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -45,14 +44,16 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.545.0",
+    "react": "^19.2.0",
     "react-day-picker": "^9.11.1",
+    "react-dom": "^19.2.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.0",
     "@types/react": "^19.0.0",
     "jest-environment-jsdom": "^29.7.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.5.0"
+    "typescript": "^5.5.0"
   }
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { BotIcon } from '@animateicons/react/lucide/bot-icon';
 /**
  * The calendar's channel card, after the reference's channel column (UI
  * revamp, 2026-10-18): the workspace's channels beside the grid, and the one
@@ -22,28 +23,28 @@
  * - A channel that cannot publish shows a red "!" on its picture that starts
  *   the fix (reconnect, or finish choosing the page), as the reference's does.
  */
+import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
+import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
+import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
+import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
+  ANIMATED_ICON_CLASS,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  MotionIcon,
   pressSm,
   TooltipHint,
+  useIconAnimation,
 } from '@postgear/ui';
-import {
-  ChevronLeft,
-  Clock,
-  MoreVertical,
-  Plug,
-  Plus,
-  RefreshCw,
-  Settings2,
-  Sparkles,
-  SquarePen,
-  Trash2,
-} from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -81,9 +82,14 @@ const TOOLTIP_GAP = 6;
  */
 const ROW_MENU_CLEARANCE = 28;
 
-/** The red "!" on a channel that cannot publish. */
+/**
+ * The red "!" on a channel that cannot publish, laid on its picture's top-left
+ * corner the way the bell's count sits on the bell. Measured from the row: the
+ * picture starts 6px in (the row button's 2px border and 4px padding), so at
+ * 2px the badge's centre lands 4px inside the picture's corner.
+ */
 const BADGE = cn(
-  'absolute start-0 -top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline',
+  'absolute start-0.5 top-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline',
   'bg-actionDanger font-sans text-[10px] font-bold leading-none text-onActionLight',
 );
 
@@ -98,6 +104,7 @@ export function ChannelsColumn({
   const router = useRouter();
   const { role } = useWorkspace();
   const { orgId, channels, channelFilter, toggleChannel, clearChannelFilter } = useCalendar();
+  const aiIcon = useIconAnimation();
   // Connecting and disconnecting are ADMIN-only on the API; this only avoids
   // offering what would come back 403.
   const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
@@ -187,9 +194,9 @@ export function ChannelsColumn({
                 FOCUS,
               )}
             >
-              <ChevronLeft
+              <MotionIcon
+                icon={ChevronLeftIcon}
                 className={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')}
-                strokeWidth={2.5}
               />
             </button>
           </TooltipHint>
@@ -214,7 +221,7 @@ export function ChannelsColumn({
                   aria-label="Add Channel"
                   className={cn(TILE, 'bg-secondary text-ink', collapsed ? 'w-11' : 'flex-1 px-3')}
                 >
-                  <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                  <MotionIcon icon={PlusIcon} className="h-4 w-4 shrink-0" />
                   {collapsed ? null : <span className="truncate">Add Channel</span>}
                 </button>
               </TooltipHint>
@@ -241,15 +248,21 @@ export function ChannelsColumn({
                   collapsed ? 'w-11' : 'flex-1 px-3',
                 )}
               >
-                <SquarePen className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                <MotionIcon icon={SquarePenIcon} className="h-4 w-4 shrink-0" />
                 {collapsed ? null : <span className="truncate">Create Post</span>}
               </ColumnLink>
               <ColumnLink
                 href={`/${orgId}/ai-copilot`}
                 label="Generate with AI"
+                triggers={aiIcon.triggers}
                 className={cn(TILE, 'w-11 bg-actionAi text-onActionAi')}
               >
-                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+                <BotIcon
+                  ref={aiIcon.ref}
+                  aria-hidden
+                  size={16}
+                  className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
+                />
               </ColumnLink>
             </div>
           ) : null}
@@ -336,6 +349,7 @@ export function ChannelsColumn({
                         )}
                       >
                         <ChannelMark
+                          id={channel.id}
                           name={channel.name}
                           picture={channel.picture}
                           platform={channel.providerIdentifier}
@@ -399,28 +413,40 @@ export function ChannelsColumn({
                                 FOCUS,
                               )}
                             >
-                              <MoreVertical className="h-4 w-4" strokeWidth={2.5} />
+                              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
                             </button>
                           </DropdownMenuTrigger>
                         </TooltipHint>
                         <DropdownMenuContent align="start">
                           <DropdownMenuItem onSelect={() => setTimesChannel(channel)}>
-                            <Clock className="me-2 h-4 w-4" />
+                            <MotionIcon icon={ClockIcon} strokeWidth={2} className="me-2 h-4 w-4" />
                             Edit posting times
                           </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => reconnect(channel)}>
-                            <RefreshCw className="me-2 h-4 w-4" />
+                            <MotionIcon
+                              icon={RefreshCwIcon}
+                              strokeWidth={2}
+                              className="me-2 h-4 w-4"
+                            />
                             Reconnect
                           </DropdownMenuItem>
                           {channel.inBetweenSteps ? (
                             <DropdownMenuItem onSelect={() => setSetupChannel(channel)}>
-                              <Plug className="me-2 h-4 w-4" />
+                              <MotionIcon
+                                icon={PlugIcon}
+                                strokeWidth={2}
+                                className="me-2 h-4 w-4"
+                              />
                               Finish setup
                             </DropdownMenuItem>
                           ) : null}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onSelect={() => setDisconnectChannel(channel)}>
-                            <Trash2 className="me-2 h-4 w-4" />
+                            <MotionIcon
+                              icon={Trash2Icon}
+                              strokeWidth={2}
+                              className="me-2 h-4 w-4"
+                            />
                             Disconnect
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -463,6 +489,7 @@ function ColumnLink({
   href,
   label,
   tooltip = true,
+  triggers,
   className,
   children,
 }: {
@@ -470,12 +497,14 @@ function ColumnLink({
   label: string;
   /** Off when the label is already written on the button. */
   tooltip?: boolean;
+  /** An animated icon's `useIconAnimation().triggers`, played from the whole tile. */
+  triggers?: ReturnType<typeof useIconAnimation>['triggers'];
   className: string;
   children: ReactNode;
 }) {
   return (
     <TooltipHint label={label} side="right" hidden={!tooltip}>
-      <Link href={href} aria-label={label} className={className}>
+      <Link href={href} aria-label={label} {...triggers} className={className}>
         {children}
       </Link>
     </TooltipHint>

@@ -1,5 +1,12 @@
 'use client';
 
+import { ArrowDownIcon } from '@animateicons/react/lucide/arrow-down-icon';
+import { ArrowUpIcon } from '@animateicons/react/lucide/arrow-up-icon';
+import { GripVerticalIcon } from '@animateicons/react/lucide/grip-vertical-icon';
+import { ImagePlusIcon } from '@animateicons/react/lucide/image-plus-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 /**
  * The reorderable list of a post's parts (UI revamp, 2026-10-19, after the
  * reference's editor): one editor for a single post, and for a thread, each
@@ -32,9 +39,16 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button, cn, TooltipHint } from '@postgear/ui';
-import { ArrowDown, ArrowUp, GripVertical, ImagePlus, Plus, Trash2, X } from 'lucide-react';
-import { type Dispatch, type ReactNode, useId } from 'react';
+import {
+  ANIMATED_ICON_CLASS,
+  type AnimatedIcon,
+  Button,
+  cn,
+  MotionIcon,
+  TooltipHint,
+  useIconAnimation,
+} from '@postgear/ui';
+import { type Dispatch, useId } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { ChannelReport } from './channel-report';
 import {
@@ -131,7 +145,7 @@ export function ThreadEditor({
             onClick={() => dispatch({ type: 'addPart', scope })}
             disabled={parts.length >= MAX_PARTS}
           >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={PlusIcon} className="h-4 w-4" />
             Add to thread
           </Button>
         </div>
@@ -237,7 +251,7 @@ function SortablePart({
                         }
                         className="absolute end-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing"
                       >
-                        <X className="h-3 w-3" strokeWidth={3} />
+                        <MotionIcon icon={XIcon} size={12} strokeWidth={3} className="h-3 w-3" />
                       </button>
                     )}
                   </div>
@@ -268,7 +282,7 @@ function SortablePart({
                     'disabled:opacity-50',
                   )}
                 >
-                  <ImagePlus className="h-4 w-4" strokeWidth={2.5} />
+                  <MotionIcon icon={ImagePlusIcon} className="h-4 w-4" />
                   Insert Media
                 </button>
               </TooltipHint>
@@ -308,30 +322,27 @@ function SortablePart({
               {...attributes}
               {...listeners}
             >
-              <GripVertical className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={GripVerticalIcon} className="h-4 w-4" />
             </button>
           </TooltipHint>
           <PartAction
             label={`Move ${label} up`}
             disabled={index === 0}
+            icon={ArrowUpIcon}
             onClick={() => dispatch({ type: 'movePart', scope, from: index, to: index - 1 })}
-          >
-            <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
-          </PartAction>
+          />
           <PartAction
             label={`Move ${label} down`}
             disabled={index === total - 1}
+            icon={ArrowDownIcon}
             onClick={() => dispatch({ type: 'movePart', scope, from: index, to: index + 1 })}
-          >
-            <ArrowDown className="h-4 w-4" strokeWidth={2.5} />
-          </PartAction>
+          />
           <PartAction
             label={`Remove ${label}`}
             danger
+            icon={Trash2Icon}
             onClick={() => dispatch({ type: 'removePart', scope, key: part.key })}
-          >
-            <Trash2 className="h-4 w-4" strokeWidth={2.5} />
-          </PartAction>
+          />
         </div>
       ) : null}
     </li>
@@ -387,15 +398,18 @@ function PartAction({
   label,
   disabled,
   danger = false,
+  icon: Icon,
   onClick,
-  children,
 }: {
   label: string;
   disabled?: boolean;
   danger?: boolean;
+  /** Animated, played from the whole button: see `useIconAnimation`. */
+  icon: AnimatedIcon;
   onClick: () => void;
-  children: ReactNode;
 }) {
+  const icon = useIconAnimation();
+
   return (
     <TooltipHint label={label} side="left" hidden={disabled}>
       <button
@@ -403,6 +417,7 @@ function PartAction({
         aria-label={label}
         disabled={disabled}
         onClick={onClick}
+        {...icon.triggers}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-md border-2 border-transparent',
           danger ? 'text-actionDanger' : 'text-ink',
@@ -411,7 +426,7 @@ function PartAction({
           'disabled:pointer-events-none disabled:opacity-30',
         )}
       >
-        {children}
+        <Icon ref={icon.ref} aria-hidden size={16} className={cn('h-4 w-4', ANIMATED_ICON_CLASS)} />
       </button>
     </TooltipHint>
   );

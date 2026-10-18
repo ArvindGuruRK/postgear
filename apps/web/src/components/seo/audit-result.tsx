@@ -16,8 +16,10 @@
  * not in a report); "Delete" asks first. The actions wait for the run to
  * end: deleting an audit the API is still writing is a race nobody wins.
  */
-import { Button, Text, useToast } from '@postgear/ui';
-import { Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
+import { Button, MotionIcon, Text, useToast } from '@postgear/ui';
 import { CrawlFacts } from './crawl-facts';
 import { Recommendations } from './recommendations';
 import { ScoreBreakdown } from './score-breakdown';
@@ -89,18 +91,18 @@ export function AuditResult({
       {!running && (state.detail || state.audit) ? (
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={onAnalyzeAgain}>
-            <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
             Analyze again
           </Button>
           {state.detail ? (
             <Button variant="secondary" onClick={() => void copy()}>
-              <Copy className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={CopyIcon} className="h-4 w-4" />
               Copy report
             </Button>
           ) : null}
           {state.audit ? (
             <Button variant="secondary" onClick={onDelete} className="sm:ms-auto">
-              <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
               Delete
             </Button>
           ) : null}

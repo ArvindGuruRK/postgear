@@ -1,14 +1,15 @@
 'use client';
 
-import {
-  BarChart3,
-  CalendarDays,
-  Image as ImageIcon,
-  ListOrdered,
-  Search,
-  Settings,
-  Sparkles,
-} from 'lucide-react';
+// Per-icon subpaths rather than the `lucide` barrel, so dev compiles seven
+// icons and not all of them.
+import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
+import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
+import { ImageIcon } from '@animateicons/react/lucide/image-icon';
+import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
+import { SearchIcon } from '@animateicons/react/lucide/search-icon';
+import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
+import type { AnimatedIcon } from '@postgear/ui';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { NotificationBell } from '../notifications/notification-bell';
@@ -31,13 +32,13 @@ import type { SidebarItem } from './sidebar';
  * from the calendar's channel card (Create Post, Add Channel, the channels
  * page button and each channel's menu), and their routes stay as they were.
  */
-const RAIL: Array<{ segment: string; label: string; icon: SidebarItem['icon'] }> = [
-  { segment: 'calendar', label: 'Calendar', icon: CalendarDays },
-  { segment: 'ai-copilot', label: 'Copilot', icon: Sparkles },
-  { segment: 'queue', label: 'Queue', icon: ListOrdered },
-  { segment: 'analytics', label: 'Analytics', icon: BarChart3 },
+const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
+  { segment: 'calendar', label: 'Calendar', icon: CalendarDaysIcon },
+  { segment: 'ai-copilot', label: 'Copilot', icon: SparklesIcon },
+  { segment: 'queue', label: 'Queue', icon: ListOrderedIcon },
+  { segment: 'analytics', label: 'Analytics', icon: ChartColumnIcon },
   { segment: 'media', label: 'Media', icon: ImageIcon },
-  { segment: 'seo-analyzer', label: 'SEO', icon: Search },
+  { segment: 'seo-analyzer', label: 'SEO', icon: SearchIcon },
 ];
 
 /** The top bar's h1 for each top-level page. */
@@ -77,7 +78,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
   const navItems: SidebarItem[] = RAIL.map((item) => ({
     label: item.label,
     href: `${base}/${item.segment}`,
-    icon: item.icon,
+    animatedIcon: item.icon,
     active: segment === item.segment,
   }));
 
@@ -87,7 +88,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
     {
       label: 'Settings',
       href: `${base}/settings/team`,
-      icon: Settings,
+      animatedIcon: SettingsIcon,
       active: segment === 'settings',
     },
   ];

@@ -37,6 +37,12 @@
  * announced (`announcePostsChanged`), so the calendar or queue under the
  * modal shows it at once.
  */
+import { ExpandIcon } from '@animateicons/react/lucide/expand-icon';
+import { GlobeIcon } from '@animateicons/react/lucide/globe-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { ShrinkIcon } from '@animateicons/react/lucide/shrink-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import {
   Alert,
   AlertDialog,
@@ -48,6 +54,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertTitle,
+  ANIMATED_ICON_CLASS,
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -59,15 +66,24 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  MotionIcon,
   Tabs,
   TabsList,
   TabsTrigger,
   TooltipHint,
+  useIconAnimation,
   useToast,
 } from '@postgear/ui';
-import { Globe, Maximize2, Minimize2, Plus, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, api } from '@/lib/api';
 import { announcePostsChanged } from '@/lib/post-events';
@@ -106,6 +122,8 @@ interface ComposerProps {
   initialPublishAt?: string | null;
   /** Set when `?group=` named a post that could not be loaded. */
   loadError: string | null;
+  /** A new post's first save: it is now the saved post `group`. */
+  onCreated?: (group: string) => void;
 }
 
 type Notice =
@@ -138,6 +156,7 @@ export function Composer({
   initialMedia,
   initialPublishAt = null,
   loadError,
+  onCreated,
 }: ComposerProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -172,6 +191,13 @@ export function Composer({
   // whole screen keeps getting it. Read after mount so the server render and
   // the first client render agree.
   const [fullscreen, setFullscreen] = useState(false);
+  // The resize animates only once the person has used the button: restoring
+  // the saved preference on open should land in place, not grow in front of
+  // them.
+  const [resizeAnimated, setResizeAnimated] = useState(false);
+  const fullscreenIcon = useIconAnimation();
+  const deleteIcon = useIconAnimation();
+  const shownFullscreen = useRef(fullscreen);
 
   useEffect(() => {
     try {
@@ -181,7 +207,18 @@ export function Composer({
     }
   }, []);
 
+  // The icon that takes over on a toggle plays as the card resizes.
+  useEffect(() => {
+    if (shownFullscreen.current !== fullscreen) {
+      shownFullscreen.current = fullscreen;
+      if (resizeAnimated) {
+        fullscreenIcon.play();
+      }
+    }
+  }, [fullscreen, resizeAnimated, fullscreenIcon.play]);
+
   const toggleFullscreen = useCallback(() => {
+    setResizeAnimated(true);
     setFullscreen((current) => {
       const next = !current;
       try {
@@ -301,6 +338,7 @@ export function Composer({
         // the composer, and with it every editor, cursor and undo stack.
         if (!state.group) {
           window.history.replaceState(null, '', `/${orgId}/composer?group=${post.group}`);
+          onCreated?.(post.group);
         }
 
         toast({
@@ -324,7 +362,7 @@ export function Composer({
         setSaving(null);
       }
     },
-    [state, blockers, publishDate, orgId, toast, locked],
+    [state, blockers, publishDate, orgId, toast, locked, onCreated],
   );
 
   // Warn before losing unsaved work to a closed tab or a reload.
@@ -406,7 +444,7 @@ export function Composer({
                   }}
                   className={buttonVariants({ variant: 'primary', size: 'sm' })}
                 >
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  <MotionIcon icon={PlusIcon} className="h-4 w-4" />
                   New post
                 </a>
               ) : null}
@@ -417,8 +455,13 @@ export function Composer({
             className={cn(
               'flex flex-col gap-5 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto pg-scrollbar pg-scrollbar-secondary',
               // Fullscreen, the writing keeps a comfortable line length,
-              // centred in the wider column, as in Buffer's fullscreen.
-              fullscreen && '[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-3xl',
+              // centred in the wider column, as in Buffer's fullscreen. The
+              // width eases between 100% and 48rem with the card (a jump to or
+              // from `none` could not), so the column narrows as it grows.
+              '[&>*]:mx-auto [&>*]:w-full',
+              fullscreen ? '[&>*]:max-w-3xl' : '[&>*]:max-w-full',
+              resizeAnimated &&
+                '[&>*]:transition-[max-width] [&>*]:duration-400 [&>*]:ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:[&>*]:transition-none',
             )}
           >
             {loadError ? <Alert variant="danger">{loadError}</Alert> : null}
@@ -456,7 +499,12 @@ export function Composer({
                 <TabsList className="max-w-full flex-wrap justify-start gap-2 border-0 bg-transparent p-0 shadow-none">
                   <TooltipHint label="All channels: one post for every channel" side="bottom">
                     <TabsTrigger value={SHARED} aria-label="All channels" className={SCOPE_TILE}>
-                      <Globe className="h-5 w-5" strokeWidth={2.25} aria-hidden="true" />
+                      <MotionIcon
+                        icon={GlobeIcon}
+                        size={20}
+                        strokeWidth={2.25}
+                        className="h-5 w-5"
+                      />
                     </TabsTrigger>
                   </TooltipHint>
                   {selectedChannels.map((channel) => {
@@ -481,7 +529,7 @@ export function Composer({
                               {channel.picture ? (
                                 <AvatarImage src={channel.picture} alt="" />
                               ) : null}
-                              <AvatarFallback className="text-[9px]">
+                              <AvatarFallback colorSeed={channel.id} className="text-[9px]">
                                 {channel.name.slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
@@ -571,6 +619,7 @@ export function Composer({
               <button
                 type="button"
                 onClick={toggleFullscreen}
+                {...fullscreenIcon.triggers}
                 aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                 aria-pressed={fullscreen}
                 className={cn(
@@ -579,9 +628,19 @@ export function Composer({
                 )}
               >
                 {fullscreen ? (
-                  <Minimize2 className="h-4 w-4" strokeWidth={2.5} />
+                  <ShrinkIcon
+                    ref={fullscreenIcon.ref}
+                    aria-hidden
+                    size={16}
+                    className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
+                  />
                 ) : (
-                  <Maximize2 className="h-4 w-4" strokeWidth={2.5} />
+                  <ExpandIcon
+                    ref={fullscreenIcon.ref}
+                    aria-hidden
+                    size={16}
+                    className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
+                  />
                 )}
               </button>
             </TooltipHint>
@@ -595,7 +654,7 @@ export function Composer({
                   FOCUS,
                 )}
               >
-                <X className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={XIcon} className="h-4 w-4" />
               </button>
             </TooltipHint>
           </div>
@@ -665,12 +724,18 @@ export function Composer({
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
+            {...deleteIcon.triggers}
             className={cn(
               'flex h-11 items-center gap-2 rounded-md px-2 type-ui text-sm text-actionDanger hover:bg-actionDanger/10',
               FOCUS,
             )}
           >
-            <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+            <Trash2Icon
+              ref={deleteIcon.ref}
+              aria-hidden
+              size={16}
+              className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
+            />
             Delete Post
           </button>
         ) : null}
@@ -782,11 +847,17 @@ export function Composer({
         }}
         data-fullscreen={fullscreen || undefined}
         className={cn(
-          'flex flex-col gap-0 overflow-hidden p-0',
-          'transition-[width,height,max-width,max-height,border-radius] duration-200 ease-out motion-reduce:transition-none',
+          'flex max-h-none max-w-none flex-col gap-0 overflow-hidden p-0',
+          // Both sizes are lengths CSS can blend (a `min()` of viewport units
+          // and rems is one px value), so the card grows from and shrinks to
+          // its centre; a `max-width: none` at either end would snap instead.
+          // Ease-in-out over 400ms: it gathers pace and then settles, so the
+          // change reads as one smooth movement rather than a lurch.
+          resizeAnimated &&
+            'transition-[width,height,border-radius,border-width,box-shadow] duration-400 ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none',
           fullscreen
-            ? 'h-dvh max-h-none w-screen max-w-none rounded-none border-0 shadow-none'
-            : 'h-[calc(100dvh-2rem)] max-h-[62rem] w-[calc(100%-2rem)] max-w-[88rem] rounded-2xl',
+            ? 'h-dvh w-screen rounded-none border-0 shadow-none'
+            : 'h-[min(calc(100dvh-2rem),62rem)] w-[min(calc(100vw-2rem),88rem)] rounded-2xl',
         )}
       >
         {frame}

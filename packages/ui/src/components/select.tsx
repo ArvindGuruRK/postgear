@@ -1,10 +1,12 @@
 'use client';
 
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { forwardRef } from 'react';
 import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
@@ -27,7 +29,7 @@ export const SelectTrigger = forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={3} />
+      <MotionIcon icon={ChevronDownIcon} className="h-4 w-4 shrink-0" strokeWidth={3} />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -101,6 +103,10 @@ export const SelectSeparator = forwardRef<
   React.ElementRef<typeof SelectPrimitive.Separator>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
 >(({ className, ...props }, ref) => (
-  <SelectPrimitive.Separator ref={ref} className={cn('my-1 h-0.5 bg-outline', className)} {...props} />
+  <SelectPrimitive.Separator
+    ref={ref}
+    className={cn('my-1 h-0.5 bg-outline', className)}
+    {...props}
+  />
 ));
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName;

@@ -1,5 +1,10 @@
 'use client';
 
+import { CalendarIcon } from '@animateicons/react/lucide/calendar-icon';
+import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import { PencilIcon } from '@animateicons/react/lucide/pencil-icon';
+import { SearchIcon } from '@animateicons/react/lucide/search-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -18,6 +23,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  MotionIcon,
   NavigationMenu,
   NavigationMenuContent,
   NavigationMenuItem,
@@ -30,7 +36,6 @@ import {
   TabsList,
   TabsTrigger,
 } from '@postgear/ui';
-import { Calendar, Copy, Pencil, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Row, Section } from '../shared';
 
@@ -93,7 +98,7 @@ export function NavigationSection() {
       </Row>
       <Row label="Command Menu / Palette">
         <Button variant="secondary" onClick={() => setCommandOpen(true)}>
-          <Search className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={SearchIcon} className="h-4 w-4" />
           Search commands…
         </Button>
         <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
@@ -102,11 +107,11 @@ export function NavigationSection() {
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Actions">
               <CommandItem onSelect={() => setCommandOpen(false)}>
-                <Calendar className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={CalendarIcon} className="h-4 w-4" />
                 Schedule a post
               </CommandItem>
               <CommandItem onSelect={() => setCommandOpen(false)}>
-                <Pencil className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={PencilIcon} className="h-4 w-4" />
                 Edit draft
               </CommandItem>
             </CommandGroup>
@@ -120,11 +125,11 @@ export function NavigationSection() {
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem className="gap-2">
-              <Copy className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={CopyIcon} className="h-4 w-4" />
               Duplicate
             </ContextMenuItem>
             <ContextMenuItem className="gap-2 text-actionDanger">
-              <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
               Delete
             </ContextMenuItem>
           </ContextMenuContent>

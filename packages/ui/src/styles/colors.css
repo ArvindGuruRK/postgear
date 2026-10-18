@@ -591,3 +591,44 @@
      accent/success) still pairs with black and is unaffected. */
   --color-on-action-ai: #ffffff;
 }
+
+/* ── Avatar initials palette (2026-10-19) ───────────────────────────────
+   After Jira's avatar group: an avatar without a photo is filled with one
+   of eight saturated colors, picked by a hash of the person's (or
+   channel's) name, so the same one keeps the same color everywhere and
+   neighbours in a group tell apart at a glance (avatarColor() in
+   packages/ui/src/components/avatar.tsx).
+
+   Flat across every theme, like the comic fills above: each avatar carries
+   its own 2px outline border, which separates it from any page, and its
+   initials sit on the fill, never on the page, so the text pairing is
+   fixed per color rather than theme-aware. Each pair was contrast-checked
+   by script, not eyeballed (WCAG AA for normal text is 4.5:1):
+     1 blue   #2563eb / white  5.17:1
+     2 orange #f97316 / black  7.06:1
+     3 teal   #0f766e / white  5.47:1
+     4 green  #16a34a / black  6.01:1
+     5 violet #7c3aed / white  5.70:1
+     6 yellow #facc15 / black 12.93:1
+     7 rose   #be185d / white  6.04:1
+     8 cyan   #06b6d4 / black  8.15:1
+   Blue first and the warm and cool hues interleaved, so a group colored by
+   position (no name to hash) also reads as a sequence. */
+:root {
+  --color-avatar-1: #2563eb;
+  --color-on-avatar-1: #ffffff;
+  --color-avatar-2: #f97316;
+  --color-on-avatar-2: #0a0a0a;
+  --color-avatar-3: #0f766e;
+  --color-on-avatar-3: #ffffff;
+  --color-avatar-4: #16a34a;
+  --color-on-avatar-4: #0a0a0a;
+  --color-avatar-5: #7c3aed;
+  --color-on-avatar-5: #ffffff;
+  --color-avatar-6: #facc15;
+  --color-on-avatar-6: #0a0a0a;
+  --color-avatar-7: #be185d;
+  --color-on-avatar-7: #ffffff;
+  --color-avatar-8: #06b6d4;
+  --color-on-avatar-8: #0a0a0a;
+}

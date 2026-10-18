@@ -1,11 +1,12 @@
 'use client';
 
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import * as ToastPrimitive from '@radix-ui/react-toast';
-import { type VariantProps, cva } from 'class-variance-authority';
-import { X } from 'lucide-react';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { forwardRef } from 'react';
 import { pressSm } from '../lib/press';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export const ToastProvider = ToastPrimitive.Provider;
 
@@ -108,7 +109,7 @@ export const ToastClose = forwardRef<
     toast-close=""
     {...props}
   >
-    <X className="h-4 w-4" strokeWidth={3} />
+    <MotionIcon icon={XIcon} className="h-4 w-4" strokeWidth={3} />
   </ToastPrimitive.Close>
 ));
 ToastClose.displayName = ToastPrimitive.Close.displayName;

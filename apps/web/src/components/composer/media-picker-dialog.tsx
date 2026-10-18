@@ -1,5 +1,6 @@
 'use client';
 
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
   Button,
   Dialog,
@@ -8,12 +9,13 @@ import {
   DialogTitle,
   EmptyState,
   ErrorState,
+  MotionIcon,
   Pagination,
   SearchInput,
   Skeleton,
   TooltipHint,
 } from '@postgear/ui';
-import { Image as ImageIcon, Plus } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { UPLOAD_ACCEPT } from '@/components/media/media-limits';
 import { MediaTile } from '@/components/media/media-tile';
@@ -123,7 +125,7 @@ function PickerBody({
             align="end"
           >
             <Button variant="secondary" onClick={() => fileInput.current?.click()}>
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={PlusIcon} className="h-4 w-4" />
               Upload
             </Button>
           </TooltipHint>

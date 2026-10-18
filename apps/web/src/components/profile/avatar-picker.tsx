@@ -1,7 +1,8 @@
 'use client';
 
-import { cn, FormErrorMessage, pressSm, Spinner, Stack, Text } from '@postgear/ui';
-import { Check, ImagePlus } from 'lucide-react';
+import { ImagePlusIcon } from '@animateicons/react/lucide/image-plus-icon';
+import { cn, FormErrorMessage, MotionIcon, pressSm, Spinner, Stack, Text } from '@postgear/ui';
+import { Check } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api, uploadFile } from '@/lib/api';
 import { AVATAR_PRESETS, presetSrc } from '@/lib/avatars';
@@ -222,7 +223,7 @@ export function AvatarPicker({
             {uploading ? (
               <Spinner size="sm" />
             ) : (
-              <ImagePlus className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+              <MotionIcon icon={ImagePlusIcon} size={20} className="h-5 w-5" />
             )}
             <span className="font-sans text-xs font-bold leading-tight">
               {uploading ? 'Uploading…' : 'Upload a photo'}

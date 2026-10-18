@@ -1,10 +1,11 @@
 'use client';
 
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon } from '@animateicons/react/lucide/calendar-icon';
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
 import { Calendar } from './calendar';
+import { MotionIcon } from './motion-icon';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 /**
@@ -166,7 +167,7 @@ export function DateTimePicker({
             className,
           )}
         >
-          <CalendarIcon className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <MotionIcon icon={CalendarIcon} className="h-4 w-4 shrink-0" />
           <span className={cn('truncate', !text && 'opacity-50')}>{text ?? placeholder}</span>
         </button>
       </PopoverTrigger>

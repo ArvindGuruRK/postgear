@@ -99,7 +99,7 @@ export function ComposerChannels({
                   )}
                 >
                   {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-                  <AvatarFallback className="text-[11px]">
+                  <AvatarFallback colorSeed={channel.id} className="text-[11px]">
                     {channel.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -112,9 +112,13 @@ export function ComposerChannels({
                   <PlatformIcon platform={channel.providerIdentifier} className="h-4 w-4" />
                 </span>
                 {channel.health === 'needs_reconnect' ? (
+                  // On the avatar's rim, not the corner of its box: a 44px
+                  // circle's edge is about 6px in from that corner, so at 0
+                  // the badge's centre sits just inside the rim, laid on the
+                  // picture the way the bell's count sits on the bell.
                   <span
                     aria-hidden="true"
-                    className="absolute -start-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline bg-actionDanger font-sans text-[10px] font-bold leading-none text-onActionLight"
+                    className="absolute start-0 top-0 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline bg-actionDanger font-sans text-[10px] font-bold leading-none text-onActionLight"
                   >
                     !
                   </span>

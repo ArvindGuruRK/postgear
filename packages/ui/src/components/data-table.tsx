@@ -1,17 +1,20 @@
 'use client';
 
+import { ArrowDownIcon } from '@animateicons/react/lucide/arrow-down-icon';
+import { ArrowUpDownIcon } from '@animateicons/react/lucide/arrow-up-down-icon';
+import { ArrowUpIcon } from '@animateicons/react/lucide/arrow-up-icon';
 import {
   type ColumnDef,
-  type SortingState,
   flexRender,
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 import { Pagination } from './pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 
@@ -65,11 +68,26 @@ export function DataTable<TData, TValue>({
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {sortDirection === 'asc' ? (
-                          <ArrowUp className="h-3.5 w-3.5" strokeWidth={3} />
+                          <MotionIcon
+                            icon={ArrowUpIcon}
+                            size={14}
+                            className="h-3.5 w-3.5"
+                            strokeWidth={3}
+                          />
                         ) : sortDirection === 'desc' ? (
-                          <ArrowDown className="h-3.5 w-3.5" strokeWidth={3} />
+                          <MotionIcon
+                            icon={ArrowDownIcon}
+                            size={14}
+                            className="h-3.5 w-3.5"
+                            strokeWidth={3}
+                          />
                         ) : (
-                          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" strokeWidth={3} />
+                          <MotionIcon
+                            icon={ArrowUpDownIcon}
+                            size={14}
+                            className="h-3.5 w-3.5 opacity-40"
+                            strokeWidth={3}
+                          />
                         )}
                       </button>
                     ) : (

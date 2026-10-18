@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarIcon } from '@animateicons/react/lucide/calendar-icon';
 import {
   endOfMonth,
   format,
@@ -10,13 +11,13 @@ import {
   subDays,
   subMonths,
 } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
 import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
 import { Button } from './button';
 import { Calendar } from './calendar';
+import { MotionIcon } from './motion-icon';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 export interface DateRangePreset {
@@ -150,7 +151,7 @@ export function DateRangePicker({
             className,
           )}
         >
-          <CalendarIcon className="h-4 w-4 shrink-0 opacity-70" strokeWidth={2.5} />
+          <MotionIcon icon={CalendarIcon} className="h-4 w-4 shrink-0 opacity-70" />
           <span className={cn('truncate', !value?.from && 'opacity-50')}>{triggerLabel}</span>
         </button>
       </PopoverTrigger>

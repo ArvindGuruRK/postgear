@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, type LucideIcon } from 'lucide-react';
+import type { AnimatedIcon } from '../lib/icon-animation';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import {
   DropdownMenu,
@@ -11,11 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './dropdown-menu';
+import { MotionIcon } from './motion-icon';
 import { TooltipHint } from './tooltip';
 
 export interface UserMenuItem {
   label: string;
   icon?: LucideIcon;
+  /** Played as the item is hovered or reached by keyboard; wins over `icon`. */
+  animatedIcon?: AnimatedIcon;
   onSelect?: () => void;
   danger?: boolean;
   /** Marks the current choice within a group, e.g. the active workspace. */
@@ -48,7 +52,11 @@ function MenuItem({ item }: { item: UserMenuItem }) {
         item.danger ? 'text-actionDanger focus:bg-actionDanger focus:text-onActionLight' : undefined
       }
     >
-      {Icon && <Icon className="h-4 w-4" strokeWidth={2.5} />}
+      {item.animatedIcon ? (
+        <MotionIcon icon={item.animatedIcon} className="h-4 w-4" />
+      ) : (
+        Icon && <Icon className="h-4 w-4" strokeWidth={2.5} />
+      )}
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
       {item.checked && (
         <Check className="ms-2 h-4 w-4 shrink-0" strokeWidth={3} aria-hidden="true" />
@@ -81,9 +89,9 @@ export function UserMenu({
             aria-label="Open user menu"
             className="rounded-full outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
           >
-            <Avatar size="sm">
+            <Avatar size="md">
               {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-              <AvatarFallback>{initials}</AvatarFallback>
+              <AvatarFallback colorSeed={name}>{initials}</AvatarFallback>
             </Avatar>
           </button>
         </DropdownMenuTrigger>

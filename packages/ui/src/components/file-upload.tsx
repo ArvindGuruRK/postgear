@@ -1,8 +1,9 @@
 'use client';
 
-import { Upload } from 'lucide-react';
+import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
 import { forwardRef, useCallback, useId, useState } from 'react';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export interface FileUploadProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onDrop'> {
   onFilesSelected?: (files: File[]) => void;
@@ -70,7 +71,7 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
             disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-actionPrimary/5',
           )}
         >
-          <Upload className="h-8 w-8 text-ink" strokeWidth={2.5} />
+          <MotionIcon icon={UploadIcon} size={32} className="h-8 w-8 text-ink" />
           {/* Same treatment as Label (label.tsx): this is a form control's
               label, so it follows the form-control typography rule in
               design-system-rules.md §1, not the display-face chrome rule.
@@ -78,7 +79,9 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
               inside the drop-zone <button>, where a real <label> element
               would be nested-interactive markup. */}
           <p className="font-sans text-sm font-bold text-ink">{label}</p>
-          {helperText && <p className="font-sans text-xs font-medium text-ink opacity-70">{helperText}</p>}
+          {helperText && (
+            <p className="font-sans text-xs font-medium text-ink opacity-70">{helperText}</p>
+          )}
         </button>
         <input
           id={inputId}

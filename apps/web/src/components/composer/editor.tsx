@@ -21,11 +21,18 @@
  * disagree with the preview. A link is something a person adds on purpose,
  * through the toolbar, to words.
  */
+import { BoldIcon } from '@animateicons/react/lucide/bold-icon';
+import { Heading2Icon } from '@animateicons/react/lucide/heading-2-icon';
+import { ItalicIcon } from '@animateicons/react/lucide/italic-icon';
+import { ListIcon } from '@animateicons/react/lucide/list-icon';
+import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
+import { UnlinkIcon } from '@animateicons/react/lucide/unlink-icon';
 import { isSafeHref } from '@postgear/social-core/composer';
 import {
   Button,
   cn,
   Input,
+  MotionIcon,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -34,7 +41,7 @@ import {
 import { Placeholder } from '@tiptap/extensions';
 import { type Editor, EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Bold, Heading2, Italic, Link2, List, ListOrdered, Unlink } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 
 interface PostEditorProps {
@@ -155,7 +162,7 @@ function EditorToolbar({
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleBold().run()}
       >
-        <Bold className="h-4 w-4" strokeWidth={2.5} />
+        <MotionIcon icon={BoldIcon} className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         label="Italic"
@@ -164,7 +171,7 @@ function EditorToolbar({
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleItalic().run()}
       >
-        <Italic className="h-4 w-4" strokeWidth={2.5} />
+        <MotionIcon icon={ItalicIcon} className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         label="Heading"
@@ -172,7 +179,7 @@ function EditorToolbar({
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
       >
-        <Heading2 className="h-4 w-4" strokeWidth={2.5} />
+        <MotionIcon icon={Heading2Icon} className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         label="Bulleted list"
@@ -180,7 +187,7 @@ function EditorToolbar({
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleBulletList().run()}
       >
-        <List className="h-4 w-4" strokeWidth={2.5} />
+        <MotionIcon icon={ListIcon} className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         label="Numbered list"
@@ -188,7 +195,7 @@ function EditorToolbar({
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleOrderedList().run()}
       >
-        <ListOrdered className="h-4 w-4" strokeWidth={2.5} />
+        <MotionIcon icon={ListOrderedIcon} className="h-4 w-4" />
       </ToolbarButton>
 
       <LinkControl editor={editor} active={active?.link ?? false} />
@@ -350,7 +357,7 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
           disabled={!editor}
           onClick={() => editor?.chain().focus().extendMarkRange('link').unsetLink().run()}
         >
-          <Unlink className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={UnlinkIcon} className="h-4 w-4" />
         </ToolbarButton>
       ) : null}
     </>

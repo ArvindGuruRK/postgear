@@ -105,6 +105,7 @@ export function DayView({
                           {rowChannels.map((channel) => (
                             <ChannelMark
                               key={channel.id}
+                              id={channel.id}
                               name={channel.name}
                               picture={channel.picture}
                               platform={channel.providerIdentifier}

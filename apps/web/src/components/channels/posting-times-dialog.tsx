@@ -1,5 +1,6 @@
 'use client';
 
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Button,
   Dialog,
@@ -8,6 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  MotionIcon,
   Select,
   SelectContent,
   SelectItem,
@@ -16,7 +18,6 @@ import {
   Stack,
   Text,
 } from '@postgear/ui';
-import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import type { Channel, PostingTime } from '@/types/channel';
@@ -175,7 +176,7 @@ export function PostingTimesDialog({ channel, onOpenChange, onDone }: PostingTim
                         setTimes(times.filter((candidate) => candidate.time !== entry.time))
                       }
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <MotionIcon icon={Trash2Icon} strokeWidth={2} className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}

@@ -21,14 +21,18 @@
  * to, so a card can be moved by arrow keys; the Reschedule dialog remains the
  * precise keyboard path.
  */
+import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
+import { EyeIcon } from '@animateicons/react/lucide/eye-icon';
+import { GripVerticalIcon } from '@animateicons/react/lucide/grip-vertical-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { cn, TooltipHint } from '@postgear/ui';
-import { BarChart3, Eye, GripVertical, Lock, Trash2 } from 'lucide-react';
+import { cn, MotionIcon, TooltipHint } from '@postgear/ui';
+import { Lock } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement, ReactNode } from 'react';
 import type { PostSummary } from '@/types/post';
-import { ChannelStack } from '../posts/channel-stack';
+import { CHANNEL_STACK_HOVER_RING, ChannelStack } from '../posts/channel-stack';
 import {
   describePost,
   formatClock,
@@ -114,7 +118,7 @@ export function PostCard({
                 'focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing',
               )}
             >
-              <GripVertical className="h-3.5 w-3.5" strokeWidth={2.5} />
+              <MotionIcon icon={GripVerticalIcon} size={14} className="h-3.5 w-3.5" />
             </button>
           </StripAction>
         ) : (
@@ -142,7 +146,7 @@ export function PostCard({
                   onClick={() => onPreview(post)}
                   className={STRIP_ACTION}
                 >
-                  <Eye className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <MotionIcon icon={EyeIcon} size={14} className="h-3.5 w-3.5" />
                 </button>
               </StripAction>
             ) : null}
@@ -154,7 +158,7 @@ export function PostCard({
                   onClick={() => onStatistics(post)}
                   className={STRIP_ACTION}
                 >
-                  <BarChart3 className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <MotionIcon icon={ChartColumnIcon} size={14} className="h-3.5 w-3.5" />
                 </button>
               </StripAction>
             ) : null}
@@ -166,7 +170,7 @@ export function PostCard({
                   onClick={() => onDelete(post)}
                   className={STRIP_ACTION}
                 >
-                  <Trash2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <MotionIcon icon={Trash2Icon} size={14} className="h-3.5 w-3.5" />
                 </button>
               </StripAction>
             ) : null}
@@ -181,7 +185,7 @@ export function PostCard({
           'flex min-w-0 flex-1 items-start gap-1.5 text-start outline-none',
           'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
           density === 'compact' ? 'p-1' : 'p-1.5',
-          !overlay && 'hover:bg-actionPrimary/10',
+          !overlay && ['hover:bg-actionPrimary/10', CHANNEL_STACK_HOVER_RING],
         )}
       >
         <ChannelStack

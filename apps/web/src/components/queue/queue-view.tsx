@@ -8,6 +8,7 @@
  * channel, date range, direction) live in the URL so a view of "failed posts
  * this week" can be bookmarked.
  */
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
   Alert,
   Button,
@@ -16,6 +17,7 @@ import {
   ErrorState,
   Input,
   Label,
+  MotionIcon,
   PageActions,
   Pagination,
   Select,
@@ -30,7 +32,7 @@ import {
   TabsTrigger,
   Text,
 } from '@postgear/ui';
-import { ArrowDownNarrowWide, ArrowUpNarrowWide, ListOrdered, Plus } from 'lucide-react';
+import { ArrowDownNarrowWide, ArrowUpNarrowWide, ListOrdered } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -125,7 +127,7 @@ export function QueueView({
     <Stack gap="lg">
       <PageActions>
         <Link href={`/${orgId}/composer`} className={buttonVariants({ variant: 'primary' })}>
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={PlusIcon} className="h-4 w-4" />
           New post
         </Link>
       </PageActions>

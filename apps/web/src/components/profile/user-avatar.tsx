@@ -9,7 +9,8 @@ import type { SessionAvatar } from '@/lib/session';
  * image on our storage (upload or re-hosted OAuth photo), or their initials.
  *
  * Built on `@postgear/ui`'s `Avatar`, so the circle, border and the initials'
- * `type-ui` treatment are the same ones `UserMenu` draws. The image is a plain
+ * `type-ui` treatment and palette color (seeded by the name) are the same ones
+ * `UserMenu` draws. The image is a plain
  * `<img>` (Radix's `AvatarImage`), not `next/image`: stored avatars live on the
  * API's origin or a bucket, which `next.config` has no remote pattern for, and
  * they are already 256 px WebP, so there is nothing for the optimizer to do.
@@ -39,7 +40,9 @@ export function UserAvatar({
   return (
     <Avatar size={size} className={className}>
       {src ? <AvatarImage src={src} alt={name} /> : null}
-      <AvatarFallback className={cn(initialsClassName)}>{initialsOf(name)}</AvatarFallback>
+      <AvatarFallback colorSeed={name} className={cn(initialsClassName)}>
+        {initialsOf(name)}
+      </AvatarFallback>
     </Avatar>
   );
 }

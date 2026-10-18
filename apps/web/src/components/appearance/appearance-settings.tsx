@@ -28,10 +28,14 @@
  * coming back anyway (an entitlement that lapsed while the page was open)
  * opens the same dialog.
  */
+import { MonitorIcon } from '@animateicons/react/lucide/monitor-icon';
+import { MoonIcon } from '@animateicons/react/lucide/moon-icon';
+import { SunIcon } from '@animateicons/react/lucide/sun-icon';
 import {
   Alert,
   AlertDescription,
   AlertTitle,
+  type AnimatedIcon,
   Button,
   buttonVariants,
   Card,
@@ -46,11 +50,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  MotionIcon,
   Skeleton,
   Stack,
   toast,
 } from '@postgear/ui';
-import { Monitor, Moon, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
@@ -71,10 +75,10 @@ import { ThemeCard } from './theme-card';
 
 const PATH = '/users/me/appearance';
 
-const MODES: Array<{ value: AppearanceMode; label: string; icon: typeof Sun }> = [
-  { value: 'system', label: 'System', icon: Monitor },
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
+const MODES: Array<{ value: AppearanceMode; label: string; icon: AnimatedIcon }> = [
+  { value: 'system', label: 'System', icon: MonitorIcon },
+  { value: 'light', label: 'Light', icon: SunIcon },
+  { value: 'dark', label: 'Dark', icon: MoonIcon },
 ];
 
 const SECTION_TITLE: Record<ColorScheme, string> = {
@@ -304,7 +308,6 @@ export function AppearanceSettings({
               className="inline-flex items-center gap-1 rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalSm"
             >
               {MODES.map((option) => {
-                const Icon = option.icon;
                 const active = option.value === mode;
 
                 return (
@@ -328,7 +331,7 @@ export function AppearanceSettings({
                         : 'text-ink hover:bg-actionPrimary/10',
                     )}
                   >
-                    <Icon className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+                    <MotionIcon icon={option.icon} className="h-4 w-4" />
                     {option.label}
                   </button>
                 );

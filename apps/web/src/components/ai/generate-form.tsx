@@ -14,6 +14,7 @@
  * disabled when the balance cannot cover it, with the reset date, since
  * "not enough credits" with no "until when" is a dead end.
  */
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   Alert,
   AlertTitle,
@@ -24,6 +25,7 @@ import {
   FormHelperText,
   FormLabel,
   Label,
+  MotionIcon,
   RadioGroup,
   RadioGroupItem,
   Select,
@@ -35,7 +37,7 @@ import {
   Textarea,
   Toggle,
 } from '@postgear/ui';
-import { Sparkles, Square } from 'lucide-react';
+import { Square } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { AiCredits, AiStatus, GenerateRequestBody, PostFormat, Tone } from '@/types/ai';
 import type { Channel } from '@/types/channel';
@@ -251,7 +253,7 @@ export function GenerateForm({
           variant="ai"
           disabled={running || cannotAfford || channels.length === 0}
         >
-          <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
           {running
             ? 'Generating…'
             : cost === null

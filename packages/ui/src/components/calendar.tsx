@@ -1,9 +1,31 @@
 'use client';
 
-import { DayPicker, type DayPickerProps } from 'react-day-picker';
+import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
+import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
+import {
+  type ChevronProps,
+  DayPicker,
+  Chevron as DayPickerChevron,
+  type DayPickerProps,
+} from 'react-day-picker';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export type CalendarProps = DayPickerProps;
+
+/** The month arrows play from their nav buttons; a caption dropdown's up/down keeps the stock glyph. */
+function CalendarChevron({ orientation = 'left', className, ...props }: ChevronProps) {
+  if (orientation === 'left' || orientation === 'right') {
+    return (
+      <MotionIcon
+        icon={orientation === 'left' ? ChevronLeftIcon : ChevronRightIcon}
+        className={className}
+        strokeWidth={3}
+      />
+    );
+  }
+  return <DayPickerChevron orientation={orientation} className={className} {...props} />;
+}
 
 const navButtonClasses = cn(
   'flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-secondary shadow-brutalSm',
@@ -39,7 +61,7 @@ export function Calendar({
         nav: 'absolute inset-x-2 top-2 z-10 flex h-9 items-center justify-between',
         button_previous: navButtonClasses,
         button_next: navButtonClasses,
-        chevron: 'h-4 w-4 fill-ink',
+        chevron: 'h-4 w-4 fill-ink text-ink',
         month_grid: 'mt-2 w-full border-collapse',
         // Weekday header and day rows share the same gap so the labels stay
         // aligned with the tiles beneath them.
@@ -71,6 +93,7 @@ export function Calendar({
         ...classNames,
       }}
       {...props}
+      components={{ Chevron: CalendarChevron, ...props.components }}
     />
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronsUpDownIcon } from '@animateicons/react/lucide/chevrons-up-down-icon';
 import {
   Accordion,
   AccordionContent,
@@ -8,6 +9,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarGroup,
+  AvatarGroupItem,
   AvatarImage,
   Badge,
   Button,
@@ -17,6 +19,7 @@ import {
   DataTable,
   List,
   ListItem,
+  MotionIcon,
   StatCard,
   StatusIndicator,
   Table,
@@ -33,7 +36,7 @@ import {
   TimelineTitle,
 } from '@postgear/ui';
 import type { ColumnDef } from '@tanstack/react-table';
-import { BarChart3, ChevronsUpDown } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 import { Row, Section } from '../shared';
 
@@ -47,10 +50,31 @@ interface DemoPost {
 
 const DEMO_POSTS: DemoPost[] = [
   { id: '1', title: 'Q3 product recap', channel: 'LinkedIn', status: 'Published', engagement: 482 },
-  { id: '2', title: 'Behind the scenes reel', channel: 'Instagram', status: 'Scheduled', engagement: 129 },
+  {
+    id: '2',
+    title: 'Behind the scenes reel',
+    channel: 'Instagram',
+    status: 'Scheduled',
+    engagement: 129,
+  },
   { id: '3', title: 'Customer spotlight', channel: 'TikTok', status: 'Draft', engagement: 0 },
-  { id: '4', title: 'Feature announcement', channel: 'YouTube', status: 'Published', engagement: 1204 },
+  {
+    id: '4',
+    title: 'Feature announcement',
+    channel: 'YouTube',
+    status: 'Published',
+    engagement: 1204,
+  },
   { id: '5', title: 'Weekly tips thread', channel: 'X', status: 'Scheduled', engagement: 76 },
+];
+
+const DEMO_PEOPLE = [
+  { name: 'Arvind R K', initials: 'AK' },
+  { name: 'Bea Okafor', initials: 'BO' },
+  { name: 'Ben Tran', initials: 'BT' },
+  { name: 'Priya Nair', initials: 'PN' },
+  { name: 'Jade Morgan', initials: 'JM', photo: 'https://i.pravatar.cc/80?img=13' },
+  { name: 'Mateo Wills', initials: 'MW' },
 ];
 
 const POST_COLUMNS: ColumnDef<DemoPost>[] = [
@@ -59,7 +83,11 @@ const POST_COLUMNS: ColumnDef<DemoPost>[] = [
   {
     accessorKey: 'status',
     header: 'Status',
-    cell: ({ row }) => <Badge variant={row.original.status === 'Published' ? 'primary' : 'outline'}>{row.original.status}</Badge>,
+    cell: ({ row }) => (
+      <Badge variant={row.original.status === 'Published' ? 'primary' : 'outline'}>
+        {row.original.status}
+      </Badge>
+    ),
   },
   { accessorKey: 'engagement', header: 'Engagement' },
 ];
@@ -73,35 +101,40 @@ export function DataDisplaySection() {
       description="Tables, stats, timelines, and collapsible content, restrained per the dense-data-surface rule: thick borders and flat color, no comic accents."
     >
       <Row label="Avatars">
+        <Avatar size="xs">
+          <AvatarFallback colorSeed="Arvind R K">AK</AvatarFallback>
+        </Avatar>
         <Avatar size="sm">
           <AvatarImage src="https://i.pravatar.cc/64?img=12" alt="" />
-          <AvatarFallback>AK</AvatarFallback>
+          <AvatarFallback colorSeed="Jade Morgan">JM</AvatarFallback>
         </Avatar>
         <Avatar size="md">
-          <AvatarImage src="https://i.pravatar.cc/64?img=13" alt="" />
-          <AvatarFallback>JM</AvatarFallback>
+          <AvatarImage src="https://i.pravatar.cc/80?img=13" alt="" />
+          <AvatarFallback colorSeed="Ravi Shah">RS</AvatarFallback>
         </Avatar>
         <Avatar size="lg">
-          <AvatarFallback>PG</AvatarFallback>
+          <AvatarFallback colorSeed="PostGear">PG</AvatarFallback>
         </Avatar>
       </Row>
       <Row label="Avatar Group">
-        <AvatarGroup max={3}>
-          <Avatar size="sm">
-            <AvatarFallback>AK</AvatarFallback>
-          </Avatar>
-          <Avatar size="sm">
-            <AvatarFallback>JM</AvatarFallback>
-          </Avatar>
-          <Avatar size="sm">
-            <AvatarFallback>RS</AvatarFallback>
-          </Avatar>
-          <Avatar size="sm">
-            <AvatarFallback>TL</AvatarFallback>
-          </Avatar>
-          <Avatar size="sm">
-            <AvatarFallback>MP</AvatarFallback>
-          </Avatar>
+        <AvatarGroup max={4}>
+          {DEMO_PEOPLE.map((person) => (
+            <AvatarGroupItem key={person.name} name={person.name}>
+              <Avatar>
+                {person.photo ? <AvatarImage src={person.photo} alt="" /> : null}
+                <AvatarFallback colorSeed={person.name}>{person.initials}</AvatarFallback>
+              </Avatar>
+            </AvatarGroupItem>
+          ))}
+        </AvatarGroup>
+        <AvatarGroup size="sm" max={3}>
+          {DEMO_PEOPLE.map((person) => (
+            <AvatarGroupItem key={person.name} name={person.name}>
+              <Avatar>
+                <AvatarFallback colorSeed={person.name}>{person.initials}</AvatarFallback>
+              </Avatar>
+            </AvatarGroupItem>
+          ))}
         </AvatarGroup>
       </Row>
       <Row label="Status Indicator">
@@ -112,8 +145,17 @@ export function DataDisplaySection() {
         <StatusIndicator status="offline" label="Offline" />
       </Row>
       <Row label="Stat Card">
-        <StatCard label="Total Posts" value="1,204" icon={BarChart3} trend={{ value: '+12% this month', direction: 'up' }} />
-        <StatCard label="Failed Publishes" value="3" trend={{ value: '-2 since last week', direction: 'down' }} />
+        <StatCard
+          label="Total Posts"
+          value="1,204"
+          icon={BarChart3}
+          trend={{ value: '+12% this month', direction: 'up' }}
+        />
+        <StatCard
+          label="Failed Publishes"
+          value="3"
+          trend={{ value: '-2 since last week', direction: 'down' }}
+        />
       </Row>
       <Row label="Table">
         <Table>
@@ -131,7 +173,9 @@ export function DataDisplaySection() {
                 <TableCell>{post.title}</TableCell>
                 <TableCell>{post.channel}</TableCell>
                 <TableCell>
-                  <Badge variant={post.status === 'Published' ? 'primary' : 'outline'}>{post.status}</Badge>
+                  <Badge variant={post.status === 'Published' ? 'primary' : 'outline'}>
+                    {post.status}
+                  </Badge>
                 </TableCell>
               </TableRow>
             ))}
@@ -169,16 +213,22 @@ export function DataDisplaySection() {
           </AccordionItem>
           <AccordionItem value="item-2">
             <AccordionTrigger>Can I schedule to multiple channels at once?</AccordionTrigger>
-            <AccordionContent>Yes, select any combination of connected channels per post.</AccordionContent>
+            <AccordionContent>
+              Yes, select any combination of connected channels per post.
+            </AccordionContent>
           </AccordionItem>
         </Accordion>
       </Row>
       <Row label="Collapsible">
-        <Collapsible open={collapsibleOpen} onOpenChange={setCollapsibleOpen} className="w-full max-w-md">
+        <Collapsible
+          open={collapsibleOpen}
+          onOpenChange={setCollapsibleOpen}
+          className="w-full max-w-md"
+        >
           <CollapsibleTrigger asChild>
             <Button variant="secondary" className="w-full justify-between">
               Advanced options
-              <ChevronsUpDown className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={ChevronsUpDownIcon} className="h-4 w-4" />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 rounded-md border-2 border-outline bg-secondary p-4 font-sans text-sm text-ink">

@@ -1,7 +1,12 @@
 'use client';
 
+import { BellIcon } from '@animateicons/react/lucide/bell-icon';
+import { CreditCardIcon } from '@animateicons/react/lucide/credit-card-icon';
+import { KeyRoundIcon } from '@animateicons/react/lucide/key-round-icon';
+import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
+import { UsersIcon } from '@animateicons/react/lucide/users-icon';
+import { WebhookIcon } from '@animateicons/react/lucide/webhook-icon';
 import { SettingsNav } from '@postgear/ui';
-import { Bell, CreditCard, KeyRound, Palette, Users, Webhook } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -15,14 +20,14 @@ import type { ReactNode } from 'react';
  * component while `settings/layout.tsx` stays a server one.
  */
 const SECTIONS = [
-  { segment: 'team', label: 'Team', icon: Users },
-  { segment: 'billing', label: 'Billing', icon: CreditCard },
-  { segment: 'api-keys', label: 'API keys', icon: KeyRound },
-  { segment: 'webhooks', label: 'Webhooks', icon: Webhook },
-  { segment: 'notifications', label: 'Notifications', icon: Bell },
+  { segment: 'team', label: 'Team', icon: UsersIcon },
+  { segment: 'billing', label: 'Billing', icon: CreditCardIcon },
+  { segment: 'api-keys', label: 'API keys', icon: KeyRoundIcon },
+  { segment: 'webhooks', label: 'Webhooks', icon: WebhookIcon },
+  { segment: 'notifications', label: 'Notifications', icon: BellIcon },
   // Per user, like Notifications: the mode and light theme follow the person
   // into every workspace.
-  { segment: 'appearance', label: 'Appearance', icon: Palette },
+  { segment: 'appearance', label: 'Appearance', icon: PaletteIcon },
 ] as const;
 
 export function SettingsShell({ orgId, children }: { orgId: string; children: ReactNode }) {
@@ -32,10 +37,12 @@ export function SettingsShell({ orgId, children }: { orgId: string; children: Re
   const items = SECTIONS.map((section) => ({
     label: section.label,
     href: `${base}/${section.segment}`,
-    icon: section.icon,
+    animatedIcon: section.icon,
   }));
 
-  const active = items.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+  const active = items.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
 
   return (
     <div className="flex flex-col gap-6 md:flex-row md:gap-8">

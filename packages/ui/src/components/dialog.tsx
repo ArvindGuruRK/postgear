@@ -1,9 +1,10 @@
 'use client';
 
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
+import { MotionIcon } from './motion-icon';
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -52,7 +53,7 @@ export const DialogContent = forwardRef<
             'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
           )}
         >
-          <X className="h-4 w-4 text-ink" strokeWidth={3} />
+          <MotionIcon icon={XIcon} className="h-4 w-4 text-ink" strokeWidth={3} />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       )}

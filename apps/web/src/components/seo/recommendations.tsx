@@ -16,17 +16,18 @@
  * Each row carries `data-testid="seo-recommendation"` and `data-severity`
  * so a test can count what was prioritised, not match on colour.
  */
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
   Badge,
+  MotionIcon,
   Skeleton,
   SpeechBubble,
   Text,
 } from '@postgear/ui';
-import { ExternalLink } from 'lucide-react';
 import type { SeoAdvice, SeoImpact, SeoRecommendation, SeoSeverity } from '@/types/seo';
 import { SEO_CATEGORY_LABELS, SEO_SEVERITIES } from '@/types/seo';
 import { SEVERITY_LABELS, severityVariant } from './seo-view-model';
@@ -160,7 +161,7 @@ function RecommendationRow({ item }: { item: SeoRecommendation }) {
           className="inline-flex w-fit items-center gap-1.5 text-xs font-bold text-ink underline decoration-2 underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
         >
           Learn more<span className="sr-only"> about {item.title}</span>
-          <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
+          <MotionIcon icon={ExternalLinkIcon} size={14} className="h-3.5 w-3.5" />
         </a>
       ) : null}
     </li>

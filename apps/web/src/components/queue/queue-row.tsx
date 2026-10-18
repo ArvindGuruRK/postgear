@@ -9,11 +9,11 @@
  * explained in the row rather than hidden behind a click. Restrained, like the
  * calendar cards: a dense list keeps its borders and drops the shadows.
  */
-import { Badge, cn } from '@postgear/ui';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { Badge, cn, MotionIcon } from '@postgear/ui';
 import { PlatformIcon, platformLabel } from '@/components/platforms/platform-icon';
 import type { PostSummary } from '@/types/post';
-import { ChannelStack } from '../posts/channel-stack';
+import { CHANNEL_STACK_HOVER_RING, ChannelStack } from '../posts/channel-stack';
 import { PostActionsMenu } from '../posts/post-actions-menu';
 import { describePost, formatClock, type PostTone } from '../posts/post-status';
 
@@ -62,6 +62,7 @@ export function QueueRow({
         onClick={() => onOpen(post)}
         className={cn(
           'flex min-w-0 flex-1 items-start gap-3 p-3 text-start outline-none hover:bg-actionPrimary/10 sm:gap-4 sm:p-4',
+          CHANNEL_STACK_HOVER_RING,
           'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
         )}
       >
@@ -127,7 +128,7 @@ export function QueueRow({
             aria-label="View the published post"
             className="flex h-9 w-9 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink shadow-brutalSm outline-none transition-[transform,box-shadow] duration-100 hover:bg-actionPrimary/10 active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
           >
-            <ExternalLink className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
           </a>
         ) : null}
       </span>

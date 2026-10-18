@@ -1,11 +1,16 @@
 'use client';
 
+import { ImageIcon as AnimatedImageIcon } from '@animateicons/react/lucide/image-icon';
+import { LayoutGridIcon } from '@animateicons/react/lucide/layout-grid-icon';
+import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Button,
   buttonVariants,
   cn,
   EmptyState,
   ErrorState,
+  MotionIcon,
   Pagination,
   SearchInput,
   Skeleton,
@@ -14,7 +19,7 @@ import {
   useToast,
   ViewSwitcher,
 } from '@postgear/ui';
-import { Film, Image as ImageIcon, LayoutGrid, PenSquare, Trash2 } from 'lucide-react';
+import { Film, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import type { MediaItem, MediaPage } from '@/types/media';
@@ -24,8 +29,9 @@ import { MediaUploader } from './media-uploader';
 import { type MediaFilter, useMediaList } from './use-media-list';
 
 const FILTERS = [
-  { value: 'all', label: 'All media', icon: LayoutGrid },
-  { value: 'image', label: 'Images', icon: ImageIcon },
+  { value: 'all', label: 'All media', animatedIcon: LayoutGridIcon },
+  { value: 'image', label: 'Images', animatedIcon: AnimatedImageIcon },
+  // The library has no animated film glyph.
   { value: 'video', label: 'Videos', icon: Film },
 ];
 
@@ -119,7 +125,7 @@ export function MediaLibrary({
                     href={`/${orgId}/composer?media=${item.id}`}
                     className={cn(buttonVariants({ size: 'sm' }), 'flex-1 px-2')}
                   >
-                    <PenSquare className="h-4 w-4" strokeWidth={2.5} />
+                    <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
                     Use in a post
                   </Link>
                   <Button
@@ -129,7 +135,7 @@ export function MediaLibrary({
                     aria-label={`Delete ${item.name}`}
                     onClick={() => setDeleting(item)}
                   >
-                    <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+                    <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
                   </Button>
                 </>
               }

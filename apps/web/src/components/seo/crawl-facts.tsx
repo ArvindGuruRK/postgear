@@ -11,8 +11,9 @@
  * that is the one fact here with a right answer. The mode is a badge rather
  * than a chip so "HTML only" stands out when the person expected rendering.
  */
-import { Badge, cn, Skeleton } from '@postgear/ui';
-import { Clock, ExternalLink, FileText, Lock, LockOpen, Timer } from 'lucide-react';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { Badge, cn, MotionIcon, Skeleton } from '@postgear/ui';
+import { Clock, FileText, Lock, LockOpen, Timer } from 'lucide-react';
 import type { SeoCrawlSummary } from '@/types/seo';
 import { formatDuration } from './seo-view-model';
 
@@ -72,7 +73,7 @@ export function CrawlFacts({
           )}
         >
           <span className="truncate">{crawl.finalUrl}</span>
-          <ExternalLink className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <MotionIcon icon={ExternalLinkIcon} size={14} className="h-3.5 w-3.5 shrink-0" />
         </a>
       </li>
       <li>

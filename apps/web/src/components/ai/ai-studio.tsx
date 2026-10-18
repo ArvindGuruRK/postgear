@@ -18,8 +18,11 @@
  * configured, and the two modes otherwise. The meter copes with its own
  * missing balance.
  */
+import { MessageSquareIcon } from '@animateicons/react/lucide/message-square-icon';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   ErrorState,
+  MotionIcon,
   PageActions,
   Stack,
   Tabs,
@@ -27,7 +30,6 @@ import {
   TabsList,
   TabsTrigger,
 } from '@postgear/ui';
-import { MessageSquare, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { AiCredits, AiStatus } from '@/types/ai';
@@ -119,11 +121,11 @@ export function AiStudio({
         >
           <TabsList aria-label="Mode">
             <TabsTrigger value="generate" className="gap-2">
-              <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
               Generate
             </TabsTrigger>
             <TabsTrigger value="copilot" className="gap-2">
-              <MessageSquare className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={MessageSquareIcon} className="h-4 w-4" />
               Copilot
             </TabsTrigger>
           </TabsList>

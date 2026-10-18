@@ -1,9 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 import { Badge } from './badge';
+import { MotionIcon } from './motion-icon';
 
 export interface FilterChip {
   id: string;
@@ -31,7 +32,7 @@ export const FilterBar = forwardRef<HTMLDivElement, FilterBarProps>(
                 onClick={() => onRemove(filter.id)}
                 className="rounded-full outline-none hover:opacity-70"
               >
-                <X className="h-3 w-3" strokeWidth={3} />
+                <MotionIcon icon={XIcon} size={12} className="h-3 w-3" strokeWidth={3} />
               </button>
             )}
           </Badge>

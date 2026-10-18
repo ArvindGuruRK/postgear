@@ -16,6 +16,10 @@
  * the first) and navigates to it. The composer is where the post is edited
  * and scheduled; this screen does not grow a second editor.
  */
+import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
+import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
 import { documentFromText, measureLength } from '@postgear/social-core/composer';
 import {
   Alert,
@@ -23,12 +27,12 @@ import {
   Button,
   Card,
   cn,
+  MotionIcon,
   Skeleton,
   SpeechBubble,
   Text,
   useToast,
 } from '@postgear/ui';
-import { Copy, ExternalLink, PenSquare, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ApiError, api } from '@/lib/api';
@@ -169,7 +173,7 @@ export function GenerateResult({
                   className="inline-flex items-center gap-1.5 font-sans text-sm font-bold text-ink underline outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
                 >
                   {source.title}
-                  <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  <MotionIcon icon={ExternalLinkIcon} size={14} className="h-3.5 w-3.5" />
                 </a>
                 <Text size="xs" muted>
                   {source.snippet}
@@ -189,15 +193,15 @@ export function GenerateResult({
       {parts.length > 0 && !running ? (
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void openInComposer()} disabled={opening}>
-            <PenSquare className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
             {opening ? 'Opening…' : 'Open in composer'}
           </Button>
           <Button variant="secondary" onClick={() => void copy()} disabled={opening}>
-            <Copy className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={CopyIcon} className="h-4 w-4" />
             Copy
           </Button>
           <Button variant="secondary" onClick={onRegenerate} disabled={opening}>
-            <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
             Regenerate
           </Button>
         </div>

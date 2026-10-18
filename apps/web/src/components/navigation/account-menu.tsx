@@ -1,7 +1,11 @@
 'use client';
 
+import { Building2Icon } from '@animateicons/react/lucide/building-2-icon';
+import { LogOutIcon } from '@animateicons/react/lucide/log-out-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
+import { UserIcon } from '@animateicons/react/lucide/user-icon';
 import { UserMenu } from '@postgear/ui';
-import { Building2, LogOut, Plus, Settings, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '@/lib/api';
@@ -86,13 +90,13 @@ export function AccountMenu() {
           items: [
             ...organizations.map((organization) => ({
               label: organization.name,
-              icon: Building2,
+              animatedIcon: Building2Icon,
               checked: organization.id === shownActive,
               onSelect: () => void switchTo(organization.id),
             })),
             {
               label: 'Create organization',
-              icon: Plus,
+              animatedIcon: PlusIcon,
               onSelect: () => router.push('/onboarding'),
             },
           ],
@@ -101,15 +105,15 @@ export function AccountMenu() {
       items={[
         {
           label: 'Profile',
-          icon: User,
+          animatedIcon: UserIcon,
           onSelect: () => router.push(`/${activeOrgId}/settings/team`),
         },
         {
           label: 'Settings',
-          icon: Settings,
+          animatedIcon: SettingsIcon,
           onSelect: () => router.push(`/${activeOrgId}/settings/team`),
         },
-        { label: 'Log out', icon: LogOut, danger: true, onSelect: signOut },
+        { label: 'Log out', animatedIcon: LogOutIcon, danger: true, onSelect: signOut },
       ]}
     />
   );

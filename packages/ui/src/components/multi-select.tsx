@@ -1,10 +1,13 @@
 'use client';
 
-import { Check, ChevronDown, X } from 'lucide-react';
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
+import { Check } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
 import { Badge } from './badge';
+import { MotionIcon } from './motion-icon';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 export interface MultiSelectOption {
@@ -91,12 +94,12 @@ export function MultiSelect({
                   }}
                   className="rounded-full outline-none hover:opacity-70"
                 >
-                  <X className="h-3 w-3" strokeWidth={3} />
+                  <MotionIcon icon={XIcon} size={12} className="h-3 w-3" strokeWidth={3} />
                 </button>
               </Badge>
             ))
           )}
-          <ChevronDown className="ml-auto h-4 w-4 shrink-0" strokeWidth={3} />
+          <MotionIcon icon={ChevronDownIcon} className="ml-auto h-4 w-4" strokeWidth={3} />
         </div>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2">

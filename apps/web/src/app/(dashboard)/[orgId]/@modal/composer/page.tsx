@@ -11,11 +11,11 @@
  *
  * `opened="direct"` tells the composer there is no in-app page to go back to:
  * closing goes to the calendar rather than back in history, which here would
- * leave the app. See `../(.)composer/page.tsx` for why the key is a fresh id
- * per render.
+ * leave the app. `ComposerHost` keeps the writing through a refresh: see
+ * `@/components/composer/composer-host.tsx`.
  */
 import { randomUUID } from 'node:crypto';
-import { Composer } from '@/components/composer/composer';
+import { ComposerHost } from '@/components/composer/composer-host';
 import { loadComposer } from '@/lib/composer-data';
 
 export default async function ComposerDirectModal({
@@ -29,8 +29,9 @@ export default async function ComposerDirectModal({
   const data = await loadComposer(await searchParams);
 
   return (
-    <Composer
-      key={randomUUID()}
+    <ComposerHost
+      renderId={randomUUID()}
+      request={data.request}
       opened="direct"
       orgId={orgId}
       channels={data.channels}

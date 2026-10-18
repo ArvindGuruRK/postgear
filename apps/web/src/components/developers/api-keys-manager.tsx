@@ -24,6 +24,8 @@
  * `Table`, the prefix in a `code` element, status as a `Badge`. The comic
  * treatment stays on the chrome: the header, the buttons, the dialogs.
  */
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
   Badge,
   Button,
@@ -36,6 +38,7 @@ import {
   EmptyState,
   ErrorState,
   Link,
+  MotionIcon,
   PageActions,
   Stack,
   Table,
@@ -47,7 +50,7 @@ import {
   Text,
   toast,
 } from '@postgear/ui';
-import { ExternalLink, KeyRound, Plus } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { ApiError, api, BROWSER_API_URL } from '@/lib/api';
 import type { ApiKeyCreated, ApiKeyView } from '@/types/developers';
@@ -104,11 +107,11 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
       <PageActions>
         <Link href={docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5">
           API reference
-          <ExternalLink className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+          <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
         </Link>
         {canManage ? (
           <Button onClick={() => setCreateOpen(true)} disabled={limitReached}>
-            <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+            <MotionIcon icon={PlusIcon} className="h-4 w-4" />
             Create key
           </Button>
         ) : null}
