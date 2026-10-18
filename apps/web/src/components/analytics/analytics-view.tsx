@@ -55,6 +55,7 @@ import {
 import { BarChart3, Download, Plug, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, api, BROWSER_API_URL } from '@/lib/api';
 import type {
   AnalyticsOverview,
@@ -204,6 +205,7 @@ export function AnalyticsView({
             <SelectItem value={ALL_CHANNELS}>All channels</SelectItem>
             {channels.map((channel) => (
               <SelectItem key={channel.id} value={channel.id}>
+                <PlatformIcon platform={channel.providerIdentifier} className="me-1.5 inline-block align-[-2px]" />
                 {channel.name} · {channel.providerName}
                 {supported.has(channel.providerIdentifier) ? '' : ' (no metrics)'}
               </SelectItem>

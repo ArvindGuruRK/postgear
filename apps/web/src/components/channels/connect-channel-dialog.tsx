@@ -10,6 +10,7 @@ import {
   Stack,
   Text,
 } from '@postgear/ui';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { channelConnectUrl } from '@/lib/api';
 import type { ProviderSummary } from '@/types/channel';
 
@@ -60,7 +61,10 @@ export function ConnectChannelDialog({ open, onOpenChange, providers }: ConnectC
                     window.location.href = channelConnectUrl(provider.identifier);
                   }}
                 >
-                  <span>{provider.name}</span>
+                  <span className="flex items-center gap-2">
+                    <PlatformIcon platform={provider.identifier} className="h-5 w-5" />
+                    {provider.name}
+                  </span>
                   {provider.requiresEntitySelection ? (
                     <span className="font-sans text-xs font-medium normal-case opacity-70">
                       Pick an account after
@@ -92,7 +96,10 @@ export function ConnectChannelDialog({ open, onOpenChange, providers }: ConnectC
                     // obvious to whoever runs the deployment.
                     title={`Missing API credentials for ${provider.name}`}
                   >
-                    <span>{provider.name}</span>
+                    <span className="flex items-center gap-2">
+                      <PlatformIcon platform={provider.identifier} className="h-5 w-5" />
+                      {provider.name}
+                    </span>
                     <span className="font-sans text-xs font-medium normal-case opacity-70">
                       Needs API keys
                     </span>

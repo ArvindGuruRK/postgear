@@ -15,6 +15,7 @@
 import { Card, cn, SectionHeader, Text } from '@postgear/ui';
 import { ExternalLink, Eye, Heart, MessageCircle, Share2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { TopPost } from '@/types/analytics';
 import { formatMetric, formatPercent, relativeTime } from './analytics-view-model';
 import { ChannelAvatar } from './channel-avatar';
@@ -89,7 +90,10 @@ export function TopPosts({
                     </span>
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-ink opacity-70">
                       <span className="font-bold">{post.channelName}</span>
-                      <span>{post.providerName}</span>
+                      <span className="flex items-center gap-1">
+                        <PlatformIcon platform={post.providerIdentifier} className="h-3.5 w-3.5" />
+                        {post.providerName}
+                      </span>
                       {published ? <span>Published {published}</span> : null}
                     </span>
                     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-ink tabular-nums">

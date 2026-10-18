@@ -2,6 +2,7 @@
 
 import { Avatar, AvatarFallback, AvatarImage, cn } from '@postgear/ui';
 import { Check } from 'lucide-react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { useCalendar } from './calendar-context';
 
 /**
@@ -60,6 +61,13 @@ export function ChannelFilter() {
               ) : null}
             </span>
             <span className="max-w-[9rem] truncate">{channel.name}</span>
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-field">
+              <PlatformIcon
+                platform={channel.providerIdentifier}
+                title={channel.providerName}
+                className="h-3 w-3"
+              />
+            </span>
           </button>
         );
       })}

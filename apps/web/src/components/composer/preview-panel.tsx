@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage, cn, EmptyState, Heading, Text } from '@postgear/ui';
 import { Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ChannelPreview } from '@/components/previews/channel-preview';
 import type { ChannelReport } from './channel-report';
 
@@ -82,6 +83,13 @@ export function PreviewPanel({
                     </Avatar>
                     <span className="max-w-[9rem] truncate" title={report.channel.providerName}>
                       {report.channel.name}
+                    </span>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-field">
+                      <PlatformIcon
+                        platform={report.channel.providerIdentifier}
+                        title={report.channel.providerName}
+                        className="h-3.5 w-3.5"
+                      />
                     </span>
                     {problems > 0 ? (
                       <>

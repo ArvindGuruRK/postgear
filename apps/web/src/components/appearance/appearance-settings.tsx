@@ -9,15 +9,14 @@
  * other devices; `setAppearance` also mirrors it into the cookie the no-flash
  * script reads, so the next load paints in it from the first frame.
  *
- * ## Picking from the other scheme
+ * ## One grid, following the mode
  *
- * A theme only shows in its own scheme. So picking one from the section that
- * is not on screen (a dark theme while the page is light, or the reverse)
- * also switches the mode, explicitly, to that scheme: the person sees what
- * they picked at once, rather than a "Current" badge and no visible change.
- * The mode and the theme go in one PATCH, so they land or fail together. A
- * pick from the scheme already showing leaves the mode alone, System
- * included.
+ * Only the themes for the scheme on screen are shown (2026-10-18): Light
+ * shows the light grid, Dark the dark one, and System whichever the device
+ * is using right now, swapping live when the device changes. A theme can
+ * only be seen in its own scheme, so a grid for the other one would let the
+ * person pick something with no visible effect. Switching the mode is how
+ * they reach the other grid.
  *
  * ## Premium themes
  *
@@ -66,7 +65,6 @@ import {
   currentAppearance,
   PREMIUM_THEME_REQUIRED_CODE,
   previewTheme,
-  resolveScheme,
   setAppearance,
 } from '@/lib/appearance';
 import { ThemeCard } from './theme-card';
@@ -79,23 +77,37 @@ const MODES: Array<{ value: AppearanceMode; label: string; icon: typeof Sun }> =
   { value: 'dark', label: 'Dark', icon: Moon },
 ];
 
-const SECTIONS: Array<{ mode: ColorScheme; title: string; description: string }> = [
-  {
-    mode: 'light',
-    title: 'Light themes',
-    description:
-      'The colours of the page, the frame and the cards in light mode. Premium themes come with any paid plan.',
-  },
-  {
-    mode: 'dark',
-    title: 'Dark themes',
-    description:
-      'The same, for dark mode. Picking one while the page is light switches you to dark, so you see it straight away.',
-  },
-];
+const SECTION_TITLE: Record<ColorScheme, string> = {
+  light: 'Light themes',
+  dark: 'Dark themes',
+};
 
-/** The number of themes per mode, for the loading placeholders. */
-const THEMES_PER_MODE = 11;
+/** The number of themes per mode (six free, six premium), for the loading placeholders. */
+const THEMES_PER_MODE = 12;
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+/**
+ * The scheme on screen for a mode. Explicit modes are known on the server;
+ * System depends on the device, so it starts as light (matching what the
+ * server rendered) and is corrected after mount, then follows the device.
+ */
+function useScheme(mode: AppearanceMode | undefined): ColorScheme {
+  const [deviceScheme, setDeviceScheme] = useState<ColorScheme>('light');
+
+  useEffect(() => {
+    const query = window.matchMedia(DARK_QUERY);
+    const update = () => setDeviceScheme(query.matches ? 'dark' : 'light');
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  if (mode === 'light' || mode === 'dark') {
+    return mode;
+  }
+  return deviceScheme;
+}
 
 type Change = Partial<Appearance>;
 
@@ -249,27 +261,17 @@ export function AppearanceSettings({
         return;
       }
 
-      const current = toAppearance(data);
-      const change: Change = {};
-
-      if (theme.id !== chosenIn(current, theme.mode)) {
-        change[theme.mode === 'light' ? 'lightTheme' : 'darkTheme'] = theme.id;
-      }
-
-      // Resolved now, on this device: under System the scheme showing is the
-      // device's, and it may have changed since the page loaded.
-      if (resolveScheme(current.mode) !== theme.mode) {
-        change.mode = theme.mode;
-      }
-
-      if (Object.keys(change).length > 0) {
-        void save(change, theme);
+      // Only the grid for the scheme on screen is shown, so the pick always
+      // shows straight away and never needs to change the mode.
+      if (theme.id !== chosenIn(toAppearance(data), theme.mode)) {
+        void save({ [theme.mode === 'light' ? 'lightTheme' : 'darkTheme']: theme.id }, theme);
       }
     },
     [data, saving, save, startPreview],
   );
 
   const mode = data?.appearance.mode;
+  const scheme = useScheme(mode);
 
   return (
     <Stack gap="lg">
@@ -338,35 +340,34 @@ export function AppearanceSettings({
         </CardContent>
       </Card>
 
-      {SECTIONS.map((section) => (
-        <Card key={section.mode} data-testid={`themes-${section.mode}`}>
-          <CardHeader>
-            <CardTitle>{section.title}</CardTitle>
-            <CardDescription>{section.description}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
-              {data
-                ? data.themes
-                    .filter((theme) => theme.mode === section.mode)
-                    .map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        selected={theme.id === chosenIn(toAppearance(data), section.mode)}
-                        locked={theme.premium && !data.premiumUnlocked}
-                        busy={saving}
-                        onChoose={choose}
-                      />
-                    ))
-                : Array.from({ length: THEMES_PER_MODE }, (_, index) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholders with no identity
-                    <Skeleton key={index} className="h-[7.5rem] w-full" />
-                  ))}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {/* Keyed by scheme so switching modes swaps the whole grid cleanly. */}
+      <Card key={scheme} data-testid={`themes-${scheme}`}>
+        <CardHeader>
+          <CardTitle>{SECTION_TITLE[scheme]}</CardTitle>
+          <CardDescription>Premium themes come with any paid plan.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+            {data
+              ? data.themes
+                  .filter((theme) => theme.mode === scheme)
+                  .map((theme) => (
+                    <ThemeCard
+                      key={theme.id}
+                      theme={theme}
+                      selected={theme.id === chosenIn(toAppearance(data), scheme)}
+                      locked={theme.premium && !data.premiumUnlocked}
+                      busy={saving}
+                      onChoose={choose}
+                    />
+                  ))
+              : Array.from({ length: THEMES_PER_MODE }, (_, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length placeholders with no identity
+                  <Skeleton key={index} className="h-[7.5rem] w-full" />
+                ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Dialog
         open={previewing !== null}
@@ -381,7 +382,8 @@ export function AppearanceSettings({
             <DialogTitle>{previewing?.name} is a premium theme</DialogTitle>
             <DialogDescription>
               You're previewing it now. Premium themes come with every paid plan: upgrade any
-              workspace you belong to and all ten, light and dark, are yours on every device.
+              workspace you belong to and all twelve, six light and six dark, are yours on every
+              device.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Stack, Text, cn } from '@postgear/ui';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Question } from '@/lib/onboarding-questions';
 
 /**
@@ -113,7 +114,7 @@ export function MultiChoiceGroup({
               key={option.value}
               htmlFor={id}
               className={cn(
-                'flex cursor-pointer items-center justify-center border-2 border-outline px-3 py-4 text-center font-sans font-bold shadow-brutalSm transition-all',
+                'flex cursor-pointer items-center justify-center gap-2 border-2 border-outline px-3 py-4 text-center font-sans font-bold shadow-brutalSm transition-all',
                 'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
                 selected ? 'bg-actionPrimary text-onActionPrimary' : 'bg-secondary text-ink',
               )}
@@ -125,6 +126,10 @@ export function MultiChoiceGroup({
                 onChange={() => onToggle(option.value)}
                 className="sr-only"
               />
+              {/* White disc so the brand colour still reads on a selected tile. */}
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-field">
+                <PlatformIcon platform={option.value} />
+              </span>
               {option.label}
             </label>
           );

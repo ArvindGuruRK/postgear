@@ -398,6 +398,17 @@
     --color-ink: #2b0a13;
     --color-outline: #2b0a13;
   }
+  /* Lemon (premium): a pale lemon page, a fresh yellow frame, cream-white
+     cards and a deep olive ink (#2a2406). Brighter and greener than Cream's
+     butter. Standard surfaces. */
+  .light[data-light-theme='lemon'] {
+    --color-primary: #fbf8d6;
+    --color-chrome: #f3ea9a;
+    --color-secondary: #fffef2;
+    --color-field: #ffffff;
+    --color-ink: #2a2406;
+    --color-outline: #2a2406;
+  }
 
   /* Midnight: a deep navy page, an ink-blue frame, slate-navy cards and a
      brighter navy field, with a cool blue-white ink. The calmest hue: it sits
@@ -508,6 +519,17 @@
     --color-field: #28303c;
     --color-ink: #e8edf3;
     --color-outline: #04060a;
+  }
+  /* Orchid (premium): a deep magenta. A black-cherry page, a wine frame,
+     plum-rose cards, a lighter orchid field and a blush-white ink. Warmer
+     than Plum and pinker than Nebula. Classic dark's diagonal shadows. */
+  .dark[data-dark-theme='orchid'] {
+    --color-primary: #170a17;
+    --color-chrome: #291029;
+    --color-secondary: #311631;
+    --color-field: #432241;
+    --color-ink: #fbe8f7;
+    --color-outline: #060206;
   }
 }
 

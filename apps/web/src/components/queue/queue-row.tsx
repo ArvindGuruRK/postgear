@@ -11,6 +11,7 @@
  */
 import { Badge, cn } from '@postgear/ui';
 import { ExternalLink } from 'lucide-react';
+import { PlatformIcon, platformLabel } from '@/components/platforms/platform-icon';
 import type { PostSummary } from '@/types/post';
 import { ChannelStack } from '../posts/channel-stack';
 import { PostActionsMenu } from '../posts/post-actions-menu';
@@ -94,8 +95,17 @@ export function QueueRow({
           </span>
           <span className="flex flex-wrap items-center gap-3 pt-0.5">
             <ChannelStack channels={post.channels} publishDate={post.publishDate} now={now} />
-            <span className="truncate font-sans text-xs text-ink opacity-70">
-              {post.channels.map((channel) => channel.name).join(', ')}
+            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-ink">
+              {post.channels.map((channel) => (
+                <span key={channel.channelId} className="flex min-w-0 items-center gap-1">
+                  <PlatformIcon
+                    platform={channel.providerIdentifier}
+                    title={platformLabel(channel.providerIdentifier)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="truncate opacity-70">{channel.name}</span>
+                </span>
+              ))}
             </span>
           </span>
         </span>

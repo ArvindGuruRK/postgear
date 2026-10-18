@@ -36,6 +36,7 @@ import {
 } from '@postgear/ui';
 import { Info } from 'lucide-react';
 import { useMemo } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { ChannelAnalytics } from '@/types/analytics';
 import {
   formatDelta,
@@ -128,7 +129,8 @@ export function ChannelsTable({
                       <ChannelAvatar name={channel.name} picture={channel.picture} />
                       <span className="flex min-w-0 flex-col gap-1">
                         <span className="truncate font-bold">{channel.name}</span>
-                        <Badge variant="outline" className="w-fit px-2 py-0 text-[10px]">
+                        <Badge variant="outline" className="w-fit gap-1 px-2 py-0 text-[10px]">
+                          <PlatformIcon platform={channel.providerIdentifier} className="h-3 w-3" />
                           {channel.providerName}
                         </Badge>
                       </span>

@@ -38,8 +38,8 @@ async function signIn(page: Page) {
 
 async function openAppearance(page: Page) {
   await page.goto(`/${orgId}/settings/appearance`);
-  await expect(page.getByTestId('theme-light-classic')).toBeVisible();
-  await expect(page.getByTestId('theme-dark-classic')).toBeVisible();
+  // One grid at a time, for the scheme on screen.
+  await expect(page.locator('[data-testid^="themes-"]')).toBeVisible();
 }
 
 function savedAppearance(page: Page) {
@@ -100,9 +100,11 @@ test.describe('appearance', () => {
     const body = page.locator('body');
     await expect(body).not.toHaveAttribute('data-light-theme');
     await expect(body).not.toHaveAttribute('data-dark-theme');
-    await expect(page.getByTestId('theme-light-classic')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('theme-dark-classic')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('mode-system')).toHaveAttribute('aria-pressed', 'true');
+    // System on a light device (the runner's default): only the light grid shows.
+    await expect(page.getByTestId('themes-light')).toBeVisible();
+    await expect(page.getByTestId('themes-dark')).toHaveCount(0);
+    await expect(page.getByTestId('theme-light-classic')).toHaveAttribute('aria-pressed', 'true');
     // The old "themes only apply in light mode" note is gone.
     await expect(page.getByTestId('appearance-dark-note')).toHaveCount(0);
   });
@@ -177,27 +179,33 @@ test.describe('appearance', () => {
     expect((await storedAppearance()).lightTheme).toBe('paper');
   });
 
-  test('a free dark theme picked from a light page switches to dark, is saved, and survives a reload', async ({
+  test('switching to Dark swaps in the dark grid; a free dark theme is saved and survives a reload', async ({
     page,
   }) => {
     await signIn(page);
     await openAppearance(page);
     const body = page.locator('body');
     await expect(body).toHaveClass(/\blight\b/);
+    await expect(page.getByTestId('themes-light')).toBeVisible();
+
+    const modeSaved = savedAppearance(page);
+    await page.getByTestId('mode-dark').click();
+    expect((await modeSaved).ok()).toBeTruthy();
+    await expect(body).toHaveClass(/\bdark\b/);
+    await expect(page.getByTestId('themes-dark')).toBeVisible();
+    await expect(page.getByTestId('themes-light')).toHaveCount(0);
 
     const saved = savedAppearance(page);
     await page.getByTestId('theme-dark-midnight').click();
-    await expect(body).toHaveClass(/\bdark\b/);
     await expect(body).toHaveAttribute('data-dark-theme', 'midnight');
     const response = await saved;
     expect(response.ok()).toBeTruthy();
-    // One request carries both the theme and the mode switch.
-    expect(response.request().postDataJSON()).toEqual({ darkTheme: 'midnight', mode: 'dark' });
+    // The grid matches the mode on screen, so a pick never changes the mode.
+    expect(response.request().postDataJSON()).toEqual({ darkTheme: 'midnight' });
 
     await expect(page.getByTestId('theme-dark-midnight')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('mode-dark')).toHaveAttribute('aria-pressed', 'true');
     // The light choice is kept for the next switch back.
-    await expect(page.getByTestId('theme-light-paper')).toHaveAttribute('aria-pressed', 'true');
     await expect(body).toHaveAttribute('data-light-theme', 'paper');
     expect(await appearanceCookie(page)).toBe('dark.paper.midnight');
 

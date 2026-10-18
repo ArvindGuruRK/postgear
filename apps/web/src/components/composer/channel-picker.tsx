@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage, Badge, cn, EmptyState, Text } from '@postgear/ui';
 import { Check, Radio } from 'lucide-react';
 import Link from 'next/link';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Channel } from '@/types/channel';
 
 /**
@@ -91,8 +92,14 @@ export function ChannelPicker({
                 ) : null}
               </span>
               <span className="max-w-[10rem] truncate">{channel.name}</span>
-              <span className={cn('text-xs font-medium', isSelected ? 'opacity-80' : 'opacity-60')}>
-                {channel.providerName}
+              {/* The platform as its logo on a white disc, so the brand colour
+                  still reads when the selected chip turns blue. */}
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-field">
+                <PlatformIcon
+                  platform={channel.providerIdentifier}
+                  title={channel.providerName}
+                  className="h-3.5 w-3.5"
+                />
               </span>
               {channel.health === 'needs_reconnect' ? (
                 <Badge variant="danger">Reconnect</Badge>

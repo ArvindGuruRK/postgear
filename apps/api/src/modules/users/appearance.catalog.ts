@@ -226,6 +226,19 @@ export const LIGHT_THEMES: readonly Theme[] = catalog('light', [
       outline: '#2b0a13',
     },
   },
+  {
+    id: 'lemon',
+    name: 'Lemon',
+    premium: true,
+    swatch: {
+      page: '#fbf8d6',
+      chrome: '#f3ea9a',
+      card: '#fffef2',
+      field: '#ffffff',
+      ink: '#2a2406',
+      outline: '#2a2406',
+    },
+  },
 ]);
 
 export const DARK_THEMES: readonly Theme[] = catalog('dark', [
@@ -370,6 +383,19 @@ export const DARK_THEMES: readonly Theme[] = catalog('dark', [
       field: '#28303c',
       ink: '#e8edf3',
       outline: '#04060a',
+    },
+  },
+  {
+    id: 'orchid',
+    name: 'Orchid',
+    premium: true,
+    swatch: {
+      page: '#170a17',
+      chrome: '#291029',
+      card: '#311631',
+      field: '#432241',
+      ink: '#fbe8f7',
+      outline: '#060206',
     },
   },
 ]);

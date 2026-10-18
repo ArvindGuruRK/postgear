@@ -55,6 +55,7 @@ import { Plus, Sparkles, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, api } from '@/lib/api';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
@@ -343,6 +344,13 @@ export function Composer({
                 <TabsTrigger value={SHARED}>All channels</TabsTrigger>
                 {selectedChannels.map((channel) => (
                   <TabsTrigger key={channel.id} value={channel.id} className="gap-1.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-field">
+                      <PlatformIcon
+                        platform={channel.providerIdentifier}
+                        title={channel.providerName}
+                        className="h-3.5 w-3.5"
+                      />
+                    </span>
                     {channel.name}
                     {isCustomized(state, channel.id) ? (
                       <span className="rounded-full bg-actionSecondary px-1.5 font-sans text-[10px] font-bold normal-case text-onActionLight">

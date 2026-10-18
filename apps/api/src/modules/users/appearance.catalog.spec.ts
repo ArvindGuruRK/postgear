@@ -18,7 +18,7 @@ import {
 } from './appearance.catalog';
 
 describe('appearance catalog', () => {
-  it('ships six free light themes, Classic first, then five premium ones', () => {
+  it('ships six free light themes, Classic first, then six premium ones', () => {
     expect(LIGHT_THEMES.map((theme) => theme.id)).toEqual([
       'classic',
       'cream',
@@ -31,14 +31,16 @@ describe('appearance catalog', () => {
       'peach',
       'sky',
       'rose',
+      'lemon',
     ]);
     expect(LIGHT_THEMES.filter((theme) => !theme.premium)).toHaveLength(6);
+    expect(LIGHT_THEMES.filter((theme) => theme.premium)).toHaveLength(6);
     expect(LIGHT_THEMES.slice(6).every((theme) => theme.premium)).toBe(true);
     expect(DEFAULT_LIGHT_THEME).toBe('classic');
     expect(isPremiumTheme('light', DEFAULT_LIGHT_THEME)).toBe(false);
   });
 
-  it('ships six free dark themes, Classic first, then five premium ones', () => {
+  it('ships six free dark themes, Classic first, then six premium ones', () => {
     expect(DARK_THEMES.map((theme) => theme.id)).toEqual([
       'classic',
       'midnight',
@@ -51,8 +53,10 @@ describe('appearance catalog', () => {
       'ember',
       'aurora',
       'slate',
+      'orchid',
     ]);
     expect(DARK_THEMES.filter((theme) => !theme.premium)).toHaveLength(6);
+    expect(DARK_THEMES.filter((theme) => theme.premium)).toHaveLength(6);
     expect(DARK_THEMES.slice(6).every((theme) => theme.premium)).toBe(true);
     expect(DEFAULT_DARK_THEME).toBe('classic');
     expect(isPremiumTheme('dark', DEFAULT_DARK_THEME)).toBe(false);

@@ -25,6 +25,7 @@ import {
 } from '@postgear/ui';
 import { CalendarClock, ExternalLink, PenSquare, Send, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { PlatformIcon, platformLabel } from '@/components/platforms/platform-icon';
 import type { PostSummary } from '@/types/post';
 import {
   describeChannel,
@@ -105,6 +106,10 @@ export function PostDetailDialog({
                   </Avatar>
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      <PlatformIcon
+                        platform={channel.providerIdentifier}
+                        title={platformLabel(channel.providerIdentifier)}
+                      />
                       <Text size="sm" weight="bold" as="span" className="truncate">
                         {channel.name}
                       </Text>

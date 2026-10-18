@@ -30,7 +30,7 @@ The values above are the **Classic** themes', the base `.light` and `.dark` bloc
 
 ## 2a. Themes
 
-Twenty-two user-selectable themes, eleven per scheme: the light ones shipped 2026-10-17 (replacing the dev-only "palette trials" and their switcher), the dark ones and Classic light 2026-10-18. The person picks one light and one dark theme in Settings → Appearance; both are stored on their account (`User.lightTheme`, `User.darkTheme`, each defaulting to `classic`) and mirrored into the `pg_appearance` cookie that the no-flash script reads.
+Twenty-four user-selectable themes, twelve per scheme (six free, six premium): the light ones shipped 2026-10-17 (replacing the dev-only "palette trials" and their switcher), the dark ones and Classic light 2026-10-18. The person picks one light and one dark theme in Settings → Appearance; both are stored on their account (`User.lightTheme`, `User.darkTheme`, each defaulting to `classic`) and mirrored into the `pg_appearance` cookie that the no-flash script reads.
 
 ### Light themes
 
@@ -47,6 +47,7 @@ Twenty-two user-selectable themes, eleven per scheme: the light ones shipped 202
 | `peach` | Premium | `#fff1e8` | `#ffdcc7` | `#fffaf6` | `#ffffff` | `#2a1206` | standard |
 | `sky` | Premium | `#eaf5fd` | `#cfe8fa` | `#f7fcff` | `#ffffff` | `#0b2239` | light: 2px everywhere |
 | `rose` | Premium | `#fdedf0` | `#f9d3dc` | `#fff8f9` | `#ffffff` | `#2b0a13` | standard |
+| `lemon` | Premium | `#fbf8d6` | `#f3ea9a` | `#fffef2` | `#ffffff` | `#2a2406` | standard |
 
 "Standard" is the base `.light` scale (§3, design-system-rules.md §6). Classic is the original light look; Cream (the butter frame and warm-white cards) was the base from 2026-10-17 until Classic took its place and is now one free option among the rest.
 
@@ -65,6 +66,7 @@ Twenty-two user-selectable themes, eleven per scheme: the light ones shipped 202
 | `ember` | Premium | `#170b09` | `#261310` | `#2d1814` | `#3e2520` | `#f8e9e4` | `#080302` |
 | `aurora` | Premium | `#08171a` | `#1d1638` | `#102629` | `#17343c` | `#e3f4f2` | `#02080a` |
 | `slate` | Premium | `#10141a` | `#1a2029` | `#1f2630` | `#28303c` | `#e8edf3` | `#04060a` |
+| `orchid` | Premium | `#170a17` | `#291029` | `#311631` | `#432241` | `#fbe8f7` | `#060206` |
 
 Every dark theme keeps the base `.dark` shadow scale (diagonal, §3). The page is the deepest layer and each one above it a step lighter, fields last, so a field stands off its card; the outline is a near-black tint of the hue, except Obsidian's grey `#3d3d3d`, since a near-black edge would vanish on its true-black page. Aurora is the two-hue one: Ocean-like teal surfaces in a violet frame.
 
@@ -73,7 +75,7 @@ Brand fills (§4) never change with the theme, light or dark.
 - **Where it lives.** CSS: `.light[data-light-theme='<id>']` and `.dark[data-dark-theme='<id>']` blocks in `colors.css` ("Themes"), each (0,3,0) so it beats the base blocks wherever it sits. Catalog (ids, names, which are premium, each entry's `mode`, and a copy of each block's surface, ink and outline hexes for the settings previews): `apps/api/src/modules/users/appearance.catalog.ts`, two lists (`LIGHT_THEMES`, `DARK_THEMES`) served together by `GET /users/me/appearance`. Ids are unique per mode only (`classic` is in both), so every catalog lookup takes the mode. A unit test (`appearance.catalog.spec.ts`) fails when a CSS block (or, for Classic, the base blocks) and its catalog entry disagree, so add a theme in both places.
 - **The cookie.** `pg_appearance=<mode>.<lightId>.<darkId>`, e.g. `system.classic.midnight`. The older two-part `<mode>.<lightId>` is still read, as dark `classic`, with its `cream` read as `classic` (Cream was the default when that form was written; the migration that added the dark themes moved every account still on it to Classic, the same rule).
 - **Contrast, by script.** Light, for every theme: ink ≥ 11.6:1 on page, chrome and cards (floor 7:1); blue `#1d4ed8` ≥ 4.6:1 on chrome and ≥ 5.6:1 on the page (floor 4.5:1); outline ≥ 14:1 against a white field (floor 3:1); the focus ring `#d6440f` ≥ 3.1:1 on page and chrome (floor 3:1). Dark, for every theme: ink ≥ 11.1:1 on page, chrome, cards and fields (floor 7:1); the focus ring `#ff6b35` ≥ 5.0:1 on page and chrome (floor 3:1); outline against a field ≥ 1.46:1 in every tinted theme, never below Classic dark's 1.42:1 (where field equals card and the outline alone draws the edge), with each field also a step lighter than its card; the blue fill ≥ 2.1:1 against every chrome (Classic dark's own figure; the tinted themes are 2.4:1 or more), so an active nav item stands off the sidebar, its white label at 6.7:1 on the blue everywhere. Re-check all of these for a new theme before shipping it.
-- **Premium.** The five premium themes in each scheme unlock while any workspace the user belongs to is entitled to a paid tier or a live trial (the plan table's `resolveEntitlement`). The server enforces it in both modes; a stored premium id is served back as Classic while the plan has lapsed.
+- **Premium.** The six premium themes in each scheme unlock while any workspace the user belongs to is entitled to a paid tier or a live trial (the plan table's `resolveEntitlement`). The server enforces it in both modes; a stored premium id is served back as Classic while the plan has lapsed.
 
 ## 3. Structural tokens (Neubrutalism)
 

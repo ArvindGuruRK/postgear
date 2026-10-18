@@ -3,8 +3,13 @@ import type { ReactNode } from 'react';
 import { AuthIllustration } from '@/components/auth/auth-illustration';
 import { ThemeToggle } from '@/components/navigation/theme-toggle';
 
-// Unauthenticated shell: a two-panel split; form on the left, illustration on
-// the right. The "already signed in → go to the app" guard lives on the login
+// Unauthenticated shell: a two-panel split; illustration on the left, form on
+// the right (swapped 2026-10-18, UI revamp). The swap is visual only
+// (`lg:order-first` on the illustration): the form stays first in the DOM, so
+// keyboard and screen-reader order still starts at the form, and below lg,
+// where the illustration is hidden, nothing moves.
+//
+// The "already signed in → go to the app" guard lives on the login
 // and register pages rather than here: /verify and /reset-password/[token] are
 // in this same group, and a signed-in user must still be able to open a
 // confirmation or reset link from their email.
@@ -22,7 +27,7 @@ import { ThemeToggle } from '@/components/navigation/theme-toggle';
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
-      <div className="flex min-h-screen flex-col bg-secondary lg:min-h-0 lg:border-r-4 lg:border-outline">
+      <div className="flex min-h-screen flex-col bg-secondary lg:min-h-0 lg:border-l-4 lg:border-outline">
         <header className="flex items-center justify-between gap-4 p-6">
           {/* No colour override: Heading already defaults to text-ink, the
               system's normal foreground. The wordmark previously forced
@@ -45,7 +50,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           to sit beside a squeezed illustration (§11). Sticky at full viewport
           height so the artwork stays put while a taller form (register)
           scrolls past it. */}
-      <aside className="hidden bg-primary bg-halftone lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:items-center lg:justify-center lg:gap-8 lg:self-start lg:px-12">
+      <aside className="hidden bg-primary bg-halftone lg:sticky lg:top-0 lg:order-first lg:flex lg:h-screen lg:flex-col lg:items-center lg:justify-center lg:gap-8 lg:self-start lg:px-12">
         <AuthIllustration className="w-full max-w-sm" />
         <div className="max-w-sm text-center">
           <Heading level="h3">Every channel. One queue.</Heading>

@@ -31,6 +31,7 @@ import {
 } from '@postgear/ui';
 import { ArrowDown, ArrowUp, ExternalLink, Minus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, api } from '@/lib/api';
 import type { Comparison, PostAnalytics, PostChannelAnalytics } from '@/types/analytics';
 import { POST_METRIC_LABELS } from '@/types/analytics';
@@ -177,7 +178,10 @@ function ChannelMetrics({ channel, now }: { channel: PostChannelAnalytics; now: 
         <Text size="sm" weight="bold" as="span" className="truncate">
           {channel.name}
         </Text>
-        <Badge variant="outline">{channel.providerName}</Badge>
+        <Badge variant="outline" className="gap-1">
+          <PlatformIcon platform={channel.providerIdentifier} className="h-3.5 w-3.5" />
+          {channel.providerName}
+        </Badge>
         {metrics ? (
           <span className="ms-auto font-sans text-sm text-ink">
             <span className="font-bold">{formatPercent(metrics.engagementRate)}</span>

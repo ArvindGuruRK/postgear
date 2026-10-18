@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Separator, Stack, Text } from '@postgear/ui';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { oauthStartUrl } from '@/lib/api';
 
 /**
@@ -34,6 +35,7 @@ export function OAuthButtons() {
             window.location.href = oauthStartUrl('google');
           }}
         >
+          <PlatformIcon platform="google" className="h-5 w-5" />
           Google
         </Button>
         <Button
@@ -43,6 +45,7 @@ export function OAuthButtons() {
             window.location.href = oauthStartUrl('facebook');
           }}
         >
+          <PlatformIcon platform="facebook" className="h-5 w-5" />
           Facebook
         </Button>
       </Stack>

@@ -17,6 +17,7 @@ import {
   Text,
 } from '@postgear/ui';
 import { Clock, MoreVertical, Plug, RefreshCw, Trash2 } from 'lucide-react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Channel } from '@/types/channel';
 import { CHANNEL_HEALTH } from './channel-health';
 
@@ -60,12 +61,15 @@ export function ChannelCard({
             {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
-          {/* The platform, as a corner sticker on the account's own avatar. */}
-          <span
-            className="absolute -bottom-1 -end-1 rounded-full border-2 border-outline bg-surface px-1.5 py-0.5 type-label text-[10px] leading-none"
-            aria-hidden="true"
-          >
-            {channel.providerName.slice(0, 2)}
+          {/* The platform, as a logo sticker on the account's own avatar. It
+              carries the platform's name for screen readers, since the line
+              under the name shows the handle rather than the platform. */}
+          <span className="absolute -bottom-1 -end-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-outline bg-field">
+            <PlatformIcon
+              platform={channel.providerIdentifier}
+              title={channel.providerName}
+              className="h-3.5 w-3.5"
+            />
           </span>
         </div>
 
