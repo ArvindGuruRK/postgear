@@ -38,7 +38,7 @@ export function SubHeading({ children }: { children: ReactNode }) {
 
 /**
  * Dev-only annotation: prints the exact Tailwind utility classes (and, by
- * extension, the design tokens they resolve to — type-heading/--font-sans,
+ * extension, the design tokens they resolve to, such as type-heading/--font-sans,
  * --color-ink, etc.) backing the specimen it sits under. Lets the one
  * developer on this project point at any sample in /dev and know which
  * class to reach for.

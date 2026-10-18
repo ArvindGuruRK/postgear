@@ -5,7 +5,7 @@
  * engagement rate, each with its move against the previous period.
  *
  * Four `StatCard`s. The arrow is a real move; the caption under it is what
- * the number cannot say on its own — "No change" when the delta is exactly
+ * the number cannot say on its own: "No change" when the delta is exactly
  * zero (a flat arrow would be a lie in either direction), "No previous
  * period" when the range began before the data did, "Not reported" when no
  * platform gave a follower count, and the posts count under the rate.

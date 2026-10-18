@@ -18,7 +18,7 @@ const ACTIONS = [
 ];
 
 /**
- * LinkedIn — for both personal profiles and company pages, which look the same
+ * LinkedIn: for both personal profiles and company pages, which look the same
  * in the feed.
  *
  * The fold matters more here than anywhere: LinkedIn shows roughly the first

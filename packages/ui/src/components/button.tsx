@@ -4,8 +4,8 @@ import { cn } from '../lib/utils';
 
 /**
  * Exported (Sprint 4) for the one thing `<Button>` cannot be: a link. A
- * navigation styled as a button must still be an `<a>` — so it can be opened in
- * a new tab and is announced as a link — and hand-copying these classes onto it
+ * navigation styled as a button must still be an `<a>`, so it can be opened in
+ * a new tab and is announced as a link, and hand-copying these classes onto it
  * is exactly the per-screen drift design-system-rules.md exists to prevent.
  */
 export const buttonVariants = cva(

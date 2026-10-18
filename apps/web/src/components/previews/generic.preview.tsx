@@ -13,8 +13,8 @@ import {
  * The fallback for a platform without its own preview.
  *
  * The reference keeps the same safety net: a provider can be added to
- * `social-core` without a bespoke preview and still be shown honestly — its
- * real text, its real limit, its media — rather than not at all.
+ * `social-core` without a bespoke preview and still be shown honestly (its
+ * real text, its real limit, its media), rather than not at all.
  */
 export function GenericPreview({ channel, parts, maxLength, lengthMethod }: PlatformPreviewProps) {
   const [first, ...rest] = parts;

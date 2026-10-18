@@ -10,7 +10,7 @@ export const metadata: Metadata = {
  * The landing page for an emailed reset link.
  *
  * The token is not validated here. Doing so would need a second endpoint whose
- * only job is to answer "is this token real?" — a free oracle for probing
+ * only job is to answer "is this token real?": a free oracle for probing
  * tokens without spending them. The form posts it, and the API decides.
  */
 export default async function NewPasswordPage({ params }: PageProps<'/reset-password/[token]'>) {

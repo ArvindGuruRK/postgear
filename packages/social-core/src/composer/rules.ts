@@ -5,7 +5,7 @@
  *
  * Sprint 3's providers expressed their limits as imperative `checkValidity`
  * code, which only the API could run. The composer needs the same rules live,
- * in the browser, on every keystroke — and the Sprint 4 plan names the failure
+ * in the browser, on every keystroke, and the Sprint 4 plan names the failure
  * mode if it gets them any other way: platform rules hardcoded in the UI layer,
  * drifting away from the provider that actually publishes.
  *
@@ -18,7 +18,7 @@
  * ## Rules describe what PostGear can publish, not what the platform allows
  *
  * Where the two differ, the rule is the narrower one. LinkedIn accepts video,
- * but PostGear's LinkedIn provider does not upload it yet — so LinkedIn's rules
+ * but PostGear's LinkedIn provider does not upload it yet, so LinkedIn's rules
  * say no video, and the composer says so before the user queues a post that
  * would lose its attachment at publish time.
  */
@@ -27,10 +27,10 @@ import type { LengthMethod } from './length';
 /**
  * What happens to the second and later parts of a multi-part post.
  *
- * - `replies` — a native thread; each part replies to the one before (X).
- * - `comments` — the first part is the post; the rest are comments under it
+ * - `replies`: a native thread; each part replies to the one before (X).
+ * - `comments`: the first part is the post; the rest are comments under it
  *   (LinkedIn, Facebook, Instagram).
- * - `none` — the platform has no such structure; only one part can be posted
+ * - `none`: the platform has no such structure; only one part can be posted
  *   (YouTube, TikTok, Pinterest).
  */
 export type ThreadMode = 'replies' | 'comments' | 'none';

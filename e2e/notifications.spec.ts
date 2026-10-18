@@ -3,12 +3,12 @@ import { cleanUp } from './helpers/media';
 
 /**
  * Notifications (Sprint 8): the bell, the live stream, and the email
- * preferences — one test per Definition of Done item the web owns.
+ * preferences; one test per Definition of Done item the web owns.
  *
  * Runs against the API with `PUBLISH_SIMULATION=true` and a worker on the
  * task queue: the failed post is a real publish through Temporal whose
  * provider is the simulated one, so the `post.failed` row is written by the
- * worker and reaches the bell over the API's dispatcher and SSE stream — the
+ * worker and reaches the bell over the API's dispatcher and SSE stream; the
  * whole path, with nothing stubbed on the web side.
  *
  * Prerequisites, as for the rest of the suite: `docker compose up -d`,
@@ -112,7 +112,7 @@ test.describe('notifications', () => {
     const before = Number(await bell.getAttribute('data-unread'));
 
     // Open the panel first, so a new item has to appear in a list that is
-    // already on screen — the stream, not a fetch on open.
+    // already on screen: the stream, not a fetch on open.
     await bell.click();
     const connection = page.getByTestId('notification-connection');
     await expect(connection).toHaveCount(0, { timeout: 20_000 });
@@ -146,7 +146,7 @@ test.describe('notifications', () => {
   test('email preferences persist across a reload', async ({ page }) => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/settings/notifications`);
-    await expect(page.getByRole('main').getByRole('heading', { name: 'Notifications' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Notifications' })).toHaveAttribute('aria-current', 'page');
 
     const success = page.getByTestId('toggle-successEmails');
     await expect(success).toBeVisible();

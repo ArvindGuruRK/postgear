@@ -12,7 +12,7 @@
  *
  * Platforms that fetch media themselves (Instagram, Facebook, Pinterest,
  * TikTok) receive these URLs, so for them the local backend only works behind
- * a tunnel — see docs/social-platform-setup.md.
+ * a tunnel: see docs/social-platform-setup.md.
  */
 import type { WorkerEnv } from '../config/env';
 

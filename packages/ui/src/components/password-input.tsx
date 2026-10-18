@@ -14,13 +14,13 @@ export interface PasswordInputProps extends Omit<InputProps, 'type'> {}
  * eye with the lid drawn down, so the pair reads as one thing changing state.
  * EyeOff is a struck-through eye, which in this system's vocabulary reads as
  * "disabled" rather than "hidden". The icon is h-5 rather than the h-4 that
- * design-system-rules.md 13 makes the default for icons next to text — this
+ * design-system-rules.md 13 makes the default for icons next to text: this
  * one is a standalone control with its own hit area, not a glyph beside a
  * word, and at h-4 it sat small against the h-11 field it lives in.
  *
  * Structurally identical to SearchInput's trailing clear button (same
  * absolute placement, same focus ring) rather than a second way of hanging a
- * control off an Input — see design-system-rules.md §13, which allows an
+ * control off an Input: see design-system-rules.md §13, which allows an
  * absolutely positioned icon only when it decorates an input.
  *
  * The toggle is a real `<button type="button">` so it is reachable by

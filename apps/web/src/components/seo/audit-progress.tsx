@@ -4,7 +4,7 @@
  * Where the analysis is: the four stages as a tracker, and what happened if
  * it did not reach the end.
  *
- * Shown only for a run started in this session — a tracker for an audit
+ * Shown only for a run started in this session: a tracker for an audit
  * loaded from the history would be four green ticks saying nothing. A stop
  * is a quiet line, not an error. A stream error is an `ErrorState` here,
  * above whatever the result still shows, so "the advice failed" does not

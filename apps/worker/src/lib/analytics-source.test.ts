@@ -1,7 +1,7 @@
 /**
  * The metrics stand-in: deterministic, shaped like a real account, and
  * willing to fail on request. The real source is checked only for which
- * platforms it answers for — the providers themselves are tested in
+ * platforms it answers for: the providers themselves are tested in
  * `@postgear/social-core`.
  */
 import { NotEnoughScopesError, RefreshTokenError, RetryableError } from '@postgear/social-core';

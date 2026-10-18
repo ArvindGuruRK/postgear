@@ -10,7 +10,7 @@
 import { PrismaClient } from '@prisma/client';
 
 /**
- * Query logging is on in development only — it is genuinely useful while
+ * Query logging is on in development only: it is genuinely useful while
  * building repositories, and genuinely a way to leak secrets into logs in
  * production, since query params include `Integration.token` values.
  */
@@ -32,7 +32,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * Explicit disconnect, for scripts and tests that need the process to exit.
- * Long-running servers should not call this — Prisma manages the pool itself.
+ * Long-running servers should not call this: Prisma manages the pool itself.
  */
 export async function disconnectPrisma(): Promise<void> {
   await prisma.$disconnect();

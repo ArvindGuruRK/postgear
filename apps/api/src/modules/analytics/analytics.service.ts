@@ -15,7 +15,7 @@
  * Whether a channel *can* be synced depends on its provider (does the
  * platform expose metrics?) and its health (can PostGear still talk to it?),
  * both of which the channels module already knows. In simulation every
- * platform is supported — the stand-in answers for all of them — which is
+ * platform is supported (the stand-in answers for all of them), which is
  * also what lets the seeded LinkedIn member channel, whose real provider
  * has no metrics, carry demo data honestly: the page says "simulated".
  */
@@ -77,7 +77,7 @@ import {
 } from './analytics.types';
 import type { OverviewQuery, SyncNowInput } from './dto/analytics.schema';
 
-/** Characters of text shown for a post — the same as the queue's preview. */
+/** Characters of text shown for a post: the same as the queue's preview. */
 const PREVIEW_LENGTH = 160;
 
 /** Leaderboard length. */
@@ -293,8 +293,8 @@ export class AnalyticsService {
 
   /**
    * Every live channel of the workspace, or the one asked for. A channel
-   * id the workspace cannot see is refused and recorded — a stale client,
-   * or a probe — the way the posts and AI modules refuse one.
+   * id the workspace cannot see is refused and recorded (a stale client,
+   * or a probe) the way the posts and AI modules refuse one.
    */
   private async shownChannels(orgId: string, channelId?: string): Promise<ChannelView[]> {
     const channels = await this.channels.list(orgId);

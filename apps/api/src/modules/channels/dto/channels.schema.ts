@@ -10,7 +10,7 @@ import { nameSchema } from '../../auth/dto/common.schema';
 /**
  * A provider identifier as it appears in a URL segment.
  *
- * Deliberately narrow — the registry rejects anything unknown anyway, but
+ * Deliberately narrow: the registry rejects anything unknown anyway, but
  * validating the shape first keeps arbitrary strings out of log lines and error
  * messages.
  */

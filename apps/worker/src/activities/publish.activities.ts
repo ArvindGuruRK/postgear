@@ -86,8 +86,8 @@ export function createPublishActivities(deps: ActivityDeps) {
     /**
      * What the workflow needs to decide whether, and when, to publish.
      *
-     * Read fresh on every wake-up, so the database — not the workflow's own
-     * memory — says when the post goes out. A reschedule, a move back to
+     * Read fresh on every wake-up, so the database, not the workflow's own
+     * memory, says when the post goes out. A reschedule, a move back to
      * drafts or a delete all take effect here without the API having to say
      * anything more than "wake up".
      */
@@ -226,7 +226,7 @@ export function createPublishActivities(deps: ActivityDeps) {
       };
 
       // A marker from an earlier attempt that never reported back means that
-      // attempt died *during* the platform call — the worker was killed, or
+      // attempt died *during* the platform call: the worker was killed, or
       // the activity timed out. The post may be out. Posting again could post
       // it twice, so the outcome is handed to a person instead.
       if (previousAttemptInFlight(root.error, attempt)) {
@@ -253,7 +253,7 @@ export function createPublishActivities(deps: ActivityDeps) {
       try {
         // Heartbeats let Temporal notice a dead worker in a minute rather than
         // at the ten-minute timeout, and deliver a cancellation to a running
-        // attempt; the gate rations the platform calls — see lib/semaphore.ts.
+        // attempt; the gate rations the platform calls: see lib/semaphore.ts.
         const activity = Context.current();
         const heartbeat = setInterval(() => activity.heartbeat(), HEARTBEAT_MS);
 
@@ -279,7 +279,7 @@ export function createPublishActivities(deps: ActivityDeps) {
         return { recorded: true, releaseURL, results };
       } catch (error) {
         // The post is out. Recording it is the workflow's job now, through an
-        // activity that may be retried freely — this one must not be.
+        // activity that may be retried freely: this one must not be.
         Context.current().log.error('publish recorded late', {
           postId: input.postId,
           error: error instanceof Error ? error.message : String(error),
@@ -353,7 +353,7 @@ export function createPublishActivities(deps: ActivityDeps) {
           },
         });
         // Sprint 8: typed, titled, and queued for the API's email dispatcher,
-        // with what the mail needs in `meta` — see notifications.types.ts.
+        // with what the mail needs in `meta`; see notifications.types.ts.
         await tx.notifications.create({
           data: {
             organizationId: input.organizationId,
@@ -507,7 +507,7 @@ async function loadChain(input: PostPublishInput): Promise<{
   });
 
   // Only the chain hanging off this root. A group holds one chain per
-  // channel, and a channel appears once per group, so this is every row —
+  // channel, and a channel appears once per group, so this is every row,
   // but the walk is from the root regardless, so a stray row can never be
   // published as part of a thread it does not belong to.
   const ordered = orderChain(rows);

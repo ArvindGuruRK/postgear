@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: 'Sign in',
 };
 
-// The page stays a server component so it can export `metadata` — a client
+// The page stays a server component so it can export `metadata`: a client
 // component cannot. The interactive parts are two small client islands.
 //
 // LoginForm reads `useSearchParams` (to surface ?error=oauth from a failed
@@ -22,7 +22,7 @@ export default async function LoginPage() {
   //
   // This lives on the page rather than in (auth)/layout.tsx on purpose. The
   // same group holds /verify and /reset-password/[token], and a signed-in user
-  // clicking a confirmation link from their email must still reach those — a
+  // clicking a confirmation link from their email must still reach those: a
   // layout-level redirect would bounce them away from their own reset link.
   if (await getSession()) {
     redirect('/');

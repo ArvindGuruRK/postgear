@@ -2,7 +2,7 @@
  * The bell's state, as a pure reducer (Sprint 8).
  *
  * The list is the most recent page of the workspace's feed plus whatever the
- * stream has pushed since — prepended, de-duplicated by id (the API pushes a
+ * stream has pushed since: prepended, de-duplicated by id (the API pushes a
  * row from two places and a reconnect re-fetches the page), and capped so a
  * tab left open for a week does not hold the whole feed. The unread count is
  * the server's, carried on every page and every stream event, so the badge
@@ -108,7 +108,7 @@ function merge(incoming: NotificationView[], existing: NotificationView[]): Noti
     .slice(0, LIST_CAP);
 }
 
-/** The title shown for a row the writer left untitled — the API's catalogue, mirrored. */
+/** The title shown for a row the writer left untitled: the API's catalogue, mirrored. */
 export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   'post.published': 'Post published',
   'post.failed': 'Post failed',

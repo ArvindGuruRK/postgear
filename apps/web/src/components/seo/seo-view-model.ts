@@ -15,7 +15,7 @@
  * ## Grades are the Sprint 5 tone vocabulary
  *
  * A and B are the unambiguously good outcomes (`success`), C is the ordinary
- * middle (`secondary`), D is "needs attention" (`accent`), F is `danger` — the
+ * middle (`secondary`), D is "needs attention" (`accent`), F is `danger`: the
  * same mapping `ScoreGauge` uses for its arc, read off the letter instead of
  * the number so a stored grade and a live score can never disagree.
  */
@@ -70,7 +70,7 @@ export interface ScoreDelta {
 
 /**
  * How this run compares with the one before, or null when there is nothing
- * to compare with — a first run, or a previous run that never scored.
+ * to compare with: a first run, or a previous run that never scored.
  */
 export function scoreDelta(
   current: number | null,
@@ -93,8 +93,8 @@ export function scoreDelta(
 /**
  * Client-side validation of the URL field: what the API will certainly
  * refuse with a 400 is caught here, so the message sits next to the field
- * before anything is sent. What it may refuse with a 422 — a private or
- * internal address — is deliberately *not* caught here: the API owns that
+ * before anything is sent. What it may refuse with a 422 (a private or
+ * internal address) is deliberately *not* caught here: the API owns that
  * rule (and logs the attempt), so `http://localhost:3000` passes this check
  * and is refused by the server with the message shown on the same field.
  */
@@ -146,7 +146,7 @@ export interface SiteHistory {
   path: string;
   latest: SeoAuditSummary;
   audits: SeoAuditSummary[];
-  /** Finished runs' overall scores, oldest first — the sparkline and the trend chart. */
+  /** Finished runs' overall scores, oldest first: the sparkline and the trend chart. */
   trend: TrendPointData[];
 }
 
@@ -232,7 +232,7 @@ export function reportAsText(detail: SeoAuditDetail): string {
   const lines: string[] = [];
   const day = detail.createdAt.slice(0, 10);
 
-  lines.push(`SEO audit — ${detail.finalUrl ?? detail.targetUrl}`);
+  lines.push(`SEO audit: ${detail.finalUrl ?? detail.targetUrl}`);
   lines.push(
     detail.overallScore === null
       ? `Not scored · ${day}`

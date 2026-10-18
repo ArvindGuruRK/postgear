@@ -1,5 +1,5 @@
 /**
- * SEO advice — the one prompt behind the analyzer's "what to fix first".
+ * SEO advice: the one prompt behind the analyzer's "what to fix first".
  *
  * The evaluators in `@postgear/seo-engine` already know what is wrong with a
  * page; what they cannot do is rank it, explain it in a sentence a marketer
@@ -8,7 +8,7 @@
  * finding is handed over as a line it may rewrite and reorder, the audit
  * digest is the only source of facts, and the schema refuses a severity,
  * category or impact outside the fixed vocabulary. A `checkId` the model
- * returns is only ever one it was shown — the agent nulls anything else.
+ * returns is only ever one it was shown: the agent nulls anything else.
  *
  * The finding lines are written and read here, in one file, for the reason
  * `fields.ts` gives: the simulated model client parses them back to answer

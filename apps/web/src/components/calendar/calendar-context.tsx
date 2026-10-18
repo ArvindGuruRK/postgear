@@ -6,7 +6,7 @@
  * Split from the rendering the way the reference splits `calendar.context`
  * from `calendar.tsx`: the views only draw; this owns the range, the fetch, the
  * filters and the optimistic move. Everything is in the viewer's local time,
- * which is why the posts are fetched from the browser rather than the server —
+ * which is why the posts are fetched from the browser rather than the server:
  * the server does not know which day "today" is where the viewer sits.
  *
  * The view and date live in the URL (`?view=week&date=2026-10-11`) so a reload
@@ -98,7 +98,7 @@ export function CalendarProvider({
 
   const range = useMemo(() => visibleRange(view, anchor), [view, anchor]);
 
-  // Keep the URL in step without a navigation — a navigation would remount
+  // Keep the URL in step without a navigation: a navigation would remount
   // the page and lose the loaded posts.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

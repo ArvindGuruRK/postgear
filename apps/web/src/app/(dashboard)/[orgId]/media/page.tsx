@@ -1,5 +1,5 @@
 /**
- * Media — the workspace's library of uploaded images and video.
+ * Media: the workspace's library of uploaded images and video.
  *
  * The server renders the first page so the grid is there on first paint; the
  * client island then owns search, filtering, paging, uploads and deletes. The

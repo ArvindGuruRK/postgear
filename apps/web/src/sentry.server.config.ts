@@ -1,6 +1,6 @@
 /**
  * Sentry on the Next server runtime. Initialised only with a DSN; traces off
- * unless asked; no default PII (cookies, headers) — the same choices as the
+ * unless asked; no default PII (cookies, headers): the same choices as the
  * API's `instrument.ts`, for the same reasons.
  */
 import * as Sentry from '@sentry/nextjs';

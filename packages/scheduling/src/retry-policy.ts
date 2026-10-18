@@ -7,7 +7,7 @@
  * API's status endpoint, which describes the policy to the UI. One definition,
  * three readers.
  *
- * The values: 30 s, 1 min, 2 min, 4 min between the five attempts — about eight
+ * The values: 30 s, 1 min, 2 min, 4 min between the five attempts; about eight
  * minutes end to end. Long enough to ride out a rate-limit window or a platform
  * having a bad minute; short enough that a post scheduled for 9:00 that fails
  * at 9:00 is either out or flagged by 9:10, while the person who scheduled it

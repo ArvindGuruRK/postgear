@@ -6,7 +6,7 @@
  * it first and feeds the sources to every later stage. It is also the stage
  * most likely to be missing (no `TAVILY_API_KEY`) or flaky (a third-party
  * search API), which is why the pipeline treats its failure as a `skipped`
- * or `failed` stage and carries on — a post without citations beats no post.
+ * or `failed` stage and carries on: a post without citations beats no post.
  *
  * {@link withResearchCache} exists for retries: the same brief submitted
  * twice in ten minutes (a regenerate, a retry after an image failure) should
@@ -142,7 +142,7 @@ export function withResearchCache(
 
 /**
  * Three canned sources that mention the query, so the "backed by research"
- * treatment can be seen — and the research-aware prompts exercised — with no
+ * treatment can be seen, and the research-aware prompts exercised, with no
  * key. The URLs are on a reserved documentation domain and go nowhere.
  */
 export function createSimulatedResearch(): ResearchProvider {

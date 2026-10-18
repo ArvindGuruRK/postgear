@@ -6,7 +6,7 @@
  * A slot that is already behind us is drawn with the halftone texture and
  * accepts no drops and no new posts; a slot in the future shows a "+" on hover
  * and focus that opens the composer at that time. The drop highlight is the
- * primary action color at low opacity with a dashed border — the system's
+ * primary action color at low opacity with a dashed border: the system's
  * "this is where it goes" treatment, not a new color.
  */
 import { useDroppable } from '@dnd-kit/core';

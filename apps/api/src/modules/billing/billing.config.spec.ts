@@ -65,7 +65,7 @@ describe('resolveBillingConfig', () => {
     expect(resolved.mode).toBe('simulation');
     expect(resolved.secretKey).toBeNull();
     expect(resolved.warnings).toEqual([
-      'STRIPE_SECRET_KEY is set but BILLING_SIMULATION=true wins — Stripe is not called.',
+      'STRIPE_SECRET_KEY is set but BILLING_SIMULATION=true wins, so Stripe is not called.',
     ]);
     expect(describeBillingMode(resolved)).toContain('Not for production');
   });
@@ -93,7 +93,7 @@ describe('resolveBillingConfig', () => {
 
     expect(resolved.mode).toBe('unconfigured');
     expect(resolved.warnings).toEqual([
-      'STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are needed together — billing stays off.',
+      'STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are needed together, so billing stays off.',
     ]);
   });
 

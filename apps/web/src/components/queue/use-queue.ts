@@ -4,8 +4,8 @@
  * One page of the queue, with its filters in the URL.
  *
  * Responses are sequenced the way the media list's are: a slow page 1 must
- * never land after a fast page 2. While a post in view is in motion — about to
- * publish, retrying — the page re-fetches every few seconds so "Publishing"
+ * never land after a fast page 2. While a post in view is in motion (about to
+ * publish, retrying) the page re-fetches every few seconds so "Publishing"
  * becomes "Published" without anyone touching anything.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -41,7 +41,7 @@ export function useQueue(initial: QueuePage | null, initialParams: URLSearchPara
     const params = paramsFromFilters(filters).toString();
     const next = `${window.location.pathname}${params ? `?${params}` : ''}`;
 
-    // Only when something changed — see the calendar context for why.
+    // Only when something changed: see the calendar context for why.
     if (`${window.location.pathname}${window.location.search}` !== next) {
       window.history.replaceState(null, '', next);
     }

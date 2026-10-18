@@ -1,10 +1,10 @@
 /**
- * Hook stage — the one or two sentences that earn the rest of the post.
+ * Hook stage: the one or two sentences that earn the rest of the post.
  *
  * Written as its own stage, before the body, on purpose: when a model writes
  * hook and body in one go the hook is whatever the first sentence happened
  * to be. Asked for alone, with the category and the research in view, it is
- * a deliberate opening line that the content stage then has to live up to —
+ * a deliberate opening line that the content stage then has to live up to:
  * the content prompt receives it verbatim and must make it the first line of
  * part 1. The rule against copying the brief exists because the laziest
  * possible hook is the brief itself, and models take that shortcut.

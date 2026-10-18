@@ -1,5 +1,5 @@
 /**
- * `GET /v1/channels` — the targets a post may be sent to.
+ * `GET /v1/channels`: the targets a post may be sent to.
  */
 import { Controller, Get } from '@nestjs/common';
 import { type ActiveOrg, CurrentOrg } from '../../../common/decorators/current-org.decorator';

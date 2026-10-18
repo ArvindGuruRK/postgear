@@ -2,7 +2,7 @@
  * S3-compatible storage: AWS S3, Cloudflare R2, MinIO.
  *
  * The bucket (or the CDN in front of it) must allow anonymous reads of these
- * objects — Instagram, Facebook, Pinterest and TikTok fetch media by URL with
+ * objects: Instagram, Facebook, Pinterest and TikTok fetch media by URL with
  * no credentials. Writes and deletes use the configured key pair.
  *
  * Every object is written with a year-long immutable cache header, which is

@@ -2,7 +2,7 @@
  * The workflows this worker runs.
  *
  * This file is what `Worker.create({ workflowsPath })` bundles into the
- * workflow sandbox, so it — and everything it imports — must be deterministic:
+ * workflow sandbox, so it, and everything it imports, must be deterministic:
  * no Prisma, no network, no Node built-ins, no `Math.random` or `Date.now`
  * outside Temporal's own patched versions. `@postgear/scheduling` is pure for
  * exactly this reason; activities reach the outside world.

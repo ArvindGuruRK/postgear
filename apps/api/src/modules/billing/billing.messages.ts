@@ -5,7 +5,7 @@
  * authenticated admin of the workspace, so there is nothing to hide behind
  * "something went wrong". What *is* hidden is Stripe. A Stripe error body
  * can quote a request, a customer id or part of a key; none of that reaches
- * a response — every provider failure is mapped to a string below and the
+ * a response: every provider failure is mapped to a string below and the
  * original goes to the server log.
  *
  * The webhook is the one exception to "specific": a signature failure is

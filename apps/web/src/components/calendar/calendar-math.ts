@@ -103,7 +103,7 @@ export function shiftAnchor(view: CalendarView, anchor: Date, direction: -1 | 1)
   }
 }
 
-/** `2026-10-11`, in local time — the key posts are bucketed by, and the URL form of a date. */
+/** `2026-10-11`, in local time: the key posts are bucketed by, and the URL form of a date. */
 export function dayKey(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -123,7 +123,7 @@ export function parseDayKey(value: string | null | undefined): Date | null {
     : null;
 }
 
-/** `2026-10-11T14` — one hour of one day, for the week and day views. */
+/** `2026-10-11T14`: one hour of one day, for the week and day views. */
 export function hourKey(date: Date): string {
   return `${dayKey(date)}T${String(date.getHours()).padStart(2, '0')}`;
 }
@@ -173,7 +173,7 @@ export function isPastSlot(slot: { day: Date; hour?: number }, now: Date): boole
 /**
  * The time a new post starts at when a slot is clicked.
  *
- * A clicked hour is that hour; a clicked day is 9:00 — the first of the
+ * A clicked hour is that hour; a clicked day is 9:00. The first of the
  * schema's default posting times is two hours in, but nine is what people
  * mean by "the morning". Today's past hours roll forward to the next whole
  * hour, so a click on today never opens the composer at a time in the past.
@@ -221,7 +221,7 @@ export function rangeLabel(view: CalendarView, anchor: Date): string {
   }
 }
 
-/** "9 AM" / "09:00" — the hour gutter label, in the viewer's clock convention. */
+/** "9 AM" / "09:00": the hour gutter label, in the viewer's clock convention. */
 export function hourLabel(hour: number): string {
   return slotStart(new Date(2026, 0, 1), hour).toLocaleTimeString(undefined, {
     hour: 'numeric',

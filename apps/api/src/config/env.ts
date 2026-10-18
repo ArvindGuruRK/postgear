@@ -7,7 +7,7 @@
  *
  * Zod (not class-validator) because it is already the tool
  * `project_structure.md` names for this job, and because the same library
- * validates request bodies in `common/pipes/zod-validation.pipe.ts` — one
+ * validates request bodies in `common/pipes/zod-validation.pipe.ts`: one
  * validation vocabulary across the app.
  */
 import { z } from 'zod';
@@ -25,8 +25,8 @@ function blankAsUnset<T extends z.ZodTypeAny>(schema: T) {
 
 /**
  * The `.env.example` placeholders for the Stripe keys. A fresh clone carries
- * them verbatim, and a placeholder must read as "no key" — the same rule the
- * AI module applies to `sk-proj-openai-api-key` — so the billing module
+ * them verbatim, and a placeholder must read as "no key" (the same rule the
+ * AI module applies to `sk-proj-openai-api-key`), so the billing module
  * reports *unconfigured* rather than failing its first Stripe call.
  */
 export const STRIPE_PLACEHOLDERS: readonly string[] = [
@@ -67,13 +67,13 @@ const envSchema = z
     // this key and Sprint 3 made it load-bearing: it is what encrypts
     // `Integration.token` / `refreshToken` at the repository boundary. Absent, the
     // API would boot happily and then fail the first time anyone connects a
-    // channel — validating it here turns that into a startup error naming the fix.
+    // channel: validating it here turns that into a startup error naming the fix.
     // Generate with `npm run generate:keys`.
     ENCRYPTION_KEY_AES256: z
       .string()
       .regex(
         /^[0-9a-fA-F]{64}$/,
-        'ENCRYPTION_KEY_AES256 must be 32 bytes as 64 hex characters — run `npm run generate:keys`',
+        'ENCRYPTION_KEY_AES256 must be 32 bytes as 64 hex characters. Run `npm run generate:keys`',
       ),
 
     AUTH_COOKIE_NAME: z.string().default('pg_session'),
@@ -122,7 +122,7 @@ const envSchema = z
     // unreachable to them.
     STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
     // Absent means `apps/api/uploads`, resolved from the API package rather than
-    // the working directory — `npm run dev:api` and `npm run dev:api:e2e` start
+    // the working directory: `npm run dev:api` and `npm run dev:api:e2e` start
     // from different directories and would otherwise write to two places.
     UPLOAD_DIRECTORY: z.string().min(1).optional(),
     S3_ENDPOINT: z.string().url().optional(),
@@ -138,8 +138,8 @@ const envSchema = z
     // path-style whenever a custom endpoint is set.
     S3_FORCE_PATH_STYLE: z.enum(['true', 'false']).optional(),
 
-    // The scheduler (Sprint 5). The API only *talks* to Temporal — starting and
-    // signalling workflows — and does so best-effort, so an unreachable server
+    // The scheduler (Sprint 5). The API only *talks* to Temporal, starting and
+    // signalling workflows, and does so best-effort, so an unreachable server
     // degrades to a logged warning rather than a failed save. The worker
     // (`apps/worker`) reads the same two variables.
     TEMPORAL_HOST: z.string().min(1).default('localhost:7233'),
@@ -152,13 +152,13 @@ const envSchema = z
     //
     // `AI_SIMULATION=true` replaces the model, the research and the image
     // provider with deterministic stand-ins so every screen, credit rule and
-    // test runs without a key or a bill — the same idea as the worker's
+    // test runs without a key or a bill: the same idea as the worker's
     // `PUBLISH_SIMULATION`. Refused in production below: a simulated post
     // looks real enough to be published by mistake.
     // See `modules/ai/engine/engine.config.ts` for how the mode is chosen.
     //
     // `.env.example` ships these as empty strings, which dotenv passes through
-    // as `""` rather than leaving them unset — so a blank is read as "use the
+    // as `""` rather than leaving them unset, so a blank is read as "use the
     // default" here, or a fresh clone would fail to boot on the model name.
     OPENAI_API_KEY: z.string().optional(),
     TAVILY_API_KEY: z.string().optional(),
@@ -245,7 +245,7 @@ const envSchema = z
     SENTRY_TRACES_SAMPLE_RATE: blankAsUnset(z.coerce.number().min(0).max(1).default(0)),
 
     // Absent SMTP_HOST selects the console transport, which prints the mail to
-    // stdout. That is the sprint's "stub the send" — a real transport is a
+    // stdout. That is the sprint's "stub the send": a real transport is a
     // config change, not a code change.
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().default(587),

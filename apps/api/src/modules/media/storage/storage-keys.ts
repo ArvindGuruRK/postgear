@@ -1,13 +1,13 @@
 /**
- * Object keys — generated here, validated everywhere.
+ * Object keys: generated here, validated everywhere.
  *
  * A key looks like `2026/09/3f9c…e1.jpg`: a date prefix so a bucket listing is
  * browsable, and 128 bits of CSPRNG output so a URL cannot be guessed. Media is
  * served publicly (platforms fetch it without credentials), which makes the
- * unguessable name the access control — the same model as an unlisted S3 URL.
+ * unguessable name the access control: the same model as an unlisted S3 URL.
  *
  * The reference builds its names from `Math.random()`, digit by digit, with
- * `Math.round(Math.random() * 16)` — which is not a CSPRNG and also yields "10"
+ * `Math.round(Math.random() * 16)`: which is not a CSPRNG and also yields "10"
  * one time in 32, so the names are neither unpredictable nor uniform.
  *
  * `assertValidKey` is what makes path traversal impossible in the local backend
@@ -42,8 +42,30 @@ export function thumbnailKeyFor(key: string): string {
   return key.replace(/\.[a-z0-9]+$/, '.thumb.webp');
 }
 
+/**
+ * User avatars (UI revamp, 2026-10-17): `avatars/<userId>/<128 random bits>.webp`.
+ *
+ * Kept under their own prefix, outside the dated media tree, because an avatar
+ * belongs to a person rather than to a workspace and has no `Media` row: a
+ * bucket listing should not mix the two. The user id is a UUID, so the
+ * segment is as tightly shaped as the rest of the key; the random file name is
+ * still what makes the URL unguessable.
+ */
+const AVATAR_KEY_PATTERN =
+  /^avatars\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{32}\.webp$/;
+
+export function createAvatarKey(userId: string): string {
+  const key = `avatars/${userId}/${randomBytes(16).toString('hex')}.webp`;
+  assertValidKey(key);
+  return key;
+}
+
+export function isAvatarKey(key: string): boolean {
+  return AVATAR_KEY_PATTERN.test(key);
+}
+
 export function isValidKey(key: string): boolean {
-  return KEY_PATTERN.test(key);
+  return KEY_PATTERN.test(key) || AVATAR_KEY_PATTERN.test(key);
 }
 
 export function assertValidKey(key: string): void {

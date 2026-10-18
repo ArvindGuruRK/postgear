@@ -1,13 +1,13 @@
-/* globals.css — Design Tokens & Tailwind v4 Entry Point */
+/* globals.css: Design Tokens & Tailwind v4 Entry Point */
 
 /* Tailwind v4: a single import replaces v3's @tailwind base/components/utilities. */
 @import 'tailwindcss';
 
-/* Design tokens (colors/CSS variables) imported from Postiz — see
+/* Design tokens (colors/CSS variables) imported from Postiz: see
    packages/ui/src/styles/colors.css and docs/design-patterns/. */
 @import '../../../../packages/ui/src/styles/colors.css';
 
-/* Theme mapping (@theme, @custom-variant, @plugin) — see that file's header
+/* Theme mapping (@theme, @custom-variant, @plugin): see that file's header
    comment for the full explanation of the v3→v4 conversion. */
 @import '../../../../packages/config/tailwind.css';
 
@@ -25,7 +25,7 @@
    different font = swap the loader in fonts.ts and retune the tokens below;
    nothing else in the codebase changes.
 
-   (Plain `font-medium`/`font-bold` on body text still exist — in Tailwind v4
+   (Plain `font-medium`/`font-bold` on body text still exist: in Tailwind v4
    those resolve through the theme's --font-weight-* scale, not fixed
    numbers, so they follow this file too.) */
 @theme {
@@ -35,7 +35,7 @@
 :root {
   /* Sora: geometric, wide set, tall x-height, variable 100–800. Wide
      geometric faces look loose at display sizes, so headings take the
-     tightest tracking of any face trialled and stay at bold (700) — Sora's
+     tightest tracking of any face trialled and stay at bold (700): Sora's
      strokes are already heavy, 800 fills the round counters (o, e, a).
      Controls tighten slightly for the same reason; the caps are wide on
      their own, so eyebrows need less extra tracking than a grotesk. The
@@ -70,38 +70,38 @@
 /* ── App scrollbar (single source of truth) ──────────────────────────────
    NOT built on the `tailwind-scrollbar` plugin's scrollbar-thumb- and
    scrollbar-track- color utilities, even though that plugin was still
-   installed and `@plugin`-registered when this was written (since removed
-   — see packages/config/tailwind.css). Tailwind v4 core ships its OWN
+   installed and `@plugin`-registered when this was written (since removed:
+   see packages/config/tailwind.css). Tailwind v4 core ships its OWN
    native utilities of those exact names (https://tailwindcss.com/docs/scrollbar-color),
    and because this app's `outline` color token happens to match the
    plugin's class-name pattern too, both a core-generated AND a
    plugin-generated `.scrollbar-thumb-outline` rule exist side by side in
-   the compiled CSS — and `tailwind-merge` (built against core's utility
+   the compiled CSS, and `tailwind-merge` (built against core's utility
    list, which has no notion of the plugin's extra `-rounded-*` variant)
    folds `scrollbar-thumb-rounded-full` into the SAME "scrollbar thumb
    color" class group as `scrollbar-thumb-outline`, so `cn()` silently
    drops the color utility whenever both are combined. Confirmed live: a
    sidebar `<nav>` rendered with `scrollbar-thumb-outline` and
    `scrollbar-track-secondary` simply absent from its class attribute,
-   `getComputedStyle(...).scrollbarColor` reading back `auto` — the
+   `getComputedStyle(...).scrollbarColor` reading back `auto`: the
    browser's unstyled native scrollbar (light/gray) showing through, which
    is what made it look wrong specifically in dark mode. Plain,
    twMerge-unrecognized class names here sidestep both the collision and
    the merge bug, and additionally let the thumb be a specific pixel width
-   (10px — a hair wider than the plugin's 8px "thin") since the *standard*
+   (10px: a hair wider than the plugin's 8px "thin") since the *standard*
    `scrollbar-width` property only has thin/auto/none keywords to choose
-   from — nothing in between without the `::-webkit-scrollbar` pixel
+   from: nothing in between without the `::-webkit-scrollbar` pixel
    escape hatch used here.
 
    Thumb color is `--color-gray` (#8c8c8c), not `--color-ink`/`--color-
-   outline` — both of those are near-black in dark mode by design (ink for
+   outline`: both of those are near-black in dark mode by design (ink for
    text, outline for borders/shadows against the lighter --color-secondary
    surface), so a thumb painted in either color sits at almost the same
    luminance as this dark page's own --color-primary background and reads
-   as basically invisible — confirmed by a screenshot of the live page
+   as basically invisible: confirmed by a screenshot of the live page
    where the track was there but no thumb was visible against it. --color-
    gray is flat (identical hex in both .light/.dark), so it holds a real
-   value against both a near-black and a pale-cream track — that's the
+   value against both a near-black and a pale-cream track: that's the
    trait an interactive scrollbar handle actually needs, not theme-
    inversion. */
 .pg-scrollbar {
@@ -133,7 +133,7 @@
    its `<main>`, styled via the `tailwind-scrollbar` plugin (thin, themed
    thumb/track). Without this reset, `html`/`body` have no fixed height, so
    a page a hair taller than 100vh (rounding, a stray margin, etc.) makes
-   the document itself scroll too — the browser's unstyled native
+   the document itself scroll too: the browser's unstyled native
    scrollbar, appearing only once you scroll past where `<main>`'s own
    content ends. Locking html/body to the viewport removes that second
    scrollbar entirely, leaving the single themed one everywhere. */
@@ -144,8 +144,8 @@
   }
 
   /* The page ground and default text color. Set here rather than on a
-     wrapper so every route — including not-found.tsx and error.tsx, which
-     render outside any route group's layout — sits on the theme's own
+     wrapper so every route (including not-found.tsx and error.tsx, which
+     render outside any route group's layout) sits on the theme's own
      background instead of the browser's white (found by the 404 page
      rendering on white paper in light mode). Resolves because the no-flash
      script in layout.tsx puts `.light`/`.dark` on <body> itself. */
@@ -157,7 +157,7 @@
 
   /* Scoped to the app shell, NOT applied globally (2026-09-02): the shell
      owns a single scroll surface on its own <main>, but `overflow: hidden`
-     on <body> also silently traps every page that ISN'T the shell — the
+     on <body> also silently traps every page that ISN'T the shell: the
      register form is taller than a short viewport, and with a hidden body
      its submit button became unreachable. `:has()` keeps the shell's
      behaviour exactly as it was while letting ordinary pages scroll. */
@@ -170,7 +170,7 @@
    TipTap renders plain semantic HTML into a contenteditable, and Tailwind's
    preflight strips the browser's list bullets and heading sizes from it, so
    the editing surface restores exactly the formatting the post document can
-   hold — nothing more. Restrained, per design-system-rules.md §15: this is a
+   hold: nothing more. Restrained, per design-system-rules.md §15: this is a
    dense text surface, so no display face and no brutal shadow on the text.
    `.is-editor-empty` and `data-placeholder` are set by TipTap's Placeholder
    extension on an empty first paragraph. */

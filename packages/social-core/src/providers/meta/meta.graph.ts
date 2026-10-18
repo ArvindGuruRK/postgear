@@ -2,15 +2,15 @@
  * Shared Meta Graph API plumbing for the Facebook and Instagram providers.
  *
  * Both sit on one Meta app, one OAuth dialog, one token exchange, and the same
- * "which Page?" enumeration — Instagram Business accounts are reached *through*
+ * "which Page?" enumeration: Instagram Business accounts are reached *through*
  * a linked Facebook Page, so even the Instagram flow starts by listing pages.
  * Duplicating that in two providers would mean fixing every Meta quirk twice.
  *
  * ## Credentials are deliberately separate from social login
  *
  * Sprint 2 added Facebook *sign-in* under `FACEBOOK_CLIENT_ID` /
- * `FACEBOOK_CLIENT_SECRET`. This uses `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET`
- * — a different Meta app. Publishing scopes (`pages_manage_posts`,
+ * `FACEBOOK_CLIENT_SECRET`. This uses `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET`:
+ * a different Meta app. Publishing scopes (`pages_manage_posts`,
  * `instagram_content_publish`) require Meta's app review; basic login does not.
  * Sharing one app would put sign-in behind that review, so a rejection or a
  * lapse would take down authentication for everyone.
@@ -56,7 +56,7 @@ export interface GraphInsight {
  * The day a daily insight value belongs to.
  *
  * Graph closes each day's bucket at `end_time`, which is midnight *Pacific*
- * expressed in UTC — `07:00Z` or `08:00Z` on the following calendar day. So
+ * expressed in UTC: `07:00Z` or `08:00Z` on the following calendar day. So
  * the value is the previous day's, and stepping back twelve hours before
  * taking the UTC date lands on it whichever side of daylight saving it is.
  */
@@ -213,7 +213,7 @@ export abstract class MetaGraphProvider extends SocialAbstract {
     return { accessToken, expiresIn: longLived.expires_in, user };
   }
 
-  /** See the class comment — Meta has no refresh grant. */
+  /** See the class comment: Meta has no refresh grant. */
   async refreshToken(_refreshToken: string): Promise<AuthTokenDetails> {
     return this.cannotRefresh();
   }
@@ -246,7 +246,7 @@ export abstract class MetaGraphProvider extends SocialAbstract {
       name: page.name,
       picture: page.picture?.data?.url,
       // Follower count is what makes five similarly-named pages
-      // distinguishable — the whole point of showing a detail line.
+      // distinguishable: the whole point of showing a detail line.
       detail:
         page.fan_count === undefined ? undefined : `${page.fan_count.toLocaleString()} followers`,
       accessToken: page.access_token,

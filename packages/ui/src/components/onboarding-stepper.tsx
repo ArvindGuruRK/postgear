@@ -41,9 +41,16 @@ export function OnboardingStepper({ className, steps, currentStep, ...props }: O
                 )}
               />
             )}
-            <div className="flex flex-col items-center text-center">
+            {/* Below `sm` only the current step is labelled (the rest stay in
+                the accessibility tree): six uppercase labels do not fit side by
+                side on a phone and ran into each other. */}
+            <div className={cn('flex flex-col items-center text-center', !isActive && 'max-sm:sr-only')}>
               <span className="type-label text-xs text-ink">{step.label}</span>
-              {step.description && <span className="font-sans text-xs font-medium text-ink opacity-60">{step.description}</span>}
+              {step.description && (
+                <span className="font-sans text-xs font-medium text-ink opacity-60 max-sm:hidden">
+                  {step.description}
+                </span>
+              )}
             </div>
           </li>
         );

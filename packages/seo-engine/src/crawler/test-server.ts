@@ -1,13 +1,13 @@
 /**
  * A tiny `node:http` server for the crawler tests, bound to 127.0.0.1.
  *
- * The guard refuses 127.0.0.1 whatever a resolver says — that is its job and
- * the tests in `url-guard.test.ts` insist on it — so an offline crawl needs
+ * The guard refuses 127.0.0.1 whatever a resolver says (that is its job and
+ * the tests in `url-guard.test.ts` insist on it), so an offline crawl needs
  * one explicit, narrow exception: the host name `test.example` is treated
  * as public while still connecting to the loopback server. Test files opt
  * in with `jest.mock('./url-guard', guardMockFactory)` (hoisted by Jest), and
- * `guardMockFactory` wraps the **real** `assertSafeUrl`: every other URL —
- * `localhost`, `169.254.169.254`, a redirect to a private host — still gets
+ * `guardMockFactory` wraps the **real** `assertSafeUrl`: every other URL
+ * (`localhost`, `169.254.169.254`, a redirect to a private host) still gets
  * the production verdict. Nothing in the engine itself is bypassed, and the
  * port the server picked is allowed through the public `allowPorts` option.
  */
@@ -19,7 +19,7 @@ import type { UrlGuardOptions, UrlSafetyResult } from '../types';
 export const TEST_HOST = 'test.example';
 
 /**
- * `jest.mock('./url-guard', guardMockFactory)` — keeps everything real except
+ * `jest.mock('./url-guard', guardMockFactory)`: keeps everything real except
  * that `test.example` (resolved to loopback by the injected resolver) passes.
  */
 export function guardMockFactory(): Record<string, unknown> {
@@ -47,7 +47,7 @@ export type RouteHandler = (req: IncomingMessage, res: ServerResponse) => void;
 
 export interface TestServer {
   port: number;
-  /** `http://test.example:PORT` — resolved to loopback by the injected resolver. */
+  /** `http://test.example:PORT`: resolved to loopback by the injected resolver. */
   origin: string;
   guard: UrlGuardOptions;
   routes: Map<string, RouteHandler>;

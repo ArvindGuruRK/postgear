@@ -3,8 +3,8 @@
  *
  * Follows the pattern `media.repository.ts` set: `orgId` in every signature
  * and every `where`, and an explicit `select` so what reaches a caller is
- * decided here once. An audit row is written progressively — created as
- * PENDING, then patched at every stage — so a crash mid-run leaves a row
+ * decided here once. An audit row is written progressively (created as
+ * PENDING, then patched at every stage), so a crash mid-run leaves a row
  * that says how far it got; `patch` is the one write path for all of that,
  * scoped by organization so a run can never touch another workspace's row
  * even with a guessed id.

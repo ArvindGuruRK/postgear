@@ -7,7 +7,7 @@ import {
   FilterBar,
   NotificationCenter,
   OnboardingStepper,
-  PageHeader,
+  PageActions,
   PlanCard,
   SectionHeader,
   SettingsNav,
@@ -98,15 +98,13 @@ export function SaasPatternsSection() {
   return (
     <Section
       title="SaaS Patterns"
-      description="Composite patterns built entirely from the primitives above — the pieces every product screen in PostGear reuses."
+      description="Composite patterns built entirely from the primitives above: the pieces every product screen in PostGear reuses."
     >
-      <Row label="Page Header">
+      <Row label="Page Actions">
         <div className="w-full">
-          <PageHeader
-            title="Content Calendar"
-            description="Every scheduled post across every connected channel."
-            actions={<Button size="sm">New Post</Button>}
-          />
+          <PageActions>
+            <Button size="sm">New post</Button>
+          </PageActions>
         </div>
       </Row>
       <Row label="Section Header">

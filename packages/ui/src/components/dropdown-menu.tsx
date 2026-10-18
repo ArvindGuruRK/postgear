@@ -22,7 +22,7 @@ export const DropdownMenuContent = forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 min-w-[10rem] rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalMd',
+        'z-50 min-w-[10rem] rounded-md border-2 border-outline bg-secondary p-1 shadow-surfaceMd',
         'font-sans text-sm text-ink outline-none',
         className,
       )}

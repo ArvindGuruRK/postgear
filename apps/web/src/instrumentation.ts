@@ -4,7 +4,7 @@
  * Next calls `register` once per server start; the Sentry config is imported
  * inside it, per runtime, so the edge bundle never loads the Node SDK.
  * `onRequestError` is Next's hook for errors thrown while rendering or in
- * server functions — Sentry's `captureRequestError` turns them into events.
+ * server functions: Sentry's `captureRequestError` turns them into events.
  * Both are no-ops without `NEXT_PUBLIC_SENTRY_DSN` (see the config files).
  */
 import * as Sentry from '@sentry/nextjs';

@@ -34,7 +34,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
  * first: it is what attaches `request.user`, and `RolesGuard` reads that to
  * resolve the active workspace. Swapping them would leave `RolesGuard` looking
  * at an unauthenticated request, where its own defensive check turns every
- * role-guarded route into a 403 — a failure that is at least loud, but the
+ * role-guarded route into a 403: a failure that is at least loud, but the
  * ordering is what makes it correct.
  *
  * Both are **global**, so authentication is the default for every route in

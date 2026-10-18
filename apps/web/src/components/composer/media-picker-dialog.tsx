@@ -33,7 +33,7 @@ const FILTERS = [
  * Attach media to one part of a post, from the library or a fresh upload.
  *
  * The same library, grid and uploader as the Media page, so an image uploaded
- * here is in the library afterwards and reusable in any other post — which is
+ * here is in the library afterwards and reusable in any other post, which is
  * the point of a library. A fresh upload is selected automatically: the person
  * uploaded it in order to attach it.
  */

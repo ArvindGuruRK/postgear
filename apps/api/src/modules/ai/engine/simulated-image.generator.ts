@@ -4,7 +4,7 @@
  * Lives in the API rather than the engine because it needs `sharp`, which the
  * media library already depends on and the engine (a pure library) must not.
  * It is handed to the engine through the same `ImageGenerator` seam as the
- * real one, so the pipeline cannot tell them apart — which is the point: the
+ * real one, so the pipeline cannot tell them apart, which is the point: the
  * image stage, the media save, the hero tile in the UI and the credit refund
  * on failure are all exercised for real with no key and no bill.
  *
@@ -12,7 +12,7 @@
  *
  * A fixed placeholder would pass every test and still hide a bug where two
  * generations show each other's image. Deriving the colours and the shape
- * from a hash of the prompt makes every image visibly its own — and the same
+ * from a hash of the prompt makes every image visibly its own, and the same
  * prompt always produces the same bytes, so a test can assert on it. The look
  * is the design system's comic register: a flat colour field, a bold
  * contrasting shape, a thick black outline.

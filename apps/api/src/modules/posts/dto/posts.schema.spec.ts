@@ -1,5 +1,5 @@
 /**
- * The post document schema — the boundary between what a browser sends and
+ * The post document schema: the boundary between what a browser sends and
  * what is stored and later rendered.
  *
  * Paired with the normalizer in social-core: whatever `normalizeDocument`
@@ -67,7 +67,7 @@ describe('postDocumentSchema', () => {
     };
 
     expect(postDocumentSchema.safeParse(normalizeDocument(tiptap)).success).toBe(true);
-    // The raw editor JSON itself is not accepted — its extra attributes are
+    // The raw editor JSON itself is not accepted: its extra attributes are
     // exactly what the normalizer exists to remove.
     expect(postDocumentSchema.safeParse(tiptap).success).toBe(false);
   });

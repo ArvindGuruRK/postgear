@@ -3,7 +3,7 @@
  * not thrown as an HttpException) is reported to Sentry with the request's
  * method, path and the signed-in ids; an HttpException never is.
  */
-import { Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, Logger, NotFoundException } from '@nestjs/common';
 
 jest.mock('../sentry/sentry', () => ({ reportUnexpectedError: jest.fn() }));
 
@@ -50,6 +50,23 @@ describe('HttpExceptionFilter', () => {
       statusCode: 500,
     });
     expect(JSON.stringify(response.json.mock.calls[0][0])).not.toContain('not a function');
+  });
+
+  it('passes a snake_case code through, and drops anything else in that field', () => {
+    const coded = host({ method: 'PATCH', url: '/users/me/appearance' });
+    filter.catch(
+      new HttpException({ message: 'Needs a plan', code: 'premium_theme_requires_plan' }, 402),
+      coded.host,
+    );
+    expect(coded.response.json).toHaveBeenCalledWith({
+      error: 'Needs a plan',
+      statusCode: 402,
+      code: 'premium_theme_requires_plan',
+    });
+
+    const freeText = host({ method: 'PATCH', url: '/x' });
+    filter.catch(new HttpException({ message: 'No', code: 'Column "email" collided' }, 409), freeText.host);
+    expect(freeText.response.json).toHaveBeenCalledWith({ error: 'No', statusCode: 409 });
   });
 
   it('does not report an HttpException', () => {

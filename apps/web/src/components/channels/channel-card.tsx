@@ -35,7 +35,7 @@ interface ChannelCardProps {
  * Two details worth keeping:
  *
  * - **The platform badge sits on the avatar**, bottom-right. At a glance the
- *   avatar answers "whose account" and the badge answers "on what" — which is
+ *   avatar answers "whose account" and the badge answers "on what", which is
  *   the pair of questions a channel list exists to answer.
  * - **The handle is shown under the name.** With three LinkedIn accounts
  *   connected, a name alone is ambiguous, and the API already returns
@@ -92,7 +92,7 @@ export function ChannelCard({
             </Text>
           )}
 
-          {/* The fix is offered inline, not buried in the menu — a broken
+          {/* The fix is offered inline, not buried in the menu: a broken
               channel silently stops everything, so the recovery has to be the
               most visible thing on the card. */}
           {health.action && canManage ? (

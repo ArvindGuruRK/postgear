@@ -13,7 +13,7 @@
  * | ERROR      | ✓     | ✓     |           |       |
  * | PUBLISHED  |       |       |           |       |
  *
- * A person may only ever move a post *to* `DRAFT` or `QUEUE` — the other two
+ * A person may only ever move a post *to* `DRAFT` or `QUEUE`: the other two
  * are outcomes, recorded by the publisher. `ERROR` is editable so a failed post
  * can be fixed and re-queued. `PUBLISHED` is final: the post exists on the
  * platform, and editing PostGear's copy would only make the two disagree.

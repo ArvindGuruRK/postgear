@@ -43,7 +43,7 @@ export function FeedbackSection() {
   return (
     <Section
       title="Feedback"
-      description="Alerts, progress, loading states, and empty/error/success placeholders — every non-toast way the system talks back."
+      description="Alerts, progress, loading states, and empty/error/success placeholders: every non-toast way the system talks back."
     >
       <Row label="Toasts (fire one)">
         <Button
@@ -61,7 +61,7 @@ export function FeedbackSection() {
             toast({
               variant: 'danger',
               title: 'Publish failed',
-              description: 'LinkedIn rejected the request — token expired.',
+              description: 'LinkedIn rejected the request: token expired.',
             })
           }
         >
@@ -123,7 +123,7 @@ export function FeedbackSection() {
           </Alert>
           <Alert variant="danger">
             <AlertTitle>Publish failed</AlertTitle>
-            <AlertDescription>Instagram rejected the request — image too large.</AlertDescription>
+            <AlertDescription>Instagram rejected the request: image too large.</AlertDescription>
           </Alert>
           <Alert variant="warning">
             <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.5} />
@@ -145,7 +145,7 @@ export function FeedbackSection() {
           <Progress value={80} tone="success" label="80%" />
           <Progress value={48} tone="accent" label="48%" />
           <Progress value={12} size="sm" tone="ai" label="12%" />
-          {/* Stripes off — the plain fill the rest of the app already uses. */}
+          {/* Stripes off: the plain fill the rest of the app already uses. */}
           <Progress value={60} striped={false} animated={false} />
         </div>
       </Row>
@@ -168,7 +168,7 @@ export function FeedbackSection() {
           h-2 w-2 rounded-full bg-ink animate-pulse, staggered 0 / 150 / 300ms, role=status
         </Spec>
       </Row>
-      <Row label="Stage Tracker (horizontal — all five statuses; stacks below sm)">
+      <Row label="Stage Tracker (horizontal, all five statuses; stacks below sm)">
         <div className="flex w-full flex-col gap-3">
           <StageTracker stages={PIPELINE_STAGES} />
           <Spec>

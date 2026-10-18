@@ -1,5 +1,5 @@
 /**
- * LinkedIn — OAuth 2.0, REST posts API.
+ * LinkedIn: OAuth 2.0, REST posts API.
  *
  * ## Personal and page are two providers, not one flag
  *
@@ -7,7 +7,7 @@
  * (`urn:li:person:` vs `urn:li:organization:`), the scopes consented to, and
  * whether a second selection step is needed. Modelling that as a boolean on one
  * provider would put a conditional in every method; modelling it as two
- * registry entries — `linkedin` and `linkedin-page` — keeps each one linear,
+ * registry entries, `linkedin` and `linkedin-page`, keeps each one linear,
  * and lets a user connect their profile *and* two company pages as three
  * independent channels, which is what they actually want.
  *
@@ -19,7 +19,7 @@
  * A single LinkedIn authorization covers the member and every page they
  * administer. Those become separate `Integration` rows sharing a
  * `rootInternalId`, which is what lets the refresh path update all of them from
- * one new token — see the sibling fan-out in the channels repository.
+ * one new token: see the sibling fan-out in the channels repository.
  */
 import {
   asCount,
@@ -83,7 +83,7 @@ const IMAGE_PROCESSING_DELAY_MS = 10_000;
 /**
  * What this provider publishes (Sprint 4).
  *
- * Images: one, or a multi-image post of up to twenty. **No video** — LinkedIn
+ * Images: one, or a multi-image post of up to twenty. **No video**: LinkedIn
  * accepts it, but its Videos API is a chunked multipart upload with a finalize
  * step and an asynchronous processing poll that PostGear does not implement
  * yet, so the composer refuses video rather than letting it be dropped at
@@ -148,7 +148,7 @@ export class LinkedInProvider extends SocialAbstract implements SocialProvider {
       };
     }
     if (body.includes('Unable to obtain activity') || body.includes('resource is forbidden')) {
-      // LinkedIn returns this transiently right after a token refresh — the new
+      // LinkedIn returns this transiently right after a token refresh: the new
       // token is briefly not yet usable.
       return { type: 'retry', value: 'LinkedIn is temporarily unavailable.' };
     }
@@ -450,7 +450,7 @@ interface LinkedInShareStatisticsElement {
     likeCount?: number;
     commentCount?: number;
     shareCount?: number;
-    /** A ratio — interactions over impressions — not a count. See `channelAnalytics`. */
+    /** A ratio, interactions over impressions, not a count. See `channelAnalytics`. */
     engagement?: number;
   };
 }
@@ -482,8 +482,8 @@ export class LinkedInPageProvider
     const details = await super.authenticate(params);
 
     // The member is authenticated, but the channel has no target until an
-    // organization is chosen. The row is persisted now — the authorization code
-    // is single-use and the browser is about to navigate away — and parked in
+    // organization is chosen. The row is persisted now (the authorization code
+    // is single-use and the browser is about to navigate away) and parked in
     // `inBetweenSteps`.
     return { ...details, requiresEntitySelection: true };
   }
@@ -530,8 +530,8 @@ export class LinkedInPageProvider
       );
     }
 
-    // LinkedIn issues no page-scoped token — the member token carries the
-    // organization permissions — so the caller keeps the existing credential.
+    // LinkedIn issues no page-scoped token (the member token carries the
+    // organization permissions), so the caller keeps the existing credential.
     return chosen;
   }
 
@@ -542,8 +542,8 @@ export class LinkedInPageProvider
    * statistics endpoint reports *gains* per day, and a gain series with no
    * starting level cannot be turned into one, so it is not read. The share
    * statistics' `engagement` field is a ratio (interactions ÷ impressions),
-   * so `engagements` is its numerator — clicks, likes, comments and shares
-   * summed — which is what the rest of the app expects a count to be.
+   * so `engagements` is its numerator (clicks, likes, comments and shares
+   * summed), which is what the rest of the app expects a count to be.
    */
   async channelAnalytics(
     channel: ChannelContext,

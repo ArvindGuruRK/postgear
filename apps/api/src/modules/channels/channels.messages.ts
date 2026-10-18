@@ -3,21 +3,21 @@
  *
  * Separate from `auth.messages.ts` on purpose. That catalogue exists to stop
  * authentication leaking whether an account exists, and every string in it is
- * worded for sign-in — `OAUTH_FAILED` reads "We could not complete that
+ * worded for sign-in: `OAUTH_FAILED` reads "We could not complete that
  * sign-in", which is simply wrong when a user was connecting an Instagram
  * account. Reusing it would have meant either a misleading message or loosening
  * a string whose exact wording is asserted by a test.
  *
  * Channel operations are also a different privacy problem. A caller here is
  * already an authenticated member of the workspace acting on a channel they can
- * already see, so these messages can be specific and useful — the
+ * already see, so these messages can be specific and useful: the
  * anti-enumeration constraint that shapes the auth catalogue does not apply.
  */
 export const CHANNEL_MESSAGES = {
   CONNECT_FAILED: 'We could not connect that account. Please try again.',
   /**
    * Shown when a reconnect authorized a different account than the channel it
-   * was meant to repair — the guard that stops credentials being silently
+   * was meant to repair: the guard that stops credentials being silently
    * swapped between accounts.
    */
   WRONG_ACCOUNT:
@@ -32,7 +32,7 @@ export const CHANNEL_MESSAGES = {
   SETUP_REQUIRED: 'Finish setting up this channel before posting to it.',
   /**
    * Sprint 8: the plan's channel ceiling, enforced where a channel is
-   * connected and nowhere else — existing channels keep publishing.
+   * connected and nowhere else; existing channels keep publishing.
    */
   LIMIT_REACHED:
     'This workspace has reached its plan’s channel limit. Upgrade the plan to connect more channels.',

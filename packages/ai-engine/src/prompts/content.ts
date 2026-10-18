@@ -1,5 +1,5 @@
 /**
- * Content stage — the post itself, as parts.
+ * Content stage: the post itself, as parts.
  *
  * Format decides shape and length (contract §1): one short post, one long
  * post, a short thread or a long thread. {@link partLimits} is the single
@@ -7,7 +7,7 @@
  * them afterwards, because a model given "at most 280 characters" delivers
  * 290 often enough that the guard is not optional. The guard's order is
  * cheap-to-expensive: one repair prompt that shows the model the exact
- * overflow, then a sentence-boundary truncation as the last resort — an
+ * overflow, then a sentence-boundary truncation as the last resort; an
  * over-limit part must never reach a platform that will reject the post.
  *
  * Text rules are deliberately plain: no hashtags (platforms treat them
@@ -88,7 +88,7 @@ export function contentSchema(withImage: boolean) {
           .nullable()
           .optional()
           .describe(
-            'For the first part only: a descriptive prompt for an illustration — style, subject, light, mood. No brand names, no text in the image.',
+            'For the first part only: a descriptive prompt for an illustration: style, subject, light, mood. No brand names, no text in the image.',
           )
       : z.null().optional().describe('Not used for this request.'),
   });

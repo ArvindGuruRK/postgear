@@ -5,7 +5,7 @@
  * rather than reskinning it.
  *
  * PRUNED 2026-09-02 (Sprint 0 close): 129 variables → 36. Everything the new
- * design language had superseded was removed — the `--color-customN` palette
+ * design language had superseded was removed: the `--color-customN` palette
  * (55 entries), the `--new-*` surface layer, the soft/blurred shadows, and the
  * unused legacy semantics. That retires this file's earlier "don't delete
  * inherited values" policy: values kept only in case Postiz's look came back
@@ -13,7 +13,7 @@
  * system plus the platform brand colors, which Sprint 3's channel UI needs.
  * git history has the original if a value ever needs recovering.
  *
- * Do not rename variables casually — every name below is consumed by
+ * Do not rename variables casually. Every name below is consumed by
  * Tailwind's theme mapping (see packages/config/tailwind.css, `@theme inline`)
  * and by hand-written CSS across the app. Renaming requires updating both.
  *
@@ -53,15 +53,30 @@
 
 :root {
   .dark {
+    /* Classic dark, the default dark theme: a near-black page and grey
+       surfaces. */
     --color-primary: #121212;
     --color-secondary: #2a2a2a;
+    /* Chrome (sidebar, top bar) and field (inputs, pickers, checkboxes)
+       layers, split from --color-secondary 2026-10-17 so a theme can tint
+       the app frame, the cards and the fields independently, the way a SaaS
+       layers its UI. Both equal secondary in Classic dark, so the original
+       dark look is unchanged; the dark themes further down set all four. */
+    --color-chrome: #2a2a2a;
+    --color-field: #2a2a2a;
     --color-forth: #1d4ed8;
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
   }
   .light {
+    /* Classic light, the default light theme (2026-10-18): the original light
+       look. A warm cream page, and everything on it plain white: frame
+       (sidebar, top bar), cards and fields. The butter-framed Cream system
+       that was the base until then is now its own theme further down. */
     --color-primary: #fff8e7;
-    --color-secondary: #fff;
+    --color-secondary: #ffffff;
+    --color-chrome: #ffffff;
+    --color-field: #ffffff;
     --color-forth: #1d4ed8;
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
@@ -72,17 +87,17 @@
    See docs/sprint-documents/sprint-00-design-system.md for the full design
    direction. Deliberately structural-only: border widths and radii already
    have suitable values in Tailwind's own defaults (border-0/2/4/8,
-   rounded-md/xl/2xl/full — moderately rounded per the 2026-08-30 revision,
+   rounded-md/xl/2xl/full, moderately rounded per the 2026-08-30 revision,
    not the original sharp rounded-none), so the only real gaps are an "ink"
-   outline color and a hard (unblurred, offset) shadow scale — Tailwind's
+   outline color and a hard (unblurred, offset) shadow scale. Tailwind's
    default shadow scale is all soft/blurred, which is the opposite of what
    this style needs.
 
    The comic accent palette that this block once deferred is locked and
-   lives in its own block further down — see the LOCKED 2026-08-30 comment. */
+   lives in its own block further down: see the LOCKED 2026-08-30 comment. */
 /* --shadow-brutal-* below is nested in the SAME .dark/.light blocks as
-   --color-ink/--color-outline, not declared separately on a bare :root —
-   a var() reference inside a :root-level declaration fails to resolve,
+   --color-ink/--color-outline, not declared separately on a bare :root.
+   A var() reference inside a :root-level declaration fails to resolve,
    because these variables only exist starting at .dark/.light (a
    descendant of :root), and a custom property can't see a descendant's
    value. Nesting here puts every declaration in the same scope so the
@@ -91,8 +106,8 @@
 
    --color-ink vs --color-outline (added 2026-08-30, dark-mode revision):
    these used to be the same variable doing double duty as both the
-   border/shadow accent AND the general text/icon foreground color — fine
-   in light mode (black works for both), but in dark mode that meant every
+   border/shadow accent AND the general text/icon foreground color. That was
+   fine in light mode (black works for both), but in dark mode it meant every
    border and shadow was near-white, reading as a stark black-and-white
    scheme rather than a softer grayscale one (per a reference screenshot:
    gray surfaces on a black page, with a dark/black border and shadow, not
@@ -100,9 +115,9 @@
    flips near-black/near-white so text stays readable against the surface
    color in both themes). --color-outline is the new, SEPARATE border +
    shadow color: identical to ink in light mode (no visual change there),
-   but stays dark in dark mode instead of inverting to white — it reads as
+   but stays dark in dark mode instead of inverting to white. It reads as
    a visible outline against the lighter gray surface (see --color-secondary
-   below) while keeping the offset shadow subtle/moody against the near-
+   above) while keeping the offset shadow subtle/moody against the near-
    black page, matching the reference rather than the light mode's loud
    comic pop. */
 :root {
@@ -113,13 +128,13 @@
        one value can't clear WCAG 2.1 SC 1.4.11's 3:1 on both grounds: the
        ring used to reuse --color-brutal-accent (#ff6b35), which manages
        6.61:1 on this near-black page but only 2.68:1 on light mode's warm
-       paper — a ring 36 components share, effectively invisible in the
+       paper, a ring 36 components share, effectively invisible in the
        theme most people use. Dark mode keeps the bright accent; .light
        darkens it (see below). Not aliased to --color-brutal-accent so that
        token stays free to change as a fill without silently breaking the
        focus indicator. */
     --color-focus-ring: #ff6b35;
-    /* Countdown/scoreboard plate (Sprint 0 extension) — a fixed dark plate
+    /* Countdown/scoreboard plate (Sprint 0 extension): a fixed dark plate
        with yellow digits in BOTH themes, so it can't be expressed with
        --color-ink (which inverts to near-white in dark and would leave
        yellow-on-white digits). Dark mode drops to pure black so the plate
@@ -130,37 +145,47 @@
     --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
     --shadow-brutal-md: 4px 4px 0 var(--color-outline);
     --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
-    /* Applied on :active alongside a translate(2px, 2px) — see the "press
+    /* Applied on :active alongside a translate(2px, 2px); see the "press
        interaction" recipe in the Sprint 0 doc. Shadow collapses to nothing
        as the element visually moves into the space it occupied. */
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
     /* Button-only hover "lift" (added 2026-08-30, per direct product
        feedback referencing the Sentry-style pushable-button feel already
-       prototyped on Button2 — see --shadow-brutal-btn-hover below).
-       Deliberately tiny — a first pass at 2px read as "too high" — grows
+       prototyped on Button2; see --shadow-brutal-btn-hover below).
+       Deliberately tiny (a first pass at 2px read as "too high"): grows
        shadow-brutal-md's diagonal offset by just 1px on each axis; paired
        in button.tsx with hover:-translate-x-px hover:-translate-y-px so
        the shadow's far corner stays anchored at the same page position
        while the button visibly, barely rises off it. No fill/color change
        on hover (moved to :active instead, alongside the existing press
-       translate — see design-system-rules.md §6/§8). Scoped to Button. */
+       translate; see design-system-rules.md §6/§8). Scoped to Button. */
     --shadow-brutal-md-hover: 5px 5px 0 var(--color-outline);
     /* Button-only "pushable" shadow (added 2026-08-30, per a comic
-       component-sheet reference) — bottom-offset only, reading as a solid
+       component-sheet reference): bottom-offset only, reading as a solid
        ink base the button sits on top of, not the diagonal offset every
        other brutal-shadow surface (Card/Dialog/Input/etc.) uses. Hover
        grows the offset (button looks like it lifts off its base); press
        collapses back to --shadow-brutal-pressed (button sinks flush).
-       Deliberately scoped to Button — see button.tsx and
+       Deliberately scoped to Button: see button.tsx and
        design-system-rules.md §6/§8 for why this doesn't replace the
        diagonal family everywhere else. */
     --shadow-brutal-btn: 0 4px 0 var(--color-outline);
     --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
+    /* Surface shadows (2026-10-17): containers, fields and overlays
+       (Card, Panel, Input, Calendar, menus, dialogs...), split from the
+       diagonal `brutal` family that pressable controls keep. Dark mode keeps
+       the original diagonal values on purpose: against #121212 the near-black
+       offset barely reads and the look was signed off as-is (briefly matched
+       to light mode, then reverted the same day by product decision). See the
+       .light block for the bottom-only treatment. */
+    --shadow-surface-sm: 2px 2px 0 var(--color-outline);
+    --shadow-surface-md: 4px 4px 0 var(--color-outline);
+    --shadow-surface-lg: 6px 6px 0 var(--color-outline);
   }
   .light {
     --color-ink: #0a0a0a;
     --color-outline: #0a0a0a;
-    /* Darkened from the accent's #ff6b35 — see the .dark block above. This
+    /* Darkened from the accent's #ff6b35; see the .dark block above. This
        shade clears 3:1 against all three surfaces the ring actually touches:
        4.23:1 on the warm paper page, 4.47:1 on white cards, and 4.42:1
        against the ink border it sits 2px outside of. Kept in the same orange
@@ -169,17 +194,324 @@
     /* See the --color-plate comment in the .dark block above. */
     --color-plate: #0a0a0a;
     --color-on-plate: var(--color-brutal-secondary);
+    /* Light mode runs lighter than dark (2026-10-17): on the pale page a
+       solid black offset reads as heavy, so the diagonal for pressable
+       controls (Button, Tabs, NavigationMenu, active nav items) is about a
+       quarter smaller than dark mode's. */
     --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md: 4px 4px 0 var(--color-outline);
-    --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
+    --shadow-brutal-md: 3px 3px 0 var(--color-outline);
+    --shadow-brutal-lg: 4px 4px 0 var(--color-outline);
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
-    --shadow-brutal-md-hover: 5px 5px 0 var(--color-outline);
+    --shadow-brutal-md-hover: 4px 4px 0 var(--color-outline);
     --shadow-brutal-btn: 0 4px 0 var(--color-outline);
     --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
+    /* Surfaces sit on a short bottom-only base, like Button2: no sideways
+       offset, so a card's right edge no longer reads twice as thick as its
+       left. */
+    --shadow-surface-sm: 0 2px 0 var(--color-outline);
+    --shadow-surface-md: 0 3px 0 var(--color-outline);
+    --shadow-surface-lg: 0 4px 0 var(--color-outline);
   }
 }
 
-/* ── Neubrutalism comic accent palette — LOCKED 2026-08-30, revised twice
+/* ── Themes (light 2026-10-17, dark and Classic 2026-10-18) ─────────────────
+   The user-selectable themes, chosen in Settings → Appearance and stored per
+   user, one per scheme (`User.lightTheme`, `User.darkTheme`). The catalog
+   (ids, names, which are premium, and a copy of each block's surface hexes
+   for the settings previews) lives in
+   apps/api/src/modules/users/appearance.catalog.ts, and a unit test there
+   fails if a block below, or the base blocks above, drift from it.
+
+   The no-flash script in apps/web/src/app/layout.tsx sets
+   `data-light-theme="<id>"` and `data-dark-theme="<id>"` on <body> from the
+   `pg_appearance` cookie, both whatever the mode. Every light selector
+   requires `.light` and every dark one `.dark`, so each attribute only acts
+   in its own scheme and both choices survive a switch. No attribute means
+   Classic: the base `.light` / `.dark` system above.
+
+   Each theme is a whole system, four layers deep: page (--color-primary),
+   frame (--color-chrome: sidebar, top bar), cards (--color-secondary) and
+   fields (--color-field), plus an ink and outline tinted toward the hue and,
+   for some, a shadow weight that suits it. In light, the frame sits a shade
+   deeper than the page, the cards a shade lighter and the fields pure white.
+   In dark, the page is the deepest layer and each one above it a step
+   lighter, fields last, so a field reads clearly on its card; the outline
+   stays a near-black tint of the hue, as in Classic dark. The brand fills
+   (blue/yellow/orange/violet/green below) never change, so a theme moves
+   only the base.
+
+   Specificity (0,3,0) beats the base `.light` / `.dark` blocks above
+   (0,2,0), so these win wherever they sit.
+
+   Contrast, checked by script rather than eyeballed, for every theme:
+
+   Light: ink at least 11.6:1 on page, frame and cards (the floor is 7:1);
+   the blue primary #1d4ed8 at least 4.6:1 on the frame and 5.6:1 on the page
+   (4.5:1 needed, for blue links and active nav text); the outline at least
+   14:1 against a white field (3:1 needed); and the focus ring #d6440f at
+   least 3.1:1 on page and frame.
+
+   Dark: ink at least 11.1:1 on page, frame, cards and fields (floor 7:1);
+   the focus ring #ff6b35 at least 5.0:1 on page and frame (floor 3:1); the
+   outline against a field at least 1.46:1, never below Classic dark's 1.42:1
+   (where field and card are the same grey and the outline alone draws the
+   edge), with each field also a step lighter than its card; and the blue
+   #1d4ed8 fill at least 2.1:1 against every frame, so an active nav item
+   stands off the sidebar as well as in Classic dark, with its white label
+   at 6.7:1 on the blue in every theme.
+
+   Light, free: classic, cream, paper, white, cool, lilac.
+   Light, premium (a paid or trialing workspace): mint, grape, peach, sky,
+   rose.
+   Dark, free: classic, midnight, forest, plum, ocean, mocha.
+   Dark, premium: obsidian, nebula, ember, aurora, slate. */
+:root {
+  /* Cream: a warm cream page, a deeper butter frame for sidebar and top bar,
+     warm-white cards that lift off the page, and pure white fields, the
+     clearest surface to type on. The base light system from 2026-10-17
+     until Classic took that place. */
+  .light[data-light-theme='cream'] {
+    --color-primary: #fff8e7;
+    --color-chrome: #ffeec2;
+    --color-secondary: #fffdf7;
+    --color-field: #ffffff;
+    --color-ink: #0a0a0a;
+    --color-outline: #0a0a0a;
+  }
+  /* Paper: neutral off-white page, a stone frame, near-black ink, the
+     standard shadow scheme. The calm, editorial take: drops the cream's
+     retro warmth. */
+  .light[data-light-theme='paper'] {
+    --color-primary: #f4f3ee;
+    --color-chrome: #e8e6dd;
+    --color-secondary: #fbfaf7;
+    --color-field: #ffffff;
+    --color-ink: #111111;
+    --color-outline: #111111;
+  }
+  /* White: light grey page with white frame, cards and fields, and the
+     lightest depth: every surface shares one 2px bottom base, buttons keep a
+     2px diagonal. Closest to a mainstream SaaS while keeping the outlines. */
+  .light[data-light-theme='white'] {
+    --color-primary: #f5f5f3;
+    --color-chrome: #ffffff;
+    --color-secondary: #ffffff;
+    --color-field: #ffffff;
+    --color-ink: #0a0a0a;
+    --color-outline: #0a0a0a;
+    --shadow-surface-sm: 0 2px 0 var(--color-outline);
+    --shadow-surface-md: 0 2px 0 var(--color-outline);
+    --shadow-surface-lg: 0 2px 0 var(--color-outline);
+    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-md: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-lg: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-md-hover: 3px 3px 0 var(--color-outline);
+  }
+  /* Cool: slate-tinted page and a blue-grey frame that sit with the blue
+     primary, blue-white cards, and a deep navy-black (#0f172a) for ink and
+     outlines: as strong as black, but reads softer and more "product" than
+     pure black on a cool ground. */
+  .light[data-light-theme='cool'] {
+    --color-primary: #eef1f7;
+    --color-chrome: #dfe6f2;
+    --color-secondary: #f9fbff;
+    --color-field: #ffffff;
+    --color-ink: #0f172a;
+    --color-outline: #0f172a;
+  }
+  /* Lilac: the classic neo-brutalist landing-page look. A pale violet
+     ground, a deeper lilac frame, violet-white cards, pure black outlines,
+     and the diagonal shadow back on surfaces too, but at 3px rather than the
+     old 4px-plus-4px-border weight. The loudest, most "comic" free option. */
+  .light[data-light-theme='lilac'] {
+    --color-primary: #ece9fb;
+    --color-chrome: #d9d2fb;
+    --color-secondary: #f8f7ff;
+    --color-field: #ffffff;
+    --color-ink: #0a0a0a;
+    --color-outline: #000000;
+    --shadow-surface-sm: 2px 2px 0 var(--color-outline);
+    --shadow-surface-md: 3px 3px 0 var(--color-outline);
+    --shadow-surface-lg: 4px 4px 0 var(--color-outline);
+  }
+  /* Mint (premium): a fresh green-white page, a sage frame, near-white
+     cards, and a deep forest ink (#052e1a) instead of black, so the outlines
+     read green-tinted rather than harsh. Standard bottom-only surfaces. */
+  .light[data-light-theme='mint'] {
+    --color-primary: #eaf6ee;
+    --color-chrome: #cdebd9;
+    --color-secondary: #f7fdf9;
+    --color-field: #ffffff;
+    --color-ink: #052e1a;
+    --color-outline: #052e1a;
+  }
+  /* Grape (premium): a redder, richer purple than Lilac. An orchid page and
+     frame, an aubergine ink (#1f0a33), and Lilac's diagonal surface shadow so
+     it keeps the comic pop that suits a saturated ground. */
+  .light[data-light-theme='grape'] {
+    --color-primary: #f3eafb;
+    --color-chrome: #e4cff6;
+    --color-secondary: #fcf8ff;
+    --color-field: #ffffff;
+    --color-ink: #1f0a33;
+    --color-outline: #1f0a33;
+    --shadow-surface-sm: 2px 2px 0 var(--color-outline);
+    --shadow-surface-md: 3px 3px 0 var(--color-outline);
+    --shadow-surface-lg: 4px 4px 0 var(--color-outline);
+  }
+  /* Peach (premium): the warmest option. A blush-apricot page, a peach
+     frame, warm-white cards and an espresso ink (#2a1206). Cream's warmth
+     pushed toward orange; standard surfaces. */
+  .light[data-light-theme='peach'] {
+    --color-primary: #fff1e8;
+    --color-chrome: #ffdcc7;
+    --color-secondary: #fffaf6;
+    --color-field: #ffffff;
+    --color-ink: #2a1206;
+    --color-outline: #2a1206;
+  }
+  /* Sky (premium): brighter and bluer than Cool's slate. An airy blue page,
+     a powder-blue frame, a deep navy ink (#0b2239), and White's light 2px
+     depth everywhere, so the whole UI feels weightless. */
+  .light[data-light-theme='sky'] {
+    --color-primary: #eaf5fd;
+    --color-chrome: #cfe8fa;
+    --color-secondary: #f7fcff;
+    --color-field: #ffffff;
+    --color-ink: #0b2239;
+    --color-outline: #0b2239;
+    --shadow-surface-sm: 0 2px 0 var(--color-outline);
+    --shadow-surface-md: 0 2px 0 var(--color-outline);
+    --shadow-surface-lg: 0 2px 0 var(--color-outline);
+    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-md: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-lg: 2px 2px 0 var(--color-outline);
+    --shadow-brutal-md-hover: 3px 3px 0 var(--color-outline);
+  }
+  /* Rose (premium): a soft pink page, a rose-quartz frame, blush-white
+     cards and a deep wine ink (#2b0a13). Standard surfaces. */
+  .light[data-light-theme='rose'] {
+    --color-primary: #fdedf0;
+    --color-chrome: #f9d3dc;
+    --color-secondary: #fff8f9;
+    --color-field: #ffffff;
+    --color-ink: #2b0a13;
+    --color-outline: #2b0a13;
+  }
+
+  /* Midnight: a deep navy page, an ink-blue frame, slate-navy cards and a
+     brighter navy field, with a cool blue-white ink. The calmest hue: it sits
+     next to the blue primary instead of competing with it. Classic dark's
+     diagonal shadows, in a navy-black outline. */
+  .dark[data-dark-theme='midnight'] {
+    --color-primary: #0b1120;
+    --color-chrome: #131c33;
+    --color-secondary: #18223c;
+    --color-field: #232e4e;
+    --color-ink: #e6ebf7;
+    --color-outline: #02050d;
+  }
+  /* Forest: a deep pine page rising through moss-dark frame and cards to a
+     green field, with a sage-white ink. Low saturation, so it reads as
+     green without tinting the content. */
+  .dark[data-dark-theme='forest'] {
+    --color-primary: #0b1510;
+    --color-chrome: #12221a;
+    --color-secondary: #17291f;
+    --color-field: #1e3428;
+    --color-ink: #e4f1e8;
+    --color-outline: #020805;
+  }
+  /* Plum: an aubergine page, a deep purple frame and cards, a mauve field,
+     and a lavender-white ink. Warmer than Nebula's blue-violet. */
+  .dark[data-dark-theme='plum'] {
+    --color-primary: #140d1c;
+    --color-chrome: #1f142b;
+    --color-secondary: #261a33;
+    --color-field: #352641;
+    --color-ink: #f0e7f7;
+    --color-outline: #07030b;
+  }
+  /* Ocean: a deep teal page, a petrol frame and cards, a sea-green field
+     and an aqua-white ink. Cool like Midnight, but greener. */
+  .dark[data-dark-theme='ocean'] {
+    --color-primary: #071518;
+    --color-chrome: #0e2226;
+    --color-secondary: #12292e;
+    --color-field: #183439;
+    --color-ink: #e0f2f3;
+    --color-outline: #010708;
+  }
+  /* Mocha: the warm one. An espresso page, a roast-brown frame and cards, a
+     latte-dark field and a cream ink, for people who find grey and blue
+     darks cold. */
+  .dark[data-dark-theme='mocha'] {
+    --color-primary: #16100c;
+    --color-chrome: #231a14;
+    --color-secondary: #2a2019;
+    --color-field: #392c23;
+    --color-ink: #f5ebe1;
+    --color-outline: #070402;
+  }
+  /* Obsidian (premium): true black for OLED screens. A #000 page, near-black
+     frame and cards, a charcoal field. A near-black outline would vanish on
+     #000, so this is the one dark theme with a grey outline (#3d3d3d): the
+     edges and the diagonal shadows read as dim grey lines instead. */
+  .dark[data-dark-theme='obsidian'] {
+    --color-primary: #000000;
+    --color-chrome: #0a0a0a;
+    --color-secondary: #141414;
+    --color-field: #1c1c1c;
+    --color-ink: #f2f2f2;
+    --color-outline: #3d3d3d;
+  }
+  /* Nebula (premium): a deep space violet. An indigo-black page, a violet
+     frame and cards, a brighter violet field and a lilac-white ink; the AI
+     violet fills sit at home on it. */
+  .dark[data-dark-theme='nebula'] {
+    --color-primary: #110c22;
+    --color-chrome: #1c1538;
+    --color-secondary: #221a40;
+    --color-field: #2f2656;
+    --color-ink: #ece8ff;
+    --color-outline: #05030d;
+  }
+  /* Ember (premium): a warm deep red. A burnt-umber page, a rust-dark frame
+     and cards, a brick field and a blush-white ink. Kept dark and brown
+     enough that the danger red still reads as a signal on it. */
+  .dark[data-dark-theme='ember'] {
+    --color-primary: #170b09;
+    --color-chrome: #261310;
+    --color-secondary: #2d1814;
+    --color-field: #3e2520;
+    --color-ink: #f8e9e4;
+    --color-outline: #080302;
+  }
+  /* Aurora (premium): the two-hue one. A deep teal page, cards and field
+     like Ocean's, inside a violet frame (#1d1638), so the sidebar and top
+     bar glow a different colour from the work area. */
+  .dark[data-dark-theme='aurora'] {
+    --color-primary: #08171a;
+    --color-chrome: #1d1638;
+    --color-secondary: #102629;
+    --color-field: #17343c;
+    --color-ink: #e3f4f2;
+    --color-outline: #02080a;
+  }
+  /* Slate (premium): a cool blue-grey. A graphite page, steel frame and
+     cards, a slate field and a cool white ink: Classic dark with a hint of
+     blue, the most neutral of the tinted themes. */
+  .dark[data-dark-theme='slate'] {
+    --color-primary: #10141a;
+    --color-chrome: #1a2029;
+    --color-secondary: #1f2630;
+    --color-field: #28303c;
+    --color-ink: #e8edf3;
+    --color-outline: #04060a;
+  }
+}
+
+/* ── Neubrutalism comic accent palette: LOCKED 2026-08-30, revised twice
    same day ──────────────────────────────────────────────────────────────
    Prototyped as 3 candidates on real Button/Badge/Card via a design canvas
    (light + dark, 2 typefaces). History: Palette A (blue primary) selected
@@ -187,7 +519,7 @@
    secondary on feedback → superseded by pulling primary/secondary/accent
    directly from Palette C's own hex values instead of hand-tuning A's
    (yellow-primary #ffd100/blue-secondary #1d4ed8/orange-accent #ff6b35) →
-   FINAL: reverted back to blue-primary/yellow-secondary — dense, all-day
+   FINAL: reverted back to blue-primary/yellow-secondary. Dense, all-day
    surfaces (dashboards, calendars, analytics tables) hold up better under
    a calmer blue as the dominant color than under yellow at that volume,
    and blue-primary keeps the more conventional white-on-primary button
@@ -197,31 +529,31 @@
    blue #1d4ed8 (via --color-forth), secondary is yellow #ffd100 (via
    --color-brutal-secondary below), accent stays Palette C's orange #ff6b35
    (via --color-brutal-accent below). Danger and ai were never pulled from
-   Palette C (scoped request: "only primary and secondary/accent") — they
+   Palette C (scoped request: "only primary and secondary/accent"); they
    kept their Palette A values at the time. Fill colors are deliberately flat
-   across .dark/.light — comic colors don't invert with the theme, only
-   ink/backgrounds do — so these live outside the .dark/.light blocks
+   across .dark/.light (comic colors don't invert with the theme, only
+   ink/backgrounds do), so these live outside the .dark/.light blocks
    above. Secondary/danger/accent get dedicated tokens below since nothing
    in the inherited Postiz layer named them.
 
    ADDENDUM (2026-08-30, later revision): --color-actionAi reassigned from
    the inherited pink (--new-ai-btn, #ff2e93, since deleted in the
-   2026-09-02 prune) to a dedicated violet, --color-brutal-ai below —
-   direct product decision to give the AI-powered surfaces (Ask AI button,
+   2026-09-02 prune) to a dedicated violet, --color-brutal-ai below.
+   Direct product decision to give the AI-powered surfaces (Ask AI button,
    ai Badge/Alert/Toast variants) their own violet identity distinct from
    the rest of the palette, referencing a purple-violet swatch supplied as
    a screenshot. It still
    pairs with --color-on-action-light (black) since the swap only changed
    the fill hue, and per-contrast-calculation black still narrowly beats
-   white on this violet (4.80:1 vs 4.38:1 — WCAG AA normal text needs
+   white on this violet (4.80:1 vs 4.38:1; WCAG AA normal text needs
    4.5:1, so black is the only one that actually clears it).
 
    Text-on-fill is fixed, NOT aliased to --color-ink, and is paired to the
-   VARIANT NAME in each component (not derived from the hue automatically)
-   — so swapping which color a variant points to also means swapping which
+   VARIANT NAME in each component (not derived from the hue automatically),
+   so swapping which color a variant points to also means swapping which
    on-action token that variant's text/icon color uses: primary now pairs
-   with --color-on-action-primary (white — blue needs white text) and
-   secondary now pairs with --color-on-action-light (black — yellow needs
+   with --color-on-action-primary (white: blue needs white text) and
+   secondary now pairs with --color-on-action-light (black: yellow needs
    black text, white fails contrast). Danger/ai/accent are unaffected and
    still pair with --color-on-action-light. Confirmed by contrast
    calculation, not eyeballed. Because these fills don't invert with the
@@ -231,7 +563,7 @@
   --color-brutal-danger: #e63946;
   --color-brutal-accent: #ff6b35;
   /* AI-powered surfaces only (Button/Button2/Badge/Alert/Toast "ai"
-     variant) — see the ADDENDUM above for why this replaced --new-ai-btn
+     variant); see the ADDENDUM above for why this replaced --new-ai-btn
      pink as the "ai" semantic's fill.
 
      SECOND ADDENDUM (2026-08-31): darkened from the original #7c5cfc to
@@ -239,7 +571,7 @@
      --color-on-action-ai below), per direct product feedback that black
      text read flat on the AI accent and white looked more consistent with
      how other products brand AI surfaces. Contrast-checked, not eyeballed:
-     white-on-#7c5cfc was 4.38:1 — under WCAG AA's 4.5:1 for normal text —
+     white-on-#7c5cfc was 4.38:1 (under WCAG AA's 4.5:1 for normal text)
      while black-on-#7c5cfc passed at only 4.52:1. Rather than ship a
      failing contrast or keep a razor-thin pass, this value is ~5% darker
      (imperceptible as a color shift) so white clears AA with real margin
@@ -249,13 +581,13 @@
      SuccessState, StatusIndicator) that need a semantic "success" color the
      original Task 1 palette never named. Same flat/saturated/non-theme-
      varying treatment as the rest of this block, and pairs with
-     --color-on-action-light (black text) — verified by contrast, same as
+     --color-on-action-light (black text), verified by contrast, same as
      secondary/danger/accent, not eyeballed. */
   --color-brutal-success: #22c55e;
   --color-on-action-primary: #ffffff;
   --color-on-action-light: #0a0a0a;
   /* ai's own on-color, split off from --color-on-action-light in the
-     2026-08-31 addendum above — every other comic accent (secondary/danger/
+     2026-08-31 addendum above. Every other comic accent (secondary/danger/
      accent/success) still pairs with black and is unaffected. */
   --color-on-action-ai: #ffffff;
 }

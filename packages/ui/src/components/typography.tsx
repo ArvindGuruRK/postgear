@@ -53,12 +53,12 @@ const textVariants = cva('font-sans text-ink', {
   },
   defaultVariants: {
     size: 'md',
-    // Slightly bolder than plain regular (400) by default — the brand
+    // Slightly bolder than plain regular (400) by default: the brand
     // font (src/app/fonts.ts) is variable, so font-medium (500) is a genuine
     // loaded weight, not synthetic. Matches the confidence of the bold
     // label/chrome text (Badge, table headers, Row labels) it sits next
     // to. Dense data surfaces (Table/DataTable) deliberately don't use
-    // Text and keep their own lighter weight — see design-system-rules.md
+    // Text and keep their own lighter weight: see design-system-rules.md
     // §15/§1.
     weight: 'medium',
     muted: false,

@@ -9,7 +9,7 @@
  *
  * Tones map to the system's action colors: scheduled is primary (the ordinary,
  * expected state), live motion is accent, success is success, failure is
- * danger, and a draft is the outline sticker — see design-system-rules.md §7.
+ * danger, and a draft is the outline sticker; see design-system-rules.md §7.
  */
 import type { BadgeProps } from '@postgear/ui';
 import type {
@@ -37,7 +37,7 @@ export const FAILURE_LABELS: Record<PublishFailureReason, string> = {
   rejected: 'Rejected by the platform',
   retries_exhausted: 'Gave up after repeated failures',
   channel_unavailable: 'Channel unavailable',
-  interrupted: 'Interrupted mid-publish — check the account before retrying',
+  interrupted: 'Interrupted mid-publish: check the account before retrying',
   unexpected: 'Unexpected error',
 };
 
@@ -175,7 +175,7 @@ export function formatClock(date: Date): string {
   return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-/** "Sat 11 Oct, 10:32" — the medium form every list and card uses. */
+/** "Sat 11 Oct, 10:32": the medium form every list and card uses. */
 export function formatWhen(date: Date): string {
   return date.toLocaleString(undefined, {
     weekday: 'short',
@@ -186,7 +186,7 @@ export function formatWhen(date: Date): string {
   });
 }
 
-/** "in 3 hours", "2 days ago" — for the detail dialog's headline. */
+/** "in 3 hours", "2 days ago": for the detail dialog's headline. */
 export function formatRelative(date: Date, now: Date): string {
   const diffMs = date.getTime() - now.getTime();
   const abs = Math.abs(diffMs);

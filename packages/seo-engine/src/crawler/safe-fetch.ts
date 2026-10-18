@@ -3,7 +3,7 @@
  *
  * Why not `fetch()`: the guard in `url-guard.ts` validates the address a host
  * resolves to, but a plain `fetch` resolves the host **again** when it
- * connects — a DNS answer that changes between the two lookups (rebinding)
+ * connects; a DNS answer that changes between the two lookups (rebinding)
  * would connect us to the private address the guard just refused. So every
  * request here goes through `node:http`/`node:https` with a `lookup` that
  * returns the validated address, while `servername`/`Host` still carry the
@@ -14,7 +14,7 @@
  * Everything else is about never letting a hostile or merely huge site hurt
  * the process: a hard byte cap on the decoded body, a per-request timer on
  * top of the crawl's deadline signal, a redirect ceiling, and errors that
- * carry a kind and a host name — never a response body.
+ * carry a kind and a host name, never a response body.
  *
  * Certificate problems do not stop the fetch. The analyzer's job is to report
  * that a certificate is bad, which it cannot do if the TLS layer refuses to
@@ -106,7 +106,7 @@ function codeOf(error: unknown): string {
 
 /**
  * Turns whatever a socket threw into a {@link SeoCrawlError}. The message
- * names the host and the code only — Node's own messages are fine, but the
+ * names the host and the code only: Node's own messages are fine, but the
  * rule in this package is that nothing from the wire reaches a message.
  */
 export function classifyFetchError(error: unknown, host: string): SeoCrawlError {
@@ -471,7 +471,7 @@ export async function fetchUrlSafely(
  * Asks whether a URL exists without downloading it: HEAD first, and a ranged
  * GET whose body is dropped at the first byte when the server refuses HEAD
  * (405/501, or no answer at all). Used for link checks and the sitemap probe.
- * A 4xx/5xx is a result here, not an error — the caller counts it.
+ * A 4xx/5xx is a result here, not an error: the caller counts it.
  */
 export async function headUrlSafely(
   url: string,

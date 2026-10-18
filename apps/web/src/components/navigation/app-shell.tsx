@@ -7,7 +7,7 @@ import { TopBar } from './topbar';
  * The chrome: sidebar, top bar, one scrolling main region.
  *
  * Deliberately knows nothing about sessions or workspaces. The two top-bar
- * controls that do — the workspace switcher and the account menu — arrive as
+ * controls that do (the workspace switcher and the account menu) arrive as
  * slots, so this component still renders outside a workspace, including in the
  * design-system playground. See the note in topbar.tsx for what broke when
  * they were imported directly.

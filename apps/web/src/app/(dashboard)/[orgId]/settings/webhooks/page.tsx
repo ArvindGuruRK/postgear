@@ -19,7 +19,7 @@ interface WebhooksResponse {
   webhooks: WebhookView[];
   events: string[];
   retryPolicy: { maximumAttempts: number };
-  /** The API's `WEBHOOK_ALLOW_PRIVATE_URLS` — whether http:// and local receivers are accepted. */
+  /** The API's `WEBHOOK_ALLOW_PRIVATE_URLS`: whether http:// and local receivers are accepted. */
   allowPrivateUrls: boolean;
 }
 
@@ -38,7 +38,7 @@ export default async function WebhooksPage({ params }: PageProps<'/[orgId]/setti
   ]);
 
   // Whether http:// / private addresses are allowed is the API's setting,
-  // read from its list response — the web server does not share its
+  // read from its list response: the web server does not share its
   // environment (Next loads apps/web/.env, not the repository's).
   return (
     <WebhooksView

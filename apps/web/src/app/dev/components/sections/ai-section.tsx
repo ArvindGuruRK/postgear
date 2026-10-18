@@ -12,14 +12,14 @@ const TAILS = ['none', 'left', 'right'] as const;
  * is the restrained profile (§15) and the speech bubble is the one comic
  * accent the system sanctions for chat (§16b). The matrix shows every
  * variant × tail; the chat sample shows the only composition the rules
- * allow — user on `primary` tail-right, assistant on `default` tail-left,
+ * allow: user on `primary` tail-right, assistant on `default` tail-left,
  * violet reserved for what the model produced.
  */
 export function AiSection() {
   return (
     <Section
       title="AI Surfaces"
-      description="Speech bubbles and the copilot chat composition — actionAi violet marks what the model produced; the user's own messages stay primary."
+      description="Speech bubbles and the copilot chat composition: actionAi violet marks what the model produced; the user's own messages stay primary."
     >
       <Row label="Speech Bubble (variant × tail)">
         <div className="grid w-full gap-x-6 gap-y-5 sm:grid-cols-3">
@@ -32,7 +32,7 @@ export function AiSection() {
           )}
         </div>
         <Spec>
-          rounded-lg border-2 border-outline shadow-brutalSm p-4 font-sans text-sm · tail = rotated
+          rounded-lg border-2 border-outline shadow-surfaceSm p-4 font-sans text-sm · tail = rotated
           bordered square, border-t-0 border-l-0, in the variant&apos;s fill
         </Spec>
       </Row>

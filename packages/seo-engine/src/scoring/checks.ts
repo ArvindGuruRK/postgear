@@ -75,7 +75,7 @@ export function scoreCategory(checks: SeoCheck[]): number {
   return Math.round((100 * attained) / totalWeight);
 }
 
-/** Builds a category and refuses weights that do not sum to 1 — a programming error, not data. */
+/** Builds a category and refuses weights that do not sum to 1: a programming error, not data. */
 export function buildCategory(
   category: SeoCategory,
   weight: number,

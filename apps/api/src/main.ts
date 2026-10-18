@@ -1,8 +1,8 @@
 /**
- * PostGear API — server entry point.
+ * PostGear API: server entry point.
  *
  * Runs on :3001 alongside the Next.js app on :3000. They are separate origins
- * but the *same host*, and cookies are scoped by host rather than by port —
+ * but the *same host*, and cookies are scoped by host rather than by port,
  * which is what lets the httpOnly session cookie set here be sent back by a
  * browser on :3000 without any proxying.
  */
@@ -35,7 +35,7 @@ async function bootstrap(): Promise<void> {
   const logger = new Logger('Bootstrap');
 
   // Standard security headers. `contentSecurityPolicy` is off because this
-  // process serves JSON only — the CSP that matters belongs on the Next app,
+  // process serves JSON only: the CSP that matters belongs on the Next app,
   // and one here would only apply to error pages nobody renders.
   app.use(helmet({ contentSecurityPolicy: false }));
 
@@ -45,7 +45,7 @@ async function bootstrap(): Promise<void> {
   // Makes `request.ip` the left-most untrusted hop instead of the proxy's own
   // address. Without it, every request behind a load balancer shares one IP
   // and the per-IP rate limit throttles the entire user base as a single
-  // client. `1` — trust exactly one hop — rather than `true`, which would let
+  // client. `1` (trust exactly one hop) rather than `true`, which would let
   // any client spoof its address with an X-Forwarded-For header and bypass
   // the throttle entirely.
   app.set('trust proxy', 1);
@@ -67,7 +67,7 @@ async function bootstrap(): Promise<void> {
   //
   // Public, like an S3 object: platforms fetch media without a session, and
   // the random key is the access control. Registered as middleware, so it is
-  // answered before any guard runs — which is the point, not an oversight.
+  // answered before any guard runs, which is the point, not an oversight.
   //
   // Two headers are overridden for this route only:
   // - `Cross-Origin-Resource-Policy: cross-origin`. Helmet's default,
@@ -93,7 +93,7 @@ async function bootstrap(): Promise<void> {
   }
 
   // No global ValidationPipe. Nest's built-in one requires class-validator,
-  // which this app does not use — every route body is validated by an explicit
+  // which this app does not use: every route body is validated by an explicit
   // `ZodBody` pipe instead, and every one of those schemas is `.strict()`, so
   // unknown properties are rejected rather than merely stripped. Installing
   // class-validator purely to register a pipe that would never fire would be a

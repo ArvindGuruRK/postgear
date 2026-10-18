@@ -68,7 +68,7 @@ export interface SchedulerStatus {
   retryPolicy: RetryPolicyValues;
 }
 
-/** The minimal client surface this service uses — what a test substitutes. */
+/** The minimal client surface this service uses: what a test substitutes. */
 export interface SchedulingClient {
   workflow: Pick<Client['workflow'], 'signalWithStart' | 'getHandle' | 'start'>;
   workflowService: Pick<Client['workflowService'], 'describeTaskQueue'>;
@@ -127,7 +127,7 @@ export class SchedulingService implements OnModuleDestroy {
   /**
    * Tells the workflows of rows that left the queue to stop waiting.
    *
-   * A workflow that is not running is simply not there to cancel — which is
+   * A workflow that is not running is simply not there to cancel, which is
    * fine, since a row that is no longer `QUEUE` is skipped the moment any
    * workflow re-reads it.
    */
@@ -197,7 +197,7 @@ export class SchedulingService implements OnModuleDestroy {
    * Sprint 8: starts the delivery workflow for a `WebhookDelivery` row the
    * API created (a test send). Plain `start`, not a signal: the workflow has
    * no signals, and a row that already has one is left exactly as it is.
-   * Best-effort like everything here — the worker's reconcile starts any
+   * Best-effort like everything here: the worker's reconcile starts any
    * delivery still PENDING a minute later.
    */
   async startWebhookDelivery(deliveryId: string, organizationId: string): Promise<boolean> {
@@ -287,8 +287,8 @@ export class SchedulingService implements OnModuleDestroy {
   }
 
   /**
-   * Runs one scheduler call. Returns false — and drops the cached client so
-   * the next call reconnects — when Temporal cannot be reached.
+   * Runs one scheduler call. Returns false, and drops the cached client so
+   * the next call reconnects, when Temporal cannot be reached.
    */
   private async attempt(
     label: string,

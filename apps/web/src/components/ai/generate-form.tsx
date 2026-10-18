@@ -11,7 +11,7 @@
  * than as a 400 after the fact; the API still has the final say.
  *
  * The cost on the button is the API's own price list, and the button is
- * disabled when the balance cannot cover it — with the reset date, since
+ * disabled when the balance cannot cover it, with the reset date, since
  * "not enough credits" with no "until when" is a dead end.
  */
 import {
@@ -82,7 +82,7 @@ export function GenerateForm({
   const topic = values.topic.trim();
   const topicError =
     topic.length < TOPIC_MIN
-      ? 'Give the post a topic — a few words is enough.'
+      ? 'Give the post a topic. A few words is enough.'
       : topic.length > TOPIC_MAX
         ? `Keep the topic under ${TOPIC_MAX.toLocaleString()} characters.`
         : null;
@@ -98,7 +98,7 @@ export function GenerateForm({
   return (
     <form
       aria-label="Generate a post"
-      className="flex flex-col gap-5 rounded-lg border-4 border-outline bg-secondary p-5 shadow-brutalMd"
+      className="flex flex-col gap-5 rounded-lg border-2 border-outline bg-secondary p-5 shadow-surfaceMd"
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
@@ -143,13 +143,13 @@ export function GenerateForm({
             id={`${id}-personal`}
             value="personal"
             title="Personal"
-            hint="I, me — your own voice."
+            hint="I and me, in your own voice."
           />
           <VoiceCard
             id={`${id}-company`}
             value="company"
             title="Company"
-            hint={`We — ${workspaceName}'s voice.`}
+            hint={`We, in ${workspaceName}'s voice.`}
           />
         </RadioGroup>
       </fieldset>
@@ -200,7 +200,7 @@ export function GenerateForm({
 
       <div className="flex flex-col gap-2">
         {/* ChannelPicker renders its own fieldset and legend, so this is a
-            heading for it rather than a label for a control — the Label
+            heading for it rather than a label for a control: the Label
             classes, copied per design-system-rules.md §1. */}
         <span className="font-sans text-sm font-bold text-ink">
           Channels<span className="ml-1 text-actionDanger">*</span>
@@ -239,7 +239,7 @@ export function GenerateForm({
               This generation costs {cost} and {credits.remaining}{' '}
               {credits.remaining === 1 ? 'remains' : 'remain'}. Credits reset{' '}
               {mounted ? formatResetDate(credits.resetsAt) : 'next cycle'}
-              {values.withImage ? ' — or drop the hero image.' : '.'}
+              {values.withImage ? ', or drop the hero image.' : '.'}
             </span>
           </div>
         </Alert>
@@ -292,7 +292,7 @@ function VoiceCard({
     <label
       htmlFor={id}
       className={cn(
-        'flex cursor-pointer items-start gap-3 rounded-md border-2 border-outline bg-secondary p-4 shadow-brutalSm',
+        'flex cursor-pointer items-start gap-3 rounded-md border-2 border-outline bg-secondary p-4 shadow-surfaceSm',
         'transition-colors hover:bg-actionPrimary/10 has-[[data-state=checked]]:bg-actionPrimary/10',
       )}
     >

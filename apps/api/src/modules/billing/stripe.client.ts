@@ -2,18 +2,18 @@
  * The Stripe gateway: the few calls billing makes to Stripe, behind one
  * interface with three implementations.
  *
- * - **`StripeGatewayClient`** — the real SDK. Checkout Sessions with inline
+ * - **`StripeGatewayClient`**: the real SDK. Checkout Sessions with inline
  *   `price_data` from the plan table (or a pinned `STRIPE_PRICE_*` id), the
  *   billing portal, prorated upgrades, scheduled downgrades, cancellation
  *   at period end. Every object it creates carries `{ organizationId, tier,
  *   period }` in its metadata, which is how the webhook knows whose event
  *   it is reading.
- * - **`SimulatedStripeGateway`** — no Stripe. Each call synthesises the
+ * - **`SimulatedStripeGateway`**: no Stripe. Each call synthesises the
  *   events Stripe would send and hands them, after a short delay, to the
  *   same `StripeWebhookService.apply` a real webhook goes through. So the
  *   idempotency table, the state machine, the notifications and the
  *   "Activating…" state on the page are all exercised with no account.
- * - **`UnconfiguredGateway`** — every call answers 503 with the catalogue's
+ * - **`UnconfiguredGateway`**: every call answers 503 with the catalogue's
  *   message. `BillingService` checks the mode first; this is the backstop.
  *
  * The service is handed one of them behind `STRIPE_GATEWAY` and never
@@ -25,8 +25,8 @@
  * the difference now and gets the plan now. A downgrade must *not* refund
  * the difference or take effect early (the contract: nothing is disabled,
  * the change lands at period end). Stripe's way to say "at the end of this
- * period, switch to this price" is a schedule with two phases — the current
- * one, repeated exactly, and the new one — released afterwards so the
+ * period, switch to this price" is a schedule with two phases (the current
+ * one, repeated exactly, and the new one) released afterwards so the
  * subscription carries on alone. The second phase carries the new tier in
  * its metadata, so when it starts, `customer.subscription.updated` arrives
  * with the new tier and the handler applies it like any other change.
@@ -53,7 +53,7 @@ export const STRIPE_EVENT_VERIFIER = Symbol('STRIPE_EVENT_VERIFIER');
 export const BILLING_CURRENCY = 'usd';
 
 export interface StripeGateway {
-  /** The Stripe customer for a workspace — reused when the org already has one. */
+  /** The Stripe customer for a workspace: reused when the org already has one. */
   ensureCustomer(params: {
     orgId: string;
     name: string;
@@ -242,7 +242,7 @@ export class StripeGatewayClient implements StripeGateway {
     const subscription = await this.stripe.subscriptions.retrieve(request.subscriptionId);
     const item = requireItem(subscription);
 
-    // A pending downgrade is undone by any new decision — an upgrade, a
+    // A pending downgrade is undone by any new decision: an upgrade, a
     // cancellation, or choosing the current plan again.
     await this.releaseSchedule(subscription);
 

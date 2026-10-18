@@ -17,7 +17,7 @@ const TITLE_LENGTH = 100;
  *
  * The provider sends the first line as the title and the whole post as the
  * description, so that is exactly what is drawn. Only the first part is ever
- * published — the composer reports any others as an issue.
+ * published: the composer reports any others as an issue.
  */
 export function YouTubePreview({ channel, parts, maxLength, lengthMethod }: PlatformPreviewProps) {
   const first = parts[0];

@@ -11,13 +11,13 @@
  *
  * `unread` is counted per stream, not re-queried: a pushed row is by
  * definition newer than the viewer's cursor, so each push is one more unread
- * until the tab marks all read — which the bell does through its own state,
+ * until the tab marks all read, which the bell does through its own state,
  * and a reconnect re-reads the real count anyway.
  */
 import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import type { SseStream } from '../../common/sse';
 
-/** The part of an SSE stream the registry uses — what a test fakes. */
+/** The part of an SSE stream the registry uses: what a test fakes. */
 export type StreamSink = Pick<SseStream, 'send' | 'close' | 'signal' | 'closed'>;
 
 export interface PushedNotification {
@@ -129,7 +129,7 @@ export class NotificationStreamRegistry implements OnModuleDestroy {
     return total;
   }
 
-  /** Workspaces with at least one open stream — what the live push has to query for. */
+  /** Workspaces with at least one open stream: what the live push has to query for. */
   openWorkspaces(): string[] {
     return [...this.byOrg.keys()];
   }

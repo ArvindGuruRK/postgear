@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The confirmation before an audit is removed from the history — the same
+ * The confirmation before an audit is removed from the history: the same
  * shape as the post and media delete dialogs, because a destructive action
  * should ask the same way everywhere.
  */

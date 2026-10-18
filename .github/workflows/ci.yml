@@ -1,4 +1,4 @@
-# PostGear CI — the same gate you run locally as `npm run validate`, plus a
+# PostGear CI: the same gate you run locally as `npm run validate`, plus a
 # schema check. Deliberately minimal: this is a pre-launch solo project, so
 # there is no Sonar / coverage-gate / i18n-lock stage to replicate.
 name: CI

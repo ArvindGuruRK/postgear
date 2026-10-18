@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp } from './helpers/media';
 
 /**
- * The AI studio — one test per Sprint 6 Definition of Done item the web owns:
+ * The AI studio: one test per Sprint 6 Definition of Done item the web owns:
  * a topic becomes a post through the staged pipeline and lands in the
  * composer as a draft, the copilot answers "what channels do I have" with its
  * list-channels tool, and every generation moves the credits meter.
@@ -32,8 +32,8 @@ async function signIn(page: Page) {
 
 async function openStudio(page: Page, query = '') {
   await page.goto(`/${DEMO_ORG}/ai-copilot${query}`);
-  // Scoped to main: the app shell's header repeats the page title in its own h1.
-  await expect(page.getByRole('main').getByRole('heading', { name: 'AI Copilot' })).toBeVisible();
+  // The page is named only by the top bar's h1 (no in-page title).
+  await expect(page.getByRole('heading', { level: 1, name: 'AI Copilot' })).toBeVisible();
 }
 
 /** The meter's `used` once the balance has loaded. */
@@ -103,7 +103,8 @@ test.describe('ai studio', () => {
     created.groups.push(group);
 
     // The draft opens with the generated text as part 1, for the channel chosen.
-    await expect(page.getByRole('heading', { name: 'Edit post' })).toBeVisible();
+    // Edit mode: only an existing post offers a fresh "New post" link.
+    await expect(page.getByRole('main').getByRole('link', { name: 'New post' })).toBeVisible();
     const firstLine = text.split('\n')[0].slice(0, 40);
     await expect(page.getByRole('textbox', { name: 'Part 1 of the shared post' })).toContainText(
       firstLine,

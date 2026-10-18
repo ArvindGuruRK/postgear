@@ -10,7 +10,7 @@
  * events. Each runs the service's two phases in order: `prepare*` first,
  * which may throw and so still produces an ordinary JSON error through the
  * global filter; then the stream is opened and the run writes to it. Taking
- * `@Res()` hands the response to the handler, so Nest sends nothing itself —
+ * `@Res()` hands the response to the handler, so Nest sends nothing itself:
  * `stream.close()` ends it, whatever happened inside. `@HttpCode(200)` is
  * stated because a `@Post()` would otherwise be a 201, which these are not.
  */

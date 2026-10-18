@@ -1,5 +1,5 @@
 # 📘 Complete Codebase & System Architecture Analysis
-## Postiz (Gitroom) — Enterprise Social Media Management & Automation Platform
+## Postiz (Gitroom): Enterprise Social Media Management & Automation Platform
 
 ---
 

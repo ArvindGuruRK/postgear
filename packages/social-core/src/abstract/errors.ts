@@ -3,7 +3,7 @@
  *
  * These are plain `Error` subclasses on purpose. The reference implementation
  * derives its equivalents from Temporal's `ApplicationFailure`, which couples
- * the whole provider layer to a workflow engine — but PostGear calls these
+ * the whole provider layer to a workflow engine, but PostGear calls these
  * providers from the API process (Sprint 3) well before the worker exists
  * (Sprint 5), and `@postgear/social-core` must stay importable from both.
  * Sprint 5 maps these onto Temporal failures at the activity boundary, which is
@@ -19,7 +19,7 @@
 const MAX_BODY_LENGTH = 4_000;
 
 /**
- * Provider error bodies are genuinely unbounded — full HTML error pages, echoed
+ * Provider error bodies are genuinely unbounded: full HTML error pages, echoed
  * base64 media, stack traces. Sprint 5 puts these into a durable Temporal
  * history that ships over gRPC with a hard frame limit, so the cap belongs here
  * rather than being remembered at each call site.
@@ -63,7 +63,7 @@ export function safeStringify(value: unknown): string {
  */
 export class ProviderError extends Error {
   readonly identifier: string;
-  /** The platform's own response body, truncated. Diagnostic only — never shown to a user. */
+  /** The platform's own response body, truncated. Diagnostic only, never shown to a user. */
   readonly providerBody: string;
   readonly status?: number;
 
@@ -77,7 +77,7 @@ export class ProviderError extends Error {
 }
 
 /**
- * The stored credentials are dead — expired, revoked, or scope-reduced.
+ * The stored credentials are dead: expired, revoked, or scope-reduced.
  *
  * The only cure is a new token: either a successful `refreshToken()`, or the
  * user re-running the OAuth handshake. Callers must **not** retry the original
@@ -87,7 +87,7 @@ export class ProviderError extends Error {
 export class RefreshTokenError extends ProviderError {}
 
 /**
- * The request itself was wrong — too long, unsupported media, duplicate
+ * The request itself was wrong: too long, unsupported media, duplicate
  * content, a rule the platform enforces.
  *
  * Retrying is pointless; the post must change. This is the branch whose
@@ -120,7 +120,7 @@ export class NotEnoughScopesError extends ProviderError {
 }
 
 /**
- * A transient failure — rate limit, 5xx, a platform having a bad minute.
+ * A transient failure: rate limit, 5xx, a platform having a bad minute.
  *
  * `SocialAbstract.fetch` already retries these a bounded number of times; this
  * escapes only once those are exhausted, at which point Sprint 5's activity
@@ -132,7 +132,7 @@ export class RetryableError extends ProviderError {}
  * Raised before any network call when a provider is missing its client id or
  * secret.
  *
- * A deployment gap, not a user error — the connect button should not have been
+ * A deployment gap, not a user error: the connect button should not have been
  * offered. Kept separate so the log can say so while the user still sees a
  * generic message.
  */

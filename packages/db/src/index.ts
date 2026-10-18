@@ -1,4 +1,4 @@
-// Package exports — @postgear/db
+// Package exports: @postgear/db
 //
 // The single import surface for database access across the monorepo:
 //   import { prisma, Role, encrypt } from '@postgear/db';

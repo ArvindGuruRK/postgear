@@ -27,14 +27,14 @@ placeholders.
 | **AI Copilot** (Sprint 6): generate a post from a topic (research → hook → copy → image), chat with an assistant that can list channels and draft posts, AI credits | |
 | **Analytics** (Sprint 7): per-channel followers, impressions, engagement over 7/30/90 days, cross-channel comparison, top posts, per-post breakdown, CSV export | PDF export, scheduled SEO re-audits, competitor comparison |
 | **SEO Analyzer** (Sprint 7): enter any public URL, get a 0–100 score with a grade, four sub-scores, prioritised fixes, and a score trend over time | |
-| **Billing** (Sprint 8): plans, a 14-day trial, subscribe / upgrade / downgrade / cancel — in simulation or against Stripe test mode | Coupons, lifetime deals |
+| **Billing** (Sprint 8): plans, a 14-day trial, subscribe / upgrade / downgrade / cancel, in simulation or against Stripe test mode | Coupons, lifetime deals |
 | **Notifications** (Sprint 8): the bell with live updates, "Mark all as read", email on a failed post (printed to the API console locally), email preferences | Weekly digest |
 | **API keys and the public API** (Sprint 8): create / rotate / revoke keys, `/v1` with Swagger docs at `/api/docs`, per-key rate limiting, the Node SDK | OAuth apps, Zapier/Make connectors |
 | **Outbound webhooks** (Sprint 8): signed deliveries on post published / failed, retries, a test send, delivery history | |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
-Since Sprint 5 the queue actually publishes — through the **worker** process
+Since Sprint 5 the queue actually publishes: through the **worker** process
 (section 3). Locally, with `PUBLISH_SIMULATION="true"` in `.env`, it publishes
 to a stand-in so the seeded fake channels work end to end; set it to `"false"`
 once you have connected a real account (section 6) and want real posts. The
@@ -132,8 +132,8 @@ website (:3000) together through Turborepo, with each one's log prefixed by
 its name. Ctrl+C stops all three; the containers keep running until
 `docker compose down`.
 
-If you prefer one process per terminal — for example to restart only the
-worker — the three pieces are:
+If you prefer one process per terminal (for example to restart only the
+worker), the three pieces are:
 
 **Terminal 1: API (port 3001)**
 
@@ -153,7 +153,7 @@ npm run dev:worker
 It waits for Temporal (from `docker compose up -d`; the Temporal UI is at
 <http://localhost:8233>), bundles its workflows, then says it is polling
 `postgear-publishing`. With `PUBLISH_SIMULATION="true"` it warns that posts go
-to a stand-in. Without a worker running, nothing publishes — the Calendar and
+to a stand-in. Without a worker running, nothing publishes: the Calendar and
 Queue pages show "No worker running" in their status pill so you can tell.
 
 **Terminal 3: website (port 3000)**
@@ -235,7 +235,7 @@ AI_SIMULATION="true"
 `.env.example` used to ship `OPENAI_API_KEY="sk-proj-openai-api-key"` and a
 similar Tavily placeholder. The API now recognises those exact placeholder
 strings and treats them as *unset* (it logs a warning naming the variable), so
-you do not have to delete them — but without `AI_SIMULATION="true"` the AI page
+you do not have to delete them, but without `AI_SIMULATION="true"` the AI page
 will say it is not configured.
 
 Open **<http://localhost:3000/seed-demo-org/ai-copilot>**.
@@ -256,7 +256,7 @@ opens the composer on it; the image is attached to part 1.
 - Press **Stop** mid-way: the run is cancelled and nothing more is charged.
 
 **Chat with the copilot.** Switch to the *Copilot* tab and ask *"What channels
-do I have connected?"* — the assistant calls its `list_channels` tool (you see
+do I have connected?"*: the assistant calls its `list_channels` tool (you see
 the tool activity row) and answers with the three seeded channels. Then try
 *"Write a LinkedIn post about our spring sale and save it as a draft"* and
 *"Generate an image of a sunrise over a city skyline"*. A drafted post appears
@@ -265,14 +265,14 @@ library. Each message costs 1 credit; the tools that generate cost 5 and 10.
 
 **Credits.** The meter at the top shows the cycle's usage (the seed starts the
 demo workspace at 23 of 100, the STANDARD tier's monthly allowance) and the
-reset date. Use them up — or temporarily lower the allowance in
-`apps/api/src/modules/ai/credits/credits.policy.ts` — and the Generate button
+reset date. Use them up, or temporarily lower the allowance in
+`apps/api/src/modules/ai/credits/credits.policy.ts`, and the Generate button
 disables with an explanation; the API answers **402**. Credits are charged
 before a generation and refunded when it fails before producing anything.
 
 Without `AI_SIMULATION`, with a real `OPENAI_API_KEY`: everything above is the
 same, except the copy is written by `gpt-4.1-mini` (set `AI_MODEL` to change
-it), images by DALL-E 3, and research runs only when `TAVILY_API_KEY` is set —
+it), images by DALL-E 3, and research runs only when `TAVILY_API_KEY` is set,
 otherwise the research stage reads "skipped" and the post is written from the
 model's own knowledge. A rejected key shows up in the UI as a configuration
 problem, not as a user error, and nothing is charged for it.
@@ -287,7 +287,7 @@ Open **<http://localhost:3000/seed-demo-org/analytics>**.
 
 - The four cards at the top (Followers, Impressions, Engagements, Engagement
   rate) show the last 30 days with the change against the 30 days before.
-  Switch the range to **7** or **90** — the URL follows (`?range=7`), so a
+  Switch the range to **7** or **90**: the URL follows (`?range=7`), so a
   view can be bookmarked.
 - **Trend** draws one line per channel; hover a day, or focus the chart and
   use the arrow keys, to read the values.
@@ -318,7 +318,7 @@ it rather than showing zeros.
 
 Nothing to add to `.env`. The crawler is free: it fetches the page itself,
 with a headless Chromium when one is installed (`npx playwright install
-chromium` — the e2e suite already installed it) and a plain HTML fetch
+chromium`; the e2e suite already installed it) and a plain HTML fetch
 otherwise. AI advice uses the same `AI_SIMULATION`/`OPENAI_API_KEY` setting
 as the copilot and costs 3 credits per audit; without either, the advice is
 the rule-based findings and the page says so.
@@ -331,7 +331,7 @@ Open **<http://localhost:3000/seed-demo-org/seo-analyzer>**.
   30 %, content 25 %, authority 15 %), the crawl facts, and the fixes grouped
   **Critical / Warning / Info**. The **Breakdown** tabs list every check.
 - Try `http://localhost:3000` or `http://169.254.169.254/`: the analyzer
-  refuses before fetching anything — private and internal addresses are
+  refuses before fetching anything; private and internal addresses are
   blocked on purpose (that is the SSRF guard the sprint required), and the
   refusal is logged by the API as `seo.unsafe_url`.
 - Analyze the same URL again: the result says how the score moved since
@@ -365,7 +365,7 @@ and ignored, so you do not have to delete them. The second line is for §5i.
 Open **<http://localhost:3000/seed-demo-org/settings/billing>** (Settings in
 the sidebar, then **Billing**). The demo workspace is seeded on the
 **Standard** plan. Prices on this page are placeholders in
-`apps/api/src/modules/billing/plans.ts` — change them there.
+`apps/api/src/modules/billing/plans.ts`: change them there.
 
 - The current-plan card shows the status badge, the next billing date and
   two meters: channels used of the plan's limit, AI credits used this cycle.
@@ -392,7 +392,7 @@ the sidebar, then **Billing**). The demo workspace is seeded on the
   docker exec postgear_postgres psql -U postgres -d postgear_db -c 'SELECT id, type, outcome FROM "BillingEvent" ORDER BY "createdAt" DESC LIMIT 5;'
   ```
 
-**With real Stripe test-mode keys** (free, no card charged — test mode is a
+**With real Stripe test-mode keys** (free, no card charged: test mode is a
 sandbox). Create a Stripe account, switch the dashboard to **Test mode**,
 then:
 
@@ -426,7 +426,7 @@ then:
    `checkout.session.completed` and the API has applied it, then the plan
    changes. Nothing was charged: test mode never moves money.
 5. **Manage billing** opens the Stripe billing portal (test mode). Plan
-   switching inside the portal needs dashboard-defined prices — pin them
+   switching inside the portal needs dashboard-defined prices: pin them
    with the `STRIPE_PRICE_*` variables if you want that; the in-app Change
    plan works without them.
 6. Replay an event to prove idempotency: `stripe events list --limit 1`,
@@ -436,14 +436,14 @@ then:
 ### 5g. Notifications (Sprint 8)
 
 Nothing to add to `.env`. With `SMTP_HOST` empty, every email is printed to
-the API console — that is the local mode, and it is how you see them.
+the API console: that is the local mode, and it is how you see them.
 
 - The bell is in the top bar. It opens live over a server-sent event
   stream; the badge is the unread count for this workspace only.
 - Make a post fail: open the composer, write a post whose text contains
   `[simulate:400]`, add it to the queue for *Acme Marketing* a minute away
-  (or queue it and **Post now** from the Queue page). Within seconds — no
-  reload — the bell shows **Post failed**, and the API console prints the
+  (or queue it and **Post now** from the Queue page). Within seconds, no
+  reload, the bell shows **Post failed**, and the API console prints the
   email that would have gone to every member who has failure emails on
   (`demo@postgear.local` and `member@postgear.local`), with the channel,
   the reason and a link to the queue.
@@ -468,7 +468,7 @@ Settings → **API keys**. Only admins can manage keys.
   API can be tried without the UI:
   `pg_seedDemoKey00000000000000000000000000000` (prefix `pg_seedDemo`; it
   is re-created, un-revoked, by every `npm run db:seed`). A local-only
-  convenience — never seed one on a real deployment.
+  convenience, never seed one on a real deployment.
 - Call the API:
 
   ```powershell
@@ -487,7 +487,7 @@ Settings → **API keys**. Only admins can manage keys.
   and a blank line an empty paragraph, so what you send is what is posted.
   `GET /v1/posts?state=draft` filters (lowercase `draft|queue|published|error`,
   twenty per page, `?page=2`). Unlike the app's own routes, a bad `/v1` body
-  names the field that failed — the caller is a program reading a terminal.
+  names the field that failed: the caller is a program reading a terminal.
 - **Swagger**: <http://localhost:3001/api/docs> documents every `/v1` route;
   <http://localhost:3001/api/docs-json> is the OpenAPI file. Paste a key
   into **Authorize** to call routes from the page.
@@ -515,7 +515,7 @@ Settings → **API keys**. Only admins can manage keys.
 Needs the worker running (deliveries are Temporal workflows) and
 `WEBHOOK_ALLOW_PRIVATE_URLS="true"` in `.env`, because a receiver on this
 machine is exactly what the SSRF guard refuses otherwise. Without the
-flag, only public `https://` addresses are accepted — and the guard
+flag, only public `https://` addresses are accepted, and the guard
 resolves the host and refuses private, link-local and loopback answers.
 
 Start a receiver in a fourth terminal (anything that prints requests):
@@ -531,7 +531,7 @@ Settings → **Webhooks** → **Add webhook**: name it, URL
 - Kebab → **Send test**: the deliveries sheet opens; within a few seconds
   the row says **Delivered · 200**, and the echo server shows a `POST` with
   `X-PostGear-Event: webhook.test`, `X-PostGear-Delivery`,
-  `X-PostGear-Timestamp` and `X-PostGear-Signature: v1=…` — the HMAC-SHA256
+  `X-PostGear-Timestamp` and `X-PostGear-Signature: v1=…`; the HMAC-SHA256
   of `"<timestamp>.<body>"` under the secret. `packages/sdk` verifies it
   (`verifyWebhookSignature`), and the Playwright test
   `e2e/webhooks.spec.ts` does exactly this against a receiver it hosts.
@@ -549,7 +549,7 @@ Settings → **Webhooks** → **Add webhook**: name it, URL
 
 ### 5j. Sentry (Sprint 8)
 
-Without a DSN nothing is sent anywhere — the local default. To see errors
+Without a DSN nothing is sent anywhere: the local default. To see errors
 arrive, a free Sentry account is enough (the developer plan has an error
 quota that these tests will not dent):
 
@@ -567,8 +567,8 @@ quota that these tests will not dent):
    <http://localhost:3001/health/sentry-test>. It answers `500` by design
    and the event appears in the API project within a minute.
    <http://localhost:3001/health> says `"sentry": true` when a DSN is set.
-4. Web: <http://localhost:3000/dev/sentry-test> has two buttons — one
-   throws in the browser, one inside a server function — and says whether
+4. Web: <http://localhost:3000/dev/sentry-test> has two buttons (one
+   throws in the browser, one inside a server function) and says whether
    a DSN is configured.
 
 Traces are off (`SENTRY_TRACES_SAMPLE_RATE=0`); set `0.1` to sample
@@ -750,7 +750,7 @@ A real upload needs a video and is not worth testing from the UI yet.
 | AI page says you are out of credits | The demo workspace's monthly allowance (100) is used up; re-seed with `npm run db:seed` to reset the ledger. |
 | Billing page says "not configured" | Neither `BILLING_SIMULATION="true"` nor a real `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` pair is set (the placeholders do not count). Restart the API after editing. |
 | Checkout stays on "Activating…" | In Stripe mode, `stripe listen` is not running or forwards to the wrong port; the API never received the event. In simulation, the API log says what the synthetic event did. |
-| A webhook URL is refused as private | `WEBHOOK_ALLOW_PRIVATE_URLS` is not `"true"` — the guard refuses localhost on purpose. Set it and restart the API **and** the worker. |
+| A webhook URL is refused as private | `WEBHOOK_ALLOW_PRIVATE_URLS` is not `"true"`: the guard refuses localhost on purpose. Set it and restart the API **and** the worker. |
 | Webhook deliveries stay Pending | The worker is not running (deliveries are Temporal workflows). Start it; the maintenance reconcile picks up anything older than a minute. |
 | `/v1` answers 429 | The per-key ceiling (`API_RATE_LIMIT_PER_MIN`, 60/min) or the per-address one (`RATE_LIMIT_PER_MIN`, 300/min). Wait for `Retry-After`. |
 | No notification email in the console | The member's preference is off (Settings → Notifications), or `SMTP_HOST` is set and mail went to a real server. The dispatcher's log line names the row and the outcome. |

@@ -1,7 +1,7 @@
 /**
  * What a failed call throws. The API answers every error as
- * `{ error, statusCode }`; the SDK surfaces that message, the status, and —
- * for a 429 — how long to wait, read from `Retry-After`.
+ * `{ error, statusCode }`; the SDK surfaces that message, the status, and, 
+ * for a 429, how long to wait, read from `Retry-After`.
  */
 export class PostGearError extends Error {
   readonly status: number;

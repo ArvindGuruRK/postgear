@@ -6,8 +6,8 @@
  *
  * ## Why the LinkedIn member channel carries data
  *
- * The real `linkedin` provider has no channel metrics — LinkedIn exposes
- * statistics for organizations only — and in a real deployment the sync
+ * The real `linkedin` provider has no channel metrics (LinkedIn exposes
+ * statistics for organizations only) and in a real deployment the sync
  * writes `UNSUPPORTED` for it. The demo workspace is a simulation
  * (`ANALYTICS_SIMULATION=true` locally), where every platform is
  * supported, and the API computes `support` from that flag; so the seed
@@ -43,7 +43,7 @@ export interface SeedPublishedPost {
   publishDate: Date;
 }
 
-/** FNV-1a, 32-bit — the same hash the worker's stand-in uses, so the shapes match. */
+/** FNV-1a, 32-bit: the same hash the worker's stand-in uses, so the shapes match. */
 function hashString(value: string): number {
   let hash = 0x811c9dc5;
 
@@ -115,8 +115,8 @@ function channelRows(
 /**
  * Seeds the three analytics tables for one workspace.
  *
- * Channels on `x` are seeded broken — a `NEEDS_RECONNECT` sync and no
- * metrics, matching the seeded X channel that needs reconnecting — and
+ * Channels on `x` are seeded broken (a `NEEDS_RECONNECT` sync and no
+ * metrics, matching the seeded X channel that needs reconnecting) and
  * every other channel gets the full quarter and an `OK` sync an hour ago.
  * Each published post gets three snapshots, two days apart and growing.
  */
@@ -173,7 +173,7 @@ export async function seedAnalytics(
     const impressions = 400 + (seed % 1_601);
     const rate = 0.03 + ((seed >>> 4) % 4) * 0.01;
 
-    // Three readings: two days ago, yesterday, an hour ago — each larger.
+    // Three readings: two days ago, yesterday, an hour ago, each larger.
     for (const [index, capturedAt] of [
       new Date(now - 2 * DAY_MS),
       new Date(now - DAY_MS),

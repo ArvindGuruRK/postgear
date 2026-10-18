@@ -1,5 +1,5 @@
 /**
- * `@postgear/social-core/composer` — the browser-safe half of the package.
+ * `@postgear/social-core/composer`: the browser-safe half of the package.
  *
  * Everything the composer needs to agree with the publisher: the post document,
  * its rendering to platform text, length counting, declarative platform rules

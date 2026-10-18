@@ -1,15 +1,15 @@
-# Sprint 1 — Completion Checklist & Test Guide
+# Sprint 1: Completion Checklist & Test Guide
 
 Companion to [sprint-01-foundation-and-data-model.md](../sprint-documents/sprint-01-foundation-and-data-model.md).
 Status as of **2026-09-05**.
 
-Sprint 1 was roughly two-thirds finished before this pass — the environment,
+Sprint 1 was roughly two-thirds finished before this pass: the environment,
 install, migrations and seed were already working and verified. This document
 marks those clearly as **[Pre-existing]** so you can skip re-testing them, and
 **[New]** for what was built in this pass.
 
 **Everything in Sprint 1 is now complete.** One item is deliberately deferred
-with a reason recorded — see [Known gaps](#known-gaps).
+with a reason recorded: see [Known gaps](#known-gaps).
 
 ---
 
@@ -32,7 +32,7 @@ npm run db:generate
 | 1.1 | `docker compose up` brings up Postgres, Redis, MinIO with no manual steps beyond the `.env` copy | ✅ [Pre-existing] |
 | 1.2 | `npm install` completes cleanly across all workspaces | ✅ [Pre-existing] |
 | 1.3 | Every `turbo run <task>` executes across all 6 workspaces | ✅ [Pre-existing] |
-| 1.4 | Tailwind v4 tokens render; app shell applies a `dark`/`light` class | ✅ [Pre-existing — Sprint 0] |
+| 1.4 | Tailwind v4 tokens render; app shell applies a `dark`/`light` class | ✅ [Pre-existing: Sprint 0] |
 | 1.5 | `ts-node` added to root devDependencies (was only hoisted from `packages/db`, so root scripts worked by luck) | ✅ [New] |
 
 **How to test**
@@ -45,11 +45,11 @@ npm run validate           # expect "28 successful, 28 total"
 For 1.4, run `npm run dev` and open <http://localhost:3000>. The theme toggle in
 the top bar should flip light/dark. The mechanism is a no-flash inline script in
 [apps/web/src/app/layout.tsx](../../apps/web/src/app/layout.tsx) that puts the
-class on `<body>` — not `<html>`, because the color variables in `colors.css` are
+class on `<body>`, not `<html>`, because the color variables in `colors.css` are
 declared as *descendant* selectors of `:root` and won't resolve otherwise.
 
 > Temporal is **not** in `docker-compose.yml`. That's intentional and matches the
-> sprint doc — it gets added when Sprint 5 needs durable scheduling.
+> sprint doc: it gets added when Sprint 5 needs durable scheduling.
 
 ---
 
@@ -59,13 +59,13 @@ declared as *descendant* selectors of `:root` and won't resolve otherwise.
 |---|---|---|
 | 2.1 | `.github/workflows/ci.yml` runs `npm run validate` on every PR | ✅ [New] |
 | 2.2 | CI also runs `prisma validate` | ✅ [New] |
-| 2.3 | Prisma client generated before typecheck (it must be — `packages/db` re-exports its types) | ✅ [New] |
+| 2.3 | Prisma client generated before typecheck (it must be: `packages/db` re-exports its types) | ✅ [New] |
 | 2.4 | Concurrency group cancels superseded runs | ✅ [New] |
-| 2.5 | Repo-wide `format:check` gate | ⏸️ Deferred — see [Known gaps](#known-gaps) |
+| 2.5 | Repo-wide `format:check` gate | ⏸️ Deferred: see [Known gaps](#known-gaps) |
 
 The file was a stub whose only real step was `actions/checkout`.
 
-**How to test** — run the CI steps locally in the same order:
+**How to test**: run the CI steps locally in the same order:
 
 ```bash
 npm ci
@@ -76,7 +76,7 @@ npm run validate
 
 All four should exit 0. The last prints `28 successful, 28 total`.
 
-To test it for real, push this branch and open a PR against `master` — note the
+To test it for real, push this branch and open a PR against `master`: note the
 workflow triggers on `master`, `main` **and** `develop`, since this repo's default
 branch is `master` but the stub only listed `main`/`develop`.
 
@@ -90,10 +90,10 @@ branch is `master` but the stub only listed `main`/`develop`.
 | 3.2 | Model list read end-to-end and classified | ✅ [New] |
 | 3.3 | `packages/db/prisma/SCHEMA_NOTES.md` written | ✅ [New] |
 | 3.4 | AES-256-GCM encryption helper exists | ✅ [New] |
-| 3.5 | `packages/db/src/client.ts` — real Prisma singleton (was `export {}`) | ✅ [New] |
-| 3.6 | `packages/db/src/types.ts` — typed re-exports (was `export {}`) | ✅ [New] |
+| 3.5 | `packages/db/src/client.ts`: real Prisma singleton (was `export {}`) | ✅ [New] |
+| 3.6 | `packages/db/src/types.ts`: typed re-exports (was `export {}`) | ✅ [New] |
 
-### 3.3 — SCHEMA_NOTES.md
+### 3.3: SCHEMA_NOTES.md
 
 [packages/db/prisma/SCHEMA_NOTES.md](../../packages/db/prisma/SCHEMA_NOTES.md)
 originally recorded all 48 inherited models split into **MVP-active** vs
@@ -111,14 +111,14 @@ doc, and are worth knowing before you write queries:
 - **Tenant scoping is not uniformly `organizationId`.** 14 models use it, but
   `Tags` and `Customer` use `orgId` for the identical concept.
 - **Soft delete is far wider than the doc's "Tags, Webhooks".** 11 of the 21
-  models carry `deletedAt`. Every read of those must filter `deletedAt: null` —
+  models carry `deletedAt`. Every read of those must filter `deletedAt: null`;
   Prisma has no global filter here, so it's per-query. This is the likeliest
   data bug in the codebase.
 
 > Counts here reflect the pruned schema. `SCHEMA_NOTES.md` is the source of
 > truth if they ever drift again.
 
-**How to test** — verify the counts yourself:
+**How to test**: verify the counts yourself:
 
 ```bash
 # Should print 21 (was 48 before pruning)
@@ -134,7 +134,7 @@ awk '/^model /{m=$2} /^  orgId /{print m}' packages/db/prisma/schema.prisma
 
 Then read the doc and spot-check any two dormant models against `schema.prisma`.
 
-### 3.4 — Encryption helper
+### 3.4: Encryption helper
 
 [packages/db/src/crypto.ts](../../packages/db/src/crypto.ts). AES-256-GCM, keyed
 from `ENCRYPTION_KEY_AES256`. Exports `encrypt` / `decrypt`, nullable variants
@@ -173,13 +173,13 @@ rm smoke-tmp.ts
 ```
 
 Expect `roundtrip ok : true` and `isEncrypted : true / plaintext: false`.
-Run it twice — **the ciphertext must differ each time** (fresh IV per call).
+Run it twice: **the ciphertext must differ each time** (fresh IV per call).
 
 > Two consequences this creates, both documented in SCHEMA_NOTES: encrypted
 > columns can't be searched by equality (`where: { token: x }` never matches),
 > and rotating the key permanently orphans stored tokens.
 
-The helper is **not yet wired to `Integration`** — that's Sprint 3's job, exactly
+The helper is **not yet wired to `Integration`**: that's Sprint 3's job, exactly
 as the sprint doc scopes it ("this sprint just needs the encryption helper to
 exist").
 
@@ -189,7 +189,7 @@ exist").
 
 | # | Item | Status |
 |---|---|---|
-| 4.1 | Confirmed a `User` is valid with zero `UserOrganization` rows — no migration needed | ✅ [New] |
+| 4.1 | Confirmed a `User` is valid with zero `UserOrganization` rows: no migration needed | ✅ [New] |
 | 4.2 | Seed creates an un-onboarded user, so the state is testable | ✅ [New] |
 | 4.3 | Two-gate route protection and the open "where does completion live" call documented | ✅ [New] |
 
@@ -229,11 +229,11 @@ The `0` row is the point. Sprint 2 must not assume `user.organizations[0]` exist
 | 5.4 | Deprecated `scripts/db-seed.ts` deleted, stale doc reference fixed | ✅ [New] |
 | 5.5 | Real secrets written into local `.env` | ✅ [New] |
 
-### 5.2 — timezone
+### 5.2: timezone
 
 Resolved by reading Postiz's client: it sends `String(dayjs.tz().utcOffset())`,
 and dayjs's `utcOffset()` returns **minutes**. So `User.timezone` is a **UTC
-offset in minutes** — `0` = UTC, `-300` = US Eastern, `330` = IST. The seed's `0`
+offset in minutes**: `0` = UTC, `-300` = US Eastern, `330` = IST. The seed's `0`
 was correct.
 
 Caveat now recorded in both the seed and SCHEMA_NOTES: an offset can't represent
@@ -241,9 +241,9 @@ DST, so a "9am local" schedule drifts an hour twice a year. If Sprint 5's
 scheduler needs DST correctness, add a nullable `timezoneName` (IANA string)
 *alongside* this field rather than reinterpreting it.
 
-`User.password` remains deliberately unset — Sprint 2 sets it via bcrypt.
+`User.password` remains deliberately unset: Sprint 2 sets it via bcrypt.
 
-### 5.3 / 5.5 — key generation
+### 5.3 / 5.5: key generation
 
 **How to test:**
 
@@ -255,7 +255,7 @@ grep -E "ENCRYPTION_KEY_AES256|JWT_SECRET|NEXTAUTH_SECRET" .env
 
 `ENCRYPTION_KEY_AES256` must be exactly 64 hex characters. The `.env` placeholder
 it replaced (`"32-byte-hex-string-for-encrypting-oauth-tokens-at-rest"`) was prose,
-and `crypto.ts` rejects it outright rather than deriving a weak key from it — try
+and `crypto.ts` rejects it outright rather than deriving a weak key from it: try
 it if you want to see the error:
 
 ```bash
@@ -267,7 +267,7 @@ vars survive byte-for-byte. Your `.env` was patched during this work; it's
 gitignored and only held non-functional placeholders beforehand. Nothing else in
 the file changed (verified by diff).
 
-### 5.1 — seed idempotency
+### 5.1: seed idempotency
 
 ```bash
 npm run db:seed && npm run db:seed
@@ -278,7 +278,7 @@ docker exec postgear_postgres psql -U postgres -d postgear_db -c \
    UNION ALL SELECT 'Subscription', count(*) FROM \"Subscription\";"
 ```
 
-Expect `User 2`, `Organization 1`, `UserOrganization 1`, `Subscription 1` — stable
+Expect `User 2`, `Organization 1`, `UserOrganization 1`, `Subscription 1`: stable
 across runs.
 
 ---
@@ -297,7 +297,7 @@ every workspace, and it now includes 26 real unit tests rather than only stubs.
 ## Known gaps
 
 **Repo-wide formatting is not enforced in CI, on purpose.**
-`npm run format:check` currently reports **86 errors, all of them pre-existing** —
+`npm run format:check` currently reports **86 errors, all of them pre-existing**:
 Sprint 0 UI files written before Biome's formatter was run over them. I verified
 this by stashing every Sprint 1 change and re-running against a clean `HEAD`,
 which reported **91**. This pass therefore reduced the backlog by 5 (the stub
@@ -309,7 +309,7 @@ this sprint *are* formatted and pass.
 
 To close it: run `npm run format` in one dedicated commit, then uncomment the
 step. I left that out of Sprint 1 because it would mean a large mechanical diff
-across the UI work you just finished in Sprint 0 — that's your call to make, not
+across the UI work you just finished in Sprint 0: that's your call to make, not
 something to bundle silently into a foundation sprint.
 
 ---
@@ -317,23 +317,23 @@ something to bundle silently into a foundation sprint.
 ## Files changed in this pass
 
 **Added**
-- `packages/db/src/crypto.ts` — AES-256-GCM helper
-- `packages/db/src/crypto.test.ts` — 26 tests
-- `packages/db/prisma/SCHEMA_NOTES.md` — model inventory & conventions
-- `scripts/tsconfig.json` — CommonJS config for root TS scripts
-- `docs/sprint-completion-checklists/sprint-01-completion-checklist.md` — this file
+- `packages/db/src/crypto.ts`: AES-256-GCM helper
+- `packages/db/src/crypto.test.ts`: 26 tests
+- `packages/db/prisma/SCHEMA_NOTES.md`: model inventory & conventions
+- `scripts/tsconfig.json`: CommonJS config for root TS scripts
+- `docs/sprint-completion-checklists/sprint-01-completion-checklist.md`: this file
 
 **Modified**
-- `.github/workflows/ci.yml` — real pipeline, replacing the TODO stub
-- `scripts/generate-keys.ts` — implemented, replacing a `console.log('TODO')`
-- `packages/db/src/client.ts` — Prisma singleton, replacing `export {}`
-- `packages/db/src/types.ts` — typed re-exports, replacing `export {}`
-- `packages/db/src/index.ts` — exports the crypto module
-- `packages/db/prisma/seeds/index.ts` — un-onboarded user; timezone convention documented
-- `package.json` — `generate:keys` script; `ts-node` devDependency
-- `project_structure.md` — stale `db-seed.ts` reference
-- `docs/sprint-documents/sprint-01-foundation-and-data-model.md` — DoD updated
-- `.env` — real generated secrets (gitignored)
+- `.github/workflows/ci.yml`: real pipeline, replacing the TODO stub
+- `scripts/generate-keys.ts`: implemented, replacing a `console.log('TODO')`
+- `packages/db/src/client.ts`: Prisma singleton, replacing `export {}`
+- `packages/db/src/types.ts`: typed re-exports, replacing `export {}`
+- `packages/db/src/index.ts`: exports the crypto module
+- `packages/db/prisma/seeds/index.ts`: un-onboarded user; timezone convention documented
+- `package.json`: `generate:keys` script; `ts-node` devDependency
+- `project_structure.md`: stale `db-seed.ts` reference
+- `docs/sprint-documents/sprint-01-foundation-and-data-model.md`: DoD updated
+- `.env`: real generated secrets (gitignored)
 
 **Deleted**
-- `scripts/db-seed.ts` — disconnected duplicate of the real seed entrypoint
+- `scripts/db-seed.ts`: disconnected duplicate of the real seed entrypoint

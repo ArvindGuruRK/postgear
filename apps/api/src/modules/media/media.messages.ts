@@ -24,7 +24,7 @@ export const MEDIA_MESSAGES = {
   NO_FILE: 'Choose a file to upload.',
   UNSUPPORTED:
     'That file type is not supported. Upload a JPEG, PNG, GIF, WebP or AVIF image, or an MP4 or MOV video.',
-  HEIC: 'HEIC photos are not supported yet. Export the photo as JPEG — on an iPhone, Settings › Camera › Formats › Most Compatible — and try again.',
+  HEIC: 'HEIC photos are not supported yet. Export the photo as JPEG (on an iPhone, Settings › Camera › Formats › Most Compatible) and try again.',
   WEBM: 'WebM video is not supported, because several platforms reject it. Convert the video to MP4 and try again.',
   UNREADABLE:
     'That image could not be read. It may be damaged, or not the kind of file its name says.',

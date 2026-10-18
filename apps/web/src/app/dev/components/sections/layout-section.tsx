@@ -20,7 +20,7 @@ export function LayoutSection() {
   return (
     <Section
       title="Layout"
-      description="Container, Stack, Grid, AspectRatio, and Card — the structural primitives every screen composes from."
+      description="Container, Stack, Grid, AspectRatio, and Card: the structural primitives every screen composes from."
     >
       <Row label="Container (size caps max-width, always centered)">
         <Container size="sm" className="border-2 border-dashed border-outline px-2 py-3 text-center">
@@ -69,7 +69,7 @@ export function LayoutSection() {
           </CardFooter>
         </Card>
       </Row>
-      <Row label="Panel (comic frame — marketing/onboarding, not app UI)">
+      <Row label="Panel (comic frame: marketing/onboarding, not app UI)">
         <Panel className="max-w-sm p-6">
           <Heading level="h4">You&apos;re all set!</Heading>
           <Text size="sm" className="mt-1">

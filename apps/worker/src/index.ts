@@ -1,10 +1,10 @@
 /**
- * PostGear worker — the process that publishes.
+ * PostGear worker: the process that publishes.
  *
  * One Temporal worker on one task queue, running the workflows in
  * `./workflows` and the activities in `./activities`. The API never publishes
  * anything itself; it writes rows and signals workflows, and this process does
- * the rest — which is what lets a post go out with no browser open and no API
+ * the rest, which is what lets a post go out with no browser open and no API
  * instance awake.
  *
  * Start with `npm run dev:worker` (through the repo's `.env`). Needs Temporal
@@ -41,12 +41,12 @@ async function main(): Promise<void> {
 
   if (publisher.simulated) {
     console.warn(
-      '[worker] PUBLISH_SIMULATION=true — posts are published to a stand-in, not to real platforms.',
+      '[worker] PUBLISH_SIMULATION=true: posts are published to a stand-in, not to real platforms.',
     );
   }
   if (analytics.simulated) {
     console.warn(
-      '[worker] ANALYTICS_SIMULATION=true — channel and post metrics come from a stand-in, not from the platforms.',
+      '[worker] ANALYTICS_SIMULATION=true: channel and post metrics come from a stand-in, not from the platforms.',
     );
   }
 
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
     }),
     maxConcurrentActivityTaskExecutions: MAX_CONCURRENT_ACTIVITIES,
     // A graceful stop lets an in-flight publish finish rather than cutting it
-    // off after the default ten seconds — a cut-off call is the one way a post
+    // off after the default ten seconds: a cut-off call is the one way a post
     // could go out twice.
     shutdownGraceTime: '11 minutes',
   });
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
  * Starts the reconcile loop if it is not already running.
  *
  * Idempotent by id: a second worker finds it started and moves on. Failure here
- * is logged, not fatal — the worker is still useful without its safety net, and
+ * is logged, not fatal: the worker is still useful without its safety net, and
  * the next boot tries again.
  */
 async function ensureMaintenanceWorkflow(

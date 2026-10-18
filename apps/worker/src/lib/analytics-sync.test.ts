@@ -86,7 +86,7 @@ describe('safeFailure', () => {
     }
   });
 
-  it('keeps a bad request’s own message — composed by PostGear — and does not retry it', () => {
+  it('keeps a bad request’s own message (composed by PostGear) and does not retry it', () => {
     const refused = safeFailure(
       new BadBodyError('X returned a response PostGear could not read.', 'x', body, 200),
       'Acme',

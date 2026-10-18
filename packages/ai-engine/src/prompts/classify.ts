@@ -1,5 +1,5 @@
 /**
- * Classify stage — which of PostGear's categories the brief belongs to.
+ * Classify stage: which of PostGear's categories the brief belongs to.
  *
  * The category is cheap to get and worth having early: the hook and content
  * prompts use it ("this is an announcement, lead with the news") and the UI

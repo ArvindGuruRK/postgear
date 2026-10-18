@@ -17,7 +17,7 @@ import type { Period, SubscriptionTier } from '@postgear/db';
 import type { BillingMode } from './billing.config';
 import type { EntitlementStatus, Plan, PlanTier } from './plans';
 
-/** What every handled event is read as — a real `Stripe.Event` fits. */
+/** What every handled event is read as: a real `Stripe.Event` fits. */
 export interface BillingWebhookEvent {
   id: string;
   type: string;
@@ -107,6 +107,6 @@ export interface CheckoutRequest {
 export interface WebhookReceipt {
   received: true;
   duplicate?: true;
-  /** `applied`, `ignored:<reason>` or `failed:<reason>` — what the `BillingEvent` row says. */
+  /** `applied`, `ignored:<reason>` or `failed:<reason>`: what the `BillingEvent` row says. */
   outcome?: string;
 }

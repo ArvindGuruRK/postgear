@@ -5,7 +5,7 @@ export function FoundationsSection() {
   return (
     <Section
       title="Foundations"
-      description="Typography hierarchy, links, labels, and separators — the raw material every other component is built from."
+      description="Typography hierarchy, links, labels, and separators: the raw material every other component is built from."
     >
       <Row label="Heading levels">
         <div className="flex flex-col gap-3">

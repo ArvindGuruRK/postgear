@@ -7,7 +7,7 @@
  * ## The rule every approximation below follows
  *
  * **Over-count, never under-count.** A counter that reads a little high makes
- * a user trim a post that would have fit — mildly annoying. One that reads low
+ * a user trim a post that would have fit: mildly annoying. One that reads low
  * lets a post be queued that the platform then rejects at publish time, hours
  * later, with the user gone. So wherever a platform's exact algorithm is not
  * reproduced, the estimate errs high.
@@ -20,15 +20,15 @@ export function measureLength(text: string, method: LengthMethod): number {
 }
 
 /**
- * Where `text` stops fitting within `max`, as a string index — or null when it fits.
+ * Where `text` stops fitting within `max`, as a string index, or null when it fits.
  *
  * Previews use it to mark the part a platform would refuse, rather than only
  * saying the post is too long. It is the end of the longest prefix that fits,
  * found by binary search over code point boundaries, so a cut never splits a
  * surrogate pair.
  *
- * X's weighting is not perfectly monotonic across a prefix — `https:/` counts
- * 7 but `https://a` counts 23 — so near a link the mark can land a few
+ * X's weighting is not perfectly monotonic across a prefix (`https:/` counts
+ * 7 but `https://a` counts 23), so near a link the mark can land a few
  * characters from the exact boundary. It is a pointer for the eye; the count
  * itself always comes from `measureLength`.
  */
@@ -60,7 +60,7 @@ export function overflowIndex(text: string, max: number, method: LengthMethod): 
 }
 
 /**
- * UTF-16 code units — what `String.prototype.length` returns.
+ * UTF-16 code units: what `String.prototype.length` returns.
  *
  * Used for every platform that documents a "character" limit without saying
  * how it counts. It is the most conservative of the reasonable readings: an
@@ -71,7 +71,7 @@ export function utf16Length(text: string): number {
   return text.length;
 }
 
-/** Every URL counts as this many, however long it really is — X wraps them all in t.co. */
+/** Every URL counts as this many, however long it really is: X wraps them all in t.co. */
 export const X_URL_LENGTH = 23;
 
 /**
@@ -80,7 +80,7 @@ export const X_URL_LENGTH = 23;
  * Latin through Georgian and Hangul Jamo (0–4351), plus the general
  * punctuation spans X treats as light: spaces and joiners, dashes and quotes,
  * primes. CJK, emoji, and the Unicode bold/italic letters all fall outside, so
- * they weigh 2 — which is why a 140-character Japanese post is already full.
+ * they weigh 2, which is why a 140-character Japanese post is already full.
  */
 const X_LIGHT_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0, 4351],
@@ -199,7 +199,7 @@ const URL_PATTERN = new RegExp(
 /**
  * Punctuation that ends a sentence rather than a URL.
  *
- * "See https://example.com." — X does not count the full stop as part of the
+ * "See https://example.com.": X does not count the full stop as part of the
  * link, so it must be counted as a character of its own. Leaving it inside the
  * URL would absorb it into the fixed 23 and under-count by one.
  */
@@ -218,7 +218,7 @@ const EMOJI_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
  * Reimplemented here rather than depending on `twitter-text`, whose last release
  * predates several Unicode versions and which would ship a large TLD table to
  * every browser that opens the composer. The one deliberate simplification is
- * the TLD list, and its direction is safe — see `GENERIC_TLDS`.
+ * the TLD list, and its direction is safe: see `GENERIC_TLDS`.
  */
 export function xWeightedLength(text: string): number {
   const normalized = text.normalize('NFC');
@@ -258,8 +258,8 @@ function isLight(codePoint: number): boolean {
 /**
  * Splits text into user-perceived characters.
  *
- * `Intl.Segmenter` is what makes a family emoji — five code points joined by
- * zero-width joiners — one unit rather than five. Without it (only very old
+ * `Intl.Segmenter` is what makes a family emoji (five code points joined by
+ * zero-width joiners) one unit rather than five. Without it (only very old
  * runtimes), each code point stands alone; an emoji sequence then counts 2 per
  * pictograph plus 1 per joiner, which over-counts, and so is still safe.
  */

@@ -5,7 +5,7 @@
  * is a one-line change in one place rather than an edit to JSX. The values
  * must match the Prisma enums in `packages/db/prisma/schema.prisma`
  * (`OnboardingRole`, `OnboardingTeamSize`, `OnboardingGoal`,
- * `PostingFrequency`, `ReferralSource`) — the API validates against those with
+ * `PostingFrequency`, `ReferralSource`): the API validates against those with
  * `z.nativeEnum`, so a typo here surfaces immediately as a rejected answer
  * rather than as silently missing data.
  *
@@ -27,7 +27,7 @@ export interface Question {
   options: QuestionOption[];
 }
 
-/** Q1 + Q2 — step 2, "About you". */
+/** Q1 + Q2: step 2, "About you". */
 export const ABOUT_YOU_QUESTIONS: Question[] = [
   {
     field: 'role',
@@ -53,7 +53,7 @@ export const ABOUT_YOU_QUESTIONS: Question[] = [
   },
 ];
 
-/** Q3 + Q4 — step 3, "Your goals". */
+/** Q3 + Q4: step 3, "Your goals". */
 export const GOALS_QUESTIONS: Question[] = [
   {
     field: 'primaryGoal',
@@ -79,7 +79,7 @@ export const GOALS_QUESTIONS: Question[] = [
   },
 ];
 
-/** Q5 — step 5, "Finish". */
+/** Q5: step 5, "Finish". */
 export const REFERRAL_QUESTION: Question = {
   field: 'referralSource',
   prompt: 'How did you hear about PostGear?',
@@ -108,11 +108,19 @@ export const CHANNEL_OPTIONS: QuestionOption[] = [
   { value: 'tiktok', label: 'TikTok' },
 ];
 
-/** Labels for `OnboardingStepper`. Five steps, 1-based `currentStep`. */
+/**
+ * Labels for `OnboardingStepper`. Six steps, 1-based `currentStep`: the
+ * numbers match `User.onboardingStep` and the API's `TOTAL_STEPS`. Step 6,
+ * "Profile", is where every path ends, including "Skip questions".
+ */
 export const ONBOARDING_STEPS = [
   { label: 'Workspace', description: 'Name it' },
   { label: 'About you', description: 'Two questions' },
   { label: 'Goals', description: 'Two questions' },
   { label: 'Channels', description: 'Optional' },
-  { label: 'Finish', description: 'Last one' },
+  { label: 'Referral', description: 'One question' },
+  { label: 'Profile', description: 'Name and avatar' },
 ];
+
+/** The step "Skip questions" and step 5 both lead to. */
+export const PROFILE_STEP = 6;

@@ -7,7 +7,7 @@
  *
  * ## The stream
  *
- * `GET /notifications/stream` is server-sent events on a GET — the one place
+ * `GET /notifications/stream` is server-sent events on a GET: the one place
  * `openSseStream` is used on a GET, since the bell has nothing to send and
  * the browser's own `EventSource` could in principle open it. The handler
  * takes `@Res()` so Nest sends nothing itself, registers the stream, and then

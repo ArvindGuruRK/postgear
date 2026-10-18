@@ -2,14 +2,14 @@
 
 /**
  * The billing page (Sprint 8, contract §6): the plan a workspace is on,
- * the two meters, and the plan grid — in one of two states.
+ * the two meters, and the plan grid, in one of two states.
  *
- * **Subscribe** — no live paid plan: the Free plan or the trial in the
+ * **Subscribe** (no live paid plan): the Free plan or the trial in the
  * summary card (with *Start free trial* when eligible), the grid's buttons
  * say *Subscribe* and open Stripe Checkout (or, in simulation, come straight
  * back with `?checkout=success`).
  *
- * **Manage** — a live paid plan: the summary card carries the status badge,
+ * **Manage** (a live paid plan): the summary card carries the status badge,
  * the next billing date, Cancel / Resume and Manage billing; the grid's
  * buttons say *Upgrade* / *Downgrade* and open the change dialog with its
  * proration preview.
@@ -33,7 +33,6 @@ import {
   AlertTitle,
   Button,
   ErrorState,
-  PageHeader,
   Spinner,
   Stack,
   Text,
@@ -295,11 +294,6 @@ export function BillingView({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Billing"
-        description="Your plan, what it allows, and how much of it you have used."
-      />
-
       {status === null ? (
         <ErrorState
           title="Billing didn't answer"
@@ -322,7 +316,7 @@ export function BillingView({
 
       {checkoutCanceled ? (
         <Alert className="items-center justify-between">
-          <AlertDescription>Checkout was cancelled — nothing has changed.</AlertDescription>
+          <AlertDescription>Checkout was cancelled. Nothing has changed.</AlertDescription>
           <Button variant="secondary" size="sm" onClick={() => setCheckoutCanceled(false)}>
             Dismiss
           </Button>

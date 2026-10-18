@@ -1,19 +1,20 @@
 import { type VariantProps, cva } from 'class-variance-authority';
 import { forwardRef } from 'react';
+import { FIELD_FOCUS, FIELD_FOCUS_ERROR } from '../lib/field';
 import { cn } from '../lib/utils';
 
 const textareaVariants = cva(
   [
-    'flex min-h-[6rem] w-full rounded-md border-2 border-outline bg-secondary p-4 text-ink shadow-brutalSm',
+    'flex min-h-[6rem] w-full rounded-md border-2 border-outline bg-field p-4 text-ink shadow-surfaceSm',
     'font-sans text-sm placeholder:text-ink placeholder:opacity-50',
-    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+    FIELD_FOCUS,
     'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
   ],
   {
     variants: {
       variant: {
         default: '',
-        error: 'border-actionDanger',
+        error: `border-actionDanger ${FIELD_FOCUS_ERROR}`,
       },
     },
     defaultVariants: {

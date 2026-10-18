@@ -8,8 +8,8 @@ export interface PanelProps extends React.HTMLAttributes<HTMLDivElement> {
 
 /**
  * The comic-frame equivalent of Card: squarer corners and a heavier
- * shadow-brutalLg, for "full comic treatment" surfaces (marketing,
- * onboarding, empty states) — see design-system-rules.md §15. Card stays
+ * shadow-surfaceLg, for "full comic treatment" surfaces (marketing,
+ * onboarding, empty states); see design-system-rules.md §15. Card stays
  * the workhorse for app UI; reach for Panel only where the comic-panel
  * motif itself is the point.
  */
@@ -18,7 +18,7 @@ export const Panel = forwardRef<HTMLDivElement, PanelProps>(
     <div
       ref={ref}
       className={cn(
-        'rounded-md border-4 border-outline bg-secondary shadow-brutalLg',
+        'rounded-md border-2 border-outline bg-secondary shadow-surfaceLg',
         halftone && 'bg-halftone',
         className,
       )}

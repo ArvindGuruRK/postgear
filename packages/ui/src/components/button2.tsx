@@ -3,24 +3,24 @@ import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
 /**
- * Alternate "pushable 3D button" — bottom-only shadow (a solid ink base
+ * Alternate "pushable 3D button": bottom-only shadow (a solid ink base
  * under the button) instead of Button's diagonal shadow-brutalMd, per a
  * comic component-sheet reference: hover grows the base (lift), press
  * collapses it flush (sink). Kept as its own component rather than a
  * Button variant/rewrite. See --shadow-brutal-btn* in colors.css and
  * design-system-rules.md §6/§8.
  *
- * WHEN TO USE WHICH (product decision, confirmed 2026-09-02 — this is not an
+ * WHEN TO USE WHICH (product decision, confirmed 2026-09-02: this is not an
  * unresolved exploration, so don't "consolidate" the two components):
- *   - Button  — the default everywhere. Its diagonal shadow matches the
+ *   - Button: the default everywhere. Its diagonal shadow matches the
  *     diagonal offset every other surface (Card/Dialog/Input) uses.
- *   - Button2 — inside modals, dialogs, and right-hand slide-over sheets.
+ *   - Button2: inside modals, dialogs, and right-hand slide-over sheets.
  *     Those surfaces already carry their own diagonal shadow, so a second
  *     diagonal stacked on top reads as visual noise; the vertical base
  *     stays legible against them.
  *
  * Hover is shadow/transform only, no fill change (matches Button's same
- * fix, 2026-08-30) — the color change moved to :active so it reads as
+ * fix, 2026-08-30): the color change moved to :active so it reads as
  * click confirmation, not a competing hover signal.
  */
 const button2Variants = cva(

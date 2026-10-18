@@ -5,7 +5,7 @@
  *
  * Time first, because the queue is read as "what goes out, and when"; then the
  * state and the text; then where it goes. The status line under the text is
- * the worker's own account — the next retry, the failure — so a problem is
+ * the worker's own account (the next retry, the failure), so a problem is
  * explained in the row rather than hidden behind a click. Restrained, like the
  * calendar cards: a dense list keeps its borders and drops the shadows.
  */

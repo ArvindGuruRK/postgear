@@ -7,14 +7,14 @@
  * A dense data surface in the restrained profile (§15): `Table` has no
  * shadow and sets `font-sans` on everything inside it, numbers are
  * `tabular-nums` and right-aligned so columns line up, and the only colour
- * is the standing badge — which reuses the Sprint 5 vocabulary (success /
+ * is the standing badge, which reuses the Sprint 5 vocabulary (success /
  * danger / secondary / outline) rather than inventing one. A badge whose
  * label does not say why ("Not supported", "Needs permissions") gets a
  * tooltip on a button, so the reason is reachable by keyboard.
  *
  * A row is also the channel filter: the name is a button (the accessible
  * path) and the row itself answers a click. Under the table, the same
- * channels as a `BarList` of engagement rate — the one number the table
+ * channels as a `BarList` of engagement rate: the one number the table
  * cannot make comparable at a glance.
  */
 import {

@@ -2,7 +2,7 @@
  * Persistence for the notification feed, the read cursor and the email outbox.
  *
  * Every read of `Notifications` carries `organizationId` and `deletedAt: null`
- * — the workspace comes from `@CurrentOrg()`, never from the client — and the
+ * (the workspace comes from `@CurrentOrg()`, never from the client) and the
  * cursor is keyed on (user, workspace), so reading one workspace's feed never
  * clears another's. The dispatcher's two queries are the only ones that span
  * workspaces, and they are driven by `emailStatus` and `createdAt`, not by a
@@ -137,7 +137,7 @@ export class NotificationsRepository {
    *
    * `PENDING` rows are the usual case. A `SENDING` row whose `updatedAt` is
    * older than {@link SENDING_STALE_MS} was claimed by an instance that never
-   * finished — a crash between the claim and the mark — and is offered again.
+   * finished (a crash between the claim and the mark) and is offered again.
    */
   async claimPending(limit: number, now: Date): Promise<NotificationRecord[]> {
     const freshest = new Date(now.getTime() - EMAIL_MAX_AGE_MS);

@@ -21,11 +21,11 @@ import {
  *
  * ## Three providers behind tokens
  *
- * - `BILLING_CONFIG` — the mode (simulation / stripe / unconfigured), read
+ * - `BILLING_CONFIG`: the mode (simulation / stripe / unconfigured), read
  *   from the environment once by `billing.config.ts`.
- * - `STRIPE_EVENT_VERIFIER` — what turns a raw webhook body and signature
+ * - `STRIPE_EVENT_VERIFIER`: what turns a raw webhook body and signature
  *   into an event, or throws. Built from the config alone.
- * - `STRIPE_GATEWAY` — the calls *to* Stripe. The simulation needs
+ * - `STRIPE_GATEWAY`: the calls *to* Stripe. The simulation needs
  *   `StripeWebhookService` so the events it synthesises go through the same
  *   `apply` a real delivery does; the webhook service itself depends only on
  *   the verifier and the repository, so there is no cycle.

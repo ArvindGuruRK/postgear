@@ -1,6 +1,6 @@
 /**
  * The credit rules, pinned: costs, allowances, the low-water mark, and the
- * cycle maths — especially month-end clamping, which is where date code
+ * cycle maths, especially month-end clamping, which is where date code
  * usually goes wrong.
  */
 import {

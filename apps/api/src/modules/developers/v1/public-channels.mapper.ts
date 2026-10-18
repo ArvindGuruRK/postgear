@@ -2,7 +2,7 @@
  * `ChannelView` → the public channel (Sprint 8, contract §5.3).
  *
  * The internal view carries the platform account ids, posting times and
- * token expiry — none of which an integrator needs, and the first of which
+ * token expiry: none of which an integrator needs, and the first of which
  * they should not have. The public shape is what is needed to pick a
  * channel for a post and to know whether it will publish.
  */

@@ -17,8 +17,8 @@
  *
  * ## The URL names the audit
  *
- * `?audit=<id>` is set when an audit is shown — a finished run, a history
- * row — through `router.replace` with `scroll: false`, so a reload or a
+ * `?audit=<id>` is set when an audit is shown (a finished run, a history
+ * row) through `router.replace` with `scroll: false`, so a reload or a
  * shared link lands on the same audit (the server page loads it) and the
  * page does not jump to the top each time. The replace re-renders the server
  * component, which is harmless: this island keeps its state, and a run in
@@ -26,14 +26,14 @@
  *
  * ## What the page shows for each way the API can answer
  *
- * `/seo/status` unanswered is an `ErrorState` with a retry — nothing else can
+ * `/seo/status` unanswered is an `ErrorState` with a retry: nothing else can
  * be trusted without it. AI off still analyzes (advice is rule-based, and
  * the form says so). A refusal about the URL (400, 422) goes on the field;
  * every other refusal before the stream (429 busy, 402 out of credits, 503)
  * is an alert under the form, with the reset date when credits are the
  * reason. Mid-stream errors are the progress section's to show.
  */
-import { Alert, EmptyState, ErrorState, PageHeader, Stack, useToast } from '@postgear/ui';
+import { Alert, EmptyState, ErrorState, PageActions, Stack, useToast } from '@postgear/ui';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
@@ -270,20 +270,16 @@ export function SeoAnalyzer({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="SEO Analyzer"
-        description="Enter any URL for a scored audit: on-page, technical, content and authority, with prioritised fixes."
-        actions={
-          status?.ai ? (
-            <CreditsMeter
-              credits={meter.credits}
-              failed={meter.failed}
-              onRetry={() => void meter.refresh()}
-              className="w-full sm:w-72"
-            />
-          ) : undefined
-        }
-      />
+      {status?.ai ? (
+        <PageActions>
+          <CreditsMeter
+            credits={meter.credits}
+            failed={meter.failed}
+            onRetry={() => void meter.refresh()}
+            className="w-full sm:w-72"
+          />
+        </PageActions>
+      ) : null}
 
       {status === null ? (
         <ErrorState
@@ -320,8 +316,8 @@ export function SeoAnalyzer({
               <EmptyState
                 icon={Search}
                 title="Your audit will appear here"
-                description="Enter a page's address above. The crawl, the four scores and the prioritised fixes show up as each stage finishes — about half a minute for most sites."
-                className="rounded-lg border-4 border-dashed border-outline"
+                description="Enter a page's address above. The crawl, the four scores and the prioritised fixes show up as each stage finishes, in about half a minute for most sites."
+                className="rounded-lg border-2 border-dashed border-outline"
               />
             ) : (
               <>

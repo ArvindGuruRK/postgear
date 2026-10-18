@@ -9,7 +9,7 @@ import { Injectable } from '@nestjs/common';
  *
  * `issue()` returns a pair: the raw token, which goes in the email, and its
  * SHA-256 digest, which is what lands in `User.activationTokenHash` /
- * `passwordResetTokenHash`. A database leak therefore yields no usable links —
+ * `passwordResetTokenHash`. A database leak therefore yields no usable links:
  * the attacker holds digests and cannot invert them.
  *
  * SHA-256 rather than argon2 here, deliberately. These tokens are 32 bytes of
@@ -22,7 +22,7 @@ import { Injectable } from '@nestjs/common';
  * ## Lookup by hash, not by user
  *
  * Because the digest is deterministic, `hash(rawToken)` can be used directly
- * in a `where` clause — which is why the columns carry a unique index. This is
+ * in a `where` clause, which is why the columns carry a unique index. This is
  * the opposite of the `Integration.token` situation described in SCHEMA_NOTES,
  * where AES-GCM's random IV makes equality search impossible.
  */
@@ -57,7 +57,7 @@ export class TokenService {
   /**
    * Digests a raw token for lookup.
    *
-   * No salt, on purpose — a salted digest could not be looked up, and there is
+   * No salt, on purpose: a salted digest could not be looked up, and there is
    * nothing to salt against when the input is already high-entropy random.
    */
   hash(raw: string): string {

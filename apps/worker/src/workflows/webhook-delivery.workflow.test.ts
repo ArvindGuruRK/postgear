@@ -1,6 +1,6 @@
 /**
  * The delivery workflow against a time-skipping Temporal test server with
- * the activities mocked — the same harness as the publish workflow's test.
+ * the activities mocked: the same harness as the publish workflow's test.
  * What is pinned: a 2xx on the first try ends it; a retryable failure is
  * tried again with the policy's backoff; a rejection is final after one
  * attempt; six retryable failures exhaust the policy; and only the final

@@ -6,7 +6,7 @@
  *
  * This is the densest surface on the page and the one §15 of the design
  * rules was written for: a `Table` in `font-sans`, no shadow, tight rows,
- * and one glyph per row that says pass or fail — `Check` success, `X`
+ * and one glyph per row that says pass or fail; `Check` success, `X`
  * danger for a critical failure, `AlertTriangle` accent for a warning, and
  * `Info` primary for an informational one, the same severity vocabulary as
  * the recommendations (§16c). The tab strip is the chrome and keeps the

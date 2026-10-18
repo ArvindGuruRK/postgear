@@ -201,9 +201,9 @@ describe('crawlStageDetail / hostOf', () => {
   it('words the crawler’s sub-stages and says nothing about a finished one', () => {
     expect(crawlStageDetail('fetch', 'started')).toBe('Fetching the page…');
     expect(crawlStageDetail('robots', 'done')).toBeNull();
-    expect(crawlStageDetail('links', 'skipped')).toBe('Checking links — skipped');
+    expect(crawlStageDetail('links', 'skipped')).toBe('Checking links: skipped');
     expect(crawlStageDetail('sitemap', 'failed')).toBe(
-      'Looking for a sitemap — could not be completed',
+      'Looking for a sitemap: could not be completed',
     );
     expect(crawlStageDetail('render', 'started')).toBe('Crawl: render…');
   });

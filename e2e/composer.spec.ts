@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp, noisyPhoto, uniqueName } from './helpers/media';
 
 /**
- * The post composer — one test per Sprint 4 Definition of Done item it owns,
+ * The post composer: one test per Sprint 4 Definition of Done item it owns,
  * plus the two rules that keep a draft safe: the queue refuses a post a
  * platform would reject, and a stale save never overwrites a newer one.
  *
@@ -27,7 +27,10 @@ async function signIn(page: Page, email = 'demo@postgear.local') {
 
 async function openComposer(page: Page, query = '') {
   await page.goto(`/${DEMO_ORG}/composer${query}`);
-  await expect(page.getByRole('heading', { name: /New post|Edit post/ })).toBeVisible();
+  // No in-page title any more: the top bar's h1 names the page, and the shared
+  // editor's first part is the sign the composer has rendered.
+  await expect(page.getByRole('heading', { level: 1, name: 'Composer' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Part 1 of the shared post' })).toBeVisible();
 }
 
 function channel(page: Page, name: RegExp) {
@@ -167,7 +170,7 @@ test.describe('composer', () => {
     const custom = part(page, 1, 'Acme Marketing');
     await custom.click();
     await page.keyboard.press('Control+End');
-    await page.keyboard.type(' — longer, for LinkedIn');
+    await page.keyboard.type(', longer, for LinkedIn');
 
     await page.getByRole('button', { name: 'Save draft' }).click();
     await expect(page.getByText('Draft saved', { exact: true })).toBeVisible();
@@ -178,11 +181,12 @@ test.describe('composer', () => {
 
     // A reload reopens exactly what was saved.
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Edit post' })).toBeVisible();
+    // Edit mode: only an existing post offers a fresh "New post" link.
+    await expect(page.getByRole('main').getByRole('link', { name: 'New post' })).toBeVisible();
     await expect(part(page, 1)).toHaveText(`${marker} for everyone`);
     await page.getByRole('tab', { name: /Acme Marketing/ }).click();
     await expect(part(page, 1, 'Acme Marketing')).toHaveText(
-      `${marker} for everyone — longer, for LinkedIn`,
+      `${marker} for everyone, longer, for LinkedIn`,
     );
 
     // And it is listed among saved posts, from where it opens too.
@@ -238,11 +242,11 @@ test.describe('composer', () => {
     await openComposer(second, `?group=${group}`);
 
     // The first tab saves a change; the second tab's copy is now stale.
-    await write(first, 1, ' — newer');
+    await write(first, 1, ', newer');
     await first.getByRole('button', { name: 'Save draft' }).click();
     await expect(first.getByText('Draft · all changes saved')).toBeVisible();
 
-    await write(second, 1, ' — older');
+    await write(second, 1, ', older');
     await second.getByRole('button', { name: 'Save draft' }).click();
     await expect(second.getByText(/Someone else changed this post/)).toBeVisible();
     await expect(second.getByRole('button', { name: 'Reload' })).toBeVisible();

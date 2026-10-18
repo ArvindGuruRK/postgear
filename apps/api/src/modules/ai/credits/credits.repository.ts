@@ -3,7 +3,7 @@
  *
  * The ledger is the existing `Credits` table, used as-is: one row per charge
  * (positive) or refund (negative), typed by what it was for. Nothing here
- * updates or deletes a row — see `credits.policy.ts` for why the history is
+ * updates or deletes a row: see `credits.policy.ts` for why the history is
  * kept whole.
  *
  * ## The charge is one serializable transaction
@@ -11,7 +11,7 @@
  * "Sum what was used, compare with the allowance, insert the charge" is a
  * read-then-write, and two generations started together could both pass the
  * check and overspend. Under `Serializable` Postgres aborts one of them
- * (`P2034`), and the service retries it — the same pattern
+ * (`P2034`), and the service retries it: the same pattern
  * `posts.repository.ts` uses for creates. The transaction is kept to those
  * three statements so the retry is cheap.
  *

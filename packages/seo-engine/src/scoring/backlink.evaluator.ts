@@ -4,7 +4,7 @@
  * A real answer needs a backlink index, which is what an
  * {@link AuthorityProvider} supplies (Open PageRank's 0–10 decimal, scaled to
  * a 0–100 domain authority). With one, the category is two graded checks and
- * nothing else — there is nothing on the page that can improve it.
+ * nothing else: there is nothing on the page that can improve it.
  *
  * Without one the category is **estimated** from the signals a trustworthy
  * site tends to show on its own pages: HTTPS, an apex or `www` host rather
@@ -194,7 +194,7 @@ export function evaluateBacklink(
       passed: false,
       // Costs nothing: it is a note that the number above is a guess.
       attainment: 1,
-      detail: 'Estimated — connect an authority provider (Open PageRank) for a measured score.',
+      detail: 'Estimated. Connect an authority provider (Open PageRank) for a measured score.',
     }),
   ];
   return buildCategory(category, SEO_CATEGORY_WEIGHTS.backlink, checks, true);

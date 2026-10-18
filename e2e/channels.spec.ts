@@ -6,14 +6,14 @@ import { expect, test } from '@playwright/test';
  * ## What these cover, and what they deliberately do not
  *
  * No real OAuth happens here. Completing a consent screen needs registered
- * developer apps, a real social account, and a third party's UI — none of which
+ * developer apps, a real social account, and a third party's UI: none of which
  * belongs in an automated suite. What *is* testable without any of that is
  * everything on this side of the redirect: the channel list, both health
  * treatments, the provider picker's configured/unconfigured split, and the
  * disconnect confirmation.
  *
- * That is possible because the seed creates two channels on `seed-demo-org` —
- * one healthy, one flagged for reconnection — with genuinely encrypted tokens.
+ * That is possible because the seed creates two channels on `seed-demo-org`
+ * (one healthy, one flagged for reconnection) with genuinely encrypted tokens.
  * Without those fixtures this page could only ever render its empty state.
  *
  * Prerequisites, same as the rest of the suite: `docker compose up -d`,
@@ -38,8 +38,8 @@ test.describe('channels page', () => {
     await signIn(page, 'demo@postgear.local');
     await page.goto(`/${DEMO_ORG}/channels`);
 
-    // Scoped to main: the top bar also titles the section "Channels".
-    await expect(page.getByRole('main').getByRole('heading', { name: 'Channels' })).toBeVisible();
+    // The page is named only by the top bar's h1 (no in-page title).
+    await expect(page.getByRole('heading', { level: 1, name: 'Channels' })).toBeVisible();
 
     await expect(page.getByText('Acme Marketing')).toBeVisible();
     await expect(page.getByText('Acme on X')).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('channels page', () => {
     await page.goto(`/${DEMO_ORG}/channels`);
 
     // The seeded X channel has refreshNeeded set, and must not look the same as
-    // the healthy one — that conflation is the specific failure this asserts
+    // the healthy one: that conflation is the specific failure this asserts
     // against.
     await expect(page.getByText('Reconnect', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Connected', { exact: true }).first()).toBeVisible();
@@ -75,7 +75,7 @@ test.describe('channels page', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     // With placeholder credentials in .env every provider is unconfigured, and
-    // the point is that they are still *listed* — hiding them would read as
+    // the point is that they are still *listed*: hiding them would read as
     // "PostGear does not support this platform" rather than "this deployment
     // has no key for it".
     await expect(page.getByText('Not set up on this instance')).toBeVisible();

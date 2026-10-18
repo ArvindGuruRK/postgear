@@ -3,7 +3,7 @@
 /**
  * The plan grid: a Monthly / Yearly toggle and one `PlanCard` per plan,
  * with the current plan marked and each button saying what pressing it
- * does for this workspace — Subscribe, Upgrade, Downgrade, Scheduled,
+ * does for this workspace: Subscribe, Upgrade, Downgrade, Scheduled,
  * Current plan (`billing-view-model.ts` decides).
  *
  * The cards carry `data-testid="billing-plan-<tier>"`, `data-current` and

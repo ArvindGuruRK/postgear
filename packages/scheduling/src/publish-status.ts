@@ -7,7 +7,7 @@
  * "attempt 2 of 5, retrying at 10:32" rather than dumping a stack trace.
  *
  * Every reader goes through `parsePublishStatus`, which treats anything it does
- * not recognise — including legacy plain text — as an opaque failure message.
+ * not recognise, including legacy plain text, as an opaque failure message.
  */
 import type { PublishFailureReason } from './workflows';
 
@@ -16,7 +16,7 @@ export type PublishStatus =
       /**
        * Written just before the platform is called, and replaced by the
        * attempt's outcome. If a retry finds it still here, the previous
-       * attempt died mid-call and the outcome is unknown — see
+       * attempt died mid-call and the outcome is unknown: see
        * `interrupted` in `PublishFailureReason`.
        */
       kind: 'in_flight';

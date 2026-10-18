@@ -8,7 +8,7 @@ import { oauthStartUrl } from '@/lib/api';
  *
  * A full page navigation rather than a `fetch`, because the provider's consent
  * screen is a page the user has to actually see, and the callback must return
- * as a top-level request — the API's session cookie is `sameSite: 'lax'`, which
+ * as a top-level request: the API's session cookie is `sameSite: 'lax'`, which
  * accepts a top-level GET and rejects anything cross-site initiated by script.
  *
  * `window.location.href` rather than a `<Link>`: this leaves the Next router

@@ -5,7 +5,7 @@
  * The composite is the weighted mean of the category scores with the
  * weights from `project_structure.md` (30/30/25/15), rounded once at the
  * end; the grade bands are the school-report ones because that is how users
- * read a letter. `findingsFromReport` is the rule-based advice — what the
+ * read a letter. `findingsFromReport` is the rule-based advice: what the
  * UI shows when no model is available, and the floor the model's advice is
  * compared against: every failed check gets a title, the issue, a concrete
  * fix and, where one exists, a link to the public documentation that says
@@ -329,7 +329,7 @@ export function summariseForAdvice(audit: SeoAudit): string {
   const page = crawl.page;
   const lines: string[] = [
     `URL: ${clip(crawl.finalUrl, 120)}`,
-    `Score: ${report.overall}/100 (${report.grade}) — on-page ${report.scores.onPage}, technical ${report.scores.technical}, content ${report.scores.content}, authority ${report.scores.backlink}${report.categories.find((c) => c.category === 'backlink')?.estimated ? ' (estimated)' : ''}`,
+    `Score: ${report.overall}/100 (${report.grade}), on-page ${report.scores.onPage}, technical ${report.scores.technical}, content ${report.scores.content}, authority ${report.scores.backlink}${report.categories.find((c) => c.category === 'backlink')?.estimated ? ' (estimated)' : ''}`,
     `Fetch: HTTP ${crawl.statusCode}, ${crawl.mode} mode, ${crawl.responseTimeMs} ms, ${crawl.https ? 'https' : 'http'}${crawl.certificateValid === false ? ' (bad certificate)' : ''}, ${crawl.redirects.length} redirects, ${crawl.compressed ? 'compressed' : 'uncompressed'}`,
     `Title (${page.title?.length ?? 0} chars): ${clip(page.title, 80)}`,
     `Meta description (${page.metaDescription?.length ?? 0} chars): ${clip(page.metaDescription, 120)}`,

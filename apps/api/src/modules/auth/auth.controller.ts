@@ -45,7 +45,7 @@ import { ProvidersManager } from './providers/providers.manager';
  * Registration returns 201 whether or not the address was taken. Login returns
  * one 401 for five different causes. Reset returns 200 whether or not the
  * account exists. Validation returns 400 naming no field. The detail is in the
- * security log, not in the response — see `auth.messages.ts` for the full
+ * security log, not in the response: see `auth.messages.ts` for the full
  * catalogue and the reasoning.
  *
  * ## Cookie strategy
@@ -55,7 +55,7 @@ import { ProvidersManager } from './providers/providers.manager';
  * still allowing the top-level GET navigation an OAuth callback performs.
  *
  * The active organization goes in a **separate, readable** cookie. It is not a
- * credential — the server re-checks membership on every request — and the
+ * credential (the server re-checks membership on every request) and the
  * frontend needs to read it to highlight the current workspace.
  */
 @Controller('auth')
@@ -118,7 +118,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   logout(@Res({ passthrough: true }) response: Response) {
-    // Cleared with the same options they were set with — a mismatched `path`
+    // Cleared with the same options they were set with: a mismatched `path`
     // or `sameSite` leaves the original cookie in place in most browsers.
     response.clearCookie(this.authCookie, this.cookieOptions());
     response.clearCookie(this.orgCookie, this.cookieOptions(false));
@@ -217,7 +217,7 @@ export class AuthController {
   /**
    * Completes a handshake and starts a session.
    *
-   * Always ends in a redirect back to the web app rather than a JSON body —
+   * Always ends in a redirect back to the web app rather than a JSON body:
    * the browser arrived here by navigation, not by fetch.
    */
   @Public()
@@ -245,7 +245,7 @@ export class AuthController {
       await this.startSession(user, response);
 
       // Land on the app root and let the two route gates decide where this
-      // user actually belongs — dashboard or onboarding. Deciding it here
+      // user actually belongs: dashboard or onboarding. Deciding it here
       // would duplicate that logic in a second place.
       return response.redirect(`${this.webUrl}/`);
     } catch (error) {
@@ -285,8 +285,8 @@ export class AuthController {
 
   /**
    * @param httpOnly false for the org cookie, which the frontend reads to
-   * highlight the active workspace. It is not a credential — membership is
-   * re-verified server-side on every request — so exposing it costs nothing.
+   * highlight the active workspace. It is not a credential (membership is
+   * re-verified server-side on every request), so exposing it costs nothing.
    */
   private cookieOptions(httpOnly = true): CookieOptions {
     return {

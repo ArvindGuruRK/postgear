@@ -4,7 +4,7 @@ import { getSession, getSessionCookieHeader, hasCompletedOnboarding } from '@/li
 import type { Organization } from '@/types/workspace';
 
 /**
- * Root route — the single place that decides where a visitor belongs.
+ * Root route: the single place that decides where a visitor belongs.
  *
  * Every post-authentication redirect in the app points here rather than
  * computing a destination itself (login, the OAuth callback, onboarding
@@ -28,7 +28,7 @@ export default async function RootPage() {
   const { organizations } = await serverApi<{ organizations: Organization[] }>('/orgs', { cookie });
 
   // Onboarding cannot complete without creating a workspace, so this should be
-  // unreachable — but a user whose last membership was revoked would land here,
+  // unreachable, but a user whose last membership was revoked would land here,
   // and sending them to /onboarding lets them create a new workspace instead of
   // seeing a crash. Nothing may assume organizations[0] exists.
   if (organizations.length === 0) {

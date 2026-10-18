@@ -6,8 +6,8 @@ import { normalizeEmail, sanitizeText } from '../../../common/sanitize';
  *
  * Each one pairs a **transform** (sanitize/normalize) with a **check** that
  * runs afterwards. The ordering is the important part: sanitizing first and
- * validating second means a value that sanitizes down to nothing — a name
- * consisting only of `<b></b>`, say — is *rejected*, not silently stored as
+ * validating second means a value that sanitizes down to nothing (a name
+ * consisting only of `<b></b>`, say) is *rejected*, not silently stored as
  * an empty string. Validating first would pass it, and the transform would
  * then quietly empty it out.
  */
@@ -36,7 +36,7 @@ export const PASSWORD_MIN = 12;
 export const PASSWORD_MAX = 128;
 
 /**
- * **Never transformed.** No trim, no sanitize, no character filtering — see
+ * **Never transformed.** No trim, no sanitize, no character filtering: see
  * the header comment in `common/sanitize.ts` for why. The raw string is
  * validated for length and composition and then handed to argon2id verbatim.
  *
@@ -57,7 +57,7 @@ export const NAME_MAX = 80;
 
 /**
  * A human display name. This is the field the security brief calls
- * "username" — the schema has no `username` column; `User.name` and
+ * "username": the schema has no `username` column; `User.name` and
  * `User.lastName` are what a person is shown as.
  */
 export const nameSchema = z
@@ -78,7 +78,7 @@ export const orgNameSchema = z
   .refine((value) => value.length <= ORG_NAME_MAX, 'too long');
 
 /**
- * An opaque token from an emailed link. Hex or base64url only, bounded — this
+ * An opaque token from an emailed link. Hex or base64url only, bounded: this
  * rejects a path-traversal or SQL-shaped value before it reaches a lookup.
  */
 export const tokenSchema = z
@@ -88,7 +88,7 @@ export const tokenSchema = z
   .regex(/^[A-Za-z0-9_-]+$/, 'invalid format');
 
 /**
- * `User.timezone` is a **UTC offset in minutes**, not an IANA zone name — see
+ * `User.timezone` is a **UTC offset in minutes**, not an IANA zone name: see
  * SCHEMA_NOTES. -720..+840 covers every real offset (UTC-12 to UTC+14).
  */
 export const timezoneSchema = z.coerce.number().int().min(-720).max(840).default(0);

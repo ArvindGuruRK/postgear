@@ -10,14 +10,14 @@ import { useWorkspace } from './workspace-provider';
  * The workspace switcher in the top bar.
  *
  * Reads real memberships from `WorkspaceProvider`, which `[orgId]/layout.tsx`
- * populated server-side — so the list is correct on first paint with no
+ * populated server-side, so the list is correct on first paint with no
  * loading state and no extra request.
  *
  * Switching is a **server** operation, not just a client route change:
  * `POST /orgs/:id/switch` verifies the membership and sets the `pg_org`
  * cookie, which is what every subsequent API call is scoped by. Navigating
  * without it would change the URL while leaving the API still answering for
- * the old workspace — the kind of mismatch that shows one tenant another
+ * the old workspace: the kind of mismatch that shows one tenant another
  * tenant's data.
  *
  * The optimistic local update is display-only, and is rolled back if the
@@ -44,7 +44,7 @@ export function OrgSwitcher() {
       router.refresh();
       router.push(`/${nextId}/calendar`);
     } catch {
-      // The API refused — most likely the membership was revoked in another
+      // The API refused: most likely the membership was revoked in another
       // tab. Drop the optimistic selection and let the provider's value stand.
       setPendingId(null);
     }

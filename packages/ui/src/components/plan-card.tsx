@@ -19,13 +19,13 @@ export interface PlanCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>
   actionVariant?: ButtonProps['variant'];
   /**
    * Sprint 8: the card for the plan a workspace is already on keeps its
-   * button, reading "Current plan", but it must not be pressable — the
+   * button, reading "Current plan", but it must not be pressable; the
    * same for a member who may see the plans but not buy one.
    */
   actionDisabled?: boolean;
 }
 
-/** Covers both "Upgrade/Plan Card" and "Pricing Card" — same shape, different copy. */
+/** Covers both "Upgrade/Plan Card" and "Pricing Card": same shape, different copy. */
 export function PlanCard({
   className,
   name,
@@ -45,7 +45,7 @@ export function PlanCard({
     <Card
       className={cn(
         'flex flex-col',
-        highlighted && 'border-actionPrimary shadow-brutalLg',
+        highlighted && 'border-actionPrimary shadow-surfaceLg',
         className,
       )}
       {...props}

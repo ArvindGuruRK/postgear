@@ -83,7 +83,7 @@ export function Sidebar({
     try {
       if (window.localStorage.getItem(STORAGE_KEY) === 'false') setCollapsed(false);
     } catch {
-      // Storage unavailable (private mode, blocked cookies) — keep the default.
+      // Storage unavailable (private mode, blocked cookies): keep the default.
     }
   }, []);
 
@@ -109,7 +109,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'flex h-full shrink-0 flex-col border-r-4 border-outline bg-secondary',
+        'flex h-full shrink-0 flex-col border-r-4 border-outline bg-chrome',
         'transition-[width] duration-150 ease-out',
         collapsed ? 'w-20 items-center' : 'w-56',
       )}

@@ -6,7 +6,7 @@
  * An integrator sends plain text; the composer stores a document. The
  * mapping is the one `render.ts` already defines, in reverse: a run of
  * non-blank lines is one paragraph with a hard break between its lines, and
- * a blank line is an *empty paragraph* — which is exactly what TipTap
+ * a blank line is an *empty paragraph*, which is exactly what TipTap
  * stores when a person presses Enter twice, and what the renderer turns
  * back into a blank line. (Merely splitting paragraphs on blank lines would
  * lose them: the renderer joins paragraphs with one newline, so "A, blank,
@@ -17,8 +17,8 @@
  *
  * The result is checked against the composer's own document schema before
  * it goes anywhere near the posts service. A text with more paragraphs than
- * a document may hold would be *stored* fine — the service does not
- * re-validate — and then refused the first time someone opened it in the
+ * a document may hold would be *stored* fine (the service does not
+ * re-validate) and then refused the first time someone opened it in the
  * composer and saved. Refusing it here keeps every stored post editable.
  *
  * ## Document out, text in
@@ -43,7 +43,7 @@ import { DEVELOPERS_MESSAGES } from '../developers.messages';
 import type { CreatePublicPostInput, PublicStateFilter } from './dto/v1.schema';
 import type { PublicPost, PublicPostChannel, PublicPostSummary } from './v1.types';
 
-/** Characters of text in a list preview — the queue's own figure. */
+/** Characters of text in a list preview: the queue's own figure. */
 export const PREVIEW_LENGTH = 160;
 
 /** A post queued through the API with no time lands this far ahead. */
@@ -73,7 +73,7 @@ export function textToDocument(text: string): PostDocument {
 
   for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
     if (line.trim().length === 0) {
-      // A blank line — whitespace-only counts — is an empty paragraph, one
+      // A blank line (whitespace-only counts) is an empty paragraph, one
       // per line, so two blank lines stay two blank lines when rendered.
       flush();
       blocks.push({ type: 'paragraph' });

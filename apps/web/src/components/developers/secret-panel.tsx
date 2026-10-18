@@ -9,7 +9,7 @@
  * it is a focusable, selectable control (`select()` on focus) and so the
  * e2e suite reads it with `inputValue()`.
  *
- * The clipboard call can fail — an insecure origin, a denied permission —
+ * The clipboard call can fail (an insecure origin, a denied permission)
  * and then the only honest thing is to say so and leave the text selectable.
  */
 import {
@@ -52,7 +52,7 @@ export function SecretPanel({ secret, apiUrl }: SecretPanelProps) {
       <Alert variant="warning">
         <TriangleAlert className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />
         <AlertDescription>
-          Copy this key now. For your security it will not be shown again — if you lose it, rotate
+          Copy this key now. For your security it will not be shown again. If you lose it, rotate
           the key to get a new one.
         </AlertDescription>
       </Alert>

@@ -4,11 +4,11 @@ import { expect, type Page, test } from '@playwright/test';
 import { verifyWebhookSignature } from '@postgear/db';
 
 /**
- * Outbound webhooks (Sprint 8) — the Definition of Done item "receive a
+ * Outbound webhooks (Sprint 8): the Definition of Done item "receive a
  * webhook when it publishes", proven with a real receiver: this test hosts
  * one, registers it through the settings page, sends a test delivery, and
- * checks the request the worker made — headers, a verifiable signature, the
- * documented payload — and the delivery history the page then shows.
+ * checks the request the worker made (headers, a verifiable signature, the
+ * documented payload) and the delivery history the page then shows.
  *
  * Prerequisites, as for the rest of the suite: `docker compose up -d`,
  * `npm run db:seed`, `npm run dev:api:e2e` and `npm run dev:worker` in their
@@ -64,7 +64,7 @@ test.describe('webhooks', () => {
   }) => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/settings/webhooks`);
-    await expect(page.getByRole('main').getByRole('heading', { name: 'Webhooks' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Webhooks' })).toHaveAttribute('aria-current', 'page');
 
     const name = `E2E receiver ${Date.now()}`;
     await page.getByTestId('webhook-add').click();

@@ -1,5 +1,5 @@
 /**
- * `@postgear/seo-engine`'s contract — every type the API (and the engine's own
+ * `@postgear/seo-engine`'s contract: every type the API (and the engine's own
  * tests) program against.
  *
  * ## Three parts, one shape
@@ -65,7 +65,7 @@ export interface UrlGuardOptions {
 /** How the page was fetched. `html` is the fallback when no browser could be used. */
 export type CrawlMode = 'browser' | 'html';
 
-/** The stages a crawl reports as it goes — `onStage` in {@link CrawlOptions}. */
+/** The stages a crawl reports as it goes: `onStage` in {@link CrawlOptions}. */
 export type CrawlStage = 'fetch' | 'robots' | 'sitemap' | 'links';
 
 export interface CrawlOptions {

@@ -1,4 +1,4 @@
-# 🏗️ PostGear — Project Setup & Directory Architecture Blueprint
+# 🏗️ PostGear: Project Setup & Directory Architecture Blueprint
 
 ---
 
@@ -69,7 +69,7 @@ PostGear/
 
 ---
 
-### 2.2 `apps/web` — Next.js SaaS Web Application
+### 2.2 `apps/web`: Next.js SaaS Web Application
 ```
 apps/web/
 ├── public/
@@ -121,7 +121,7 @@ apps/web/
 
 ---
 
-### 2.3 `apps/api` — Core REST & Webhook Backend Server
+### 2.3 `apps/api`: Core REST & Webhook Backend Server
 ```
 apps/api/
 ├── src/
@@ -153,7 +153,7 @@ apps/api/
 
 ---
 
-### 2.4 `apps/worker` — Background Job & Temporal Worker Engine
+### 2.4 `apps/worker`: Background Job & Temporal Worker Engine
 ```
 apps/worker/
 ├── src/
@@ -175,7 +175,7 @@ apps/worker/
 
 ---
 
-### 2.5 `packages/db` — Prisma Schema & Database Layer
+### 2.5 `packages/db`: Prisma Schema & Database Layer
 ```
 packages/db/
 ├── prisma/
@@ -192,7 +192,7 @@ packages/db/
 
 ---
 
-### 2.6 `packages/social-core` — Modular Social Media Integrations
+### 2.6 `packages/social-core`: Modular Social Media Integrations
 ```
 packages/social-core/
 ├── src/
@@ -203,11 +203,11 @@ packages/social-core/
 │   │   └── errors.ts            # RefreshToken / BadBody / Retryable / NotEnoughScopes
 │   ├── composer/                # Browser-safe: post document, render, length, rules, validate
 │   ├── providers/               # Social Network Implementation Modules
-│   │   ├── twitter/             # X — API v2, OAuth 2.0 PKCE (identifier: 'x')
+│   │   ├── twitter/             # X: API v2, OAuth 2.0 PKCE (identifier: 'x')
 │   │   ├── meta/                # Shared Graph API plumbing for the two below
 │   │   ├── instagram/           # Instagram Business Graph API
 │   │   ├── facebook/            # Facebook Pages API
-│   │   ├── linkedin/            # LinkedIn v2 — personal + page providers
+│   │   ├── linkedin/            # LinkedIn v2: personal + page providers
 │   │   ├── youtube/             # YouTube Data API v3
 │   │   ├── tiktok/              # TikTok Content Posting API v2
 │   │   └── pinterest/           # Pinterest API v5
@@ -219,9 +219,9 @@ packages/social-core/
 ```
 
 > **One addition, made in Sprint 4: `composer/` is a second entry point.** It
-> holds everything the post composer must agree with the publisher about — the
+> holds everything the post composer must agree with the publisher about (the
 > post document, its rendering to platform text, X's weighted length, declarative
-> `ProviderRules` and the one validator — with no Node imports and no provider
+> `ProviderRules` and the one validator), with no Node imports and no provider
 > classes. `apps/web` imports it as `@postgear/social-core/composer` (a path alias
 > in its tsconfig) and never the package root, which would bundle the providers
 > and `node:crypto` into the browser. Each provider now declares `rules` beside
@@ -233,7 +233,7 @@ packages/social-core/
 > S3 from `STORAGE_PROVIDER`.
 
 > **Two corrections to the sketch above, made real in Sprint 3.** Token
-> cryptography is **not** in `integration.manager.ts` — it lives at the
+> cryptography is **not** in `integration.manager.ts`: it lives at the
 > persistence boundary, in `apps/api/src/modules/channels/channels.repository.ts`,
 > using the AES-256-GCM helper in `packages/db/src/crypto.ts`. A registry that
 > never touches a database has no business holding a key. And the folder is
@@ -243,7 +243,7 @@ packages/social-core/
 
 ---
 
-### 2.7 `packages/seo-engine` — Web Crawler & SEO Prediction Engine
+### 2.7 `packages/seo-engine`: Web Crawler & SEO Prediction Engine
 ```
 packages/seo-engine/
 ├── src/
@@ -262,7 +262,7 @@ packages/seo-engine/
 
 ---
 
-### 2.8 `packages/ai-engine` — LangChain / Mastra AI Pipeline
+### 2.8 `packages/ai-engine`: LangChain / Mastra AI Pipeline
 ```
 packages/ai-engine/
 ├── src/
@@ -281,7 +281,7 @@ packages/ai-engine/
 
 ---
 
-### 2.9 `packages/ui` — Shared Design System Component Library
+### 2.9 `packages/ui`: Shared Design System Component Library
 ```
 packages/ui/
 ├── src/

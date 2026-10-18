@@ -5,8 +5,8 @@
  * A stored audit is a row with five score columns plus two JSON documents:
  * `auditData` (`{ crawl, report, authority }`, the engine's `SeoAudit`) and
  * `aiAdvice` (the engine's `SeoAdvice`). The history list reads the columns
- * only; the detail opens the JSON. Reading the JSON is defensive on purpose
- * — a row written by an older build, or a seed, or a run that crashed
+ * only; the detail opens the JSON. Reading the JSON is defensive on purpose:
+ * a row written by an older build, or a seed, or a run that crashed
  * between two writes, must render as "no crawl yet" rather than as a 500.
  *
  * The crawl summary is a *projection* of the crawl result: counts instead
@@ -304,9 +304,9 @@ export function crawlStageDetail(
     case 'started':
       return `${label}…`;
     case 'skipped':
-      return `${label} — skipped`;
+      return `${label}: skipped`;
     case 'failed':
-      return `${label} — could not be completed`;
+      return `${label}: could not be completed`;
     default:
       return null;
   }

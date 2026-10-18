@@ -8,21 +8,21 @@
  *
  * The API answers `/developers/api-keys` for admins only, so a `USER`
  * member's page load lands here with `initialKeys === null`. The role from
- * `useWorkspace()` decides what the page *offers* — the create button, the
- * row actions — and the note explains why there is nothing to offer. It is
+ * `useWorkspace()` decides what the page *offers* (the create button, the
+ * row actions) and the note explains why there is nothing to offer. It is
  * presentation only; `RolesGuard` is where the rule binds.
  *
  * ## Dates render after mount
  *
  * "Created" and "Last used" are formatted in the viewer's locale, which the
  * server does not share, so both wait for `useMounted()` and show a dash
- * until then — the same hydration rule the queue follows.
+ * until then: the same hydration rule the queue follows.
  *
  * ## Restrained surface
  *
  * The list is a dense data surface (design-system-rules.md §15): a plain
  * `Table`, the prefix in a `code` element, status as a `Badge`. The comic
- * treatment stays on the chrome — the header, the buttons, the dialogs.
+ * treatment stays on the chrome: the header, the buttons, the dialogs.
  */
 import {
   Badge,
@@ -36,7 +36,7 @@ import {
   EmptyState,
   ErrorState,
   Link,
-  PageHeader,
+  PageActions,
   Stack,
   Table,
   TableBody,
@@ -68,7 +68,7 @@ import { RotateKeyDialog } from './rotate-key-dialog';
 import { SecretPanel } from './secret-panel';
 
 interface ApiKeysManagerProps {
-  /** Null when the list could not be loaded — a `USER` member, or the API away. */
+  /** Null when the list could not be loaded: a `USER` member, or the API away. */
   initialKeys: ApiKeyView[] | null;
 }
 
@@ -101,24 +101,18 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="API keys"
-        description="Keys let your own code call the PostGear API as this workspace. Every key acts as an admin here, so treat it like a password."
-        actions={
-          <>
-            <Link href={docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5">
-              API reference
-              <ExternalLink className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
-            </Link>
-            {canManage ? (
-              <Button onClick={() => setCreateOpen(true)} disabled={limitReached}>
-                <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
-                Create key
-              </Button>
-            ) : null}
-          </>
-        }
-      />
+      <PageActions>
+        <Link href={docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5">
+          API reference
+          <ExternalLink className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+        </Link>
+        {canManage ? (
+          <Button onClick={() => setCreateOpen(true)} disabled={limitReached}>
+            <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+            Create key
+          </Button>
+        ) : null}
+      </PageActions>
 
       {!canManage ? (
         <Text size="sm" muted>
@@ -147,7 +141,7 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
         <EmptyState
           icon={KeyRound}
           title="No API keys yet"
-          description="Create a key to call the PostGear API from your own code — list channels, create posts, read analytics."
+          description="Create a key to call the PostGear API from your own code: list channels, create posts, read analytics."
           action={canManage ? { label: 'Create key', onClick: () => setCreateOpen(true) } : undefined}
         />
       ) : (
@@ -185,10 +179,10 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
                     </code>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {mounted ? formatCreated(key.createdAt, now) : '—'}
+                    {mounted ? formatCreated(key.createdAt, now) : '-'}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {mounted ? formatLastUsed(key.lastUsedAt, now) : '—'}
+                    {mounted ? formatLastUsed(key.lastUsedAt, now) : '-'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={badge.variant}>{badge.label}</Badge>

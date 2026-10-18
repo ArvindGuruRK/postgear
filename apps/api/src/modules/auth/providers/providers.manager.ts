@@ -12,14 +12,14 @@ import { GoogleAuthProvider } from './google.provider';
  * `state` parameter.
  *
  * Adding a provider means implementing `AuthProvider` and adding one line to
- * the constructor — no controller changes, no new routes.
+ * the constructor: no controller changes, no new routes.
  *
  * ## Why state lives here and not in the provider
  *
  * `state` is CSRF protection for the handshake, and the requirement is
  * identical for every provider, so implementing it per-provider would be three
  * copies of the same security-critical code. It works by minting a random
- * value, storing it server-side before the redirect, and requiring it back —
+ * value, storing it server-side before the redirect, and requiring it back,
  * and, crucially, **consuming it**, so a captured callback URL cannot be
  * replayed.
  *
@@ -53,7 +53,7 @@ export class ProvidersManager {
     }
 
     if (!provider.isConfigured()) {
-      // A provider with no client id is a deployment gap, not a user error —
+      // A provider with no client id is a deployment gap, not a user error:
       // the button should not have been rendered. Distinguishing it in the log
       // is worth it; the user still sees the generic OAUTH_FAILED.
       throw new OAuthError(`Provider ${name} is not configured`);

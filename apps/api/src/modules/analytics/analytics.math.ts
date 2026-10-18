@@ -1,8 +1,8 @@
 /**
  * The arithmetic behind the Analytics page, with nothing else in it: no
  * Prisma, no Nest, no clock it was not handed. Every number the page shows
- * — a range's series, a stat's delta, an engagement rate, "above average",
- * the CSV — is computed here from plain rows, so each can be pinned by a
+ * (a range's series, a stat's delta, an engagement rate, "above average",
+ * the CSV) is computed here from plain rows, so each can be pinned by a
  * unit test and the service is left with fetching and shaping.
  *
  * ## Days are UTC calendar days
@@ -81,7 +81,7 @@ export function rangeWindow(range: AnalyticsRange, now: number = Date.now()): Ra
 /**
  * A metric's series over the window, from its rows (any dates; only this
  * metric). Days without a row carry 0. A level's total is the latest value
- * inside the range and its previous is the value at the range start — the
+ * inside the range and its previous is the value at the range start: the
  * latest recorded on or before the first day; a flow's are the two sums.
  */
 export function buildSeries(
@@ -164,7 +164,7 @@ export const NO_CHANGE: Readonly<MetricChange> = Object.freeze({
  * Adds changes across channels: the values summed, the delta summed over
  * the channels that have one, and the percent recomputed against their
  * summed previous. A channel with no previous period contributes its value
- * and nothing else — counting it as a gain from zero would read as growth
+ * and nothing else: counting it as a gain from zero would read as growth
  * that never happened.
  */
 export function sumChanges(changes: MetricChange[]): MetricChange {

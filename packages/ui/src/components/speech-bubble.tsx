@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
 /**
  * The comic speech bubble the Sprint 0 doc names as a sanctioned accent
  * ("rounded rectangle + a small triangular tail"), built here for the Sprint 6
- * copilot chat — and, per design-system-rules.md §16b, for chat only. Fills
+ * copilot chat, and, per design-system-rules.md §16b, for chat only. Fills
  * follow the Badge/Alert pairing: `primary` is the user's own message,
  * `ai` marks what the model produced, `default` is a plain surface.
  *
@@ -15,10 +15,10 @@ import { cn } from '../lib/utils';
  * into the tail, and the square's borderless top half paints over the
  * bubble's own bottom border in the variant's fill. It is clipped by nothing,
  * so the bubble must not get `overflow-hidden`. The bubble's shadow is not
- * repeated on the tail — a rotated box-shadow would point the wrong way.
+ * repeated on the tail: a rotated box-shadow would point the wrong way.
  */
 const bubbleVariants = cva(
-  'relative rounded-lg border-2 border-outline p-4 font-sans text-sm shadow-brutalSm',
+  'relative rounded-lg border-2 border-outline p-4 font-sans text-sm shadow-surfaceSm',
   {
     variants: {
       variant: {

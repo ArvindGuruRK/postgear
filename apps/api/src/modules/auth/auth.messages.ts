@@ -7,7 +7,7 @@
  * site. "No user with that email" and "Wrong password" are individually
  * reasonable and jointly an account-enumeration oracle: an attacker learns
  * which addresses are registered by reading the difference. Centralising them
- * makes the property testable — `auth.messages.spec.ts` asserts that no string
+ * makes the property testable: `auth.messages.spec.ts` asserts that no string
  * in this file contains a banned phrase, so a future leak fails CI rather than
  * shipping.
  *
@@ -22,8 +22,8 @@
  *
  * ## The cost, stated plainly
  *
- * A locked-out user cannot tell why they are being refused. That is the point
- * — but it means the lockout notification email is not a nicety, it is the
+ * A locked-out user cannot tell why they are being refused. That is the point,
+ * but it means the lockout notification email is not a nicety, it is the
  * only channel through which the real account owner learns what happened. If
  * mail delivery breaks, users are locked out with no explanation. See
  * `lockout.service.ts`.
@@ -47,7 +47,7 @@ export const AUTH_MESSAGES = {
   /** Returned whether or not the address is already taken. */
   REGISTRATION_ACCEPTED: 'Check your email to confirm your account',
 
-  /** Expired, already-used, or entirely unknown reset token — indistinguishable. */
+  /** Expired, already-used, or entirely unknown reset token: indistinguishable. */
   RESET_LINK_INVALID: 'That reset link is no longer valid',
 
   /** Expired, already-used, or unknown activation token. */
@@ -68,7 +68,7 @@ export const AUTH_MESSAGES = {
   /** Generic 500 body. Never carries an exception message. */
   UNEXPECTED: 'Something went wrong. Please try again.',
 
-  /** OAuth handshake failed for any reason — bad state, provider error, denial. */
+  /** OAuth handshake failed for any reason: bad state, provider error, denial. */
   OAUTH_FAILED: 'We could not complete that sign-in',
 } as const;
 

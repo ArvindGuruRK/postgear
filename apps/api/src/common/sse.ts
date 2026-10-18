@@ -3,8 +3,8 @@
  *
  * ## Why not Nest's `@Sse()`
  *
- * Nest's decorator only answers `GET`, and an AI generation needs a body — a
- * topic, a tone, a list of channels, a conversation — that no sane client puts
+ * Nest's decorator only answers `GET`, and an AI generation needs a body (a
+ * topic, a tone, a list of channels, a conversation) that no sane client puts
  * in a query string. So the handlers take `@Req()`/`@Res()` and write the
  * stream by hand through this helper, which is the one place the wire format
  * lives: `event: <type>\ndata: <json>\n\n` per event and `: ping\n\n` as a
@@ -19,7 +19,7 @@
  * - **Errors after the first byte cannot become HTTP errors.** The status and
  *   headers are already sent, so the global exception filter cannot help; a
  *   failure mid-stream is reported as an `error` *event*, never as a dropped
- *   socket the client has to guess at. That is the caller's job — this helper
+ *   socket the client has to guess at. That is the caller's job: this helper
  *   only guarantees that `send` and `close` are safe to call at any time,
  *   including after the client has gone.
  *
@@ -43,7 +43,7 @@ export interface SseStream {
   readonly closed: boolean;
 }
 
-/** The subset of an Express request/response this helper touches — what a test fakes. */
+/** The subset of an Express request/response this helper touches: what a test fakes. */
 export type SseRequest = Pick<Request, 'on'>;
 export type SseResponse = Pick<
   Response,

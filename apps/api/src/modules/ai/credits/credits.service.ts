@@ -4,8 +4,8 @@
  *
  * ## Charged before the work, refunded when it fails
  *
- * A generation is charged *before* the model is called. The alternative —
- * charge on success — lets a workspace with one credit left run any number
+ * A generation is charged *before* the model is called. The alternative, 
+ * charge on success, lets a workspace with one credit left run any number
  * of generations in parallel. When the work then fails before producing
  * anything, the whole charge is refunded; when only the image failed, the
  * image's share is. A refund is a negative ledger row (`credits.policy.ts`).

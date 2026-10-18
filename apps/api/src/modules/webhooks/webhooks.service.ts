@@ -2,8 +2,8 @@
  * Outbound webhooks: what a workspace has configured, and the test send
  * (Sprint 8, PRD 5.10).
  *
- * The service owns the rules — the URL policy, the per-workspace cap, that
- * a hook may only name this workspace's channels — and the repository the
+ * The service owns the rules (the URL policy, the per-workspace cap, that
+ * a hook may only name this workspace's channels) and the repository the
  * rows. Delivery itself is the worker's: a test send creates a delivery row
  * and asks the scheduler to start its workflow, exactly the path a real
  * post outcome takes, so what a receiver sees from "Send test" is what it

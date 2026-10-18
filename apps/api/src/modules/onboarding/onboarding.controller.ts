@@ -6,19 +6,20 @@ import {
   CurrentUser,
 } from '../../common/decorators/current-user.decorator';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
-import type { AnswersStepDto } from './dto/onboarding.schema';
+import type { AnswersStepDto, ProfileStepDto } from './dto/onboarding.schema';
 import {
   answersStepSchema,
   channelsStepSchema,
+  profileStepSchema,
   workspaceStepSchema,
 } from './dto/onboarding.schema';
-import { OnboardingService } from './onboarding.service';
+import { OnboardingService, PROFILE_STEP } from './onboarding.service';
 
 /**
  * The onboarding wizard's API.
  *
  * **No `@Roles()` on any route here, deliberately.** A user in this flow may
- * belong to no organization at all — that is the entire point of the flow —
+ * belong to no organization at all (that is the entire point of the flow)
  * and a role requirement resolves against an active workspace that does not
  * exist yet. These routes need authentication and nothing more.
  */
@@ -42,13 +43,13 @@ export class OnboardingController {
   }
 
   /**
-   * Step 1 — create the workspace.
+   * Step 1: create the workspace.
    *
    * The active-workspace cookie is set here, which is not incidental. The rest
    * of the API resolves the current workspace from that cookie (see
    * `@CurrentOrg()`), so without it a user who has just created their first
    * workspace reaches step 4 with an organization in the database but no active
-   * one on the request — and connecting a channel fails with "Select a workspace
+   * one on the request, and connecting a channel fails with "Select a workspace
    * first". `POST /orgs` has always set it for the same reason; onboarding
    * creates workspaces by a different route and needs to do the same.
    */
@@ -71,7 +72,7 @@ export class OnboardingController {
   /**
    * Mirrors `OrgController`'s options exactly.
    *
-   * Readable by JavaScript on purpose — unlike the session cookie, this one only
+   * Readable by JavaScript on purpose: unlike the session cookie, this one only
    * names which workspace is selected, and the web app reads it to route. It is
    * never trusted for authorization: `RolesGuard` re-checks membership against
    * the database on every request.
@@ -91,7 +92,7 @@ export class OnboardingController {
    *
    * The next step is derived from which questions the body carried rather than
    * trusted from the client: a client that could name its own next step could
-   * skip step 5 and still be marked complete.
+   * jump past steps it never saw.
    */
   @Post('answers')
   @HttpCode(HttpStatus.OK)
@@ -102,7 +103,7 @@ export class OnboardingController {
     return this.onboarding.saveAnswers(user.id, dto, nextStepFor(dto));
   }
 
-  /** Step 4. An empty array is a valid submission — that is "skip". */
+  /** Step 4. An empty array is a valid submission: that is "skip". */
   @Post('channels')
   @HttpCode(HttpStatus.OK)
   async channels(
@@ -113,10 +114,25 @@ export class OnboardingController {
     return this.onboarding.saveChannels(user.id, dto.interestedChannels);
   }
 
-  @Post('complete')
+  /** "Skip questions" from steps 2–5: straight to the profile step. */
+  @Post('skip')
   @HttpCode(HttpStatus.OK)
-  async complete(@CurrentUser() user: AuthenticatedUser) {
-    return this.onboarding.complete(user.id);
+  async skip(@CurrentUser() user: AuthenticatedUser) {
+    return this.onboarding.skipQuestions(user.id);
+  }
+
+  /**
+   * Step 6: the name to be called by, and the end of onboarding. Replaces the
+   * old `POST /onboarding/complete`, so there is no way to finish without
+   * passing through this step.
+   */
+  @Post('profile')
+  @HttpCode(HttpStatus.OK)
+  async profile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodBody(profileStepSchema, 'onboarding/profile')) dto: ProfileStepDto,
+  ) {
+    return this.onboarding.completeProfile(user.id, dto.name);
   }
 }
 
@@ -124,15 +140,14 @@ export class OnboardingController {
  * Maps a set of submitted answers to the step that follows it.
  *
  * Step 2 asks role and team size; step 3 asks goal and frequency; step 5 asks
- * referral source. Anything unrecognised leaves the user where they are rather
- * than guessing.
+ * referral source and leads to the profile step. Exported for its unit test.
  */
-function nextStepFor(dto: AnswersStepDto): number {
+export function nextStepFor(dto: AnswersStepDto): number {
   if (dto.role !== undefined || dto.teamSize !== undefined) {
     return 3;
   }
   if (dto.primaryGoal !== undefined || dto.postingFrequency !== undefined) {
     return 4;
   }
-  return 5;
+  return PROFILE_STEP;
 }

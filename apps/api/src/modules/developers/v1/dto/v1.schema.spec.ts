@@ -1,5 +1,5 @@
 /**
- * The public schemas' bounds, pinned — they are also what the OpenAPI
+ * The public schemas' bounds, pinned: they are also what the OpenAPI
  * document states, so a change here is a change to the published contract.
  */
 import { createPublicPostSchema, listPublicPostsQuerySchema } from './v1.schema';

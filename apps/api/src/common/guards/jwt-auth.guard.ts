@@ -24,7 +24,7 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
  * An httpOnly cookie is unreadable by JavaScript, so an XSS bug on the
  * frontend cannot exfiltrate the session the way it could a token kept in
  * `localStorage`. The cost is CSRF exposure, which is handled by
- * `sameSite: 'lax'` on the cookie (see `auth.controller.ts`) — that blocks the
+ * `sameSite: 'lax'` on the cookie (see `auth.controller.ts`); that blocks the
  * cross-site POST an attacker would need, while still allowing the top-level
  * GET navigations that OAuth callbacks rely on.
  *
@@ -33,8 +33,8 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
  *
  * ## Why it re-reads the user on every request
  *
- * The JWT carries only `sub` and `email`. Everything else — superadmin status,
- * onboarding state — is loaded fresh, so a change takes effect immediately
+ * The JWT carries only `sub` and `email`. Everything else (superadmin status,
+ * onboarding state) is loaded fresh, so a change takes effect immediately
  * rather than at token expiry. That is one indexed primary-key lookup per
  * request, which is the right price for not having stale authorization data.
  */
@@ -72,7 +72,7 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwt.verifyAsync<{ sub: string }>(token);
       subject = payload.sub;
     } catch {
-      // Expired, wrong signature, malformed — all one message. Distinguishing
+      // Expired, wrong signature, malformed: all one message. Distinguishing
       // them tells an attacker whether their forged token was structurally
       // valid, which is a free oracle on the signing scheme.
       throw new UnauthorizedException(AUTH_MESSAGES.SESSION_EXPIRED);

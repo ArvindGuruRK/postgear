@@ -3,7 +3,7 @@ import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
 const alertVariants = cva(
-  'flex items-start gap-3 rounded-md border-2 border-outline p-4 font-sans text-sm shadow-brutalSm',
+  'flex items-start gap-3 rounded-md border-2 border-outline p-4 font-sans text-sm shadow-surfaceSm',
   {
     variants: {
       variant: {

@@ -8,7 +8,7 @@ import type { Provider } from '@postgear/db';
  * for a profile.
  *
  * The shape is deliberately the same idea as the provider/manager pattern used
- * for social *channels* in Sprint 3 — one interface, N implementations, one
+ * for social *channels* in Sprint 3: one interface, N implementations, one
  * registry that dispatches by name. Learning it once here pays off there.
  *
  * Note what the interface does **not** expose: no access token, no refresh
@@ -23,6 +23,12 @@ export interface OAuthProfile {
   /** Verified primary address. Providers that can omit it are handled below. */
   email: string;
   name?: string;
+  /**
+   * The provider's profile photo URL, when there is a real one (not a
+   * placeholder silhouette). Used once, at account creation, as the default
+   * avatar: `AvatarService.importFromUrl` copies it onto our storage.
+   */
+  picture?: string;
 }
 
 export interface AuthProvider {

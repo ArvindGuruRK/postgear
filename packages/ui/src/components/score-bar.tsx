@@ -5,15 +5,15 @@ import { type ScoreTone, toneForScore } from './score-gauge';
 
 /**
  * One sub-score as a labelled flat bar (Sprint 7: the four SEO categories
- * under the gauge). `Progress` with its stripes and crawl turned off — a
- * score is a reading, not a job in progress — and the tone taken from the
+ * under the gauge). `Progress` with its stripes and crawl turned off (a
+ * score is a reading, not a job in progress) and the tone taken from the
  * same bands as `ScoreGauge`, so a 55 reads red everywhere.
  */
 export interface ScoreBarProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'> {
   label: string;
   /** 0–100. Null renders an empty bar with a dash. */
   score: number | null;
-  /** Text after the value — "30% of total", "estimated". */
+  /** Text after the value: "30% of total", "estimated". */
   hint?: string;
   tone?: ScoreTone;
   size?: 'sm' | 'md';

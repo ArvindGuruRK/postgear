@@ -19,7 +19,7 @@ export type SniffedMedia =
     }
   | { kind: 'video'; mimeType: 'video/mp4' | 'video/quicktime' };
 
-/** Recognised, but deliberately refused — each with its own explanation. */
+/** Recognised, but deliberately refused, each with its own explanation. */
 export type RefusedMedia = { kind: 'refused'; reason: 'heic' | 'webm' };
 
 /** How many leading bytes `sniffMedia` needs. */
@@ -27,7 +27,7 @@ export const SNIFF_BYTES = 32;
 
 /**
  * ISO base media `ftyp` brands that are ordinary MP4 video. Anything else in an
- * `ftyp` box — audio-only `M4A `, 3GPP, the HEIF image brands — is not accepted
+ * `ftyp` box (audio-only `M4A `, 3GPP, the HEIF image brands) is not accepted
  * as video just because it shares the container.
  */
 const MP4_BRANDS = new Set([

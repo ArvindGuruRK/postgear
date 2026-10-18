@@ -9,7 +9,7 @@
  * - **The `BillingEvent` row is inserted first.** Its primary key is the
  *   Stripe event id, so a redelivery (or two deliveries racing) fails the
  *   insert, the transaction rolls back, and the answer is `duplicate` with
- *   a 200 — nothing was applied twice.
+ *   a 200: nothing was applied twice.
  * - **An event older than the row's `lastStripeEventAt` is ignored.** A
  *   delayed `customer.subscription.updated` from before a cancellation
  *   must not un-cancel it. The outcome is recorded as `ignored:stale`.
@@ -18,7 +18,7 @@
  *
  * Stripe retries a non-2xx for up to three days. A verified event the
  * handler cannot process is a bug on this side, and replaying it every
- * hour will not fix it — it will only repeat whatever half-effect it had.
+ * hour will not fix it: it will only repeat whatever half-effect it had.
  * So the error is logged as `billing.webhook_failed`, the event is recorded
  * `failed:<reason>` (outside the rolled-back transaction, so the replay
  * reads as a duplicate), and the response is 200. The log is the alarm.
@@ -525,7 +525,7 @@ export class StripeWebhookService {
 }
 
 // ---------------------------------------------------------------------------
-// Readers — every field optional, nothing trusted to be well-formed
+// Readers: every field optional, nothing trusted to be well-formed
 // ---------------------------------------------------------------------------
 
 function objectOf(event: BillingWebhookEvent): StripeObjectLike {
@@ -590,7 +590,7 @@ function staleOutcome(event: BillingWebhookEvent, org: OrgBilling): string | nul
   return null;
 }
 
-/** A row that is live for this very subscription — so activating it again is not news. */
+/** A row that is live for this very subscription, so activating it again is not news. */
 function isLive(existing: Subscription | null, subscriptionId: string | null): boolean {
   return Boolean(
     existing &&

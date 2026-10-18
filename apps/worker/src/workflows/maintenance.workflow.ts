@@ -3,7 +3,7 @@
  * refreshable channel has its workflow.
  *
  * Started by the worker at boot under a fixed id, so there is exactly one of
- * it per namespace no matter how many workers run. It is itself durable — a
+ * it per namespace no matter how many workers run. It is itself durable: a
  * cron in the worker process would stop when the process did, which is the
  * one moment the safety net is for.
  *

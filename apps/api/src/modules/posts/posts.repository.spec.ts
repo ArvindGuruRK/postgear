@@ -149,7 +149,7 @@ describe('PostsRepository', () => {
         ),
       ).resolves.toBe('saved');
 
-      // The root keeps its id — the row Sprint 5's publish workflow is keyed on.
+      // The root keeps its id: the row Sprint 5's publish workflow is keyed on.
       expect(
         db.post.update.mock.calls.map(([args]) => [
           args.where.id,

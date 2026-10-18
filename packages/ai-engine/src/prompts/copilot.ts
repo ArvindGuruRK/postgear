@@ -1,9 +1,9 @@
 /**
- * Copilot — the system prompt and the tool-result encoding.
+ * Copilot: the system prompt and the tool-result encoding.
  *
  * The copilot is stateless; everything it may know about the workspace is in
  * {@link CopilotContext} and goes into this prompt on every turn. Tools are
- * described by the model client (name, description, schema) — the prompt only
+ * described by the model client (name, description, schema): the prompt only
  * explains *when* to reach for them and how to talk about the outcome, which
  * is the part a schema cannot say.
  *

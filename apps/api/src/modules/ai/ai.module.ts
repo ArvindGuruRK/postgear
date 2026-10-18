@@ -22,7 +22,7 @@ import { AI_ENGINE } from './engine/engine.types';
  * library items). `RedisService` arrives through the global `RedisModule`.
  *
  * The engine is a provider behind a token, built once from the environment,
- * so the service never knows which mode it has and a test hands it a fake —
+ * so the service never knows which mode it has and a test hands it a fake:
  * the same pattern as the scheduling module's Temporal connection.
  *
  * The engine and the credit ledger are exported (Sprint 7): the SEO analyzer

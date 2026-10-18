@@ -6,13 +6,13 @@ import {
   ReferralSource,
 } from '@postgear/db';
 import { z } from 'zod';
-import { orgNameSchema } from '../../auth/dto/common.schema';
+import { nameSchema, orgNameSchema } from '../../auth/dto/common.schema';
 
 /**
  * The onboarding wizard's request bodies.
  *
  * The five survey answers are validated with `z.nativeEnum` against the Prisma
- * enums, so the allowed values are defined once — in `schema.prisma` — and
+ * enums, so the allowed values are defined once, in `schema.prisma`, and
  * both the database and the API agree by construction. Adding a sixth option
  * to a question is a migration plus a UI change; the validation follows for
  * free and cannot drift out of sync.
@@ -44,7 +44,7 @@ export type AnswersStepDto = z.infer<typeof answersStepSchema>;
  * A bounded array of short slugs rather than free text: the values are written
  * to a `String[]` column and rendered back into the UI, so an unbounded list
  * of arbitrary strings would be both a storage and an injection concern. The
- * slug pattern is deliberately narrow — Sprint 3 owns the real channel
+ * slug pattern is deliberately narrow: Sprint 3 owns the real channel
  * registry, and this list only has to survive until then.
  */
 export const channelsStepSchema = z
@@ -56,4 +56,25 @@ export const channelsStepSchema = z
   .strict();
 
 /** The step number the client believes it is on, used to resume. */
-export const stepSchema = z.object({ step: z.coerce.number().int().min(1).max(5) }).strict();
+export const stepSchema = z.object({ step: z.coerce.number().int().min(1).max(6) }).strict();
+
+/**
+ * Shorter than `NAME_MAX` (80) on purpose: this is the name the AI copilot
+ * addresses the user by and the top bar shows, so it is a "what should we call
+ * you" name rather than a full legal one.
+ */
+export const PROFILE_NAME_MAX = 50;
+
+/**
+ * Step 6, "What should we call you?". The same `nameSchema` as
+ * `PATCH /users/me`: sanitized (markup and control characters stripped,
+ * whitespace collapsed and trimmed) before the checks run, with the tighter
+ * length bound on top.
+ */
+export const profileStepSchema = z
+  .object({
+    name: nameSchema.refine((value) => value.length <= PROFILE_NAME_MAX, 'too long'),
+  })
+  .strict();
+
+export type ProfileStepDto = z.infer<typeof profileStepSchema>;

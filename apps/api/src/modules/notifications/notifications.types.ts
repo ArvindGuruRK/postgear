@@ -4,7 +4,7 @@
  * One table of every `Notifications.type` the system writes, who should be
  * emailed about it, and how that email reads. Plain text only: a channel
  * name and a provider's error message are interpolated as text, never as
- * markup, so nothing a platform returns can become HTML in someone's inbox —
+ * markup, so nothing a platform returns can become HTML in someone's inbox;
  * `MailService.sendPlain` keeps it that way on the wire.
  *
  * The worker writes `post.*` and `channel.*` rows; the API's billing and
@@ -68,7 +68,7 @@ export const DEFAULT_TITLES: Record<NotificationType, string> = {
 };
 
 /**
- * What a row's `meta` may carry — everything an email needs that the one-line
+ * What a row's `meta` may carry: everything an email needs that the one-line
  * `content` does not say. Every key is optional: the worker fills what it has
  * at hand, and a row from before this sprint has none of it.
  */

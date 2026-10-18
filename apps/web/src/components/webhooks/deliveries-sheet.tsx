@@ -3,8 +3,8 @@
 /**
  * The delivery history of one hook, in a side sheet (Sprint 8).
  *
- * Refetched every 3 s while open, because the thing a person opens it for —
- * "did my test arrive?" — is being decided by the worker as they watch. A
+ * Refetched every 3 s while open, because the thing a person opens it for 
+ * ("did my test arrive?") is being decided by the worker as they watch. A
  * `Timeline`-style list would over-dress twenty rows of status; it is a
  * restrained list with a badge per row (design-system-rules §15).
  */

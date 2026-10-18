@@ -2,12 +2,12 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp, noisyPhoto, uniqueName } from './helpers/media';
 
 /**
- * The media library — Sprint 4's last Definition of Done item: an uploaded
+ * The media library, Sprint 4's last Definition of Done item: an uploaded
  * image is compressed automatically, appears in the library, and can be reused
  * across posts.
  *
- * "Compressed" is asserted from what the page reports about the stored file —
- * its size against the original's, and its dimensions — which the API reads
+ * "Compressed" is asserted from what the page reports about the stored file
+ * (its size against the original's, and its dimensions), which the API reads
  * from the file it actually wrote. Nothing here trusts the upload's own claims.
  */
 
@@ -38,10 +38,8 @@ test.describe('media library', () => {
 
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/media`);
-    // Scoped to main: the top bar also titles the section "Media".
-    await expect(
-      page.getByRole('main').getByRole('heading', { name: 'Media', exact: true }),
-    ).toBeVisible();
+    // The page is named only by the top bar's h1 (no in-page title).
+    await expect(page.getByRole('heading', { level: 1, name: 'Media', exact: true })).toBeVisible();
 
     const original = await noisyPhoto(4000, 3000);
     await page

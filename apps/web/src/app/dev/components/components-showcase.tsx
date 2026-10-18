@@ -67,7 +67,7 @@ export function ComponentsShowcase() {
         <div>
           <h1 className="type-heading text-4xl text-ink">Component Playground</h1>
           <p className="mt-2 max-w-2xl font-sans text-sm text-ink opacity-70">
-            Every primitive in <code>@postgear/ui</code>, every variant, every state — light and
+            Every primitive in <code>@postgear/ui</code>, every variant, every state, in light and
             dark. Flip the theme toggle in the top bar to check parity. Dev-only: excluded from
             production builds.
           </p>

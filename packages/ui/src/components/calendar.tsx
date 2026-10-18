@@ -12,7 +12,7 @@ const navButtonClasses = cn(
   'disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none',
 );
 
-/** Styled wrapper around react-day-picker — the shared calendar grid behind DatePicker/DateRangePicker. */
+/** Styled wrapper around react-day-picker: the shared calendar grid behind DatePicker/DateRangePicker. */
 export function Calendar({
   className,
   classNames,
@@ -58,15 +58,15 @@ export function Calendar({
         ),
         today: '[&>button]:font-bold [&>button]:text-actionPrimary',
         selected:
-          '[&>button]:bg-actionPrimary [&>button]:text-onActionPrimary [&>button]:shadow-brutalSm [&>button]:hover:bg-actionPrimary',
+          '[&>button]:bg-actionPrimary [&>button]:text-onActionPrimary [&>button]:shadow-surfaceSm [&>button]:hover:bg-actionPrimary',
         outside: '[&>button]:border-outline/40 [&>button]:opacity-40',
         disabled: '[&>button]:pointer-events-none [&>button]:opacity-30',
         // Tiles keep their own borders across a range; only the fill changes,
         // so the key grid stays intact instead of fusing into one bar.
         range_start:
-          '[&>button]:bg-actionPrimary [&>button]:text-onActionPrimary [&>button]:shadow-brutalSm [&>button]:hover:bg-actionPrimary',
+          '[&>button]:bg-actionPrimary [&>button]:text-onActionPrimary [&>button]:shadow-surfaceSm [&>button]:hover:bg-actionPrimary',
         range_end:
-          '[&>button]:bg-actionPrimary [&>button]:text-onActionPrimary [&>button]:shadow-brutalSm [&>button]:hover:bg-actionPrimary',
+          '[&>button]:bg-actionPrimary [&>button]:text-onActionPrimary [&>button]:shadow-surfaceSm [&>button]:hover:bg-actionPrimary',
         range_middle: '[&>button]:bg-actionPrimary/25 [&>button]:text-ink',
         ...classNames,
       }}

@@ -40,7 +40,7 @@ services:
     volumes:
       - minio_data:/data
 
-  # Temporal (Sprint 5) — the durable scheduler behind every queued post.
+  # Temporal (Sprint 5): the durable scheduler behind every queued post.
   #
   # `auto-setup` creates and migrates its own two databases (`temporal` and
   # `temporal_visibility`) inside the Postgres above, so the stack stays at one
@@ -65,7 +65,7 @@ services:
     volumes:
       - ./infra/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
 
-  # The Temporal web UI, at http://localhost:8233 — every scheduled post is a
+  # The Temporal web UI, at http://localhost:8233: every scheduled post is a
   # workflow you can open, with its timers, retries and signals laid out.
   temporal-ui:
     image: temporalio/ui:2.34.0

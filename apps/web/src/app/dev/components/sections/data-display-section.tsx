@@ -70,7 +70,7 @@ export function DataDisplaySection() {
   return (
     <Section
       title="Data Display"
-      description="Tables, stats, timelines, and collapsible content — restrained per the dense-data-surface rule: thick borders and flat color, no comic accents."
+      description="Tables, stats, timelines, and collapsible content, restrained per the dense-data-surface rule: thick borders and flat color, no comic accents."
     >
       <Row label="Avatars">
         <Avatar size="sm">
@@ -169,7 +169,7 @@ export function DataDisplaySection() {
           </AccordionItem>
           <AccordionItem value="item-2">
             <AccordionTrigger>Can I schedule to multiple channels at once?</AccordionTrigger>
-            <AccordionContent>Yes — select any combination of connected channels per post.</AccordionContent>
+            <AccordionContent>Yes, select any combination of connected channels per post.</AccordionContent>
           </AccordionItem>
         </Accordion>
       </Row>
@@ -188,9 +188,9 @@ export function DataDisplaySection() {
       </Row>
       <Row label="List">
         <List className="w-72">
-          <ListItem>LinkedIn — Acme Media</ListItem>
-          <ListItem>Instagram — Acme Media</ListItem>
-          <ListItem>TikTok — Acme Media</ListItem>
+          <ListItem>LinkedIn: Acme Media</ListItem>
+          <ListItem>Instagram: Acme Media</ListItem>
+          <ListItem>TikTok: Acme Media</ListItem>
         </List>
       </Row>
     </Section>

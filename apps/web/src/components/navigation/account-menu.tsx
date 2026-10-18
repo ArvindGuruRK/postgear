@@ -4,6 +4,7 @@ import { UserMenu } from '@postgear/ui';
 import { LogOut, Settings, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { avatarSrc } from '@/lib/avatars';
 import { useWorkspace } from './workspace-provider';
 
 /**
@@ -38,6 +39,9 @@ export function AccountMenu() {
     <UserMenu
       name={user.name ?? user.email}
       email={user.email}
+      // Preset → bundled SVG, image → its URL, none → `UserMenu` draws
+      // initials. Same resolution as `UserAvatar` (components/profile).
+      avatarUrl={avatarSrc(user.avatar)}
       items={[
         {
           label: 'Profile',

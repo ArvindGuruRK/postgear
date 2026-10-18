@@ -2,8 +2,8 @@
  * Bold and italic for platforms that have neither.
  *
  * X, LinkedIn, Instagram, Facebook, TikTok, YouTube and Pinterest all accept
- * plain text only. The established workaround — used by the reference and by
- * every scheduler in this space — is to swap ASCII letters for their lookalikes
+ * plain text only. The established workaround (used by the reference and by
+ * every scheduler in this space) is to swap ASCII letters for their lookalikes
  * in Unicode's Mathematical Alphanumeric Symbols block, which every platform
  * displays as styled text.
  *
@@ -18,8 +18,8 @@
  *   count in PostGear is taken from the *rendered* text, never from what the
  *   editor shows.
  *
- * Only unaccented Latin letters and digits have styled forms. Everything else —
- * accented letters, other scripts, punctuation, emoji — passes through
+ * Only unaccented Latin letters and digits have styled forms. Everything else
+ * (accented letters, other scripts, punctuation, emoji) passes through
  * unchanged, which is the correct behaviour rather than a gap.
  *
  * The Sans-Serif ranges are used because they are complete. The Serif italic

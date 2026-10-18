@@ -5,7 +5,7 @@
  * rather than through `BillingModule`. The contract's module table lists
  * billing among this module's imports, but the only thing `/v1/me` needs
  * from it is `resolveEntitlement`, which is a pure function in `plans.ts`
- * with no Nest in it — importing the whole billing module (Stripe client,
+ * with no Nest in it: importing the whole billing module (Stripe client,
  * webhook handler, mail) for one tier label would couple the public API's
  * boot to billing's, and the two workstreams are being built in parallel.
  */

@@ -45,7 +45,7 @@ const prismaMock = prisma as unknown as PrismaMock;
 
 const usage = { used: 5, limit: 5, tier: 'STANDARD' as const };
 
-describe('ChannelsService — the channel limit', () => {
+describe('ChannelsService: the channel limit', () => {
   let repository: { findById: jest.Mock; upsertFromAuth: jest.Mock; listForOrg: jest.Mock };
   let oauth: { begin: jest.Mock; consume: jest.Mock };
   let scheduling: { ensureTokenRefresh: jest.Mock };

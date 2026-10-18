@@ -1,6 +1,8 @@
 import { Toaster } from '@postgear/ui';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { AppearanceRuntime } from '@/components/appearance/appearance-runtime';
+import { NO_FLASH_APPEARANCE_SCRIPT } from '@/lib/appearance';
 import { brandFont } from './fonts';
 import './globals.css';
 
@@ -15,10 +17,12 @@ export const metadata: Metadata = {
   applicationName: 'PostGear',
 };
 
-// Matches the page background in each theme so mobile browser chrome doesn't
-// sit against a color the app never uses. Values come from --color-primary in
-// packages/ui/src/styles/colors.css; they're literals here because the browser
-// reads this meta tag before any stylesheet resolves.
+// Matches the page background in each mode so mobile browser chrome doesn't
+// sit against a color the app never uses. Values come from the Classic
+// themes' --color-primary in packages/ui/src/styles/colors.css (the other
+// themes keep these: one meta tag cannot follow a per-user choice); they're
+// literals here because the browser reads this meta tag before any stylesheet
+// resolves.
 export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#fff8e7' },
@@ -26,19 +30,23 @@ export const viewport: Viewport = {
   ],
 };
 
-// Runs before paint (see colors.css: `.dark`/`.light` are descendant
-// selectors of `:root`, so the class must land on `<body>`, not `<html>`,
-// for the CSS custom properties to resolve at all) — a plain inline script
-// is the standard no-flash pattern since next-themes-style tooling isn't in
-// scope for this sprint.
-const NO_FLASH_THEME_SCRIPT = `(function(){try{var t=window.localStorage.getItem('postgear-theme')||'light';document.body.classList.add(t);}catch(e){document.body.classList.add('light');}})();`;
-
+// The no-flash script (lib/appearance.ts) runs first thing in <body>, before
+// paint: it reads the `pg_appearance` cookie, resolves `system` against
+// prefers-color-scheme, and sets the `light`/`dark` class plus
+// `data-light-theme` and `data-dark-theme` on <body> (on body, not <html>,
+// because colors.css scopes every token under `.dark`/`.light` as
+// descendants of `:root`).
+// Reading the cookie in the script rather than with `cookies()` here keeps the
+// root layout from forcing every route dynamic. `AppearanceRuntime` then
+// keeps body right after hydration and follows the OS while the mode is
+// System.
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={brandFont.variable}>
       <body suppressHydrationWarning>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static no-flash theme script, no user input */}
-        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_APPEARANCE_SCRIPT }} />
+        <AppearanceRuntime />
         {children}
         <Toaster />
       </body>

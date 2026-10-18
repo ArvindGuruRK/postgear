@@ -2,14 +2,14 @@
  * When a channel's next analytics sync is due.
  *
  * Pure on purpose: the workflow imports this, and the workflow sandbox
- * allows no Node built-ins and nothing that reaches outside — not even the
+ * allows no Node built-ins and nothing that reaches outside, not even the
  * error classes in `@postgear/social-core`, whose base class pulls in
  * `node:crypto`. The activity side uses the same function so the two agree
  * on the slot to the millisecond.
  *
  * ## Why a per-channel minute
  *
- * Every channel syncs once a day, twenty-four hours after its last sync —
+ * Every channel syncs once a day, twenty-four hours after its last sync,
  * but if a fleet of channels were all connected during one onboarding
  * session they would all come due in the same minute, every day, and hit
  * the same platform's rate limit together. Hashing the integration id into
@@ -44,7 +44,7 @@ export function minuteOffset(integrationId: string): number {
 
 /**
  * The next slot after `lastSyncAt`: a day later, at the channel's minute of
- * that hour, and never in the past relative to `now` — a workflow that was
+ * that hour, and never in the past relative to `now`; a workflow that was
  * down for a week comes back and syncs once, not seven times.
  */
 export function nextSyncSlot(

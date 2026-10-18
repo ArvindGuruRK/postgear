@@ -12,7 +12,7 @@
  * so the model can read them and either call more tools or answer.
  *
  * The loop is bounded by `maxToolRounds` (default 6). On the last round the
- * model is called with **no tools**, so it has to answer with what it has —
+ * model is called with **no tools**, so it has to answer with what it has,
  * without that, a model that keeps "checking one more thing" never stops,
  * and every round is a paid call.
  *

@@ -6,7 +6,7 @@
  * A warning-toned `Alert` rather than a plain field, because the thing to
  * understand is not the value but that it will not be shown again. Copy is a
  * real clipboard write with a fallback message when the browser refuses
- * (no secure context, no permission) — the person can still select the text.
+ * (no secure context, no permission): the person can still select the text.
  */
 import { Alert, AlertDescription, AlertTitle, Button, Input, Stack, Text } from '@postgear/ui';
 import { Check, Copy } from 'lucide-react';

@@ -5,7 +5,7 @@
  *
  * Opened from a calendar card or a queue row. Shows the post's text, when it
  * goes (or went) out, and one line per channel with that channel's own
- * standing — a thread that published to X but is retrying on LinkedIn is
+ * standing: a thread that published to X but is retrying on LinkedIn is
  * exactly the case this exists for. Actions: edit in the composer, publish
  * now, reschedule, delete; each only when the state allows it.
  */
@@ -64,7 +64,7 @@ export function PostDetailDialog({
   const canPublishNow = post.state === 'QUEUE' || post.state === 'ERROR';
   const canMove = post.state !== 'PUBLISHED';
   // Once any channel has published, the post can be read and its pending
-  // channels moved or retried, but not edited or deleted — the API locks it.
+  // channels moved or retried, but not edited or deleted: the API locks it.
   const locked = hasPublishedChannel(post);
 
   return (
@@ -83,7 +83,7 @@ export function PostDetailDialog({
         </DialogHeader>
 
         <div className="mt-4 flex flex-col gap-4">
-          <blockquote className="m-0 whitespace-pre-wrap break-words rounded-md border-2 border-outline bg-secondary p-4 font-sans text-sm font-medium text-ink shadow-brutalSm">
+          <blockquote className="m-0 whitespace-pre-wrap break-words rounded-md border-2 border-outline bg-secondary p-4 font-sans text-sm font-medium text-ink shadow-surfaceSm">
             {post.preview || <span className="opacity-60">Empty post</span>}
           </blockquote>
 

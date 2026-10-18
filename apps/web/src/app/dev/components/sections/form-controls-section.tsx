@@ -57,7 +57,7 @@ export function FormControlsSection() {
   return (
     <Section
       title="Form Controls"
-      description="Thick border, flat surface, one shared focus ring across every control in this section."
+      description="2px border, flat surface, a short bottom shadow; focus turns the border blue with a soft glow."
     >
       <Row label="Input">
         <Input placeholder="Channel name" className="w-56" />
@@ -155,10 +155,10 @@ export function FormControlsSection() {
       </Row>
       <Row label="Calendar">
         <div className="flex flex-wrap gap-6">
-          <div className="rounded-lg border-4 border-outline bg-secondary p-2 shadow-brutalMd">
+          <div className="rounded-lg border-2 border-outline bg-secondary p-2 shadow-surfaceMd">
             <Calendar mode="single" selected={date} onSelect={setDate} />
           </div>
-          <div className="rounded-lg border-4 border-outline bg-secondary p-2 shadow-brutalMd">
+          <div className="rounded-lg border-2 border-outline bg-secondary p-2 shadow-surfaceMd">
             <Calendar
               mode="range"
               selected={dateRange}

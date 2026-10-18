@@ -7,7 +7,7 @@
  * On mount the hook loads one page and opens `GET /notifications/stream`.
  * The stream's `ready` frame carries the unread count and every
  * `notification` frame a new row; both go through the reducer. When the
- * stream drops — a deploy, a proxy timeout, a laptop lid — it reconnects
+ * stream drops (a deploy, a proxy timeout, a laptop lid) it reconnects
  * with a doubling delay from one second to thirty, and because rows written
  * while it was down were never pushed, every *re*connect re-fetches the page
  * so nothing missed stays missed. Unmounting aborts the stream and stops the

@@ -14,7 +14,7 @@ import {
  * X: a thread is a chain of real posts, each replying to the one before.
  *
  * So every part is drawn as its own post, joined by the connector line X uses
- * down the avatar column — and every part can carry its own media. Length is
+ * down the avatar column, and every part can carry its own media. Length is
  * X's weighted count, so the overflow mark lands where X's own composer would
  * put it, not where a character count would.
  */

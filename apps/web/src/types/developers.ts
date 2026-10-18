@@ -1,6 +1,6 @@
 /**
  * API-key shapes shared between server components and client islands
- * (Sprint 8). Mirror `/developers/api-keys` — see
+ * (Sprint 8). Mirror `/developers/api-keys`: see
  * docs/sprint-documents/sprint-08-contract.md §5.3.
  */
 

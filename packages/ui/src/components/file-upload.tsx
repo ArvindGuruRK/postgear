@@ -39,7 +39,7 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
     );
 
     return (
-      // biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop is a mouse-only enhancement — the nested button + file input already provide full keyboard access
+      // biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop is a mouse-only enhancement; the nested button + file input already provide full keyboard access
       <div
         ref={ref}
         onDragOver={(event) => {
@@ -71,7 +71,7 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
           )}
         >
           <Upload className="h-8 w-8 text-ink" strokeWidth={2.5} />
-          {/* Same treatment as Label (label.tsx) — this is a form control's
+          {/* Same treatment as Label (label.tsx): this is a form control's
               label, so it follows the form-control typography rule in
               design-system-rules.md §1, not the display-face chrome rule.
               Written out rather than rendered as <Label> because it sits

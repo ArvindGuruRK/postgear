@@ -12,7 +12,7 @@ import {
 /**
  * TikTok: a full-height vertical video, the caption over its lower edge.
  *
- * The caption is the whole post — the provider sends it as the video's title
+ * The caption is the whole post: the provider sends it as the video's title
  * field, which TikTok displays as the caption.
  */
 export function TikTokPreview({ channel, parts, maxLength, lengthMethod }: PlatformPreviewProps) {

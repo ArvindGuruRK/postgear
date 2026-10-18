@@ -1,5 +1,5 @@
 /**
- * `@postgear/sdk` — the Node.js client for PostGear's public API and the
+ * `@postgear/sdk`: the Node.js client for PostGear's public API and the
  * verifier for its webhook deliveries (Sprint 8, PRD 5.10).
  *
  *   import { PostGear } from '@postgear/sdk';

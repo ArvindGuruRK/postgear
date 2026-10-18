@@ -3,7 +3,7 @@
  *
  * ## Shape
  *
- * `pg_` + 40 base64url characters from 30 random bytes — 240 bits of entropy,
+ * `pg_` + 40 base64url characters from 30 random bytes: 240 bits of entropy,
  * well past anything brute force reaches, and a fixed length so a glance at a
  * log line or a config file tells a PostGear key from a stray token. The
  * first eleven characters (`pg_` + 8) are the *prefix*, stored in the clear
@@ -18,7 +18,7 @@
  * timing side channel is a concern when application code compares a secret
  * the attacker controls against a stored one byte by byte. Here the attacker
  * controls the preimage, the database compares a 256-bit digest against an
- * index, and no amount of timing on that lookup narrows the preimage — the
+ * index, and no amount of timing on that lookup narrows the preimage: the
  * hash function's whole job is to make the digest tell you nothing about it.
  * A plain SHA-256 (no salt, no slow KDF) is also deliberate: unlike a
  * password, the secret is high-entropy and never chosen by a person, so a
@@ -53,7 +53,7 @@ export function generateApiKey(): GeneratedApiKey {
   return { secret, prefix: visiblePrefix(secret), keyHash: hashApiKey(secret) };
 }
 
-/** SHA-256 hex of the full secret — the only form that is ever stored. */
+/** SHA-256 hex of the full secret: the only form that is ever stored. */
 export function hashApiKey(secret: string): string {
   return createHash('sha256').update(secret, 'utf8').digest('hex');
 }
@@ -66,7 +66,7 @@ export function visiblePrefix(secret: string): string {
  * Whether a presented value has the shape of a PostGear key.
  *
  * Checked before the database is asked, so a stray session JWT or a random
- * string sent as a bearer token is refused without a query — and so the
+ * string sent as a bearer token is refused without a query, and so the
  * security log can record a prefix only when there is a plausible one.
  */
 export function looksLikeApiKey(value: string): boolean {

@@ -39,7 +39,7 @@ export function ButtonsSection() {
       </Section>
 
       <Section
-        title="Buttons — 3D Push (Button2)"
+        title="Buttons: 3D Push (Button2)"
         description="A separate, parallel exploration living in button2.tsx, not a Button variant: shadow-brutalBtn is bottom-only (no x-offset), grows to shadow-brutalBtnHover on hover (lifts off its base), then collapses to shadow-brutalPressed on click (sinks flush)."
       >
         <Row label="Primary">
@@ -69,7 +69,7 @@ export function ButtonsSection() {
             Disabled
           </Button2>
         </Row>
-        <Row label="Pressed state (static — the shadow sinks flush, hover/press disabled below)">
+        <Row label="Pressed state (static: the shadow sinks flush, hover/press disabled below)">
           <Button2 className="pointer-events-none translate-y-1 shadow-brutalPressed">
             Connect Channel
           </Button2>

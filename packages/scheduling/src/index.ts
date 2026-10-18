@@ -1,5 +1,5 @@
 /**
- * `@postgear/scheduling` — the contract between the API and the worker.
+ * `@postgear/scheduling`: the contract between the API and the worker.
  *
  * The API starts, signals and cancels workflows; the worker runs them. Neither
  * imports the other, so everything they must agree on lives here: workflow and

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, type ReactNode, useContext } from 'react';
+import type { SessionAvatar } from '@/lib/session';
 import type { Organization, WorkspaceRole } from '@/types/workspace';
 
 /**
@@ -10,7 +11,7 @@ import type { Organization, WorkspaceRole } from '@/types/workspace';
  * fetched by the client on mount. That means the org switcher has real data on
  * first paint with no loading state, and one fewer request per navigation.
  *
- * The role here is for **presentation only** — hiding an admin-only menu item
+ * The role here is for **presentation only**: hiding an admin-only menu item
  * a `USER` cannot use. It is not access control. Every privileged action is
  * re-checked by `RolesGuard` on the API, which is the only place a role
  * decision actually binds.
@@ -18,6 +19,8 @@ import type { Organization, WorkspaceRole } from '@/types/workspace';
 export interface WorkspaceUser {
   name: string | null;
   email: string;
+  /** UI revamp (2026-10-17): drawn by the account menu; null = initials. */
+  avatar: SessionAvatar;
 }
 
 interface WorkspaceContextValue {

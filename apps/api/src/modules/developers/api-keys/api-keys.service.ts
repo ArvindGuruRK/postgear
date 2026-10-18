@@ -4,7 +4,7 @@
  * ## The secret is shown once
  *
  * `create` and `rotate` are the only methods that ever return a secret, and
- * they return it from the value they just generated — nothing stored can
+ * they return it from the value they just generated: nothing stored can
  * reproduce it. A caller who loses it rotates; there is no "reveal".
  *
  * ## Rotation is revoke + create, atomically
@@ -17,7 +17,7 @@
  * ## Why every lifecycle event is logged
  *
  * A key is a credential. Its creation, rotation and revocation go to the
- * security log by id and prefix — never by hash, never by secret — so an
+ * security log by id and prefix (never by hash, never by secret), so an
  * investigation can reconstruct who could call the API when.
  */
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
@@ -29,7 +29,7 @@ import { type ApiKeyRow, ApiKeysRepository } from './api-keys.repository';
 /** Live keys per workspace. Past this a workspace is hoarding, not integrating. */
 export const MAX_LIVE_API_KEYS = 10;
 
-/** What `/developers/api-keys` returns — mirrored in `apps/web/src/types/developers.ts`. */
+/** What `/developers/api-keys` returns: mirrored in `apps/web/src/types/developers.ts`. */
 export interface ApiKeyView {
   id: string;
   name: string;
@@ -102,7 +102,7 @@ export class ApiKeysService {
       at: new Date(),
     });
 
-    // Revoked between the read above and the transaction — by a colleague,
+    // Revoked between the read above and the transaction, by a colleague,
     // or by a double-click. Either way there is no longer a live key to rotate.
     if (!result) {
       throw new UnprocessableEntityException(DEVELOPERS_MESSAGES.KEY_REVOKED);

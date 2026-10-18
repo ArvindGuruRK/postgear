@@ -10,7 +10,7 @@
  * - **`orgId` in every signature and every `where`** on the session paths,
  *   so a key id from another workspace reads as "not found" at the query,
  *   not after a check someone forgot. `findByHash` is the exception on
- *   purpose: the guard has no workspace yet — the key is what names it.
+ *   purpose: the guard has no workspace yet; the key is what names it.
  *
  * Revocation is a timestamp, never a delete: a revoked key keeps its row so
  * the list shows what was issued and when it stopped working.
@@ -98,7 +98,7 @@ export class ApiKeysRepository {
   /**
    * Marks a live key revoked. Returns the row afterwards, or `null` when no
    * key with that id exists in the workspace. A key that was already revoked
-   * is left as it was — its original `revokedAt` is the honest record — and
+   * is left as it was (its original `revokedAt` is the honest record) and
    * returned unchanged, so the caller can tell "revoked now" from "was
    * already" by comparing timestamps rather than by a second query.
    */

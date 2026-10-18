@@ -5,8 +5,8 @@
  * it next bills (or ends, or changes), and the two meters.
  *
  * One component for both page states. With a live paid plan it is the
- * **manage** card — Cancel / Resume and Manage billing live in its footer.
- * Without one it is the **subscribe** summary — the Free plan or the trial,
+ * **manage** card: Cancel / Resume and Manage billing live in its footer.
+ * Without one it is the **subscribe** summary: the Free plan or the trial,
  * the same meters, and Start free trial when the workspace is eligible.
  *
  * Dates are formatted in the viewer's locale after mount (see
@@ -78,7 +78,7 @@ export function CurrentPlanCard({
         </div>
 
         {view.isLifetime ? (
-          <CardDescription>A lifetime plan — never billed.</CardDescription>
+          <CardDescription>A lifetime plan, never billed.</CardDescription>
         ) : view.status === 'canceling' ? (
           <CardDescription data-testid="billing-cancel-at" data-date={view.cancelAt ?? ''}>
             Your plan ends on {date(view.cancelAt) ?? 'the last day of this period'}. Everything
@@ -94,7 +94,7 @@ export function CurrentPlanCard({
             {trialDays === null
               ? 'Your free trial is running.'
               : `${trialDays} ${trialDays === 1 ? 'day' : 'days'} left in your free trial`}
-            {view.trialEndsAt ? ` — it ends on ${date(view.trialEndsAt) ?? 'its last day'}.` : '.'}{' '}
+            {view.trialEndsAt ? `. It ends on ${date(view.trialEndsAt) ?? 'its last day'}.` : '.'}{' '}
             Pick a plan below before then to keep everything running.
           </CardDescription>
         ) : view.status === 'trial_expired' ? (

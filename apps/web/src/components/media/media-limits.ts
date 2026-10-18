@@ -3,7 +3,7 @@
  *
  * A courtesy, not a control: they mirror
  * `apps/api/src/modules/media/media.messages.ts`, and the API enforces the
- * real limits — on the file's actual bytes, which the browser's claimed type
+ * real limits, on the file's actual bytes, which the browser's claimed type
  * says nothing reliable about. Checking here only spares someone a 200 MB
  * upload that was always going to be refused.
  */
@@ -25,7 +25,7 @@ const MAX_VIDEO_BYTES = 250 * MB;
 /** Why a file will be refused, or null when it is worth sending. */
 export function preflightUpload(file: File): string | null {
   // HEIC reports as image/heic in some browsers and as nothing in others, so
-  // the extension is checked too — this is advice, and the server decides.
+  // the extension is checked too: this is advice, and the server decides.
   if (/\.hei[cf]$/i.test(file.name) || file.type === 'image/heic' || file.type === 'image/heif') {
     return `${file.name}: HEIC photos are not supported yet. Export it as JPEG and try again.`;
   }

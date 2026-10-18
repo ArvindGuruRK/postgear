@@ -4,8 +4,8 @@
  * One post's numbers (user story 6.2): per channel, each metric against the
  * channel's own average, with the engagement over every snapshot taken.
  *
- * Loaded on open — the leaderboard carries the latest snapshot but not the
- * averages or the history — with a skeleton that keeps the dialog's size
+ * Loaded on open (the leaderboard carries the latest snapshot but not the
+ * averages or the history) with a skeleton that keeps the dialog's size
  * and an `ErrorState` with a retry when the request fails. Opening the same
  * post twice fetches twice: the numbers are cheap and a stale "vs avg"
  * after a sync is worse than a round trip.

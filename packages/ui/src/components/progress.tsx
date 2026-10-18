@@ -62,7 +62,7 @@ export const Progress = forwardRef<React.ElementRef<typeof ProgressPrimitive.Roo
         ref={ref}
         value={percent}
         className={cn(
-          'relative w-full overflow-hidden rounded-full border-2 border-outline bg-secondary shadow-brutalSm',
+          'relative w-full overflow-hidden rounded-full border-2 border-outline bg-secondary shadow-surfaceSm',
           // Halftone dots show through wherever the fill hasn't reached,
           // reusing the texture already established in the system.
           'bg-halftone',

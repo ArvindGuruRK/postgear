@@ -28,7 +28,7 @@ const MAX_RATIO = 1.91;
  * Instagram: media first, always.
  *
  * A carousel, framed at the shape of its first item the way the feed frames
- * it, with the caption beneath — handle first, folded after about 125
+ * it, with the caption beneath: handle first, folded after about 125
  * characters. A post with no media shows where the required image would go,
  * because Instagram has no text-only post.
  */

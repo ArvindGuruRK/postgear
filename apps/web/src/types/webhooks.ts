@@ -1,6 +1,6 @@
 /**
  * Outbound-webhook shapes shared between server components and client islands
- * (Sprint 8). Mirror `/webhooks*` — see
+ * (Sprint 8). Mirror `/webhooks*`: see
  * docs/sprint-documents/sprint-08-contract.md §5.4.
  */
 

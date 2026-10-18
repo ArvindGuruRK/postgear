@@ -3,7 +3,7 @@
  *
  * The X cases are the ones X's own `twitter-text` library gives for the same
  * input. Where PostGear's implementation deliberately differs, the test says
- * so and asserts the difference is an over-count — the safe direction.
+ * so and asserts the difference is an over-count: the safe direction.
  */
 import { measureLength, overflowIndex, utf16Length, X_URL_LENGTH, xWeightedLength } from './length';
 import { styleText } from './unicode';
@@ -28,7 +28,7 @@ describe('xWeightedLength', () => {
 
   it('counts the light punctuation ranges as one', () => {
     // Em dash (U+2014), curly quotes (U+201C/D), prime (U+2032).
-    expect(xWeightedLength('—“”′')).toBe(4);
+    expect(xWeightedLength('\u2014“”′')).toBe(4);
   });
 
   it('counts every URL as 23, however long', () => {
@@ -64,7 +64,7 @@ describe('xWeightedLength', () => {
   });
 
   it('over-counts, never under-counts, the domain part of an email address', () => {
-    // twitter-text reports 14 here. PostGear counts the domain as a link — a
+    // twitter-text reports 14 here. PostGear counts the domain as a link: a
     // deliberate simplification in the safe direction.
     expect(xWeightedLength('me@example.com')).toBeGreaterThanOrEqual(14);
   });

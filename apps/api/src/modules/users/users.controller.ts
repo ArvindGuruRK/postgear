@@ -74,7 +74,7 @@ export class UsersController {
    * Email preferences for notifications (Sprint 8, contract §5.2): the
    * inherited `sendSuccessEmails` / `sendFailureEmails` columns, which the
    * notifications dispatcher reads to pick who a `post.published` or a
-   * `post.failed` mail goes to. Per user, not per workspace — the columns are
+   * `post.failed` mail goes to. Per user, not per workspace: the columns are
    * the user's, and the dispatcher applies them in every workspace they are in.
    */
   @Get('me/notification-preferences')

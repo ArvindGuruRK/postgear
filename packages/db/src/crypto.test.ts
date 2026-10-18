@@ -9,7 +9,7 @@ import {
 } from './crypto';
 
 // A real 32-byte key, hardcoded so the suite doesn't depend on a developer's
-// local .env. Test-only — never reuse this value anywhere else.
+// local .env. Test-only, never reuse this value anywhere else.
 const TEST_KEY = 'a'.repeat(64);
 const OTHER_KEY = 'b'.repeat(64);
 
@@ -108,7 +108,7 @@ describe('crypto', () => {
 
   describe('key validation', () => {
     it('throws a pointed error when the key is missing', () => {
-      // `delete`, not `= undefined` — assigning undefined to a process.env
+      // `delete`, not `= undefined`: assigning undefined to a process.env
       // property stores the *string* "undefined", which sails past a falsy
       // check and fails later with a confusing length error instead.
       delete process.env.ENCRYPTION_KEY_AES256;

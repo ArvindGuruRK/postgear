@@ -11,7 +11,7 @@ import { getSession } from '@/lib/session';
  * first exists.
  *
  * This gate belongs here rather than in [orgId] because an unauthenticated
- * visitor should not reach an org at all — and because /onboarding is a
+ * visitor should not reach an org at all, and because /onboarding is a
  * sibling of [orgId] inside this group, so it inherits this check while
  * deliberately escaping gate 2.
  *

@@ -1,5 +1,5 @@
 # 📋 User Stories Document
-## AI-Powered Digital Marketing Platform — SaaS Product
+## AI-Powered Digital Marketing Platform: SaaS Product
 
 ---
 

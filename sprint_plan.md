@@ -1,4 +1,4 @@
-# 📅 PostGear AI — 2-Month MVP Sprint Plan
+# 📅 PostGear AI: 2-Month MVP Sprint Plan
 
 ---
 
@@ -13,7 +13,7 @@
 
 ## 1. Executive Summary & Sprint Strategy
 
-This document outlines the **2-Month (8-Week) Agile Sprint Plan** to build the Minimum Viable Product (MVP) of **PostGear AI** — an AI-powered digital marketing SaaS platform enabling multi-platform social scheduling, AI-assisted content generation, and proprietary SEO score prediction.
+This document outlines the **2-Month (8-Week) Agile Sprint Plan** to build the Minimum Viable Product (MVP) of **PostGear AI**: an AI-powered digital marketing SaaS platform enabling multi-platform social scheduling, AI-assisted content generation, and proprietary SEO score prediction.
 
 ### 1.1 Velocity & Resource Assumptions
 * **Team Structure**: 1 Engineering Lead, 2 Full-Stack Developers (Node.js/React/Next.js), 1 AI/Data Engineer, 1 Product Designer/QA, 1 DevOps Engineer (Part-time).

@@ -10,7 +10,7 @@ export const ToastProvider = ToastPrimitive.Provider;
 
 /**
  * Every Toast shares this single grid cell (see `col-start-1 row-start-1` in
- * toastVariants below) instead of stacking as separate flex rows — that's
+ * toastVariants below) instead of stacking as separate flex rows: that's
  * what lets several toasts visually overlap into a card deck, with Toaster
  * computing each one's depth offset/scale/opacity as a plain inline style.
  */
@@ -29,7 +29,7 @@ ToastViewport.displayName = ToastPrimitive.Viewport.displayName;
 const toastVariants = cva(
   [
     'relative col-start-1 row-start-1 flex w-full items-center justify-between gap-3 self-end',
-    'rounded-md border-2 border-outline p-4 shadow-brutalMd',
+    'rounded-md border-2 border-outline p-4 shadow-surfaceMd',
     'font-sans text-sm will-change-transform',
     'transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
     'data-[state=open]:animate-toastIn data-[state=closed]:animate-toastOut',

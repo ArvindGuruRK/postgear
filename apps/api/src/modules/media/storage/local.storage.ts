@@ -7,7 +7,7 @@
  *
  * Not for production publishing. Its URLs point at the API's own address, which
  * Instagram, Facebook, Pinterest and TikTok cannot reach when that is
- * `localhost` — and those four fetch the media themselves.
+ * `localhost`: and those four fetch the media themselves.
  */
 import { constants } from 'node:fs';
 import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';

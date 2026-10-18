@@ -6,7 +6,7 @@
     // No `rootDir`, for the reason apps/api gives: `@postgear/db`,
     // `@postgear/social-core` and `@postgear/scheduling` are consumed as
     // TypeScript source and live outside this directory, so tsc infers the
-    // common root and emits to dist/apps/worker/src/ — which is where the
+    // common root and emits to dist/apps/worker/src/, which is where the
     // `start` script points.
 
     // The worker runs its emitted JavaScript directly under Node, and

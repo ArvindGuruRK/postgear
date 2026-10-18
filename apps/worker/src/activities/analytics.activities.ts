@@ -7,7 +7,7 @@
  * The window's daily channel metrics, upserted on (channel, metric, day) so
  * a re-read of a day the platform revised overwrites rather than
  * duplicates; one new `PostMetricSnapshot` per published post the channel
- * still has — append-only, so the per-post line has history; and the
+ * still has: append-only, so the per-post line has history; and the
  * `AnalyticsSync` row the status line reads. The row is written on every
  * outcome, including the failures, with a message composed by class of
  * failure (`lib/analytics-sync.ts`) and never the platform's own words.
@@ -250,7 +250,7 @@ export type AnalyticsActivities = ReturnType<typeof createAnalyticsActivities>;
 
 /**
  * Reads and records the newest published posts' counters. Each read is
- * caught on its own — see the file comment — and a null (the platform no
+ * caught on its own (see the file comment), and a null (the platform no
  * longer has the post) is simply not a snapshot.
  */
 async function syncPosts(

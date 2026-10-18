@@ -6,7 +6,7 @@ the question every later sprint hits within five minutes of opening that file:
 
 ## Where this schema came from
 
-It is Postiz's production schema, adopted wholesale rather than redesigned — a
+It is Postiz's production schema, adopted wholesale rather than redesigned: a
 deliberate, one-time exception to this project's "reference, don't copy" rule,
 recorded in [Sprint 1](../../../docs/sprint-documents/sprint-01-foundation-and-data-model.md).
 The reasoning: a battle-tested multi-tenant schema is exactly the kind of
@@ -14,8 +14,8 @@ foundational, hard-to-get-right asset worth inheriting. Controllers, workflows,
 UI and providers are still built fresh.
 
 It arrived with **48 models**, more than half of which PostGear's MVP will never
-touch. **27 were dropped** across two migrations — see
-[Deliberately removed](#deliberately-removed) — leaving **21**. Sprint 2 added
+touch. **27 were dropped** across two migrations (see
+[Deliberately removed](#deliberately-removed)), leaving **21**. Sprint 2 added
 one back (`OnboardingResponse`), so the file now holds **22**.
 
 Every model still in the file is either MVP-active or a deliberate, justified
@@ -30,26 +30,26 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | Model | Role | First used |
 |---|---|---|
 | `Organization` | The tenant. Root of nearly every scoping query. | Sprint 2 |
-| `User` | An account. **Not** tenant-scoped — a user may belong to many orgs, or none. | Sprint 2 |
-| `UserOrganization` | The membership join table, carrying `role`. This is the name to use — do not invent a `Member`. | Sprint 2 |
-| `OnboardingResponse` | The five onboarding survey answers, one row per user. **Not** tenant-scoped — collected before the workspace exists. | Sprint 2 |
+| `User` | An account. **Not** tenant-scoped: a user may belong to many orgs, or none. | Sprint 2 |
+| `UserOrganization` | The membership join table, carrying `role`. This is the name to use: do not invent a `Member`. | Sprint 2 |
+| `OnboardingResponse` | The five onboarding survey answers, one row per user. **Not** tenant-scoped: collected before the workspace exists. | Sprint 2 |
 | `Integration` | **A connected social channel.** The name is Postiz's history; read it as "channel" everywhere. Holds the encrypted OAuth `token`/`refreshToken`. | Sprint 3 |
 | `Post` | One row **per platform target per thread part**. A cross-posted batch is tied together by `group`; thread/reply chains by `parentPostId`. There is no separate `PostItem` table. See [How a post is stored](#how-a-post-is-stored-sprint-4). | Sprint 4 |
-| `Media` | Uploaded images/video — local disk in development, any S3-compatible store in production. | Sprint 4 |
-| `Tags` / `TagsPosts` | Post labelling and its join table. | Not yet — PRD P1. Sprint 4 did not need it. |
-| `Sets` | Saved groupings of channels, for "post to my usual five". | Not yet — PRD P2. |
-| `Signatures` | Reusable sign-off blocks appended to post content. | Not yet — PRD P2. |
+| `Media` | Uploaded images/video: local disk in development, any S3-compatible store in production. | Sprint 4 |
+| `Tags` / `TagsPosts` | Post labelling and its join table. | Not yet: PRD P1. Sprint 4 did not need it. |
+| `Sets` | Saved groupings of channels, for "post to my usual five". | Not yet: PRD P2. |
+| `Signatures` | Reusable sign-off blocks appended to post content. | Not yet: PRD P2. |
 | `Errors` | Publish-failure records, surfaced in the queue UI. | Sprint 5 |
 | `Notifications` | In-app notification feed. | Sprint 5 |
 | `Subscription` | Billing plan + `totalChannels` entitlement. Gates channel connection. Sprint 8 added `status`, `currentPeriodEnd`, `trialEndsAt`, `scheduledTier`/`scheduledPeriod` and `lastStripeEventAt`; see [Sprint 8 additions](#sprint-8-additions). | Sprint 8 |
 | `Credits` | AI usage metering. | Sprint 6 |
-| `Customer` | **Not** the Stripe customer mapping — `Organization.paymentId` is. Kept as the client-grouping label on `Integration` (PRD "Agency mode", P1). | Not yet |
+| `Customer` | **Not** the Stripe customer mapping: `Organization.paymentId` is. Kept as the client-grouping label on `Integration` (PRD "Agency mode", P1). | Not yet |
 | `Webhooks` / `IntegrationsWebhooks` | Outbound webhooks and their channel scoping. Sprint 8 added `secret` (ciphertext), `events` and `disabled`. | Sprint 8 |
 | `WebhookDelivery` | One attempt-series per event per hook (Sprint 8). | Sprint 8 |
 | `ApiKey` | Public API keys, hashed (Sprint 8). Replaces the inherited single `Organization.apiKey`, which stays unused. | Sprint 8 |
 | `BillingEvent` | Processed Stripe events, keyed on the event id (Sprint 8). | Sprint 8 |
 | `NotificationCursor` | Per-(user, workspace) read marker for the notification feed (Sprint 8). | Sprint 8 |
-| `OAuthApp` / `OAuthAuthorization` | PostGear acting as an OAuth *provider* for its public API. | Not yet — PRD P2. Sprint 8 built API keys instead. |
+| `OAuthApp` / `OAuthAuthorization` | PostGear acting as an OAuth *provider* for its public API. | Not yet: PRD P2. Sprint 8 built API keys instead. |
 
 ### Kept, though not yet used
 
@@ -61,7 +61,7 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 > If a later sprint activates one of these, move its row up to the table above
 > rather than starting a third list.
 
-## Conventions — and where the schema breaks its own
+## Conventions, and where the schema breaks its own
 
 Follow these when **adding** models. Two of the four are not actually uniform
 in the inherited file, so check before assuming.
@@ -69,7 +69,7 @@ in the inherited file, so check before assuming.
 1. **Primary keys are `String @id`, but the generator is not consistent.**
    16 models use `@default(uuid())`; only `Subscription`, `Integration` and
    `Post` use `@default(cuid())`. The rest have no default and are assigned by
-   application code. Sprint 1's own planning doc calls the convention "cuid" —
+   application code. Sprint 1's own planning doc calls the convention "cuid":
    that is wrong as a description of the file. **Use `uuid()` for new models**,
    matching the overwhelming majority; do not migrate existing tables to match.
 
@@ -77,12 +77,12 @@ in the inherited file, so check before assuming.
    14 models use `organizationId`. `Tags` and `Customer` use `orgId` for the
    identical concept. (`UsedCodes`, a third offender, was pruned.) Use
    `organizationId` in new models. The
-   practical hazard is a query written from memory against the wrong one — it
+   practical hazard is a query written from memory against the wrong one: it
    is a compile error with the generated Prisma types, so it fails fast, but
    expect to look it up.
 
 3. **Soft delete is `deletedAt DateTime?`** and it is far more widespread than
-   it first appears — 11 of the 22 models carry it: `Comments`, `Customer`,
+   it first appears; 11 of the 22 models carry it: `Comments`, `Customer`,
    `Integration`, `Media`, `Notifications`, `OAuthApp`, `Post`,
    `Signatures`, `Subscription`, `Tags`,
    `Webhooks`. **Every read of these must filter `deletedAt: null`.** Prisma
@@ -91,7 +91,7 @@ in the inherited file, so check before assuming.
 
 4. **Timestamps are `createdAt DateTime @default(now())` and
    `updatedAt DateTime @updatedAt`.** `Integration.updatedAt` is nullable
-   (`DateTime?`) where others are not — an upstream quirk, not a pattern.
+   (`DateTime?`) where others are not: an upstream quirk, not a pattern.
 
 ## Field meanings that are not self-evident
 
@@ -109,28 +109,28 @@ in the inherited file, so check before assuming.
   clicks "Sign in with Google" gets their existing account rather than a second
   one. The constraint still permits the split; the application refuses to
   create it. The safety condition is that both OAuth providers reject an
-  unverified address — without that, matching on email would be an
+  unverified address: without that, matching on email would be an
   account-takeover path.
 - **The `User` auth-lifecycle columns hold hashes, not tokens.**
   `activationTokenHash` and `passwordResetTokenHash` store the SHA-256 of the
   value that was emailed, so a database leak yields nothing usable. SHA-256
   rather than argon2 precisely because the column has to be searchable by
-  equality — the tokens are 32 bytes of CSPRNG output, so there is no
+  equality: the tokens are 32 bytes of CSPRNG output, so there is no
   dictionary to slow down. (Contrast `Integration.token` below, where the
   random IV makes equality search impossible.)
 - **Lockout state lives in Postgres, not Redis.** `failedLoginAttempts`,
   `lastFailedLoginAt` and `lockedUntil` are on `User` so that restarting or
   evicting Redis is not a lockout bypass. The per-IP request throttle is the
   ephemeral half and does live in Redis.
-- **`Integration.token` / `refreshToken` are ciphertext**, not plaintext — see
+- **`Integration.token` / `refreshToken` are ciphertext**, not plaintext: see
   the next section.
 - **`Integration.internalId`** is the *provider's* account id, unique per org
   (`@@unique([organizationId, internalId])`). `Integration.id` is ours.
 - **`Post.group`** ties a cross-post batch together; **`Post.parentPostId`**
   builds thread/reply chains. Both are needed to reconstruct what a user
   thinks of as "one post".
-- **`Post.state`** is the `State` enum — `QUEUE`, `PUBLISHED`, `ERROR`,
-  `DRAFT` — driving the queue and calendar views. The schema's default is
+- **`Post.state`** is the `State` enum (`QUEUE`, `PUBLISHED`, `ERROR`,
+  `DRAFT`) driving the queue and calendar views. The schema's default is
   `QUEUE`; the composer always writes the state explicitly, and a person can
   only ever set `DRAFT` or `QUEUE`. See `apps/api/src/modules/posts/post-state.ts`
   for the transition table.
@@ -150,12 +150,12 @@ group g ─┬─ X:        part 1 ← part 2 ← part 3
 
 Four columns carry more than their names say:
 
-- **`Post.content` is a JSON document, not text or HTML** — the TipTap/ProseMirror
+- **`Post.content` is a JSON document, not text or HTML**: the TipTap/ProseMirror
   shape defined in `packages/social-core/src/composer/document.ts`, restricted
   by the API's schema to paragraphs, one heading level, lists, bold, italic,
   links and line breaks. Read it with `parseDocument()`, which also accepts plain
   text from any other writer; get platform text with `renderPlainText()`. Never
-  render it as HTML — nothing in PostGear does.
+  render it as HTML: nothing in PostGear does.
 - **`Post.image` is a JSON array of media references, `[{"id": "<Media.id>"}]`**,
   and never a URL. The file behind an id is looked up when the post is read or
   published, so moving storage or changing the API's address does not strand
@@ -181,13 +181,13 @@ carry the `updatedAt` it loaded: a save from a stale copy is refused with a
   not URLs. The configured backend turns a key into a public URL at read time.
   Keys are 128 random bits and never reused, which is what lets objects be served
   publicly with year-long immutable caching.
-- **`Media.fileSize` is the stored size, after compression** — the upload's
+- **`Media.fileSize` is the stored size, after compression**: the upload's
   original size is not kept.
 - **`mimeType`, `width` and `height`** (added in
   `20260914074756_sprint4_media_metadata`) are read from the stored file, so
   platform rules such as Instagram's JPEG-only and 4:5–1.91:1 limits can be
   checked without downloading it again. Video records its `mimeType` but no
-  dimensions — PostGear does not probe video files yet.
+  dimensions: PostGear does not probe video files yet.
 - **`Media.name` is display text** from the original filename, cleaned of paths
   and control characters. It is never used to build a key or a path.
 - **`Media.type` is `image` or `video`.** An animated GIF is an `image` with
@@ -196,7 +196,7 @@ carry the `updatedAt` it loaded: a save from a stale copy is refused with a
 ## The encryption boundary
 
 `Integration.token` and `Integration.refreshToken` hold live OAuth credentials.
-They are encrypted **at the repository layer** with AES-256-GCM — see
+They are encrypted **at the repository layer** with AES-256-GCM: see
 [`../src/crypto.ts`](../src/crypto.ts), built in Sprint 1 and **wired up in
 Sprint 3**.
 
@@ -210,7 +210,7 @@ another one:
   one. `getWithCredentials()` is the only method that decrypts, and exists for
   publishing and refreshing alone.
 - **Disconnect empties the columns** rather than leaving live credentials in a
-  soft-deleted row. `token` is `NOT NULL`, so the cleared value is `''` — which
+  soft-deleted row. `token` is `NOT NULL`, so the cleared value is `''`, which
   `decrypt()` would reject, and the repository handles explicitly.
 
 Repository-layer, specifically, so that:
@@ -255,13 +255,13 @@ or renamed. The design is in
 - **`Notifications`** gained `type` (the catalogue in
   `apps/api/src/modules/notifications/notifications.types.ts`), `title`,
   `meta` (what an email needs beyond `content`) and `emailStatus`
-  (`NotificationEmailStatus`): the row is an **outbox** — whoever writes the
+  (`NotificationEmailStatus`): the row is an **outbox**; whoever writes the
   event sets `PENDING`, the API's dispatcher sends through the one mail path
   and records the outcome. `NotificationCursor` is the read marker per
   (user, workspace); no row means "unread is everything newer than the
   membership". `User.lastReadNotifications` (inherited) is unused.
 - **`Webhooks`** gained `secret` (AES-256-GCM ciphertext of the HMAC signing
-  secret — the worker needs the plaintext to sign, so it cannot be a hash;
+  secret: the worker needs the plaintext to sign, so it cannot be a hash;
   the UI sees it only at creation and rotation), `events` (a Postgres text
   array) and `disabled`. **`WebhookDelivery`** holds one row per event per
   hook, unique on `deliveryKey` (`<webhookId>:<event>:<subjectId>`) so a
@@ -282,7 +282,7 @@ Signup collects credentials only; the workspace is created afterward, in a real
 post-authentication onboarding flow (Sprint 1 Task 3a; built in Sprint 2).
 "Authenticated but not onboarded" is therefore a real, persistable state.
 
-The schema already permits it — `User.organizations` is a to-many relation with
+The schema already permits it: `User.organizations` is a to-many relation with
 no minimum cardinality, so **no migration is needed.** What is needed is
 discipline in queries: nothing may assume `user.organizations[0]` exists.
 Doing so is the classic way this pattern breaks, usually as a crash on the
@@ -298,12 +298,12 @@ Route protection is correspondingly **two gates, not one**:
    that layout and the `[orgId]` layout, since an un-onboarded user has no org
    id to route with.
 
-### Where onboarding-completion lives — decided (Sprint 2)
+### Where onboarding-completion lives: decided (Sprint 2)
 
 **`User.onboardingCompletedAt` (nullable timestamp), alongside
 `User.onboardingStep` (1-based int) and a dedicated `OnboardingResponse` row.**
 
-The cheaper option — deriving it from "has at least one `UserOrganization`" —
+The cheaper option (deriving it from "has at least one `UserOrganization`")
 was rejected, and the reason is worth keeping because it is not obvious until
 the flow has more than one step. Onboarding is five steps, and **creating the
 workspace is step 1**. A derived check therefore flips to "onboarded" the
@@ -324,15 +324,15 @@ flow.
 
 **27 of the inherited 48 models were dropped**, across two migrations. They held
 zero rows, the repo had a single prior migration, and no production database
-existed — so this was the cheapest moment it would ever be. It is a deliberate
+existed, so this was the cheapest moment it would ever be. It is a deliberate
 reversal of Sprint 1's original "leave dormant models in place" decision, whose
 reasoning (avoiding migration churn) was load-bearing on having data to migrate.
 
-### `20260905090442_prune_dormant_tier1_tier2` — 20 tables
+### `20260905090442_prune_dormant_tier1_tier2`: 20 tables
 
 | Removed | Was |
 |---|---|
-| `GitHub`, `Trending`, `TrendingLog`, `Star`, `ItemUser`, `PopularPosts` | GitHub-trending-repo tracking — a Postiz-specific content source with no PostGear equivalent. |
+| `GitHub`, `Trending`, `TrendingLog`, `Star`, `ItemUser`, `PopularPosts` | GitHub-trending-repo tracking: a Postiz-specific content source with no PostGear equivalent. |
 | `Plugs`, `ExisingPlugData` | Auto-engagement automations ("auto-reply to comments after N hours"). |
 | `AutoPost` | RSS-feed-driven auto-posting. |
 | `ThirdParty` | Generic third-party API credential storage. |
@@ -346,10 +346,10 @@ them (`Organization.github`, `Organization.autoPost`, `Organization.plugs`,
 `Organization.thirdParty`, `Organization.usedCodes`, `User.items`,
 `Integration.plugs`, `Integration.exisingPlugData`).
 
-### `20260905091907_prune_marketplace_tier3` — 7 tables
+### `20260905091907_prune_marketplace_tier3`: 7 tables
 
 `Orders`, `OrderItems`, `Messages`, `MessagesGroup`, `PayoutProblems`,
-`SocialMediaAgency`, `SocialMediaAgencyNiche` — Postiz's creator marketplace
+`SocialMediaAgency`, `SocialMediaAgencyNiche`: Postiz's creator marketplace
 (buying sponsored posts from other users, with an escrow and messaging layer)
 and its agency directory. Explicitly out of PostGear's scope.
 
@@ -372,10 +372,10 @@ and were dropped: `OrderStatus`, `From`, `APPROVED_SUBMIT_FOR_ORDER`.
 One tidy-up rode along: `Post.organization` had a named relation
 (`@relation("organization")`) that existed only to disambiguate it from
 `submittedForOrganization`. With the latter gone the name was redundant, so it
-was removed from both sides. Relation names are Prisma-side only — this produced
+was removed from both sides. Relation names are Prisma-side only: this produced
 no SQL.
 
-The payoff is that `Post` — the table every sprint from 4 onward reads most —
+The payoff is that `Post` (the table every sprint from 4 onward reads most)
 now contains only fields that mean something to PostGear.
 
 ### Before re-adding any of these
@@ -388,8 +388,8 @@ column names carry assumptions that no longer hold here.
 ## Changing this schema later
 
 The schema is **not frozen**. When a sprint needs a capability it does not
-cover — SEO auditing (Sprint 7), AI copilot specifics (Sprint 6), PostGear-only
-analytics — that sprint adds models to this same file following the conventions
+cover, such as SEO auditing (Sprint 7), AI copilot specifics (Sprint 6) or PostGear-only
+analytics, that sprint adds models to this same file following the conventions
 above, and updates the tables in this document.
 
 Resist renaming inherited fields. `Integration` for "channel" and

@@ -4,7 +4,7 @@
  * Specific, for the reason `ai.messages.ts` gives: the caller is a member of
  * the workspace analysing a site they chose, so every refusal names what to
  * change. What never reaches a response is the page's own text or a
- * provider's error body — a crawled page can say anything, and an error body
+ * provider's error body: a crawled page can say anything, and an error body
  * from the authority provider or the model can quote the request. Every
  * failure is mapped to one of these strings by its *kind* (`seo.errors.ts`),
  * and the original goes to the server log.
@@ -38,7 +38,7 @@ export const SEO_MESSAGES = {
   UNEXPECTED: 'Something went wrong while analysing. Please try again.',
 } as const;
 
-/** The copy shown for a crawl failure, chosen by its kind — never by its text. */
+/** The copy shown for a crawl failure, chosen by its kind, never by its text. */
 export function messageForCrawlKind(kind: CrawlErrorKind): string {
   switch (kind) {
     case 'unsafe_url':

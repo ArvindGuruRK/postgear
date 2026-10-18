@@ -17,8 +17,8 @@ import type { PlanTier } from './billing';
  * A channel's state, in the order the user needs to act on it.
  *
  * `needs_setup` and `needs_reconnect` are deliberately separate values rather
- * than one "broken" flag. They look similar — both mean the channel cannot
- * publish — but they need different actions: one resumes an unfinished
+ * than one "broken" flag. They look similar (both mean the channel cannot
+ * publish), but they need different actions: one resumes an unfinished
  * connection, the other re-authorizes an expired one. Collapsing them into a
  * single badge (as the reference implementation does) leaves the user unable to
  * tell which is which without clicking.
@@ -75,14 +75,14 @@ export interface ProviderSummary {
   /**
    * False when the deployment has no client id for this platform.
    *
-   * Rendered as a disabled tile with a reason rather than hidden — a missing
+   * Rendered as a disabled tile with a reason rather than hidden: a missing
    * environment variable is a setup gap, and silently omitting the platform
    * makes it look unsupported instead.
    */
   configured: boolean;
   requiresEntitySelection: boolean;
   /**
-   * What the provider can publish (Sprint 4) — the same object its
+   * What the provider can publish (Sprint 4): the same object its
    * `checkValidity` enforces, so the composer never hardcodes a platform rule.
    */
   rules: ProviderRules;
@@ -97,7 +97,7 @@ export interface ProviderEntity {
   picture?: string;
   username?: string;
   /**
-   * A disambiguating line — follower count, board size, "via Acme Page".
+   * A disambiguating line: follower count, board size, "via Acme Page".
    *
    * Not decoration: with five similarly-named Facebook pages, this is what
    * makes the choice possible.

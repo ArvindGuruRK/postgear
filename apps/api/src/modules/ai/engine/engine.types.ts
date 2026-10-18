@@ -5,8 +5,8 @@
  * cache, a sink. This interface is what they add up to once the environment
  * has been read: a mode, what the mode can do, and three things to build per
  * request. The service, the controller and the copilot tools depend on this
- * and only this — behind the `AI_ENGINE` token, like `TEMPORAL_CONNECT` in
- * the scheduling module — so every one of their tests hands in a fake instead
+ * and only this (behind the `AI_ENGINE` token, like `TEMPORAL_CONNECT` in
+ * the scheduling module), so every one of their tests hands in a fake instead
  * of constructing the real factories.
  *
  * ## Why the pipeline is built per request
@@ -92,5 +92,5 @@ export const AI_ENGINE = Symbol('AI_ENGINE');
 /** The name a saved AI image gets in the library: the prompt, cut to a label. */
 export function imageNameFor(prompt: string): string {
   const label = prompt.replace(/\s+/g, ' ').trim();
-  return `AI image — ${label.length > 60 ? `${label.slice(0, 60).trimEnd()}…` : label}`;
+  return `AI image: ${label.length > 60 ? `${label.slice(0, 60).trimEnd()}…` : label}`;
 }

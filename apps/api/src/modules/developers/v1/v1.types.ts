@@ -25,7 +25,7 @@ export interface PublicPostChannel {
 }
 
 export interface PublicPostSummary {
-  /** The post's group id — what every `/v1/posts/:id` route takes. */
+  /** The post's group id: what every `/v1/posts/:id` route takes. */
   id: string;
   state: PublicPostState;
   publishAt: string;
@@ -36,7 +36,7 @@ export interface PublicPostSummary {
 }
 
 export interface PublicPostPart {
-  /** The part as plain text — what a platform receives. */
+  /** The part as plain text: what a platform receives. */
   text: string;
   media: { id: string; url: string }[];
 }

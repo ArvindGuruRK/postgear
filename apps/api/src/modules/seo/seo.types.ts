@@ -1,12 +1,12 @@
 /**
- * What `/seo/*` returns and streams — the API's copy of
+ * What `/seo/*` returns and streams: the API's copy of
  * `apps/web/src/types/seo.ts`.
  *
  * Declared here rather than imported from the web app (an app must not
  * depend on another app) or from `@postgear/seo-engine` alone (the engine
  * knows crawls and reports, not audits with ids, statuses and history). The
- * shapes the engine already defines — advice, recommendations, grades,
- * categories — are reused as-is so there is one definition of each; the
+ * shapes the engine already defines (advice, recommendations, grades,
+ * categories) are reused as-is so there is one definition of each; the
  * rest mirrors the browser's file field for field. `seo.mappers.ts` is the
  * only place rows and engine results are turned into these.
  */

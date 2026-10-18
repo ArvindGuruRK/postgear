@@ -13,8 +13,8 @@
  *
  * ## Layout
  *
- * Channels, then the writing — one shared thread with a tab per selected
- * channel for overrides — then the schedule and the save actions. The live
+ * Channels, then the writing (one shared thread with a tab per selected
+ * channel for overrides), then the schedule and the save actions. The live
  * preview sits beside it on wide screens and below it on narrow ones.
  *
  * ## Saving
@@ -43,7 +43,7 @@ import {
   FormLabel,
   Heading,
   Input,
-  PageHeader,
+  PageActions,
   Stack,
   Tabs,
   TabsList,
@@ -84,7 +84,7 @@ interface ComposerProps {
   providers: ProviderSummary[];
   initialPost: PostDetail | null;
   initialMedia: MediaItem | null;
-  /** An ISO time to start a new post at — the calendar's "click a slot". */
+  /** An ISO time to start a new post at: the calendar's "click a slot". */
   initialPublishAt?: string | null;
   /** Set when `?group=` named a post that could not be loaded. */
   loadError: string | null;
@@ -291,28 +291,19 @@ export function Composer({
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_28rem]">
       <Stack gap="lg" className="min-w-0">
-        <PageHeader
-          title={state.group ? 'Edit post' : 'New post'}
-          description="Write once, adjust per channel, and see it the way each platform will show it."
-          actions={
-            <>
-              <Link href={`/${orgId}/ai-copilot`} className={buttonVariants({ variant: 'ai' })}>
-                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-                Generate with AI
-              </Link>
-              <DraftsButton onClick={() => setDraftsOpen(true)} />
-              {state.group ? (
-                <Link
-                  href={`/${orgId}/composer`}
-                  className={buttonVariants({ variant: 'primary' })}
-                >
-                  <Plus className="h-4 w-4" strokeWidth={2.5} />
-                  New post
-                </Link>
-              ) : null}
-            </>
-          }
-        />
+        <PageActions>
+          <Link href={`/${orgId}/ai-copilot`} className={buttonVariants({ variant: 'ai' })}>
+            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+            Generate with AI
+          </Link>
+          <DraftsButton onClick={() => setDraftsOpen(true)} />
+          {state.group ? (
+            <Link href={`/${orgId}/composer`} className={buttonVariants({ variant: 'primary' })}>
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              New post
+            </Link>
+          ) : null}
+        </PageActions>
 
         {loadError ? <Alert variant="danger">{loadError}</Alert> : null}
 
@@ -365,7 +356,7 @@ export function Composer({
           ) : null}
 
           {scopeChannel && !isCustomized(state, scopeChannel.id) ? (
-            <div className="flex flex-col items-start gap-3 rounded-lg border-4 border-dashed border-outline p-5">
+            <div className="flex flex-col items-start gap-3 rounded-lg border-2 border-dashed border-outline p-5">
               <Text>
                 <strong>{scopeChannel.name}</strong> uses the post written under “All channels”.
               </Text>
@@ -414,7 +405,7 @@ export function Composer({
 
         <section
           aria-label="Schedule and save"
-          className="flex flex-col gap-4 rounded-lg border-4 border-outline bg-secondary p-5 shadow-brutalMd"
+          className="flex flex-col gap-4 rounded-lg border-2 border-outline bg-secondary p-5 shadow-surfaceMd"
         >
           <FormField className="max-w-xs">
             <FormLabel htmlFor="composer-publish-at">Publish at</FormLabel>

@@ -1,4 +1,4 @@
-// Package Entry Point — @postgear/ui
+// Package Entry Point: @postgear/ui
 
 export * from './components/accordion';
 export * from './components/activity-feed';
@@ -40,7 +40,7 @@ export * from './components/multi-select';
 export * from './components/navigation-menu';
 export * from './components/notification-center';
 export * from './components/onboarding-stepper';
-export * from './components/page-header';
+export * from './components/page-actions';
 export * from './components/pagination';
 export * from './components/panel';
 export * from './components/password-input';

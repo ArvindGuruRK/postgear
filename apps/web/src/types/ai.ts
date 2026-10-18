@@ -109,7 +109,7 @@ export type CopilotStreamEvent =
   | { type: 'done'; message: string; toolCalls: number; credits: AiCredits }
   | { type: 'error'; kind: AiErrorKind; message: string; retryable: boolean; credits: AiCredits };
 
-/** What the copilot's `draft_post` tool returns — the UI turns `group` into a composer link. */
+/** What the copilot's `draft_post` tool returns: the UI turns `group` into a composer link. */
 export interface DraftPostToolOutput {
   group: string;
   channelNames: string[];

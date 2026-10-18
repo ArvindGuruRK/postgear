@@ -41,7 +41,7 @@ export function AnalyticsSection() {
   return (
     <Section
       title="Analytics & Scores"
-      description="Gauges, bars and charts for the analytics dashboard and the SEO analyzer — flat strokes from the action tokens, no gradients, body face on the data."
+      description="Gauges, bars and charts for the analytics dashboard and the SEO analyzer: flat strokes from the action tokens, no gradients, body face on the data."
     >
       <Row label="Score Gauge (tone follows the grade band)">
         <ScoreGauge value={92} grade="A" label="Overall" size="sm" />

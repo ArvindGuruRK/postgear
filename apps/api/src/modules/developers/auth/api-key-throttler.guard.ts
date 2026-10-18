@@ -11,7 +11,7 @@
  *   against `RATE_LIMIT_PER_MIN`. The two are independent: a key can be
  *   throttled while its address is fine, and vice versa.
  * - **The tracker is the key id**, which `ApiKeyGuard` attached a moment
- *   earlier. Not the address — one integrator's server is one address and
+ *   earlier. Not the address: one integrator's server is one address and
  *   many keys, and one key may call from many addresses.
  * - **One bucket per key, across every route.** The base guard keys its
  *   counter by controller and handler as well, which would give each key
@@ -99,7 +99,7 @@ export class ApiKeyThrottlerGuard extends ThrottlerGuard {
       hits: detail.totalHits,
     });
 
-    // Seconds until the window clears — the same value the base guard put in
+    // Seconds until the window clears: the same value the base guard put in
     // the suffixed header a moment ago.
     this.setResponseHeader(res, 'Retry-After', Math.max(1, Math.ceil(detail.timeToBlockExpire)));
 

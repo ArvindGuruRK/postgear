@@ -3,7 +3,7 @@
  *
  * Storage and the repository are fakes here; sniffing and image processing
  * are real, run on real files in a temp directory. What is pinned is the
- * order of operations the service's header comment argues for — and above all
+ * order of operations the service's header comment argues for, and above all
  * the cleanup: no temp file survives a request, and no stored object survives
  * a failed one.
  */
@@ -214,7 +214,7 @@ describe('MediaService', () => {
     const media = await service.saveGenerated('org_1', {
       data: png,
       mimeType: 'image/png',
-      name: 'AI image — a sunrise over a city skyline',
+      name: 'AI image: a sunrise over a city skyline',
       alt: 'A sunrise over a city skyline, ‮comic style',
     });
 
@@ -225,8 +225,8 @@ describe('MediaService', () => {
     expect(thumbKey).toBe(String(imageKey).replace('.jpg', '.thumb.webp'));
     expect(repository.create.mock.calls[0][0]).toMatchObject({
       orgId: 'org_1',
-      name: 'AI image — a sunrise over a city skyline',
-      originalName: 'AI image — a sunrise over a city skyline',
+      name: 'AI image: a sunrise over a city skyline',
+      originalName: 'AI image: a sunrise over a city skyline',
       type: 'image',
       width: 64,
       height: 64,

@@ -5,7 +5,7 @@
  *
  * ## One store interface, two bindings
  *
- * The webhook handler applies an event as one transaction — the event row,
+ * The webhook handler applies an event as one transaction: the event row,
  * the subscription, the organization flags and the notification succeed or
  * fail together. So the operations are declared once as `BillingStore`, and
  * the repository provides them twice: bound to the shared client for plain
@@ -17,7 +17,7 @@
  *
  * `BillingModule` must never import `ChannelsModule`, `AiModule` or
  * `OrgModule` (they import it), so the two numbers it needs from their
- * tables — live channels and AI credits used — are small queries here. The
+ * tables (live channels and AI credits used) are small queries here. The
  * credits query mirrors `ai/credits/credits.repository.ts`'s `sumUsed` over
  * the same ledger types, read from the pure `credits.policy.ts`.
  */
@@ -118,7 +118,7 @@ const ORG_SELECT = {
   },
 } as const;
 
-/** The store over any Prisma client — the shared one or a transaction's. */
+/** The store over any Prisma client: the shared one or a transaction's. */
 class PrismaBillingStore implements BillingStore {
   constructor(protected readonly client: Client) {}
 
@@ -240,7 +240,7 @@ export class BillingRepository extends PrismaBillingStore {
     return prisma.integration.count({ where: { organizationId: orgId, deletedAt: null } });
   }
 
-  /** Whether any subscription row — live, cancelled or deleted — was ever made for the org. */
+  /** Whether any subscription row (live, cancelled or deleted) was ever made for the org. */
   async hasAnySubscription(orgId: string): Promise<boolean> {
     const row = await prisma.subscription.findUnique({
       where: { organizationId: orgId },
@@ -265,7 +265,7 @@ export class BillingRepository extends PrismaBillingStore {
   }
 }
 
-/** Prisma's unique-constraint failure — the second delivery of one Stripe event. */
+/** Prisma's unique-constraint failure: the second delivery of one Stripe event. */
 export function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }

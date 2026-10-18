@@ -2,7 +2,7 @@
  * Billing shapes shared between server components and client islands
  * (Sprint 8). Declared here rather than imported from the API or from
  * `@postgear/db`, for the reason `workspace.ts` gives: nothing Prisma-backed
- * may reach a browser bundle. These mirror `GET /billing/*` exactly — see
+ * may reach a browser bundle. These mirror `GET /billing/*` exactly: see
  * docs/sprint-documents/sprint-08-contract.md §5.1.
  */
 
@@ -85,7 +85,7 @@ export interface ChangePreviewResponse {
   preview: ChangePreview;
 }
 
-/** `{ tier, period }` — the body of checkout and change, the query of the preview. */
+/** `{ tier, period }`: the body of checkout and change, the query of the preview. */
 export interface PlanSelection {
   tier: PaidTier;
   period: BillingPeriod;

@@ -5,7 +5,7 @@
  *
  * The user's message is a primary bubble with its tail on the right; the
  * assistant's is a plain bubble with its tail on the left and a violet
- * Sparkles avatar — violet on the avatar, not the bubble, because the reply
+ * Sparkles avatar: violet on the avatar, not the bubble, because the reply
  * is conversation and the system reserves the violet fill for the artefacts
  * the model produces (design-system-rules.md §16b). Tool rows sit above the
  * reply's text, in the order they happened: the assistant checks, then says.

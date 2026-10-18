@@ -6,7 +6,6 @@ import {
   cn,
   EmptyState,
   ErrorState,
-  PageHeader,
   Pagination,
   SearchInput,
   Skeleton,
@@ -33,7 +32,7 @@ const FILTERS = [
 /**
  * The media library: upload, find, reuse, delete.
  *
- * "Use in a post" opens a new composer with the file already attached — the
+ * "Use in a post" opens a new composer with the file already attached: the
  * one-click insert the sprint asks for. The composer's own picker offers the
  * same library from the other direction.
  */
@@ -53,11 +52,6 @@ export function MediaLibrary({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Media"
-        description="Every image and video uploaded to this workspace, ready to reuse in any post."
-      />
-
       <MediaUploader
         onUploaded={(item) => {
           list.prepend(item);

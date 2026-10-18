@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Picks the preview for a channel's platform — the registry the sprint plan
+ * Picks the preview for a channel's platform: the registry the sprint plan
  * describes: one small component per platform, and a generic one for the rest.
  *
  * Keyed by provider identifier, the same value stored in
@@ -69,7 +69,7 @@ export function ChannelPreview({
       </div>
       {rules.thread === 'none' && parts.length > 1 ? (
         <Text size="xs" muted>
-          {providerName} has no threads — only part 1 is shown, and only part 1 would be posted.
+          {providerName} has no threads. Only part 1 is shown, and only part 1 would be posted.
         </Text>
       ) : rules.thread === 'comments' && parts.length > 1 ? (
         <Text size="xs" muted>

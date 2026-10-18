@@ -21,7 +21,7 @@ const toneIconClasses: Record<StateDisplayTone, string> = {
   success: 'text-actionSuccess',
 };
 
-/** Shared layout behind EmptyState/ErrorState/SuccessState — icon + heading + description + optional action. */
+/** Shared layout behind EmptyState/ErrorState/SuccessState: icon + heading + description + optional action. */
 export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
   ({ className, icon: Icon, title, description, tone = 'neutral', action, ...props }, ref) => (
     <div
@@ -32,7 +32,7 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
       {Icon && (
         <div
           className={cn(
-            'rounded-full border-2 border-outline bg-secondary p-4 shadow-brutalSm',
+            'rounded-full border-2 border-outline bg-secondary p-4 shadow-surfaceSm',
             toneIconClasses[tone],
           )}
         >

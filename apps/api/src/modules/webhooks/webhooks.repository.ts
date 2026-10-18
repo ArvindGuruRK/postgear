@@ -1,5 +1,5 @@
 /**
- * Persistence for outbound webhooks (Sprint 8) — and, like the channels
+ * Persistence for outbound webhooks (Sprint 8), and, like the channels
  * repository, an encryption boundary: the signing secret is AES-256-GCM
  * ciphertext in the row and plaintext only in the one method that mints it.
  * Nothing here ever reads it back out for a caller; the worker decrypts at
@@ -181,7 +181,7 @@ export class WebhooksRepository {
   }
 
   /**
-   * Soft delete. The secret is cleared, not left in a tombstone — the same
+   * Soft delete. The secret is cleared, not left in a tombstone: the same
    * rule the channels repository applies to tokens.
    */
   async softDelete(orgId: string, id: string): Promise<WebhookRow | null> {

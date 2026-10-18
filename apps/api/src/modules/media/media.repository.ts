@@ -10,7 +10,7 @@ import { prisma, State } from '@postgear/db';
 
 export type MediaKind = 'image' | 'video';
 
-/** A media row as the rest of the API sees it. Keys, not URLs — the service builds those. */
+/** A media row as the rest of the API sees it. Keys, not URLs: the service builds those. */
 export interface MediaRecord {
   id: string;
   name: string;
@@ -158,7 +158,7 @@ export class MediaRepository {
   }
 
   /**
-   * How many unpublished posts attach this media — the number the delete
+   * How many unpublished posts attach this media: the number the delete
    * confirmation states.
    *
    * Counted in groups, because that is what a user calls "a post": one image

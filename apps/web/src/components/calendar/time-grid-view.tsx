@@ -4,9 +4,9 @@
  * The week and day views: hours down, days across.
  *
  * One component, because the day view is the week view with one column and
- * roomier cards. The grid scrolls inside its own frame — vertically through
+ * roomier cards. The grid scrolls inside its own frame: vertically through
  * the hours, and horizontally on a narrow screen rather than squeezing seven
- * days into a phone's width — the page itself never scrolls, per the app
+ * days into a phone's width: the page itself never scrolls, per the app
  * shell. It opens on the working morning rather than midnight, with the
  * current hour marked.
  */

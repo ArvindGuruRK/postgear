@@ -12,7 +12,7 @@
  * The signal handler increments a counter rather than setting a flag, for
  * the reason the publish workflow gives: a click that lands while the
  * schedule is being read must still interrupt the wait that follows. A
- * request is honoured at once — but never within two minutes of the last
+ * request is honoured at once, but never within two minutes of the last
  * attempt. Clicks inside that window coalesce into one sync at the end of
  * it, which is what a person repeatedly pressing the button wants, and is
  * what keeps a stuck button from hammering a platform.

@@ -14,34 +14,43 @@ import {
 } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { AvatarPicker } from '@/components/profile/avatar-picker';
 import { ApiError, api, channelConnectUrl } from '@/lib/api';
 import {
   ABOUT_YOU_QUESTIONS,
   CHANNEL_OPTIONS,
   GOALS_QUESTIONS,
   ONBOARDING_STEPS,
+  PROFILE_STEP,
   REFERRAL_QUESTION,
 } from '@/lib/onboarding-questions';
+import type { SessionAvatar } from '@/lib/session';
 import { ChoiceGroup, MultiChoiceGroup } from './choice-group';
 
 /**
  * The display name for a channel slug.
  *
  * `CHANNEL_OPTIONS` is the same list the Channels page's registry is keyed on,
- * so the slug doubles as the provider identifier — no mapping table needed.
+ * so the slug doubles as the provider identifier: no mapping table needed.
  */
 function channelLabel(value: string): string {
   return CHANNEL_OPTIONS.find((option) => option.value === value)?.label ?? 'a channel';
 }
 
 /**
- * The five-step onboarding wizard.
+ * The six-step onboarding wizard.
+ *
+ * Steps 1–5 are the workspace and the five survey questions; step 6,
+ * "Profile", asks what to call the user and lets them pick an avatar, and is
+ * the only step that finishes onboarding. From steps 2–5 "Skip questions"
+ * jumps straight to it: every path ends there (see the step table in
+ * `apps/api/src/modules/onboarding/onboarding.service.ts`).
  *
  * ## Every step writes before it advances
  *
  * There is no "collect everything, submit at the end". Each step posts its own
  * answers and the server bumps `User.onboardingStep`, so closing the tab at
- * step 3 loses nothing — signing back in resumes exactly there. That is what
+ * step 3 loses nothing: signing back in resumes exactly there. That is what
  * the sprint's "a user who abandons onboarding midway can sign back in without
  * hitting an error page" requirement actually asks for, and it is not
  * achievable with client-only state.
@@ -60,21 +69,36 @@ interface Answers {
   interestedChannels: string[];
 }
 
+/** Mirrors the API's `PROFILE_NAME_MAX`. */
+const PROFILE_NAME_MAX = 50;
+
 export function OnboardingWizard({
   initialStep,
   initialAnswers,
   initialWorkspaceName,
+  initialName,
+  initialAvatar,
 }: {
   initialStep: number;
   initialAnswers: Answers;
   initialWorkspaceName: string | null;
+  /** `User.name`, from signup or the OAuth profile, to pre-fill step 6. */
+  initialName: string | null;
+  /** A Google/Facebook signup arrives with its provider photo already set. */
+  initialAvatar: SessionAvatar;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(initialStep);
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
   const [workspaceName, setWorkspaceName] = useState(initialWorkspaceName ?? '');
+  const [name, setName] = useState(initialName ?? '');
+  const [avatar, setAvatar] = useState<SessionAvatar>(initialAvatar);
+  const [avatarPending, setAvatarPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const trimmedName = name.trim();
+  const nameValid = trimmedName.length >= 1 && trimmedName.length <= PROFILE_NAME_MAX;
 
   function set<K extends keyof Answers>(key: K, value: Answers[K]) {
     setAnswers((current) => ({ ...current, [key]: value }));
@@ -103,26 +127,27 @@ export function OnboardingWizard({
     }
   }
 
+  /** "Skip questions": the server checks the workspace exists and moves to 6. */
+  function skipQuestions() {
+    return submit(async () => {
+      await api('/onboarding/skip', { method: 'POST' });
+    }, PROFILE_STEP);
+  }
+
   async function finish() {
     setError(null);
     setPending(true);
 
     try {
-      // Save Q5 first, then mark complete — two calls rather than one so the
-      // answer is durable even if the completion call fails.
-      if (answers.referralSource) {
-        await api('/onboarding/answers', {
-          method: 'POST',
-          body: { referralSource: answers.referralSource },
-        });
-      }
-
-      const { organizationId } = await api<{ organizationId: string }>('/onboarding/complete', {
+      // Saves the name and marks onboarding complete in one call. The avatar
+      // is already saved: the picker writes it the moment it is chosen.
+      const { organizationId } = await api<{ organizationId: string }>('/onboarding/profile', {
         method: 'POST',
+        body: { name: trimmedName },
       });
 
       // `refresh()` before navigating so the layouts re-read the session and
-      // see `onboardingCompletedAt` set — without it, route gate 2 still holds
+      // see `onboardingCompletedAt` set: without it, route gate 2 still holds
       // the stale value and bounces the user straight back to /onboarding.
       router.refresh();
       router.replace(`/${organizationId}/calendar`);
@@ -136,7 +161,7 @@ export function OnboardingWizard({
 
   return (
     <Stack gap="lg">
-      {/* Presentational only — it does not navigate. currentStep is 1-based. */}
+      {/* Presentational only: it does not navigate. currentStep is 1-based. */}
       <OnboardingStepper steps={ONBOARDING_STEPS} currentStep={step} />
 
       {error ? <FormErrorMessage>{error}</FormErrorMessage> : null}
@@ -202,6 +227,7 @@ export function OnboardingWizard({
           <StepActions
             pending={pending}
             canContinue={Boolean(answers.role && answers.teamSize)}
+            onSkip={skipQuestions}
             onContinue={() =>
               submit(async () => {
                 await api('/onboarding/answers', {
@@ -236,6 +262,7 @@ export function OnboardingWizard({
             pending={pending}
             canContinue={Boolean(answers.primaryGoal && answers.postingFrequency)}
             onBack={() => setStep(2)}
+            onSkip={skipQuestions}
             onContinue={() =>
               submit(async () => {
                 await api('/onboarding/answers', {
@@ -256,7 +283,7 @@ export function OnboardingWizard({
           <Stack gap="xs">
             <Heading level="h3">Where do you post?</Heading>
             <Text muted>
-              Tell us which channels matter to you. Connecting them comes next — and it is not
+              Tell us which channels matter to you. Connecting them comes next, and it is not
               required to start.
             </Text>
           </Stack>
@@ -281,7 +308,7 @@ export function OnboardingWizard({
 
               This records the step *before* navigating, and deliberately does
               not mark onboarding complete. OAuth leaves the app entirely, so
-              there is no half-finished wizard to come back to — but the last
+              there is no half-finished wizard to come back to, but the last
               survey question has not been asked yet, and completing early to
               avoid an awkward return would silently discard it. Instead the
               step is advanced to 5, so when the platform sends the user back
@@ -309,8 +336,8 @@ export function OnboardingWizard({
             </Button>
             <Text size="sm" muted>
               {answers.interestedChannels.length === 0
-                ? 'Pick a platform above to connect one now — or skip and do it later from the Channels page.'
-                : 'Or skip — you can connect accounts any time from the Channels page.'}
+                ? 'Pick a platform above to connect one now, or skip and do it later from the Channels page.'
+                : 'Or skip: you can connect accounts any time from the Channels page.'}
             </Text>
           </Stack>
 
@@ -319,6 +346,7 @@ export function OnboardingWizard({
             canContinue
             continueLabel={answers.interestedChannels.length === 0 ? 'Skip for now' : 'Continue'}
             onBack={() => setStep(3)}
+            onSkip={skipQuestions}
             onContinue={() =>
               submit(async () => {
                 await api('/onboarding/channels', {
@@ -335,7 +363,7 @@ export function OnboardingWizard({
         <Stack gap="lg">
           <Stack gap="xs">
             <Heading level="h3">One last thing</Heading>
-            <Text muted>Then you are in.</Text>
+            <Text muted>Then tell us what to call you, and you are in.</Text>
           </Stack>
 
           <ChoiceGroup
@@ -347,11 +375,70 @@ export function OnboardingWizard({
           <StepActions
             pending={pending}
             canContinue={Boolean(answers.referralSource)}
-            continueLabel="Finish setup"
             onBack={() => setStep(4)}
-            onContinue={finish}
+            onSkip={skipQuestions}
+            onContinue={() =>
+              submit(async () => {
+                await api('/onboarding/answers', {
+                  method: 'POST',
+                  body: { referralSource: answers.referralSource },
+                });
+              }, PROFILE_STEP)
+            }
           />
         </Stack>
+      ) : null}
+
+      {/* Step 6, where every path ends. Two columns from `md` up; below that
+          the grid stacks name, then picker, then the button, so "Finish"
+          is always the last thing on the screen. */}
+      {step === PROFILE_STEP ? (
+        // `grid-rows-[auto_1fr]`: the first row is only as tall as the name
+        // field, so the button sits right under it rather than halfway down
+        // the (taller) picker column.
+        <div className="grid gap-8 md:grid-cols-2 md:grid-rows-[auto_1fr] md:gap-x-10">
+          <Stack gap="md" className="md:col-start-1 md:row-start-1">
+            <Stack gap="xs">
+              <Heading level="h3">What should we call you?</Heading>
+              <Text muted>This is how PostGear and its AI will address you.</Text>
+            </Stack>
+
+            <FormField>
+              <FormLabel htmlFor="profile-name" required>
+                Your name
+              </FormLabel>
+              <Input
+                id="profile-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Alex"
+                autoComplete="name"
+                maxLength={PROFILE_NAME_MAX}
+              />
+              <FormHelperText>A first name is fine. You can change it later.</FormHelperText>
+            </FormField>
+          </Stack>
+
+          <div className="md:col-start-2 md:row-span-2 md:row-start-1">
+            <AvatarPicker
+              name={trimmedName || 'You'}
+              value={avatar}
+              onChange={setAvatar}
+              onPendingChange={setAvatarPending}
+            />
+          </div>
+
+          <div className="md:col-start-1 md:row-start-2">
+            <Button
+              size="lg"
+              className="w-full md:w-auto"
+              disabled={pending || avatarPending || !nameValid}
+              onClick={finish}
+            >
+              {pending ? 'Finishing…' : 'Finish setup'}
+            </Button>
+          </div>
+        </div>
       ) : null}
     </Stack>
   );
@@ -362,12 +449,15 @@ function StepActions({
   canContinue,
   continueLabel = 'Continue',
   onBack,
+  onSkip,
   onContinue,
 }: {
   pending: boolean;
   canContinue: boolean;
   continueLabel?: string;
   onBack?: () => void;
+  /** Steps 2–5: "Skip questions", straight to the profile step. */
+  onSkip?: () => void;
   onContinue: () => void;
 }) {
   return (
@@ -380,9 +470,25 @@ function StepActions({
         <span />
       )}
 
-      <Button size="lg" onClick={onContinue} disabled={pending || !canContinue}>
-        {pending ? 'Saving…' : continueLabel}
-      </Button>
+      <Stack direction="row" gap="md" align="center">
+        {/* A text button, not a third filled one: skipping is the quiet
+            option, and three equal buttons would make it compete with
+            Continue. */}
+        {onSkip ? (
+          <button
+            type="button"
+            onClick={onSkip}
+            disabled={pending}
+            className="rounded-sm font-sans text-sm font-bold text-ink underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing disabled:pointer-events-none disabled:opacity-50"
+          >
+            Skip questions
+          </button>
+        ) : null}
+
+        <Button size="lg" onClick={onContinue} disabled={pending || !canContinue}>
+          {pending ? 'Saving…' : continueLabel}
+        </Button>
+      </Stack>
     </Stack>
   );
 }

@@ -5,8 +5,8 @@
  *
  * The reason is required and the feedback optional; both go to the owner
  * by mail, which is the one thing the product learns from a cancellation.
- * The copy says what actually happens — access until the period end, then
- * the Free plan, nothing deleted — because "cancel" on its own reads as
+ * The copy says what actually happens (access until the period end, then
+ * the Free plan, nothing deleted), because "cancel" on its own reads as
  * "lose everything now".
  */
 import {
@@ -131,7 +131,7 @@ export function CancelDialog({
               placeholder="What would have made you stay?"
             />
             <FormHelperText>
-              {feedback.length} / {MAX_FEEDBACK_LENGTH} — goes to whoever runs PostGear.
+              {feedback.length} / {MAX_FEEDBACK_LENGTH}. This goes to whoever runs PostGear.
             </FormHelperText>
           </FormField>
 

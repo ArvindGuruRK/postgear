@@ -12,7 +12,7 @@
  *
  * Snapshots are append-only, so "a post's current metrics" is its newest
  * row. Prisma's `distinct` with an ordering returns the first row of each
- * group, which with `capturedAt desc` is exactly that — one query, no
+ * group, which with `capturedAt desc` is exactly that: one query, no
  * window function, and bounded by the number of posts rather than the
  * number of syncs.
  */
@@ -194,7 +194,7 @@ export class AnalyticsRepository {
     });
   }
 
-  /** The root rows of a group — one per channel — with their channels, live or not. */
+  /** The root rows of a group, one per channel, with their channels, live or not. */
   async findRootsByGroup(orgId: string, group: string): Promise<RootRow[]> {
     return prisma.post.findMany({
       where: { organizationId: orgId, group, parentPostId: null, deletedAt: null },

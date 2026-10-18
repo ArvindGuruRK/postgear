@@ -1,5 +1,5 @@
 /**
- * `GET /v1/analytics/overview` — the same overview the dashboard shows,
+ * `GET /v1/analytics/overview`: the same overview the dashboard shows,
  * through the same service and the same query schema, so the numbers an
  * integrator pulls are the numbers the page shows.
  */

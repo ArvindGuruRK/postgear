@@ -4,7 +4,7 @@
  * Reads carry `@Roles(ADMIN, USER)`: every member may see the plan and the
  * meters. Writes carry `@Roles(ADMIN)`: only an admin spends the
  * workspace's money. The roles are on each handler rather than the class
- * because one route has none at all — the webhook.
+ * because one route has none at all: the webhook.
  *
  * ## The webhook
  *
@@ -12,8 +12,8 @@
  * and a replay is already harmless through the idempotency table. It reads
  * `request.rawBody`, which `main.ts` keeps for exactly this route: Stripe
  * signs the bytes it sent, and a re-serialised JSON object would never
- * verify. The handler answers 200 for everything it could verify — a
- * duplicate, an unhandled type, even a handler failure — because a non-2xx
+ * verify. The handler answers 200 for everything it could verify (a
+ * duplicate, an unhandled type, even a handler failure), because a non-2xx
  * only makes Stripe send it again (see `stripe-webhook.service.ts`).
  */
 import {

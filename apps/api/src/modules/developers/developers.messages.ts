@@ -4,8 +4,8 @@
  * Two audiences, two registers. The session routes (`/developers/api-keys`)
  * are used by an authenticated admin editing their own workspace, so the
  * messages are specific, as in `posts.messages.ts`. The public API's
- * authentication failures are deliberately one string for every cause —
- * missing, malformed, unknown, revoked — because a caller probing with
+ * authentication failures are deliberately one string for every cause
+ * (missing, malformed, unknown, revoked), because a caller probing with
  * guessed keys must not learn which of those it hit.
  */
 export const DEVELOPERS_MESSAGES = {

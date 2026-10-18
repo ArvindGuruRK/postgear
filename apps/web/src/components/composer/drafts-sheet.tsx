@@ -21,14 +21,14 @@ import { ApiError, api } from '@/lib/api';
 import type { PostSummary } from '@/types/post';
 
 /**
- * Saved posts that are not published yet — where a draft is reopened.
+ * Saved posts that are not published yet, where a draft is reopened.
  *
  * Queued posts are listed too. Sprint 5 builds the queue page proper; until
  * then, this is the only way back into a queued post to change it, and
  * leaving it out would make "Add to queue" a one-way door.
  *
  * Fetched when opened rather than rendered with the page, so it always shows
- * the latest saves — including one made seconds ago in this same composer.
+ * the latest saves, including one made seconds ago in this same composer.
  */
 export function DraftsSheet({
   orgId,
@@ -148,7 +148,7 @@ function PostList({
               href={`/${orgId}/composer?group=${post.group}`}
               onClick={onOpen}
               aria-current={post.group === currentGroup ? 'page' : undefined}
-              className="flex flex-col gap-1 rounded-md border-2 border-outline bg-secondary p-3 text-ink shadow-brutalSm outline-none hover:bg-actionPrimary/10 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing aria-[current=page]:bg-actionPrimary/10"
+              className="flex flex-col gap-1 rounded-md border-2 border-outline bg-secondary p-3 text-ink shadow-surfaceSm outline-none hover:bg-actionPrimary/10 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing aria-[current=page]:bg-actionPrimary/10"
             >
               <span className="line-clamp-2 font-sans text-sm font-medium">
                 {post.preview || <span className="opacity-60">Empty post</span>}

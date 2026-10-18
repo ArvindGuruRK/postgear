@@ -15,12 +15,12 @@ const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
     // Decrypts `Integration.token` before a publish. The same key the API uses
-    // to encrypt it — see packages/db/src/crypto.ts.
+    // to encrypt it: see packages/db/src/crypto.ts.
     ENCRYPTION_KEY_AES256: z
       .string()
       .regex(
         /^[0-9a-fA-F]{64}$/,
-        'ENCRYPTION_KEY_AES256 must be 32 bytes as 64 hex characters — run `npm run generate:keys`',
+        'ENCRYPTION_KEY_AES256 must be 32 bytes as 64 hex characters. Run `npm run generate:keys`',
       ),
 
     TEMPORAL_HOST: z.string().min(1).default('localhost:7233'),
@@ -32,7 +32,7 @@ const envSchema = z
     WORKER_MAX_CONCURRENT_PUBLISHES: z.coerce.number().int().positive().default(5),
 
     // Media URLs are built the same way the API's storage backends build them,
-    // from the same variables — see lib/media-url.ts.
+    // from the same variables: see lib/media-url.ts.
     STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
     API_URL: z.string().url().default('http://localhost:3001'),
     S3_PUBLIC_URL: z.string().url().optional(),
@@ -41,9 +41,9 @@ const envSchema = z
      * Publish to a stand-in instead of real platforms.
      *
      * For local development and the end-to-end suite, where no developer app is
-     * registered and the seeded channels hold fake tokens. Every other step —
-     * the timer, the retry policy, the status written for the queue, the
-     * refresh branch — runs for real; only the final HTTP call is replaced. A
+     * registered and the seeded channels hold fake tokens. Every other step
+     * (the timer, the retry policy, the status written for the queue, the
+     * refresh branch) runs for real; only the final HTTP call is replaced. A
      * message can ask for a failure with `[simulate:429]` and friends; see
      * lib/publisher.ts. Refused in production, so a misconfigured deploy cannot
      * quietly "publish" everything to nowhere.

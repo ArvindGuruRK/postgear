@@ -4,8 +4,8 @@
  * ## The client holds the history
  *
  * The API is stateless: each request carries the conversation so far and
- * streams one reply. This module owns that conversation — the entries, the
- * reply being streamed into, and the tool rows under it — and
+ * streams one reply. This module owns that conversation (the entries, the
+ * reply being streamed into, and the tool rows under it) and
  * `historyFor` turns it back into what the API accepts (the last twenty
  * messages, ending with the user's).
  *
@@ -75,7 +75,7 @@ export interface ChatState {
   /**
    * The session's stored conversation has been read (whether or not it held
    * anything). Persisting is gated on this, and it can only become true
-   * through a dispatch — so the render that mounts the chat can never write
+   * through a dispatch, so the render that mounts the chat can never write
    * its empty initial state over what the session holds. An effect-order
    * guard (a ref flipped in the restore effect) is not enough: the persist
    * effect of that same commit still sees the pre-restore entries, and React's
@@ -111,7 +111,7 @@ export function initialChatState(credits: AiCredits | null = null): ChatState {
 let idCounter = 0;
 
 /**
- * Unique within the origin's session, not globally — a restore brings back
+ * Unique within the origin's session, not globally: a restore brings back
  * ids from an earlier page, so the time prefix keeps them apart from the
  * counter's.
  */
@@ -306,7 +306,7 @@ export function copilotStorageKey(orgId: string): string {
 /**
  * Entries as stored. A reply that was streaming when the page went away is
  * stored settled: its text is whatever had arrived, and a tool still running
- * is recorded as interrupted — the API run was aborted with the connection.
+ * is recorded as interrupted; the API run was aborted with the connection.
  */
 export function serializeHistory(entries: readonly ChatEntry[]): string {
   return JSON.stringify(

@@ -11,7 +11,7 @@
  * - **Paragraphs are lines.** Enter in the editor is a new line in the post; an
  *   empty paragraph is a blank line. This is how people already write social
  *   posts, and it round-trips.
- * - **Bold and italic become Unicode styles** — see `unicode.ts` for the costs.
+ * - **Bold and italic become Unicode styles**: see `unicode.ts` for the costs.
  * - **Headings become a bold line.** No platform has headings.
  * - **Lists become `•` or `1.` lines**, indented two spaces per level.
  * - **Links keep their words and their target.** A link whose text already is
@@ -136,7 +136,7 @@ function renderInline(nodes: InlineNode[], forceBold: boolean): string {
 /**
  * Whether a link's visible text already says where it goes.
  *
- * Compared loosely — scheme, `www.` and a trailing slash are ignored — so that
+ * Compared loosely (scheme, `www.` and a trailing slash are ignored), so that
  * `example.com` linked to `https://www.example.com/` is not rendered as
  * `example.com (https://www.example.com/)`.
  */

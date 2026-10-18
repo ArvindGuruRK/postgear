@@ -16,7 +16,7 @@
       "@postgear/ui/*": ["../../packages/ui/src/*"],
       // The browser-safe half of social-core only (Sprint 4). The package root
       // re-exports the providers, which import node:crypto and must never be
-      // bundled for the browser — so the web app is given this entry point and
+      // bundled for the browser, so the web app is given this entry point and
       // not the root. See packages/social-core/src/composer/index.ts.
       "@postgear/social-core/composer": ["../../packages/social-core/src/composer/index.ts"],
       "@postgear/config/*": ["../../packages/config/*"]
@@ -33,6 +33,6 @@
     "**/*.ts",
     "**/*.tsx"
   ],
-  // Do not exclude `.next` here — it would filter out the generated types above.
+  // Do not exclude `.next` here: it would filter out the generated types above.
   "exclude": ["node_modules"]
 }

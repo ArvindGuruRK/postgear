@@ -34,7 +34,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
  * Removes what a test created, through the API, with the signed-in page's session.
  *
  * Through the API rather than the database so a deleted media item's files are
- * removed from storage too — deleting rows alone would leave uploads behind in
+ * removed from storage too: deleting rows alone would leave uploads behind in
  * `apps/api/uploads` after every run.
  */
 export async function cleanUp(

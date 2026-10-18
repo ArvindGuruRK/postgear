@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
 import { Badge } from './badge';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
@@ -66,9 +67,9 @@ export function MultiSelect({
             }
           }}
           className={cn(
-            'flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-md border-2 border-outline bg-secondary px-3 py-2',
-            'font-sans text-sm text-ink shadow-brutalSm',
-            'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+            'flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-md border-2 border-outline bg-field px-3 py-2',
+            'font-sans text-sm text-ink shadow-surfaceSm',
+            FIELD_FOCUS,
             disabled ? 'cursor-not-allowed opacity-50 shadow-none' : 'cursor-pointer',
             className,
           )}
@@ -104,8 +105,8 @@ export function MultiSelect({
           onChange={(event) => setQuery(event.target.value)}
           placeholder={searchPlaceholder}
           className={cn(
-            'mb-2 w-full rounded-md border-2 border-outline bg-secondary px-3 py-2 font-sans text-sm text-ink',
-            'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+            'mb-2 w-full rounded-md border-2 border-outline bg-field px-3 py-2 font-sans text-sm text-ink',
+            FIELD_FOCUS,
           )}
         />
         <div className="max-h-56 overflow-y-auto pg-scrollbar pg-scrollbar-secondary">

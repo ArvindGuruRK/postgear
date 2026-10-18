@@ -3,19 +3,19 @@
  *
  * Three modes, decided by `engine.config.ts`:
  *
- * - **openai** — the real model, DALL-E, and Tavily research when its key is
+ * - **openai**: the real model, DALL-E, and Tavily research when its key is
  *   set (cached in Redis so a retry does not pay for the same search twice).
- * - **simulation** — the engine's deterministic model and canned research,
+ * - **simulation**: the engine's deterministic model and canned research,
  *   plus this module's sharp-drawn images. Everything downstream of the
- *   providers — credits, SSE, tool calling, the media library — runs for real.
- * - **unconfigured** — no model. `/ai/status` says so and the generation
+ *   providers (credits, SSE, tool calling, the media library) runs for real.
+ * - **unconfigured**: no model. `/ai/status` says so and the generation
  *   routes answer 503; the UI explains how to fix it.
  *
  * The result is an `AiEngine` behind the `AI_ENGINE` token. This file is the
  * only one in the module that calls the engine's factories, and it has no
  * unit test of its own: every branch here is a wiring of real providers that
- * a test could only mock into meaninglessness. What it wires — the config
- * decision, the image sink, the simulated generator — is tested where it is
+ * a test could only mock into meaninglessness. What it wires (the config
+ * decision, the image sink, the simulated generator) is tested where it is
  * defined.
  */
 import { Logger } from '@nestjs/common';
@@ -92,7 +92,7 @@ export function createAiEngine(deps: EngineFactoryDeps): AiEngine {
   switch (resolved.mode) {
     case 'simulation':
       logger.warn(
-        'AI_SIMULATION=true — the model, research and images are simulated. ' +
+        'AI_SIMULATION=true: the model, research and images are simulated. ' +
           'Credits, streaming and the media library are real. Not for production.',
       );
       providers = {
@@ -119,13 +119,13 @@ export function createAiEngine(deps: EngineFactoryDeps): AiEngine {
         images: createOpenAiImageGenerator({ apiKey, model: resolved.imageModel }),
       };
       if (!resolved.tavilyKey) {
-        logger.log('TAVILY_API_KEY is not set — posts will be written without web research.');
+        logger.log('TAVILY_API_KEY is not set, so posts will be written without web research.');
       }
       break;
     }
     case 'unconfigured':
       logger.warn(
-        'Neither OPENAI_API_KEY nor AI_SIMULATION=true is set — AI features are off. ' +
+        'Neither OPENAI_API_KEY nor AI_SIMULATION=true is set, so AI features are off. ' +
           'The /ai routes answer 503 until one of them is.',
       );
       providers = { mode: 'unconfigured', model: null, research: null, images: null };

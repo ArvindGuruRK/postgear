@@ -5,7 +5,7 @@
  *
  * The list is a restrained `Table` (§15): a name, where it goes, what it
  * listens for, the last delivery's outcome, and a kebab of actions. The
- * chrome around it — the header, the empty state, the dialogs — carries the
+ * chrome around it (the header, the empty state, the dialogs) carries the
  * treatment. Secrets appear in exactly two places, the create dialog and
  * the rotate result, and nowhere else.
  */
@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
-  PageHeader,
+  PageActions,
   Stack,
   Table,
   TableBody,
@@ -142,24 +142,20 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Webhooks"
-        description="Send a signed POST to your own systems when a post is published or fails."
-        actions={
-          canManage ? (
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setDialogOpen(true);
-              }}
-              data-testid="webhook-add"
-            >
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              Add webhook
-            </Button>
-          ) : undefined
-        }
-      />
+      {canManage ? (
+        <PageActions>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setDialogOpen(true);
+            }}
+            data-testid="webhook-add"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add webhook
+          </Button>
+        </PageActions>
+      ) : null}
 
       {rotated ? (
         <Stack gap="sm">

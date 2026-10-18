@@ -2,7 +2,7 @@
  * Server-sent events over a GET, for the notification stream (Sprint 8).
  *
  * `lib/sse.ts` is the POST-shaped client the AI studio needs. The bell has
- * nothing to send, so this is the same parser on a `fetch` GET — still
+ * nothing to send, so this is the same parser on a `fetch` GET, still
  * `fetch` rather than the browser's `EventSource`, which cannot be told to
  * stop sending the request's cookies to another origin, reconnects on its
  * own schedule, and gives the caller no way to tell an opened stream from a

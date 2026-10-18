@@ -1,9 +1,9 @@
 /**
- * Facebook Pages — publishing via the Meta Graph API.
+ * Facebook Pages: publishing via the Meta Graph API.
  *
  * A person is authenticated, but a *Page* is what gets posted to, so this is a
  * two-phase connect: OAuth first, then the user picks which Page. The Page also
- * carries its own access token, which replaces the user token once chosen —
+ * carries its own access token, which replaces the user token once chosen:
  * page-scoped tokens are what the publishing endpoints actually accept, and
  * unlike the user token they do not expire on their own.
  */

@@ -6,8 +6,8 @@
  * here, so the rule the composer shows in the browser and the rule enforced
  * before publishing are one object run through one validator.
  *
- * `PostDetails.message` is already platform text — the publisher renders the
- * document before calling the provider — so it is validated as-is.
+ * `PostDetails.message` is already platform text (the publisher renders the
+ * document before calling the provider), so it is validated as-is.
  */
 import { validatePost } from '../composer/validate';
 import type { PostDetails, SocialProvider } from './social.provider.interface';

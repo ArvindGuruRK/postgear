@@ -7,8 +7,8 @@
  * ## What a drop does
  *
  * The card moves at once (optimistic), then `PUT /posts/:group/schedule` is
- * sent. The API's answer replaces the card; a refusal — a queued post dragged
- * into a slot that became "past" during the drag, a post published meanwhile —
+ * sent. The API's answer replaces the card; a refusal (a queued post dragged
+ * into a slot that became "past" during the drag, a post published meanwhile)
  * puts the card back where it was and says why. The workflow behind the post
  * is woken by the API, so the new time is also the time it actually publishes.
  *
@@ -38,7 +38,7 @@ import {
   buttonVariants,
   EmptyState,
   ErrorState,
-  PageHeader,
+  PageActions,
   Skeleton,
   Stack,
   useToast,
@@ -51,7 +51,6 @@ import type { PostSummary } from '@/types/post';
 import { DeletePostDialog } from '../posts/delete-post-dialog';
 import { PostDetailDialog } from '../posts/post-detail-dialog';
 import { RescheduleDialog } from '../posts/reschedule-dialog';
-import { SchedulerStatusPill } from '../posts/scheduler-status';
 import { useMounted } from '../posts/use-mounted';
 import { usePostActions } from '../posts/use-post-actions';
 import { useCalendar } from './calendar-context';
@@ -210,25 +209,18 @@ export function CalendarView() {
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Calendar"
-        description="Every scheduled post, where it falls. Drag a card to move it; click a slot to write one."
-        actions={
-          <>
-            <SchedulerStatusPill />
-            <Link
-              href={`/${calendar.orgId}/composer`}
-              className={buttonVariants({ variant: 'primary' })}
-            >
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              New post
-            </Link>
-          </>
-        }
-      />
+      <PageActions>
+        <Link
+          href={`/${calendar.orgId}/composer`}
+          className={buttonVariants({ variant: 'primary' })}
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          New post
+        </Link>
+      </PageActions>
 
       {/* Everything below formats dates in the viewer's locale and time zone,
-          which the server does not share — so the server renders a skeleton
+          which the server does not share, so the server renders a skeleton
           and the browser draws the real thing on mount (see useMounted). */}
       {!mounted ? (
         <Stack gap="md" aria-busy="true" aria-label="Loading calendar">

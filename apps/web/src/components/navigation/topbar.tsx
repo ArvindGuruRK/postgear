@@ -8,7 +8,7 @@ import { ThemeToggle } from './theme-toggle';
  *
  * Both of their real implementations read workspace context that only exists
  * inside `[orgId]/layout.tsx`. Importing them here would make the entire app
- * shell unrenderable anywhere else — which is exactly what happened to the
+ * shell unrenderable anywhere else, which is exactly what happened to the
  * design-system playground at /dev/components when AccountMenu was wired in
  * directly: every showcase route 500'd with "useWorkspace must be used inside
  * a WorkspaceProvider".
@@ -26,11 +26,11 @@ export function TopBar({
   title: string;
   orgSwitcher?: ReactNode;
   accountMenu?: ReactNode;
-  /** The notification bell (Sprint 8) — a slot for the same reason as the two above. */
+  /** The notification bell (Sprint 8): a slot for the same reason as the two above. */
   notifications?: ReactNode;
 }) {
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b-4 border-outline bg-secondary px-6">
+    <header className="flex h-16 shrink-0 items-center gap-4 border-b-4 border-outline bg-chrome px-6">
       {orgSwitcher}
       <h1 className="type-heading text-xl text-ink">{title}</h1>
       <div className="ml-auto flex items-center gap-4">
@@ -41,7 +41,7 @@ export function TopBar({
           />
           <Input placeholder="Search…" className="w-64 pl-9" size="sm" />
         </div>
-        <ThemeToggle />
+        <ThemeToggle saveToAccount />
         {notifications}
         {accountMenu}
       </div>

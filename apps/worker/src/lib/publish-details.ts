@@ -1,5 +1,5 @@
 /**
- * From stored rows to what a provider publishes — pure, and tested on its own.
+ * From stored rows to what a provider publishes: pure, and tested on its own.
  *
  * The composer, the API and this file all render a post through the same
  * `renderPlainText`, so the text a platform receives is the text the preview
@@ -34,7 +34,7 @@ export interface MediaRow {
 
 /**
  * Orders one channel's rows from the root to the last part by following
- * parent links — the same tolerant walk the API's repository uses: an orphan
+ * parent links, the same tolerant walk the API's repository uses: an orphan
  * is a root, a cycle cannot loop, and whatever the walk never reaches is
  * appended rather than lost.
  */

@@ -1,4 +1,4 @@
-# Sprint 5 — Completion Checklist & Test Guide
+# Sprint 5: Completion Checklist & Test Guide
 
 Companion to [sprint-05-scheduling-and-publishing.md](../sprint-documents/sprint-05-scheduling-and-publishing.md).
 Status as of **2026-10-11**.
@@ -22,7 +22,7 @@ because the seeded channels hold fake tokens; everything around it is real.
 ## Prerequisites
 
 ```bash
-docker compose up -d          # Postgres, Redis, MinIO — and now Temporal + its UI
+docker compose up -d          # Postgres, Redis, MinIO, and now Temporal + its UI
 npm install
 npm run db:generate
 npm run db:migrate            # no new migration: Post.error / releaseURL and the Errors
@@ -48,7 +48,7 @@ workflow there, with its timer, signals and retries laid out.
 |---|---|---|
 | `TEMPORAL_HOST` / `TEMPORAL_NAMESPACE` | `localhost:7233` / `default` | Where the API signals and the worker polls |
 | `WORKER_MAX_CONCURRENT_PUBLISHES` | `5` | Posts one worker publishes at once |
-| `PUBLISH_SIMULATION` | `false` | Publish to a stand-in instead of real platforms — set to `true` locally; refused in production |
+| `PUBLISH_SIMULATION` | `false` | Publish to a stand-in instead of real platforms: set to `true` locally; refused in production |
 
 Seeded posts on `seed-demo-org` (re-seeding resets them):
 
@@ -66,19 +66,19 @@ Seeded posts on `seed-demo-org` (re-seeding resets them):
 | # | Item | Status |
 |---|---|---|
 | 1.1 | `docker-compose.yml`: Temporal (`auto-setup`, SQL visibility in the shared Postgres) + UI on :8233 | ✅ [New] |
-| 1.2 | `packages/scheduling` — the pure API↔worker contract: workflow/signal names, deterministic ids, retry policy, publish-status JSON | ✅ [New] |
+| 1.2 | `packages/scheduling`: the pure API↔worker contract: workflow/signal names, deterministic ids, retry policy, publish-status JSON | ✅ [New] |
 | 1.3 | `apps/worker`: real Temporal worker, one task queue, graceful shutdown, waits for Temporal at boot | ✅ [New] |
-| 1.4 | `postPublishWorkflow` — durable sleep until `publishDate`, re-reads the row on every wake, `publishNow` / `wake` / `cancel` signals | ✅ [New] |
+| 1.4 | `postPublishWorkflow`: durable sleep until `publishDate`, re-reads the row on every wake, `publishNow` / `wake` / `cancel` signals | ✅ [New] |
 | 1.5 | Retry policy as data: 30 s → 1 → 2 → 4 min, five attempts, each recorded for the UI | ✅ [New] |
 | 1.6 | Error branching at the activity boundary: Retryable → policy; RefreshToken → refresh once, then `needs_reconnect`; BadBody → `rejected`; scopes → `needs_permissions`; disabled/unconfigured/disconnected → `channel_unavailable`; an attempt cut off mid-call → `interrupted` | ✅ [New] |
-| 1.7 | `tokenRefreshWorkflow` — refreshes 30 min before `tokenExpiration`, re-reads after every sleep, stops and flags on failure | ✅ [New] |
-| 1.8 | `maintenanceWorkflow` — every 15 min, every queued root row and refreshable channel gets its workflow (an idempotent `start`; never a wake, which would grow every sleeping workflow's history) | ✅ [New] |
+| 1.7 | `tokenRefreshWorkflow`: refreshes 30 min before `tokenExpiration`, re-reads after every sleep, stops and flags on failure | ✅ [New] |
+| 1.8 | `maintenanceWorkflow`: every 15 min, every queued root row and refreshable channel gets its workflow (an idempotent `start`; never a wake, which would grow every sleeping workflow's history) | ✅ [New] |
 | 1.11 | Signals honoured *during* the publish: a move or unqueue while the policy is backing off cancels the attempt and the wait starts over | ✅ [New] |
 | 1.12 | Exactly-once guard across a crash mid-call: an `in_flight` marker before the platform call, heartbeats every 15 s, an 11-minute graceful shutdown, and a retry that finds the marker fails as `interrupted` instead of posting twice | ✅ [New] |
 | 1.9 | `Post.error` holds structured status (`retrying` with next attempt / `failed` with reason); `Errors` and `Notifications` rows written | ✅ [New] |
 | 1.10 | Publish simulation (`PUBLISH_SIMULATION=true`) with `[simulate:…]` directives | ✅ [New] |
 
-### 1.12 — what a crash in the middle of a platform call does
+### 1.12: what a crash in the middle of a platform call does
 
 The one thing a durable timer cannot make safe is the platform call itself: a
 worker killed *after* LinkedIn accepted the post but *before* the row was
@@ -86,16 +86,16 @@ written would, on retry, post it again. So the activity writes an `in_flight`
 marker on the root row just before the call and replaces it with the outcome
 after; heartbeats let Temporal notice a dead worker within a minute; a graceful
 stop waits for an in-flight call to finish; and a retry that finds the marker
-left behind by an earlier attempt does not post — it fails as **interrupted**,
-which the queue shows as "Interrupted mid-publish — check the account before
+left behind by an earlier attempt does not post: it fails as **interrupted**,
+which the queue shows as "Interrupted mid-publish: check the account before
 retrying". Better a post a person has to check than one that went out twice.
 
-### 1.4 — the database is the truth; signals only wake
+### 1.4: the database is the truth; signals only wake
 
 The workflow never trusts its own memory of when to publish. It reads the row,
 waits until that time or until a signal, then **reads the row again** before
 acting. So a reschedule, a move to drafts, a delete or a channel disconnect need
-the API to do nothing more than write the row and send `wake` — and a missed
+the API to do nothing more than write the row and send `wake`, and a missed
 signal only delays the correction to the next wake-up; it can never publish a
 time the row no longer holds. "Post now" is the one signal with meaning of its
 own. Wakes are *counted*, not flagged, so one arriving while the row is being
@@ -106,7 +106,7 @@ on edit it terminates and restarts the workflow. PostGear's one-workflow-per-roo
 with a deterministic id (`post-publish:<rootRowId>`) makes every operation a
 single idempotent `signalWithStart`, with no listing and no terminate.
 
-### 1.4 — publish simulation, why it exists
+### 1.4: publish simulation, why it exists
 
 Nothing about the scheduler can be exercised locally against real platforms: a
 fresh clone has no developer apps, and the seeded tokens would all 401. The
@@ -151,16 +151,16 @@ cd packages/scheduling && npx jest     # 7 passed: backoff, status round trip, i
 
 | # | Item | Status |
 |---|---|---|
-| 2.1 | `SchedulingService`: `schedulePublish`, `publishNow`, `cancelPublish`, `ensureTokenRefresh`, `status()` — all best-effort | ✅ [New] |
+| 2.1 | `SchedulingService`: `schedulePublish`, `publishNow`, `cancelPublish`, `ensureTokenRefresh`, `status()`; all best-effort | ✅ [New] |
 | 2.2 | Every post save syncs the scheduler: queued roots woken/started, drafted roots cancelled, dropped channels cancelled | ✅ [New] |
 | 2.3 | `PUT /posts/:group/schedule` (reschedule; ERROR → QUEUE; past refused for queued; published locked) | ✅ [New] |
 | 2.4 | `POST /posts/:group/publish-now` (QUEUE/ERROR → now; published channels untouched) | ✅ [New] |
 | 2.5 | `GET /posts/calendar?from&to` (≤ 62 days) and `GET /posts/queue` (state, channel, dates, sort, pages of 20) | ✅ [New] |
-| 2.6 | `GET /scheduling/status` — reachable? worker polling? retry policy | ✅ [New] |
+| 2.6 | `GET /scheduling/status`: reachable? worker polling? retry policy | ✅ [New] |
 | 2.7 | Channel connect / entity selection / manual refresh start or wake the token-refresh loop; disconnect cancels the drafted posts' workflows | ✅ [New] |
 | 2.8 | Per-channel `state`, `releaseURL`, `publishStatus` on every post the API returns | ✅ [New] |
 
-### 2.1 — a scheduler outage never fails a save
+### 2.1: a scheduler outage never fails a save
 
 Every scheduler call returns whether it reached Temporal and logs
 `scheduling.unavailable` when it did not. The row is already written; the
@@ -168,7 +168,7 @@ worker's maintenance loop (§1.8) reconciles it within fifteen minutes, and the
 status pill (§3) says "Scheduler unreachable" in the meantime. This is the
 difference between a post that is late and a person who could not save.
 
-**How to test — the whole flow against the real stack** (API, worker with
+**How to test: the whole flow against the real stack** (API, worker with
 `PUBLISH_SIMULATION=true`, Temporal). Verified today, in this order:
 
 | Step | Verified result |
@@ -217,20 +217,20 @@ pass with the new fields.
 | 3.11 | `Badge` gained a `success` variant (the one new design-system token use); shown in the playground | ✅ [New] |
 | 3.12 | Composer accepts `?at=` and defaults the publish time to it | ✅ [New] |
 
-### 3.2 — why the grip, not the card
+### 3.2: why the grip, not the card
 
-Making the whole card the drag handle turns Space and Enter — which open a
-button — into drag starts for keyboard users, and a tap into an ambiguous
+Making the whole card the drag handle turns Space and Enter, which open a
+button, into drag starts for keyboard users, and a tap into an ambiguous
 gesture. The card body opens the details; a separate grip drags, and is also
 what dnd-kit's keyboard sensor binds to. The Reschedule dialog is the precise
 keyboard path.
 
-### 3.4 — one vocabulary for "how is this post doing"
+### 3.4: one vocabulary for "how is this post doing"
 
 `components/posts/post-status.ts` turns four database states into the six
-situations a person sees — draft, scheduled, **publishing** (queued and due),
+situations a person sees: draft, scheduled, **publishing** (queued and due),
 **retrying** (the worker is backing off), published, failed (with "Published to
-1 of 2 channels" for a partial) — and the card, the row and the dialog all read
+1 of 2 channels" for a partial), and the card, the row and the dialog all read
 it, so none can disagree.
 
 ```bash
@@ -254,7 +254,7 @@ moves a post to the current minute; delete removes it for every channel.
 
 ---
 
-## Definition of Done — evidence
+## Definition of Done: evidence
 
 | DoD item | Evidence |
 |---|---|
@@ -272,7 +272,7 @@ moves a post to the current minute; delete removes it for every channel.
 |---|---|---|
 | Versioned workflow names when logic changes | One version, with the rule written at the top of the workflow file | No logic has changed yet; the discipline is documented where the next change will be made |
 | Reference's `poke` signal | `wake` (re-read the row), `publishNow`, `cancel` | A wake that re-reads makes reschedule/delete/disconnect a single idempotent call each; `publishNow` is the one signal that carries intent |
-| Reference terminates and restarts the workflow on edit, found by search attribute | Deterministic workflow id per root row; `signalWithStart` everywhere | No listing, no terminate race, no custom search attributes — and therefore no Elasticsearch in docker-compose |
+| Reference terminates and restarts the workflow on edit, found by search attribute | Deterministic workflow id per root row; `signalWithStart` everywhere | No listing, no terminate race, no custom search attributes, and therefore no Elasticsearch in docker-compose |
 | Token refresh "~30 min before `tokenExpiration`" | Exactly that, plus a 6-hour floor between refreshes | A provider that returns a token with no later expiry would otherwise loop immediately |
 | "Study `apps/frontend/.../calendar.tsx`" (react-dnd, dayjs) | dnd-kit (already a dependency) and hand-written date maths | One drag library in the app, and `startOfWeek` is not worth a date library on the page |
 
@@ -280,7 +280,7 @@ moves a post to the current minute; delete removes it for every channel.
 
 ## Review findings fixed before closing (2026-10-11)
 
-Three subagents reviewed the sprint — a code review of the diff, a visual
+Three subagents reviewed the sprint: a code review of the diff, a visual
 review of both screens in both themes and at phone width, and a run of the
 browser suite. What they found, and what changed:
 
@@ -298,11 +298,11 @@ browser suite. What they found, and what changed:
 | Queue paging had no tiebreaker; the count loaded every row | Group id breaks ties; count by `groupBy` |
 | Two concurrent saves could abort each other's serializable transaction and return a 500 | A create retries three times on a serialization failure |
 | A superadmin with no active workspace hit a 500 (`org.id` of undefined) on every org route | The guard's superadmin bypass requires a resolved workspace; otherwise 403 |
-| **The focus ring never painted — on any component since Sprint 0.** Tailwind v4's bare `outline` only re-reads the variable `outline-none` set to `none` | `focus-visible:outline-solid` in all 63 uses; rule §8 corrected; `auth.spec.ts` asserts the ring's style and width |
+| **The focus ring never painted, on any component since Sprint 0.** Tailwind v4's bare `outline` only re-reads the variable `outline-none` set to `none` | `focus-visible:outline-solid` in all 63 uses; rule §8 corrected; `auth.spec.ts` asserts the ring's style and width |
 | Hour labels and dates rendered in the server's locale, so React reported a hydration mismatch and re-rendered the tree (dropping the theme class on the queue page) | Locale-dependent parts render after mount (`useMounted`); the server sends a skeleton |
 | The week/day grid's "open at 7:00" scrolled the whole page, hiding the header | Scrolls its own container only |
 | Phone-width week and month grids collapsed to unreadable slivers | Both scroll sideways inside their frame (§11) |
-| Past-slot halftone texture invisible in dark mode (`bg-halftone` mixed from `--color-outline`, which stays near-black) | Mixed from `--color-ink`, which flips with the theme — also fixes `Panel` and `Progress` in dark |
+| Past-slot halftone texture invisible in dark mode (`bg-halftone` mixed from `--color-outline`, which stays near-black) | Mixed from `--color-ink`, which flips with the theme, also fixes `Panel` and `Progress` in dark |
 | Dialogs full-bleed on phones; a busy hour stretched the whole week row; the "+" covered a card's corner and added 168 tab stops; draft tone invisible in dark; `bg-primary` inside a dialog; reschedule dialog opened on a past time with no message | All addressed: `w-[calc(100%-2rem)]`, "+N more" at 3 per hour in week view, "+" bottom-right and out of the tab order, draft edge from `ink`, dialog surface `bg-secondary`, next-hour default with a `FormErrorMessage` |
 | Several e2e specs created posts before signing in, took bounding boxes of off-screen slots, or matched Radix's duplicated toast text | Specs corrected; the onboarding spec's `calendar$` URL assertions widened for the calendar's `?view=&date=` |
 
@@ -327,7 +327,7 @@ browser suite. What they found, and what changed:
 7. **The worker is a second encryption boundary.** Refreshing a token writes a
    new ciphertext from `apps/worker/src/activities/integration.activities.ts`,
    following the channels repository's rules; it is documented there.
-8. **The E2E suite is still not in CI** — unchanged from Sprint 2.
+8. **The E2E suite is still not in CI**: unchanged from Sprint 2.
 9. **A published post cannot be deleted**, by design (Sprint 4's rule). The
    queue's "Post now" browser test therefore leaves one published row behind
    per run when a worker is running; re-seeding resets the demo workspace.
@@ -340,33 +340,33 @@ browser suite. What they found, and what changed:
 
 ## Files changed in this pass
 
-**Added — `packages/scheduling`** (new workspace package)
+**Added: `packages/scheduling`** (new workspace package)
 - `src/{index,workflows,retry-policy,publish-status}.ts`, `src/scheduling.test.ts`
 
-**Added / rewritten — worker**
+**Added / rewritten: worker**
 - `src/index.ts`, `src/config/env.ts`
 - `src/lib/{temporal,publisher,publish-details,media-url}.ts` (+ three test files)
 - `src/activities/{index,deps,publish.activities,integration.activities,maintenance.activities}.ts`
 - `src/workflows/{index,post-publish.workflow,token-refresh.workflow,maintenance.workflow}.ts`, `post-publish.workflow.test.ts`
 - Removed the Sprint 6/7 stubs (`analytics-sync`, `seo-crawler`, `crawler`, `notification`) and `queues/`
 
-**Added — API**
+**Added: API**
 - `src/modules/scheduling/{scheduling.module,scheduling.service,scheduling.controller}.ts`, `scheduling.service.spec.ts`
 
-**Added — web**
+**Added: web**
 - `src/components/calendar/{calendar-context,calendar-view,calendar-toolbar,channel-filter,month-view,time-grid-view,calendar-slot,post-card}.tsx`, `calendar-math.ts` (+ test)
 - `src/components/queue/{queue-view,queue-row}.tsx`, `use-queue.ts`, `queue-filters.ts` (+ test)
 - `src/components/posts/{post-detail-dialog,reschedule-dialog,delete-post-dialog,post-actions-menu,scheduler-status,channel-stack}.tsx`, `use-post-actions.ts`, `post-status.ts` (+ test)
 
-**Added — infra, tests, docs**
+**Added: infra, tests, docs**
 - `infra/temporal/dynamicconfig/development-sql.yaml`
 - `e2e/calendar.spec.ts`, `e2e/queue.spec.ts`
 - this file
 
 **Modified**
-- `docker-compose.yml` — Temporal + UI, Postgres healthcheck
-- `apps/api` — posts repository (`findRoots`, `listCalendar`, `listQueue`, `reschedule`, `publishNow`; release/error columns), service, controller, schema, messages, module; channels service/repository/module (refresh loop hooks, disconnect cancels); `env.ts`; `app.module.ts`; posts/channels specs
-- `apps/web` — calendar and queue pages; `types/post.ts`; composer `?at=`; playground badge row
-- `packages/ui/src/components/badge.tsx` — `success` variant
-- `packages/db/prisma/seeds/index.ts` — four posts
+- `docker-compose.yml`: Temporal + UI, Postgres healthcheck
+- `apps/api`: posts repository (`findRoots`, `listCalendar`, `listQueue`, `reschedule`, `publishNow`; release/error columns), service, controller, schema, messages, module; channels service/repository/module (refresh loop hooks, disconnect cancels); `env.ts`; `app.module.ts`; posts/channels specs
+- `apps/web`: calendar and queue pages; `types/post.ts`; composer `?at=`; playground badge row
+- `packages/ui/src/components/badge.tsx`: `success` variant
+- `packages/db/prisma/seeds/index.ts`: four posts
 - `tsconfig.json`, `apps/api/tsconfig.json`, `apps/worker/{package.json,tsconfig.json}`, root `package.json` (`dev:worker`), `.env.example`

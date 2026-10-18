@@ -4,7 +4,7 @@
  *
  * Both are public by construction, not by `@Public()`: `SwaggerModule.setup`
  * registers them on the Express adapter directly, before Nest's router, so
- * no guard — session or key — ever sees them. There is nothing in the
+ * no guard, session or key, ever sees them. There is nothing in the
  * document a caller could not learn by reading this repository, and an
  * integrator reads it before they have a key.
  *

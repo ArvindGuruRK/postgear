@@ -3,8 +3,8 @@
   // under ts-node rather than through a bundler.
   //
   // The root config targets ESNext/bundler for the apps; ts-node needs real
-  // CommonJS output. `node16` (not the older `node`) is deliberate: `node` —
-  // now aliased as `node10` — is deprecated in TypeScript 6, and an editor
+  // CommonJS output. `node16` (not the older `node`) is deliberate: `node`, 
+  // now aliased as `node10`, is deprecated in TypeScript 6, and an editor
   // running a newer TypeScript than this workspace will flag it and offer an
   // `ignoreDeprecations` quick-fix whose value the pinned CLI compiler then
   // rejects outright. `node16` avoids that whole loop.

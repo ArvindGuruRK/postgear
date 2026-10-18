@@ -80,7 +80,7 @@ async function withWorker<T>(activities: Mocks, fn: () => Promise<T>): Promise<T
 /**
  * A moment on the *test server's* clock. Time skipping moves that clock days
  * ahead as tests run, so a wall-clock "in an hour" is already in the past by
- * the second test — and a post whose time has passed publishes at once.
+ * the second test, and a post whose time has passed publishes at once.
  */
 async function fromNow(ms: number): Promise<string> {
   return new Date((await env.currentTimeMs()) + ms).toISOString();
@@ -186,8 +186,8 @@ describe('postPublishWorkflow', () => {
         workflowId: 'publish-woken',
         args: [input],
       });
-      // A wake that lands before the first read changes nothing — the read
-      // already sees it — so the test waits for that read before signalling.
+      // A wake that lands before the first read changes nothing (the read
+      // already sees it), so the test waits for that read before signalling.
       await until(() => activities.loadPublishJob.mock.calls.length >= 1);
       await handle.signal(wakeSignal);
       return handle.result();
@@ -424,7 +424,7 @@ describe('postPublishWorkflow during the publish phase', () => {
     });
 
     expect(outcome).toEqual({ outcome: 'published', releaseURL: 'https://x.test/5' });
-    // One attempt before the move, one after the hour — never the retry at the
+    // One attempt before the move, one after the hour, never the retry at the
     // old time with the row already pointing elsewhere.
     expect(activities.publishPost).toHaveBeenCalledTimes(2);
     expect(activities.markPublishFailed).not.toHaveBeenCalled();

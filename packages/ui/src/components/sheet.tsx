@@ -24,14 +24,14 @@ export const SheetOverlay = forwardRef<
 SheetOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  'fixed z-50 flex flex-col gap-4 border-outline bg-secondary p-6 shadow-brutalLg outline-none',
+  'fixed z-50 flex flex-col gap-4 border-outline bg-secondary p-6 shadow-surfaceLg outline-none',
   {
     variants: {
       side: {
-        right: 'inset-y-0 right-0 h-full w-full max-w-md border-l-4',
-        left: 'inset-y-0 left-0 h-full w-full max-w-md border-r-4',
-        top: 'inset-x-0 top-0 w-full border-b-4',
-        bottom: 'inset-x-0 bottom-0 w-full border-t-4',
+        right: 'inset-y-0 right-0 h-full w-full max-w-md border-l-2',
+        left: 'inset-y-0 left-0 h-full w-full max-w-md border-r-2',
+        top: 'inset-x-0 top-0 w-full border-b-2',
+        bottom: 'inset-x-0 bottom-0 w-full border-t-2',
       },
     },
     defaultVariants: {

@@ -4,8 +4,8 @@
  *
  * ## Why an outbox
  *
- * The worker writes the row and the email in one place — the row, with
- * `emailStatus = PENDING` — and this loop in the API turns pending rows into
+ * The worker writes the row and the email in one place (the row, with
+ * `emailStatus = PENDING`) and this loop in the API turns pending rows into
  * mail through the existing `MailService`. One event, one row, one mail
  * path; a row is never emailed twice because the claim is a conditional
  * `updateMany` only one process can win (see the repository), and a row the
@@ -21,8 +21,8 @@
  * wrote it. `NotificationsService.notify()` pushes its own rows at once as
  * well; the stream registry drops the repeat.
  *
- * Ticks never overlap — a slow mail server stretches one tick, it does not
- * stack them — and the timer is `unref`'d so it never keeps the process up.
+ * Ticks never overlap (a slow mail server stretches one tick, it does not
+ * stack them) and the timer is `unref`'d so it never keeps the process up.
  * Under `NODE_ENV=test` nothing starts; the suite drives `runOnce()`.
  */
 import {
@@ -57,7 +57,7 @@ export interface DispatchReport {
   pushed: number;
 }
 
-/** The repository surface the dispatcher uses — what a test fakes. */
+/** The repository surface the dispatcher uses: what a test fakes. */
 export type DispatcherStore = Pick<
   NotificationsRepository,
   'claimPending' | 'findRecipients' | 'markEmail' | 'findNewerThan'

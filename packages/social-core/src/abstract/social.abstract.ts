@@ -46,7 +46,7 @@ const BASE_BACKOFF_MS = 1_000;
  * Backoff is capped, and the cap is a real control rather than a nicety.
  *
  * An uncapped exponential delay that holds a connection open while it sleeps is
- * itself a denial-of-service surface — the same reasoning Sprint 2 applied to
+ * itself a denial-of-service surface: the same reasoning Sprint 2 applied to
  * login throttling in `lockout.service.ts`.
  */
 const MAX_BACKOFF_MS = 8_000;
@@ -61,7 +61,7 @@ export abstract class SocialAbstract {
   /**
    * Maps a platform's error response onto an action.
    *
-   * Overridden per provider — this is where each platform's opaque strings
+   * Overridden per provider: this is where each platform's opaque strings
    * ("You are not permitted to perform this action") become something a user
    * can act on. Returning `undefined` falls back to status-code classification.
    */
@@ -105,7 +105,7 @@ export abstract class SocialAbstract {
       return response;
     }
 
-    // Read the body once — it is both the retry signal and the error detail,
+    // Read the body once: it is both the retry signal and the error detail,
     // and a Response body can only be consumed a single time.
     const body = await response.text().catch(() => '');
     const handled = this.handleErrors(body, response.status);
@@ -167,7 +167,7 @@ export abstract class SocialAbstract {
 
     // 403 is deliberately *not* a refresh signal. A valid token can still be
     // refused for a permission the user never granted, and refreshing it would
-    // return an equally powerless token — the user has to re-consent.
+    // return an equally powerless token: the user has to re-consent.
     if (!handled && status === 403) {
       return new NotEnoughScopesError(
         this.identifier,
@@ -186,7 +186,7 @@ export abstract class SocialAbstract {
 
   /**
    * Exponential backoff, capped, and respecting `Retry-After` when the platform
-   * sends one — a server telling us when to come back beats guessing, and
+   * sends one: a server telling us when to come back beats guessing, and
    * ignoring it is how an integration earns a longer ban.
    */
   private backoffFor(attempt: number, response?: Response): number {
@@ -205,8 +205,8 @@ export abstract class SocialAbstract {
   /**
    * Verifies the platform granted everything we asked for.
    *
-   * Providers return granted scopes inconsistently — an array, a
-   * space-delimited string, a comma-delimited one, sometimes URL-encoded — so
+   * Providers return granted scopes inconsistently (an array, a
+   * space-delimited string, a comma-delimited one, sometimes URL-encoded), so
    * this normalizes before comparing.
    */
   protected checkScopes(required: string[], granted: string | string[] | undefined): void {
@@ -238,7 +238,7 @@ export abstract class SocialAbstract {
    * PKCE pair generation.
    *
    * Shared rather than per-provider because X, LinkedIn, TikTok and Pinterest
-   * all use it and the construction is fixed by RFC 7636 — S256, base64url, no
+   * all use it and the construction is fixed by RFC 7636: S256, base64url, no
    * padding. Getting it subtly wrong in one provider would be an obscure bug.
    */
   protected generatePkcePair(): { codeVerifier: string; codeChallenge: string } {

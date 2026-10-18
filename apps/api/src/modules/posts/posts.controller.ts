@@ -1,8 +1,8 @@
 /**
  * Posts.
  *
- * Addressed by **group** — the id of a post as a person thinks of it, spanning
- * every channel and every part — never by individual row. Rows are the
+ * Addressed by **group** (the id of a post as a person thinks of it, spanning
+ * every channel and every part), never by individual row. Rows are the
  * repository's business; see `posts.repository.ts`.
  *
  * `@Roles(ADMIN, USER)` makes an active membership mandatory while leaving
@@ -54,7 +54,7 @@ export class PostsController {
     return { posts: await this.posts.list(org.id, query.state) };
   }
 
-  // The two literal routes are declared before `:group` — Nest matches in
+  // The two literal routes are declared before `:group`: Nest matches in
   // declaration order, and "calendar" would otherwise be read as a group id.
 
   /** Sprint 5: every post scheduled inside a range, for the calendar. */

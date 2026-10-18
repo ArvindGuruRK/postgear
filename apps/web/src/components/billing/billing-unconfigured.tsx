@@ -5,7 +5,7 @@
  * key nor simulation is set; checkout and the portal would answer 503.
  * The plans and the trial still render below this (the trial needs no
  * Stripe), so this is an explanation at the top, not a replacement for
- * the page — and it names the two ways out, the same two the AI studio
+ * the page, and it names the two ways out, the same two the AI studio
  * names for its own unconfigured state.
  */
 import { Alert, AlertDescription, AlertTitle, Text } from '@postgear/ui';

@@ -17,7 +17,7 @@ import type { Request } from 'express';
  *
  * Every query against a tenant-scoped table must filter on the id this
  * decorator returns, never on an organization id taken from the request body
- * or a route parameter — those are attacker-controlled. `RolesGuard` has
+ * or a route parameter: those are attacker-controlled. `RolesGuard` has
  * already verified that the caller holds a non-disabled membership in this
  * organization by the time a handler can read it.
  */

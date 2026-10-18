@@ -21,7 +21,7 @@ export function BulkActionBar({
   return (
     <div
       className={cn(
-        'flex items-center gap-4 rounded-md border-2 border-outline bg-secondary px-4 py-3 shadow-brutalLg',
+        'flex items-center gap-4 rounded-md border-2 border-outline bg-secondary px-4 py-3 shadow-surfaceLg',
         className,
       )}
       {...props}

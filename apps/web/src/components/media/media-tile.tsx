@@ -72,10 +72,10 @@ export function MediaTile({ item, selected, onToggle, actions }: MediaTileProps)
   );
 
   const frame = cn(
-    'overflow-hidden rounded-lg border-4 border-outline bg-secondary',
+    'overflow-hidden rounded-lg border-2 border-outline bg-secondary',
     selected
       ? 'shadow-brutalPressed outline outline-[3px] outline-offset-2 outline-actionPrimary'
-      : 'shadow-brutalMd',
+      : 'shadow-surfaceMd',
   );
 
   if (onToggle) {

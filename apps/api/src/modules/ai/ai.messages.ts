@@ -5,7 +5,7 @@
  * authenticated member of the workspace, so there is nothing to hide behind
  * "something went wrong". What *is* hidden is the provider. An OpenAI error
  * body can quote the request that caused it, name the model, or echo part of a
- * key; a Tavily one can include the query. None of that reaches a response —
+ * key; a Tavily one can include the query. None of that reaches a response:
  * every provider failure is mapped to one of the strings below by its `kind`,
  * and the original goes to the server log.
  */
@@ -40,7 +40,7 @@ export const AI_MESSAGES = {
   TOOL_IMAGE_FAILED: 'The image could not be generated. The image credits were returned.',
 } as const;
 
-/** The copy shown for an engine error, chosen by its kind — never by its text. */
+/** The copy shown for an engine error, chosen by its kind, never by its text. */
 export function messageForKind(kind: AiErrorKind): string {
   switch (kind) {
     case 'not_configured':

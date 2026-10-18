@@ -3,8 +3,8 @@
  *
  * ## Why the split
  *
- * The interface is deliberately two halves — authenticating an account, and
- * posting to it — joined by `SocialProvider`. That separation is worth keeping
+ * The interface is deliberately two halves (authenticating an account, and
+ * posting to it) joined by `SocialProvider`. That separation is worth keeping
  * even though every current provider implements both: the auth half is what the
  * channels module and the Sprint 5 refresh workflow call, and the publishing
  * half is what the Sprint 5 publish activity calls. Two different consumers,
@@ -41,7 +41,7 @@ export type RedirectUri = string;
 export interface ChannelContext {
   /** PostGear's own `Integration.id`. */
   id: string;
-  /** The platform-side id of the thing being posted to — a page, channel, board, or the account itself. */
+  /** The platform-side id of the thing being posted to: a page, channel, board, or the account itself. */
   internalId: string;
   /** The platform-side id of the account that granted access. Equal to `internalId` when there is no page indirection. */
   rootInternalId: string;
@@ -72,7 +72,7 @@ export interface AuthenticateParams {
   code: string;
   /** The PKCE verifier minted by `generateAuthUrl`, retrieved from server-side storage. */
   codeVerifier: string;
-  /** Must match the value used in `generateAuthUrl` — most platforms verify it. */
+  /** Must match the value used in `generateAuthUrl`: most platforms verify it. */
   redirectUri: RedirectUri;
 }
 
@@ -103,7 +103,7 @@ export interface ProviderEntity {
   /** Handle, where the platform has one. */
   username?: string;
   /**
-   * A disambiguating detail — follower count, location, "Primary".
+   * A disambiguating detail: follower count, location, "Primary".
    *
    * Not decoration: when someone has five similarly-named Facebook pages, this
    * is what makes the choice possible.
@@ -134,7 +134,7 @@ export interface SocialAuthenticator {
    * Best-effort revocation at the platform, on disconnect.
    *
    * Optional because not every platform offers it. Callers must never block a
-   * disconnect on this succeeding — a user asking to disconnect gets
+   * disconnect on this succeeding: a user asking to disconnect gets
    * disconnected regardless.
    */
   revoke?(accessToken: string): Promise<void>;
@@ -157,7 +157,7 @@ export interface SupportsEntitySelection {
 export interface MediaDescriptor {
   type: 'image' | 'video';
   /**
-   * A public URL the provider can fetch — and that the *platform* can fetch,
+   * A public URL the provider can fetch, and that the *platform* can fetch,
    * since Instagram, Facebook, Pinterest and TikTok pull media from it themselves.
    * Built from `Media.path` by the API's storage backend.
    */
@@ -197,7 +197,7 @@ export interface SocialPublisher {
   /** Publishes one post. Throws `BadBodyError` / `RefreshTokenError` / `RetryableError`. */
   post(channel: ChannelContext, accessToken: string, posts: PostDetails[]): Promise<PostResponse[]>;
 
-  /** Replies to an existing post — threads on X, comments elsewhere. */
+  /** Replies to an existing post: threads on X, comments elsewhere. */
   comment?(
     channel: ChannelContext,
     accessToken: string,
@@ -231,7 +231,7 @@ export interface SocialProvider extends SocialAuthenticator, SocialPublisher {
    * What this provider can publish, as data (Sprint 4).
    *
    * Sent to the browser so the composer validates against exactly what the
-   * provider will do — see `composer/rules.ts` for why this is declarative.
+   * provider will do: see `composer/rules.ts` for why this is declarative.
    */
   readonly rules: ProviderRules;
 
@@ -245,7 +245,7 @@ export interface SocialProvider extends SocialAuthenticator, SocialPublisher {
   checkValidity(posts: PostDetails[]): Promise<string | true>;
 }
 
-/** Narrowing helper — providers needing a second step implement `listEntities`. */
+/** Narrowing helper: providers needing a second step implement `listEntities`. */
 export function supportsEntitySelection(
   provider: SocialProvider,
 ): provider is SocialProvider & SupportsEntitySelection {
@@ -331,9 +331,9 @@ export function engagementsOf(metrics: PostMetrics): number {
 /**
  * Implemented by providers whose platform exposes metrics.
  *
- * Both methods throw the same error classes as publishing — `RefreshTokenError`
+ * Both methods throw the same error classes as publishing: `RefreshTokenError`
  * for a dead token, `NotEnoughScopesError` for a permission the account never
- * granted, `RetryableError` for a platform having a bad minute — so the worker
+ * granted, `RetryableError` for a platform having a bad minute, so the worker
  * branches on them exactly as the publish activity does.
  */
 export interface SocialAnalytics {
@@ -350,7 +350,7 @@ export interface SocialAnalytics {
   /**
    * Lifetime metrics for one published post, by the platform's post id (the
    * `releaseId` Sprint 5 stores). Null when the platform no longer has the
-   * post (deleted on the platform) — not an error.
+   * post (deleted on the platform), not an error.
    */
   postAnalytics?(
     channel: ChannelContext,
@@ -359,7 +359,7 @@ export interface SocialAnalytics {
   ): Promise<PostMetrics | null>;
 }
 
-/** Narrowing helper — providers with metrics implement `channelAnalytics`. */
+/** Narrowing helper: providers with metrics implement `channelAnalytics`. */
 export function supportsAnalytics(
   provider: SocialProvider | SocialAnalytics,
 ): provider is SocialProvider & SocialAnalytics {

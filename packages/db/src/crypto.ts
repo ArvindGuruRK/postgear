@@ -25,7 +25,7 @@ const AUTH_TAG_BYTES = 16;
 
 /**
  * Version marker on every payload. If the algorithm or key-derivation ever
- * changes, bump this and branch on it in `decrypt` — existing rows stay
+ * changes, bump this and branch on it in `decrypt`: existing rows stay
  * readable instead of needing a big-bang migration.
  */
 const PAYLOAD_VERSION = 'v1';
@@ -59,7 +59,7 @@ function getKey(): Buffer {
   if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
     throw new EncryptionError(
       `${ENV_KEY_NAME} must be exactly ${KEY_BYTES} bytes encoded as ${KEY_BYTES * 2} hex characters. ` +
-        `Got ${raw.length} character(s). The .env.example placeholder is not a real key — ` +
+        `Got ${raw.length} character(s). The .env.example placeholder is not a real key; ` +
         'generate one with `npm run generate:keys`.',
     );
   }
@@ -96,7 +96,7 @@ export function encrypt(plaintext: string): string {
 
 /**
  * Reverses `encrypt`. Throws `EncryptionError` if the payload is malformed, was
- * produced under a different key, or has been tampered with — all three are
+ * produced under a different key, or has been tampered with: all three are
  * genuine "stop and investigate" conditions, never something to swallow.
  */
 export function decrypt(payload: string): string {
@@ -136,7 +136,7 @@ export function decrypt(payload: string): string {
       throw error;
     }
     // `final()` throwing here means the auth tag didn't verify. Deliberately
-    // not forwarding the original message — it varies by Node version and adds
+    // not forwarding the original message: it varies by Node version and adds
     // nothing a caller can act on.
     throw new EncryptionError(
       'Failed to decrypt: the payload was tampered with, or was encrypted under a different key.',
@@ -181,7 +181,7 @@ export function safeCompare(a: string, b: string): boolean {
   const bufferB = Buffer.from(b, 'utf8');
 
   // timingSafeEqual throws on length mismatch, so the length check has to come
-  // first. Length is not the secret here — the contents are.
+  // first. Length is not the secret here: the contents are.
   if (bufferA.length !== bufferB.length) {
     return false;
   }

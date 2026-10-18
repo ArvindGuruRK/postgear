@@ -16,14 +16,14 @@
  * row, waits until that time (or until a signal arrives), then reads the row
  * **again** before acting. So a reschedule, a move back to drafts, a delete or
  * a disconnect need the API to do nothing more than write the row and send
- * `wake` — and even a missed signal only delays the correction to the next
+ * `wake`: and even a missed signal only delays the correction to the next
  * wake-up, it never publishes stale intent. "Post now" is the one signal that
  * carries meaning of its own: it says publish regardless of the stored time.
  *
  * The same holds *during* the publish: a wake that arrives while the activity
  * is backing off between attempts re-reads the row, and if the post has been
  * moved or unqueued the attempt is cancelled and the wait starts over. An
- * attempt already talking to the platform is allowed to finish — cancelling a
+ * attempt already talking to the platform is allowed to finish: cancelling a
  * call half-way is how a post goes out twice.
  *
  * ## Error branching
@@ -94,7 +94,7 @@ const { loadPublishJob, recordPublished, markPublishFailed, refreshChannelToken 
  * The heartbeat timeout is what lets a dead worker be noticed in a minute
  * rather than at the ten-minute limit; the activity heartbeats every fifteen
  * seconds while it talks to the platform. Cancellation waits for a running
- * attempt to finish — see the header — so the workflow learns the real outcome.
+ * attempt to finish (see the header), so the workflow learns the real outcome.
  */
 const { publishPost } = proxyActivities<Activities>({
   // Long enough for a video upload to a slow platform.
@@ -182,7 +182,7 @@ export async function postPublishWorkflow(input: PostPublishInput): Promise<Post
       }
 
       await condition(() => wakes !== wakesBeforeRead || publishNow || cancelled, next.delay);
-      // Whatever ended the wait — the timer, a wake, both in the same instant —
+      // Whatever ended the wait (the timer, a wake, both in the same instant)
       // the loop re-reads the row and lets it decide. One extra read per publish
       // is the price of never acting on a time the row no longer holds.
     }
@@ -308,7 +308,7 @@ interface ClassifiedFailure {
 
 /**
  * Unwraps what Temporal hands back: an `ActivityFailure` whose cause is the
- * `ApplicationFailure` the activity threw. Anything else — a timeout, a bug —
+ * `ApplicationFailure` the activity threw. Anything else (a timeout, a bug)
  * is reported as unexpected with whatever message it has.
  */
 function classify(error: unknown): ClassifiedFailure {

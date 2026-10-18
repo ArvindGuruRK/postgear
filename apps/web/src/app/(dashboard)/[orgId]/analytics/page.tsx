@@ -1,5 +1,5 @@
 /**
- * Analytics — how every channel and post is doing (Sprint 7).
+ * Analytics: how every channel and post is doing (Sprint 7).
  *
  * A server component that loads what the dashboard needs in one round of
  * parallel requests: the channels (the filter and the "connect one first"

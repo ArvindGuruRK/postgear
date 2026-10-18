@@ -3,7 +3,7 @@
 /**
  * The AI studio: one page, two modes.
  *
- * Generate is a form and a pipeline — a topic in, a researched post out.
+ * Generate is a form and a pipeline: a topic in, a researched post out.
  * Copilot is a conversation with an assistant that acts. They share the
  * credits meter in the header and nothing else, so each is its own island
  * below; the mode lives in the URL (`?mode=copilot`) the way the calendar's
@@ -20,7 +20,7 @@
  */
 import {
   ErrorState,
-  PageHeader,
+  PageActions,
   Stack,
   Tabs,
   TabsContent,
@@ -70,7 +70,7 @@ export function AiStudio({
     return isStudioMode(requested) ? requested : 'generate';
   });
 
-  // Keep the URL in step without a navigation — a navigation would remount
+  // Keep the URL in step without a navigation: a navigation would remount
   // the page and with it a generation in progress.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -91,18 +91,14 @@ export function AiStudio({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="AI Copilot"
-        description="Research-backed posts from a topic, and an assistant that acts in your workspace. Every call is metered in credits."
-        actions={
-          <CreditsMeter
-            credits={meter.credits}
-            failed={meter.failed}
-            onRetry={() => void meter.refresh()}
-            className="w-full sm:w-72"
-          />
-        }
-      />
+      <PageActions>
+        <CreditsMeter
+          credits={meter.credits}
+          failed={meter.failed}
+          onRetry={() => void meter.refresh()}
+          className="w-full sm:w-72"
+        />
+      </PageActions>
 
       {status === null ? (
         <ErrorState

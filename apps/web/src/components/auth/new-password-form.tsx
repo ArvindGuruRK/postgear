@@ -22,7 +22,7 @@ const PASSWORD_MIN = 12;
  *
  * The token comes from the URL segment rather than a hidden field, so a user
  * who reloads the page keeps it. Completing this also clears any active
- * lockout server-side — which is why the lockout notification email links
+ * lockout server-side, which is why the lockout notification email links
  * here: it is the escape hatch for someone who cannot wait fifteen minutes.
  */
 export function NewPasswordForm({ token }: { token: string }) {

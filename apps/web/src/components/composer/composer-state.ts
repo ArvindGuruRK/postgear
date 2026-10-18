@@ -5,7 +5,7 @@
  *
  * One **shared** thread, written once, and a set of **selected channels**.
  * A channel follows the shared thread until someone customizes it, at which
- * point it gets its own copy — copied, not referenced, so later shared edits
+ * point it gets its own copy: copied, not referenced, so later shared edits
  * stop reaching it. "Use the shared post" throws the copy away.
  *
  * That is the reference's global-plus-per-channel-override design, kept, with
@@ -23,7 +23,7 @@
  * ## Why editors are uncontrolled
  *
  * A part's `content` is whatever the editor last reported, and the editor is
- * never pushed new content while mounted — pushing on every keystroke is the
+ * never pushed new content while mounted: pushing on every keystroke is the
  * classic cause of a cursor jumping to the end. Content only enters an editor
  * when it mounts, which is exactly when a part is created, copied or loaded.
  */
@@ -106,7 +106,7 @@ let keyCounter = 0;
  * A key unique within this page.
  *
  * Deliberately not `crypto.randomUUID()`, which only exists in a secure
- * context — opening the app over a LAN address would break the composer.
+ * context: opening the app over a LAN address would break the composer.
  */
 export function newKey(): string {
   keyCounter += 1;
@@ -126,7 +126,7 @@ function fromSaved(part: PostPart): DraftPart {
   };
 }
 
-/** The top of the next hour — a sensible default that is always in the future. */
+/** The top of the next hour: a sensible default that is always in the future. */
 export function defaultPublishAt(now: Date): string {
   const next = new Date(now);
   next.setMinutes(0, 0, 0);
@@ -149,7 +149,7 @@ export function initialComposerState(options: {
   availableChannelIds: Set<string>;
   now: Date;
   /**
-   * A time to start a new post at — the calendar's "click a slot" (Sprint 5).
+   * A time to start a new post at: the calendar's "click a slot" (Sprint 5).
    * Ignored for a reopened post, which has its own, and when it is in the past.
    */
   publishAt?: Date | null;
@@ -319,7 +319,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
           ...state.custom,
           [action.channelId]: state.shared.map((part) =>
             // Editor content is plain JSON, so a JSON round trip is a complete
-            // copy — and unlike structuredClone it exists in every test runner.
+            // copy, and unlike structuredClone it exists in every test runner.
             newPart(JSON.parse(JSON.stringify(part.content)) as unknown, [...part.media]),
           ),
         },
@@ -339,7 +339,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
       return touch({ ...state, publishAt: action.value });
 
     case 'saved':
-      // Content stays as the editors hold it — the server stored exactly what
+      // Content stays as the editors hold it: the server stored exactly what
       // was sent. Only the version changes, and anything typed while the save
       // was in flight stays unsaved.
       return {

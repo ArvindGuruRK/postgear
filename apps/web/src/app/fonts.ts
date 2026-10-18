@@ -2,7 +2,7 @@ import { Sora } from 'next/font/google';
 
 /**
  * The platform's single typeface, loaded once and shared by layout.tsx and
- * global-error.tsx (a font definitions file, per the Next.js font docs — each
+ * global-error.tsx (a font definitions file, per the Next.js font docs: each
  * loader call is its own hosted instance, so it must live in one place).
  *
  * Sora is the locked brand typeface (product decision, 2026-10-15), chosen

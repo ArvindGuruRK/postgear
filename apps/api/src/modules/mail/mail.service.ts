@@ -18,7 +18,7 @@ import * as nodemailer from 'nodemailer';
  * a locked-out user is told nothing useful by the API. The lockout email is
  * the *only* channel through which the account owner learns what happened and
  * how to recover. If mail is broken, users are locked out with no
- * explanation — so a send failure is logged at error level rather than
+ * explanation, so a send failure is logged at error level rather than
  * swallowed.
  */
 
@@ -43,7 +43,7 @@ export class MailService {
 
     if (!host) {
       this.transporter = null;
-      this.logger.warn('SMTP_HOST is not set — email will be printed to the console.');
+      this.logger.warn('SMTP_HOST is not set, so email will be printed to the console.');
       return;
     }
 
@@ -91,7 +91,7 @@ export class MailService {
    *
    * This exists because the registration endpoint cannot say "that email is
    * taken" without becoming an enumeration oracle. The person who owns the
-   * address is the one who should be told, and this is how they are told —
+   * address is the one who should be told, and this is how they are told,
    * including the case where the attempt was not theirs.
    */
   async sendDuplicateRegistration(to: string): Promise<void> {
@@ -106,7 +106,7 @@ export class MailService {
         '',
         `If you've forgotten your password, reset it: ${this.webUrl}/reset-password`,
         '',
-        'If this was not you, no action is needed — the attempt did not reveal',
+        'If this was not you, no action is needed. The attempt did not reveal',
         'anything about your account.',
       ].join('\n'),
     });
@@ -124,7 +124,7 @@ export class MailService {
         link,
         '',
         'This link expires in one hour and can only be used once.',
-        "If you didn't ask for this, you can ignore this email — your password",
+        "If you didn't ask for this, you can ignore this email. Your password",
         'has not changed.',
       ].join('\n'),
     });
@@ -148,7 +148,7 @@ export class MailService {
         `There have been several failed sign-in attempts on this account, so it is`,
         `locked for ${minutes} minutes.`,
         '',
-        'If that was you, wait and try again — or reset your password now to sign',
+        'If that was you, wait and try again, or reset your password now to sign',
         'in straight away:',
         link,
         '',
@@ -181,7 +181,7 @@ export class MailService {
    * Sends, or prints.
    *
    * Never throws. A mail failure must not roll back the operation that
-   * triggered it — a user whose account was created successfully should not
+   * triggered it: a user whose account was created successfully should not
    * see a 500 because the SMTP server was briefly unreachable. The failure is
    * logged at error level so it is visible in monitoring. Returns whether the
    * message went out (printing counts).

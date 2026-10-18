@@ -1,5 +1,5 @@
 /**
- * `GET /v1/me` — the first call every integration makes: is this key good,
+ * `GET /v1/me`, the first call every integration makes: is this key good,
  * and which workspace does it open.
  */
 import { Controller, Get } from '@nestjs/common';

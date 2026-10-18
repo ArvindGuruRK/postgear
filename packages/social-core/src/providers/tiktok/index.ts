@@ -1,10 +1,10 @@
 /**
- * TikTok — OAuth 2.0 with PKCE, Content Posting API v2.
+ * TikTok: OAuth 2.0 with PKCE, Content Posting API v2.
  *
  * ## Two TikTok-specific traps
  *
  * The client credential is called `client_key`, not `client_id`, in every
- * TikTok request — using the conventional name fails with an unhelpful error.
+ * TikTok request: using the conventional name fails with an unhelpful error.
  *
  * And unless the app has passed TikTok's content-posting audit, every video it
  * publishes is forced to `SELF_ONLY` (private) regardless of what is requested.

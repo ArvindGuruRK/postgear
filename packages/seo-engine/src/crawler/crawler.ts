@@ -4,9 +4,9 @@
  * ## One ceiling
  *
  * `timeoutMs` (default 30 s, the sprint's "a score within ~30 seconds") is a
- * single `AbortController` armed once at the start. Every sub-step — the
+ * single `AbortController` armed once at the start. Every sub-step (the
  * browser navigation, the HTML fetch, robots.txt, the sitemap probe, each
- * link check — is handed the remaining time, never its own fresh budget, so
+ * link check) is handed the remaining time, never its own fresh budget, so
  * a site that is slow at every step still cannot push a crawl past the
  * ceiling. The caller's own `signal` is linked in and reported as `aborted`.
  *
@@ -17,8 +17,8 @@
  * engines index for most sites today. When the browser cannot launch, times
  * out, or the request says `off`, the plain HTML path (`safe-fetch.ts`) is
  * used instead and the result says `mode: 'html'` so the UI can explain the
- * difference. The fallback is taken only while at least five seconds remain —
- * less than that is a second failure waiting to happen — and never for
+ * difference. The fallback is taken only while at least five seconds remain
+ * (less than that is a second failure waiting to happen) and never for
  * failures the HTML path would reproduce (a 404, a non-HTML answer, a URL the
  * guard refused). `browser: 'on'` is for callers that would rather fail than
  * score un-rendered markup.
@@ -26,10 +26,10 @@
  * ## Best effort around the page
  *
  * robots.txt, the sitemap and the link checks describe the site, not the
- * page; a failure in any of them — the deadline running out included, once
- * the page itself is in hand — is reported as `unknown` (or a skipped
+ * page; a failure in any of them (the deadline running out included, once
+ * the page itself is in hand) is reported as `unknown` (or a skipped
  * stage) and never fails the crawl. Every error that does escape is a
- * {@link SeoCrawlError} — a bare error here would reach the API's stream as
+ * {@link SeoCrawlError}: a bare error here would reach the API's stream as
  * "unexpected", which tells the user nothing.
  */
 import type { Response as PlaywrightResponse } from 'playwright';

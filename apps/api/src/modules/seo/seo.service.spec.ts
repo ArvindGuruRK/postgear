@@ -3,7 +3,7 @@
  * repository: the pre-stream refusals (400, 422, 429, 402) and their order
  * relative to the charge, the stage events and row writes of a full run,
  * the fallbacks (no advisor, a failing advisor, a failing authority
- * provider), and the refund on every failure path — crawl error, abort.
+ * provider), and the refund on every failure path: crawl error, abort.
  */
 import {
   BadRequestException,
@@ -450,7 +450,7 @@ describe('SeoService', () => {
       );
       expect(details).toEqual([
         'Fetching the page…',
-        'Checking links — skipped',
+        'Checking links: skipped',
         'Fetched as HTML in 412 ms',
       ]);
     });

@@ -14,7 +14,7 @@ export const AccordionItem = forwardRef<
   <AccordionPrimitive.Item
     ref={ref}
     className={cn(
-      'overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-brutalSm',
+      'overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-surfaceSm',
       className,
     )}
     {...props}
@@ -37,7 +37,7 @@ export const AccordionTrigger = forwardRef<
         // The divider belongs to the header, not the sliding panel, so the
         // card reads as one surface growing downward rather than a separate
         // block sliding out from under a lid. The border is always present and
-        // only changes color — toggling its width would resize the header by
+        // only changes color: toggling its width would resize the header by
         // 2px mid-animation and make the open/close jump.
         'border-b-2 border-transparent data-[state=open]:rounded-b-none data-[state=open]:border-outline',
         '[&[data-state=open]>svg]:rotate-180',

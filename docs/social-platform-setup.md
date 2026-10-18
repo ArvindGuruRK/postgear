@@ -4,13 +4,13 @@ Everything in [Sprint 3](sprint-documents/sprint-03-social-integrations.md) is
 built and tested except the four Definition-of-Done items that need a real
 developer app to connect against. This is the guide for closing those.
 
-Work through it in the order below — the first two sections have review queues
+Work through it in the order below: the first two sections have review queues
 measured in weeks, so start them today and do the quick ones while you wait.
 
 > **On accuracy.** The scopes, environment variable names and callback URLs
 > below come straight from PostGear's own code and are exact. The developer
 > portals themselves get reorganised constantly, so menu names and page layouts
-> may not match what you see — treat the navigation as a description of *what to
+> may not match what you see: treat the navigation as a description of *what to
 > find*, not a literal click path.
 
 ---
@@ -42,7 +42,7 @@ in the same app:
 - **One LinkedIn app** covers `linkedin` and `linkedin-page`.
 - **One Meta app** covers `facebook` and `instagram`.
 
-The URL must match byte for byte — a trailing slash or `127.0.0.1` instead of
+The URL must match byte for byte: a trailing slash or `127.0.0.1` instead of
 `localhost` is rejected, usually with an unhelpful error.
 
 ## You will probably need an HTTPS tunnel
@@ -71,36 +71,36 @@ redirect because the URI does not match the registration.
 
 Connecting a channel only needs the callback to reach PostGear. **Publishing an
 image or video** needs more: Instagram, Facebook, Pinterest and TikTok do not
-accept uploaded bytes from PostGear — they are handed the media library's URL
+accept uploaded bytes from PostGear; they are handed the media library's URL
 and fetch the file themselves. With the default `STORAGE_PROVIDER=local` that URL is
 `<API_URL>/uploads/…`, which `localhost` makes unreachable to them, and the post
 fails at the platform with a fetch error rather than in PostGear.
 
 Two ways to make it work:
 
-- **A tunnel** — the one set up above. Media URLs are built from `API_URL`, so
+- **A tunnel**: the one set up above. Media URLs are built from `API_URL`, so
   pointing it at the tunnel hostname makes uploads fetchable as well. Fine for
   testing.
-- **An S3-compatible bucket** with public read — what production needs anyway.
+- **An S3-compatible bucket** with public read: what production needs anyway.
   Set `STORAGE_PROVIDER=s3` and the `S3_*` variables in `.env.example`, with
   `S3_PUBLIC_URL` as the bucket's public address.
 
 X, LinkedIn and YouTube download the file inside PostGear and upload the bytes,
 so they only need PostGear itself to reach the URL. **TikTok is the strictest:**
 its `PULL_FROM_URL` upload only accepts a domain verified in the TikTok developer
-portal, which in practice means a bucket or CDN on a domain you own — a
+portal, which in practice means a bucket or CDN on a domain you own: a
 throwaway tunnel hostname will not do.
 
 ---
 
-## 1. Meta — Facebook Pages + Instagram (start first, longest lead time)
+## 1. Meta: Facebook Pages + Instagram (start first, longest lead time)
 
 **Portal:** developers.facebook.com → *My Apps* → *Create App* → **Business**
 
 **This must be a different app from your Sprint 2 Facebook login.** That one uses
 `FACEBOOK_CLIENT_ID` / `FACEBOOK_CLIENT_SECRET` and needs only basic profile
 scopes. Publishing needs review-gated permissions, and sharing one app would put
-sign-in behind that review — a rejection would take down authentication for
+sign-in behind that review: a rejection would take down authentication for
 everyone.
 
 **Steps**
@@ -119,7 +119,7 @@ everyone.
    | `business_management` | `pages_read_engagement` |
    | | `business_management` |
 
-5. Complete **Business Verification** — this is the slow part.
+5. Complete **Business Verification**: this is the slow part.
 
 ```env
 FACEBOOK_APP_ID="your-app-id"
@@ -131,7 +131,7 @@ FACEBOOK_APP_SECRET="your-app-secret"
 - You must **administer at least one Facebook Page**.
 - For Instagram, the account must be a **Business or Creator** account **linked
   to one of those Pages**. A personal Instagram account cannot be published to
-  through any API — the "Finish setup" dialog will show its empty state
+  through any API: the "Finish setup" dialog will show its empty state
   explaining exactly this.
 
 **While in development mode** you can connect Pages you administer with your own
@@ -139,7 +139,7 @@ developer account without full review, which is enough to test end to end.
 
 ---
 
-## 2. LinkedIn (start second — company pages need approval)
+## 2. LinkedIn (start second: company pages need approval)
 
 **Portal:** linkedin.com/developers → *Create app*
 
@@ -151,10 +151,10 @@ not have one, create it first; that alone can take a day to verify.
 1. Create the app, then register **both** callback URLs (`linkedin` and
    `linkedin-page`) under *Auth → Authorized redirect URLs*.
 2. Under *Products*, request:
-   - **Sign In with LinkedIn using OpenID Connect** — grants `openid`, `profile`.
+   - **Sign In with LinkedIn using OpenID Connect**: grants `openid`, `profile`.
      Usually self-serve and instant.
-   - **Share on LinkedIn** — grants `w_member_social`. Usually self-serve.
-   - **Community Management API** — grants `r_organization_admin` and
+   - **Share on LinkedIn**: grants `w_member_social`. Usually self-serve.
+   - **Community Management API**: grants `r_organization_admin` and
      `w_organization_social`. **This one needs an application and approval**, and
      is what `linkedin-page` requires.
 3. Copy the Client ID and Client Secret from *Auth*.
@@ -170,31 +170,31 @@ expect to test them separately.
 
 > **A token quirk worth expecting.** LinkedIn only issues refresh tokens to apps
 > approved for its Marketing Developer Platform. Without that, access tokens last
-> about 60 days and there is nothing to refresh with — PostGear reports the
+> about 60 days and there is nothing to refresh with: PostGear reports the
 > channel as expiring and asks the user to reconnect, which is the honest
 > behaviour rather than a refresh that silently never works.
 
 ---
 
-## 3. X — the quickest real test, and the best first one
+## 3. X: the quickest real test, and the best first one
 
 **Portal:** developer.x.com → *Developer Portal* → *Projects & Apps*
 
 Do this one first if you want to see the whole flow working today. It also
-exercises the sprint's actual goal — PKCE plus a genuine refresh token — which
+exercises the sprint's actual goal (PKCE plus a genuine refresh token), which
 none of the others do as cleanly.
 
 **Steps**
 
 1. Create a **Project**, then an **App** inside it.
 2. Open *User authentication settings* and enable **OAuth 2.0**.
-3. Set **Type of App** to **Web App, Automated App or Bot** — this is the
+3. Set **Type of App** to **Web App, Automated App or Bot**: this is the
    confidential-client option, and PostGear sends a client secret via HTTP Basic.
    Choosing the public-client option makes the token exchange fail.
 4. Set the callback URL, plus any website URL.
 5. Set **App permissions** to **Read and write**. Read-only is the default and
    posting will fail later with a permissions error rather than at connect time.
-6. Copy the **OAuth 2.0 Client ID and Client Secret** — *not* the API Key/Secret,
+6. Copy the **OAuth 2.0 Client ID and Client Secret**, *not* the API Key/Secret,
    which are the OAuth 1.0a credentials and will not work here.
 
 ```env
@@ -219,7 +219,7 @@ Scopes PostGear requests: `tweet.read`, `tweet.write`, `users.read`,
 1. Create a project, then enable **YouTube Data API v3** under *APIs & Services
    → Library*.
 2. Configure the **OAuth consent screen**. Choose **External** and leave it in
-   **Testing** — that permits up to 100 named test users without Google's
+   **Testing**: that permits up to 100 named test users without Google's
    verification review, which is all you need. Add your own Google account under
    *Test users*.
 3. Create credentials → **OAuth client ID** → **Web application**, and add the
@@ -259,7 +259,7 @@ TIKTOK_CLIENT_KEY="your-client-key"
 TIKTOK_CLIENT_SECRET="your-client-secret"
 ```
 
-Note the variable is `TIKTOK_CLIENT_KEY`, not `..._CLIENT_ID` — TikTok calls it a
+Note the variable is `TIKTOK_CLIENT_KEY`, not `..._CLIENT_ID`: TikTok calls it a
 client key in every request, and using the conventional name fails with an
 unhelpful error. PostGear follows TikTok's naming.
 
@@ -272,7 +272,7 @@ Scopes: `user.info.basic`, `video.publish`, `video.upload`.
   integration will appear to work perfectly while nothing is publicly visible.
 - PostGear uploads via `PULL_FROM_URL`, which has TikTok fetch the file itself
   rather than streaming it through the API. That requires **verifying ownership
-  of the domain** the media is served from — so a localhost media URL will not
+  of the domain** the media is served from, so a localhost media URL will not
   work, and this is not really testable until Sprint 4's media library is on a
   real hostname.
 
@@ -299,7 +299,7 @@ New apps get **trial access**, which is rate-limited but sufficient to connect
 and create a Pin. Standard access needs a separate request.
 
 A Pin cannot exist outside a board, so Pinterest is one of the five providers
-with a second setup step — you pick the board after authorising, and it becomes
+with a second setup step: you pick the board after authorising, and it becomes
 the channel's target.
 
 ---
@@ -322,7 +322,7 @@ curl -s -b /tmp/c.txt localhost:3001/channels/providers
 ```
 
 > `"configured": true` only means a credential is **present**, not that it is
-> valid — PostGear cannot tell a placeholder from a real key without calling the
+> valid; PostGear cannot tell a placeholder from a real key without calling the
 > platform. A handshake started with a placeholder reaches the platform and is
 > rejected there.
 

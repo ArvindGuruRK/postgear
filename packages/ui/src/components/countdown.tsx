@@ -70,14 +70,14 @@ function Tile({
     <div className="flex flex-col items-center gap-1">
       <div
         className={cn(
-          'flex items-center justify-center overflow-hidden rounded-md border-2 border-outline shadow-brutalSm',
+          'flex items-center justify-center overflow-hidden rounded-md border-2 border-outline shadow-surfaceSm',
           'type-heading tabular-nums leading-none',
           SIZE[size].tile,
           emphasised ? 'bg-actionDanger text-onActionLight' : 'bg-plate text-onPlate',
         )}
       >
         {/* Keyed on the value so React remounts the span on every change,
-            restarting the tick animation — a CSS animation on a persistent
+            restarting the tick animation: a CSS animation on a persistent
             node only ever plays once. */}
         <span
           key={digits}
@@ -117,8 +117,8 @@ export function Countdown({
   // suppressHydrationWarning on the digits covers.
   const [remaining, setRemaining] = useState<Remaining>(() => remainingUntil(target));
   const completed = useRef(false);
-  // Held in a ref so an inline `onComplete={() => …}` — a new function on every
-  // parent render — doesn't land in the effect's deps and restart the timer.
+  // Held in a ref so an inline `onComplete={() => …}` (a new function on every
+  // parent render) doesn't land in the effect's deps and restart the timer.
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -172,7 +172,7 @@ export function Countdown({
           size={size}
           showLabel={showLabels}
           // The seconds tile is the one visibly ticking, so it carries the
-          // accent — matching the reference's single red plate.
+          // accent: matching the reference's single red plate.
           live={index === tiles.length - 1}
           urgent={urgent}
         />

@@ -6,7 +6,7 @@
  * A draft is somewhere to put unfinished work, so saving one checks only that
  * the post is well-formed and that every channel and attachment belongs to
  * this workspace. It may be empty, too long, or missing the image Instagram
- * requires — that is what unfinished means.
+ * requires: that is what unfinished means.
  *
  * Entering the queue is a promise that the post can be published, so it is
  * held to everything the provider will enforce: a future time, a channel that
@@ -187,7 +187,7 @@ export class PostsService {
   }
 
   /**
-   * Moves a post to a new time — the calendar's drag-and-drop and the
+   * Moves a post to a new time: the calendar's drag-and-drop and the
    * "Reschedule" action both end here.
    *
    * A queued or failed post may not be moved into the past: that would publish
@@ -332,7 +332,7 @@ export class PostsService {
    * Brings the scheduler in line with a group's rows after a write.
    *
    * Queued roots get a workflow started or woken; everything else gets its
-   * workflow (if any) told to stop. Both are idempotent and best-effort — see
+   * workflow (if any) told to stop. Both are idempotent and best-effort: see
    * `SchedulingService` for why a scheduler outage never fails a save.
    */
   private async syncSchedules(orgId: string, roots: ChainRoot[]): Promise<void> {
@@ -419,7 +419,7 @@ export class PostsService {
     }
 
     for (const { channel, parts } of targets) {
-      // A channel needing reconnection may still be queued to — it can be fixed
+      // A channel needing reconnection may still be queued to: it can be fixed
       // before the post is due, and the Channels page already shouts about it.
       // One with no target yet, or one switched off, cannot.
       if (channel.inBetweenSteps) {
@@ -541,7 +541,7 @@ export class PostsService {
  *
  * The state is the chain's worst (a thread whose comment failed is a failed
  * thread), the permalink is the root's, and the status is whatever the worker
- * wrote on the root — see `@postgear/scheduling`.
+ * wrote on the root: see `@postgear/scheduling`.
  */
 function publishView(chain: PostRow[]): ChannelPublishView {
   const root = chain[0];
@@ -579,7 +579,7 @@ function channelChains(
   }));
 }
 
-/** `Post.image` is `[{"id": …}]`. Anything else — including legacy URL lists — yields no ids. */
+/** `Post.image` is `[{"id": …}]`. Anything else, including legacy URL lists, yields no ids. */
 export function parseImageIds(raw: string | null): string[] {
   if (!raw) {
     return [];

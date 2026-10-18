@@ -9,7 +9,7 @@ import { z } from 'zod';
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 50;
 
-/** `GET /notifications?limit=&before=` — a page of the feed, newest first. */
+/** `GET /notifications?limit=&before=`: a page of the feed, newest first. */
 export const listNotificationsQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),

@@ -40,7 +40,7 @@ export interface NotificationCenterProps {
   /** Shown as a header action when set; disabled while nothing is unread. */
   onMarkAllRead?: () => void;
   markAllReadLabel?: string;
-  /** Rendered under the list — a settings link, a "see all". */
+  /** Rendered under the list: a settings link, a "see all". */
   footer?: ReactNode;
   /** Skeleton rows instead of the list, for the first load. */
   loading?: boolean;
@@ -52,7 +52,7 @@ export interface NotificationCenterProps {
 
 /**
  * The icon and tone for a catalogue type (Sprint 8). Tones are the Sprint 5
- * vocabulary — success, danger, accent — and `ink` for everything neutral; a
+ * vocabulary (success, danger, accent) and `ink` for everything neutral; a
  * type nobody has catalogued gets the plain bell.
  */
 const ICONS: Array<{ match: (type: string) => boolean; icon: LucideIcon; tone: string }> = [

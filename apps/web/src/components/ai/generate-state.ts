@@ -38,7 +38,7 @@ import type {
 import { GENERATE_STAGES } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
 
-/** The tracker's vocabulary — `StageTracker`'s statuses, named here so this module stays UI-free. */
+/** The tracker's vocabulary: `StageTracker`'s statuses, named here so this module stays UI-free. */
 export type TrackerStatus = 'pending' | 'active' | 'done' | 'skipped' | 'failed';
 
 export interface StageState {
@@ -309,7 +309,7 @@ export interface CharacterLimit {
 }
 
 /**
- * The strictest limit among the selected channels' platforms — the one the
+ * The strictest limit among the selected channels' platforms: the one the
  * API will hand the engine as `maxCharacters`, and the one the result's
  * counters measure against. Null when nothing is selected, or when the
  * providers list did not load.

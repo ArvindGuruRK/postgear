@@ -9,7 +9,7 @@ export const Tooltip = TooltipPrimitive.Root;
 export const TooltipTrigger = TooltipPrimitive.Trigger;
 
 /**
- * Same border-2/shadow-brutalSm/bg-secondary/border-outline treatment as the
+ * Same border-2/shadow-surfaceSm/bg-secondary/border-outline treatment as the
  * rest of the small-surface family (DropdownMenuContent, Toast) so it flips
  * light/dark with the rest of the system, plus a bordered Arrow so it reads
  * as one continuous brutalist shape rather than a floating rectangle.
@@ -23,7 +23,7 @@ export const TooltipContent = forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 max-w-xs rounded-md border-2 border-outline bg-secondary px-3 py-1.5 shadow-brutalSm',
+        'z-50 max-w-xs rounded-md border-2 border-outline bg-secondary px-3 py-1.5 shadow-surfaceSm',
         'font-sans text-xs leading-snug text-ink',
         'data-[state=delayed-open]:animate-fadeIn',
         className,

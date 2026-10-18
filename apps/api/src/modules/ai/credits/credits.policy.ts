@@ -10,7 +10,7 @@
  * A charge is a `Credits` row with a positive `credits`; a refund is a row
  * with a negative one, typed `refund:<what>`. Nothing is ever updated or
  * deleted, so "used this cycle" is a sum over rows since the cycle started
- * and the history of every generation survives — including the ones that were
+ * and the history of every generation survives, including the ones that were
  * refunded, which is exactly what a billing dispute needs to see.
  *
  * ## Why the cycle follows the subscription's day of the month
@@ -20,7 +20,7 @@
  * started (or, with no subscription, the day the workspace was created) gives
  * every workspace a full month, and matches how the subscription itself bills.
  * Day 31 clamps to the month's last day, so a January 31 anchor resets on
- * February 28 and then March 31 — never skipping a month.
+ * February 28 and then March 31, never skipping a month.
  */
 import type { SubscriptionTier } from '@postgear/db';
 import {
@@ -34,7 +34,7 @@ export const AI_CREDIT_COSTS = {
   generate_post: 5,
   generate_image: 10,
   copilot_message: 1,
-  /** Sprint 7: the SEO analyzer's AI advice — one structured call over the audit. */
+  /** Sprint 7: the SEO analyzer's AI advice; one structured call over the audit. */
   seo_advice: 3,
 } as const;
 
@@ -59,15 +59,15 @@ export const AI_LEDGER_TYPES: readonly string[] = [
 ];
 
 /**
- * `NONE` is a workspace with no live entitlement — no subscription, an expired
- * trial, a cancelled plan — and gets the FREE plan's allowance. The name
+ * `NONE` is a workspace with no live entitlement (no subscription, an expired
+ * trial, a cancelled plan) and gets the FREE plan's allowance. The name
  * predates Sprint 8's plan table and is kept because the web app and every
  * stream event carry it; it maps to `PlanTier` `FREE`.
  */
 export type AiTier = 'NONE' | SubscriptionTier;
 
 /**
- * Derived from the plan table (Sprint 8) — `billing/plans.ts` is the single
+ * Derived from the plan table (Sprint 8): `billing/plans.ts` is the single
  * source of truth, and this module holds no numbers of its own.
  */
 export const AI_CREDIT_ALLOWANCE: Record<AiTier, number> = Object.fromEntries(

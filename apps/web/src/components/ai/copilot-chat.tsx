@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Copilot mode: a conversation with an assistant that can act — list the
- * channels, write a post, draft it, make an image.
+ * Copilot mode: a conversation with an assistant that can act (list the
+ * channels, write a post, draft it, make an image).
  *
  * The API is stateless, so this component owns the conversation (see
  * `chat-state.ts`) and sends the recent history with each message. The
@@ -11,8 +11,8 @@
  *
  * The conversation is kept in `sessionStorage` per workspace so a reload, or
  * following a "Drafted a post" row into the composer and coming back, does
- * not start it over. Storage is read once after mount — never during render,
- * where the server has no storage and the markup would differ — and every
+ * not start it over. Storage is read once after mount (never during render,
+ * where the server has no storage and the markup would differ) and every
  * access is wrapped, because private windows and full quotas both throw.
  */
 import {
@@ -80,12 +80,12 @@ export function CopilotChat({
     try {
       entries = parseHistory(window.sessionStorage.getItem(copilotStorageKey(orgId)));
     } catch {
-      // No storage (private window, blocked) — the conversation starts empty.
+      // No storage (private window, blocked): the conversation starts empty.
     }
     dispatch({ type: 'restore', entries });
   }, [orgId]);
 
-  // Persist after every change, but never before the restore has rendered —
+  // Persist after every change, but never before the restore has rendered:
   // `hydrated` is set by the restore dispatch itself, so the mount commit
   // (which StrictMode runs twice) cannot write the empty initial state over
   // what the session held. See `ChatState.hydrated`.
@@ -205,7 +205,7 @@ export function CopilotChat({
 
       <div
         ref={listRef}
-        className="flex max-h-[60vh] min-h-[16rem] flex-col overflow-y-auto rounded-lg border-4 border-outline p-4 pg-scrollbar pg-scrollbar-primary"
+        className="flex max-h-[60vh] min-h-[16rem] flex-col overflow-y-auto rounded-lg border-2 border-outline p-4 pg-scrollbar pg-scrollbar-primary"
         aria-live="polite"
         aria-busy={state.streaming}
       >

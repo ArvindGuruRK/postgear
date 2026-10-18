@@ -1,5 +1,5 @@
 /**
- * The simulated model client — a language model with no model in it.
+ * The simulated model client: a language model with no model in it.
  *
  * `AI_SIMULATION=true` is how PostGear is exercised locally and in CI: every
  * screen, credit rule, SSE stream and tool call is real, only the provider
@@ -13,7 +13,7 @@
  *
  * Deterministic on purpose: the PRNG is seeded from the prompt text, so the
  * same brief produces the same post, tests can assert on shape, and a demo
- * does not change under someone's hands. There is no artificial delay — a
+ * does not change under someone's hands. There is no artificial delay: a
  * simulation that pretends to be slow only slows the tests.
  */
 import { z } from 'zod';
@@ -157,7 +157,7 @@ const TRAILING_STOPWORD =
 export function subjectOf(brief: string): string {
   let text = brief.replace(/\s+/g, ' ').trim().replace(LEADING_REQUEST, '');
   text = text.replace(/^(about|on)\s+/i, '');
-  const clause = text.split(/(?<=[.!?])\s|[;:\n]| — | - /)[0] ?? text;
+  const clause = text.split(/(?<=[.!?])\s|[;:\n]| \u2014 | - /)[0] ?? text;
   let subject = clause.trim().replace(/[.!?,"']+$/g, '');
   if (subject.length > SUBJECT_MAX_CHARS) {
     const cut = subject.slice(0, SUBJECT_MAX_CHARS);
@@ -873,7 +873,7 @@ function collectTurn(messages: ModelMessage[]): {
 
 function postRequestFrom(message: string): Record<string, unknown> {
   const lower = message.toLowerCase();
-  // "…about X and save it as a draft" — the drafting clause is an instruction, not the topic.
+  // "…about X and save it as a draft": the drafting clause is an instruction, not the topic.
   const request = message
     .replace(/[,;]?\s*\b(and|then)?\s*(save|draft)\b.*$/i, '')
     .replace(/[,;]?\s*\bas a draft\b.*$/i, '')

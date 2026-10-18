@@ -1,21 +1,21 @@
 /**
- * Composer — write a post once, tailor it per channel, preview it, save it.
+ * Composer: write a post once, tailor it per channel, preview it, save it.
  *
  * A server component that loads what the island needs in one round of
  * parallel requests: the workspace's channels, the providers with their
- * publishing rules, and — when the URL names them — the post being edited and
+ * publishing rules, and, when the URL names them, the post being edited and
  * the library item being attached.
  *
  * `?group=` reopens a saved post. `?media=` starts a new post with a library
  * item attached, which is how the media library's "Use in a post" arrives.
- * `?at=` starts a new post at a given time — the calendar's clicked slot.
+ * `?at=` starts a new post at a given time: the calendar's clicked slot.
  *
  * ## Why the island's key is a fresh id per render
  *
  * The composer keeps its state in the client, and after a first save it
  * rewrites the URL to `?group=` without navigating (so editors are not torn
  * down). A key derived from the URL would therefore see "new post" before and
- * after — and clicking "New post" from a just-saved draft would keep showing
+ * after, and clicking "New post" from a just-saved draft would keep showing
  * the draft. This server component only renders on a navigation, so a random
  * key per render means exactly: every navigation into the composer starts
  * from what the server says, and nothing else remounts it.
@@ -59,7 +59,7 @@ export default async function ComposerPage({
             post: null,
             error:
               error instanceof ApiError && error.status === 404
-                ? 'That post no longer exists. It may have been deleted — you are starting a new one.'
+                ? 'That post no longer exists. It may have been deleted, so you are starting a new one.'
                 : 'That post could not be loaded. You are starting a new one.',
           }),
         )

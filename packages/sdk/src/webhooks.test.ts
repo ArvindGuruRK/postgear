@@ -1,6 +1,6 @@
 /**
  * The verifier, and that it agrees byte for byte with what PostGear's worker
- * signs (`packages/db/src/webhook-signature.ts` — the same vector is pinned
+ * signs (`packages/db/src/webhook-signature.ts`: the same vector is pinned
  * there).
  */
 import { constructWebhookEvent, signWebhookPayload, verifyWebhookSignature } from './webhooks';

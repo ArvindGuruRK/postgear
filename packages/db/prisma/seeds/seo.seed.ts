@@ -3,7 +3,7 @@
  *
  * Without these rows the analyzer page can only ever render its empty state
  * on a fresh clone, and the two things the sprint's Definition of Done asks
- * to see — a trend line across re-runs and a prioritised advice list — need
+ * to see (a trend line across re-runs and a prioritised advice list) need
  * history to exist. So: three finished audits of `https://example.com/`
  * over three weeks with a rising score (58/F → 71/C → 84/B), each with a
  * crawl, a full report and advice shaped exactly as the API's
@@ -108,7 +108,7 @@ function checksFor(run: RunShape): Check[] {
     check(run, 'title-present', 'onPage', 'Title tag', 'critical', 0.2, {
       pass: 'The page has a title.',
       fail: 'The page has no title tag.',
-      value: 'Example Domain — plain-language examples',
+      value: 'Example Domain: plain-language examples',
     }),
     check(run, 'title-length', 'onPage', 'Title length', 'warning', 0.15, {
       pass: '41 characters, inside the 30–60 window.',
@@ -357,7 +357,7 @@ function auditDataFor(run: RunShape): Prisma.InputJsonValue {
     page: {
       title: run.failing.has('title-length')
         ? 'Example Domain'
-        : 'Example Domain — plain-language examples',
+        : 'Example Domain: plain-language examples',
       metaDescription: run.metaDescription,
       canonical: run.failing.has('canonical') ? null : TARGET_URL,
       robotsMeta: null,

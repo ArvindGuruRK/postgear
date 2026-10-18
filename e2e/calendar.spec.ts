@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp } from './helpers/media';
 
 /**
- * The calendar — Sprint 5's visual scheduler.
+ * The calendar: Sprint 5's visual scheduler.
  *
  * Runs against the seeded demo workspace, whose posts were chosen to show every
  * state at once: a thread queued for tomorrow, one published yesterday, one
@@ -50,7 +50,7 @@ async function createQueued(page: Page, text: string, publishAt: Date): Promise<
   return post.group;
 }
 
-/** Noon, `days` days from now — well inside a week view and never in the past. */
+/** Noon, `days` days from now: well inside a week view and never in the past. */
 function atNoon(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -79,10 +79,9 @@ test.describe('calendar', () => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/calendar?view=week&date=${dayKey(new Date())}`);
 
-    // Scoped to main: the app shell's header repeats the page title in its own h1.
-    await expect(page.getByRole('main').getByRole('heading', { name: 'Calendar' })).toBeVisible();
+    // The page is named only by the top bar's h1 (no in-page title).
+    await expect(page.getByRole('heading', { level: 1, name: 'Calendar' })).toBeVisible();
     await expect(page.getByTestId('week-view')).toBeVisible();
-    await expect(page.getByTestId('scheduler-status')).toBeVisible();
 
     // The seeded thread for tomorrow is on this week's grid (or next week's,
     // on a Sunday), published yesterday is behind us: both reachable by
@@ -200,7 +199,7 @@ test.describe('calendar', () => {
 
     // Generous: the first visit compiles the composer route under `next dev`.
     await expect(page).toHaveURL(/\/composer\?at=/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { name: 'New post' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Composer' })).toBeVisible();
     const expected = new Date(day);
     expected.setHours(14, 0, 0, 0);
     const pad = (value: number) => String(value).padStart(2, '0');

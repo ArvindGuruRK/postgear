@@ -3,7 +3,7 @@
  *
  * `.strict()`, like every schema in this API: an unknown key is refused,
  * not stripped. The range arrives as a query string, so it is coerced
- * before the literal check — and an absent one is the thirty-day view,
+ * before the literal check, and an absent one is the thirty-day view,
  * which is what the page opens on.
  */
 import { z } from 'zod';

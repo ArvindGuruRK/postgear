@@ -3,7 +3,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 
 /**
  * tailwind-merge only knows Tailwind's own utilities. Our custom texture
- * utilities (`bg-stripes`, `bg-halftone` — see packages/config/tailwind.css)
+ * utilities (`bg-stripes`, `bg-halftone`: see packages/config/tailwind.css)
  * look like `bg-<color>` to it, so it treated them as background-COLOR and
  * dropped the real color that preceded them:
  *

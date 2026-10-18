@@ -7,7 +7,7 @@
  * ## The pending state is a reducer
  *
  * After checkout, a plan change, a cancellation or a resume, the row does
- * not change until Stripe's webhook (or the simulation's) is processed —
+ * not change until Stripe's webhook (or the simulation's) is processed:
  * the contract's "pending state rather than optimistic update". So the
  * page declares what it is waiting for (`Expectation`), polls every two
  * seconds for at most a minute, and the reducer decides between still
@@ -51,7 +51,7 @@ export function statusBadge(status: EntitlementStatus): { label: string; variant
   return STATUS_PRESENTATION[status];
 }
 
-/** "$29" or "$24.17" — prices are USD, so the locale is fixed and safe to render on the server. */
+/** "$29" or "$24.17": prices are USD, so the locale is fixed and safe to render on the server. */
 export function formatPrice(cents: number, currency = 'USD'): string {
   const whole = cents % 100 === 0;
 

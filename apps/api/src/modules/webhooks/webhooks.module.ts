@@ -11,7 +11,7 @@ import { WebhooksService } from './webhooks.service';
  * Delivery itself runs in the worker
  * (`apps/worker/src/workflows/webhook-delivery.workflow.ts`); this module
  * only writes rows and, for a test send, asks the scheduler to start the
- * workflow — the same relationship the posts module has with publishing.
+ * workflow: the same relationship the posts module has with publishing.
  */
 @Module({
   imports: [SchedulingModule],

@@ -9,8 +9,8 @@
  *
  * `PasswordService` upgrades a legacy or under-cost hash to argon2id
  * transparently, on the user's next successful login. That is the right
- * migration strategy — no forced reset, no batch job holding plaintext it
- * cannot have — but it is *lazy*: an account nobody signs into keeps its old
+ * migration strategy (no forced reset, no batch job holding plaintext it
+ * cannot have), but it is *lazy*: an account nobody signs into keeps its old
  * hash indefinitely, and nothing surfaces that.
  *
  * This script is the visibility half. It answers "is anything still stored
@@ -22,9 +22,9 @@
  * It does not rehash anything. Rehashing requires the plaintext, which exists
  * only for the instant a user submits it at login. A script that could
  * re-derive a stronger hash from a stored weak one would mean the weak one was
- * reversible — which is the problem, not the solution.
+ * reversible, which is the problem, not the solution.
  *
- * For the one format that cannot be verified at all (bcrypt — this repo has no
+ * For the one format that cannot be verified at all (bcrypt: this repo has no
  * bcrypt dependency, see `password.service.ts`), the report says so explicitly,
  * because those accounts must go through password reset rather than silently
  * failing to log in.
@@ -50,7 +50,7 @@ function detectFormat(stored: string): Format {
 function argon2Params(stored: string): string | null {
   // Rebuilt from the capture groups rather than sliced out of match[0], which
   // carries the surrounding `$` delimiters and made every row compare unequal
-  // to TARGET_PARAMS — reporting the whole table as under-cost.
+  // to TARGET_PARAMS: reporting the whole table as under-cost.
   const match = /\$m=(\d+),t=(\d+),p=(\d+)\$/.exec(stored);
   return match ? `m=${match[1]},t=${match[2]},p=${match[3]}` : null;
 }
@@ -59,7 +59,7 @@ const TARGET_PARAMS = 'm=19456,t=2,p=1';
 
 async function main(): Promise<void> {
   const users = await prisma.user.findMany({
-    // Only the columns needed. Notably `password` — this script reads hashes,
+    // Only the columns needed. Notably `password`: this script reads hashes,
     // so it must never print one, and it never does: only its *shape*.
     select: { id: true, email: true, password: true, providerName: true, lastOnline: true },
     orderBy: { createdAt: 'asc' },
@@ -88,22 +88,22 @@ async function main(): Promise<void> {
 
     if (format === 'bcrypt') {
       needsAttention.push(
-        `  ${user.email} — bcrypt. CANNOT be verified by this codebase; this account must reset its password.`,
+        `  ${user.email}: bcrypt. CANNOT be verified by this codebase; this account must reset its password.`,
       );
     } else if (format === 'plaintext' || format === 'md5' || format === 'sha1') {
       needsAttention.push(
-        `  ${user.email} — ${format}. Upgrades to argon2id on next successful login (last seen ${user.lastOnline.toISOString().slice(0, 10)}).`,
+        `  ${user.email}: ${format}. Upgrades to argon2id on next successful login (last seen ${user.lastOnline.toISOString().slice(0, 10)}).`,
       );
     } else if (params && params !== TARGET_PARAMS) {
       needsAttention.push(
-        `  ${user.email} — argon2 below current cost (${params}). Upgrades on next successful login.`,
+        `  ${user.email}: argon2 below current cost (${params}). Upgrades on next successful login.`,
       );
     }
   }
 
   console.log('\nPassword hash audit');
   console.log('===================\n');
-  console.log(`Users: ${users.length}  (${passwordless} with no password — OAuth-only)\n`);
+  console.log(`Users: ${users.length}  (${passwordless} with no password: OAuth-only)\n`);
 
   console.log('Format distribution');
   for (const [format, count] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
@@ -118,7 +118,7 @@ async function main(): Promise<void> {
       console.log(line);
     }
     console.log(
-      '\nNothing is rehashed here, by design — that needs the plaintext, which only\n' +
+      '\nNothing is rehashed here, by design: that needs the plaintext, which only\n' +
         'exists at login. See the header comment in this file.',
     );
   }

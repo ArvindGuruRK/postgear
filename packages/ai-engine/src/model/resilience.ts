@@ -4,7 +4,7 @@
  * A generation is three to five model calls, a web search and an image call,
  * each against a service that rate-limits, hiccups and occasionally hangs.
  * Without a shared policy every call site would improvise its own, and the
- * API's SSE stream would see raw SDK errors — some of which echo request
+ * API's SSE stream would see raw SDK errors, some of which echo request
  * headers, i.e. the key. So all of it lives here:
  *
  * - {@link classifyError} turns anything a provider throws into an
@@ -286,7 +286,7 @@ export async function withRetry<T>(
 /**
  * Rejects with `timeout` if the promise has not settled after `ms`, or with
  * `aborted` when the signal fires first. The underlying work is not cancelled
- * by this alone — pair it with a linked signal (see {@link withDeadline}).
+ * by this alone: pair it with a linked signal (see {@link withDeadline}).
  */
 export function withTimeout<T>(promise: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {

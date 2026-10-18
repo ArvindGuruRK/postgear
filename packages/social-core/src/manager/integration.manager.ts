@@ -7,12 +7,12 @@
  * `apps/api` (Nest) and, from Sprint 5, `apps/worker` (a Temporal worker, not a
  * Nest app). Depending on `@nestjs/common` here would force the worker to carry
  * a DI framework it has no use for. The API wraps this in a thin Nest provider
- * instead — one file, in the layer that already knows about Nest.
+ * instead: one file, in the layer that already knows about Nest.
  *
  * **Not the home of token cryptography**, despite the scaffolded TODO that said
  * so. Encryption belongs at the persistence boundary, where the plaintext stops
- * and the database begins — `apps/api/src/modules/channels/channels.repository.ts`
- * — not in a lookup table that never touches a database.
+ * and the database begins, `apps/api/src/modules/channels/channels.repository.ts`,
+ * not in a lookup table that never touches a database.
  *
  * The pattern mirrors `apps/api/src/modules/auth/providers/providers.manager.ts`
  * from Sprint 2 on purpose: one interface, N implementations, one registry that
@@ -78,7 +78,7 @@ export class IntegrationManager {
    * Resolves an identifier to a provider, or throws.
    *
    * Unknown and unconfigured are distinguished so the log can say which, while
-   * the user sees the same generic message either way — an unconfigured
+   * the user sees the same generic message either way: an unconfigured
    * provider is a deployment gap, and saying so to an end user helps nobody.
    */
   get(identifier: string): SocialProvider {

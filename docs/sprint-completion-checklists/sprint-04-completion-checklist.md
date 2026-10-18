@@ -1,4 +1,4 @@
-# Sprint 4 — Completion Checklist & Test Guide
+# Sprint 4: Completion Checklist & Test Guide
 
 Companion to [sprint-04-post-composer-and-media.md](../sprint-documents/sprint-04-post-composer-and-media.md).
 Status as of **2026-09-14**.
@@ -14,8 +14,8 @@ and the `State` enum, Sprint 3's providers and channels API, the design-system
 components, and `sharp` (already present as a dependency of Next).
 
 **All four Definition of Done items are met and each has a browser test.**
-Nothing is published to a real platform in this sprint — that is Sprint 5's
-scheduler, and it still needs the developer apps Sprint 3's gaps describe — so
+Nothing is published to a real platform in this sprint (that is Sprint 5's
+scheduler, and it still needs the developer apps Sprint 3's gaps describe), so
 the [Known gaps](#known-gaps) are about what the composer hands to Sprint 5, not
 about what the composer does.
 
@@ -44,25 +44,25 @@ has to handle:
 
 | Channel | Provider | Why it is there |
 |---|---|---|
-| Acme on X | `x` | Weighted length, native threads, media on every part — and flagged `needs_reconnect` |
+| Acme on X | `x` | Weighted length, native threads, media on every part, and flagged `needs_reconnect` |
 | Acme Marketing | `linkedin` | Later parts become comments, which carry no media |
 | Acme Studio | `instagram` | **New.** No post without an image; JPEG only; 4:5–1.91:1 |
 
 ---
 
-## 1. Shared composer layer — one set of rules, run everywhere (Task 1 groundwork + the Risk)
+## 1. Shared composer layer: one set of rules, run everywhere (Task 1 groundwork + the Risk)
 
 | # | Item | Status |
 |---|---|---|
-| 1.1 | `packages/social-core/src/composer/` — a browser-safe entry point | ✅ [New] |
+| 1.1 | `packages/social-core/src/composer/`: a browser-safe entry point | ✅ [New] |
 | 1.2 | Post **document**: a closed JSON tree, not HTML | ✅ [New] |
-| 1.3 | `renderPlainText` — document → the exact text a platform receives | ✅ [New] |
+| 1.3 | `renderPlainText`: document → the exact text a platform receives | ✅ [New] |
 | 1.4 | X's weighted length (URLs 23, CJK/emoji 2) and `overflowIndex` | ✅ [New] |
 | 1.5 | Declarative `ProviderRules` on all eight providers | ✅ [New] |
 | 1.6 | One validator, used by the browser, the API and every `checkValidity` | ✅ [New] |
 | 1.7 | `GET /channels/providers` sends each provider's rules | ✅ [New] |
 
-### 1.5 — the sprint's own risk, retired rather than worked around
+### 1.5: the sprint's own risk, retired rather than worked around
 
 The sprint document names the risk: *"providers should expose maxLength/media
 constraints so this sprint's validation doesn't hardcode platform rules in the
@@ -75,7 +75,7 @@ object to the browser. **There is no platform rule anywhere in `apps/web`.**
 A test asserts the equivalence directly: for every provider, `checkValidity` on
 a too-long post returns exactly the message the shared validator gives.
 
-### 1.2 — why a JSON document
+### 1.2: why a JSON document
 
 The reference stores editor HTML and renders every preview through
 `dangerouslySetInnerHTML`. That makes the post body a stored-XSS surface, and
@@ -85,14 +85,14 @@ that the API holds to an allowlist of six node types, three marks and
 `http`/`https` links; previews render text nodes as text. Nothing in PostGear
 turns a post into HTML.
 
-### 1.4 — the counter errs high, deliberately
+### 1.4: the counter errs high, deliberately
 
 A counter that reads low lets a post be queued that X rejects hours later with
 the user gone; one that reads high asks for a trim that was not strictly needed.
 Where PostGear does not reproduce `twitter-text` exactly, it over-counts: an
 email's domain counts as a link, a keycap emoji counts more than 2. The one
 under-count left is a bare domain on an uncommon generic TLD shorter than 23
-characters — see [Known gaps](#known-gaps).
+characters: see [Known gaps](#known-gaps).
 
 **How to test:**
 
@@ -112,8 +112,8 @@ does. Three providers accepted media they could not publish:
 
 | Provider | What Sprint 3 did | What Sprint 4 does |
 |---|---|---|
-| **LinkedIn** | `createPost` sent `commentary` only — an attached image passed `checkValidity` and was **silently dropped** | **Implemented** the Images API: `initializeUpload` → PUT bytes → `content.media` for one image, `content.multiImage` for 2–20. Uploads are owned by the author URN, so company pages work unchanged. Video is declared unsupported. |
-| **Pinterest** | Sent a video URL where the API expects a `media_id` from its upload flow — every video Pin would fail | Video **declared unsupported** until that flow exists |
+| **LinkedIn** | `createPost` sent `commentary` only: an attached image passed `checkValidity` and was **silently dropped** | **Implemented** the Images API: `initializeUpload` → PUT bytes → `content.media` for one image, `content.multiImage` for 2–20. Uploads are owned by the author URN, so company pages work unchanged. Video is declared unsupported. |
+| **Pinterest** | Sent a video URL where the API expects a `media_id` from its upload flow: every video Pin would fail | Video **declared unsupported** until that flow exists |
 | **TikTok** | Counted videos only; an attached image was ignored | Images **declared unsupported** (photo mode is a different API) |
 
 Facebook's rules also record something its code already did: with a video
@@ -135,7 +135,7 @@ The four `LinkedIn image publishing` tests pin the request sequence, the
 
 | # | Item | Status |
 |---|---|---|
-| 3.1 | `POST /media` — streamed to disk, one file, no extra fields | ✅ [New] |
+| 3.1 | `POST /media`: streamed to disk, one file, no extra fields | ✅ [New] |
 | 3.2 | Type decided by **content sniffing**, never the name or claimed type | ✅ [New] |
 | 3.3 | `sharp` pipeline: orient → strip metadata → fit 2048 px → JPEG/PNG → WebP thumbnail | ✅ [New] |
 | 3.4 | Decoder must agree with the sniffer (disguised files refused) | ✅ [New] |
@@ -144,18 +144,18 @@ The four `LinkedIn image publishing` tests pin the request sequence, the
 | 3.7 | S3 backend (AWS / R2 / MinIO), immutable cache headers | ✅ [New] |
 | 3.8 | `GET /media` (search, type filter, pages), `GET /media/:id`, `GET /media/:id/usage`, `DELETE /media/:id` | ✅ [New] |
 | 3.9 | Failed DB write removes stored objects; temp file always removed | ✅ [New] |
-| 3.10 | `Media.mimeType`, `width`, `height` — the sprint's one migration | ✅ [New] |
+| 3.10 | `Media.mimeType`, `width`, `height`: the sprint's one migration | ✅ [New] |
 
-### 3.3 — compression on the server, not in the browser
+### 3.3: compression on the server, not in the browser
 
 The sprint document says the reference compresses with `sharp`. Its upload
 path does not: the reference compresses in its **frontend**, and its own
 LinkedIn provider warns that self-hosters who switch that off send full-size
-images to platforms. PostGear compresses in the API, so no client can skip it —
+images to platforms. PostGear compresses in the API, so no client can skip it,
 and stripping a phone photo's GPS location is a privacy guarantee only if the
 client cannot opt out.
 
-### 3.6 — two headers that are easy to get wrong
+### 3.6: two headers that are easy to get wrong
 
 Helmet's default `Cross-Origin-Resource-Policy: same-origin` makes the browser
 refuse to render images from `:3001` inside the app on `:3000`. The `/uploads`
@@ -163,7 +163,7 @@ route overrides it to `cross-origin`, and adds `Content-Security-Policy:
 default-src 'none'; sandbox` so that nothing served from that path could run
 script on the API's origin even if a non-image ever got stored there.
 
-**How to test — the compression and privacy claim, against a raw file:**
+**How to test: the compression and privacy claim, against a raw file:**
 
 ```bash
 # a 4000×3000 photo carrying an EXIF block with GPS text
@@ -202,7 +202,7 @@ Verified `0`, and headers `Content-Type: image/jpeg`,
 | `/uploads/../package.json`, `%2e%2e` variants | **404** JSON, nothing served |
 | A media id from another workspace (`GET`, `usage`, `DELETE`) | **404** |
 
-A UTF-8 filename (`Écran — café 日本.png`) is stored intact; Multer's Latin-1
+A UTF-8 filename (`Écran: café 日本.png`) is stored intact; Multer's Latin-1
 default would have garbled it, so `defParamCharset: 'utf8'` is set.
 
 **The S3 backend, against the MinIO in `docker-compose.yml`:**
@@ -219,7 +219,7 @@ the temp file came back **byte-identical**.
 cd apps/api && npx jest src/modules/media
 ```
 
-Expect **46 passed** across four suites — including real `sharp` runs proving
+Expect **46 passed** across four suites, including real `sharp` runs proving
 EXIF removal, CMYK→sRGB, transparency kept only when used, GIFs stored
 byte-for-byte, truncated and disguised images refused, and orphan cleanup when
 the database write fails.
@@ -242,7 +242,7 @@ the database write fails.
 | 4.10 | Channel connect scoped to `organizationId` + `deletedAt: null` inside the insert | ✅ [New] |
 | 4.11 | `@Roles(ADMIN, USER)`: membership required, writing open to members | ✅ [New] |
 
-### 4.2 and 4.4 — two reference bugs this is written against
+### 4.2 and 4.4: two reference bugs this is written against
 
 - **The group that is not a group.** The reference's `createOrUpdatePost` mints
   a fresh `uuidv4()` inside its per-channel loop, so a post sent to three
@@ -252,7 +252,7 @@ the database write fails.
   another workspace's post. PostGear's schema has no row-id field at all, and
   rows are matched by position inside a group already filtered by organization.
 
-**How to test — the whole lifecycle against a real API and database:**
+**How to test: the whole lifecycle against a real API and database:**
 
 Every step is an ordinary JSON request with the demo session from section 3.
 The first, for example:
@@ -285,7 +285,7 @@ by a scripted walk through the sequence:
 | Queue with 281 characters for X | **422** "Acme on X: X allows 280 characters; this post has 281." |
 | Queue for a time in the past | **422** "Choose a time in the future…" |
 | **Two concurrent saves from the same version** | exactly one **200**, one **409** |
-| Queue a valid post | **200**, `state: QUEUE` (to an X channel needing reconnection — allowed, see 5.3) |
+| Queue a valid post | **200**, `state: QUEUE` (to an X channel needing reconnection; allowed, see 5.3) |
 | `member@postgear.local` (USER role) creates a draft | **201** |
 | Read the post from `seed-second-org` | **404** |
 | A channel id that is not the workspace's | **400** "One of the selected channels is no longer connected…" |
@@ -322,7 +322,7 @@ rules against the real provider rules.
 
 | # | Item | Status |
 |---|---|---|
-| 5.1 | `/[orgId]/composer` — a route, not a modal; `?group=` reopens, `?media=` attaches | ✅ [New] |
+| 5.1 | `/[orgId]/composer`: a route, not a modal; `?group=` reopens, `?media=` attaches | ✅ [New] |
 | 5.2 | TipTap editor, configured down to what the document can hold | ✅ [New] |
 | 5.3 | Channel picker with health: setup-needed unpickable, reconnect-needed warned | ✅ [New] |
 | 5.4 | Shared thread + per-channel customize / "use the shared post" | ✅ [New] |
@@ -338,23 +338,23 @@ rules against the real provider rules.
 | 5.14 | Unsaved-changes warning on close/reload; Ctrl/⌘+S saves | ✅ [New] |
 | 5.15 | `buttonVariants` exported from `@postgear/ui` for links styled as buttons | ✅ [New] |
 
-### 5.2 — why the editor is uncontrolled
+### 5.2: why the editor is uncontrolled
 
 Each part owns a TipTap instance keyed by a client-only id that travels with the
-part. Content enters an editor only when it mounts — on create, copy or load —
+part. Content enters an editor only when it mounts (on create, copy or load)
 and is never pushed back while mounted. Pushing on every keystroke is the
 classic cause of a cursor jumping to the end; keying by position would hand one
 part's editor and undo history to another part's text on every drag.
 
-### 5.7 — previews render the post, not the editor
+### 5.7: previews render the post, not the editor
 
 Every preview shows `renderPlainText` output as text: styled Unicode bold,
 list bullets, links expanded to `words (url)`. Threads are drawn the way each
-platform publishes them — a reply chain on X, the post plus comments on
+platform publishes them: a reply chain on X, the post plus comments on
 LinkedIn, Facebook and Instagram, and only part 1 on YouTube, TikTok and
 Pinterest with a note saying so.
 
-### 5.9 — what happens on "Add to queue"
+### 5.9: what happens on "Add to queue"
 
 The composer runs the same validator the API will and lists every blocker at
 once, labelled by channel. The API still decides; if it disagrees, its message
@@ -372,7 +372,7 @@ is shown.
   preview follows the tab;
 - **Save draft**, reload the page: everything comes back; **Saved posts** lists it.
 
-### 5.3 — reconnect-needed channels can be queued to
+### 5.3: reconnect-needed channels can be queued to
 
 The API and the composer draw the same line: a channel still being set up has
 nowhere to post and cannot be queued to; a channel needing reconnection can be,
@@ -389,7 +389,7 @@ Channels.
 | 6.2 | 12 provider tests (rules equivalence, X premium/CJK, LinkedIn images, Instagram rules) | ✅ [New] |
 | 6.3 | 46 media tests (sniffing, real `sharp` pipeline, storage, service) | ✅ [New] |
 | 6.4 | 48 posts tests (schema, state, repository, service) | ✅ [New] |
-| 6.5 | 16 web tests — composer reducer, payload, reports (first tests in `apps/web`) | ✅ [New] |
+| 6.5 | 16 web tests: composer reducer, payload, reports (first tests in `apps/web`) | ✅ [New] |
 | 6.6 | 6 Playwright composer journeys + 2 media journeys | ✅ [New] |
 | 6.7 | Everything from Sprints 0–3 still green | ✅ [Pre-existing] |
 
@@ -402,12 +402,12 @@ Expect `Tasks: 28 successful, 28 total`, now covering **377 unit tests**
 
 ```bash
 docker compose up -d && npm run db:seed
-npm run dev:api:e2e      # :e2e — relaxed login throttles
+npm run dev:api:e2e      # :e2e: relaxed login throttles
 npm run test:e2e
 ```
 
 Expect **42 passed**, up from 34. The new specs clean up after themselves
-through the API — posts and media, including the uploaded files.
+through the API: posts and media, including the uploaded files.
 
 `next build` also succeeds, which is the check that the composer's
 `@postgear/social-core/composer` alias bundles for the browser without pulling
@@ -436,9 +436,9 @@ Each of these passed every unit test and failed only when exercised for real:
 ## Known gaps
 
 **1. Nothing is published yet.** "Add to queue" sets `QUEUE` and stops; Sprint 5's
-scheduler reads the queue. Everything the publisher needs is in place — rendered
+scheduler reads the queue. Everything the publisher needs is in place: rendered
 text from `renderPlainText`, media descriptors with type, size and dimensions,
-rules enforced by `checkValidity` — but no post has reached a real platform,
+rules enforced by `checkValidity`, but no post has reached a real platform,
 because no developer app is registered (Sprint 3's gap 1).
 
 **2. LinkedIn image upload is implemented, not proven.** It follows LinkedIn's
@@ -491,40 +491,40 @@ blocking navigation API.
 **13. Customization is per channel, not per part.** A channel either follows the
 whole shared thread or has its own whole thread.
 
-**14. The E2E suite is still not in CI** — unchanged from Sprint 2.
+**14. The E2E suite is still not in CI**: unchanged from Sprint 2.
 
 ---
 
 ## Files changed in this pass
 
-**Added — `packages/social-core`**
+**Added: `packages/social-core`**
 - `src/composer/{document,render,length,rules,unicode,validate,index}.ts` (+ four test files)
 - `src/abstract/validity.ts`
 
-**Added — API**
+**Added: API**
 - `src/modules/media/{media.module,media.controller,media.service,media.repository,media.messages,file-type,image-processor}.ts`, `dto/media.schema.ts`
 - `src/modules/media/storage/{storage.interface,storage-keys,local.storage,s3.storage,storage.factory}.ts`
 - `src/modules/posts/{posts.module,posts.controller,posts.service,posts.repository,posts.messages,post-state}.ts`, `dto/posts.schema.ts`
 - Tests: `file-type`, `image-processor`, `media.service`, `storage`, `posts.schema`, `post-state`, `posts.repository`, `posts.service`
 
-**Added — web**
+**Added: web**
 - `src/components/composer/{composer,composer-state,channel-report,channel-picker,editor,thread-editor,media-picker-dialog,preview-panel,drafts-sheet}.tsx|ts` (+ `composer-state.test.ts`)
 - `src/components/previews/{x,linkedin,facebook,instagram,youtube,tiktok,pinterest,generic}.preview.tsx`, `channel-preview.tsx`, `comment-list.tsx`, `preview-parts.tsx`
 - `src/components/media/{media-library,media-tile,media-uploader,delete-media-dialog,use-media-list,media-limits}.tsx|ts`
 - `src/types/{post,media}.ts`
 
-**Added — database, tests & docs**
+**Added: database, tests & docs**
 - `packages/db/prisma/migrations/20260914074756_sprint4_media_metadata/`
 - `e2e/composer.spec.ts`, `e2e/media.spec.ts`, `e2e/helpers/media.ts`
 - this file
 
 **Modified**
-- `packages/social-core` — all eight providers declare `rules`; LinkedIn uploads images; `MediaDescriptor` gains `mimeType`/`bytes`/`width`/`height`; the registry lists rules
-- `packages/db/prisma/schema.prisma` — `Media.mimeType`, `width`, `height`; `seeds/index.ts` — Instagram channel
-- `apps/api/src/config/env.ts` — storage variables, S3 settings required together
-- `apps/api/src/main.ts` — 1 MB JSON limit, `/uploads` static route
-- `apps/api/src/app.module.ts` — `MediaModule`, `PostsModule`; `security-logger.ts` — two events
-- `apps/web` — composer and media pages, `lib/api.ts` (`PUT`, `uploadFile`), `types/channel.ts`, `globals.css` (editor styles), tsconfig/next/jest config for the composer alias
-- `packages/ui/src/components/button.tsx` — export `buttonVariants`
+- `packages/social-core`: all eight providers declare `rules`; LinkedIn uploads images; `MediaDescriptor` gains `mimeType`/`bytes`/`width`/`height`; the registry lists rules
+- `packages/db/prisma/schema.prisma`: `Media.mimeType`, `width`, `height`; `seeds/index.ts`: Instagram channel
+- `apps/api/src/config/env.ts`: storage variables, S3 settings required together
+- `apps/api/src/main.ts`: 1 MB JSON limit, `/uploads` static route
+- `apps/api/src/app.module.ts`: `MediaModule`, `PostsModule`; `security-logger.ts`: two events
+- `apps/web`: composer and media pages, `lib/api.ts` (`PUT`, `uploadFile`), `types/channel.ts`, `globals.css` (editor styles), tsconfig/next/jest config for the composer alias
+- `packages/ui/src/components/button.tsx`: export `buttonVariants`
 - `.env.example`, `.gitignore`, `project_structure.md`, `packages/db/prisma/SCHEMA_NOTES.md`, `docs/social-platform-setup.md`, the Sprint 4 document
-- Dependencies: API — `sharp`, `@aws-sdk/client-s3`, `multer` (was transitive), `@types/multer`; web — `@tiptap/{react,pm,core,starter-kit,extensions}`, `@dnd-kit/{core,sortable,utilities}`, `@postgear/social-core`
+- Dependencies: API, `sharp`, `@aws-sdk/client-s3`, `multer` (was transitive), `@types/multer`; web, `@tiptap/{react,pm,core,starter-kit,extensions}`, `@dnd-kit/{core,sortable,utilities}`, `@postgear/social-core`

@@ -10,7 +10,7 @@
  * a button that says "Upgrade", so the dialog fetches
  * `GET /billing/change/preview` first and states the amount and the date.
  * The confirm button is disabled until the preview has loaded; a preview
- * that fails is shown with a retry, and the change is still possible — the
+ * that fails is shown with a retry, and the change is still possible: the
  * API computes the real charge regardless.
  */
 import {
@@ -135,7 +135,7 @@ export function ChangePlanDialog({
           <DialogDescription>
             {price ? `${price.amount}${price.per}` : ''}
             {price?.note ? ` (${price.note})` : ''}
-            {target ? ` — ${target.plan.channels} channels, ${target.plan.aiCredits.toLocaleString()} AI credits a month.` : ''}
+            {target ? `: ${target.plan.channels} channels, ${target.plan.aiCredits.toLocaleString()} AI credits a month.` : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -151,7 +151,7 @@ export function ChangePlanDialog({
                 <Text size="sm">
                   {preview.amountDueCents > 0
                     ? `You pay ${formatPrice(preview.amountDueCents, preview.currency)} today for the rest of this period, prorated.`
-                    : 'Nothing to pay today — the unused part of your current plan covers it.'}{' '}
+                    : 'Nothing to pay today: the unused part of your current plan covers it.'}{' '}
                   The new plan applies as soon as the payment is confirmed
                   {preview.periodEnd ? `, and renews on ${date(preview.periodEnd) ?? 'the period end'}` : ''}.
                 </Text>

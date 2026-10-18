@@ -3,20 +3,20 @@
  * holding up a scheduled post.
  *
  * Hand-authored SVG rather than lucide-react, which design-system-rules.md
- * §13 mandates "exclusively, no custom SVG set". That rule governs *icons* —
- * the interchangeable 16/20px glyphs that sit beside text — and this is a
+ * §13 mandates "exclusively, no custom SVG set". That rule governs *icons*
+ * (the interchangeable 16/20px glyphs that sit beside text), and this is a
  * single named illustration, the one thing lucide cannot supply. It is kept
  * to the same constraints that make the icon rule work, so it stays part of
  * the system rather than an exception to it:
  *
  * - No raw hex (§7). Every stroke is `stroke-ink` and every fill is a
  *   surface or action token, so the drawing re-colors with the theme for
- *   free — ink flips near-white in dark mode, keeping the linework visible
+ *   free: ink flips near-white in dark mode, keeping the linework visible
  *   against the panel, while the five flat action fills stay put (§12).
  * - Chunky linework matching `strokeWidth={2.5}`-and-up icon weight (§13)
  *   and the border scale (§4): 6px on the body, 3-4px on details.
  * - `aria-hidden`, because the panel beside it already says in words what
- *   this says in pictures — announcing it twice is noise, not access.
+ *   this says in pictures: announcing it twice is noise, not access.
  */
 export function AuthIllustration({ className }: { className?: string }) {
   return (
@@ -29,7 +29,7 @@ export function AuthIllustration({ className }: { className?: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {/* Ground shadow — ink at low opacity, not a gray token, so it reads as
+      {/* Ground shadow: ink at low opacity, not a gray token, so it reads as
           a shadow of the figure in both themes. */}
       <ellipse cx="160" cy="338" rx="92" ry="12" className="fill-ink opacity-20" />
 
@@ -88,7 +88,7 @@ export function AuthIllustration({ className }: { className?: string }) {
       </g>
       <path d="M140 142c6 10 34 10 40 0" className="stroke-ink" strokeWidth="5" />
 
-      {/* Channel tiles: the five action fills, one per square — the same
+      {/* Channel tiles: the five action fills, one per square; the same
           palette the app uses for its own action surfaces. */}
       <g className="stroke-ink" strokeWidth="3">
         <rect x="124" y="168" width="34" height="32" rx="8" className="fill-actionSecondary" />

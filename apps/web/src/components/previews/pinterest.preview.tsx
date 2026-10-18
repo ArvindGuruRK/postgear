@@ -15,7 +15,7 @@ const TITLE_LENGTH = 100;
  * Pinterest: one image, a title and a description.
  *
  * Drawn from the same split the provider makes: the first line becomes the
- * title, trimmed to 100 characters, and the remaining lines the description —
+ * title, trimmed to 100 characters, and the remaining lines the description,
  * or the whole post, when it is a single line.
  */
 export function PinterestPreview({

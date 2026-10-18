@@ -4,7 +4,7 @@
  * The engine produces bytes and a rewritten prompt; this turns them into an
  * ordinary library item through `MediaService.saveGenerated`, so a generated
  * image is attachable, listable and deletable exactly like an upload. Bound
- * to one workspace at construction — see `engine.types.ts` for why a sink
+ * to one workspace at construction: see `engine.types.ts` for why a sink
  * cannot be shared across requests.
  */
 import type { ImageSink } from '@postgear/ai-engine';

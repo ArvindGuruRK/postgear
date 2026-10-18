@@ -12,7 +12,7 @@ export const metadata: Metadata = {
  * Activation happens **server-side during render**, not from a click. The
  * token is single-use, and a page that only activates on click would be
  * silently consumed by any email client or security scanner that prefetches
- * links — leaving the real user with a dead link and no explanation.
+ * links, leaving the real user with a dead link and no explanation.
  *
  * The trade is that a prefetch still activates the account. That is the
  * benign direction to fail in: the account is confirmed, which is what the
@@ -42,7 +42,7 @@ export default async function VerifyPage({ searchParams }: PageProps<'/verify'>)
       ) : (
         <Stack gap="sm">
           <Text size="sm" muted>
-            Try signing in — if your account is already confirmed, it will just work. Otherwise
+            Try signing in. If your account is already confirmed, it will just work. Otherwise
             register again to get a fresh link.
           </Text>
           <Stack direction="row" gap="sm">
@@ -68,7 +68,7 @@ async function activate(token: string): Promise<boolean> {
     await serverApi(`/auth/activate?token=${encodeURIComponent(token)}`);
     return true;
   } catch {
-    // Expired, already used, or never existed — all one outcome, matching the
+    // Expired, already used, or never existed: all one outcome, matching the
     // API, which does not distinguish them either.
     return false;
   }

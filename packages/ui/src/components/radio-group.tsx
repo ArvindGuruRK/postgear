@@ -19,7 +19,7 @@ export const RadioGroupItem = forwardRef<
   <RadioGroupPrimitive.Item
     ref={ref}
     className={cn(
-      'peer flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-outline bg-secondary shadow-brutalSm',
+      'peer flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-outline bg-field shadow-surfaceSm',
       'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
       'data-[state=checked]:bg-actionPrimary',

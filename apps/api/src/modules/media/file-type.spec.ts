@@ -3,8 +3,8 @@
  *
  * The allowlist is what decides whether a file can end up publicly served, so
  * both directions are pinned: each accepted signature is recognised, and the
- * lookalikes — SVG and HTML that pretend to be images, audio in a video
- * container, HEIC — are not accepted as what they resemble.
+ * lookalikes (SVG and HTML that pretend to be images, audio in a video
+ * container, HEIC) are not accepted as what they resemble.
  */
 import { sniffMedia } from './file-type';
 

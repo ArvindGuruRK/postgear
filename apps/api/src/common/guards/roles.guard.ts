@@ -22,7 +22,7 @@ import { securityLogger } from '../logging/security-logger';
  * three roles and route-level checks do not justify an ability engine, and the
  * engine is the thing that is hard to remove later. If a real feature ever
  * needs attribute-level rules ("edit posts you authored"), that is the moment
- * to revisit — not before.
+ * to revisit, not before.
  *
  * ## Two responsibilities, one pass
  *
@@ -37,14 +37,14 @@ import { securityLogger } from '../logging/security-logger';
  * | Route is `@Public()` | Allowed; no org resolved |
  * | No `@Roles()` on the route | Allowed; org resolved *opportunistically* if the cookie is present and valid |
  * | `@Roles()` present, no active org cookie | 403 |
- * | `@Roles()` present, cookie names an org the caller is not in | 403 — same message as a wrong role, so the cookie cannot be used to probe which organizations exist |
+ * | `@Roles()` present, cookie names an org the caller is not in | 403: same message as a wrong role, so the cookie cannot be used to probe which organizations exist |
  * | Membership exists but `disabled: true` | 403 |
  * | `User.isSuperAdmin` | Allowed, and treated as `SUPERADMIN` |
  * | Role not in the required list | 403 |
  *
  * The "no `@Roles()` still resolves the org" case is what lets a route like
- * `GET /posts` read `@CurrentOrg()` while routes like `/onboarding/*` — used
- * by a user who belongs to no organization yet — keep working.
+ * `GET /posts` read `@CurrentOrg()` while routes like `/onboarding/*` (used
+ * by a user who belongs to no organization yet) keep working.
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -135,7 +135,7 @@ export class RolesGuard implements CanActivate {
    * Loads a live membership.
    *
    * `disabled: false` is part of the `where`, not checked afterwards, so a
-   * disabled membership reads as "not a member" throughout — including in the
+   * disabled membership reads as "not a member" throughout, including in the
    * superadmin fallback above, which is correct: disabling is meant to revoke
    * access without deleting the row and its audit trail.
    */

@@ -1,6 +1,6 @@
-# PostGear — Design Patterns & Tokens Index
+# PostGear: Design Patterns & Tokens Index
 
-> **Decision (2026-08-29)**: PostGear imports Postiz's actual design-token system (colors, Tailwind theme extensions, shadows, animations, breakpoints) as its starting visual foundation, rather than inventing a new one from scratch. This is a deliberate exception to the "reference, don't copy" rule that governs application *logic* in [`../sprint-documents/`](../sprint-documents/README.md) — visual tokens aren't business logic, and reusing a shipped, cross-browser-tested token set is a legitimate time-saver for a solo developer. The colors get reskinned to PostGear's own brand later; the token *structure* (variable names, the light/dark switching mechanism, the Tailwind utility mapping) stays.
+> **Decision (2026-08-29)**: PostGear imports Postiz's actual design-token system (colors, Tailwind theme extensions, shadows, animations, breakpoints) as its starting visual foundation, rather than inventing a new one from scratch. This is a deliberate exception to the "reference, don't copy" rule that governs application *logic* in [`../sprint-documents/`](../sprint-documents/README.md): visual tokens aren't business logic, and reusing a shipped, cross-browser-tested token set is a legitimate time-saver for a solo developer. The colors get reskinned to PostGear's own brand later; the token *structure* (variable names, the light/dark switching mechanism, the Tailwind utility mapping) stays.
 
 ## What's in this folder
 
@@ -11,17 +11,17 @@
 
 ## Where the tokens actually live now
 
-PostGear's apps install `tailwindcss@^4.0.0`, which moved theme configuration from a JS file into CSS (`@theme`, `@custom-variant`, `@plugin`). Everything below is already written in native v4 syntax — not the v3 `module.exports` style Postiz's own source uses.
+PostGear's apps install `tailwindcss@^4.0.0`, which moved theme configuration from a JS file into CSS (`@theme`, `@custom-variant`, `@plugin`). Everything below is already written in native v4 syntax, not the v3 `module.exports` style Postiz's own source uses.
 
 | File | Contents | Status |
 |---|---|---|
-| `packages/ui/src/styles/colors.css` | Raw CSS custom properties — the actual color values, in `.dark`/`.light` variants | ✅ Copied in, valid CSS, importable as-is |
+| `packages/ui/src/styles/colors.css` | Raw CSS custom properties: the actual color values, in `.dark`/`.light` variants | ✅ Copied in, valid CSS, importable as-is |
 | `packages/config/tailwind.css` | Native v4 `@theme inline` block mapping semantic utility names (`bg-primary`, `text-forth`, `shadow-menu`, `animate-fadeIn`, etc.) to the CSS variables above, plus `@keyframes`, `@custom-variant` (dark mode, `child`/`child-hover`, the custom max-width breakpoints), and `@plugin` directives | ✅ Written in v4 syntax |
-| `packages/config/tailwind.config.js` | The old v3 `theme.extend` object | ⚠️ Deprecated stub — content moved to `tailwind.css` above, kept only as a placeholder |
+| `packages/config/tailwind.config.js` | The old v3 `theme.extend` object | ⚠️ Deprecated stub: content moved to `tailwind.css` above, kept only as a placeholder |
 | `apps/web/src/app/globals.css` | `@import "tailwindcss"` + imports `colors.css` and `tailwind.css` | ✅ Wired |
 | `apps/web/postcss.config.js` | `@tailwindcss/postcss` plugin registration (v4's replacement for the old `tailwindcss` + `autoprefixer` PostCSS setup) | ✅ Created |
 
-**Status**: `npm install` has run and succeeded. `tailwindcss-rtl` was dropped along the way — it has no Tailwind v4 release at all and broke dependency resolution outright; see `design-tokens.md` §10 for why that's an acceptable loss (RTL/i18n is P2 in the PRD). `tailwind-scrollbar` was bumped to `^4.0.0`, which does support v4.
+**Status**: `npm install` has run and succeeded. `tailwindcss-rtl` was dropped along the way: it has no Tailwind v4 release at all and broke dependency resolution outright; see `design-tokens.md` §10 for why that's an acceptable loss (RTL/i18n is P2 in the PRD). `tailwind-scrollbar` was bumped to `^4.0.0`, which does support v4.
 
 **Still remaining before this actually renders**: something in the app shell needs to apply a `dark` or `light` class to a root element, since the color variables in `colors.css` only resolve once one of those is present (see `design-tokens.md` §1). That's a Sprint 0/Sprint 1 implementation task, not a dependency problem.
 

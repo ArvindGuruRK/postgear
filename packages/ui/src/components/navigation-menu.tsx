@@ -60,9 +60,9 @@ export const NavigationMenuTrigger = forwardRef<
 NavigationMenuTrigger.displayName = NavigationMenuPrimitive.Trigger.displayName;
 
 /**
- * No border/bg/shadow here — the Viewport below already renders that chrome
+ * No border/bg/shadow here: the Viewport below already renders that chrome
  * as a single shared surface all Content panels animate inside. Content
- * previously duplicated the same border-4/shadow-brutalLg/bg-secondary,
+ * previously duplicated the same border-2/shadow-surfaceLg/bg-secondary,
  * producing two offset bordered boxes stacked on top of each other (visible
  * as a thick double outline with an overlapping second card edge).
  */
@@ -76,7 +76,7 @@ NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
 
 /**
  * Styled as a selectable row (same shape as DropdownMenuItem: full-width,
- * padded, solid hover/active fill) instead of bare inline text — a mega-menu
+ * padded, solid hover/active fill) instead of bare inline text; a mega-menu
  * link list should read as a menu, not a stack of underlined hyperlinks.
  */
 export const NavigationMenuLink = forwardRef<
@@ -106,7 +106,7 @@ export const NavigationMenuViewport = forwardRef<
     <NavigationMenuPrimitive.Viewport
       ref={ref}
       className={cn(
-        'mt-2 h-[var(--radix-navigation-menu-viewport-height)] w-full origin-top-center overflow-hidden rounded-lg border-4 border-outline bg-secondary shadow-brutalLg sm:w-[var(--radix-navigation-menu-viewport-width)]',
+        'mt-2 h-[var(--radix-navigation-menu-viewport-height)] w-full origin-top-center overflow-hidden rounded-lg border-2 border-outline bg-secondary shadow-surfaceLg sm:w-[var(--radix-navigation-menu-viewport-width)]',
         className,
       )}
       {...props}

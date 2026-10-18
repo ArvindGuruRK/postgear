@@ -18,7 +18,7 @@ export const THROTTLE_WINDOW_MS = 60_000;
  * One named throttler, `default`, is the per-address ceiling applied
  * globally by `AppThrottlerGuard`. The public API's per-key ceiling is a
  * second guard in the developers module that reuses this module's store and
- * options — which is why the module is `@Global()` and re-exports
+ * options, which is why the module is `@Global()` and re-exports
  * `ThrottlerModule`: a guard applied with `@UseGuards()` resolves its
  * dependencies from the module its controller lives in.
  *

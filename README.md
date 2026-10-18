@@ -11,7 +11,7 @@ PostGear is a modern, full-stack SaaS application for managing social media cont
 - **Database**: PostgreSQL + Prisma ORM
 - **Caching**: Redis
 - **Workers**: Temporal.io & BullMQ
-- **AI**: LangGraph (on LangChain core), OpenAI (gpt-4.1-mini, DALL-E 3), Tavily Search — with a key-free simulation mode for local development
+- **AI**: LangGraph (on LangChain core), OpenAI (gpt-4.1-mini, DALL-E 3), Tavily Search, with a key-free simulation mode for local development
 - **SEO**: Playwright Web Crawler, Proprietary Scoring Engine
 - **Payments**: Stripe
 - **Storage**: S3-compatible (MinIO for local dev)

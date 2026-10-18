@@ -6,7 +6,7 @@
  * Rotation is not destructive to data, but it is to integrations: the old
  * secret stops working the instant the new one exists, and whatever still
  * sends it gets 401 until someone updates it. The copy says so plainly, and
- * the action is the primary colour rather than danger — it is the right
+ * the action is the primary colour rather than danger: it is the right
  * thing to do to a leaked key, not a deletion.
  */
 import {

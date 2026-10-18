@@ -1,5 +1,5 @@
 /**
- * AI Copilot — generate a post from a topic, or talk to an assistant that
+ * AI Copilot: generate a post from a topic, or talk to an assistant that
  * acts in the workspace (Sprint 6).
  *
  * A server component that loads what the island needs in one round of

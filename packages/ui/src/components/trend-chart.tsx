@@ -10,7 +10,7 @@ import { cn } from '../lib/utils';
  * ## Why not a charting library
  *
  * Every chart library ships its own colours, soft shadows, eased curves and
- * gradient fills — the SaaS look Sprint 0 rejected. A dashboard built on one
+ * gradient fills: the SaaS look Sprint 0 rejected. A dashboard built on one
  * would either fight it on every option or quietly drift. The charts
  * PostGear needs are lines over days; that is forty lines of SVG, and the
  * tokens do the rest: thick flat strokes, square points, hard grid lines,
@@ -20,8 +20,8 @@ import { cn } from '../lib/utils';
  * ## Restrained by rule
  *
  * This is a dense data surface (design-system-rules.md §15): no brutal
- * shadow on the plot itself, no halftone. The chrome around it — the card,
- * the toolbar, the range tabs — carries the treatment.
+ * shadow on the plot itself, no halftone. The chrome around it (the card,
+ * the toolbar, the range tabs) carries the treatment.
  *
  * ## Accessible by construction
  *
@@ -34,7 +34,7 @@ import { cn } from '../lib/utils';
 export type TrendTone = 'primary' | 'ai' | 'accent' | 'success' | 'danger' | 'secondary';
 
 export interface TrendPoint {
-  /** The category on the x axis — a `YYYY-MM-DD` day, or any label. */
+  /** The category on the x axis: a `YYYY-MM-DD` day, or any label. */
   x: string;
   /** Null draws a gap. */
   y: number | null;
@@ -102,7 +102,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
  * Deliberately not `toLocaleDateString`: this chart is server-rendered, and
  * a label that depends on the locale ("15 Sept" on one machine, "Sep 15" on
  * another) is a hydration mismatch that makes React throw the server markup
- * away — and with it the body's theme class. A caller that wants the
+ * away, and with it the body's theme class. A caller that wants the
  * viewer's locale passes `formatX` and renders the chart after mount.
  */
 const defaultFormatX = (x: string): string => {
@@ -451,7 +451,7 @@ export function TrendChart({
         role="status"
         aria-live="polite"
         className={cn(
-          'pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-md border-2 border-outline bg-secondary px-3 py-2 font-sans text-xs text-ink shadow-brutalSm',
+          'pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-md border-2 border-outline bg-secondary px-3 py-2 font-sans text-xs text-ink shadow-surfaceSm',
           readings ? 'opacity-100' : 'sr-only',
         )}
         style={
@@ -489,7 +489,7 @@ export interface SparklineProps extends Omit<React.SVGAttributes<SVGSVGElement>,
 
 /**
  * A line in a table cell: the shape of a metric over the range, no axes.
- * Decorative — callers put the numbers next to it.
+ * Decorative: callers put the numbers next to it.
  */
 export function Sparkline({
   points,

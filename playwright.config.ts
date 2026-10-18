@@ -22,14 +22,14 @@ const BASE_URL = `http://localhost:${PORT}`;
  *
  * Note `dev:api:e2e` rather than `dev:api`. The suite signs in roughly a dozen
  * times a minute from a single address, which is over the production login
- * throttle of 10/IP/minute — so with the normal limits the last few tests get
+ * throttle of 10/IP/minute, so with the normal limits the last few tests get
  * a 429 and fail for a reason that has nothing to do with what they assert.
  * The e2e script raises `LOGIN_RATE_LIMIT_PER_MIN` and `LOCKOUT_THRESHOLD`,
  * which is what those env vars exist for. The throttle and lockout themselves
- * are verified directly against the API — see the Sprint 2 completion
+ * are verified directly against the API: see the Sprint 2 completion
  * checklist, section 8.
  *
- * Left unmanaged on purpose — Playwright's `webServer` would kill the API
+ * Left unmanaged on purpose: Playwright's `webServer` would kill the API
  * between runs, and the API holds a Postgres pool and a Redis connection that
  * are slow to cycle. A missing API shows up as an unexpected redirect to
  * /login rather than a crash, since `getSession()` treats an unreachable API

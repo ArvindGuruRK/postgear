@@ -4,7 +4,7 @@
  * ## Every handler scopes on `@CurrentOrg()`, never on a route parameter
  *
  * The workspace comes from the resolved active org, and the `:id` in a path is
- * only ever the channel being acted on — it is never trusted to say which
+ * only ever the channel being acted on: it is never trusted to say which
  * workspace that channel belongs to. `current-org.decorator.ts` states the rule;
  * `org.controller.ts` demonstrates it.
  *
@@ -13,8 +13,8 @@
  * Reading the channel list and starting a connection are open to any member,
  * because connecting a channel is part of onboarding and blocking it behind
  * `ADMIN` would stop a solo user finishing their own setup. Anything
- * destructive or configuration-changing — disconnect, rename, posting times,
- * publishing — requires `ADMIN`.
+ * destructive or configuration-changing (disconnect, rename, posting times,
+ * publishing) requires `ADMIN`.
  *
  * A route without `@Roles()` gets its org resolved *opportunistically*, so
  * `@CurrentOrg()` can legitimately be undefined; those handlers check for it
@@ -72,7 +72,7 @@ export class ChannelsController {
    * Every provider PostGear supports, and whether it is configured.
    *
    * Unconfigured providers are listed rather than filtered out, so the UI can
-   * show them disabled with a reason — a missing client id is a deployment gap,
+   * show them disabled with a reason: a missing client id is a deployment gap,
    * not evidence the platform is unsupported.
    */
   @Get('providers')
@@ -135,7 +135,7 @@ export class ChannelsController {
       return response.redirect(url);
     } catch (error) {
       // At the plan's limit the person is sent back with a reason that points
-      // at billing, not the generic "could not connect" — nothing went wrong.
+      // at billing, not the generic "could not connect": nothing went wrong.
       const code = error instanceof ChannelLimitReachedError ? 'channel_limit' : 'channel_oauth';
       return response.redirect(`${this.webUrl}/${org.id}/channels?error=${code}`);
     }

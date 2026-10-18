@@ -30,7 +30,7 @@ export class FacebookAuthProvider implements AuthProvider {
       client_id: this.clientId ?? '',
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      // `email` is the whole scope — a display name we can live without, at
+      // `email` is the whole scope: a display name we can live without, at
       // the cost of a scarier consent screen. The user types their name
       // during onboarding anyway.
       scope: 'email',
@@ -53,7 +53,7 @@ export class FacebookAuthProvider implements AuthProvider {
     const tokenResponse = await fetch(`${TOKEN_ENDPOINT}?${tokenParams.toString()}`);
 
     if (!tokenResponse.ok) {
-      // The provider's own error body is deliberately not forwarded — it can
+      // The provider's own error body is deliberately not forwarded: it can
       // contain the client secret back in an echoed request.
       throw new OAuthError(`Facebook token exchange failed with ${tokenResponse.status}`);
     }
@@ -66,7 +66,10 @@ export class FacebookAuthProvider implements AuthProvider {
       throw new OAuthError('Facebook token response contained no access token');
     }
 
-    const profileParams = new URLSearchParams({ fields: 'id,name,email' });
+    // `picture.type(large)` (UI revamp, 2026-10-17): the photo becomes the new
+    // user's default avatar. It needs no extra scope: the profile picture is
+    // part of `public_profile`, which every login grants.
+    const profileParams = new URLSearchParams({ fields: 'id,name,email,picture.type(large)' });
     const profileResponse = await fetch(`${USERINFO_ENDPOINT}?${profileParams.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -79,19 +82,25 @@ export class FacebookAuthProvider implements AuthProvider {
       id?: string;
       email?: string;
       name?: string;
+      picture?: { data?: { url?: string; is_silhouette?: boolean } };
     };
 
     if (!profile.id) {
       throw new OAuthError('Facebook profile was missing an id');
     }
 
-    // Facebook does not return an unverified email under the `email` scope —
-    // an address only comes back once it has been confirmed on the account —
+    // Facebook does not return an unverified email under the `email` scope
+    // (an address only comes back once it has been confirmed on the account),
     // so there is no separate verified check to make here, unlike Google.
     if (!profile.email) {
       throw new OAuthError('Facebook account has no email address');
     }
 
-    return { providerId: profile.id, email: profile.email, name: profile.name };
+    // A silhouette is Facebook's grey placeholder for "no photo": initials
+    // are a better default than a generic outline.
+    const photo = profile.picture?.data;
+    const picture = photo?.url && !photo.is_silhouette ? photo.url : undefined;
+
+    return { providerId: profile.id, email: profile.email, name: profile.name, picture };
   }
 }

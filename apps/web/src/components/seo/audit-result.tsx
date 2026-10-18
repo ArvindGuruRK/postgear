@@ -2,7 +2,7 @@
 
 /**
  * The audit as it stands: the hero, the crawl facts, what to fix, the
- * breakdown — and the three things to do with it.
+ * breakdown, and the three things to do with it.
  *
  * Rendered from the reducer's partial fields rather than the final detail,
  * so the facts strip appears the moment the crawl lands, the gauge the
@@ -12,7 +12,7 @@
  * data will take, so nothing jumps.
  *
  * "Analyze again" sends the same URL; "Copy report" puts `reportAsText` on
- * the clipboard (the complete audit only — partial results are on screen,
+ * the clipboard (the complete audit only: partial results are on screen,
  * not in a report); "Delete" asks first. The actions wait for the run to
  * end: deleting an audit the API is still writing is a race nobody wins.
  */

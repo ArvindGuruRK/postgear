@@ -23,11 +23,11 @@ import { V1PostsController } from './v1/v1-posts.controller';
  * here reads their tables. The one table this module owns is `ApiKey`.
  *
  * The two guards are providers so `@UseGuards()` can resolve their
- * dependencies — the repository for `ApiKeyGuard`, and the global throttler
+ * dependencies: the repository for `ApiKeyGuard`, and the global throttler
  * module's options and store for `ApiKeyThrottlerGuard`.
  *
  * `BillingModule` is deliberately not imported: `/v1/me` reads the plan
- * tier through the pure `plans.ts` — see `v1-me.service.ts`. The OpenAPI
+ * tier through the pure `plans.ts`; see `v1-me.service.ts`. The OpenAPI
  * document is served from `main.ts` (`openapi/setup-openapi.ts`), outside
  * the Nest router, so it is not a controller here.
  */

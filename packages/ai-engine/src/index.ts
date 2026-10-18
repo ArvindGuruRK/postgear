@@ -1,15 +1,15 @@
 /**
- * `@postgear/ai-engine` — the content pipeline, the copilot, and the
+ * `@postgear/ai-engine`: the content pipeline, the copilot, and the
  * providers they run on.
  *
  * A pure library: no Nest, no Prisma, no environment reads, no storage.
  * The API composes it from these factories according to its configuration:
  *
- * - a model client — {@link createOpenAiModelClient} with a key, or
+ * - a model client: {@link createOpenAiModelClient} with a key, or
  *   {@link createSimulatedModelClient} without one (`AI_SIMULATION=true`);
- * - optionally research — {@link createTavilyResearch} with a key, wrapped
+ * - optionally research: {@link createTavilyResearch} with a key, wrapped
  *   in {@link withResearchCache} over Redis, or {@link createSimulatedResearch};
- * - optionally images — {@link createOpenAiImageGenerator} plus the API's
+ * - optionally images: {@link createOpenAiImageGenerator} plus the API's
  *   own `ImageSink` into the media library;
  *
  * then {@link createContentPipeline} and {@link createCopilotAgent} take

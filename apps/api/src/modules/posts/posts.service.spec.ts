@@ -187,7 +187,7 @@ describe('PostsService', () => {
       expect(write.group).toMatch(/^[0-9a-f-]{36}$/);
       expect(write.channels.map((entry) => entry.integrationId)).toEqual(['ch_x', 'ch_li']);
       expect(write.channels[0].parts[0].image).toBe(JSON.stringify([{ id: IMAGE_ID }]));
-      // No URL is persisted — only the id, resolved again whenever it is read.
+      // No URL is persisted: only the id, resolved again whenever it is read.
       expect(write.channels[0].parts[0].image).not.toContain('http');
     });
 

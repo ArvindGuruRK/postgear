@@ -1,5 +1,5 @@
 /**
- * Billing — the plan, its limits, and what the workspace has used
+ * Billing: the plan, its limits, and what the workspace has used
  * (Sprint 8).
  *
  * A server component that loads what the island needs in one round of

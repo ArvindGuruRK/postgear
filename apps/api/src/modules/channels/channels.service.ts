@@ -1,7 +1,7 @@
 /**
  * Channel connection lifecycle.
  *
- * The repository owns persistence and encryption; this owns the sequence —
+ * The repository owns persistence and encryption; this owns the sequence:
  * starting a handshake, completing it safely, refreshing a token, and
  * disconnecting. Every method takes the caller's `orgId` and re-scopes its own
  * queries, even though `RolesGuard` has already checked membership: the same
@@ -93,7 +93,7 @@ export class ChannelsService {
    * Starts a handshake and returns the URL to redirect the browser to.
    *
    * The workspace is captured here, from the authenticated request, and carried
-   * server-side — the callback is public and must not trust anything the
+   * server-side: the callback is public and must not trust anything the
    * browser hands back.
    */
   async beginConnect(params: {
@@ -145,7 +145,7 @@ export class ChannelsService {
   /**
    * Completes a handshake.
    *
-   * Returns the path to send the browser to. Never throws to the controller —
+   * Returns the path to send the browser to. Never throws to the controller:
    * an OAuth callback always ends in a redirect, because the user arrived by
    * navigation and has nowhere to read an error body.
    */
@@ -213,7 +213,7 @@ export class ChannelsService {
         }
       } else if (!(await this.hasRowFor(handshake.orgId, details.id))) {
         // Re-checked here because the limit can have been reached between the
-        // handshake starting and the platform calling back — another admin
+        // handshake starting and the platform calling back: another admin
         // connecting at the same time, or a plan that ended meanwhile. Only a
         // genuinely new row counts: re-authorising an account that already
         // has a row (live, or disconnected and about to be resurrected by
@@ -253,7 +253,7 @@ export class ChannelsService {
       securityLogger.warn('channel.oauth.failed', {
         provider: params.provider,
         orgId: handshake.orgId,
-        // The provider's own message, never its response body — that can echo
+        // The provider's own message, never its response body: that can echo
         // back the client secret.
         reason: error instanceof Error ? error.name : 'unknown',
       });
@@ -293,7 +293,7 @@ export class ChannelsService {
       picture: entity.picture ?? null,
       profile: entity.username ?? null,
       // Where the platform issues a scoped token (Facebook Pages, Instagram via
-      // its Page), it replaces the user token — that is what the publishing
+      // its Page), it replaces the user token: that is what the publishing
       // endpoints actually accept.
       token: entity.accessToken,
     });
@@ -333,7 +333,7 @@ export class ChannelsService {
    * Disconnects a channel: revoke remotely, then clear and soft-delete.
    *
    * Revocation is best-effort by design. A user asking to disconnect gets
-   * disconnected whether or not the platform cooperates — failing the request
+   * disconnected whether or not the platform cooperates: failing the request
    * because a third party is down would leave them stuck with a channel they
    * have asked to remove.
    */
@@ -374,7 +374,7 @@ export class ChannelsService {
    * Shared by the on-demand path here and, from Sprint 5, the scheduled refresh
    * workflow. A provider that cannot refresh returns an empty access token
    * rather than throwing, so "no refresh support" and "refresh failed" land in
-   * the same branch — the channel is flagged, and the user is asked to reconnect.
+   * the same branch: the channel is flagged, and the user is asked to reconnect.
    */
   async refresh(orgId: string, id: string): Promise<boolean> {
     const channel = await this.repository.getWithCredentials(orgId, id);
@@ -405,7 +405,7 @@ export class ChannelsService {
         expiresIn: refreshed.expiresIn,
       });
 
-      // One grant can cover several channels — a LinkedIn member plus the
+      // One grant can cover several channels: a LinkedIn member plus the
       // pages they administer. Siblings share a `rootInternalId` and would
       // otherwise keep holding the superseded token.
       if (channel.rootInternalId !== channel.internalId || refreshed.refreshToken) {
@@ -467,7 +467,7 @@ export class ChannelsService {
   }
 
   /**
-   * A channel that is usable — exists, is configured, and has credentials.
+   * A channel that is usable: exists, is configured, and has credentials.
    *
    * `inBetweenSteps` is deliberately allowed here: the entity-selection calls
    * need the user token precisely while the channel is half-configured.
@@ -495,7 +495,7 @@ export class ChannelsService {
   }
 
   /**
-   * Whether a row — live or soft-deleted — already holds this platform id for
+   * Whether a row, live or soft-deleted, already holds this platform id for
    * the workspace. The upsert in `completeConnect` keys on exactly this pair,
    * so "a row exists" is "no new channel will be created".
    */
@@ -510,7 +510,7 @@ export class ChannelsService {
 
   /**
    * The callback URL, built the same way in `generateAuthUrl` and
-   * `authenticate` — platforms compare the two and reject a mismatch.
+   * `authenticate`: platforms compare the two and reject a mismatch.
    */
   private redirectUriFor(providerIdentifier: string): string {
     const apiUrl = this.config.get<string>('API_URL', 'http://localhost:3001');

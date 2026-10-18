@@ -1,7 +1,7 @@
 /**
  * The AI service against a fake engine and a fake ledger: the pre-stream
  * refusals (503, 422, 402) and their order relative to the charge, what is
- * relayed, and the refund on every failure path — whole, image-only, abort.
+ * relayed, and the refund on every failure path: whole, image-only, abort.
  */
 import { ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import type { GenerateEvent, GenerateResult } from '@postgear/ai-engine';

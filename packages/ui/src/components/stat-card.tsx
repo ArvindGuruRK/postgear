@@ -9,7 +9,7 @@ export interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: LucideIcon;
   trend?: { value: string; direction: 'up' | 'down' };
   /**
-   * One quiet line under the number (Sprint 7) — "No change", "No previous
+   * One quiet line under the number (Sprint 7): "No change", "No previous
    * period", "12 posts". A trend is a move; a caption is what the number
    * cannot say by itself. Both may show at once.
    */

@@ -1,5 +1,5 @@
 /**
- * The analyzer's configuration, read from the environment once — and the
+ * The analyzer's configuration, read from the environment once, and the
  * one decision it embodies: where the authority (backlink) signal comes from.
  *
  * Separate from the engine factory so the decision is a pure function with
@@ -7,14 +7,14 @@
  *
  * ## Three authority sources
  *
- * - **openpagerank** — a real backlink index, when `OPEN_PAGERANK_API_KEY`
+ * - **openpagerank**: a real backlink index, when `OPEN_PAGERANK_API_KEY`
  *   is set. The one external call the analyzer makes besides the crawl.
- * - **simulation** — a deterministic stand-in, when `AI_SIMULATION=true` and
+ * - **simulation**: a deterministic stand-in, when `AI_SIMULATION=true` and
  *   no key is set. The crawler itself needs no key and crawls real public
  *   pages for free, so the authority provider is the only part of the
  *   analyzer that has a stand-in; tying it to the AI flag keeps "simulated"
  *   one switch rather than two.
- * - **heuristic** — neither: the backlink category is estimated from
+ * - **heuristic**: when neither is set, the backlink category is estimated from
  *   on-page signals by the evaluators and the UI says so.
  *
  * A real key beats the simulation flag, unlike the AI engine where the flag

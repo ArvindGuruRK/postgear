@@ -1,5 +1,5 @@
 /**
- * The post document — what a user wrote, before any platform has had a say.
+ * The post document: what a user wrote, before any platform has had a say.
  *
  * ## Why a JSON tree and not HTML
  *
@@ -12,8 +12,8 @@
  *
  * A JSON tree sidesteps the problem rather than defending against it. The API
  * validates the shape against a closed allowlist (`dto/posts.schema.ts`), there
- * is no markup to parse, and every consumer — preview, character counter,
- * publisher — walks the same small set of node types and renders text nodes as
+ * is no markup to parse, and every consumer (preview, character counter,
+ * publisher) walks the same small set of node types and renders text nodes as
  * text. Nothing in PostGear ever turns a post into HTML.
  *
  * ## Why only these node types
@@ -111,7 +111,7 @@ export function emptyDocument(): PostDocument {
 }
 
 /**
- * A document from plain text — one paragraph per line.
+ * A document from plain text: one paragraph per line.
  *
  * Used for content that did not come from the editor: seeds, AI output from
  * Sprint 6, and legacy rows. An empty line becomes an empty paragraph, which
@@ -134,7 +134,7 @@ export function documentFromText(text: string): PostDocument {
  * Whether a link target is safe to keep.
  *
  * `http:` and `https:` only. The obvious threat is `javascript:`, but the rule
- * is an allowlist rather than a blocklist on purpose — `data:`, `vbscript:` and
+ * is an allowlist rather than a blocklist on purpose: `data:`, `vbscript:` and
  * whatever a browser invents next are refused without being named.
  */
 export function isSafeHref(href: string): boolean {
@@ -156,7 +156,7 @@ export function isSafeHref(href: string): boolean {
  * are unwrapped so their text survives; unknown leaves are dropped; unsafe
  * links lose the link but keep the words.
  *
- * The API never trusts that this ran — it validates the result independently.
+ * The API never trusts that this ran: it validates the result independently.
  */
 export function normalizeDocument(input: unknown): PostDocument {
   if (!isRecord(input) || input.type !== 'doc' || !Array.isArray(input.content)) {
@@ -188,7 +188,7 @@ export function parseDocument(raw: string | null | undefined): PostDocument {
       return normalizeDocument(parsed);
     }
   } catch {
-    // Not JSON — fall through to treating it as text.
+    // Not JSON: fall through to treating it as text.
   }
 
   return documentFromText(raw);
@@ -249,7 +249,7 @@ function normalizeBlock(node: unknown, depth: number): BlockNode[] {
       }
 
       // Past the depth limit the list flattens into its own paragraphs rather
-      // than vanishing — the words matter more than the indentation.
+      // than vanishing: the words matter more than the indentation.
       if (depth + 1 > MAX_LIST_DEPTH) {
         return items.flatMap((item) => item.content);
       }

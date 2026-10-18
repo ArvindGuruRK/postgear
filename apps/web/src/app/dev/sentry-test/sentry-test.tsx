@@ -23,7 +23,7 @@ export function SentryTest({ dsnConfigured }: { dsnConfigured: boolean }) {
     startTransition(async () => {
       try {
         await throwOnServer();
-        setServerOutcome('The server did not throw — that is the bug.');
+        setServerOutcome('The server did not throw, and that is the bug.');
       } catch (error) {
         setServerOutcome(
           `The server threw as intended${error instanceof Error && error.message ? `: ${error.message}` : ''}.`,

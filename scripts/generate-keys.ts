@@ -5,7 +5,7 @@
  *   npm run generate:keys           # print the values, copy them yourself
  *   npm run generate:keys -- --write  # rewrite the keys in .env in place
  *
- * The values in `.env.example` are descriptive placeholders, not real keys —
+ * The values in `.env.example` are descriptive placeholders, not real keys:
  * `ENCRYPTION_KEY_AES256` in particular is prose, and packages/db/src/crypto.ts
  * rejects it outright rather than silently deriving a weak key from it.
  */
@@ -16,7 +16,7 @@ import { join } from 'node:path';
 const ENV_PATH = join(__dirname, '..', '.env');
 
 /**
- * `ENCRYPTION_KEY_AES256` must be exactly 32 bytes as 64 hex characters —
+ * `ENCRYPTION_KEY_AES256` must be exactly 32 bytes as 64 hex characters:
  * crypto.ts validates that shape, so anything else fails fast at first use.
  */
 const GENERATORS: Record<string, () => string> = {
@@ -32,8 +32,8 @@ function generate(): Record<string, string> {
 }
 
 /**
- * Replaces each key's line in .env, leaving every other line — comments,
- * ordering, unrelated vars — byte-for-byte untouched. A regex rewrite rather
+ * Replaces each key's line in .env, leaving every other line (comments,
+ * ordering, unrelated vars) byte-for-byte untouched. A regex rewrite rather
  * than a parse-and-serialize round trip, precisely to avoid reformatting a
  * file the developer hand-maintains.
  */
@@ -65,7 +65,7 @@ function writeToEnv(keys: Record<string, string>): void {
 
   if (missing.length > 0) {
     console.log(
-      `\nNot present in .env, so not written — add these lines yourself:\n` +
+      `\nNot present in .env, so not written. Add these lines yourself:\n` +
         missing.map((name) => `${name}="${keys[name]}"`).join('\n'),
     );
   }
@@ -77,14 +77,14 @@ function writeToEnv(keys: Record<string, string>): void {
 }
 
 function printToStdout(keys: Record<string, string>): void {
-  console.log('# PostGear local development secrets — paste into .env\n');
+  console.log('# PostGear local development secrets: paste into .env\n');
   for (const [name, value] of Object.entries(keys)) {
     console.log(`${name}="${value}"`);
   }
   console.log(
     '\n# Re-run with `--write` to patch these into .env automatically.\n' +
       '# Rotating ENCRYPTION_KEY_AES256 makes every already-encrypted\n' +
-      '# Integration.token unreadable — re-connect those channels afterward.',
+      '# Integration.token unreadable, so re-connect those channels afterward.',
   );
 }
 

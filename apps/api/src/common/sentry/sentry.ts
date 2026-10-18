@@ -14,7 +14,7 @@ import { SENTRY_ENABLED } from '../../instrument';
 export interface ErrorReportContext {
   method?: string;
   url?: string;
-  /** Who was signed in, as an id only — never an email. */
+  /** Who was signed in, as an id only, never an email. */
   userId?: string;
   orgId?: string;
 }

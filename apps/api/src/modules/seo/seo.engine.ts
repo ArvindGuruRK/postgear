@@ -4,7 +4,7 @@
  * `@postgear/seo-engine` exports a crawler factory, two authority providers,
  * the evaluators and a few pure helpers. This interface is what they add up
  * to once the environment has been read, and the service depends on this
- * and only this — behind `SEO_ENGINE`, like `AI_ENGINE` in the AI module —
+ * and only this (behind `SEO_ENGINE`, like `AI_ENGINE` in the AI module),
  * so every test hands in a fake. That matters more here than usual: the
  * real crawler drives Playwright, and a unit test that loads a browser is
  * not a unit test.

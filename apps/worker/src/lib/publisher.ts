@@ -7,7 +7,7 @@
  * a fresh clone has no developer apps, and the seeded channels hold fake
  * tokens that every platform would reject with a 401. With
  * `PUBLISH_SIMULATION=true` the final HTTP call is replaced by a stand-in that
- * returns a plausible result — and can be *asked* to fail, by a directive in
+ * returns a plausible result, and can be *asked* to fail, by a directive in
  * the post text:
  *
  * | Directive              | What the stand-in does                                  |
@@ -21,9 +21,9 @@
  *
  * Everything around the call is real: the Temporal timer, the retry policy and
  * its backoff, the status written for the queue, the refresh branch and its
- * `refreshNeeded` flag. That is what makes the sprint's Definition of Done —
- * a visible retry on a 429, "post now" within seconds, a restart losing
- * nothing — verifiable without a single platform credential. The env schema
+ * `refreshNeeded` flag. That is what makes the sprint's Definition of Done
+ * (a visible retry on a 429, "post now" within seconds, a restart losing
+ * nothing) verifiable without a single platform credential. The env schema
  * refuses the flag in production.
  *
  * Validation still runs against the **real** provider's rules, so a simulated

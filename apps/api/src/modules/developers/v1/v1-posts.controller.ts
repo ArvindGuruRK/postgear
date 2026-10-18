@@ -1,7 +1,7 @@
 /**
- * `/v1/posts` — list, read, create, delete (Sprint 8, contract §5.3).
+ * `/v1/posts`: list, read, create, delete (Sprint 8, contract §5.3).
  *
- * Every route hands `@CurrentOrg()` — set by `ApiKeyGuard` — to the same
+ * Every route hands `@CurrentOrg()`, set by `ApiKeyGuard`, to the same
  * `PostsService` the composer uses, so a post made through the API is held
  * to exactly the checks a person's is: the channel must be the workspace's,
  * the media must be in its library, a queued post must be in the future

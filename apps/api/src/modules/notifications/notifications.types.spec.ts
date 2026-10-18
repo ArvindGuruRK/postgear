@@ -1,7 +1,7 @@
 /**
  * The email catalogue: one subject and one plain-text body per type, with
  * the channel, the reason and the link where the row has them, and never any
- * markup — a provider message is interpolated as the text it is.
+ * markup; a provider message is interpolated as the text it is.
  */
 import { NotificationEmailStatus } from '@postgear/db';
 import {

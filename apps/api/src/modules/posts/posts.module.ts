@@ -7,7 +7,7 @@ import { PostsRepository } from './posts.repository';
 import { PostsService } from './posts.service';
 
 /**
- * Posts — the composer's drafts and queue.
+ * Posts: the composer's drafts and queue.
  *
  * Depends on channels (what may be targeted, and its health) and media (what an
  * attachment id resolves to), both through their services. It never reads
@@ -16,7 +16,7 @@ import { PostsService } from './posts.service';
  * reaches the worker: every save, reschedule, "post now" and delete tells it.
  *
  * `PostsService` is exported for the AI module (Sprint 6), whose copilot
- * drafts posts through it rather than writing rows — so a draft the
+ * drafts posts through it rather than writing rows, so a draft the
  * assistant makes is held to exactly the checks a person's is.
  */
 @Module({

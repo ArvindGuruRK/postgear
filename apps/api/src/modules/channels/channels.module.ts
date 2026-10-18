@@ -9,7 +9,7 @@ import { ChannelsService } from './channels.service';
 /**
  * Connected social channels.
  *
- * `RedisService` is not imported here — `RedisModule` is `@Global()`, so
+ * `RedisService` is not imported here: `RedisModule` is `@Global()`, so
  * `ChannelOAuthService` gets it by injection alone.
  *
  * The repository is a provider rather than a static import so it can be

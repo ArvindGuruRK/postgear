@@ -1,9 +1,9 @@
 /**
  * Helpers shared by every provider's `SocialAnalytics` implementation.
  *
- * Each platform reports metrics in its own shape — X hands back per-post
+ * Each platform reports metrics in its own shape: X hands back per-post
  * counters, LinkedIn daily buckets keyed by epoch milliseconds, Meta buckets
- * keyed by an `end_time`, Pinterest by a date string — but three things are
+ * keyed by an `end_time`, Pinterest by a date string, but three things are
  * the same everywhere, and they are the things that go subtly wrong when
  * each provider does them itself: a day is a **UTC calendar day**, a window
  * is "the last N days ending today", and per-item counters have to be summed
@@ -17,7 +17,7 @@
  * the connect flow does not ask for). What they do expose is each post's
  * lifetime counters, so a provider sums those into the day each post went
  * out. That is "what the content published on this day has earned so far",
- * re-read on every sync so the number keeps up — the honest series those
+ * re-read on every sync so the number keeps up: the honest series those
  * platforms allow, and the same thing their own dashboards show.
  */
 import { ProviderError } from './errors';
@@ -87,7 +87,7 @@ export function asCount(value: unknown): number {
  *
  * Levels (`followers`) are expected once per day, so summing leaves them
  * alone; flows from several posts on one day add up. Entries with an unknown
- * metric or no usable date are dropped rather than failing the sync — a
+ * metric or no usable date are dropped rather than failing the sync: a
  * platform adding a field must never cost a channel its metrics.
  */
 export function sumByDay(entries: Iterable<MetricEntry>): ChannelMetricPoint[] {
@@ -114,7 +114,7 @@ export function sumByDay(entries: Iterable<MetricEntry>): ChannelMetricPoint[] {
 }
 
 /**
- * Whether a provider failure means the thing asked for is gone — a post
+ * Whether a provider failure means the thing asked for is gone: a post
  * deleted on the platform. `postAnalytics` answers null for those rather
  * than failing the sync, because a deleted post is not an error.
  */

@@ -1,5 +1,5 @@
 /**
- * The persistence layer for connected channels — and the encryption boundary.
+ * The persistence layer for connected channels, and the encryption boundary.
  *
  * This is the repository layer that `packages/db/src/crypto.ts` and
  * `SCHEMA_NOTES.md` have both been pointing at since Sprint 1. It is the first
@@ -80,7 +80,7 @@ export interface UpsertChannelInput {
   picture?: string | null;
   /** True when the channel still needs the user to pick a page/board/channel. */
   inBetweenSteps?: boolean;
-  /** True on a reconnect — suppresses the `inBetweenSteps` write. */
+  /** True on a reconnect: suppresses the `inBetweenSteps` write. */
   isReconnect?: boolean;
 }
 
@@ -90,7 +90,7 @@ export class ChannelsRepository {
    * The channel list for an organization.
    *
    * Selects explicitly rather than returning the row, so `token` and
-   * `refreshToken` cannot reach a caller even by accident — a safer default
+   * `refreshToken` cannot reach a caller even by accident: a safer default
    * than remembering to strip them at every call site.
    */
   async listForOrg(orgId: string): Promise<ChannelSummary[]> {
@@ -131,7 +131,7 @@ export class ChannelsRepository {
     return {
       ...this.toSummary(row),
       // `token` is NOT NULL in the schema but is emptied on disconnect, and
-      // `decrypt` rejects an empty string — so an emptied credential reads back
+      // `decrypt` rejects an empty string, so an emptied credential reads back
       // as empty rather than throwing.
       token: row.token ? (decryptNullable(row.token) ?? '') : '',
       refreshToken: row.refreshToken ? decryptNullable(row.refreshToken) : null,
@@ -203,7 +203,7 @@ export class ChannelsRepository {
    *
    * Separate from `upsertFromAuth` because a refresh knows strictly less: it has
    * new credentials and nothing else. Writing only those three columns is what
-   * stops a refresh from nulling the handle — the exact bug the reference
+   * stops a refresh from nulling the handle: the exact bug the reference
    * implementation has.
    */
   async applyRefreshedToken(params: {
@@ -233,7 +233,7 @@ export class ChannelsRepository {
    * they administer, which are separate rows sharing a `rootInternalId`.
    * Refreshing one without the others leaves the rest holding a dead token.
    *
-   * Scoped to `organizationId` — without it, refreshing in one workspace
+   * Scoped to `organizationId`: without it, refreshing in one workspace
    * rewrites another workspace's credentials for the same account, which is
    * exactly the cross-tenant write the reference implementation has.
    */
@@ -351,7 +351,7 @@ export class ChannelsRepository {
   /**
    * Disconnects a channel.
    *
-   * Soft delete, because `Post.integrationId` is a required foreign key — a hard
+   * Soft delete, because `Post.integrationId` is a required foreign key: a hard
    * delete would break referential integrity for any workspace that has ever
    * scheduled to this channel.
    *
@@ -440,7 +440,7 @@ export class ChannelsRepository {
    * Soft delete plus `@@unique([organizationId, internalId])` means a deleted
    * row still occupies the slot. Postgres would express this better as a partial
    * unique index, but Prisma cannot declare one, so the tombstone is renamed
-   * instead. The rename must not happen on delete — keeping `internalId` intact
+   * instead. The rename must not happen on delete: keeping `internalId` intact
    * there is exactly what lets a reconnect resurrect the original row.
    */
   private async vacateInternalId(
@@ -472,7 +472,7 @@ export class ChannelsRepository {
     });
   }
 
-  /** The column set safe to hand upwards — note the absence of token columns. */
+  /** The column set safe to hand upwards: note the absence of token columns. */
   private summarySelect() {
     return {
       id: true,

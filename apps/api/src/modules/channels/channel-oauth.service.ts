@@ -4,7 +4,7 @@
  * ## Why this is not the auth module's `ProvidersManager`
  *
  * Sprint 2's login handshake stores one thing against a state value: the
- * provider name. A channel handshake has to carry more — which workspace the
+ * provider name. A channel handshake has to carry more, which workspace the
  * channel belongs to, which user started it, the PKCE verifier, and whether this
  * is a reconnect of an existing channel. It is the same idea with a bigger
  * payload, under its own key prefix so the two can never be confused for each
@@ -26,8 +26,8 @@ import { Injectable } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 
 /**
- * Long enough for a user to complete a consent screen — including reading a
- * Meta permission list — and short enough that a leaked URL goes stale.
+ * Long enough for a user to complete a consent screen, including reading a
+ * Meta permission list, and short enough that a leaked URL goes stale.
  */
 export const CHANNEL_OAUTH_STATE_TTL_SECONDS = 900;
 
@@ -67,7 +67,7 @@ export class ChannelOAuthService {
    * provider is compared too, closing a cross-provider mix-up where a state
    * minted for LinkedIn is presented to the Facebook callback.
    *
-   * Returns `null` for anything unrecognised — the caller redirects to a generic
+   * Returns `null` for anything unrecognised: the caller redirects to a generic
    * error, and the authorization code is never spent.
    */
   async consume(provider: string, state: string | undefined): Promise<ChannelHandshake | null> {

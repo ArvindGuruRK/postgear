@@ -1,11 +1,11 @@
 /**
- * X (Twitter) — OAuth 2.0 with PKCE, API v2.
+ * X (Twitter): OAuth 2.0 with PKCE, API v2.
  *
  * ## Why PKCE and not OAuth 1.0a
  *
  * The reference implementation uses OAuth 1.0a, which means hand-rolled
  * HMAC-SHA1 request signing and a credential stored as `token:secret`. It works,
- * but its tokens never expire — which would leave `refreshToken()` a permanent
+ * but its tokens never expire, which would leave `refreshToken()` a permanent
  * no-op for X and leave this sprint's whole token-refresh story untested on the
  * one platform most likely to exercise it.
  *
@@ -17,7 +17,7 @@
  *
  * X rotates refresh tokens: every refresh returns a *new* refresh token and
  * invalidates the old one. Persisting the new one is mandatory, not an
- * optimisation — miss it once and the channel is permanently disconnected.
+ * optimisation: miss it once and the channel is permanently disconnected.
  */
 
 import {
@@ -63,7 +63,7 @@ const MB = 1024 * 1024;
 
 /**
  * What X accepts, per its media upload documentation: up to four images, or
- * one GIF, or one video — never a mix. Images up to 5 MB, animated GIFs up to
+ * one GIF, or one video, never a mix. Images up to 5 MB, animated GIFs up to
  * 15 MB, video up to 512 MB. Every part of a thread can carry its own media,
  * because each part is a real post replying to the one before.
  */
@@ -154,7 +154,7 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
 
   /**
    * X returns HTTP 200 with an error body in several cases, so status alone
-   * misclassifies them. These strings are the ones worth translating — each
+   * misclassifies them. These strings are the ones worth translating: each
    * maps to something the user can actually change.
    */
   protected override handleErrors(body: string): HandledError | undefined {
@@ -274,7 +274,7 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
   ): Promise<PostResponse[]> {
     const results: PostResponse[] = [];
     // A thread is a chain of replies, so each item needs the id of the one
-    // before it — this cannot be parallelised.
+    // before it: this cannot be parallelised.
     let previousId: string | undefined;
 
     for (const post of posts) {
@@ -389,7 +389,7 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
 
   /**
    * Followers today, and the window's posts summed into the day each went
-   * out — see `abstract/analytics.ts` for why that is the series X allows.
+   * out: see `abstract/analytics.ts` for why that is the series X allows.
    * `impressions` is X's own impression count; `engagements` is every
    * interaction it counts: likes, replies, reposts, quotes and bookmarks.
    */
@@ -465,8 +465,8 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
   }
 
   /**
-   * One post's lifetime counters. X answers a deleted post two ways — a 404,
-   * or a 200 whose body has `errors` and no `data` — and both mean "gone".
+   * One post's lifetime counters. X answers a deleted post two ways (a 404,
+   * or a 200 whose body has `errors` and no `data`) and both mean "gone".
    */
   async postAnalytics(
     _channel: ChannelContext,
@@ -510,7 +510,7 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
       method: 'POST',
       headers: {
         // X requires HTTP Basic for confidential clients even though the token
-        // request also carries a client_id — sending only one of the two fails
+        // request also carries a client_id: sending only one of the two fails
         // with an unhelpful invalid_request.
         Authorization: this.basicAuthHeader(),
         'Content-Type': 'application/x-www-form-urlencoded',

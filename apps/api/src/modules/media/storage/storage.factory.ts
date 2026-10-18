@@ -71,7 +71,7 @@ export function createStorage(config: StorageConfig): StorageBackend {
  * any path in an env file). The default is anchored to the API package instead,
  * found by walking up from this file: `npm run dev:api` runs from `apps/api`
  * but `npm run dev:api:e2e` runs from the repository root, and a
- * `process.cwd()`-relative default would split uploads across two directories —
+ * `process.cwd()`-relative default would split uploads across two directories,
  * with the second one serving 404s for everything the first one stored.
  */
 export function resolveUploadDirectory(configured?: string): string {

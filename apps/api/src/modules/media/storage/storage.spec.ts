@@ -1,7 +1,7 @@
 /**
  * Storage keys, both backends, and the factory that chooses between them.
  *
- * The local backend runs against a real temporary directory — the point is to
+ * The local backend runs against a real temporary directory: the point is to
  * prove what reaches the disk, and where. The S3 backend is checked at its
  * seam, the commands it sends, since a real bucket is an integration concern
  * (the Sprint 4 checklist verifies it against MinIO).
@@ -14,7 +14,13 @@ import { validateEnv } from '../../../config/env';
 import { LocalStorage } from './local.storage';
 import { S3Storage } from './s3.storage';
 import { createStorage, resolveUploadDirectory } from './storage.factory';
-import { createMediaKey, isValidKey, thumbnailKeyFor } from './storage-keys';
+import {
+  createAvatarKey,
+  createMediaKey,
+  isAvatarKey,
+  isValidKey,
+  thumbnailKeyFor,
+} from './storage-keys';
 
 describe('storage keys', () => {
   it('are date-prefixed and carry 128 random bits', () => {
@@ -40,6 +46,30 @@ describe('storage keys', () => {
       '/2026/09/abcdefabcdefabcdefabcdefabcdefab.jpg',
       '2026\\09\\abcdefabcdefabcdefabcdefabcdefab.jpg',
       '2026/09/ABCDEFABCDEFABCDEFABCDEFABCDEFAB.jpg',
+    ]) {
+      expect(isValidKey(key)).toBe(false);
+    }
+  });
+});
+
+describe('avatar keys', () => {
+  const userId = '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e';
+
+  it('live under avatars/<userId>/ with a random WebP name', () => {
+    const key = createAvatarKey(userId);
+
+    expect(key).toMatch(new RegExp(`^avatars/${userId}/[0-9a-f]{32}\\.webp$`));
+    expect(isValidKey(key)).toBe(true);
+    expect(isAvatarKey(key)).toBe(true);
+    expect(createAvatarKey(userId)).not.toBe(key);
+  });
+
+  it('refuse a user segment that is not a UUID, and any other extension', () => {
+    expect(() => createAvatarKey('../../etc')).toThrow();
+    for (const key of [
+      `avatars/${userId}/${'ab'.repeat(16)}.png`,
+      `avatars/${userId}/../${'ab'.repeat(16)}.webp`,
+      `avatars/u1/${'ab'.repeat(16)}.webp`,
     ]) {
       expect(isValidKey(key)).toBe(false);
     }

@@ -4,8 +4,8 @@
  * `@Roles(ADMIN, USER)` makes an active membership mandatory while leaving
  * every member free to read the numbers, as the posts and media controllers
  * do. The literal routes are declared before `posts/:group` out of habit
- * rather than need — Nest matches in declaration order, and none of them
- * collides — so a later route cannot shadow one by accident.
+ * rather than need (Nest matches in declaration order, and none of them
+ * collides), so a later route cannot shadow one by accident.
  *
  * ## The export takes the response
  *

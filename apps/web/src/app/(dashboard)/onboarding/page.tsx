@@ -27,7 +27,7 @@ interface OnboardingState {
 /**
  * The onboarding wizard's host page.
  *
- * Lives at `(dashboard)/onboarding`, a **sibling** of `[orgId]` — so it passes
+ * Lives at `(dashboard)/onboarding`, a **sibling** of `[orgId]`, so it passes
  * through route gate 1 (must be signed in) and never reaches gate 2 (must be
  * onboarded), which would otherwise redirect this page to itself forever.
  *
@@ -53,20 +53,24 @@ export default async function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-primary">
-      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-8 px-6 py-12">
+      {/* max-w-3xl (was 2xl) so step 6's two columns leave the avatar grid
+          tiles a comfortable ~90px; the question steps read fine at this width. */}
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-8 px-6 py-12">
         <Stack gap="xs">
           <Heading as="h1" level="h4">
             PostGear
           </Heading>
           <Text muted>
             Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}. Let&apos;s get your
-            workspace set up — it takes about a minute.
+            workspace set up. It takes about a minute.
           </Text>
         </Stack>
 
         <OnboardingWizard
           initialStep={state.step}
           initialWorkspaceName={null}
+          initialName={session.name}
+          initialAvatar={session.avatar}
           initialAnswers={{
             role: state.answers?.role ?? null,
             teamSize: state.answers?.teamSize ?? null,

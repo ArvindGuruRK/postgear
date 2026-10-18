@@ -1,5 +1,5 @@
 /**
- * What the analytics page shows, computed from what the API returns — pure,
+ * What the analytics page shows, computed from what the API returns: pure,
  * so every judgement the page makes about a number is testable without React.
  *
  * The API (`apps/web/src/types/analytics.ts`) already does the arithmetic:
@@ -12,7 +12,7 @@
  * a test next to it.
  *
  * Numbers are formatted in the viewer's locale (thousands separators follow
- * it), which is why the page only renders them after mount — see
+ * it), which is why the page only renders them after mount: see
  * `use-mounted.ts` for the hydration reason.
  */
 import type { BadgeProps, TrendSeries, TrendTone } from '@postgear/ui';
@@ -134,7 +134,7 @@ export function metricsAvailable(overview: AnalyticsOverview): ChannelMetric[] {
 
 /**
  * One tone per channel, cycling through the system's action colours by the
- * channel's position in the overview — so a channel keeps its colour across
+ * channel's position in the overview, so a channel keeps its colour across
  * the chart, the bar list and the legend on the same page.
  */
 export const CHANNEL_TONES: readonly TrendTone[] = [
@@ -179,7 +179,7 @@ export function sparklineFor(channel: ChannelAnalytics, metric: ChannelMetric = 
   return series ? series.points.map((point) => point.value) : [];
 }
 
-/** True once anything at all was recorded — the page's "No metrics yet" gate. */
+/** True once anything at all was recorded: the page's "No metrics yet" gate. */
 export function hasMetrics(overview: AnalyticsOverview): boolean {
   return (
     overview.topPosts.length > 0 ||
@@ -200,7 +200,7 @@ export function metricLabel(metric: ChannelMetric): string {
 }
 
 /**
- * "2h ago", "3d ago", "just now" — the short form a table cell has room
+ * "2h ago", "3d ago", "just now": the short form a table cell has room
  * for. Beyond a week the date itself says more than a count of days.
  */
 export function relativeTime(iso: string | null | undefined, now: Date): string | null {
@@ -229,7 +229,7 @@ export function relativeTime(iso: string | null | undefined, now: Date): string 
 export interface SyncBadge {
   variant: NonNullable<BadgeProps['variant']>;
   label: string;
-  /** Why, when the label alone does not say — shown as a tooltip. */
+  /** Why, when the label alone does not say: shown as a tooltip. */
   explanation: string | null;
 }
 
@@ -324,8 +324,8 @@ function channelLine(channel: ChannelSyncStatus, now: Date): string {
 }
 
 /**
- * The fleet's standing as one pill, the way `SchedulerStatusPill` reads the
- * scheduler: online when every supported channel last synced fine, busy when
+ * The fleet's standing as one pill, reading the analytics sync the way a
+ * status light would: online when every supported channel last synced fine, busy when
  * one needs a person (reconnect, permissions, a failure), away when nothing
  * has synced yet or nothing can run a sync, pending while the API is asked.
  */

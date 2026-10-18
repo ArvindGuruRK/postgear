@@ -7,7 +7,7 @@
  * Restrained by rule (design-system-rules.md §15, §16c): the gauge and the
  * bars are data, drawn by `ScoreGauge`/`ScoreBar` from the one score scale,
  * with no card shadow of their own. The comparison is an arrow and a word
- * — `ArrowUp` success, `ArrowDown` danger, `Minus` muted — plus a badge that
+ * (`ArrowUp` success, `ArrowDown` danger, `Minus` muted) plus a badge that
  * says it in a word, never a colour wash over the number.
  *
  * Rendered from the reducer's partial fields: the bars fill the moment the

@@ -61,7 +61,7 @@ export class OrgController {
   ) {
     const organization = await this.orgs.create(user.id, dto.name);
 
-    // Switch into the new workspace immediately — creating one and then not
+    // Switch into the new workspace immediately: creating one and then not
     // being in it is a pointless extra step.
     response.cookie(this.orgCookie, organization.id, this.cookieOptions());
 
@@ -93,7 +93,7 @@ export class OrgController {
 
   /**
    * `@Roles(ADMIN)` resolves against the **active org cookie**, not the `:id`
-   * path parameter — the guard cannot trust a value from the URL. So an admin
+   * path parameter: the guard cannot trust a value from the URL. So an admin
    * of workspace A cannot invite into workspace B by changing the path: the
    * guard sees their role in A, and `@CurrentOrg()` below is what the service
    * actually acts on.
@@ -107,7 +107,7 @@ export class OrgController {
   ) {
     await this.orgs.invite(org.id, dto.email, dto.role);
     // Same body whether the invitee already had an account or was emailed an
-    // invitation — otherwise this is an account-enumeration oracle usable by
+    // invitation, otherwise this is an account-enumeration oracle usable by
     // anyone who can create a workspace.
     return { message: 'Invitation sent' };
   }
@@ -132,7 +132,7 @@ export class OrgController {
     return { message: 'Member removed' };
   }
 
-  /** Readable by the frontend — see the note in `auth.controller.ts`. */
+  /** Readable by the frontend: see the note in `auth.controller.ts`. */
   private cookieOptions(): CookieOptions {
     return {
       httpOnly: false,

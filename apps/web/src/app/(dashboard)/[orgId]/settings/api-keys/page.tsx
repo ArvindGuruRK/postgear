@@ -3,7 +3,7 @@
  *
  * A server component that loads the list once and hands it to the island.
  * The list route is admin-only, so for a `USER` member the request answers
- * 403 and the island receives `null` — which it reads, together with the
+ * 403 and the island receives `null`, which it reads, together with the
  * role from the workspace provider, as "nothing to manage here" rather than
  * as an error. An API that is genuinely away produces the same `null`, and
  * for an admin the island shows a retry.

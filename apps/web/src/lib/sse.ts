@@ -4,7 +4,7 @@
  * ## Why not `EventSource`
  *
  * The browser's `EventSource` only speaks GET, and a generation request is a
- * body — topic, tone, channels — not a query string. So this is `fetch` with
+ * body (topic, tone, channels) not a query string. So this is `fetch` with
  * the response body read as it arrives, and the SSE wire format parsed by
  * hand. The format is small (`event:` and `data:` lines, blank-line
  * delimited, `:` comments for the API's heartbeat) and the parser below is
@@ -12,8 +12,8 @@
  *
  * ## The two kinds of failure
  *
- * A failure *before* the stream opens — 402 out of credits, 422 a channel
- * that cannot be used, 503 not configured — arrives as an ordinary JSON error,
+ * A failure *before* the stream opens (402 out of credits, 422 a channel
+ * that cannot be used, 503 not configured) arrives as an ordinary JSON error,
  * and is thrown as the same `ApiError` the rest of the app shows. A failure
  * *after* the stream opens arrives as an `error` event, because the status
  * line has already been sent; the caller sees it through `onEvent` like any
@@ -33,8 +33,8 @@ export interface SseFrame {
 
 /**
  * An incremental parser: feed it text as it arrives, and it calls back with
- * each complete frame. A frame split across two chunks — the usual case, since
- * chunk boundaries fall wherever the network puts them — is held until its
+ * each complete frame. A frame split across two chunks (the usual case, since
+ * chunk boundaries fall wherever the network puts them) is held until its
  * closing blank line arrives.
  */
 export function createSseParser(onFrame: (frame: SseFrame) => void): {
@@ -103,7 +103,7 @@ export interface StreamOptions<T> {
  *
  * The event's type is the `event:` field, falling back to a `type` in the
  * JSON; the API sends both, identical. A frame whose data is not JSON is
- * dropped rather than thrown — one malformed heartbeat must not end a
+ * dropped rather than thrown: one malformed heartbeat must not end a
  * generation that is otherwise going fine.
  */
 export async function streamEvents<T extends { type: string }>(

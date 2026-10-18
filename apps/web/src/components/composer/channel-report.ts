@@ -1,8 +1,8 @@
 /**
  * What each selected channel will publish, and what is wrong with it.
  *
- * Computed from the same three functions the API uses before queueing — render,
- * measure, validate, all from `@postgear/social-core/composer` — against the
+ * Computed from the same three functions the API uses before queueing (render,
+ * measure, validate, all from `@postgear/social-core/composer`) against the
  * rules the API sent with the provider list. The counters, the previews and the
  * queue button all read this one report, so none of them can disagree with
  * another, or with the server.

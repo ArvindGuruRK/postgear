@@ -4,8 +4,8 @@
  * ## Membership, not admin
  *
  * `@Roles(ADMIN, USER)` at the class level makes an active membership mandatory
- * for every route — without it, a route resolves the workspace only
- * opportunistically — while leaving content work open to every member. Writing
+ * for every route (without it, a route resolves the workspace only
+ * opportunistically), while leaving content work open to every member. Writing
  * posts and managing their images is what a `USER` is for; channel management
  * is where Sprint 3 drew the admin line, and that line stays there.
  *
@@ -44,7 +44,7 @@ import { MediaService, type UploadedFileInput } from './media.service';
 const UPLOAD_OPTIONS = {
   storage: diskStorage({
     destination: join(tmpdir(), 'postgear-uploads'),
-    // The temp name is random too — the original name is only ever display text.
+    // The temp name is random too: the original name is only ever display text.
     filename: (_request, _file, callback) => callback(null, randomBytes(16).toString('hex')),
   }),
   limits: {
@@ -53,7 +53,7 @@ const UPLOAD_OPTIONS = {
     fields: 0,
     // No `parts` limit, deliberately. Busboy signals that limit when the count
     // *reaches* it rather than exceeds it, and Multer treats the signal as an
-    // error — so `parts: 1` rejects the one file it was meant to allow. One
+    // error, so `parts: 1` rejects the one file it was meant to allow. One
     // file and zero fields already bound the request.
   },
   // Browsers send UTF-8 filenames. Multer's Latin-1 default turns "café.jpg"

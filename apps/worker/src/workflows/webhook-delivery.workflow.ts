@@ -5,7 +5,7 @@
  *
  * A receiver that is down for an hour must still get the event, and the
  * worker that was sending it may be restarted in between. Temporal owns the
- * retry timers — 30 s, 2 min, 8 min, 32 min, 2 h — so a deploy in the middle
+ * retry timers (30 s, 2 min, 8 min, 32 min, 2 h), so a deploy in the middle
  * of a backoff resumes the backoff rather than losing the delivery. The row
  * (`WebhookDelivery`) is written by the activity after every attempt, so the
  * deliveries screen sees the same thing Temporal does.

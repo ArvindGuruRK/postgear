@@ -88,10 +88,10 @@ describe('generateReducer', () => {
       type: 'stage',
       stage: 'research',
       status: 'skipped',
-      detail: 'Research skipped — no TAVILY_API_KEY',
+      detail: 'Research skipped: no TAVILY_API_KEY',
     });
 
-    expect(state.stages.research.detail).toBe('Research skipped — no TAVILY_API_KEY');
+    expect(state.stages.research.detail).toBe('Research skipped: no TAVILY_API_KEY');
   });
 
   it('collects category, hook, parts and the image on its part', () => {

@@ -2,7 +2,7 @@
  * What a failure becomes on the wire.
  *
  * Every error that reaches the stream passes through `describeSeoFailure`,
- * which maps it to a kind, a catalogue message and a retryable flag — and
+ * which maps it to a kind, a catalogue message and a retryable flag, and
  * nothing else. The original goes to the caller's logger. This is the single
  * chokepoint that keeps page text, provider error bodies and key fragments
  * out of responses; the analyzer has three sources of such text (the crawled
@@ -10,8 +10,8 @@
  * exactly one chokepoint.
  *
  * Both engines' errors are recognised by shape rather than `instanceof`, as
- * `ai.errors.ts` does: the classes live in packages whose runtime this file
- * — and the service spec that depends on it — need not load.
+ * `ai.errors.ts` does: the classes live in packages whose runtime this file,
+ * and the service spec that depends on it, need not load.
  */
 import { HttpException, HttpStatus } from '@nestjs/common';
 import type { AiErrorKind } from '@postgear/ai-engine';

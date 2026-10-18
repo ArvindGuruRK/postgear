@@ -30,7 +30,7 @@ interface DisconnectDialogProps {
  * Disconnecting has a consequence the user cannot see from the channel list:
  * anything queued to this channel stops being scheduled. So the dialog fetches
  * the count first and states it. The reference implementation asks a bare "are
- * you sure?" while silently *deleting* every scheduled post for the channel —
+ * you sure?" while silently *deleting* every scheduled post for the channel:
  * no count, no warning, no undo.
  *
  * PostGear moves those posts back to drafts instead of deleting them, which is
@@ -60,7 +60,7 @@ export function DisconnectDialog({ channel, onOpenChange, onDone }: DisconnectDi
         }
       })
       .catch(() => {
-        // Not being able to count them is no reason to block the disconnect —
+        // Not being able to count them is no reason to block the disconnect:
         // the dialog just falls back to the generic wording.
         if (!cancelled) {
           setQueuedPosts(0);

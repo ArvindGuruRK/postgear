@@ -10,8 +10,8 @@ import { MailService } from '../mail/mail.service';
  *
  * Not because the controller could not hold it, but because it forces each
  * query to be scoped by "what is this user allowed to see" at the point the
- * query is written. The alternative — a service that trusts an organization id
- * handed in by the caller — is how multi-tenant data leaks happen, and it
+ * query is written. The alternative (a service that trusts an organization id
+ * handed in by the caller) is how multi-tenant data leaks happen, and it
  * looks perfectly reasonable in review.
  *
  * `RolesGuard` has already verified membership for role-guarded routes, but
@@ -38,7 +38,7 @@ export class OrgService {
    * Creates a workspace and makes the creator its ADMIN.
    *
    * Both rows in one transaction: an organization with no members is
-   * unreachable — nobody can list it, nobody can be invited to it, and it
+   * unreachable; nobody can list it, nobody can be invited to it, and it
    * cannot be deleted through any route. A partial failure here would leave
    * exactly that orphan.
    *
@@ -80,7 +80,7 @@ export class OrgService {
   /**
    * The caller's workspaces.
    *
-   * Returns an empty array for a user who has not onboarded yet — a valid
+   * Returns an empty array for a user who has not onboarded yet: a valid
    * state, not an error. Nothing may assume `[0]` exists.
    */
   async listForUser(userId: string): Promise<OrgSummary[]> {
@@ -106,7 +106,7 @@ export class OrgService {
    *
    * The controller only sets the cookie after this returns, so a forged
    * `pg_org` value can never be established through the API. (It could still
-   * be set by hand in the browser — which is why `RolesGuard` re-checks
+   * be set by hand in the browser, which is why `RolesGuard` re-checks
    * membership on every request rather than trusting the cookie.)
    */
   async assertMembership(userId: string, organizationId: string): Promise<OrgSummary> {
@@ -195,7 +195,7 @@ export class OrgService {
    *
    * Refuses to remove the last ADMIN. Without that check an admin can demote
    * themselves in a single-admin workspace and lock everyone out of billing,
-   * invitations and settings permanently — recoverable only by direct database
+   * invitations and settings permanently: recoverable only by direct database
    * access.
    */
   async changeRole(organizationId: string, targetUserId: string, role: Role): Promise<void> {

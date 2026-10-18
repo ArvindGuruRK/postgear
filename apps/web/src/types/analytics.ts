@@ -8,9 +8,9 @@
  *
  * ## Levels and flows
  *
- * `followers` is a level — the count on a day — so a range shows its latest
- * value and the change since the range began. Every other metric is a flow —
- * what happened on a day — so a range shows its sum and the change against
+ * `followers` is a level, the count on a day, so a range shows its latest
+ * value and the change since the range began. Every other metric is a flow, 
+ * what happened on a day, so a range shows its sum and the change against
  * the same-length period before it.
  */
 
@@ -141,7 +141,7 @@ export type PostMetricKey = (typeof POST_METRIC_KEYS)[number];
 export interface TopPost {
   rank: number;
   group: string;
-  /** The root row of the channel's chain — what the snapshot is keyed on. */
+  /** The root row of the channel's chain: what the snapshot is keyed on. */
   postId: string;
   channelId: string;
   channelName: string;

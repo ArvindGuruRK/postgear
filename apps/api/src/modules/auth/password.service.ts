@@ -9,7 +9,7 @@ import * as argon2 from 'argon2';
  *
  * argon2id at OWASP's minimum recommended configuration: 19 MiB of memory,
  * two iterations, one lane. Chosen over bcrypt (which the sprint document
- * names) because it is memory-hard — the cost of a GPU or ASIC cracking rig
+ * names) because it is memory-hard: the cost of a GPU or ASIC cracking rig
  * scales with RAM rather than with cheap parallel cores, which is the whole
  * weakness of bcrypt's small fixed 4 KiB working set.
  *
@@ -64,7 +64,7 @@ export class PasswordService {
   /**
    * Classifies a stored value by shape.
    *
-   * Nothing in this database is currently anything but argon2 — `User.password`
+   * Nothing in this database is currently anything but argon2: `User.password`
    * was unset before this sprint. The legacy branches exist so that importing
    * users from another system, or discovering an old column, is a supported
    * path rather than an emergency. See `scripts/audit-password-hashes.ts` for
@@ -74,7 +74,7 @@ export class PasswordService {
     if (stored.startsWith('$argon2')) {
       return 'argon2';
     }
-    // $2a$ (OpenBSD), $2b$ (current), $2y$ (PHP's variant) — all bcrypt.
+    // $2a$ (OpenBSD), $2b$ (current), $2y$ (PHP's variant): all bcrypt.
     if (/^\$2[aby]\$\d{2}\$/.test(stored)) {
       return 'bcrypt';
     }
@@ -91,7 +91,7 @@ export class PasswordService {
    * Verifies a password against a stored value of any supported format.
    *
    * Returns both the outcome and whether the stored value should be replaced,
-   * so the caller can re-hash inside the same successful-login transaction —
+   * so the caller can re-hash inside the same successful-login transaction,
    * which is the only moment the plaintext is available to re-hash *from*.
    */
   async verify(
@@ -124,7 +124,7 @@ export class PasswordService {
   }
 
   /**
-   * `argon2.verify` throws — rather than returning false — on a malformed or
+   * `argon2.verify` throws, rather than returning false, on a malformed or
    * truncated hash. A corrupted row must read as "wrong password", not as a
    * 500 that tells the caller the row exists and is broken.
    */
@@ -142,7 +142,7 @@ export class PasswordService {
    * bcrypt is deliberately **not** verifiable here: this codebase has no
    * bcrypt dependency, and adding one solely to read hypothetical legacy rows
    * would be dead weight. A bcrypt row therefore fails to verify and the
-   * account must go through password reset — which the audit script surfaces
+   * account must go through password reset, which the audit script surfaces
    * before any user hits it, rather than after.
    */
   private verifyLegacy(plaintext: string, stored: string, format: HashFormat): boolean {
@@ -166,7 +166,7 @@ export class PasswordService {
  *
  * `timingSafeEqual` throws on a length mismatch, so the lengths are compared
  * first. That comparison is not itself constant-time, but a length difference
- * is not secret — a hash of a given format always has a fixed length.
+ * is not secret: a hash of a given format always has a fixed length.
  */
 function constantTimeEquals(a: string, b: string): boolean {
   const left = Buffer.from(a, 'utf8');

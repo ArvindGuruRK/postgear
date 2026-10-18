@@ -6,7 +6,7 @@
  * The run is one `streamEvents` call feeding the reducer; an
  * `AbortController` is the Stop button, and also what unmounting pulls. A
  * stream that closes without a terminal event is reported as a failure
- * rather than left spinning — the API always ends with `done` or `error`, so
+ * rather than left spinning: the API always ends with `done` or `error`, so
  * silence means the connection dropped.
  *
  * The form's values live here, not in the form, so "Regenerate" on the
@@ -163,8 +163,8 @@ export function GeneratePanel({
           <EmptyState
             icon={Sparkles}
             title="Your post will appear here"
-            description="Pick a topic, a voice and the channels. Each stage shows up as it runs — research, a hook, the post, an image."
-            className="rounded-lg border-4 border-dashed border-outline"
+            description="Pick a topic, a voice and the channels. Each stage shows up as it runs: research, a hook, the post, an image."
+            className="rounded-lg border-2 border-dashed border-outline"
           />
         ) : (
           <>

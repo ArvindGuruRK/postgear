@@ -63,7 +63,7 @@ describe('decodeEntities', () => {
     expect(decodeEntities('a &amp; b &lt; c &gt; d &quot;e&quot; &apos;f&apos;')).toBe(
       'a & b < c > d "e" \'f\'',
     );
-    expect(decodeEntities('&#169; &#xA9; &#x1F600; &mdash; &nbsp;')).toBe('© © 😀 —  ');
+    expect(decodeEntities('&#169; &#xA9; &#x1F600; &mdash; &nbsp;')).toBe('© © 😀 \u2014  ');
     expect(decodeEntities('&eacute;&Eacute;&unknown;')).toBe('éÉ&unknown;');
     expect(decodeEntities('&#0; &#99999999;')).toBe('� �');
     expect(decodeEntities('no entities')).toBe('no entities');
@@ -108,7 +108,7 @@ describe('parseHtml', () => {
   const page = parseHtml(FIXTURE, 'https://acme.example/widgets?ref=1');
 
   it('extracts head metadata with entities decoded and whitespace collapsed', () => {
-    expect(page.title).toBe('Acme & Co — Widgets');
+    expect(page.title).toBe('Acme & Co \u2014 Widgets');
     expect(page.metaDescription).toBe('Buy widgets & gadgets from Acme.');
     expect(page.robotsMeta).toBe('index, follow');
     expect(page.viewport).toBe('width=device-width, initial-scale=1');

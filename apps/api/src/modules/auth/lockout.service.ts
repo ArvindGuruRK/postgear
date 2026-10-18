@@ -28,7 +28,7 @@ import { RedisService } from '../redis/redis.service';
  *
  * `isLocked` returns a boolean, and the login route turns it into the same
  * "Incorrect email or password" as a wrong password. The user is told what
- * actually happened by email — see `MailService.sendAccountLocked`.
+ * actually happened by email: see `MailService.sendAccountLocked`.
  */
 
 const DELAY_BASE_MS = 250;
@@ -67,7 +67,7 @@ export class LockoutService {
    *
    * Called before the password is even checked, so the delay applies to a
    * wrong email exactly as it applies to a wrong password. Applying it only
-   * on failure would leak — a fast response would mean "that address is not
+   * on failure would leak: a fast response would mean "that address is not
    * registered".
    */
   async applyProgressiveDelay(ip: string, email: string): Promise<void> {
@@ -125,7 +125,7 @@ export class LockoutService {
   /**
    * Clears every counter after a successful sign-in.
    *
-   * "Consecutive" in "5 consecutive failed attempts" is what this enforces —
+   * "Consecutive" in "5 consecutive failed attempts" is what this enforces,
    * without it the counter would be cumulative and a user who mistypes once a
    * month would eventually lock themselves out for no reason.
    */
@@ -140,7 +140,7 @@ export class LockoutService {
   /**
    * Records a failure for an address with no account behind it.
    *
-   * There is no row to increment, but the Redis-side delay still has to grow —
+   * There is no row to increment, but the Redis-side delay still has to grow,
    * otherwise attempts against non-existent addresses stay fast forever, and
    * the response time distinguishes them from real ones.
    */

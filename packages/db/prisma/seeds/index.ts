@@ -5,7 +5,7 @@
  * this automatically afterward because of the `"prisma": { "seed": ... }`
  * field in this package's package.json).
  *
- * Idempotent by design (fixed ids + upsert) — safe to re-run.
+ * Idempotent by design (fixed ids + upsert): safe to re-run.
  *
  * Sprint 2 gave every seeded user a real argon2id password and added the two
  * accounts the sprint's Definition of Done needs a subject for: a `USER`-role
@@ -30,7 +30,7 @@ import * as argon2 from 'argon2';
 // writing placeholder strings is what makes the "inspect a raw row" check
 // meaningful.
 //
-// This import is why `prisma/seeds/tsconfig.json` exists — see the comment
+// This import is why `prisma/seeds/tsconfig.json` exists: see the comment
 // there. Under the root ESNext config, ts-node cannot resolve it at all.
 import { encrypt } from '../../src/crypto';
 import { seedAnalytics } from './analytics.seed';
@@ -48,7 +48,7 @@ const MEMBER_USER_ID = 'seed-member-user';
  *
  * Sprint 1 Task 3a locked in that signup collects credentials only, and the
  * workspace is created afterward in a real onboarding flow. That makes
- * "authenticated but not onboarded" a genuine, persistable state — and the
+ * "authenticated but not onboarded" a genuine, persistable state, and the
  * classic way this pattern breaks is a query that assumes every user has at
  * least one `UserOrganization`, crashing on the first post-login page load.
  *
@@ -62,7 +62,7 @@ const ONBOARDING_USER_ID = 'seed-onboarding-user';
  *
  * Without these, every channels view can only ever render its empty state, and
  * the encryption boundary can only be verified by connecting a real social
- * account — which needs developer app registrations nobody has on a fresh
+ * account, which needs developer app registrations nobody has on a fresh
  * clone. Seeding them makes the channel list, both health treatments, the
  * disconnect flow and the "inspect a raw row" check all exercisable with zero
  * platform credentials.
@@ -96,7 +96,7 @@ const INSTAGRAM_CHANNEL_ID = 'seed-channel-instagram';
  *
  *     Authorization: Bearer pg_seedDemoKey00000000000000000000000000000
  *
- * The secret has the production shape — `pg_` + 40 base64url characters —
+ * The secret has the production shape, `pg_` + 40 base64url characters,
  * because the guard refuses anything else before it ever reaches the
  * database. Only the digest and the 11-character prefix are stored, exactly
  * as `apps/api/src/modules/developers/api-keys/api-key.crypto.ts` would.
@@ -115,7 +115,7 @@ const SEED_PASSWORD = 'DemoPassword123!';
 
 /**
  * Matches `PasswordService.ARGON2_OPTIONS` in apps/api. Duplicated rather than
- * imported because packages/db must not depend on an app — and if the two ever
+ * imported because packages/db must not depend on an app, and if the two ever
  * drift, nothing breaks: `argon2.needsRehash()` upgrades the seeded hash on the
  * user's next successful login, which is the same mechanism that migrates a
  * legacy hash.
@@ -154,7 +154,7 @@ async function main() {
   const user = await prisma.user.upsert({
     where: { id: DEMO_USER_ID },
     // `update` sets the password so re-seeding an existing database picks it
-    // up — before Sprint 2 these rows had none, and an empty `update` would
+    // up: before Sprint 2 these rows had none, and an empty `update` would
     // leave them permanently unable to sign in.
     update: { password, activated: true, onboardingCompletedAt: new Date(), onboardingStep: 5 },
     create: {
@@ -166,7 +166,7 @@ async function main() {
       // Convention confirmed (Sprint 1): `timezone` is the user's **UTC
       // offset in minutes**, not an IANA-zone index. Postiz's client sends
       // `String(dayjs.tz().utcOffset())`, and dayjs's `utcOffset()` returns
-      // minutes — so 0 = UTC, -300 = US Eastern (EST), 330 = IST.
+      // minutes, so 0 = UTC, -300 = US Eastern (EST), 330 = IST.
       //
       // Worth knowing before Sprint 2's profile UI writes this: an offset is
       // strictly less information than a zone name. It cannot survive a DST
@@ -218,7 +218,7 @@ async function main() {
    * needs a hand-built account every time, which is exactly the kind of setup
    * friction that leaves an authorization rule untested.
    *
-   * Note `isSuperAdmin: false` is doing real work here — the demo admin above
+   * Note `isSuperAdmin: false` is doing real work here; the demo admin above
    * is a superadmin and bypasses RolesGuard entirely, so it can never
    * demonstrate a 403.
    */
@@ -280,7 +280,7 @@ async function main() {
     where: { organizationId: organization.id, type: { startsWith: 'billing.' } },
   });
 
-  // No `userOrganization` row is created for this user, on purpose — see the
+  // No `userOrganization` row is created for this user, on purpose: see the
   // comment on ONBOARDING_USER_ID. The schema already permits it:
   // `User.organizations` is a to-many relation with no minimum cardinality,
   // so zero rows needs no migration, only queries that don't assume otherwise.
@@ -312,7 +312,7 @@ async function main() {
   const seededCredits = await seedAiCredits(organization.id);
   const seededApiKey = await seedApiKey(organization.id, user.id);
   // Sprint 8: a few typed notifications so the bell has every treatment on a
-  // fresh clone — already emailed (or never meant to be), so the dispatcher
+  // fresh clone, already emailed (or never meant to be), so the dispatcher
   // sends nothing at boot.
   const seededNotifications = await seedNotifications(organization.id);
   // Sprint 7: ninety days of metrics for the two healthy channels (none for
@@ -355,14 +355,14 @@ async function main() {
 }
 
 /**
- * The seeded API key — see DEMO_API_KEY_SECRET. Upserted on its fixed id,
+ * The seeded API key: see DEMO_API_KEY_SECRET. Upserted on its fixed id,
  * and `revokedAt` is reset on re-seed so a run that revoked it (the e2e suite
  * does not, but a manual check might) gets it back.
  */
 /**
  * Three typed notifications on the demo workspace (Sprint 8): a published
  * post with its permalink, a failed post pointing at the queue, and a channel
- * needing reconnection — one per icon treatment the bell has. `emailStatus`
+ * needing reconnection; one per icon treatment the bell has. `emailStatus`
  * is SENT or NONE so the API's outbox dispatcher never mails them at boot.
  *
  * Fixed ids and upsert, like everything else here; the demo admin's read
@@ -510,7 +510,7 @@ async function seedAiCredits(organizationId: string) {
 
 /**
  * Four posts in four states (Sprint 5), so the calendar and the queue have
- * something to show — and every treatment they have — on a fresh clone:
+ * something to show, and every treatment they have, on a fresh clone:
  *
  * - a thread **queued** for tomorrow morning on LinkedIn and X;
  * - one **published** yesterday on LinkedIn, with a permalink;
@@ -650,7 +650,7 @@ async function seedPosts(organizationId: string) {
 }
 
 /**
- * Two connected channels on the demo workspace — one healthy, one needing a
+ * Two connected channels on the demo workspace: one healthy, one needing a
  * reconnect. See the comment on DEMO_CHANNEL_ID for why both exist.
  *
  * Idempotent like everything else here: fixed ids and upsert, so re-running

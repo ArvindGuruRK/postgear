@@ -10,7 +10,7 @@
  * that say the same host; the runs are listed under the selected site, each
  * loadable on its own, so "what did it score on the 3rd" is one click. The
  * `TrendChart` at the top draws the selected site's finished runs when there
- * are at least two of them — one point is a number, not a trend.
+ * are at least two of them: one point is a number, not a trend.
  *
  * ## What is a button and what is not
  *
@@ -165,7 +165,7 @@ export function AuditHistory({
           </div>
         ) : sites.length === 0 ? (
           <Text size="sm" muted>
-            No audits yet — analyze your first URL.
+            No audits yet. Analyze your first URL.
           </Text>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Analyzed sites">

@@ -6,8 +6,8 @@
  * Controlled from the analyzer above it, which keeps the value so "Re-run"
  * on a history row and "Analyze again" on a result can fill and send it.
  * The form validates what the API will certainly refuse with a 400 (not an
- * http/https address) before sending; what it may refuse with a 422 — a
- * private or internal address — is the API's rule, and its message is shown
+ * http/https address) before sending; what it may refuse with a 422 (a
+ * private or internal address) is the API's rule, and its message is shown
  * on the same field when it comes back, so the person sees one place for
  * "this URL won't do" whichever side decided it.
  *
@@ -148,7 +148,7 @@ export function AnalyzeForm({
           </FormErrorMessage>
         ) : (
           <FormHelperText id={`${id}-help`}>
-            Public sites only — private and internal addresses are refused.
+            Public sites only. Private and internal addresses are refused.
           </FormHelperText>
         )}
 
@@ -167,7 +167,7 @@ export function AnalyzeForm({
 
         {!status.ai ? (
           <Alert>
-            AI advice is off in this setup — recommendations are rule-based, written from the checks
+            AI advice is off in this setup, so recommendations are rule-based, written from the checks
             alone. Set <code className="font-bold">OPENAI_API_KEY</code> or{' '}
             <code className="font-bold">AI_SIMULATION="true"</code> on the API for model-written
             advice.
@@ -183,7 +183,7 @@ export function AnalyzeForm({
           ) : (
             <>
               <Code2 className="h-4 w-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-              Plain HTML crawl — JavaScript-rendered content isn't seen
+              Plain HTML crawl: JavaScript-rendered content isn't seen
             </>
           )}
         </Text>

@@ -1,9 +1,9 @@
 /**
- * The plan table — the single source of truth for what each tier costs and
+ * The plan table: the single source of truth for what each tier costs and
  * allows (Sprint 8).
  *
  * Pure data and pure functions: no Nest, no Prisma, no Stripe. Everything
- * that gates on a plan reads from here — the AI credit allowance
+ * that gates on a plan reads from here: the AI credit allowance
  * (`ai/credits/credits.policy.ts`), the channel limit (`channels`), the
  * billing page (`GET /billing/plans`) and the Stripe checkout (inline
  * `price_data` built from these numbers). There is deliberately no second
@@ -38,7 +38,7 @@ export interface Plan {
   channels: number;
   /** AI credits per billing cycle. Enforced by the credit ledger. */
   aiCredits: number;
-  /** Workspace members. `null` = unlimited. Not enforced yet — see the checklist. */
+  /** Workspace members. `null` = unlimited. Not enforced yet: see the checklist. */
   members: number | null;
   features: string[];
   /** The plan the billing page draws attention to. */
@@ -80,6 +80,7 @@ export const PLANS: Record<PlanTier, Plan> = {
       '100 AI credits a month',
       'Analytics for every channel',
       'Public API and webhooks',
+      'Premium light themes',
     ],
     highlighted: false,
   },
@@ -97,6 +98,7 @@ export const PLANS: Record<PlanTier, Plan> = {
       '500 AI credits a month',
       '3 team members',
       'Analytics, API and webhooks',
+      'Premium light themes',
     ],
     highlighted: true,
   },
@@ -114,6 +116,7 @@ export const PLANS: Record<PlanTier, Plan> = {
       '2,000 AI credits a month',
       '10 team members',
       'Analytics, API and webhooks',
+      'Premium light themes',
     ],
     highlighted: false,
   },
@@ -131,6 +134,7 @@ export const PLANS: Record<PlanTier, Plan> = {
       '10,000 AI credits a month',
       'Unlimited team members',
       'Analytics, API and webhooks',
+      'Premium light themes',
     ],
     highlighted: false,
   },
@@ -181,7 +185,7 @@ export type EntitlementStatus =
   | 'canceled'
   | 'incomplete';
 
-/** The columns `resolveEntitlement` reads — what a repository selects. */
+/** The columns `resolveEntitlement` reads: what a repository selects. */
 export interface SubscriptionLike {
   subscriptionTier: SubscriptionTier;
   status: SubscriptionStatus;

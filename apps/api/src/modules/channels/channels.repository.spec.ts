@@ -2,7 +2,7 @@
  * The encryption boundary, asserted rather than assumed.
  *
  * This suite exists because "tokens are encrypted at rest" is a claim that is
- * easy to believe and easy to get subtly wrong — one `create` that forgets to
+ * easy to believe and easy to get subtly wrong: one `create` that forgets to
  * wrap a value, one `select` that returns the whole row, and plaintext
  * credentials are in the database with nothing failing. So these tests inspect
  * what is actually handed to Prisma, not what the repository returns.
@@ -16,7 +16,7 @@
 // `const`: `jest.mock` is hoisted above every declaration in the file, so a
 // factory closing over one would read it before initialization.
 //
-// `requireActual` keeps the real crypto helpers — the point of this suite is to
+// `requireActual` keeps the real crypto helpers: the point of this suite is to
 // verify the genuine AES-256-GCM round trip, not a stub of it.
 jest.mock('@postgear/db', () => ({
   ...jest.requireActual('@postgear/db'),
@@ -103,7 +103,7 @@ describe('ChannelsRepository', () => {
         expect(branch.refreshToken).not.toContain('super-secret-refresh-token');
         expect(isEncrypted(branch.token)).toBe(true);
         expect(isEncrypted(branch.refreshToken)).toBe(true);
-        // Round-trips back to the original — encrypted, not merely mangled.
+        // Round-trips back to the original: encrypted, not merely mangled.
         expect(decrypt(branch.token)).toBe('super-secret-access-token');
         expect(decrypt(branch.refreshToken)).toBe('super-secret-refresh-token');
       }
@@ -127,7 +127,7 @@ describe('ChannelsRepository', () => {
       const first = prismaMock.integration.upsert.mock.calls[0][0].create.token;
       const second = prismaMock.integration.upsert.mock.calls[1][0].create.token;
 
-      // A random IV per call is what makes reusing the helper safe — and is
+      // A random IV per call is what makes reusing the helper safe, and is
       // also why an encrypted column can never be queried by equality.
       expect(first).not.toEqual(second);
       expect(decrypt(first)).toBe(decrypt(second));
@@ -162,7 +162,7 @@ describe('ChannelsRepository', () => {
 
     it('reads an emptied credential as empty rather than throwing', async () => {
       // Disconnect writes '' because the column is NOT NULL, and `decrypt`
-      // rejects an empty string — so this path has to be handled explicitly.
+      // rejects an empty string, so this path has to be handled explicitly.
       prismaMock.integration.findFirst.mockResolvedValue({
         ...baseRow(),
         token: '',
@@ -415,7 +415,7 @@ describe('ChannelsRepository', () => {
     it('redirects the write to an existing live row so its posts survive', async () => {
       prismaMock.integration.findFirst
         .mockResolvedValueOnce(baseRow({ id: 'ch_new', inBetweenSteps: true }))
-        // A channel already represents this page — it holds the history.
+        // A channel already represents this page: it holds the history.
         .mockResolvedValueOnce({ id: 'ch_original' });
       prismaMock.integration.updateMany.mockResolvedValue({ count: 0 });
       prismaMock.integration.update.mockResolvedValue(baseRow({ id: 'ch_original' }));

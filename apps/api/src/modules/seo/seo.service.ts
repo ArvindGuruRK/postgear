@@ -4,9 +4,9 @@
  *
  * ## Two phases, because a stream cannot change its status code
  *
- * `prepareAnalyze` does everything that can refuse — is the address a URL
- * (400), is it safe to fetch (422), is there a free slot (429), can the
- * cycle afford the advice (402) — and *charges*, then creates the row. It
+ * `prepareAnalyze` does everything that can refuse, checking that the address is a URL
+ * (400), it is safe to fetch (422), there is a free slot (429) and the
+ * cycle can afford the advice (402), then *charges* and creates the row. It
  * throws ordinary HTTP exceptions, because nothing has been written yet. It
  * returns a `PreparedRun`; the controller opens the stream and runs it. From
  * that point nothing throws: every outcome, including a dead site, a model
@@ -18,7 +18,7 @@
  * Only the AI advice costs credits, and only when an advisor is configured.
  * The charge is made before the crawl, so a workspace with one credit left
  * cannot start ten analyses at once; it is refunded whenever the advice did
- * not happen — the crawl failed, the model failed, the person left. A
+ * not happen: the crawl failed, the model failed, the person left. A
  * failed model call does *not* fail the audit: the evaluators' findings are
  * shown instead, the stage says why, and the credits come back.
  *
@@ -168,7 +168,7 @@ export class SeoService {
 
   /**
    * `POST /seo/audits`, phase one: the address, the guard, the slot, the
-   * charge, the row — in the order a person would want to hear about them,
+   * charge, the row, in the order a person would want to hear about them,
    * and with the charge last so a refused request never costs anything.
    */
   async prepareAnalyze(orgId: string, input: AnalyzeInput): Promise<PreparedRun> {
@@ -336,7 +336,7 @@ export class SeoService {
   /**
    * The advice stage. A model failure is survived: the stage says so, the
    * credits come back and the rule-based findings stand in. An abort is not
-   * survived — it is the person leaving, and the run ends as a whole.
+   * survived: it is the person leaving, and the run ends as a whole.
    */
   private async advise(params: {
     url: string;
@@ -398,8 +398,8 @@ export class SeoService {
   }
 
   /**
-   * The backlink signal, under a deadline. Any failure — provider down, slow,
-   * no key quota left — means the heuristic score, logged once; a crawl that
+   * The backlink signal, under a deadline. Any failure (provider down, slow,
+   * no key quota left) means the heuristic score, logged once; a crawl that
    * succeeded is not failed over a lookup that is optional.
    */
   private async estimateAuthority(
@@ -580,7 +580,7 @@ function abortError(): Error {
   return Object.assign(new Error('The request was cancelled.'), { name: 'AbortError' });
 }
 
-/** The name and message only — never a page body or a provider response. */
+/** The name and message only, never a page body or a provider response. */
 function reasonOf(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }

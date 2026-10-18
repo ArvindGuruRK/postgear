@@ -5,7 +5,7 @@
  *
  * Two controls, deliberately: the card body opens the post, and a separate
  * grip starts a drag. Making the whole card the drag handle would turn Space
- * and Enter — which open a button — into drag starts for keyboard users, and
+ * and Enter, which open a button, into drag starts for keyboard users, and
  * a pointer tap into an ambiguous gesture. The grip is also what dnd-kit's
  * keyboard sensor binds to, so a card can be moved by arrow keys; the
  * Reschedule dialog remains the precise keyboard path.
@@ -70,7 +70,7 @@ export function PostCard({
         'group/card relative flex min-w-0 items-stretch rounded-md border-2 border-outline bg-secondary text-ink',
         'border-s-4',
         EDGE[shown.tone],
-        overlay ? 'shadow-brutalMd' : 'shadow-brutalSm',
+        overlay ? 'shadow-surfaceMd' : 'shadow-surfaceSm',
         isDragging && !overlay && 'opacity-30',
         shown.tone === 'published' && !overlay && 'opacity-80',
       )}

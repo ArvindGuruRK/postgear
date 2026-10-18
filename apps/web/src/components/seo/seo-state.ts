@@ -1,6 +1,6 @@
 /**
  * The SEO analyzer's state, as a pure reducer over the stream's events
- * (Sprint 7) — the same shape as the AI studio's `generate-state.ts`, for
+ * (Sprint 7): the same shape as the AI studio's `generate-state.ts`, for
  * the same reasons.
  *
  * ## One transition per event
@@ -13,8 +13,8 @@
  *
  * ## Partial results are kept
  *
- * An `error` mid-stream — the advice model rate-limited after the crawl and
- * the scores arrived — leaves the crawl facts and the four scores on screen.
+ * An `error` mid-stream (the advice model rate-limited after the crawl and
+ * the scores arrived) leaves the crawl facts and the four scores on screen.
  * The audit was saved as far as it got and the person can still read it;
  * only `start`, `reset` and a `delete` of the shown audit clear it.
  *

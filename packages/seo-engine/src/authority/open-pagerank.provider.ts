@@ -1,11 +1,11 @@
 /**
- * Domain authority from Open PageRank (openpagerank.com) — the free backlink
+ * Domain authority from Open PageRank (openpagerank.com): the free backlink
  * index the sprint plan points at for the P1 authority signal.
  *
  * One GET per audit with the host name; the answer carries a 0–10
  * `page_rank_decimal` that is scaled to the Moz-style 0–100 the rest of the
  * engine speaks. A domain the index does not know comes back with a
- * per-domain status other than 200 and is reported as `null` — the evaluator
+ * per-domain status other than 200 and is reported as `null`: the evaluator
  * then estimates, which is the honest outcome, not a failure. The call has a
  * deadline, one retry on 429/5xx (a rate-limited audit should not fail
  * outright, and a second rate limit should not stall it), and an error

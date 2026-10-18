@@ -1,12 +1,12 @@
 # 🚀 Product Requirements Document (PRD)
-## AI-Powered Digital Marketing Platform — SaaS Product
+## AI-Powered Digital Marketing Platform: SaaS Product
 
 ---
 
 > **Project Codename**: *MarketPulse AI* (Suggested)  
 > **Version**: 1.0  
 > **Last Updated**: July 2026  
-> **Status**: Draft — Awaiting Stakeholder Review
+> **Status**: Draft, Awaiting Stakeholder Review
 
 ---
 
@@ -14,7 +14,7 @@
 
 MarketPulse AI is a proprietary, AI-powered digital marketing SaaS platform designed to help businesses, agencies, and solo creators **enrich and enhance their social media performance**, **predict SEO scores for their websites**, and **automate social media scheduling, posting, and publishing** across multiple platforms. 
 
-The platform is developed as a **private, commercially-licensed product** — completely independent of any AGPL/MIT obligations — and draws architectural inspiration from modern open-source social media management tools while introducing significant differentiators: **AI-driven SEO prediction**, **intelligent content optimization**, and **advanced multi-platform automation**.
+The platform is developed as a **private, commercially-licensed product** (completely independent of any AGPL/MIT obligations) and draws architectural inspiration from modern open-source social media management tools while introducing significant differentiators: **AI-driven SEO prediction**, **intelligent content optimization**, and **advanced multi-platform automation**.
 
 ---
 
@@ -34,7 +34,7 @@ The platform is developed as a **private, commercially-licensed product** — co
 ## 3. Product Vision & Goals
 
 ### Vision
-> *"One intelligent platform that transforms how businesses create, schedule, analyze, and optimize their digital presence — powered by AI that learns and improves with every post."*
+> *"One intelligent platform that transforms how businesses create, schedule, analyze, and optimize their digital presence: powered by AI that learns and improves with every post."*
 
 ### Goals (MVP → V1.0)
 
@@ -97,7 +97,7 @@ The platform is developed as a **private, commercially-licensed product** — co
 | Feature | Description | Priority |
 |---|---|---|
 | Platform OAuth Connect | Connect accounts via official OAuth2 flows | P0 |
-| Abstract Provider Interface | Pluggable architecture — each platform implements a standard interface | P0 |
+| Abstract Provider Interface | Pluggable architecture: each platform implements a standard interface | P0 |
 | Token Refresh Management | Automatic token refresh with retry and error handling | P0 |
 | **Supported Platforms (MVP)**: | | |
 | → X (Twitter) | Full posting, threads, media, analytics | P0 |
@@ -336,7 +336,7 @@ The platform is developed as a **private, commercially-licensed product** — co
 
 ## 7. Out of Scope (V1.0)
 
-- Native mobile apps (iOS/Android) — planned for V2.0
+- Native mobile apps (iOS/Android): planned for V2.0
 - Social listening / brand monitoring
 - Influencer marketplace
 - Advanced A/B testing for posts

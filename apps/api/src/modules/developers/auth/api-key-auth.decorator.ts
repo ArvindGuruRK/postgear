@@ -1,5 +1,5 @@
 /**
- * `@ApiKeyAuth()` — the one decorator every `/v1` controller carries.
+ * `@ApiKeyAuth()`: the one decorator every `/v1` controller carries.
  *
  * Three things in one, so a public-API controller cannot get two of them
  * and forget the third:
@@ -8,7 +8,7 @@
  *    would demand a session cookie before `ApiKeyGuard` ever ran.
  * 2. `ApiKeyGuard`, which authenticates the key and sets `request.activeOrg`
  *    and `request.apiKey`.
- * 3. `ApiKeyThrottlerGuard`, which reads `request.apiKey.id` — so it has to
+ * 3. `ApiKeyThrottlerGuard`, which reads `request.apiKey.id`, so it has to
  *    run *after* the key guard, which `UseGuards`' argument order guarantees.
  *
  * Applied at class level in the contract (§5.3); applying it per handler

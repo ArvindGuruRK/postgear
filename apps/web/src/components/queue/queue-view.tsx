@@ -4,8 +4,8 @@
  * The queue: every post in publish order, filtered and paged.
  *
  * The calendar answers "when"; this answers "what, in what order, and did it
- * work". Rows are grouped under day headings, and the filters — state tabs,
- * channel, date range, direction — live in the URL so a view of "failed posts
+ * work". Rows are grouped under day headings, and the filters (state tabs,
+ * channel, date range, direction) live in the URL so a view of "failed posts
  * this week" can be bookmarked.
  */
 import {
@@ -16,7 +16,7 @@ import {
   ErrorState,
   Input,
   Label,
-  PageHeader,
+  PageActions,
   Pagination,
   Select,
   SelectContent,
@@ -40,7 +40,6 @@ import type { PostSummary, QueuePage } from '@/types/post';
 import { DeletePostDialog } from '../posts/delete-post-dialog';
 import { PostDetailDialog } from '../posts/post-detail-dialog';
 import { RescheduleDialog } from '../posts/reschedule-dialog';
-import { SchedulerStatusPill } from '../posts/scheduler-status';
 import { useMounted } from '../posts/use-mounted';
 import { usePostActions } from '../posts/use-post-actions';
 import { isFiltered, type QueueStateFilter, STATE_TABS } from './queue-filters';
@@ -124,19 +123,12 @@ export function QueueView({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Queue"
-        description="What goes out, in order — and how each one went."
-        actions={
-          <>
-            <SchedulerStatusPill />
-            <Link href={`/${orgId}/composer`} className={buttonVariants({ variant: 'primary' })}>
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              New post
-            </Link>
-          </>
-        }
-      />
+      <PageActions>
+        <Link href={`/${orgId}/composer`} className={buttonVariants({ variant: 'primary' })}>
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          New post
+        </Link>
+      </PageActions>
 
       <Tabs
         value={queue.filters.state}
@@ -151,7 +143,7 @@ export function QueueView({
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-brutalSm md:flex-row md:flex-wrap md:items-end">
+      <div className="flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-surfaceSm md:flex-row md:flex-wrap md:items-end">
         <div className="flex flex-col gap-1.5 md:w-56">
           <Label htmlFor="queue-channel">Channel</Label>
           <Select
@@ -256,9 +248,7 @@ export function QueueView({
         <div className="flex flex-col gap-6" aria-busy={queue.loading}>
           {days.map((day) => (
             <section key={day.label} aria-label={day.label} className="flex flex-col gap-2">
-              <h2 className="type-label text-sm text-ink opacity-70">
-                {day.label}
-              </h2>
+              <h2 className="type-label text-sm text-ink opacity-70">{day.label}</h2>
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
                 {day.posts.map((post) => (
                   <QueueRow

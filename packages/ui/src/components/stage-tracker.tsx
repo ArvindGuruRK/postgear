@@ -6,7 +6,7 @@ import { Spinner } from './spinner';
 /**
  * Progress through a multi-stage pipeline (Sprint 6: research → classify →
  * hook → content → image) where stages can be skipped or fail independently,
- * which is why this is not `OnboardingStepper` — that one has a single
+ * which is why this is not `OnboardingStepper`; that one has a single
  * "current step" index and every earlier step is implicitly complete.
  *
  * Status colours reuse the Sprint 5 tone vocabulary rather than a new set
@@ -28,7 +28,7 @@ export interface Stage {
   id: string;
   label: string;
   status: StageStatus;
-  /** One short line under the label — "4 sources found", "Skipped — no key". */
+  /** One short line under the label: "4 sources found", "Skipped: no key". */
   detail?: string;
 }
 

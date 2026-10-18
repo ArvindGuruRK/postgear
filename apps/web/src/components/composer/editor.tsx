@@ -6,7 +6,7 @@
  * TipTap, as the sprint plan names, configured down to what a post document
  * can hold: paragraphs, one heading level, bullet and numbered lists, bold,
  * italic and links. Everything StarterKit offers beyond that is switched off
- * rather than left on and stripped later — a toolbar button for strikethrough
+ * rather than left on and stripped later: a toolbar button for strikethrough
  * that silently disappears on save would be a lie.
  *
  * ## Uncontrolled on purpose

@@ -1,5 +1,5 @@
 /**
- * Which engine to build, decided from the environment — and nothing else.
+ * Which engine to build, decided from the environment, and nothing else.
  *
  * Separate from the factory so the decision is a pure function with a test,
  * and so it can be imported without pulling the engine's dependencies in.
@@ -67,7 +67,7 @@ export function resolveAiConfig(env: AiEnv): ResolvedAiConfig {
 
   if (!openAiKey) {
     if (tavilyKey) {
-      warnings.push('TAVILY_API_KEY is set but OPENAI_API_KEY is not — research needs a model.');
+      warnings.push('TAVILY_API_KEY is set but OPENAI_API_KEY is not, and research needs a model.');
     }
 
     return {

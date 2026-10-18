@@ -2,9 +2,9 @@ import { cn } from '../lib/utils';
 import { Progress } from './progress';
 
 /**
- * A labelled quota bar: "AI credits — 950 / 1,000". `tone` (Sprint 6) lets a
- * meter take the colour of the feature it measures — the credits meter on
- * the AI studio is `ai` so it reads as part of that surface — but the
+ * A labelled quota bar: "AI credits: 950 / 1,000". `tone` (Sprint 6) lets a
+ * meter take the colour of the feature it measures (the credits meter on
+ * the AI studio is `ai` so it reads as part of that surface), but the
  * ≥ 90% danger takeover is not a tone and can't be opted out of: a nearly
  * exhausted quota has to look the same everywhere, whatever colour the
  * feature wears. `caption` is one quiet line under the bar for the thing

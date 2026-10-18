@@ -5,7 +5,7 @@
  *
  * 1. **Sniff** the real type from the bytes (`file-type.ts`). The name and the
  *    browser's claimed type are ignored.
- * 2. **Size-check** against the limit for *that* type — a 200 MB "image" is
+ * 2. **Size-check** against the limit for *that* type: a 200 MB "image" is
  *    refused even though the multipart limit let a video that size through.
  * 3. **Process** images (`image-processor.ts`); store video as uploaded.
  * 4. **Store** the file and its thumbnail under fresh random keys.
@@ -64,7 +64,7 @@ export interface UploadedFileInput {
   originalname: string;
 }
 
-/** Bytes produced inside the API — an AI image (Sprint 6) — rather than uploaded. */
+/** Bytes produced inside the API, an AI image (Sprint 6), rather than uploaded. */
 export interface GeneratedFileInput {
   data: Buffer;
   /** What the producer believes it made. The bytes are sniffed anyway. */
@@ -194,13 +194,13 @@ export class MediaService {
   }
 
   /**
-   * Stores an image the API itself produced — the AI engine's hero image or
-   * the copilot's `generate_image` (Sprint 6) — as an ordinary library item.
+   * Stores an image the API itself produced (the AI engine's hero image or
+   * the copilot's `generate_image`, both Sprint 6) as an ordinary library item.
    *
    * Runs the same sequence as `upload` from step 1: the bytes are sniffed
    * rather than trusted (a provider that says "PNG" and sends something else
    * is treated exactly like a browser that does), compressed and stripped by
-   * `processImage`, stored under random keys, and recorded — with the stored
+   * `processImage`, stored under random keys, and recorded, with the stored
    * objects removed again if the row write fails. The differences are what an
    * upload has and a generation does not: there is no temp file, no size limit
    * (the generator's output is bounded by its own parameters, and the decoder's
@@ -275,7 +275,7 @@ export class MediaService {
     };
   }
 
-  /** One item — how "Use in a post" hands a library image to a new composer. */
+  /** One item: how "Use in a post" hands a library image to a new composer. */
   async get(orgId: string, id: string): Promise<MediaView> {
     const media = await this.repository.findById(orgId, id);
 
@@ -301,8 +301,8 @@ export class MediaService {
    * Deletes an item: the row first, then its files.
    *
    * In that order so a user is never shown a tile whose image is already gone.
-   * Removing the files is best-effort — a storage outage must not make an item
-   * undeletable — and a failure is logged for cleanup rather than surfaced.
+   * Removing the files is best-effort (a storage outage must not make an item
+   * undeletable) and a failure is logged for cleanup rather than surfaced.
    */
   async remove(orgId: string, id: string): Promise<void> {
     const removed = await this.repository.softDelete(orgId, id);
@@ -373,7 +373,7 @@ async function readHead(path: string): Promise<Buffer> {
  * Only the last path segment survives (some browsers send a full path),
  * control and direction-override characters are removed so a name cannot
  * render as something else, and the length is capped. Never used to build a
- * storage key — that is always random.
+ * storage key: that is always random.
  */
 export function displayName(originalName: string): string {
   const cleaned = stripControlChars(basename(originalName.replace(/\\/g, '/')))

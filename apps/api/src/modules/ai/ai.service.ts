@@ -5,8 +5,8 @@
  * ## Two phases, because a stream cannot change its status code
  *
  * Each streaming route runs in two phases. `prepare*` does everything that
- * can refuse — is the engine configured (503), are the channels this
- * workspace's (422), can the cycle afford it (402) — and *charges*. It throws
+ * can refuse, checking that the engine is configured (503), the channels are
+ * the workspace's (422) and the cycle can afford it (402), and *charges*. It throws
  * ordinary HTTP exceptions, which the global filter turns into JSON, because
  * nothing has been written yet. It returns a `PreparedRun`; the controller
  * then opens the stream and runs it. From that point nothing throws: every
@@ -282,8 +282,8 @@ export class AiService {
   /**
    * The channels a generation targets, as platforms and the strictest limit.
    *
-   * A channel id that is not this workspace's — or was disconnected since
-   * the page loaded — is refused before anything is charged.
+   * A channel id that is not this workspace's, or was disconnected since
+   * the page loaded, is refused before anything is charged.
    */
   private async resolveTargets(orgId: string, channelIds: string[]): Promise<GenerateTargets> {
     const available = new Map(
@@ -365,7 +365,7 @@ const HEALTH_LABELS: Record<ChannelView['health'], string> = {
   disabled: 'disabled',
 };
 
-/** The name and message only — never a provider response body. */
+/** The name and message only, never a provider response body. */
 function reasonOf(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }

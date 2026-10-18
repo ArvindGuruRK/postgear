@@ -4,7 +4,7 @@
  * The reorderable list of a post's parts.
  *
  * Drag-and-drop through dnd-kit, with its keyboard sensor, so a part can be
- * picked up with Space and moved with the arrow keys — plus explicit "Move up"
+ * picked up with Space and moved with the arrow keys, plus explicit "Move up"
  * and "Move down" buttons on every part, because a drag handle is not a
  * discoverable control for everyone and a button is.
  *
@@ -50,7 +50,7 @@ export function ThreadEditor({
   onAttachMedia,
 }: {
   scope: Scope;
-  /** "the shared post", or a channel name — used in accessible labels. */
+  /** "the shared post", or a channel name: used in accessible labels. */
   scopeLabel: string;
   parts: DraftPart[];
   /** Reports for the channels that publish these parts. */
@@ -172,8 +172,8 @@ function SortablePart({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       data-testid="thread-part"
       className={cn(
-        'rounded-lg border-4 border-outline bg-secondary',
-        isDragging ? 'relative z-10 shadow-brutalLg' : 'shadow-brutalMd',
+        'rounded-lg border-2 border-outline bg-secondary',
+        isDragging ? 'relative z-10 shadow-surfaceLg' : 'shadow-surfaceMd',
       )}
     >
       <div className="flex flex-wrap items-center gap-2 border-b-2 border-outline px-3 py-2">

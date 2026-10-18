@@ -1,13 +1,13 @@
 'use client';
 
-// Lightweight external-store toast queue (the standard shadcn pattern) — lets
+// Lightweight external-store toast queue (the standard shadcn pattern): lets
 // `toast()` be called from anywhere (event handlers, non-component code)
 // while `useToast()` subscribes components to the current queue.
 import * as React from 'react';
 import type { ToastActionElement, ToastProps } from '../components/toast';
 
 const TOAST_LIMIT = 3;
-// Just past toastSlideOut's 0.2s exit animation (see tailwind.css) — long
+// Just past toastSlideOut's 0.2s exit animation (see tailwind.css): long
 // enough for the close animation to finish, short enough that a just-closed
 // toast stops occupying a stack slot almost immediately. Used to sit at
 // 5000ms, which let closed-but-not-yet-removed toasts count against

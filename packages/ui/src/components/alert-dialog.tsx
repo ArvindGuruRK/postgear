@@ -31,7 +31,7 @@ export const AlertDialogContent = forwardRef<
       ref={ref}
       className={cn(
         'fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2',
-        'rounded-lg border-4 border-outline bg-secondary p-6 shadow-brutalLg outline-none',
+        'rounded-lg border-2 border-outline bg-secondary p-6 shadow-surfaceLg outline-none',
         className,
       )}
       {...props}
@@ -72,7 +72,7 @@ export const AlertDialogDescription = forwardRef<
 ));
 AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayName;
 
-/** Destructive by default — this is a confirmation dialog for actions that need one. */
+/** Destructive by default: this is a confirmation dialog for actions that need one. */
 export const AlertDialogAction = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'danger', ...props }, ref) => (
     <AlertDialogPrimitive.Action asChild>

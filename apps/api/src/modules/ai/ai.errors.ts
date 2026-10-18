@@ -3,13 +3,13 @@
  *
  * Every error that reaches a stream or a tool result passes through
  * `describeFailure`, which maps it to a kind, a catalogue message and a
- * retryable flag — and nothing else. The original, with the provider's own
+ * retryable flag, and nothing else. The original, with the provider's own
  * text, goes to the caller's logger. This is the single chokepoint that keeps
  * provider error bodies and key fragments out of responses.
  *
  * Engine errors are recognised by shape rather than by `instanceof`: the
  * class lives in `@postgear/ai-engine`, and a structural check keeps this
- * file — and the service and tool tests that depend on it — independent of
+ * file, and the service and tool tests that depend on it, independent of
  * the engine's runtime.
  */
 import { HttpException } from '@nestjs/common';
@@ -90,8 +90,8 @@ export function describeFailure(error: unknown): DescribedFailure {
     return { kind: 'aborted', message: AI_MESSAGES.ABORTED, retryable: false };
   }
 
-  // Messages this API wrote itself — a tool refusing a foreign channel, the
-  // posts service refusing an attachment — are already safe to show.
+  // Messages this API wrote itself (a tool refusing a foreign channel, the
+  // posts service refusing an attachment) are already safe to show.
   if (error instanceof CopilotToolError) {
     return { kind: 'unexpected', message: error.message, retryable: false };
   }

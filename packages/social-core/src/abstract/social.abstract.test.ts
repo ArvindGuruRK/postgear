@@ -84,7 +84,7 @@ describe('SocialAbstract', () => {
 
       await expect(provider.call('https://example.test/a')).rejects.toBeInstanceOf(RetryableError);
 
-      // Bounded, not infinite — an unbounded loop would pin a worker on a
+      // Bounded, not infinite: an unbounded loop would pin a worker on a
       // platform having a bad day.
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
@@ -203,7 +203,7 @@ describe('SocialAbstract', () => {
     });
 
     it('does not fail when the platform reports no scopes at all', () => {
-      // Silence is not evidence of a problem — the first real call will 403 if
+      // Silence is not evidence of a problem: the first real call will 403 if
       // something is genuinely missing, and that path is already handled.
       expect(() => provider.scopes(['read'], undefined)).not.toThrow();
     });

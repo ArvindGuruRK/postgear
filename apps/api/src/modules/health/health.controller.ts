@@ -2,7 +2,7 @@
  * Health (Sprint 8, PRD 5.12): what an orchestrator or an uptime monitor
  * asks, and the one deliberate failure the Sentry wiring is proven with.
  *
- * `GET /health` is `@Public()` — a monitor has no session — and answers
+ * `GET /health` is `@Public()` (a monitor has no session) and answers
  * `200 ok` only when the database answers; a `503 degraded` otherwise, so a
  * load balancer stops routing to an instance that cannot serve. It says
  * nothing about versions or hosts that would help someone mapping the

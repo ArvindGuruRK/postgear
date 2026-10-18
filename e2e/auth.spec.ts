@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Covers the Sprint 0 app shell — the auth screens that serve as the design
+ * Covers the Sprint 0 app shell: the auth screens that serve as the design
  * system's end-to-end smoke test, the routes that used to 404, and the focus
- * ring's contrast fix — plus the Sprint 2 behaviour layered onto those same
+ * ring's contrast fix, plus the Sprint 2 behaviour layered onto those same
  * screens: route gate 1, and the two places the UI must stay deliberately
  * uninformative about whether an account exists.
  *
@@ -28,7 +28,7 @@ test('sign in renders its fields and routes on to the other auth screens', async
   await page.getByRole('link', { name: 'Create an account' }).click();
   await expect(page).toHaveURL(/\/register$/);
   await expect(page.getByLabel('Full name')).toBeVisible();
-  // No workspace/organization field here on purpose — that moved into the
+  // No workspace/organization field here on purpose: that moved into the
   // post-signup onboarding flow (sprint-02, Task 6).
   await expect(page.getByLabel('Organization')).toHaveCount(0);
 
@@ -57,16 +57,36 @@ test('the password reveal toggle swaps the field type without losing the value',
   await expect(field).toHaveValue('correct horse battery staple');
 });
 
-test('the focus ring uses the darkened light-mode colour', async ({ page }) => {
+test('a focused field turns its own border blue instead of drawing an outline', async ({
+  page,
+}) => {
+  // Fields use FIELD_FOCUS (packages/ui/src/lib/field.ts, 2026-10-17): a text
+  // field matches :focus-visible on a plain click, so an outline drawn outside
+  // it read as a second, red border on every click.
+  await page.goto('/login');
+  const field = page.getByLabel('Email');
+  await field.focus();
+
+  // Retrying assertions: the border and ring ease in over 150ms, so a single
+  // read can land mid-transition. actionPrimary is #1d4ed8. The soft ring is a
+  // 3px box-shadow at 20% of that blue; Tailwind v4 mixes it as an `oklab()`
+  // colour, so the check is on the ring's spread and alpha rather than an rgb.
+  await expect(field).toHaveCSS('border-top-color', 'rgb(29, 78, 216)');
+  await expect(field).toHaveCSS('outline-style', 'none');
+  await expect(field).toHaveCSS('box-shadow', /\/ 0\.2\) 0px 0px 0px 3px/);
+});
+
+test('keyboard focus on a button uses the darkened light-mode ring', async ({ page }) => {
   // Regression guard for the WCAG fix: the ring used to reuse actionAccent
   // (#ff6b35), which only reached 2.68:1 against the light page background.
   // #d6440f clears 3:1 on the page, on white cards, and against the ink
-  // border. If someone re-points the ring at actionAccent, this fails.
+  // border. If someone re-points the ring at actionAccent, this fails. Fields
+  // have their own treatment (test above); buttons keep this ring.
   await page.goto('/login');
-  await page.getByLabel('Email').focus();
+  await page.getByRole('button', { name: 'Show password' }).focus();
 
   const outline = await page
-    .getByLabel('Email')
+    .getByRole('button', { name: 'Show password' })
     .evaluate((el) => {
       const style = getComputedStyle(el);
       return { color: style.outlineColor, style: style.outlineStyle, width: style.outlineWidth };
@@ -82,7 +102,7 @@ test('the focus ring uses the darkened light-mode colour', async ({ page }) => {
 test('form labels use the body face, not the display face', async ({ page }) => {
   // Regression guard for a mistake made twice: form-control labels rendered in
   // Bangers (font-display), then in the body face but uppercase with wide
-  // tracking — neither matching the specimen the playground has always shown.
+  // tracking, neither matching the specimen the playground has always shown.
   // design-system-rules.md §1 is the rule; this is the enforcement.
   await page.goto('/register');
 
@@ -129,7 +149,7 @@ test('an unknown route renders the styled 404, not a bare Next.js page', async (
 });
 
 test('an org route redirects an anonymous visitor to sign in', async ({ page }) => {
-  // This test used to assert the opposite — that /acme/calendar rendered the
+  // This test used to assert the opposite: that /acme/calendar rendered the
   // app shell for anyone. That was correct while the shell was a Sprint 0
   // design-system smoke test with no auth behind it. Sprint 2 added route
   // gate 1 in the (dashboard) group layout, so reaching a workspace without a
@@ -143,7 +163,7 @@ test('an org route redirects an anonymous visitor to sign in', async ({ page }) 
 test('the sign-in form reports a failure without saying which field was wrong', async ({
   page,
 }) => {
-  // The API returns one message for every cause — unknown email, wrong
+  // The API returns one message for every cause: unknown email, wrong
   // password, unactivated, locked. If a future change starts distinguishing
   // them the API becomes an account-enumeration oracle, and this fails.
   await page.goto('/login');

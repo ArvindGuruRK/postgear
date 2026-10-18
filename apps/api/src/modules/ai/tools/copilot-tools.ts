@@ -2,8 +2,8 @@
  * The four things the copilot can do, as the engine's `CopilotTool`s.
  *
  * The engine knows a tool's name, description and input schema and calls
- * `execute`; everything a tool touches — channels, posts, credits, the
- * engine's own pipeline and image generator — comes from the API through
+ * `execute`; everything a tool touches (channels, posts, credits, the
+ * engine's own pipeline and image generator) comes from the API through
  * `CopilotToolDeps`, bound to one workspace for one request. The names are
  * fixed: the web app renders each by name (`tool-activity.tsx`).
  *
@@ -356,7 +356,7 @@ function generateImageTool(
   };
 }
 
-/** The top of the next hour — where a copilot draft is parked, like the composer's default. */
+/** The top of the next hour, where a copilot draft is parked, like the composer's default. */
 export function nextFullHour(now: Date = new Date()): Date {
   const date = new Date(now);
   date.setUTCMinutes(0, 0, 0);

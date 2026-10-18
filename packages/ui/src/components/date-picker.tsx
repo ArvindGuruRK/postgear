@@ -3,6 +3,7 @@
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useState } from 'react';
+import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
 import { Calendar } from './calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
@@ -33,9 +34,9 @@ export function DatePicker({
           type="button"
           disabled={disabled}
           className={cn(
-            'flex h-11 w-full items-center gap-2 rounded-md border-2 border-outline bg-secondary px-4',
-            'font-sans text-sm text-ink shadow-brutalSm',
-            'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+            'flex h-11 w-full items-center gap-2 rounded-md border-2 border-outline bg-field px-4',
+            'font-sans text-sm text-ink shadow-surfaceSm',
+            FIELD_FOCUS,
             'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
             className,
           )}

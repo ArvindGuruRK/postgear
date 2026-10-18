@@ -7,8 +7,8 @@
  * ## Messages are composed here, never copied from the platform
  *
  * `AnalyticsSync.lastError` is shown to the user as-is, so what goes into
- * it is chosen by *class* of failure. A provider's `providerBody` — the
- * platform's own response — is diagnostic and goes only to the log; it can
+ * it is chosen by *class* of failure. A provider's `providerBody`, the
+ * platform's own response, is diagnostic and goes only to the log; it can
  * contain the request that caused it, and on some platforms an echo of the
  * token. The provider's own `message` is safe by the contract in
  * `social.abstract.ts` (every message there is written by PostGear), and is
@@ -78,7 +78,7 @@ export function planUpserts(
   );
 }
 
-/** How many distinct days the rows cover — what the status line calls `channelDays`. */
+/** How many distinct days the rows cover: what the status line calls `channelDays`. */
 export function distinctDays(rows: SnapshotRow[]): number {
   return new Set(rows.map((row) => row.date.getTime())).size;
 }
@@ -106,7 +106,7 @@ export interface SafeFailure {
  *
  * Only a transient failure (or an unclassified one, which is more likely a
  * platform having a bad minute than a bug) is retried; the others need a
- * person — to reconnect, to re-consent — and retrying would just repeat
+ * person (to reconnect, to re-consent) and retrying would just repeat
  * the same answer every thirty seconds.
  */
 export function safeFailure(error: unknown, channelName: string): SafeFailure {

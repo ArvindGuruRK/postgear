@@ -1,5 +1,5 @@
 /**
- * Calendar — every scheduled post, by month, week or day (Sprint 5).
+ * Calendar: every scheduled post, by month, week or day (Sprint 5).
  *
  * The server loads the channels (for the filter and the posting-time
  * suggestions); the posts themselves are fetched by the client, because the

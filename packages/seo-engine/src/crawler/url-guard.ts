@@ -1,5 +1,5 @@
 /**
- * SSRF protection for every URL the engine fetches — the main page, each
+ * SSRF protection for every URL the engine fetches: the main page, each
  * redirect hop, every link it checks, robots.txt, the sitemap, and (through
  * the browser pool's route hook) every sub-resource a headless page requests.
  *
@@ -14,7 +14,7 @@
  * 1. it parses as a URL, with an `http:` or `https:` scheme;
  * 2. no credentials in the authority (`user:pw@host` is how phishing and
  *    some proxy tricks smuggle hosts past naive checks);
- * 3. the port is the scheme's default unless the caller allowed others — an
+ * 3. the port is the scheme's default unless the caller allowed others: an
  *    attacker cannot pick a service by port;
  * 4. the host name is not one of the names that only mean something inside a
  *    machine or a network (`localhost`, `*.local`, `*.internal`,
@@ -73,7 +73,7 @@ function reject(reason: UrlRejectReason): SeoCrawlError {
 /**
  * The canonical spelling of a URL: lower-cased scheme and host (the URL
  * parser does this), no fragment, no default port, path and query kept as
- * given. Credentials are not stripped silently — they are refused, because a
+ * given. Credentials are not stripped silently: they are refused, because a
  * URL that carried them was almost certainly crafted.
  */
 export function normaliseUrl(input: string): string {
@@ -143,7 +143,7 @@ function isPrivateV4(octets: number[]): boolean {
 /**
  * Expands an IPv6 literal to its sixteen bytes. Handles `::` compression, an
  * embedded dotted IPv4 tail (`::ffff:127.0.0.1`) and a zone id (`fe80::1%eth0`).
- * Returns null for anything it cannot read — which the caller treats as
+ * Returns null for anything it cannot read, which the caller treats as
  * private, since an address we cannot parse is not one we can vouch for.
  */
 function parseIpv6(ip: string): number[] | null {
@@ -191,11 +191,11 @@ function isPrivateV6(bytes: number[]): boolean {
 
   // :: (unspecified) and ::1 (loopback).
   if (allZeroUpTo(15) && (bytes[15] === 0 || bytes[15] === 1)) return true;
-  // ::ffff:a.b.c.d — IPv4-mapped: the verdict is the embedded IPv4's.
+  // ::ffff:a.b.c.d, IPv4-mapped: the verdict is the embedded IPv4's.
   if (allZeroUpTo(10) && bytes[10] === 0xff && bytes[11] === 0xff) {
     return isPrivateV4(bytes.slice(12));
   }
-  // 64:ff9b::/96 — NAT64: likewise, the embedded IPv4 decides.
+  // 64:ff9b::/96, NAT64: likewise, the embedded IPv4 decides.
   if (
     bytes[0] === 0x00 &&
     bytes[1] === 0x64 &&
@@ -205,7 +205,7 @@ function isPrivateV6(bytes: number[]): boolean {
   ) {
     return isPrivateV4(bytes.slice(12));
   }
-  // ::a.b.c.d — deprecated IPv4-compatible form; treat like mapped.
+  // ::a.b.c.d, deprecated IPv4-compatible form; treat like mapped.
   if (allZeroUpTo(12) && bytes.slice(12).some((b) => b !== 0)) {
     return isPrivateV4(bytes.slice(12));
   }
@@ -222,7 +222,7 @@ function isPrivateV6(bytes: number[]): boolean {
 
 /**
  * True when the address must never be connected to: loopback, link-local,
- * private, CGNAT, multicast, reserved, unspecified, documentation — or
+ * private, CGNAT, multicast, reserved, unspecified, documentation, or
  * unparseable. IPv6 forms that wrap an IPv4 address (mapped, NAT64,
  * compatible) are judged by the IPv4 inside them.
  */

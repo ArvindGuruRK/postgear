@@ -2,7 +2,7 @@
  * Request schemas for `/v1` (Sprint 8, contract §5.3).
  *
  * `.strict()` like every schema in this API: an unknown key is refused, not
- * stripped — for a public API that is also the kindest behaviour, because a
+ * stripped; for a public API that is also the kindest behaviour, because a
  * misspelled `publishAt` that was silently dropped would queue a post for
  * five minutes from now and nobody would know why.
  *

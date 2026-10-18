@@ -2,8 +2,8 @@
  * The post document's normalizer and reader.
  *
  * The normalizer runs on TipTap's raw JSON in the browser, so these tests feed
- * it what TipTap actually emits — null attributes, `target`/`rel` on links,
- * node types from extensions PostGear does not use — and pin that nothing
+ * it what TipTap actually emits (null attributes, `target`/`rel` on links,
+ * node types from extensions PostGear does not use) and pin that nothing
  * outside the allowlist survives while the user's words always do.
  */
 import {

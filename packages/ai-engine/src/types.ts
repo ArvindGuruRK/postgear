@@ -1,5 +1,5 @@
 /**
- * The AI engine's contract — every type the API (and the engine's own tests)
+ * The AI engine's contract: every type the API (and the engine's own tests)
  * program against.
  *
  * ## Three seams, all injected
@@ -7,14 +7,14 @@
  * The engine never reads an environment variable, opens a database, or stores
  * a file. Three things are handed to it by whoever builds it:
  *
- * - a {@link ModelClient} — the one place a language model is called. The
+ * - a {@link ModelClient}: the one place a language model is called. The
  *   OpenAI client is the production one; the simulated client produces
  *   deterministic output with no key, so every screen, every credit rule and
  *   every test runs without spending anything (the same reasoning as Sprint 5's
  *   `PUBLISH_SIMULATION`).
- * - a {@link ResearchProvider} — web research (Tavily). Optional: without one
+ * - a {@link ResearchProvider}: web research (Tavily). Optional: without one
  *   the pipeline skips research and says so, rather than failing.
- * - an {@link ImageGenerator} plus an {@link ImageSink} — DALL-E and the media
+ * - an {@link ImageGenerator} plus an {@link ImageSink}: DALL-E and the media
  *   library. The engine produces bytes; the API decides where they live.
  *
  * ## Why events, not a return value alone
@@ -24,7 +24,7 @@
  * (SSE) and a person watches research, hook and copy arrive instead of a
  * spinner. The final result is also returned, for callers that do not stream.
  *
- * This file must stay free of runtime imports other than `zod` — it is the
+ * This file must stay free of runtime imports other than `zod`: it is the
  * contract, and the web app mirrors it in `apps/web/src/types/ai.ts`.
  */
 import type { z } from 'zod';
@@ -49,7 +49,7 @@ export const POST_FORMATS: readonly PostFormat[] = [
 ] as const;
 
 export interface GenerateRequest {
-  /** What the post should be about — a topic, a brief, a link, a rough draft. */
+  /** What the post should be about: a topic, a brief, a link, a rough draft. */
   topic: string;
   tone: Tone;
   format: PostFormat;
@@ -76,7 +76,7 @@ export interface GenerateRequest {
 export interface ResearchSource {
   title: string;
   url: string;
-  /** A short excerpt the model was shown — what the UI cites. */
+  /** A short excerpt the model was shown: what the UI cites. */
   snippet: string;
 }
 
@@ -86,7 +86,7 @@ export interface ResearchProvider {
   search(query: string, options?: { signal?: AbortSignal }): Promise<ResearchSource[]>;
 }
 
-/** The cache a research provider may be wrapped with — the API backs it with Redis. */
+/** The cache a research provider may be wrapped with: the API backs it with Redis. */
 export interface ResearchCache {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
@@ -178,7 +178,7 @@ export interface ContentPipeline {
   /**
    * Runs the graph. Resolves with the result; rejects with an
    * {@link AiProviderError} (or `AbortError`) when the copy itself could not be
-   * produced. Research and image failures are *not* rejections — they are
+   * produced. Research and image failures are *not* rejections: they are
    * reported as `stage … failed` events and the result is returned without them.
    */
   generate(request: GenerateRequest, options?: GenerateOptions): Promise<GenerateResult>;
@@ -206,7 +206,7 @@ export interface CopilotTool<Input = unknown, Output = unknown> {
   name: string;
   description: string;
   inputSchema: z.ZodType<Input>;
-  /** True for tools that change nothing — the UI shows them differently. */
+  /** True for tools that change nothing: the UI shows them differently. */
   readOnly: boolean;
   execute(input: Input, context: CopilotToolContext): Promise<Output>;
   /**
@@ -385,7 +385,7 @@ export type ModelChunk =
  * errors into {@link AiProviderError}.
  */
 export interface ModelClient {
-  /** "openai:gpt-4.1-mini", "simulation" — reported by `/ai/status`. */
+  /** "openai:gpt-4.1-mini", "simulation": reported by `/ai/status`. */
   readonly name: string;
   structured<T>(params: {
     schema: z.ZodType<T>;
@@ -405,7 +405,7 @@ export interface ModelClient {
 // ---------------------------------------------------------------------------
 
 export type AiErrorKind =
-  /** No model client could be built — no key and no simulation. */
+  /** No model client could be built: no key and no simulation. */
   | 'not_configured'
   /** The provider rejected the key. A deployment problem, not a user one. */
   | 'invalid_key'
@@ -443,7 +443,7 @@ export function isAiProviderError(error: unknown): error is AiProviderError {
 
 /**
  * The categories the classify stage chooses from (PRD 5.5 "Category
- * Classification"). PostGear's own list — short enough to fit one prompt,
+ * Classification"). PostGear's own list: short enough to fit one prompt,
  * broad enough that every brief lands somewhere.
  */
 export const AI_CATEGORIES = [

@@ -69,7 +69,7 @@ describe('SimulatedStripeGateway', () => {
     });
 
     expect(url).toMatch(/\?checkout=success&session_id=cs_sim_[0-9a-f]{16}$/);
-    // Nothing has landed yet — the page's "Activating…" window.
+    // Nothing has landed yet: the page's "Activating…" window.
     expect(store.org().subscription).toBeNull();
 
     await gateway.flush();

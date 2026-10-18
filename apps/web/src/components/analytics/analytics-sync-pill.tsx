@@ -3,11 +3,11 @@
 /**
  * When the metrics were last fetched, and whether anything is fetching them.
  *
- * The analytics twin of `SchedulerStatusPill`: a number on this page is only
+ * Why it is shown: a number on this page is only
  * as current as the worker's last sync, and a worker that is not running
  * leaves every number looking perfectly healthy and quietly stale. The pill
- * asks `/analytics/sync` every half minute while the page is visible — and
- * straight away when the page requests a sync — and the tooltip lists each
+ * asks `/analytics/sync` every half minute while the page is visible (and
+ * straight away when the page requests a sync), and the tooltip lists each
  * channel's own last sync, so "2 channels need attention" can be read
  * without scrolling to the table.
  */
@@ -35,7 +35,7 @@ export function AnalyticsSyncPill({
 }: {
   /** What the server page loaded; null when it could not. */
   initial: AnalyticsSyncOverview | null;
-  /** Bump to re-check immediately — after "Sync now". */
+  /** Bump to re-check immediately, after "Sync now". */
   refreshKey?: number;
   now: Date;
   className?: string;

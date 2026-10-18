@@ -1,7 +1,7 @@
 /**
  * Helpers shared by the model clients.
  *
- * The engine speaks {@link ModelMessage} — a small, provider-neutral shape —
+ * The engine speaks {@link ModelMessage} (a small, provider-neutral shape),
  * so the agents, the simulated client and the tests never import LangChain
  * message classes. The OpenAI client is the one place that shape is turned
  * into LangChain's, and {@link toLangChainMessages} is that translation.
@@ -9,7 +9,7 @@
  * {@link structuredWithRepair} is the structured-output policy from contract
  * §2: ask once; if the answer does not satisfy the Zod schema, ask once more
  * with the validation errors quoted back; then give up as `bad_output`. One
- * repair, not a loop — a model that fails twice with the errors in front of
+ * repair, not a loop: a model that fails twice with the errors in front of
  * it is not going to pass on the third try, and every attempt costs money.
  */
 import {

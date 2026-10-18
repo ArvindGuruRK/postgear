@@ -3,6 +3,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { forwardRef } from 'react';
+import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
 
 export const Select = SelectPrimitive.Root;
@@ -16,9 +17,9 @@ export const SelectTrigger = forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-11 w-full items-center justify-between gap-2 rounded-md border-2 border-outline bg-secondary px-4',
-      'font-sans text-sm text-ink shadow-brutalSm',
-      'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+      'flex h-11 w-full items-center justify-between gap-2 rounded-md border-2 border-outline bg-field px-4',
+      'font-sans text-sm text-ink shadow-surfaceSm',
+      FIELD_FOCUS,
       'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
       className,
     )}
@@ -41,7 +42,7 @@ export const SelectContent = forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-brutalMd',
+        'z-50 min-w-[8rem] overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-surfaceMd',
         'font-sans text-sm text-ink',
         position === 'popper' && 'translate-y-1',
         className,

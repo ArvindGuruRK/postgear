@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 /**
  * "The model is typing" for the Sprint 6 copilot chat: three ink dots on a
  * staggered pulse. Reuses Tailwind's `animate-pulse` with per-dot
- * `animation-delay` instead of adding a keyframe — the system has one
+ * `animation-delay` instead of adding a keyframe: the system has one
  * entrance animation and no bounce (design-system-rules.md §16), and a
  * brightness pulse is the quietest way to say "working" without inventing
  * motion. Under `prefers-reduced-motion` the dots simply sit still; they

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule, type JwtModuleOptions } from '@nestjs/jwt';
+import { AvatarModule } from '../users/avatar.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { LockoutService } from './lockout.service';
@@ -12,6 +13,8 @@ import { TokenService } from './token.service';
 
 @Module({
   imports: [
+    // For the OAuth signup photo import (`AuthService.findOrCreateFromOAuth`).
+    AvatarModule,
     // Registered async so the secret comes from the validated config rather
     // than a raw `process.env` read that would silently sign with `undefined`
     // if the variable were missing.
@@ -40,8 +43,8 @@ import { TokenService } from './token.service';
     FacebookAuthProvider,
     ProvidersManager,
   ],
-  // JwtModule is re-exported so JwtAuthGuard — registered globally in
-  // AppModule — can inject JwtService without re-configuring the secret.
+  // JwtModule is re-exported so JwtAuthGuard, registered globally in
+  // AppModule, can inject JwtService without re-configuring the secret.
   exports: [AuthService, PasswordService, JwtModule],
 })
 export class AuthModule {}

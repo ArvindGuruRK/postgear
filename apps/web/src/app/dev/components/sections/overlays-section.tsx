@@ -53,7 +53,7 @@ export function OverlaysSection() {
   return (
     <Section
       title="Overlays"
-      description="Flat ink-tinted backdrop, no blur — large-surface treatment (border-4, shadow-brutalLg) on every modal surface."
+      description="Flat ink-tinted backdrop, no blur: every modal surface uses border-2 and the bottom-only shadow-surfaceLg."
     >
       <Row label="Dialog">
         <Dialog>
@@ -64,7 +64,7 @@ export function OverlaysSection() {
             <DialogHeader>
               <DialogTitle>Delete this channel?</DialogTitle>
               <DialogDescription>
-                This removes LinkedIn — Acme Media from PostGear. Scheduled posts for this channel will be
+                This removes LinkedIn (Acme Media) from PostGear. Scheduled posts for this channel will be
                 cancelled. This can&apos;t be undone.
               </DialogDescription>
             </DialogHeader>
@@ -151,7 +151,7 @@ export function OverlaysSection() {
           <HoverCardContent>
             <p className="type-label text-sm text-ink">Jordan Miles</p>
             <p className="mt-1 font-sans text-sm text-ink opacity-70">
-              Content lead — connected 4 channels, 128 posts scheduled this quarter.
+              Content lead. Connected 4 channels, 128 posts scheduled this quarter.
             </p>
           </HoverCardContent>
         </HoverCard>

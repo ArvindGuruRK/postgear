@@ -5,8 +5,8 @@
  * ranked by engagement.
  *
  * Each row is a button that opens the post's own numbers; the two links a
- * row carries — "Create similar", which hands the post's text to the AI
- * studio as a topic, and the platform permalink — sit beside the button,
+ * row carries ("Create similar", which hands the post's text to the AI
+ * studio as a topic, and the platform permalink) sit beside the button,
  * not inside it, because a link inside a button is reachable by neither
  * keyboard nor screen reader. The rank is `type-heading` (it is chrome: a
  * big number meant to be read from across the room); everything else in

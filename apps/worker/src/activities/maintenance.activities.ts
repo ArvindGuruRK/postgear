@@ -3,7 +3,7 @@
  * every refreshable channel has a workflow.
  *
  * The API starts workflows as posts are queued and channels connected, but it
- * does so best-effort — if Temporal is unreachable for a moment, the save still
+ * does so best-effort: if Temporal is unreachable for a moment, the save still
  * succeeds and the row is simply waiting for this. A `start` with the
  * deterministic id is idempotent: one that already runs is left exactly as it
  * is (the "already started" error is the expected answer), and one that does

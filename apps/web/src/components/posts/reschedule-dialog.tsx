@@ -5,8 +5,8 @@
  *
  * The keyboard-first counterpart to dragging a card on the calendar, and the
  * only way to move a post from the queue list. Offers the channels' own posting
- * times for the chosen day first — those are the slots the person configured
- * on the Channels page, so they are usually what is wanted — and a free field
+ * times for the chosen day first (those are the slots the person configured
+ * on the Channels page, so they are usually what is wanted) and a free field
  * for anything else.
  */
 import {
@@ -53,7 +53,7 @@ export function RescheduleDialog({
     }
 
     // A failed or overdue post opens on the next whole hour rather than on its
-    // old, past time — which would only be refused.
+    // old, past time, which would only be refused.
     const current = new Date(post.publishDate);
     const nextHour = new Date();
     nextHour.setMinutes(0, 0, 0);

@@ -4,7 +4,7 @@
  * The engine asks for base64 rather than a URL: OpenAI's image URLs expire
  * after an hour, and the bytes have to end up in PostGear's media library
  * anyway, where the API's `ImageSink` stores them for good. The size is
- * fixed at 1024×1024 — one square hero image works on every platform
+ * fixed at 1024×1024: one square hero image works on every platform
  * PostGear supports, and offering a choice would only add a way to pick
  * something a platform rejects.
  *

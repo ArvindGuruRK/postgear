@@ -2,14 +2,14 @@
 
 /**
  * The analytics dashboard (Sprint 7, user stories 6.1–6.5): totals, a
- * trend, the channels compared, the posts that did best — for a range and,
+ * trend, the channels compared, the posts that did best, for a range and,
  * optionally, one channel.
  *
  * ## Shape
  *
  * The header is the chrome and carries the full treatment: range tabs, the
  * channel select, Sync now, Export CSV and the sync pill. Everything under
- * it is data in the restrained profile (§15) — cards with no halftone, a
+ * it is data in the restrained profile (§15): cards with no halftone, a
  * table with no shadow, charts drawn from tokens.
  *
  * ## States, in the order they are checked
@@ -27,7 +27,7 @@
  *
  * `ANALYTICS_SIMULATION=true` makes the worker read a deterministic stand-in
  * instead of the platforms, and the API says so on every overview. The
- * banner is one plain line in the default `Alert` — not the AI violet,
+ * banner is one plain line in the default `Alert`, not the AI violet,
  * which marks model output, and not a warning, which this is not: it is
  * the local setup working as intended.
  */
@@ -38,7 +38,7 @@ import {
   cn,
   EmptyState,
   ErrorState,
-  PageHeader,
+  PageActions,
   SectionHeader,
   Select,
   SelectContent,
@@ -172,13 +172,9 @@ export function AnalyticsView({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Analytics"
-        description="How every channel and post is doing — followers, reach, engagement — across the range."
-        actions={headerActions}
-      />
+      <PageActions>{headerActions}</PageActions>
 
-      <div className="flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-brutalSm md:flex-row md:flex-wrap md:items-center">
+      <div className="flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-surfaceSm md:flex-row md:flex-wrap md:items-center">
         <Tabs
           value={String(analytics.filters.range)}
           onValueChange={(value) =>

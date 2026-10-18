@@ -6,7 +6,7 @@
  * Rows are workspace-scoped (the worker has written them since Sprint 5) and
  * have no per-user state. "Read" is derived: a row is read when it is no
  * older than the viewer's `NotificationCursor.lastReadAt` for this workspace,
- * and a viewer with no cursor yet has read nothing since they joined — the
+ * and a viewer with no cursor yet has read nothing since they joined; the
  * membership's `createdAt` stands in, so a new member is not greeted by a
  * year of history as unread. A superadmin acting without a membership has no
  * join date; for them everything counts until they mark all read.
@@ -15,7 +15,7 @@
  *
  * Billing and webhooks call it; the worker writes its own rows directly. It
  * pushes the row to the open streams of the workspace at once rather than
- * waiting for the dispatcher's next poll — the dispatcher will see it too,
+ * waiting for the dispatcher's next poll: the dispatcher will see it too,
  * and the stream registry drops the repeat.
  */
 import { Injectable } from '@nestjs/common';

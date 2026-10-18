@@ -3,7 +3,7 @@
  *
  * Built by hand rather than from `@nestjs/swagger`'s decorators, for two
  * reasons. First, the decorators describe class-validator DTOs, and this
- * API validates with zod — so the request bodies here are generated from
+ * API validates with zod, so the request bodies here are generated from
  * the very schemas the routes enforce (`zod-to-json-schema`), and cannot
  * drift from them. Second, only `/v1` is public; a decorator scan would
  * document the session routes too, and an "internal" tag is not a boundary.
@@ -29,7 +29,7 @@ import {
   PUBLIC_STATE_FILTERS,
 } from '../v1/dto/v1.schema';
 
-/** The security scheme's name — what every operation's `security` refers to. */
+/** The security scheme's name: what every operation's `security` refers to. */
 export const OPENAPI_SECURITY_SCHEME = 'apiKey';
 
 export const OPENAPI_UI_PATH = 'api/docs';
@@ -208,7 +208,7 @@ function buildPaths(): OpenAPIObject['paths'] {
         operationId: 'getAnalyticsOverview',
         summary: 'The analytics overview',
         description:
-          'Totals, per-channel figures and the top posts for the last 7, 30 or 90 days — the same overview the Analytics page shows.',
+          'Totals, per-channel figures and the top posts for the last 7, 30 or 90 days: the same overview the Analytics page shows.',
         parameters: [
           {
             name: 'range',

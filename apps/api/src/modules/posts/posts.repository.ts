@@ -1,5 +1,5 @@
 /**
- * Persistence for posts — and the only place a post's row structure is known.
+ * Persistence for posts, and the only place a post's row structure is known.
  *
  * ## One post, many rows
  *
@@ -29,7 +29,7 @@
  *
  * Reordering a thread changes which text sits at which position, not which
  * rows exist. Keeping row ids stable by position means the root row of each
- * channel — which Sprint 5's publish workflow is keyed on — survives every
+ * channel, which Sprint 5's publish workflow is keyed on, survives every
  * edit, reorder included.
  */
 import { Injectable } from '@nestjs/common';
@@ -50,7 +50,7 @@ export interface PostRow {
   /** The platform's id and permalink, once published (Sprint 5). */
   releaseId: string | null;
   releaseURL: string | null;
-  /** The worker's publish status JSON, on a chain's root row — see `@postgear/scheduling`. */
+  /** The worker's publish status JSON, on a chain's root row: see `@postgear/scheduling`. */
   error: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -80,7 +80,7 @@ export interface GroupWrite {
 
 export type ReplaceOutcome = 'saved' | 'not_found' | 'locked' | 'conflict';
 
-/** The root row of one channel's chain — what the scheduler's workflow is keyed on. */
+/** The root row of one channel's chain: what the scheduler's workflow is keyed on. */
 export interface ChainRoot {
   id: string;
   integrationId: string;
@@ -229,7 +229,7 @@ export class PostsRepository {
    * Replaces a group's content in place.
    *
    * Existing rows are updated by position, missing ones created, surplus ones
-   * soft-deleted — and a channel that is no longer targeted has all of its rows
+   * soft-deleted, and a channel that is no longer targeted has all of its rows
    * soft-deleted. Nothing is hard-deleted: `Errors` and `Comments` reference
    * post ids, and history should outlive an edit.
    */
@@ -387,7 +387,7 @@ export class PostsRepository {
    *
    * Filters apply to root rows: a group is listed when any of its channels
    * matches, so "failed" shows a post that published to one channel and failed
-   * on another — which is exactly the post that needs attention.
+   * on another, which is exactly the post that needs attention.
    */
   async listQueue(query: QueueQuery): Promise<{ rows: PostRow[]; total: number }> {
     const where: Prisma.PostWhereInput = {
@@ -440,8 +440,8 @@ export class PostsRepository {
   /**
    * Moves a group's unpublished channels to a new publish time.
    *
-   * Every row of those channels moves — a thread's parts share the root's
-   * date — and a channel that had failed goes back to the queue, since a new
+   * Every row of those channels moves (a thread's parts share the root's
+   * date) and a channel that had failed goes back to the queue, since a new
    * time is a new attempt. Channels already published stay exactly where they
    * are: they are out there. A group with nothing left to move is `locked`.
    */
@@ -556,7 +556,7 @@ export class PostsRepository {
         publishDate: write.publishDate,
         parentPostId: previousId,
         // A save is a new version; whatever the worker recorded about the old
-        // one — a failure, a retry in progress — no longer describes it.
+        // one (a failure, a retry in progress) no longer describes it.
         error: null,
       };
 

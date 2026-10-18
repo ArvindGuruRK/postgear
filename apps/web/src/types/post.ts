@@ -111,7 +111,7 @@ export interface QueuePage {
   total: number;
 }
 
-/** `GET /scheduling/status` — whether anything would actually publish. */
+/** `GET /scheduling/status`: whether anything would actually publish. */
 export interface SchedulerStatus {
   reachable: boolean;
   /** Null when the scheduler itself is unreachable. */

@@ -1,11 +1,11 @@
 /**
- * Pinterest — OAuth 2.0, API v5.
+ * Pinterest: OAuth 2.0, API v5.
  *
  * ## Why this has an entity-selection step even though OAuth already gave us a user
  *
  * A Pin cannot exist outside a Board. Unlike Facebook, where the Page also
  * carries the token, Pinterest's board choice is purely about *where* the
- * content lands — but it is equally required, and asking at connect time is far
+ * content lands, but it is equally required, and asking at connect time is far
  * better than failing at publish time. The selected board becomes the channel's
  * `internalId`.
  *
@@ -56,7 +56,7 @@ const MAX_TITLE_LENGTH = 100;
  *
  * Video is declared unsupported because `createPin` cannot publish it. A
  * Pinterest video Pin needs the bytes registered through the media upload API
- * first, which returns the `video_id` that `media_source` expects — passing a
+ * first, which returns the `video_id` that `media_source` expects: passing a
  * URL where that id belongs is rejected. Until that flow exists, saying "no
  * video" in the composer is the honest answer.
  *
@@ -306,7 +306,7 @@ export class PinterestProvider
 
   /**
    * The account's follower level and its daily analytics. A `SAVE` is a Pin
-   * re-pinned to someone else's board — Pinterest's form of a share — so it
+   * re-pinned to someone else's board (Pinterest's form of a share), so it
    * is recorded as `shares`; `ENGAGEMENT` is Pinterest's own total.
    */
   async channelAnalytics(

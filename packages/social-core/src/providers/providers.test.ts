@@ -1,5 +1,5 @@
 /**
- * Per-provider behaviour, with `fetch` mocked — no network.
+ * Per-provider behaviour, with `fetch` mocked: no network.
  *
  * The focus is the parts that are silently wrong rather than loudly broken: a
  * missing `offline.access` scope yields no refresh token and the channel dies a
@@ -305,7 +305,7 @@ describe('IntegrationManager', () => {
   });
 
   it('uses "x" as the identifier even though the folder is named twitter', () => {
-    // The identifier is data — it is written to Integration.providerIdentifier
+    // The identifier is data: it is written to Integration.providerIdentifier
     // and already shipped in the onboarding channel list. Folder names are not.
     expect(new XProvider().identifier).toBe('x');
   });
@@ -399,7 +399,7 @@ describe('publishing rules (Sprint 4)', () => {
   });
 
   it('counts X length the way X does, not by string length', async () => {
-    // 140 CJK characters weigh 280 — full, but not over.
+    // 140 CJK characters weigh 280: full, but not over.
     await expect(
       new XProvider().checkValidity([{ id: 'p1', message: '字'.repeat(140) }]),
     ).resolves.toBe(true);

@@ -1,19 +1,19 @@
 /**
- * Instagram Business — publishing via the Meta Graph API.
+ * Instagram Business: publishing via the Meta Graph API.
  *
  * ## Instagram is reached through Facebook
  *
  * There is no standalone Instagram publishing API for business accounts. An IG
  * Business account must be linked to a Facebook Page, and it is that Page's
  * token which authorises publishing. So the entity list here is "the Instagram
- * accounts behind the Pages you administer" — pages without a linked IG account
+ * accounts behind the Pages you administer": pages without a linked IG account
  * simply do not appear, which is the single most common reason a user sees an
  * empty picker.
  *
  * ## Publishing is two calls, not one
  *
  * Instagram requires creating a *media container* and then publishing it, and
- * for video the container is processed asynchronously — publishing too early is
+ * for video the container is processed asynchronously: publishing too early is
  * rejected. Hence the poll between the two steps.
  */
 import {
@@ -58,7 +58,7 @@ const MAX_CAROUSEL_ITEMS = 10;
 
 /**
  * Instagram reports interactions (`likes`, `comments`, `shares`, `saves`) as
- * one total over the requested span — `metric_type=total_value` is the only
+ * one total over the requested span: `metric_type=total_value` is the only
  * form those metrics support. A per-day series therefore takes one call per
  * day. Rather than ninety calls a sync, each sync reads today and the two
  * days before it, and the daily cadence fills the window over time: a day
@@ -257,7 +257,7 @@ export class InstagramProvider
 
   /**
    * The account's follower level, daily reach, and its interactions for the
-   * last few days — see `TOTAL_VALUE_BACKFILL_DAYS` for why only a few.
+   * last few days: see `TOTAL_VALUE_BACKFILL_DAYS` for why only a few.
    *
    * The level is the account's `followers_count` field. The `follower_count`
    * *insight* is new followers per day (a flow), and is withheld for accounts

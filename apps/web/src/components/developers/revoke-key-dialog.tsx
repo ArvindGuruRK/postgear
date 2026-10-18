@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Confirms revoking a key. Destructive in the sense that matters — every
- * call with this secret is refused from now on, and there is no undo — so
+ * Confirms revoking a key. Destructive in the sense that matters (every
+ * call with this secret is refused from now on, and there is no undo), so
  * it takes the danger action, like disconnecting a channel.
  */
 import {

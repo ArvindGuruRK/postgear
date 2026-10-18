@@ -2,7 +2,7 @@
 
 /**
  * What the model produced: the category, the hook, the parts, the image, the
- * sources — and the three things to do with it.
+ * sources, and the three things to do with it.
  *
  * Rendered from the reducer's partial fields rather than the final result,
  * so the hook appears the moment it streams and a run that failed at the
@@ -11,9 +11,9 @@
  * cards, because they are the composer's content next, not an exhibit
  * (design-system-rules.md §16b).
  *
- * "Open in composer" creates a real DRAFT through `POST /posts` — the same
+ * "Open in composer" creates a real DRAFT through `POST /posts` (the same
  * payload the composer sends, one part per generated part, the hero image on
- * the first — and navigates to it. The composer is where the post is edited
+ * the first) and navigates to it. The composer is where the post is edited
  * and scheduled; this screen does not grow a second editor.
  */
 import { documentFromText, measureLength } from '@postgear/social-core/composer';
@@ -224,7 +224,7 @@ function PartCard({
 
   return (
     <li data-testid="ai-result-part" data-index={index + 1}>
-      <Card className="flex flex-col gap-3 border-2 p-4 shadow-brutalSm">
+      <Card className="flex flex-col gap-3 border-2 p-4 shadow-surfaceSm">
         <div className="flex items-center justify-between gap-3">
           <span className="type-label text-sm text-ink">
             {total > 1 ? `Part ${index + 1} of ${total}` : 'Post'}

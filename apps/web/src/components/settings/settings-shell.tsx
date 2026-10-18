@@ -1,7 +1,7 @@
 'use client';
 
 import { SettingsNav } from '@postgear/ui';
-import { Bell, CreditCard, KeyRound, Users, Webhook } from 'lucide-react';
+import { Bell, CreditCard, KeyRound, Palette, Users, Webhook } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -20,6 +20,9 @@ const SECTIONS = [
   { segment: 'api-keys', label: 'API keys', icon: KeyRound },
   { segment: 'webhooks', label: 'Webhooks', icon: Webhook },
   { segment: 'notifications', label: 'Notifications', icon: Bell },
+  // Per user, like Notifications: the mode and light theme follow the person
+  // into every workspace.
+  { segment: 'appearance', label: 'Appearance', icon: Palette },
 ] as const;
 
 export function SettingsShell({ orgId, children }: { orgId: string; children: ReactNode }) {

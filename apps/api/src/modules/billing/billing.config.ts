@@ -1,5 +1,5 @@
 /**
- * Which billing mode to run, decided from the environment — and nothing else.
+ * Which billing mode to run, decided from the environment, and nothing else.
  *
  * Separate from the module's wiring so the decision is a pure function with
  * a test, as `ai/engine/engine.config.ts` is for the AI engine.
@@ -11,13 +11,13 @@
  * Then a real secret key means `stripe`; otherwise `unconfigured`, where
  * `/billing/status` says so, checkout answers 503 and the page explains.
  *
- * ## Placeholders count as unset — checked here too
+ * ## Placeholders count as unset: checked here too
  *
  * `config/env.ts` turns the `.env.example` placeholders into `undefined`
  * and refuses a secret key without a webhook secret. But Nest's
  * `ConfigService.get` falls back to the raw `process.env` value when the
  * validated one is `undefined`, so a placeholder would reach this file
- * anyway — and select Stripe mode with a key that cannot work. The same
+ * anyway, and select Stripe mode with a key that cannot work. The same
  * list is applied again here, the way `ai/engine/engine.config.ts` keeps
  * its own, and each ignored variable is named once in the boot log.
  */
@@ -105,7 +105,7 @@ export function resolveBillingConfig(env: BillingEnv): BillingConfig {
 
   if (env.BILLING_SIMULATION === 'true') {
     if (secretKey) {
-      warnings.push('STRIPE_SECRET_KEY is set but BILLING_SIMULATION=true wins — Stripe is not called.');
+      warnings.push('STRIPE_SECRET_KEY is set but BILLING_SIMULATION=true wins, so Stripe is not called.');
     }
 
     return { ...base, mode: 'simulation', secretKey: null, webhookSecret: null };
@@ -114,11 +114,11 @@ export function resolveBillingConfig(env: BillingEnv): BillingConfig {
   if (!secretKey || !webhookSecret) {
     if (secretKey || webhookSecret) {
       warnings.push(
-        'STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are needed together — billing stays off.',
+        'STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are needed together, so billing stays off.',
       );
     }
     if (Object.keys(priceIds).length > 0) {
-      warnings.push('STRIPE_PRICE_* ids are set but no STRIPE_SECRET_KEY is — they are ignored.');
+      warnings.push('STRIPE_PRICE_* ids are set but no STRIPE_SECRET_KEY is, so they are ignored.');
     }
 
     return { ...base, mode: 'unconfigured', secretKey: null, webhookSecret: null };
@@ -169,7 +169,7 @@ export function describeBillingMode(config: BillingConfig): string {
   switch (config.mode) {
     case 'simulation':
       return (
-        'BILLING_SIMULATION=true — Stripe is simulated: checkout, plan changes and cancellation ' +
+        'BILLING_SIMULATION=true: Stripe is simulated. Checkout, plan changes and cancellation ' +
         'synthesise the events and run them through the real webhook handler. Not for production.'
       );
     case 'stripe':
@@ -178,7 +178,7 @@ export function describeBillingMode(config: BillingConfig): string {
       } pinned price ids).`;
     case 'unconfigured':
       return (
-        'Neither STRIPE_SECRET_KEY nor BILLING_SIMULATION=true is set — billing is off. ' +
+        'Neither STRIPE_SECRET_KEY nor BILLING_SIMULATION=true is set, so billing is off. ' +
         'Checkout and the portal answer 503 until one of them is.'
       );
   }

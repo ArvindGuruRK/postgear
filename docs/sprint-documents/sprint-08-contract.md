@@ -1,4 +1,4 @@
-# Sprint 8 — Build Contract
+# Sprint 8: Build Contract
 
 > Companion to [sprint-08-billing-notifications-api-launch.md](sprint-08-billing-notifications-api-launch.md).
 > Written **before** the code, on 2026-10-16, after reading the Postiz reference for
@@ -46,7 +46,7 @@ model Subscription {           // inherited fields unchanged; added:
 // scheduled cancellation ends access, `totalChannels` = the channel entitlement,
 // `Organization.paymentId` = Stripe customer id, `Organization.isTrailing` = trial live.
 
-model BillingEvent {           // processed Stripe events — the idempotency table
+model BillingEvent {           // processed Stripe events: the idempotency table
   id             String   @id          // Stripe `event.id`, or `sim_<uuid>` in simulation
   type           String
   organizationId String?
@@ -99,7 +99,7 @@ model WebhookDelivery {
   organizationId String
   webhookId      String
   event          String
-  deliveryKey    String  @unique       // `${webhookId}:${event}:${subjectId}` — one per occurrence
+  deliveryKey    String  @unique       // `${webhookId}:${event}:${subjectId}`: one per occurrence
   payload        Json
   status         WebhookDeliveryStatus @default(PENDING)
   attempts       Int     @default(0)
@@ -114,7 +114,7 @@ model WebhookDelivery {
 
 `Organization` gains back-relations `notificationCursors`, `apiKeys`, `webhookDeliveries`; `User` gains `notificationCursors`. All new rows cascade with their organization. `packages/db/src/types.ts` re-exports the three enums and four model types.
 
-## 2. Plans — the single source of truth
+## 2. Plans: the single source of truth
 
 `apps/api/src/modules/billing/plans.ts` (pure data + functions, no Nest, no Prisma):
 
@@ -144,14 +144,14 @@ interface Plan { tier; name; description; monthlyPriceCents; yearlyPriceCents; c
 |---|---|---|---|
 | `billing` | plans, entitlements, Stripe client + simulation, webhook handler, `BillingEvent`, trial, checkout/portal/change/cancel, web billing page | `NotificationsModule`, `MailModule` | `EntitlementsService` (tier, channel limit, `startTrial`) |
 | `notifications` | list/unread/read-all/stream, the outbox dispatcher, preferences, the bell, the preferences page | `MailModule` | `NotificationsService.notify()` (writes a row for API-side events) |
-| `developers` | `ApiKey` CRUD, `ApiKeyGuard`, `/v1/*`, the per-key throttle, Swagger document, the API-keys page | `ChannelsModule`, `PostsModule`, `AnalyticsModule`, `BillingModule` | — |
-| `webhooks` | `Webhooks` CRUD, secret rotation, test send, deliveries list, the webhooks page; worker delivery workflow | `SchedulingModule` | — |
-| `common/throttling` | global per-IP throttler module + guard | `RedisModule` | — |
-| `common/sentry` | init + capture in the exception filter; `/health` | — | — |
-| `channels` (edit) | enforces the channel limit on connect | `BillingModule` | — |
-| `ai/credits` (edit) | allowance from `plans.ts` | — | — |
-| worker | `publish.activities.ts` writes `type`/`emailStatus`/`meta` on its two rows and enqueues webhook deliveries; `webhook-delivery.workflow.ts`; maintenance reconcile also restarts stuck deliveries | — | — |
-| `packages/sdk` | built last against the stable `/v1` | — | — |
+| `developers` | `ApiKey` CRUD, `ApiKeyGuard`, `/v1/*`, the per-key throttle, Swagger document, the API-keys page | `ChannelsModule`, `PostsModule`, `AnalyticsModule`, `BillingModule` | - |
+| `webhooks` | `Webhooks` CRUD, secret rotation, test send, deliveries list, the webhooks page; worker delivery workflow | `SchedulingModule` | - |
+| `common/throttling` | global per-IP throttler module + guard | `RedisModule` | - |
+| `common/sentry` | init + capture in the exception filter; `/health` | - | - |
+| `channels` (edit) | enforces the channel limit on connect | `BillingModule` | - |
+| `ai/credits` (edit) | allowance from `plans.ts` | - | - |
+| worker | `publish.activities.ts` writes `type`/`emailStatus`/`meta` on its two rows and enqueues webhook deliveries; `webhook-delivery.workflow.ts`; maintenance reconcile also restarts stuck deliveries | - | - |
+| `packages/sdk` | built last against the stable `/v1` | - | - |
 
 Files that several workstreams touch are **pre-created by the coordinator** before the parallel build: `config/env.ts`, `app.module.ts`, `security-logger.ts` events, the migration, `packages/db/src/types.ts`, the web `types/*.ts`, the settings layout and nav. Workstreams add to their own module folders only.
 
@@ -186,9 +186,9 @@ Every error is `{ error, statusCode }` (the global filter). Every body is a stri
 | `POST /billing/checkout` | `{ tier: 'STANDARD'\|'PRO'\|'TEAM'\|'ULTIMATE', period: 'MONTHLY'\|'YEARLY' }` → `{ url }` (the browser navigates there; simulation returns the billing page with `?checkout=success`) |
 | `POST /billing/portal` | → `{ url }` (503 when no Stripe customer / unconfigured) |
 | `GET /billing/change/preview?tier=&period=` | `{ preview: { effective: 'now'\|'period_end', amountDueCents, currency, periodEnd } }` |
-| `POST /billing/change` | `{ tier, period }` → `{ subscription }` — upgrade now with proration, downgrade scheduled for period end |
-| `POST /billing/cancel` | `{ reason: 'too_expensive'\|'missing_features'\|'not_using'\|'switching'\|'other', feedback?: string ≤ 1000 }` → `{ subscription }` — access kept until `cancelAt`; feedback mailed to `SMTP_FROM` |
-| `POST /billing/resume` | → `{ subscription }` — undoes a scheduled cancellation |
+| `POST /billing/change` | `{ tier, period }` → `{ subscription }`: upgrade now with proration, downgrade scheduled for period end |
+| `POST /billing/cancel` | `{ reason: 'too_expensive'\|'missing_features'\|'not_using'\|'switching'\|'other', feedback?: string ≤ 1000 }` → `{ subscription }`; access kept until `cancelAt`; feedback mailed to `SMTP_FROM` |
+| `POST /billing/resume` | → `{ subscription }`: undoes a scheduled cancellation |
 | `POST /billing/webhook` | `@Public()`, raw body, `stripe-signature` verified → `{ received: true, duplicate?: true }`; 400 on a bad signature |
 
 ```ts
@@ -227,7 +227,7 @@ The dispatcher (`notifications.dispatcher.ts`) runs in the API every 3 s: claims
 | Route | Body → Response |
 |---|---|
 | `GET /developers/api-keys` | `{ keys: ApiKeyView[] }` newest first, revoked included |
-| `POST /developers/api-keys` | `{ name: 1..60 }` → 201 `{ key: ApiKeyView, secret }` — the only time the secret is shown; max 10 live keys (422) |
+| `POST /developers/api-keys` | `{ name: 1..60 }` → 201 `{ key: ApiKeyView, secret }`; the only time the secret is shown; max 10 live keys (422) |
 | `POST /developers/api-keys/:id/rotate` | → `{ key, secret, revokedKeyId }` |
 | `DELETE /developers/api-keys/:id` | → `{ key }` (revoked, never deleted) |
 
@@ -245,7 +245,7 @@ Auth on `/v1`: `Authorization: Bearer pg_…` (also `X-API-Key: pg_…`). `@ApiK
 | `GET /v1/channels` | `{ channels: [{ id, provider, providerName, name, profile, picture, health, disabled }] }` |
 | `GET /v1/posts?state=&page=` | `{ posts: PublicPostSummary[], page, pageCount, total }` (the queue, 20 per page) |
 | `GET /v1/posts/:id` | `{ post: PublicPost }` (`id` is the group) |
-| `POST /v1/posts` | `{ text: 1..70000, channelIds: 1..20 ids, publishAt?: iso, state?: 'draft'\|'queue' (default queue), mediaIds?: uuid[] }` → 201 `{ post }` — text becomes a document (blank line = paragraph, newline = hard break); queued posts must be in the future and pass every platform rule (422 with the rule's message) |
+| `POST /v1/posts` | `{ text: 1..70000, channelIds: 1..20 ids, publishAt?: iso, state?: 'draft'\|'queue' (default queue), mediaIds?: uuid[] }` → 201 `{ post }`; text becomes a document (blank line = paragraph, newline = hard break); queued posts must be in the future and pass every platform rule (422 with the rule's message) |
 | `DELETE /v1/posts/:id` | `{ deleted: true }` |
 | `GET /v1/analytics/overview?range=7\|30\|90` | the same overview `GET /analytics/overview` returns |
 
@@ -263,11 +263,11 @@ Swagger: `GET /api/docs` (UI) and `GET /api/docs-json`, public, documenting `/v1
 | Route | Body → Response |
 |---|---|
 | `GET /webhooks` | `{ webhooks: WebhookView[] }` |
-| `POST /webhooks` | `{ name: 1..60, url: https (http only with WEBHOOK_ALLOW_PRIVATE_URLS), events: subset of ['post.published','post.failed'] (≥ 1), channelIds?: string[] }` → 201 `{ webhook, secret }` — the secret is shown once; URL refused by the SSRF guard → 422 |
+| `POST /webhooks` | `{ name: 1..60, url: https (http only with WEBHOOK_ALLOW_PRIVATE_URLS), events: subset of ['post.published','post.failed'] (≥ 1), channelIds?: string[] }` → 201 `{ webhook, secret }`; the secret is shown once; URL refused by the SSRF guard → 422 |
 | `PATCH /webhooks/:id` | any of the above → `{ webhook }` |
 | `DELETE /webhooks/:id` | → `{ webhook }` (soft delete) |
 | `POST /webhooks/:id/rotate-secret` | → `{ webhook, secret }` |
-| `POST /webhooks/:id/test` | → `{ delivery }` — enqueues a `webhook.test` delivery with a sample payload |
+| `POST /webhooks/:id/test` | → `{ delivery }`: enqueues a `webhook.test` delivery with a sample payload |
 | `GET /webhooks/:id/deliveries` | `{ deliveries: DeliveryView[] }` (last 20) |
 
 ```ts
@@ -304,10 +304,10 @@ Where it fires: the worker's `writePublished` / `markPublishFailed` create `Webh
 
 - Shared types: `apps/web/src/types/{billing,notifications,developers,webhooks}.ts` mirror the shapes above (the codebase never imports `@postgear/db` into the browser).
 - `settings/layout.tsx` wraps every settings page in a two-column layout with `SettingsNav` (Team · Billing · API keys · Webhooks · Notifications). Team stays the Sprint 2 stub.
-- `settings/billing` — two states as the sprint document asks: **subscribe** (plan grid from `PlanCard`, Monthly/Yearly toggle, trial banner or *Start free trial*) and **manage** (current-plan card with status `Badge`, next billing date, two `UsageMeter`s, Manage billing → portal, Change plan with a proration preview dialog, Cancel with a reason + feedback dialog, Resume, scheduled-downgrade notice). `?checkout=success` → *Activating…* polling; simulation banner via `Alert`.
-- `settings/api-keys` — list (`Table`), Create dialog, the one-time secret in a copy box, Rotate (confirm dialog warning about live integrations) and Revoke; the `/api/docs` link and a curl example.
-- `settings/webhooks` — list, Create/Edit dialog (name, URL, events checkboxes, channel multi-select), one-time secret, Test, Deliveries sheet, Rotate secret, Delete.
-- `settings/notifications` — two `Toggle`s for the email preferences.
+- `settings/billing`: two states as the sprint document asks: **subscribe** (plan grid from `PlanCard`, Monthly/Yearly toggle, trial banner or *Start free trial*) and **manage** (current-plan card with status `Badge`, next billing date, two `UsageMeter`s, Manage billing → portal, Change plan with a proration preview dialog, Cancel with a reason + feedback dialog, Resume, scheduled-downgrade notice). `?checkout=success` → *Activating…* polling; simulation banner via `Alert`.
+- `settings/api-keys`: list (`Table`), Create dialog, the one-time secret in a copy box, Rotate (confirm dialog warning about live integrations) and Revoke; the `/api/docs` link and a curl example.
+- `settings/webhooks`: list, Create/Edit dialog (name, URL, events checkboxes, channel multi-select), one-time secret, Test, Deliveries sheet, Rotate secret, Delete.
+- `settings/notifications`: two `Toggle`s for the email preferences.
 - The bell: `NotificationBell` in the top bar (a new `notifications` slot on `TopBar`), fed by `useNotifications` (SSE with reconnect, `read-all`, unread badge), rendering `NotificationCenter` (extended with `onMarkAllRead` and `onItemClick` navigation).
 - Channels page: the limit line and the `channel_limit` error copy.
 - Every screen uses `@postgear/ui` components and tokens; new components go to the playground.

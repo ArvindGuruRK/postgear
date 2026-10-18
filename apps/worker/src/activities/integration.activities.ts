@@ -6,12 +6,12 @@
  *
  * `apps/api/src/modules/channels/channels.repository.ts` is where credentials
  * are encrypted on the way in and decrypted on the way out, and it has been the
- * only such place since Sprint 3. The worker cannot call it — it is a Nest
- * provider in another process — and refreshing a token is unavoidably a write
+ * only such place since Sprint 3. The worker cannot call it (it is a Nest
+ * provider in another process) and refreshing a token is unavoidably a write
  * of a new ciphertext. So this file is the second place that hands ciphertext
  * to Prisma, and it follows the same rules: every `where` carries the
  * organization and `deletedAt: null`; a refresh writes only the three
- * credential columns (never the name, never the handle — the reference's
+ * credential columns (never the name, never the handle: the reference's
  * refresh bug); siblings of one grant share the new token; and a failure flips
  * `refreshNeeded`, which is the flag the UI reads to offer "Reconnect".
  */
@@ -71,7 +71,7 @@ export function createIntegrationActivities(deps: ActivityDeps) {
     /**
      * Exchanges the refresh token for new credentials and stores them.
      *
-     * Returns false — and flags the channel — when the platform *refuses*: no
+     * Returns false, and flags the channel, when the platform *refuses*: no
      * provider, a provider that cannot refresh, a revoked grant. A platform
      * that is merely unreachable throws instead, so Temporal's activity retry
      * tries again in a minute rather than demanding a re-authorisation for a
@@ -119,8 +119,8 @@ export function createIntegrationActivities(deps: ActivityDeps) {
             where: { id: row.id, organizationId: input.organizationId, deletedAt: null },
             data: credentials,
           }),
-          // One grant can cover several channels — a LinkedIn member plus the
-          // pages they administer — which share a rootInternalId and would
+          // One grant can cover several channels (a LinkedIn member plus the
+          // pages they administer), which share a rootInternalId and would
           // otherwise keep a superseded token.
           prisma.integration.updateMany({
             where: {

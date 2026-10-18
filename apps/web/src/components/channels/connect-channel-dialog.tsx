@@ -25,7 +25,7 @@ interface ConnectChannelDialogProps {
  * A plain grid rather than a searchable, categorised list: with eight platforms
  * a search box is chrome that costs a keystroke and saves none. That calculus
  * changes past a couple of dozen, which is where the reference implementation
- * sits — and it still has no search, which is its problem, not a precedent.
+ * sits, and it still has no search, which is its problem, not a precedent.
  *
  * **Unconfigured providers are shown disabled, with the reason.** Hiding them
  * would be tidier and worse: a self-hoster who has not set `TIKTOK_CLIENT_KEY`

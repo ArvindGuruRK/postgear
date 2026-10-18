@@ -30,10 +30,12 @@ export class GoogleAuthProvider implements AuthProvider {
       client_id: this.clientId ?? '',
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      // `openid email` is the whole scope. Asking for `profile` too would gain
-      // a display name we can live without, at the cost of a scarier consent
-      // screen. The user types their name during onboarding anyway.
-      scope: 'openid email',
+      // `profile` is requested alongside `openid email` (UI revamp,
+      // 2026-10-17): the product now uses the Google photo as the new user's
+      // default avatar, and pre-fills the onboarding "What should we call
+      // you?" step with their name. Both come only from `profile`. It is still
+      // the basic, non-sensitive scope tier: no verification review needed.
+      scope: 'openid email profile',
       state,
       // Sign-in only, so no refresh token is requested: we never call Google
       // again on the user's behalf, and an unused refresh token is a stored
@@ -58,7 +60,7 @@ export class GoogleAuthProvider implements AuthProvider {
     });
 
     if (!tokenResponse.ok) {
-      // The provider's own error body is deliberately not forwarded — it can
+      // The provider's own error body is deliberately not forwarded: it can
       // contain the client secret back in an echoed request.
       throw new OAuthError(`Google token exchange failed with ${tokenResponse.status}`);
     }
@@ -84,6 +86,7 @@ export class GoogleAuthProvider implements AuthProvider {
       email?: string;
       email_verified?: boolean;
       name?: string;
+      picture?: string;
     };
 
     if (!profile.sub || !profile.email) {
@@ -97,6 +100,11 @@ export class GoogleAuthProvider implements AuthProvider {
       throw new OAuthError('Google email address is not verified');
     }
 
-    return { providerId: profile.sub, email: profile.email, name: profile.name };
+    return {
+      providerId: profile.sub,
+      email: profile.email,
+      name: profile.name,
+      picture: profile.picture || undefined,
+    };
   }
 }

@@ -1,6 +1,15 @@
 'use client';
 
-import { Alert, Button, EmptyState, Grid, Link as UiLink, PageHeader, Stack, Text } from '@postgear/ui';
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Grid,
+  Link as UiLink,
+  PageActions,
+  Stack,
+  Text,
+} from '@postgear/ui';
 import { Radio } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { type MouseEvent, useMemo, useState } from 'react';
@@ -33,7 +42,13 @@ const ERROR_MESSAGES: Record<string, string> = {
     'This workspace has reached its plan’s channel limit. Upgrade the plan to connect more channels.',
 };
 
-export function ChannelsView({ orgId, initialChannels, providers, canManage, limit }: ChannelsViewProps) {
+export function ChannelsView({
+  orgId,
+  initialChannels,
+  providers,
+  canManage,
+  limit,
+}: ChannelsViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const billingHref = `/${orgId}/settings/billing`;
@@ -59,7 +74,7 @@ export function ChannelsView({ orgId, initialChannels, providers, canManage, lim
   const setupId = searchParams.get('setup');
 
   // A channel that came back from OAuth needing an account chosen opens the
-  // picker straight away — the user is already in that flow, and making them
+  // picker straight away: the user is already in that flow, and making them
   // find the button again is a step for nothing.
   const pendingSetup = useMemo(
     () => (setupId ? (initialChannels.find((c) => c.id === setupId) ?? null) : null),
@@ -89,17 +104,13 @@ export function ChannelsView({ orgId, initialChannels, providers, canManage, lim
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Channels"
-        description="The social accounts PostGear can publish to."
-        actions={
-          canManage ? (
-            <Button onClick={() => setConnectOpen(true)} disabled={atLimit}>
-              Connect a channel
-            </Button>
-          ) : undefined
-        }
-      />
+      {canManage ? (
+        <PageActions>
+          <Button onClick={() => setConnectOpen(true)} disabled={atLimit}>
+            Connect a channel
+          </Button>
+        </PageActions>
+      ) : null}
 
       {limit ? (
         <Text
@@ -111,7 +122,9 @@ export function ChannelsView({ orgId, initialChannels, providers, canManage, lim
           data-tier={limit.tier}
         >
           {limit.used} of {limit.max} {limit.max === 1 ? 'channel' : 'channels'} on the{' '}
-          {limit.tier === 'FREE' ? 'Free' : limit.tier.charAt(0) + limit.tier.slice(1).toLowerCase()}{' '}
+          {limit.tier === 'FREE'
+            ? 'Free'
+            : limit.tier.charAt(0) + limit.tier.slice(1).toLowerCase()}{' '}
           plan.
           {atLimit ? (
             <>

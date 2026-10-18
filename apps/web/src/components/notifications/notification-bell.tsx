@@ -7,7 +7,7 @@
  * A click on an item navigates by what its link is: an app path goes
  * through the router and closes the panel; a platform URL (a published post)
  * opens in a new tab with `noopener`, since the destination is not ours;
- * anything else is inert. Content is rendered as text by the component —
+ * anything else is inert. Content is rendered as text by the component:
  * nothing a provider's error message contains can become markup here.
  *
  * Timestamps are formatted only after mount (`useMounted`): "2h ago" is the

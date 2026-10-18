@@ -2,7 +2,7 @@
 
 /**
  * One tool the copilot used, as a row under its reply: what it did, whether
- * it worked, and the thing it made — a link to the drafted post, the image
+ * it worked, and the thing it made, such as a link to the drafted post or the image
  * it generated.
  *
  * The rows are the proof that the assistant acted rather than only talked.

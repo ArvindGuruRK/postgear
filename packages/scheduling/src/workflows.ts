@@ -19,14 +19,14 @@ export const SCHEDULING_TASK_QUEUE = 'postgear-publishing';
 export const POST_PUBLISH_WORKFLOW = 'postPublishWorkflow';
 export const TOKEN_REFRESH_WORKFLOW = 'tokenRefreshWorkflow';
 export const MAINTENANCE_WORKFLOW = 'maintenanceWorkflow';
-/** Sprint 7: keeps one channel's metrics current — a daily pull, or on demand. */
+/** Sprint 7: keeps one channel's metrics current; a daily pull, or on demand. */
 export const ANALYTICS_SYNC_WORKFLOW = 'analyticsSyncWorkflow';
 
 /** Wakes a waiting publish or refresh workflow so it re-reads the database. */
 export const WAKE_SIGNAL = 'wake';
 /** Publishes a queued post as soon as the worker picks it up. */
 export const PUBLISH_NOW_SIGNAL = 'publishNow';
-/** Ends a waiting publish workflow — the post left the queue. */
+/** Ends a waiting publish workflow: the post left the queue. */
 export const CANCEL_SIGNAL = 'cancel';
 /** Sprint 7: tells a waiting analytics workflow to pull metrics now rather than at its next slot. */
 export const SYNC_NOW_SIGNAL = 'syncNow';
@@ -70,7 +70,7 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 export type WebhookDeliveryEvent = WebhookEvent | 'webhook.test';
 
 /**
- * How a delivery is retried: 30 s, 2 min, 8 min, 32 min, 2 h — six attempts
+ * How a delivery is retried: 30 s, 2 min, 8 min, 32 min, 2 h; six attempts
  * over roughly three hours, which covers a receiver's deploy or an outage
  * without hammering it. The values are data so the API can describe them on
  * the webhooks page and the worker enforce them, from one place.
@@ -93,7 +93,7 @@ export const WEBHOOK_DELIVERY_TIMEOUT_MS = 10_000;
 export const WEBHOOK_FAILURE_TYPES = {
   retryable: 'WebhookRetryable',
   rejected: 'WebhookRejected',
-  /** The webhook was deleted or disabled, or the row is gone — nothing to do. */
+  /** The webhook was deleted or disabled, or the row is gone: nothing to do. */
   skipped: 'WebhookSkipped',
 } as const;
 
@@ -113,7 +113,7 @@ export interface TokenRefreshInput {
   organizationId: string;
 }
 
-/** Sprint 7: the analytics workflow's input — the same two ids as a refresh. */
+/** Sprint 7: the analytics workflow's input; the same two ids as a refresh. */
 export interface AnalyticsSyncInput {
   integrationId: string;
   organizationId: string;
@@ -153,14 +153,14 @@ export type PostPublishOutcome =
 /**
  * Why a publish failed for good.
  *
- * - `needs_reconnect` — the credentials are dead and could not be refreshed.
- * - `needs_permissions` — the account never granted a scope the post needs.
- * - `rejected` — the platform refused the content; it has to change.
- * - `retries_exhausted` — transient failures every time, for the whole policy.
- * - `channel_unavailable` — the channel was disabled or removed while waiting.
- * - `interrupted` — an earlier attempt died after it may have reached the
+ * - `needs_reconnect`: the credentials are dead and could not be refreshed.
+ * - `needs_permissions`: the account never granted a scope the post needs.
+ * - `rejected`: the platform refused the content; it has to change.
+ * - `retries_exhausted`: transient failures every time, for the whole policy.
+ * - `channel_unavailable`: the channel was disabled or removed while waiting.
+ * - `interrupted`: an earlier attempt died after it may have reached the
  *   platform, so a retry could post twice; a person has to check the account.
- * - `unexpected` — a bug or an unclassified error, after the retry policy.
+ * - `unexpected`: a bug or an unclassified error, after the retry policy.
  */
 export type PublishFailureReason =
   | 'needs_reconnect'
@@ -175,7 +175,7 @@ export type PublishFailureReason =
  * `ApplicationFailure.type` values the publish activity throws, and the
  * workflow branches on. Listed as data so the retry policy can name the
  * non-retryable ones and the workflow can switch on them without a shared
- * class — Temporal only carries the type *string* across the activity boundary.
+ * class: Temporal only carries the type *string* across the activity boundary.
  */
 export const PUBLISH_FAILURE_TYPES = {
   /** 429, 5xx, network: retried by the activity retry policy. */

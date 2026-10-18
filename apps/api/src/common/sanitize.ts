@@ -10,12 +10,12 @@
  * **Passwords are not sanitized. Ever.** Not trimmed, not HTML-stripped, not
  * "special character" filtered. Three reasons:
  *
- *   1. Stripping characters silently weakens the secret — `p<ssw>rd!` becoming
+ *   1. Stripping characters silently weakens the secret: `p<ssw>rd!` becoming
  *      `pssw rd!` removes entropy the user thought they had.
  *   2. It breaks password managers, which generate exactly the punctuation-
  *      heavy strings a naive filter eats.
  *   3. It is unnecessary. A password is never rendered, never interpolated
- *      into a query, and never stored — only its argon2id digest is. There is
+ *      into a query, and never stored: only its argon2id digest is. There is
  *      no injection surface to defend.
  *
  * Passwords are *validated* (length, composition) and then hashed verbatim.
@@ -27,12 +27,12 @@
  * Removes HTML/XML markup, including unclosed and malformed tags.
  *
  * Deliberately allowlist-free: it strips *all* markup rather than permitting
- * "safe" tags. None of the fields this guards — display name, organization
- * name — has any legitimate reason to contain markup, so there is nothing to
+ * "safe" tags. None of the fields this guards (display name, organization
+ * name) has any legitimate reason to contain markup, so there is nothing to
  * preserve, and a permissive sanitizer is where XSS bypasses live.
  *
  * Script and style elements have their *contents* removed too, not just their
- * tags — otherwise `<script>alert(1)</script>` would sanitize to the string
+ * tags, otherwise `<script>alert(1)</script>` would sanitize to the string
  * `alert(1)`, which is worse than useless as a display name.
  */
 export function stripHtml(input: string): string {
@@ -48,7 +48,7 @@ export function stripHtml(input: string): string {
       // A trailing `<` that never opened a tag.
       .replace(/<[\s\S]*$/g, '')
       // Entities last, so `&lt;script&gt;` cannot be decoded back into a tag
-      // by an earlier pass. Decoding is not the goal — removal is.
+      // by an earlier pass. Decoding is not the goal: removal is.
       .replace(/&[#a-zA-Z0-9]+;?/g, '')
   );
 }
@@ -63,7 +63,7 @@ export function stripHtml(input: string): string {
  *
  * Tab, newline and carriage return (0x09, 0x0A, 0x0D) are deliberately spared
  * even though they fall inside the C0 range. Deleting them outright would
- * glue words together — `Alice{newline}Smith` becoming `AliceSmith`.
+ * glue words together: `Alice{newline}Smith` becoming `AliceSmith`.
  * collapseWhitespace turns them into single spaces instead, which is what a
  * pasted multi-line name should become.
  */
@@ -98,7 +98,7 @@ export function sanitizeText(input: string): string {
  * Normalizes an email for storage and lookup: trims, lowercases, strips
  * control characters.
  *
- * Note what this does *not* do — it does not strip "special characters".
+ * Note what this does *not* do: it does not strip "special characters".
  * `+`, `.`, `'` and `-` are all legal in the local part, and removing them
  * would silently deliver mail to the wrong address (or to nobody). Email is
  * validated against a strict pattern instead; see `dto/common.schema.ts`.
@@ -106,7 +106,7 @@ export function sanitizeText(input: string): string {
  * Lowercasing the local part is technically a departure from RFC 5321, which
  * says it is case-sensitive. Every mail provider in practice treats it as
  * insensitive, and not normalizing means `Bob@x.com` and `bob@x.com` become
- * two accounts — a far worse outcome than the theoretical incompatibility.
+ * two accounts: a far worse outcome than the theoretical incompatibility.
  */
 export function normalizeEmail(input: string): string {
   return stripControlChars(input).trim().toLowerCase();

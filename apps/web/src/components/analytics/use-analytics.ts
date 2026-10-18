@@ -15,7 +15,7 @@
  * A sync is the worker's business and takes seconds to minutes; nothing
  * pushes its result to the page. So for a minute after one is requested the
  * overview is polled every ten seconds, and only swapped in when something
- * a sync would change actually changed (`syncFingerprint`) — `generatedAt`
+ * a sync would change actually changed (`syncFingerprint`): `generatedAt`
  * moves on every call and is not a signal.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';

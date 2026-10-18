@@ -3,7 +3,7 @@
 /**
  * The trend: one metric over the range, one line per channel.
  *
- * The metric switch is a `Tabs` list of only the metrics the data has — a
+ * The metric switch is a `Tabs` list of only the metrics the data has: a
  * tab for "Clicks" that every platform left empty would be a tab to nothing.
  * The chart is `TrendChart` from the design system, which is restrained by
  * construction (§15); the card and the section header around it carry the

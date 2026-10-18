@@ -1,7 +1,7 @@
 import { Card, CardContent, Container, Heading, Link, Stack, Text } from '@postgear/ui';
 
 // Root 404. Empty/error states get the "full comic treatment" per
-// design-system-rules.md §15 — this is exactly the kind of surface the
+// design-system-rules.md §15: this is exactly the kind of surface the
 // halftone texture and oversized display type are meant for, unlike the
 // dense data screens the rest of the app is made of.
 export default function NotFound() {
@@ -19,7 +19,7 @@ export default function NotFound() {
               </Heading>
             </Stack>
             <Text muted className="max-w-sm">
-              This page doesn&apos;t exist — it may have been moved, or the link that brought
+              This page doesn&apos;t exist. It may have been moved, or the link that brought
               you here is out of date.
             </Text>
             <Link href="/login">Back to sign in</Link>

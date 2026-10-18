@@ -7,7 +7,7 @@ import { Logger } from '@nestjs/common';
  * Two jobs:
  *
  *  1. **Monitoring.** Validation failures, failed logins, lockouts and
- *     throttle trips are invisible to the client by design — every one of
+ *     throttle trips are invisible to the client by design: every one of
  *     them returns a deliberately generic message. Without a server-side
  *     record there would be no way to tell a typo from a credential-stuffing
  *     run, so the detail the response withholds is written here instead.
@@ -20,7 +20,7 @@ import { Logger } from '@nestjs/common';
 
 /**
  * Keys whose values are replaced with `[REDACTED]`, matched case-insensitively
- * as substrings — so `password`, `newPassword`, `passwordHash` and
+ * as substrings, so `password`, `newPassword`, `passwordHash` and
  * `PASSWORD_CONFIRM` are all caught by the single entry `password`.
  */
 const REDACTED_KEYS = [
@@ -75,7 +75,7 @@ export function redact(value: unknown, depth = 0): unknown {
 }
 
 /**
- * Truncates and hashes nothing — emails are logged in full on purpose. They
+ * Truncates and hashes nothing: emails are logged in full on purpose. They
  * are the only usable correlation key when investigating an attack, and they
  * are not a secret in the way a password is.
  */
@@ -109,6 +109,8 @@ export type SecurityEvent =
   // is the classic way to smuggle HTML or SVG onto a public origin, so every
   // refusal is recorded even though most are an honest wrong-file pick.
   | 'media.upload_rejected'
+  // Avatar uploads (UI revamp): the same reasoning, for profile photos.
+  | 'avatar.upload_rejected'
   // Posts (Sprint 4). An edit that references another workspace's media, or a
   // channel it cannot see, is either a stale client or a probe.
   | 'post.foreign_reference'

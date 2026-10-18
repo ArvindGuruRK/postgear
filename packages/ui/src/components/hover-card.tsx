@@ -17,7 +17,7 @@ export const HoverCardContent = forwardRef<
       align={align}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 w-72 rounded-lg border-4 border-outline bg-secondary p-4 shadow-brutalLg',
+        'z-50 w-72 rounded-lg border-2 border-outline bg-secondary p-4 shadow-surfaceLg',
         'font-sans text-sm text-ink outline-none data-[state=open]:animate-fadeIn',
         className,
       )}

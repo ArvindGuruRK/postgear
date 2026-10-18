@@ -16,7 +16,7 @@ const VIEWS = [
  * Where, when and what: navigation, the view switch and the channel filter.
  *
  * This is the chrome *around* the dense grid, so it carries the full
- * treatment — display face on the range label, brutal shadows on the buttons —
+ * treatment (display face on the range label, brutal shadows on the buttons)
  * that the grid itself does without (design-system-rules.md §15).
  */
 export function CalendarToolbar() {

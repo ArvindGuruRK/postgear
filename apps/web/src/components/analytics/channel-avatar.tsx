@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage, cn } from '@postgear/ui';
 
 /**
  * A channel's picture with its initials behind it, the way the post
- * dialogs and the channel stack draw one — here so the table, the bar
+ * dialogs and the channel stack draw one: here so the table, the bar
  * list, the leaderboard and the post dialog all draw the same avatar.
  */
 export function ChannelAvatar({

@@ -1,11 +1,11 @@
 /**
- * SEO Analyzer — enter a URL, get a scored audit with prioritised fixes, and
+ * SEO Analyzer: enter a URL, get a scored audit with prioritised fixes, and
  * keep every run (Sprint 7, Part B).
  *
  * A server component that loads what the island needs in one round of
  * parallel requests: whether the analyzer is available and how (browser,
  * AI advice, its price), the recent history, the credit balance when AI
- * advice is on, and — when the URL names one — the audit to show. Each has
+ * advice is on, and, when the URL names one, the audit to show. Each has
  * a safe fallback so a single failed request degrades one part of the page
  * rather than all of it: no status renders an error with a retry, no
  * history is retried from the browser, no balance leaves the meter saying so, and an

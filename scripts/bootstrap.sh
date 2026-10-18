@@ -1,5 +1,5 @@
 #!/bin/bash
-# bootstrap.sh — Automatic local environment setup script
+# bootstrap.sh: Automatic local environment setup script
 # TODO: Implement automated setup:
 # - Check for Node.js, Docker, npm prerequisites
 # - Install dependencies (npm install)

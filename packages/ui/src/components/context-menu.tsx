@@ -35,7 +35,7 @@ export const ContextMenuSubContent = forwardRef<
   <ContextMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      'z-50 min-w-[10rem] rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalMd',
+      'z-50 min-w-[10rem] rounded-md border-2 border-outline bg-secondary p-1 shadow-surfaceMd',
       'font-sans text-sm text-ink outline-none',
       className,
     )}
@@ -52,7 +52,7 @@ export const ContextMenuContent = forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        'z-50 min-w-[10rem] rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalMd',
+        'z-50 min-w-[10rem] rounded-md border-2 border-outline bg-secondary p-1 shadow-surfaceMd',
         'font-sans text-sm text-ink outline-none',
         className,
       )}

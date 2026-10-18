@@ -1,14 +1,14 @@
 /**
  * Turns one HTML document into the {@link ParsedPage} the evaluators score.
  *
- * It is a pure function of the markup and the base URL — no DOM, no network —
+ * It is a pure function of the markup and the base URL (no DOM, no network)
  * and it is deliberately not a full HTML5 parser. The page is read through a
  * small tokenizer that understands exactly what SEO extraction needs: tags
  * with attributes in either quote style or none, self-closing tags, comments,
  * CDATA, the raw-text bodies of `<script>`/`<style>` (so a `<` in a script
  * never opens a tag), and character entities. That is enough to be right on
  * real pages while staying a few hundred lines that are easy to test and
- * impossible to make issue a request — which is why the package has no
+ * impossible to make issue a request, which is why the package has no
  * `cheerio`/`jsdom` dependency: nothing the crawled page contains can run.
  *
  * Everything "visible text" derived (word count, sentences, readability,
@@ -33,7 +33,7 @@ const NAMED_ENTITIES: Record<string, string> = {
   reg: '®',
   trade: '™',
   hellip: '…',
-  mdash: '—',
+  mdash: '\u2014',
   ndash: '–',
   lsquo: '‘',
   rsquo: '’',
@@ -509,7 +509,7 @@ export function countSentences(text: string): number {
 /**
  * The usual vowel-group heuristic: count vowel runs, drop a silent trailing
  * `e` (`-es`/`-ed` included), never fewer than one. Off by one on some
- * words, which is fine — the Flesch formula averages it out over a page.
+ * words, which is fine: the Flesch formula averages it out over a page.
  */
 export function countSyllables(word: string): number {
   const letters = word.toLowerCase().replace(/[^a-z]/g, '');
@@ -522,7 +522,7 @@ export function countSyllables(word: string): number {
 
 /**
  * Flesch reading ease: 206.835 − 1.015 × (words / sentences) − 84.6 ×
- * (syllables / words), clamped to 0–100. Null under 100 words — too little
+ * (syllables / words), clamped to 0–100. Null under 100 words, too little
  * text for the averages to mean anything.
  */
 export function fleschReadingEase(text: string): number | null {

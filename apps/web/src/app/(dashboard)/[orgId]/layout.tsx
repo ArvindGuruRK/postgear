@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { AppearanceSync } from '@/components/appearance/appearance-sync';
 import { DashboardShell } from '@/components/navigation/dashboard-shell';
 import { SyncActiveWorkspace } from '@/components/navigation/sync-active-workspace';
 import { serverApi } from '@/lib/api';
@@ -15,7 +16,7 @@ import type { Organization } from '@/types/workspace';
  * **Route gate 2: authenticated but not onboarded → /onboarding.**
  *
  * This sits between gate 1 (the (dashboard) group layout above) and the
- * workspace itself, exactly as SCHEMA_NOTES prescribes — an un-onboarded user
+ * workspace itself, exactly as SCHEMA_NOTES prescribes: an un-onboarded user
  * has no org id to route with, so the check has to happen before anything
  * reads `[orgId]`.
  *
@@ -54,7 +55,7 @@ export default async function OrgLayout({ children, params }: LayoutProps<'/[org
 
   // The API scopes workspace-owned requests on the `pg_org` cookie, not on this
   // segment. Arriving by bookmark, by shared link, or as a user in more than
-  // one workspace (where login sets no default) leaves the two disagreeing —
+  // one workspace (where login sets no default) leaves the two disagreeing,
   // and every page that fetches workspace data then renders someone else's, or
   // nothing at all. See `SyncActiveWorkspace` for why the fix lives on the
   // client.
@@ -65,9 +66,11 @@ export default async function OrgLayout({ children, params }: LayoutProps<'/[org
       organizations={organizations}
       activeOrgId={active.id}
       role={active.role}
-      user={{ name: session.name, email: session.email }}
+      user={{ name: session.name, email: session.email, avatar: session.avatar }}
     >
       {needsWorkspaceSync ? <SyncActiveWorkspace orgId={active.id} /> : null}
+      {/* Brings this browser's appearance cookie in line with the account: see AppearanceSync. */}
+      <AppearanceSync stored={session.appearance} />
       <DashboardShell orgId={orgId}>{children}</DashboardShell>
     </WorkspaceProvider>
   );

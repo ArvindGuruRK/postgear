@@ -1,5 +1,5 @@
 /**
- * Queue — every post in publish order, with how each one went (Sprint 5).
+ * Queue: every post in publish order, with how each one went (Sprint 5).
  *
  * The server renders the first page when no filter is in the URL, so the list
  * is there on first paint; with filters, the client fetches, because the date

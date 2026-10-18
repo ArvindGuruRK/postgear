@@ -61,17 +61,17 @@ export function createSeoEngine(config: SeoConfig, logger: Logger): SeoEngine {
       logger.log('SEO authority scores come from Open PageRank.');
       break;
     case 'simulation':
-      logger.warn('AI_SIMULATION=true — SEO authority scores are simulated. Not for production.');
+      logger.warn('AI_SIMULATION=true: SEO authority scores are simulated. Not for production.');
       break;
     case 'heuristic':
       logger.log(
-        'OPEN_PAGERANK_API_KEY is not set — SEO authority is estimated from on-page signals.',
+        'OPEN_PAGERANK_API_KEY is not set, so SEO authority is estimated from on-page signals.',
       );
       break;
   }
 
   if (config.browser === 'off') {
-    logger.log('SEO_BROWSER=off — every crawl is a plain HTML fetch.');
+    logger.log('SEO_BROWSER=off: every crawl is a plain HTML fetch.');
   }
 
   return {

@@ -24,7 +24,7 @@ let rowCounter = 0;
  * on a home connection, mostly just compete for the same upstream bandwidth
  * while making every progress bar crawl.
  *
- * A finished upload says how much compression saved — the number is the
+ * A finished upload says how much compression saved: the number is the
  * visible proof that the server really did something to the file.
  */
 export function MediaUploader({

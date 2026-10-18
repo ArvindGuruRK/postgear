@@ -4,7 +4,7 @@
  * `/ai/status` says `configured: false` when neither an OpenAI key nor
  * simulation mode is set, and every generation endpoint would answer 503.
  * Rendering the forms anyway would invite a request that cannot succeed, so
- * this takes their place and names the two ways out — the same two the
+ * this takes their place and names the two ways out: the same two the
  * local testing guide gives. Nothing here spends a credit.
  */
 import { EmptyState, Text } from '@postgear/ui';
@@ -12,7 +12,7 @@ import { Sparkles } from 'lucide-react';
 
 export function AiUnavailable() {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border-4 border-outline bg-secondary p-6 shadow-brutalMd">
+    <div className="flex flex-col items-center gap-4 rounded-lg border-2 border-outline bg-secondary p-6 shadow-surfaceMd">
       <EmptyState
         icon={Sparkles}
         title="AI isn't set up yet"

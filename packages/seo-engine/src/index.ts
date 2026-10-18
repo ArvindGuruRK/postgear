@@ -1,5 +1,5 @@
 /**
- * `@postgear/seo-engine` — crawl a URL safely, score what came back.
+ * `@postgear/seo-engine`: crawl a URL safely, score what came back.
  *
  * The API composes three things from here: a crawler (`createSeoCrawler`),
  * the scoring (`evaluateAll` + `findingsFromReport`) and an authority

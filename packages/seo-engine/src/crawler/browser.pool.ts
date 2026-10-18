@@ -10,7 +10,7 @@
  * Why the route hook matters more than the pooling: the guard in
  * `url-guard.ts` validates the URL the crawl starts from, but a page then
  * loads scripts, frames and XHRs, and follows redirects, each to a URL nobody
- * validated — and the browser resolves DNS itself, so the pinned-address
+ * validated, and the browser resolves DNS itself, so the pinned-address
  * trick the HTML path uses is not available. So every context routes
  * `**\/*` through a hook that re-runs the guard on each request URL (cached
  * per host for the page's lifetime) and aborts anything private. Images,
@@ -48,7 +48,7 @@ export interface BrowserPoolOptions {
 
 export interface PooledPage {
   page: Page;
-  /** URLs the route hook refused as private, in order — diagnostics for the crawler. */
+  /** URLs the route hook refused as private, in order: diagnostics for the crawler. */
   refused: string[];
   release(): Promise<void>;
 }

@@ -1,9 +1,9 @@
 /**
- * PostGear shared Tailwind v4 theme — CSS-first config, replacing the old
+ * PostGear shared Tailwind v4 theme: CSS-first config, replacing the old
  * v3-style `tailwind.config.js` in this package (kept only as a deprecated
- * stub — see that file). Token *values* still come from
+ * stub: see that file). Token *values* still come from
  * packages/ui/src/styles/colors.css (imported separately, before this file,
- * by whatever app consumes it) — this file only maps them into Tailwind's
+ * by whatever app consumes it): this file only maps them into Tailwind's
  * theme namespace so utility classes like `bg-actionPrimary` /
  * `shadow-brutalMd` / `animate-fadeIn` get generated.
  *
@@ -14,7 +14,7 @@
  *
  * PRUNED (2026-09-02, Sprint 0 close): this file previously mapped 154
  * tokens, of which an audit found 34 in use. Everything inherited from
- * Postiz that PostGear's Neubrutalism system had superseded was removed —
+ * Postiz that PostGear's Neubrutalism system had superseded was removed:
  * the 55-entry `customColorN` palette, the 28-token `new-*` surface layer,
  * the soft/blurred shadows, eight unused animations, and seven unused
  * breakpoint variants. The reason was drift, not bundle size (the saving
@@ -22,14 +22,14 @@
  * class, so `bg-newBgColor` or `text-customColor7` silently painted the old
  * muted SaaS palette onto a Neubrutalism screen and failed no check. What
  * stayed: the live design system below, plus the platform brand colors
- * (unused only because Sprint 3's channel UI isn't built yet — see the
+ * (unused only because Sprint 3's channel UI isn't built yet; see the
  * note above them). If something here needs reviving, git history has the
  * original mapping.
  *
  * DROPPED EARLIER (2026-08-29, discovered during `npm install`): the
  * original Postiz config also used `tailwindcss-rtl`, but it has no
  * Tailwind v4 release at all (tops out at 0.9.0, no v4 peer dependency,
- * effectively unmaintained for v4) — installing it broke dependency
+ * effectively unmaintained for v4); installing it broke dependency
  * resolution entirely. Removed rather than forced past, since RTL/i18n is
  * already P2 scope in the PRD. Revisit if/when i18n work actually starts.
  */
@@ -38,10 +38,10 @@
    Tailwind v4's automatic content detection walks from the importing app's
    own directory (e.g. apps/web) and does not cross into a sibling npm
    workspace package. `packages/ui/src` is where every actual component
-   className lives (Button/Badge/etc. — `packages/ui`'s own package.json
+   className lives (Button/Badge/etc.: `packages/ui`'s own package.json
    has no build step consuming this), so without this directive any
    utility class used ONLY inside packages/ui (not also incidentally typed
-   out in apps/web source) never gets generated — found by a component
+   out in apps/web source) never gets generated: found by a component
    rendering with no background at all despite its token resolving fine.
    Path is relative to this file. */
 @source "../ui/src";
@@ -50,19 +50,22 @@
    `@theme inline` (rather than plain `@theme`) is used deliberately: it
    tells Tailwind to reference these CSS variables live at paint time
    instead of baking in a value at build time. That's what makes the
-   `.dark`/`.light` class-swap in colors.css keep working — a plain
+   `.dark`/`.light` class-swap in colors.css keep working: a plain
    `@theme` block would freeze each color to whichever value was active
    when Tailwind's build ran. */
 @theme inline {
-  /* Surfaces — the page ground and the card/dialog surface on top of it. */
+  /* Surfaces: the page ground and the card/dialog surface on top of it. */
   --color-primary: var(--color-primary);
   --color-secondary: var(--color-secondary);
+  /* App frame (sidebar, top bar) and form fields: see colors.css. */
+  --color-chrome: var(--color-chrome);
+  --color-field: var(--color-field);
 
-  /* Neubrutalism structural tokens (Sprint 0) — see
+  /* Neubrutalism structural tokens (Sprint 0): see
      docs/sprint-documents/sprint-00-design-system.md and the header comment
      in packages/ui/src/styles/colors.css. */
   --color-ink: var(--color-ink);
-  /* Border/shadow accent — separate from --color-ink (text/icon color) so
+  /* Border/shadow accent: separate from --color-ink (text/icon color) so
      dark mode can keep borders/shadows dark instead of inverting to white;
      see the header comment above --color-outline in colors.css. */
   --color-outline: var(--color-outline);
@@ -70,49 +73,55 @@
   --shadow-brutalMd: var(--shadow-brutal-md);
   --shadow-brutalLg: var(--shadow-brutal-lg);
   --shadow-brutalPressed: var(--shadow-brutal-pressed);
-  /* Button-only diagonal hover "lift" — see the comment above
+  /* Button-only diagonal hover "lift": see the comment above
      --shadow-brutal-md-hover in colors.css. */
   --shadow-brutalMdHover: var(--shadow-brutal-md-hover);
-  /* Button2-only vertical "pushable" shadow — see the comment above
+  /* Button2-only vertical "pushable" shadow: see the comment above
      --shadow-brutal-btn in colors.css. */
   --shadow-brutalBtn: var(--shadow-brutal-btn);
   --shadow-brutalBtnHover: var(--shadow-brutal-btn-hover);
+  /* Containers, fields and overlays: bottom-only in light mode. The
+     diagonal brutal* family above is for things you press. See
+     --shadow-surface-* in colors.css. */
+  --shadow-surfaceSm: var(--shadow-surface-sm);
+  --shadow-surfaceMd: var(--shadow-surface-md);
+  --shadow-surfaceLg: var(--shadow-surface-lg);
 
-  /* Comic accent action colors (Sprint 0 Task 1 — locked, Palette A). See
+  /* Comic accent action colors (Sprint 0 Task 1: locked, Palette A). See
      the header comment above --color-brutal-* in colors.css for why
      text-on-fill is a fixed pair rather than theme-aware. */
   --color-actionPrimary: var(--color-forth);
   --color-actionPrimaryHover: var(--color-seventh);
   --color-actionSecondary: var(--color-brutal-secondary);
   --color-actionDanger: var(--color-brutal-danger);
-  /* Violet, not the inherited pink --new-ai-btn — see the ADDENDUM above
+  /* Violet, not the inherited pink --new-ai-btn: see the ADDENDUM above
      --color-brutal-ai in colors.css. */
   --color-actionAi: var(--color-brutal-ai);
   --color-actionAccent: var(--color-brutal-accent);
   --color-actionSuccess: var(--color-brutal-success);
-  /* Countdown plate + its digit color — theme-scoped in colors.css because
+  /* Countdown plate + its digit color: theme-scoped in colors.css because
      the plate stays dark in both themes; see the comment there. */
   --color-plate: var(--color-plate);
   --color-onPlate: var(--color-on-plate);
   --color-onActionPrimary: var(--color-on-action-primary);
   --color-onActionLight: var(--color-on-action-light);
-  /* ai's own on-color (white) — see the 2026-08-31 addendum above
+  /* ai's own on-color (white): see the 2026-08-31 addendum above
      --color-brutal-ai in colors.css for why it split off from
      --color-on-action-light. */
   --color-onActionAi: var(--color-on-action-ai);
 
-  /* Focus ring — its own token rather than reusing actionAccent (2026-09-02,
+  /* Focus ring: its own token rather than reusing actionAccent (2026-09-02,
      Sprint 0 close). WCAG 2.1 SC 1.4.11 wants 3:1 for a focus indicator
      against everything it touches, and actionAccent (#ff6b35) managed only
      2.68:1 on the light page and 2.84:1 on white cards, so the ring that all
      36 interactive components share was effectively invisible in light mode.
      Splitting it lets the light theme darken the ring to #d6440f (4.23:1 on
      paper, 4.47:1 on white, 4.42:1 against the ink border) while dark mode
-     keeps the brighter #ff6b35, which already passed at 6.61:1 — and leaves
+     keeps the brighter #ff6b35, which already passed at 6.61:1, and leaves
      actionAccent free to stay a fill color. */
   --color-focusRing: var(--color-focus-ring);
 
-  /* Platform brand colors — never rebrand these; they represent each target
+  /* Platform brand colors: never rebrand these; they represent each target
      platform's own identity in previews, not PostGear's style. Deliberately
      kept through the 2026-09-02 prune despite having no uses yet: Sprint 3's
      channel-connection UI is what consumes them. */
@@ -132,23 +141,23 @@
   /* Typography lives in apps/web/src/app/globals.css ("Typography"): one
      font family plus the role tokens and `type-*` utilities built on it. */
 
-  /* Animations — each name here needs a matching @keyframes below. */
+  /* Animations: each name here needs a matching @keyframes below. */
   --animate-fadeIn: normalFadeIn 0.2s ease-in-out forwards;
   /* Progress fill's barber-pole crawl (Sprint 0 extension). The distance
      matches bg-stripes' 16px band period measured along a -45deg axis
-     (16 * sqrt(2) = 22.63px), so the loop is seamless — any other value
+     (16 * sqrt(2) = 22.63px), so the loop is seamless: any other value
      visibly jumps once per cycle. */
   --animate-progressStripes: progressStripes 1s linear infinite;
   /* One tile's digit changing on a countdown tick. */
   --animate-digitTick: digitTick 0.35s cubic-bezier(0.33, 1, 0.68, 1);
-  /* Accordion/Collapsible expand-collapse (Sprint 0 extension) — each Radix
+  /* Accordion/Collapsible expand-collapse (Sprint 0 extension): each Radix
      primitive exposes its own content-height custom property scoped to its
      own element, so these can't share one keyframe pair. */
   --animate-accordionDown: accordionDown 0.25s cubic-bezier(0.33, 1, 0.68, 1);
   --animate-accordionUp: accordionUp 0.2s cubic-bezier(0.32, 0, 0.67, 0);
   --animate-collapsibleDown: collapsibleDown 0.2s ease-out;
   --animate-collapsibleUp: collapsibleUp 0.2s ease-out;
-  /* Toast stack enter/exit (Sprint 0 extension) — paired with the stacking
+  /* Toast stack enter/exit (Sprint 0 extension): paired with the stacking
      transform/opacity Toaster computes per-item in JS (see toaster.tsx);
      these only own the moment a toast is inserted/removed, not the
      depth-shift transition between stack positions (that's a plain
@@ -208,7 +217,7 @@
    own native scrollbar-thumb- and scrollbar-track- color utilities
    (https://tailwindcss.com/docs/scrollbar-color), colliding by name with
    this plugin's own utilities whenever a color token matches one of the
-   plugin's class suffixes (this app's `outline` token did) — two separate
+   plugin's class suffixes (this app's `outline` token did): two separate
    `.scrollbar-thumb-outline` rules end up in the compiled CSS, and
    `tailwind-merge` (built against core's utility list, not the plugin's)
    folds the plugin's `-rounded-*` variant into core's color class group,
@@ -219,12 +228,12 @@
 
 /* ── Texture utilities ────────────────────────────────────────────────────
    Decorative-only patterns for "full comic treatment" surfaces (marketing,
-   onboarding, empty states) per design-system-rules.md §15 — never on dense
+   onboarding, empty states) per design-system-rules.md §15, never on dense
    data surfaces. Not `@theme` entries because each is a background-image
    pattern, not a single value. Both derive their color from --color-outline
    via color-mix rather than a fixed rgba, so one utility works on every fill
    and in both themes, and both layer on top of whatever background-color the
-   element already has — apply alongside bg-actionPrimary etc., not instead
+   element already has: apply alongside bg-actionPrimary etc., not instead
    of it. */
 
 /* Diagonal barber-pole banding for filled bars (Sprint 0 extension). The

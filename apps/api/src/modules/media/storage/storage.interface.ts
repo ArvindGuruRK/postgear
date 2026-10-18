@@ -3,7 +3,7 @@
  *
  * Three operations, and deliberately no `get`: nothing in PostGear reads media
  * back through the API. Browsers and social platforms fetch it from
- * `publicUrl()` directly — a CDN for S3, a static route for local disk — so
+ * `publicUrl()` directly (a CDN for S3, a static route for local disk), so
  * the API never proxies bytes it has already stored.
  */
 

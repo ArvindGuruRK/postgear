@@ -1,6 +1,6 @@
 /**
  * Notification shapes shared between server components and client islands
- * (Sprint 8). Mirror `GET /notifications*` — see
+ * (Sprint 8). Mirror `GET /notifications*`: see
  * docs/sprint-documents/sprint-08-contract.md §5.2.
  */
 

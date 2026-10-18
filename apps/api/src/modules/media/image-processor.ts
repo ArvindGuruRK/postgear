@@ -7,7 +7,7 @@
  * LinkedIn provider carries a comment warning that self-hosters who switch that
  * off send full-size images straight to platforms. Server-side, compression
  * cannot be skipped by a different client, an API call, or a browser without
- * the right codec — and stripping location metadata is a privacy guarantee,
+ * the right codec, and stripping location metadata is a privacy guarantee,
  * which only means something if the client cannot opt out of it.
  *
  * ## What every image goes through
@@ -15,13 +15,13 @@
  * 1. **Decoded once** at a bounded size. Sharp's pixel limit refuses a
  *    decompression bomb before it allocates.
  * 2. **Rotated upright** from its EXIF orientation, then **stripped of all
- *    metadata** — EXIF, GPS, camera serials. A phone photo's location does not
+ *    metadata**: EXIF, GPS, camera serials. A phone photo's location does not
  *    ride along to four social networks.
  * 3. **Fit within 2048 px** on its long edge, never enlarged. 2048 is one of
  *    Facebook's recommended photo widths, well above the 1080 px Instagram
- *    displays, and inside X's 4096 px maximum — so feeds lose nothing visible,
+ *    displays, and inside X's 4096 px maximum, so feeds lose nothing visible,
  *    and only X's full-screen zoom on a very large original would.
- * 4. **Re-encoded** as JPEG (quality 82, mozjpeg) — or as PNG when the image
+ * 4. **Re-encoded** as JPEG (quality 82, mozjpeg), or as PNG when the image
  *    genuinely uses transparency, since JPEG would paint it black. Every
  *    platform PostGear publishes to accepts both; WebP and AVIF inputs are
  *    converted because several do not.
@@ -31,7 +31,7 @@
  * Animated GIFs are the exception: re-encoding frame by frame would bloat them
  * or lose the animation, so their bytes are stored as uploaded and only the
  * thumbnail is generated. The GIF format has no EXIF block, so there is no
- * camera location to strip — though an XMP comment packet, if present,
+ * camera location to strip, though an XMP comment packet, if present,
  * survives. That is the trade for keeping the animation.
  */
 import { readFile } from 'node:fs/promises';
@@ -166,11 +166,57 @@ export async function processImage(
   }
 }
 
+/** Edge of a stored avatar: 2× the largest place one is drawn (a 128px preview). */
+export const AVATAR_EDGE = 256;
+
+const AVATAR_QUALITY = 82;
+
+/**
+ * A user avatar (UI revamp, 2026-10-17): an upload or a re-hosted OAuth photo.
+ *
+ * The same safety steps as `processImage`: bounded decode, the sniffer and the
+ * decoder must agree, EXIF rotation applied and then every byte of metadata
+ * dropped, but a different output: centre-cropped to a square and resized to
+ * exactly {@link AVATAR_EDGE}² WebP. Small enough that no thumbnail is needed,
+ * and WebP is fine here because nothing but a browser ever fetches an avatar
+ * (unlike media, which social platforms must accept). Animated input is
+ * flattened to its first frame.
+ */
+export async function processAvatarImage(
+  input: Buffer,
+  sniffed: Extract<SniffedMedia, { kind: 'image' }>,
+): Promise<Buffer> {
+  const options = { failOn: 'error' as const, limitInputPixels: MAX_INPUT_PIXELS };
+
+  let format: string | undefined;
+
+  try {
+    ({ format } = await sharp(input, options).metadata());
+  } catch {
+    throw new UnreadableImageError();
+  }
+
+  if (format !== DECODED_FORMAT[sniffed.mimeType]) {
+    throw new UnreadableImageError('The file is not the image it claims to be');
+  }
+
+  try {
+    return await sharp(input, { ...options, animated: false })
+      .rotate()
+      .resize({ width: AVATAR_EDGE, height: AVATAR_EDGE, fit: 'cover', position: 'centre' })
+      .toColourspace('srgb')
+      .webp({ quality: AVATAR_QUALITY })
+      .toBuffer();
+  } catch {
+    throw new UnreadableImageError();
+  }
+}
+
 /**
  * True when any pixel is less than fully opaque.
  *
  * Scanned directly rather than via `sharp().stats()`, which measures the
- * *input* and ignores the pipeline — it would decode the full-size original a
+ * *input* and ignores the pipeline: it would decode the full-size original a
  * second time. Grey-plus-alpha (two channels) and RGBA (four) both carry alpha
  * last.
  */

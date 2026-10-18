@@ -65,7 +65,7 @@ describe('registerSchema', () => {
     ).toThrow();
   });
 
-  it(`rejects a password longer than ${PASSWORD_MAX} — unbounded input is a CPU DoS`, () => {
+  it(`rejects a password longer than ${PASSWORD_MAX}, since unbounded input is a CPU DoS`, () => {
     const password = `${'a'.repeat(PASSWORD_MAX)}1`;
     expect(() => registerSchema.parse({ ...validRegistration, password })).toThrow();
   });

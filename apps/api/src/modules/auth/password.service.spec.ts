@@ -150,7 +150,7 @@ describe('PasswordService', () => {
       const dummyMs = Number(process.hrtime.bigint() - dummyStart) / 1e6;
 
       // A loose bound on purpose. The claim being tested is "same order of
-      // magnitude, not microseconds versus milliseconds" — tightening this
+      // magnitude, not microseconds versus milliseconds": tightening this
       // would make it a flaky timing test on shared CI hardware.
       expect(dummyMs).toBeGreaterThan(realMs / 10);
       expect(dummyMs).toBeLessThan(realMs * 10);

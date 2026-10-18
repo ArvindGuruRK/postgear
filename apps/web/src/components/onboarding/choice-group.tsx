@@ -11,7 +11,7 @@ import type { Question } from '@/lib/onboarding-questions';
  *
  * Built on real radio inputs kept visually hidden rather than on styled
  * `<div onClick>`s, so the group is keyboard-navigable with arrow keys, is
- * announced as a radiogroup by screen readers, and participates in the form —
+ * announced as a radiogroup by screen readers, and participates in the form:
  * all behaviour that a div would have to reimplement badly. The visible card
  * is the `<label>`, which is why clicking anywhere on it selects the option.
  */
@@ -53,7 +53,7 @@ export function ChoiceGroup({
                 value={option.value}
                 checked={selected}
                 onChange={() => onChange(option.value)}
-                // Visually hidden, not `hidden` and not `display: none` —
+                // Visually hidden, not `hidden` and not `display: none`,
                 // either of those removes it from the tab order and from the
                 // accessibility tree, which is the whole reason to use a real
                 // input here.
@@ -85,7 +85,7 @@ export function ChoiceGroup({
 /**
  * The multi-select variant, for step 4's channel picker.
  *
- * Checkboxes rather than radios, and no "none" option — deselecting everything
+ * Checkboxes rather than radios, and no "none" option: deselecting everything
  * is a valid answer that means the same thing as skipping.
  */
 export function MultiChoiceGroup({
@@ -132,7 +132,7 @@ export function MultiChoiceGroup({
       </div>
 
       <Text size="sm" muted className="mt-3">
-        Pick as many as you like, or none — you can connect channels later.
+        Pick as many as you like, or none. You can connect channels later.
       </Text>
     </fieldset>
   );

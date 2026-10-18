@@ -5,7 +5,7 @@ rule off: `style/useImportType`.
 
 That rule rewrites `import { ConfigService } from '@nestjs/config'` into
 `import type { ConfigService } ...` whenever the identifier is only referenced
-in type position — which, for a NestJS constructor, it always appears to be:
+in type position, which, for a NestJS constructor, it always appears to be:
 
 ```ts
 constructor(private readonly config: ConfigService) {}
@@ -27,5 +27,5 @@ imports" commit and is hard to attribute.
 
 The rule stays **on** everywhere else in the monorepo, where it is a genuine
 improvement. `import type` is still used explicitly in this app for things that
-really are type-only — `Request` from express, `Role` from `@postgear/db` — and
+really are type-only (`Request` from express, `Role` from `@postgear/db`) and
 those are unaffected by the override.

@@ -39,7 +39,7 @@ export const SEO_SEVERITIES: readonly SeoSeverity[] = ['critical', 'warning', 'i
 
 export type SeoAuditStatus = 'pending' | 'crawling' | 'scoring' | 'advising' | 'done' | 'failed';
 
-/** The stages the analyzer streams, in order — what the tracker shows. */
+/** The stages the analyzer streams, in order: what the tracker shows. */
 export type SeoStage = 'validate' | 'crawl' | 'score' | 'advise';
 
 export const SEO_STAGES: readonly SeoStage[] = ['validate', 'crawl', 'score', 'advise'] as const;

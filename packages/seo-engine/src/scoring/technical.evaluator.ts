@@ -2,7 +2,7 @@
  * Technical SEO (30% of the score): what the fetch said about the site.
  *
  * HTTPS, a trusted certificate, a 2xx status and the absence of `noindex` are
- * critical — any one of them keeps the page out of results or marks it "not
+ * critical: any one of them keeps the page out of results or marks it "not
  * secure", and no amount of copy fixes that. Speed and broken links are
  * warnings, graded: 800 ms earns full marks and 2.5 s none, matching the
  * range where field data shows bounce rates climbing; a page is only as
@@ -11,7 +11,7 @@
  * is information.
  *
  * Unknowns do not cost points. A robots.txt or sitemap the crawler could not
- * fetch in time is `unknown` and scores as if fine — penalising a site for
+ * fetch in time is `unknown` and scores as if fine: penalising a site for
  * our own timeout would make the score depend on the crawler's luck.
  */
 import { type CategoryScore, type CrawlResult, SEO_CATEGORY_WEIGHTS } from '../types';

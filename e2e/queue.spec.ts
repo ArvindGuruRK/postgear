@@ -2,12 +2,12 @@ import { expect, type Page, test } from '@playwright/test';
 import { cleanUp } from './helpers/media';
 
 /**
- * The queue — every post in publish order, with how each one went.
+ * The queue: every post in publish order, with how each one went.
  *
  * Uses the seeded demo posts for the read-only checks and creates its own for
  * the ones that change state. "Post now" is asserted up to what the API
- * records — the post moves to the current minute and stays queued for the
- * worker — because whether a worker is running is the deployment's business,
+ * records (the post moves to the current minute and stays queued for the
+ * worker), because whether a worker is running is the deployment's business,
  * not this suite's (the completion checklist covers the publish itself).
  */
 
@@ -59,8 +59,8 @@ test.describe('queue', () => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/queue`);
 
-    // Scoped to main: the app shell's header repeats the page title in its own h1.
-    await expect(page.getByRole('main').getByRole('heading', { name: 'Queue' })).toBeVisible();
+    // The page is named only by the top bar's h1 (no in-page title).
+    await expect(page.getByRole('heading', { level: 1, name: 'Queue' })).toBeVisible();
     const rows = page.getByTestId('queue-row');
     await expect(rows.first()).toBeVisible();
 

@@ -32,13 +32,13 @@ interface FinishSetupDialogProps {
  * This runs both immediately after OAuth (the callback redirects with
  * `?setup=<id>`) and later from the channel list, for anyone who closed the tab
  * mid-setup. The reference implementation has two separate components for these
- * — one inline on the return page, one modal on the calendar — with different
+ * (one inline on the return page, one modal on the calendar) with different
  * titles, different endpoints, and two copies of the same mock object. Building
  * it once means the resume path cannot drift from the fresh one.
  *
  * ## Why the metadata line matters
  *
- * Each option shows a disambiguating detail — follower count, board size, the
+ * Each option shows a disambiguating detail: follower count, board size, the
  * Page an Instagram account sits behind. With five similarly-named Facebook
  * pages, the name alone makes the choice impossible.
  */
@@ -119,7 +119,7 @@ export function FinishSetupDialog({ channel, onOpenChange, onDone }: FinishSetup
             <Spinner />
           </div>
         ) : entities.length === 0 ? (
-          /* The empty state names the cause, the fix, and the way out — a bare
+          /* The empty state names the cause, the fix, and the way out: a bare
              "nothing found" leaves the user with no next move, and this is the
              single most common place a Meta connection stalls. */
           <Stack gap="sm">

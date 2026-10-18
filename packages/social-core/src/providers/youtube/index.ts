@@ -1,9 +1,9 @@
 /**
- * YouTube — Google OAuth 2.0, Data API v3.
+ * YouTube: Google OAuth 2.0, Data API v3.
  *
  * ## Two things about Google's OAuth that break integrations quietly
  *
- * `access_type=offline` is what makes Google issue a refresh token at all — and
+ * `access_type=offline` is what makes Google issue a refresh token at all, and
  * it issues one **only on the first consent**. A user who reconnects gets an
  * access token and no refresh token, so the channel silently becomes
  * unrefreshable. `prompt=consent` forces the consent screen every time and with
@@ -108,7 +108,7 @@ interface YouTubeVideo {
 }
 
 /**
- * Pages of the uploads playlist read per sync — fifty videos each. Two pages
+ * Pages of the uploads playlist read per sync: fifty videos each. Two pages
  * is a hundred uploads, more than a channel posts in ninety days; the read
  * stops early anyway once it reaches a video older than the window.
  */
@@ -176,7 +176,7 @@ export class YouTubeProvider
       redirect_uri: redirectUri,
       state,
       scope: this.scopes.join(' '),
-      // See the class comment — these two together are what guarantee a
+      // See the class comment: these two together are what guarantee a
       // refresh token on every connect, including reconnects.
       access_type: 'offline',
       prompt: 'consent',
@@ -359,14 +359,14 @@ export class YouTubeProvider
 
   /**
    * Subscribers today, and the window's uploads summed into the day each
-   * was published — the same series X gives, for the same reason (see
+   * was published: the same series X gives, for the same reason (see
    * `abstract/analytics.ts`). The channel's lifetime `viewCount` is
    * deliberately not recorded as a daily `views` flow: summing a lifetime
    * figure over a range would be nonsense.
    *
    * Uploads are read through the channel's uploads playlist rather than
    * `search?forMine=true`, which answers for the Google account's default
-   * channel and so is wrong for a brand channel — the common case for a
+   * channel and so is wrong for a brand channel: the common case for a
    * business.
    */
   async channelAnalytics(

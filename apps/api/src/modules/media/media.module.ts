@@ -11,7 +11,7 @@ import { createStorage, type StorageConfig } from './storage/storage.factory';
  * Builds storage config from validated environment values.
  *
  * Exported because `main.ts` needs the same answer to mount the static route
- * for local uploads — two copies of this mapping would be two chances to
+ * for local uploads: two copies of this mapping would be two chances to
  * serve from a different directory than the one being written to.
  */
 export function storageConfigFrom(config: ConfigService<Env, true>): StorageConfig {
@@ -38,6 +38,11 @@ export function storageConfigFrom(config: ConfigService<Env, true>): StorageConf
  * so the service never knows which one it has and a test can hand it a fake.
  * `MediaService` is exported for the posts module, which resolves attachments
  * through it rather than reading `Media` rows itself.
+ *
+ * `STORAGE_BACKEND` is exported too (UI revamp, 2026-10-17) so user avatars are
+ * written to the same local directory or bucket as media, from the same
+ * validated config, without a second factory call that could drift from this
+ * one. Avatars use the backend directly and never create a `Media` row.
  */
 @Module({
   controllers: [MediaController],
@@ -50,6 +55,6 @@ export function storageConfigFrom(config: ConfigService<Env, true>): StorageConf
       useFactory: (config: ConfigService<Env, true>) => createStorage(storageConfigFrom(config)),
     },
   ],
-  exports: [MediaService],
+  exports: [MediaService, STORAGE_BACKEND],
 })
 export class MediaModule {}

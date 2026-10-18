@@ -3,7 +3,7 @@
  *
  * The important decision here is that `needs_setup` and `needs_reconnect` get
  * **different colours and different verbs**. Both mean "this channel cannot
- * publish", so it is tempting to give them one warning badge — the reference
+ * publish", so it is tempting to give them one warning badge: the reference
  * implementation does exactly that, and the result is a user who can see
  * something is wrong but not what to do about it. One is "finish what you
  * started", the other is "your access expired". Different problems, different

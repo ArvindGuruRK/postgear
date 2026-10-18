@@ -5,8 +5,8 @@
  *
  * ## Text is rendered as text
  *
- * Every preview shows the output of `renderPlainText` — the exact string the
- * platform will receive — as React text nodes, with `white-space: pre-wrap` for
+ * Every preview shows the output of `renderPlainText` (the exact string the
+ * platform will receive) as React text nodes, with `white-space: pre-wrap` for
  * line breaks. The reference renders each preview through
  * `dangerouslySetInnerHTML` from the editor's HTML, which both makes the post
  * body an XSS surface and shows formatting the platform will never display.
@@ -42,7 +42,7 @@ export interface PlatformPreviewProps {
   parts: PreviewPart[];
   maxLength: number;
   lengthMethod: LengthMethod;
-  /** When it is scheduled — shown where the platform shows a timestamp. */
+  /** When it is scheduled: shown where the platform shows a timestamp. */
   publishAt: Date | null;
 }
 
@@ -66,7 +66,7 @@ export function ChannelAvatar({
 /**
  * Post text with an overflow mark and, optionally, the platform's own fold.
  *
- * `foldAfter` reproduces where a feed truncates with "…see more" — LinkedIn and
+ * `foldAfter` reproduces where a feed truncates with "…see more": LinkedIn and
  * Instagram hide most of a long post behind it, which is worth knowing when the
  * first line is doing all the work.
  */
@@ -80,7 +80,7 @@ export function PreviewText({
   className,
 }: {
   text: string;
-  /** Rendered before the text, outside the count — Instagram's bold handle. */
+  /** Rendered before the text, outside the count: Instagram's bold handle. */
   prefix?: React.ReactNode;
   maxLength: number;
   lengthMethod: LengthMethod;
@@ -122,7 +122,7 @@ export function PreviewText({
           {over ? (
             <mark
               className="rounded-sm bg-actionDanger text-onActionLight"
-              title={`Past the ${maxLength.toLocaleString('en-US')}-character limit — this will not be accepted`}
+              title={`Past the ${maxLength.toLocaleString('en-US')}-character limit: this will not be accepted`}
             >
               {over}
             </mark>
@@ -244,7 +244,7 @@ export function MissingMedia({ label, className }: { label: string; className?: 
   );
 }
 
-/** "Oct 1" — or "Now" for an unscheduled post. */
+/** "Oct 1", or "Now" for an unscheduled post. */
 export function shortDate(date: Date | null): string {
   return date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Now';
 }

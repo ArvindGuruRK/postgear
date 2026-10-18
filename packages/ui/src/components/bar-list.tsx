@@ -2,8 +2,8 @@ import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
 /**
- * Rows compared by one number — channels by engagement, keywords by density
- * — each a label, a value and a bar scaled against the largest (Sprint 7).
+ * Rows compared by one number (channels by engagement, keywords by density),
+ * each a label, a value and a bar scaled against the largest (Sprint 7).
  *
  * The horizontal-bar equivalent of a comparison table (user story 6.4), in
  * the restrained profile: bars are flat fills inside a bordered track, no

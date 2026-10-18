@@ -217,7 +217,7 @@ describe('reportAsText', () => {
   it('writes the score line, the comparison, the categories and the grouped fixes', () => {
     expect(reportAsText(detail)).toBe(
       [
-        'SEO audit — https://example.com/',
+        'SEO audit: https://example.com/',
         'Score 82/100 · Grade B · 2026-10-15',
         'vs last run (2026-10-08): +11 from 71',
         'On-page 80 · Technical 90 · Content 75 · Authority 70 (estimated)',

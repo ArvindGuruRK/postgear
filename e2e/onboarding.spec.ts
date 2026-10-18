@@ -2,8 +2,9 @@ import { expect, test } from '@playwright/test';
 import { createUnonboardedUser, deleteUser, disconnect, type FixtureUser } from './helpers/users';
 
 /**
- * Sprint 2's end-to-end journeys: the two route gates, the five-step
- * onboarding wizard, resuming an abandoned flow, and signing out.
+ * Sprint 2's end-to-end journeys: the two route gates, the onboarding wizard
+ * (six steps since the UI revamp, with "Skip questions" and the profile /
+ * avatar step), resuming an abandoned flow, and signing out.
  *
  * ## What these need
  *
@@ -14,7 +15,7 @@ import { createUnonboardedUser, deleteUser, disconnect, type FixtureUser } from 
  *
  * The Playwright `webServer` starts only the Next app. A missing API surfaces
  * as an unexpected redirect to /login, because `getSession()` deliberately
- * treats an unreachable API as "not signed in" — a recoverable login screen
+ * treats an unreachable API as "not signed in": a recoverable login screen
  * beats an error page.
  *
  * ## Why fixtures create their own users
@@ -97,32 +98,32 @@ test.describe('the onboarding wizard', () => {
     await deleteUser(user.id);
   });
 
-  test('walks all five steps, skips the channel step, and lands in the dashboard', async ({
+  test('walks all six steps, skips the channel step, and lands in the dashboard', async ({
     page,
   }) => {
     await signIn(page, user.email, user.password);
     await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
 
-    // Step 1 — workspace
+    // Step 1: workspace
     await page.getByLabel('Workspace name').fill('E2E Workspace');
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
-    // Step 2 — Q1 role, Q2 team size
+    // Step 2: Q1 role, Q2 team size
     await expect(page.getByRole('heading', { name: 'About you' })).toBeVisible();
     await page.getByText('Solo creator', { exact: true }).click();
     await page.getByText('Just me', { exact: true }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Step 3 — Q3 goal, Q4 frequency
+    // Step 3: Q3 goal, Q4 frequency
     await expect(page.getByRole('heading', { name: 'What are you here to do?' })).toBeVisible();
     await page.getByText('Save time scheduling', { exact: true }).click();
     await page.getByText('Every day', { exact: true }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Step 4 — channels. Selecting nothing turns Continue into "Skip for now".
+    // Step 4: channels. Selecting nothing turns Continue into "Skip for now".
     //
     // Sprint 3 made the connect button real, but it stays disabled until a
-    // platform is picked — there is nothing to connect otherwise. The skip path
+    // platform is picked: there is nothing to connect otherwise. The skip path
     // is what matters here and must never require an OAuth handshake: the
     // sprint requires that a user who cannot complete one still reaches the
     // dashboard.
@@ -130,14 +131,101 @@ test.describe('the onboarding wizard', () => {
     await expect(page.getByRole('button', { name: /Connect .* now/ })).toBeDisabled();
     await page.getByRole('button', { name: 'Skip for now' }).click();
 
-    // Step 5 — Q5 referral
+    // Step 5: Q5 referral. No longer the end: it leads to the profile step.
     await expect(page.getByRole('heading', { name: 'One last thing' })).toBeVisible();
     await page.getByText('Search engine', { exact: true }).click();
+    await page.getByRole('button', { name: 'Continue' }).click();
+
+    // Step 6: profile. The name is pre-filled from the account.
+    await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
+    await expect(page.getByLabel('Your name')).toHaveValue('E2E Tester');
     await page.getByRole('button', { name: 'Finish setup' }).click();
 
     await expect(page).toHaveURL(/\/[^/]+\/calendar(\?|$)/, { timeout: 20_000 });
-    // The app shell — which gate 2 was keeping this user out of a moment ago.
+    // The app shell, which gate 2 was keeping this user out of a moment ago.
     await expect(page.locator('aside').first()).toBeVisible();
+  });
+
+  test('"Skip questions" goes straight to the profile step, which still has to be finished', async ({
+    page,
+  }) => {
+    await signIn(page, user.email, user.password);
+    await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
+
+    await page.getByLabel('Workspace name').fill('Skipper');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+
+    await expect(page.getByRole('heading', { name: 'About you' })).toBeVisible();
+    await page.getByRole('button', { name: 'Skip questions' }).click();
+
+    await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
+
+    // Skipping does not finish onboarding: a reload resumes on the profile
+    // step instead of opening the dashboard.
+    await page.goto('/onboarding');
+    await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
+  });
+
+  test('a chosen preset avatar replaces the initials in the account menu', async ({ page }) => {
+    await signIn(page, user.email, user.password);
+    await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
+
+    await page.getByLabel('Workspace name').fill('Avatar Picker');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+    await page.getByRole('button', { name: 'Skip questions' }).click();
+    await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
+
+    await page.getByLabel('Your name').fill('Avery');
+
+    // The tile is the radio's label; the input itself is visually hidden.
+    const radio = page.getByRole('radio', { name: 'Person with two hair buns, waving, on violet' });
+    const saved = page.waitForResponse(
+      (response) => response.url().endsWith('/users/me/avatar/preset') && response.ok(),
+    );
+    await page.locator('label', { has: radio }).click();
+    await expect(radio).toBeChecked();
+    await saved;
+
+    // "Finish setup" waits for the avatar save to land before enabling.
+    const finish = page.getByRole('button', { name: 'Finish setup' });
+    await expect(finish).toBeEnabled();
+    await finish.click();
+
+    await expect(page).toHaveURL(/\/[^/]+\/calendar(\?|$)/, { timeout: 20_000 });
+
+    const menu = page.getByRole('button', { name: 'Open user menu' });
+    await expect(menu.locator('img')).toHaveAttribute('src', /\/avatars\/notionists-05\.svg$/);
+    await expect(menu).not.toContainText('AV');
+  });
+
+  test('an uploaded photo becomes the avatar', async ({ page }) => {
+    await signIn(page, user.email, user.password);
+    await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
+
+    await page.getByLabel('Workspace name').fill('Avatar Upload');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+    await page.getByRole('button', { name: 'Skip questions' }).click();
+    await expect(page.getByRole('heading', { name: 'What should we call you?' })).toBeVisible();
+
+    // A real 1×1 PNG; the API crops and re-encodes it to a 256 px WebP.
+    await page.getByTestId('avatar-upload-input').setInputFiles({
+      name: 'me.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+
+    await expect(page.getByRole('radio', { name: 'Your photo' })).toBeChecked({ timeout: 15_000 });
+
+    // Client-side checks fire before any upload.
+    await page.getByTestId('avatar-upload-input').setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('not an image'),
+    });
+    await expect(page.getByText('Upload a JPEG, PNG or WebP image.')).toBeVisible();
   });
 
   test('records the channels a user does select', async ({ page }) => {
@@ -175,7 +263,7 @@ test.describe('the onboarding wizard', () => {
     // Abandon: a full reload, discarding every scrap of client state.
     await page.goto('/onboarding');
 
-    // Back on step 2 — not step 1, not an error page, and specifically not
+    // Back on step 2, not step 1, not an error page, and specifically not
     // dropped into a dashboard with a half-finished profile. This is the
     // behaviour a derived "has >= 1 organization" completion check could not
     // provide: creating the workspace would have ended onboarding outright.

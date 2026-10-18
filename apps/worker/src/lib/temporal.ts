@@ -2,8 +2,8 @@
  * Connections to the Temporal server, for the worker and for its own client.
  *
  * Two connections because the SDK needs two: the worker polls through a native
- * (Rust core) connection, while activities that start other workflows — the
- * maintenance reconcile — use the ordinary gRPC client.
+ * (Rust core) connection, while activities that start other workflows (the
+ * maintenance reconcile) use the ordinary gRPC client.
  *
  * Both retry at boot. The worker usually starts in the same `docker compose up`
  * as Temporal, which takes a good thirty seconds to run its schema setup, and

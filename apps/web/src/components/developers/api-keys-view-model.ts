@@ -1,7 +1,7 @@
 /**
  * The API-keys page's judgements, as pure functions so they can be pinned:
  * which keys are live, when the ceiling is reached, how a timestamp reads,
- * and the two strings the page shows a developer — the docs URL and the
+ * and the two strings the page shows a developer: the docs URL and the
  * first `curl`.
  */
 import type { BadgeProps } from '@postgear/ui';

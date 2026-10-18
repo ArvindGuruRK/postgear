@@ -5,7 +5,7 @@ import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
 /**
- * Handles both a single-value slider and a range slider — thumb count is
+ * Handles both a single-value slider and a range slider: thumb count is
  * derived from `value`/`defaultValue` array length (1 thumb = slider, 2 = range).
  */
 export const Slider = forwardRef<
@@ -29,7 +29,7 @@ export const Slider = forwardRef<
           // biome-ignore lint/suspicious/noArrayIndexKey: thumb count is fixed per slider instance
           key={index}
           className={cn(
-            'block h-5 w-5 rounded-full border-2 border-outline bg-secondary shadow-brutalSm',
+            'block h-5 w-5 rounded-full border-2 border-outline bg-secondary shadow-surfaceSm',
             'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             'disabled:pointer-events-none disabled:opacity-50',
           )}

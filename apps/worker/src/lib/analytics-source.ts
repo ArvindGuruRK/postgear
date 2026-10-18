@@ -5,8 +5,8 @@
  * read from a real platform locally, because the seeded channels hold fake
  * tokens every platform would answer with a 401. With
  * `ANALYTICS_SIMULATION=true` the platform call is replaced by a stand-in,
- * and everything around it — the daily timer, the upserts, the sync status
- * row, the leaderboard — runs for real against the real database.
+ * and everything around it (the daily timer, the upserts, the sync status
+ * row, the leaderboard) runs for real against the real database.
  *
  * ## The stand-in is deterministic
  *
@@ -57,7 +57,7 @@ export type AnalyticsProvider = Pick<SocialAnalytics, 'channelAnalytics' | 'post
 export interface AnalyticsSource {
   /** True when a stand-in is in use rather than the platforms. */
   readonly simulated: boolean;
-  /** Null when the platform exposes no metrics — the channel is reported as unsupported. */
+  /** Null when the platform exposes no metrics: the channel is reported as unsupported. */
   resolve(providerIdentifier: string): AnalyticsProvider | null;
 }
 
@@ -105,8 +105,8 @@ function noise(label: string): number {
  * The stand-in's channel series for the window ending today.
  *
  * Exported for the tests, which pin the ranges and the determinism. The
- * level and the flows are tied together — impressions scale with the
- * follower count — so the engagement rate looks like a real account's.
+ * level and the flows are tied together (impressions scale with the
+ * follower count), so the engagement rate looks like a real account's.
  */
 export function simulatedChannelPoints(
   channelId: string,

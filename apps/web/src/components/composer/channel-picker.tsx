@@ -9,13 +9,13 @@ import type { Channel } from '@/types/channel';
  * Which connected channels a post goes to.
  *
  * Toggle buttons rather than a dropdown multi-select: with a handful of
- * channels, seeing every account at once — avatar, name, platform — is the
+ * channels, seeing every account at once (avatar, name, platform) is the
  * choice, and a closed dropdown hides it.
  *
  * Health is shown here, where the choice is made. A channel still being set up
  * cannot be picked at all (there is nowhere to post yet); one needing
  * reconnection can, with a warning, because it can be fixed before the post is
- * due — the same line the API draws when queueing.
+ * due: the same line the API draws when queueing.
  */
 export function ChannelPicker({
   orgId,

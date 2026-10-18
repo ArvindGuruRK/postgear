@@ -2,7 +2,7 @@
  * Request schemas for the AI routes.
  *
  * Both bodies are `.strict()`, as every schema in this API is: an unknown key
- * is refused, not stripped. Free text — the topic, each chat message — has
+ * is refused, not stripped. Free text (the topic, each chat message) has
  * its control and direction-override characters removed before the length
  * check, so a prompt cannot carry an invisible instruction and a stripped
  * one cannot sneak under the minimum.

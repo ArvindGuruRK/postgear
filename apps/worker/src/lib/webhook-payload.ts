@@ -13,7 +13,7 @@
  *
  * It is stored on the row and sent as-is on every attempt, so a receiver
  * that sees a retry sees the same bytes (and the same signature input) as the
- * first try — and so a post edited after it published does not change what a
+ * first try, and so a post edited after it published does not change what a
  * delivery about the publish says.
  */
 import type { Prisma } from '@postgear/db';
@@ -80,7 +80,7 @@ export function buildWebhookPayload(params: {
   };
 }
 
-/** The subset of a Prisma client the enqueue needs — the real client or a transaction. */
+/** The subset of a Prisma client the enqueue needs: the real client or a transaction. */
 export type WebhookEnqueueClient = {
   webhooks: { findMany: Prisma.WebhooksDelegate['findMany'] };
   webhookDelivery: {

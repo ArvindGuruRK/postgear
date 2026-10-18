@@ -5,7 +5,7 @@ import { cn } from '../lib/utils';
  * A 0–100 score as an arc meter with the number inside and a letter grade
  * under it (Sprint 7: the SEO analyzer's composite score).
  *
- * Restrained per design-system-rules.md §15 — a score is data. The arc has
+ * Restrained per design-system-rules.md §15: a score is data. The arc has
  * hard ends (`butt` caps) and a thick stroke in the system's flat action
  * colours; the track is the outline at low opacity so it reads in both
  * themes; the number is `type-heading` because it is the one thing on the
@@ -39,7 +39,7 @@ const SIZE = {
   lg: { box: 'h-56 w-56', value: 'text-7xl', grade: 'text-base', stroke: 14 },
 } as const;
 
-/** The arc spans 240° — open at the bottom, like a dial. */
+/** The arc spans 240°: open at the bottom, like a dial. */
 const SWEEP_DEGREES = 240;
 const START_DEGREES = 150;
 const RADIUS = 42;
@@ -66,7 +66,7 @@ export function arcPath(degrees: number): string {
 export interface ScoreGaugeProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'> {
   /** 0–100. Clamped. Null renders an empty dial with a dash. */
   value: number | null;
-  /** A letter under the number — the analyzer's grade. */
+  /** A letter under the number: the analyzer's grade. */
   grade?: string | null;
   /** Small caption under the grade ("Overall"). */
   label?: string;

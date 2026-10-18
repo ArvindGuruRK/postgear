@@ -5,7 +5,7 @@
  * server said, how fast, whether it was HTTPS, how the page was fetched,
  * how much text there was, and how long the whole run took.
  *
- * `font-sans` throughout — these are readings, not chrome — in bordered
+ * `font-sans` throughout (these are readings, not chrome) in bordered
  * chips with no shadow (design-system-rules.md §15). The lock is the one
  * tinted glyph: green closed for HTTPS, red open for plain HTTP, because
  * that is the one fact here with a right answer. The mode is a badge rather

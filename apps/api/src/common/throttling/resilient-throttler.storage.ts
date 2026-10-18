@@ -6,7 +6,7 @@
  * storage-redis` a shared one. Neither degrades: with Redis configured, a
  * restart of the container turns every request into a 500 from inside the
  * guard. This wrapper applies the same rule `RedisService` does for the login
- * throttle — fail *open* to per-instance accuracy, never closed — because a
+ * throttle (fail *open* to per-instance accuracy, never closed), because a
  * rate limit that is briefly per-process is a smaller failure than an API
  * that refuses everyone while Redis comes back.
  */

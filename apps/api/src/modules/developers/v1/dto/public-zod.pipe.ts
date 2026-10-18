@@ -4,7 +4,7 @@
  * The house pipes (`ZodBody`, `ZodQuery`) answer every failure with the
  * bare "Invalid input", naming no field, because on an *auth* form the field
  * is itself an oracle. A `/v1` caller is already authenticated, acting in
- * their own workspace, and reading the error in a terminal — for them
+ * their own workspace, and reading the error in a terminal: for them
  * "channelIds: Array must contain at least 1 element(s)" is the difference
  * between a fixed integration and a support ticket. So this pipe names the
  * first failing path and its message. The full issue list still goes to the

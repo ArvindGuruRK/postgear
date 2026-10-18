@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 /**
- * The analytics dashboard — what the seed makes checkable without a platform:
+ * The analytics dashboard: what the seed makes checkable without a platform:
  * the totals render as numbers, the range lives in the URL, every channel is
  * compared with its standing (LinkedIn synced, X needing a reconnect), the
  * top post opens its own numbers against the channel's average, and "Sync
@@ -30,8 +30,8 @@ async function signIn(page: Page) {
 
 async function openAnalytics(page: Page, query = '') {
   await page.goto(`/${DEMO_ORG}/analytics${query}`);
-  // Scoped to main: the app shell's header repeats the page title in its own h1.
-  await expect(page.getByRole('main').getByRole('heading', { name: 'Analytics' })).toBeVisible();
+  // The page is named only by the top bar's h1 (no in-page title).
+  await expect(page.getByRole('heading', { level: 1, name: 'Analytics' })).toBeVisible();
 }
 
 const STATS = ['followers', 'impressions', 'engagements', 'engagementRate'] as const;

@@ -7,8 +7,8 @@
  * `packages/social-core/src/composer/document.ts` for why not HTML). This file
  * is where that document is held to a closed allowlist: six node types, three
  * marks, `http`/`https` links only, and no attribute the renderer does not read.
- * Every object is `.strict()`, so an unknown key — an `onclick`, a `style`, a
- * node type from an editor extension nobody reviewed — is rejected rather than
+ * Every object is `.strict()`, so an unknown key (an `onclick`, a `style`, a
+ * node type from an editor extension nobody reviewed) is rejected rather than
  * stored and trusted later.
  *
  * ## Why the schema is built to a fixed depth
@@ -33,7 +33,7 @@ export const MAX_THREAD_PARTS = 25;
 /** Channels one post may target. */
 export const MAX_CHANNELS_PER_POST = 20;
 
-/** Attachments on one part — LinkedIn's twenty-image post is the most generous rule. */
+/** Attachments on one part: LinkedIn's twenty-image post is the most generous rule. */
 export const MAX_MEDIA_PER_PART = 20;
 
 /** Facebook's 63,206-character limit is the longest any platform allows; this leaves room. */

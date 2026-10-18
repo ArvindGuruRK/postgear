@@ -5,8 +5,8 @@
  *
  * The dialog stays open after the key is created and swaps its body for the
  * secret, because closing it is the one moment the secret is lost. Only
- * "Done" (or an explicit close) dismisses it, and the list refreshes then —
- * not at creation — so the new row appears next to a developer who has
+ * "Done" (or an explicit close) dismisses it, and the list refreshes then, 
+ * not at creation, so the new row appears next to a developer who has
  * finished copying, rather than shifting the page under them.
  */
 import {
@@ -113,6 +113,7 @@ export function CreateKeyDialog({ open, apiUrl, onOpenChange, onCreated }: Creat
               <DialogTitle>Create an API key</DialogTitle>
               <DialogDescription>
                 Name it after the integration that will use it, so you know what to revoke later.
+                Every key acts as an admin in this workspace, so treat it like a password.
               </DialogDescription>
             </DialogHeader>
             <FormField className="mt-4">

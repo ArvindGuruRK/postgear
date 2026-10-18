@@ -10,7 +10,7 @@ export const ROLES_KEY = 'auth:roles';
  * Applying this decorator also makes membership mandatory: a route with
  * `@Roles(...)` cannot be reached by an authenticated user who has no active
  * workspace, even if the role list would otherwise be permissive. A route
- * with no `@Roles()` requires authentication but not membership — which is
+ * with no `@Roles()` requires authentication but not membership, which is
  * what `/auth/me`, `/orgs` and the whole onboarding flow need, since an
  * un-onboarded user belongs to no organization at all.
  */

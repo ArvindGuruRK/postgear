@@ -26,7 +26,7 @@ const PASSWORD_MIN = 12;
  * The length and digit checks below duplicate the server's. That duplication
  * is deliberate and is the resolution of a genuine tension in the
  * requirements: the server must return a single generic "Invalid input" that
- * names no field, but a signup form that says only that is close to unusable —
+ * names no field, but a signup form that says only that is close to unusable;
  * the user has no idea which of four fields to fix.
  *
  * So the client keeps its own field-level hints for the common case of an
@@ -37,7 +37,7 @@ const PASSWORD_MIN = 12;
  * ## Success does not sign you in
  *
  * Registration returns the same "check your email" message whether or not the
- * address was already taken — so the form cannot know whether an account was
+ * address was already taken, so the form cannot know whether an account was
  * created, and must not pretend to. It shows the confirmation state and stops.
  */
 export function RegisterForm() {
@@ -54,7 +54,7 @@ export function RegisterForm() {
     const email = String(form.get('email') ?? '').trim();
     const password = String(form.get('password') ?? '');
 
-    // Local hints only — see the note above. The server re-checks all of this.
+    // Local hints only: see the note above. The server re-checks all of this.
     if (!name) {
       setError('Enter your name.');
       return;
@@ -137,7 +137,7 @@ export function RegisterForm() {
           <FormHelperText>At least 12 characters, including a number.</FormHelperText>
         </FormField>
 
-        {/* No organization/workspace field here by design — creating the
+        {/* No organization/workspace field here by design: creating the
             workspace belongs to the post-signup onboarding flow, not to
             the signup form. Sprint 2 builds that flow at /onboarding. */}
 

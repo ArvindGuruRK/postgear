@@ -22,7 +22,7 @@ const SEED_PASSWORD = 'DemoPassword123!';
 const DEMO_ORG = 'seed-demo-org';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-/** `packages/db/prisma/seeds/index.ts` — DEMO_API_KEY_SECRET. */
+/** `packages/db/prisma/seeds/index.ts`: DEMO_API_KEY_SECRET. */
 const SEED_API_KEY = `pg_seedDemoKey${'0'.repeat(29)}`;
 const SEED_LINKEDIN_CHANNEL = 'seed-channel-linkedin';
 
@@ -38,7 +38,7 @@ async function signIn(page: Page) {
 
 async function openApiKeys(page: Page) {
   await page.goto(`/${DEMO_ORG}/settings/api-keys`);
-  await expect(page.getByRole('main').getByRole('heading', { name: 'API keys' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'API keys' })).toHaveAttribute('aria-current', 'page');
 }
 
 function bearer(secret: string) {

@@ -13,7 +13,7 @@ export const Command = forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      'flex h-full w-full flex-col overflow-hidden rounded-lg border-4 border-outline bg-secondary text-ink',
+      'flex h-full w-full flex-col overflow-hidden rounded-lg border-2 border-outline bg-secondary text-ink',
       className,
     )}
     {...props}
@@ -23,11 +23,11 @@ Command.displayName = CommandPrimitive.displayName;
 
 export type CommandDialogProps = React.ComponentPropsWithoutRef<typeof Dialog>;
 
-/** ⌘K-style command palette — a Command list rendered inside a Dialog shell. */
+/** ⌘K-style command palette: a Command list rendered inside a Dialog shell. */
 export function CommandDialog({ children, ...props }: CommandDialogProps) {
   return (
     <Dialog {...props}>
-      <DialogContent className="overflow-hidden p-0 shadow-brutalLg">
+      <DialogContent className="overflow-hidden p-0 shadow-surfaceLg">
         <Command className="border-none shadow-none">{children}</Command>
       </DialogContent>
     </Dialog>

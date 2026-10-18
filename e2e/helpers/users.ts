@@ -10,7 +10,7 @@ import * as argon2 from 'argon2';
  * way to activate it is a token that exists solely inside an email. In local
  * development that email is printed to the API process's stdout, which a
  * browser test cannot read. There is no "give me the token" endpoint, and
- * adding one — even guarded by NODE_ENV — would be a bypass of the
+ * adding one, even guarded by NODE_ENV, would be a bypass of the
  * confirmation flow living permanently in the codebase for the convenience of
  * a test.
  *
@@ -69,7 +69,7 @@ export async function createUnonboardedUser(label: string): Promise<FixtureUser>
 /**
  * Removes a fixture user and everything hanging off it.
  *
- * Order matters — `UserOrganization` and `OnboardingResponse` both hold a
+ * Order matters: `UserOrganization` and `OnboardingResponse` both hold a
  * foreign key to `User`, and Prisma's default referential action is `Restrict`,
  * so deleting the user first fails. Organizations created during a test are
  * removed too; leaving them behind would slowly fill the switcher in every
@@ -86,7 +86,7 @@ export async function deleteUser(userId: string): Promise<void> {
   await prisma.user.delete({ where: { id: userId } });
 
   for (const { organizationId } of memberships) {
-    // Only if the test was its sole member — never touch a seeded workspace
+    // Only if the test was its sole member: never touch a seeded workspace
     // that other tests depend on.
     const remaining = await prisma.userOrganization.count({ where: { organizationId } });
     if (remaining === 0) {

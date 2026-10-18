@@ -138,6 +138,24 @@ model User {
   onboardingCompletedAt DateTime?
   onboarding            OnboardingResponse?
 
+  // --- UI revamp (2026-10-17): appearance and avatar -----------------------
+  // Per user, not per workspace: how the app looks is a personal choice that
+  // follows the person across devices and workspaces. `lightTheme` and
+  // `darkTheme` are ids from the theme catalog
+  // (apps/api/src/modules/users/appearance.catalog.ts), one per scheme: the
+  // light one applies while the effective mode is light, the dark one while it
+  // is dark, and both are kept across a switch. A premium id stays stored if a
+  // plan lapses, but is served back as `classic` (the default in both modes)
+  // until the user is entitled again.
+  themeMode  ThemeMode @default(SYSTEM)
+  lightTheme String    @default("classic")
+  darkTheme  String    @default("classic")
+  // At most one of these is set; choosing one clears the other. A preset is
+  // an id into the bundled avatar set; `avatarUrl` is an uploaded image (or
+  // the OAuth provider's photo, re-hosted at signup) on our own storage.
+  avatarPreset String?
+  avatarUrl    String?
+
   @@unique([email, providerName])
   @@index([lastReadNotifications])
   @@index([inviteId])
@@ -554,7 +572,7 @@ model WebhookDelivery {
 /// Only `keyHash` (SHA-256 of the secret) is stored; the secret is shown once
 /// at creation. SHA-256 rather than argon2 because the secret is 30 bytes of
 /// CSPRNG output with no dictionary to slow down, and the column has to be
-/// searchable by equality — the same reasoning as the User token hashes.
+/// searchable by equality, the same reasoning as the User token hashes.
 /// `prefix` (`pg_` + 8 chars) lets a person tell keys apart in the UI and in
 /// a leaked log without revealing anything usable.
 model ApiKey {
@@ -573,7 +591,7 @@ model ApiKey {
   @@index([organizationId])
 }
 
-/// A Stripe event that has been processed — the webhook's idempotency table.
+/// A Stripe event that has been processed: the webhook's idempotency table.
 ///
 /// The primary key *is* the Stripe event id, so inserting it inside the same
 /// transaction as the state change makes a replayed event a unique-constraint
@@ -693,6 +711,14 @@ enum Provider {
   GENERIC
 }
 
+/// UI revamp (2026-10-17). SYSTEM follows the device's prefers-color-scheme:
+/// the default, as most SaaS apps do; LIGHT/DARK are explicit overrides.
+enum ThemeMode {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
 enum Role {
   SUPERADMIN
   ADMIN
@@ -704,7 +730,7 @@ enum Role {
 // than only by the Zod schema in front of it. Values that begin with a digit
 // are prefixed (SIZE_2_10) because Prisma enum members cannot start with one.
 
-/// Q1 — "What best describes you?"
+/// Q1: "What best describes you?"
 enum OnboardingRole {
   SOLO_CREATOR
   AGENCY
@@ -713,7 +739,7 @@ enum OnboardingRole {
   OTHER
 }
 
-/// Q2 — "How big is your team?"
+/// Q2: "How big is your team?"
 enum OnboardingTeamSize {
   JUST_ME
   SIZE_2_10
@@ -722,7 +748,7 @@ enum OnboardingTeamSize {
   SIZE_200_PLUS
 }
 
-/// Q3 — "What do you most want from PostGear?"
+/// Q3: "What do you most want from PostGear?"
 enum OnboardingGoal {
   GROW_AUDIENCE
   SAVE_TIME
@@ -731,7 +757,7 @@ enum OnboardingGoal {
   TEAM_COLLAB
 }
 
-/// Q4 — "How often do you post today?"
+/// Q4: "How often do you post today?"
 enum PostingFrequency {
   DAILY
   FEW_TIMES_WEEK
@@ -740,7 +766,7 @@ enum PostingFrequency {
   NOT_YET
 }
 
-/// Q5 — "How did you hear about us?"
+/// Q5: "How did you hear about us?"
 enum ReferralSource {
   SEARCH
   SOCIAL
@@ -779,7 +805,7 @@ model Announcement {
 }
 
 // ---------------------------------------------------------------------------
-// Sprint 7 — analytics (PRD 5.6) and SEO score prediction (PRD 5.7).
+// Sprint 7: analytics (PRD 5.6) and SEO score prediction (PRD 5.7).
 //
 // PostGear's own models, added per Sprint 1's rule: uuid ids, `organizationId`
 // scoping, `createdAt`/`updatedAt`. All four hold *derived* data (platform
@@ -850,7 +876,7 @@ enum AnalyticsSyncStatus {
   NEEDS_PERMISSIONS
 }
 
-/// Where one channel's metrics sync stands — written by the worker's
+/// Where one channel's metrics sync stands, written by the worker's
 /// analytics workflow, read by the Analytics page's status row.
 model AnalyticsSync {
   id             String              @id @default(uuid())
@@ -859,7 +885,7 @@ model AnalyticsSync {
   status         AnalyticsSyncStatus @default(NEVER)
   lastSyncedAt   DateTime?
   lastAttemptAt  DateTime?
-  /// A message already safe to show — never a provider response body.
+  /// A message already safe to show, never a provider response body.
   lastError      String?
   /// What the last successful sync wrote, for the status row.
   channelDays    Int                 @default(0)

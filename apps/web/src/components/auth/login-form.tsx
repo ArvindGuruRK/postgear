@@ -17,7 +17,7 @@ import { ApiError, api } from '@/lib/api';
 /**
  * The sign-in form.
  *
- * The markup is the inert Sprint 0 form, wired up — same components, same
+ * The markup is the inert Sprint 0 form, wired up: same components, same
  * layout, same copy. Two things it has to get right that the static version
  * did not have to think about:
  *
@@ -26,7 +26,7 @@ import { ApiError, api } from '@/lib/api';
  * - The error is rendered once, above the fields, not per field. The API
  *   returns a single generic message for every failure cause (wrong email,
  *   wrong password, unactivated, locked), so there is no per-field information
- *   to render — and inventing one would undo the property that makes the API
+ *   to render, and inventing one would undo the property that makes the API
  *   useless for account enumeration.
  */
 export function LoginForm() {

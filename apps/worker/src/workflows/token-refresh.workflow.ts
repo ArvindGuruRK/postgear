@@ -2,7 +2,7 @@
  * Keeps one channel's access token alive.
  *
  * Sleeps until thirty minutes before `Integration.tokenExpiration`, refreshes,
- * reads the new expiry, and sleeps again — for as long as the channel exists
+ * reads the new expiry, and sleeps again: for as long as the channel exists
  * and can be refreshed. The reference's equivalent waits until the exact
  * expiry; refreshing early means a post due at the moment the token dies finds
  * a live one.

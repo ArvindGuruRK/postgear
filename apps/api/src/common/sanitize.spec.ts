@@ -43,7 +43,7 @@ describe('stripHtml', () => {
 
   it('removes HTML entities rather than decoding them back into markup', () => {
     // The angle brackets are removed with the entity, leaving inert text. The
-    // point is that no pass ever turns `&lt;` back into `<` — a stripper that
+    // point is that no pass ever turns `&lt;` back into `<`: a stripper that
     // decoded first and stripped second would hand back a live `<script>`.
     expect(stripHtml('&lt;script&gt;')).toBe('script');
     expect(stripHtml('&#60;script&#62;')).toBe('script');
@@ -71,7 +71,7 @@ describe('stripControlChars', () => {
     expect(stripControlChars(`${BOM}Bob`)).toBe('Bob');
   });
 
-  it('leaves ordinary whitespace alone — collapseWhitespace owns that', () => {
+  it('leaves ordinary whitespace alone (collapseWhitespace owns that)', () => {
     expect(stripControlChars('a b\tc')).toBe('a b\tc');
   });
 });
@@ -117,7 +117,7 @@ describe('normalizeEmail', () => {
     expect(normalizeEmail('  Bob@Example.COM ')).toBe('bob@example.com');
   });
 
-  it('keeps plus-addressing and dots — stripping them misdirects mail', () => {
+  it('keeps plus-addressing and dots, since stripping them misdirects mail', () => {
     expect(normalizeEmail('Bob.Smith+news@Example.com')).toBe('bob.smith+news@example.com');
   });
 

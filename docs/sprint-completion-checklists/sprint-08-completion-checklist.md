@@ -1,4 +1,4 @@
-# Sprint 8 — Completion Checklist & Test Guide
+# Sprint 8: Completion Checklist & Test Guide
 
 Companion to [sprint-08-billing-notifications-api-launch.md](../sprint-documents/sprint-08-billing-notifications-api-launch.md)
 and the build contract [sprint-08-contract.md](../sprint-documents/sprint-08-contract.md).
@@ -27,10 +27,10 @@ together). Two things have **not** run for real and need an account you own:
 the Stripe client has never spoken to Stripe (the keys in `.env` are the
 `.env.example` placeholders, which the API now recognises and ignores), and
 Sentry has never received an event (no DSN). Both are a config change away;
-[§8](#8-what-remains-for-you) lists the exact steps. Every other piece — the
+[§8](#8-what-remains-for-you) lists the exact steps. Every other piece (the
 idempotency table, the plan limits, the notification outbox, the live bell,
 the API keys, the `/v1` routes, the signed webhook deliveries with their
-retries, the rate limits, the health check — ran for real on this machine.
+retries, the rate limits, the health check) ran for real on this machine.
 
 ---
 
@@ -70,24 +70,24 @@ and three typed notifications so the bell has every treatment.
 
 ---
 
-## 1. Plans and billing — `apps/api/src/modules/billing`
+## 1. Plans and billing: `apps/api/src/modules/billing`
 
 | # | Item | Status |
 |---|---|---|
-| 1.1 | `plans.ts` — the plan table as data (FREE · STANDARD · PRO · TEAM · ULTIMATE: price, channels, AI credits, members, features) and the pure `resolveEntitlement` (trial until `trialEndsAt`, cancellation until `cancelAt`, past-due keeps access, canceled/incomplete → FREE). **The single source of truth**: `ai/credits/credits.policy.ts` now derives `AI_CREDIT_ALLOWANCE` from it and keeps no numbers of its own | ✅ [New] |
-| 1.2 | `billing.config.ts` — mode: simulation → stripe → unconfigured; placeholder keys ignored with a boot warning (also re-applied here because `ConfigService.get` falls back to the raw environment) | ✅ [New] |
-| 1.3 | `stripe.client.ts` — a `StripeGateway` behind a token: the real client (stripe v23: Checkout Session with inline `price_data`, customer reuse via `paymentId` with an idempotency key, billing portal, `subscriptions.update` with `create_prorations` + `pending_if_incomplete`, a Subscription Schedule for downgrades, `invoices.createPreview`), the simulation (synthetic `sim_<uuid>` events applied through the same handler after 1–2 s), and the unconfigured gateway (503) | ✅ [New] — real client **not run** |
-| 1.4 | `stripe-webhook.service.ts` — `receive(rawBody, signature)` verifies with `stripe.webhooks.constructEvent` (400 + `billing.webhook_rejected`); `apply(event)` inserts the `BillingEvent` row first inside the transaction (duplicate → 200 `{ duplicate: true }` + `billing.webhook_duplicate`), ignores events older than `lastStripeEventAt` (`ignored:stale`), resolves the org from metadata → `client_reference_id` → `paymentId` → subscription id, handles `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`; a handler error is logged `billing.webhook_failed`, recorded `failed:<reason>`, and answered 200 so Stripe does not replay a half-effect for three days | ✅ [New] |
-| 1.5 | `entitlements.service.ts` — `entitlement`, `channelUsage` (limit = max(plan, `totalChannels`)), `assertCanConnect`, `startTrial` (TRIALING Pro for `BILLING_TRIAL_DAYS`, refused when any row ever existed), notifications `billing.activated` / `billing.canceled` / `billing.payment_failed` / `billing.trial_started` | ✅ [New] |
+| 1.1 | `plans.ts`: the plan table as data (FREE · STANDARD · PRO · TEAM · ULTIMATE: price, channels, AI credits, members, features) and the pure `resolveEntitlement` (trial until `trialEndsAt`, cancellation until `cancelAt`, past-due keeps access, canceled/incomplete → FREE). **The single source of truth**: `ai/credits/credits.policy.ts` now derives `AI_CREDIT_ALLOWANCE` from it and keeps no numbers of its own | ✅ [New] |
+| 1.2 | `billing.config.ts`: mode: simulation → stripe → unconfigured; placeholder keys ignored with a boot warning (also re-applied here because `ConfigService.get` falls back to the raw environment) | ✅ [New] |
+| 1.3 | `stripe.client.ts`: a `StripeGateway` behind a token: the real client (stripe v23: Checkout Session with inline `price_data`, customer reuse via `paymentId` with an idempotency key, billing portal, `subscriptions.update` with `create_prorations` + `pending_if_incomplete`, a Subscription Schedule for downgrades, `invoices.createPreview`), the simulation (synthetic `sim_<uuid>` events applied through the same handler after 1–2 s), and the unconfigured gateway (503) | ✅ [New]; real client **not run** |
+| 1.4 | `stripe-webhook.service.ts`: `receive(rawBody, signature)` verifies with `stripe.webhooks.constructEvent` (400 + `billing.webhook_rejected`); `apply(event)` inserts the `BillingEvent` row first inside the transaction (duplicate → 200 `{ duplicate: true }` + `billing.webhook_duplicate`), ignores events older than `lastStripeEventAt` (`ignored:stale`), resolves the org from metadata → `client_reference_id` → `paymentId` → subscription id, handles `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`; a handler error is logged `billing.webhook_failed`, recorded `failed:<reason>`, and answered 200 so Stripe does not replay a half-effect for three days | ✅ [New] |
+| 1.5 | `entitlements.service.ts`: `entitlement`, `channelUsage` (limit = max(plan, `totalChannels`)), `assertCanConnect`, `startTrial` (TRIALING Pro for `BILLING_TRIAL_DAYS`, refused when any row ever existed), notifications `billing.activated` / `billing.canceled` / `billing.payment_failed` / `billing.trial_started` | ✅ [New] |
 | 1.6 | Routes `GET /billing/status`, `GET /billing/plans`, `GET /billing/subscription` (+ usage), `POST /billing/trial`, `POST /billing/checkout`, `POST /billing/portal`, `GET /billing/change/preview`, `POST /billing/change` (upgrade now, downgrade at period end, "choose the current plan again" releases a pending downgrade), `POST /billing/cancel` (reason + feedback mailed to `SMTP_FROM`), `POST /billing/resume`, `POST /billing/webhook` (`@Public() @SkipThrottle()`, raw body) | ✅ [New] |
 | 1.7 | Channel limit (Sprint 3's connect flow): `GET /channels` → `{ channels, limit }`; `connect/:provider` redirects `?error=channel_limit` at the limit (never on a reconnect); `completeConnect` re-checks before a new row; `billing.limit_reached` logged | ✅ [New] |
 | 1.8 | Trial on workspace creation (`OrgService.create`, best-effort after the transaction) | ✅ [New] |
 
-### 1.4 — why a failed handler answers 200
+### 1.4: why a failed handler answers 200
 
 Stripe retries a non-2xx for three days. A handler that throws half-way has
 already rolled back its transaction, so a replay would run the same code
-against the same state and fail the same way — or, worse, succeed on the
+against the same state and fail the same way, or, worse, succeed on the
 second half of a partial effect. Recording the event as `failed:<reason>`
 and answering 200 makes the replay a duplicate, and the security log line
 is the alarm. The reference's 500 is what makes its webhook repeat the $1
@@ -102,7 +102,7 @@ cd apps/api && npx jest src/modules/billing src/modules/channels src/modules/org
 The suite: config modes and placeholders; every entitlement status and
 trial expiry; the channel limit at and below the line, lifetime rows,
 hand-granted `totalChannels`, reconnects allowed; trial eligibility; the
-webhook against a fake store — bad signature 400 + log, duplicate, the
+webhook against a fake store; bad signature 400 + log, duplicate, the
 insert race, stale, each handled type's effect, unknown org, a handler
 error recorded not thrown; the simulation producing events the handler
 accepts and cancel/resume/upgrade/downgrade through it; the service's
@@ -119,18 +119,18 @@ event is a `BillingEvent` row (`sim_…`, `applied`).
 
 ---
 
-## 2. Notifications — `apps/api/src/modules/notifications`, worker rows
+## 2. Notifications: `apps/api/src/modules/notifications`, worker rows
 
 | # | Item | Status |
 |---|---|---|
 | 2.1 | The worker's two outcome rows (`publish.activities.ts`) are typed (`post.failed` / `post.published`), titled, carry `meta` (post, channel, reason, message, attempts, permalink) and `emailStatus: PENDING`; a `channel.needs_reconnect` row when a refresh fails (`integration.activities.ts`, once per channel per day) | ✅ [New] |
 | 2.2 | `NotificationsService.notify()` for API-side events (billing, webhooks): writes the row, pushes to open streams | ✅ [New] |
 | 2.3 | `GET /notifications?limit=&before=` (read = older than the cursor, or the membership's `createdAt` when there is none), `GET /notifications/unread`, `POST /notifications/read-all` (a `NotificationCursor` per user **and** workspace), `GET /notifications/stream` (SSE on GET through `openSseStream`: `ready`, then `notification` per row, heartbeat, `@SkipThrottle()`) | ✅ [New] |
-| 2.4 | `notifications.dispatcher.ts` — every 3 s, non-overlapping, skipped under `NODE_ENV=test`: claims `PENDING` rows (`updateMany` → `SENDING`, re-offering rows stuck 5 min), resolves the audience per type (failure emails / success emails / admins, non-disabled, activated), mails plain text through `MailService.sendPlain`, marks `SENT` / `SKIPPED` / `FAILED` (+ `notification.email_failed`); pushes every row newer than its last poll to that workspace's streams | ✅ [New] |
-| 2.5 | `GET/PATCH /users/me/notification-preferences` — the inherited `sendSuccessEmails` / `sendFailureEmails` | ✅ [New] |
+| 2.4 | `notifications.dispatcher.ts`: every 3 s, non-overlapping, skipped under `NODE_ENV=test`: claims `PENDING` rows (`updateMany` → `SENDING`, re-offering rows stuck 5 min), resolves the audience per type (failure emails / success emails / admins, non-disabled, activated), mails plain text through `MailService.sendPlain`, marks `SENT` / `SKIPPED` / `FAILED` (+ `notification.email_failed`); pushes every row newer than its last poll to that workspace's streams | ✅ [New] |
+| 2.5 | `GET/PATCH /users/me/notification-preferences`: the inherited `sendSuccessEmails` / `sendFailureEmails` | ✅ [New] |
 | 2.6 | Email catalogue (`notifications.types.ts`): subject and lines per type, plain text, provider messages interpolated as text, a link to the queue / channels / billing and to the preferences | ✅ [New] |
 
-### 2.4 — why an outbox and not a mail call from the worker
+### 2.4: why an outbox and not a mail call from the worker
 
 The worker has the event; the API has the mail transport. Giving the worker
 its own transport would be a second mail path to configure and a second
@@ -157,14 +157,14 @@ asserts the three.
 
 ---
 
-## 3. API keys and the public API — `apps/api/src/modules/developers`
+## 3. API keys and the public API: `apps/api/src/modules/developers`
 
 | # | Item | Status |
 |---|---|---|
 | 3.1 | `ApiKey` model: `pg_` + 40 base64url chars (30 random bytes), SHA-256 hash stored, 11-char prefix shown, `lastUsedAt` written at most once a minute (memo + conditional `updateMany`), `revokedAt` instead of deletion, max 10 live keys, rotate = revoke + create in one transaction; every lifecycle change logged `apikey.*` with ids and prefix only | ✅ [New] |
 | 3.2 | `ApiKeyGuard` + `@ApiKeyAuth()` (public to the session guards, never them): `Authorization: Bearer` or `X-API-Key`; malformed values refused before any query; one 401 message for every cause + `apikey.rejected`; sets `activeOrg` (`ADMIN`) and `apiKey` | ✅ [New] |
-| 3.3 | `ApiKeyThrottlerGuard` — `@nestjs/throttler` on the global module's Redis store, one bucket per key across every `/v1` route, `API_RATE_LIMIT_PER_MIN`, 429 `Rate limit exceeded` + `Retry-After`, `api.throttled` logged | ✅ [New] |
-| 3.4 | `/v1/me`, `/v1/channels`, `/v1/posts` (list by lowercase `state`, 20 per page; get; create from plain text — paragraphs, hard breaks, empty paragraphs for blank lines, round-trip exact — through `PostsService.create` so every platform rule applies; delete), `/v1/analytics/overview` — a second front door to three existing services, no second implementation | ✅ [New] |
+| 3.3 | `ApiKeyThrottlerGuard`: `@nestjs/throttler` on the global module's Redis store, one bucket per key across every `/v1` route, `API_RATE_LIMIT_PER_MIN`, 429 `Rate limit exceeded` + `Retry-After`, `api.throttled` logged | ✅ [New] |
+| 3.4 | `/v1/me`, `/v1/channels`, `/v1/posts` (list by lowercase `state`, 20 per page; get; create from plain text (paragraphs, hard breaks, empty paragraphs for blank lines, round-trip exact) through `PostsService.create` so every platform rule applies; delete), `/v1/analytics/overview`: a second front door to three existing services, no second implementation | ✅ [New] |
 | 3.5 | `/v1` validation names the failing field (`PublicZodBody`), unlike the app's own routes; bodies stay strict | ✅ [New] |
 | 3.6 | OpenAPI: `GET /api/docs` (UI) and `GET /api/docs-json`, public, `/v1` only, bearer scheme, request schemas from the zod DTOs via `zod-to-json-schema`, 401/429 on every operation | ✅ [New] |
 | 3.7 | Session routes `GET/POST /developers/api-keys`, `POST :id/rotate`, `DELETE :id` (`ADMIN`) | ✅ [New] |
@@ -185,20 +185,20 @@ create on the page → secret once → row; `/v1/posts` with it; revoke → 401;
 
 ---
 
-## 4. Outbound webhooks — `apps/api/src/modules/webhooks`, `apps/worker`
+## 4. Outbound webhooks: `apps/api/src/modules/webhooks`, `apps/worker`
 
 | # | Item | Status |
 |---|---|---|
 | 4.1 | `Webhooks` gains `secret` (AES-256-GCM ciphertext of `whsec_…`, shown at creation and rotation only, cleared on delete), `events`, `disabled`; `WebhookDelivery` one row per event per hook, unique on `deliveryKey` | ✅ [New] |
 | 4.2 | Routes (`ADMIN`): `GET /webhooks` (with the events, the retry policy and `allowPrivateUrls`), `POST` (201 + one-time secret), `GET/PATCH/DELETE :id`, `POST :id/rotate-secret`, `POST :id/test` (202, a `webhook.test` delivery with a sample post), `GET :id/deliveries` (last 20) | ✅ [New] |
 | 4.3 | URL policy (`webhook-url.ts`): https-only through the Sprint 7 SSRF guard (every resolved address checked), or any http(s) address with `WEBHOOK_ALLOW_PRIVATE_URLS`; refusals logged `webhook.unsafe_url`; channel ids must be the workspace's | ✅ [New] |
-| 4.4 | `packages/db/src/webhook-signature.ts` — `X-PostGear-Signature: v1=<HMAC-SHA256(secret, "<ts>.<body>")>`, verify with a ±5 min window, constant-time; the SDK carries its own copy, pinned to the same vector | ✅ [New] |
-| 4.5 | Worker `lib/webhook-sender.ts` — `node:http(s)` with the socket **pinned** to the guard-validated address (no second DNS lookup), 10 s timeout, body drained and capped, never stored; 2xx delivered, 408/429/5xx/network retry, other 4xx rejected | ✅ [New] |
-| 4.6 | `webhookDeliveryWorkflow` — one per delivery, activity retry 30 s × 4ⁿ capped at 2 h, six attempts, non-retryable types; every attempt written on the row; final failure → `FAILED` + a `webhook.failed` notification once | ✅ [New] |
+| 4.4 | `packages/db/src/webhook-signature.ts`: `X-PostGear-Signature: v1=<HMAC-SHA256(secret, "<ts>.<body>")>`, verify with a ±5 min window, constant-time; the SDK carries its own copy, pinned to the same vector | ✅ [New] |
+| 4.5 | Worker `lib/webhook-sender.ts`: `node:http(s)` with the socket **pinned** to the guard-validated address (no second DNS lookup), 10 s timeout, body drained and capped, never stored; 2xx delivered, 408/429/5xx/network retry, other 4xx rejected | ✅ [New] |
+| 4.6 | `webhookDeliveryWorkflow`: one per delivery, activity retry 30 s × 4ⁿ capped at 2 h, six attempts, non-retryable types; every attempt written on the row; final failure → `FAILED` + a `webhook.failed` notification once | ✅ [New] |
 | 4.7 | Fan-out: `writePublished` / `markPublishFailed` create the deliveries **in the same transaction** as the outcome and the notification (`createMany skipDuplicates`), then start the workflows best-effort; the maintenance reconcile starts any `PENDING` delivery older than a minute | ✅ [New] |
 | 4.8 | The settings page: list, create/edit dialog (name, URL, events, channel multi-select), the one-time secret panel, Send test, Pause/Resume, Rotate secret, Delete, a deliveries sheet refreshed every 3 s | ✅ [New] |
 
-### 4.5 — why the sender pins the socket
+### 4.5: why the sender pins the socket
 
 Judging a URL at save time and again at send time is still two lookups
 apart from the connection the HTTP client makes; a host whose record flips
@@ -229,8 +229,8 @@ guard's message.
 
 | # | Item | Status |
 |---|---|---|
-| 5.1 | `common/throttling` — `@nestjs/throttler` with `@nest-lab/throttler-storage-redis` behind a wrapper that counts in-process during a Redis outage; `AppThrottlerGuard` per address on every route (`request.ip` behind `trust proxy`), `api.throttled` logged; `@SkipThrottle()` on the Stripe webhook and the notification stream | ✅ [New] |
-| 5.2 | Sentry: `apps/api/src/instrument.ts` first import, a no-op without `SENTRY_DSN`, traces off, no default PII; `HttpExceptionFilter` reports only non-`HttpException` errors with method, path and ids; web `instrumentation.ts` (+ `onRequestError`), `instrumentation-client.ts`, server/edge configs, `withSentryConfig` from `@sentry/nextjs/config` without source-map upload | ✅ [New] — **no real event sent** |
+| 5.1 | `common/throttling`: `@nestjs/throttler` with `@nest-lab/throttler-storage-redis` behind a wrapper that counts in-process during a Redis outage; `AppThrottlerGuard` per address on every route (`request.ip` behind `trust proxy`), `api.throttled` logged; `@SkipThrottle()` on the Stripe webhook and the notification stream | ✅ [New] |
+| 5.2 | Sentry: `apps/api/src/instrument.ts` first import, a no-op without `SENTRY_DSN`, traces off, no default PII; `HttpExceptionFilter` reports only non-`HttpException` errors with method, path and ids; web `instrumentation.ts` (+ `onRequestError`), `instrumentation-client.ts`, server/edge configs, `withSentryConfig` from `@sentry/nextjs/config` without source-map upload | ✅ [New]; **no real event sent** |
 | 5.3 | `GET /health` (public: database check, uptime, whether Sentry is on; 503 when degraded), `GET /health/sentry-test` (superadmin; throws), `/dev/sentry-test` page (browser and server-function throws; excluded from production) | ✅ [New] |
 | 5.4 | Security pass: every new body and query through a zod pipe (grep-verified: no bare `@Body`/`@Query`); CORS unchanged (credentials only for `WEB_URL`; `/v1` is server-to-server); the Sprint 7 SEO URL schema (control characters stripped, bounded, the guard fails closed) re-read and unchanged; social previews still render text nodes, no `dangerouslySetInnerHTML` added anywhere; notification content and provider messages rendered as text, emails plain text; API keys hashed, webhook secrets encrypted, secrets never logged (prefixes only); `/v1` 401 is one message | ✅ |
 | 5.5 | `main.ts`: `rawBody: true` for Stripe; `dev:api:e2e` raises `RATE_LIMIT_PER_MIN` for the browser suite | ✅ |
@@ -248,15 +248,15 @@ cd apps/api && npx jest src/modules/health src/common   # the health route, the 
 
 ---
 
-## 6. The screens — `apps/web`
+## 6. The screens: `apps/web`
 
 | # | Item | Status |
 |---|---|---|
-| 6.1 | `settings/layout.tsx` + `SettingsShell` — `SettingsNav` (Team · Billing · API keys · Webhooks · Notifications) around every settings page | ✅ [New] |
-| 6.2 | `/settings/billing` — two states: subscribe (plan grid from `PlanCard`, Monthly/Yearly, trial banner, *Start free trial*) and manage (current-plan `Card` with a status `Badge`, next billing date, two `UsageMeter`s, Manage billing, Change plan with a proration preview, Cancel with reason + feedback, Resume, the scheduled-downgrade line); *Activating…* polls for ≤ 60 s after a checkout or change; simulation and unconfigured `Alert`s | ✅ [New] |
-| 6.3 | `/settings/api-keys` — the table, Create → one-time secret with Copy and a curl example, Rotate and Revoke behind `AlertDialog`s, the limit line, the `/api/docs` link | ✅ [New] |
-| 6.4 | `/settings/webhooks` — see 4.8 | ✅ [New] |
-| 6.5 | `/settings/notifications` — the two email `Toggle`s, saved on change | ✅ [New] |
+| 6.1 | `settings/layout.tsx` + `SettingsShell`: `SettingsNav` (Team · Billing · API keys · Webhooks · Notifications) around every settings page | ✅ [New] |
+| 6.2 | `/settings/billing`: two states: subscribe (plan grid from `PlanCard`, Monthly/Yearly, trial banner, *Start free trial*) and manage (current-plan `Card` with a status `Badge`, next billing date, two `UsageMeter`s, Manage billing, Change plan with a proration preview, Cancel with reason + feedback, Resume, the scheduled-downgrade line); *Activating…* polls for ≤ 60 s after a checkout or change; simulation and unconfigured `Alert`s | ✅ [New] |
+| 6.3 | `/settings/api-keys`: the table, Create → one-time secret with Copy and a curl example, Rotate and Revoke behind `AlertDialog`s, the limit line, the `/api/docs` link | ✅ [New] |
+| 6.4 | `/settings/webhooks`: see 4.8 | ✅ [New] |
+| 6.5 | `/settings/notifications`: the two email `Toggle`s, saved on change | ✅ [New] |
 | 6.6 | The bell (`NotificationBell` in the top bar's new slot): SSE with 1 s → 30 s reconnect and a re-fetch after each reconnect, the unread badge, Mark all as read, items navigate (app paths in-app, platform links in a new tab), a settings footer | ✅ [New] |
 | 6.7 | Channels page: "n of m channels", Connect disabled at the limit with a link to billing, the `channel_limit` error copy | ✅ [New] |
 | 6.8 | Design system: `NotificationCenter` extended (`unreadCount`, `onMarkAllRead`, `footer`, `loading`, typed items with an icon and tone), `PlanCard` gains `actionDisabled`; both in the playground; rule §16d written | ✅ |
@@ -275,7 +275,7 @@ With the API (`npm run dev:api:e2e`), the worker and `BILLING_SIMULATION`,
 `playground`, `ai`, `analytics`, `seo`) was re-run after the sprint: every
 test passes except `queue › lists the seeded posts in order`, which Sprint 7
 already recorded as a data artefact of earlier runs (published posts cannot
-be deleted; `npm run db:reset` clears it — not run here because this
+be deleted; `npm run db:reset` clears it, not run here because this
 database holds a real LinkedIn channel). Three pre-existing tests were made
 robust on the way: the onboarding clean-up helper now removes a workspace's
 trial subscription and notifications before the workspace; the analytics
@@ -288,7 +288,7 @@ found and fixed, see the review table).
 
 ---
 
-## 7. The SDK — `packages/sdk`
+## 7. The SDK: `packages/sdk`
 
 | # | Item | Status |
 |---|---|---|
@@ -302,15 +302,15 @@ cd packages/sdk && npx jest     # 16 passed
 
 ---
 
-## Definition of Done — evidence
+## Definition of Done: evidence
 
 | DoD item | Evidence |
 |---|---|
-| A real (test-mode) Stripe subscription can be purchased, upgraded, and cancelled, with plan limits (channel count, AI credits) actually enforced against Sprint 3/6 features | **In simulation.** `e2e/billing.spec.ts` (5 passed): Standard → Pro through *Activating…*, the channel meter 5 → 15 and the credits meter 100 → 500 (the Sprint 6 ledger reads the plan table), cancel with a reason and resume, a scheduled downgrade; `channels.service.spec.ts` and the live Channels page enforce the connect limit; the webhook handler that applies a real Stripe event is the same code path (§1.4). **Not run against Stripe** — see §8 step 1 |
+| A real (test-mode) Stripe subscription can be purchased, upgraded, and cancelled, with plan limits (channel count, AI credits) actually enforced against Sprint 3/6 features | **In simulation.** `e2e/billing.spec.ts` (5 passed): Standard → Pro through *Activating…*, the channel meter 5 → 15 and the credits meter 100 → 500 (the Sprint 6 ledger reads the plan table), cancel with a reason and resume, a scheduled downgrade; `channels.service.spec.ts` and the live Channels page enforce the connect limit; the webhook handler that applies a real Stripe event is the same code path (§1.4). **Not run against Stripe**: see §8 step 1 |
 | A post failure triggers both an in-app notification and an email within seconds | `e2e/notifications.spec.ts › a post that fails arrives in the bell over the stream, without a reload`, and the API console printing the email to both members, all within the dispatcher's 3 s tick. Live run 2026-10-16 |
 | An external request with a valid API key can create a post via `/v1/posts` and receive a webhook when it publishes | `e2e/developers.spec.ts` (201 from `/v1/posts` with a key created on the page) and `e2e/webhooks.spec.ts` (a signed delivery received by a real receiver, verified with the shared helper). The publish fan-out is the same `enqueueWebhookDeliveries` the test send uses, exercised by `webhook-payload.test.ts` and the worker suite; a queued `/v1` post published to the stand-in produced a `post.published` delivery on this machine |
 | Rate limiting visibly blocks a rapid-fire request burst against a public endpoint | Live: 65 calls to `/v1/me` with the seeded key → 49 × 200 then 16 × 429 with `Retry-After: 60`; `e2e/developers.spec.ts › burst` asserts at least one 429 with `retry-after`; `api-key-throttler.guard.spec.ts` pins the 61st call |
-| Sentry captures a deliberately-thrown test error from both `apps/api` and `apps/web` | **In simulation.** `GET /health/sentry-test` throws and the filter calls `reportUnexpectedError` (`http-exception.filter.spec.ts`), which is a no-op without a DSN; `/dev/sentry-test` throws in the browser and in a server function. **No DSN on this machine**, so no event has reached Sentry — see §8 step 2 |
+| Sentry captures a deliberately-thrown test error from both `apps/api` and `apps/web` | **In simulation.** `GET /health/sentry-test` throws and the filter calls `reportUnexpectedError` (`http-exception.filter.spec.ts`), which is a no-op without a DSN; `/dev/sentry-test` throws in the browser and in a server function. **No DSN on this machine**, so no event has reached Sentry: see §8 step 2 |
 
 ---
 
@@ -318,7 +318,7 @@ cd packages/sdk && npx jest     # 16 passed
 
 | Topic | Decision | Why |
 |---|---|---|
-| API keys | A new `ApiKey` table: hash only, prefix, `lastUsedAt`, `revokedAt`, several per workspace, rotate = revoke + create. `Organization.apiKey` left unused | The reference's single key is stored under AES-CBC with a fixed IV and shown in the UI — effectively plaintext — and cannot be rotated without breaking every integration at once |
+| API keys | A new `ApiKey` table: hash only, prefix, `lastUsedAt`, `revokedAt`, several per workspace, rotate = revoke + create. `Organization.apiKey` left unused | The reference's single key is stored under AES-CBC with a fixed IV and shown in the UI, effectively plaintext, and cannot be rotated without breaking every integration at once |
 | Stripe idempotency | `BillingEvent` keyed on the event id, inserted in the transaction; `lastStripeEventAt` as the ordering guard; a failed handler answers 200 and is logged | §1.4; the reference has no idempotency and a 500 on any throw |
 | Plan limits | Channel count where channels are **connected** (connect route + callback re-check); AI credits through the Sprint 6 ledger reading the plan table; nothing already connected is disabled on a downgrade; members **not** enforced | A downgrade that silently disables channels in arbitrary order (the reference) is a support ticket; refusing the next connection is a message. Member limits need the Team page, which is still the Sprint 2 stub |
 | Trial | 14 days, Pro, no card, started when a workspace is created; expiry computed on read | US-8.5 says no card; a job that flips trials is a job that can be late |
@@ -357,8 +357,8 @@ cd packages/sdk && npx jest     # 16 passed
 3. **Member limits are not enforced** (`Plan.members` is data only): the Team
    page is still the Sprint 2 stub, so there is nowhere to enforce it yet.
 4. **At phone width the top bar's right-hand controls (bell, account menu) are
-   clipped** behind the fixed-width workspace switcher. Pre-existing — the
-   avatar was already off-screen at 390 px — and worsened by the bell; the
+   clipped** behind the fixed-width workspace switcher. Pre-existing (the
+   avatar was already off-screen at 390 px) and worsened by the bell; the
    compact switcher belongs to the `ui-revamp` branch's top bar work.
 5. **Not built (P1/P2)**: `post.scheduled` webhooks, a trial-ending reminder
    email (the banner on the billing page is the P0 half), digest emails,
@@ -372,20 +372,20 @@ cd packages/sdk && npx jest     # 16 passed
    deployment that seeds must not install it.
 8. **The SDK is `private: true`** and unpublished; `AnalyticsOverview` is typed
    loosely there (the full shape is in the OpenAPI document).
-9. **The e2e suite is still not in CI** — unchanged since Sprint 2.
+9. **The e2e suite is still not in CI**: unchanged since Sprint 2.
 
 ## 8. What remains for you
 
-1. **A real Stripe test-mode run** (free): `docs/local-testing-guide.md` §5f —
+1. **A real Stripe test-mode run** (free): `docs/local-testing-guide.md` §5f;
    keys from a test-mode dashboard, `stripe listen --forward-to
    localhost:3001/billing/webhook`, `BILLING_SIMULATION="false"`, pay with
    `4242 4242 4242 4242`, watch *Activating…* become the plan, then
    `stripe events resend <id>` to see `{ duplicate: true }`.
-2. **A real Sentry event** (free): §5j — two DSNs (or one), restart both apps,
+2. **A real Sentry event** (free): §5j; two DSNs (or one), restart both apps,
    open `/health/sentry-test` as the demo admin and `/dev/sentry-test` in the
    browser.
 3. **Confirm the prices and the trial tier** in `apps/api/src/modules/billing/plans.ts`.
-4. The manual walk-through: §5f–§5j of the testing guide, in order — billing
+4. The manual walk-through: §5f–§5j of the testing guide, in order; billing
    (change, cancel, resume, the channel limit, a new workspace's trial),
    notifications (a failing post, the console email, the preferences), API
    keys (create, curl `/v1/me`, `/api/docs`, the 429 burst, revoke), webhooks
@@ -396,31 +396,31 @@ cd packages/sdk && npx jest     # 16 passed
 
 ## Files changed in this pass
 
-**Added — schema, packages**
+**Added: schema, packages**
 - `packages/db/prisma/migrations/20261016120000_sprint8_billing_notifications_api/`; `schema.prisma` (four models, three enums, columns on `Subscription`, `Notifications`, `Webhooks`); `src/types.ts`; `src/webhook-signature.ts` (+ test); `prisma/SCHEMA_NOTES.md`; the seed (plan reset, API key, notifications)
-- `packages/scheduling/src/workflows.ts` — the delivery workflow's names, retry policy, failure types
-- `packages/sdk/` — the whole package
+- `packages/scheduling/src/workflows.ts`: the delivery workflow's names, retry policy, failure types
+- `packages/sdk/`: the whole package
 - `packages/ui/src/components/notification-center.tsx` (extended), `plan-card.tsx` (`actionDisabled`)
 
-**Added — API**
+**Added: API**
 - `src/modules/billing/{plans,billing.config,billing.types,billing.messages,billing.repository,entitlements.service,stripe.client,stripe-webhook.service,billing.service,billing.controller,billing.module}.ts`, `dto/billing.schema.ts`, `testing/fake-billing-store.ts` (+ 7 specs)
 - `src/modules/notifications/{notifications.types,notifications.repository,notifications.stream,notifications.service,notifications.dispatcher,notifications.controller,notifications.messages,notifications.module}.ts`, `dto/notifications.schema.ts` (+ 5 specs)
 - `src/modules/developers/{developers.module,developers.messages}.ts`, `api-keys/*`, `auth/*`, `v1/*`, `openapi/*` (+ 8 specs)
 - `src/modules/webhooks/{webhooks.module,webhooks.controller,webhooks.service,webhooks.repository,webhooks.messages,webhook-url}.ts`, `dto/webhooks.schema.ts` (+ 3 specs)
 - `src/modules/health/{health.module,health.controller}.ts` (+ spec); `src/common/throttling/{throttling.module,app-throttler.guard,resilient-throttler.storage}.ts`; `src/common/sentry/sentry.ts`; `src/instrument.ts`
 
-**Added — worker**
+**Added: worker**
 - `src/lib/{webhook-sender,webhook-payload,webhook-start}.ts` (+ tests), `src/activities/webhook.activities.ts`, `src/workflows/webhook-delivery.workflow.ts` (+ test)
 
-**Added — web**
+**Added: web**
 - `src/app/(dashboard)/[orgId]/settings/{layout,billing/page,api-keys/page,webhooks/page,notifications/page}.tsx`, `src/components/settings/settings-shell.tsx`
 - `src/components/billing/*`, `src/components/notifications/*`, `src/components/developers/*`, `src/components/webhooks/*` (+ tests)
 - `src/types/{billing,notifications,developers,webhooks}.ts`; `src/instrumentation.ts`, `src/instrumentation-client.ts`, `src/sentry.{server,edge}.config.ts`; `src/app/dev/sentry-test/*`
 - `e2e/{billing,notifications,developers,webhooks}.spec.ts`
 
 **Modified**
-- `apps/api` — `app.module.ts`, `main.ts` (raw body, Sentry first, OpenAPI), `config/env.ts`, `common/logging/security-logger.ts`, `common/filters/http-exception.filter.ts` (+ spec), `modules/ai/credits/{credits.policy,credits.service,credits.repository}.ts` (+ specs), `modules/channels/{channels.service,channels.controller,channels.messages,channels.module}.ts` (+ spec), `modules/org/{org.service,org.module}.ts` (+ spec), `modules/users/users.controller.ts` (+ spec), `modules/mail/mail.service.ts` (`sendPlain`, `linkTo`), `modules/redis/redis.service.ts` (`rawClient`), `modules/analytics/analytics.module.ts` (export), `modules/scheduling/scheduling.service.ts` (`startWebhookDelivery`)
-- `apps/worker` — `config/env.ts`, `activities/{index,publish.activities,integration.activities,maintenance.activities}.ts`, `workflows/index.ts`, two workflow tests
-- `apps/web` — `next.config.mjs`, `components/navigation/{topbar,app-shell,dashboard-shell}.tsx`, `components/channels/channels-view.tsx`, `app/(dashboard)/[orgId]/channels/page.tsx`, `types/channel.ts`, the playground's SaaS-patterns section
+- `apps/api`: `app.module.ts`, `main.ts` (raw body, Sentry first, OpenAPI), `config/env.ts`, `common/logging/security-logger.ts`, `common/filters/http-exception.filter.ts` (+ spec), `modules/ai/credits/{credits.policy,credits.service,credits.repository}.ts` (+ specs), `modules/channels/{channels.service,channels.controller,channels.messages,channels.module}.ts` (+ spec), `modules/org/{org.service,org.module}.ts` (+ spec), `modules/users/users.controller.ts` (+ spec), `modules/mail/mail.service.ts` (`sendPlain`, `linkTo`), `modules/redis/redis.service.ts` (`rawClient`), `modules/analytics/analytics.module.ts` (export), `modules/scheduling/scheduling.service.ts` (`startWebhookDelivery`)
+- `apps/worker`: `config/env.ts`, `activities/{index,publish.activities,integration.activities,maintenance.activities}.ts`, `workflows/index.ts`, two workflow tests
+- `apps/web`: `next.config.mjs`, `components/navigation/{topbar,app-shell,dashboard-shell}.tsx`, `components/channels/channels-view.tsx`, `app/(dashboard)/[orgId]/channels/page.tsx`, `types/channel.ts`, the playground's SaaS-patterns section
 - `e2e/helpers/users.ts`, `e2e/{analytics,calendar}.spec.ts`; root `package.json` (`dev:api:e2e`), `package-lock.json`, `.env.example`
 - `docs/local-testing-guide.md` (§5f–§5j, the table, the cheat-sheet), `docs/design-patterns/design-system-rules.md` §16d, `docs/sprint-documents/sprint-08-billing-notifications-api-launch.md`, this file and the contract

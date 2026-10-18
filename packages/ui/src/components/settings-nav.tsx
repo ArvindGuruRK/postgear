@@ -10,7 +10,7 @@ export interface SettingsNavItem {
 export interface SettingsNavProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children'> {
   items: SettingsNavItem[];
   activeHref: string;
-  /** Defaults to a plain `<a>` — pass the app's own routing Link (e.g. next/link) to integrate real navigation. */
+  /** Defaults to a plain `<a>`: pass the app's own routing Link (e.g. next/link) to integrate real navigation. */
   linkComponent?: React.ElementType;
 }
 
@@ -30,6 +30,9 @@ export function SettingsNav({
           <LinkComponent
             key={item.href}
             href={item.href}
+            // The only thing naming a settings page (no in-page title), so it
+            // must be announced, not just coloured.
+            aria-current={isActive ? 'page' : undefined}
             className={cn(
               'flex items-center gap-2 rounded-md border-2 px-3 py-2 font-sans text-sm font-medium outline-none transition-colors',
               'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',

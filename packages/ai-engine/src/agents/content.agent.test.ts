@@ -317,8 +317,8 @@ describe('helpers', () => {
   });
 
   it('imageNameFor keeps the first 60 characters of the prompt', () => {
-    expect(imageNameFor('short prompt')).toBe('AI image — short prompt');
-    expect(imageNameFor('p'.repeat(100))).toBe(`AI image — ${'p'.repeat(60)}…`);
+    expect(imageNameFor('short prompt')).toBe('AI image: short prompt');
+    expect(imageNameFor('p'.repeat(100))).toBe(`AI image: ${'p'.repeat(60)}…`);
   });
 
   it('normaliseParts cleans, leads with the hook, caps the count and flags overflow', () => {

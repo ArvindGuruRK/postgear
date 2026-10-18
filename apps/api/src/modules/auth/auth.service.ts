@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { Provider, type User, prisma } from '@postgear/db';
 import { securityLogger } from '../../common/logging/security-logger';
 import { MailService } from '../mail/mail.service';
+import { AvatarService } from '../users/avatar.service';
+import { type SessionAvatar, toSessionAvatar } from '../users/session-avatar';
 import { AUTH_MESSAGES } from './auth.messages';
 import type { LoginDto, RegisterDto } from './dto/auth.schema';
 import { LockoutService } from './lockout.service';
@@ -23,7 +25,7 @@ import { ACTIVATION_TTL_MS, RESET_TTL_MS, TokenService } from './token.service';
  * Reset returns the same body whether or not an account exists.
  *
  * That is what makes the API useless as an account-enumeration oracle, and it
- * is why several methods here do work whose only purpose is to *not* be fast —
+ * is why several methods here do work whose only purpose is to *not* be fast:
  * see `PasswordService.burnTime`.
  *
  * ## The `[email, providerName]` trap
@@ -36,6 +38,24 @@ import { ACTIVATION_TTL_MS, RESET_TTL_MS, TokenService } from './token.service';
  * commented where they happen.
  */
 
+/** How the app should look for this user (UI revamp, 2026-10-17). */
+export interface SessionAppearance {
+  /** `system` follows the device's prefers-color-scheme. */
+  mode: 'system' | 'light' | 'dark';
+  /**
+   * The light theme id exactly as stored. Premium entitlement is NOT applied
+   * here (`/auth/me` stays one indexed lookup), so a lapsed premium id comes
+   * back as-is; `/users/me/appearance` returns the effective one.
+   */
+  lightTheme: string;
+  /** The dark theme id exactly as stored, on the same terms as `lightTheme`. */
+  darkTheme: string;
+}
+
+// The avatar shape and its mapper live beside `AvatarService` (see the note in
+// session-avatar.ts on why) and are re-exported here for existing importers.
+export { type SessionAvatar, toSessionAvatar };
+
 export interface SessionUser {
   id: string;
   email: string;
@@ -43,6 +63,19 @@ export interface SessionUser {
   isSuperAdmin: boolean;
   onboardingStep: number;
   onboardingCompletedAt: Date | null;
+  avatar: SessionAvatar;
+  appearance: SessionAppearance;
+}
+
+/** Maps the stored enum to the lowercase wire value. */
+export function toSessionAppearance(
+  user: Pick<User, 'themeMode' | 'lightTheme' | 'darkTheme'>,
+): SessionAppearance {
+  return {
+    mode: user.themeMode.toLowerCase() as SessionAppearance['mode'],
+    lightTheme: user.lightTheme,
+    darkTheme: user.darkTheme,
+  };
 }
 
 @Injectable()
@@ -56,6 +89,7 @@ export class AuthService {
     private readonly mail: MailService,
     private readonly jwt: JwtService,
     config: ConfigService,
+    private readonly avatars: AvatarService,
   ) {
     this.lockoutMinutes = config.get<number>('LOCKOUT_MINUTES', 15);
   }
@@ -63,7 +97,7 @@ export class AuthService {
   /**
    * Creates an account, or quietly does nothing if the address is taken.
    *
-   * The caller cannot tell which happened — same status, same body, and
+   * The caller cannot tell which happened: same status, same body, and
    * roughly the same latency, because the duplicate branch still hashes the
    * password before discarding it.
    *
@@ -105,7 +139,7 @@ export class AuthService {
         timezone: dto.timezone ?? 0,
         // Explicitly false. The column's default is `true` (inherited from
         // Postiz) and is deliberately left alone so the seeded users stay
-        // usable — see the migration note in SCHEMA_NOTES.
+        // usable; see the migration note in SCHEMA_NOTES.
         activated: false,
         activationTokenHash: activation.hash,
         activationTokenExpiresAt: activation.expiresAt,
@@ -229,7 +263,7 @@ export class AuthService {
    * exist twice under different providers, which would split one person into
    * two accounts with two separate sets of workspaces. The sprint's Definition
    * of Done requires attaching to the existing user instead, so the lookup is
-   * on **email alone** and the found row is reused as-is — its original
+   * on **email alone** and the found row is reused as-is; its original
    * `providerName` is left untouched, since rewriting it would break that
    * user's password login.
    *
@@ -285,7 +319,16 @@ export class AuthService {
     });
 
     securityLogger.log('oauth.succeeded', { userId: created.id, provider, linked: false });
-    return created;
+
+    // The provider's photo becomes the default avatar, on this first creation
+    // only, never on a later sign-in (the linked branch above does not touch
+    // it), so a preset or upload the user picks afterwards is never replaced.
+    // Copied onto our storage because provider CDN URLs expire. Bounded by a
+    // short timeout and never throws: on any failure the user simply starts
+    // with initials.
+    const avatar = await this.avatars.importFromUrl(created.id, profile.picture);
+
+    return avatar?.kind === 'image' ? { ...created, avatarUrl: avatar.url } : created;
   }
 
   /**
@@ -409,6 +452,8 @@ export class AuthService {
       isSuperAdmin: user.isSuperAdmin,
       onboardingStep: user.onboardingStep,
       onboardingCompletedAt: user.onboardingCompletedAt,
+      avatar: toSessionAvatar(user),
+      appearance: toSessionAppearance(user),
     };
   }
 

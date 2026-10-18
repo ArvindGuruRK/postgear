@@ -7,7 +7,7 @@
  * site fix, in what order?") with one answer, and the model client already
  * does the single repair re-ask when the answer does not fit the schema.
  * What this agent adds is the part a schema cannot express: the answer is
- * post-processed so the API and the UI can rely on its shape — ids are
+ * post-processed so the API and the UI can rely on its shape; ids are
  * unique, the order is critical → warning → info, there are at most twelve,
  * strings are trimmed, and a `checkId` is either one of the findings' or
  * null. A model that cites a check it was never shown is making something

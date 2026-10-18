@@ -32,6 +32,8 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^9.4.2",
     "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.0",

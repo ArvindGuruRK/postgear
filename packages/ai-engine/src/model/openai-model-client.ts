@@ -10,8 +10,8 @@
  *   (a category outside the list, a part with no text).
  * - `chat` binds the copilot's tools and *streams*: text deltas are yielded
  *   as they arrive so the browser sees words, not a spinner, and the
- *   `AIMessageChunk`s are concatenated so the tool calls — which only make
- *   sense once every argument chunk has landed — are yielded once, at the
+ *   `AIMessageChunk`s are concatenated so the tool calls, which only make
+ *   sense once every argument chunk has landed, are yielded once, at the
  *   end, with their arguments parsed.
  *
  * `maxRetries: 0` on the SDK because the retry policy lives in

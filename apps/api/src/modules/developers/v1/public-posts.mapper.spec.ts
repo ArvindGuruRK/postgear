@@ -79,7 +79,7 @@ describe('textToDocument', () => {
   });
 
   it('round-trips through the renderer, so GET shows what POST sent', () => {
-    const text = 'Launch day.\nDoors open at nine.\n\nSee you there — bring a friend.\n\n\n#launch';
+    const text = 'Launch day.\nDoors open at nine.\n\nSee you there, and bring a friend.\n\n\n#launch';
 
     expect(renderPlainText(textToDocument(text))).toBe(text);
   });

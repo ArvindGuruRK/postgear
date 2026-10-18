@@ -3,8 +3,8 @@
  *
  * PostGear signs every delivery: `X-PostGear-Signature: v1=<hex>` is the
  * HMAC-SHA256 of `"<X-PostGear-Timestamp>.<raw body>"` under the webhook's
- * secret. Verify against the **raw** request body — a body that has been
- * parsed and re-serialised will not match — and reject anything older than
+ * secret. Verify against the **raw** request body (a body that has been
+ * parsed and re-serialised will not match) and reject anything older than
  * the tolerance, which is what stops a captured delivery being replayed.
  *
  * This file is the SDK's own copy of `packages/db/src/webhook-signature.ts`

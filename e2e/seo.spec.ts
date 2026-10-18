@@ -1,7 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 /**
- * The SEO analyzer — one test per Sprint 7 Part B Definition of Done item
+ * The SEO analyzer: one test per Sprint 7 Part B Definition of Done item
  * the web owns: a private or internal address is refused on the field before
  * any stage starts (SSRF fails closed, both the `localhost` and the cloud
  * metadata flavours), a real public URL runs every stage to a score with a
@@ -15,7 +15,7 @@ import { expect, type Page, test } from '@playwright/test';
  * the network; set `SEO_E2E_OFFLINE=true` to skip the one test that does.
  *
  * Prerequisites, as for the rest of the suite: `docker compose up -d`,
- * `npm run db:seed` (which seeds three `example.com` audits — F, C, B — and
+ * `npm run db:seed` (which seeds three `example.com` audits, graded F, C and B, and
  * one failed `nonexistent.invalid` audit for the demo workspace), and
  * `npm run dev:api:e2e` in its own terminal.
  */
@@ -36,8 +36,8 @@ async function signIn(page: Page) {
 
 async function openAnalyzer(page: Page, query = '') {
   await page.goto(`/${DEMO_ORG}/seo-analyzer${query}`);
-  // Scoped to main: the app shell's header repeats the page title in its own h1.
-  await expect(page.getByRole('main').getByRole('heading', { name: 'SEO Analyzer' })).toBeVisible();
+  // The page is named only by the top bar's h1 (no in-page title).
+  await expect(page.getByRole('heading', { level: 1, name: 'SEO Analyzer' })).toBeVisible();
 }
 
 const stage = (page: Page, id: string) =>

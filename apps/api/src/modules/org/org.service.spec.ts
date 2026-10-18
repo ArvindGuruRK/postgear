@@ -1,5 +1,5 @@
 /**
- * Creating a workspace starts its trial (Sprint 8) — after the transaction,
+ * Creating a workspace starts its trial (Sprint 8), after the transaction,
  * and best-effort: a trial that cannot start never loses the workspace.
  */
 jest.mock('@postgear/db', () => ({

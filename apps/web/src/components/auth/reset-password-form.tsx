@@ -17,7 +17,7 @@ import { ApiError, api } from '@/lib/api';
  * "Send me a reset link".
  *
  * The success state is shown for **every** submission that the server accepts,
- * including addresses with no account behind them. That is not a shortcut — it
+ * including addresses with no account behind them. That is not a shortcut: it
  * is the requirement: the response must not reveal whether an address is
  * registered, so the UI cannot branch on something it is deliberately not told.
  *

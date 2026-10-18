@@ -4,7 +4,7 @@
  * Where the generation is: the five stages as a tracker, and what happened
  * if it did not reach the end.
  *
- * A stop is a quiet line, not an error — the person asked for it. A stream
+ * A stop is a quiet line, not an error: the person asked for it. A stream
  * error is an `ErrorState` here, above whatever the result card still shows,
  * so "the image failed" does not hide the three parts that were written.
  * Refusals that arrived before the stream are the form's to show.

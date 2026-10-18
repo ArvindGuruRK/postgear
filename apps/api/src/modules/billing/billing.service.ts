@@ -1,12 +1,12 @@
 /**
  * The billing routes' logic: what a workspace is on, and the four things an
- * admin can do about it — subscribe, change, cancel, resume — plus the trial
+ * admin can do about it (subscribe, change, cancel, resume) plus the trial
  * and the portal.
  *
  * ## The row is the truth, Stripe is told
  *
  * Every write here goes to Stripe (or the simulation) first and to the row
- * only through the webhook that comes back — except two columns Stripe does
+ * only through the webhook that comes back, except two columns Stripe does
  * not model for us: `scheduledTier`/`scheduledPeriod`, which record a
  * downgrade waiting for period end, and the simulation's stand-in ids. So a
  * change answers with the row as it is *now*, and the page polls
@@ -15,8 +15,8 @@
  *
  * ## Checks before calls
  *
- * Each action refuses — unconfigured (503), no workspace (404), nothing to
- * change (422) — before the gateway is touched, so a refused request never
+ * Each action refuses before the gateway is touched (unconfigured: 503, no
+ * workspace: 404, nothing to change: 422), so a refused request never
  * creates a customer or a session. A gateway failure that is not already
  * an HTTP error is logged and answered 503 with the catalogue's message:
  * Stripe's own error text can name ids and keys and never reaches a client.
@@ -25,8 +25,8 @@
  *
  * A row with no `identifier` (the seed's, or one an operator granted) has
  * no Stripe subscription to change. In Stripe mode that is a 422 saying so.
- * In simulation the row is adopted on first use — a `cus_sim_…` customer
- * and a `sub_sim_…` subscription are written — so every flow on the page
+ * In simulation the row is adopted on first use (a `cus_sim_…` customer
+ * and a `sub_sim_…` subscription are written), so every flow on the page
  * can be exercised against the seeded workspace.
  */
 import {
@@ -109,7 +109,7 @@ export class BillingService {
     const entitlement = resolveEntitlement(org.subscription, now);
     const channelsUsed = await this.repository.countLiveChannels(orgId);
     // The cycle anchors on the subscription's day of the month when there is
-    // one, else the workspace's — the same rule `credits.service.ts` applies,
+    // one, else the workspace's: the same rule `credits.service.ts` applies,
     // so the two meters never disagree about the reset date.
     const cycle = cycleFor(org.subscription?.createdAt ?? org.createdAt, now);
     const creditsUsed = await this.repository.sumCreditsUsed(orgId, cycle.start);
@@ -314,7 +314,7 @@ export class BillingService {
     return subscription;
   }
 
-  /** A live row with the ids a gateway call needs — adopted in simulation, refused in Stripe mode. */
+  /** A live row with the ids a gateway call needs: adopted in simulation, refused in Stripe mode. */
   private async requireChangeable(orgId: string): Promise<ChangeableOrg> {
     let org = await this.requireOrg(orgId);
     this.requireLiveSubscription(org);
@@ -424,13 +424,13 @@ function iso(date: Date | null): string | null {
   return date ? date.toISOString() : null;
 }
 
-/** A live, paid row — ACTIVE or in PAST_DUE grace, not deleted. */
+/** A live, paid row: ACTIVE or in PAST_DUE grace, not deleted. */
 export function hasLiveSubscription(org: OrgBilling): boolean {
   const row = org.subscription;
   return Boolean(row && !row.deletedAt && (row.status === 'ACTIVE' || row.status === 'PAST_DUE'));
 }
 
-/** A row Stripe is still billing — a new checkout would make a second subscription. */
+/** A row Stripe is still billing: a new checkout would make a second subscription. */
 export function hasStripeSubscription(org: OrgBilling): boolean {
   const row = org.subscription;
   return Boolean(
@@ -462,7 +462,7 @@ function snapshotOf(
 /**
  * Up the ladder (or monthly to yearly on the same tier) is now, with
  * prorations; down (or yearly to monthly) waits for the period end. The
- * same plan again is a 422 — unless a downgrade is pending, in which case
+ * same plan again is a 422, unless a downgrade is pending, in which case
  * it means "keep my plan" and is applied now by releasing the schedule.
  */
 export function changeRequestFor(

@@ -2,7 +2,7 @@
  * Every activity the worker registers, built from one set of dependencies.
  *
  * Workflows import only the *type* of this object (`import type`), which the
- * bundler erases — so nothing here, Prisma included, is ever pulled into the
+ * bundler erases, so nothing here, Prisma included, is ever pulled into the
  * workflow sandbox.
  */
 import { createAnalyticsActivities } from './analytics.activities';

@@ -8,13 +8,13 @@ import { securityLogger } from '../logging/security-logger';
  *
  * Used per-route as `@Body(new ZodBody(someSchema))` rather than registered
  * globally, because a global pipe has no way to know which schema belongs to
- * which handler — Zod schemas are values, not decorator metadata attached to
+ * which handler: Zod schemas are values, not decorator metadata attached to
  * a DTO class.
  *
  * ## Why the client is told so little
  *
  * On failure this throws a `BadRequestException` carrying only
- * {@link AUTH_MESSAGES.INVALID_INPUT} — "Invalid input", naming no field and
+ * {@link AUTH_MESSAGES.INVALID_INPUT}: "Invalid input", naming no field and
  * giving no reason. The requirement is that a validation error must not
  * reveal which field failed, because on an auth form "the email is invalid"
  * versus "the password is invalid" is itself a small oracle.
@@ -23,7 +23,7 @@ import { securityLogger } from '../logging/security-logger';
  * is told only "Invalid input". The client keeps its own field-level hints so
  * the common case is still guided; the server refuses to confirm them.
  *
- * The precise failure — path, code, message — goes to `securityLogger`, which
+ * The precise failure (path, code, message) goes to `securityLogger`, which
  * is where field-level detail is *supposed* to live. That is what makes the
  * generic response monitorable rather than a black hole.
  */
@@ -41,7 +41,7 @@ export class ZodBody<T> implements PipeTransform<unknown, T> {
       return result.data;
     }
 
-    // Field paths and codes only. Never `issue.received` or the input itself —
+    // Field paths and codes only. Never `issue.received` or the input itself:
     // for a login body that would write the attempted password to the log.
     securityLogger.warn('validation.failed', {
       route: this.label,
@@ -60,7 +60,7 @@ export class ZodBody<T> implements PipeTransform<unknown, T> {
  * The same validation for a query string or route parameters.
  *
  * Separate class purely so the log line distinguishes "a malformed body" from
- * "a tampered URL" — the second is far more likely to be an attack than a typo.
+ * "a tampered URL": the second is far more likely to be an attack than a typo.
  */
 export class ZodQuery<T> implements PipeTransform<unknown, T> {
   constructor(

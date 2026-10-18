@@ -44,7 +44,7 @@ function format(minutes: number): string {
  * `Integration.postingTimes` is a flat list of minutes-since-midnight that
  * applies to every day, so "9am on weekdays, 11am at weekends" cannot be
  * expressed. That is a real limitation, inherited from the schema rather than
- * chosen here — a weekday grid would be a better editor but needs a column
+ * chosen here: a weekday grid would be a better editor but needs a column
  * change, which is not this sprint's to make. Worth revisiting when the
  * scheduler lands and the constraint starts costing something.
  *

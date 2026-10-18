@@ -11,7 +11,7 @@
  * as *input*, so the hook is written knowing the category and the sources,
  * and the body is written knowing the hook it has to open with. That staged
  * structure (research first, hook before body) is what separates a post that
- * reads like it was written on purpose from a model's first paragraph — the
+ * reads like it was written on purpose from a model's first paragraph: the
  * same reasoning the reference Postiz graph follows. Keeping it a real
  * `StateGraph` rather than a chain of awaits also gives the API a place to
  * attach LangGraph's streaming and tracing later without restructuring.
@@ -22,7 +22,7 @@
  * SSE so the browser shows research arriving, then the hook, then the copy.
  *
  * Failure policy (contract §1, §2): research and image failures are reported
- * and survived — the post is still produced, just without citations or a
+ * and survived; the post is still produced, just without citations or a
  * hero image. Classify, hook and content failures are the run's failure.
  * Every provider error reaches the caller as an {@link AiProviderError};
  * an abort surfaces as kind `aborted`.
@@ -140,7 +140,7 @@ export function researchQueryFor(topic: string): string {
 
 export function imageNameFor(prompt: string): string {
   const clean = prompt.replace(/\s+/g, ' ').trim();
-  return `AI image — ${clean.length > IMAGE_NAME_MAX_CHARS ? `${clean.slice(0, IMAGE_NAME_MAX_CHARS).trim()}…` : clean}`;
+  return `AI image: ${clean.length > IMAGE_NAME_MAX_CHARS ? `${clean.slice(0, IMAGE_NAME_MAX_CHARS).trim()}…` : clean}`;
 }
 
 /**

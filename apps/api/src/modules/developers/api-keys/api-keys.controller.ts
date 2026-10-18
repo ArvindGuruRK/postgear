@@ -1,5 +1,5 @@
 /**
- * `/developers/api-keys` — the session side of the public API (Sprint 8).
+ * `/developers/api-keys`: the session side of the public API (Sprint 8).
  *
  * `@Roles(ADMIN)` on the class: a key is the workspace's credential, and
  * issuing one is an admin's call, as the contract (§5.3) says. The global

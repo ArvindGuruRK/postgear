@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 /**
  * The billing page in simulation mode (`BILLING_SIMULATION=true`): no card,
  * no Stripe, but every change goes through the real webhook handler a second
- * or two later — which is exactly what the "Activating…" state waits for.
+ * or two later, which is exactly what the "Activating…" state waits for.
  *
  * ## Why this does not subscribe
  *
@@ -44,8 +44,8 @@ async function signIn(page: Page) {
 
 async function openBilling(page: Page) {
   await page.goto(`/${DEMO_ORG}/settings/billing`);
-  // Scoped to main: the app shell's header repeats the page title in its own h1.
-  await expect(page.getByRole('main').getByRole('heading', { name: 'Billing' })).toBeVisible();
+  // No in-page title: the settings nav marks the open page.
+  await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Billing' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('billing-simulated')).toBeVisible();
 }
 

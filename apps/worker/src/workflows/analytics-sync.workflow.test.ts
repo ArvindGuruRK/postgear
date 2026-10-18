@@ -1,6 +1,6 @@
 /**
  * The analytics workflow against a real Temporal test server with time
- * skipping, activities mocked — the same harness as the publish workflow's
+ * skipping, activities mocked: the same harness as the publish workflow's
  * test. What is pinned: a channel syncs on start, then a day later; a
  * "sync now" interrupts the wait; repeated requests are held to one sync
  * per two minutes; and every skip reason ends the run without a sync.
@@ -112,7 +112,7 @@ describe('analyticsSyncWorkflow', () => {
     expect(outcome).toBe('gone');
     expect(activities.syncChannelAnalytics).toHaveBeenCalledTimes(2);
     expect(activities.syncChannelAnalytics).toHaveBeenCalledWith(input);
-    // The second sync waited for the slot a day out — not for the hour the
+    // The second sync waited for the slot a day out, not for the hour the
     // in-memory slot would have allowed, and not at once.
     expect(times[1] - times[0]).toBeGreaterThanOrEqual(SYNC_INTERVAL_MS - 60 * 60_000);
   });

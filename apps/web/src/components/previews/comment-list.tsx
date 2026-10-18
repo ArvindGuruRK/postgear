@@ -9,8 +9,8 @@ import { ChannelAvatar, type PreviewChannel, type PreviewPart, PreviewText } fro
  * LinkedIn, Facebook and Instagram have no thread structure, so their
  * providers publish part one as the post and each later part as a comment
  * from the same account. The preview says so rather than pretending they are
- * one long post. Comments carry no media on any of the three — the composer
- * flags an attachment on a later part as an issue — so none is drawn here.
+ * one long post. Comments carry no media on any of the three (the composer
+ * flags an attachment on a later part as an issue), so none is drawn here.
  */
 export function CommentList({
   channel,

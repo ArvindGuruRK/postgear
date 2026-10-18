@@ -4,7 +4,7 @@
  * The email preferences (Sprint 8): two toggles over the inherited
  * `sendSuccessEmails` / `sendFailureEmails`, saved as they are switched.
  *
- * Each change is optimistic — the toggle moves at once — and reverted if
+ * Each change is optimistic (the toggle moves at once) and reverted if
  * the save fails, with the failure in an alert whose "Try again" repeats
  * the same change. The server page passes what it loaded; when it could not
  * (`initial` is null) the island loads for itself, and the same alert covers
@@ -21,7 +21,6 @@ import {
   CardHeader,
   CardTitle,
   Label,
-  PageHeader,
   Skeleton,
   Stack,
   Toggle,
@@ -125,11 +124,6 @@ export function NotificationPreferencesForm({
 
   return (
     <Stack gap="lg">
-      <PageHeader
-        title="Notifications"
-        description="Every event shows in the bell. Choose which ones also reach your inbox."
-      />
-
       {error && (
         <Alert variant="danger" data-testid="notification-preferences-error">
           <div className="flex flex-1 flex-col gap-1">

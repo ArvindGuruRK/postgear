@@ -4,7 +4,7 @@ import { Button, Card, CardContent, Container, ErrorState } from '@postgear/ui';
 import { TriangleAlert } from 'lucide-react';
 import { useEffect } from 'react';
 
-// Route-level error boundary. Must be a client component — React needs to
+// Route-level error boundary. Must be a client component: React needs to
 // attach it as an error boundary, and `reset` re-renders the segment.
 export default function AppError({
   error,
@@ -26,7 +26,7 @@ export default function AppError({
           <ErrorState
             icon={TriangleAlert}
             title="Something broke on our end"
-            description="The page couldn't finish loading. Trying again often clears it — if it doesn't, the error has been logged."
+            description="The page couldn't finish loading. Trying again often clears it. If it doesn't, the error has been logged."
             className="py-8"
           />
           <div className="flex justify-center gap-3 pb-8">

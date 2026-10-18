@@ -11,7 +11,7 @@
  * `Subscription.totalChannels` is inherited from the reference schema, where
  * an operator could set it by hand. The limit is the larger of the plan's
  * number and that column while the entitlement is live, and a lifetime row
- * is live for ever — so a grant made outside Stripe keeps working and a
+ * is live for ever, so a grant made outside Stripe keeps working and a
  * downgrade never counts against channels that were granted on purpose.
  *
  * ## The trial is a row, not a flag
@@ -116,8 +116,8 @@ export class EntitlementsService {
   /**
    * Starts the no-card trial. Returns the entitlement it grants, or `null`
    * when the workspace is not eligible (a row already exists, trials are
-   * off, or the workspace does not exist). Best-effort callers — the org
-   * service after creating a workspace — treat `null` as "nothing to do".
+   * off, or the workspace does not exist). Best-effort callers (the org
+   * service after creating a workspace) treat `null` as "nothing to do".
    */
   async startTrial(orgId: string, now: Date = new Date()): Promise<Entitlement | null> {
     if (this.config.trialDays <= 0) {

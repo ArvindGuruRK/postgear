@@ -1,5 +1,5 @@
 /**
- * Provider analytics against a mocked `fetch` — no network.
+ * Provider analytics against a mocked `fetch`: no network.
  *
  * What is pinned is the mapping: that each platform's field names land on
  * PostGear's metric names, that per-post counters are summed into the day

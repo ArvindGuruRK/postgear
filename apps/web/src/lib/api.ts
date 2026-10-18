@@ -8,7 +8,7 @@
  *
  * - **In the browser**, `credentials: 'include'` attaches it automatically.
  *   The API and the web app are different *ports* but the same *host*, and
- *   cookies are scoped by host, so no proxy layer is needed — just CORS with
+ *   cookies are scoped by host, so no proxy layer is needed, just CORS with
  *   credentials, which `apps/api/src/main.ts` enables.
  * - **On the server**, there is no ambient cookie jar, so `serverApi()`
  *   forwards the incoming request's cookies explicitly. Forgetting that is the
@@ -36,13 +36,19 @@ const SERVER_API_URL = process.env.API_URL ?? BROWSER_API_URL;
  *
  * The API deliberately returns generic strings for anything auth-related (see
  * `apps/api/src/modules/auth/auth.messages.ts`), so whatever arrives here is
- * already safe to show a user verbatim — there is no field-level detail to
+ * already safe to show a user verbatim: there is no field-level detail to
  * leak because the server never sent any.
  */
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /**
+     * A machine-readable reason the API attached (e.g.
+     * `premium_theme_requires_plan`), for branching on the kind of refusal
+     * without matching on copy. Absent for most errors.
+     */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -86,6 +92,7 @@ async function request<T>(baseUrl: string, path: string, options: ApiOptions = {
     throw new ApiError(
       typeof payload.error === 'string' ? payload.error : 'Something went wrong. Please try again.',
       response.status,
+      typeof payload.code === 'string' ? payload.code : undefined,
     );
   }
 
@@ -112,7 +119,7 @@ export function serverApi<T>(path: string, options: ApiOptions = {}): Promise<T>
  *
  * `XMLHttpRequest` rather than `fetch`, for one reason: `fetch` has no upload
  * progress event, and a 200 MB video with no progress bar looks exactly like a
- * frozen page. Credentials travel the same way as `api()` — the session cookie,
+ * frozen page. Credentials travel the same way as `api()`: the session cookie,
  * via `withCredentials`.
  *
  * No `Content-Type` is set: the browser writes the multipart boundary itself,
@@ -197,8 +204,8 @@ export function oauthStartUrl(provider: 'google' | 'facebook'): string {
  * page the user has to see, and the callback has to arrive as a top-level
  * request for the `sameSite: 'lax'` session cookie to be sent.
  *
- * `reconnect` carries PostGear's own channel id — never the platform's account
- * id — so the API can verify the user re-authorized the same account rather
+ * `reconnect` carries PostGear's own channel id, never the platform's account
+ * id, so the API can verify the user re-authorized the same account rather
  * than silently swapping a different one into an existing channel.
  */
 export function channelConnectUrl(provider: string, reconnectChannelId?: string): string {

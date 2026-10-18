@@ -1,7 +1,7 @@
 /**
  * Fixtures shared by the SEO specs: one crawl, one report, one row, built
  * by hand against the engine's types so the mappers and the service are
- * tested on the shapes they will really see — without running a crawl.
+ * tested on the shapes they will really see, without running a crawl.
  * Not a test file (no `.spec`), so Jest does not collect it.
  */
 import { SEOAuditStatus } from '@postgear/db';

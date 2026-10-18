@@ -6,7 +6,7 @@ import Redis from 'ioredis';
  * A tiny counter/KV store over Redis, with an in-process fallback.
  *
  * Only the operations rate limiting and OAuth state actually need are exposed
- * — `incrementWithTtl`, `get`, `set`, `delete` — rather than the whole ioredis
+ * (`incrementWithTtl`, `get`, `set`, `delete`), rather than the whole ioredis
  * surface. Keeping it narrow is what makes the in-memory fallback tractable.
  *
  * ## What the fallback is and is not
@@ -18,8 +18,8 @@ import Redis from 'ioredis';
  * convenience, and it logs a warning saying so at startup.
  *
  * This is exactly why account lockout does **not** live here. Lockout state is
- * on the `User` row in Postgres, because losing it — to an eviction, a
- * restart, or a second instance — would be a silent bypass of the control.
+ * on the `User` row in Postgres, because losing it (to an eviction, a
+ * restart, or a second instance) would be a silent bypass of the control.
  * Losing an IP counter merely resets a one-minute window.
  */
 
@@ -42,7 +42,7 @@ export class RedisService implements CounterStore, OnModuleDestroy {
     if (!url) {
       this.client = null;
       this.logger.warn(
-        'REDIS_URL is not set — rate limiting is using an in-process store. ' +
+        'REDIS_URL is not set, so rate limiting is using an in-process store. ' +
           'Counters are per-instance and lost on restart. Do not run production this way.',
       );
       return;
@@ -69,7 +69,7 @@ export class RedisService implements CounterStore, OnModuleDestroy {
    * Increments a counter, setting its TTL on first write only.
    *
    * The TTL must not be refreshed on every increment or the window becomes a
-   * sliding one that never expires under sustained load — an attacker hitting
+   * sliding one that never expires under sustained load: an attacker hitting
    * the endpoint continuously would stay throttled forever, and, worse, a
    * legitimate user sharing a NAT with them never recovers.
    */
@@ -146,7 +146,7 @@ export class RedisService implements CounterStore, OnModuleDestroy {
    * Failing *open* here is the right trade only because of what these counters
    * gate: a degraded rate limit is worse than a perfect one but far better
    * than a login endpoint that returns 500 for everyone because Redis is
-   * restarting. The control that must never fail open — account lockout —
+   * restarting. The control that must never fail open (account lockout)
    * deliberately does not use this class.
    */
   private async callWithFallback<T>(

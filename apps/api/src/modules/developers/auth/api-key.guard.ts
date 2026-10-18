@@ -3,14 +3,14 @@
  *
  * The session guards (`JwtAuthGuard`, `RolesGuard`) never run on `/v1`:
  * `@ApiKeyAuth()` marks the route `@Public()` for them and applies this
- * guard in their place. The two worlds do not mix — a session cookie on a
+ * guard in their place. The two worlds do not mix: a session cookie on a
  * `/v1` call is ignored, and an API key on a session route is not a session.
  *
  * ## What a key resolves to
  *
  * A key belongs to a workspace, not a person, and it may do what an admin
  * may do there. So on success the guard sets `request.activeOrg` to
- * `{ id, role: ADMIN }` — the shape `RolesGuard` would have produced — which
+ * `{ id, role: ADMIN }` (the shape `RolesGuard` would have produced), which
  * is what lets the `/v1` controllers hand `@CurrentOrg()` straight to the
  * same services the session routes use, with no second code path.
  *
@@ -85,7 +85,7 @@ export class ApiKeyGuard implements CanActivate {
 
     if (!looksLikeApiKey(presented)) {
       // Not even key-shaped: a session JWT sent to the wrong API, or noise.
-      // No prefix is logged, because there is no prefix — slicing eleven
+      // No prefix is logged, because there is no prefix: slicing eleven
       // characters off an arbitrary string would put part of some other
       // credential in the log.
       securityLogger.warn('apikey.rejected', { reason: 'malformed', route });

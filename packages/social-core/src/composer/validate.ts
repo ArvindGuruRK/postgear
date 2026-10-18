@@ -4,7 +4,7 @@
  * The composer calls it on every change to show what is wrong while the user
  * can still fix it; the API calls it before a post may enter the queue; and
  * every provider's `checkValidity` calls it before publishing. Same rules,
- * same code, same messages — so a post the composer shows as valid is a post
+ * same code, same messages, so a post the composer shows as valid is a post
  * the provider will attempt, and a message the user saw in the composer is the
  * message a failed publish would report.
  *
@@ -28,7 +28,7 @@ export interface ComposedMedia {
   height?: number;
 }
 
-/** One part of a post — the whole post, or one entry of a thread. */
+/** One part of a post: the whole post, or one entry of a thread. */
 export interface ComposedPart {
   /** Rendered text: exactly what the platform will receive. */
   text: string;
@@ -97,7 +97,7 @@ export function validatePost(
       if (index === 1) {
         add(
           'thread_unsupported',
-          `${name} can't publish a multi-part post — only part 1 would be posted. Remove the other parts or customize this channel.`,
+          `${name} can't publish a multi-part post. Only part 1 would be posted. Remove the other parts or customize this channel.`,
         );
       }
       return;

@@ -8,7 +8,7 @@
  * guard that resolves the host and then lets the HTTP client resolve it
  * *again* leaves a DNS-rebinding window between the two lookups. So the
  * request is made with `node:http(s)` and a `lookup` pinned to the address
- * the guard validated — the socket can only ever connect to what was
+ * the guard validated: the socket can only ever connect to what was
  * checked. `servername` keeps TLS verification against the real host name.
  *
  * ## What an outcome means
@@ -22,7 +22,7 @@
  *   and logged: the URL was checked at save time, so this is a record that
  *   changed underneath (a host that now resolves privately), not a typo.
  *
- * `lastError` is a status line, never the receiver's response body — a
+ * `lastError` is a status line, never the receiver's response body: a
  * receiver's body is content a workspace member will see on the deliveries
  * screen, and an attacker-chosen one has no business there.
  */

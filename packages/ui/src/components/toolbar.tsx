@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
-/** A generic toolbar shell — covers both the "search + filter toolbar" and "data table toolbar" patterns. */
+/** A generic toolbar shell: covers both the "search + filter toolbar" and "data table toolbar" patterns. */
 export interface ToolbarProps extends React.HTMLAttributes<HTMLDivElement> {
   start?: React.ReactNode;
   end?: React.ReactNode;
@@ -12,7 +12,7 @@ export const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
     <div
       ref={ref}
       className={cn(
-        'flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-brutalSm',
+        'flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-surfaceSm',
         'sm:flex-row sm:items-center sm:justify-between',
         className,
       )}

@@ -1,12 +1,12 @@
 /**
- * What `/analytics/*` returns — the server-side copy of
+ * What `/analytics/*` returns: the server-side copy of
  * `apps/web/src/types/analytics.ts`.
  *
  * Declared twice on purpose, for the reason every web type file gives: the
  * API's packages must never reach the browser bundle, and the browser's
  * files are not part of this program. This is the source; the web file
  * mirrors it, and the service spec asserts shapes against this one. Keep
- * the two in step — a field added here is a field the page can show.
+ * the two in step: a field added here is a field the page can show.
  *
  * ## Levels and flows
  *
@@ -144,7 +144,7 @@ export type PostMetricKey = (typeof POST_METRIC_KEYS)[number];
 export interface TopPost {
   rank: number;
   group: string;
-  /** The root row of the channel's chain — what the snapshot is keyed on. */
+  /** The root row of the channel's chain: what the snapshot is keyed on. */
   postId: string;
   channelId: string;
   channelName: string;

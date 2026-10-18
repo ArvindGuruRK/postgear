@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * What to fix, in priority order: three groups — Critical, Warning, Info —
+ * What to fix, in priority order: three groups (Critical, Warning, Info)
  * each an accordion with its count, critical open by default because that
  * is where to start.
  *
  * Violet marks what the model wrote and nothing else (design-system-rules.md
  * §16b, §16c): when `advice.source` is `ai`, the summary sits in a
  * `SpeechBubble variant="ai"` under a `Badge variant="ai"` naming the model.
- * Rule-based advice — the evaluators' findings, which no model wrote — gets
+ * Rule-based advice (the evaluators' findings, which no model wrote) gets
  * a plain `Text` and an `outline` badge. The recommendations themselves are
  * the same restrained rows either way: a title, the issue, the fix labelled
  * as such, an impact chip, and a "Learn more" link when the API has one.
@@ -38,7 +38,7 @@ const IMPACT_LABELS: Record<SeoImpact, string> = {
 };
 
 const EMPTY_GROUP: Record<SeoSeverity, string> = {
-  critical: 'Nothing critical — the page clears every check that blocks ranking.',
+  critical: 'Nothing critical: the page clears every check that blocks ranking.',
   warning: 'No warnings.',
   info: 'Nothing further to note.',
 };
