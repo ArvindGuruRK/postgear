@@ -1,15 +1,15 @@
 /* globals.css: Design Tokens & Tailwind v4 Entry Point */
 
 /* Tailwind v4: a single import replaces v3's @tailwind base/components/utilities. */
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* Design tokens (colors/CSS variables) imported from Postiz: see
    packages/ui/src/styles/colors.css and docs/design-patterns/. */
-@import '../../../../packages/ui/src/styles/colors.css';
+@import "../../../../packages/ui/src/styles/colors.css";
 
 /* Theme mapping (@theme, @custom-variant, @plugin): see that file's header
    comment for the full explanation of the v3→v4 conversion. */
-@import '../../../../packages/config/tailwind.css';
+@import "../../../../packages/config/tailwind.css";
 
 /* ── Typography (single source of truth) ─────────────────────────────────
    ONE family for the whole platform, loaded in src/app/fonts.ts and exposed
@@ -177,9 +177,10 @@
    hold: nothing more. Restrained, per design-system-rules.md §15: this is a
    dense text surface, so no display face and no brutal shadow on the text.
    `.is-editor-empty` and `data-placeholder` are set by TipTap's Placeholder
-   extension on an empty first paragraph. */
+   extension on an empty first paragraph. The height is set by PostEditor
+   (the post itself taller than its replies), not here: this rule is outside
+   any layer, so a min-height here would beat the component's utilities. */
 .pg-editor .ProseMirror {
-  min-height: 7rem;
   outline: none;
   font-family: var(--font-sans);
   font-size: 0.9375rem;

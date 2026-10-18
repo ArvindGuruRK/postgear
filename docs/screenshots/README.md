@@ -3,7 +3,7 @@
 Reference captures for the UI revamp (started 2026-10-17). They come from two apps:
 
 - **Postiz** (`05` to `16`): the main reference. The local source is at `D:\rk-personal-projects\postiz-app-main` (`apps/frontend/src/components/`).
-- **Buffer** (`01` to `04`): the reference for the home dashboard and the connect-a-channel flow.
+- **Buffer** (`01` to `04`, `17` to `19`): the reference for the home dashboard, the connect-a-channel flow, and the composer's fullscreen mode.
 
 These show layout, component placement and UX flow. They are not a palette or font spec: PostGear keeps its own themes and the Sora type scale.
 
@@ -27,3 +27,6 @@ These show layout, component placement and UX flow. They are not a palette or fo
 | 14 | [14-postiz-calendar-week-post-hover-actions.png](14-postiz-calendar-week-post-hover-actions.png) | Hovering a post chip in the calendar | Three icon actions appear in the chip's top bar (duplicate, preview, delete) with a tooltip ("Delete Post") |
 | 15 | [15-postiz-media-library-modal.png](15-postiz-media-library-modal.png) | Media Library modal | Search by file name with Upload beside it; square thumbnail grid with the file name over the bottom of each tile; expand icon on hover; delete dot on the corner; footer with Cancel and "Add selected media" |
 | 16 | [16-postiz-create-post-ai-image-modal.png](16-postiz-create-post-ai-image-modal.png) | Editing an existing post with the "Generate AI Image" modal open | Prompt box, a row of style chips (Realistic, Cartoon, Anime and so on) with one selected, one full-width Generate button; behind it the editing state of the composer: attached image thumbnail in the editor, platform-styled preview (LinkedIn card with reactions and Like/Comment/Repost/Send), "<channel> Settings" bar, Delete Post in the footer, primary button reads "Update" |
+| 17 | [17-buffer-create-post-modal.png](17-buffer-create-post-modal.png) | Buffer's "Create Post" modal over the home page | The composer is always a modal, never a page of its own; header holds Tags, Templates, AI Assistant, a Preview toggle, the fullscreen button and close; editor left, "Post Previews" right, Save Draft and the main action in the footer |
+| 18 | [18-buffer-create-post-enter-fullscreen-tooltip.png](18-buffer-create-post-enter-fullscreen-tooltip.png) | The same modal, hovering the fullscreen button | A small icon button beside close, named "Enter fullscreen" by its tooltip |
+| 19 | [19-buffer-create-post-fullscreen.png](19-buffer-create-post-fullscreen.png) | The composer in fullscreen | The modal fills the window edge to edge; the editor stays a comfortable reading width, centred, with the preview pinned to the right and the footer across the bottom; the button turns into "exit fullscreen" |

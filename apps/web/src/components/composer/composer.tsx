@@ -3,26 +3,39 @@
 /**
  * The post composer.
  *
- * ## A page, not a modal
+ * ## Always a modal
  *
- * The reference composes in a modal over the calendar. PostGear's route was
- * already scaffolded at `/[orgId]/composer`, and a page earns its keep here: a
- * draft has a URL (`?group=`), so it can be bookmarked, reopened after a
- * reload, and linked from the media library's "Use in a post". Sprint 5's
- * calendar can link into the same page with a time prefilled.
+ * Laid out after the reference's "Create Post" (UI revamp, 2026-10-19): a
+ * wide card with the writing on the left (channels, the per-channel tabs,
+ * the editor) and the live "Post Preview" on the right, over one footer that
+ * holds the time and the save actions. It is a modal, never a page of its
+ * own, and can be switched to fullscreen (after Buffer's composer).
  *
- * ## Layout
+ * The URL still names what is open (`/composer?group=`, `?at=`, `?media=`),
+ * so a post can be reloaded, bookmarked and linked. It opens two ways:
  *
- * Channels, then the writing (one shared thread with a tab per selected
- * channel for overrides), then the schedule and the save actions. The live
- * preview sits beside it on wide screens and below it on narrow ones.
+ * - `opened="in-app"`: navigated to from inside the app, the route is
+ *   intercepted (`[orgId]/@modal/(.)composer`) and the modal opens over the
+ *   page the person was on. Closing goes back in history, so the browser's
+ *   back button closes it too and that page is exactly as it was.
+ * - `opened="direct"`: a reload, a bookmark or a shared link
+ *   (`[orgId]/@modal/composer`) opens the same modal over the calendar.
+ *   There is no in-app page to go back to, so closing goes to the calendar.
+ *
+ * Links that stay inside the composer (a saved post, "New post") move with
+ * `navigateTo`: opened in-app they replace the modal's contents, keeping
+ * "back" as "close"; opened directly they load in full, since an in-app
+ * navigation from there would be intercepted as an in-app opening and lose
+ * the way back to the calendar.
  *
  * ## Saving
  *
  * "Save draft" accepts anything well-formed. "Add to queue" first runs the
  * same checks the API will, and shows every blocker at once rather than
  * sending a request to learn about them one at a time; the API still has the
- * final say, and its message is shown if it disagrees.
+ * final say, and its message is shown if it disagrees. A save or delete is
+ * announced (`announcePostsChanged`), so the calendar or queue under the
+ * modal shows it at once.
  */
 import {
   Alert,
@@ -35,33 +48,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertTitle,
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
   Badge,
   Button,
   buttonVariants,
-  FormField,
-  FormHelperText,
-  FormLabel,
-  Heading,
-  Input,
-  PageActions,
-  Stack,
+  cn,
+  DateTimePicker,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Tabs,
   TabsList,
   TabsTrigger,
-  Text,
+  TooltipHint,
   useToast,
 } from '@postgear/ui';
-import { Plus, Sparkles, Trash2 } from 'lucide-react';
-import Link from 'next/link';
+import { Globe, Maximize2, Minimize2, Plus, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, api } from '@/lib/api';
+import { announcePostsChanged } from '@/lib/post-events';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
 import type { PostDetail } from '@/types/post';
 import { buildReport, queueBlockers } from './channel-report';
-import { ChannelPicker } from './channel-picker';
+import { ComposerChannels } from './composer-channels';
 import {
   composerReducer,
   effectiveParts,
@@ -72,6 +86,7 @@ import {
   MAX_MEDIA_PER_PART,
   partsFor,
   SHARED,
+  toLocalInputValue,
   toSavePayload,
 } from './composer-state';
 import { DraftsButton, DraftsSheet } from './drafts-sheet';
@@ -80,6 +95,8 @@ import { PreviewPanel } from './preview-panel';
 import { ThreadEditor } from './thread-editor';
 
 interface ComposerProps {
+  /** How the modal was reached, which decides what closing does: see the header. */
+  opened: 'in-app' | 'direct';
   orgId: string;
   channels: Channel[];
   providers: ProviderSummary[];
@@ -96,7 +113,24 @@ type Notice =
   | { kind: 'conflict'; message: string }
   | { kind: 'blockers'; items: string[] };
 
+const FOCUS =
+  'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
+
+const FULLSCREEN_KEY = 'postgear:composer-fullscreen';
+
+/**
+ * One scope tile; the active one is the primary fill, as a pressed choice.
+ * Styled on `aria-selected`, not `data-state`: the tooltip around each tile
+ * sets its own `data-state` (open or closed) on the same element, which
+ * replaces the tab's "active" / "inactive".
+ */
+const SCOPE_TILE = cn(
+  'h-11 w-11 rounded-lg border-2 border-ink/15 bg-chrome p-0 text-ink hover:border-outline',
+  'aria-selected:border-outline aria-selected:bg-actionPrimary aria-selected:text-onActionPrimary',
+);
+
 export function Composer({
+  opened,
   orgId,
   channels,
   providers,
@@ -133,6 +167,31 @@ export function Composer({
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmUseShared, setConfirmUseShared] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(false);
+  // Fullscreen is a preference, kept per browser: whoever writes with the
+  // whole screen keeps getting it. Read after mount so the server render and
+  // the first client render agree.
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    try {
+      setFullscreen(window.localStorage.getItem(FULLSCREEN_KEY) === 'true');
+    } catch {
+      // Storage unavailable (private mode, blocked site data): windowed.
+    }
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    setFullscreen((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(FULLSCREEN_KEY, String(next));
+      } catch {
+        // The preference just won't persist.
+      }
+      return next;
+    });
+  }, []);
 
   const selectedChannels = state.selected.flatMap((id) => channelsById.get(id) ?? []);
 
@@ -164,6 +223,35 @@ export function Composer({
     state.scope === SHARED
       ? reports.filter((report) => !isCustomized(state, report.channel.id))
       : reports.filter((report) => report.channel.id === state.scope);
+
+  /** Moves within the composer: see "Always a modal" in the header. */
+  const navigateTo = useCallback(
+    (href: string) => {
+      if (opened === 'in-app') {
+        router.replace(href);
+      } else {
+        window.location.assign(href);
+      }
+    },
+    [opened, router],
+  );
+
+  const close = useCallback(() => {
+    if (opened === 'in-app') {
+      router.back();
+    } else {
+      router.replace(`/${orgId}/calendar`);
+    }
+  }, [opened, router, orgId]);
+
+  /** Closing never silently drops unsaved writing. */
+  const requestClose = useCallback(() => {
+    if (dirty) {
+      setConfirmClose(true);
+    } else {
+      close();
+    }
+  }, [dirty, close]);
 
   const save = useCallback(
     async (target: 'DRAFT' | 'QUEUE') => {
@@ -206,6 +294,7 @@ export function Composer({
           : await api<{ post: PostDetail }>('/posts', { method: 'POST', body: payload });
 
         dispatch({ type: 'saved', post, revision });
+        announcePostsChanged();
 
         // The URL gains the group so a reload reopens this post. History is
         // replaced directly rather than navigated: a navigation would remount
@@ -272,7 +361,8 @@ export function Composer({
     try {
       await api(`/posts/${state.group}`, { method: 'DELETE' });
       toast({ title: 'Post deleted' });
-      router.push(`/${orgId}/composer`);
+      announcePostsChanged();
+      close();
     } catch (cause) {
       setNotice({
         kind: 'error',
@@ -288,146 +378,240 @@ export function Composer({
     : undefined;
   const scopeChannel = state.scope === SHARED ? null : channelsById.get(state.scope);
   const queued = state.savedState === 'QUEUE';
+  const noChannels = state.selected.length === 0;
+  const title = locked ? 'Published Post' : state.group ? 'Edit Post' : 'Create Post';
+  const newPostHref = `/${orgId}/composer`;
 
-  return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_28rem]">
-      <Stack gap="lg" className="min-w-0">
-        <PageActions>
-          <Link href={`/${orgId}/ai-copilot`} className={buttonVariants({ variant: 'ai' })}>
-            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-            Generate with AI
-          </Link>
-          <DraftsButton onClick={() => setDraftsOpen(true)} />
-          {state.group ? (
-            <Link href={`/${orgId}/composer`} className={buttonVariants({ variant: 'primary' })}>
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
-              New post
-            </Link>
-          ) : null}
-        </PageActions>
-
-        {loadError ? <Alert variant="danger">{loadError}</Alert> : null}
-
-        {locked ? (
-          <Alert variant="warning">
-            This post has been published. It can be read here but no longer changed.
-          </Alert>
-        ) : null}
-
-        {state.disconnected.length > 0 ? (
-          <Alert variant="warning">
-            {state.disconnected.map((channel) => channel.name).join(', ')}{' '}
-            {state.disconnected.length === 1 ? 'was' : 'were'} disconnected after this post was
-            saved and will be removed from it when you save.
-          </Alert>
-        ) : null}
-
-        <section aria-labelledby="composer-channels-heading" className="flex flex-col gap-3">
-          <Heading level="h4" as="h2" id="composer-channels-heading">
-            Post to
-          </Heading>
-          <ChannelPicker
-            orgId={orgId}
-            channels={channels}
-            selected={state.selected}
-            onToggle={(channelId) => dispatch({ type: 'toggleChannel', channelId })}
-          />
-        </section>
-
-        <section aria-label="Content" className="flex flex-col gap-4">
-          {selectedChannels.length > 0 ? (
-            <Tabs
-              value={state.scope}
-              onValueChange={(scope) => dispatch({ type: 'setScope', scope })}
-            >
-              <TabsList className="flex-wrap">
-                <TabsTrigger value={SHARED}>All channels</TabsTrigger>
-                {selectedChannels.map((channel) => (
-                  <TabsTrigger key={channel.id} value={channel.id} className="gap-1.5">
-                    <PlatformIcon
-                      platform={channel.providerIdentifier}
-                      title={channel.providerName}
-                      className="h-5 w-5"
-                    />
-                    {channel.name}
-                    {isCustomized(state, channel.id) ? (
-                      <span className="rounded-full bg-actionSecondary px-1.5 font-sans text-[10px] font-bold normal-case text-onActionLight">
-                        custom
-                      </span>
-                    ) : null}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          ) : null}
-
-          {scopeChannel && !isCustomized(state, scopeChannel.id) ? (
-            <div className="flex flex-col items-start gap-3 rounded-lg border-2 border-dashed border-outline p-5">
-              <Text>
-                <strong>{scopeChannel.name}</strong> uses the post written under “All channels”.
-              </Text>
-              <Text size="sm" muted>
-                Customize it to give {scopeChannel.providerName} its own wording, media or thread.
-                Changes to the shared post will then stop applying here.
-              </Text>
-              <Button
-                onClick={() => dispatch({ type: 'customize', channelId: scopeChannel.id })}
-                disabled={locked}
-              >
-                Customize for {scopeChannel.name}
-              </Button>
-            </div>
-          ) : (
-            <>
-              {scopeChannel ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant="secondary">Custom for {scopeChannel.name}</Badge>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setConfirmUseShared(scopeChannel.id)}
-                  >
-                    Use the shared post instead
-                  </Button>
-                </div>
-              ) : state.selected.some((id) => isCustomized(state, id)) ? (
-                <Text size="sm" muted>
-                  Channels with their own version ignore changes made here.
-                </Text>
+  const frame = (
+    <>
+      {/* Two columns on wide screens, each scrolling on its own; one
+          scrolling column, preview last, on narrow ones. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pg-scrollbar pg-scrollbar-secondary lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)] lg:overflow-hidden">
+        <section aria-label="Write" className="flex min-w-0 flex-col lg:min-h-0">
+          <div className="flex h-16 shrink-0 items-center gap-3 border-b-2 border-outline px-5">
+            <DialogTitle className="truncate text-xl">{title}</DialogTitle>
+            {state.group ? (
+              <Badge variant={locked ? 'success' : queued ? 'primary' : 'outline'}>
+                {locked ? 'Published' : queued ? 'Queued' : 'Draft'}
+              </Badge>
+            ) : null}
+            <div className="ms-auto flex shrink-0 items-center gap-2">
+              <DraftsButton onClick={() => setDraftsOpen(true)} />
+              {state.group ? (
+                <a
+                  href={newPostHref}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigateTo(newPostHref);
+                  }}
+                  className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  New post
+                </a>
               ) : null}
+            </div>
+          </div>
 
-              <ThreadEditor
-                key={state.scope}
-                scope={state.scope}
-                scopeLabel={scopeChannel ? scopeChannel.name : 'the shared post'}
-                parts={partsFor(state, state.scope)}
-                reports={scopeReports}
-                dispatch={dispatch}
-                onAttachMedia={setPickerFor}
-              />
-            </>
-          )}
-        </section>
+          <div
+            className={cn(
+              'flex flex-col gap-5 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto pg-scrollbar pg-scrollbar-secondary',
+              // Fullscreen, the writing keeps a comfortable line length,
+              // centred in the wider column, as in Buffer's fullscreen.
+              fullscreen && '[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-3xl',
+            )}
+          >
+            {loadError ? <Alert variant="danger">{loadError}</Alert> : null}
 
-        <section
-          aria-label="Schedule and save"
-          className="flex flex-col gap-4 rounded-lg border-2 border-outline bg-secondary p-5 shadow-surfaceMd"
-        >
-          <FormField className="max-w-xs">
-            <FormLabel htmlFor="composer-publish-at">Publish at</FormLabel>
-            <Input
-              id="composer-publish-at"
-              type="datetime-local"
-              value={state.publishAt}
-              onChange={(event) => dispatch({ type: 'setPublishAt', value: event.target.value })}
+            {locked ? (
+              <Alert variant="warning">
+                This post has been published. It can be read here but no longer changed.
+              </Alert>
+            ) : null}
+
+            {state.disconnected.length > 0 ? (
+              <Alert variant="warning">
+                {state.disconnected.map((channel) => channel.name).join(', ')}{' '}
+                {state.disconnected.length === 1 ? 'was' : 'were'} disconnected after this post was
+                saved and will be removed from it when you save.
+              </Alert>
+            ) : null}
+
+            <ComposerChannels
+              orgId={orgId}
+              channels={channels}
+              selected={state.selected}
+              onToggle={(channelId) => dispatch({ type: 'toggleChannel', channelId })}
               disabled={locked}
             />
-            <FormHelperText>
-              Your local time ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
-            </FormHelperText>
-          </FormField>
 
-          {notice?.kind === 'blockers' ? (
+            {selectedChannels.length > 0 ? (
+              <Tabs
+                value={state.scope}
+                onValueChange={(scope) => dispatch({ type: 'setScope', scope })}
+              >
+                {/* The reference's scope tiles: the globe edits the post every
+                    channel shares; each selected channel's tile edits that
+                    channel's own version, marked with a dot once it has one. */}
+                <TabsList className="max-w-full flex-wrap justify-start gap-2 border-0 bg-transparent p-0 shadow-none">
+                  <TooltipHint label="All channels: one post for every channel" side="bottom">
+                    <TabsTrigger value={SHARED} aria-label="All channels" className={SCOPE_TILE}>
+                      <Globe className="h-5 w-5" strokeWidth={2.25} aria-hidden="true" />
+                    </TabsTrigger>
+                  </TooltipHint>
+                  {selectedChannels.map((channel) => {
+                    const custom = isCustomized(state, channel.id);
+                    return (
+                      <TooltipHint
+                        key={channel.id}
+                        label={
+                          custom
+                            ? `${channel.name}: its own version`
+                            : `${channel.name}: edit its own version`
+                        }
+                        side="bottom"
+                      >
+                        <TabsTrigger
+                          value={channel.id}
+                          aria-label={custom ? `${channel.name}, customized` : channel.name}
+                          className={cn(SCOPE_TILE, 'relative')}
+                        >
+                          <span className="relative" aria-hidden="true">
+                            <Avatar className="h-7 w-7 border">
+                              {channel.picture ? (
+                                <AvatarImage src={channel.picture} alt="" />
+                              ) : null}
+                              <AvatarFallback className="text-[9px]">
+                                {channel.name.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="absolute -end-1 -bottom-1 rounded-sm bg-secondary p-px">
+                              <PlatformIcon
+                                platform={channel.providerIdentifier}
+                                className="h-3 w-3"
+                              />
+                            </span>
+                          </span>
+                          {custom ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute -end-1 -top-1 h-3 w-3 rounded-full border-2 border-outline bg-actionSecondary"
+                            />
+                          ) : null}
+                        </TabsTrigger>
+                      </TooltipHint>
+                    );
+                  })}
+                </TabsList>
+              </Tabs>
+            ) : null}
+
+            {scopeChannel && !isCustomized(state, scopeChannel.id) ? (
+              <div className="flex flex-col items-start gap-3 rounded-lg border-2 border-dashed border-ink/30 p-5">
+                <p className="m-0 font-sans text-sm text-ink">
+                  <strong className="type-ui">{scopeChannel.name}</strong> uses the post written
+                  under “All channels”.
+                </p>
+                <p className="m-0 font-sans text-sm text-ink opacity-70">
+                  Customize it to give {scopeChannel.providerName} its own wording, media or thread.
+                  Changes to the shared post will then stop applying here.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => dispatch({ type: 'customize', channelId: scopeChannel.id })}
+                  disabled={locked}
+                >
+                  Customize for {scopeChannel.name}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {scopeChannel ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge variant="secondary">Custom for {scopeChannel.name}</Badge>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setConfirmUseShared(scopeChannel.id)}
+                      disabled={locked}
+                    >
+                      Use the shared post instead
+                    </Button>
+                  </div>
+                ) : state.selected.some((id) => isCustomized(state, id)) ? (
+                  <p className="m-0 font-sans text-xs text-ink opacity-70">
+                    Channels with their own version ignore changes made here.
+                  </p>
+                ) : null}
+
+                <ThreadEditor
+                  key={state.scope}
+                  scope={state.scope}
+                  scopeLabel={scopeChannel ? scopeChannel.name : 'the shared post'}
+                  parts={partsFor(state, state.scope)}
+                  reports={scopeReports}
+                  dispatch={dispatch}
+                  onAttachMedia={setPickerFor}
+                  disabled={locked}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        <aside
+          aria-label="Post preview"
+          className="flex min-w-0 flex-col border-t-2 border-outline bg-primary lg:min-h-0 lg:border-t-0 lg:border-s-2"
+        >
+          <div className="flex h-16 shrink-0 items-center gap-3 border-b-2 border-outline px-5">
+            <h3 className="m-0 min-w-0 flex-1 truncate type-heading text-xl text-ink">
+              Post Preview
+            </h3>
+            <TooltipHint label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} side="bottom">
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                aria-pressed={fullscreen}
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10',
+                  FOCUS,
+                )}
+              >
+                {fullscreen ? (
+                  <Minimize2 className="h-4 w-4" strokeWidth={2.5} />
+                ) : (
+                  <Maximize2 className="h-4 w-4" strokeWidth={2.5} />
+                )}
+              </button>
+            </TooltipHint>
+            <TooltipHint label="Close" side="bottom" align="end">
+              <button
+                type="button"
+                onClick={requestClose}
+                aria-label="Close composer"
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10',
+                  FOCUS,
+                )}
+              >
+                <X className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            </TooltipHint>
+          </div>
+          <div className="p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto pg-scrollbar pg-scrollbar-primary">
+            <PreviewPanel
+              reports={reports}
+              publishAt={publishDate}
+              focusChannelId={state.scope === SHARED ? null : state.scope}
+            />
+          </div>
+        </aside>
+      </div>
+
+      {notice ? (
+        <div className="shrink-0 border-t-2 border-outline px-5 py-3">
+          {notice.kind === 'blockers' ? (
             <Alert variant="danger">
               {/* Alert lays its children out in a row, for an icon beside content. */}
               <div className="flex flex-col gap-1">
@@ -440,7 +624,7 @@ export function Composer({
                 <span>It can still be saved as a draft.</span>
               </div>
             </Alert>
-          ) : notice?.kind === 'conflict' ? (
+          ) : notice.kind === 'conflict' ? (
             <Alert variant="danger">
               {notice.message}{' '}
               <button
@@ -451,58 +635,75 @@ export function Composer({
                 Reload
               </button>
             </Alert>
-          ) : notice?.kind === 'error' ? (
+          ) : (
             <Alert variant="danger">{notice.message}</Alert>
+          )}
+        </div>
+      ) : null}
+
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-t-2 border-outline px-5 py-4">
+        <p aria-live="polite" className="m-0 me-auto flex flex-col font-sans text-xs text-ink">
+          <span className="opacity-70">
+            {saving
+              ? 'Saving…'
+              : dirty
+                ? 'Unsaved changes'
+                : state.group
+                  ? 'All changes saved'
+                  : ''}
+          </span>
+          {blockers.length > 0 && selectedChannels.length > 0 ? (
+            <span className="text-actionDanger">
+              {blockers.length} {blockers.length === 1 ? 'issue' : 'issues'} to fix before queueing
+            </span>
           ) : null}
+        </p>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => void save('DRAFT')}
-              disabled={saving !== null || locked}
-            >
-              {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move to drafts' : 'Save draft'}
-            </Button>
-            <Button onClick={() => void save('QUEUE')} disabled={saving !== null || locked}>
-              {saving === 'QUEUE' ? 'Saving…' : queued ? 'Update queue' : 'Add to queue'}
-            </Button>
+        {state.group && !locked ? (
+          // A quiet text action, as in the reference: deleting is rarer than
+          // saving, and a confirmation follows.
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className={cn(
+              'flex h-11 items-center gap-2 rounded-md px-2 type-ui text-sm text-actionDanger hover:bg-actionDanger/10',
+              FOCUS,
+            )}
+          >
+            <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+            Delete Post
+          </button>
+        ) : null}
 
-            <Text size="sm" muted aria-live="polite" className="me-auto">
-              {saving
-                ? 'Saving…'
-                : dirty
-                  ? 'Unsaved changes'
-                  : state.group
-                    ? queued
-                      ? 'Queued · all changes saved'
-                      : 'Draft · all changes saved'
-                    : ''}
-              {blockers.length > 0 && selectedChannels.length > 0
-                ? ` · ${blockers.length} ${blockers.length === 1 ? 'issue' : 'issues'} to fix before queueing`
-                : ''}
-            </Text>
-
-            {state.group && !locked ? (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => setConfirmDelete(true)}
-                aria-label="Delete post"
-              >
-                <Trash2 className="h-4 w-4" strokeWidth={2.5} />
-              </Button>
-            ) : null}
-          </div>
-        </section>
-      </Stack>
-
-      <aside className="min-w-0 xl:sticky xl:top-0 xl:self-start">
-        <PreviewPanel
-          reports={reports}
-          publishAt={publishDate}
-          focusChannelId={state.scope === SHARED ? null : state.scope}
+        <PublishAt
+          value={state.publishAt}
+          onChange={(value) => dispatch({ type: 'setPublishAt', value })}
+          disabled={locked}
         />
-      </aside>
+
+        {/* Nothing to save until there is somewhere to post it: the main
+            button says so, the reference's "check the circles above". */}
+        <Button
+          variant="secondary"
+          onClick={() => void save('DRAFT')}
+          disabled={saving !== null || locked || noChannels}
+        >
+          {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move to drafts' : 'Save draft'}
+        </Button>
+        <Button
+          onClick={() => void save('QUEUE')}
+          disabled={saving !== null || locked || noChannels}
+          className="min-w-44"
+        >
+          {saving === 'QUEUE'
+            ? 'Saving…'
+            : noChannels
+              ? 'Pick a channel above'
+              : queued
+                ? 'Update queue'
+                : 'Add to queue'}
+        </Button>
+      </div>
 
       <MediaPickerDialog
         open={pickerFor !== null}
@@ -521,57 +722,140 @@ export function Composer({
         open={draftsOpen}
         onOpenChange={setDraftsOpen}
         currentGroup={state.group}
+        onNavigate={navigateTo}
       />
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
-            <AlertDialogDescription>
-              It is removed for every channel{queued ? ' and taken out of the queue' : ''}. This
-              cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
-            <AlertDialogAction variant="danger" onClick={() => void deletePost()}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Confirm
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this post?"
+        description={`It is removed for every channel${queued ? ' and taken out of the queue' : ''}. This cannot be undone.`}
+        cancel="Keep it"
+        action="Delete"
+        onAction={() => void deletePost()}
+      />
 
-      <AlertDialog
+      <Confirm
         open={confirmUseShared !== null}
         onOpenChange={(open) => !open && setConfirmUseShared(null)}
+        title={`Discard the custom version for ${confirmUseShared ? (channelsById.get(confirmUseShared)?.name ?? '') : ''}?`}
+        description="The channel goes back to the post written under “All channels”, and its own wording and media are removed."
+        cancel="Keep custom version"
+        action="Use shared post"
+        onAction={() => {
+          if (confirmUseShared) {
+            dispatch({ type: 'useShared', channelId: confirmUseShared });
+          }
+          setConfirmUseShared(null);
+        }}
+      />
+
+      <Confirm
+        open={confirmClose}
+        onOpenChange={setConfirmClose}
+        title="Close without saving?"
+        description="What you have written since the last save will be lost."
+        cancel="Keep writing"
+        action="Discard changes"
+        onAction={() => {
+          setConfirmClose(false);
+          close();
+        }}
+      />
+    </>
+  );
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && requestClose()}>
+      <DialogContent
+        hideClose
+        aria-describedby={undefined}
+        // A stray click beside the card must not end the writing; closing is
+        // the X, Escape, or the browser's back button.
+        onInteractOutside={(event) => event.preventDefault()}
+        // Focus the card itself rather than its first button: on a reload the
+        // browser counts that as keyboard focus and rings "Saved posts", as if
+        // it had been chosen. Tab still starts from the top of the card.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement | null)?.focus();
+        }}
+        data-fullscreen={fullscreen || undefined}
+        className={cn(
+          'flex flex-col gap-0 overflow-hidden p-0',
+          'transition-[width,height,max-width,max-height,border-radius] duration-200 ease-out motion-reduce:transition-none',
+          fullscreen
+            ? 'h-dvh max-h-none w-screen max-w-none rounded-none border-0 shadow-none'
+            : 'h-[calc(100dvh-2rem)] max-h-[62rem] w-[calc(100%-2rem)] max-w-[88rem] rounded-2xl',
+        )}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Discard the custom version for{' '}
-              {confirmUseShared ? channelsById.get(confirmUseShared)?.name : ''}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              The channel goes back to the post written under “All channels”, and its own wording
-              and media are removed.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep custom version</AlertDialogCancel>
-            <AlertDialogAction
-              variant="danger"
-              onClick={() => {
-                if (confirmUseShared) {
-                  dispatch({ type: 'useShared', channelId: confirmUseShared });
-                }
-                setConfirmUseShared(null);
-              }}
-            >
-              Use shared post
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        {frame}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * The publish time, as the reference's date button: a calendar icon and the
+ * local date and time; it opens the design system's calendar with time keys
+ * beside it (DateTimePicker). The composer keeps the time as a local
+ * `YYYY-MM-DDTHH:mm` string, converted at this edge.
+ */
+function PublishAt({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <DateTimePicker
+      id="composer-publish-at"
+      label="Publish at"
+      value={isValidPublishAt(value) ? new Date(value) : null}
+      onValueChange={(date) => onChange(toLocalInputValue(date))}
+      disabled={disabled}
+      side="top"
+      align="end"
+      footnote={`Your local time, ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
+    />
+  );
+}
+
+/** A yes-or-no question before something that cannot be undone. */
+function Confirm({
+  open,
+  onOpenChange,
+  title,
+  description,
+  cancel,
+  action,
+  onAction,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: ReactNode;
+  description: ReactNode;
+  cancel: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancel}</AlertDialogCancel>
+          <AlertDialogAction variant="danger" onClick={onAction}>
+            {action}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

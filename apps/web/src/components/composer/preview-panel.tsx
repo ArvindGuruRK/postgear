@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, AvatarFallback, AvatarImage, cn, EmptyState, Heading, Text } from '@postgear/ui';
+import { Avatar, AvatarFallback, AvatarImage, cn, Text } from '@postgear/ui';
 import { Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
@@ -38,18 +38,14 @@ export function PreviewPanel({
   const active = reports.find((report) => report.channel.id === chosen) ?? reports[0];
 
   return (
-    <section aria-labelledby="composer-preview-heading" className="flex flex-col gap-3">
-      <Heading level="h4" as="h2" id="composer-preview-heading">
-        Preview
-      </Heading>
-
+    <div className="flex flex-col gap-3">
       {!active ? (
-        <EmptyState
-          icon={Eye}
-          title="Nothing to preview yet"
-          description="Pick a channel and the post appears here the way that platform will show it."
-          className="rounded-lg border-2 border-dashed border-outline p-6"
-        />
+        <div className="flex flex-col items-center gap-2 px-4 py-16 text-center">
+          <Eye className="h-7 w-7 text-ink opacity-40" strokeWidth={2} />
+          <p className="m-0 font-sans text-sm text-ink opacity-70">
+            Pick a channel and start writing to see the post the way that platform shows it.
+          </p>
+        </div>
       ) : (
         <>
           {reports.length > 1 ? (
@@ -152,6 +148,6 @@ export function PreviewPanel({
           )}
         </>
       )}
-    </section>
+    </div>
   );
 }

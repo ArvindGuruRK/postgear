@@ -27,10 +27,15 @@ async function signIn(page: Page, email = 'demo@postgear.local') {
 
 async function openComposer(page: Page, query = '') {
   await page.goto(`/${DEMO_ORG}/composer${query}`);
-  // No in-page title any more: the top bar's h1 names the page, and the shared
-  // editor's first part is the sign the composer has rendered.
-  await expect(page.getByRole('heading', { level: 1, name: 'Composer' })).toBeVisible();
+  // The composer is only ever a modal: loaded directly it opens over the
+  // calendar, and the shared editor's first part is the sign it has rendered.
+  await expect(composer(page)).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Part 1 of the shared post' })).toBeVisible();
+}
+
+function composer(page: Page) {
+  // "Create Post" for a new post, "Edit Post" once it has been saved.
+  return page.getByRole('dialog', { name: /^(Create|Edit) Post$/ });
 }
 
 function channel(page: Page, name: RegExp) {
@@ -80,18 +85,23 @@ test.describe('composer', () => {
 
     // Attach through the picker, uploading a fresh image from inside it.
     await page.getByRole('button', { name: 'Add media to Part 1' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Add media' });
+    const dialog = page.getByRole('dialog', { name: 'Media Library' });
     await dialog.locator('input[type="file"]').setInputFiles({
       name: fileName,
       mimeType: 'image/jpeg',
       buffer: await noisyPhoto(),
     });
     await expect(dialog.getByText(/Compressed .* → /)).toBeVisible({ timeout: 30_000 });
-    await dialog.getByRole('button', { name: /^Attach 1/ }).click();
+    await dialog.getByRole('button', { name: 'Add selected media' }).click();
     await expect(page.getByRole('img', { name: fileName }).first()).toBeVisible();
 
-    // Every counter measures the rendered text, per platform.
-    await expect(page.getByTitle('Acme on X: 28 of 280 characters')).toBeVisible();
+    // Every counter measures the rendered text, per platform, in the toolbar.
+    await expect(
+      page
+        .getByRole('list', { name: 'Character counts' })
+        .getByRole('listitem')
+        .filter({ hasText: 'Acme on X' }),
+    ).toContainText('28/280');
 
     // One preview per platform, each showing the same text and the image.
     const xPreview = page.getByTestId('preview-x');
@@ -182,7 +192,7 @@ test.describe('composer', () => {
     // A reload reopens exactly what was saved.
     await page.reload();
     // Edit mode: only an existing post offers a fresh "New post" link.
-    await expect(page.getByRole('main').getByRole('link', { name: 'New post' })).toBeVisible();
+    await expect(composer(page).getByRole('link', { name: 'New post' })).toBeVisible();
     await expect(part(page, 1)).toHaveText(`${marker} for everyone`);
     await page.getByRole('tab', { name: /Acme Marketing/ }).click();
     await expect(part(page, 1, 'Acme Marketing')).toHaveText(
@@ -199,7 +209,7 @@ test.describe('composer', () => {
     // Edit and save again: the same post, updated in place.
     await write(page, 1, ' (edited)');
     await page.getByRole('button', { name: 'Save draft' }).click();
-    await expect(page.getByText('Draft · all changes saved')).toBeVisible();
+    await expect(page.getByText('All changes saved')).toBeVisible();
     expect(groupFrom(page)).toBe(group);
   });
 
@@ -214,7 +224,9 @@ test.describe('composer', () => {
     await page.getByRole('button', { name: 'Add to queue' }).click();
 
     const alert = page.getByRole('alert').filter({ hasText: 'Not ready for the queue yet' });
-    await expect(alert).toContainText('Acme on X: Twitter / X allows 280 characters; this post has 290.');
+    await expect(alert).toContainText(
+      'Acme on X: Twitter / X allows 280 characters; this post has 290.',
+    );
     await expect(alert).toContainText(
       'Acme Studio: Instagram posts must include at least one image or video.',
     );
@@ -244,7 +256,7 @@ test.describe('composer', () => {
     // The first tab saves a change; the second tab's copy is now stale.
     await write(first, 1, ', newer');
     await first.getByRole('button', { name: 'Save draft' }).click();
-    await expect(first.getByText('Draft · all changes saved')).toBeVisible();
+    await expect(first.getByText('All changes saved')).toBeVisible();
 
     await write(second, 1, ', older');
     await second.getByRole('button', { name: 'Save draft' }).click();

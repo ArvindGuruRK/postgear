@@ -1,16 +1,20 @@
 'use client';
 
 /**
- * The reorderable list of a post's parts.
+ * The reorderable list of a post's parts (UI revamp, 2026-10-19, after the
+ * reference's editor): one editor for a single post, and for a thread, each
+ * further part as its own editor under it, added with "Add to thread".
+ *
+ * Inside each editor: the text, the part's media, and a toolbar with Insert
+ * Media first and each selected platform's character count at the far end,
+ * red once the text runs past that platform's limit.
  *
  * Drag-and-drop through dnd-kit, with its keyboard sensor, so a part can be
  * picked up with Space and moved with the arrow keys, plus explicit "Move up"
  * and "Move down" buttons on every part, because a drag handle is not a
- * discoverable control for everyone and a button is.
- *
- * Only the handle starts a drag. The whole card cannot be a drag source: it
- * contains a text editor, and a drag that starts on a text selection is a
- * text selection.
+ * discoverable control for everyone and a button is. Only the handle starts a
+ * drag: the part contains a text editor, and a drag that starts on a text
+ * selection is a text selection.
  */
 import {
   closestCenter,
@@ -28,9 +32,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Badge, Button, cn, Stack, Text } from '@postgear/ui';
+import { Button, cn, TooltipHint } from '@postgear/ui';
 import { ArrowDown, ArrowUp, GripVertical, ImagePlus, Plus, Trash2, X } from 'lucide-react';
-import { type Dispatch, useId } from 'react';
+import { type Dispatch, type ReactNode, useId } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { ChannelReport } from './channel-report';
 import {
   type ComposerAction,
@@ -48,6 +53,7 @@ export function ThreadEditor({
   reports,
   dispatch,
   onAttachMedia,
+  disabled = false,
 }: {
   scope: Scope;
   /** "the shared post", or a channel name: used in accessible labels. */
@@ -57,6 +63,8 @@ export function ThreadEditor({
   reports: ChannelReport[];
   dispatch: Dispatch<ComposerAction>;
   onAttachMedia: (partKey: string) => void;
+  /** A published post: readable, not changeable. */
+  disabled?: boolean;
 }) {
   // dnd-kit numbers its accessibility ids from a module-level counter, which
   // differs between the server render and the browser and makes React report
@@ -80,7 +88,9 @@ export function ThreadEditor({
   }
 
   return (
-    <Stack gap="md">
+    // The reference's group card: every part of the post in one surface,
+    // with "Add to thread" under the last.
+    <div className="flex flex-col gap-3 rounded-xl border-2 border-outline bg-chrome p-3">
       <DndContext
         id={dndId}
         sensors={sensors}
@@ -93,7 +103,7 @@ export function ThreadEditor({
         >
           <ol
             aria-label={`Parts of ${scopeLabel}`}
-            className="m-0 flex list-none flex-col gap-4 p-0"
+            className="m-0 flex list-none flex-col gap-3 p-0"
           >
             {parts.map((part, index) => (
               <SortablePart
@@ -106,24 +116,27 @@ export function ThreadEditor({
                 reports={reports}
                 dispatch={dispatch}
                 onAttachMedia={onAttachMedia}
+                disabled={disabled}
               />
             ))}
           </ol>
         </SortableContext>
       </DndContext>
 
-      <div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => dispatch({ type: 'addPart', scope })}
-          disabled={parts.length >= MAX_PARTS}
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          Add to thread
-        </Button>
-      </div>
-    </Stack>
+      {disabled ? null : (
+        <div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => dispatch({ type: 'addPart', scope })}
+            disabled={parts.length >= MAX_PARTS}
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add to thread
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -136,6 +149,7 @@ function SortablePart({
   reports,
   dispatch,
   onAttachMedia,
+  disabled,
 }: {
   part: DraftPart;
   index: number;
@@ -145,6 +159,7 @@ function SortablePart({
   reports: ChannelReport[];
   dispatch: Dispatch<ComposerAction>;
   onAttachMedia: (partKey: string) => void;
+  disabled: boolean;
 }) {
   const {
     attributes,
@@ -154,9 +169,10 @@ function SortablePart({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: part.key });
+  } = useSortable({ id: part.key, disabled });
 
   const label = `Part ${index + 1}`;
+  const thread = total > 1;
   const issues = reports.flatMap((report) =>
     report.issues
       .filter((issue) => issue.part === index)
@@ -171,136 +187,103 @@ function SortablePart({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       data-testid="thread-part"
-      className={cn(
-        'rounded-lg border-2 border-outline bg-secondary',
-        isDragging ? 'relative z-10 shadow-surfaceLg' : 'shadow-surfaceMd',
-      )}
+      className={cn('flex gap-2', isDragging && 'relative z-10 opacity-90')}
     >
-      <div className="flex flex-wrap items-center gap-2 border-b-2 border-outline px-3 py-2">
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          aria-label={`Drag to reorder ${label}`}
-          className="flex h-8 w-6 cursor-grab touch-none items-center justify-center rounded-sm text-ink outline-none active:cursor-grabbing focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4" strokeWidth={2.5} />
-        </button>
+      {/* A reply hangs off the part above it, as the reference draws a thread. */}
+      {index > 0 ? (
+        <span
+          aria-hidden="true"
+          className="ms-3 h-9 w-4 shrink-0 rounded-es-lg border-s-2 border-b-2 border-ink/25"
+        />
+      ) : null}
 
-        <span className="type-label text-sm text-ink">{label}</span>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          {reports.map((report) => {
-            const rendered = report.parts[index];
-            const max = report.provider?.rules.maxLength;
-
-            if (!rendered || max === undefined) {
-              return null;
-            }
-
-            const over = rendered.length > max;
-
-            return (
-              <Badge
-                key={report.channel.id}
-                variant={over ? 'danger' : 'outline'}
-                title={`${report.channel.name}: ${rendered.length} of ${max} characters`}
-              >
-                {report.provider?.name ?? report.channel.providerName}{' '}
-                {rendered.length.toLocaleString('en-US')}/{max.toLocaleString('en-US')}
-              </Badge>
-            );
-          })}
-        </div>
-
-        <div className="ms-auto flex items-center gap-1">
-          <IconButton
-            label={`Move ${label} up`}
-            disabled={index === 0}
-            onClick={() => dispatch({ type: 'movePart', scope, from: index, to: index - 1 })}
-          >
-            <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
-          </IconButton>
-          <IconButton
-            label={`Move ${label} down`}
-            disabled={index === total - 1}
-            onClick={() => dispatch({ type: 'movePart', scope, from: index, to: index + 1 })}
-          >
-            <ArrowDown className="h-4 w-4" strokeWidth={2.5} />
-          </IconButton>
-          <IconButton
-            label={`Remove ${label}`}
-            disabled={total <= 1}
-            onClick={() => dispatch({ type: 'removePart', scope, key: part.key })}
-          >
-            <Trash2 className="h-4 w-4" strokeWidth={2.5} />
-          </IconButton>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 p-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
         <PostEditor
           initialContent={part.content}
           onChange={(content) => dispatch({ type: 'editContent', scope, key: part.key, content })}
           label={`${label} of ${scopeLabel}`}
-          placeholder={index === 0 ? 'What do you want to share?' : 'Continue the thread…'}
+          placeholder={index === 0 ? 'Write something…' : 'Continue the thread…'}
+          tall={index === 0}
+          attachments={
+            part.media.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+                {part.media.map((item) => (
+                  <div
+                    key={item.id}
+                    className="relative h-16 w-16 overflow-hidden rounded-md border-2 border-outline bg-primary"
+                  >
+                    {item.type === 'image' ? (
+                      // biome-ignore lint/performance/noImgElement: a thumbnail served from media storage
+                      <img
+                        src={item.thumbnailUrl ?? item.url}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={item.url}
+                        preload="metadata"
+                        muted
+                        className="h-full w-full object-cover"
+                        aria-label={item.name}
+                      />
+                    )}
+                    {disabled ? null : (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${item.name} from ${label}`}
+                        onClick={() =>
+                          dispatch({ type: 'detachMedia', scope, key: part.key, mediaId: item.id })
+                        }
+                        className="absolute end-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing"
+                      >
+                        <X className="h-3 w-3" strokeWidth={3} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null
+          }
+          toolbarStart={
+            disabled ? null : (
+              <TooltipHint
+                label={
+                  part.media.length >= MAX_MEDIA_PER_PART
+                    ? 'This part has as many attachments as a post can take'
+                    : 'Add images or video from the Media Library'
+                }
+                side="top"
+                disabled={part.media.length >= MAX_MEDIA_PER_PART}
+              >
+                <button
+                  type="button"
+                  onClick={() => onAttachMedia(part.key)}
+                  disabled={part.media.length >= MAX_MEDIA_PER_PART}
+                  aria-label={`Add media to ${label}`}
+                  className={cn(
+                    'flex h-8 items-center gap-1.5 rounded-md border-2 border-outline bg-secondary px-2.5 type-ui text-xs text-ink',
+                    'outline-none hover:bg-actionPrimary/10',
+                    'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                    'disabled:opacity-50',
+                  )}
+                >
+                  <ImagePlus className="h-4 w-4" strokeWidth={2.5} />
+                  Insert Media
+                </button>
+              </TooltipHint>
+            )
+          }
+          toolbarEnd={<Counts reports={reports} index={index} />}
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {part.media.map((item) => (
-            <div
-              key={item.id}
-              className="relative h-16 w-16 overflow-hidden rounded-md border-2 border-outline bg-primary"
-            >
-              {item.type === 'image' ? (
-                // biome-ignore lint/performance/noImgElement: a thumbnail served from media storage
-                <img
-                  src={item.thumbnailUrl ?? item.url}
-                  alt={item.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <video
-                  src={item.url}
-                  preload="metadata"
-                  muted
-                  className="h-full w-full object-cover"
-                  aria-label={item.name}
-                />
-              )}
-              <button
-                type="button"
-                aria-label={`Remove ${item.name} from ${label}`}
-                onClick={() =>
-                  dispatch({ type: 'detachMedia', scope, key: part.key, mediaId: item.id })
-                }
-                className="absolute end-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing"
-              >
-                <X className="h-3 w-3" strokeWidth={3} />
-              </button>
-            </div>
-          ))}
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onAttachMedia(part.key)}
-            disabled={part.media.length >= MAX_MEDIA_PER_PART}
-            aria-label={`Add media to ${label}`}
-          >
-            <ImagePlus className="h-4 w-4" strokeWidth={2.5} />
-            Media
-          </Button>
-        </div>
-
         {part.removedMedia > 0 ? (
-          <Text size="xs" muted>
+          <p className="m-0 font-sans text-xs text-ink opacity-70">
             {part.removedMedia === 1
               ? 'An attachment was'
               : `${part.removedMedia} attachments were`}{' '}
             deleted from the media library since this was saved.
-          </Text>
+          </p>
         ) : null}
 
         {issues.length > 0 ? (
@@ -313,36 +296,123 @@ function SortablePart({
           </ul>
         ) : null}
       </div>
+
+      {thread && !disabled ? (
+        <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
+          <TooltipHint label="Drag to reorder" side="left">
+            <button
+              type="button"
+              ref={setActivatorNodeRef}
+              aria-label={`Drag to reorder ${label}`}
+              className="flex h-7 w-7 cursor-grab touch-none items-center justify-center rounded-md text-ink opacity-60 outline-none hover:opacity-100 active:cursor-grabbing focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </TooltipHint>
+          <PartAction
+            label={`Move ${label} up`}
+            disabled={index === 0}
+            onClick={() => dispatch({ type: 'movePart', scope, from: index, to: index - 1 })}
+          >
+            <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+          </PartAction>
+          <PartAction
+            label={`Move ${label} down`}
+            disabled={index === total - 1}
+            onClick={() => dispatch({ type: 'movePart', scope, from: index, to: index + 1 })}
+          >
+            <ArrowDown className="h-4 w-4" strokeWidth={2.5} />
+          </PartAction>
+          <PartAction
+            label={`Remove ${label}`}
+            danger
+            onClick={() => dispatch({ type: 'removePart', scope, key: part.key })}
+          >
+            <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+          </PartAction>
+        </div>
+      ) : null}
     </li>
   );
 }
 
-function IconButton({
+/**
+ * Each selected platform's count for this part, as the platform measures it:
+ * its logo and `used/limit`, red once over.
+ */
+function Counts({ reports, index }: { reports: ChannelReport[]; index: number }) {
+  const counts = reports.flatMap((report) => {
+    const rendered = report.parts[index];
+    const max = report.provider?.rules.maxLength;
+    return rendered && max !== undefined ? [{ report, length: rendered.length, max }] : [];
+  });
+
+  if (counts.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul aria-label="Character counts" className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+      {counts.map(({ report, length, max }) => {
+        const over = length > max;
+        return (
+          <TooltipHint
+            key={report.channel.id}
+            label={`${report.channel.name}: ${length.toLocaleString('en-US')} of ${max.toLocaleString('en-US')} characters`}
+            side="top"
+          >
+            <li
+              className={cn(
+                'flex h-7 items-center gap-1 rounded-md border-2 px-1.5 font-sans text-[11px] tabular-nums',
+                over
+                  ? 'border-outline bg-actionDanger text-onActionLight'
+                  : 'border-ink/15 text-ink',
+              )}
+            >
+              <PlatformIcon platform={report.channel.providerIdentifier} className="h-3.5 w-3.5" />
+              <span className="sr-only">{report.channel.name}: </span>
+              {length.toLocaleString('en-US')}/{max.toLocaleString('en-US')}
+              <span className="sr-only"> characters</span>
+            </li>
+          </TooltipHint>
+        );
+      })}
+    </ul>
+  );
+}
+
+function PartAction({
   label,
   disabled,
+  danger = false,
   onClick,
   children,
 }: {
   label: string;
   disabled?: boolean;
+  danger?: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
-        'outline-none hover:border-outline hover:bg-actionPrimary/10',
-        'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-        'disabled:pointer-events-none disabled:opacity-40',
-      )}
-    >
-      {children}
-    </button>
+    <TooltipHint label={label} side="left" hidden={disabled}>
+      <button
+        type="button"
+        aria-label={label}
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+          'flex h-7 w-7 items-center justify-center rounded-md border-2 border-transparent',
+          danger ? 'text-actionDanger' : 'text-ink',
+          'outline-none hover:border-outline hover:bg-actionPrimary/10',
+          'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+          'disabled:pointer-events-none disabled:opacity-30',
+        )}
+      >
+        {children}
+      </button>
+    </TooltipHint>
   );
 }

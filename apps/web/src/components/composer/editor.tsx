@@ -22,7 +22,15 @@
  * through the toolbar, to words.
  */
 import { isSafeHref } from '@postgear/social-core/composer';
-import { Button, cn, Input, Popover, PopoverContent, PopoverTrigger, Text } from '@postgear/ui';
+import {
+  Button,
+  cn,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  TooltipHint,
+} from '@postgear/ui';
 import { Placeholder } from '@tiptap/extensions';
 import { type Editor, EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -35,9 +43,31 @@ interface PostEditorProps {
   /** Names the field for assistive technology, e.g. "Part 2 of the shared post". */
   label: string;
   placeholder?: string;
+  /** The first part is the post itself and gets more room; replies get less. */
+  tall?: boolean;
+  /** Shown between the text and the toolbar: the part's attached media. */
+  attachments?: ReactNode;
+  /** The toolbar's leading controls, before formatting: Insert Media. */
+  toolbarStart?: ReactNode;
+  /** The toolbar's trailing end: the per-platform character counts. */
+  toolbarEnd?: ReactNode;
 }
 
-export function PostEditor({ initialContent, onChange, label, placeholder }: PostEditorProps) {
+/**
+ * Layout (UI revamp, 2026-10-19), after the reference's editor: the text
+ * first, the part's media under it, and one toolbar along the bottom with
+ * Insert Media, the formatting, and the character counts at its far end.
+ */
+export function PostEditor({
+  initialContent,
+  onChange,
+  label,
+  placeholder,
+  tall = false,
+  attachments,
+  toolbarStart,
+  toolbarEnd,
+}: PostEditorProps) {
   const editor = useEditor({
     // Rendering on the server would produce markup the client then replaces,
     // which React reports as a hydration mismatch.
@@ -76,14 +106,29 @@ export function PostEditor({ initialContent, onChange, label, placeholder }: Pos
   });
 
   return (
-    <div className="pg-editor rounded-md border-2 border-outline bg-secondary focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-focusRing">
-      <EditorToolbar editor={editor} />
+    <div
+      className={cn(
+        'pg-editor flex flex-col rounded-lg border-2 border-outline bg-field shadow-surfaceSm',
+        'focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-focusRing',
+        tall ? '[&_.ProseMirror]:min-h-48' : '[&_.ProseMirror]:min-h-20',
+      )}
+    >
       <EditorContent editor={editor} />
+      {attachments}
+      <EditorToolbar editor={editor} start={toolbarStart} end={toolbarEnd} />
     </div>
   );
 }
 
-function EditorToolbar({ editor }: { editor: Editor | null }) {
+function EditorToolbar({
+  editor,
+  start,
+  end,
+}: {
+  editor: Editor | null;
+  start?: ReactNode;
+  end?: ReactNode;
+}) {
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -100,10 +145,12 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex flex-wrap items-center gap-1 border-b-2 border-outline px-2 py-1.5"
+      className="flex flex-wrap items-center gap-1 border-t-2 border-outline px-2 py-1.5"
     >
+      {start ? <div className="me-1 flex items-center gap-1">{start}</div> : null}
       <ToolbarButton
         label="Bold"
+        hint="Bold: posts as styled Unicode letters"
         pressed={active?.bold}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -112,6 +159,7 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
       </ToolbarButton>
       <ToolbarButton
         label="Italic"
+        hint="Italic: posts as styled Unicode letters"
         pressed={active?.italic}
         disabled={!editor}
         onClick={() => editor?.chain().focus().toggleItalic().run()}
@@ -143,53 +191,56 @@ function EditorToolbar({ editor }: { editor: Editor | null }) {
         <ListOrdered className="h-4 w-4" strokeWidth={2.5} />
       </ToolbarButton>
 
-      <span className="mx-1 h-5 w-0.5 bg-outline" aria-hidden="true" />
-
       <LinkControl editor={editor} active={active?.link ?? false} />
 
-      <Text size="xs" muted className="ms-auto hidden pe-1 sm:block">
-        Bold and italic post as styled Unicode letters.
-      </Text>
+      {end ? <div className="ms-auto flex flex-wrap items-center gap-1.5 ps-2">{end}</div> : null}
     </div>
   );
 }
 
 function ToolbarButton({
   label,
+  hint,
   pressed,
   disabled,
   onClick,
   children,
 }: {
   label: string;
+  /** The hover text, when it says more than the name. */
+  hint?: string;
   pressed?: boolean;
   disabled?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      aria-pressed={pressed ?? false}
-      disabled={disabled}
-      // Keeps the selection in the editor: a mousedown on a button would
-      // otherwise blur the editor before the command runs against it.
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onClick}
-      className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
-        'outline-none hover:border-outline hover:bg-actionPrimary/10',
-        'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-        'disabled:pointer-events-none disabled:opacity-50',
-        pressed && 'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary',
-      )}
-    >
-      {children}
-    </button>
+    <TooltipHint label={hint ?? label} side="top">
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pressed ?? false}
+        disabled={disabled}
+        // Keeps the selection in the editor: a mousedown on a button would
+        // otherwise blur the editor before the command runs against it.
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onClick}
+        className={cn(TOOL, pressed && TOOL_PRESSED)}
+      >
+        {children}
+      </button>
+    </TooltipHint>
   );
 }
+
+/** A toolbar icon button, and its pressed (format on) state. */
+const TOOL = cn(
+  'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
+  'outline-none hover:border-outline hover:bg-actionPrimary/10',
+  'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+  'disabled:pointer-events-none disabled:opacity-50',
+);
+const TOOL_PRESSED = 'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary';
 
 /**
  * Adds, edits or removes a link on the selection.
@@ -250,26 +301,20 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
   return (
     <>
       <Popover open={open} onOpenChange={openWith}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-label={active ? 'Edit link' : 'Add link'}
-            title={active ? 'Edit link' : 'Add link'}
-            aria-pressed={active}
-            disabled={!editor}
-            onMouseDown={(event) => event.preventDefault()}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
-              'outline-none hover:border-outline hover:bg-actionPrimary/10',
-              'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-              'disabled:pointer-events-none disabled:opacity-50',
-              active &&
-                'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary',
-            )}
-          >
-            <Link2 className="h-4 w-4" strokeWidth={2.5} />
-          </button>
-        </PopoverTrigger>
+        <TooltipHint label={active ? 'Edit link' : 'Add link'} side="top">
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={active ? 'Edit link' : 'Add link'}
+              aria-pressed={active}
+              disabled={!editor}
+              onMouseDown={(event) => event.preventDefault()}
+              className={cn(TOOL, active && TOOL_PRESSED)}
+            >
+              <Link2 className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </PopoverTrigger>
+        </TooltipHint>
         <PopoverContent align="start" className="w-80">
           <form onSubmit={apply} className="flex flex-col gap-2">
             <label htmlFor="composer-link-url" className="font-sans text-sm font-bold text-ink">

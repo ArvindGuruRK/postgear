@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
+import { POSTS_CHANGED_EVENT } from '@/lib/post-events';
 import type { PostSummary, QueuePage } from '@/types/post';
 import { describePost } from '../posts/post-status';
 import {
@@ -107,6 +108,13 @@ export function useQueue(initial: QueuePage | null, initialParams: URLSearchPara
 
   const reset = useCallback(() => setFiltersState(DEFAULT_FILTERS), []);
   const reload = useCallback(() => setVersion((current) => current + 1), []);
+
+  // Reload at once when the composer, open as a modal over the queue, saves
+  // or deletes a post: see lib/post-events.ts.
+  useEffect(() => {
+    window.addEventListener(POSTS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(POSTS_CHANGED_EVENT, reload);
+  }, [reload]);
 
   const replacePost = useCallback((post: PostSummary) => {
     setData((current) =>

@@ -88,10 +88,10 @@ test.describe('media library', () => {
     await page.keyboard.type('Second post, same image');
     await page.getByRole('button', { name: 'Add media to Part 1' }).click();
 
-    const dialog = page.getByRole('dialog', { name: 'Add media' });
+    const dialog = page.getByRole('dialog', { name: 'Media Library' });
     await dialog.getByRole('searchbox', { name: 'Search media' }).fill(fileName);
     await dialog.getByRole('button', { name: `Select ${fileName}` }).click();
-    await dialog.getByRole('button', { name: /^Attach 1/ }).click();
+    await dialog.getByRole('button', { name: 'Add selected media' }).click();
     await expect(
       page.getByTestId('preview-linkedin').getByRole('img', { name: fileName }),
     ).toBeVisible();

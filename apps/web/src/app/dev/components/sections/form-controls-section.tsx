@@ -6,6 +6,7 @@ import {
   Combobox,
   type ComboboxOption,
   DatePicker,
+  DateTimePicker,
   DateRangePicker,
   FileUpload,
   FormErrorMessage,
@@ -51,6 +52,7 @@ export function FormControlsSection() {
   const [multiValue, setMultiValue] = useState<string[]>(['linkedin', 'tiktok']);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [dateTime, setDateTime] = useState<Date | null>(null);
 
   const multiOptions: MultiSelectOption[] = PLATFORM_OPTIONS;
 
@@ -149,6 +151,14 @@ export function FormControlsSection() {
       </Row>
       <Row label="Date Picker">
         <DatePicker value={date} onValueChange={setDate} className="w-56" />
+      </Row>
+      <Row label="Date and Time Picker">
+        <DateTimePicker
+          label="Publish at"
+          value={dateTime}
+          onValueChange={setDateTime}
+          className="w-72"
+        />
       </Row>
       <Row label="Date Range Picker">
         <DateRangePicker value={dateRange} onValueChange={setDateRange} className="w-64" />

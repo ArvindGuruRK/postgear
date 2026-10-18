@@ -88,14 +88,14 @@ test.describe('calendar', () => {
     // stepping, so step until the queued one is in view.
     const tomorrow = page.getByTestId('post-card').filter({ hasText: /open the doors/ });
     if (!(await tomorrow.first().isVisible())) {
-      await page.getByRole('button', { name: 'Next week' }).click();
+      await page.getByRole('button', { name: 'Next week', exact: true }).click();
     }
     await expect(tomorrow.first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Month view' }).click();
+    await page.getByRole('button', { name: 'Month view', exact: true }).click();
     await expect(page.getByTestId('month-view')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Day view' }).click();
+    await page.getByRole('button', { name: 'Day view', exact: true }).click();
     await expect(page.getByTestId('day-view')).toBeVisible();
     await expect(page.getByTestId('calendar-range')).toContainText(/\d{4}/);
   });
@@ -204,12 +204,18 @@ test.describe('calendar', () => {
     await slot.getByRole('button', { name: /^New post/ }).click();
 
     // Generous: the first visit compiles the composer route under `next dev`.
+    // A click from the calendar opens the composer as a modal over it.
     await expect(page).toHaveURL(/\/composer\?at=/, { timeout: 30_000 });
-    await expect(page.getByRole('heading', { level: 1, name: 'Composer' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Create Post' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('week-view')).toBeVisible();
     const expected = new Date(day);
     expected.setHours(14, 0, 0, 0);
     const pad = (value: number) => String(value).padStart(2, '0');
-    await expect(page.getByLabel('Publish at')).toHaveValue(
+    // The composer's date and time picker carries its exact local value.
+    await expect(page.locator('#composer-publish-at')).toHaveAttribute(
+      'data-value',
       `${expected.getFullYear()}-${pad(expected.getMonth() + 1)}-${pad(expected.getDate())}T14:00`,
     );
   });

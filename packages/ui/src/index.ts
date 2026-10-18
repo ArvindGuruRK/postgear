@@ -25,6 +25,7 @@ export * from './components/countdown';
 export * from './components/data-table';
 export * from './components/date-picker';
 export * from './components/date-range-picker';
+export * from './components/date-time-picker';
 export * from './components/dialog';
 export * from './components/dropdown-menu';
 export * from './components/file-upload';

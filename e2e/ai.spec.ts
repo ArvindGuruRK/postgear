@@ -104,7 +104,9 @@ test.describe('ai studio', () => {
 
     // The draft opens with the generated text as part 1, for the channel chosen.
     // Edit mode: only an existing post offers a fresh "New post" link.
-    await expect(page.getByRole('main').getByRole('link', { name: 'New post' })).toBeVisible();
+    await expect(
+      page.getByRole('dialog', { name: 'Edit Post' }).getByRole('link', { name: 'New post' }),
+    ).toBeVisible();
     const firstLine = text.split('\n')[0].slice(0, 40);
     await expect(page.getByRole('textbox', { name: 'Part 1 of the shared post' })).toContainText(
       firstLine,

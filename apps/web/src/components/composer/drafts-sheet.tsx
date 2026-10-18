@@ -35,11 +35,17 @@ export function DraftsSheet({
   open,
   onOpenChange,
   currentGroup,
+  onNavigate,
 }: {
   orgId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentGroup: string | null;
+  /**
+   * Opens a saved post. The composer passes this so its own links stay in
+   * the composer (see `navigateTo` in composer.tsx); without it, a plain link.
+   */
+  onNavigate?: (href: string) => void;
 }) {
   const [posts, setPosts] = useState<PostSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +110,7 @@ export function DraftsSheet({
               orgId={orgId}
               currentGroup={currentGroup}
               onOpen={() => onOpenChange(false)}
+              onNavigate={onNavigate}
             />
             <PostList
               title="Queued"
@@ -111,6 +118,7 @@ export function DraftsSheet({
               orgId={orgId}
               currentGroup={currentGroup}
               onOpen={() => onOpenChange(false)}
+              onNavigate={onNavigate}
             />
           </>
         )}
@@ -125,12 +133,14 @@ function PostList({
   orgId,
   currentGroup,
   onOpen,
+  onNavigate,
 }: {
   title: string;
   posts: PostSummary[];
   orgId: string;
   currentGroup: string | null;
   onOpen: () => void;
+  onNavigate?: (href: string) => void;
 }) {
   if (posts.length === 0) {
     return null;
@@ -146,7 +156,13 @@ function PostList({
           <li key={post.group}>
             <Link
               href={`/${orgId}/composer?group=${post.group}`}
-              onClick={onOpen}
+              onClick={(event) => {
+                onOpen();
+                if (onNavigate) {
+                  event.preventDefault();
+                  onNavigate(`/${orgId}/composer?group=${post.group}`);
+                }
+              }}
               aria-current={post.group === currentGroup ? 'page' : undefined}
               className="flex flex-col gap-1 rounded-md border-2 border-outline bg-secondary p-3 text-ink shadow-surfaceSm outline-none hover:bg-actionPrimary/10 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing aria-[current=page]:bg-actionPrimary/10"
             >
@@ -185,7 +201,7 @@ function PostList({
 /** The button that opens the sheet, kept beside it so the two never drift. */
 export function DraftsButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="secondary" onClick={onClick}>
+    <Button variant="secondary" size="sm" onClick={onClick}>
       <FileText className="h-4 w-4" strokeWidth={2.5} />
       Saved posts
     </Button>

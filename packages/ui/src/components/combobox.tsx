@@ -45,6 +45,9 @@ export function Combobox({
 
   return (
     <Popover
+      // Modal so its list scrolls by wheel and touch inside a Dialog: see
+      // the note on `modal` in date-time-picker.tsx.
+      modal
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -83,7 +86,9 @@ export function Combobox({
         />
         <div className="max-h-56 overflow-y-auto pg-scrollbar pg-scrollbar-secondary">
           {filtered.length === 0 && (
-            <p className="px-2 py-4 text-center font-sans text-sm text-ink opacity-60">{emptyText}</p>
+            <p className="px-2 py-4 text-center font-sans text-sm text-ink opacity-60">
+              {emptyText}
+            </p>
           )}
           {filtered.map((option) => (
             <button
@@ -103,7 +108,10 @@ export function Combobox({
               )}
             >
               <Check
-                className={cn('h-4 w-4 shrink-0', option.value === value ? 'opacity-100' : 'opacity-0')}
+                className={cn(
+                  'h-4 w-4 shrink-0',
+                  option.value === value ? 'opacity-100' : 'opacity-0',
+                )}
                 strokeWidth={3}
               />
               {option.label}

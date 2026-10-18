@@ -28,7 +28,7 @@ import type { Organization } from '@/types/workspace';
  * `params` is a Promise in App Router; `LayoutProps<'/[orgId]'>` is the type
  * Next generates and validates every layout against.
  */
-export default async function OrgLayout({ children, params }: LayoutProps<'/[orgId]'>) {
+export default async function OrgLayout({ children, modal, params }: LayoutProps<'/[orgId]'>) {
   const { orgId } = await params;
   const session = await getSession();
 
@@ -72,6 +72,9 @@ export default async function OrgLayout({ children, params }: LayoutProps<'/[org
       {/* Brings this browser's appearance cookie in line with the account: see AppearanceSync. */}
       <AppearanceSync stored={session.appearance} />
       <DashboardShell orgId={orgId}>{children}</DashboardShell>
+      {/* The @modal slot: the composer opened over this page, or nothing.
+          See @modal/(.)composer/page.tsx. */}
+      {modal}
     </WorkspaceProvider>
   );
 }

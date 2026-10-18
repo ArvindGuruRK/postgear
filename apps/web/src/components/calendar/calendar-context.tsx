@@ -23,6 +23,7 @@ import {
   useState,
 } from 'react';
 import { ApiError, api } from '@/lib/api';
+import { POSTS_CHANGED_EVENT } from '@/lib/post-events';
 import type { Channel } from '@/types/channel';
 import type { PostSummary } from '@/types/post';
 import { describePost } from '../posts/post-status';
@@ -99,8 +100,13 @@ export function CalendarProvider({
   const range = useMemo(() => visibleRange(view, anchor), [view, anchor]);
 
   // Keep the URL in step without a navigation: a navigation would remount
-  // the page and lose the loaded posts.
+  // the page and lose the loaded posts. Only on the calendar's own URL: the
+  // calendar also sits beneath the composer modal on `/composer`, whose query
+  // (`?group=`, `?at=`) is the composer's, not ours.
   useEffect(() => {
+    if (!window.location.pathname.endsWith('/calendar')) {
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     params.set('view', view);
     params.set('date', dayKey(anchor));
@@ -142,6 +148,14 @@ export function CalendarProvider({
         }
       });
   }, [range, version]);
+
+  // Reload at once when the composer, open as a modal over the calendar,
+  // saves or deletes a post: see lib/post-events.ts.
+  useEffect(() => {
+    const reload = () => setVersion((current) => current + 1);
+    window.addEventListener(POSTS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(POSTS_CHANGED_EVENT, reload);
+  }, []);
 
   // Refresh while the worker is expected to change something in view.
   const live = useMemo(

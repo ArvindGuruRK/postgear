@@ -10,7 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { NotificationBell } from '../notifications/notification-bell';
 import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
@@ -48,7 +48,6 @@ const TITLES: Record<string, string> = {
   analytics: 'Analytics',
   media: 'Media',
   'seo-analyzer': 'SEO Analyzer',
-  composer: 'Composer',
   channels: 'Channels',
   settings: 'Settings',
 };
@@ -60,9 +59,20 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
   const pathname = usePathname();
   const base = `/${orgId}`;
   // `/acme/settings/billing` → `settings`; the org's own root → ''.
-  const segment = pathname.startsWith(`${base}/`)
+  const urlSegment = pathname.startsWith(`${base}/`)
     ? (pathname.slice(base.length + 1).split('/')[0] ?? '')
     : '';
+  // The composer is a modal, not a page, so the shell follows the page beneath
+  // it. Opened in-app, that is whatever page the URL showed before; loaded
+  // directly, it is the calendar (`[orgId]/composer/page.tsx`). Adjusting
+  // state while rendering is React's pattern for "remember the last value".
+  const [pageSegment, setPageSegment] = useState(
+    urlSegment === 'composer' ? 'calendar' : urlSegment,
+  );
+  if (urlSegment !== 'composer' && urlSegment !== pageSegment) {
+    setPageSegment(urlSegment);
+  }
+  const segment = pageSegment;
 
   const navItems: SidebarItem[] = RAIL.map((item) => ({
     label: item.label,

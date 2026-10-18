@@ -52,7 +52,9 @@ export function MultiSelect({
   const selectedOptions = options.filter((option) => value.includes(option.value));
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // Modal so its list scrolls by wheel and touch inside a Dialog: see the
+    // note on `modal` in date-time-picker.tsx.
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div
           role="combobox"
@@ -111,7 +113,9 @@ export function MultiSelect({
         />
         <div className="max-h-56 overflow-y-auto pg-scrollbar pg-scrollbar-secondary">
           {filtered.length === 0 && (
-            <p className="px-2 py-4 text-center font-sans text-sm text-ink opacity-60">{emptyText}</p>
+            <p className="px-2 py-4 text-center font-sans text-sm text-ink opacity-60">
+              {emptyText}
+            </p>
           )}
           {filtered.map((option) => {
             const isSelected = value.includes(option.value);
