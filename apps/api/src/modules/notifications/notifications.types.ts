@@ -125,7 +125,7 @@ export function readMeta(meta: unknown): NotificationMeta {
 const PROVIDER_NAMES: Record<string, string> = {
   linkedin: 'LinkedIn',
   'linkedin-page': 'LinkedIn',
-  x: 'X',
+  x: 'Twitter / X',
   facebook: 'Facebook',
   instagram: 'Instagram',
   threads: 'Threads',

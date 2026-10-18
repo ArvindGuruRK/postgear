@@ -99,11 +99,12 @@ export const REFERRAL_QUESTION: Question = {
  * owns the real channel registry; this list only has to survive until then,
  * which is why it lives here rather than being fetched.
  */
+// Most used first (2026-10-18), the same order as the Connect a channel picker.
 export const CHANNEL_OPTIONS: QuestionOption[] = [
-  { value: 'x', label: 'X' },
-  { value: 'linkedin', label: 'LinkedIn' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'facebook', label: 'Facebook' },
+  { value: 'x', label: 'Twitter / X' },
+  { value: 'linkedin', label: 'LinkedIn' },
   { value: 'youtube', label: 'YouTube' },
   { value: 'tiktok', label: 'TikTok' },
 ];

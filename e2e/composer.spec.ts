@@ -214,7 +214,7 @@ test.describe('composer', () => {
     await page.getByRole('button', { name: 'Add to queue' }).click();
 
     const alert = page.getByRole('alert').filter({ hasText: 'Not ready for the queue yet' });
-    await expect(alert).toContainText('Acme on X: X allows 280 characters; this post has 290.');
+    await expect(alert).toContainText('Acme on X: Twitter / X allows 280 characters; this post has 290.');
     await expect(alert).toContainText(
       'Acme Studio: Instagram posts must include at least one image or video.',
     );

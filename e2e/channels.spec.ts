@@ -78,8 +78,18 @@ test.describe('channels page', () => {
     // the point is that they are still *listed*: hiding them would read as
     // "PostGear does not support this platform" rather than "this deployment
     // has no key for it".
-    await expect(page.getByText('Not set up on this instance')).toBeVisible();
     await expect(page.getByRole('button', { name: /LinkedIn/ }).first()).toBeVisible();
+    // LinkedIn profile and LinkedIn Page are two separate options (a merged
+    // tile was tried and reverted 2026-10-18, product decision).
+    await expect(page.getByRole('dialog').getByRole('button', { name: /LinkedIn/ })).toHaveCount(2);
+    // Which platforms are configured depends on the machine's .env, so pick
+    // whichever one is not. Listed but unavailable: aria-disabled (still
+    // focusable), with the reason in a tooltip on the tile.
+    const unconfigured = page.locator('[data-unconfigured="true"]').first();
+    await expect(unconfigured).toBeVisible();
+    await expect(unconfigured).toHaveAttribute('aria-disabled', 'true');
+    await unconfigured.hover();
+    await expect(page.getByRole('tooltip')).toContainText('needs API keys');
   });
 
   test('disconnecting asks for confirmation and says what it will affect', async ({ page }) => {

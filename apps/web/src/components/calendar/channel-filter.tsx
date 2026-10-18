@@ -61,13 +61,11 @@ export function ChannelFilter() {
               ) : null}
             </span>
             <span className="max-w-[9rem] truncate">{channel.name}</span>
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-field">
-              <PlatformIcon
-                platform={channel.providerIdentifier}
-                title={channel.providerName}
-                className="h-3 w-3"
-              />
-            </span>
+            <PlatformIcon
+              platform={channel.providerIdentifier}
+              title={channel.providerName}
+              className="h-4 w-4"
+            />
           </button>
         );
       })}

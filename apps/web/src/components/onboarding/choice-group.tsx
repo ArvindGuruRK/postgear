@@ -126,10 +126,7 @@ export function MultiChoiceGroup({
                 onChange={() => onToggle(option.value)}
                 className="sr-only"
               />
-              {/* White disc so the brand colour still reads on a selected tile. */}
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-field">
-                <PlatformIcon platform={option.value} />
-              </span>
+              <PlatformIcon platform={option.value} className="h-6 w-6" />
               {option.label}
             </label>
           );

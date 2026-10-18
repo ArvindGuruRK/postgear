@@ -344,13 +344,11 @@ export function Composer({
                 <TabsTrigger value={SHARED}>All channels</TabsTrigger>
                 {selectedChannels.map((channel) => (
                   <TabsTrigger key={channel.id} value={channel.id} className="gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-field">
-                      <PlatformIcon
-                        platform={channel.providerIdentifier}
-                        title={channel.providerName}
-                        className="h-3.5 w-3.5"
-                      />
-                    </span>
+                    <PlatformIcon
+                      platform={channel.providerIdentifier}
+                      title={channel.providerName}
+                      className="h-5 w-5"
+                    />
                     {channel.name}
                     {isCustomized(state, channel.id) ? (
                       <span className="rounded-full bg-actionSecondary px-1.5 font-sans text-[10px] font-bold normal-case text-onActionLight">

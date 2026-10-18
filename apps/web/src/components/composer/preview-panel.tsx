@@ -84,13 +84,11 @@ export function PreviewPanel({
                     <span className="max-w-[9rem] truncate" title={report.channel.providerName}>
                       {report.channel.name}
                     </span>
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-field">
-                      <PlatformIcon
-                        platform={report.channel.providerIdentifier}
-                        title={report.channel.providerName}
-                        className="h-3.5 w-3.5"
-                      />
-                    </span>
+                    <PlatformIcon
+                      platform={report.channel.providerIdentifier}
+                      title={report.channel.providerName}
+                      className="h-5 w-5"
+                    />
                     {problems > 0 ? (
                       <>
                         <span

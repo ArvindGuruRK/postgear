@@ -125,7 +125,10 @@ const MAX_TIMELINE_PAGES = 5;
 
 export class XProvider extends SocialAbstract implements SocialProvider, SocialAnalytics {
   readonly identifier = 'x';
-  readonly name = 'X';
+  // Shown as "Twitter / X" (2026-10-18): plenty of people still look for
+  // Twitter, so the old name stays alongside the new one wherever a person
+  // reads it. The identifier stays `x`.
+  readonly name = 'Twitter / X';
   readonly usesPkce = true;
 
   readonly scopes = [

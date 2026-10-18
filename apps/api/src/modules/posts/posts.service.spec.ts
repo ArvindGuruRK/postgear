@@ -279,7 +279,7 @@ describe('PostsService', () => {
       );
 
       await expect(promise).rejects.toThrow(
-        'Acme on X: X allows 280 characters; this post has 281.',
+        'Acme on X: Twitter / X allows 280 characters; this post has 281.',
       );
       expect(repository.createGroup).not.toHaveBeenCalled();
     });

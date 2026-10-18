@@ -45,7 +45,7 @@ export function OAuthButtons() {
             window.location.href = oauthStartUrl('facebook');
           }}
         >
-          <PlatformIcon platform="facebook" className="h-5 w-5" />
+          <PlatformIcon platform="facebook-signin" className="h-5 w-5" />
           Facebook
         </Button>
       </Stack>

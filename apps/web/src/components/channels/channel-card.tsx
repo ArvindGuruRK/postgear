@@ -64,11 +64,11 @@ export function ChannelCard({
           {/* The platform, as a logo sticker on the account's own avatar. It
               carries the platform's name for screen readers, since the line
               under the name shows the handle rather than the platform. */}
-          <span className="absolute -bottom-1 -end-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-outline bg-field">
+          <span className="absolute -bottom-1.5 -end-1.5 rounded-md bg-secondary p-0.5">
             <PlatformIcon
               platform={channel.providerIdentifier}
               title={channel.providerName}
-              className="h-3.5 w-3.5"
+              className="h-5 w-5"
             />
           </span>
         </div>
