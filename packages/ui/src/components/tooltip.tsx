@@ -89,6 +89,20 @@ export interface TooltipHintProps {
   hidden?: boolean;
   /** Layout for the disabled wrapper, e.g. `flex-1` when the control fills a row. */
   triggerClassName?: string;
+  /**
+   * Gap between the trigger and the tooltip, in px (default 6). Raise it to
+   * clear a control that sits right beside the trigger, so the tooltip opens
+   * past it rather than on top of it.
+   */
+  sideOffset?: number;
+  /**
+   * Whether the tooltip stays open while the pointer travels onto it (Radix's
+   * default, and what WCAG 1.4.13 asks for). Set false only where the trigger
+   * sits flush against another control: there the open tooltip would hold on
+   * while the pointer moves to its neighbour, covering it or showing the
+   * wrong name, so it closes the moment the pointer leaves the trigger.
+   */
+  hoverable?: boolean;
   /** One element, typically an icon button that carries its own aria-label. */
   children: ReactElement;
 }
@@ -109,6 +123,8 @@ export function TooltipHint({
   disabled = false,
   hidden = false,
   triggerClassName,
+  sideOffset,
+  hoverable = true,
   children,
 }: TooltipHintProps) {
   if (hidden) {
@@ -136,9 +152,9 @@ export function TooltipHint({
   );
 
   return (
-    <Tooltip>
+    <Tooltip disableHoverableContent={!hoverable}>
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-      <TooltipContent side={side} align={align}>
+      <TooltipContent side={side} align={align} sideOffset={sideOffset}>
         <span>{label}</span>
         {shortcut}
       </TooltipContent>

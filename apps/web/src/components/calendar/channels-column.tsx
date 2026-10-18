@@ -71,6 +71,16 @@ const TILE = cn(
   FOCUS,
 );
 
+/** TooltipContent's default gap from its trigger, in px. */
+const TOOLTIP_GAP = 6;
+
+/**
+ * What a channel row's tooltip must clear to open past the row's ⋮ button:
+ * the button (w-6, 24px) plus the row's gap-1 (4px). Kept in step with those
+ * two classes below.
+ */
+const ROW_MENU_CLEARANCE = 28;
+
 /** The red "!" on a channel that cannot publish. */
 const BADGE = cn(
   'absolute start-0 -top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline',
@@ -166,10 +176,7 @@ export function ChannelsColumn({
           {collapsed ? null : (
             <h2 className="min-w-0 flex-1 truncate type-heading text-xl text-ink">Channels</h2>
           )}
-          <TooltipHint
-            label={collapsed ? 'Expand channels' : 'Collapse channels'}
-            side={collapsed ? 'right' : 'bottom'}
-          >
+          <TooltipHint label={collapsed ? 'Expand channels' : 'Collapse channels'} side="right">
             <button
               type="button"
               onClick={toggleCollapsed}
@@ -193,7 +200,7 @@ export function ChannelsColumn({
             {canManage ? (
               <TooltipHint
                 label={atLimit ? 'This plan’s channel limit is reached' : 'Add Channel'}
-                side={collapsed ? 'right' : 'bottom'}
+                side="right"
                 disabled={atLimit}
                 // Expanded, the button says "Add Channel" itself; only the
                 // limit reason is worth a hover.
@@ -215,7 +222,6 @@ export function ChannelsColumn({
             <ColumnLink
               href={`/${orgId}/channels`}
               label="Manage channels"
-              side={collapsed ? 'right' : 'bottom'}
               className={cn(TILE, 'w-11 bg-secondary text-ink')}
             >
               <Settings2 className="h-4 w-4" strokeWidth={2.5} />
@@ -227,7 +233,6 @@ export function ChannelsColumn({
               <ColumnLink
                 href={`/${orgId}/composer`}
                 label="Create Post"
-                side={collapsed ? 'right' : 'bottom'}
                 // Expanded, the label is on the button already.
                 tooltip={collapsed}
                 className={cn(
@@ -242,7 +247,6 @@ export function ChannelsColumn({
               <ColumnLink
                 href={`/${orgId}/ai-copilot`}
                 label="Generate with AI"
-                side={collapsed ? 'right' : 'bottom'}
                 className={cn(TILE, 'w-11 bg-actionAi text-onActionAi')}
               >
                 <Sparkles className="h-4 w-4" strokeWidth={2.5} />
@@ -311,6 +315,13 @@ export function ChannelsColumn({
                             : `Show only ${channel.name}'s posts`
                       }
                       side="right"
+                      // Opens past the row's ⋮ button, not on top of it, and
+                      // closes as the pointer leaves, so moving onto the ⋮
+                      // shows its own name instead of this one lingering.
+                      sideOffset={
+                        canManage && !collapsed ? TOOLTIP_GAP + ROW_MENU_CLEARANCE : undefined
+                      }
+                      hoverable={false}
                     >
                       <button
                         type="button"
@@ -347,7 +358,11 @@ export function ChannelsColumn({
                             ? `${health.explanation ?? health.label} Click to fix.`
                             : (health.explanation ?? health.label)
                         }
-                        side="right"
+                        // Above the badge: to its right it covered the
+                        // channel's name, the next thing the pointer reaches.
+                        side="top"
+                        align="start"
+                        hoverable={false}
                       >
                         {canManage ? (
                           <button
@@ -447,21 +462,19 @@ export function ChannelsColumn({
 function ColumnLink({
   href,
   label,
-  side,
   tooltip = true,
   className,
   children,
 }: {
   href: string;
   label: string;
-  side: 'right' | 'bottom';
   /** Off when the label is already written on the button. */
   tooltip?: boolean;
   className: string;
   children: ReactNode;
 }) {
   return (
-    <TooltipHint label={label} side={side} hidden={!tooltip}>
+    <TooltipHint label={label} side="right" hidden={!tooltip}>
       <Link href={href} aria-label={label} className={className}>
         {children}
       </Link>
