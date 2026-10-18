@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * The calendar: month, week and day views of every scheduled post, with
- * drag-to-reschedule.
+ * The calendar page's body (UI revamp, 2026-10-18), laid out as the
+ * reference's: the channel card on the left, and beside it the toolbar over
+ * the day, week or month grid, open on the page ground.
  *
  * ## What a drop does
  *
@@ -32,34 +33,27 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import {
-  Alert,
-  Button,
-  buttonVariants,
-  EmptyState,
-  ErrorState,
-  PageActions,
-  Skeleton,
-  Stack,
-  useToast,
-} from '@postgear/ui';
-import { CalendarDays, Plus } from 'lucide-react';
-import Link from 'next/link';
+import { ErrorState, Skeleton, useToast } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
+import type { ChannelLimit, ProviderSummary } from '@/types/channel';
 import type { PostSummary } from '@/types/post';
+import { PostAnalyticsDialog } from '../analytics/post-analytics-dialog';
 import { DeletePostDialog } from '../posts/delete-post-dialog';
 import { PostDetailDialog } from '../posts/post-detail-dialog';
 import { RescheduleDialog } from '../posts/reschedule-dialog';
 import { useMounted } from '../posts/use-mounted';
 import { usePostActions } from '../posts/use-post-actions';
 import { useCalendar } from './calendar-context';
+import type { CalendarHandlers } from './calendar-handlers';
 import { composerTimeFor, droppedAt, isPastSlot } from './calendar-math';
 import type { SlotTarget } from './calendar-slot';
 import { CalendarToolbar } from './calendar-toolbar';
+import { ChannelsColumn } from './channels-column';
+import { DayView } from './day-view';
 import { MonthView } from './month-view';
 import { PostCard } from './post-card';
-import { TimeGridView } from './time-grid-view';
+import { WeekView } from './week-view';
 
 /** Summarises a detail response back into the shape the calendar lists. */
 export function toSummary(
@@ -92,7 +86,13 @@ export function toSummary(
   };
 }
 
-export function CalendarView() {
+export function CalendarView({
+  providers,
+  limit,
+}: {
+  providers: ProviderSummary[];
+  limit: ChannelLimit | null;
+}) {
   const calendar = useCalendar();
   const router = useRouter();
   const { toast } = useToast();
@@ -104,6 +104,7 @@ export function CalendarView() {
   const [open, setOpen] = useState<PostSummary | null>(null);
   const [rescheduling, setRescheduling] = useState<PostSummary | null>(null);
   const [deleting, setDeleting] = useState<PostSummary | null>(null);
+  const [statistics, setStatistics] = useState<string | null>(null);
 
   const sensors = useSensors(
     // A few pixels of travel, so a click on the grip is not read as a drag.
@@ -167,11 +168,6 @@ export function CalendarView() {
     }
   }
 
-  function createAt(target: SlotTarget) {
-    const at = composerTimeFor(target, new Date());
-    router.push(`/${calendar.orgId}/composer?at=${encodeURIComponent(at.toISOString())}`);
-  }
-
   async function publishNow(post: PostSummary) {
     const detail = await actions.publishNow(post.group);
     if (detail) {
@@ -204,108 +200,110 @@ export function CalendarView() {
     }
   }
 
+  const { orgId, goTo } = calendar;
+  const handlers = useMemo<CalendarHandlers>(
+    () => ({
+      editHref: (post) => `/${orgId}/composer?group=${post.group}`,
+      onPreview: setOpen,
+      onStatistics: (post) => setStatistics(post.group),
+      onDelete: setDeleting,
+      onCreate: (target) => {
+        const at = composerTimeFor(target, new Date());
+        router.push(`/${orgId}/composer?at=${encodeURIComponent(at.toISOString())}`);
+      },
+      onShowDay: (day) => goTo(day, 'day'),
+    }),
+    [orgId, goTo, router],
+  );
+
+  // The day view's rows come from the channels in view that can post.
+  const dayChannels = calendar.channels.filter(
+    (channel) =>
+      !channel.disabled &&
+      (calendar.channelFilter.length === 0 || calendar.channelFilter.includes(channel.id)),
+  );
+
   const busy = actions.busy !== null;
-  const empty = mounted && !calendar.loading && !calendar.error && calendar.posts.length === 0;
 
   return (
-    <Stack gap="lg">
-      <PageActions>
-        <Link
-          href={`/${calendar.orgId}/composer`}
-          className={buttonVariants({ variant: 'primary' })}
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          New post
-        </Link>
-      </PageActions>
+    <>
+      <div className="flex min-w-0 flex-1 gap-5">
+        <ChannelsColumn providers={providers} limit={limit} />
 
-      {/* Everything below formats dates in the viewer's locale and time zone,
-          which the server does not share, so the server renders a skeleton
-          and the browser draws the real thing on mount (see useMounted). */}
-      {!mounted ? (
-        <Stack gap="md" aria-busy="true" aria-label="Loading calendar">
-          <Skeleton className="h-16" />
-          <Skeleton className="h-[28rem]" />
-        </Stack>
-      ) : (
-        <CalendarToolbar />
-      )}
-
-      {!mounted ? null : calendar.error ? (
-        <ErrorState
-          title="The calendar didn't load"
-          description={calendar.error}
-          action={{ label: 'Try again', onClick: calendar.reload }}
-        />
-      ) : (
-        <DndContext
-          id={dndId}
-          sensors={sensors}
-          collisionDetection={(args) => {
-            // The pointer's own slot first; the nearest overlapping one for keyboard drags.
-            const within = pointerWithin(args);
-            return within.length > 0 ? within : rectIntersection(args);
-          }}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onDragCancel={() => setDragging(null)}
+        <section
+          aria-label="Calendar"
+          aria-busy={calendar.loading}
+          className="flex min-w-0 flex-1 flex-col gap-3"
         >
-          {calendar.view === 'month' ? (
-            <MonthView
-              anchor={calendar.anchor}
-              posts={calendar.posts}
-              now={calendar.now}
-              onOpen={setOpen}
-              onCreate={createAt}
-              onShowDay={(day) => calendar.goTo(day, 'day')}
-            />
+          {/* Everything below formats dates in the viewer's locale and time
+              zone, which the server does not share, so the server renders a
+              skeleton and the browser draws the real thing on mount. */}
+          {!mounted ? (
+            <div className="flex flex-1 flex-col gap-3" role="status" aria-label="Loading calendar">
+              <Skeleton className="h-10" />
+              <Skeleton className="flex-1" />
+            </div>
           ) : (
-            <TimeGridView
-              view={calendar.view}
-              anchor={calendar.anchor}
-              posts={calendar.posts}
-              now={calendar.now}
-              onOpen={setOpen}
-              onCreate={createAt}
-              onShowDay={(day) => calendar.goTo(day, 'day')}
-            />
+            <>
+              <CalendarToolbar />
+              {calendar.error ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <ErrorState
+                    title="The calendar didn't load"
+                    description={calendar.error}
+                    action={{ label: 'Try again', onClick: calendar.reload }}
+                  />
+                </div>
+              ) : (
+                <DndContext
+                  id={dndId}
+                  sensors={sensors}
+                  collisionDetection={(args) => {
+                    // The pointer's own slot first; the nearest overlapping one for keyboard drags.
+                    const within = pointerWithin(args);
+                    return within.length > 0 ? within : rectIntersection(args);
+                  }}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  onDragCancel={() => setDragging(null)}
+                >
+                  {calendar.view === 'month' ? (
+                    <MonthView
+                      anchor={calendar.anchor}
+                      posts={calendar.posts}
+                      now={calendar.now}
+                      handlers={handlers}
+                    />
+                  ) : calendar.view === 'week' ? (
+                    <WeekView
+                      anchor={calendar.anchor}
+                      posts={calendar.posts}
+                      now={calendar.now}
+                      handlers={handlers}
+                    />
+                  ) : (
+                    <DayView
+                      anchor={calendar.anchor}
+                      posts={calendar.posts}
+                      channels={dayChannels}
+                      now={calendar.now}
+                      handlers={handlers}
+                    />
+                  )}
+
+                  <DragOverlay dropAnimation={null}>
+                    {dragging ? (
+                      <div className="w-56 rotate-[-1deg]">
+                        <PostCard post={dragging} now={calendar.now} overlay />
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              )}
+            </>
           )}
-
-          <DragOverlay dropAnimation={null}>
-            {dragging ? (
-              <div className="w-56 rotate-[-1deg]">
-                <PostCard post={dragging} now={calendar.now} overlay />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      )}
-
-      {empty ? (
-        calendar.allPosts.length > 0 ? (
-          <Alert>
-            No posts for the selected channels in this {calendar.view}.{' '}
-            <Button
-              variant="secondary"
-              size="sm"
-              className="ms-2"
-              onClick={calendar.clearChannelFilter}
-            >
-              Show all channels
-            </Button>
-          </Alert>
-        ) : (
-          <EmptyState
-            icon={CalendarDays}
-            title={`Nothing scheduled this ${calendar.view}`}
-            description="Click a slot above, or open the composer, and the post appears here at its time."
-            action={{
-              label: 'Write a post',
-              onClick: () => router.push(`/${calendar.orgId}/composer`),
-            }}
-          />
-        )
-      ) : null}
+        </section>
+      </div>
 
       <PostDetailDialog
         orgId={calendar.orgId}
@@ -332,6 +330,12 @@ export function CalendarView() {
         onOpenChange={(isOpen) => !isOpen && setDeleting(null)}
         onConfirm={() => void remove()}
       />
-    </Stack>
+
+      <PostAnalyticsDialog
+        group={statistics}
+        now={calendar.now}
+        onOpenChange={(isOpen) => !isOpen && setStatistics(null)}
+      />
+    </>
   );
 }

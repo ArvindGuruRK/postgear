@@ -4,6 +4,7 @@ import * as ToastPrimitive from '@radix-ui/react-toast';
 import { type VariantProps, cva } from 'class-variance-authority';
 import { X } from 'lucide-react';
 import { forwardRef } from 'react';
+import { pressSm } from '../lib/press';
 import { cn } from '../lib/utils';
 
 export const ToastProvider = ToastPrimitive.Provider;
@@ -67,11 +68,7 @@ export const ToastTitle = forwardRef<
   React.ElementRef<typeof ToastPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <ToastPrimitive.Title
-    ref={ref}
-    className={cn('type-heading text-base', className)}
-    {...props}
-  />
+  <ToastPrimitive.Title ref={ref} className={cn('type-heading text-base', className)} {...props} />
 ));
 ToastTitle.displayName = ToastPrimitive.Title.displayName;
 
@@ -90,10 +87,9 @@ export const ToastAction = forwardRef<
   <ToastPrimitive.Action
     ref={ref}
     className={cn(
-      'shrink-0 rounded-md border-2 border-outline bg-secondary px-3 py-1.5 shadow-brutalSm',
-      'type-ui text-xs text-ink transition-[transform,box-shadow] duration-100',
-      'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
-      'active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutalPressed',
+      'shrink-0 rounded-md border-2 border-outline bg-secondary px-3 py-1.5',
+      'type-ui text-xs text-ink',
+      pressSm,
       'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
       className,
     )}

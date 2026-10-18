@@ -163,14 +163,21 @@ export function CalendarProvider({
     return () => clearInterval(timer);
   }, [live]);
 
+  // Only ids that are still channels: one disconnected from the channel card
+  // while selected would otherwise filter the calendar down to nothing.
+  const activeFilter = useMemo(
+    () => channelFilter.filter((id) => channels.some((channel) => channel.id === id)),
+    [channelFilter, channels],
+  );
+
   const posts = useMemo(
     () =>
-      channelFilter.length === 0
+      activeFilter.length === 0
         ? allPosts
         : allPosts.filter((post) =>
-            post.channels.some((channel) => channelFilter.includes(channel.channelId)),
+            post.channels.some((channel) => activeFilter.includes(channel.channelId)),
           ),
-    [allPosts, channelFilter],
+    [allPosts, activeFilter],
   );
 
   const value = useMemo<CalendarContextValue>(
@@ -184,7 +191,7 @@ export function CalendarProvider({
       allPosts,
       loading,
       error,
-      channelFilter,
+      channelFilter: activeFilter,
       setView: (next) => setViewState(next),
       goTo: (next, nextView) => {
         setAnchor(startOfDay(next));
@@ -218,7 +225,7 @@ export function CalendarProvider({
       removePostLocally: (group) =>
         setAllPosts((current) => current.filter((post) => post.group !== group)),
     }),
-    [orgId, view, anchor, now, channels, posts, allPosts, loading, error, channelFilter],
+    [orgId, view, anchor, now, channels, posts, allPosts, loading, error, activeFilter],
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

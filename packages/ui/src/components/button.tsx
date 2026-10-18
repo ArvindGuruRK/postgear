@@ -1,5 +1,6 @@
 import { type VariantProps, cva } from 'class-variance-authority';
 import { forwardRef } from 'react';
+import { pressMd } from '../lib/press';
 import { cn } from '../lib/utils';
 
 /**
@@ -12,11 +13,10 @@ export const buttonVariants = cva(
   [
     'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap',
     'rounded-md border-2 border-outline type-ui',
-    'shadow-brutalMd transition-[transform,box-shadow] duration-100',
-    'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
-    'active:translate-x-[2px] active:translate-y-[2px] active:shadow-brutalPressed',
+    // Sinks into its shadow on hover and press: see lib/press.ts.
+    pressMd,
     'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-    'disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
+    'disabled:opacity-50',
   ],
   {
     variants: {

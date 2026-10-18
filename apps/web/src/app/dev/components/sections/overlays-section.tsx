@@ -30,6 +30,8 @@ import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
+  Kbd,
+  KbdGroup,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -43,10 +45,10 @@ import {
   SheetTrigger,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
+  TooltipHint,
   TooltipTrigger,
 } from '@postgear/ui';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, Sparkles } from 'lucide-react';
 import { Row, Section } from '../shared';
 
 export function OverlaysSection() {
@@ -64,8 +66,8 @@ export function OverlaysSection() {
             <DialogHeader>
               <DialogTitle>Delete this channel?</DialogTitle>
               <DialogDescription>
-                This removes LinkedIn (Acme Media) from PostGear. Scheduled posts for this channel will be
-                cancelled. This can&apos;t be undone.
+                This removes LinkedIn (Acme Media) from PostGear. Scheduled posts for this channel
+                will be cancelled. This can&apos;t be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -129,14 +131,56 @@ export function OverlaysSection() {
         </Popover>
       </Row>
       <Row label="Tooltip">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="secondary">Hover me</Button>
-            </TooltipTrigger>
-            <TooltipContent>Publishes immediately to all connected channels.</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="secondary">Hover me</Button>
+          </TooltipTrigger>
+          <TooltipContent>Publishes immediately to all connected channels.</TooltipContent>
+        </Tooltip>
+      </Row>
+      <Row label="Tooltip: sides">
+        {(['left', 'top', 'bottom', 'right'] as const).map((side) => (
+          <TooltipHint key={side} label={`Opens ${side}`} side={side}>
+            <Button variant="secondary" size="sm" className="capitalize">
+              {side}
+            </Button>
+          </TooltipHint>
+        ))}
+      </Row>
+      <Row label="Tooltip: keyboard shortcut, icon button, disabled">
+        <TooltipHint
+          label="Search"
+          shortcut={
+            <KbdGroup>
+              <Kbd>Ctrl</Kbd>
+              <Kbd>K</Kbd>
+            </KbdGroup>
+          }
+        >
+          <Button variant="secondary" size="sm">
+            Search
+          </Button>
+        </TooltipHint>
+        <TooltipHint label="Generate with AI">
+          <Button variant="ai" size="sm" className="w-9 px-0" aria-label="Generate with AI">
+            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+          </Button>
+        </TooltipHint>
+        <TooltipHint label="This plan’s channel limit is reached" disabled>
+          <Button size="sm" disabled>
+            Add Channel
+          </Button>
+        </TooltipHint>
+      </Row>
+      <Row label="Kbd">
+        <p className="flex items-center gap-2 font-sans text-sm text-ink">
+          Press
+          <KbdGroup>
+            <Kbd>Shift</Kbd>
+            <Kbd>?</Kbd>
+          </KbdGroup>
+          for shortcuts
+        </p>
       </Row>
       <Row label="Hover Card">
         <HoverCard>

@@ -73,16 +73,13 @@
   --shadow-brutalMd: var(--shadow-brutal-md);
   --shadow-brutalLg: var(--shadow-brutal-lg);
   --shadow-brutalPressed: var(--shadow-brutal-pressed);
-  /* Button-only diagonal hover "lift": see the comment above
-     --shadow-brutal-md-hover in colors.css. */
-  --shadow-brutalMdHover: var(--shadow-brutal-md-hover);
   /* Button2-only vertical "pushable" shadow: see the comment above
      --shadow-brutal-btn in colors.css. */
   --shadow-brutalBtn: var(--shadow-brutal-btn);
   --shadow-brutalBtnHover: var(--shadow-brutal-btn-hover);
-  /* Containers, fields and overlays: bottom-only in light mode. The
-     diagonal brutal* family above is for things you press. See
-     --shadow-surface-* in colors.css. */
+  /* Containers, fields and overlays: the same right-and-bottom diagonal as
+     the brutal* family above, which is for things you press. Named apart so
+     the two can diverge again. See --shadow-surface-* in colors.css. */
   --shadow-surfaceSm: var(--shadow-surface-sm);
   --shadow-surfaceMd: var(--shadow-surface-md);
   --shadow-surfaceLg: var(--shadow-surface-lg);
@@ -165,6 +162,10 @@
      whenever a toast's computed depth changes on every render). */
   --animate-toastIn: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-toastOut: toastSlideOut 0.2s ease-in forwards;
+  /* Tooltip entrance (UI revamp, 2026-10-18): fades and grows in from the
+     side it opens on. TooltipContent sets --pg-tooltip-x / --pg-tooltip-y
+     per side; unset, they are 0 and it simply fades and grows. */
+  --animate-tooltipIn: tooltipIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Keyframes (must live outside @theme, referenced by --animate-* above) ── */
@@ -200,6 +201,16 @@
 @keyframes toastSlideIn {
   0% { transform: translateY(16px) scale(0.96); opacity: 0; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    transform: translate(var(--pg-tooltip-x, 0), var(--pg-tooltip-y, 0)) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
 }
 @keyframes toastSlideOut {
   0% { transform: translateY(0) scale(1); opacity: 1; }
@@ -245,6 +256,19 @@
     -45deg,
     color-mix(in srgb, var(--color-outline) 28%, transparent) 0 8px,
     transparent 8px 16px
+  );
+}
+
+/* Fine diagonal hatching for calendar slots already behind us (UI revamp,
+   2026-10-18): the reference calendar's "date passed" stripes. Mixed from
+   --color-ink at a low percentage, like bg-halftone below, so it reads on
+   every light and dark theme without a per-theme value; 4px bands at 135deg
+   keep it quiet enough to sit under post chips. */
+@utility bg-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-ink) 7%, transparent) 0 4px,
+    transparent 4px 8px
   );
 }
 

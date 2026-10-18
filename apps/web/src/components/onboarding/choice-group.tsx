@@ -1,6 +1,6 @@
 'use client';
 
-import { Stack, Text, cn } from '@postgear/ui';
+import { cn, pressSm, Stack, Text } from '@postgear/ui';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Question } from '@/lib/onboarding-questions';
 
@@ -39,8 +39,8 @@ export function ChoiceGroup({
               key={option.value}
               htmlFor={id}
               className={cn(
-                'flex cursor-pointer items-start gap-3 border-2 border-outline px-4 py-3 shadow-brutalSm transition-all',
-                'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
+                'flex cursor-pointer items-start gap-3 border-2 border-outline px-4 py-3',
+                pressSm,
                 // The selected card uses the action colour with its paired
                 // on-colour rather than a tint, so contrast holds in both
                 // themes (design-system-rules §7: no raw hex, no ad-hoc tints).
@@ -114,8 +114,8 @@ export function MultiChoiceGroup({
               key={option.value}
               htmlFor={id}
               className={cn(
-                'flex cursor-pointer items-center justify-center gap-2 border-2 border-outline px-3 py-4 text-center font-sans font-bold shadow-brutalSm transition-all',
-                'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
+                'flex cursor-pointer items-center justify-center gap-2 border-2 border-outline px-3 py-4 text-center font-sans font-bold',
+                pressSm,
                 selected ? 'bg-actionPrimary text-onActionPrimary' : 'bg-secondary text-ink',
               )}
             >

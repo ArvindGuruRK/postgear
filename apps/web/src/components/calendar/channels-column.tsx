@@ -1,0 +1,470 @@
+'use client';
+
+/**
+ * The calendar's channel card, after the reference's channel column (UI
+ * revamp, 2026-10-18): the workspace's channels beside the grid, and the one
+ * place a person starts from, whether adding a channel or creating a post.
+ * That is why neither Channels nor Composer is in the rail.
+ *
+ * Its layout, kept as is: the "Channels" title with a collapse toggle; Add
+ * Channel with a square companion button; Create Post with the AI shortcut
+ * beside it (both only once a channel exists); then one row per channel, its
+ * picture with the platform sticker, its name, and a menu. Collapsed, it
+ * keeps only the icons and the pictures. It is the page's one framed card:
+ * the toolbar and grid beside it sit on the page ground.
+ *
+ * Where PostGear differs, and why:
+ * - The square beside Add Channel opens the full Channels page (plan limit,
+ *   health, every channel's detail). The reference's invites a customer,
+ *   which PostGear does not have.
+ * - Clicking a channel filters the calendar to it, and to any other selected;
+ *   this is where the calendar's channel filter lives.
+ * - A channel that cannot publish shows a red "!" on its picture that starts
+ *   the fix (reconnect, or finish choosing the page), as the reference's does.
+ */
+import {
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  pressSm,
+  TooltipHint,
+} from '@postgear/ui';
+import {
+  ChevronLeft,
+  Clock,
+  MoreVertical,
+  Plug,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Sparkles,
+  SquarePen,
+  Trash2,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { type ReactNode, useEffect, useState } from 'react';
+import { CHANNEL_HEALTH, isBroken } from '@/components/channels/channel-health';
+import { ChannelMark } from '@/components/channels/channel-mark';
+import { ConnectChannelDialog } from '@/components/channels/connect-channel-dialog';
+import { DisconnectDialog } from '@/components/channels/disconnect-dialog';
+import { FinishSetupDialog } from '@/components/channels/finish-setup-dialog';
+import { PostingTimesDialog } from '@/components/channels/posting-times-dialog';
+import { useWorkspace } from '@/components/navigation/workspace-provider';
+import { channelConnectUrl } from '@/lib/api';
+import type { Channel, ChannelLimit, ProviderSummary } from '@/types/channel';
+import { useCalendar } from './calendar-context';
+
+const STORAGE_KEY = 'postgear:channels-collapsed';
+
+const FOCUS =
+  'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
+
+/** The pressable tile every button in the card shares, sized by the caller. */
+const TILE = cn(
+  'flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border-2 border-outline type-ui text-sm',
+  pressSm,
+  'disabled:opacity-50',
+  FOCUS,
+);
+
+/** The red "!" on a channel that cannot publish. */
+const BADGE = cn(
+  'absolute start-0 -top-1.5 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline',
+  'bg-actionDanger font-sans text-[10px] font-bold leading-none text-onActionLight',
+);
+
+export function ChannelsColumn({
+  providers,
+  limit,
+}: {
+  providers: ProviderSummary[];
+  /** The plan's channel ceiling; null only when no workspace is active. */
+  limit: ChannelLimit | null;
+}) {
+  const router = useRouter();
+  const { role } = useWorkspace();
+  const { orgId, channels, channelFilter, toggleChannel, clearChannelFilter } = useCalendar();
+  // Connecting and disconnecting are ADMIN-only on the API; this only avoids
+  // offering what would come back 403.
+  const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
+  const atLimit = limit !== null && limit.used >= limit.max;
+
+  // Expanded is the default; the stored preference is applied after mount so
+  // server and first client render agree.
+  const [collapsed, setCollapsed] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [setupChannel, setSetupChannel] = useState<Channel | null>(null);
+  const [timesChannel, setTimesChannel] = useState<Channel | null>(null);
+  const [disconnectChannel, setDisconnectChannel] = useState<Channel | null>(null);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true);
+    } catch {
+      // Storage unavailable (private mode, blocked cookies): keep the default.
+    }
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(STORAGE_KEY, String(next));
+      } catch {
+        // The preference just won't persist.
+      }
+      return next;
+    });
+  }
+
+  function reconnect(channel: Channel) {
+    // Restarts the handshake for this channel, passing PostGear's own id so
+    // the API can verify the same account is re-authorized.
+    window.location.href = channelConnectUrl(channel.providerIdentifier, channel.id);
+  }
+
+  function fix(channel: Channel) {
+    if (channel.health === 'needs_setup') {
+      setSetupChannel(channel);
+    } else {
+      reconnect(channel);
+    }
+  }
+
+  function done() {
+    setSetupChannel(null);
+    setTimesChannel(null);
+    setDisconnectChannel(null);
+    // Re-runs the page's server fetch, so the card and the day view's
+    // posting times show what was just saved.
+    router.refresh();
+  }
+
+  const hasChannels = channels.length > 0;
+  const filtering = channelFilter.length > 0;
+
+  return (
+    <aside
+      aria-label="Channels"
+      className={cn(
+        'relative flex shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-outline bg-chrome shadow-surfaceMd',
+        'transition-[width] duration-150 ease-out',
+        collapsed ? 'w-[5.5rem]' : 'w-[16.25rem]',
+      )}
+    >
+      <div
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden pg-scrollbar pg-scrollbar-chrome',
+          collapsed ? 'items-center px-3 py-5' : 'p-5',
+        )}
+      >
+        <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-2')}>
+          {collapsed ? null : (
+            <h2 className="min-w-0 flex-1 truncate type-heading text-xl text-ink">Channels</h2>
+          )}
+          <TooltipHint
+            label={collapsed ? 'Expand channels' : 'Collapse channels'}
+            side={collapsed ? 'right' : 'bottom'}
+          >
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? 'Expand channels' : 'Collapse channels'}
+              aria-expanded={!collapsed}
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-primary',
+                FOCUS,
+              )}
+            >
+              <ChevronLeft
+                className={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')}
+                strokeWidth={2.5}
+              />
+            </button>
+          </TooltipHint>
+        </div>
+
+        <div className={cn('flex flex-col gap-2', collapsed && 'items-center')}>
+          <div className={cn('flex gap-2', collapsed && 'flex-col')}>
+            {canManage ? (
+              <TooltipHint
+                label={atLimit ? 'This plan’s channel limit is reached' : 'Add Channel'}
+                side={collapsed ? 'right' : 'bottom'}
+                disabled={atLimit}
+                // Expanded, the button says "Add Channel" itself; only the
+                // limit reason is worth a hover.
+                hidden={!collapsed && !atLimit}
+                triggerClassName={collapsed ? undefined : 'flex-1'}
+              >
+                <button
+                  type="button"
+                  onClick={() => setConnectOpen(true)}
+                  disabled={atLimit}
+                  aria-label="Add Channel"
+                  className={cn(TILE, 'bg-secondary text-ink', collapsed ? 'w-11' : 'flex-1 px-3')}
+                >
+                  <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                  {collapsed ? null : <span className="truncate">Add Channel</span>}
+                </button>
+              </TooltipHint>
+            ) : null}
+            <ColumnLink
+              href={`/${orgId}/channels`}
+              label="Manage channels"
+              side={collapsed ? 'right' : 'bottom'}
+              className={cn(TILE, 'w-11 bg-secondary text-ink')}
+            >
+              <Settings2 className="h-4 w-4" strokeWidth={2.5} />
+            </ColumnLink>
+          </div>
+
+          {hasChannels ? (
+            <div className={cn('flex gap-2', collapsed && 'flex-col')}>
+              <ColumnLink
+                href={`/${orgId}/composer`}
+                label="Create Post"
+                side={collapsed ? 'right' : 'bottom'}
+                // Expanded, the label is on the button already.
+                tooltip={collapsed}
+                className={cn(
+                  TILE,
+                  'bg-actionPrimary text-onActionPrimary',
+                  collapsed ? 'w-11' : 'flex-1 px-3',
+                )}
+              >
+                <SquarePen className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+                {collapsed ? null : <span className="truncate">Create Post</span>}
+              </ColumnLink>
+              <ColumnLink
+                href={`/${orgId}/ai-copilot`}
+                label="Generate with AI"
+                side={collapsed ? 'right' : 'bottom'}
+                className={cn(TILE, 'w-11 bg-actionAi text-onActionAi')}
+              >
+                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+              </ColumnLink>
+            </div>
+          ) : null}
+        </div>
+
+        {!hasChannels ? (
+          collapsed ? null : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 text-center">
+              <p className="type-heading text-lg text-ink">No channels yet</p>
+              <p className="font-sans text-sm text-ink opacity-70">
+                Connect your social accounts to start posting.
+              </p>
+            </div>
+          )
+        ) : (
+          <div className={cn('flex flex-col gap-3', collapsed && 'items-center')}>
+            {filtering && !collapsed ? (
+              <div className="flex items-center justify-between gap-2 font-sans text-xs text-ink">
+                <span className="opacity-70">
+                  Showing {channelFilter.length} of {channels.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearChannelFilter}
+                  className={cn('rounded-sm type-ui underline underline-offset-2', FOCUS)}
+                >
+                  Show all
+                </button>
+              </div>
+            ) : null}
+
+            <ul className="m-0 flex list-none flex-col gap-3 p-0">
+              {channels.map((channel) => {
+                const selected = channelFilter.includes(channel.id);
+                const broken = isBroken(channel.health);
+                const health = CHANNEL_HEALTH[channel.health];
+
+                return (
+                  <li
+                    key={channel.id}
+                    className={cn(
+                      'group/row relative flex items-center gap-1 rounded-lg',
+                      channel.disabled && 'opacity-50',
+                    )}
+                  >
+                    {/* The reference's hover marker on the card's edge. */}
+                    {collapsed ? null : (
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'absolute -start-5 top-1 bottom-1 w-1 rounded-e-full bg-actionPrimary transition-opacity',
+                          selected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+                        )}
+                      />
+                    )}
+
+                    <TooltipHint
+                      label={
+                        collapsed
+                          ? channel.name
+                          : selected
+                            ? `Stop filtering by ${channel.name}`
+                            : `Show only ${channel.name}'s posts`
+                      }
+                      side="right"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleChannel(channel.id)}
+                        aria-pressed={selected}
+                        className={cn(
+                          'flex min-w-0 flex-1 items-center gap-3 rounded-lg border-2 p-1',
+                          FOCUS,
+                          selected
+                            ? 'border-outline bg-actionPrimary/10'
+                            : 'border-transparent hover:bg-primary',
+                        )}
+                      >
+                        <ChannelMark
+                          name={channel.name}
+                          picture={channel.picture}
+                          platform={channel.providerIdentifier}
+                          platformName={channel.providerName}
+                        />
+                        {collapsed ? (
+                          <span className="sr-only">{channel.name}</span>
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate text-start type-ui text-sm text-ink">
+                            {channel.name}
+                          </span>
+                        )}
+                      </button>
+                    </TooltipHint>
+
+                    {broken ? (
+                      <TooltipHint
+                        label={
+                          canManage
+                            ? `${health.explanation ?? health.label} Click to fix.`
+                            : (health.explanation ?? health.label)
+                        }
+                        side="right"
+                      >
+                        {canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => fix(channel)}
+                            aria-label={`${channel.name}: ${health.explanation ?? health.label}`}
+                            className={cn(BADGE, FOCUS)}
+                          >
+                            !
+                          </button>
+                        ) : (
+                          // Not a disabled button: nothing here can be done by
+                          // this person, so it is a status mark, not a control.
+                          <span
+                            role="img"
+                            aria-label={`${channel.name}: ${health.explanation ?? health.label}`}
+                            className={BADGE}
+                          >
+                            !
+                          </span>
+                        )}
+                      </TooltipHint>
+                    ) : null}
+
+                    {canManage && !collapsed ? (
+                      <DropdownMenu>
+                        <TooltipHint label="Channel options" side="right">
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Manage ${channel.name}`}
+                              className={cn(
+                                'flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-ink opacity-60 hover:bg-primary hover:opacity-100',
+                                FOCUS,
+                              )}
+                            >
+                              <MoreVertical className="h-4 w-4" strokeWidth={2.5} />
+                            </button>
+                          </DropdownMenuTrigger>
+                        </TooltipHint>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onSelect={() => setTimesChannel(channel)}>
+                            <Clock className="me-2 h-4 w-4" />
+                            Edit posting times
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => reconnect(channel)}>
+                            <RefreshCw className="me-2 h-4 w-4" />
+                            Reconnect
+                          </DropdownMenuItem>
+                          {channel.inBetweenSteps ? (
+                            <DropdownMenuItem onSelect={() => setSetupChannel(channel)}>
+                              <Plug className="me-2 h-4 w-4" />
+                              Finish setup
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setDisconnectChannel(channel)}>
+                            <Trash2 className="me-2 h-4 w-4" />
+                            Disconnect
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <ConnectChannelDialog
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        providers={providers}
+      />
+      <FinishSetupDialog
+        channel={setupChannel}
+        onOpenChange={(open) => !open && setSetupChannel(null)}
+        onDone={done}
+      />
+      <PostingTimesDialog
+        channel={timesChannel}
+        onOpenChange={(open) => !open && setTimesChannel(null)}
+        onDone={done}
+      />
+      <DisconnectDialog
+        channel={disconnectChannel}
+        onOpenChange={(open) => !open && setDisconnectChannel(null)}
+        onDone={done}
+      />
+    </aside>
+  );
+}
+
+/** A card button that navigates, named for screen readers and on hover. */
+function ColumnLink({
+  href,
+  label,
+  side,
+  tooltip = true,
+  className,
+  children,
+}: {
+  href: string;
+  label: string;
+  side: 'right' | 'bottom';
+  /** Off when the label is already written on the button. */
+  tooltip?: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <TooltipHint label={label} side={side} hidden={!tooltip}>
+      <Link href={href} aria-label={label} className={className}>
+        {children}
+      </Link>
+    </TooltipHint>
+  );
+}

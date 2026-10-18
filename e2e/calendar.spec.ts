@@ -152,18 +152,23 @@ test.describe('calendar', () => {
     expect(post.state).toBe('QUEUE');
   });
 
-  test('a card opens its details, and Reschedule moves it to a typed time', async ({ page }) => {
+  test('a card previews its details, and Reschedule moves it to a typed time', async ({ page }) => {
     await signIn(page);
     const from = atNoon(4);
     const group = await createQueued(page, `E2E reschedule me ${Date.now()}`, from);
     created.groups.push(group);
 
+    // The day view lists the day's moments, the card's own time among them.
     await page.goto(`/${DEMO_ORG}/calendar?view=day&date=${dayKey(from)}`);
 
-    await page
-      .locator(`[data-testid="post-card"][data-group="${group}"]`)
-      .getByRole('button', { name: /Scheduled:/ })
-      .click();
+    const card = page.locator(`[data-testid="post-card"][data-group="${group}"]`);
+    // The body opens the composer; the strip's hover actions hold Preview.
+    await expect(card.getByRole('link', { name: /Scheduled:/ })).toHaveAttribute(
+      'href',
+      `/${DEMO_ORG}/composer?group=${group}`,
+    );
+    await card.hover();
+    await card.getByRole('button', { name: 'Preview post' }).click();
 
     const dialog = page.getByTestId('post-detail');
     await expect(dialog).toBeVisible();
@@ -191,7 +196,8 @@ test.describe('calendar', () => {
   test('clicking a future slot opens the composer at that time', async ({ page }) => {
     await signIn(page);
     const day = atNoon(5);
-    await page.goto(`/${DEMO_ORG}/calendar?view=day&date=${dayKey(day)}`);
+    // The week view's hour cells: the day view's rows are posting times instead.
+    await page.goto(`/${DEMO_ORG}/calendar?view=week&date=${dayKey(day)}`);
 
     const slot = page.locator(`[data-slot="slot:${day.getTime() - 12 * 60 * 60 * 1000}:14"]`);
     await slot.hover();

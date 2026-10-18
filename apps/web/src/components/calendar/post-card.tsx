@@ -1,35 +1,49 @@
 'use client';
 
 /**
- * One post on the calendar.
+ * One post on the calendar, after the reference's calendar item (UI revamp,
+ * 2026-10-18): a colored strip on top and the post underneath.
  *
- * Two controls, deliberately: the card body opens the post, and a separate
- * grip starts a drag. Making the whole card the drag handle would turn Space
- * and Enter, which open a button, into drag starts for keyboard users, and
- * a pointer tap into an ambiguous gesture. The grip is also what dnd-kit's
- * keyboard sensor binds to, so a card can be moved by arrow keys; the
- * Reschedule dialog remains the precise keyboard path.
+ * - **The strip** carries the state as its fill (scheduled is primary,
+ *   published is success, and so on: post-status.ts), the time, and the drag
+ *   grip. On hover or keyboard focus it also shows the reference's quick
+ *   actions: preview (the detail dialog, with reschedule and post-now),
+ *   statistics once something has gone out, and delete while the API still
+ *   allows it.
+ * - **The body** opens the post in the composer, as the reference's opens
+ *   its editor: its channels as avatars, then the first line of the text,
+ *   prefixed "Draft:" for drafts.
  *
- * Restrained treatment, per design-system-rules.md §15: a calendar is a dense
- * data surface, so the card keeps its thick border and a small shadow, and the
- * state speaks through a colored edge rather than a loud fill.
+ * Two controls for the two gestures, deliberately: the body opens the post,
+ * and the grip starts a drag. Making the whole card the drag handle would turn
+ * Space and Enter into drag starts for keyboard users, and a pointer tap into
+ * an ambiguous gesture. The grip is also what dnd-kit's keyboard sensor binds
+ * to, so a card can be moved by arrow keys; the Reschedule dialog remains the
+ * precise keyboard path.
  */
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Badge, cn } from '@postgear/ui';
-import { GripVertical, Lock } from 'lucide-react';
+import { cn, TooltipHint } from '@postgear/ui';
+import { BarChart3, Eye, GripVertical, Lock, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import type { ReactElement, ReactNode } from 'react';
 import type { PostSummary } from '@/types/post';
 import { ChannelStack } from '../posts/channel-stack';
-import { describePost, formatClock, type PostTone } from '../posts/post-status';
+import {
+  describePost,
+  formatClock,
+  hasPublishedChannel,
+  type PostTone,
+} from '../posts/post-status';
 
-/** The state as a colored start edge, in the system's action colors. */
-const EDGE: Record<PostTone, string> = {
-  draft: 'border-s-ink/40',
-  scheduled: 'border-s-actionPrimary',
-  publishing: 'border-s-actionAccent',
-  retrying: 'border-s-actionAccent',
-  published: 'border-s-actionSuccess',
-  failed: 'border-s-actionDanger',
+/** The strip: the state's fill, with the text color that clears contrast on it. */
+const STRIP: Record<PostTone, string> = {
+  draft: 'bg-ink/15 text-ink',
+  scheduled: 'bg-actionPrimary text-onActionPrimary',
+  publishing: 'bg-actionAccent text-onActionLight',
+  retrying: 'bg-actionAccent text-onActionLight',
+  published: 'bg-actionSuccess text-onActionLight',
+  failed: 'bg-actionDanger text-onActionLight',
 };
 
 export type CardDensity = 'compact' | 'regular' | 'roomy';
@@ -38,25 +52,36 @@ export function PostCard({
   post,
   now,
   density = 'regular',
-  onOpen,
+  editHref,
+  onPreview,
+  onStatistics,
+  onDelete,
   overlay = false,
 }: {
   post: PostSummary;
   now: Date;
   density?: CardDensity;
-  onOpen?: (post: PostSummary) => void;
-  /** Rendered inside the drag overlay: no drag handle of its own, no fading. */
+  /** The composer, opened on this post: where the card body goes. */
+  editHref?: string;
+  onPreview?: (post: PostSummary) => void;
+  onStatistics?: (post: PostSummary) => void;
+  onDelete?: (post: PostSummary) => void;
+  /** Rendered inside the drag overlay: no handle, no actions, no fading. */
   overlay?: boolean;
 }) {
   const shown = describePost(post, now);
-  const locked = post.state === 'PUBLISHED';
+  const published = post.state === 'PUBLISHED';
+  // Once any channel has gone out the API refuses edits and deletes; the
+  // detail dialog applies the same rule.
+  const locked = hasPublishedChannel(post);
   const when = new Date(post.publishDate);
+  const preview = post.preview || 'Empty post';
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
     useDraggable({
       id: post.group,
       data: { post },
-      disabled: locked || overlay,
+      disabled: published || overlay,
     });
 
   return (
@@ -67,89 +92,156 @@ export function PostCard({
       data-group={post.group}
       data-tone={shown.tone}
       className={cn(
-        'group/card relative flex min-w-0 items-stretch rounded-md border-2 border-outline bg-secondary text-ink',
-        'border-s-4',
-        EDGE[shown.tone],
+        'group/card relative flex min-w-0 flex-col overflow-hidden rounded-lg border-2 border-outline bg-secondary text-ink',
         overlay ? 'shadow-surfaceMd' : 'shadow-surfaceSm',
         isDragging && !overlay && 'opacity-30',
-        shown.tone === 'published' && !overlay && 'opacity-80',
+        published && !overlay && 'opacity-80 grayscale',
       )}
     >
-      <button
-        type="button"
-        onClick={() => onOpen?.(post)}
-        aria-label={`${shown.label}: ${post.preview || 'Empty post'}, ${formatClock(when)}`}
+      <div className={cn('flex h-6 shrink-0 items-center gap-1 ps-0.5 pe-1', STRIP[shown.tone])}>
+        {!published && !overlay ? (
+          <StripAction label="Drag to reschedule">
+            <button
+              type="button"
+              ref={setActivatorNodeRef}
+              {...listeners}
+              {...attributes}
+              aria-label={`Drag to reschedule: ${preview}`}
+              data-testid="post-card-grip"
+              className={cn(
+                'flex h-5 w-4 shrink-0 cursor-grab items-center justify-center rounded-sm opacity-70 outline-none',
+                'transition-opacity hover:opacity-100 active:cursor-grabbing',
+                'focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing',
+              )}
+            >
+              <GripVertical className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+          </StripAction>
+        ) : (
+          <span className="w-1 shrink-0" />
+        )}
+        <span className="min-w-0 truncate type-ui text-[11px] tabular-nums">
+          {formatClock(when)}
+        </span>
+        {published ? (
+          <Lock
+            // Steps aside while the hover actions take the strip's end.
+            className="ms-auto h-3 w-3 shrink-0 opacity-70 group-focus-within/card:hidden group-hover/card:hidden"
+            strokeWidth={3}
+            aria-hidden="true"
+          />
+        ) : null}
+
+        {overlay ? null : (
+          <span className="ms-auto hidden shrink-0 items-center gap-0.5 group-focus-within/card:flex group-hover/card:flex">
+            {onPreview ? (
+              <StripAction label="Preview post">
+                <button
+                  type="button"
+                  aria-label="Preview post"
+                  onClick={() => onPreview(post)}
+                  className={STRIP_ACTION}
+                >
+                  <Eye className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              </StripAction>
+            ) : null}
+            {onStatistics && locked ? (
+              <StripAction label="Statistics">
+                <button
+                  type="button"
+                  aria-label="Statistics"
+                  onClick={() => onStatistics(post)}
+                  className={STRIP_ACTION}
+                >
+                  <BarChart3 className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              </StripAction>
+            ) : null}
+            {onDelete && !locked ? (
+              <StripAction label="Delete post">
+                <button
+                  type="button"
+                  aria-label="Delete post"
+                  onClick={() => onDelete(post)}
+                  className={STRIP_ACTION}
+                >
+                  <Trash2 className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              </StripAction>
+            ) : null}
+          </span>
+        )}
+      </div>
+
+      <CardBody
+        href={overlay ? undefined : editHref}
+        label={`${shown.label}: ${preview}, ${formatClock(when)}`}
         className={cn(
-          'flex min-w-0 flex-1 flex-col gap-1 text-start outline-none',
-          'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-          density === 'compact' ? 'px-2 py-1' : 'px-2.5 py-2',
+          'flex min-w-0 flex-1 items-start gap-1.5 text-start outline-none',
+          'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
+          density === 'compact' ? 'p-1' : 'p-1.5',
           !overlay && 'hover:bg-actionPrimary/10',
         )}
       >
-        <span className="flex items-center gap-1.5">
-          <span className="font-sans text-[11px] font-bold tabular-nums">{formatClock(when)}</span>
-          {density !== 'compact' ? (
-            <Badge
-              variant={shown.variant}
-              className="px-1.5 py-0 text-[9px] leading-4 tracking-normal"
-            >
-              {shown.label}
-            </Badge>
-          ) : (
-            <span
-              className={cn('h-2 w-2 rounded-full border border-outline', DOT[shown.tone])}
-              aria-hidden="true"
-            />
-          )}
-          {locked ? <Lock className="ms-auto h-3 w-3 opacity-60" strokeWidth={3} /> : null}
-        </span>
-        <span
-          className={cn(
-            'break-words font-sans font-medium leading-snug',
-            density === 'compact' ? 'line-clamp-1 text-xs' : 'text-sm',
-            density === 'regular' && 'line-clamp-2',
-            density === 'roomy' && 'line-clamp-4',
-            !post.preview && 'opacity-60',
-          )}
-        >
-          {post.preview || 'Empty post'}
-        </span>
-        {density !== 'compact' ? (
-          <span className="flex items-center justify-between gap-2 pt-0.5">
-            <ChannelStack channels={post.channels} publishDate={post.publishDate} now={now} />
-            {shown.detail && density === 'roomy' ? (
-              <span className="truncate font-sans text-[11px] opacity-70">{shown.detail}</span>
-            ) : null}
+        <ChannelStack
+          channels={post.channels}
+          publishDate={post.publishDate}
+          now={now}
+          max={density === 'roomy' ? 4 : 1}
+          className="shrink-0"
+        />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span
+            className={cn(
+              'break-words font-sans leading-snug',
+              density === 'roomy' ? 'line-clamp-2 text-sm' : 'line-clamp-1 text-xs',
+              !post.preview && 'opacity-60',
+            )}
+          >
+            {post.state === 'DRAFT' ? <span className="type-ui">Draft: </span> : null}
+            {preview}
           </span>
-        ) : null}
-      </button>
-
-      {!locked && !overlay ? (
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          {...listeners}
-          {...attributes}
-          aria-label={`Drag to reschedule: ${post.preview || 'Empty post'}`}
-          data-testid="post-card-grip"
-          className={cn(
-            'flex w-5 shrink-0 cursor-grab items-center justify-center border-s-2 border-outline/30 opacity-50 outline-none',
-            'transition-opacity hover:opacity-100 active:cursor-grabbing',
-            'focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
-          )}
-        >
-          <GripVertical className="h-3.5 w-3.5" strokeWidth={2.5} />
-        </button>
-      ) : null}
+          {density === 'roomy' && shown.detail ? (
+            <span className="truncate font-sans text-[11px] opacity-70">{shown.detail}</span>
+          ) : null}
+        </span>
+      </CardBody>
     </div>
   );
 }
 
-const DOT: Record<PostTone, string> = {
-  draft: 'bg-ink/30',
-  scheduled: 'bg-actionPrimary',
-  publishing: 'bg-actionAccent',
-  retrying: 'bg-actionAccent',
-  published: 'bg-actionSuccess',
-  failed: 'bg-actionDanger',
-};
+const STRIP_ACTION = cn(
+  'flex h-5 w-5 items-center justify-center rounded-sm outline-none',
+  'hover:bg-black/15 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-1 focus-visible:outline-focusRing',
+);
+
+/** A strip icon with its name as a tooltip, as the reference shows on hover. */
+function StripAction({ label, children }: { label: string; children: ReactElement }) {
+  return (
+    <TooltipHint label={label} side="top">
+      {children}
+    </TooltipHint>
+  );
+}
+
+/** A link to the composer, or plain content in the drag overlay copy. */
+function CardBody({
+  href,
+  label,
+  className,
+  children,
+}: {
+  href?: string;
+  label: string;
+  className: string;
+  children: ReactNode;
+}) {
+  return href ? (
+    <Link href={href} aria-label={label} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <div className={className}>{children}</div>
+  );
+}

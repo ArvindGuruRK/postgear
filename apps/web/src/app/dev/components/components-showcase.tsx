@@ -1,6 +1,6 @@
 'use client';
 
-import { UserMenu, WorkspaceSwitcher } from '@postgear/ui';
+import { UserMenu } from '@postgear/ui';
 import { BarChart3, Calendar, LayoutGrid, Palette, Search, Settings, Users } from 'lucide-react';
 import { useState } from 'react';
 import { AppShell } from '@/components/navigation/app-shell';
@@ -26,7 +26,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { label: 'Design System', href: '/dev/components', icon: Palette, active: true },
 ];
 
-const SETTINGS_ITEM: SidebarItem = { label: 'Settings', href: '#settings', icon: Settings };
+const BOTTOM_ITEMS: SidebarItem[] = [{ label: 'Settings', href: '#settings', icon: Settings }];
 
 // Demo data for the two top-bar slots. The playground showcases the *UI
 // components* (WorkspaceSwitcher, UserMenu) rather than the app-wired
@@ -43,22 +43,22 @@ export function ComponentsShowcase() {
   return (
     <AppShell
       navItems={NAV_ITEMS}
-      sidebarBottomItem={SETTINGS_ITEM}
+      sidebarBottomItems={BOTTOM_ITEMS}
       pageTitle="Design System"
-      orgSwitcher={
-        <WorkspaceSwitcher
-          workspaces={DEMO_WORKSPACES}
-          activeId={activeWorkspace}
-          onActiveChange={setActiveWorkspace}
-          label="Organizations"
-          createLabel="Create organization"
-          onCreate={() => {}}
-        />
-      }
       accountMenu={
         <UserMenu
           name="Ada Lovelace"
           email="ada@postgear.local"
+          groups={[
+            {
+              label: 'Organizations',
+              items: DEMO_WORKSPACES.map((workspace) => ({
+                label: workspace.name,
+                checked: workspace.id === activeWorkspace,
+                onSelect: () => setActiveWorkspace(workspace.id),
+              })),
+            },
+          ]}
           items={[{ label: 'Log out', danger: true }]}
         />
       }

@@ -16,7 +16,7 @@ interface SyncActiveWorkspaceProps {
  *
  * The API scopes every workspace-owned request on the `pg_org` cookie, not on
  * the `[orgId]` segment: deliberately, so a path parameter can never be used
- * to read another tenant's data. `OrgSwitcher` keeps the two in step when a
+ * to read another tenant's data. The account menu's workspace list keeps the two in step when a
  * user switches through the UI, and its own comment names the failure mode if
  * they drift: "the URL changes while the API is still answering for the old
  * workspace."

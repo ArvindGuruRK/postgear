@@ -1,4 +1,4 @@
-import { Toaster } from '@postgear/ui';
+import { Toaster, TooltipProvider } from '@postgear/ui';
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { AppearanceRuntime } from '@/components/appearance/appearance-runtime';
@@ -8,10 +8,10 @@ import './globals.css';
 
 export const metadata: Metadata = {
   // `template` lets each route set a short `title` ("Sign in") and get
-  // "Sign in · PostGear" in the tab; `default` covers routes that set none.
+  // "Sign in - PostGear" in the tab; `default` covers routes that set none.
   title: {
     default: 'PostGear',
-    template: '%s · PostGear',
+    template: '%s - PostGear',
   },
   description: 'AI-Powered Social Media Management & SEO Platform',
   applicationName: 'PostGear',
@@ -47,7 +47,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static no-flash theme script, no user input */}
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_APPEARANCE_SCRIPT }} />
         <AppearanceRuntime />
-        {children}
+        {/* One provider for every tooltip in the app: see TooltipProvider. */}
+        <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
       </body>
     </html>

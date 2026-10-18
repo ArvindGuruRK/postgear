@@ -2,7 +2,19 @@
 
 > **PRD Coverage**: none directly; this is cross-cutting infrastructure every later sprint's UI work depends on, not a feature module of its own.
 > **Depends on**: nothing technically (this sprint touches `apps/web` + `packages/ui`; [Sprint 1](sprint-01-foundation-and-data-model.md) touches DB/infra; the two don't block each other). Sequenced first anyway per an explicit product decision (2026-08-29): the design system gets built before any feature screens, so every later sprint consumes finished, reusable components instead of writing one-off styled markup.
-> **Reference repo**: `D:\rk-personal-projects\postiz-app-main`, **not applicable here**. Postiz's actual visual design (soft shadows, muted purple, blurred glows: a conventional SaaS look) is close to the opposite of the direction chosen for PostGear. Nothing in this sprint studies Postiz's UI; see "Relationship to the imported tokens" below for what *is* being kept from that import.
+> **Reference repo**: `D:\rk-personal-projects\postiz-app-main`. Originally marked "not applicable here"; that changed on 2026-10-18 (see the revamp note below).
+
+> **UI revamp (2026-10-18), supersedes the Neubrutalism direction below for layout and components.** The current design is being replaced across the whole app. Postiz is now the reference for UX patterns, page layouts and component placement, and Buffer for the home dashboard and connect-channel flow. The captures and a per-screenshot pattern list are in [`../screenshots/`](../screenshots/README.md); the Postiz source to study is `postiz-app-main/apps/frontend/src/components/` (`new-layout`, `launches`, `new-launch`, `media`, `ui`). When Arvind asks to take inspiration from Postiz for a screen, match its structure and behaviour, then build it from PostGear's own `packages/ui` components and tokens without pasting Postiz code (AGPL-3.0).
+>
+> Kept from PostGear's own system: the light/dark theme sets and their token mechanism, the Sora type scale and role tokens, and the "no filler UI" rule (no repeated page titles, taglines or decorative pills). The goal is a calm, intentional product UI that does not read as AI-generated.
+>
+> The patterns that define the revamp, from the screenshots:
+> - **Shell**: a narrow framed icon rail (icon above a short label) on the far left; everything to its right sits on the page background with no frame: a top bar (page name left; theme, notifications and the account menu right, the account menu also holding the workspace switcher), then the page. No rule under the bar and no dividers between its buttons: spacing does that work. Billing is reached from Settings, not the rail. Composer and Channels are not in the rail; the calendar's channel card is their entry point.
+> - **Calendar as home**: the Channels column is the page's one framed card, and the toolbar and grid sit open on the background; a collapsible Channels column (Add Channel, Create Post, AI shortcut, draggable channel list) beside a Day / Week / Month calendar with a calendar/list toggle, a `+` on hover in empty future slots, hatched past slots, and hover actions on post chips.
+> - **Modals for focused tasks**: composer, media library, AI generation and channel connection all open as modals over the current page instead of navigating away.
+> - **Restrained chrome**: one accent colour for the primary action, small icon buttons for secondary actions, empty states as one icon and two lines of copy.
+>
+> **Styling stays neo-brutalist** (decided 2026-10-18): Postiz supplies the structure and behaviour, PostGear keeps its own skin. Its colours and typography are not taken: the reference's hairline gaps become 2px outlines, its soft panels take the hard `shadow-surface*` and `shadow-brutal*` shadows, and all 24 themes and the Sora type roles apply unchanged. The sections below are the original Sprint 0 record and still govern tokens, outlines, shadows and the press interaction; only the comic accents (halftone, speech bubbles) stay limited to marketing, onboarding and empty states.
 
 ## Sprint Goal
 

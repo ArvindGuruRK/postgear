@@ -1,6 +1,6 @@
 'use client';
 
-import { cn, toast } from '@postgear/ui';
+import { cn, pressSm, TooltipHint, toast } from '@postgear/ui';
 import { Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -58,38 +58,38 @@ export function ThemeToggle({ saveToAccount = false }: { saveToAccount?: boolean
     'absolute h-4 w-4 text-ink transition-[transform,opacity] duration-200 ease-out group-hover:text-onActionPrimary';
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      title={label}
-      aria-label={label}
-      data-testid="theme-toggle"
-      suppressHydrationWarning
-      className={cn(
-        'group relative flex h-9 w-9 shrink-0 items-center justify-center',
-        'rounded-md border-2 border-outline bg-secondary shadow-brutalSm',
-        'outline-none transition-[transform,box-shadow] duration-100',
-        'hover:bg-actionPrimary',
-        'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-        'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-      )}
-    >
-      <Sun
+    <TooltipHint label={label} side="bottom">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={label}
+        data-testid="theme-toggle"
+        suppressHydrationWarning
         className={cn(
-          iconBase,
-          'rotate-0 scale-100 opacity-100',
-          'dark:-rotate-90 dark:scale-0 dark:opacity-0',
+          'group relative flex h-9 w-9 shrink-0 items-center justify-center',
+          'rounded-md border-2 border-outline bg-secondary outline-none',
+          'hover:bg-actionPrimary',
+          pressSm,
+          'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         )}
-        strokeWidth={2.5}
-      />
-      <Moon
-        className={cn(
-          iconBase,
-          'rotate-90 scale-0 opacity-0',
-          'dark:rotate-0 dark:scale-100 dark:opacity-100',
-        )}
-        strokeWidth={2.5}
-      />
-    </button>
+      >
+        <Sun
+          className={cn(
+            iconBase,
+            'rotate-0 scale-100 opacity-100',
+            'dark:-rotate-90 dark:scale-0 dark:opacity-0',
+          )}
+          strokeWidth={2.5}
+        />
+        <Moon
+          className={cn(
+            iconBase,
+            'rotate-90 scale-0 opacity-0',
+            'dark:rotate-0 dark:scale-100 dark:opacity-100',
+          )}
+          strokeWidth={2.5}
+        />
+      </button>
+    </TooltipHint>
   );
 }

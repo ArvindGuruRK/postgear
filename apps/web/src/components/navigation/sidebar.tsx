@@ -2,9 +2,8 @@
 
 import { cn } from '@postgear/ui';
 import type { LucideIcon } from 'lucide-react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 export interface SidebarItem {
   label: string;
@@ -13,175 +12,90 @@ export interface SidebarItem {
   active?: boolean;
 }
 
-const STORAGE_KEY = 'postgear:sidebar-collapsed';
-
-function NavTile({
-  label,
-  href,
-  icon: Icon,
-  active,
-  collapsed,
-}: SidebarItem & { collapsed: boolean }) {
+/**
+ * One rail entry: the icon above a short label, the reference's menu item.
+ *
+ * Always labelled, never icon-only: at 64px wide the label still fits on two
+ * lines, and a rail of bare glyphs makes people hover to find Analytics.
+ * The active entry takes the primary fill and a pressable shadow, the same
+ * treatment as a pressed Button, so "where am I" reads from across the room.
+ */
+function RailItem({ label, href, icon: Icon, active }: SidebarItem) {
   return (
     <Link
       href={href}
-      title={collapsed ? label : undefined}
+      title={label}
+      aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex items-center rounded-md border-2 border-transparent',
-        'outline-none transition-[transform,box-shadow] duration-100',
-        'hover:border-outline hover:bg-primary',
-        'active:translate-x-[1px] active:translate-y-[1px]',
+        'flex w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 px-0.5 py-2',
+        'outline-none transition-[transform,box-shadow,background-color] duration-100',
         'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-        // Collapsed tile keeps its 64px footprint but only a hair of side
-        // padding, so labels get the full width instead of clipping.
-        collapsed ? 'w-16 flex-col gap-1 px-0.5 py-1.5' : 'w-full gap-3 px-3 py-2.5',
-        active &&
-          'border-outline bg-actionPrimary shadow-brutalSm hover:bg-actionPrimary active:shadow-brutalPressed',
+        active
+          ? 'border-outline bg-actionPrimary text-onActionPrimary shadow-brutalSm active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed'
+          : 'border-transparent text-ink hover:border-outline hover:bg-primary',
       )}
     >
-      <Icon
-        className={cn(
-          'shrink-0',
-          collapsed ? 'h-5 w-5' : 'h-4 w-4',
-          active ? 'text-onActionPrimary' : 'text-ink',
-        )}
-        strokeWidth={2.5}
-      />
-      <span
-        className={cn(
-          collapsed
-            ? 'line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.2]'
-            : 'truncate pr-0.5 type-ui text-sm leading-[1.15]',
-          active ? 'text-onActionPrimary' : 'text-ink',
-        )}
-      >
+      <Icon className="h-5 w-5 shrink-0" strokeWidth={2.25} />
+      <span className="line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.15]">
         {label}
       </span>
     </Link>
   );
 }
 
+/**
+ * The app rail (UI revamp, 2026-10-18), after the reference's left menu: a
+ * fixed 80px column with the brand mark on top, the product sections under
+ * it, and account-level destinations pinned to the bottom.
+ *
+ * Fixed width on purpose. The expanding sidebar it replaces spent 150px on
+ * labels the rail already shows, and the calendar needs that width; the
+ * collapsible column moved one level in, to the calendar's channel list.
+ */
 export function Sidebar({
   items,
+  bottomItems = [],
   brand = 'P',
   brandLabel = 'PostGear',
-  bottomItem,
 }: {
   items: SidebarItem[];
-  /** Monogram (or any short node) shown in the brand tile of the collapsed rail. */
+  /** Pinned to the bottom of the rail (e.g. Billing, Settings). */
+  bottomItems?: SidebarItem[];
+  /** Monogram shown in the brand tile. */
   brand?: ReactNode;
-  /** Wordmark shown in the header when the sidebar is expanded. */
-  brandLabel?: ReactNode;
-  /** Pinned to the bottom of the rail, below the scrollable nav list (e.g. Settings). */
-  bottomItem?: SidebarItem;
+  /** Accessible name of the brand tile. */
+  brandLabel?: string;
 }) {
-  // Collapsed rail is the default; the stored preference is applied after mount
-  // so server and first client render always agree.
-  const [collapsed, setCollapsed] = useState(true);
-
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(STORAGE_KEY) === 'false') setCollapsed(false);
-    } catch {
-      // Storage unavailable (private mode, blocked cookies): keep the default.
-    }
-  }, []);
-
-  const toggle = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(STORAGE_KEY, String(next));
-      } catch {
-        // Preference just won't persist.
-      }
-      return next;
-    });
-  };
-
-  const toggleClasses = cn(
-    'group flex items-center justify-center rounded-md border-2 border-outline',
-    'outline-none transition-[transform,box-shadow] duration-100',
-    'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-    'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-  );
-
   return (
     <aside
-      className={cn(
-        'flex h-full shrink-0 flex-col border-r-4 border-outline bg-chrome',
-        'transition-[width] duration-150 ease-out',
-        collapsed ? 'w-20 items-center' : 'w-56',
-      )}
+      aria-label="Main"
+      className="flex w-20 shrink-0 flex-col items-center gap-6 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd"
     >
-      <div
-        className={cn(
-          'flex h-16 w-full shrink-0 items-center border-b-4 border-outline',
-          collapsed ? 'justify-center' : 'justify-between gap-2 px-4',
-        )}
+      <span
+        role="img"
+        aria-label={brandLabel}
+        title={brandLabel}
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-outline bg-actionPrimary shadow-brutalSm"
       >
-        {collapsed ? (
-          <button
-            type="button"
-            onClick={toggle}
-            title="Expand sidebar"
-            aria-label="Expand sidebar"
-            aria-expanded={false}
-            className={cn(toggleClasses, 'h-11 w-11 bg-actionPrimary shadow-brutalSm')}
-          >
-            {/* Monogram swaps to the expand affordance on hover/focus. */}
-            <span className="type-heading text-xl text-onActionPrimary group-hover:hidden group-focus-visible:hidden">
-              {brand}
-            </span>
-            <PanelLeftOpen
-              className="hidden h-5 w-5 text-onActionPrimary group-hover:block group-focus-visible:block"
-              strokeWidth={2.5}
-            />
-          </button>
-        ) : (
-          <>
-            <span className="min-w-0 whitespace-nowrap pr-1 type-heading text-2xl leading-none text-ink">
-              {brandLabel}
-            </span>
-            <button
-              type="button"
-              onClick={toggle}
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-              aria-expanded={true}
-              className={cn(toggleClasses, 'h-9 w-9 shrink-0 bg-primary hover:bg-actionPrimary')}
-            >
-              <PanelLeftClose
-                className="h-4 w-4 text-ink group-hover:text-onActionPrimary"
-                strokeWidth={2.5}
-              />
-            </button>
-          </>
-        )}
-      </div>
+        <span className="type-heading text-2xl leading-none text-onActionPrimary">{brand}</span>
+      </span>
 
       <nav
-        className={cn(
-          'flex w-full flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden',
-          'pg-scrollbar pg-scrollbar-secondary',
-          collapsed ? 'items-center py-2' : 'p-3',
-        )}
+        aria-label="Sections"
+        className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden pg-scrollbar pg-scrollbar-chrome"
       >
         {items.map((item) => (
-          <NavTile key={item.href} {...item} collapsed={collapsed} />
+          <RailItem key={item.href} {...item} />
         ))}
       </nav>
 
-      {bottomItem && (
-        <div
-          className={cn(
-            'flex w-full shrink-0 items-center border-t-4 border-outline',
-            collapsed ? 'justify-center py-2' : 'p-3',
-          )}
-        >
-          <NavTile {...bottomItem} collapsed={collapsed} />
-        </div>
-      )}
+      {bottomItems.length > 0 ? (
+        <nav aria-label="Account" className="flex w-full flex-col items-center gap-2">
+          {bottomItems.map((item) => (
+            <RailItem key={item.href} {...item} />
+          ))}
+        </nav>
+      ) : null}
     </aside>
   );
 }

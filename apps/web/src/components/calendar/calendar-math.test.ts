@@ -3,6 +3,7 @@ import {
   bucketPosts,
   composerTimeFor,
   dayKey,
+  dayRows,
   droppedAt,
   hourKey,
   isPastSlot,
@@ -102,5 +103,37 @@ describe('dropping and clicking', () => {
     expect(composerTimeFor({ day: new Date(2026, 9, 11), hour: 9 }, saturday)).toEqual(
       new Date(2026, 9, 11, 15),
     );
+  });
+
+  it('takes an exact time from a day-view row, for drops, clicks and the past check', () => {
+    const monday = new Date(2026, 9, 13);
+
+    expect(droppedAt(saturday, { day: monday, hour: 9, minute: 20 })).toEqual(
+      new Date(2026, 9, 13, 9, 20),
+    );
+    expect(composerTimeFor({ day: monday, hour: 19, minute: 5 }, saturday)).toEqual(
+      new Date(2026, 9, 13, 19, 5),
+    );
+    // 14:20 has arrived at 14:30; 14:40 has not. An hour slot would call both open.
+    expect(isPastSlot({ day: new Date(2026, 9, 11), hour: 14, minute: 20 }, saturday)).toBe(true);
+    expect(isPastSlot({ day: new Date(2026, 9, 11), hour: 14, minute: 40 }, saturday)).toBe(false);
+    // A minute without an hour means nothing: a day drop still keeps the time of day.
+    expect(droppedAt(saturday, { day: monday, minute: 5 })).toEqual(new Date(2026, 9, 13, 14, 30));
+  });
+});
+
+describe('day view rows', () => {
+  it('merges posting times with the times posts sit at, once each, in order', () => {
+    const posts = [
+      { publishDate: new Date(2026, 9, 11, 14, 10).toISOString() },
+      { publishDate: new Date(2026, 9, 11, 9, 0).toISOString() },
+    ];
+
+    expect(dayRows(posts, [1140, 540, 560, 540])).toEqual([540, 560, 850, 1140]);
+  });
+
+  it('drops posting times outside a day and is empty with nothing to show', () => {
+    expect(dayRows([], [-5, 1440, 60])).toEqual([60]);
+    expect(dayRows([], [])).toEqual([]);
   });
 });

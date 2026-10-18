@@ -11,9 +11,11 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { pressSm } from '../lib/press';
 import { cn } from '../lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 import { Skeleton } from './skeleton';
+import { TooltipHint } from './tooltip';
 
 export interface NotificationItem {
   id: string;
@@ -89,32 +91,37 @@ export function NotificationCenter({
   onOpenChange,
   title = 'Notifications',
 }: NotificationCenterProps) {
-  const unread =
-    unreadCount ?? notifications.filter((notification) => !notification.read).length;
+  const unread = unreadCount ?? notifications.filter((notification) => !notification.read).length;
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-          data-testid="notification-bell"
-          data-unread={unread}
-          className={cn(
-            'relative flex h-10 w-10 items-center justify-center rounded-md border-2 border-outline bg-secondary shadow-brutalSm outline-none',
-            'transition-[transform,box-shadow] duration-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-            'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-            className,
-          )}
-        >
-          <Bell className="h-4 w-4 text-ink" strokeWidth={2.5} />
-          {unread > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-outline bg-actionDanger px-1 font-sans text-[10px] font-bold text-onActionLight">
-              {badgeText(unread)}
-            </span>
-          )}
-        </button>
-      </PopoverTrigger>
+      <TooltipHint
+        label={unread > 0 ? `${title} (${badgeText(unread)} unread)` : title}
+        side="bottom"
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+            data-testid="notification-bell"
+            data-unread={unread}
+            className={cn(
+              // 36px, the theme toggle's size, so the top bar's tiles match.
+              'relative flex h-9 w-9 items-center justify-center rounded-md border-2 border-outline bg-secondary outline-none',
+              pressSm,
+              'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+              className,
+            )}
+          >
+            <Bell className="h-4 w-4 text-ink" strokeWidth={2.5} />
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-outline bg-actionDanger px-1 font-sans text-[10px] font-bold text-onActionLight">
+                {badgeText(unread)}
+              </span>
+            )}
+          </button>
+        </PopoverTrigger>
+      </TooltipHint>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between gap-3 border-b-2 border-outline px-4 py-3">
           <p className="type-label text-sm text-ink">{title}</p>

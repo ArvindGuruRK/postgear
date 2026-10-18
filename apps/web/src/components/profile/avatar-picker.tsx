@@ -1,6 +1,6 @@
 'use client';
 
-import { FormErrorMessage, Spinner, Stack, Text, cn } from '@postgear/ui';
+import { cn, FormErrorMessage, pressSm, Spinner, Stack, Text } from '@postgear/ui';
 import { Check, ImagePlus } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api, uploadFile } from '@/lib/api';
@@ -272,8 +272,8 @@ function Tile({
   return (
     <label
       className={cn(
-        'relative block aspect-square cursor-pointer rounded-md border-2 border-outline shadow-brutalSm transition-all duration-100',
-        'hover:-translate-x-px hover:-translate-y-px hover:shadow-brutalMdHover',
+        'relative block aspect-square cursor-pointer rounded-md border-2 border-outline',
+        pressSm,
         'has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focusRing',
         // The selection ring is the action colour, offset from the tile by
         // the page colour so it reads as a ring rather than a thicker border.

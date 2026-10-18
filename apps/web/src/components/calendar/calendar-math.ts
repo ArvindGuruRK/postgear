@@ -128,10 +128,47 @@ export function hourKey(date: Date): string {
   return `${dayKey(date)}T${String(date.getHours()).padStart(2, '0')}`;
 }
 
-export function slotStart(day: Date, hour: number): Date {
+export function slotStart(day: Date, hour: number, minute = 0): Date {
   const next = startOfDay(day);
-  next.setHours(hour);
+  next.setHours(hour, minute);
   return next;
+}
+
+/**
+ * A calendar drop or click target: a whole day (month view), an hour of a day
+ * (week view), or an exact time of a day (the day view's posting-time rows).
+ */
+export interface SlotTime {
+  day: Date;
+  hour?: number;
+  /** Only with `hour`: the day view's rows sit on exact minutes. */
+  minute?: number;
+}
+
+/** Minutes since local midnight. */
+export function minuteOfDay(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+/**
+ * The day view's rows, as minutes since midnight: every channel posting time
+ * plus every time a post on that day actually sits at, once each, in order.
+ *
+ * The reference's day view: a day is the list of moments something goes out,
+ * not 24 empty hours. Posting times are stored as minutes since local
+ * midnight (see channels.schema.ts), which is the unit here too.
+ */
+export function dayRows(
+  dayPosts: Pick<PostSummary, 'publishDate'>[],
+  postingTimes: number[],
+): number[] {
+  const minutes = new Set<number>(postingTimes.filter((time) => time >= 0 && time < 24 * 60));
+
+  for (const post of dayPosts) {
+    minutes.add(minuteOfDay(new Date(post.publishDate)));
+  }
+
+  return [...minutes].sort((a, b) => a - b);
 }
 
 /** Posts grouped by the slot they fall in. */
@@ -155,16 +192,28 @@ export function bucketPosts(
  * Where a dragged post lands.
  *
  * A drop on a day keeps the post's time of day; a drop on an hour keeps its
- * minutes. Dragging to "Tuesday" should not also mean "and at midnight".
+ * minutes; a drop on an exact time takes that time. Dragging to "Tuesday"
+ * should not also mean "and at midnight".
  */
-export function droppedAt(current: Date, target: { day: Date; hour?: number }): Date {
+export function droppedAt(current: Date, target: SlotTime): Date {
   const next = startOfDay(target.day);
-  next.setHours(target.hour ?? current.getHours(), current.getMinutes(), 0, 0);
+  next.setHours(
+    target.hour ?? current.getHours(),
+    target.hour !== undefined && target.minute !== undefined ? target.minute : current.getMinutes(),
+    0,
+    0,
+  );
   return next;
 }
 
-/** True when the whole slot is behind us: nothing can be scheduled into it. */
-export function isPastSlot(slot: { day: Date; hour?: number }, now: Date): boolean {
+/**
+ * True when nothing can be scheduled into the slot any more: a day or an hour
+ * once all of it is behind us, an exact time once it has arrived.
+ */
+export function isPastSlot(slot: SlotTime, now: Date): boolean {
+  if (slot.hour !== undefined && slot.minute !== undefined) {
+    return slotStart(slot.day, slot.hour, slot.minute).getTime() <= now.getTime();
+  }
   const end =
     slot.hour === undefined ? addDays(startOfDay(slot.day), 1) : slotStart(slot.day, slot.hour + 1);
   return end.getTime() <= now.getTime();
@@ -173,13 +222,17 @@ export function isPastSlot(slot: { day: Date; hour?: number }, now: Date): boole
 /**
  * The time a new post starts at when a slot is clicked.
  *
- * A clicked hour is that hour; a clicked day is 9:00. The first of the
- * schema's default posting times is two hours in, but nine is what people
- * mean by "the morning". Today's past hours roll forward to the next whole
- * hour, so a click on today never opens the composer at a time in the past.
+ * A clicked hour is that hour, a clicked posting time is that time, and a
+ * clicked day is 9:00. The first of the schema's default posting times is two
+ * hours in, but nine is what people mean by "the morning". Today's past hours
+ * roll forward to the next whole hour, so a click on today never opens the
+ * composer at a time in the past.
  */
-export function composerTimeFor(slot: { day: Date; hour?: number }, now: Date): Date {
-  const requested = slotStart(slot.day, slot.hour ?? 9);
+export function composerTimeFor(slot: SlotTime, now: Date): Date {
+  const requested =
+    slot.hour === undefined
+      ? slotStart(slot.day, 9)
+      : slotStart(slot.day, slot.hour, slot.minute ?? 0);
 
   if (requested.getTime() > now.getTime()) {
     return requested;
@@ -219,6 +272,14 @@ export function rangeLabel(view: CalendarView, anchor: Date): string {
       return `${startLabel} – ${endLabel}`;
     }
   }
+}
+
+/** "9:20 AM" / "09:20": a day-view row label, in the viewer's clock convention. */
+export function minuteLabel(minutes: number): string {
+  return slotStart(new Date(2026, 0, 1), Math.floor(minutes / 60), minutes % 60).toLocaleTimeString(
+    undefined,
+    { hour: 'numeric', minute: '2-digit' },
+  );
 }
 
 /** "9 AM" / "09:00": the hour gutter label, in the viewer's clock convention. */

@@ -2,7 +2,17 @@
 
 > **PRD Coverage**: Section 5.3 (Post Creation & Content Management Module).
 > **Depends on**: [Sprint 2](sprint-02-auth-and-organizations.md) (org scoping), [Sprint 3](sprint-03-social-integrations.md) (channels to target/preview).
-> **Reference repo**: `D:\rk-personal-projects\postiz-app-main` (study only).
+> **Reference repo**: `D:\rk-personal-projects\postiz-app-main` (study only for logic; UI inspiration allowed, see below).
+
+> **UI revamp (2026-10-18)**: the composer and media library are being rebuilt to follow Postiz's UX. Screenshots `10` to `16` in [`../screenshots/`](../screenshots/README.md) are the target; the Postiz source is `apps/frontend/src/components/new-launch/` and `components/media/`. Take the pattern, write the code fresh in PostGear's components (Postiz is AGPL-3.0). This reverses the earlier choice of a dedicated `/composer` route: the composer becomes a modal opened from the calendar, the sidebar and empty calendar slots.
+>
+> Target composer layout:
+> - **Header**: "Create Post" on the left (or the edit state when editing), close on the right of the preview column.
+> - **Left column, editor**: connected-channel avatars across the top as the target picker (selected ones get a ring); a global-edit button and, once channels are picked, one tab per channel for per-channel overrides; the editor itself; a toolbar under it (Insert Media, Design Media, AI Image, AI Video, signature, underline, bold, emoji) with a validity badge and character counter (`292/3000`) on the right; attached media as thumbnails inside the editor; "Add comment / post" for threads; a collapsible per-channel Settings bar for platform-specific options.
+> - **Right column, Post Preview**: "Start writing your post for a preview" when empty, a generic card in global edit, the platform-styled card (for example LinkedIn with reactions and Like / Comment / Repost / Send) when a channel tab is focused.
+> - **Footer**: Add New Tag and Repeat Post on the left; Delete Post (edit only), the date-time picker, Save as draft and the primary split button on the right. The primary label tells the user what is missing ("Check the circles above") until the post is valid, then reads "Add to Calendar", or "Update" when editing.
+> - **Media Library modal**: search by file name with Upload beside it, square thumbnail grid with file names over each tile, expand on hover, delete in the corner, Cancel and "Add selected media" in the footer.
+> - **AI modals**: "Generate AI Image" with a prompt box, a row of style chips and one full-width Generate button; "Generate Posts" with a free-text brief, output format and voice selects, an "Add pictures?" checkbox and one Generate button.
 
 ## Sprint Goal
 

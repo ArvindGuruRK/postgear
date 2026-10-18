@@ -31,16 +31,62 @@ test('calendar arrows are clickable, not buried under the caption', async ({ pag
   await expect(caption).not.toHaveText(before ?? '');
 });
 
-test('sidebar expands from the rail and collapses back', async ({ page }) => {
-  const sidebar = page.locator('aside').first();
-  await expect(sidebar).toHaveClass(/w-20/);
+test('rail shows every section with its label and marks the current one', async ({ page }) => {
+  const rail = page.getByRole('complementary', { name: 'Main' });
+  await expect(rail.getByRole('img', { name: 'PostGear' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Expand sidebar' }).click();
-  await expect(sidebar).toHaveClass(/w-56/);
-  await expect(sidebar.getByText('PostGear')).toBeVisible();
+  const sections = rail.getByRole('navigation', { name: 'Sections' });
+  await expect(sections.getByRole('link', { name: 'Calendar' })).toBeVisible();
+  await expect(sections.getByRole('link', { name: 'Design System' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(sections.getByRole('link', { name: 'Calendar' })).not.toHaveAttribute(
+    'aria-current',
+  );
 
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click();
-  await expect(sidebar).toHaveClass(/w-20/);
+  await expect(
+    rail.getByRole('navigation', { name: 'Account' }).getByRole('link', { name: 'Settings' }),
+  ).toBeVisible();
+});
+
+test('tooltips open on hover and focus, on the side asked for, even on a disabled button', async ({
+  page,
+}) => {
+  // Radix renders the label twice: the visible content (data-side) and a
+  // visually hidden role="tooltip" copy for screen readers.
+  const visible = page.locator('[data-slot="tooltip-content"]');
+
+  // Radix opens on pointermove inside the trigger. `locator.hover()` jumps
+  // the pointer there in a single move, which a real mouse never does, so
+  // glide in over a few steps instead, from above, where the row's label
+  // sits: from the side would cross the neighbouring button first. Retried,
+  // because on this long page a glide made before hydration finishes lands
+  // on a button with no handlers yet.
+  async function glideOnto(name: string) {
+    const target = page.getByRole('button', { name, exact: true });
+    await target.scrollIntoViewIfNeeded();
+    await expect(async () => {
+      const box = await target.boundingBox();
+      if (!box) throw new Error(`${name} has no box`);
+      await page.mouse.move(box.x + box.width / 2, box.y - 24);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
+      await expect(visible).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+  }
+
+  await glideOnto('right');
+  await expect(visible).toHaveAttribute('data-side', 'right');
+  await expect(page.getByRole('tooltip')).toHaveText('Opens right');
+
+  // A disabled button gets no pointer events; the wrapper hovers for it.
+  await glideOnto('Add Channel');
+  await expect(page.getByRole('tooltip')).toHaveText('This plan’s channel limit is reached');
+
+  // Keyboard focus opens it too: the icon-only AI button names itself.
+  await page.mouse.move(0, 0);
+  await page.getByRole('button', { name: 'Generate with AI' }).focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Generate with AI');
 });
 
 test('theme toggle is not covered by anything and flips the body class', async ({ page }) => {

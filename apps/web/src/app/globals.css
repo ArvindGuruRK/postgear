@@ -126,6 +126,10 @@
 .pg-scrollbar-secondary {
   --pg-scrollbar-track: var(--color-secondary);
 }
+/* The frame layer (rail, calendar channel column): see --color-chrome. */
+.pg-scrollbar-chrome {
+  --pg-scrollbar-track: var(--color-chrome);
+}
 
 /* ── Single scroll surface ──────────────────────────────────────────────
    AppShell (apps/web/src/components/navigation/app-shell.tsx) renders

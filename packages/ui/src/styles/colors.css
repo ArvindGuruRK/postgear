@@ -142,24 +142,20 @@
        other dark-mode surface separates by value rather than by border. */
     --color-plate: #000000;
     --color-on-plate: var(--color-brutal-secondary);
-    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md: 4px 4px 0 var(--color-outline);
-    --shadow-brutal-lg: 6px 6px 0 var(--color-outline);
-    /* Applied on :active alongside a translate(2px, 2px); see the "press
-       interaction" recipe in the Sprint 0 doc. Shadow collapses to nothing
-       as the element visually moves into the space it occupied. */
+    /* The shadow offsets, as their own tokens (2026-10-18), so a pressable
+       control can move by exactly its shadow's depth when it sinks into it
+       (press-sm / press-md in packages/ui/src/lib/press.ts, after the
+       neobrutalism.dev button). One scale per scheme; a theme that wants a
+       lighter depth overrides these three and every shadow follows. */
+    --brutal-offset-sm: 2px;
+    --brutal-offset-md: 4px;
+    --brutal-offset-lg: 6px;
+    --shadow-brutal-sm: var(--brutal-offset-sm) var(--brutal-offset-sm) 0 var(--color-outline);
+    --shadow-brutal-md: var(--brutal-offset-md) var(--brutal-offset-md) 0 var(--color-outline);
+    --shadow-brutal-lg: var(--brutal-offset-lg) var(--brutal-offset-lg) 0 var(--color-outline);
+    /* The pressed state: the control has moved into the space its shadow
+       occupied, so the shadow collapses to nothing. */
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
-    /* Button-only hover "lift" (added 2026-08-30, per direct product
-       feedback referencing the Sentry-style pushable-button feel already
-       prototyped on Button2; see --shadow-brutal-btn-hover below).
-       Deliberately tiny (a first pass at 2px read as "too high"): grows
-       shadow-brutal-md's diagonal offset by just 1px on each axis; paired
-       in button.tsx with hover:-translate-x-px hover:-translate-y-px so
-       the shadow's far corner stays anchored at the same page position
-       while the button visibly, barely rises off it. No fill/color change
-       on hover (moved to :active instead, alongside the existing press
-       translate; see design-system-rules.md §6/§8). Scoped to Button. */
-    --shadow-brutal-md-hover: 5px 5px 0 var(--color-outline);
     /* Button-only "pushable" shadow (added 2026-08-30, per a comic
        component-sheet reference): bottom-offset only, reading as a solid
        ink base the button sits on top of, not the diagonal offset every
@@ -171,16 +167,14 @@
        diagonal family everywhere else. */
     --shadow-brutal-btn: 0 4px 0 var(--color-outline);
     --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
-    /* Surface shadows (2026-10-17): containers, fields and overlays
-       (Card, Panel, Input, Calendar, menus, dialogs...), split from the
-       diagonal `brutal` family that pressable controls keep. Dark mode keeps
-       the original diagonal values on purpose: against #121212 the near-black
-       offset barely reads and the look was signed off as-is (briefly matched
-       to light mode, then reverted the same day by product decision). See the
-       .light block for the bottom-only treatment. */
-    --shadow-surface-sm: 2px 2px 0 var(--color-outline);
-    --shadow-surface-md: 4px 4px 0 var(--color-outline);
-    --shadow-surface-lg: 6px 6px 0 var(--color-outline);
+    /* Surface shadows: containers, fields and overlays (Card, Panel,
+       Input, Calendar, menus, dialogs...). Named apart from the `brutal`
+       family that pressable controls use, but the same diagonal in every
+       theme of both schemes (2026-10-18): right and bottom, never
+       bottom-only. */
+    --shadow-surface-sm: var(--shadow-brutal-sm);
+    --shadow-surface-md: var(--shadow-brutal-md);
+    --shadow-surface-lg: var(--shadow-brutal-lg);
   }
   .light {
     --color-ink: #0a0a0a;
@@ -195,22 +189,22 @@
     --color-plate: #0a0a0a;
     --color-on-plate: var(--color-brutal-secondary);
     /* Light mode runs lighter than dark (2026-10-17): on the pale page a
-       solid black offset reads as heavy, so the diagonal for pressable
-       controls (Button, Tabs, NavigationMenu, active nav items) is about a
-       quarter smaller than dark mode's. */
-    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md: 3px 3px 0 var(--color-outline);
-    --shadow-brutal-lg: 4px 4px 0 var(--color-outline);
+       solid black offset reads as heavy, so the diagonal is about a quarter
+       smaller than dark mode's. Same direction as dark, right and bottom,
+       for surfaces as well as controls (2026-10-18: the bottom-only surface
+       shadow light mode had made the two schemes look like two products). */
+    --brutal-offset-sm: 2px;
+    --brutal-offset-md: 3px;
+    --brutal-offset-lg: 4px;
+    --shadow-brutal-sm: var(--brutal-offset-sm) var(--brutal-offset-sm) 0 var(--color-outline);
+    --shadow-brutal-md: var(--brutal-offset-md) var(--brutal-offset-md) 0 var(--color-outline);
+    --shadow-brutal-lg: var(--brutal-offset-lg) var(--brutal-offset-lg) 0 var(--color-outline);
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
-    --shadow-brutal-md-hover: 4px 4px 0 var(--color-outline);
     --shadow-brutal-btn: 0 4px 0 var(--color-outline);
     --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
-    /* Surfaces sit on a short bottom-only base, like Button2: no sideways
-       offset, so a card's right edge no longer reads twice as thick as its
-       left. */
-    --shadow-surface-sm: 0 2px 0 var(--color-outline);
-    --shadow-surface-md: 0 3px 0 var(--color-outline);
-    --shadow-surface-lg: 0 4px 0 var(--color-outline);
+    --shadow-surface-sm: var(--shadow-brutal-sm);
+    --shadow-surface-md: var(--shadow-brutal-md);
+    --shadow-surface-lg: var(--shadow-brutal-lg);
   }
 }
 
@@ -290,8 +284,8 @@
     --color-outline: #111111;
   }
   /* White: light grey page with white frame, cards and fields, and the
-     lightest depth: every surface shares one 2px bottom base, buttons keep a
-     2px diagonal. Closest to a mainstream SaaS while keeping the outlines. */
+     lightest depth: every shadow, control or surface, is one 2px diagonal.
+     Closest to a mainstream SaaS while keeping the outlines. */
   .light[data-light-theme='white'] {
     --color-primary: #f5f5f3;
     --color-chrome: #ffffff;
@@ -299,13 +293,9 @@
     --color-field: #ffffff;
     --color-ink: #0a0a0a;
     --color-outline: #0a0a0a;
-    --shadow-surface-sm: 0 2px 0 var(--color-outline);
-    --shadow-surface-md: 0 2px 0 var(--color-outline);
-    --shadow-surface-lg: 0 2px 0 var(--color-outline);
-    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-lg: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md-hover: 3px 3px 0 var(--color-outline);
+    --brutal-offset-sm: 2px;
+    --brutal-offset-md: 2px;
+    --brutal-offset-lg: 2px;
   }
   /* Cool: slate-tinted page and a blue-grey frame that sit with the blue
      primary, blue-white cards, and a deep navy-black (#0f172a) for ink and
@@ -320,9 +310,8 @@
     --color-outline: #0f172a;
   }
   /* Lilac: the classic neo-brutalist landing-page look. A pale violet
-     ground, a deeper lilac frame, violet-white cards, pure black outlines,
-     and the diagonal shadow back on surfaces too, but at 3px rather than the
-     old 4px-plus-4px-border weight. The loudest, most "comic" free option. */
+     ground, a deeper lilac frame, violet-white cards and pure black
+     outlines. The loudest, most "comic" free option. */
   .light[data-light-theme='lilac'] {
     --color-primary: #ece9fb;
     --color-chrome: #d9d2fb;
@@ -330,13 +319,10 @@
     --color-field: #ffffff;
     --color-ink: #0a0a0a;
     --color-outline: #000000;
-    --shadow-surface-sm: 2px 2px 0 var(--color-outline);
-    --shadow-surface-md: 3px 3px 0 var(--color-outline);
-    --shadow-surface-lg: 4px 4px 0 var(--color-outline);
   }
   /* Mint (premium): a fresh green-white page, a sage frame, near-white
      cards, and a deep forest ink (#052e1a) instead of black, so the outlines
-     read green-tinted rather than harsh. Standard bottom-only surfaces. */
+     read green-tinted rather than harsh. Standard shadows. */
   .light[data-light-theme='mint'] {
     --color-primary: #eaf6ee;
     --color-chrome: #cdebd9;
@@ -346,8 +332,7 @@
     --color-outline: #052e1a;
   }
   /* Grape (premium): a redder, richer purple than Lilac. An orchid page and
-     frame, an aubergine ink (#1f0a33), and Lilac's diagonal surface shadow so
-     it keeps the comic pop that suits a saturated ground. */
+     frame and an aubergine ink (#1f0a33). */
   .light[data-light-theme='grape'] {
     --color-primary: #f3eafb;
     --color-chrome: #e4cff6;
@@ -355,9 +340,6 @@
     --color-field: #ffffff;
     --color-ink: #1f0a33;
     --color-outline: #1f0a33;
-    --shadow-surface-sm: 2px 2px 0 var(--color-outline);
-    --shadow-surface-md: 3px 3px 0 var(--color-outline);
-    --shadow-surface-lg: 4px 4px 0 var(--color-outline);
   }
   /* Peach (premium): the warmest option. A blush-apricot page, a peach
      frame, warm-white cards and an espresso ink (#2a1206). Cream's warmth
@@ -380,13 +362,9 @@
     --color-field: #ffffff;
     --color-ink: #0b2239;
     --color-outline: #0b2239;
-    --shadow-surface-sm: 0 2px 0 var(--color-outline);
-    --shadow-surface-md: 0 2px 0 var(--color-outline);
-    --shadow-surface-lg: 0 2px 0 var(--color-outline);
-    --shadow-brutal-sm: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-lg: 2px 2px 0 var(--color-outline);
-    --shadow-brutal-md-hover: 3px 3px 0 var(--color-outline);
+    --brutal-offset-sm: 2px;
+    --brutal-offset-md: 2px;
+    --brutal-offset-lg: 2px;
   }
   /* Rose (premium): a soft pink page, a rose-quartz frame, blush-white
      cards and a deep wine ink (#2b0a13). Standard surfaces. */

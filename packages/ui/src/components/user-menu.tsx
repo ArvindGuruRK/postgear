@@ -1,21 +1,31 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
+import { Check, type LucideIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './dropdown-menu';
+import { TooltipHint } from './tooltip';
 
 export interface UserMenuItem {
   label: string;
   icon?: LucideIcon;
   onSelect?: () => void;
   danger?: boolean;
+  /** Marks the current choice within a group, e.g. the active workspace. */
+  checked?: boolean;
+}
+
+/** A titled section above the main items, e.g. the workspaces to switch between. */
+export interface UserMenuGroup {
+  label: string;
+  items: UserMenuItem[];
 }
 
 export interface UserMenuProps {
@@ -23,9 +33,38 @@ export interface UserMenuProps {
   email?: string;
   avatarUrl?: string;
   items: UserMenuItem[];
+  groups?: UserMenuGroup[];
+  /** The avatar's hover label. */
+  tooltip?: string;
 }
 
-export function UserMenu({ name, email, avatarUrl, items }: UserMenuProps) {
+function MenuItem({ item }: { item: UserMenuItem }) {
+  const Icon = item.icon;
+  return (
+    <DropdownMenuItem
+      onSelect={item.onSelect}
+      aria-current={item.checked ? 'true' : undefined}
+      className={
+        item.danger ? 'text-actionDanger focus:bg-actionDanger focus:text-onActionLight' : undefined
+      }
+    >
+      {Icon && <Icon className="h-4 w-4" strokeWidth={2.5} />}
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {item.checked && (
+        <Check className="ms-2 h-4 w-4 shrink-0" strokeWidth={3} aria-hidden="true" />
+      )}
+    </DropdownMenuItem>
+  );
+}
+
+export function UserMenu({
+  name,
+  email,
+  avatarUrl,
+  items,
+  groups = [],
+  tooltip = 'Account',
+}: UserMenuProps) {
   const initials = name
     .split(' ')
     .map((part) => part[0])
@@ -35,18 +74,20 @@ export function UserMenu({ name, email, avatarUrl, items }: UserMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Open user menu"
-          className="rounded-full outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
-        >
-          <Avatar size="sm">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
-        </button>
-      </DropdownMenuTrigger>
+      <TooltipHint label={tooltip} side="bottom" align="end">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Open user menu"
+            className="rounded-full outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+          >
+            <Avatar size="sm">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
+              <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+          </button>
+        </DropdownMenuTrigger>
+      </TooltipHint>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>
           <span className="block type-ui text-sm text-ink">{name}</span>
@@ -56,20 +97,21 @@ export function UserMenu({ name, email, avatarUrl, items }: UserMenuProps) {
             </span>
           )}
         </DropdownMenuLabel>
+        {groups.map((group) => (
+          <DropdownMenuGroup key={group.label} aria-label={group.label}>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+            {group.items.map((item, index) => (
+              // Index keys: two workspaces may share a name.
+              // biome-ignore lint/suspicious/noArrayIndexKey: labels are not unique within a group
+              <MenuItem key={index} item={item} />
+            ))}
+          </DropdownMenuGroup>
+        ))}
         <DropdownMenuSeparator />
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <DropdownMenuItem
-              key={item.label}
-              onSelect={item.onSelect}
-              className={item.danger ? 'text-actionDanger focus:bg-actionDanger focus:text-onActionLight' : undefined}
-            >
-              {Icon && <Icon className="h-4 w-4" strokeWidth={2.5} />}
-              {item.label}
-            </DropdownMenuItem>
-          );
-        })}
+        {items.map((item) => (
+          <MenuItem key={item.label} item={item} />
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

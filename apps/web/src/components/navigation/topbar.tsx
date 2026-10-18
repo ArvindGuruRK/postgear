@@ -1,10 +1,8 @@
-import { Input } from '@postgear/ui';
-import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ThemeToggle } from './theme-toggle';
 
 /**
- * `orgSwitcher` and `accountMenu` are slots rather than imports.
+ * `accountMenu` and `notifications` are slots rather than imports.
  *
  * Both of their real implementations read workspace context that only exists
  * inside `[orgId]/layout.tsx`. Importing them here would make the entire app
@@ -16,31 +14,29 @@ import { ThemeToggle } from './theme-toggle';
  * As slots, the chrome stays context-free and each caller supplies whatever it
  * can: the dashboard passes the live components, the playground passes demo
  * ones.
+ *
+ * Layout (UI revamp, 2026-10-18), after the reference's header: the page's
+ * name on the left as the one h1, and the utilities on the right (theme,
+ * notifications, and the account, which also holds the workspace switcher).
+ * It sits on the page ground with no frame, no rule under it and no
+ * dividers between its buttons: the title's size and the spacing do that
+ * work, and decorative rules read as generated UI. The search field that
+ * used to sit here is gone: it searched nothing.
  */
 export function TopBar({
   title,
-  orgSwitcher,
   accountMenu,
   notifications,
 }: {
   title: string;
-  orgSwitcher?: ReactNode;
   accountMenu?: ReactNode;
-  /** The notification bell (Sprint 8): a slot for the same reason as the two above. */
+  /** The notification bell (Sprint 8): a slot for the same reason as the account menu. */
   notifications?: ReactNode;
 }) {
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b-4 border-outline bg-chrome px-6">
-      {orgSwitcher}
-      <h1 className="type-heading text-xl text-ink">{title}</h1>
-      <div className="ml-auto flex items-center gap-4">
-        <div className="relative hidden sm:block">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink opacity-50"
-            strokeWidth={2.5}
-          />
-          <Input placeholder="Search…" className="w-64 pl-9" size="sm" />
-        </div>
+    <header className="flex h-20 shrink-0 items-center gap-4 px-3">
+      <h1 className="min-w-0 flex-1 truncate type-heading text-2xl text-ink">{title}</h1>
+      <div className="flex shrink-0 items-center gap-3">
         <ThemeToggle saveToAccount />
         {notifications}
         {accountMenu}
