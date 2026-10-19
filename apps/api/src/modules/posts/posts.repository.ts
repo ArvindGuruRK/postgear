@@ -33,7 +33,7 @@
  * edit, reorder included.
  */
 import { Injectable } from '@nestjs/common';
-import { Prisma, prisma, type PrismaTransactionClient, State } from '@postgear/db';
+import { Prisma, type PrismaTransactionClient, prisma, State } from '@postgear/db';
 import { canTransition } from './post-state';
 
 /** One stored row, as the service needs it. */
@@ -52,8 +52,15 @@ export interface PostRow {
   releaseURL: string | null;
   /** The worker's publish status JSON, on a chain's root row: see `@postgear/scheduling`. */
   error: string | null;
+  /** Days between repeats, or null (2026-10-19). Every row of a group holds the same value. */
+  intervalInDays: number | null;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * The row's live tags, in the order they were added (2026-10-19). Only a
+   * chain's root carries any; deleted tags are filtered out by the query.
+   */
+  tags: { tag: { id: string; name: string; color: string } }[];
   integration: {
     id: string;
     name: string;
@@ -75,7 +82,17 @@ export interface GroupWrite {
   group: string;
   state: 'DRAFT' | 'QUEUE';
   publishDate: Date;
-  channels: { integrationId: string; customized: boolean; parts: StoredPart[] }[];
+  /** Written on every row of the group; null means no repeat. */
+  intervalInDays: number | null;
+  /** Live tag ids of this workspace, already checked, in display order. */
+  tagIds: string[];
+  channels: {
+    integrationId: string;
+    customized: boolean;
+    /** Already validated against the channel's provider: see `validateProviderSettings`. */
+    settings: Record<string, unknown>;
+    parts: StoredPart[];
+  }[];
 }
 
 export type ReplaceOutcome = 'saved' | 'not_found' | 'locked' | 'conflict';
@@ -108,32 +125,46 @@ export type PublishNowOutcome =
   | { outcome: 'not_found' }
   | { outcome: 'not_queued' };
 
-const ROW_SELECT = {
-  id: true,
-  group: true,
-  integrationId: true,
-  parentPostId: true,
-  state: true,
-  publishDate: true,
-  content: true,
-  image: true,
-  settings: true,
-  releaseId: true,
-  releaseURL: true,
-  error: true,
-  createdAt: true,
-  updatedAt: true,
-  integration: {
-    select: {
-      id: true,
-      name: true,
-      providerIdentifier: true,
-      picture: true,
-      profile: true,
-      deletedAt: true,
+/**
+ * The columns of a `PostRow`. A function of the workspace because the tag
+ * join is scoped to it as well as to live tags: a link to another
+ * workspace's tag cannot be written (the service checks every id), and if one
+ * ever were, it would still never be read back.
+ */
+function rowSelect(orgId: string) {
+  return {
+    id: true,
+    group: true,
+    integrationId: true,
+    parentPostId: true,
+    state: true,
+    publishDate: true,
+    content: true,
+    image: true,
+    settings: true,
+    releaseId: true,
+    releaseURL: true,
+    error: true,
+    intervalInDays: true,
+    createdAt: true,
+    updatedAt: true,
+    tags: {
+      where: { tag: { orgId, deletedAt: null } },
+      orderBy: [{ createdAt: 'asc' }, { tagId: 'asc' }],
+      select: { tag: { select: { id: true, name: true, color: true } } },
     },
-  },
-} as const;
+    integration: {
+      select: {
+        id: true,
+        name: true,
+        providerIdentifier: true,
+        picture: true,
+        profile: true,
+        deletedAt: true,
+      },
+    },
+  } satisfies Prisma.PostSelect;
+}
 
 /**
  * Serializable, because the optimistic `expectedUpdatedAt` check alone is a
@@ -187,7 +218,7 @@ export class PostsRepository {
         group: { in: groups.map((entry) => entry.group) },
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: ROW_SELECT,
+      select: rowSelect(params.orgId),
     });
   }
 
@@ -195,7 +226,7 @@ export class PostsRepository {
     return prisma.post.findMany({
       where: { organizationId: orgId, group, deletedAt: null },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: ROW_SELECT,
+      select: rowSelect(orgId),
     });
   }
 
@@ -378,7 +409,7 @@ export class PostsRepository {
         group: { in: groups.map((entry) => entry.group) },
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: ROW_SELECT,
+      select: rowSelect(params.orgId),
     });
   }
 
@@ -431,7 +462,7 @@ export class PostsRepository {
         group: { in: page.map((entry) => entry.group) },
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      select: ROW_SELECT,
+      select: rowSelect(query.orgId),
     });
 
     return { rows, total: all.length };
@@ -544,8 +575,12 @@ export class PostsRepository {
     channel: GroupWrite['channels'][number],
     existingIds: string[],
   ): Promise<void> {
-    const settings = JSON.stringify({ customized: channel.customized });
+    // The composer's flag first, then the provider's options (2026-10-19),
+    // on every row of the chain: the worker reads them from whichever row it
+    // publishes, and drops `customized` before handing them to the provider.
+    const settings = JSON.stringify({ customized: channel.customized, ...channel.settings });
     let previousId: string | null = null;
+    let rootId: string | null = null;
 
     for (const [index, part] of channel.parts.entries()) {
       const data = {
@@ -554,6 +589,7 @@ export class PostsRepository {
         settings,
         state: write.state,
         publishDate: write.publishDate,
+        intervalInDays: write.intervalInDays,
         parentPostId: previousId,
         // A save is a new version; whatever the worker recorded about the old
         // one (a failure, a retry in progress) no longer describes it.
@@ -573,6 +609,7 @@ export class PostsRepository {
             settings: data.settings,
             state: data.state,
             publishDate: data.publishDate,
+            intervalInDays: data.intervalInDays,
             group: write.group,
             creationMethod: 'WEB',
             organization: { connect: { id: write.orgId } },
@@ -588,6 +625,8 @@ export class PostsRepository {
         });
         previousId = created.id;
       }
+
+      rootId ??= previousId;
     }
 
     const surplus = existingIds.slice(channel.parts.length);
@@ -598,6 +637,42 @@ export class PostsRepository {
         data: { deletedAt: new Date(), parentPostId: null },
       });
     }
+
+    if (rootId) {
+      await this.writeTags(tx, write, rootId);
+    }
+  }
+
+  /**
+   * Replaces a chain root's tags with the save's, keeping their order.
+   *
+   * Tags hang off the root only (the post as a person sees it, once per
+   * channel), and a save is the whole post, so the old links go and the new
+   * ones are written with ascending `createdAt`, which is what reads order
+   * them by: one `createMany` would stamp them all with the same instant.
+   */
+  private async writeTags(
+    tx: PrismaTransactionClient,
+    write: GroupWrite,
+    rootId: string,
+  ): Promise<void> {
+    await tx.tagsPosts.deleteMany({
+      where: { postId: rootId, post: { organizationId: write.orgId } },
+    });
+
+    if (write.tagIds.length === 0) {
+      return;
+    }
+
+    const base = Date.now();
+
+    await tx.tagsPosts.createMany({
+      data: write.tagIds.map((tagId, index) => ({
+        postId: rootId,
+        tagId,
+        createdAt: new Date(base + index),
+      })),
+    });
   }
 }
 

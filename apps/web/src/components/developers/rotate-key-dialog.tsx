@@ -72,14 +72,14 @@ export function RotateKeyDialog({ apiKey, onOpenChange, onRotated }: RotateKeyDi
         <AlertDialogHeader>
           <AlertDialogTitle>Rotate {apiKey?.name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            A new secret is issued under the same name and the current one ({apiKey?.prefix}…)
-            stops working immediately. Any integration still sending the old secret will be refused
-            until you update it.
+            A new secret is issued under the same name and the current one ({apiKey?.prefix}…) stops
+            working immediately. Any integration still sending the old secret will be refused until
+            you update it.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {error ? (
-          <Text size="sm" className="text-actionDanger">
+          <Text size="sm" className="text-dangerInk">
             {error}
           </Text>
         ) : null}

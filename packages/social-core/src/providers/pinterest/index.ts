@@ -41,6 +41,7 @@ import {
   type SupportsEntitySelection,
 } from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
+import { isSafeHref } from '../../composer/document';
 import type { ProviderRules } from '../../composer/rules';
 
 const AUTHORIZE_URL = 'https://www.pinterest.com/oauth/';
@@ -270,6 +271,17 @@ export class PinterestProvider
     }
 
     const [firstLine, ...rest] = post.message.split('\n');
+    // An empty or blank title is "not set", as `validateProviderSettings`
+    // treats it, so the first line stands in rather than an empty title.
+    // Only then does the first line leave the description: with a title of
+    // its own, the whole post is the description.
+    const ownTitle =
+      typeof post.settings?.title === 'string' && post.settings.title.trim()
+        ? post.settings.title.trim()
+        : null;
+    const title = ownTitle ?? firstLine;
+    const description = ownTitle || rest.length === 0 ? post.message : rest.join('\n');
+    const link = typeof post.settings?.link === 'string' ? post.settings.link.trim() : '';
 
     const response = await this.fetchJson<{ id?: string }>(`${API_BASE}/pins`, {
       method: 'POST',
@@ -280,12 +292,9 @@ export class PinterestProvider
       body: JSON.stringify({
         // The board chosen during connect is this channel's target.
         board_id: channel.internalId,
-        title: (typeof post.settings?.title === 'string' ? post.settings.title : firstLine).slice(
-          0,
-          MAX_TITLE_LENGTH,
-        ),
-        description: (rest.length > 0 ? rest.join('\n') : post.message).slice(0, MAX_LENGTH),
-        link: typeof post.settings?.link === 'string' ? post.settings.link : undefined,
+        title: title.slice(0, MAX_TITLE_LENGTH),
+        description: description.slice(0, MAX_LENGTH),
+        link: link && isSafeHref(link) ? link : undefined,
         media_source: {
           source_type: item.type === 'video' ? 'video_id' : 'image_url',
           url: item.path,

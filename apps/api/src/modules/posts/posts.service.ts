@@ -14,6 +14,15 @@
  * composer runs in the browser and the provider runs before publishing.
  * Queueing hands the post to the scheduler (Sprint 5): every save tells it
  * which rows to wait on and which to forget.
+ *
+ * ## Settings, tags and repeat ride with the save (2026-10-19)
+ *
+ * A save is the whole post, so each channel's provider settings, the tags and
+ * the repeat interval are replaced by every save, absent meaning none. The
+ * settings follow the same split as the content: their types and bounds are
+ * checked on every save, a required one only on the way into the queue.
+ * Repeating itself is the worker's: after each successful publish it queues
+ * the next occurrence (see `apps/worker/src/lib/next-occurrence.ts`).
  */
 import { randomUUID } from 'node:crypto';
 import {
@@ -31,7 +40,9 @@ import {
   type PostDocument,
   parseDocument,
   renderPlainText,
+  settingsFieldsFor,
   validatePost,
+  validateProviderSettings,
 } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
 import { type ChannelColors, colorOf } from '../channels/channel-colors';
@@ -40,6 +51,7 @@ import { ChannelsService } from '../channels/channels.service';
 import type { MediaView } from '../media/media.service';
 import { MediaService } from '../media/media.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
+import { TagsService, type TagView, toTagView } from '../tags/tags.service';
 import type {
   CalendarQuery,
   CreatePostInput,
@@ -97,6 +109,11 @@ export interface PostChannelView extends ChannelPublishView {
   /** True when the channel was disconnected after the post was saved. */
   disconnected: boolean;
   parts: PartView[];
+  /**
+   * The platform's own options (2026-10-19), keyed as social-core's
+   * `PROVIDER_SETTINGS` lists them; empty when none were set.
+   */
+  settings: Record<string, unknown>;
 }
 
 export interface PostDetail {
@@ -107,6 +124,10 @@ export interface PostDetail {
   updatedAt: Date;
   shared: PartView[];
   channels: PostChannelView[];
+  /** Live tags, in the order they were added (2026-10-19). */
+  tags: TagView[];
+  /** Days between repeats; null when the post does not repeat (2026-10-19). */
+  intervalInDays: number | null;
 }
 
 export interface PostSummary {
@@ -116,6 +137,9 @@ export interface PostSummary {
   updatedAt: Date;
   preview: string;
   parts: number;
+  /** Live tags, in order; the calendar card takes the first one's colour. */
+  tags: TagView[];
+  intervalInDays: number | null;
   channels: Pick<
     PostChannelView,
     | 'channelId'
@@ -146,6 +170,7 @@ export class PostsService {
     private readonly channels: ChannelsService,
     private readonly media: MediaService,
     private readonly scheduling: SchedulingService,
+    private readonly tags: TagsService,
   ) {}
 
   /** Every post with a channel scheduled inside the range, for the calendar. */
@@ -281,9 +306,17 @@ export class PostsService {
 
   async create(orgId: string, input: CreatePostInput): Promise<PostDetail> {
     const group = randomUUID();
-    const write = await this.prepare(orgId, input);
+    const { publishNow, ...write } = await this.prepare(orgId, input);
 
     await this.repository.createGroup({ orgId, group, ...write });
+
+    // "Post now" on save (2026-10-19, Postiz's button): the post was written
+    // to the queue at the current time, and is handed to the worker through
+    // exactly the path `POST /posts/:group/publish-now` takes.
+    if (publishNow) {
+      return this.publishNow(orgId, group);
+    }
+
     await this.syncSchedules(orgId, await this.repository.findRoots(orgId, group));
 
     return this.get(orgId, group);
@@ -294,7 +327,7 @@ export class PostsService {
       throw new NotFoundException(POST_MESSAGES.NOT_FOUND);
     }
 
-    const write = await this.prepare(orgId, input);
+    const { publishNow, ...write } = await this.prepare(orgId, input);
     const before = await this.repository.findRoots(orgId, group);
     const outcome = await this.repository.replaceGroup({
       orgId,
@@ -318,6 +351,11 @@ export class PostsService {
         await this.scheduling.cancelPublish(
           before.filter((root) => !kept.has(root.id)).map((root) => root.id),
         );
+
+        if (publishNow) {
+          return this.publishNow(orgId, group);
+        }
+
         await this.syncSchedules(orgId, after);
         return this.get(orgId, group);
       }
@@ -372,11 +410,20 @@ export class PostsService {
   ): Promise<{
     state: 'DRAFT' | 'QUEUE';
     publishDate: Date;
-    channels: { integrationId: string; customized: boolean; parts: StoredPart[] }[];
+    intervalInDays: number | null;
+    tagIds: string[];
+    channels: {
+      integrationId: string;
+      customized: boolean;
+      settings: Record<string, unknown>;
+      parts: StoredPart[];
+    }[];
+    publishNow: boolean;
   }> {
     const available = new Map(
       (await this.channels.list(orgId)).map((channel) => [channel.id, channel]),
     );
+    const mode = input.state === State.QUEUE ? 'queue' : 'draft';
 
     const targets = input.channels.map((entry) => {
       const channel = available.get(entry.channelId);
@@ -386,8 +433,38 @@ export class PostsService {
         throw new BadRequestException(POST_MESSAGES.CHANNEL_UNAVAILABLE);
       }
 
-      return { channel, customized: entry.customized, parts: entry.parts ?? input.shared };
+      // Judged against this channel's provider: unknown keys are dropped,
+      // wrong types and bounds refused, required fields only for the queue.
+      const { values, issues } = validateProviderSettings(
+        channel.providerIdentifier,
+        entry.settings,
+        mode,
+      );
+
+      if (issues.length > 0) {
+        throw new BadRequestException(
+          `${channel.providerName} (${channel.name}): ${issues[0].message}`,
+        );
+      }
+
+      return {
+        channel,
+        customized: entry.customized,
+        settings: values,
+        parts: entry.parts ?? input.shared,
+      };
     });
+
+    const tagIds = input.tags ?? [];
+
+    if (tagIds.length > 0) {
+      const live = await this.tags.findLive(orgId, tagIds);
+
+      if (tagIds.some((id) => !live.has(id))) {
+        securityLogger.warn('post.foreign_reference', { orgId, kind: 'tag' });
+        throw new BadRequestException(POST_MESSAGES.TAG_UNAVAILABLE);
+      }
+    }
 
     const mediaIds = [input.shared, ...targets.map((target) => target.parts)]
       .flat()
@@ -399,18 +476,25 @@ export class PostsService {
       throw new BadRequestException(POST_MESSAGES.MEDIA_UNAVAILABLE);
     }
 
-    const publishDate = new Date(input.publishDate);
+    // "Post now" publishes at the current time whatever date the composer
+    // held, so that date is neither checked nor stored.
+    const publishNow = input.state === State.QUEUE && input.publishNow === true;
+    const publishDate = publishNow ? new Date() : new Date(input.publishDate);
 
     if (input.state === State.QUEUE) {
-      this.assertQueueable(targets, publishDate, mediaViews);
+      this.assertQueueable(targets, publishDate, mediaViews, { publishNow });
     }
 
     return {
       state: input.state,
       publishDate,
+      intervalInDays: input.intervalInDays ?? null,
+      tagIds,
+      publishNow,
       channels: targets.map((target) => ({
         integrationId: target.channel.id,
         customized: target.customized,
+        settings: target.settings,
         parts: target.parts.map((part) => ({
           content: JSON.stringify(part.content),
           // References only. The file behind an id is resolved at read and
@@ -423,15 +507,16 @@ export class PostsService {
 
   /** Everything the queue requires beyond a draft. Throws the first problem found. */
   private assertQueueable(
-    targets: { channel: ChannelView; parts: PostPartInput[] }[],
+    targets: { channel: ChannelView; settings: Record<string, unknown>; parts: PostPartInput[] }[],
     publishDate: Date,
     mediaViews: Map<string, MediaView>,
+    options: { publishNow: boolean },
   ): void {
-    if (publishDate.getTime() <= Date.now()) {
+    if (!options.publishNow && publishDate.getTime() <= Date.now()) {
       throw new UnprocessableEntityException(POST_MESSAGES.PUBLISH_DATE_PAST);
     }
 
-    for (const { channel, parts } of targets) {
+    for (const { channel, settings, parts } of targets) {
       // A channel needing reconnection may still be queued to: it can be fixed
       // before the post is due, and the Channels page already shouts about it.
       // One with no target yet, or one switched off, cannot.
@@ -470,7 +555,12 @@ export class PostsService {
             };
           }),
         })),
-        { providerName: provider.name },
+        {
+          providerName: provider.name,
+          // An explicit title (YouTube's setting) is what the platform will
+          // receive, so it is the one held to the title rules.
+          title: typeof settings.title === 'string' ? settings.title : undefined,
+        },
       );
 
       if (issue) {
@@ -508,6 +598,7 @@ export class PostsService {
         disconnected: integration.deletedAt !== null,
         ...publishView(chain),
         parts,
+        settings: parseProviderSettings(chain[0]?.settings ?? null, integration.providerIdentifier),
       };
     });
 
@@ -523,6 +614,8 @@ export class PostsService {
       updatedAt: new Date(Math.max(...rows.map((row) => row.updatedAt.getTime()))),
       shared,
       channels,
+      tags: tagsOf(rows),
+      intervalInDays: rows[0].intervalInDays,
     };
   }
 
@@ -541,6 +634,8 @@ export class PostsService {
         ? ''
         : truncate(renderPlainText(firstDocument), PREVIEW_LENGTH),
       parts: Math.max(...chains.map((entry) => entry.chain.length)),
+      tags: tagsOf(rows),
+      intervalInDays: rows[0].intervalInDays,
       channels: chains.map(({ integration, chain }) => ({
         channelId: integration.id,
         name: integration.name,
@@ -597,6 +692,49 @@ function channelChains(
   }));
 }
 
+/**
+ * A group's tags: those of its first channel's root, which every save writes
+ * identically on each channel's root. Deleted tags were already filtered out
+ * by the query.
+ */
+function tagsOf(rows: PostRow[]): TagView[] {
+  const root = rows.find((row) => row.parentPostId === null && row.tags.length > 0);
+  return (root?.tags ?? []).map(({ tag }) => toTagView(tag));
+}
+
+/**
+ * The provider settings stored on a chain's root (2026-10-19): everything but
+ * the composer's own `customized` flag, limited to the fields the provider
+ * declares, so a key written by an older version never reaches the composer.
+ * Values are returned as stored; they were validated when they were saved.
+ */
+export function parseProviderSettings(
+  raw: string | null,
+  providerIdentifier: string,
+): Record<string, unknown> {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+
+    const stored = parsed as Record<string, unknown>;
+
+    return Object.fromEntries(
+      settingsFieldsFor(providerIdentifier)
+        .filter((field) => Object.hasOwn(stored, field.key) && stored[field.key] !== null)
+        .map((field) => [field.key, stored[field.key]]),
+    );
+  } catch {
+    return {};
+  }
+}
+
 /** `Post.image` is `[{"id": …}]`. Anything else, including legacy URL lists, yields no ids. */
 export function parseImageIds(raw: string | null): string[] {
   if (!raw) {
@@ -620,7 +758,10 @@ export function parseImageIds(raw: string | null): string[] {
   }
 }
 
-/** `Post.settings` is `{"customized": boolean}`. A missing or unreadable value means shared. */
+/**
+ * `Post.settings` is `{"customized": boolean, ...provider settings}`. A missing
+ * or unreadable value means shared.
+ */
 export function parseCustomized(raw: string | null): boolean {
   if (!raw) {
     return false;

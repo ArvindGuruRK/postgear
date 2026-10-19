@@ -5,6 +5,8 @@ import type { SlotTarget } from './calendar-slot';
 export interface CalendarHandlers {
   /** The composer, opened on a post: where a card's body goes. */
   editHref: (post: PostSummary) => string;
+  /** The composer, starting a new post from this one's text and media. */
+  onDuplicate: (post: PostSummary) => void;
   onPreview: (post: PostSummary) => void;
   onStatistics: (post: PostSummary) => void;
   onDelete: (post: PostSummary) => void;

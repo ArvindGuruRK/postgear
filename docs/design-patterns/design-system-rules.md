@@ -115,7 +115,8 @@ Both reduce to 50% opacity and drop the shadow (a disabled element shouldn't loo
 ## 10. Error states
 
 - Form fields: `variant="error"` swaps only the border to `border-actionDanger` (Input, Textarea). Don't also change the background or shadow: the border color alone is the signal.
-- `FormErrorMessage` (`form-field.tsx`): `role="alert"`, `text-actionDanger`, paired with `FormField` + `FormLabel` + optional `FormHelperText`.
+- `FormErrorMessage` (`form-field.tsx`): `role="alert"`, `text-dangerInk`, paired with `FormField` + `FormLabel` + optional `FormHelperText`.
+- Status colour as **text** (an error line in a dialog, a failed upload, a negative delta) uses the ink tokens `text-dangerInk`, `text-successInk`, `text-accentInk`, never the fills: `text-actionDanger` and the rest are too light to read on a light theme's page. In dark mode the inks equal the fills. Fills (`bg-action*`, badges, toasts, strips) keep the action tokens with their on-fill text pair (§7).
 - Whole-surface error states (a failed data fetch, not a single field) use `ErrorState` (`state-display.tsx`), not a red-bordered card: tone comes from the icon/heading color, not from wrapping the surface in danger-red chrome.
 
 ## 11. Responsive behavior

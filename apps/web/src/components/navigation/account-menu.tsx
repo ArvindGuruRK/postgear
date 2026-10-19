@@ -57,7 +57,7 @@ export function AccountMenu() {
       // `refresh()` first so the server components re-read the new cookie
       // rather than replaying the previous workspace's cached render.
       router.refresh();
-      router.push(`/${nextId}/calendar`);
+      router.push(`/${nextId}/home`);
     } catch {
       // The API refused: most likely the membership was revoked in another
       // tab. Drop the optimistic selection and let the provider's value stand.

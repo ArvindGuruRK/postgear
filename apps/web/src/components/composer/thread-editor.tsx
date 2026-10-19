@@ -48,6 +48,7 @@ import {
   TooltipHint,
   useIconAnimation,
 } from '@postgear/ui';
+import type { Editor } from '@tiptap/react';
 import { type Dispatch, useId } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { ChannelReport } from './channel-report';
@@ -68,6 +69,9 @@ export function ThreadEditor({
   dispatch,
   onAttachMedia,
   disabled = false,
+  signaturesHref,
+  onEditor,
+  onEditorFocus,
 }: {
   scope: Scope;
   /** "the shared post", or a channel name: used in accessible labels. */
@@ -79,6 +83,12 @@ export function ThreadEditor({
   onAttachMedia: (partKey: string) => void;
   /** A published post: readable, not changeable. */
   disabled?: boolean;
+  /** Settings > Signatures, for the toolbar's Signature popover. */
+  signaturesHref: string;
+  /** Each part's editor as it mounts (null as it goes), by part key: see `PostEditor`. */
+  onEditor?: (partKey: string, editor: Editor | null) => void;
+  /** A part's editor took focus. */
+  onEditorFocus?: (partKey: string) => void;
 }) {
   // dnd-kit numbers its accessibility ids from a module-level counter, which
   // differs between the server render and the browser and makes React report
@@ -131,6 +141,9 @@ export function ThreadEditor({
                 dispatch={dispatch}
                 onAttachMedia={onAttachMedia}
                 disabled={disabled}
+                signaturesHref={signaturesHref}
+                onEditor={onEditor}
+                onEditorFocus={onEditorFocus}
               />
             ))}
           </ol>
@@ -164,6 +177,9 @@ function SortablePart({
   dispatch,
   onAttachMedia,
   disabled,
+  signaturesHref,
+  onEditor,
+  onEditorFocus,
 }: {
   part: DraftPart;
   index: number;
@@ -174,6 +190,9 @@ function SortablePart({
   dispatch: Dispatch<ComposerAction>;
   onAttachMedia: (partKey: string) => void;
   disabled: boolean;
+  signaturesHref: string;
+  onEditor?: (partKey: string, editor: Editor | null) => void;
+  onEditorFocus?: (partKey: string) => void;
 }) {
   const {
     attributes,
@@ -218,6 +237,9 @@ function SortablePart({
           label={`${label} of ${scopeLabel}`}
           placeholder={index === 0 ? 'Write something…' : 'Continue the thread…'}
           tall={index === 0}
+          signaturesHref={signaturesHref}
+          onEditor={(editor) => onEditor?.(part.key, editor)}
+          onFocus={() => onEditorFocus?.(part.key)}
           attachments={
             part.media.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
@@ -303,7 +325,7 @@ function SortablePart({
         {issues.length > 0 ? (
           <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label={`${label} issues`}>
             {issues.map((issue) => (
-              <li key={issue.key} className="font-sans text-xs font-bold text-actionDanger">
+              <li key={issue.key} className="font-sans text-xs font-bold text-dangerInk">
                 {issue.text}
               </li>
             ))}
@@ -420,7 +442,7 @@ function PartAction({
         {...icon.triggers}
         className={cn(
           'flex h-7 w-7 items-center justify-center rounded-md border-2 border-transparent',
-          danger ? 'text-actionDanger' : 'text-ink',
+          danger ? 'text-dangerInk' : 'text-ink',
           'outline-none hover:border-outline hover:bg-actionPrimary/10',
           'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
           'disabled:pointer-events-none disabled:opacity-30',

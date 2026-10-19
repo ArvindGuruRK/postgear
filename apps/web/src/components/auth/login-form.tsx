@@ -28,8 +28,12 @@ import { ApiError, api } from '@/lib/api';
  *   wrong password, unactivated, locked), so there is no per-field information
  *   to render, and inventing one would undo the property that makes the API
  *   useless for account enumeration.
+ *
+ * `next` (2026-10-19) is a same-site path the page has already checked with
+ * `safeNextPath`; the form never reads `?next=` itself, so there is one
+ * check, on the server, and nothing here can be pointed off-site.
  */
-export function LoginForm() {
+export function LoginForm({ next = null }: { next?: string | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(
@@ -57,8 +61,9 @@ export function LoginForm() {
 
       // Send them to the root and let the two route gates decide: dashboard if
       // onboarded, /onboarding if not. Deciding here would put that logic in a
-      // second place, where it can drift.
-      router.replace('/');
+      // second place, where it can drift. The one exception is a page that
+      // sent them here to come back (an invitation), which then decides.
+      router.replace(next ?? '/');
       router.refresh();
     } catch (caught) {
       setError(

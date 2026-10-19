@@ -23,7 +23,16 @@ export const metadata: Metadata = {
 // themes keep these: one meta tag cannot follow a per-user choice); they're
 // literals here because the browser reads this meta tag before any stylesheet
 // resolves.
+//
+// `viewportFit: 'cover'` lets the page draw edge to edge on a phone with a
+// notch or a home indicator, so the page ground runs under them rather than
+// stopping at white bars. In exchange, every surface that touches a screen
+// edge pads itself by that edge's `env(safe-area-inset-*)`: the app shell
+// (navigation/app-shell.tsx), the tab bar, Sheet, the toast viewport, the
+// auth layout and onboarding. Next merges this with its default
+// `width=device-width, initial-scale=1`.
 export const viewport: Viewport = {
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#fff8e7' },
     { media: '(prefers-color-scheme: dark)', color: '#121212' },

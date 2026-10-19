@@ -8,6 +8,7 @@ import { cn, MotionIcon, TooltipHint } from '@postgear/ui';
 import Link from 'next/link';
 import { useCalendar } from './calendar-context';
 import { type CalendarView, rangeLabel } from './calendar-math';
+import { TagFilter } from './tag-filter';
 
 /** In the reference's order: the narrowest view first. */
 const VIEWS: Array<{ value: CalendarView; label: string }> = [
@@ -43,9 +44,10 @@ const SEGMENT = (active: boolean) =>
 /**
  * The calendar's controls, laid out as the reference's filter bar (UI revamp,
  * 2026-10-18): on the left the range, between its previous and next arrows
- * in one joined control, then Today; on the right the Day / Week / Month
- * switch and the calendar / list switch. The list is the Queue: every post in
- * order, which is what the reference's list mode shows.
+ * in one joined control, then Today; on the right the tag filter
+ * (2026-10-19, PostGear's own), the Day / Week / Month switch and the
+ * calendar / list switch. The list is the Queue: every post in order, which
+ * is what the reference's list mode shows.
  */
 export function CalendarToolbar() {
   const calendar = useCalendar();
@@ -104,6 +106,8 @@ export function CalendarToolbar() {
       </button>
 
       <div className="ms-auto flex w-full items-center gap-2 md:w-auto">
+        <TagFilter />
+
         <fieldset className={cn(GROUP, 'flex-1 md:flex-none')}>
           <legend className="sr-only">View</legend>
           {VIEWS.map((option) => (

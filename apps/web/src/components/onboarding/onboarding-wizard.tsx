@@ -150,7 +150,7 @@ export function OnboardingWizard({
       // see `onboardingCompletedAt` set: without it, route gate 2 still holds
       // the stale value and bounces the user straight back to /onboarding.
       router.refresh();
-      router.replace(`/${organizationId}/calendar`);
+      router.replace(`/${organizationId}/home`);
     } catch (caught) {
       setError(
         caught instanceof ApiError ? caught.message : 'Something went wrong. Please try again.',
@@ -332,7 +332,11 @@ export function OnboardingWizard({
                 }, 5)
               }
             >
-              Connect {answers.interestedChannels[0] ? channelLabel(answers.interestedChannels[0]) : 'a channel'} now
+              Connect{' '}
+              {answers.interestedChannels[0]
+                ? channelLabel(answers.interestedChannels[0])
+                : 'a channel'}{' '}
+              now
             </Button>
             <Text size="sm" muted>
               {answers.interestedChannels.length === 0

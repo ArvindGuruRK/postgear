@@ -1,87 +1,126 @@
 /**
- * The channel colour rule: creation order (then id) across every row the
- * workspace has ever had, soft-deleted ones included, wrapping after seven.
+ * The channel colour rule: a stored slot, the least-used one on connect,
+ * never recomputed on read.
  */
 jest.mock('@postgear/db', () => ({
-  prisma: { integration: { findMany: jest.fn() } },
+  prisma: {
+    integration: { findMany: jest.fn(), updateMany: jest.fn() },
+    $transaction: jest.fn(),
+    $executeRaw: jest.fn(),
+  },
 }));
 
 import { prisma } from '@postgear/db';
 import {
-  assignChannelColors,
   CHANNEL_COLOR_COUNT,
   colorOf,
   loadChannelColors,
+  nextChannelColor,
+  pickChannelColor,
 } from './channel-colors';
 
-const findMany = prisma.integration.findMany as unknown as jest.Mock;
-
-const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 9, minute));
+const db = prisma as unknown as {
+  integration: { findMany: jest.Mock; updateMany: jest.Mock };
+  $transaction: jest.Mock;
+  $executeRaw: jest.Mock;
+};
 
 describe('channel colours', () => {
-  beforeEach(() => findMany.mockReset());
-
-  it('hands out slots in creation order, whatever order the rows arrive in', () => {
-    const colors = assignChannelColors([
-      { id: 'c', createdAt: at(30) },
-      { id: 'a', createdAt: at(10) },
-      { id: 'b', createdAt: at(20) },
-    ]);
-
-    expect([colors.get('a'), colors.get('b'), colors.get('c')]).toEqual([0, 1, 2]);
+  beforeEach(() => {
+    db.integration.findMany.mockReset();
+    db.integration.updateMany.mockReset();
+    db.$executeRaw.mockReset().mockResolvedValue(1);
+    db.$transaction
+      .mockReset()
+      .mockImplementation(async (callback: (tx: unknown) => unknown) => callback(db));
   });
 
-  it('breaks a createdAt tie by id', () => {
-    const colors = assignChannelColors([
-      { id: 'ch_b', createdAt: at(10) },
-      { id: 'ch_a', createdAt: at(10) },
-    ]);
+  describe('pickChannelColor', () => {
+    it('takes the first slot nobody uses', () => {
+      expect(pickChannelColor([])).toBe(0);
+      expect(pickChannelColor([0, 1, 2])).toBe(3);
+      // A gap left by a disconnected channel is filled first.
+      expect(pickChannelColor([0, 2, 3])).toBe(1);
+    });
 
-    expect(colors.get('ch_a')).toBe(0);
-    expect(colors.get('ch_b')).toBe(1);
+    it('takes the least-used slot, lowest first, once all are in use', () => {
+      const allOnce = Array.from({ length: CHANNEL_COLOR_COUNT }, (_, slot) => slot);
+
+      expect(CHANNEL_COLOR_COUNT).toBe(7);
+      expect(pickChannelColor(allOnce)).toBe(0);
+      expect(pickChannelColor([...allOnce, 0, 1])).toBe(2);
+      expect(pickChannelColor([...allOnce, ...allOnce, 3])).toBe(0);
+    });
+
+    it('ignores slots outside the palette', () => {
+      expect(pickChannelColor([0, 9, -1, 1.5])).toBe(1);
+    });
   });
 
-  it('wraps after the palette runs out', () => {
-    const rows = Array.from({ length: CHANNEL_COLOR_COUNT + 2 }, (_, index) => ({
-      id: `ch_${String(index).padStart(2, '0')}`,
-      createdAt: at(index),
-    }));
-    const colors = assignChannelColors(rows);
+  it('picks a new colour under the workspace lock, from connected channels only', async () => {
+    db.integration.findMany.mockResolvedValue([{ color: 0 }, { color: 1 }]);
 
-    expect(CHANNEL_COLOR_COUNT).toBe(7);
-    expect(colors.get('ch_06')).toBe(6);
-    expect(colors.get('ch_07')).toBe(0);
-    expect(colors.get('ch_08')).toBe(1);
+    await expect(nextChannelColor(db as never, 'org_1')).resolves.toBe(2);
+
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(db.$executeRaw.mock.calls[0]).toContain('channel-colors:org_1');
+    expect(db.integration.findMany).toHaveBeenCalledWith({
+      where: { organizationId: 'org_1', deletedAt: null, color: { not: null } },
+      select: { color: true },
+    });
   });
 
-  it('counts soft-deleted channels, so deleting one never repaints the rest', async () => {
-    // The second channel was disconnected: its row stays, and so does its slot.
-    findMany.mockResolvedValue([
-      { id: 'first', createdAt: at(1) },
-      { id: 'deleted', createdAt: at(2) },
-      { id: 'third', createdAt: at(3) },
+  it('reads stored colours, disconnected channels included, without writing', async () => {
+    db.integration.findMany.mockResolvedValue([
+      { id: 'first', color: 4 },
+      { id: 'deleted', color: 1 },
     ]);
 
     const colors = await loadChannelColors('org_1');
 
-    expect(colors.get('first')).toBe(0);
+    expect(colors.get('first')).toBe(4);
     expect(colors.get('deleted')).toBe(1);
-    expect(colors.get('third')).toBe(2);
-
-    const [args] = findMany.mock.calls[0];
-    expect(args.where).toEqual({ organizationId: 'org_1' });
-    expect(args.where).not.toHaveProperty('deletedAt');
-    expect(args.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
-    expect(args.select).toEqual({ id: true, createdAt: true });
+    expect(db.integration.findMany.mock.calls[0][0].where).toEqual({ organizationId: 'org_1' });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.integration.updateMany).not.toHaveBeenCalled();
   });
 
-  it('gives a channel newer than the map the next slot', () => {
-    const colors = assignChannelColors([
-      { id: 'a', createdAt: at(1) },
-      { id: 'b', createdAt: at(2) },
-    ]);
+  it('assigns and stores a colour for a row that has none, once', async () => {
+    db.integration.findMany
+      // The plain read finds a row without a colour...
+      .mockResolvedValueOnce([
+        { id: 'a', color: 0 },
+        { id: 'b', color: null },
+      ])
+      // ...and the read under the lock still does.
+      .mockResolvedValueOnce([
+        { id: 'a', color: 0, deletedAt: null },
+        { id: 'gone', color: null, deletedAt: new Date('2026-10-01') },
+        { id: 'b', color: null, deletedAt: null },
+      ]);
 
-    expect(colorOf(colors, 'b')).toBe(1);
-    expect(colorOf(colors, 'just-connected')).toBe(2);
+    const colors = await loadChannelColors('org_1');
+
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
+    // Only live rows hold a slot, so the disconnected row and `b` both get 1.
+    expect(colors.get('a')).toBe(0);
+    expect(colors.get('gone')).toBe(1);
+    expect(colors.get('b')).toBe(1);
+    // Guarded on `color: null`, so a concurrent assignment is never overwritten.
+    expect(db.integration.updateMany).toHaveBeenCalledWith({
+      where: { id: 'b', organizationId: 'org_1', color: null },
+      data: { color: 1 },
+    });
+    expect(db.integration.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('draws a channel the map does not know in a stable colour', () => {
+    const colors = new Map([['known', 3]]);
+
+    expect(colorOf(colors, 'known')).toBe(3);
+    const first = colorOf(colors, 'just-connected');
+    expect(first).toBe(colorOf(colors, 'just-connected'));
+    expect(first).toBeGreaterThanOrEqual(0);
+    expect(first).toBeLessThan(CHANNEL_COLOR_COUNT);
   });
 });

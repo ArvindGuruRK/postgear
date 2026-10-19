@@ -17,7 +17,7 @@ export const FormLabel = forwardRef<React.ElementRef<typeof Label>, FormLabelPro
   ({ className, required, children, ...props }, ref) => (
     <Label ref={ref} className={className} {...props}>
       {children}
-      {required && <span className="ml-1 text-actionDanger">*</span>}
+      {required && <span className="ml-1 text-dangerInk">*</span>}
     </Label>
   ),
 );
@@ -27,7 +27,11 @@ export const FormHelperText = forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn('font-sans text-xs font-medium text-ink opacity-70', className)} {...props} />
+  <p
+    ref={ref}
+    className={cn('font-sans text-xs font-medium text-ink opacity-70', className)}
+    {...props}
+  />
 ));
 FormHelperText.displayName = 'FormHelperText';
 
@@ -38,7 +42,7 @@ export const FormErrorMessage = forwardRef<
   <p
     ref={ref}
     role="alert"
-    className={cn('font-sans text-xs font-semibold text-actionDanger', className)}
+    className={cn('font-sans text-xs font-semibold text-dangerInk', className)}
     {...props}
   />
 ));

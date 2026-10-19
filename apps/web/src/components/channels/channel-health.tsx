@@ -51,7 +51,7 @@ export const CHANNEL_HEALTH: Record<ChannelHealth, HealthPresentation> = {
     label: 'Disabled',
     variant: 'outline',
     action: null,
-    explanation: 'This channel is turned off and will be skipped when publishing.',
+    explanation: 'Posts scheduled to this channel will not publish until it is enabled again.',
   },
 };
 

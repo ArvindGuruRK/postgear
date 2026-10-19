@@ -30,7 +30,7 @@ async function signIn(page: import('@playwright/test').Page, email: string) {
   // "Show password", which the accessible-name lookup also matches.
   await page.locator('#password').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 
 test.describe('channels page', () => {

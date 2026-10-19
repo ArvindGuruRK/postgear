@@ -5,9 +5,14 @@
  *
  * TipTap, as the sprint plan names, configured down to what a post document
  * can hold: paragraphs, one heading level, bullet and numbered lists, bold,
- * italic and links. Everything StarterKit offers beyond that is switched off
- * rather than left on and stripped later: a toolbar button for strikethrough
- * that silently disappears on save would be a lie.
+ * italic, underline and links. Everything StarterKit offers beyond that is
+ * switched off rather than left on and stripped later: a toolbar button for
+ * strikethrough that silently disappears on save would be a lie.
+ *
+ * Underline (2026-10-19, after Postiz) posts the way Postiz posts it: each
+ * letter followed by a combining low line, which every platform shows,
+ * applied on top of bold or italic letters (social-core's `renderPlainText`).
+ * Mod-U is the extension's own shortcut.
  *
  * ## Uncontrolled on purpose
  *
@@ -27,6 +32,7 @@ import { ItalicIcon } from '@animateicons/react/lucide/italic-icon';
 import { LinkIcon } from '@animateicons/react/lucide/link-icon';
 import { ListIcon } from '@animateicons/react/lucide/list-icon';
 import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
+import { UnderlineIcon } from '@animateicons/react/lucide/underline-icon';
 import { UnlinkIcon } from '@animateicons/react/lucide/unlink-icon';
 import { isSafeHref } from '@postgear/social-core/composer';
 import {
@@ -42,7 +48,9 @@ import {
 import { Placeholder } from '@tiptap/extensions';
 import { type Editor, EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { EmojiControl, SignatureControl } from './editor-inserts';
+import { TOOL, TOOL_PRESSED } from './toolbar';
 
 interface PostEditorProps {
   initialContent: unknown;
@@ -58,6 +66,15 @@ interface PostEditorProps {
   toolbarStart?: ReactNode;
   /** The toolbar's trailing end: the per-platform character counts. */
   toolbarEnd?: ReactNode;
+  /** Settings > Signatures, where the Signature popover points when there are none. */
+  signaturesHref: string;
+  /**
+   * Called with the editor once it exists, and with null as it goes: the
+   * header's Templates writes into it at the cursor.
+   */
+  onEditor?: (editor: Editor | null) => void;
+  /** The editor took focus, which makes it the one Templates writes into. */
+  onFocus?: () => void;
 }
 
 /**
@@ -74,6 +91,9 @@ export function PostEditor({
   attachments,
   toolbarStart,
   toolbarEnd,
+  signaturesHref,
+  onEditor,
+  onFocus,
 }: PostEditorProps) {
   const editor = useEditor({
     // Rendering on the server would produce markup the client then replaces,
@@ -86,7 +106,6 @@ export function PostEditor({
         codeBlock: false,
         horizontalRule: false,
         strike: false,
-        underline: false,
         heading: { levels: [2] },
         link: {
           autolink: false,
@@ -102,6 +121,7 @@ export function PostEditor({
     ],
     content: initialContent as object,
     onUpdate: ({ editor: current }) => onChange(current.getJSON()),
+    onFocus: () => onFocus?.(),
     editorProps: {
       attributes: {
         'aria-label': label,
@@ -111,6 +131,21 @@ export function PostEditor({
       },
     },
   });
+
+  // The latest callback, read when the editor arrives or goes, so a parent
+  // re-rendering with a new function does not unregister and re-register it.
+  const onEditorRef = useRef(onEditor);
+  useEffect(() => {
+    onEditorRef.current = onEditor;
+  });
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+    onEditorRef.current?.(editor);
+    return () => onEditorRef.current?.(null);
+  }, [editor]);
 
   return (
     <div
@@ -122,25 +157,37 @@ export function PostEditor({
     >
       <EditorContent editor={editor} />
       {attachments}
-      <EditorToolbar editor={editor} start={toolbarStart} end={toolbarEnd} />
+      <EditorToolbar
+        editor={editor}
+        start={toolbarStart}
+        end={toolbarEnd}
+        signaturesHref={signaturesHref}
+      />
     </div>
   );
 }
 
+/**
+ * After the reference's toolbar: Insert Media, then the signature, the text
+ * formatting, the link and the emoji, then the counts at the far end.
+ */
 function EditorToolbar({
   editor,
   start,
   end,
+  signaturesHref,
 }: {
   editor: Editor | null;
   start?: ReactNode;
   end?: ReactNode;
+  signaturesHref: string;
 }) {
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
       bold: current?.isActive('bold') ?? false,
       italic: current?.isActive('italic') ?? false,
+      underline: current?.isActive('underline') ?? false,
       heading: current?.isActive('heading', { level: 2 }) ?? false,
       bulletList: current?.isActive('bulletList') ?? false,
       orderedList: current?.isActive('orderedList') ?? false,
@@ -155,6 +202,7 @@ function EditorToolbar({
       className="flex flex-wrap items-center gap-1 border-t-2 border-outline px-2 py-1.5"
     >
       {start ? <div className="me-1 flex items-center gap-1">{start}</div> : null}
+      <SignatureControl editor={editor} settingsHref={signaturesHref} />
       <ToolbarButton
         label="Bold"
         hint="Bold: posts as styled Unicode letters"
@@ -172,6 +220,15 @@ function EditorToolbar({
         onClick={() => editor?.chain().focus().toggleItalic().run()}
       >
         <MotionIcon icon={ItalicIcon} className="h-4 w-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Underline"
+        hint="Underline: posts as underlined Unicode letters"
+        pressed={active?.underline}
+        disabled={!editor}
+        onClick={() => editor?.chain().focus().toggleUnderline().run()}
+      >
+        <MotionIcon icon={UnderlineIcon} className="h-4 w-4" />
       </ToolbarButton>
       <ToolbarButton
         label="Heading"
@@ -199,6 +256,7 @@ function EditorToolbar({
       </ToolbarButton>
 
       <LinkControl editor={editor} active={active?.link ?? false} />
+      <EmojiControl editor={editor} />
 
       {end ? <div className="ms-auto flex flex-wrap items-center gap-1.5 ps-2">{end}</div> : null}
     </div>
@@ -239,15 +297,6 @@ function ToolbarButton({
     </TooltipHint>
   );
 }
-
-/** A toolbar icon button, and its pressed (format on) state. */
-const TOOL = cn(
-  'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink',
-  'outline-none hover:border-outline hover:bg-actionPrimary/10',
-  'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-  'disabled:pointer-events-none disabled:opacity-50',
-);
-const TOOL_PRESSED = 'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary';
 
 /**
  * Adds, edits or removes a link on the selection.
@@ -338,7 +387,7 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
               autoFocus
             />
             {error ? (
-              <p role="alert" className="font-sans text-xs font-medium text-actionDanger">
+              <p role="alert" className="font-sans text-xs font-medium text-dangerInk">
                 {error}
               </p>
             ) : null}

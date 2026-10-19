@@ -76,16 +76,21 @@ export const cancelSignal = defineSignal(CANCEL_SIGNAL);
  * Database reads and writes: retried generously, because a blip in Postgres
  * must never fail a post that the platform would have accepted.
  */
-const { loadPublishJob, recordPublished, markPublishFailed, refreshChannelToken } =
-  proxyActivities<Activities>({
-    startToCloseTimeout: '2 minutes',
-    retry: {
-      initialInterval: '2 seconds',
-      backoffCoefficient: 2,
-      maximumInterval: '1 minute',
-      maximumAttempts: 20,
-    },
-  });
+const {
+  loadPublishJob,
+  recordPublished,
+  markPublishFailed,
+  refreshChannelToken,
+  queueNextOccurrence,
+} = proxyActivities<Activities>({
+  startToCloseTimeout: '2 minutes',
+  retry: {
+    initialInterval: '2 seconds',
+    backoffCoefficient: 2,
+    maximumInterval: '1 minute',
+    maximumAttempts: 20,
+  },
+});
 
 /**
  * The publish itself: the sprint's retry policy, with the failures that mean
@@ -244,6 +249,8 @@ export async function postPublishWorkflow(input: PostPublishInput): Promise<Post
           await recordPublished({ ...input, results: settledAttempt.result.results });
         }
 
+        await queueRepeat();
+
         return { outcome: 'published', releaseURL: settledAttempt.result.releaseURL };
       }
 
@@ -295,6 +302,30 @@ export async function postPublishWorkflow(input: PostPublishInput): Promise<Post
       });
 
       return { outcome: 'failed', reason };
+    }
+  }
+
+  /**
+   * After a successful publish only (2026-10-19): a repeating post's next
+   * occurrence is queued as a new post (see `lib/next-occurrence.ts`); for
+   * one that does not repeat the activity answers "none" at once.
+   *
+   * Never allowed to change the outcome: the post *is* published, and a
+   * repeat that could not be queued after the activity's whole retry policy
+   * is logged rather than turned into a failure the person would misread.
+   *
+   * Appended after the publish, it is safe for runs already asleep when this
+   * shipped: their history ends before the point where it schedules anything,
+   * so replay matches and the new step simply runs when they get there.
+   */
+  async function queueRepeat(): Promise<void> {
+    try {
+      await queueNextOccurrence(input);
+    } catch (error) {
+      log.warn('published, but the next occurrence could not be queued', {
+        postId: input.postId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

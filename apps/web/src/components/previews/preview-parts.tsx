@@ -25,10 +25,16 @@ import { useState } from 'react';
 import type { MediaItem } from '@/types/media';
 
 export interface PreviewChannel {
+  id: string;
   name: string;
   /** Handle without the @, when the platform has one. */
   profile: string | null;
   picture: string | null;
+  /**
+   * The avatar palette slot, so the initials match the channel everywhere
+   * else. See `Channel.color` for why readers fall back to the id.
+   */
+  color: number;
 }
 
 export interface PreviewPart {
@@ -44,6 +50,17 @@ export interface PlatformPreviewProps {
   lengthMethod: LengthMethod;
   /** When it is scheduled: shown where the platform shows a timestamp. */
   publishAt: Date | null;
+  /**
+   * The channel's platform settings from the composer (`PROVIDER_SETTINGS`),
+   * for the previews whose platform shows one: a YouTube or Pinterest title.
+   */
+  settings?: Record<string, unknown>;
+}
+
+/** A set, non-blank `title` setting, as the providers read it; null otherwise. */
+export function titleSetting(settings: Record<string, unknown> | undefined): string | null {
+  const value = settings?.title;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 export function ChannelAvatar({
@@ -58,7 +75,9 @@ export function ChannelAvatar({
   return (
     <Avatar size={size} className={className}>
       {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-      <AvatarFallback>{channel.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+      <AvatarFallback colorSeed={channel.color ?? channel.id}>
+        {channel.name.slice(0, 2).toUpperCase()}
+      </AvatarFallback>
     </Avatar>
   );
 }

@@ -10,6 +10,7 @@ export const POST_MESSAGES = {
   CHANNEL_UNAVAILABLE:
     'One of the selected channels is no longer connected. Remove it and save again.',
   MEDIA_UNAVAILABLE: 'An attachment is no longer in the media library. Remove it and save again.',
+  TAG_UNAVAILABLE: 'One of the selected tags was deleted. Remove it and save again.',
   PUBLISH_DATE_PAST: 'Choose a time in the future to add this post to the queue.',
   RESCHEDULE_PAST:
     'A queued post can only be moved to a time in the future. Use "Post now" to publish it right away.',

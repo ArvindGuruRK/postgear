@@ -160,9 +160,7 @@ export function GenerateResult({
 
       {state.sources && state.sources.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <h3 className="type-label text-sm text-ink">
-            Backed by research
-          </h3>
+          <h3 className="type-label text-sm text-ink">Backed by research</h3>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {state.sources.map((source) => (
               <li key={source.url} className="flex flex-col gap-0.5">
@@ -236,7 +234,7 @@ function PartCard({
           <span
             className={cn(
               'font-sans text-xs font-medium text-ink',
-              over ? 'font-bold text-actionDanger' : 'opacity-70',
+              over ? 'font-bold text-dangerInk' : 'opacity-70',
             )}
             title={
               limit

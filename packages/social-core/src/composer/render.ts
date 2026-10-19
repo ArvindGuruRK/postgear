@@ -12,6 +12,8 @@
  *   empty paragraph is a blank line. This is how people already write social
  *   posts, and it round-trips.
  * - **Bold and italic become Unicode styles**: see `unicode.ts` for the costs.
+ * - **Underline becomes a combining low line** (U+0332) after each letter and
+ *   digit, on top of any bold or italic: see `underlineText`.
  * - **Headings become a bold line.** No platform has headings.
  * - **Lists become `•` or `1.` lines**, indented two spaces per level.
  * - **Links keep their words and their target.** A link whose text already is
@@ -23,7 +25,7 @@
  *   in a newline because of it.
  */
 import type { BlockNode, InlineNode, PostDocument } from './document';
-import { styleText } from './unicode';
+import { styleText, underlineText } from './unicode';
 
 const LIST_INDENT = '  ';
 
@@ -110,8 +112,11 @@ function renderInline(nodes: InlineNode[], forceBold: boolean): string {
     const marks = node.marks ?? [];
     const bold = forceBold || marks.some((mark) => mark.type === 'bold');
     const italic = marks.some((mark) => mark.type === 'italic');
+    const underline = marks.some((mark) => mark.type === 'underline');
     const link = marks.find((mark) => mark.type === 'link');
-    const styled = styleText(node.text, { bold, italic });
+    // Styled first, then underlined, so the line sits under the styled letter.
+    const boldItalic = styleText(node.text, { bold, italic });
+    const styled = underline ? underlineText(boldItalic) : boldItalic;
 
     if (link?.type === 'link') {
       if (linkHref !== null && linkHref !== link.attrs.href) {

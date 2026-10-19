@@ -22,23 +22,23 @@ import { BotIcon } from '@animateicons/react/lucide/bot-icon';
  *   this is where the calendar's channel filter lives.
  * - A channel that cannot publish shows a red "!" on its picture that starts
  *   the fix (reconnect, or finish choosing the page), as the reference's does.
+ * - Admins can drag a channel by its grip into the workspace's order
+ *   (2026-10-19, `channel-rows.tsx`); the reference has no reordering.
+ * - The foot carries the plan's channel usage and quick-connect icons, after
+ *   Buffer's sidebar (`channels-usage.tsx`).
+ *
+ * The ⋮ menu is the reference's channel menu (`ChannelMenuContent`, shared
+ * with the Channels page), so the two places never offer different things.
  */
 import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
-import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
-import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
-import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import { SlidersHorizontalIcon } from '@animateicons/react/lucide/sliders-horizontal-icon';
 import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
-import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   ANIMATED_ICON_CLASS,
   cn,
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   MotionIcon,
   pressSm,
@@ -51,7 +51,10 @@ import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { CHANNEL_HEALTH, isBroken } from '@/components/channels/channel-health';
 import { ChannelMark } from '@/components/channels/channel-mark';
+import { ChannelMenuContent, type ChannelMenuHandlers } from '@/components/channels/channel-menu';
+import { ChannelPreferencesDialog } from '@/components/channels/channel-preferences-dialog';
 import { ConnectChannelDialog } from '@/components/channels/connect-channel-dialog';
+import { DisableChannelDialog } from '@/components/channels/disable-channel-dialog';
 import { DisconnectDialog } from '@/components/channels/disconnect-dialog';
 import { FinishSetupDialog } from '@/components/channels/finish-setup-dialog';
 import { PostingTimesDialog } from '@/components/channels/posting-times-dialog';
@@ -59,6 +62,8 @@ import { useWorkspace } from '@/components/navigation/workspace-provider';
 import { channelConnectUrl } from '@/lib/api';
 import type { Channel, ChannelLimit, ProviderSummary } from '@/types/channel';
 import { useCalendar } from './calendar-context';
+import { SortableChannelList } from './channel-rows';
+import { ChannelsUsage } from './channels-usage';
 
 const STORAGE_KEY = 'postgear:channels-collapsed';
 
@@ -87,10 +92,12 @@ const ROW_MENU_CLEARANCE = 28;
  * The red "!" on a channel that cannot publish, laid on its picture's top-left
  * corner the way the bell's count sits on the bell. Measured from the row: the
  * picture starts 6px in (the row button's 2px border and 4px padding), so at
- * 2px the badge's centre lands 4px inside the picture's corner.
+ * 2px the badge's centre lands 4px inside the picture's corner. With the
+ * reorder grip before the button (w-4 plus the row's gap-1) everything moves
+ * 20px along, hence `start-5.5`.
  */
 const BADGE = cn(
-  'absolute start-0.5 top-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline',
+  'absolute top-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline',
   'bg-actionDanger font-sans text-[10px] font-bold leading-none text-onActionLight',
 );
 
@@ -126,6 +133,8 @@ export function ChannelsColumn({
   const [connectOpen, setConnectOpen] = useState(false);
   const [setupChannel, setSetupChannel] = useState<Channel | null>(null);
   const [timesChannel, setTimesChannel] = useState<Channel | null>(null);
+  const [preferencesChannel, setPreferencesChannel] = useState<Channel | null>(null);
+  const [disableChannel, setDisableChannel] = useState<Channel | null>(null);
   const [disconnectChannel, setDisconnectChannel] = useState<Channel | null>(null);
 
   useEffect(() => {
@@ -165,14 +174,150 @@ export function ChannelsColumn({
   function done() {
     setSetupChannel(null);
     setTimesChannel(null);
+    setPreferencesChannel(null);
+    setDisableChannel(null);
     setDisconnectChannel(null);
-    // Re-runs the page's server fetch, so the card and the day view's
-    // posting times show what was just saved.
+    // Re-runs the page's server fetch, so the card, the day view's posting
+    // times and every post's avatar show what was just saved.
     router.refresh();
   }
 
+  const menu: ChannelMenuHandlers = {
+    onPreferences: setPreferencesChannel,
+    onEditTimes: setTimesChannel,
+    onReconnect: reconnect,
+    onFinishSetup: setSetupChannel,
+    onDisable: setDisableChannel,
+    onDisconnect: setDisconnectChannel,
+    onChanged: done,
+  };
+
   const hasChannels = channels.length > 0;
   const filtering = channelFilter.length > 0;
+
+  function renderRow(channel: Channel, grip: ReactNode) {
+    const selected = channelFilter.includes(channel.id);
+    const broken = isBroken(channel.health);
+    const health = CHANNEL_HEALTH[channel.health];
+
+    return (
+      <>
+        {/* The reference's hover marker on the card's edge. */}
+        {collapsed ? null : (
+          <span
+            aria-hidden="true"
+            className={cn(
+              'absolute -start-5 top-1 bottom-1 w-1 rounded-e-full bg-actionPrimary transition-opacity',
+              selected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
+            )}
+          />
+        )}
+
+        {grip}
+
+        <TooltipHint
+          label={
+            collapsed
+              ? channel.name
+              : selected
+                ? `Stop filtering by ${channel.name}`
+                : `Show only ${channel.name}'s posts`
+          }
+          side="right"
+          // Opens past the row's ⋮ button, not on top of it, and closes as
+          // the pointer leaves, so moving onto the ⋮ shows its own name
+          // instead of this one lingering.
+          sideOffset={canManage && !collapsed ? TOOLTIP_GAP + ROW_MENU_CLEARANCE : undefined}
+          hoverable={false}
+        >
+          <button
+            type="button"
+            onClick={() => toggleChannel(channel.id)}
+            aria-pressed={selected}
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-3 rounded-lg border-2 p-1',
+              FOCUS,
+              selected
+                ? 'border-outline bg-actionPrimary/10'
+                : 'border-transparent hover:bg-primary',
+            )}
+          >
+            <ChannelMark
+              color={channel.color}
+              id={channel.id}
+              name={channel.name}
+              picture={channel.picture}
+              platform={channel.providerIdentifier}
+              platformName={channel.providerName}
+            />
+            {collapsed ? (
+              <span className="sr-only">{channel.name}</span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-start type-ui text-sm text-ink">
+                {channel.name}
+              </span>
+            )}
+          </button>
+        </TooltipHint>
+
+        {broken ? (
+          <TooltipHint
+            label={
+              canManage
+                ? `${health.explanation ?? health.label} Click to fix.`
+                : (health.explanation ?? health.label)
+            }
+            // Above the badge: to its right it covered the channel's name,
+            // the next thing the pointer reaches.
+            side="top"
+            align="start"
+            hoverable={false}
+          >
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => fix(channel)}
+                aria-label={`${channel.name}: ${health.explanation ?? health.label}`}
+                className={cn(BADGE, grip ? 'start-5.5' : 'start-0.5', FOCUS)}
+              >
+                !
+              </button>
+            ) : (
+              // Not a disabled button: nothing here can be done by this
+              // person, so it is a status mark, not a control.
+              <span
+                role="img"
+                aria-label={`${channel.name}: ${health.explanation ?? health.label}`}
+                className={cn(BADGE, grip ? 'start-5.5' : 'start-0.5')}
+              >
+                !
+              </span>
+            )}
+          </TooltipHint>
+        ) : null}
+
+        {canManage && !collapsed ? (
+          <DropdownMenu>
+            <TooltipHint label="Channel options" side="right">
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Manage ${channel.name}`}
+                  className={cn(
+                    'flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-ink opacity-60 hover:bg-primary hover:opacity-100',
+                    FOCUS,
+                  )}
+                >
+                  <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+            </TooltipHint>
+            <ChannelMenuContent channel={channel} orgId={orgId} handlers={menu} />
+          </DropdownMenu>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <aside
@@ -315,172 +460,28 @@ export function ChannelsColumn({
               </div>
             ) : null}
 
-            <ul className="m-0 flex list-none flex-col gap-3 p-0">
-              {channels.map((channel) => {
-                const selected = channelFilter.includes(channel.id);
-                const broken = isBroken(channel.health);
-                const health = CHANNEL_HEALTH[channel.health];
-
-                return (
-                  <li
-                    key={channel.id}
-                    className={cn(
-                      'group/row relative flex items-center gap-1 rounded-lg',
-                      channel.disabled && 'opacity-50',
-                    )}
-                  >
-                    {/* The reference's hover marker on the card's edge. */}
-                    {collapsed ? null : (
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          'absolute -start-5 top-1 bottom-1 w-1 rounded-e-full bg-actionPrimary transition-opacity',
-                          selected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
-                        )}
-                      />
-                    )}
-
-                    <TooltipHint
-                      label={
-                        collapsed
-                          ? channel.name
-                          : selected
-                            ? `Stop filtering by ${channel.name}`
-                            : `Show only ${channel.name}'s posts`
-                      }
-                      side="right"
-                      // Opens past the row's ⋮ button, not on top of it, and
-                      // closes as the pointer leaves, so moving onto the ⋮
-                      // shows its own name instead of this one lingering.
-                      sideOffset={
-                        canManage && !collapsed ? TOOLTIP_GAP + ROW_MENU_CLEARANCE : undefined
-                      }
-                      hoverable={false}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleChannel(channel.id)}
-                        aria-pressed={selected}
-                        className={cn(
-                          'flex min-w-0 flex-1 items-center gap-3 rounded-lg border-2 p-1',
-                          FOCUS,
-                          selected
-                            ? 'border-outline bg-actionPrimary/10'
-                            : 'border-transparent hover:bg-primary',
-                        )}
-                      >
-                        <ChannelMark
-                          color={channel.color}
-                          id={channel.id}
-                          name={channel.name}
-                          picture={channel.picture}
-                          platform={channel.providerIdentifier}
-                          platformName={channel.providerName}
-                        />
-                        {collapsed ? (
-                          <span className="sr-only">{channel.name}</span>
-                        ) : (
-                          <span className="min-w-0 flex-1 truncate text-start type-ui text-sm text-ink">
-                            {channel.name}
-                          </span>
-                        )}
-                      </button>
-                    </TooltipHint>
-
-                    {broken ? (
-                      <TooltipHint
-                        label={
-                          canManage
-                            ? `${health.explanation ?? health.label} Click to fix.`
-                            : (health.explanation ?? health.label)
-                        }
-                        // Above the badge: to its right it covered the
-                        // channel's name, the next thing the pointer reaches.
-                        side="top"
-                        align="start"
-                        hoverable={false}
-                      >
-                        {canManage ? (
-                          <button
-                            type="button"
-                            onClick={() => fix(channel)}
-                            aria-label={`${channel.name}: ${health.explanation ?? health.label}`}
-                            className={cn(BADGE, FOCUS)}
-                          >
-                            !
-                          </button>
-                        ) : (
-                          // Not a disabled button: nothing here can be done by
-                          // this person, so it is a status mark, not a control.
-                          <span
-                            role="img"
-                            aria-label={`${channel.name}: ${health.explanation ?? health.label}`}
-                            className={BADGE}
-                          >
-                            !
-                          </span>
-                        )}
-                      </TooltipHint>
-                    ) : null}
-
-                    {canManage && !collapsed ? (
-                      <DropdownMenu>
-                        <TooltipHint label="Channel options" side="right">
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label={`Manage ${channel.name}`}
-                              className={cn(
-                                'flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-ink opacity-60 hover:bg-primary hover:opacity-100',
-                                FOCUS,
-                              )}
-                            >
-                              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                        </TooltipHint>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem onSelect={() => setTimesChannel(channel)}>
-                            <MotionIcon icon={ClockIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-                            Edit posting times
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => reconnect(channel)}>
-                            <MotionIcon
-                              icon={RefreshCwIcon}
-                              strokeWidth={2}
-                              className="me-2 h-4 w-4"
-                            />
-                            Reconnect
-                          </DropdownMenuItem>
-                          {channel.inBetweenSteps ? (
-                            <DropdownMenuItem onSelect={() => setSetupChannel(channel)}>
-                              <MotionIcon
-                                icon={PlugIcon}
-                                strokeWidth={2}
-                                className="me-2 h-4 w-4"
-                              />
-                              Finish setup
-                            </DropdownMenuItem>
-                          ) : null}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => setDisconnectChannel(channel)}>
-                            <MotionIcon
-                              icon={Trash2Icon}
-                              strokeWidth={2}
-                              className="me-2 h-4 w-4"
-                            />
-                            Disconnect
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+            <SortableChannelList
+              // Not while collapsed: the pictures alone leave no room for a
+              // grip, and the order is easier to judge with the names shown.
+              canReorder={canManage && !collapsed}
+              renderRow={renderRow}
+            />
           </div>
         )}
       </div>
+
+      {/* Pinned under the list rather than scrolling with it. Not while
+          collapsed: a meter and icons in an 88px card are noise. */}
+      {collapsed ? null : (
+        <ChannelsUsage
+          orgId={orgId}
+          channels={channels}
+          providers={providers}
+          limit={limit}
+          canManage={canManage}
+          className="px-5 pt-3 pb-5"
+        />
+      )}
 
       <ConnectChannelDialog
         open={connectOpen}
@@ -495,6 +496,16 @@ export function ChannelsColumn({
       <PostingTimesDialog
         channel={timesChannel}
         onOpenChange={(open) => !open && setTimesChannel(null)}
+        onDone={done}
+      />
+      <ChannelPreferencesDialog
+        channel={preferencesChannel}
+        onOpenChange={(open) => !open && setPreferencesChannel(null)}
+        onDone={done}
+      />
+      <DisableChannelDialog
+        channel={disableChannel}
+        onOpenChange={(open) => !open && setDisableChannel(null)}
         onDone={done}
       />
       <DisconnectDialog

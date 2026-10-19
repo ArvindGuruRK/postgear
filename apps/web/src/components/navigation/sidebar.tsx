@@ -151,11 +151,14 @@ const TAB_SLOTS = 5;
  *
  * A bottom bar rather than a menu button: every main destination stays one
  * tap away and within a thumb's reach, where a menu would hide all of them
- * behind a tap at the top of the screen. Seven entries do not fit five 70px
- * slots, so the first four sections stay and the rest (Media, SEO, Settings)
+ * behind a tap at the top of the screen. Eight entries do not fit five 70px
+ * slots, so the first four sections stay (Home, Calendar, Copilot, Queue)
+ * and the rest (Analytics, Media, SEO, Settings)
  * open from More in a sheet; More takes the active fill while one of those is
  * the current page. Its bottom margin is at least the safe-area inset, so the
- * bar clears the home indicator wherever the page reaches under it.
+ * bar clears the home indicator now that the page reaches under it
+ * (`viewport-fit=cover`, root layout); the More sheet's bottom edge does the
+ * same inside Sheet.
  */
 export function TabBar({
   items,
@@ -203,7 +206,7 @@ export function TabBar({
             onClickCapture={(event) => {
               if ((event.target as Element).closest('a')) setMoreOpen(false);
             }}
-            className="rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+            className="rounded-t-2xl"
           >
             <SheetTitle className="text-xl">More</SheetTitle>
             <div className="flex flex-wrap gap-2">

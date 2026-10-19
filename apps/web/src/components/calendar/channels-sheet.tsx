@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { ChannelLimit, ProviderSummary } from '@/types/channel';
 import { useCalendar } from './calendar-context';
+import { CHANNEL_DRAGGING_ATTRIBUTE } from './channel-rows';
 import { ChannelsColumn } from './channels-column';
 
 const TILE = cn(
@@ -70,6 +71,13 @@ export function ChannelsSheet({
           // when the person comes back.
           onClickCapture={(event) => {
             if ((event.target as Element).closest('a')) setOpen(false);
+          }}
+          // Escape during a keyboard reorder cancels the move (channel-rows);
+          // it must not also close the sheet underneath it.
+          onEscapeKeyDown={(event) => {
+            if (document.querySelector(`[${CHANNEL_DRAGGING_ATTRIBUTE}="true"]`)) {
+              event.preventDefault();
+            }
           }}
           className="w-[18rem] max-w-[85vw] gap-0 bg-chrome p-0"
         >

@@ -39,13 +39,17 @@ async function signIn(page: Page) {
   await page.getByLabel('Email').fill('demo@postgear.local');
   await page.locator('#password').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 
 async function openBilling(page: Page) {
   await page.goto(`/${DEMO_ORG}/settings/billing`);
   // No in-page title: the settings nav marks the open page.
-  await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Billing' })).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Settings sections' })
+      .getByRole('link', { name: 'Billing' }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByTestId('billing-simulated')).toBeVisible();
 }
 
@@ -59,12 +63,14 @@ test.describe('billing (simulation)', () => {
     await signIn(page);
     await openBilling(page);
 
-    await expect(status(page), 'Re-seed the database: the demo org must start on an active Standard plan').toHaveAttribute(
-      'data-status',
-      'active',
-    );
+    await expect(
+      status(page),
+      'Re-seed the database: the demo org must start on an active Standard plan',
+    ).toHaveAttribute('data-status', 'active');
     await expect(planCard(page, 'STANDARD')).toHaveAttribute('data-current', 'true');
-    await expect(planCard(page, 'STANDARD').getByRole('button', { name: 'Current plan' })).toBeDisabled();
+    await expect(
+      planCard(page, 'STANDARD').getByRole('button', { name: 'Current plan' }),
+    ).toBeDisabled();
     await expect(page.getByTestId('billing-scheduled')).toHaveCount(0);
 
     const channels = page.getByTestId('billing-usage-channels');
@@ -123,13 +129,17 @@ test.describe('billing (simulation)', () => {
     await dialog.getByLabel('Anything else? (optional)').fill('E2E cancellation feedback.');
     await dialog.getByRole('button', { name: 'Cancel plan' }).click();
 
-    await expect(status(page)).toHaveAttribute('data-status', 'canceling', { timeout: WEBHOOK_TIMEOUT });
+    await expect(status(page)).toHaveAttribute('data-status', 'canceling', {
+      timeout: WEBHOOK_TIMEOUT,
+    });
     const cancelAt = page.getByTestId('billing-cancel-at');
     await expect(cancelAt).toContainText(/ends on/);
     await expect(cancelAt).toHaveAttribute('data-date', /^\d{4}-\d{2}-\d{2}T/);
 
     await page.getByRole('button', { name: 'Resume plan' }).click();
-    await expect(status(page)).toHaveAttribute('data-status', 'active', { timeout: WEBHOOK_TIMEOUT });
+    await expect(status(page)).toHaveAttribute('data-status', 'active', {
+      timeout: WEBHOOK_TIMEOUT,
+    });
     await expect(page.getByTestId('billing-cancel-at')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Cancel plan' })).toBeVisible();
   });
@@ -142,9 +152,13 @@ test.describe('billing (simulation)', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Switch to Standard' })).toBeVisible();
-    await expect(dialog.getByTestId('billing-preview')).toHaveAttribute('data-effective', 'period_end', {
-      timeout: 20_000,
-    });
+    await expect(dialog.getByTestId('billing-preview')).toHaveAttribute(
+      'data-effective',
+      'period_end',
+      {
+        timeout: 20_000,
+      },
+    );
     await expect(dialog.getByTestId('billing-preview')).toHaveAttribute('data-amount', '2900');
 
     await dialog.getByRole('button', { name: 'Schedule change' }).click();
@@ -163,12 +177,14 @@ test.describe('billing (simulation)', () => {
     await page.getByLabel('Email').fill('member@postgear.local');
     await page.locator('#password').fill(SEED_PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
     await openBilling(page);
 
     await expect(status(page)).toHaveAttribute('data-status', /active|canceling/);
     await expect(page.getByRole('button', { name: 'Cancel plan' })).toHaveCount(0);
     await expect(planCard(page, 'TEAM').getByRole('button', { name: 'Upgrade' })).toBeDisabled();
-    await expect(page.getByText('Only workspace admins can subscribe, change or cancel the plan.')).toBeVisible();
+    await expect(
+      page.getByText('Only workspace admins can subscribe, change or cancel the plan.'),
+    ).toBeVisible();
   });
 });

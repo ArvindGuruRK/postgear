@@ -28,6 +28,7 @@
     "@tiptap/pm": "^3.31.3",
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "emoji-picker-react": "^4.22.3",
     "next": "16.3.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

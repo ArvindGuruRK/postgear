@@ -10,8 +10,10 @@ import type { ActivityDeps } from './deps';
 import { createIntegrationActivities } from './integration.activities';
 import { createMaintenanceActivities } from './maintenance.activities';
 import { createPublishActivities } from './publish.activities';
+import { createRepeatActivities } from './repeat.activities';
 import { createWebhookActivities } from './webhook.activities';
 
+export type { NextOccurrenceResult } from '../lib/next-occurrence';
 export type { AnalyticsSchedule, AnalyticsSyncResult } from './analytics.activities';
 export type { ActivityDeps } from './deps';
 export type { IntegrationSchedule } from './integration.activities';
@@ -27,6 +29,8 @@ export type { DeliverWebhookResult, MarkWebhookDeliveryFailedInput } from './web
 export function createActivities(deps: ActivityDeps) {
   return {
     ...createPublishActivities(deps),
+    // 2026-10-19: the next occurrence of a repeating post.
+    ...createRepeatActivities(deps),
     ...createIntegrationActivities(deps),
     ...createAnalyticsActivities(deps),
     ...createMaintenanceActivities(deps),

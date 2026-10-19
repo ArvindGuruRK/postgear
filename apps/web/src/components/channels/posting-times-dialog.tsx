@@ -185,7 +185,7 @@ export function PostingTimesDialog({ channel, onOpenChange, onDone }: PostingTim
           </Stack>
 
           {error ? (
-            <Text size="sm" className="text-actionDanger">
+            <Text size="sm" className="text-dangerInk">
               {error}
             </Text>
           ) : null}

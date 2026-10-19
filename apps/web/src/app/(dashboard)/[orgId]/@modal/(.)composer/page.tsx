@@ -4,10 +4,12 @@
  * "Use in a post") is intercepted here and opens over the page the person
  * was on, the way the reference composes over its calendar.
  *
- * The URL still changes, so `?group=` / `?at=` / `?media=` work as links, and
- * the browser's back button closes the modal. A reload or a shared link opens
- * the same modal over the calendar instead (`../composer/page.tsx`, with
- * `opened="direct"`). Same loader, same component: it is always a modal.
+ * The URL still changes, so `?group=` / `?at=` / `?media=` / `?template=` /
+ * `?duplicate=` / `?channel=` work as links (`lib/composer-data.ts` says what
+ * each means), and the browser's back button closes the modal. A reload or
+ * a shared link opens the same modal over the calendar instead
+ * (`../composer/page.tsx`, with `opened="direct"`). Same loader, same
+ * component: it is always a modal.
  *
  * Each render passes a fresh `renderId` and what its URL asked for, and
  * `ComposerHost` decides from those whether this render is a navigation to
@@ -38,6 +40,10 @@ export default async function ComposerModalPage({
       initialPost={data.post}
       initialMedia={data.media}
       initialPublishAt={data.publishAt}
+      initialText={data.text}
+      initialParts={data.parts}
+      initialChannelId={data.channelId}
+      initialSignature={data.signature}
       loadError={data.loadError}
     />
   );

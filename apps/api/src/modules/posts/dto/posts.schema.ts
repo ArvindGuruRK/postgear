@@ -5,7 +5,7 @@
  *
  * `Post.content` holds a structured document (see
  * `packages/social-core/src/composer/document.ts` for why not HTML). This file
- * is where that document is held to a closed allowlist: six node types, three
+ * is where that document is held to a closed allowlist: six node types, four
  * marks, `http`/`https` links only, and no attribute the renderer does not read.
  * Every object is `.strict()`, so an unknown key (an `onclick`, a `style`, a
  * node type from an editor extension nobody reviewed) is rejected rather than
@@ -47,6 +47,8 @@ const MAX_ITEM_BLOCKS = 50;
 const markSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('bold') }).strict(),
   z.object({ type: z.literal('italic') }).strict(),
+  // 2026-10-19: rendered as a combining low line; see social-core's unicode.ts.
+  z.object({ type: z.literal('underline') }).strict(),
   z
     .object({
       type: z.literal('link'),
@@ -64,7 +66,7 @@ const inlineSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('text'),
       text: z.string().min(1).max(MAX_TEXT_LENGTH),
-      marks: z.array(markSchema).max(3).optional(),
+      marks: z.array(markSchema).max(4).optional(),
     })
     .strict(),
   z.object({ type: z.literal('hardBreak') }).strict(),
@@ -144,6 +146,9 @@ export const postPartSchema = z
   })
   .strict();
 
+/** Keys one channel's settings may carry. No provider has more than four. */
+const MAX_SETTINGS_KEYS = 20;
+
 const channelEntrySchema = z
   .object({
     channelId: z.string().min(1).max(64),
@@ -153,11 +158,41 @@ const channelEntrySchema = z
      */
     customized: z.boolean(),
     parts: z.array(postPartSchema).min(1).max(MAX_THREAD_PARTS).optional(),
+    /**
+     * The platform's own options (2026-10-19): a YouTube title, a TikTok
+     * privacy level. Only the shape is checked here; what each key may hold
+     * depends on the channel's provider, so the service judges the values
+     * with social-core's `validateProviderSettings` once it knows which
+     * provider the channel is. Absent means none.
+     */
+    settings: z
+      .record(z.string().max(64), z.unknown())
+      .refine((settings) => Object.keys(settings).length <= MAX_SETTINGS_KEYS, 'Too many settings')
+      .optional(),
   })
   .strict()
   .refine(
     (entry) => entry.customized === (entry.parts !== undefined),
     'Parts are sent for a channel exactly when it is customized',
+  );
+
+/** Tags on one post, as Postiz allows in practice: enough to label, too few to be a list. */
+export const MAX_TAGS_PER_POST = 10;
+
+/**
+ * How often a post may repeat, in days (2026-10-19, after Postiz's "Repeat
+ * Post Every"). The same list as `REPEAT_INTERVALS` in the web's
+ * `types/post.ts`.
+ */
+export const REPEAT_INTERVALS = [1, 2, 3, 4, 5, 6, 7, 14, 30] as const;
+export type RepeatInterval = (typeof REPEAT_INTERVALS)[number];
+
+const repeatIntervalSchema = z
+  .number()
+  .int()
+  .refine(
+    (days): days is RepeatInterval => (REPEAT_INTERVALS as readonly number[]).includes(days),
+    'Choose one of the repeat intervals PostGear offers',
   );
 
 const postBodyShape = {
@@ -176,9 +211,36 @@ const postBodyShape = {
       (channels) => new Set(channels.map((entry) => entry.channelId)).size === channels.length,
       'A channel is listed twice',
     ),
+  /**
+   * Ids of this workspace's tags, in the order they are shown (2026-10-19).
+   * Absent means none, on an update too: a save is the whole post.
+   */
+  tags: z
+    .array(z.string().min(1).max(64))
+    .max(MAX_TAGS_PER_POST)
+    .refine((tags) => new Set(tags).size === tags.length, 'A tag is listed twice')
+    .optional(),
+  /**
+   * Publish again every this many days (2026-10-19). Absent or null means
+   * the post does not repeat; an update replaces it like the rest of the post.
+   */
+  intervalInDays: repeatIntervalSchema.nullable().optional(),
+  /**
+   * Publish right away instead of at `publishDate` (2026-10-19, Postiz's
+   * "Post now"). Only with `QUEUE`: a draft is not published by anyone.
+   */
+  publishNow: z.boolean().optional(),
 };
 
-export const createPostSchema = z.object(postBodyShape).strict();
+const publishNowNeedsQueue = (body: { state: 'DRAFT' | 'QUEUE'; publishNow?: boolean }) =>
+  body.publishNow !== true || body.state === 'QUEUE';
+
+const PUBLISH_NOW_NEEDS_QUEUE = 'Only a post being added to the queue can be published now';
+
+export const createPostSchema = z
+  .object(postBodyShape)
+  .strict()
+  .refine(publishNowNeedsQueue, PUBLISH_NOW_NEEDS_QUEUE);
 
 export const updatePostSchema = z
   .object({
@@ -189,7 +251,8 @@ export const updatePostSchema = z
      */
     expectedUpdatedAt: z.string().datetime({ offset: true }),
   })
-  .strict();
+  .strict()
+  .refine(publishNowNeedsQueue, PUBLISH_NOW_NEEDS_QUEUE);
 
 export const listPostsQuerySchema = z
   .object({

@@ -17,9 +17,15 @@ import { documentFromText } from '@postgear/social-core';
 import type { ChannelsService, ChannelView } from '../channels/channels.service';
 import type { MediaService, MediaView } from '../media/media.service';
 import type { SchedulingService } from '../scheduling/scheduling.service';
+import type { TagsService } from '../tags/tags.service';
 import type { CreatePostInput } from './dto/posts.schema';
 import type { PostRow, PostsRepository } from './posts.repository';
-import { PostsService, parseCustomized, parseImageIds } from './posts.service';
+import {
+  PostsService,
+  parseCustomized,
+  parseImageIds,
+  parseProviderSettings,
+} from './posts.service';
 
 const GROUP = '0b8f3f3e-8a1f-4c55-9a55-2f1f5d1c9e11';
 const IMAGE_ID = '6f1c2f7e-5d2b-4d0c-9a4e-3b8f0e2a1c11';
@@ -93,6 +99,7 @@ describe('PostsService', () => {
   let channels: { list: jest.Mock; colors: jest.Mock };
   let media: { findViews: jest.Mock };
   let scheduling: { schedulePublish: jest.Mock; cancelPublish: jest.Mock; publishNow: jest.Mock };
+  let tags: { findLive: jest.Mock };
   let service: PostsService;
 
   beforeEach(() => {
@@ -128,6 +135,12 @@ describe('PostsService', () => {
           name: 'Acme Studio',
           providerName: 'Instagram',
         }),
+        channel({
+          id: 'ch_yt',
+          providerIdentifier: 'youtube',
+          name: 'Acme',
+          providerName: 'YouTube',
+        }),
       ]),
       colors: jest.fn().mockResolvedValue(
         new Map([
@@ -138,12 +151,23 @@ describe('PostsService', () => {
       ),
     };
     media = { findViews: jest.fn().mockResolvedValue(new Map([[IMAGE_ID, image()]])) };
+    tags = {
+      findLive: jest.fn(
+        async (_orgId: string, ids: string[]) =>
+          new Map(
+            ids
+              .filter((id) => id.startsWith('tag_'))
+              .map((id) => [id, { id, name: id, color: 'teal' }]),
+          ),
+      ),
+    };
 
     service = new PostsService(
       repository as unknown as PostsRepository,
       channels as unknown as ChannelsService,
       media as unknown as MediaService,
       scheduling as unknown as SchedulingService,
+      tags as unknown as TagsService,
     );
 
     // `create` re-reads the group it wrote.
@@ -164,8 +188,10 @@ describe('PostsService', () => {
       releaseId: null,
       releaseURL: null,
       error: null,
+      intervalInDays: null,
       createdAt: new Date('2026-09-14T10:00:00Z'),
       updatedAt: new Date('2026-09-14T10:00:00Z'),
+      tags: [],
       integration: {
         id: 'ch_x',
         name: 'Acme on X',
@@ -590,6 +616,179 @@ describe('PostsService', () => {
       expect(colours(page.posts[0].channels)).toEqual(expected);
     });
   });
+
+  describe('settings, tags, repeat and post now (2026-10-19)', () => {
+    const VIDEO_ID = '9e8d7c6b-5a49-4382-8170-6f5e4d3c2b1a';
+    const video = () =>
+      image({ id: VIDEO_ID, type: 'video', mimeType: 'video/mp4', width: null, height: null });
+
+    it('keeps only the settings the channel’s provider reads, per channel', async () => {
+      await service.create(
+        'org_1',
+        input({
+          channels: [
+            {
+              channelId: 'ch_x',
+              customized: false,
+              settings: { replySettings: 'following', customized: true, premium: true },
+            },
+            { channelId: 'ch_li', customized: false, settings: { title: 'ignored' } },
+          ],
+        }),
+      );
+
+      const [x, linkedin] = repository.createGroup.mock.calls[0][0].channels;
+      expect(x.settings).toEqual({ replySettings: 'following' });
+      expect(linkedin.settings).toEqual({});
+    });
+
+    it('refuses a bad setting even in a draft, naming the platform, the channel and the field', async () => {
+      const promise = service.create(
+        'org_1',
+        input({
+          channels: [
+            { channelId: 'ch_yt', customized: false, settings: { title: 'x'.repeat(101) } },
+          ],
+        }),
+      );
+
+      await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+      await expect(promise).rejects.toThrow(
+        'YouTube (Acme): Title must be at most 100 characters.',
+      );
+      expect(repository.createGroup).not.toHaveBeenCalled();
+    });
+
+    it('holds an explicit YouTube title to YouTube’s title rules when queueing', async () => {
+      media.findViews.mockResolvedValue(new Map([[VIDEO_ID, video()]]));
+
+      await expect(
+        service.create(
+          'org_1',
+          input({
+            state: 'QUEUE',
+            shared: [{ content: documentFromText('A fine first line'), media: [{ id: VIDEO_ID }] }],
+            channels: [{ channelId: 'ch_yt', customized: false, settings: { title: 'a <b>' } }],
+          }),
+        ),
+      ).rejects.toThrow('Acme: YouTube titles cannot contain < or > characters.');
+    });
+
+    it('stores this workspace’s live tags in the order sent, and refuses any other', async () => {
+      await service.create('org_1', input({ tags: ['tag_b', 'tag_a'] }));
+      expect(repository.createGroup.mock.calls[0][0].tagIds).toEqual(['tag_b', 'tag_a']);
+      expect(tags.findLive).toHaveBeenCalledWith('org_1', ['tag_b', 'tag_a']);
+
+      await expect(
+        service.create('org_1', input({ tags: ['tag_a', 'someone_elses'] })),
+      ).rejects.toThrow('One of the selected tags was deleted.');
+      expect(repository.createGroup).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores the repeat, and no repeat when none is sent', async () => {
+      await service.create('org_1', input({ intervalInDays: 7 }));
+      await service.create('org_1', input());
+
+      expect(repository.createGroup.mock.calls.map(([write]) => write.intervalInDays)).toEqual([
+        7,
+        null,
+      ]);
+      expect(repository.createGroup.mock.calls[1][0].tagIds).toEqual([]);
+    });
+
+    it('posts now on save: today’s time, no future check, and the publish-now path', async () => {
+      repository.publishNow.mockResolvedValue({
+        outcome: 'saved',
+        roots: [{ id: 'root_x', integrationId: 'ch_x', state: State.QUEUE }],
+      });
+      const before = Date.now();
+
+      await service.create(
+        'org_1',
+        input({ state: 'QUEUE', publishNow: true, publishDate: '2020-01-01T00:00:00.000Z' }),
+      );
+
+      const write = repository.createGroup.mock.calls[0][0];
+      expect(write.state).toBe('QUEUE');
+      expect(write.publishDate.getTime()).toBeGreaterThanOrEqual(before);
+      expect(repository.publishNow).toHaveBeenCalledWith({ orgId: 'org_1', group: write.group });
+      expect(scheduling.publishNow).toHaveBeenCalledWith([
+        { postId: 'root_x', organizationId: 'org_1' },
+      ]);
+      expect(scheduling.schedulePublish).not.toHaveBeenCalled();
+    });
+
+    it('posts now on an update too, after cancelling the channels it dropped', async () => {
+      repository.findRoots.mockResolvedValueOnce([
+        { id: 'root_x', integrationId: 'ch_x', state: State.QUEUE },
+        { id: 'root_li', integrationId: 'ch_li', state: State.QUEUE },
+      ]);
+      repository.findRoots.mockResolvedValueOnce([
+        { id: 'root_x', integrationId: 'ch_x', state: State.QUEUE },
+      ]);
+      repository.publishNow.mockResolvedValue({
+        outcome: 'saved',
+        roots: [{ id: 'root_x', integrationId: 'ch_x', state: State.QUEUE }],
+      });
+
+      await service.update('org_1', GROUP, {
+        ...input({ state: 'QUEUE', publishNow: true }),
+        expectedUpdatedAt: new Date().toISOString(),
+      });
+
+      expect(scheduling.cancelPublish).toHaveBeenCalledWith(['root_li']);
+      expect(scheduling.publishNow).toHaveBeenCalledWith([
+        { postId: 'root_x', organizationId: 'org_1' },
+      ]);
+    });
+
+    it('returns settings, tags and the repeat in details, the calendar and the queue', async () => {
+      const tagged = [
+        row({
+          id: 'y1',
+          integrationId: 'ch_yt',
+          settings: '{"customized":false,"title":"Launch","privacyStatus":"private","stale":1}',
+          intervalInDays: 7,
+          tags: [
+            { tag: { id: 'tag_b', name: 'Beta', color: 'rose' } },
+            { tag: { id: 'tag_a', name: 'Alpha', color: 'teal' } },
+          ],
+          integration: {
+            id: 'ch_yt',
+            name: 'Acme',
+            providerIdentifier: 'youtube',
+            picture: null,
+            profile: null,
+            deletedAt: null,
+          },
+        }),
+      ];
+      repository.findGroup.mockResolvedValueOnce(tagged);
+      repository.listCalendar.mockResolvedValueOnce(tagged);
+      repository.listQueue.mockResolvedValueOnce({ rows: tagged, total: 1 });
+
+      const detail = await service.get('org_1', GROUP);
+      expect(detail.channels[0].settings).toEqual({ title: 'Launch', privacyStatus: 'private' });
+      expect(detail.tags).toEqual([
+        { id: 'tag_b', name: 'Beta', color: 'rose' },
+        { id: 'tag_a', name: 'Alpha', color: 'teal' },
+      ]);
+      expect(detail.intervalInDays).toBe(7);
+
+      const [summary] = await service.calendar('org_1', {
+        from: '2026-09-28T00:00:00.000Z',
+        to: '2026-10-05T00:00:00.000Z',
+      });
+      expect(summary.tags.map((tag) => tag.id)).toEqual(['tag_b', 'tag_a']);
+      expect(summary.intervalInDays).toBe(7);
+
+      const page = await service.queue('org_1', { page: 1, sort: 'asc' });
+      expect(page.posts[0]).toMatchObject({
+        intervalInDays: 7,
+        tags: [{ id: 'tag_b' }, { id: 'tag_a' }],
+      });
+    });
+  });
 });
 
 describe('stored JSON readers', () => {
@@ -604,5 +803,17 @@ describe('stored JSON readers', () => {
     expect(parseCustomized('{"customized":"true"}')).toBe(false);
     expect(parseCustomized('garbage')).toBe(false);
     expect(parseCustomized(null)).toBe(false);
+    // Provider settings beside the flag do not change it.
+    expect(parseCustomized('{"customized":true,"title":"x"}')).toBe(true);
+  });
+
+  it('read provider settings without the flag, limited to the provider’s fields', () => {
+    expect(
+      parseProviderSettings('{"customized":true,"replySettings":"verified","x":1}', 'x'),
+    ).toEqual({ replySettings: 'verified' });
+    expect(parseProviderSettings('{"customized":false,"title":"t"}', 'linkedin')).toEqual({});
+    expect(parseProviderSettings('[1]', 'x')).toEqual({});
+    expect(parseProviderSettings('nope', 'x')).toEqual({});
+    expect(parseProviderSettings(null, 'x')).toEqual({});
   });
 });

@@ -113,7 +113,7 @@ export function DisconnectDialog({ channel, onOpenChange, onDone }: DisconnectDi
           )}
 
           {error ? (
-            <Text size="sm" className="text-actionDanger">
+            <Text size="sm" className="text-dangerInk">
               {error}
             </Text>
           ) : null}

@@ -11,8 +11,8 @@
  * holds the time and the save actions. It is a modal, never a page of its
  * own, and can be switched to fullscreen (after Buffer's composer).
  *
- * The URL still names what is open (`/composer?group=`, `?at=`, `?media=`),
- * so a post can be reloaded, bookmarked and linked. It opens two ways:
+ * The URL still names what is open (`/composer?group=`, `?at=`, `?media=`,
+ * `?template=`), so a post can be reloaded, bookmarked and linked. It opens two ways:
  *
  * - `opened="in-app"`: navigated to from inside the app, the route is
  *   intercepted (`[orgId]/@modal/(.)composer`) and the modal opens over the
@@ -30,19 +30,35 @@
  *
  * ## Saving
  *
- * "Save draft" accepts anything well-formed. "Add to queue" first runs the
- * same checks the API will, and shows every blocker at once rather than
- * sending a request to learn about them one at a time; the API still has the
- * final say, and its message is shown if it disagrees. A save or delete is
- * announced (`announcePostsChanged`), so the calendar or queue under the
- * modal shows it at once.
+ * The footer follows the reference's (2026-10-19): Tags and Repeat on the
+ * left; Delete, the time, "Save as draft" and the main button on the right.
+ * The main button says what it will do: "Add to calendar" for a new post,
+ * "Schedule" for a draft, "Update" for a queued post; its chevron offers
+ * "Post now", which queues the post for this moment and publishes it at once.
+ *
+ * "Save as draft" accepts anything well-formed. The main button and Post now
+ * first run the same checks the API will. A platform setting that is
+ * missing or wrong is named in a toast ("YouTube (Acme): ..."), and the
+ * composer opens that channel's tab and its Settings bar with the message
+ * under the field, as the reference does; content problems are listed all
+ * at once rather than learned from the API one request at a time. The API
+ * still has the final say, and its message is shown if it disagrees. A save
+ * or delete is announced (`announcePostsChanged`), so the calendar or queue
+ * under the modal shows it at once.
  */
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { ExpandIcon } from '@animateicons/react/lucide/expand-icon';
 import { GlobeIcon } from '@animateicons/react/lucide/globe-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { ShrinkIcon } from '@animateicons/react/lucide/shrink-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
+import {
+  documentFromText,
+  settingsFieldsFor,
+  validateProviderSettings,
+} from '@postgear/social-core/composer';
 import {
   Alert,
   AlertDialog,
@@ -66,6 +82,10 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   MotionIcon,
   Tabs,
   TabsList,
@@ -74,6 +94,7 @@ import {
   useIconAnimation,
   useToast,
 } from '@postgear/ui';
+import type { Editor } from '@tiptap/react';
 import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
@@ -89,9 +110,11 @@ import { ApiError, api } from '@/lib/api';
 import { announcePostsChanged } from '@/lib/post-events';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
-import type { PostDetail } from '@/types/post';
+import type { PostDetail, PostPart } from '@/types/post';
 import { buildReport, queueBlockers } from './channel-report';
 import { ComposerChannels } from './composer-channels';
+import { RepeatControl } from './composer-repeat';
+import { SettingsBar, type SettingsBlock } from './composer-settings';
 import {
   composerReducer,
   effectiveParts,
@@ -102,10 +125,14 @@ import {
   MAX_MEDIA_PER_PART,
   partsFor,
   SHARED,
+  settingsOf,
   toLocalInputValue,
   toSavePayload,
 } from './composer-state';
+import { TagsControl } from './composer-tags';
+import { TemplatesButton } from './composer-templates';
 import { DraftsButton, DraftsSheet } from './drafts-sheet';
+import { insertParagraphs } from './editor-inserts';
 import { MediaPickerDialog } from './media-picker-dialog';
 import { PreviewPanel } from './preview-panel';
 import { ThreadEditor } from './thread-editor';
@@ -120,7 +147,15 @@ interface ComposerProps {
   initialMedia: MediaItem | null;
   /** An ISO time to start a new post at: the calendar's "click a slot". */
   initialPublishAt?: string | null;
-  /** Set when `?group=` named a post that could not be loaded. */
+  /** Text to start a new post with: a starter template picked on Home. */
+  initialText?: string | null;
+  /** Parts to start a new post with: a duplicated post's (`?duplicate=`). */
+  initialParts?: PostPart[] | null;
+  /** A channel to start a new post with (`?channel=`). */
+  initialChannelId?: string | null;
+  /** The default signature for a new blank post. */
+  initialSignature?: string | null;
+  /** Set when `?group=` or `?duplicate=` named a post that could not be loaded. */
   loadError: string | null;
   /** A new post's first save: it is now the saved post `group`. */
   onCreated?: (group: string) => void;
@@ -135,6 +170,10 @@ const FOCUS =
   'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
 
 const FULLSCREEN_KEY = 'postgear:composer-fullscreen';
+
+/** Each screen edge's notch or home-indicator inset; 0 on screens without one. */
+const SAFE_AREA_PADDING =
+  'pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]';
 
 /**
  * One scope tile; the active one is the primary fill, as a pressed choice.
@@ -155,6 +194,10 @@ export function Composer({
   initialPost,
   initialMedia,
   initialPublishAt = null,
+  initialText = null,
+  initialParts = null,
+  initialChannelId = null,
+  initialSignature = null,
   loadError,
   onCreated,
 }: ComposerProps) {
@@ -177,10 +220,18 @@ export function Composer({
       availableChannelIds: new Set(channels.map((channel) => channel.id)),
       now: new Date(),
       publishAt: initialPublishAt ? new Date(initialPublishAt) : null,
+      text: initialText,
+      parts: initialParts,
+      channelId: initialChannelId,
+      signature: initialSignature,
     }),
   );
 
-  const [saving, setSaving] = useState<'DRAFT' | 'QUEUE' | null>(null);
+  /** Which action is in flight: a draft, the main button, or Post now. */
+  const [saving, setSaving] = useState<'DRAFT' | 'QUEUE' | 'NOW' | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Settings problems found before a save, by channel id and field key. */
+  const [settingsErrors, setSettingsErrors] = useState<Record<string, Record<string, string>>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [draftsOpen, setDraftsOpen] = useState(false);
@@ -230,7 +281,26 @@ export function Composer({
     });
   }, []);
 
-  const selectedChannels = state.selected.flatMap((id) => channelsById.get(id) ?? []);
+  const selectedChannels = useMemo(
+    () => state.selected.flatMap((id) => channelsById.get(id) ?? []),
+    [state.selected, channelsById],
+  );
+
+  // Every mounted part editor, by part key, and the one that last had focus:
+  // where the header's Templates writes. Editors are uncontrolled (see
+  // composer-state.ts), so writing into a mounted one goes through it.
+  const editors = useRef(new Map<string, Editor>());
+  const focusedPart = useRef<string | null>(null);
+  const onEditor = useCallback((key: string, editor: Editor | null) => {
+    if (editor) {
+      editors.current.set(key, editor);
+    } else {
+      editors.current.delete(key);
+    }
+  }, []);
+  const onEditorFocus = useCallback((key: string) => {
+    focusedPart.current = key;
+  }, []);
 
   const reports = useMemo(
     () =>
@@ -290,8 +360,18 @@ export function Composer({
     }
   }, [dirty, close]);
 
+  /**
+   * Shows a platform setting problem where it can be fixed, as the reference
+   * does: that channel's tab, its Settings bar open.
+   */
+  const showSettingsOf = useCallback((channelId: string) => {
+    dispatch({ type: 'setScope', scope: channelId });
+    setSettingsOpen(true);
+  }, []);
+
   const save = useCallback(
-    async (target: 'DRAFT' | 'QUEUE') => {
+    async (target: 'DRAFT' | 'QUEUE', options: { publishNow?: boolean } = {}) => {
+      const publishNow = target === 'QUEUE' && options.publishNow === true;
       setNotice(null);
 
       if (state.selected.length === 0) {
@@ -305,9 +385,43 @@ export function Composer({
       }
 
       if (target === 'QUEUE') {
+        // Every selected channel's settings, checked the way the API will;
+        // the first problem is the one shown and navigated to.
+        const errors: Record<string, Record<string, string>> = {};
+        let first: { channel: Channel; message: string } | null = null;
+
+        for (const channel of selectedChannels) {
+          if (settingsFieldsFor(channel.providerIdentifier).length === 0) {
+            continue;
+          }
+          const { issues } = validateProviderSettings(
+            channel.providerIdentifier,
+            settingsOf(state, channel.id),
+            'queue',
+          );
+          if (issues.length > 0) {
+            errors[channel.id] = Object.fromEntries(
+              issues.map((issue) => [issue.key, issue.message]),
+            );
+            first ??= { channel, message: issues[0].message };
+          }
+        }
+
+        setSettingsErrors(errors);
+
+        if (first) {
+          toast({
+            variant: 'danger',
+            title: `${first.channel.providerName} (${first.channel.name}): ${first.message}`,
+          });
+          showSettingsOf(first.channel.id);
+          return;
+        }
+
         const problems = [
-          ...(publishDate && publishDate.getTime() <= Date.now()
-            ? ['Choose a time in the future to add this post to the queue.']
+          // Post now publishes at this moment, whatever time is picked.
+          ...(!publishNow && publishDate && publishDate.getTime() <= Date.now()
+            ? ['Choose a time in the future to add this post to the calendar.']
             : []),
           ...blockers,
         ];
@@ -318,11 +432,12 @@ export function Composer({
         }
       }
 
-      setSaving(target);
+      setSaving(publishNow ? 'NOW' : target);
       const revision = state.revision;
+      const wasQueued = state.savedState === 'QUEUE';
 
       try {
-        const payload = toSavePayload(state, target);
+        const payload = toSavePayload(state, target, { publishNow });
         const { post } = state.group
           ? await api<{ post: PostDetail }>(`/posts/${state.group}`, {
               method: 'PUT',
@@ -333,6 +448,17 @@ export function Composer({
         dispatch({ type: 'saved', post, revision });
         announcePostsChanged();
 
+        if (publishNow) {
+          // Out of the writer's hands now, as in the reference: the
+          // calendar shows how it goes.
+          toast({
+            title: 'Publishing now',
+            description: 'It goes out to each channel in a moment.',
+          });
+          close();
+          return;
+        }
+
         // The URL gains the group so a reload reopens this post. History is
         // replaced directly rather than navigated: a navigation would remount
         // the composer, and with it every editor, cursor and undo stack.
@@ -342,7 +468,14 @@ export function Composer({
         }
 
         toast({
-          title: target === 'QUEUE' ? 'Added to the queue' : 'Draft saved',
+          title:
+            target === 'DRAFT'
+              ? 'Draft saved'
+              : !state.group
+                ? 'Added to the calendar'
+                : wasQueued
+                  ? 'Post updated'
+                  : 'Scheduled',
           description:
             target === 'QUEUE' && publishDate
               ? `Scheduled for ${publishDate.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}.`
@@ -353,6 +486,22 @@ export function Composer({
           cause instanceof ApiError
             ? cause.message
             : 'The post could not be saved. Please try again.';
+
+        // The API's settings check names the channel ("YouTube (Acme): ..."):
+        // the same toast as the composer's own, and the same way to the field.
+        if (cause instanceof ApiError && cause.status === 400) {
+          toast({ variant: 'danger', title: message });
+          const named = selectedChannels.find(
+            (channel) =>
+              message.includes(`(${channel.name}):`) &&
+              settingsFieldsFor(channel.providerIdentifier).length > 0,
+          );
+          if (named) {
+            showSettingsOf(named.id);
+          }
+          return;
+        }
+
         setNotice(
           cause instanceof ApiError && cause.status === 409 && !locked
             ? { kind: 'conflict', message }
@@ -362,7 +511,18 @@ export function Composer({
         setSaving(null);
       }
     },
-    [state, blockers, publishDate, orgId, toast, locked, onCreated],
+    [
+      state,
+      selectedChannels,
+      blockers,
+      publishDate,
+      orgId,
+      toast,
+      locked,
+      onCreated,
+      close,
+      showSettingsOf,
+    ],
   );
 
   // Warn before losing unsaved work to a closed tab or a reload.
@@ -419,6 +579,69 @@ export function Composer({
   const noChannels = state.selected.length === 0;
   const title = locked ? 'Published Post' : state.group ? 'Edit Post' : 'Create Post';
   const newPostHref = `/${orgId}/composer`;
+  const busy = saving !== null;
+  const primaryLabel =
+    saving === 'QUEUE'
+      ? 'Saving…'
+      : saving === 'NOW'
+        ? 'Publishing…'
+        : noChannels
+          ? 'Pick a channel above'
+          : !state.group
+            ? 'Add to calendar'
+            : queued
+              ? 'Update'
+              : 'Schedule';
+
+  /**
+   * A starter template from the header: into the part being written (the
+   * last one focused, or the first), filling it when empty and going in at
+   * the cursor otherwise. A channel tab that follows the shared post has no
+   * editor of its own, so the words go to the shared post, and the tab with
+   * them.
+   */
+  function applyTemplate(text: string) {
+    if (!scopeChannel || isCustomized(state, scopeChannel.id)) {
+      const parts = partsFor(state, state.scope);
+      const key = parts.find((part) => part.key === focusedPart.current)?.key ?? parts[0]?.key;
+      const editor = key ? editors.current.get(key) : undefined;
+
+      if (editor) {
+        if (editor.isEmpty) {
+          editor.chain().focus().setContent(documentFromText(text)).run();
+        } else {
+          insertParagraphs(editor, text);
+        }
+        return;
+      }
+    }
+
+    dispatch({ type: 'insertText', scope: SHARED, key: state.shared[0].key, text });
+    dispatch({ type: 'setScope', scope: SHARED });
+  }
+
+  // The Settings bar: the open channel's fields, or on All channels every
+  // selected channel's that has any. No fields, no bar.
+  const settingsBlocks: SettingsBlock[] = (scopeChannel ? [scopeChannel] : selectedChannels)
+    .map((channel) => ({
+      channel,
+      fields: settingsFieldsFor(channel.providerIdentifier),
+      values: settingsOf(state, channel.id),
+      errors: settingsErrors[channel.id] ?? {},
+    }))
+    .filter((block) => block.fields.length > 0);
+
+  function changeSetting(channelId: string, key: string, value: unknown) {
+    dispatch({ type: 'setSetting', channelId, key, value });
+    // Changing a field answers its problem; the next save checks again.
+    setSettingsErrors((current) => {
+      if (!current[channelId]?.[key]) {
+        return current;
+      }
+      const { [key]: _answered, ...rest } = current[channelId];
+      return { ...current, [channelId]: rest };
+    });
+  }
 
   const frame = (
     <>
@@ -434,6 +657,7 @@ export function Composer({
               </Badge>
             ) : null}
             <div className="ms-auto flex shrink-0 items-center gap-2">
+              <TemplatesButton onPick={applyTemplate} disabled={locked} />
               <DraftsButton onClick={() => setDraftsOpen(true)} />
               {state.group ? (
                 <a
@@ -619,10 +843,36 @@ export function Composer({
                   dispatch={dispatch}
                   onAttachMedia={setPickerFor}
                   disabled={locked}
+                  signaturesHref={`/${orgId}/settings/signatures`}
+                  onEditor={onEditor}
+                  onEditorFocus={onEditorFocus}
                 />
               </div>
             )}
           </div>
+
+          {settingsBlocks.length > 0 ? (
+            <div
+              className={cn(
+                'flex min-h-0 shrink-0 flex-col px-5 pb-5',
+                // Centred with the writing in fullscreen: see above.
+                '[&>*]:mx-auto [&>*]:w-full',
+                fullscreen ? '[&>*]:max-w-3xl' : '[&>*]:max-w-full',
+                resizeAnimated &&
+                  '[&>*]:transition-[max-width] [&>*]:duration-400 [&>*]:ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:[&>*]:transition-none',
+              )}
+            >
+              <SettingsBar
+                title={scopeChannel ? `${scopeChannel.name} Settings` : 'Settings'}
+                blocks={settingsBlocks}
+                headed={!scopeChannel}
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+                onChange={changeSetting}
+                disabled={locked}
+              />
+            </div>
+          ) : null}
         </section>
 
         <aside
@@ -682,6 +932,7 @@ export function Composer({
               reports={reports}
               publishAt={publishDate}
               focusChannelId={state.scope === SHARED ? null : state.scope}
+              settings={state.settings}
             />
           </div>
         </aside>
@@ -719,7 +970,22 @@ export function Composer({
         </div>
       ) : null}
 
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-t-2 border-outline px-5 py-4">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t-2 border-outline px-5 py-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <TagsControl
+            selected={state.tags}
+            onChange={(tags) => dispatch({ type: 'setTags', tags })}
+            onTagChanged={(tag) => dispatch({ type: 'tagChanged', tag })}
+            onTagDeleted={(tagId) => dispatch({ type: 'tagDeleted', tagId })}
+            disabled={locked}
+          />
+          <RepeatControl
+            value={state.intervalInDays}
+            onChange={(value) => dispatch({ type: 'setRepeat', value })}
+            disabled={locked}
+          />
+        </div>
+
         <p aria-live="polite" className="m-0 me-auto flex flex-col font-sans text-xs text-ink">
           <span className="opacity-70">
             {saving
@@ -731,62 +997,85 @@ export function Composer({
                   : ''}
           </span>
           {blockers.length > 0 && selectedChannels.length > 0 ? (
-            <span className="text-actionDanger">
-              {blockers.length} {blockers.length === 1 ? 'issue' : 'issues'} to fix before queueing
+            <span className="text-dangerInk">
+              {blockers.length} {blockers.length === 1 ? 'issue' : 'issues'} to fix before
+              scheduling
             </span>
           ) : null}
         </p>
 
-        {state.group && !locked ? (
-          // A quiet text action, as in the reference: deleting is rarer than
-          // saving, and a confirmation follows.
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            {...deleteIcon.triggers}
-            className={cn(
-              'flex h-11 items-center gap-2 rounded-md px-2 type-ui text-sm text-actionDanger hover:bg-actionDanger/10',
-              FOCUS,
-            )}
-          >
-            <Trash2Icon
-              ref={deleteIcon.ref}
-              aria-hidden
-              size={16}
-              className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
-            />
-            Delete Post
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {state.group && !locked ? (
+            // A quiet text action, as in the reference: deleting is rarer than
+            // saving, and a confirmation follows. Its icon alone on a phone.
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              {...deleteIcon.triggers}
+              aria-label="Delete Post"
+              className={cn(
+                'flex h-11 items-center gap-2 rounded-md px-2 type-ui text-sm text-dangerInk hover:bg-actionDanger/10',
+                FOCUS,
+              )}
+            >
+              <Trash2Icon
+                ref={deleteIcon.ref}
+                aria-hidden
+                size={16}
+                className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
+              />
+              <span className="hidden sm:inline">Delete Post</span>
+            </button>
+          ) : null}
 
-        <PublishAt
-          value={state.publishAt}
-          onChange={(value) => dispatch({ type: 'setPublishAt', value })}
-          disabled={locked}
-        />
+          <PublishAt
+            value={state.publishAt}
+            onChange={(value) => dispatch({ type: 'setPublishAt', value })}
+            disabled={locked}
+          />
 
-        {/* Nothing to save until there is somewhere to post it: the main
-            button says so, the reference's "check the circles above". */}
-        <Button
-          variant="secondary"
-          onClick={() => void save('DRAFT')}
-          disabled={saving !== null || locked || noChannels}
-        >
-          {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move to drafts' : 'Save draft'}
-        </Button>
-        <Button
-          onClick={() => void save('QUEUE')}
-          disabled={saving !== null || locked || noChannels}
-          className="min-w-44"
-        >
-          {saving === 'QUEUE'
-            ? 'Saving…'
-            : noChannels
-              ? 'Pick a channel above'
-              : queued
-                ? 'Update queue'
-                : 'Add to queue'}
-        </Button>
+          {/* Nothing to save until there is somewhere to post it: the main
+              button says so, the reference's "check the circles above". */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => void save('DRAFT')}
+              disabled={busy || locked || noChannels}
+              className="px-4 sm:px-6"
+            >
+              {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move to drafts' : 'Save as draft'}
+            </Button>
+
+            {/* The reference's split button: the main action, and a chevron
+                for publishing at once. */}
+            <div className="flex">
+              <Button
+                onClick={() => void save('QUEUE')}
+                disabled={busy || locked || noChannels}
+                className="rounded-e-none px-4 sm:min-w-40 sm:px-6"
+              >
+                {primaryLabel}
+              </Button>
+              <DropdownMenu modal>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    aria-label="More ways to publish"
+                    disabled={busy || locked || noChannels}
+                    className="rounded-s-none border-s-0 px-2.5"
+                  >
+                    <MotionIcon icon={ChevronDownIcon} strokeWidth={3} className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="end" className="w-44">
+                  <DropdownMenuItem onSelect={() => void save('QUEUE', { publishNow: true })}>
+                    <MotionIcon icon={SendIcon} className="h-4 w-4" />
+                    Post now
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
       </div>
 
       <MediaPickerDialog
@@ -875,10 +1164,17 @@ export function Composer({
           resizeAnimated &&
             'transition-[width,height,border-radius,border-width,box-shadow] duration-400 ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none',
           // Below `md` the windowed card is full screen too: a 16px margin
-          // round a phone's screen buys nothing but a smaller editor.
+          // round a phone's screen buys nothing but a smaller editor. Edge to
+          // edge, it pads by the safe-area insets (`viewport-fit=cover`, root
+          // layout), so the header clears a notch and the footer the home
+          // indicator while the card's surface still fills behind them.
           fullscreen
-            ? 'h-dvh w-screen rounded-none border-0 shadow-none'
-            : 'h-dvh w-screen rounded-none border-0 shadow-none md:h-[min(calc(100dvh-2rem),62rem)] md:w-[min(calc(100vw-2rem),88rem)] md:rounded-2xl md:border-2 md:shadow-surfaceLg',
+            ? cn('h-dvh w-screen rounded-none border-0 shadow-none', SAFE_AREA_PADDING)
+            : cn(
+                'h-dvh w-screen rounded-none border-0 shadow-none',
+                SAFE_AREA_PADDING,
+                'md:h-[min(calc(100dvh-2rem),62rem)] md:w-[min(calc(100vw-2rem),88rem)] md:rounded-2xl md:border-2 md:p-0 md:shadow-surfaceLg',
+              ),
         )}
       >
         {frame}

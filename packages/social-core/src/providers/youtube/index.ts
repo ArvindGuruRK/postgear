@@ -298,11 +298,15 @@ export class YouTubeProvider
     const source = await this.fetch(video.path);
     const bytes = await source.arrayBuffer();
 
+    const tags = this.tagsFor(post);
     const metadata = {
       snippet: {
         title: this.titleFor(post),
         description: post.message,
         categoryId: String(post.settings?.categoryId ?? '22'),
+        // Omitted rather than sent empty, so a video without tags is exactly
+        // the request it was before tags existed.
+        ...(tags.length > 0 ? { tags } : {}),
       },
       status: {
         privacyStatus: String(post.settings?.privacyStatus ?? 'public'),
@@ -513,6 +517,19 @@ export class YouTubeProvider
     const firstLine = post.message.split('\n')[0]?.trim() ?? '';
 
     return (firstLine || 'Untitled').slice(0, MAX_TITLE_LENGTH);
+  }
+
+  /**
+   * `settings.tags` (see `PROVIDER_SETTINGS.youtube`), trimmed, with anything
+   * that is not a non-empty string dropped. The API has already held the list
+   * to YouTube's limits; this only refuses to send junk a stored row might hold.
+   */
+  private tagsFor(post: PostDetails): string[] {
+    const raw = post.settings?.tags;
+
+    return Array.isArray(raw)
+      ? raw.flatMap((tag) => (typeof tag === 'string' && tag.trim() ? [tag.trim()] : []))
+      : [];
   }
 
   private async exchange(params: Record<string, string>): Promise<GoogleTokenResponse> {

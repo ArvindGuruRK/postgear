@@ -21,9 +21,13 @@ jest.mock('@postgear/social-core', () => ({
   })),
 }));
 
+import { BadRequestException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { prisma } from '@postgear/db';
-import { ChannelLimitReachedError, type EntitlementsService } from '../billing/entitlements.service';
+import {
+  ChannelLimitReachedError,
+  type EntitlementsService,
+} from '../billing/entitlements.service';
 import type { SchedulingService } from '../scheduling/scheduling.service';
 import type { ChannelOAuthService } from './channel-oauth.service';
 import type { ChannelsRepository } from './channels.repository';
@@ -32,7 +36,10 @@ import { ChannelsService } from './channels.service';
 const fakeProvider = {
   identifier: 'linkedin',
   name: 'LinkedIn',
-  generateAuthUrl: jest.fn(async () => ({ url: 'https://linkedin.example/auth?state=theirs', codeVerifier: 'v' })),
+  generateAuthUrl: jest.fn(async () => ({
+    url: 'https://linkedin.example/auth?state=theirs',
+    codeVerifier: 'v',
+  })),
   authenticate: jest.fn(async () => ({ id: 'acct_new', accessToken: 'tok', name: 'New Page' })),
 };
 
@@ -49,13 +56,19 @@ describe('ChannelsService: the channel limit', () => {
   let repository: { findById: jest.Mock; upsertFromAuth: jest.Mock; listForOrg: jest.Mock };
   let oauth: { begin: jest.Mock; consume: jest.Mock };
   let scheduling: { ensureTokenRefresh: jest.Mock };
-  let entitlements: { assertCanConnect: jest.Mock; checkConnect: jest.Mock; channelUsage: jest.Mock };
+  let entitlements: {
+    assertCanConnect: jest.Mock;
+    checkConnect: jest.Mock;
+    channelUsage: jest.Mock;
+  };
   let service: ChannelsService;
 
   beforeEach(() => {
     repository = {
       findById: jest.fn().mockResolvedValue({ id: 'ch_1', rootInternalId: 'acct_1' }),
-      upsertFromAuth: jest.fn().mockResolvedValue({ id: 'ch_new', name: 'New Page', inBetweenSteps: false }),
+      upsertFromAuth: jest
+        .fn()
+        .mockResolvedValue({ id: 'ch_new', name: 'New Page', inBetweenSteps: false }),
       listForOrg: jest.fn().mockResolvedValue([]),
     };
     oauth = {
@@ -117,7 +130,9 @@ describe('ChannelsService: the channel limit', () => {
   it('re-checks on the callback and sends a new account back with channel_limit', async () => {
     entitlements.checkConnect.mockResolvedValue({ allowed: false, usage });
 
-    await expect(service.completeConnect({ provider: 'linkedin', code: 'c', state: 's' })).resolves.toEqual({
+    await expect(
+      service.completeConnect({ provider: 'linkedin', code: 'c', state: 's' }),
+    ).resolves.toEqual({
       path: '/org_1/channels?error=channel_limit',
     });
     expect(repository.upsertFromAuth).not.toHaveBeenCalled();
@@ -139,6 +154,83 @@ describe('ChannelsService: the channel limit', () => {
 
     expect(result.path).toBe('/org_1/channels?connected=New%20Page');
     expect(entitlements.checkConnect).toHaveBeenCalledWith('org_1');
-    expect(repository.upsertFromAuth).toHaveBeenCalledWith(expect.objectContaining({ orgId: 'org_1', internalId: 'acct_new' }));
+    expect(repository.upsertFromAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ orgId: 'org_1', internalId: 'acct_new' }),
+    );
+  });
+});
+
+/**
+ * The channel order and the disable switch (UI revamp, 2026-10-19): the
+ * service's part is refusing a list with a stranger in it and handing back
+ * the list in its new order, and passing `disabled` through untouched.
+ */
+describe('ChannelsService: order and disabling', () => {
+  let repository: { setOrder: jest.Mock; listForOrg: jest.Mock; updateSettings: jest.Mock };
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    repository = {
+      setOrder: jest.fn().mockResolvedValue(true),
+      listForOrg: jest.fn().mockResolvedValue([
+        {
+          id: 'b',
+          providerIdentifier: 'linkedin',
+          inBetweenSteps: false,
+          refreshNeeded: false,
+          disabled: false,
+          tokenExpiration: null,
+        },
+        {
+          id: 'a',
+          providerIdentifier: 'linkedin',
+          inBetweenSteps: false,
+          refreshNeeded: false,
+          disabled: true,
+          tokenExpiration: null,
+        },
+      ]),
+      updateSettings: jest.fn().mockResolvedValue({ id: 'a', disabled: true }),
+    };
+    service = new ChannelsService(
+      repository as unknown as ChannelsRepository,
+      {} as unknown as ChannelOAuthService,
+      { get: () => 'http://localhost:3001' } as unknown as ConfigService,
+      {} as unknown as SchedulingService,
+      {} as unknown as EntitlementsService,
+    );
+    jest.spyOn(service, 'colors').mockResolvedValue(
+      new Map([
+        ['a', 2],
+        ['b', 5],
+      ]),
+    );
+  });
+
+  it('saves the order and returns the list as it now stands', async () => {
+    const channels = await service.reorder('org_1', ['b', 'a']);
+
+    expect(repository.setOrder).toHaveBeenCalledWith('org_1', ['b', 'a']);
+    expect(channels.map((channel) => channel.id)).toEqual(['b', 'a']);
+    expect(channels[1]).toMatchObject({ health: 'disabled', color: 2 });
+  });
+
+  it('answers 400 when an id is not one of the workspace’s live channels', async () => {
+    repository.setOrder.mockResolvedValue(false);
+
+    await expect(service.reorder('org_1', ['b', 'elsewhere'])).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(repository.listForOrg).not.toHaveBeenCalled();
+  });
+
+  it('passes disabled through to the repository', async () => {
+    await service.updateSettings({ orgId: 'org_1', id: 'a', disabled: true });
+
+    expect(repository.updateSettings).toHaveBeenCalledWith({
+      orgId: 'org_1',
+      id: 'a',
+      disabled: true,
+    });
   });
 });

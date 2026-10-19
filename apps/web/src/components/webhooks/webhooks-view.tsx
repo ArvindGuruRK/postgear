@@ -56,16 +56,25 @@ export interface WebhooksViewProps {
   retryPolicy: { maximumAttempts: number } | null;
 }
 
-export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, retryPolicy }: WebhooksViewProps) {
+export function WebhooksView({
+  initialWebhooks,
+  channels,
+  canManage,
+  allowHttp,
+  retryPolicy,
+}: WebhooksViewProps) {
   const [webhooks, setWebhooks] = useState<WebhookView[] | null>(initialWebhooks);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<WebhookView | null>(null);
-  const [confirm, setConfirm] = useState<{ webhook: WebhookView; kind: WebhookConfirmKind } | null>(null);
+  const [confirm, setConfirm] = useState<{ webhook: WebhookView; kind: WebhookConfirmKind } | null>(
+    null,
+  );
   const [history, setHistory] = useState<WebhookView | null>(null);
   const [rotated, setRotated] = useState<WebhookCreated | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const channelName = (id: string) => channels.find((channel) => channel.id === id)?.name ?? 'a removed channel';
+  const channelName = (id: string) =>
+    channels.find((channel) => channel.id === id)?.name ?? 'a removed channel';
 
   async function reload() {
     try {
@@ -93,7 +102,9 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
     try {
       if (confirm.kind === 'delete') {
         await api(`/webhooks/${confirm.webhook.id}`, { method: 'DELETE' });
-        setWebhooks((current) => (current ?? []).filter((entry) => entry.id !== confirm.webhook.id));
+        setWebhooks((current) =>
+          (current ?? []).filter((entry) => entry.id !== confirm.webhook.id),
+        );
         toast({ title: 'Webhook deleted' });
       } else {
         const result = await api<WebhookCreated>(`/webhooks/${confirm.webhook.id}/rotate-secret`, {
@@ -115,9 +126,12 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
 
   async function sendTest(webhook: WebhookView) {
     try {
-      const result = await api<{ scheduled: boolean; message: string }>(`/webhooks/${webhook.id}/test`, {
-        method: 'POST',
-      });
+      const result = await api<{ scheduled: boolean; message: string }>(
+        `/webhooks/${webhook.id}/test`,
+        {
+          method: 'POST',
+        },
+      );
       toast({ title: result.message, variant: result.scheduled ? 'default' : 'danger' });
       setHistory(webhook);
     } catch (cause) {
@@ -270,7 +284,11 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="secondary" size="sm" aria-label={`Actions for ${webhook.name}`}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            aria-label={`Actions for ${webhook.name}`}
+                          >
                             <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -281,7 +299,9 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
                           </DropdownMenuItem>
                           {canManage ? (
                             <>
-                              <DropdownMenuItem onSelect={() => void sendTest(webhook)}>Send test</DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => void sendTest(webhook)}>
+                                Send test
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => {
                                   setEditing(webhook);
@@ -293,12 +313,14 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
                               <DropdownMenuItem onSelect={() => void toggleDisabled(webhook)}>
                                 {webhook.disabled ? 'Resume' : 'Pause'}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => setConfirm({ webhook, kind: 'rotate' })}>
+                              <DropdownMenuItem
+                                onSelect={() => setConfirm({ webhook, kind: 'rotate' })}
+                              >
                                 Rotate secret
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                className="text-actionDanger"
+                                className="text-dangerInk"
                                 onSelect={() => setConfirm({ webhook, kind: 'delete' })}
                               >
                                 Delete
@@ -317,8 +339,8 @@ export function WebhooksView({ initialWebhooks, channels, canManage, allowHttp, 
       )}
 
       <Text size="sm" muted>
-        Deliveries carry <code className="font-mono text-xs">X-PostGear-Signature</code> (HMAC-SHA256 of
-        the timestamp and body with your secret)
+        Deliveries carry <code className="font-mono text-xs">X-PostGear-Signature</code>{' '}
+        (HMAC-SHA256 of the timestamp and body with your secret)
         {retryPolicy
           ? `, and a failed delivery is retried up to ${retryPolicy.maximumAttempts} times with growing delays.`
           : '.'}

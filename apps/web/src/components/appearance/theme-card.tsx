@@ -48,7 +48,8 @@ export function ThemeCard({
       data-testid={`theme-${theme.mode}-${theme.id}`}
       onClick={() => onChoose(theme)}
       className={cn(
-        'group flex flex-col gap-2 rounded-md border-2 border-outline bg-secondary p-2 text-left text-ink',
+        // A size container, for the name row below.
+        '@container group flex flex-col gap-2 rounded-md border-2 border-outline bg-secondary p-2 text-left text-ink',
         'shadow-brutalSm transition-[transform,box-shadow] duration-100',
         'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
         'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
@@ -87,15 +88,20 @@ export function ThemeCard({
         </span>
       </span>
 
-      <span className="flex min-h-6 items-center justify-between gap-2 px-0.5">
-        <span className="type-ui truncate text-sm">{theme.name}</span>
+      {/* Name and badge side by side only when the card has room for both.
+          A narrow card (two up on a phone, three beside the settings nav at
+          md) puts the badge under the name instead of cutting the name to a
+          letter, and every narrow card keeps that two-line height, badge or
+          not, so a row of cards still lines up. */}
+      <span className="flex min-h-12 flex-col items-start gap-1 px-0.5 @[11.25rem]:min-h-6 @[11.25rem]:flex-row @[11.25rem]:items-center @[11.25rem]:justify-between @[11.25rem]:gap-2">
+        <span className="type-ui max-w-full min-w-0 truncate text-sm">{theme.name}</span>
         {selected ? (
-          <Badge variant="primary" className="px-2 py-0.5">
+          <Badge variant="primary" className="shrink-0 px-2 py-0.5">
             <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
             Current
           </Badge>
         ) : theme.premium ? (
-          <Badge variant="outline" className="px-2 py-0.5">
+          <Badge variant="outline" className="shrink-0 px-2 py-0.5">
             {locked ? <Lock className="h-3 w-3" strokeWidth={3} aria-hidden="true" /> : null}
             Premium
           </Badge>

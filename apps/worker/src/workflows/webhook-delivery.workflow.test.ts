@@ -6,10 +6,11 @@
  * attempt; six retryable failures exhaust the policy; and only the final
  * outcome marks the row failed, exactly once.
  */
+
+import { WEBHOOK_DELIVERY_RETRY_POLICY, WEBHOOK_FAILURE_TYPES } from '@postgear/scheduling';
 import { ApplicationFailure } from '@temporalio/common';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { Worker } from '@temporalio/worker';
-import { WEBHOOK_DELIVERY_RETRY_POLICY, WEBHOOK_FAILURE_TYPES } from '@postgear/scheduling';
 import type { Activities } from '../activities';
 import { webhookDeliveryWorkflow } from './webhook-delivery.workflow';
 
@@ -26,6 +27,7 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     publishPost: jest.fn(),
     recordPublished: jest.fn(),
     markPublishFailed: jest.fn(),
+    queueNextOccurrence: jest.fn(),
     loadIntegrationSchedule: jest.fn(),
     refreshChannelToken: jest.fn(),
     loadAnalyticsSchedule: jest.fn(),
@@ -65,7 +67,11 @@ async function run(activities: Mocks, workflowId: string) {
 }
 
 const retryable = (message: string) =>
-  ApplicationFailure.create({ type: WEBHOOK_FAILURE_TYPES.retryable, nonRetryable: false, message });
+  ApplicationFailure.create({
+    type: WEBHOOK_FAILURE_TYPES.retryable,
+    nonRetryable: false,
+    message,
+  });
 const rejected = (message: string) =>
   ApplicationFailure.create({ type: WEBHOOK_FAILURE_TYPES.rejected, nonRetryable: true, message });
 
@@ -98,9 +104,12 @@ describe('webhookDeliveryWorkflow', () => {
     expect(outcome).toEqual({ outcome: 'delivered', statusCode: 200, attempts: 3 });
     expect(times).toHaveLength(3);
     // 30 s, then 2 min (× 4), on the test server's skipping clock.
-    expect(times[1] - times[0]).toBeGreaterThanOrEqual(WEBHOOK_DELIVERY_RETRY_POLICY.initialIntervalMs);
+    expect(times[1] - times[0]).toBeGreaterThanOrEqual(
+      WEBHOOK_DELIVERY_RETRY_POLICY.initialIntervalMs,
+    );
     expect(times[2] - times[1]).toBeGreaterThanOrEqual(
-      WEBHOOK_DELIVERY_RETRY_POLICY.initialIntervalMs * WEBHOOK_DELIVERY_RETRY_POLICY.backoffCoefficient,
+      WEBHOOK_DELIVERY_RETRY_POLICY.initialIntervalMs *
+        WEBHOOK_DELIVERY_RETRY_POLICY.backoffCoefficient,
     );
     expect(activities.markWebhookDeliveryFailed).not.toHaveBeenCalled();
   });
@@ -113,7 +122,11 @@ describe('webhookDeliveryWorkflow', () => {
 
     const outcome = await run(activities, 'wh-rejected');
 
-    expect(outcome).toEqual({ outcome: 'failed', reason: 'rejected', message: 'Receiver answered 404' });
+    expect(outcome).toEqual({
+      outcome: 'failed',
+      reason: 'rejected',
+      message: 'Receiver answered 404',
+    });
     expect(activities.deliverWebhook).toHaveBeenCalledTimes(1);
     expect(activities.markWebhookDeliveryFailed).toHaveBeenCalledTimes(1);
     expect(activities.markWebhookDeliveryFailed).toHaveBeenCalledWith({
@@ -154,7 +167,10 @@ describe('webhookDeliveryWorkflow', () => {
 
     const outcome = await run(activities, 'wh-skipped');
 
-    expect(outcome).toEqual({ outcome: 'skipped', message: 'The webhook was removed or disabled.' });
+    expect(outcome).toEqual({
+      outcome: 'skipped',
+      message: 'The webhook was removed or disabled.',
+    });
     expect(activities.markWebhookDeliveryFailed).not.toHaveBeenCalled();
   });
 });

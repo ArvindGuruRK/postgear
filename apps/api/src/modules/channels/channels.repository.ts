@@ -31,13 +31,26 @@ import {
   encrypt,
   encryptNullable,
   type Integration,
+  type Prisma,
   type PrismaTransactionClient,
   prisma,
   State,
 } from '@postgear/db';
+import { nextChannelColor } from './channel-colors';
 
 /** The default the schema itself declares, used when a stored value is unreadable. */
 const DEFAULT_POSTING_TIMES = [{ time: 120 }, { time: 400 }, { time: 700 }];
+
+/**
+ * The workspace's channel order: the stored `position` (an admin's drag, or
+ * last on connect), then creation time and id, which only decide for a row
+ * without one (created outside this repository) or two that share one.
+ */
+const CHANNEL_ORDER = [
+  { position: { sort: 'asc', nulls: 'last' } },
+  { createdAt: 'asc' },
+  { id: 'asc' },
+] satisfies Prisma.IntegrationOrderByWithRelationInput[];
 
 /** A channel as the rest of the app sees it. Deliberately carries no credentials. */
 export interface ChannelSummary {
@@ -87,20 +100,66 @@ export interface UpsertChannelInput {
 @Injectable()
 export class ChannelsRepository {
   /**
-   * The channel list for an organization.
+   * The channel list for an organization, in the workspace's order.
    *
    * Selects explicitly rather than returning the row, so `token` and
    * `refreshToken` cannot reach a caller even by accident: a safer default
    * than remembering to strip them at every call site.
+   *
+   * Every channel list in the API (the channels page, the calendar, the
+   * composer, analytics, the public API) comes through here, so this one
+   * `orderBy` is what makes an admin's drag in the calendar the order
+   * everywhere.
    */
   async listForOrg(orgId: string): Promise<ChannelSummary[]> {
     const rows = await prisma.integration.findMany({
       where: { organizationId: orgId, deletedAt: null },
-      orderBy: { createdAt: 'asc' },
+      orderBy: CHANNEL_ORDER,
       select: this.summarySelect(),
     });
 
     return rows.map((row) => this.toSummary(row));
+  }
+
+  /**
+   * Puts the workspace's live channels in the order given (UI revamp,
+   * 2026-10-19): `position` 0, 1, 2... in the order of `ids`, and any live
+   * channel left out after them, in the order they already had.
+   *
+   * Returns false, writing nothing, when an id is not one of the workspace's
+   * live channels (another workspace's, a disconnected one, a typo): the
+   * caller answers 400. One transaction, so a list is never half reordered.
+   */
+  async setOrder(orgId: string, ids: string[]): Promise<boolean> {
+    return prisma.$transaction(async (tx) => {
+      const live = await tx.integration.findMany({
+        where: { organizationId: orgId, deletedAt: null },
+        orderBy: CHANNEL_ORDER,
+        select: { id: true, position: true },
+      });
+
+      const liveIds = new Set(live.map((row) => row.id));
+
+      if (ids.some((id) => !liveIds.has(id))) {
+        return false;
+      }
+
+      const listed = new Set(ids);
+      const order = [...ids, ...live.map((row) => row.id).filter((id) => !listed.has(id))];
+      const current = new Map(live.map((row) => [row.id, row.position]));
+
+      for (const [position, id] of order.entries()) {
+        // Only rows that move: a drag usually shifts a few of them.
+        if (current.get(id) !== position) {
+          await tx.integration.updateMany({
+            where: { id, organizationId: orgId, deletedAt: null },
+            data: { position },
+          });
+        }
+      }
+
+      return true;
+    });
   }
 
   /** One channel, without credentials. */
@@ -147,52 +206,71 @@ export class ChannelsRepository {
    * all survive, and `deletedAt: null` resurrects a channel that had been
    * disconnected.
    *
-   * The update branch deliberately omits `name`, `disabled` and `postingTimes`.
-   * Those carry user intent, and a machine-driven reconnect or token refresh
-   * must not overwrite them.
+   * The update branch deliberately omits `name`, `disabled`, `postingTimes`,
+   * `color` and `position`. Those carry user intent, and a machine-driven
+   * reconnect or token refresh must not overwrite them.
+   *
+   * In a transaction because a new row's colour is chosen from the colours
+   * already in use (`nextChannelColor`, which locks the workspace's colours
+   * until the row is written), and its place in the channel list goes after
+   * the last one (`position`, read under the same lock, so two channels
+   * connected at once do not share a place). Both are computed on every call
+   * but only the create branch uses them: a reconnect keeps its colour and
+   * its place.
    */
   async upsertFromAuth(input: UpsertChannelInput): Promise<ChannelSummary> {
     const tokenExpiration = input.expiresIn
       ? new Date(Date.now() + input.expiresIn * 1_000)
       : undefined;
 
-    const row = await prisma.integration.upsert({
-      where: {
-        organizationId_internalId: {
+    const row = await prisma.$transaction(async (tx) => {
+      const color = await nextChannelColor(tx, input.orgId);
+      const last = await tx.integration.aggregate({
+        where: { organizationId: input.orgId, deletedAt: null },
+        _max: { position: true },
+      });
+      const position = (last._max.position ?? -1) + 1;
+
+      return tx.integration.upsert({
+        where: {
+          organizationId_internalId: {
+            organizationId: input.orgId,
+            internalId: input.internalId,
+          },
+        },
+        create: {
           organizationId: input.orgId,
           internalId: input.internalId,
+          rootInternalId: input.rootInternalId,
+          providerIdentifier: input.providerIdentifier,
+          type: 'social',
+          name: input.name,
+          profile: input.profile ?? null,
+          picture: input.picture ?? null,
+          token: encrypt(input.token),
+          refreshToken: encryptNullable(input.refreshToken),
+          tokenExpiration: tokenExpiration ?? null,
+          inBetweenSteps: input.inBetweenSteps ?? false,
+          refreshNeeded: false,
+          color,
+          position,
         },
-      },
-      create: {
-        organizationId: input.orgId,
-        internalId: input.internalId,
-        rootInternalId: input.rootInternalId,
-        providerIdentifier: input.providerIdentifier,
-        type: 'social',
-        name: input.name,
-        profile: input.profile ?? null,
-        picture: input.picture ?? null,
-        token: encrypt(input.token),
-        refreshToken: encryptNullable(input.refreshToken),
-        tokenExpiration: tokenExpiration ?? null,
-        inBetweenSteps: input.inBetweenSteps ?? false,
-        refreshNeeded: false,
-      },
-      update: {
-        token: encrypt(input.token),
-        refreshToken: encryptNullable(input.refreshToken),
-        // A conditional spread, not a plain assignment: a refresh that does not
-        // know the expiry must leave the stored one alone rather than null it.
-        ...(tokenExpiration ? { tokenExpiration } : {}),
-        ...(input.profile ? { profile: input.profile } : {}),
-        ...(input.picture ? { picture: input.picture } : {}),
-        // A reconnect must not drop the user back into the page picker for a
-        // page they already chose.
-        ...(input.isReconnect ? {} : { inBetweenSteps: input.inBetweenSteps ?? false }),
-        deletedAt: null,
-        refreshNeeded: false,
-      },
-      select: this.summarySelect(),
+        update: {
+          token: encrypt(input.token),
+          refreshToken: encryptNullable(input.refreshToken),
+          // A conditional spread, not a plain assignment: a refresh that does not
+          // know the expiry must leave the stored one alone rather than null it.
+          ...(tokenExpiration ? { tokenExpiration } : {}),
+          ...(input.profile ? { profile: input.profile } : {}),
+          ...(input.picture ? { picture: input.picture } : {}),
+          // A reconnect must not drop the user back into the page picker for a
+          // page they already chose.
+          ...(input.isReconnect ? {} : { inBetweenSteps: input.inBetweenSteps ?? false }),
+          deletedAt: null,
+          refreshNeeded: false,
+        },
+        select: this.summarySelect(),
+      });
     });
 
     return this.toSummary(row);
@@ -308,6 +386,20 @@ export class ChannelsRepository {
         throw new Error('Channel is not awaiting selection');
       }
 
+      // A page chosen again after a disconnect is a reconnect, and keeps its
+      // colour: read from its tombstone before `vacateInternalId` renames it.
+      const previous = await tx.integration.findFirst({
+        where: {
+          organizationId: params.orgId,
+          internalId: params.entityId,
+          deletedAt: { not: null },
+          id: { not: params.id },
+          color: { not: null },
+        },
+        orderBy: { deletedAt: 'desc' },
+        select: { color: true },
+      });
+
       await this.vacateInternalId(tx, params.orgId, params.entityId, params.id);
 
       const target = await this.findLiveHolder(tx, params.orgId, params.entityId, params.id);
@@ -337,6 +429,8 @@ export class ChannelsRepository {
           ...(params.picture ? { picture: params.picture } : {}),
           ...(params.profile ? { profile: params.profile } : {}),
           ...(params.token ? { token: encrypt(params.token) } : {}),
+          // A live row that already represents the page keeps its own colour.
+          ...(!target && previous?.color != null ? { color: previous.color } : {}),
           inBetweenSteps: false,
           refreshNeeded: false,
           deletedAt: null,
@@ -422,12 +516,18 @@ export class ChannelsRepository {
     id: string;
     name?: string;
     postingTimes?: { time: number }[];
+    /** A palette slot, validated against `CHANNEL_COLOR_COUNT` by the schema. */
+    color?: number;
+    /** An admin's "Disable channel" / "Enable channel"; queued posts stay queued. */
+    disabled?: boolean;
   }): Promise<ChannelSummary | null> {
     await prisma.integration.updateMany({
       where: { id: params.id, organizationId: params.orgId, deletedAt: null },
       data: {
         ...(params.name ? { name: params.name } : {}),
         ...(params.postingTimes ? { postingTimes: JSON.stringify(params.postingTimes) } : {}),
+        ...(params.color !== undefined ? { color: params.color } : {}),
+        ...(params.disabled !== undefined ? { disabled: params.disabled } : {}),
       },
     });
 

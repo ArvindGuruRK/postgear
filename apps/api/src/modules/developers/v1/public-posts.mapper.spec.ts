@@ -167,6 +167,10 @@ describe('view mappers', () => {
       preview: 'Yesterday: the first post',
       parts: 1,
       channels: [channel],
+      // Composer-only fields (2026-10-19): `/v1` does not promise them, and
+      // the exact match below shows they stay out of the public shape.
+      tags: [{ id: 'tag-1', name: 'Launch', color: 'teal' }],
+      intervalInDays: 7,
     };
 
     expect(toPublicPostSummary(summary)).toEqual({
@@ -213,8 +217,17 @@ describe('view mappers', () => {
       updatedAt: new Date('2026-10-16T10:00:00Z'),
       shared: [part, { content: documentFromText('Second part'), media: [], removedMedia: 0 }],
       channels: [
-        { ...channel, customized: false, parts: [part], state: State.QUEUE, releaseURL: null },
+        {
+          ...channel,
+          customized: false,
+          parts: [part],
+          state: State.QUEUE,
+          releaseURL: null,
+          settings: {},
+        },
       ],
+      tags: [],
+      intervalInDays: null,
     };
 
     const post = toPublicPost(detail);
@@ -251,6 +264,8 @@ describe('view mappers', () => {
       updatedAt: NOW,
       shared: [{ content: documentFromText('x'.repeat(400)), media: [], removedMedia: 0 }],
       channels: [],
+      tags: [],
+      intervalInDays: null,
     };
 
     const { preview } = toPublicPost(detail);

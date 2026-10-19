@@ -5,10 +5,10 @@ import {
   Button,
   EmptyState,
   Grid,
-  Link as UiLink,
   PageActions,
   Stack,
   Text,
+  Link as UiLink,
 } from '@postgear/ui';
 import { Radio } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -17,7 +17,10 @@ import { channelConnectUrl } from '@/lib/api';
 import type { Channel, ChannelLimit, ProviderSummary } from '@/types/channel';
 import { ChannelCard } from './channel-card';
 import { isBroken } from './channel-health';
+import type { ChannelMenuHandlers } from './channel-menu';
+import { ChannelPreferencesDialog } from './channel-preferences-dialog';
 import { ConnectChannelDialog } from './connect-channel-dialog';
+import { DisableChannelDialog } from './disable-channel-dialog';
 import { DisconnectDialog } from './disconnect-dialog';
 import { FinishSetupDialog } from './finish-setup-dialog';
 import { PostingTimesDialog } from './posting-times-dialog';
@@ -67,6 +70,8 @@ export function ChannelsView({
   const [connectOpen, setConnectOpen] = useState(false);
   const [setupChannel, setSetupChannel] = useState<Channel | null>(null);
   const [timesChannel, setTimesChannel] = useState<Channel | null>(null);
+  const [preferencesChannel, setPreferencesChannel] = useState<Channel | null>(null);
+  const [disableChannel, setDisableChannel] = useState<Channel | null>(null);
   const [disconnectChannel, setDisconnectChannel] = useState<Channel | null>(null);
 
   const errorCode = searchParams.get('error');
@@ -95,12 +100,29 @@ export function ChannelsView({
   function refresh() {
     setSetupChannel(null);
     setTimesChannel(null);
+    setPreferencesChannel(null);
+    setDisableChannel(null);
     setDisconnectChannel(null);
     // Clears the ?connected / ?setup / ?error params so a reload does not
     // replay the same banner or reopen the dialog.
     router.replace(window.location.pathname);
     router.refresh();
   }
+
+  const menu: ChannelMenuHandlers = {
+    onPreferences: setPreferencesChannel,
+    onEditTimes: setTimesChannel,
+    // Reconnect restarts the handshake for this specific channel, passing
+    // PostGear's own id so the API can verify the same account is
+    // re-authorized rather than a different one.
+    onReconnect: (target) => {
+      window.location.href = channelConnectUrl(target.providerIdentifier, target.id);
+    },
+    onFinishSetup: setSetupChannel,
+    onDisable: setDisableChannel,
+    onDisconnect: setDisconnectChannel,
+    onChanged: refresh,
+  };
 
   return (
     <Stack gap="lg">
@@ -175,16 +197,9 @@ export function ChannelsView({
             <ChannelCard
               key={channel.id}
               channel={channel}
+              orgId={orgId}
               canManage={canManage}
-              onReconnect={(target) => {
-                // Reconnect restarts the handshake for this specific channel,
-                // passing PostGear's own id so the API can verify the same
-                // account is re-authorized rather than a different one.
-                window.location.href = channelConnectUrl(target.providerIdentifier, target.id);
-              }}
-              onFinishSetup={setSetupChannel}
-              onEditTimes={setTimesChannel}
-              onDisconnect={setDisconnectChannel}
+              handlers={menu}
             />
           ))}
         </Grid>
@@ -218,6 +233,18 @@ export function ChannelsView({
       <PostingTimesDialog
         channel={timesChannel}
         onOpenChange={(open) => !open && setTimesChannel(null)}
+        onDone={refresh}
+      />
+
+      <ChannelPreferencesDialog
+        channel={preferencesChannel}
+        onOpenChange={(open) => !open && setPreferencesChannel(null)}
+        onDone={refresh}
+      />
+
+      <DisableChannelDialog
+        channel={disableChannel}
+        onOpenChange={(open) => !open && setDisableChannel(null)}
         onDone={refresh}
       />
 

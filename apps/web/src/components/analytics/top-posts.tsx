@@ -6,8 +6,8 @@
  *
  * Each row is a button that opens the post's own numbers; the two links a
  * row carries ("Create similar", which hands the post's text to the AI
- * studio as a topic, and the platform permalink) sit beside the button,
- * not inside it, because a link inside a button is reachable by neither
+ * studio as a topic, and the platform permalink) sit beside the button
+ * (under it on a phone), not inside it, because a link inside a button is reachable by neither
  * keyboard nor screen reader. The rank is `type-heading` (it is chrome: a
  * big number meant to be read from across the room); everything else in
  * the row is data and stays in the body face (§15).
@@ -68,7 +68,10 @@ export function TopPosts({
                 data-testid="analytics-top-post"
                 data-rank={post.rank}
                 data-group={post.group}
-                className="flex items-stretch gap-2 rounded-md border-2 border-outline bg-secondary"
+                // On a phone the links go under the post rather than beside
+                // it: as a column they took half the row and squeezed the
+                // post's text to a word a line.
+                className="flex flex-col rounded-md border-2 border-outline bg-secondary sm:flex-row sm:items-stretch sm:gap-2"
               >
                 <button
                   type="button"
@@ -116,7 +119,7 @@ export function TopPosts({
                   </span>
                 </button>
 
-                <span className="flex shrink-0 flex-col items-start justify-center gap-2 border-s-2 border-outline p-3">
+                <span className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t-2 border-outline px-3 py-2.5 sm:flex-col sm:flex-nowrap sm:items-start sm:justify-center sm:gap-2 sm:border-t-0 sm:border-s-2 sm:p-3">
                   <Link
                     href={`/${orgId}/ai-copilot?topic=${encodeURIComponent(post.preview.slice(0, 200))}`}
                     className={LINK}

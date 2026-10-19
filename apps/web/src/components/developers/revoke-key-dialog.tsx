@@ -72,7 +72,7 @@ export function RevokeKeyDialog({ apiKey, onOpenChange, onDone }: RevokeKeyDialo
         </AlertDialogHeader>
 
         {error ? (
-          <Text size="sm" className="text-actionDanger">
+          <Text size="sm" className="text-dangerInk">
             {error}
           </Text>
         ) : null}

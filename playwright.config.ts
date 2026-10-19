@@ -27,7 +27,8 @@ const BASE_URL = `http://localhost:${PORT}`;
  * The e2e script raises `LOGIN_RATE_LIMIT_PER_MIN` and `LOCKOUT_THRESHOLD`,
  * which is what those env vars exist for. The throttle and lockout themselves
  * are verified directly against the API: see the Sprint 2 completion
- * checklist, section 8.
+ * checklist, section 8. `e2e/global-setup.ts` checks which script started the
+ * API before the first test and prints a warning when it was not this one.
  *
  * Left unmanaged on purpose: Playwright's `webServer` would kill the API
  * between runs, and the API holds a Postgres pool and a Redis connection that
@@ -42,6 +43,7 @@ const BASE_URL = `http://localhost:${PORT}`;
 export default defineConfig({
   testDir: './e2e',
   outputDir: './e2e/.results',
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   // Capped deliberately. Playwright defaults to one worker per core (11 here),
   // and the Sprint 2 specs each drive a real sign-in against a single
@@ -59,9 +61,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `npm run dev --workspace=@postgear/web -- --port ${PORT}`,
     // Probe a terminal route rather than `/`: `/` is a redirect to /login

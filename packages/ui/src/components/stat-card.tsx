@@ -30,7 +30,7 @@ export const StatCard = forwardRef<HTMLDivElement, StatCardProps>(
             <span
               className={cn(
                 'inline-flex w-fit items-center gap-1 font-semibold',
-                trend.direction === 'up' ? 'text-actionSuccess' : 'text-actionDanger',
+                trend.direction === 'up' ? 'text-successInk' : 'text-dangerInk',
               )}
             >
               {trend.direction === 'up' ? (

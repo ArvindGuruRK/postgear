@@ -6,6 +6,7 @@ import {
   type PlatformPreviewProps,
   PreviewMediaItem,
   PreviewText,
+  titleSetting,
 } from './preview-parts';
 
 /** Pin titles are capped at 100 characters; the provider trims the first line to fit. */
@@ -23,6 +24,7 @@ export function PinterestPreview({
   parts,
   maxLength,
   lengthMethod,
+  settings,
 }: PlatformPreviewProps) {
   const first = parts[0];
 
@@ -30,9 +32,12 @@ export function PinterestPreview({
     return null;
   }
 
+  // The provider's rule: a Pin title of its own leaves the whole post as the
+  // description; otherwise the first line is the title and leaves it.
+  const ownTitle = titleSetting(settings);
   const [firstLine = '', ...restLines] = first.text.split('\n');
-  const title = firstLine.slice(0, TITLE_LENGTH);
-  const description = restLines.length > 0 ? restLines.join('\n') : first.text;
+  const title = (ownTitle ?? firstLine).slice(0, TITLE_LENGTH);
+  const description = ownTitle || restLines.length === 0 ? first.text : restLines.join('\n');
   const image = first.media[0];
 
   return (

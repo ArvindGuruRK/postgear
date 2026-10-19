@@ -34,6 +34,7 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     publishPost: jest.fn(),
     recordPublished: jest.fn(),
     markPublishFailed: jest.fn(),
+    queueNextOccurrence: jest.fn(),
     loadIntegrationSchedule: jest.fn(),
     refreshChannelToken: jest.fn(),
     loadAnalyticsSchedule: jest.fn(),
@@ -121,6 +122,37 @@ describe('postPublishWorkflow', () => {
     expect(outcome).toEqual({ outcome: 'published', releaseURL: 'https://x.test/1' });
     expect(activities.publishPost).toHaveBeenCalledTimes(1);
     expect(activities.recordPublished).not.toHaveBeenCalled();
+    expect(activities.markPublishFailed).not.toHaveBeenCalled();
+    // 2026-10-19: every successful publish asks for a repeat's next occurrence.
+    expect(activities.queueNextOccurrence).toHaveBeenCalledTimes(1);
+    expect(activities.queueNextOccurrence).toHaveBeenCalledWith(input);
+  });
+
+  it('stays published when the next occurrence cannot be queued', async () => {
+    const activities = mocks({
+      loadPublishJob: jest.fn().mockResolvedValue({
+        status: 'ready',
+        publishAt: new Date().toISOString(),
+        integrationId: 'ch-1',
+      }),
+      publishPost: jest
+        .fn()
+        .mockResolvedValue({ recorded: true, releaseURL: 'https://x.test/9', results: [] }),
+      queueNextOccurrence: jest
+        .fn()
+        .mockRejectedValue(ApplicationFailure.create({ message: 'db away', nonRetryable: true })),
+    });
+
+    const outcome = await withWorker(activities, () =>
+      env.client.workflow.execute(postPublishWorkflow, {
+        taskQueue: TASK_QUEUE,
+        workflowId: 'publish-repeat-fails',
+        args: [input],
+      }),
+    );
+
+    expect(outcome).toEqual({ outcome: 'published', releaseURL: 'https://x.test/9' });
+    expect(activities.queueNextOccurrence).toHaveBeenCalledTimes(1);
     expect(activities.markPublishFailed).not.toHaveBeenCalled();
   });
 
@@ -337,6 +369,8 @@ describe('postPublishWorkflow', () => {
     expect(activities.markPublishFailed).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'rejected', message: 'Duplicate content', attempts: 1 }),
     );
+    // A failed publish starts no next occurrence, as in Postiz.
+    expect(activities.queueNextOccurrence).not.toHaveBeenCalled();
   });
 
   it('records a publish whose own write failed, through the retried activity', async () => {
@@ -368,6 +402,10 @@ describe('postPublishWorkflow', () => {
     expect(activities.publishPost).toHaveBeenCalledTimes(1);
     expect(activities.recordPublished).toHaveBeenCalledTimes(2);
     expect(activities.recordPublished).toHaveBeenLastCalledWith({ ...input, results });
+    // Only once the publish is recorded, since the next occurrence is read from it.
+    expect(activities.queueNextOccurrence.mock.invocationCallOrder[0]).toBeGreaterThan(
+      activities.recordPublished.mock.invocationCallOrder[1],
+    );
   });
 
   it('skips a post that was deleted after the timer fired', async () => {

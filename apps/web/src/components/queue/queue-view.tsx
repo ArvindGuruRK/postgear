@@ -139,9 +139,16 @@ export function QueueView({
         value={queue.filters.state}
         onValueChange={(value) => queue.setFilters({ state: value as QueueStateFilter })}
       >
-        <TabsList className="flex-wrap" aria-label="Filter by state">
+        {/* One row, always: wrapped, "Drafts" sat alone on a second line on
+            a phone. Tighter tabs there fit all five across a 390px screen,
+            and anything narrower scrolls inside the list itself rather than
+            widening the page. */}
+        <TabsList
+          className="max-w-full overflow-x-auto pg-scrollbar pg-scrollbar-secondary"
+          aria-label="Filter by state"
+        >
           {STATE_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
+            <TabsTrigger key={tab.value} value={tab.value} className="px-3 sm:px-4">
               {tab.label}
             </TabsTrigger>
           ))}

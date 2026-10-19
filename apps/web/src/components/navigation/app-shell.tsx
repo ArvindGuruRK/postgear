@@ -20,6 +20,14 @@ import { TopBar } from './topbar';
  * On a phone (below `md`) the same items move to a tab bar along the bottom
  * and the page runs edge to edge under a shorter top bar.
  *
+ * The root layout sets `viewport-fit=cover`, so the frame draws under a
+ * notch and a home indicator. Its own padding keeps the content out of them:
+ * on a phone the top inset (the top bar starts below the notch) and the side
+ * insets (a landscape notch), with the tab bar clearing the bottom itself;
+ * from `md` the 12px margin grows to the inset wherever the inset is larger,
+ * which is a landscape phone's notch beside the rail. `env()` is 0 on every
+ * screen without one, so nothing moves there.
+ *
  * `fullBleed` is for pages that lay out their own blocks to fill the height
  * (the calendar's channel card beside its grid): the region does not scroll,
  * and each block scrolls itself. Every other page scrolls as one.
@@ -46,7 +54,13 @@ export function AppShell({
     // toolbars hidden, which would push the tab bar under them.
     <div
       data-app-shell
-      className="flex h-dvh w-full flex-col overflow-hidden bg-primary md:flex-row md:gap-3 md:p-3"
+      className={cn(
+        'flex h-dvh w-full flex-col overflow-hidden bg-primary',
+        'pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]',
+        'md:flex-row md:gap-3',
+        'md:pt-[max(0.75rem,env(safe-area-inset-top))] md:pr-[max(0.75rem,env(safe-area-inset-right))]',
+        'md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pl-[max(0.75rem,env(safe-area-inset-left))]',
+      )}
     >
       <Sidebar items={navItems} bottomItems={sidebarBottomItems} className="hidden md:flex" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

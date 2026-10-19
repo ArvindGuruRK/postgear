@@ -22,7 +22,7 @@ async function signIn(page: Page, email = 'demo@postgear.local') {
   await page.getByLabel('Email').fill(email);
   await page.locator('#password').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 
 async function openComposer(page: Page, query = '') {
@@ -182,7 +182,7 @@ test.describe('composer', () => {
     await page.keyboard.press('Control+End');
     await page.keyboard.type(', longer, for LinkedIn');
 
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save as draft' }).click();
     await expect(page.getByText('Draft saved', { exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\?group=/);
 
@@ -208,7 +208,7 @@ test.describe('composer', () => {
 
     // Edit and save again: the same post, updated in place.
     await write(page, 1, ' (edited)');
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save as draft' }).click();
     await expect(page.getByText('All changes saved')).toBeVisible();
     expect(groupFrom(page)).toBe(group);
   });
@@ -221,7 +221,7 @@ test.describe('composer', () => {
 
     await write(page, 1, 'x'.repeat(290));
 
-    await page.getByRole('button', { name: 'Add to queue' }).click();
+    await page.getByRole('button', { name: 'Add to calendar' }).click();
 
     const alert = page.getByRole('alert').filter({ hasText: 'Not ready for the queue yet' });
     await expect(alert).toContainText(
@@ -243,7 +243,7 @@ test.describe('composer', () => {
     await openComposer(first);
     await channel(first, /Acme Marketing/).click();
     await write(first, 1, `Conflict ${Date.now()}`);
-    await first.getByRole('button', { name: 'Save draft' }).click();
+    await first.getByRole('button', { name: 'Save as draft' }).click();
     await expect(first).toHaveURL(/\?group=/);
     const group = groupFrom(first);
     created.groups.push(group);
@@ -255,11 +255,11 @@ test.describe('composer', () => {
 
     // The first tab saves a change; the second tab's copy is now stale.
     await write(first, 1, ', newer');
-    await first.getByRole('button', { name: 'Save draft' }).click();
+    await first.getByRole('button', { name: 'Save as draft' }).click();
     await expect(first.getByText('All changes saved')).toBeVisible();
 
     await write(second, 1, ', older');
-    await second.getByRole('button', { name: 'Save draft' }).click();
+    await second.getByRole('button', { name: 'Save as draft' }).click();
     await expect(second.getByText(/Someone else changed this post/)).toBeVisible();
     await expect(second.getByRole('button', { name: 'Reload' })).toBeVisible();
 
@@ -272,7 +272,7 @@ test.describe('composer', () => {
     await openComposer(page);
     await channel(page, /Acme Marketing/).click();
     await write(page, 1, `Member draft ${Date.now()}`);
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save as draft' }).click();
     await expect(page.getByText('Draft saved', { exact: true })).toBeVisible();
     created.groups.push(groupFrom(page));
   });

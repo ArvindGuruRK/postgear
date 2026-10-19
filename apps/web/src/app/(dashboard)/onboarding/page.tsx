@@ -54,8 +54,11 @@ export default async function OnboardingPage() {
   return (
     <div className="min-h-screen bg-primary">
       {/* max-w-3xl (was 2xl) so step 6's two columns leave the avatar grid
-          tiles a comfortable ~90px; the question steps read fine at this width. */}
-      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-8 px-6 py-12">
+          tiles a comfortable ~90px; the question steps read fine at this width.
+          Its own full-screen page, so it keeps clear of a phone's notch and
+          home indicator itself (`viewport-fit=cover`, root layout): each
+          padding grows to its safe-area inset where that is larger. */}
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-8 pt-[max(3rem,env(safe-area-inset-top))] pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(3rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))]">
         <Stack gap="xs">
           <Heading as="h1" level="h4">
             PostGear

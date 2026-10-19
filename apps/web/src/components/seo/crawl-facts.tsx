@@ -54,10 +54,10 @@ export function CrawlFacts({
 
   const statusTone =
     crawl.statusCode >= 400
-      ? 'text-actionDanger'
+      ? 'text-dangerInk'
       : crawl.statusCode >= 300
-        ? 'text-actionAccent'
-        : 'text-actionSuccess';
+        ? 'text-accentInk'
+        : 'text-successInk';
 
   return (
     <ul className="m-0 flex list-none flex-wrap items-center gap-2 p-0" aria-label="Crawl facts">

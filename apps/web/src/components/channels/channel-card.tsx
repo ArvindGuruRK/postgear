@@ -1,10 +1,6 @@
 'use client';
 
-import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
-import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
-import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
-import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Avatar,
   AvatarFallback,
@@ -14,9 +10,6 @@ import {
   Card,
   CardContent,
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   MotionIcon,
   Stack,
@@ -25,14 +18,14 @@ import {
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Channel } from '@/types/channel';
 import { CHANNEL_HEALTH } from './channel-health';
+import { ChannelMenuContent, type ChannelMenuHandlers } from './channel-menu';
 
 interface ChannelCardProps {
   channel: Channel;
+  orgId: string;
   canManage: boolean;
-  onReconnect: (channel: Channel) => void;
-  onFinishSetup: (channel: Channel) => void;
-  onEditTimes: (channel: Channel) => void;
-  onDisconnect: (channel: Channel) => void;
+  /** The channel menu's actions, which the inline fix button shares. */
+  handlers: ChannelMenuHandlers;
 }
 
 /**
@@ -47,14 +40,7 @@ interface ChannelCardProps {
  *   connected, a name alone is ambiguous, and the API already returns
  *   `profile` for exactly this.
  */
-export function ChannelCard({
-  channel,
-  canManage,
-  onReconnect,
-  onFinishSetup,
-  onEditTimes,
-  onDisconnect,
-}: ChannelCardProps) {
+export function ChannelCard({ channel, orgId, canManage, handlers }: ChannelCardProps) {
   const health = CHANNEL_HEALTH[channel.health];
   const initials = channel.name.slice(0, 2).toUpperCase();
 
@@ -110,7 +96,9 @@ export function ChannelCard({
                 size="sm"
                 variant={channel.health === 'needs_reconnect' ? 'primary' : 'secondary'}
                 onClick={() =>
-                  channel.health === 'needs_setup' ? onFinishSetup(channel) : onReconnect(channel)
+                  channel.health === 'needs_setup'
+                    ? handlers.onFinishSetup(channel)
+                    : handlers.onReconnect(channel)
                 }
               >
                 {health.action}
@@ -131,27 +119,7 @@ export function ChannelCard({
                 <MotionIcon icon={EllipsisVerticalIcon} strokeWidth={2} className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => onEditTimes(channel)}>
-                <MotionIcon icon={ClockIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-                Edit posting times
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onReconnect(channel)}>
-                <MotionIcon icon={RefreshCwIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-                Reconnect
-              </DropdownMenuItem>
-              {channel.inBetweenSteps ? (
-                <DropdownMenuItem onSelect={() => onFinishSetup(channel)}>
-                  <MotionIcon icon={PlugIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-                  Finish setup
-                </DropdownMenuItem>
-              ) : null}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onDisconnect(channel)}>
-                <MotionIcon icon={Trash2Icon} strokeWidth={2} className="me-2 h-4 w-4" />
-                Disconnect
-              </DropdownMenuItem>
-            </DropdownMenuContent>
+            <ChannelMenuContent channel={channel} orgId={orgId} align="end" handlers={handlers} />
           </DropdownMenu>
         ) : null}
       </CardContent>

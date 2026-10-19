@@ -127,9 +127,7 @@ export function AuditHistory({
             data-points={selected.trend.length}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <h3 className="m-0 type-label text-xs text-ink">
-                Score over time
-              </h3>
+              <h3 className="m-0 type-label text-xs text-ink">Score over time</h3>
               <Text size="xs" muted as="span" className="truncate">
                 {selected.host}
               </Text>
@@ -241,7 +239,7 @@ export function AuditHistory({
                       </span>
 
                       {failed && latest.failureReason ? (
-                        <span className="font-sans text-xs font-medium text-actionDanger">
+                        <span className="font-sans text-xs font-medium text-dangerInk">
                           {latest.failureReason}
                         </span>
                       ) : null}

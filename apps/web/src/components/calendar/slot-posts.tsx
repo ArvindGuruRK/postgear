@@ -41,6 +41,7 @@ export function SlotPosts({
           now={now}
           density={density}
           editHref={handlers.editHref(post)}
+          onDuplicate={handlers.onDuplicate}
           onPreview={handlers.onPreview}
           onStatistics={handlers.onStatistics}
           onDelete={handlers.onDelete}

@@ -11,6 +11,18 @@
  *
  * The view and date live in the URL (`?view=week&date=2026-10-11`) so a reload
  * or a shared link lands on the same week.
+ *
+ * The two filters (channels from the channel card, tags from the toolbar,
+ * 2026-10-19) live here for as long as the calendar is mounted, which spans
+ * the composer opening over it and closing again; a reload starts unfiltered.
+ * A post is shown when it is on a selected channel (or none is selected) and
+ * carries a selected tag (or none is selected).
+ *
+ * The channel order is the server's (`GET /channels` sorts by the stored
+ * position), with one local override: a drag in the channel card reorders at
+ * once, before `PUT /channels/order` answers, and puts the old order back if
+ * it fails. The override belongs to the channel list it was made on, so the
+ * next server render (a `router.refresh()`) takes over again.
  */
 import { useSearchParams } from 'next/navigation';
 import {
@@ -26,7 +38,9 @@ import { ApiError, api } from '@/lib/api';
 import { POSTS_CHANGED_EVENT } from '@/lib/post-events';
 import type { Channel } from '@/types/channel';
 import type { PostSummary } from '@/types/post';
+import type { Tag } from '@/types/tag';
 import { describePost } from '../posts/post-status';
+import { filterPosts, orderChannels } from './calendar-filters';
 import {
   type CalendarView,
   dayKey,
@@ -47,15 +61,26 @@ interface CalendarContextValue {
   view: CalendarView;
   anchor: Date;
   now: Date;
+  /** In the workspace's order, with a drag's new order applied at once. */
   channels: Channel[];
-  /** Posts in the visible range, after the channel filter. */
+  /** Posts in the visible range, after the channel and tag filters. */
   posts: PostSummary[];
-  /** Posts in the visible range, before the channel filter. */
+  /** Posts in the visible range, before the filters. */
   allPosts: PostSummary[];
   loading: boolean;
   error: string | null;
   /** Channel ids shown. Empty means every channel. */
   channelFilter: string[];
+  /** The workspace's tags, by name; null until the first load answers. */
+  tags: Tag[] | null;
+  /** Tag ids shown. Empty means every post, tagged or not. */
+  tagFilter: string[];
+  toggleTag: (tagId: string) => void;
+  clearTagFilter: () => void;
+  /** Fetches the tags again: the composer can add one while the calendar is open. */
+  reloadTags: () => void;
+  /** Shows the channels in this order at once (ids; any left out keep their place after). */
+  orderChannelsLocally: (ids: string[]) => void;
   setView: (view: CalendarView) => void;
   goTo: (anchor: Date, view?: CalendarView) => void;
   step: (direction: -1 | 1) => void;
@@ -73,7 +98,7 @@ const CalendarContext = createContext<CalendarContextValue | null>(null);
 
 export function CalendarProvider({
   orgId,
-  channels,
+  channels: serverChannels,
   children,
 }: {
   orgId: string;
@@ -90,6 +115,11 @@ export function CalendarProvider({
     () => parseDayKey(searchParams.get('date')) ?? startOfDay(new Date()),
   );
   const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tags, setTags] = useState<Tag[] | null>(null);
+  const [tagsVersion, setTagsVersion] = useState(0);
+  // The drag's order, tied to the server list it was made on (see above).
+  const [localOrder, setLocalOrder] = useState<{ source: Channel[]; ids: string[] } | null>(null);
   const [allPosts, setAllPosts] = useState<PostSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,10 +179,38 @@ export function CalendarProvider({
       });
   }, [range, version]);
 
-  // Reload at once when the composer, open as a modal over the calendar,
-  // saves or deletes a post: see lib/post-events.ts.
+  // The workspace's tags, for the toolbar's filter. A failure leaves the
+  // last list (or none): the filter is a convenience, the calendar works
+  // without it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tagsVersion` is the explicit reload trigger
   useEffect(() => {
-    const reload = () => setVersion((current) => current + 1);
+    let cancelled = false;
+
+    api<{ tags: Tag[] }>('/tags')
+      .then((result) => {
+        if (!cancelled) {
+          setTags(result.tags);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTags((current) => current ?? []);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tagsVersion]);
+
+  // Reload at once when the composer, open as a modal over the calendar,
+  // saves or deletes a post: see lib/post-events.ts. Its tags too, since the
+  // composer is where tags are made.
+  useEffect(() => {
+    const reload = () => {
+      setVersion((current) => current + 1);
+      setTagsVersion((current) => current + 1);
+    };
     window.addEventListener(POSTS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(POSTS_CHANGED_EVENT, reload);
   }, []);
@@ -177,6 +235,14 @@ export function CalendarProvider({
     return () => clearInterval(timer);
   }, [live]);
 
+  const channels = useMemo(
+    () =>
+      localOrder && localOrder.source === serverChannels
+        ? orderChannels(serverChannels, localOrder.ids)
+        : serverChannels,
+    [serverChannels, localOrder],
+  );
+
   // Only ids that are still channels: one disconnected from the channel card
   // while selected would otherwise filter the calendar down to nothing.
   const activeFilter = useMemo(
@@ -184,14 +250,16 @@ export function CalendarProvider({
     [channelFilter, channels],
   );
 
+  // The same for tags, once they have loaded: one deleted in the composer
+  // while selected would hide every post.
+  const activeTagFilter = useMemo(
+    () => (tags ? tagFilter.filter((id) => tags.some((tag) => tag.id === id)) : tagFilter),
+    [tagFilter, tags],
+  );
+
   const posts = useMemo(
-    () =>
-      activeFilter.length === 0
-        ? allPosts
-        : allPosts.filter((post) =>
-            post.channels.some((channel) => activeFilter.includes(channel.channelId)),
-          ),
-    [allPosts, activeFilter],
+    () => filterPosts(allPosts, activeFilter, activeTagFilter),
+    [allPosts, activeFilter, activeTagFilter],
   );
 
   const value = useMemo<CalendarContextValue>(
@@ -206,6 +274,15 @@ export function CalendarProvider({
       loading,
       error,
       channelFilter: activeFilter,
+      tags,
+      tagFilter: activeTagFilter,
+      toggleTag: (tagId) =>
+        setTagFilter((current) =>
+          current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId],
+        ),
+      clearTagFilter: () => setTagFilter([]),
+      reloadTags: () => setTagsVersion((current) => current + 1),
+      orderChannelsLocally: (ids) => setLocalOrder({ source: serverChannels, ids }),
       setView: (next) => setViewState(next),
       goTo: (next, nextView) => {
         setAnchor(startOfDay(next));
@@ -239,7 +316,21 @@ export function CalendarProvider({
       removePostLocally: (group) =>
         setAllPosts((current) => current.filter((post) => post.group !== group)),
     }),
-    [orgId, view, anchor, now, channels, posts, allPosts, loading, error, activeFilter],
+    [
+      orgId,
+      view,
+      anchor,
+      now,
+      channels,
+      serverChannels,
+      posts,
+      allPosts,
+      loading,
+      error,
+      activeFilter,
+      tags,
+      activeTagFilter,
+    ],
   );
 
   return <CalendarContext.Provider value={value}>{children}</CalendarContext.Provider>;

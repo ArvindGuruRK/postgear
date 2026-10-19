@@ -52,7 +52,7 @@ export function ToolActivityRow({ tool, orgId }: { tool: ToolActivity; orgId: st
         )}
       </span>
       <span className="flex min-w-0 flex-col gap-1">
-        <span className={cn(tool.status === 'failed' && 'text-actionDanger')}>
+        <span className={cn(tool.status === 'failed' && 'text-dangerInk')}>
           {describeTool(tool)}
           {draft ? (
             <>
@@ -66,7 +66,7 @@ export function ToolActivityRow({ tool, orgId }: { tool: ToolActivity; orgId: st
             </>
           ) : null}
         </span>
-        {reason ? <span className="text-actionDanger opacity-90">{reason}</span> : null}
+        {reason ? <span className="text-dangerInk opacity-90">{reason}</span> : null}
         {image ? (
           // biome-ignore lint/performance/noImgElement: a thumbnail served from media storage, as the media tile shows it
           <img

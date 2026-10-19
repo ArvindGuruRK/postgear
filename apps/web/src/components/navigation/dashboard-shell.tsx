@@ -1,9 +1,10 @@
 'use client';
 
-// Per-icon subpaths rather than the `lucide` barrel, so dev compiles seven
+// Per-icon subpaths rather than the `lucide` barrel, so dev compiles eight
 // icons and not all of them.
 import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
 import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
+import { HouseIcon } from '@animateicons/react/lucide/house-icon';
 import { ImageIcon } from '@animateicons/react/lucide/image-icon';
 import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
@@ -24,15 +25,18 @@ import type { SidebarItem } from './sidebar';
 // up through the layout, which App Router gives no clean way to do.
 
 /**
- * The rail's sections, in the reference's order: the calendar first, the AI
- * second (its "Agent"), then the read-and-manage pages. `label` is what fits
+ * The rail's sections: Home first (2026-10-19, the Buffer-style dashboard
+ * and the page sign-in lands on), then the reference's order: the calendar,
+ * the AI (its "Agent"), then the read-and-manage pages. `label` is what fits
  * under a 20px icon in a 64px tile; the top bar shows the page's full name.
  *
  * Composer and Channels are not here, as in the reference: both are reached
  * from the calendar's channel card (Create Post, Add Channel, the channels
- * page button and each channel's menu), and their routes stay as they were.
+ * page button and each channel's menu) and from Home, and their routes stay
+ * as they were.
  */
 const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
+  { segment: 'home', label: 'Home', icon: HouseIcon },
   { segment: 'calendar', label: 'Calendar', icon: CalendarDaysIcon },
   { segment: 'ai-copilot', label: 'Copilot', icon: SparklesIcon },
   { segment: 'queue', label: 'Queue', icon: ListOrderedIcon },
@@ -43,6 +47,7 @@ const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
 
 /** The top bar's h1 for each top-level page. */
 const TITLES: Record<string, string> = {
+  home: 'Home',
   calendar: 'Calendar',
   'ai-copilot': 'AI Copilot',
   queue: 'Queue',

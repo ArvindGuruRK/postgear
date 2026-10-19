@@ -56,6 +56,20 @@ const REVOKE_URL = 'https://api.x.com/2/oauth2/revoke';
 const API_BASE = 'https://api.x.com/2';
 const UPLOAD_URL = 'https://api.x.com/2/media/upload';
 
+/**
+ * The restricting `reply_settings` values of `POST /2/tweets`. "Everyone" is
+ * X's default when the field is absent, so it is expressed by leaving the
+ * field out, as Postiz does. `PROVIDER_SETTINGS.x` offers these plus it; any
+ * other stored value is ignored rather than sent.
+ */
+const X_REPLY_SETTINGS = ['following', 'mentionedUsers', 'subscribers', 'verified'] as const;
+type XReplySettings = (typeof X_REPLY_SETTINGS)[number];
+
+function replySettingsOf(post: PostDetails): XReplySettings | undefined {
+  const value = post.settings?.replySettings;
+  return X_REPLY_SETTINGS.find((setting) => setting === value);
+}
+
 const STANDARD_MAX_LENGTH = 280;
 const PREMIUM_MAX_LENGTH = 25_000;
 
@@ -281,7 +295,16 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
     let previousId: string | undefined;
 
     for (const post of posts) {
-      const published = await this.publishOne(channel, accessToken, post, previousId);
+      // Who may reply is a property of the post, so it is set on the first
+      // tweet only, as Postiz does; the thread's own replies keep X's default.
+      const replySettings = previousId === undefined ? replySettingsOf(post) : undefined;
+      const published = await this.publishOne(
+        channel,
+        accessToken,
+        post,
+        previousId,
+        replySettings,
+      );
       results.push(published);
       previousId = published.postId;
     }
@@ -312,6 +335,7 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
     accessToken: string,
     post: PostDetails,
     replyToId?: string,
+    replySettings?: XReplySettings,
   ): Promise<PostResponse> {
     const mediaIds = await this.uploadMedia(accessToken, post);
 
@@ -322,6 +346,9 @@ export class XProvider extends SocialAbstract implements SocialProvider, SocialA
     }
     if (replyToId) {
       body.reply = { in_reply_to_tweet_id: replyToId };
+    }
+    if (replySettings) {
+      body.reply_settings = replySettings;
     }
 
     const response = await this.fetchJson<{ data?: { id: string } }>(`${API_BASE}/tweets`, {

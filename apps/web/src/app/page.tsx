@@ -35,5 +35,6 @@ export default async function RootPage() {
     redirect('/onboarding');
   }
 
-  redirect(`/${organizations[0].id}/calendar`);
+  // Home, the first entry in the rail, is where a signed-in visitor lands.
+  redirect(`/${organizations[0].id}/home`);
 }

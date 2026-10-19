@@ -280,8 +280,8 @@ function Indicator({ comparison }: { comparison: Comparison | null }) {
     <span
       className={cn(
         'inline-flex items-center',
-        comparison === 'above' && 'text-actionSuccess',
-        comparison === 'below' && 'text-actionDanger',
+        comparison === 'above' && 'text-successInk',
+        comparison === 'below' && 'text-dangerInk',
         comparison === 'even' && 'opacity-50',
       )}
       title={label}

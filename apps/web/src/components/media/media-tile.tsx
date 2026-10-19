@@ -98,7 +98,8 @@ export function MediaTile({ item, selected, onToggle, actions }: MediaTileProps)
   }
 
   return (
-    <figure className={cn(frame, 'm-0 flex flex-col')}>
+    // A size container: the library's actions fit their labels to the tile.
+    <figure className={cn(frame, '@container m-0 flex flex-col')}>
       {preview}
       <figcaption>{caption}</figcaption>
       {actions ? <div className="mt-auto flex gap-2 px-3 pb-3">{actions}</div> : null}

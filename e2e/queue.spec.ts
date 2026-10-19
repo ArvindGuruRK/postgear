@@ -21,7 +21,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Email').fill('demo@postgear.local');
   await page.locator('#password').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 
 async function createQueued(page: Page, text: string, publishAt: Date): Promise<string> {

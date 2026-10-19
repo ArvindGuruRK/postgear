@@ -6,6 +6,7 @@
  */
 import { z } from 'zod';
 import { nameSchema } from '../../auth/dto/common.schema';
+import { CHANNEL_COLOR_COUNT } from '../channel-colors';
 
 /**
  * A provider identifier as it appears in a URL segment.
@@ -43,12 +44,44 @@ export const updateChannelSchema = z
       .min(1, 'Add at least one posting time')
       .max(48)
       .optional(),
+    // The avatar palette slot: one of the `CHANNEL_COLOR_COUNT` colours.
+    color: z
+      .number()
+      .int()
+      .min(0)
+      .max(CHANNEL_COLOR_COUNT - 1, 'Pick one of the palette colours')
+      .optional(),
+    // Postiz's "Disable channel" (UI revamp, 2026-10-19). Disabling keeps the
+    // queued posts; they fail at publish with the worker's "disabled" reason
+    // until the channel is enabled again. Enabling is never refused: a
+    // disabled channel already counts toward the plan's limit.
+    disabled: z.boolean().optional(),
   })
   .strict()
   .refine(
-    (value) => value.name !== undefined || value.postingTimes !== undefined,
+    (value) =>
+      value.name !== undefined ||
+      value.postingTimes !== undefined ||
+      value.color !== undefined ||
+      value.disabled !== undefined,
     'Nothing to update',
   );
+
+/**
+ * `PUT /channels/order`: the workspace's channel ids in the order an admin
+ * dragged them into. Usually every live channel; any left out keep their
+ * place after these. No repeats, and capped so the body stays small (no plan
+ * comes near it).
+ */
+export const reorderChannelsSchema = z
+  .object({
+    ids: z
+      .array(z.string().min(1).max(64))
+      .min(1, 'Send at least one channel')
+      .max(500)
+      .refine((ids) => new Set(ids).size === ids.length, 'A channel appears twice'),
+  })
+  .strict();
 
 export const selectEntitySchema = z
   .object({
@@ -90,5 +123,6 @@ export const testPostSchema = z
   .strict();
 
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
+export type ReorderChannelsInput = z.infer<typeof reorderChannelsSchema>;
 export type SelectEntityInput = z.infer<typeof selectEntitySchema>;
 export type TestPostInput = z.infer<typeof testPostSchema>;

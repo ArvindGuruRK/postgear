@@ -49,7 +49,7 @@ function MenuItem({ item }: { item: UserMenuItem }) {
       onSelect={item.onSelect}
       aria-current={item.checked ? 'true' : undefined}
       className={
-        item.danger ? 'text-actionDanger focus:bg-actionDanger focus:text-onActionLight' : undefined
+        item.danger ? 'text-dangerInk focus:bg-actionDanger focus:text-onActionLight' : undefined
       }
     >
       {item.animatedIcon ? (

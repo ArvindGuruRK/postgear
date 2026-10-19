@@ -10,15 +10,18 @@ import { documentFromText, renderPlainText } from '@postgear/social-core/compose
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
 import type { PostDetail } from '@/types/post';
+import type { Tag } from '@/types/tag';
 import { buildReport, queueBlockers } from './channel-report';
 import {
   type ComposerState,
   composerReducer,
   defaultPublishAt,
+  duplicateParts,
   effectiveParts,
   initialComposerState,
   isDirty,
   isValidPublishAt,
+  MAX_TAGS,
   SHARED,
   textPart,
   toSavePayload,
@@ -75,6 +78,48 @@ describe('composerReducer', () => {
     });
 
     expect(state.shared[0].media).toEqual([image]);
+  });
+
+  it('starts a new post with a template’s text, one paragraph per line, and is not dirty', () => {
+    const state = initialComposerState({
+      post: null,
+      availableChannelIds: new Set(),
+      now: new Date('2026-09-14T13:41:00'),
+      text: 'Tips for [topic]:\n\n1. [First tip]',
+    });
+
+    expect(state.shared).toHaveLength(1);
+    expect(state.shared[0].content).toEqual(
+      documentFromText('Tips for [topic]:\n\n1. [First tip]'),
+    );
+    expect(textOf(state.shared[0].content)).toContain('1. [First tip]');
+    // Starter text is not the writer's own: closing it untouched asks nothing.
+    expect(isDirty(state)).toBe(false);
+    expect(toSavePayload(state, 'DRAFT').shared[0].content).toEqual(
+      documentFromText('Tips for [topic]:\n\n1. [First tip]'),
+    );
+  });
+
+  it('ignores template text when reopening a saved post', () => {
+    const post: PostDetail = {
+      group: 'g_saved',
+      state: 'DRAFT',
+      publishDate: '2026-09-15T09:00:00.000Z',
+      updatedAt: '2026-09-14T00:00:00.000Z',
+      shared: [{ content: documentFromText('mine'), media: [], removedMedia: 0 }],
+      channels: [],
+      tags: [],
+      intervalInDays: null,
+    };
+
+    const state = initialComposerState({
+      post,
+      availableChannelIds: new Set(),
+      now: new Date('2026-09-14T13:41:00'),
+      text: 'A template',
+    });
+
+    expect(textOf(state.shared[0].content)).toBe('mine');
   });
 
   it('copies the shared thread on customize, so later shared edits stop reaching the channel', () => {
@@ -159,7 +204,7 @@ describe('composerReducer', () => {
     const state = composerReducer(fresh(), { type: 'toggleChannel', channelId: 'constructor' });
 
     expect(toSavePayload(state, 'DRAFT').channels).toEqual([
-      { channelId: 'constructor', customized: false },
+      { channelId: 'constructor', customized: false, settings: {} },
     ]);
   });
 });
@@ -185,6 +230,7 @@ describe('initialComposerState from a saved post', () => {
         releaseURL: null,
         publishStatus: null,
         parts: [{ content: documentFromText('mine'), media: [], removedMedia: 1 }],
+        settings: { replySettings: 'following' },
       },
       {
         channelId: 'ch_li',
@@ -199,6 +245,7 @@ describe('initialComposerState from a saved post', () => {
         releaseURL: null,
         publishStatus: null,
         parts: [],
+        settings: {},
       },
       {
         channelId: 'ch_gone',
@@ -213,8 +260,11 @@ describe('initialComposerState from a saved post', () => {
         releaseURL: null,
         publishStatus: null,
         parts: [],
+        settings: {},
       },
     ],
+    tags: [{ id: 'tag_1', name: 'Launch', color: 'teal' }],
+    intervalInDays: 7,
   };
 
   it('restores selection, customizations and version, and flags a disconnected channel', () => {
@@ -252,6 +302,303 @@ describe('initialComposerState from a saved post', () => {
         { channelId: 'ch_li', customized: false },
       ],
     });
+  });
+
+  it('loads tags, the repeat and each channel’s settings, and sends them back', () => {
+    const state = initialComposerState({
+      post: saved,
+      availableChannelIds: new Set(['ch_x', 'ch_li']),
+      now: new Date(),
+    });
+
+    expect(state.tags).toEqual([{ id: 'tag_1', name: 'Launch', color: 'teal' }]);
+    expect(state.intervalInDays).toBe(7);
+    expect(state.settings).toEqual({ ch_x: { replySettings: 'following' } });
+
+    const payload = toSavePayload(state, 'QUEUE');
+    expect(payload.tags).toEqual(['tag_1']);
+    expect(payload.intervalInDays).toBe(7);
+    expect(payload.channels.map((channel) => channel.settings)).toEqual([
+      { replySettings: 'following' },
+      {},
+    ]);
+  });
+
+  it('defaults the new fields when the API sends a post without them', () => {
+    const { tags: _tags, intervalInDays: _interval, ...older } = saved;
+    const state = initialComposerState({
+      post: {
+        ...older,
+        channels: older.channels.map(({ settings: _settings, ...channel }) => channel),
+      } as unknown as PostDetail,
+      availableChannelIds: new Set(['ch_x', 'ch_li']),
+      now: new Date(),
+    });
+
+    expect(state.tags).toEqual([]);
+    expect(state.intervalInDays).toBeNull();
+    expect(state.settings).toEqual({});
+  });
+});
+
+describe('tags, repeat and settings', () => {
+  const launch: Tag = { id: 'tag_1', name: 'Launch', color: 'teal' };
+  const promo: Tag = { id: 'tag_2', name: 'Promo', color: 'rose' };
+
+  it('sets tags as an edit, in the order they were added, and sends their ids', () => {
+    const state = composerReducer(fresh(), { type: 'setTags', tags: [promo, launch] });
+
+    expect(isDirty(state)).toBe(true);
+    expect(toSavePayload(state, 'DRAFT').tags).toEqual(['tag_2', 'tag_1']);
+  });
+
+  it('caps a post at the API’s tag limit', () => {
+    const many = Array.from({ length: MAX_TAGS + 2 }, (_, index) => ({
+      ...launch,
+      id: `tag_${index}`,
+    }));
+
+    expect(composerReducer(fresh(), { type: 'setTags', tags: many }).tags).toHaveLength(MAX_TAGS);
+  });
+
+  it('follows a tag renamed or deleted in the workspace without counting it as an edit', () => {
+    let state = composerReducer(fresh(), { type: 'setTags', tags: [launch, promo] });
+    state = composerReducer(state, {
+      type: 'saved',
+      revision: state.revision,
+      post: { group: 'g', updatedAt: '2026-09-14T10:00:00.000Z', state: 'DRAFT' } as PostDetail,
+    });
+
+    state = composerReducer(state, {
+      type: 'tagChanged',
+      tag: { ...launch, name: 'Launch day', color: 'green' },
+    });
+    state = composerReducer(state, { type: 'tagDeleted', tagId: promo.id });
+
+    expect(state.tags).toEqual([{ id: 'tag_1', name: 'Launch day', color: 'green' }]);
+    expect(isDirty(state)).toBe(false);
+  });
+
+  it('ignores a workspace change to a tag the post does not have', () => {
+    const state = fresh();
+
+    expect(composerReducer(state, { type: 'tagChanged', tag: launch })).toBe(state);
+    expect(composerReducer(state, { type: 'tagDeleted', tagId: launch.id })).toBe(state);
+  });
+
+  it('sets and clears the repeat, and sends null for none', () => {
+    let state = composerReducer(fresh(), { type: 'setRepeat', value: 14 });
+
+    expect(toSavePayload(state, 'QUEUE').intervalInDays).toBe(14);
+    expect(isDirty(state)).toBe(true);
+
+    state = composerReducer(state, { type: 'setRepeat', value: null });
+    expect(toSavePayload(state, 'QUEUE').intervalInDays).toBeNull();
+
+    // Choosing what is already chosen changes nothing.
+    expect(composerReducer(state, { type: 'setRepeat', value: null })).toBe(state);
+  });
+
+  it('keeps settings per channel, clears a field with undefined, and sends only selected channels', () => {
+    let state = composerReducer(fresh(), { type: 'toggleChannel', channelId: 'ch_yt' });
+    state = composerReducer(state, { type: 'toggleChannel', channelId: 'ch_x' });
+    state = composerReducer(state, {
+      type: 'setSetting',
+      channelId: 'ch_yt',
+      key: 'title',
+      value: 'Launch video',
+    });
+    state = composerReducer(state, {
+      type: 'setSetting',
+      channelId: 'ch_yt',
+      key: 'madeForKids',
+      value: true,
+    });
+    state = composerReducer(state, {
+      type: 'setSetting',
+      channelId: 'ch_x',
+      key: 'replySettings',
+      value: 'verified',
+    });
+    state = composerReducer(state, {
+      type: 'setSetting',
+      channelId: 'ch_yt',
+      key: 'title',
+      value: undefined,
+    });
+
+    expect(toSavePayload(state, 'DRAFT').channels).toEqual([
+      { channelId: 'ch_yt', customized: false, settings: { madeForKids: true } },
+      { channelId: 'ch_x', customized: false, settings: { replySettings: 'verified' } },
+    ]);
+
+    // Deselected, a channel keeps its settings for when it comes back.
+    state = composerReducer(state, { type: 'toggleChannel', channelId: 'ch_x' });
+    expect(toSavePayload(state, 'DRAFT').channels.map((channel) => channel.channelId)).toEqual([
+      'ch_yt',
+    ]);
+    state = composerReducer(state, { type: 'toggleChannel', channelId: 'ch_x' });
+    expect(toSavePayload(state, 'DRAFT').channels[1].settings).toEqual({
+      replySettings: 'verified',
+    });
+  });
+
+  it('asks to publish now only for the queue', () => {
+    const state = fresh();
+
+    expect(toSavePayload(state, 'QUEUE', { publishNow: true })).toMatchObject({
+      state: 'QUEUE',
+      publishNow: true,
+    });
+    expect(toSavePayload(state, 'DRAFT', { publishNow: true })).not.toHaveProperty('publishNow');
+    expect(toSavePayload(state, 'QUEUE')).not.toHaveProperty('publishNow');
+  });
+});
+
+describe('starting a new post', () => {
+  const original: PostDetail = {
+    group: 'g_orig',
+    state: 'QUEUE',
+    publishDate: '2026-10-01T09:00:00.000Z',
+    updatedAt: '2026-09-14T10:00:00.000Z',
+    shared: [
+      { content: documentFromText('shared words'), media: [image], removedMedia: 0 },
+      { content: documentFromText('a reply'), media: [], removedMedia: 0 },
+    ],
+    channels: [
+      {
+        channelId: 'ch_li',
+        name: 'LinkedIn',
+        providerIdentifier: 'linkedin',
+        picture: null,
+        profile: null,
+        color: 1,
+        customized: false,
+        disconnected: false,
+        state: 'QUEUE',
+        releaseURL: null,
+        publishStatus: null,
+        parts: [],
+        settings: {},
+      },
+    ],
+    tags: [{ id: 'tag_1', name: 'Launch', color: 'teal' }],
+    intervalInDays: 7,
+  };
+
+  it('duplicates the shared parts with their media, and nothing else', () => {
+    const state = initialComposerState({
+      post: null,
+      parts: duplicateParts(original),
+      availableChannelIds: new Set(['ch_li']),
+      now: new Date('2026-09-14T13:41:00'),
+    });
+
+    expect(state.group).toBeNull();
+    expect(state.shared.map((part) => textOf(part.content))).toEqual(['shared words', 'a reply']);
+    expect(state.shared[0].media).toEqual([image]);
+    expect(state.selected).toEqual([]);
+    expect(state.tags).toEqual([]);
+    expect(state.intervalInDays).toBeNull();
+    expect(state.settings).toEqual({});
+    expect(state.publishAt).toBe('2026-09-14T14:00');
+    expect(isDirty(state)).toBe(false);
+  });
+
+  it('duplicates the first channel’s own version when it had one', () => {
+    const customized: PostDetail = {
+      ...original,
+      channels: [
+        {
+          ...original.channels[0],
+          customized: true,
+          parts: [{ content: documentFromText('for LinkedIn'), media: [], removedMedia: 2 }],
+        },
+      ],
+    };
+
+    const parts = duplicateParts(customized);
+
+    expect(parts.map((part) => textOf(part.content))).toEqual(['for LinkedIn']);
+    expect(parts[0].removedMedia).toBe(0);
+  });
+
+  it('preselects a channel that can still be targeted, and ignores one that cannot', () => {
+    const picked = initialComposerState({
+      post: null,
+      channelId: 'ch_li',
+      availableChannelIds: new Set(['ch_li']),
+      now: new Date(),
+    });
+    const gone = initialComposerState({
+      post: null,
+      channelId: 'ch_gone',
+      availableChannelIds: new Set(['ch_li']),
+      now: new Date(),
+    });
+
+    expect(picked.selected).toEqual(['ch_li']);
+    expect(isDirty(picked)).toBe(false);
+    expect(gone.selected).toEqual([]);
+  });
+
+  it('starts a blank post with the default signature after one empty line, not as an edit', () => {
+    const state = initialComposerState({
+      post: null,
+      signature: 'Thanks,\nAcme',
+      availableChannelIds: new Set(),
+      now: new Date(),
+    });
+
+    expect(state.shared[0].content).toEqual(documentFromText('\nThanks,\nAcme'));
+    expect(isDirty(state)).toBe(false);
+  });
+
+  it('gives a template or a duplicate precedence over the signature', () => {
+    const fromTemplate = initialComposerState({
+      post: null,
+      text: 'A template',
+      signature: 'Thanks',
+      availableChannelIds: new Set(),
+      now: new Date(),
+    });
+    const fromDuplicate = initialComposerState({
+      post: null,
+      parts: duplicateParts(original),
+      signature: 'Thanks',
+      availableChannelIds: new Set(),
+      now: new Date(),
+    });
+
+    expect(textOf(fromTemplate.shared[0].content)).toBe('A template');
+    expect(textOf(fromDuplicate.shared[0].content)).toBe('shared words');
+  });
+});
+
+describe('insertText', () => {
+  it('fills an empty part', () => {
+    const state = fresh();
+    const next = composerReducer(state, {
+      type: 'insertText',
+      scope: SHARED,
+      key: state.shared[0].key,
+      text: 'Line one\nLine two',
+    });
+
+    expect(next.shared[0].content).toEqual(documentFromText('Line one\nLine two'));
+    expect(isDirty(next)).toBe(true);
+  });
+
+  it('adds paragraphs after what is already written', () => {
+    const state = withText(fresh(), 'Mine');
+    const next = composerReducer(state, {
+      type: 'insertText',
+      scope: SHARED,
+      key: state.shared[0].key,
+      text: 'Added',
+    });
+
+    expect(textOf(next.shared[0].content)).toBe('Mine\nAdded');
   });
 });
 

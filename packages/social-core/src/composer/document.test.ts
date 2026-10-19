@@ -120,6 +120,43 @@ describe('normalizeDocument', () => {
     });
   });
 
+  it('keeps underline, ordered after bold and italic and before a link', () => {
+    const doc = normalizeDocument({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'x',
+              marks: [
+                { type: 'link', attrs: { href: 'https://a.test', target: '_blank' } },
+                { type: 'underline' },
+                { type: 'bold' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(doc.content[0]).toEqual({
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'x',
+          marks: [
+            { type: 'bold' },
+            { type: 'underline' },
+            { type: 'link', attrs: { href: 'https://a.test' } },
+          ],
+        },
+      ],
+    });
+  });
+
   it('clamps heading levels to the three the schema accepts', () => {
     const doc = normalizeDocument({
       type: 'doc',

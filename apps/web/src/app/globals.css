@@ -32,6 +32,19 @@
   --font-sans: var(--font-brand), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Status text colours (2026-10-19): `text-successInk`, `text-dangerInk`,
+   `text-accentInk`. The success, danger and accent hues for TEXT on a
+   surface; the action fills (`bg-actionSuccess` and the rest) stay as they
+   are. One value per scheme in colors.css (see --color-success-ink there):
+   in dark they equal the fills, in light they are darker shades that stay
+   readable on a light page. `inline`, like the colour mapping in
+   packages/config/tailwind.css, so each resolves per scheme at use. */
+@theme inline {
+  --color-successInk: var(--color-success-ink);
+  --color-dangerInk: var(--color-danger-ink);
+  --color-accentInk: var(--color-accent-ink);
+}
+
 :root {
   /* Sora: geometric, wide set, tall x-height, variable 100–800. Wide
      geometric faces look loose at display sizes, so headings take the

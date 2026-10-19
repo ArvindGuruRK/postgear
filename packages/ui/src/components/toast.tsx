@@ -15,6 +15,16 @@ export const ToastProvider = ToastPrimitive.Provider;
  * toastVariants below) instead of stacking as separate flex rows: that's
  * what lets several toasts visually overlap into a card deck, with Toaster
  * computing each one's depth offset/scale/opacity as a plain inline style.
+ *
+ * The corner it sits in keeps clear of a phone's home indicator and a
+ * landscape notch: the bottom and right padding grow to the safe-area inset
+ * where that is larger (the app sets `viewport-fit=cover`; see Sheet).
+ *
+ * On a phone inside the app it also clears the bottom tab bar, which
+ * apps/web's AppShell draws below `md` (and marks with `data-app-shell`):
+ * room for the bar (about 4.5rem, 5.25rem when a label takes two lines) and
+ * the margin under it, which is the home-indicator inset or 0.75rem. Pages
+ * without the shell (sign-in, onboarding) and wider screens keep the corner.
  */
 export const ToastViewport = forwardRef<
   React.ElementRef<typeof ToastPrimitive.Viewport>,
@@ -22,7 +32,12 @@ export const ToastViewport = forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Viewport
     ref={ref}
-    className={cn('fixed bottom-0 right-0 z-[100] grid w-full max-w-sm p-6', className)}
+    className={cn(
+      'fixed bottom-0 right-0 z-[100] grid w-full max-w-sm p-6',
+      'pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(1.5rem,env(safe-area-inset-bottom))]',
+      'max-md:[body:has([data-app-shell])_&]:pb-[calc(5.5rem_+_max(0.75rem,env(safe-area-inset-bottom)))]',
+      className,
+    )}
     {...props}
   />
 ));

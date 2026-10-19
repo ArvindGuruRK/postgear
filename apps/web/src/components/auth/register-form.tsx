@@ -8,6 +8,7 @@ import {
   FormHelperText,
   FormLabel,
   Input,
+  Link,
   PasswordInput,
   Stack,
   Text,
@@ -39,8 +40,12 @@ const PASSWORD_MIN = 12;
  * Registration returns the same "check your email" message whether or not the
  * address was already taken, so the form cannot know whether an account was
  * created, and must not pretend to. It shows the confirmation state and stops.
+ *
+ * With `next` (2026-10-19: someone arriving from an invitation), that state
+ * also links to sign-in carrying it, so after confirming they come back to
+ * the invitation. The page has already checked it with `safeNextPath`.
  */
-export function RegisterForm() {
+export function RegisterForm({ next = null }: { next?: string | null }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -93,6 +98,12 @@ export function RegisterForm() {
           We have sent a confirmation link. It expires in 24 hours. If nothing arrives, check your
           spam folder.
         </Text>
+        {next ? (
+          <Text size="sm">
+            Once it is confirmed,{' '}
+            <Link href={`/login?next=${encodeURIComponent(next)}`}>sign in to continue</Link>.
+          </Text>
+        ) : null}
       </Stack>
     );
   }

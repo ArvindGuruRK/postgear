@@ -6,6 +6,7 @@
  */
 import type { PostDocument } from '@postgear/social-core/composer';
 import type { MediaItem } from './media';
+import type { Tag } from './tag';
 
 export type PostState = 'DRAFT' | 'QUEUE' | 'PUBLISHED' | 'ERROR';
 
@@ -75,7 +76,21 @@ export interface PostChannel extends ChannelPublish {
   /** The channel was disconnected after the post was saved. */
   disconnected: boolean;
   parts: PostPart[];
+  /**
+   * The platform's own options for this post (YouTube title, TikTok privacy
+   * and so on), keyed as `PROVIDER_SETTINGS` in social-core describes them.
+   * Empty when the platform has none or nothing was set.
+   */
+  settings: Record<string, unknown>;
 }
+
+/**
+ * How often a post publishes again, in days, after Postiz's "Repeat Post
+ * Every": each successful publish queues the next occurrence this many days
+ * later. The API accepts exactly these values.
+ */
+export const REPEAT_INTERVALS = [1, 2, 3, 4, 5, 6, 7, 14, 30] as const;
+export type RepeatInterval = (typeof REPEAT_INTERVALS)[number];
 
 export interface PostDetail {
   group: string;
@@ -85,6 +100,10 @@ export interface PostDetail {
   updatedAt: string;
   shared: PostPart[];
   channels: PostChannel[];
+  /** In the order they were added. */
+  tags: Tag[];
+  /** Null when the post does not repeat. */
+  intervalInDays: RepeatInterval | null;
 }
 
 export interface PostSummaryChannel extends ChannelPublish {
@@ -104,6 +123,10 @@ export interface PostSummary {
   preview: string;
   parts: number;
   channels: PostSummaryChannel[];
+  /** The calendar card's strip takes the first tag's colour. */
+  tags: Tag[];
+  /** Null when the post does not repeat. */
+  intervalInDays: RepeatInterval | null;
 }
 
 /** One page of `GET /posts/queue`. */

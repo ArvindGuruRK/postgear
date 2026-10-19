@@ -25,6 +25,7 @@ import {
   type SupportsEntitySelection,
 } from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
+import { isSafeHref } from '../../composer/document';
 import type { ProviderRules } from '../../composer/rules';
 import {
   GRAPH_BASE,
@@ -44,6 +45,16 @@ const MAX_LENGTH = 63_206;
  * `GRAPH_BASE` so this change cannot alter what a post does.
  */
 const INSIGHTS_BASE = 'https://graph.facebook.com/v23.0';
+
+/**
+ * `settings.link` (see `PROVIDER_SETTINGS.facebook`), when it is a web link.
+ * The API already refused anything else; a stored row is not trusted to have
+ * gone through it.
+ */
+function linkOf(post: PostDetails): string | undefined {
+  const link = post.settings?.link;
+  return typeof link === 'string' && isSafeHref(link.trim()) ? link.trim() : undefined;
+}
 
 /** Page insight names → PostGear metrics. `page_follows` is the follower level on that day. */
 const PAGE_INSIGHTS: Record<string, ChannelMetricName> = {
@@ -268,12 +279,21 @@ export class FacebookProvider
       return this.toResponse(post.id, response.id);
     }
 
+    // A text-only post may carry a link, which Facebook turns into a preview
+    // card (Postiz's "url" setting). A post with media shows the media, not a
+    // card, so the link is sent only here, which is what the composer's hint
+    // for the field ("Attached to text-only posts") promises.
+    const link = linkOf(post);
     const response = await this.fetchJson<{ id?: string }>(
       `${GRAPH_BASE}/${channel.internalId}/feed`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: post.message, access_token: accessToken }),
+        body: JSON.stringify({
+          message: post.message,
+          ...(link ? { link } : {}),
+          access_token: accessToken,
+        }),
       },
     );
 

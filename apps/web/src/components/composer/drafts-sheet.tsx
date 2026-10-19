@@ -200,12 +200,16 @@ function PostList({
   );
 }
 
-/** The button that opens the sheet, kept beside it so the two never drift. */
+/**
+ * The button that opens the sheet, kept beside it so the two never drift. On
+ * a phone the composer's header keeps to icons (Templates sits beside it),
+ * named for assistive technology by its label.
+ */
 export function DraftsButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="secondary" size="sm" onClick={onClick}>
+    <Button variant="secondary" size="sm" onClick={onClick} aria-label="Saved posts">
       <MotionIcon icon={FileTextIcon} className="h-4 w-4" />
-      Saved posts
+      <span className="hidden sm:inline">Saved posts</span>
     </Button>
   );
 }

@@ -14,7 +14,7 @@
  * because connecting a channel is part of onboarding and blocking it behind
  * `ADMIN` would stop a solo user finishing their own setup. Anything
  * destructive or configuration-changing (disconnect, rename, posting times,
- * publishing) requires `ADMIN`.
+ * disabling, the channel order, publishing) requires `ADMIN`.
  *
  * A route without `@Roles()` gets its org resolved *opportunistically*, so
  * `@CurrentOrg()` can legitimately be undefined; those handlers check for it
@@ -30,6 +30,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
 } from '@nestjs/common';
@@ -49,6 +50,8 @@ import { CHANNEL_MESSAGES } from './channels.messages';
 import { ChannelsService } from './channels.service';
 import {
   providerParamSchema,
+  type ReorderChannelsInput,
+  reorderChannelsSchema,
   type SelectEntityInput,
   selectEntitySchema,
   type TestPostInput,
@@ -181,6 +184,21 @@ export class ChannelsController {
     return { channel: await this.channels.selectEntity(org.id, id, dto.entityId) };
   }
 
+  /**
+   * The workspace's channel order (UI revamp, 2026-10-19): an admin drags a
+   * channel in the calendar's channel card, and every channel list follows.
+   * A whole list rather than "move X to n", so a retried or late request
+   * leaves the order the person last saw, never a shifted one.
+   */
+  @Put('order')
+  @Roles(Role.ADMIN)
+  async reorder(
+    @CurrentOrg() org: ActiveOrg,
+    @Body(new ZodBody(reorderChannelsSchema, 'channels/reorder')) dto: ReorderChannelsInput,
+  ) {
+    return { channels: await this.channels.reorder(org.id, dto.ids) };
+  }
+
   @Patch(':id')
   @Roles(Role.ADMIN)
   async update(
@@ -194,6 +212,8 @@ export class ChannelsController {
         id,
         name: dto.name,
         postingTimes: dto.postingTimes,
+        color: dto.color,
+        disabled: dto.disabled,
       }),
     };
   }

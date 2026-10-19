@@ -21,8 +21,8 @@
  * Every platform PostGear publishes to accepts plain text. Formatting survives
  * only as far as `render.ts` can express it in Unicode, so the document admits
  * exactly what that renderer can honour: paragraphs, one heading style, bullet
- * and numbered lists, bold, italic, links and line breaks. A node the renderer
- * could not express would be a lie the preview tells.
+ * and numbered lists, bold, italic, underline, links and line breaks. A node
+ * the renderer could not express would be a lie the preview tells.
  *
  * This file must stay free of Node imports. The web app bundles it for the
  * browser, which is why it lives under `composer/` rather than beside the
@@ -39,12 +39,17 @@ export interface ItalicMark {
   type: 'italic';
 }
 
+/** Rendered as a combining low line under each letter: see `underlineText` in unicode.ts. */
+export interface UnderlineMark {
+  type: 'underline';
+}
+
 export interface LinkMark {
   type: 'link';
   attrs: { href: string };
 }
 
-export type Mark = BoldMark | ItalicMark | LinkMark;
+export type Mark = BoldMark | ItalicMark | UnderlineMark | LinkMark;
 
 export interface TextNode {
   type: 'text';
@@ -104,7 +109,7 @@ export const MAX_LIST_DEPTH = 3;
 /** The largest ordered-list start number worth honouring. */
 const MAX_LIST_START = 10_000;
 
-const MARK_ORDER: Record<Mark['type'], number> = { bold: 0, italic: 1, link: 2 };
+const MARK_ORDER: Record<Mark['type'], number> = { bold: 0, italic: 1, underline: 2, link: 3 };
 
 export function emptyDocument(): PostDocument {
   return { type: 'doc', content: [{ type: 'paragraph' }] };
@@ -350,7 +355,7 @@ function normalizeMarks(raw: unknown): Mark[] {
       continue;
     }
 
-    if (mark.type === 'bold' || mark.type === 'italic') {
+    if (mark.type === 'bold' || mark.type === 'italic' || mark.type === 'underline') {
       byType.set(mark.type, { type: mark.type });
     } else if (mark.type === 'link' && isRecord(mark.attrs)) {
       const href = typeof mark.attrs.href === 'string' ? mark.attrs.href.trim() : '';

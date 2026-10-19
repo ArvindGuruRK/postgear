@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["PLAYWRIGHT_PORT", "SEO_E2E_OFFLINE"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

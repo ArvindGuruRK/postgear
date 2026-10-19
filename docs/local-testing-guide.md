@@ -162,6 +162,38 @@ Queue pages show "No worker running" in their status pill so you can tell.
 npm run dev --workspace=@postgear/web
 ```
 
+### 3a. Running the e2e suite
+
+The Playwright suite signs in about a dozen times a minute, which is over the
+API's normal login limit (10 per minute per address). Run it against the
+API's e2e mode instead:
+
+1. In the API's terminal, stop `npm run dev:api` with Ctrl+C. If you started
+   everything with `npm run dev`, stop that and run the worker and website on
+   their own (Terminals 2 and 3 above).
+2. In the same terminal, start the API in e2e mode:
+
+   ```powershell
+   npm run dev:api:e2e
+   ```
+
+   Same API, reloading on save like `dev:api`, with `LOGIN_RATE_LIMIT_PER_MIN=500`,
+   `LOCKOUT_THRESHOLD=50` and `RATE_LIMIT_PER_MIN=3000` set on top of `.env`.
+3. From another terminal (the database must be seeded):
+
+   ```powershell
+   npm run test:e2e
+   ```
+
+4. Afterwards, stop it and start `npm run dev:api` again, so manual testing
+   runs with the real limits.
+
+**What a 429 means.** A sign-in that fails with "Too many requests" (HTTP 429)
+is the login throttle doing its job, not a broken test: the API was started
+with `dev:api`. The suite checks this before the first test and prints a
+warning box saying so. Switch to `dev:api:e2e`; the higher limit applies at
+once, no waiting needed.
+
 ---
 
 ## 4. Log in
@@ -752,6 +784,7 @@ A real upload needs a video and is not worth testing from the UI yet.
 | Checkout stays on "Activating…" | In Stripe mode, `stripe listen` is not running or forwards to the wrong port; the API never received the event. In simulation, the API log says what the synthetic event did. |
 | A webhook URL is refused as private | `WEBHOOK_ALLOW_PRIVATE_URLS` is not `"true"`: the guard refuses localhost on purpose. Set it and restart the API **and** the worker. |
 | Webhook deliveries stay Pending | The worker is not running (deliveries are Temporal workflows). Start it; the maintenance reconcile picks up anything older than a minute. |
+| `npm run test:e2e` sign-ins fail with "Too many requests" (429) | The API was started with `npm run dev:api` or `npm run dev`. Use `npm run dev:api:e2e`: section 3a. |
 | `/v1` answers 429 | The per-key ceiling (`API_RATE_LIMIT_PER_MIN`, 60/min) or the per-address one (`RATE_LIMIT_PER_MIN`, 300/min). Wait for `Retry-After`. |
 | No notification email in the console | The member's preference is off (Settings → Notifications), or `SMTP_HOST` is set and mail went to a real server. The dispatcher's log line names the row and the outcome. |
 

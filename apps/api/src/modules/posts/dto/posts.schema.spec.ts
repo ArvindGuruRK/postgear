@@ -236,4 +236,72 @@ describe('createPostSchema', () => {
       updatePostSchema.safeParse(body({ expectedUpdatedAt: '2026-09-14T10:00:00.000Z' })).success,
     ).toBe(true);
   });
+
+  it('accepts underline as a mark, with all four marks on one run', () => {
+    const marked = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'x',
+              marks: [
+                { type: 'bold' },
+                { type: 'italic' },
+                { type: 'underline' },
+                { type: 'link', attrs: { href: 'https://a.test' } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(postDocumentSchema.safeParse(marked).success).toBe(true);
+  });
+
+  it('takes settings per channel as a bounded record, leaving the values to the provider', () => {
+    const channel = (settings: unknown) => ({ channelId: 'ch_1', customized: false, settings });
+
+    expect(
+      createPostSchema.safeParse(body({ channels: [channel({ title: 'x', tags: ['a'] })] }))
+        .success,
+    ).toBe(true);
+    expect(createPostSchema.safeParse(body({ channels: [channel(['x'])] })).success).toBe(false);
+    const tooMany = Object.fromEntries(Array.from({ length: 21 }, (_, index) => [`k${index}`, 1]));
+    expect(createPostSchema.safeParse(body({ channels: [channel(tooMany)] })).success).toBe(false);
+  });
+
+  it('takes up to ten distinct tags', () => {
+    const ids = Array.from({ length: 11 }, (_, index) => `tag-${index}`);
+
+    expect(createPostSchema.safeParse(body({ tags: ids.slice(0, 10) })).success).toBe(true);
+    expect(createPostSchema.safeParse(body({ tags: ids })).success).toBe(false);
+    expect(createPostSchema.safeParse(body({ tags: ['a', 'a'] })).success).toBe(false);
+  });
+
+  it('repeats only at the intervals PostGear offers, or not at all', () => {
+    for (const days of [1, 2, 3, 4, 5, 6, 7, 14, 30, null]) {
+      expect(createPostSchema.safeParse(body({ intervalInDays: days })).success).toBe(true);
+    }
+    for (const days of [0, 8, 31, 1.5, '7']) {
+      expect(createPostSchema.safeParse(body({ intervalInDays: days })).success).toBe(false);
+    }
+  });
+
+  it('publishes now only a post entering the queue', () => {
+    expect(createPostSchema.safeParse(body({ state: 'QUEUE', publishNow: true })).success).toBe(
+      true,
+    );
+    expect(createPostSchema.safeParse(body({ state: 'DRAFT', publishNow: true })).success).toBe(
+      false,
+    );
+    expect(
+      updatePostSchema.safeParse(
+        body({ state: 'DRAFT', publishNow: true, expectedUpdatedAt: '2026-09-14T10:00:00.000Z' }),
+      ).success,
+    ).toBe(false);
+  });
 });

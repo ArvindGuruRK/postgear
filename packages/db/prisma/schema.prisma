@@ -20,6 +20,10 @@ model Organization {
   allowTrial          Boolean              @default(false)
   isTrailing          Boolean              @default(false)
   shortlink           ShortLinkPreference  @default(ASK)
+  // Home dashboard (2026-10-19): how many posts a week the workspace aims to
+  // publish. Null means "not set", and the dashboard derives a default from
+  // the creator's onboarding answer to "How often do you post today?".
+  weeklyPostGoal      Int?
   Comments            Comments[]
   credits             Credits[]
   customers           Customer[]
@@ -331,6 +335,17 @@ model Integration {
   customerId            String?
   rootInternalId        String?
   additionalSettings    String?                @default("[]")
+  // UI revamp (2026-10-19): the avatar palette slot the channel's initials are
+  // drawn in, 0-based, as handed to the web's `colorSeed`. Stored rather than
+  // computed so changing the palette later never repaints existing channels
+  // and an admin can pick a colour. Assigned on connect; see
+  // apps/api/src/modules/channels/channel-colors.ts.
+  color                 Int?
+  // UI revamp (2026-10-19): where the channel sits in the workspace's channel
+  // list (the calendar's Channels card, pickers), 0 first. Admins reorder by
+  // dragging; a new channel goes last. Null only on a row created outside the
+  // channels repository, which then sorts after the rest by creation time.
+  position              Int?
   customer              Customer?              @relation(fields: [customerId], references: [id])
   organization          Organization           @relation(fields: [organizationId], references: [id])
   webhooks              IntegrationsWebhooks[]

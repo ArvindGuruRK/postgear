@@ -51,11 +51,12 @@ export interface Channel {
   postingTimes: PostingTime[];
   createdAt: string;
   /**
-   * The avatar palette slot (0-6), handed out in the order channels were
-   * connected so no two of the first seven share one (the rule lives in the
-   * API's `channel-colors.ts`). Passed as `colorSeed`; readers write
-   * `color ?? id` because a response cached from before the field existed
-   * has none, and the id hash beats a blank.
+   * The avatar palette slot (0-6), stored on the channel: a new channel takes
+   * the first slot no connected channel uses, and an admin can change it
+   * (`ChannelPreferencesDialog`; the rule lives in the API's `channel-colors.ts`).
+   * Passed as `colorSeed`; readers write `color ?? id` because a response
+   * cached from before the field existed has none, and the id hash beats a
+   * blank.
    */
   color: number;
 }

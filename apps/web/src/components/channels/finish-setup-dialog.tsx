@@ -177,7 +177,7 @@ export function FinishSetupDialog({ channel, onOpenChange, onDone }: FinishSetup
         )}
 
         {error ? (
-          <Text size="sm" className="text-actionDanger">
+          <Text size="sm" className="text-dangerInk">
             {error}
           </Text>
         ) : null}

@@ -27,6 +27,7 @@ jest.mock('@postgear/db', () => ({
       upsert: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+      aggregate: jest.fn(),
     },
     post: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -34,6 +35,7 @@ jest.mock('@postgear/db', () => ({
       count: jest.fn(),
     },
     $transaction: jest.fn(),
+    $executeRaw: jest.fn(),
   },
 }));
 
@@ -41,9 +43,13 @@ import { decrypt, isEncrypted, prisma } from '@postgear/db';
 import { ChannelsRepository } from './channels.repository';
 
 type PrismaMock = {
-  integration: Record<'findMany' | 'findFirst' | 'upsert' | 'update' | 'updateMany', jest.Mock>;
+  integration: Record<
+    'findMany' | 'findFirst' | 'upsert' | 'update' | 'updateMany' | 'aggregate',
+    jest.Mock
+  >;
   post: Record<'findMany' | 'updateMany' | 'count', jest.Mock>;
   $transaction: jest.Mock;
+  $executeRaw: jest.Mock;
 };
 
 const prismaMock = prisma as unknown as PrismaMock;
@@ -60,6 +66,13 @@ describe('ChannelsRepository', () => {
     prismaMock.$transaction.mockImplementation(
       async (callback: (tx: unknown) => Promise<unknown>) => callback(prismaMock),
     );
+    // A connect picks the new row's colour first: the workspace lock, then the
+    // colours its connected channels hold (none, unless a test says so).
+    prismaMock.$executeRaw.mockResolvedValue(1);
+    prismaMock.integration.findMany.mockResolvedValue([]);
+    // ...and its place at the end of the list (an empty workspace, unless a
+    // test says otherwise).
+    prismaMock.integration.aggregate.mockResolvedValue({ _max: { position: null } });
   });
 
   function baseRow(overrides: Record<string, unknown> = {}) {
@@ -279,6 +292,40 @@ describe('ChannelsRepository', () => {
       expect(update).not.toHaveProperty('inBetweenSteps');
     });
 
+    it('gives a new channel the least-used colour, and never repaints on reconnect', async () => {
+      // Slots 0 to 2 are taken, 0 twice: the first free one is 3.
+      prismaMock.integration.findMany.mockResolvedValue([
+        { color: 0 },
+        { color: 1 },
+        { color: 0 },
+        { color: 2 },
+      ]);
+      prismaMock.integration.upsert.mockResolvedValue(baseRow());
+
+      await repository.upsertFromAuth({
+        orgId: 'org_1',
+        providerIdentifier: 'x',
+        internalId: 'acct_1',
+        rootInternalId: 'acct_1',
+        name: 'Demo',
+        token: 'token',
+      });
+
+      const { create, update } = prismaMock.integration.upsert.mock.calls[0][0];
+      expect(create.color).toBe(3);
+      // The update branch is a reconnect: the row keeps the colour it has.
+      expect(update).not.toHaveProperty('color');
+
+      // Chosen under the workspace's lock, from its connected channels only.
+      expect(prismaMock.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(prismaMock.$executeRaw.mock.calls[0]).toContain('channel-colors:org_1');
+      expect(prismaMock.integration.findMany.mock.calls[0][0].where).toEqual({
+        organizationId: 'org_1',
+        deletedAt: null,
+        color: { not: null },
+      });
+    });
+
     it('leaves the stored expiry alone when a refresh does not report one', async () => {
       prismaMock.integration.updateMany.mockResolvedValue({ count: 1 });
 
@@ -295,6 +342,121 @@ describe('ChannelsRepository', () => {
       expect(data).not.toHaveProperty('tokenExpiration');
       expect(data).not.toHaveProperty('profile');
       expect(data.refreshNeeded).toBe(false);
+    });
+  });
+
+  describe('channel order (UI revamp, 2026-10-19)', () => {
+    it('lists by stored position, nulls last, then creation time and id', async () => {
+      prismaMock.integration.findMany.mockResolvedValue([]);
+
+      await repository.listForOrg('org_1');
+
+      expect(prismaMock.integration.findMany.mock.calls[0][0].orderBy).toEqual([
+        { position: { sort: 'asc', nulls: 'last' } },
+        { createdAt: 'asc' },
+        { id: 'asc' },
+      ]);
+    });
+
+    it('puts a new channel after the last one, under the connect lock, and never moves it on reconnect', async () => {
+      prismaMock.integration.aggregate.mockResolvedValue({ _max: { position: 4 } });
+      prismaMock.integration.upsert.mockResolvedValue(baseRow());
+
+      await repository.upsertFromAuth({
+        orgId: 'org_1',
+        providerIdentifier: 'x',
+        internalId: 'acct_1',
+        rootInternalId: 'acct_1',
+        name: 'Demo',
+        token: 'token',
+      });
+
+      const { create, update } = prismaMock.integration.upsert.mock.calls[0][0];
+      expect(create.position).toBe(5);
+      expect(update).not.toHaveProperty('position');
+      // Live channels only, read after the workspace lock is taken.
+      expect(prismaMock.integration.aggregate.mock.calls[0][0]).toEqual({
+        where: { organizationId: 'org_1', deletedAt: null },
+        _max: { position: true },
+      });
+      expect(prismaMock.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prismaMock.integration.aggregate.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('gives the first channel of a workspace position 0', async () => {
+      prismaMock.integration.upsert.mockResolvedValue(baseRow());
+
+      await repository.upsertFromAuth({
+        orgId: 'org_1',
+        providerIdentifier: 'x',
+        internalId: 'acct_1',
+        rootInternalId: 'acct_1',
+        name: 'Demo',
+        token: 'token',
+      });
+
+      expect(prismaMock.integration.upsert.mock.calls[0][0].create.position).toBe(0);
+    });
+
+    it('writes 0..n-1 in the order sent, with left-out channels after in their old order', async () => {
+      prismaMock.integration.findMany.mockResolvedValue([
+        { id: 'a', position: 0 },
+        { id: 'b', position: 1 },
+        { id: 'c', position: 2 },
+        { id: 'd', position: 3 },
+      ]);
+      prismaMock.integration.updateMany.mockResolvedValue({ count: 1 });
+
+      await expect(repository.setOrder('org_1', ['c', 'a'])).resolves.toBe(true);
+
+      // c, a, then b and d as they were: b (was 1) moves to 2, d stays at 3.
+      const writes = prismaMock.integration.updateMany.mock.calls.map(([args]) => [
+        args.where.id,
+        args.data.position,
+      ]);
+      expect(writes).toEqual([
+        ['c', 0],
+        ['a', 1],
+        ['b', 2],
+      ]);
+      for (const [args] of prismaMock.integration.updateMany.mock.calls) {
+        expect(args.where).toMatchObject({ organizationId: 'org_1', deletedAt: null });
+      }
+      expect(prismaMock.integration.findMany.mock.calls[0][0].where).toEqual({
+        organizationId: 'org_1',
+        deletedAt: null,
+      });
+    });
+
+    it('refuses an id that is not a live channel of the workspace, writing nothing', async () => {
+      prismaMock.integration.findMany.mockResolvedValue([
+        { id: 'a', position: 0 },
+        { id: 'b', position: 1 },
+      ]);
+
+      await expect(repository.setOrder('org_1', ['b', 'someone-elses'])).resolves.toBe(false);
+      expect(prismaMock.integration.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('disabling', () => {
+    it('writes the disabled flag only when it is sent', async () => {
+      prismaMock.integration.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.integration.findFirst.mockResolvedValue(baseRow({ disabled: true }));
+
+      await repository.updateSettings({ orgId: 'org_1', id: 'ch_1', disabled: true });
+      await repository.updateSettings({ orgId: 'org_1', id: 'ch_1', disabled: false });
+      await repository.updateSettings({ orgId: 'org_1', id: 'ch_1', name: 'Renamed' });
+
+      const [disable, enable, rename] = prismaMock.integration.updateMany.mock.calls.map(
+        ([args]) => args,
+      );
+      expect(disable.data).toEqual({ disabled: true });
+      expect(enable.data).toEqual({ disabled: false });
+      // A rename leaves the flag alone: undefined is "not sent", not "enable".
+      expect(rename.data).toEqual({ name: 'Renamed' });
+      expect(disable.where).toEqual({ id: 'ch_1', organizationId: 'org_1', deletedAt: null });
     });
   });
 
@@ -389,6 +551,8 @@ describe('ChannelsRepository', () => {
     it('flips internalId to the entity and clears inBetweenSteps', async () => {
       prismaMock.integration.findFirst
         .mockResolvedValueOnce(baseRow({ inBetweenSteps: true }))
+        // The page was never connected here before: no tombstone colour.
+        .mockResolvedValueOnce(null)
         // No live row already holds the target id.
         .mockResolvedValueOnce(null);
       prismaMock.integration.updateMany.mockResolvedValue({ count: 0 });
@@ -410,11 +574,44 @@ describe('ChannelsRepository', () => {
       expect(data.inBetweenSteps).toBe(false);
       expect(isEncrypted(data.token)).toBe(true);
       expect(decrypt(data.token)).toBe('page-scoped-token');
+      // Nothing to carry over: the colour it was given on connect stands.
+      expect(data).not.toHaveProperty('color');
+    });
+
+    it('gives a page chosen again after a disconnect its old colour back', async () => {
+      prismaMock.integration.findFirst
+        .mockResolvedValueOnce(baseRow({ inBetweenSteps: true }))
+        // The page's tombstone from the earlier disconnect.
+        .mockResolvedValueOnce({ color: 5 })
+        .mockResolvedValueOnce(null);
+      prismaMock.integration.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.integration.update.mockResolvedValue(baseRow({ internalId: 'page_1' }));
+
+      await repository.completeEntitySelection({
+        orgId: 'org_1',
+        id: 'ch_1',
+        entityId: 'page_1',
+        name: 'My Page',
+      });
+
+      // Read before the tombstone is renamed off the page's id, newest first.
+      const [lookup] = prismaMock.integration.findFirst.mock.calls[1];
+      expect(lookup.where).toEqual({
+        organizationId: 'org_1',
+        internalId: 'page_1',
+        deletedAt: { not: null },
+        id: { not: 'ch_1' },
+        color: { not: null },
+      });
+      expect(lookup.orderBy).toEqual({ deletedAt: 'desc' });
+      expect(prismaMock.integration.update.mock.calls[0][0].data.color).toBe(5);
     });
 
     it('redirects the write to an existing live row so its posts survive', async () => {
       prismaMock.integration.findFirst
         .mockResolvedValueOnce(baseRow({ id: 'ch_new', inBetweenSteps: true }))
+        // An old tombstone exists too, but the live row below wins.
+        .mockResolvedValueOnce({ color: 5 })
         // A channel already represents this page: it holds the history.
         .mockResolvedValueOnce({ id: 'ch_original' });
       prismaMock.integration.updateMany.mockResolvedValue({ count: 0 });
@@ -434,8 +631,9 @@ describe('ChannelsRepository', () => {
       expect(discard[0].data.deletedAt).toBeInstanceOf(Date);
       expect(discard[0].data.token).toBe('');
       // ...and the original keeps its primary key, so scheduled posts and
-      // webhooks pointing at it stay valid.
+      // webhooks pointing at it stay valid, and its own colour.
       expect(keep[0].where.id).toBe('ch_original');
+      expect(keep[0].data).not.toHaveProperty('color');
     });
   });
 });

@@ -7,7 +7,12 @@
  * queries, even though `RolesGuard` has already checked membership: the same
  * defence-in-depth convention `org.service.ts` follows.
  */
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { prisma } from '@postgear/db';
 import {
@@ -323,6 +328,8 @@ export class ChannelsService {
     id: string;
     name?: string;
     postingTimes?: { time: number }[];
+    color?: number;
+    disabled?: boolean;
   }): Promise<ChannelSummary> {
     const updated = await this.repository.updateSettings(params);
 
@@ -331,6 +338,22 @@ export class ChannelsService {
     }
 
     return updated;
+  }
+
+  /**
+   * The workspace's channel order, after an admin's drag (UI revamp,
+   * 2026-10-19). `ids` lead in that order and any live channel left out
+   * keeps its place after them; an id that is not one of the workspace's
+   * live channels refuses the whole list. Returns the list in its new order.
+   */
+  async reorder(orgId: string, ids: string[]): Promise<ChannelView[]> {
+    const applied = await this.repository.setOrder(orgId, ids);
+
+    if (!applied) {
+      throw new BadRequestException('One of those channels is not in this workspace');
+    }
+
+    return this.list(orgId);
   }
 
   /** How many queued posts a disconnect would send back to drafts. */
@@ -490,7 +513,7 @@ export class ChannelsService {
   private async requireCredentials(orgId: string, id: string): Promise<ChannelWithCredentials> {
     const channel = await this.repository.getWithCredentials(orgId, id);
 
-    if (!channel || !channel.token) {
+    if (!channel?.token) {
       throw new NotFoundException('Channel not found');
     }
 

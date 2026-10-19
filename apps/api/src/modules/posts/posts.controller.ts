@@ -26,8 +26,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../common/pipes/zod-validation.pipe';
 import {
   type CalendarQuery,
-  calendarQuerySchema,
   type CreatePostInput,
+  calendarQuerySchema,
   createPostSchema,
   type ListPostsQuery,
   listPostsQuerySchema,

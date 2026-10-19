@@ -59,8 +59,15 @@ function popularity(provider: ProviderSummary): number {
   return index === -1 ? POPULARITY.length : index;
 }
 
+/** Most used first; shared with the channel card's quick-connect icons. */
+export function byPopularity(providers: ProviderSummary[]): ProviderSummary[] {
+  return [...providers].sort((a, b) => popularity(a) - popularity(b));
+}
+
 function accountKind(provider: ProviderSummary): string {
-  return ACCOUNT_KIND[provider.identifier] ?? (provider.requiresEntitySelection ? 'Page' : 'Profile');
+  return (
+    ACCOUNT_KIND[provider.identifier] ?? (provider.requiresEntitySelection ? 'Page' : 'Profile')
+  );
 }
 
 /** The tile shell both states share: a large centred logo, the name, the account kind. */
@@ -106,10 +113,10 @@ function TileBody({ provider }: { provider: ProviderSummary }) {
  * and keyboard users would never reach the reason.
  */
 export function ConnectChannelDialog({ open, onOpenChange, providers }: ConnectChannelDialogProps) {
-  const byPopularity = [...providers].sort((a, b) => popularity(a) - popularity(b));
+  const sorted = byPopularity(providers);
   const ordered = [
-    ...byPopularity.filter((provider) => provider.configured),
-    ...byPopularity.filter((provider) => !provider.configured),
+    ...sorted.filter((provider) => provider.configured),
+    ...sorted.filter((provider) => !provider.configured),
   ];
 
   return (

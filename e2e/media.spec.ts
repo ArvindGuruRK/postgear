@@ -19,7 +19,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Email').fill('demo@postgear.local');
   await page.locator('#password').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 
 const created = { groups: [] as string[], mediaNames: [] as string[] };
@@ -74,7 +74,7 @@ test.describe('media library', () => {
       .click();
     await page.getByRole('textbox', { name: 'Part 1 of the shared post' }).click();
     await page.keyboard.type('First post using the image');
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save as draft' }).click();
     await expect(page).toHaveURL(/\?group=/);
     created.groups.push(new URL(page.url()).searchParams.get('group') ?? '');
 
@@ -96,7 +96,7 @@ test.describe('media library', () => {
       page.getByTestId('preview-linkedin').getByRole('img', { name: fileName }),
     ).toBeVisible();
 
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save as draft' }).click();
     await expect(page).toHaveURL(/\?group=/);
     created.groups.push(new URL(page.url()).searchParams.get('group') ?? '');
 

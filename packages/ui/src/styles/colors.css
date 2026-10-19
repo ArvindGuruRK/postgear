@@ -142,6 +142,15 @@
        other dark-mode surface separates by value rather than by border. */
     --color-plate: #000000;
     --color-on-plate: var(--color-brutal-secondary);
+    /* Status hues as TEXT on a surface (2026-10-19): a trend arrow and its
+       figure, a form error, an HTTP status. In dark they are the fills
+       themselves, which read on every dark page and card; the .light block
+       below sets darker shades of the same hues, because the bright fills
+       are too pale to read as text on a light ground. Fills (bg-action*)
+       never use these. */
+    --color-success-ink: var(--color-brutal-success);
+    --color-danger-ink: var(--color-brutal-danger);
+    --color-accent-ink: var(--color-brutal-accent);
     /* The shadow offsets, as their own tokens (2026-10-18), so a pressable
        control can move by exactly its shadow's depth when it sinks into it
        (press-sm / press-md in packages/ui/src/lib/press.ts, after the
@@ -188,6 +197,16 @@
     /* See the --color-plate comment in the .dark block above. */
     --color-plate: #0a0a0a;
     --color-on-plate: var(--color-brutal-secondary);
+    /* Status text, darkened from the fills (see the .dark block above).
+       As text on the light grounds the fills manage only 1.9:1 (success
+       #22c55e), 3.5:1 (danger #e63946) and 2.4:1 (accent #ff6b35) at worst.
+       These shades keep the hue and clear WCAG AA's 4.5:1 against the page
+       and the cards of every light theme, checked by script: at worst
+       success 4.85:1, danger 4.79:1 and accent 4.72:1, all on Lilac's
+       page. No light theme overrides them. */
+    --color-success-ink: #147537;
+    --color-danger-ink: #c81e2c;
+    --color-accent-ink: #b93d0b;
     /* Light mode runs lighter than dark (2026-10-17): on the pale page a
        solid black offset reads as heavy, so the diagonal is about a quarter
        smaller than dark mode's. Same direction as dark, right and bottom,

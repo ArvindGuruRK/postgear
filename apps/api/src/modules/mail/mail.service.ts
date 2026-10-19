@@ -161,6 +161,57 @@ export class MailService {
   }
 
   /**
+   * A workspace invitation (Settings > Team, 2026-10-19).
+   *
+   * The link is the invitation: a signed token that names the workspace and
+   * the role, and is bound to this address, so forwarding it does not let
+   * someone else in. The message is the same whether or not the address has
+   * a PostGear account, because the API never looks: the landing page offers
+   * sign-in and sign-up side by side, and saying either here would make the
+   * invite form an account-enumeration oracle for every workspace admin.
+   *
+   * Names arrive sanitized but are folded onto one line anyway before going
+   * into the subject, the one header a caller's text reaches.
+   *
+   * Reports the outcome, like `sendPlain`; the admin is not told about a
+   * failure (the copy-link path is there for exactly that), but it is logged.
+   */
+  async sendWorkspaceInvitation(
+    to: string,
+    invitation: {
+      workspaceName: string;
+      inviterName: string;
+      role: 'ADMIN' | 'USER';
+      link: string;
+      expiresAt: Date;
+    },
+  ): Promise<boolean> {
+    const workspace = oneLine(invitation.workspaceName);
+    const inviter = oneLine(invitation.inviterName);
+    const role = invitation.role === 'ADMIN' ? 'an admin' : 'a member';
+    const expires = invitation.expiresAt.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+
+    return this.send({
+      to,
+      subject: `${inviter} invited you to ${workspace} on PostGear`,
+      text: [
+        `${inviter} invited you to join ${workspace} on PostGear as ${role}.`,
+        '',
+        'Open this link to accept. You can sign in or create an account from there:',
+        invitation.link,
+        '',
+        `The link works once and expires on ${expires} (UTC).`,
+        "If you weren't expecting this, you can ignore this email.",
+      ].join('\n'),
+    });
+  }
+
+  /**
    * A plain-text message assembled by a caller (Sprint 8: notification and
    * billing emails). Lines are joined with newlines; nothing is HTML, so
    * nothing a channel name or a provider error contains can become markup.
@@ -214,4 +265,9 @@ export class MailService {
       return false;
     }
   }
+}
+
+/** Collapses line breaks and runs of whitespace, for text placed in a header. */
+function oneLine(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
 }

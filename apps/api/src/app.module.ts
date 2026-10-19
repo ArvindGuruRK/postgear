@@ -1,16 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
-import { validateEnv } from './config/env';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ThrottlingModule } from './common/throttling/throttling.module';
+import { validateEnv } from './config/env';
 import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DevelopersModule } from './modules/developers/developers.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -22,6 +23,8 @@ import { PostsModule } from './modules/posts/posts.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { SeoModule } from './modules/seo/seo.module';
+import { SignaturesModule } from './modules/signatures/signatures.module';
+import { TagsModule } from './modules/tags/tags.module';
 import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 
@@ -75,6 +78,11 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     DevelopersModule,
     WebhooksModule,
     HealthModule,
+    // UI revamp (2026-10-19): the home dashboard's streak, goal and first steps.
+    DashboardModule,
+    // UI revamp (2026-10-19): post tags and saved signatures, after Postiz's.
+    TagsModule,
+    SignaturesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

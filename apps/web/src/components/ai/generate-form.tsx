@@ -205,7 +205,7 @@ export function GenerateForm({
             heading for it rather than a label for a control: the Label
             classes, copied per design-system-rules.md §1. */}
         <span className="font-sans text-sm font-bold text-ink">
-          Channels<span className="ml-1 text-actionDanger">*</span>
+          Channels<span className="ml-1 text-dangerInk">*</span>
         </span>
         <div className={cn(running && 'pointer-events-none opacity-70')}>
           <ChannelPicker

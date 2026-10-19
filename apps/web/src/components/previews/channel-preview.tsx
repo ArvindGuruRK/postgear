@@ -39,6 +39,7 @@ export function ChannelPreview({
   channel,
   parts,
   publishAt,
+  settings,
 }: {
   providerIdentifier: string;
   providerName: string;
@@ -46,6 +47,8 @@ export function ChannelPreview({
   channel: PreviewChannel;
   parts: PreviewPart[];
   publishAt: Date | null;
+  /** The channel's platform settings, for previews that show one (a title). */
+  settings?: Record<string, unknown>;
 }) {
   const Preview = PREVIEWS[providerIdentifier] ?? GenericPreview;
 
@@ -65,6 +68,7 @@ export function ChannelPreview({
           maxLength={rules.maxLength}
           lengthMethod={rules.lengthMethod}
           publishAt={publishAt}
+          settings={settings}
         />
       </div>
       {rules.thread === 'none' && parts.length > 1 ? (

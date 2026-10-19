@@ -78,7 +78,11 @@ export function CancelDialog({
       setFeedback('');
       onCanceled(subscription);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'The plan could not be cancelled. Please try again.');
+      setError(
+        cause instanceof ApiError
+          ? cause.message
+          : 'The plan could not be cancelled. Please try again.',
+      );
     } finally {
       setWorking(false);
     }
@@ -136,7 +140,7 @@ export function CancelDialog({
           </FormField>
 
           {error ? (
-            <Text size="sm" className="text-actionDanger" role="alert">
+            <Text size="sm" className="text-dangerInk" role="alert">
               {error}
             </Text>
           ) : null}

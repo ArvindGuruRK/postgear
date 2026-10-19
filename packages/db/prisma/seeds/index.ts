@@ -375,7 +375,8 @@ async function seedNotifications(organizationId: string) {
       id: 'seed-notification-published',
       type: 'post.published',
       title: 'Post published',
-      content: 'Published to Acme Marketing: Yesterday: the first post PostGear published on its own schedule.',
+      content:
+        'Published to Acme Marketing: Yesterday: the first post PostGear published on its own schedule.',
       link: 'https://www.linkedin.com/feed/update/urn:li:share:seed-7001',
       emailStatus: 'SENT' as const,
       emailedAt: minutesAgo(24 * 60 - 1),
@@ -392,7 +393,8 @@ async function seedNotifications(organizationId: string) {
       id: 'seed-notification-failed',
       type: 'post.failed',
       title: 'Post failed',
-      content: 'Could not publish to Acme on X: Acme on X needs reconnecting before PostGear can publish to it.',
+      content:
+        'Could not publish to Acme on X: Acme on X needs reconnecting before PostGear can publish to it.',
       link: `/${organizationId}/queue?state=ERROR`,
       emailStatus: 'SENT' as const,
       emailedAt: minutesAgo(2 * 24 * 60 - 1),
@@ -556,7 +558,9 @@ async function seedPosts(organizationId: string) {
       integrationId: DEMO_CHANNEL_ID,
       state: 'QUEUE',
       publishDate: at(1, 10),
-      content: doc('Tomorrow we open the doors on the new PostGear calendar. Drag a post, change its day.'),
+      content: doc(
+        'Tomorrow we open the doors on the new PostGear calendar. Drag a post, change its day.',
+      ),
     },
     {
       id: 'seed-post-queued-x',
@@ -564,7 +568,9 @@ async function seedPosts(organizationId: string) {
       integrationId: BROKEN_CHANNEL_ID,
       state: 'QUEUE',
       publishDate: at(1, 10),
-      content: doc('Tomorrow we open the doors on the new PostGear calendar. Drag a post, change its day.'),
+      content: doc(
+        'Tomorrow we open the doors on the new PostGear calendar. Drag a post, change its day.',
+      ),
     },
     {
       id: 'seed-post-queued-x-2',
@@ -694,7 +700,7 @@ async function seedChannels(organizationId: string) {
     },
   ];
 
-  for (const channel of channels) {
+  for (const [position, channel] of channels.entries()) {
     const shared = {
       organizationId,
       internalId: channel.internalId,
@@ -710,10 +716,19 @@ async function seedChannels(organizationId: string) {
       deletedAt: null,
     };
 
+    // The avatar colour and the place in the channel list only on create, in
+    // list order like a real workspace's first channels: a re-seed keeps a
+    // colour someone picked, or an order someone dragged, since.
     await prisma.integration.upsert({
       where: { id: channel.id },
       update: shared,
-      create: { id: channel.id, rootInternalId: channel.internalId, ...shared },
+      create: {
+        id: channel.id,
+        rootInternalId: channel.internalId,
+        ...shared,
+        color: position % 7,
+        position,
+      },
     });
   }
 

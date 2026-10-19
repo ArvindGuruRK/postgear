@@ -103,7 +103,7 @@ export function DeleteMediaDialog({
         )}
 
         {error ? (
-          <Text size="sm" className="text-actionDanger" role="alert">
+          <Text size="sm" className="text-dangerInk" role="alert">
             {error}
           </Text>
         ) : null}

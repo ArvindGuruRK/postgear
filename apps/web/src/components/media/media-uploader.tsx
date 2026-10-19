@@ -118,7 +118,7 @@ export function UploadRows({ rows }: { rows: UploadRow[] }) {
             <Text
               size="xs"
               className={
-                row.status === 'failed' ? 'shrink-0 text-actionDanger' : 'shrink-0 opacity-70'
+                row.status === 'failed' ? 'shrink-0 text-dangerInk' : 'shrink-0 opacity-70'
               }
             >
               {row.status === 'uploading'
@@ -136,7 +136,7 @@ export function UploadRows({ rows }: { rows: UploadRow[] }) {
           {row.message ? (
             <Text
               size="xs"
-              className={row.status === 'failed' ? 'text-actionDanger' : undefined}
+              className={row.status === 'failed' ? 'text-dangerInk' : undefined}
               muted={row.status !== 'failed'}
             >
               {row.message}

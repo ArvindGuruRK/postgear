@@ -31,7 +31,7 @@ async function signIn(page: Page) {
   await page.getByLabel('Email').fill('demo@postgear.local');
   await page.locator('#password').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page).toHaveURL(/\/[^/]+\/(calendar|channels)/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 
 let server: Server;
@@ -64,7 +64,11 @@ test.describe('webhooks', () => {
   }) => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/settings/webhooks`);
-    await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Webhooks' })).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('link', { name: 'Webhooks' }),
+    ).toHaveAttribute('aria-current', 'page');
 
     const name = `E2E receiver ${Date.now()}`;
     await page.getByTestId('webhook-add').click();
@@ -88,7 +92,10 @@ test.describe('webhooks', () => {
 
     // The receiver gets exactly one signed request.
     await expect
-      .poll(() => received.length, { timeout: DELIVERY_TIMEOUT, message: 'the worker delivered the test' })
+      .poll(() => received.length, {
+        timeout: DELIVERY_TIMEOUT,
+        message: 'the worker delivered the test',
+      })
       .toBeGreaterThan(0);
     const [request] = received;
     expect(request.headers['content-type']).toBe('application/json');
@@ -115,8 +122,12 @@ test.describe('webhooks', () => {
     expect(payload.data.post.channel.provider).toBeTruthy();
 
     // The deliveries sheet opened by the test send shows it delivered.
-    const delivery = page.locator('[data-testid="webhook-delivery"][data-event="webhook.test"]').first();
-    await expect(delivery).toHaveAttribute('data-status', 'DELIVERED', { timeout: DELIVERY_TIMEOUT });
+    const delivery = page
+      .locator('[data-testid="webhook-delivery"][data-event="webhook.test"]')
+      .first();
+    await expect(delivery).toHaveAttribute('data-status', 'DELIVERED', {
+      timeout: DELIVERY_TIMEOUT,
+    });
     await page.keyboard.press('Escape');
 
     // Clean up through the UI: delete the hook.

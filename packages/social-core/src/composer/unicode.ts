@@ -1,5 +1,5 @@
 /**
- * Bold and italic for platforms that have neither.
+ * Bold, italic and underline for platforms that have none of them.
  *
  * X, LinkedIn, Instagram, Facebook, TikTok, YouTube and Pinterest all accept
  * plain text only. The established workaround (used by the reference and by
@@ -69,4 +69,48 @@ export function styleText(text: string, style: TextStyle): string {
   }
 
   return output;
+}
+
+/** U+0332 COMBINING LOW LINE: drawn under the character before it. */
+export const COMBINING_LOW_LINE = '̲';
+
+/**
+ * A letter or digit, with any accents it carries. An enclosing mark (the
+ * keycap in 1️⃣) is deliberately not accepted, so emoji built on a digit are
+ * left whole rather than split by a line.
+ */
+const UNDERLINABLE = /^[\p{L}\p{N}][\p{Mn}\p{Mc}]*$/u;
+
+/**
+ * Underline for platforms that have none, as Postiz does it: a combining low
+ * line after each letter and digit. Spaces and punctuation are left bare, so
+ * words read as underlined words rather than one ruled line.
+ *
+ * Applied to already-styled text, so a bold underlined word is the bold
+ * letters each followed by the line; the Mathematical Alphanumeric letters
+ * are letters to Unicode too. The line goes after a character's own accents,
+ * keeping each user-perceived character in one piece.
+ *
+ * Every line is one more UTF-16 unit, and weighs 1 on X (U+0332 sits in X's
+ * light range), which `length.ts` counts without knowing about it because
+ * lengths are always taken from rendered text.
+ */
+export function underlineText(text: string): string {
+  let output = '';
+
+  for (const grapheme of graphemes(text)) {
+    output += UNDERLINABLE.test(grapheme) ? `${grapheme}${COMBINING_LOW_LINE}` : grapheme;
+  }
+
+  return output;
+}
+
+/** User-perceived characters; code points where `Intl.Segmenter` is missing. */
+function graphemes(text: string): string[] {
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    return Array.from(segmenter.segment(text), (segment) => segment.segment);
+  }
+
+  return Array.from(text);
 }

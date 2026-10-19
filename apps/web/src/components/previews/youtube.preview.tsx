@@ -7,6 +7,7 @@ import {
   type PlatformPreviewProps,
   PreviewMediaItem,
   PreviewText,
+  titleSetting,
 } from './preview-parts';
 
 /** YouTube truncates a title past 100 characters; the provider does the same. */
@@ -19,7 +20,13 @@ const TITLE_LENGTH = 100;
  * description, so that is exactly what is drawn. Only the first part is ever
  * published: the composer reports any others as an issue.
  */
-export function YouTubePreview({ channel, parts, maxLength, lengthMethod }: PlatformPreviewProps) {
+export function YouTubePreview({
+  channel,
+  parts,
+  maxLength,
+  lengthMethod,
+  settings,
+}: PlatformPreviewProps) {
   const first = parts[0];
 
   if (!first) {
@@ -27,7 +34,11 @@ export function YouTubePreview({ channel, parts, maxLength, lengthMethod }: Plat
   }
 
   const video = first.media.find((item) => item.type === 'video');
-  const title = (first.text.split('\n')[0]?.trim() || 'Untitled').slice(0, TITLE_LENGTH);
+  // The Title setting when there is one, else the first line: the provider's rule.
+  const title = (titleSetting(settings) ?? (first.text.split('\n')[0]?.trim() || 'Untitled')).slice(
+    0,
+    TITLE_LENGTH,
+  );
 
   return (
     <article className="bg-bgYoutube p-3 font-sans text-sm text-ink">

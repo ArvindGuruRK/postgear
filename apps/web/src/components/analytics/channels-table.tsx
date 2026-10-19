@@ -186,9 +186,7 @@ export function ChannelsTable({
                           <span
                             className={cn(
                               'text-xs font-semibold',
-                              channel.followers.delta > 0
-                                ? 'text-actionSuccess'
-                                : 'text-actionDanger',
+                              channel.followers.delta > 0 ? 'text-successInk' : 'text-dangerInk',
                             )}
                           >
                             {formatDelta(channel.followers.delta)}

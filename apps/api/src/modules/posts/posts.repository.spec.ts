@@ -20,6 +20,10 @@ jest.mock('@postgear/db', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      tagsPosts: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
       $transaction: jest.fn(),
     },
   };
@@ -30,6 +34,7 @@ import { orderChain, PostsRepository } from './posts.repository';
 
 type PrismaMock = {
   post: Record<'findMany' | 'groupBy' | 'create' | 'update' | 'updateMany', jest.Mock>;
+  tagsPosts: Record<'deleteMany' | 'createMany', jest.Mock>;
   $transaction: jest.Mock;
 };
 
@@ -57,9 +62,11 @@ describe('PostsRepository', () => {
         group: 'g_1',
         state: 'DRAFT',
         publishDate: new Date('2026-10-01T09:00:00Z'),
+        intervalInDays: null,
+        tagIds: [],
         channels: [
-          { integrationId: 'ch_x', customized: false, parts: [part('a'), part('b')] },
-          { integrationId: 'ch_li', customized: true, parts: [part('c')] },
+          { integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a'), part('b')] },
+          { integrationId: 'ch_li', customized: true, settings: {}, parts: [part('c')] },
         ],
       });
 
@@ -80,7 +87,9 @@ describe('PostsRepository', () => {
         group: 'g_1',
         state: 'QUEUE',
         publishDate: new Date(),
-        channels: [{ integrationId: 'ch_x', customized: false, parts: [part('a')] }],
+        intervalInDays: null,
+        tagIds: [],
+        channels: [{ integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a')] }],
       });
 
       expect(db.post.create.mock.calls[0][0].data).toMatchObject({
@@ -97,12 +106,94 @@ describe('PostsRepository', () => {
         group: 'g',
         state: 'DRAFT',
         publishDate: new Date(),
+        intervalInDays: null,
+        tagIds: [],
         channels: [],
       });
 
       expect(db.$transaction.mock.calls[0][1]).toMatchObject({
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       });
+    });
+
+    it('stores provider settings and the repeat on every row of the chain (2026-10-19)', async () => {
+      await repository.createGroup({
+        orgId: 'org_1',
+        group: 'g_1',
+        state: 'QUEUE',
+        publishDate: new Date(),
+        intervalInDays: 7,
+        tagIds: [],
+        channels: [
+          {
+            integrationId: 'ch_yt',
+            customized: false,
+            settings: { title: 'Launch', privacyStatus: 'unlisted' },
+            parts: [part('a'), part('b')],
+          },
+        ],
+      });
+
+      const writes = db.post.create.mock.calls.map(([args]) => args.data);
+      expect(writes.map((data) => data.settings)).toEqual([
+        '{"customized":false,"title":"Launch","privacyStatus":"unlisted"}',
+        '{"customized":false,"title":"Launch","privacyStatus":"unlisted"}',
+      ]);
+      expect(writes.map((data) => data.intervalInDays)).toEqual([7, 7]);
+    });
+
+    it('links the tags to each channel’s root only, in the order they were sent', async () => {
+      await repository.createGroup({
+        orgId: 'org_1',
+        group: 'g_1',
+        state: 'DRAFT',
+        publishDate: new Date(),
+        intervalInDays: null,
+        tagIds: ['tag_b', 'tag_a'],
+        channels: [
+          { integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a'), part('b')] },
+          { integrationId: 'ch_li', customized: false, settings: {}, parts: [part('c')] },
+        ],
+      });
+
+      // new_1 and new_3 are the roots; new_2 is X's second part.
+      expect(db.tagsPosts.deleteMany.mock.calls.map(([args]) => args.where)).toEqual([
+        { postId: 'new_1', post: { organizationId: 'org_1' } },
+        { postId: 'new_3', post: { organizationId: 'org_1' } },
+      ]);
+      const links = db.tagsPosts.createMany.mock.calls.map(([args]) => args.data);
+      expect(
+        links.map((rows) =>
+          rows.map((row: { postId: string; tagId: string }) => [row.postId, row.tagId]),
+        ),
+      ).toEqual([
+        [
+          ['new_1', 'tag_b'],
+          ['new_1', 'tag_a'],
+        ],
+        [
+          ['new_3', 'tag_b'],
+          ['new_3', 'tag_a'],
+        ],
+      ]);
+      // Ascending times keep the order, since reads sort by them.
+      const [first, second] = links[0] as { createdAt: Date }[];
+      expect(first.createdAt.getTime()).toBeLessThan(second.createdAt.getTime());
+    });
+  });
+
+  describe('reads', () => {
+    it('join only live tags of the same workspace, in the order they were added', async () => {
+      db.post.findMany.mockResolvedValueOnce([]);
+
+      await repository.findGroup('org_1', 'g_1');
+
+      expect(db.post.findMany.mock.calls[0][0].select.tags).toEqual({
+        where: { tag: { orgId: 'org_1', deletedAt: null } },
+        orderBy: [{ createdAt: 'asc' }, { tagId: 'asc' }],
+        select: { tag: { select: { id: true, name: true, color: true } } },
+      });
+      expect(db.post.findMany.mock.calls[0][0].select.intervalInDays).toBe(true);
     });
   });
 
@@ -131,6 +222,8 @@ describe('PostsRepository', () => {
       group: 'g_1',
       state: 'DRAFT' as const,
       publishDate: new Date('2026-10-01T09:00:00Z'),
+      intervalInDays: null,
+      tagIds: [],
       expectedUpdatedAt: loaded,
       channels,
       ...overrides,
@@ -145,7 +238,14 @@ describe('PostsRepository', () => {
 
       await expect(
         repository.replaceGroup(
-          write([{ integrationId: 'ch_x', customized: false, parts: [part('B'), part('A')] }]),
+          write([
+            {
+              integrationId: 'ch_x',
+              customized: false,
+              settings: {},
+              parts: [part('B'), part('A')],
+            },
+          ]),
         ),
       ).resolves.toBe('saved');
 
@@ -171,10 +271,34 @@ describe('PostsRepository', () => {
       existing([{ id: 'x1', integrationId: 'ch_x', parentPostId: null }]);
 
       await repository.replaceGroup(
-        write([{ integrationId: 'ch_x', customized: false, parts: [part('a'), part('b')] }]),
+        write([
+          { integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a'), part('b')] },
+        ]),
       );
 
       expect(db.post.create.mock.calls[0][0].data.parentPost).toEqual({ connect: { id: 'x1' } });
+    });
+
+    it('replaces the tags and the repeat, so a save without them clears them', async () => {
+      existing([
+        { id: 'x1', integrationId: 'ch_x', parentPostId: null },
+        { id: 'x2', integrationId: 'ch_x', parentPostId: 'x1' },
+      ]);
+
+      await repository.replaceGroup(
+        write([
+          { integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a'), part('b')] },
+        ]),
+      );
+
+      expect(db.tagsPosts.deleteMany).toHaveBeenCalledWith({
+        where: { postId: 'x1', post: { organizationId: 'org_1' } },
+      });
+      expect(db.tagsPosts.createMany).not.toHaveBeenCalled();
+      expect(db.post.update.mock.calls.map(([args]) => args.data.intervalInDays)).toEqual([
+        null,
+        null,
+      ]);
     });
 
     it('soft-deletes every row of a channel the post no longer targets', async () => {
@@ -185,7 +309,7 @@ describe('PostsRepository', () => {
       ]);
 
       await repository.replaceGroup(
-        write([{ integrationId: 'ch_x', customized: false, parts: [part('a')] }]),
+        write([{ integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a')] }]),
       );
 
       expect(db.post.updateMany).toHaveBeenCalledWith({
@@ -206,7 +330,7 @@ describe('PostsRepository', () => {
 
       await expect(
         repository.replaceGroup(
-          write([{ integrationId: 'ch_x', customized: false, parts: [part('a')] }]),
+          write([{ integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a')] }]),
         ),
       ).resolves.toBe('conflict');
       expect(db.post.update).not.toHaveBeenCalled();
@@ -228,7 +352,7 @@ describe('PostsRepository', () => {
 
       await expect(
         repository.replaceGroup(
-          write([{ integrationId: 'ch_x', customized: false, parts: [part('a')] }]),
+          write([{ integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a')] }]),
         ),
       ).resolves.toBe('locked');
     });

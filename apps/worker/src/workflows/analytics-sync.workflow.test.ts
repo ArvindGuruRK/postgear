@@ -25,6 +25,7 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     publishPost: jest.fn(),
     recordPublished: jest.fn(),
     markPublishFailed: jest.fn(),
+    queueNextOccurrence: jest.fn(),
     loadIntegrationSchedule: jest.fn(),
     refreshChannelToken: jest.fn(),
     loadAnalyticsSchedule: jest.fn(),

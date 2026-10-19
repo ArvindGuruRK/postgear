@@ -19,11 +19,14 @@ export function PreviewPanel({
   reports,
   publishAt,
   focusChannelId,
+  settings,
 }: {
   reports: ChannelReport[];
   publishAt: Date | null;
   /** The channel whose tab is open in the editor. Opening a tab previews that channel. */
   focusChannelId: string | null;
+  /** Each channel's platform settings, keyed by channel id: a set title shows in the preview. */
+  settings: Record<string, Record<string, unknown>>;
 }) {
   const [chosen, setChosen] = useState<string | null>(focusChannelId);
 
@@ -114,12 +117,15 @@ export function PreviewPanel({
                 providerName={active.provider.name}
                 rules={active.provider.rules}
                 channel={{
+                  id: active.channel.id,
                   name: active.channel.name,
                   profile: active.channel.profile,
                   picture: active.channel.picture,
+                  color: active.channel.color,
                 }}
                 parts={active.parts}
                 publishAt={publishAt}
+                settings={settings[active.channel.id]}
               />
             ) : null}
           </section>
@@ -131,12 +137,12 @@ export function PreviewPanel({
               </Text>
               <ul className="m-0 mt-1 flex list-disc flex-col gap-1 ps-5">
                 {active.channelProblem ? (
-                  <li className="font-sans text-sm text-actionDanger">{active.channelProblem}</li>
+                  <li className="font-sans text-sm text-dangerInk">{active.channelProblem}</li>
                 ) : null}
                 {active.issues.map((issue) => (
                   <li
                     key={`${issue.part}-${issue.code}`}
-                    className="font-sans text-sm text-actionDanger"
+                    className="font-sans text-sm text-dangerInk"
                   >
                     {active.parts.length > 1 ? `Part ${issue.part + 1}: ` : ''}
                     {issue.message}

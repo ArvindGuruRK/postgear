@@ -39,6 +39,10 @@ export default async function ComposerDirectModal({
       initialPost={data.post}
       initialMedia={data.media}
       initialPublishAt={data.publishAt}
+      initialText={data.text}
+      initialParts={data.parts}
+      initialChannelId={data.channelId}
+      initialSignature={data.signature}
       loadError={data.loadError}
     />
   );

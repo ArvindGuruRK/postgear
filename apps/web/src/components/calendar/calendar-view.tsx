@@ -27,9 +27,10 @@ import {
   DragOverlay,
   type DragStartEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   pointerWithin,
   rectIntersection,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -65,6 +66,8 @@ export function toSummary(
     updatedAt: string;
     channels: PostSummary['channels'];
     shared: { content: unknown }[];
+    tags?: PostSummary['tags'];
+    intervalInDays?: PostSummary['intervalInDays'];
   },
   previous: PostSummary,
 ): PostSummary {
@@ -74,6 +77,10 @@ export function toSummary(
     state: detail.state,
     publishDate: detail.publishDate,
     updatedAt: detail.updatedAt,
+    // Optional: a detail from an API older than tags carries neither.
+    tags: detail.tags ?? previous.tags,
+    intervalInDays:
+      detail.intervalInDays === undefined ? previous.intervalInDays : detail.intervalInDays,
     channels: detail.channels.map((channel) => ({
       channelId: channel.channelId,
       name: channel.name,
@@ -86,6 +93,23 @@ export function toSummary(
       publishStatus: channel.publishStatus,
     })),
   };
+}
+
+/**
+ * Swallows the click a drag can leave behind. A finger that long-presses a
+ * card and lets go where it started is still a tap to the browser, which then
+ * clicks the card's link. dnd-kit stops that click's propagation, so Next's
+ * Link never handles it, but not its default, so the browser would follow the
+ * href with a full page load. A window capture listener runs before dnd-kit's
+ * document one; the click follows the touchend at once, well inside 100ms.
+ */
+function swallowClickAfterDrag() {
+  const swallow = (event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  window.addEventListener('click', swallow, true);
+  setTimeout(() => window.removeEventListener('click', swallow, true), 100);
 }
 
 export function CalendarView({
@@ -109,8 +133,15 @@ export function CalendarView({
   const [statistics, setStatistics] = useState<string | null>(null);
 
   const sensors = useSensors(
-    // A few pixels of travel, so a click on the grip is not read as a drag.
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Mouse and touch as separate sensors, as dnd-kit advises when the two
+    // need different activation. The mouse drags the grip after a few pixels
+    // of travel, so a click on it is not read as a drag. A finger long-presses
+    // anywhere on the card (PostCard): still for 250ms, within 5px, so a
+    // swipe over the grid still scrolls it and a tap still opens the post.
+    // One PointerSensor for both would claim a touch's pointerdown, and the
+    // browser would turn the finger's movement into a scroll and cancel it.
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor),
   );
 
@@ -119,7 +150,13 @@ export function CalendarView({
     setDragging(post ?? null);
   }
 
+  function onDragCancel() {
+    swallowClickAfterDrag();
+    setDragging(null);
+  }
+
   async function onDragEnd({ active, over }: DragEndEvent) {
+    swallowClickAfterDrag();
     setDragging(null);
 
     const post = (active.data.current as { post?: PostSummary } | undefined)?.post;
@@ -206,6 +243,11 @@ export function CalendarView({
   const handlers = useMemo<CalendarHandlers>(
     () => ({
       editHref: (post) => `/${orgId}/composer?group=${post.group}`,
+      // The reference's Duplicate: a new post from the original's text and
+      // media, no channel picked, at the default time (the composer reads
+      // `?duplicate=`).
+      onDuplicate: (post) =>
+        router.push(`/${orgId}/composer?duplicate=${encodeURIComponent(post.group)}`),
       onPreview: setOpen,
       onStatistics: (post) => setStatistics(post.group),
       onDelete: setDeleting,
@@ -270,7 +312,7 @@ export function CalendarView({
                   }}
                   onDragStart={onDragStart}
                   onDragEnd={onDragEnd}
-                  onDragCancel={() => setDragging(null)}
+                  onDragCancel={onDragCancel}
                 >
                   {calendar.view === 'month' ? (
                     <MonthView
@@ -296,9 +338,12 @@ export function CalendarView({
                     />
                   )}
 
+                  {/* dnd-kit sizes the overlay to the card being dragged, so the
+                      copy fills it: a fixed width made it wider than a week
+                      column's card on a phone. */}
                   <DragOverlay dropAnimation={null}>
                     {dragging ? (
-                      <div className="w-56 rotate-[-1deg]">
+                      <div className="w-full rotate-[-1deg]">
                         <PostCard post={dragging} now={calendar.now} overlay />
                       </div>
                     ) : null}

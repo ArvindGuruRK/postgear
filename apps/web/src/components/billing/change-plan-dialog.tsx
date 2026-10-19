@@ -52,7 +52,11 @@ export function ChangePlanDialog({
   target: ChangeTarget | null;
   view: SubscriptionView;
   onOpenChange: (open: boolean) => void;
-  onConfirmed: (subscription: SubscriptionView, preview: ChangePreview, target: ChangeTarget) => void;
+  onConfirmed: (
+    subscription: SubscriptionView,
+    preview: ChangePreview,
+    target: ChangeTarget,
+  ) => void;
 }) {
   const mounted = useMounted();
   const [preview, setPreview] = useState<ChangePreview | null>(null);
@@ -115,7 +119,11 @@ export function ChangePlanDialog({
       });
       onConfirmed(subscription, preview, target);
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'The plan could not be changed. Please try again.');
+      setError(
+        cause instanceof ApiError
+          ? cause.message
+          : 'The plan could not be changed. Please try again.',
+      );
     } finally {
       setWorking(false);
     }
@@ -135,7 +143,9 @@ export function ChangePlanDialog({
           <DialogDescription>
             {price ? `${price.amount}${price.per}` : ''}
             {price?.note ? ` (${price.note})` : ''}
-            {target ? `: ${target.plan.channels} channels, ${target.plan.aiCredits.toLocaleString()} AI credits a month.` : ''}
+            {target
+              ? `: ${target.plan.channels} channels, ${target.plan.aiCredits.toLocaleString()} AI credits a month.`
+              : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -153,12 +163,15 @@ export function ChangePlanDialog({
                     ? `You pay ${formatPrice(preview.amountDueCents, preview.currency)} today for the rest of this period, prorated.`
                     : 'Nothing to pay today: the unused part of your current plan covers it.'}{' '}
                   The new plan applies as soon as the payment is confirmed
-                  {preview.periodEnd ? `, and renews on ${date(preview.periodEnd) ?? 'the period end'}` : ''}.
+                  {preview.periodEnd
+                    ? `, and renews on ${date(preview.periodEnd) ?? 'the period end'}`
+                    : ''}
+                  .
                 </Text>
               ) : (
                 <Text size="sm">
-                  Nothing changes until {date(preview.periodEnd) ?? 'the end of this period'}. From then
-                  you pay {formatPrice(preview.amountDueCents, preview.currency)}
+                  Nothing changes until {date(preview.periodEnd) ?? 'the end of this period'}. From
+                  then you pay {formatPrice(preview.amountDueCents, preview.currency)}
                   {price?.per ?? ''} and the new limits apply. Channels already connected keep
                   publishing.
                 </Text>
@@ -166,7 +179,7 @@ export function ChangePlanDialog({
             </div>
           ) : previewError ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border-2 border-outline bg-secondary p-4">
-              <Text size="sm" className="text-actionDanger">
+              <Text size="sm" className="text-dangerInk">
                 {previewError}
               </Text>
               <Button variant="secondary" size="sm" onClick={() => void loadPreview()}>
@@ -178,7 +191,7 @@ export function ChangePlanDialog({
           )}
 
           {error ? (
-            <Text size="sm" className="text-actionDanger" role="alert">
+            <Text size="sm" className="text-dangerInk" role="alert">
               {error}
             </Text>
           ) : null}

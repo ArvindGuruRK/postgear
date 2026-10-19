@@ -121,17 +121,23 @@ export function MediaLibrary({
               item={item}
               actions={
                 <>
+                  {/* A narrow tile (two up on a phone, six up on a laptop)
+                      has no room for the whole label beside the delete
+                      button, so it shows "Use" there; the name stays the
+                      whole phrase, which the visible word starts. */}
                   <Link
                     href={`/${orgId}/composer?media=${item.id}`}
-                    className={cn(buttonVariants({ size: 'sm' }), 'flex-1 px-2')}
+                    aria-label="Use in a post"
+                    className={cn(buttonVariants({ size: 'sm' }), 'min-w-0 flex-1 px-2')}
                   >
                     <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
-                    Use in a post
+                    <span className="@[12.25rem]:hidden">Use</span>
+                    <span className="hidden @[12.25rem]:inline">Use in a post</span>
                   </Link>
                   <Button
                     size="sm"
                     variant="danger"
-                    className="w-9 px-0"
+                    className="w-9 shrink-0 px-0"
                     aria-label={`Delete ${item.name}`}
                     onClick={() => setDeleting(item)}
                   >

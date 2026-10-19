@@ -6,8 +6,9 @@
  */
 import type { InlineNode, PostDocument } from './document';
 import { documentFromText } from './document';
+import { measureLength } from './length';
 import { renderPlainText } from './render';
-import { styleText } from './unicode';
+import { styleText, underlineText } from './unicode';
 
 function doc(...content: PostDocument['content']): PostDocument {
   return { type: 'doc', content };
@@ -17,7 +18,10 @@ function p(...content: InlineNode[]) {
   return { type: 'paragraph' as const, content };
 }
 
-function t(text: string, ...marks: Array<'bold' | 'italic' | { href: string }>): InlineNode {
+function t(
+  text: string,
+  ...marks: Array<'bold' | 'italic' | 'underline' | { href: string }>
+): InlineNode {
   return {
     type: 'text',
     text,
@@ -108,6 +112,42 @@ describe('renderPlainText', () => {
     expect(renderPlainText(doc(p(t('line one'), { type: 'hardBreak' }, t('line two'))))).toBe(
       'line one\nline two',
     );
+  });
+
+  it('underlines each letter and digit with a combining low line, as Postiz does', () => {
+    expect(renderPlainText(doc(p(t('Go 2', 'underline'), t(' now!'))))).toBe('G̲o̲ 2̲ now!');
+  });
+
+  it('underlines the styled letter when underline is combined with bold or italic', () => {
+    expect(renderPlainText(doc(p(t('Hi', 'bold', 'underline'))))).toBe(
+      `${styleText('H', { bold: true })}̲${styleText('i', { bold: true })}̲`,
+    );
+    expect(renderPlainText(doc(p(t('a', 'italic', 'underline'))))).toBe(
+      `${styleText('a', { italic: true })}̲`,
+    );
+  });
+
+  it('underlines link words but compares the raw words to the target', () => {
+    expect(
+      renderPlainText(doc(p(t('postgear.test', 'underline', { href: 'https://postgear.test' })))),
+    ).toBe(underlineText('postgear.test'));
+  });
+});
+
+describe('underlineText', () => {
+  it('keeps accents with their letter and leaves spaces, punctuation and emoji bare', () => {
+    expect(underlineText('é, ok')).toBe('é̲, o̲k̲');
+    // A decomposed accent stays before the line, in one grapheme.
+    expect(underlineText('é')).toBe('é̲');
+    expect(underlineText('🚀 1️⃣')).toBe('🚀 1️⃣');
+  });
+
+  it('adds one UTF-16 unit and one X weight per underlined character', () => {
+    const underlined = underlineText('abc');
+    expect(measureLength(underlined, 'utf16')).toBe(6);
+    expect(measureLength(underlined, 'x-weighted')).toBe(6);
+    // A bold letter weighs 2 on X, and its line 1 more.
+    expect(measureLength(underlineText(styleText('a', { bold: true })), 'x-weighted')).toBe(3);
   });
 });
 

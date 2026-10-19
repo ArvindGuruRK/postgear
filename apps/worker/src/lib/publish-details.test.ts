@@ -100,6 +100,31 @@ describe('buildPostDetails', () => {
     expect(parseProviderSettings('[]')).toEqual({});
     expect(parseProviderSettings('{broken')).toEqual({});
   });
+
+  it('hands every provider setting the API stores to the provider, unchanged (2026-10-19)', () => {
+    // What `PostsRepository.writeChain` writes for a YouTube channel: the
+    // composer's flag first, then the validated settings, on every row.
+    const settings = JSON.stringify({
+      customized: false,
+      title: 'Launch day',
+      privacyStatus: 'unlisted',
+      madeForKids: true,
+      tags: ['launch', 'product news'],
+    });
+
+    const [details] = buildPostDetails(
+      [{ id: 'root', parentPostId: null, content: doc('Video'), image: '[]', settings }],
+      new Map(),
+      publicUrl,
+    );
+
+    expect(details.settings).toEqual({
+      title: 'Launch day',
+      privacyStatus: 'unlisted',
+      madeForKids: true,
+      tags: ['launch', 'product news'],
+    });
+  });
 });
 
 describe('previousAttemptInFlight', () => {

@@ -24,11 +24,18 @@ import { ThemeToggle } from '@/components/navigation/theme-toggle';
 // illustration side. They are siblings, not nested, so this is not the
 // "bg-primary inside bg-secondary" bug §7 warns about; it is the two-tone the
 // token pair already describes.
+//
+// The root layout sets `viewport-fit=cover`, so on a phone the form column
+// runs under the notch and the home indicator. The padding goes inside the
+// column rather than on the outer frame, so the column's own surface fills
+// the space under the notch instead of a band of page colour: the header's
+// top and the form's bottom grow to the safe-area insets where those are
+// larger, and both sides do the same for a landscape notch.
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       <div className="flex min-h-screen flex-col bg-secondary lg:min-h-0 lg:border-l-4 lg:border-outline">
-        <header className="flex items-center justify-between gap-4 p-6">
+        <header className="flex items-center justify-between gap-4 p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pr-[max(1.5rem,env(safe-area-inset-right))] pl-[max(1.5rem,env(safe-area-inset-left))]">
           {/* No colour override: Heading already defaults to text-ink, the
               system's normal foreground. The wordmark previously forced
               text-actionPrimary, which put the page's loudest colour on
@@ -40,7 +47,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <ThemeToggle />
         </header>
 
-        <main className="flex flex-1 items-center justify-center px-6 pb-12">
+        <main className="flex flex-1 items-center justify-center pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(3rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))]">
           <div className="w-full max-w-md">{children}</div>
         </main>
       </div>
