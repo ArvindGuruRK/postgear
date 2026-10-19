@@ -50,6 +50,7 @@ import { composerTimeFor, droppedAt, isPastSlot } from './calendar-math';
 import type { SlotTarget } from './calendar-slot';
 import { CalendarToolbar } from './calendar-toolbar';
 import { ChannelsColumn } from './channels-column';
+import { ChannelsSheet } from './channels-sheet';
 import { DayView } from './day-view';
 import { MonthView } from './month-view';
 import { PostCard } from './post-card';
@@ -78,6 +79,7 @@ export function toSummary(
       name: channel.name,
       providerIdentifier: channel.providerIdentifier,
       picture: channel.picture,
+      color: channel.color,
       disconnected: channel.disconnected,
       state: channel.state,
       releaseURL: channel.releaseURL,
@@ -227,13 +229,16 @@ export function CalendarView({
 
   return (
     <>
-      <div className="flex min-w-0 flex-1 gap-5">
-        <ChannelsColumn providers={providers} limit={limit} />
+      {/* On a phone the card would leave the grid no width: it moves into a
+          sheet behind a row above the toolbar (ChannelsSheet). */}
+      <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:gap-5">
+        <ChannelsColumn providers={providers} limit={limit} className="hidden md:flex" />
+        <ChannelsSheet providers={providers} limit={limit} className="md:hidden" />
 
         <section
           aria-label="Calendar"
           aria-busy={calendar.loading}
-          className="flex min-w-0 flex-1 flex-col gap-3"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"
         >
           {/* Everything below formats dates in the viewer's locale and time
               zone, which the server does not share, so the server renders a

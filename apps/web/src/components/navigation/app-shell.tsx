@@ -1,6 +1,6 @@
 import { cn } from '@postgear/ui';
 import type { ReactNode } from 'react';
-import { Sidebar, type SidebarItem } from './sidebar';
+import { Sidebar, type SidebarItem, TabBar } from './sidebar';
 import { TopBar } from './topbar';
 
 /**
@@ -16,6 +16,9 @@ import { TopBar } from './topbar';
  * a 12px margin; the top bar and the page sit on the page ground itself, with
  * a single line under the bar, so the content reads as the page rather than
  * a card on it.
+ *
+ * On a phone (below `md`) the same items move to a tab bar along the bottom
+ * and the page runs edge to edge under a shorter top bar.
  *
  * `fullBleed` is for pages that lay out their own blocks to fill the height
  * (the calendar's channel card beside its grid): the region does not scroll,
@@ -39,21 +42,28 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div data-app-shell className="flex h-screen w-full gap-3 overflow-hidden bg-primary p-3">
-      <Sidebar items={navItems} bottomItems={sidebarBottomItems} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+    // `dvh`, not `vh`: on a phone `100vh` is the height with the browser's
+    // toolbars hidden, which would push the tab bar under them.
+    <div
+      data-app-shell
+      className="flex h-dvh w-full flex-col overflow-hidden bg-primary md:flex-row md:gap-3 md:p-3"
+    >
+      <Sidebar items={navItems} bottomItems={sidebarBottomItems} className="hidden md:flex" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar title={pageTitle} accountMenu={accountMenu} notifications={notifications} />
         <main
           className={cn(
-            'min-h-0 flex-1 px-3 pt-5',
+            'min-h-0 flex-1 px-4 pt-2 md:px-3 md:pt-5',
             fullBleed
-              ? 'flex overflow-hidden pb-1'
+              ? 'flex overflow-hidden pb-3 md:pb-1'
               : 'overflow-y-auto pb-6 pg-scrollbar pg-scrollbar-primary',
           )}
         >
           {children}
         </main>
       </div>
+      {/* Below `md` the rail becomes a bottom tab bar: see TabBar. */}
+      <TabBar items={navItems} bottomItems={sidebarBottomItems} className="md:hidden" />
     </div>
   );
 }

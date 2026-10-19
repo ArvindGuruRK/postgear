@@ -51,8 +51,10 @@ export function CalendarToolbar() {
   const calendar = useCalendar();
 
   return (
+    // On a phone it wraps to two full-width rows: the range and Today, then
+    // the two switches, each stretching to the width rather than overflowing.
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex h-10 items-stretch overflow-hidden rounded-lg border-2 border-outline bg-chrome">
+      <div className="flex h-10 min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border-2 border-outline bg-chrome md:flex-none">
         <TooltipHint label={`Previous ${calendar.view}`} side="bottom">
           <button
             type="button"
@@ -68,7 +70,7 @@ export function CalendarToolbar() {
           </button>
         </TooltipHint>
         <span
-          className="flex min-w-[12.5rem] items-center justify-center border-x-2 border-outline px-3 type-ui text-sm text-ink"
+          className="flex min-w-0 flex-1 items-center justify-center truncate border-x-2 border-outline px-2 type-ui text-sm text-ink md:min-w-[12.5rem] md:flex-none md:px-3"
           aria-live="polite"
           data-testid="calendar-range"
         >
@@ -101,8 +103,8 @@ export function CalendarToolbar() {
         Today
       </button>
 
-      <div className="ms-auto flex items-center gap-2">
-        <fieldset className={GROUP}>
+      <div className="ms-auto flex w-full items-center gap-2 md:w-auto">
+        <fieldset className={cn(GROUP, 'flex-1 md:flex-none')}>
           <legend className="sr-only">View</legend>
           {VIEWS.map((option) => (
             <button
@@ -111,7 +113,10 @@ export function CalendarToolbar() {
               aria-pressed={calendar.view === option.value}
               aria-label={`${option.label} view`}
               onClick={() => calendar.setView(option.value)}
-              className={cn(SEGMENT(calendar.view === option.value), 'w-[4.625rem]')}
+              className={cn(
+                SEGMENT(calendar.view === option.value),
+                'flex-1 md:w-[4.625rem] md:flex-none',
+              )}
             >
               {option.label}
             </button>

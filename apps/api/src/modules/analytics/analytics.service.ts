@@ -29,6 +29,7 @@ import { ConfigService } from '@nestjs/config';
 import { isDocumentEmpty, parseDocument, renderPlainText } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
 import { analyticsSimulated, type Env } from '../../config/env';
+import { colorOf } from '../channels/channel-colors';
 import { ChannelsService, type ChannelView } from '../channels/channels.service';
 import { groupState } from '../posts/post-state';
 import { parseCustomized } from '../posts/posts.service';
@@ -204,8 +205,11 @@ export class AnalyticsService {
     const channelIds = [...new Set(roots.map((root) => root.integrationId))];
     const since = new Date(utcMidnight(this.clock()).getTime() - AVERAGE_DAYS * DAY_MS);
 
-    const [liveChannels, history, recent] = await Promise.all([
+    const [liveChannels, colors, history, recent] = await Promise.all([
       this.channels.list(orgId),
+      // A channel disconnected since the post went out is missing from the
+      // live list but keeps its colour.
+      this.channels.colors(orgId),
       this.repository.snapshotsForPosts(
         orgId,
         roots.map((root) => root.id),
@@ -227,6 +231,7 @@ export class AnalyticsService {
         this.postChannel(
           root,
           liveById.get(root.integrationId),
+          colorOf(colors, root.integrationId),
           history.filter((row) => row.postId === root.id),
           recent.filter((row) => row.integrationId === root.integrationId),
           supported,
@@ -350,6 +355,7 @@ export class AnalyticsService {
       providerName: channel.providerName,
       picture: channel.picture,
       profile: channel.profile,
+      color: channel.color,
       support,
       sync: {
         status: sync ? SYNC_STATES[sync.status] : 'never',
@@ -386,6 +392,7 @@ export class AnalyticsService {
             providerIdentifier: channel.providerIdentifier,
             providerName: channel.providerName,
             picture: channel.picture,
+            color: channel.color,
             preview: previewOf(snapshot.post.content),
             publishDate: snapshot.post.publishDate.toISOString(),
             releaseURL: snapshot.post.releaseURL,
@@ -402,6 +409,7 @@ export class AnalyticsService {
   private postChannel(
     root: RootRow,
     live: ChannelView | undefined,
+    color: number,
     history: SnapshotRow[],
     recent: SnapshotRow[],
     supported: Map<string, boolean>,
@@ -422,6 +430,7 @@ export class AnalyticsService {
           .find((provider) => provider.identifier === root.integration.providerIdentifier)?.name ??
         root.integration.providerIdentifier,
       picture: live?.picture ?? root.integration.picture,
+      color,
       releaseURL: root.releaseURL,
       // A channel disconnected after the post went out keeps its history but
       // cannot be synced again.

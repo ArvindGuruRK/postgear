@@ -9,7 +9,7 @@
  * ## Levels and flows
  *
  * `followers` is a level, the count on a day, so a range shows its latest
- * value and the change since the range began. Every other metric is a flow, 
+ * value and the change since the range began. Every other metric is a flow,
  * what happened on a day, so a range shows its sum and the change against
  * the same-length period before it.
  */
@@ -98,6 +98,8 @@ export interface ChannelAnalytics {
   providerName: string;
   picture: string | null;
   profile: string | null;
+  /** The avatar palette slot: see `Channel.color`. */
+  color: number;
   support: AnalyticsSupport;
   sync: Pick<ChannelSyncStatus, 'status' | 'lastSyncedAt' | 'error'>;
   followers: MetricChange | null;
@@ -148,6 +150,7 @@ export interface TopPost {
   providerIdentifier: string;
   providerName: string;
   picture: string | null;
+  color: number;
   preview: string;
   publishDate: string;
   releaseURL: string | null;
@@ -186,6 +189,7 @@ export interface PostChannelAnalytics {
   providerIdentifier: string;
   providerName: string;
   picture: string | null;
+  color: number;
   releaseURL: string | null;
   support: AnalyticsSupport;
   /** The latest snapshot; null when none has been taken yet. */

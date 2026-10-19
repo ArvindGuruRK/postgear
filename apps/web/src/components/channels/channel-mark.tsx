@@ -9,6 +9,7 @@ import { PlatformIcon } from '@/components/platforms/platform-icon';
  * The picture answers "whose account", the sticker "on what".
  */
 export function ChannelMark({
+  color,
   id,
   name,
   picture,
@@ -17,7 +18,9 @@ export function ChannelMark({
   size = 'md',
   className,
 }: {
-  /** Seeds the initials' palette color, the same one the channel has everywhere. */
+  /** The channel's palette slot (`Channel.color`), the same one it has everywhere. */
+  color: number;
+  /** Seeds the initials only when `color` is missing from a stale payload. */
   id: string;
   name: string;
   picture: string | null;
@@ -31,7 +34,7 @@ export function ChannelMark({
     <span className={cn('relative inline-flex shrink-0', className)}>
       <Avatar className={cn('rounded-lg', size === 'sm' ? 'h-8 w-8' : 'h-9 w-9')}>
         {picture ? <AvatarImage src={picture} alt="" /> : null}
-        <AvatarFallback colorSeed={id} className="rounded-none text-[10px]">
+        <AvatarFallback colorSeed={color ?? id} className="rounded-none text-[10px]">
           {name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>

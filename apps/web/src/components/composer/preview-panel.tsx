@@ -73,7 +73,10 @@ export function PreviewPanel({
                       {report.channel.picture ? (
                         <AvatarImage src={report.channel.picture} alt="" />
                       ) : null}
-                      <AvatarFallback colorSeed={report.channel.id} className="text-[10px]">
+                      <AvatarFallback
+                        colorSeed={report.channel.color ?? report.channel.id}
+                        className="text-[10px]"
+                      >
                         {report.channel.name.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>

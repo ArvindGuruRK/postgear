@@ -29,6 +29,7 @@ import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertic
 import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
+import { SlidersHorizontalIcon } from '@animateicons/react/lucide/sliders-horizontal-icon';
 import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
@@ -44,7 +45,7 @@ import {
   TooltipHint,
   useIconAnimation,
 } from '@postgear/ui';
-import { Settings2 } from 'lucide-react';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -96,10 +97,18 @@ const BADGE = cn(
 export function ChannelsColumn({
   providers,
   limit,
+  inSheet = false,
+  className,
 }: {
   providers: ProviderSummary[];
   /** The plan's channel ceiling; null only when no workspace is active. */
   limit: ChannelLimit | null;
+  /**
+   * Shown in the phone's channel sheet (ChannelsSheet): always expanded,
+   * unframed, and titled by the sheet, which also closes it.
+   */
+  inSheet?: boolean;
+  className?: string;
 }) {
   const router = useRouter();
   const { role } = useWorkspace();
@@ -112,7 +121,8 @@ export function ChannelsColumn({
 
   // Expanded is the default; the stored preference is applied after mount so
   // server and first client render agree.
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedPreference, setCollapsed] = useState(false);
+  const collapsed = !inSheet && collapsedPreference;
   const [connectOpen, setConnectOpen] = useState(false);
   const [setupChannel, setSetupChannel] = useState<Channel | null>(null);
   const [timesChannel, setTimesChannel] = useState<Channel | null>(null);
@@ -168,18 +178,27 @@ export function ChannelsColumn({
     <aside
       aria-label="Channels"
       className={cn(
-        'relative flex shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-outline bg-chrome shadow-surfaceMd',
-        'transition-[width] duration-150 ease-out',
-        collapsed ? 'w-[5.5rem]' : 'w-[16.25rem]',
+        'relative flex shrink-0 flex-col overflow-hidden',
+        inSheet
+          ? 'min-h-0 flex-1'
+          : 'rounded-2xl border-2 border-outline bg-chrome shadow-surfaceMd transition-[width] duration-150 ease-out',
+        inSheet ? null : collapsed ? 'w-[5.5rem]' : 'w-[16.25rem]',
+        className,
       )}
     >
       <div
         className={cn(
           'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden pg-scrollbar pg-scrollbar-chrome',
-          collapsed ? 'items-center px-3 py-5' : 'p-5',
+          collapsed ? 'items-center px-3 py-5' : inSheet ? 'px-5 pb-5' : 'p-5',
         )}
       >
-        <div className={cn('flex items-center', collapsed ? 'justify-center' : 'gap-2')}>
+        <div
+          className={cn(
+            'flex items-center',
+            collapsed ? 'justify-center' : 'gap-2',
+            inSheet && 'hidden',
+          )}
+        >
           {collapsed ? null : (
             <h2 className="min-w-0 flex-1 truncate type-heading text-xl text-ink">Channels</h2>
           )}
@@ -231,7 +250,7 @@ export function ChannelsColumn({
               label="Manage channels"
               className={cn(TILE, 'w-11 bg-secondary text-ink')}
             >
-              <Settings2 className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={SlidersHorizontalIcon} className="h-4 w-4" />
             </ColumnLink>
           </div>
 
@@ -349,6 +368,7 @@ export function ChannelsColumn({
                         )}
                       >
                         <ChannelMark
+                          color={channel.color}
                           id={channel.id}
                           name={channel.name}
                           picture={channel.picture}

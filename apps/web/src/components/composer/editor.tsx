@@ -24,6 +24,7 @@
 import { BoldIcon } from '@animateicons/react/lucide/bold-icon';
 import { Heading2Icon } from '@animateicons/react/lucide/heading-2-icon';
 import { ItalicIcon } from '@animateicons/react/lucide/italic-icon';
+import { LinkIcon } from '@animateicons/react/lucide/link-icon';
 import { ListIcon } from '@animateicons/react/lucide/list-icon';
 import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
 import { UnlinkIcon } from '@animateicons/react/lucide/unlink-icon';
@@ -41,7 +42,6 @@ import {
 import { Placeholder } from '@tiptap/extensions';
 import { type Editor, EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { Link2 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 
 interface PostEditorProps {
@@ -318,7 +318,7 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
               onMouseDown={(event) => event.preventDefault()}
               className={cn(TOOL, active && TOOL_PRESSED)}
             >
-              <Link2 className="h-4 w-4" strokeWidth={2.5} />
+              <MotionIcon icon={LinkIcon} className="h-4 w-4" />
             </button>
           </PopoverTrigger>
         </TooltipHint>

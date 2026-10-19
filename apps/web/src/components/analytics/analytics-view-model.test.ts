@@ -43,6 +43,7 @@ function channel(overrides: Partial<ChannelAnalytics> = {}): ChannelAnalytics {
     providerName: 'LinkedIn',
     picture: null,
     profile: 'acme',
+    color: 0,
     support: 'supported',
     sync: { status: 'ok', lastSyncedAt: '2026-10-15T10:00:00.000Z', error: null },
     followers: { value: 1200, delta: 40, percent: 3.4 },

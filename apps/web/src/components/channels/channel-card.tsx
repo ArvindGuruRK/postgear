@@ -64,7 +64,7 @@ export function ChannelCard({
         <div className="relative shrink-0">
           <Avatar size="lg">
             {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-            <AvatarFallback>{initials}</AvatarFallback>
+            <AvatarFallback colorSeed={channel.color ?? channel.id}>{initials}</AvatarFallback>
           </Avatar>
           {/* The platform, as a logo sticker on the account's own avatar. It
               carries the platform's name for screen readers, since the line

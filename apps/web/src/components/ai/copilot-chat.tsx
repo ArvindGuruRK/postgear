@@ -15,6 +15,7 @@
  * where the server has no storage and the markup would differ) and every
  * access is wrapped, because private windows and full quotas both throw.
  */
+import { CircleStopIcon } from '@animateicons/react/lucide/circle-stop-icon';
 import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
@@ -28,7 +29,7 @@ import {
   Text,
   Textarea,
 } from '@postgear/ui';
-import { MessageSquare, Square } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { streamEvents } from '@/lib/sse';
@@ -319,7 +320,7 @@ export function CopilotChat({
                   size="sm"
                   onClick={() => controller.current?.abort()}
                 >
-                  <Square className="h-4 w-4" strokeWidth={2.5} />
+                  <MotionIcon icon={CircleStopIcon} className="h-4 w-4" />
                   Stop
                 </Button>
               ) : null}

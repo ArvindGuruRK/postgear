@@ -76,8 +76,7 @@ export function ChannelStack({
           >
             <Avatar>
               {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-              {/* Seeded by id: two channels can share a name (a person's profile and their Page). */}
-              <AvatarFallback colorSeed={channel.channelId}>
+              <AvatarFallback colorSeed={channel.color ?? channel.channelId}>
                 {channel.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>

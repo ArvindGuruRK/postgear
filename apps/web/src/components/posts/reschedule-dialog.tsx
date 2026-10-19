@@ -6,13 +6,14 @@
  * The keyboard-first counterpart to dragging a card on the calendar, and the
  * only way to move a post from the queue list. Offers the channels' own posting
  * times for the chosen day first (those are the slots the person configured
- * on the Channels page, so they are usually what is wanted) and a free field
- * for anything else.
+ * on the Channels page, so they are usually what is wanted) and the date and
+ * time picker for anything else.
  */
 import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
 import {
   Button,
   cn,
+  DateTimePicker,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,9 +22,7 @@ import {
   DialogTitle,
   FormErrorMessage,
   FormField,
-  FormHelperText,
   FormLabel,
-  Input,
   MotionIcon,
   Text,
 } from '@postgear/ui';
@@ -106,22 +105,25 @@ export function RescheduleDialog({
         <div className="mt-4 flex flex-col gap-4">
           <FormField>
             <FormLabel htmlFor="reschedule-at">Publish at</FormLabel>
-            <Input
+            {/* The composer's own date and time picker. The dialog keeps the
+                time as a local `YYYY-MM-DDTHH:mm` string, converted here. A
+                queued post cannot go back in time, so past days are greyed
+                out; a past hour today is still reachable and is refused below. */}
+            <DateTimePicker
               id="reschedule-at"
-              type="datetime-local"
-              value={value}
-              variant={inPast ? 'error' : 'default'}
-              onChange={(event) => setValue(event.target.value)}
+              label="Publish at"
+              value={valid ? chosen : null}
+              onValueChange={(date) => setValue(toLocalInputValue(date))}
+              minDate={mustBeFuture ? new Date() : undefined}
+              invalid={inPast}
+              className="w-full"
+              footnote={`Your local time, ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
             />
             {inPast ? (
               <FormErrorMessage>
                 That time has passed. Choose a time in the future, or use "Post now".
               </FormErrorMessage>
-            ) : (
-              <FormHelperText>
-                Your local time ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
-              </FormHelperText>
-            )}
+            ) : null}
           </FormField>
 
           {suggestions.length > 0 ? (

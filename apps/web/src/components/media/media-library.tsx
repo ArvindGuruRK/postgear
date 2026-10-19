@@ -4,6 +4,7 @@ import { ImageIcon as AnimatedImageIcon } from '@animateicons/react/lucide/image
 import { LayoutGridIcon } from '@animateicons/react/lucide/layout-grid-icon';
 import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
+import { VideoIcon } from '@animateicons/react/lucide/video-icon';
 import {
   Button,
   buttonVariants,
@@ -19,7 +20,7 @@ import {
   useToast,
   ViewSwitcher,
 } from '@postgear/ui';
-import { Film, Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import type { MediaItem, MediaPage } from '@/types/media';
@@ -31,8 +32,7 @@ import { type MediaFilter, useMediaList } from './use-media-list';
 const FILTERS = [
   { value: 'all', label: 'All media', animatedIcon: LayoutGridIcon },
   { value: 'image', label: 'Images', animatedIcon: AnimatedImageIcon },
-  // The library has no animated film glyph.
-  { value: 'video', label: 'Videos', icon: Film },
+  { value: 'video', label: 'Videos', animatedIcon: VideoIcon },
 ];
 
 /**

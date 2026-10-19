@@ -49,6 +49,7 @@ function channel(overrides: Partial<ChannelView>): ChannelView {
     createdAt: new Date(NOW),
     health: 'connected',
     providerName: 'LinkedIn',
+    color: 0,
     ...overrides,
   };
 }
@@ -146,7 +147,7 @@ describe('AnalyticsService', () => {
       | 'snapshotsForPosts'
     >
   >;
-  let channels: { list: jest.Mock; listProviders: jest.Mock };
+  let channels: { list: jest.Mock; colors: jest.Mock; listProviders: jest.Mock };
   let scheduling: { status: jest.Mock; syncAnalyticsNow: jest.Mock };
   let env: { ANALYTICS_SIMULATION?: string; PUBLISH_SIMULATION: string };
   let service: AnalyticsService;
@@ -162,6 +163,14 @@ describe('AnalyticsService', () => {
     };
     channels = {
       list: jest.fn().mockResolvedValue([linkedin, x, instagram]),
+      colors: jest.fn().mockResolvedValue(
+        new Map([
+          ['ch_li', 0],
+          ['ch_x', 1],
+          ['ch_ig', 2],
+          ['ch_gone', 3],
+        ]),
+      ),
       listProviders: jest.fn().mockReturnValue([
         { identifier: 'linkedin', name: 'LinkedIn', analytics: false },
         { identifier: 'x', name: 'X', analytics: true },

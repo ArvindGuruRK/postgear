@@ -70,6 +70,45 @@ test.afterAll(async ({ browser }) => {
 });
 
 test.describe('notifications', () => {
+  test('signing in loads the bell with no request refused', async ({ page }) => {
+    // The demo admin is in two workspaces, so login sets no `pg_org` and the
+    // layout's workspace switch races the bell's first requests: both used
+    // to come back 403 (the list and the stream) on almost every sign-in.
+    const refused: string[] = [];
+    page.on('response', (response) => {
+      if (response.url().startsWith(API_URL) && response.status() === 403) {
+        refused.push(`${response.request().method()} ${response.url().slice(API_URL.length)}`);
+      }
+    });
+
+    await signIn(page);
+    await page.goto(`/${DEMO_ORG}/calendar`);
+
+    const bell = page.getByTestId('notification-bell');
+    await bell.click();
+    // The stream is open: the footer's "Connecting…" is gone.
+    await expect(page.getByTestId('notification-connection')).toHaveCount(0, { timeout: 20_000 });
+
+    // The panel is the API's first page and the badge its unread count.
+    const response = await page.request.get(`${API_URL}/notifications?limit=20`);
+    expect(response.ok()).toBeTruthy();
+    const { notifications } = (await response.json()) as { notifications: { id: string }[] };
+    expect(notifications.length).toBeGreaterThan(0);
+    await expect(page.getByTestId('notification-item')).toHaveCount(notifications.length, {
+      timeout: 20_000,
+    });
+    await expect
+      .poll(
+        async () => (await bell.getAttribute('data-unread')) === String(await unreadFromApi(page)),
+        {
+          timeout: 20_000,
+        },
+      )
+      .toBe(true);
+
+    expect(refused).toEqual([]);
+  });
+
   test('the bell shows the unread count and "Mark all as read" clears it', async ({ page }) => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/calendar`);
@@ -82,7 +121,11 @@ test.describe('notifications', () => {
     await expect(bell).toHaveAttribute('data-unread', String(expected), { timeout: 20_000 });
 
     await bell.click();
-    await expect(page.getByRole('heading', { name: 'Notifications' }).or(page.getByText('Notifications', { exact: true }))).toBeVisible();
+    await expect(
+      page
+        .getByRole('heading', { name: 'Notifications' })
+        .or(page.getByText('Notifications', { exact: true })),
+    ).toBeVisible();
 
     const markAll = page.getByRole('button', { name: 'Mark all as read' });
     if (expected > 0) {
@@ -146,7 +189,11 @@ test.describe('notifications', () => {
   test('email preferences persist across a reload', async ({ page }) => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/settings/notifications`);
-    await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Notifications' })).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('link', { name: 'Notifications' }),
+    ).toHaveAttribute('aria-current', 'page');
 
     const success = page.getByTestId('toggle-successEmails');
     await expect(success).toBeVisible();
@@ -154,7 +201,7 @@ test.describe('notifications', () => {
     const initial = (await success.getAttribute('aria-checked')) === 'true';
 
     await success.click();
-    await expect(page.getByText('Saved')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Saved', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(success).toHaveAttribute('aria-checked', String(!initial));
 
     await page.reload();

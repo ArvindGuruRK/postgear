@@ -105,7 +105,10 @@ export function PostDetailDialog({
                 >
                   <Avatar size="sm">
                     {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-                    <AvatarFallback className="text-[10px]">
+                    <AvatarFallback
+                      colorSeed={channel.color ?? channel.channelId}
+                      className="text-[10px]"
+                    >
                       {channel.name.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>

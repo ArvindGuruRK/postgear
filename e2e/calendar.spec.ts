@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { localDateTime, pickDateTime } from './helpers/date-picker';
 import { cleanUp } from './helpers/media';
 
 /**
@@ -152,7 +153,9 @@ test.describe('calendar', () => {
     expect(post.state).toBe('QUEUE');
   });
 
-  test('a card previews its details, and Reschedule moves it to a typed time', async ({ page }) => {
+  test('a card previews its details, and Reschedule moves it to a picked time', async ({
+    page,
+  }) => {
     await signIn(page);
     const from = atNoon(4);
     const group = await createQueued(page, `E2E reschedule me ${Date.now()}`, from);
@@ -177,14 +180,13 @@ test.describe('calendar', () => {
     await expect(dialog.getByText('Acme Marketing')).toBeVisible();
 
     await dialog.getByRole('button', { name: 'Reschedule' }).click();
+    // The next day at 15:30, picked on the design system's calendar and time keys.
     const to = new Date(from);
+    to.setDate(to.getDate() + 1);
     to.setHours(15, 30, 0, 0);
-    const pad = (value: number) => String(value).padStart(2, '0');
-    await page
-      .getByLabel('Publish at')
-      .fill(
-        `${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}T${pad(to.getHours())}:${pad(to.getMinutes())}`,
-      );
+    const picker = page.locator('#reschedule-at');
+    await expect(picker).toHaveAttribute('data-value', localDateTime(from));
+    await pickDateTime(page, picker, to);
     await page.getByRole('button', { name: 'Move post' }).click();
 
     await expect(page.getByText('Rescheduled', { exact: true }).first()).toBeVisible();

@@ -448,6 +448,21 @@ export function Composer({
                   New post
                 </a>
               ) : null}
+              {/* Stacked (below lg), the preview's header is under the
+                  editor, so its Close would be out of sight: it moves here. */}
+              <TooltipHint label="Close" side="bottom" align="end">
+                <button
+                  type="button"
+                  onClick={requestClose}
+                  aria-label="Close composer"
+                  className={cn(
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10 lg:hidden',
+                    FOCUS,
+                  )}
+                >
+                  <MotionIcon icon={XIcon} className="h-4 w-4" />
+                </button>
+              </TooltipHint>
             </div>
           </div>
 
@@ -529,7 +544,10 @@ export function Composer({
                               {channel.picture ? (
                                 <AvatarImage src={channel.picture} alt="" />
                               ) : null}
-                              <AvatarFallback colorSeed={channel.id} className="text-[9px]">
+                              <AvatarFallback
+                                colorSeed={channel.color ?? channel.id}
+                                className="text-[9px]"
+                              >
                                 {channel.name.slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
@@ -623,7 +641,8 @@ export function Composer({
                 aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                 aria-pressed={fullscreen}
                 className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10',
+                  // Phones are always full screen, so there is nothing to toggle.
+                  'hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10 md:flex',
                   FOCUS,
                 )}
               >
@@ -650,7 +669,7 @@ export function Composer({
                 onClick={requestClose}
                 aria-label="Close composer"
                 className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10',
+                  'hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-actionPrimary/10 lg:flex',
                   FOCUS,
                 )}
               >
@@ -855,9 +874,11 @@ export function Composer({
           // change reads as one smooth movement rather than a lurch.
           resizeAnimated &&
             'transition-[width,height,border-radius,border-width,box-shadow] duration-400 ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none',
+          // Below `md` the windowed card is full screen too: a 16px margin
+          // round a phone's screen buys nothing but a smaller editor.
           fullscreen
             ? 'h-dvh w-screen rounded-none border-0 shadow-none'
-            : 'h-[min(calc(100dvh-2rem),62rem)] w-[min(calc(100vw-2rem),88rem)] rounded-2xl',
+            : 'h-dvh w-screen rounded-none border-0 shadow-none md:h-[min(calc(100dvh-2rem),62rem)] md:w-[min(calc(100vw-2rem),88rem)] md:rounded-2xl md:border-2 md:shadow-surfaceLg',
         )}
       >
         {frame}

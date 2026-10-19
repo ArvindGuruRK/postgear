@@ -50,6 +50,14 @@ export interface Channel {
   tokenExpiration: string | null;
   postingTimes: PostingTime[];
   createdAt: string;
+  /**
+   * The avatar palette slot (0-7), handed out in the order channels were
+   * connected so no two of the first eight share one (the rule lives in the
+   * API's `channel-colors.ts`). Passed as `colorSeed`; readers write
+   * `color ?? id` because a response cached from before the field existed
+   * has none, and the id hash beats a blank.
+   */
+  color: number;
 }
 
 /**

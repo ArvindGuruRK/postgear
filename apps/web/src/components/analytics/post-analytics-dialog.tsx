@@ -176,7 +176,12 @@ function ChannelMetrics({ channel, now }: { channel: PostChannelAnalytics; now: 
       data-channel={channel.channelId}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <ChannelAvatar name={channel.name} picture={channel.picture} />
+        <ChannelAvatar
+          id={channel.channelId}
+          color={channel.color}
+          name={channel.name}
+          picture={channel.picture}
+        />
         <Text size="sm" weight="bold" as="span" className="truncate">
           {channel.name}
         </Text>

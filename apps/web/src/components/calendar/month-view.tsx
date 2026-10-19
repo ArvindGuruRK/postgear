@@ -49,7 +49,11 @@ export function MonthView({
                 key={day.getDay()}
                 className="flex h-[3.875rem] items-center justify-center rounded-lg border-2 border-outline bg-chrome px-1 type-ui text-sm text-ink"
               >
-                <span className="truncate">
+                {/* A phone's columns fit "Wed", not "Wednesday". */}
+                <span className="truncate md:hidden">
+                  {day.toLocaleDateString(undefined, { weekday: 'short' })}
+                </span>
+                <span className="hidden truncate md:inline">
                   {day.toLocaleDateString(undefined, { weekday: 'long' })}
                 </span>
               </div>

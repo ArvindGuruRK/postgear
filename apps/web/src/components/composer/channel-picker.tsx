@@ -83,7 +83,9 @@ export function ChannelPicker({
               <span className="relative">
                 <Avatar size="sm">
                   {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-                  <AvatarFallback>{channel.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback colorSeed={channel.color ?? channel.id}>
+                    {channel.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
                 {isSelected ? (
                   <span className="absolute -end-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-outline bg-actionSuccess text-onActionLight">

@@ -102,6 +102,8 @@ export interface ChannelAnalytics {
   providerName: string;
   picture: string | null;
   profile: string | null;
+  /** The avatar palette slot: see `channel-colors.ts`. */
+  color: number;
   support: AnalyticsSupport;
   sync: Pick<ChannelSyncStatus, 'status' | 'lastSyncedAt' | 'error'>;
   followers: MetricChange | null;
@@ -151,6 +153,7 @@ export interface TopPost {
   providerIdentifier: string;
   providerName: string;
   picture: string | null;
+  color: number;
   preview: string;
   publishDate: string;
   releaseURL: string | null;
@@ -192,6 +195,7 @@ export interface PostChannelAnalytics {
   providerIdentifier: string;
   providerName: string;
   picture: string | null;
+  color: number;
   releaseURL: string | null;
   support: AnalyticsSupport;
   /** The latest snapshot; null when none has been taken yet. */

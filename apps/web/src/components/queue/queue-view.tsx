@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowUp01Icon } from '@animateicons/react/lucide/arrow-up-0-1-icon';
+import { ArrowUp10Icon } from '@animateicons/react/lucide/arrow-up-1-0-icon';
 /**
  * The queue: every post in publish order, filtered and paged.
  *
@@ -13,10 +15,11 @@ import {
   Alert,
   Button,
   buttonVariants,
+  DatePicker,
   EmptyState,
   ErrorState,
-  Input,
   Label,
+  localDayValue,
   MotionIcon,
   PageActions,
   Pagination,
@@ -32,7 +35,7 @@ import {
   TabsTrigger,
   Text,
 } from '@postgear/ui';
-import { ArrowDownNarrowWide, ArrowUpNarrowWide, ListOrdered } from 'lucide-react';
+import { ListOrdered } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -168,24 +171,31 @@ export function QueueView({
           </Select>
         </div>
 
+        {/* Two pickers rather than one range: either end may stay open ("from
+            today on"), as the URL allows. Each greys out the days that would
+            put the range the wrong way round. */}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="queue-from">From</Label>
-          <Input
+          <DatePicker
             id="queue-from"
-            type="date"
-            size="sm"
-            value={queue.filters.from ?? ''}
-            onChange={(event) => queue.setFilters({ from: event.target.value || null })}
+            label="From"
+            placeholder="Any day"
+            value={filterDay(queue.filters.from)}
+            onValueChange={(date) => queue.setFilters({ from: date ? localDayValue(date) : null })}
+            maxDate={filterDay(queue.filters.to)}
+            className="h-9 text-xs md:w-48"
           />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="queue-to">To</Label>
-          <Input
+          <DatePicker
             id="queue-to"
-            type="date"
-            size="sm"
-            value={queue.filters.to ?? ''}
-            onChange={(event) => queue.setFilters({ to: event.target.value || null })}
+            label="To"
+            placeholder="Any day"
+            value={filterDay(queue.filters.to)}
+            onValueChange={(date) => queue.setFilters({ to: date ? localDayValue(date) : null })}
+            minDate={filterDay(queue.filters.from)}
+            className="h-9 text-xs md:w-48"
           />
         </div>
 
@@ -196,9 +206,9 @@ export function QueueView({
           aria-label={queue.filters.sort === 'asc' ? 'Sorted soonest first' : 'Sorted latest first'}
         >
           {queue.filters.sort === 'asc' ? (
-            <ArrowUpNarrowWide className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={ArrowUp01Icon} className="h-4 w-4" />
           ) : (
-            <ArrowDownNarrowWide className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={ArrowUp10Icon} className="h-4 w-4" />
           )}
           {queue.filters.sort === 'asc' ? 'Soonest first' : 'Latest first'}
         </Button>
@@ -327,4 +337,13 @@ function dayLabel(date: Date, now: Date): string {
   if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow · ${formatted}`;
   if (date.toDateString() === yesterday.toDateString()) return `Yesterday · ${formatted}`;
   return formatted;
+}
+
+/** A filter's `YYYY-MM-DD` as that local day, for the date pickers. */
+function filterDay(value: string | null): Date | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }

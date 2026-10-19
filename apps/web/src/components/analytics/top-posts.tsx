@@ -85,7 +85,12 @@ export function TopPosts({
                   >
                     {post.rank}
                   </span>
-                  <ChannelAvatar name={post.channelName} picture={post.picture} />
+                  <ChannelAvatar
+                    id={post.channelId}
+                    color={post.color}
+                    name={post.channelName}
+                    picture={post.picture}
+                  />
                   <span className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <span className="line-clamp-2 font-sans text-sm font-medium text-ink">
                       {post.preview || <span className="opacity-60">Empty post</span>}

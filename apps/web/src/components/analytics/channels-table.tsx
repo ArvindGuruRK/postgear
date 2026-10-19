@@ -78,7 +78,14 @@ export function ChannelsTable({
                 display: formatPercent(channel.engagementRate),
                 hint: `${channel.providerName} · ${channel.posts} ${channel.posts === 1 ? 'post' : 'posts'}`,
                 tone: toneForIndex(index),
-                leading: <ChannelAvatar name={channel.name} picture={channel.picture} />,
+                leading: (
+                  <ChannelAvatar
+                    id={channel.channelId}
+                    color={channel.color}
+                    name={channel.name}
+                    picture={channel.picture}
+                  />
+                ),
               },
             ],
       ),
@@ -127,7 +134,12 @@ export function ChannelsTable({
                       aria-label={`${selected ? 'Show all channels' : `Show only ${channel.name}`}`}
                       className={cn('flex items-center gap-3 rounded-md text-start', FOCUS)}
                     >
-                      <ChannelAvatar name={channel.name} picture={channel.picture} />
+                      <ChannelAvatar
+                        id={channel.channelId}
+                        color={channel.color}
+                        name={channel.name}
+                        picture={channel.picture}
+                      />
                       <span className="flex min-w-0 flex-col gap-1">
                         <span className="truncate font-bold">{channel.name}</span>
                         <Badge variant="outline" className="w-fit gap-1 px-2 py-0 text-[10px]">
@@ -210,9 +222,7 @@ export function ChannelsTable({
       </TooltipProvider>
 
       <section aria-label="Engagement rate by channel" className="flex flex-col gap-3">
-        <h3 className="m-0 type-label text-sm text-ink opacity-70">
-          Engagement rate by channel
-        </h3>
+        <h3 className="m-0 type-label text-sm text-ink opacity-70">Engagement rate by channel</h3>
         <BarList items={bars} emptyMessage="No channel has impressions in this range yet." />
       </section>
     </div>

@@ -1,11 +1,8 @@
 'use client';
 
-import { CalendarIcon } from '@animateicons/react/lucide/calendar-icon';
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FIELD_FOCUS } from '../lib/field';
 import { cn } from '../lib/utils';
-import { Calendar } from './calendar';
-import { MotionIcon } from './motion-icon';
+import { Calendar, CalendarFooter, CalendarTrigger, calendarPopoverClasses } from './calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 /**
@@ -21,10 +18,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './popover';
  * - Minutes step by 5, the way people schedule; a time already on another
  *   minute (a channel's 9:20 posting slot) is kept and shown in the list.
  * - Everything is local time. Callers convert at their own edges.
- *
- * The trigger's text is set after mount: the date is formatted in the
- * viewer's locale and time zone, which the server rendering this does not
- * share, and a server-formatted label would mismatch on hydration.
+ * - Below the `sm` breakpoint the time columns sit under the calendar, so the
+ *   popover fits a phone.
  */
 export interface DateTimePickerProps {
   value: Date | null;
@@ -43,6 +38,8 @@ export interface DateTimePickerProps {
   id?: string;
   /** A short line in the popover's footer, e.g. which time zone this is. */
   footnote?: ReactNode;
+  /** Draws the trigger as an invalid field (a red border), e.g. a past time. */
+  invalid?: boolean;
 }
 
 const MINUTE_STEP = 5;
@@ -84,23 +81,26 @@ export function DateTimePicker({
   className,
   id,
   footnote,
+  invalid = false,
 }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [twelveHour, setTwelveHour] = useState(true);
   const [month, setMonth] = useState<Date>(() => value ?? new Date());
 
+  // After mount: the server does not know the viewer's clock convention.
   useEffect(() => {
-    setMounted(true);
     setTwelveHour(uses12HourClock());
   }, []);
 
   // Opening shows the month of the chosen date, not wherever it was left.
-  useEffect(() => {
-    if (open) {
+  // Here rather than in an effect on `value`: callers pass a fresh Date on
+  // every render, which would snap the month back while browsing.
+  function handleOpenChange(next: boolean) {
+    if (next) {
       setMonth(value ?? new Date());
     }
-  }, [open, value]);
+    setOpen(next);
+  }
 
   const current = value ?? nextHour();
 
@@ -130,17 +130,17 @@ export function DateTimePicker({
     new Set([...Array.from({ length: 60 / MINUTE_STEP }, (_, i) => i * MINUTE_STEP), minutes]),
   ).sort((a, b) => a - b);
 
-  const text =
-    mounted && value
-      ? value.toLocaleString(undefined, {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-        })
-      : null;
+  const minDay = minDate ? startOfDay(minDate) : undefined;
+  const text = value
+    ? value.toLocaleString(undefined, {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : null;
 
   return (
     // Modal, for the time columns' scrolling. Inside a Dialog (the composer),
@@ -149,30 +149,23 @@ export function DateTimePicker({
     // dragging the scrollbar. A modal popover takes its own scroll lock,
     // which stacks over the dialog's and lets its content scroll; it also
     // closes on any click outside, as a picker should.
-    <Popover modal open={open} onOpenChange={setOpen}>
+    <Popover modal open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <CalendarTrigger
           id={id}
           disabled={disabled}
-          aria-label={text ? `${label}: ${text}` : label}
+          label={label}
+          text={text}
+          placeholder={placeholder}
           // The exact local value (`2026-10-24T14:00`), whatever the locale
           // makes of the visible text: for forms and tests to read.
-          data-value={value ? localValue(value) : ''}
-          className={cn(
-            'flex h-11 items-center gap-2 rounded-md border-2 border-outline bg-field px-3',
-            'font-sans text-sm text-ink tabular-nums shadow-surfaceSm',
-            FIELD_FOCUS,
-            'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
-            className,
-          )}
-        >
-          <MotionIcon icon={CalendarIcon} className="h-4 w-4 shrink-0" />
-          <span className={cn('truncate', !text && 'opacity-50')}>{text ?? placeholder}</span>
-        </button>
+          dataValue={value ? localValue(value) : ''}
+          invalid={invalid}
+          className={className}
+        />
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className="w-auto p-0">
-        <div className="flex">
+      <PopoverContent side={side} align={align} className={calendarPopoverClasses}>
+        <div className="flex flex-col sm:flex-row">
           <Calendar
             mode="single"
             required
@@ -180,19 +173,20 @@ export function DateTimePicker({
             onSelect={setDay}
             month={month}
             onMonthChange={setMonth}
-            // Always six rows, so the time columns beside it keep one height.
-            fixedWeeks
-            disabled={minDate ? { before: startOfDay(minDate) } : undefined}
+            // Six rows (the Calendar's default), so the time columns beside
+            // it keep one height.
+            disabled={minDay ? { before: minDay } : undefined}
             className="p-3"
           />
           {/* The columns take exactly the calendar's height and scroll inside
               it: the box stretches to the calendar's height, and the columns
               fill it absolutely so their long lists cannot set it instead.
-              Width: three 48px keys plus scrollbars and gaps, or two. */}
+              Width: three 48px keys plus scrollbars and gaps, or two. On a
+              phone they sit under the calendar at a fixed height. */}
           <div
             className={cn(
-              'relative shrink-0 border-s-2 border-outline',
-              twelveHour ? 'w-56' : 'w-40',
+              'relative h-44 shrink-0 border-t-2 border-outline sm:h-auto sm:border-t-0 sm:border-s-2',
+              twelveHour ? 'sm:w-56' : 'sm:w-40',
             )}
           >
             <div className="absolute inset-0 flex gap-1.5 p-3">
@@ -231,38 +225,16 @@ export function DateTimePicker({
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t-2 border-outline px-3 py-2.5">
-          <button
-            type="button"
-            onClick={() => {
-              const today = new Date();
-              setMonth(today);
-              setDay(today);
-            }}
-            className={cn(
-              'rounded-md px-2 py-1 type-ui text-xs text-ink underline underline-offset-2 hover:bg-actionPrimary/10',
-              FIELD_FOCUS,
-            )}
-          >
-            Today
-          </button>
-          {footnote ? (
-            <span className="min-w-0 flex-1 truncate text-center font-sans text-[11px] text-ink opacity-60">
-              {footnote}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className={cn(
-              'flex h-8 items-center rounded-md border-2 border-outline bg-actionPrimary px-3 type-ui text-xs text-onActionPrimary shadow-brutalSm',
-              'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
-              FIELD_FOCUS,
-            )}
-          >
-            Done
-          </button>
-        </div>
+        <CalendarFooter
+          onToday={() => {
+            const today = new Date();
+            setMonth(today);
+            setDay(today);
+          }}
+          todayDisabled={minDay !== undefined && startOfDay(new Date()) < minDay}
+          note={footnote}
+          onDone={() => setOpen(false)}
+        />
       </PopoverContent>
     </Popover>
   );

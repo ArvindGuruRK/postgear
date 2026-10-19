@@ -31,6 +31,7 @@ function channel(overrides: Partial<ChannelView>): ChannelView {
     createdAt: new Date(),
     health: 'connected',
     providerName: 'LinkedIn',
+    color: 0,
     ...overrides,
   };
 }

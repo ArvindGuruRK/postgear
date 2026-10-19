@@ -45,10 +45,12 @@ export function SettingsShell({ orgId, children }: { orgId: string; children: Re
   );
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:gap-8">
+    <div className="flex flex-col gap-4 md:flex-row md:gap-8">
       <SettingsNav
         aria-label="Settings sections"
-        className="w-full shrink-0 md:w-52"
+        // On a phone, a row that scrolls sideways: as a column the six
+        // sections pushed every settings page below the fold.
+        className="w-full shrink-0 flex-row overflow-x-auto pb-1 pg-scrollbar pg-scrollbar-primary md:w-52 md:flex-col md:overflow-visible md:pb-0 [&>*]:shrink-0"
         items={items}
         activeHref={active?.href ?? ''}
         linkComponent={Link}

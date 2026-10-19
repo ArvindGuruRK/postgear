@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+import { useWorkspace } from './workspace-provider';
 
 interface SyncActiveWorkspaceProps {
   /** The workspace the URL names. Membership is already verified by the layout. */
@@ -39,29 +40,43 @@ interface SyncActiveWorkspaceProps {
  * client. The cost is one extra round trip on a mismatched arrival, and a
  * moment where the page renders before its data is scoped: visible only in
  * that case, and preferable to showing the wrong workspace's contents.
+ *
+ * ## Why a layout effect
+ *
+ * Client components that fetch on mount (the bell) are mounted in the same
+ * commit, and their passive effects would fire alongside the switch, before
+ * its cookie exists: a 403 with no cookie, the previous workspace's data
+ * with a stale one. Layout effects all run before any passive effect, so
+ * recording the switch here lets them wait on `useWorkspaceScope()`.
  */
 export function SyncActiveWorkspace({ orgId }: SyncActiveWorkspaceProps) {
   const router = useRouter();
+  const { scope } = useWorkspace();
   // Guards against a re-render re-issuing the switch, and against retrying a
   // switch the server has already refused.
   const attempted = useRef<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (attempted.current === orgId) {
       return;
     }
 
     attempted.current = orgId;
+    scope.begin(orgId);
 
     api(`/orgs/${orgId}/switch`, { method: 'POST' })
-      .then(() => router.refresh())
+      .then(() => {
+        scope.settle(orgId, true);
+        router.refresh();
+      })
       .catch(() => {
         // The layout already confirmed membership, so a refusal here means it
-        // changed underneath us. Doing nothing leaves the user on a page whose
-        // data simply stays empty, which the next navigation resolves: far
-        // better than a redirect loop.
+        // changed underneath us. Doing nothing more leaves the user on a page
+        // whose data simply stays empty, which the next navigation resolves:
+        // far better than a redirect loop.
+        scope.settle(orgId, false);
       });
-  }, [orgId, router]);
+  }, [orgId, router, scope]);
 
   return null;
 }

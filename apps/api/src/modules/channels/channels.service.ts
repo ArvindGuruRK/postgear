@@ -25,6 +25,7 @@ import { securityLogger } from '../../common/logging/security-logger';
 import type { ChannelUsage } from '../billing/billing.types';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
+import { type ChannelColors, colorOf, loadChannelColors } from './channel-colors';
 import { type ChannelHandshake, ChannelOAuthService } from './channel-oauth.service';
 import {
   type ChannelSummary,
@@ -46,6 +47,8 @@ const EXPIRY_WARNING_MS = 24 * 60 * 60 * 1_000;
 export interface ChannelView extends ChannelSummary {
   health: ChannelHealth;
   providerName: string;
+  /** The avatar palette slot, 0-based: see `channel-colors.ts`. */
+  color: number;
 }
 
 /** What `GET /channels` says about the plan's ceiling (Sprint 8). */
@@ -79,14 +82,26 @@ export class ChannelsService {
   }
 
   async list(orgId: string): Promise<ChannelView[]> {
-    const channels = await this.repository.listForOrg(orgId);
+    const [channels, colors] = await Promise.all([
+      this.repository.listForOrg(orgId),
+      this.colors(orgId),
+    ]);
 
     return channels.map((channel) => ({
       ...channel,
       health: this.healthOf(channel),
       providerName:
         this.manager.find(channel.providerIdentifier)?.name ?? channel.providerIdentifier,
+      color: colorOf(colors, channel.id),
     }));
+  }
+
+  /**
+   * Every channel's avatar colour, disconnected ones included, for payloads
+   * that carry channels from post rows rather than from `list`.
+   */
+  colors(orgId: string): Promise<ChannelColors> {
+    return loadChannelColors(orgId);
   }
 
   /**

@@ -19,7 +19,7 @@ import type { MediaService, MediaView } from '../media/media.service';
 import type { SchedulingService } from '../scheduling/scheduling.service';
 import type { CreatePostInput } from './dto/posts.schema';
 import type { PostRow, PostsRepository } from './posts.repository';
-import { parseCustomized, parseImageIds, PostsService } from './posts.service';
+import { PostsService, parseCustomized, parseImageIds } from './posts.service';
 
 const GROUP = '0b8f3f3e-8a1f-4c55-9a55-2f1f5d1c9e11';
 const IMAGE_ID = '6f1c2f7e-5d2b-4d0c-9a4e-3b8f0e2a1c11';
@@ -43,6 +43,7 @@ function channel(overrides: Partial<ChannelView>): ChannelView {
     createdAt: new Date(),
     health: 'connected',
     providerName: 'X',
+    color: 0,
     ...overrides,
   };
 }
@@ -89,7 +90,7 @@ describe('PostsService', () => {
       | 'publishNow'
     >
   >;
-  let channels: { list: jest.Mock };
+  let channels: { list: jest.Mock; colors: jest.Mock };
   let media: { findViews: jest.Mock };
   let scheduling: { schedulePublish: jest.Mock; cancelPublish: jest.Mock; publishNow: jest.Mock };
   let service: PostsService;
@@ -128,6 +129,13 @@ describe('PostsService', () => {
           providerName: 'Instagram',
         }),
       ]),
+      colors: jest.fn().mockResolvedValue(
+        new Map([
+          ['ch_li', 0],
+          ['ch_x', 1],
+          ['ch_ig', 2],
+        ]),
+      ),
     };
     media = { findViews: jest.fn().mockResolvedValue(new Map([[IMAGE_ID, image()]])) };
 
@@ -543,6 +551,43 @@ describe('PostsService', () => {
       expect((await service.get('org_1', GROUP)).updatedAt).toEqual(
         new Date('2026-09-14T11:00:00Z'),
       );
+    });
+
+    it('carries each channel’s avatar colour in details, the calendar and the queue', async () => {
+      const rows = [
+        row({ id: 'a', integrationId: 'ch_x' }),
+        row({
+          id: 'b',
+          integrationId: 'ch_ig',
+          integration: {
+            id: 'ch_ig',
+            name: 'Acme Studio',
+            providerIdentifier: 'instagram',
+            picture: null,
+            profile: 'acme.studio',
+            deletedAt: null,
+          },
+        }),
+      ];
+      repository.findGroup.mockResolvedValueOnce(rows);
+      repository.listCalendar.mockResolvedValueOnce(rows);
+      repository.listQueue.mockResolvedValueOnce({ rows, total: 1 });
+
+      const colours = (channels: { channelId: string; color: number }[]) =>
+        channels.map((channel) => [channel.channelId, channel.color]);
+      const expected = [
+        ['ch_x', 1],
+        ['ch_ig', 2],
+      ];
+
+      expect(colours((await service.get('org_1', GROUP)).channels)).toEqual(expected);
+      const [summary] = await service.calendar('org_1', {
+        from: '2026-09-28T00:00:00.000Z',
+        to: '2026-10-05T00:00:00.000Z',
+      });
+      expect(colours(summary.channels)).toEqual(expected);
+      const page = await service.queue('org_1', { page: 1, sort: 'asc' });
+      expect(colours(page.posts[0].channels)).toEqual(expected);
     });
   });
 });

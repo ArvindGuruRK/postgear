@@ -1,8 +1,10 @@
 'use client';
 
-import { ArrowDownAZ, ArrowUpAZ } from 'lucide-react';
+import { ArrowUpAZIcon } from '@animateicons/react/lucide/arrow-up-a-z-icon';
+import { ArrowUpZAIcon } from '@animateicons/react/lucide/arrow-up-z-a-icon';
 import { cn } from '../lib/utils';
 import { Button } from './button';
+import { MotionIcon } from './motion-icon';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 
 export interface SortOption {
@@ -50,9 +52,9 @@ export function SortControl({
         className="px-3"
       >
         {direction === 'asc' ? (
-          <ArrowUpAZ className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={ArrowUpAZIcon} className="h-4 w-4" />
         ) : (
-          <ArrowDownAZ className="h-4 w-4" strokeWidth={2.5} />
+          <MotionIcon icon={ArrowUpZAIcon} className="h-4 w-4" />
         )}
       </Button>
     </div>

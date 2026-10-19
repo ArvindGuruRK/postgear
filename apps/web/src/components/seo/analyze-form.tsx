@@ -18,6 +18,7 @@
  * advice costs when it is on, and is disabled with the reset date when the
  * balance cannot cover it, since the API would answer 402 anyway.
  */
+import { CircleStopIcon } from '@animateicons/react/lucide/circle-stop-icon';
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import {
   Alert,
@@ -32,7 +33,7 @@ import {
   MotionIcon,
   Text,
 } from '@postgear/ui';
-import { Code2, Globe, Square } from 'lucide-react';
+import { Code2, Globe } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { AiCredits } from '@/types/ai';
 import type { SeoStatus } from '@/types/seo';
@@ -137,7 +138,7 @@ export function AnalyzeForm({
             </Button>
             {running ? (
               <Button type="button" variant="secondary" size="lg" onClick={onStop}>
-                <Square className="h-4 w-4" strokeWidth={2.5} />
+                <MotionIcon icon={CircleStopIcon} className="h-4 w-4" />
                 Stop
               </Button>
             ) : null}

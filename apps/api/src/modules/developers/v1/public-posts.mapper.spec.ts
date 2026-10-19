@@ -79,7 +79,8 @@ describe('textToDocument', () => {
   });
 
   it('round-trips through the renderer, so GET shows what POST sent', () => {
-    const text = 'Launch day.\nDoors open at nine.\n\nSee you there, and bring a friend.\n\n\n#launch';
+    const text =
+      'Launch day.\nDoors open at nine.\n\nSee you there, and bring a friend.\n\n\n#launch';
 
     expect(renderPlainText(textToDocument(text))).toBe(text);
   });
@@ -150,6 +151,7 @@ describe('view mappers', () => {
     providerIdentifier: 'linkedin',
     picture: null,
     profile: 'acme',
+    color: 0,
     disconnected: false,
     state: State.PUBLISHED,
     releaseURL: 'https://www.linkedin.com/feed/update/1',
@@ -228,7 +230,10 @@ describe('view mappers', () => {
       {
         text: 'Hello\nthere',
         media: [
-          { id: '6f1c2f7e-5d2b-4d0c-9a4e-3b8f0e2a1c11', url: 'http://localhost:3001/uploads/a.jpg' },
+          {
+            id: '6f1c2f7e-5d2b-4d0c-9a4e-3b8f0e2a1c11',
+            url: 'http://localhost:3001/uploads/a.jpg',
+          },
         ],
       },
       { text: 'Second part', media: [] },

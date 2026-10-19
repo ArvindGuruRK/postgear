@@ -14,6 +14,7 @@
  * disabled when the balance cannot cover it, with the reset date, since
  * "not enough credits" with no "until when" is a dead end.
  */
+import { CircleStopIcon } from '@animateicons/react/lucide/circle-stop-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   Alert,
@@ -37,7 +38,6 @@ import {
   Textarea,
   Toggle,
 } from '@postgear/ui';
-import { Square } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { AiCredits, AiStatus, GenerateRequestBody, PostFormat, Tone } from '@/types/ai';
 import type { Channel } from '@/types/channel';
@@ -262,7 +262,7 @@ export function GenerateForm({
         </Button>
         {running ? (
           <Button type="button" variant="secondary" onClick={onStop}>
-            <Square className="h-4 w-4" strokeWidth={2.5} />
+            <MotionIcon icon={CircleStopIcon} className="h-4 w-4" />
             Stop
           </Button>
         ) : null}

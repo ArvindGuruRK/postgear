@@ -20,6 +20,7 @@ describe('toPublicChannel', () => {
       createdAt: new Date(),
       health: 'connected',
       providerName: 'LinkedIn',
+      color: 0,
     };
 
     expect(toPublicChannel(view)).toEqual({

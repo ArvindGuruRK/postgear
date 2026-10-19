@@ -4,7 +4,9 @@
  * The bell's data: the latest page of the feed, kept live over the
  * notification stream (Sprint 8).
  *
- * On mount the hook loads one page and opens `GET /notifications/stream`.
+ * Once the API is scoped to the URL's workspace (at once, or after
+ * `SyncActiveWorkspace`'s switch) the hook loads one page and opens
+ * `GET /notifications/stream`.
  * The stream's `ready` frame carries the unread count and every
  * `notification` frame a new row; both go through the reducer. When the
  * stream drops (a deploy, a proxy timeout, a laptop lid) it reconnects
@@ -14,12 +16,13 @@
  * timer; nothing here outlives the bell.
  */
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { api, ApiError } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import type {
-  NotificationsPage,
   NotificationStreamEvent,
   NotificationStreamReady,
+  NotificationsPage,
 } from '@/types/notifications';
+import { useWorkspaceScope } from '../navigation/workspace-provider';
 import { isAbortError, openEventStream } from './event-stream';
 import {
   initialNotificationsState,
@@ -62,15 +65,32 @@ export function useNotifications(): NotificationsHandle {
     dispatch({ type: 'read_all', lastReadAt: result.lastReadAt });
   }, []);
 
-  // The latest `refresh` for the stream loop, which is started once.
+  // The latest `refresh` for the stream loop, which is started once per scope.
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  // Both requests are scoped by the `pg_org` cookie, so neither goes out
+  // while `SyncActiveWorkspace` is still setting it. `scope.status()` is read
+  // again inside each effect because the switch is recorded in a layout
+  // effect of the very commit that rendered `status` as `ready`.
+  const { orgId, scope, status } = useWorkspaceScope();
 
   useEffect(() => {
+    if (status === 'failed') {
+      dispatch({ type: 'load_failed', message: "Couldn't load notifications right now." });
+      return;
+    }
+    if (status !== 'ready' || scope.status(orgId) !== 'ready') {
+      return;
+    }
+    void refresh();
+  }, [refresh, orgId, scope, status]);
+
+  useEffect(() => {
+    if (status !== 'ready' || scope.status(orgId) !== 'ready') {
+      return;
+    }
+
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
@@ -134,7 +154,7 @@ export function useNotifications(): NotificationsHandle {
         clearTimeout(timer);
       }
     };
-  }, []);
+  }, [orgId, scope, status]);
 
   return { state, refresh, markAllRead };
 }

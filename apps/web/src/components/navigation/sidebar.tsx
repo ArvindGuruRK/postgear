@@ -1,9 +1,18 @@
 'use client';
 
-import { type AnimatedIcon, cn, useIconAnimation } from '@postgear/ui';
+import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import {
+  type AnimatedIcon,
+  cn,
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+  useIconAnimation,
+} from '@postgear/ui';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 interface SidebarItemBase {
   label: string;
@@ -32,7 +41,8 @@ function RailItem({
   icon: Icon,
   animatedIcon: AnimatedRailIcon,
   active,
-}: SidebarItem) {
+  className,
+}: SidebarItem & { className?: string }) {
   const icon = useIconAnimation();
 
   return (
@@ -41,33 +51,34 @@ function RailItem({
       title={label}
       aria-current={active ? 'page' : undefined}
       {...icon.triggers}
-      className={cn(
-        'flex w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 px-0.5 py-2',
-        'outline-none transition-[transform,box-shadow,background-color] duration-100',
-        'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-        active
-          ? 'border-outline bg-actionPrimary text-onActionPrimary shadow-brutalSm active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed'
-          : 'border-transparent text-ink hover:border-outline hover:bg-primary',
-      )}
+      className={cn(TILE(active), className)}
     >
       {AnimatedRailIcon ? (
         // The library fixes stroke-width="2" on the svg; CSS outranks the
         // attribute, which keeps the animated set at the lucide set's weight.
-        <AnimatedRailIcon
-          ref={icon.ref}
-          aria-hidden
-          size={20}
-          className="!block h-5 w-5 shrink-0 [&_svg]:[stroke-width:2.25]"
-        />
+        <AnimatedRailIcon ref={icon.ref} aria-hidden size={20} className={ANIMATED_TILE_ICON} />
       ) : Icon ? (
         <Icon className="h-5 w-5 shrink-0" strokeWidth={2.25} />
       ) : null}
-      <span className="line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.15]">
-        {label}
-      </span>
+      <span className={TILE_LABEL}>{label}</span>
     </Link>
   );
 }
+
+/** A rail tile's frame; the tab bar's tiles are the same tile, sized to share the row. */
+const TILE = (active?: boolean) =>
+  cn(
+    'flex w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 px-0.5 py-2',
+    'outline-none transition-[transform,box-shadow,background-color] duration-100',
+    'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+    active
+      ? 'border-outline bg-actionPrimary text-onActionPrimary shadow-brutalSm active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed'
+      : 'border-transparent text-ink hover:border-outline hover:bg-primary',
+  );
+
+const ANIMATED_TILE_ICON = '!block h-5 w-5 shrink-0 [&_svg]:[stroke-width:2.25]';
+
+const TILE_LABEL = 'line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.15]';
 
 /**
  * The app rail (UI revamp, 2026-10-18), after the reference's left menu: a
@@ -83,6 +94,7 @@ export function Sidebar({
   bottomItems = [],
   brand = 'P',
   brandLabel = 'PostGear',
+  className,
 }: {
   items: SidebarItem[];
   /** Pinned to the bottom of the rail (e.g. Billing, Settings). */
@@ -91,11 +103,15 @@ export function Sidebar({
   brand?: ReactNode;
   /** Accessible name of the brand tile. */
   brandLabel?: string;
+  className?: string;
 }) {
   return (
     <aside
       aria-label="Main"
-      className="flex w-20 shrink-0 flex-col items-center gap-6 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd"
+      className={cn(
+        'flex w-20 shrink-0 flex-col items-center gap-6 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd',
+        className,
+      )}
     >
       <span
         role="img"
@@ -123,5 +139,81 @@ export function Sidebar({
         </nav>
       ) : null}
     </aside>
+  );
+}
+
+/** Tiles a phone's bar holds before the rest move behind More. */
+const TAB_SLOTS = 5;
+
+/**
+ * The rail on a phone (below `md`): the same tiles in a bar along the bottom,
+ * the pattern of most mobile SaaS apps, framed and inset like the rail.
+ *
+ * A bottom bar rather than a menu button: every main destination stays one
+ * tap away and within a thumb's reach, where a menu would hide all of them
+ * behind a tap at the top of the screen. Seven entries do not fit five 70px
+ * slots, so the first four sections stay and the rest (Media, SEO, Settings)
+ * open from More in a sheet; More takes the active fill while one of those is
+ * the current page. Its bottom margin is at least the safe-area inset, so the
+ * bar clears the home indicator wherever the page reaches under it.
+ */
+export function TabBar({
+  items,
+  bottomItems = [],
+  className,
+}: {
+  items: SidebarItem[];
+  bottomItems?: SidebarItem[];
+  className?: string;
+}) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreIcon = useIconAnimation();
+  const all = [...items, ...bottomItems];
+  const fits = all.length <= TAB_SLOTS;
+  const shown = fits ? all : all.slice(0, TAB_SLOTS - 1);
+  const overflow = fits ? [] : all.slice(TAB_SLOTS - 1);
+  const overflowActive = overflow.some((item) => item.active);
+
+  return (
+    <nav
+      aria-label="Main"
+      className={cn(
+        'mx-3 mb-[max(0.75rem,env(safe-area-inset-bottom))] flex shrink-0 gap-1 rounded-2xl border-2 border-outline bg-chrome p-1.5 shadow-surfaceMd',
+        className,
+      )}
+    >
+      {shown.map((item) => (
+        <RailItem key={item.href} {...item} className="w-auto min-w-0 flex-1" />
+      ))}
+
+      {overflow.length > 0 ? (
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetTrigger
+            title="More"
+            {...moreIcon.triggers}
+            className={cn(TILE(overflowActive), 'w-auto min-w-0 flex-1')}
+          >
+            <EllipsisIcon ref={moreIcon.ref} aria-hidden size={20} className={ANIMATED_TILE_ICON} />
+            <span className={TILE_LABEL}>More</span>
+          </SheetTrigger>
+          <SheetContent
+            side="bottom"
+            aria-describedby={undefined}
+            // A tile's click closes the sheet as the page changes beneath it.
+            onClickCapture={(event) => {
+              if ((event.target as Element).closest('a')) setMoreOpen(false);
+            }}
+            className="rounded-t-2xl pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+          >
+            <SheetTitle className="text-xl">More</SheetTitle>
+            <div className="flex flex-wrap gap-2">
+              {overflow.map((item) => (
+                <RailItem key={item.href} {...item} className="w-20" />
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+    </nav>
   );
 }

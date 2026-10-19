@@ -34,7 +34,9 @@ import { SlotPosts } from './slot-posts';
 /** Where the grid scrolls to when it opens. */
 const MORNING_HOUR = 7;
 
-const COLUMNS = 'grid-cols-[5.5rem_repeat(7,minmax(0,1fr))]';
+/** A narrower hour gutter on a phone, where every column is scrolled past. */
+const COLUMNS =
+  'grid-cols-[3.75rem_repeat(7,minmax(0,1fr))] md:grid-cols-[5.5rem_repeat(7,minmax(0,1fr))]';
 
 export function WeekView({
   anchor,
@@ -89,7 +91,12 @@ export function WeekView({
                   )}
                 >
                   <span className="truncate font-sans text-xs text-ink opacity-70">
-                    {day.toLocaleDateString(undefined, { weekday: 'long' })}
+                    <span className="md:hidden">
+                      {day.toLocaleDateString(undefined, { weekday: 'short' })}
+                    </span>
+                    <span className="hidden md:inline">
+                      {day.toLocaleDateString(undefined, { weekday: 'long' })}
+                    </span>
                   </span>
                   <span
                     className={cn(

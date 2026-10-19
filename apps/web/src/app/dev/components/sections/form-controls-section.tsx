@@ -6,8 +6,8 @@ import {
   Combobox,
   type ComboboxOption,
   DatePicker,
-  DateTimePicker,
   DateRangePicker,
+  DateTimePicker,
   FileUpload,
   FormErrorMessage,
   FormField,
@@ -51,6 +51,7 @@ export function FormControlsSection() {
   const [comboValue, setComboValue] = useState('linkedin');
   const [multiValue, setMultiValue] = useState<string[]>(['linkedin', 'tiktok']);
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [laterDate, setLaterDate] = useState<Date | undefined>();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [dateTime, setDateTime] = useState<Date | null>(null);
 
@@ -150,7 +151,15 @@ export function FormControlsSection() {
         </div>
       </Row>
       <Row label="Date Picker">
-        <DatePicker value={date} onValueChange={setDate} className="w-56" />
+        <DatePicker label="Date" value={date} onValueChange={setDate} className="w-64" />
+        <DatePicker
+          label="From today"
+          placeholder="Today or later"
+          value={laterDate}
+          onValueChange={setLaterDate}
+          minDate={new Date()}
+          className="w-64"
+        />
       </Row>
       <Row label="Date and Time Picker">
         <DateTimePicker
@@ -161,7 +170,12 @@ export function FormControlsSection() {
         />
       </Row>
       <Row label="Date Range Picker">
-        <DateRangePicker value={dateRange} onValueChange={setDateRange} className="w-64" />
+        <DateRangePicker
+          label="Date range"
+          value={dateRange}
+          onValueChange={setDateRange}
+          className="w-72"
+        />
       </Row>
       <Row label="Calendar">
         <div className="flex flex-wrap gap-6">

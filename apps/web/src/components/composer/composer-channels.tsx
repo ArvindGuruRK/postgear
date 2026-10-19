@@ -99,7 +99,7 @@ export function ComposerChannels({
                   )}
                 >
                   {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}
-                  <AvatarFallback colorSeed={channel.id} className="text-[11px]">
+                  <AvatarFallback colorSeed={channel.color ?? channel.id} className="text-[11px]">
                     {channel.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

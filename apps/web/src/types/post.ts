@@ -69,6 +69,8 @@ export interface PostChannel extends ChannelPublish {
   providerIdentifier: string;
   picture: string | null;
   profile: string | null;
+  /** The avatar palette slot: see `Channel.color`. */
+  color: number;
   customized: boolean;
   /** The channel was disconnected after the post was saved. */
   disconnected: boolean;
@@ -90,6 +92,7 @@ export interface PostSummaryChannel extends ChannelPublish {
   name: string;
   providerIdentifier: string;
   picture: string | null;
+  color: number;
   disconnected: boolean;
 }
 

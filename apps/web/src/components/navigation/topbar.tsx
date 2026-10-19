@@ -34,9 +34,10 @@ export function TopBar({
   notifications?: ReactNode;
 }) {
   return (
-    <header className="flex h-20 shrink-0 items-center gap-4 px-3">
-      <h1 className="min-w-0 flex-1 truncate type-heading text-2xl text-ink">{title}</h1>
-      <div className="flex shrink-0 items-center gap-3">
+    // Shorter on a phone, where 80px of bar is a tenth of the screen.
+    <header className="flex h-16 shrink-0 items-center gap-3 px-4 md:h-20 md:gap-4 md:px-3">
+      <h1 className="min-w-0 flex-1 truncate type-heading text-xl text-ink md:text-2xl">{title}</h1>
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
         <ThemeToggle saveToAccount />
         {notifications}
         {accountMenu}

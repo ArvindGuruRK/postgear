@@ -24,7 +24,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { State } from '@postgear/db';
-import { parsePublishStatus, type PublishStatus } from '@postgear/scheduling';
+import { type PublishStatus, parsePublishStatus } from '@postgear/scheduling';
 import {
   IntegrationManager,
   isDocumentEmpty,
@@ -34,6 +34,7 @@ import {
   validatePost,
 } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
+import { type ChannelColors, colorOf } from '../channels/channel-colors';
 import type { ChannelView } from '../channels/channels.service';
 import { ChannelsService } from '../channels/channels.service';
 import type { MediaView } from '../media/media.service';
@@ -90,6 +91,8 @@ export interface PostChannelView extends ChannelPublishView {
   providerIdentifier: string;
   picture: string | null;
   profile: string | null;
+  /** The avatar palette slot: see `channel-colors.ts`. */
+  color: number;
   customized: boolean;
   /** True when the channel was disconnected after the post was saved. */
   disconnected: boolean;
@@ -119,6 +122,7 @@ export interface PostSummary {
     | 'name'
     | 'providerIdentifier'
     | 'picture'
+    | 'color'
     | 'disconnected'
     | 'state'
     | 'releaseURL'
@@ -146,32 +150,38 @@ export class PostsService {
 
   /** Every post with a channel scheduled inside the range, for the calendar. */
   async calendar(orgId: string, query: CalendarQuery): Promise<PostSummary[]> {
-    const rows = await this.repository.listCalendar({
-      orgId,
-      from: new Date(query.from),
-      to: new Date(query.to),
-    });
+    const [rows, colors] = await Promise.all([
+      this.repository.listCalendar({
+        orgId,
+        from: new Date(query.from),
+        to: new Date(query.to),
+      }),
+      this.channels.colors(orgId),
+    ]);
 
     return [...groupRows(rows).entries()]
-      .map(([group, groupRows]) => this.summarize(group, groupRows))
+      .map(([group, groupRows]) => this.summarize(group, groupRows, colors))
       .sort((a, b) => a.publishDate.getTime() - b.publishDate.getTime());
   }
 
   /** One page of the queue, in publish order. */
   async queue(orgId: string, query: QueueQueryInput): Promise<QueuePage> {
-    const { rows, total } = await this.repository.listQueue({
-      orgId,
-      states: query.state ? [query.state] : undefined,
-      channelId: query.channelId,
-      from: query.from ? new Date(query.from) : undefined,
-      to: query.to ? new Date(query.to) : undefined,
-      sort: query.sort,
-      page: query.page,
-      pageSize: QUEUE_PAGE_SIZE,
-    });
+    const [{ rows, total }, colors] = await Promise.all([
+      this.repository.listQueue({
+        orgId,
+        states: query.state ? [query.state] : undefined,
+        channelId: query.channelId,
+        from: query.from ? new Date(query.from) : undefined,
+        to: query.to ? new Date(query.to) : undefined,
+        sort: query.sort,
+        page: query.page,
+        pageSize: QUEUE_PAGE_SIZE,
+      }),
+      this.channels.colors(orgId),
+    ]);
 
     const posts = [...groupRows(rows).entries()]
-      .map(([group, groupRows]) => this.summarize(group, groupRows))
+      .map(([group, groupRows]) => this.summarize(group, groupRows, colors))
       .sort((a, b) =>
         query.sort === 'asc'
           ? a.publishDate.getTime() - b.publishDate.getTime()
@@ -248,11 +258,14 @@ export class PostsService {
   }
 
   async list(orgId: string, state?: State): Promise<PostSummary[]> {
-    const rows = await this.repository.listRecentGroups({ orgId, state, limit: LIST_LIMIT });
+    const [rows, colors] = await Promise.all([
+      this.repository.listRecentGroups({ orgId, state, limit: LIST_LIMIT }),
+      this.channels.colors(orgId),
+    ]);
     const byGroup = groupRows(rows);
 
     return [...byGroup.entries()]
-      .map(([group, groupRows]) => this.summarize(group, groupRows))
+      .map(([group, groupRows]) => this.summarize(group, groupRows, colors))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
@@ -468,7 +481,10 @@ export class PostsService {
 
   private async detail(orgId: string, group: string, rows: PostRow[]): Promise<PostDetail> {
     const mediaIds = rows.flatMap((row) => parseImageIds(row.image));
-    const mediaViews = await this.media.findViews(orgId, mediaIds);
+    const [mediaViews, colors] = await Promise.all([
+      this.media.findViews(orgId, mediaIds),
+      this.channels.colors(orgId),
+    ]);
 
     const channels = channelChains(rows).map(({ integration, chain }) => {
       const parts = chain.map((row): PartView => {
@@ -487,6 +503,7 @@ export class PostsService {
         providerIdentifier: integration.providerIdentifier,
         picture: integration.picture,
         profile: integration.profile,
+        color: colorOf(colors, integration.id),
         customized: parseCustomized(chain[0]?.settings ?? null),
         disconnected: integration.deletedAt !== null,
         ...publishView(chain),
@@ -509,7 +526,7 @@ export class PostsService {
     };
   }
 
-  private summarize(group: string, rows: PostRow[]): PostSummary {
+  private summarize(group: string, rows: PostRow[], colors: ChannelColors): PostSummary {
     const chains = channelChains(rows);
     const first =
       chains.find((entry) => !parseCustomized(entry.chain[0]?.settings ?? null)) ?? chains[0];
@@ -529,6 +546,7 @@ export class PostsService {
         name: integration.name,
         providerIdentifier: integration.providerIdentifier,
         picture: integration.picture,
+        color: colorOf(colors, integration.id),
         disconnected: integration.deletedAt !== null,
         ...publishView(chain),
       })),
