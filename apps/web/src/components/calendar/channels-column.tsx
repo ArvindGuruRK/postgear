@@ -279,8 +279,10 @@ export function ChannelsColumn({
                 <BotIcon
                   ref={aiIcon.ref}
                   aria-hidden
-                  size={16}
-                  className={cn('h-4 w-4', ANIMATED_ICON_CLASS)}
+                  // Larger than the tile's other glyphs: the bot's face is
+                  // detailed, and at 16px it read as a smudge in a 44px tile.
+                  size={22}
+                  className={cn('h-[22px] w-[22px]', ANIMATED_ICON_CLASS)}
                 />
               </ColumnLink>
             </div>

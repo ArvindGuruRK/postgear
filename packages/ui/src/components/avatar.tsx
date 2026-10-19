@@ -1,7 +1,7 @@
 'use client';
 
 import * as AvatarPrimitive from '@radix-ui/react-avatar';
-import { type VariantProps, cva } from 'class-variance-authority';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { createContext, forwardRef, useContext } from 'react';
 import { cn } from '../lib/utils';
 
@@ -38,7 +38,6 @@ const AVATAR_COLORS = [
   'bg-avatar5 text-onAvatar5',
   'bg-avatar6 text-onAvatar6',
   'bg-avatar7 text-onAvatar7',
-  'bg-avatar8 text-onAvatar8',
 ] as const;
 
 /**

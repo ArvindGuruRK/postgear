@@ -1,6 +1,6 @@
 /**
  * The channel colour rule: creation order (then id) across every row the
- * workspace has ever had, soft-deleted ones included, wrapping after eight.
+ * workspace has ever had, soft-deleted ones included, wrapping after seven.
  */
 jest.mock('@postgear/db', () => ({
   prisma: { integration: { findMany: jest.fn() } },
@@ -48,9 +48,10 @@ describe('channel colours', () => {
     }));
     const colors = assignChannelColors(rows);
 
-    expect(colors.get('ch_07')).toBe(7);
-    expect(colors.get('ch_08')).toBe(0);
-    expect(colors.get('ch_09')).toBe(1);
+    expect(CHANNEL_COLOR_COUNT).toBe(7);
+    expect(colors.get('ch_06')).toBe(6);
+    expect(colors.get('ch_07')).toBe(0);
+    expect(colors.get('ch_08')).toBe(1);
   });
 
   it('counts soft-deleted channels, so deleting one never repaints the rest', async () => {

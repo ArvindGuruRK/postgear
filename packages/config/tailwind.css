@@ -107,7 +107,7 @@
      --color-on-action-light. */
   --color-onActionAi: var(--color-on-action-ai);
 
-  /* Avatar initials: eight fills and the text that clears contrast on
+  /* Avatar initials: seven fills and the text that clears contrast on
      each. See the avatar palette block in colors.css. */
   --color-avatar1: var(--color-avatar-1);
   --color-onAvatar1: var(--color-on-avatar-1);
@@ -123,8 +123,6 @@
   --color-onAvatar6: var(--color-on-avatar-6);
   --color-avatar7: var(--color-avatar-7);
   --color-onAvatar7: var(--color-on-avatar-7);
-  --color-avatar8: var(--color-avatar-8);
-  --color-onAvatar8: var(--color-on-avatar-8);
 
   /* Focus ring: its own token rather than reusing actionAccent (2026-09-02,
      Sprint 0 close). WCAG 2.1 SC 1.4.11 wants 3:1 for a focus indicator

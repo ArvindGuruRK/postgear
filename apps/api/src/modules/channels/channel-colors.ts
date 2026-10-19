@@ -4,13 +4,14 @@
  * ## The rule
  *
  * Colours are handed out in order, the way Slack and Jira do it: the
- * workspace's first channel gets palette slot 1, the second slot 2, and so on,
- * wrapping after the eighth. A channel's position is its place among **every**
+ * workspace's first channel gets palette slot 1 (violet), the second slot 2
+ * (teal), and so on, wrapping after the seventh. A channel's position is
+ * its place among **every**
  * Integration row the workspace has ever had, ordered by `createdAt` and then
  * `id`, soft-deleted rows included. Disconnecting is a soft delete, so a
  * position never changes once given: removing a channel never repaints
  * another, and a new channel takes the next colour. Two live channels can
- * only share a colour once more than eight have ever been connected.
+ * only share a colour once more than seven have ever been connected.
  *
  * Computed per request rather than stored, so there is no column to migrate
  * or backfill. The web passes `color` straight to `AvatarFallback`'s
@@ -18,8 +19,11 @@
  */
 import { prisma } from '@postgear/db';
 
-/** Mirrors the eight `--color-avatar-*` tokens in packages/ui colors.css. */
-export const CHANNEL_COLOR_COUNT = 8;
+/**
+ * Mirrors the seven `--color-avatar-*` tokens in packages/ui colors.css (no
+ * blue: that is the primary button's fill). Change both together.
+ */
+export const CHANNEL_COLOR_COUNT = 7;
 
 /** Channel id to colour index (0-based, `0..CHANNEL_COLOR_COUNT - 1`). */
 export type ChannelColors = ReadonlyMap<string, number>;

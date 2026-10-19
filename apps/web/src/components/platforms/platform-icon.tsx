@@ -85,7 +85,10 @@ export function PlatformIcon({ platform, className, title }: PlatformIconProps) 
       <img
         src={brand.darkSrc}
         alt={title ?? ''}
-        className={cn(size, 'hidden dark:inline-block')}
+        // `block`, as preflight makes the light one: an inline-block image
+        // sits on a text line, which grew the sticker behind it into a dark
+        // band above the white X tile.
+        className={cn(size, 'hidden dark:block')}
         draggable={false}
       />
     </>
