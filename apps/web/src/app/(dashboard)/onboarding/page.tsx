@@ -1,4 +1,3 @@
-import { Heading, Stack, Text } from '@postgear/ui';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
@@ -6,7 +5,7 @@ import { serverApi } from '@/lib/api';
 import { getSession, getSessionCookieHeader } from '@/lib/session';
 
 export const metadata: Metadata = {
-  title: 'Set up your workspace',
+  title: 'Welcome',
 };
 
 interface OnboardingState {
@@ -51,39 +50,23 @@ export default async function OnboardingPage() {
     redirect('/');
   }
 
+  // The wizard draws the whole screen (its own header, safe-area padding and
+  // all), after Buffer's onboarding: see docs/screenshots 20 to 23.
   return (
-    <div className="min-h-screen bg-primary">
-      {/* max-w-3xl (was 2xl) so step 6's two columns leave the avatar grid
-          tiles a comfortable ~90px; the question steps read fine at this width.
-          Its own full-screen page, so it keeps clear of a phone's notch and
-          home indicator itself (`viewport-fit=cover`, root layout): each
-          padding grows to its safe-area inset where that is larger. */}
-      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-8 pt-[max(3rem,env(safe-area-inset-top))] pr-[max(1.5rem,env(safe-area-inset-right))] pb-[max(3rem,env(safe-area-inset-bottom))] pl-[max(1.5rem,env(safe-area-inset-left))]">
-        <Stack gap="xs">
-          <Heading as="h1" level="h4">
-            PostGear
-          </Heading>
-          <Text muted>
-            Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}. Let&apos;s get your
-            workspace set up. It takes about a minute.
-          </Text>
-        </Stack>
-
-        <OnboardingWizard
-          initialStep={state.step}
-          initialWorkspaceName={null}
-          initialName={session.name}
-          initialAvatar={session.avatar}
-          initialAnswers={{
-            role: state.answers?.role ?? null,
-            teamSize: state.answers?.teamSize ?? null,
-            primaryGoal: state.answers?.primaryGoal ?? null,
-            postingFrequency: state.answers?.postingFrequency ?? null,
-            referralSource: state.answers?.referralSource ?? null,
-            interestedChannels: state.answers?.interestedChannels ?? [],
-          }}
-        />
-      </div>
-    </div>
+    <OnboardingWizard
+      initialStep={state.step}
+      initialHasWorkspace={state.hasWorkspace}
+      firstName={session.name?.trim().split(/\s+/)[0] || null}
+      initialName={session.name}
+      initialAvatar={session.avatar}
+      initialAnswers={{
+        role: state.answers?.role ?? null,
+        teamSize: state.answers?.teamSize ?? null,
+        primaryGoal: state.answers?.primaryGoal ?? null,
+        postingFrequency: state.answers?.postingFrequency ?? null,
+        referralSource: state.answers?.referralSource ?? null,
+        interestedChannels: state.answers?.interestedChannels ?? [],
+      }}
+    />
   );
 }

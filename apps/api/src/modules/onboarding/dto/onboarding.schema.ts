@@ -55,6 +55,15 @@ export const channelsStepSchema = z
   })
   .strict();
 
+/**
+ * `POST /onboarding/skip`: the step whose question is being skipped. Only the
+ * question steps (2 to 5) can be skipped; the workspace (1) is required and
+ * the profile step (6) is where onboarding finishes.
+ */
+export const skipStepSchema = z.object({ step: z.number().int().min(2).max(5) }).strict();
+
+export type SkipStepDto = z.infer<typeof skipStepSchema>;
+
 /** The step number the client believes it is on, used to resume. */
 export const stepSchema = z.object({ step: z.coerce.number().int().min(1).max(6) }).strict();
 

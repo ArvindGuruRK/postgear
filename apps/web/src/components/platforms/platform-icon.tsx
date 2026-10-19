@@ -1,5 +1,5 @@
-import { Share2 } from 'lucide-react';
 import { cn } from '@postgear/ui';
+import { Share2 } from 'lucide-react';
 
 /**
  * The one place a platform's logo is chosen (UI revamp, 2026-10-18). Every
@@ -25,13 +25,26 @@ interface Brand {
   src: string;
   /** Shown instead of `src` in dark mode, when the light artwork would vanish. */
   darkSrc?: string;
+  /**
+   * A `scale-*` class for `src` artwork drawn with a margin inside its own
+   * canvas, so every platform tile comes out the same size (2026-10-20).
+   * Every other file fills its canvas edge to edge; check a new one does too.
+   */
+  fit?: string;
 }
 
 const BRANDS: Record<string, Brand> = {
   google: { label: 'Google', src: '/icon/google.svg' },
   'facebook-signin': { label: 'Facebook', src: '/icon/facebook.svg' },
   facebook: { label: 'Facebook', src: '/icon/facebookplatform.svg' },
-  x: { label: 'Twitter / X', src: '/icon/twitter.svg', darkSrc: '/icon/twitterlight.svg' },
+  // twitter.svg draws its tile 4 units in from each edge of a 64-unit canvas;
+  // 64 / 56 brings it to the full size the other tiles (and twitterlight.svg) are.
+  x: {
+    label: 'Twitter / X',
+    src: '/icon/twitter.svg',
+    darkSrc: '/icon/twitterlight.svg',
+    fit: 'scale-[1.143]',
+  },
   linkedin: { label: 'LinkedIn', src: '/icon/linkedin.svg' },
   'linkedin-page': { label: 'LinkedIn Page', src: '/icon/linkedin.svg' },
   instagram: { label: 'Instagram', src: '/icon/instagram.svg' },
@@ -67,8 +80,10 @@ export function PlatformIcon({ platform, className, title }: PlatformIconProps) 
   // Plain <img>: tiny static SVGs from /public. next/image would add a loader
   // and size bookkeeping for no gain (SVGs aren't resized).
   if (!brand.darkSrc) {
-    // biome-ignore lint/performance/noImgElement: static SVG logo from /public
-    return <img src={brand.src} alt={title ?? ''} className={size} draggable={false} />;
+    return (
+      // biome-ignore lint/performance/noImgElement: static SVG logo from /public
+      <img src={brand.src} alt={title ?? ''} className={cn(size, brand.fit)} draggable={false} />
+    );
   }
 
   // Two images, one per scheme. Only the visible one carries the name.
@@ -78,7 +93,7 @@ export function PlatformIcon({ platform, className, title }: PlatformIconProps) 
       <img
         src={brand.src}
         alt={title ?? ''}
-        className={cn(size, 'dark:hidden')}
+        className={cn(size, brand.fit, 'dark:hidden')}
         draggable={false}
       />
       {/* biome-ignore lint/performance/noImgElement: static SVG logo from /public */}

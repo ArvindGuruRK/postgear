@@ -29,6 +29,7 @@ export const AVATAR_PRESET_IDS = [
   'notionists-14',
   'notionists-15',
   'notionists-16',
+  'notionists-17',
 ] as const;
 
 export type AvatarPresetId = (typeof AVATAR_PRESET_IDS)[number];

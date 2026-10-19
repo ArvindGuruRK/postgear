@@ -52,7 +52,12 @@ const BG = {
   greenTint: 'bbf7d0',
 };
 
-/** Picker order, row by row (4 per row). */
+/**
+ * Picker order. Laid out for a 4-column grid at first; the picker became 9
+ * columns (6 on a phone) on 2026-10-20, with the upload card as the 18th cell,
+ * and notionists-17 was added then with a background that differs from its
+ * neighbours in both grids.
+ */
 const PRESETS = [
   { id: 'notionists-01', seed: 'pg-2', background: BG.yellow },
   { id: 'notionists-02', seed: 'pg-42', background: BG.blue },
@@ -70,6 +75,7 @@ const PRESETS = [
   { id: 'notionists-14', seed: 'pg-111', background: BG.orange },
   { id: 'notionists-15', seed: 'pg-30', background: BG.violet },
   { id: 'notionists-16', seed: 'pg-47', background: BG.greenTint },
+  { id: 'notionists-17', seed: 'pg-6', background: BG.blueTint },
 ];
 
 await mkdir(OUTPUT, { recursive: true });

@@ -6,11 +6,12 @@ import {
   CurrentUser,
 } from '../../common/decorators/current-user.decorator';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
-import type { AnswersStepDto, ProfileStepDto } from './dto/onboarding.schema';
+import type { AnswersStepDto, ProfileStepDto, SkipStepDto } from './dto/onboarding.schema';
 import {
   answersStepSchema,
   channelsStepSchema,
   profileStepSchema,
+  skipStepSchema,
   workspaceStepSchema,
 } from './dto/onboarding.schema';
 import { OnboardingService, PROFILE_STEP } from './onboarding.service';
@@ -114,11 +115,14 @@ export class OnboardingController {
     return this.onboarding.saveChannels(user.id, dto.interestedChannels);
   }
 
-  /** "Skip questions" from steps 2–5: straight to the profile step. */
+  /** "Skip" on the last question of steps 2–5: moves on one step. */
   @Post('skip')
   @HttpCode(HttpStatus.OK)
-  async skip(@CurrentUser() user: AuthenticatedUser) {
-    return this.onboarding.skipQuestions(user.id);
+  async skip(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodBody(skipStepSchema, 'onboarding/skip')) dto: SkipStepDto,
+  ) {
+    return this.onboarding.skipStep(user.id, dto.step);
   }
 
   /**
@@ -139,15 +143,25 @@ export class OnboardingController {
 /**
  * Maps a set of submitted answers to the step that follows it.
  *
- * Step 2 asks role and team size; step 3 asks goal and frequency; step 5 asks
- * referral source and leads to the profile step. Exported for its unit test.
+ * Step 2 asks role then team size; step 3 asks goal then frequency; step 5
+ * asks referral source and leads to the profile step. The wizard shows one
+ * question per screen (2026-10-19) and saves each as it is answered, so the
+ * first question of a pair alone keeps the user on its step: resuming then
+ * lands on the second question instead of skipping past it. Exported for its
+ * unit test.
  */
 export function nextStepFor(dto: AnswersStepDto): number {
-  if (dto.role !== undefined || dto.teamSize !== undefined) {
+  if (dto.teamSize !== undefined) {
     return 3;
   }
-  if (dto.primaryGoal !== undefined || dto.postingFrequency !== undefined) {
+  if (dto.role !== undefined) {
+    return 2;
+  }
+  if (dto.postingFrequency !== undefined) {
     return 4;
+  }
+  if (dto.primaryGoal !== undefined) {
+    return 3;
   }
   return PROFILE_STEP;
 }

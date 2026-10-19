@@ -234,6 +234,50 @@
   opacity: 0.5;
 }
 
+/* ── Onboarding welcome (2026-10-19) ─────────────────────────────────────
+   The welcome screen's backdrop: graph paper, an even square grid across
+   the whole page (the neobrutalist take on Buffer's faded glow,
+   docs/screenshots 20), mixed from --color-ink like bg-halftone so it reads
+   on every theme.
+
+   `.pg-float` drifts a scattered sticker a few pixels up and back. It
+   animates `transform`, not `translate` or `rotate`: the stickers are
+   centred on their point and tilted with Tailwind's -translate-* and
+   rotate-* utilities, which set the `translate` and `rotate` properties,
+   and those compose with `transform` instead of being replaced by it.
+   Nothing moves under reduced motion. */
+.pg-welcome-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-ink) 7%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-ink) 7%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 56px 56px;
+  background-position: center center;
+}
+
+@keyframes pg-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pg-float {
+    animation: pg-float 7s ease-in-out infinite;
+  }
+}
+
 /* The setup this file once listed as outstanding is all in place as of
    Sprint 0's close: `@tailwindcss/postcss` is installed and wired through
    postcss.config.js, the two plugins that were listed were dropped rather

@@ -21,7 +21,10 @@ export interface AvatarPreset {
   label: string;
 }
 
-/** Picker order: the generator lays the colours out for a 4-column grid. */
+/**
+ * Picker order: 17 presets in a 9-column grid (6 on a phone), the upload card
+ * taking the 18th cell. The generator picks backgrounds so neighbours differ.
+ */
 export const AVATAR_PRESETS: readonly AvatarPreset[] = [
   { id: 'notionists-01', label: 'Person with a hair bow and sunglasses, on yellow' },
   { id: 'notionists-02', label: 'Long-haired person with a beard, waving, on blue' },
@@ -39,6 +42,7 @@ export const AVATAR_PRESETS: readonly AvatarPreset[] = [
   { id: 'notionists-14', label: 'Person with white hair and sunglasses, on orange' },
   { id: 'notionists-15', label: 'Smiling person with curly hair, on violet' },
   { id: 'notionists-16', label: 'Grinning person with a goatee, on mint' },
+  { id: 'notionists-17', label: 'Smiling person in a patterned sweater, on light blue' },
 ];
 
 const PRESET_IDS = new Set(AVATAR_PRESETS.map((preset) => preset.id));

@@ -22,7 +22,7 @@ model Organization {
   shortlink           ShortLinkPreference  @default(ASK)
   // Home dashboard (2026-10-19): how many posts a week the workspace aims to
   // publish. Null means "not set", and the dashboard derives a default from
-  // the creator's onboarding answer to "How often do you post today?".
+  // the creator's onboarding answer to "How often do you post on social media?".
   weeklyPostGoal      Int?
   Comments            Comments[]
   credits             Credits[]
@@ -745,13 +745,18 @@ enum Role {
 // than only by the Zod schema in front of it. Values that begin with a digit
 // are prefixed (SIZE_2_10) because Prisma enum members cannot start with one.
 
-/// Q1: "What best describes you?"
+/// Q1: "How would you describe yourself?" Eight answers since 2026-10-20
+/// (Buffer's onboarding): FREELANCER, NONPROFIT and FOUNDER were added; the
+/// first five keep their names so stored answers stay valid.
 enum OnboardingRole {
   SOLO_CREATOR
   AGENCY
   IN_HOUSE_TEAM
   SMALL_BUSINESS
   OTHER
+  FREELANCER
+  NONPROFIT
+  FOUNDER
 }
 
 /// Q2: "How big is your team?"
@@ -763,16 +768,18 @@ enum OnboardingTeamSize {
   SIZE_200_PLUS
 }
 
-/// Q3: "What do you most want from PostGear?"
+/// Q3: "What do you most want from PostGear?" DRIVE_SALES added 2026-10-20 for
+/// six answers, an even three rows in the wizard's two-column grid.
 enum OnboardingGoal {
   GROW_AUDIENCE
   SAVE_TIME
   BETTER_CONTENT
   TRACK_PERFORMANCE
   TEAM_COLLAB
+  DRIVE_SALES
 }
 
-/// Q4: "How often do you post today?"
+/// Q4: "How often do you post on social media?" (worded "today" until 2026-10-20)
 enum PostingFrequency {
   DAILY
   FEW_TIMES_WEEK

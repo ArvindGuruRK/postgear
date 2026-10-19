@@ -117,7 +117,7 @@ export function RegisterForm({ next = null }: { next?: string | null }) {
           <FormLabel htmlFor="name" required>
             Full name
           </FormLabel>
-          <Input id="name" name="name" autoComplete="name" placeholder="Ada Lovelace" required />
+          <Input id="name" name="name" autoComplete="name" placeholder="Enter your name" required />
         </FormField>
 
         <FormField>
@@ -129,7 +129,7 @@ export function RegisterForm({ next = null }: { next?: string | null }) {
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="you@company.com"
+            placeholder="Enter your email"
             required
           />
         </FormField>

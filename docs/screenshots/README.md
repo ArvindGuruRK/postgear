@@ -3,7 +3,7 @@
 Reference captures for the UI revamp (started 2026-10-17). They come from two apps:
 
 - **Postiz** (`05` to `16`): the main reference. The local source is at `D:\rk-personal-projects\postiz-app-main` (`apps/frontend/src/components/`).
-- **Buffer** (`01` to `04`, `17` to `19`): the reference for the home dashboard, the connect-a-channel flow, and the composer's fullscreen mode.
+- **Buffer** (`01` to `04`, `17` to `23`): the reference for the home dashboard, the connect-a-channel flow, the composer's fullscreen mode, and onboarding.
 
 These show layout, component placement and UX flow. They are not a palette or font spec: PostGear keeps its own themes and the Sora type scale.
 
@@ -30,3 +30,7 @@ These show layout, component placement and UX flow. They are not a palette or fo
 | 17 | [17-buffer-create-post-modal.png](17-buffer-create-post-modal.png) | Buffer's "Create Post" modal over the home page | The composer is always a modal, never a page of its own; header holds Tags, Templates, AI Assistant, a Preview toggle, the fullscreen button and close; editor left, "Post Previews" right, Save Draft and the main action in the footer |
 | 18 | [18-buffer-create-post-enter-fullscreen-tooltip.png](18-buffer-create-post-enter-fullscreen-tooltip.png) | The same modal, hovering the fullscreen button | A small icon button beside close, named "Enter fullscreen" by its tooltip |
 | 19 | [19-buffer-create-post-fullscreen.png](19-buffer-create-post-fullscreen.png) | The composer in fullscreen | The modal fills the window edge to edge; the editor stays a comfortable reading width, centred, with the preview pinned to the right and the footer across the bottom; the button turns into "exit fullscreen" |
+| 20 | [20-buffer-onboarding-welcome.png](20-buffer-onboarding-welcome.png) | Buffer's first onboarding screen | "Hey there <name>" with a waving hand, then "Welcome to Buffer", over one "Let's start" button in the middle of the page; platform logos and small tiles scattered on a faint grid; logo top left, theme toggle top right, no back arrow or progress dots. PostGear keeps the layout but draws it neobrutalist: the greeting on a bordered card, solid tilted stickers, graph-paper lines |
+| 21 | [21-buffer-onboarding-describe-yourself.png](21-buffer-onboarding-describe-yourself.png) | First question: "How would you describe yourself?" | One question per screen: back arrow beside the logo, progress dots centred in the header; the question as a large centred heading; answers as a two-column grid of cards, each a tinted icon tile and a label; a wide Continue (disabled until an answer is picked) and a plain Skip under it |
+| 22 | [22-buffer-onboarding-tools-multi-select.png](22-buffer-onboarding-tools-multi-select.png) | A multi-select question | The same card grid with a checkbox on the right of each card and an optional second line under the label ("e.g. Hootsuite, Sprout Social") |
+| 23 | [23-buffer-onboarding-accounts-count.png](23-buffer-onboarding-accounts-count.png) | "How many social accounts do you currently manage?" | Short answers drop the icon tile: plain text cards in the same two-column grid |

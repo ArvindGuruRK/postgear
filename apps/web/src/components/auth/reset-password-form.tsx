@@ -75,7 +75,7 @@ export function ResetPasswordForm() {
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="you@company.com"
+            placeholder="Enter your email"
             required
           />
           <FormHelperText>

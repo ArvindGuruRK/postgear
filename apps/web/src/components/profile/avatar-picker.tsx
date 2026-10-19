@@ -1,7 +1,7 @@
 'use client';
 
 import { ImagePlusIcon } from '@animateicons/react/lucide/image-plus-icon';
-import { cn, FormErrorMessage, MotionIcon, pressSm, Spinner, Stack, Text } from '@postgear/ui';
+import { cn, MotionIcon, pressSm, Spinner, Stack, Text, toast } from '@postgear/ui';
 import { Check } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api, uploadFile } from '@/lib/api';
@@ -17,9 +17,17 @@ interface AvatarResponse {
   avatar: SessionAvatar;
 }
 
+/** Every problem (a wrong file, a failed save) is a danger toast (2026-10-20). */
+function warn(title: string, description: string) {
+  toast({ title, description, variant: 'danger' });
+}
+
 /**
- * The avatar chooser: a large preview, a grid of preset avatars, the user's
- * own photo when they have one, and an "Upload a photo" tile.
+ * The avatar chooser: a large preview, then the preset avatars nine to a row,
+ * two rows, with one more card at the end: "Upload a photo", or the user's
+ * own photo once they have one (2026-10-20). A file the API would refuse, or
+ * any save that fails, is reported in a danger toast rather than in text
+ * under the grid.
  *
  * Built for the onboarding profile step and kept free of onboarding logic so a
  * profile settings page can drop it in as-is.
@@ -43,9 +51,12 @@ export function AvatarPicker({
   value,
   onChange,
   onPendingChange,
+  centered = false,
 }: {
   /** For the preview's initials and alt text. */
   name: string;
+  /** Centres the preview and the "Pick an avatar" label over the grid. */
+  centered?: boolean;
   value: SessionAvatar;
   onChange: (avatar: SessionAvatar) => void;
   /** Lets a parent hold its own submit until the avatar is saved. */
@@ -55,7 +66,6 @@ export function AvatarPicker({
   const fileInput = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   /** The last avatar the server confirmed, to roll back to on failure. */
   const confirmed = useRef<SessionAvatar>(value);
@@ -69,13 +79,13 @@ export function AvatarPicker({
     onPendingChange?.(pending);
   }, [pending, onPendingChange]);
 
-  function fail(caught: unknown, fallback: string) {
-    setError(caught instanceof ApiError ? caught.message : fallback);
+  /** Puts the last saved avatar back and says what went wrong, in a toast. */
+  function fail(caught: unknown, title: string) {
+    warn(title, caught instanceof ApiError ? caught.message : 'Please try again.');
     onChange(confirmed.current);
   }
 
   async function pickPreset(id: string) {
-    setError(null);
     wanted.current = id;
     onChange({ kind: 'preset', id });
 
@@ -97,7 +107,7 @@ export function AvatarPicker({
 
       onChange(confirmed.current);
     } catch (caught) {
-      fail(caught, 'That avatar could not be saved. Please try again.');
+      fail(caught, 'That avatar could not be saved');
     } finally {
       wanted.current = null;
       syncing.current = false;
@@ -111,15 +121,14 @@ export function AvatarPicker({
     event.target.value = '';
 
     if (!file) return;
-    setError(null);
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError('Upload a JPEG, PNG or WebP image.');
+      warn("That file can't be used", 'Upload a JPEG, PNG or WebP image.');
       return;
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      setError('Photos can be at most 5 MB.');
+      warn('That photo is too big', 'Photos can be at most 5 MB.');
       return;
     }
 
@@ -130,14 +139,13 @@ export function AvatarPicker({
       confirmed.current = avatar;
       onChange(avatar);
     } catch (caught) {
-      fail(caught, 'The photo could not be uploaded. Please try again.');
+      fail(caught, 'The photo could not be uploaded');
     } finally {
       setUploading(false);
     }
   }
 
   async function clearAvatar() {
-    setError(null);
     setSaving(true);
     onChange(null);
 
@@ -145,7 +153,7 @@ export function AvatarPicker({
       await api<AvatarResponse>('/users/me/avatar', { method: 'DELETE' });
       confirmed.current = null;
     } catch (caught) {
-      fail(caught, 'The avatar could not be removed. Please try again.');
+      fail(caught, 'The avatar could not be removed');
     } finally {
       setSaving(false);
     }
@@ -155,7 +163,7 @@ export function AvatarPicker({
 
   return (
     <Stack gap="md">
-      <div className="flex items-center gap-4">
+      <div className={cn('flex items-center gap-4', centered && 'justify-center')}>
         <UserAvatar
           name={name}
           avatar={value}
@@ -180,9 +188,18 @@ export function AvatarPicker({
       </div>
 
       <fieldset>
-        <legend className="mb-3 type-heading text-lg text-ink">Pick an avatar</legend>
+        <legend
+          className={cn('mb-3 type-heading text-lg text-ink', centered && 'w-full text-center')}
+        >
+          Pick an avatar
+        </legend>
 
-        <div className="grid grid-cols-4 gap-3">
+        {/* The 17 presets, then the photo slot as the last card: nine to a
+            row from `lg`, two rows (2026-10-20). Each card keeps the size it
+            had four to a row (about 100px) as long as the parent is wide
+            enough (onboarding gives it 64rem); below `lg` there is not room
+            for nine at that size, so it is six to a row, and four on a phone. */}
+        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-9">
           {AVATAR_PRESETS.map((preset) => (
             <Tile
               key={preset.id}
@@ -196,39 +213,62 @@ export function AvatarPicker({
           ))}
 
           {value?.kind === 'image' ? (
-            <Tile
-              name={groupName}
-              value="photo"
-              label="Your photo"
-              src={value.url}
-              selected
-              onSelect={() => undefined}
-            />
-          ) : null}
-
-          {/* A button, not a radio: it opens the file picker rather than
-              selecting anything, and the photo it produces becomes the
-              "Your photo" tile above. Dashed and shadowless like FileUpload
-              (§6): it reads as a slot to fill, not a choice. */}
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            disabled={uploading}
-            className={cn(
-              'flex aspect-square flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-outline bg-secondary p-1 text-center text-ink',
-              'outline-none hover:bg-actionPrimary/10 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-            )}
-          >
-            {uploading ? (
-              <Spinner size="sm" />
-            ) : (
-              <MotionIcon icon={ImagePlusIcon} size={20} className="h-5 w-5" />
-            )}
-            <span className="font-sans text-xs font-bold leading-tight">
-              {uploading ? 'Uploading…' : 'Upload a photo'}
-            </span>
-          </button>
+            // The photo takes the upload card's place, with a small button in
+            // its corner to swap it for another. Picking a preset deletes the
+            // photo (the API does), and the upload card comes back.
+            <div className="relative">
+              <Tile
+                name={groupName}
+                value="photo"
+                label="Your photo"
+                src={value.url}
+                selected
+                onSelect={() => undefined}
+              />
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={uploading}
+                aria-label="Upload a different photo"
+                className={cn(
+                  'absolute -bottom-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink',
+                  'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                  'disabled:opacity-50',
+                )}
+              >
+                {uploading ? (
+                  <Spinner size="sm" className="h-3 w-3" />
+                ) : (
+                  <MotionIcon icon={ImagePlusIcon} size={12} className="h-3 w-3" />
+                )}
+              </button>
+            </div>
+          ) : (
+            // A button, not a radio: it opens the file picker rather than
+            // selecting anything, and the photo it produces takes this card's
+            // place. Dashed and shadowless like FileUpload (§6): it reads as a
+            // slot to fill, not a choice. The file rules are not spelled out
+            // here (the user's call); a file that breaks them gets a toast.
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={uploading}
+              className={cn(
+                'flex aspect-square flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-outline bg-secondary p-1 text-center text-ink',
+                'outline-none hover:bg-actionPrimary/10 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+              )}
+            >
+              {uploading ? (
+                <Spinner size="sm" />
+              ) : (
+                <MotionIcon icon={ImagePlusIcon} size={20} className="h-5 w-5" />
+              )}
+              <span className="font-sans text-xs font-bold leading-tight">
+                {uploading ? 'Uploading…' : 'Upload a photo'}
+              </span>
+            </button>
+          )}
         </div>
 
         <input
@@ -239,13 +279,7 @@ export function AvatarPicker({
           className="hidden"
           data-testid="avatar-upload-input"
         />
-
-        <Text size="sm" muted className="mt-3">
-          Or upload a JPEG, PNG or WebP photo, up to 5 MB. We crop it to a square.
-        </Text>
       </fieldset>
-
-      {error ? <FormErrorMessage>{error}</FormErrorMessage> : null}
     </Stack>
   );
 }

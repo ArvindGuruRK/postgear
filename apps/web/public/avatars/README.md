@@ -1,6 +1,6 @@
 # Preset avatars
 
-The 16 SVGs in this folder are the preset avatars offered on the onboarding
+The 17 SVGs in this folder are the preset avatars offered on the onboarding
 "Profile" step (and any later profile settings page). They are static files,
 committed to the repository and served by Next at `/avatars/<id>.svg`. Nothing
 generates or fetches an avatar at runtime.

@@ -19,9 +19,10 @@ import type { AnswersStepDto } from './dto/onboarding.schema';
  *
  * ## Every path ends on step 6 (UI revamp, 2026-10-17)
  *
- * Once the workspace exists, steps 2–5 can be skipped as a block
- * (`POST /onboarding/skip`), but nothing skips step 6: finishing the questions
- * and skipping them both land on "What should we call you?", and only
+ * Once the workspace exists, each question can be skipped (one question per
+ * screen since 2026-10-19; `POST /onboarding/skip` moves past the step whose
+ * last question was skipped), but nothing skips step 6: answering and
+ * skipping both land on "What should we call you?", and only
  * `POST /onboarding/profile` marks onboarding complete. The name it saves is
  * the one the AI copilot addresses the user by, which is why it is asked even
  * of someone in a hurry.
@@ -142,8 +143,9 @@ export class OnboardingService {
   }
 
   /**
-   * Steps 2, 3 and 5. Merges answers into the single response row. Step 5 now
-   * advances to the profile step (6) rather than completing.
+   * Steps 2, 3 and 5, one answer per call. Merges answers into the single
+   * response row. Step 5 now advances to the profile step (6) rather than
+   * completing.
    *
    * `upsert` with a partial `update` is what makes going back a step safe: the
    * fields this request did not mention keep their existing values instead of
@@ -183,20 +185,23 @@ export class OnboardingService {
   }
 
   /**
-   * "Skip questions" from any of steps 2–5: jumps straight to the profile step.
+   * "Skip" on the last question of step 2–5: moves on to the step after it
+   * (step 5 leads to the profile step). The first question of a pair needs no
+   * call, since answering or skipping it leaves the user on the same step.
    *
-   * Answers already given are kept; the ones not reached stay null, which
-   * every reader of `OnboardingResponse` already has to handle. Refuses before
-   * the workspace exists: step 1 is the one step that cannot be skipped.
+   * Nothing is written to `OnboardingResponse`: a skipped question stays null,
+   * which every reader of it already has to handle, and an answer given
+   * earlier is kept. Refuses before the workspace exists: step 1 is the one
+   * step that cannot be skipped.
    */
-  async skipQuestions(userId: string): Promise<OnboardingState> {
+  async skipStep(userId: string, step: number): Promise<OnboardingState> {
     const state = await this.getState(userId);
 
     if (!state.hasWorkspace) {
       throw new BadRequestException('Create a workspace before skipping ahead');
     }
 
-    await this.advanceTo(userId, PROFILE_STEP);
+    await this.advanceTo(userId, Math.min(step + 1, PROFILE_STEP));
     return this.getState(userId);
   }
 

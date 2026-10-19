@@ -87,7 +87,7 @@ export function LoginForm({ next = null }: { next?: string | null }) {
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="you@company.com"
+            placeholder="Enter your email"
             required
           />
         </FormField>
