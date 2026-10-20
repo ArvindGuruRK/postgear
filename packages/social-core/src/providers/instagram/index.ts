@@ -184,7 +184,7 @@ export class InstagramProvider
           detail:
             account.followers_count === undefined
               ? `via ${page.name}`
-              : `${account.followers_count.toLocaleString()} followers · via ${page.name}`,
+              : `${account.followers_count.toLocaleString()} followers via ${page.name}`,
           // Publishing authorises against the *Page's* token, not the user's.
           accessToken: page.access_token,
         };

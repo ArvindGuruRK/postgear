@@ -80,7 +80,7 @@ export function Recommendations({
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="type-label text-sm text-ink">What to fix</h2>
         {advice.source === 'ai' ? (
-          <Badge variant="ai">AI advice{advice.model ? ` · ${advice.model}` : ''}</Badge>
+          <Badge variant="ai">AI advice{advice.model ? ` (${advice.model})` : ''}</Badge>
         ) : (
           <Badge variant="outline">Rule-based</Badge>
         )}

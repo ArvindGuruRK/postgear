@@ -45,7 +45,7 @@ Target locations: `apps/worker/src/{workflows,activities}/` (Temporal, already s
 
 - [x] A post scheduled for 2+ minutes out publishes automatically without any process being kept alive by the browser/client. **Verified live**: the timer is a Temporal durable timer; the post published on time with no browser open.
 - [x] Killing and restarting the worker process mid-wait does not lose or duplicate the scheduled post. **Verified live**: the worker was killed with two timers due while it was down; on restart both posts published within seconds, a third at its time, each exactly once.
-- [x] A simulated 429 response triggers a visible retry with backoff instead of an immediate failure state. **Verified live**: `[simulate:429x2]` showed "Retrying · attempt 1 of 5", then attempt 2 after 30 s, then Published after a further 60 s; the policy in `@postgear/scheduling`.
+- [x] A simulated 429 response triggers a visible retry with backoff instead of an immediate failure state. **Verified live**: `[simulate:429x2]` showed "Retrying, attempt 1 of 5", then attempt 2 after 30 s, then Published after a further 60 s; the policy in `@postgear/scheduling`.
 - [x] "Post Now" on a queued post publishes within seconds. **Verified live** (~3 s), including the branch where one channel's token is dead and ends as "needs reconnecting" while the other publishes.
 - [x] Drag-and-drop reschedule on the calendar updates the actual publish time. Browser test: `calendar.spec.ts` › *drag-and-drop moves a post to another day and the API records the new time*.
 

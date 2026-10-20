@@ -206,7 +206,7 @@ export function SaasPatternsSection() {
         />
         <NotificationCenter notifications={[]} loading />
         <NotificationCenter notifications={[]} />
-        <Spec>Default · with a server count, mark-all-read and a footer · loading · empty</Spec>
+        <Spec>Default (with a server count, mark-all-read and a footer), loading, empty</Spec>
       </Row>
       <Row label="Activity Feed">
         <ActivityFeed items={DEMO_ACTIVITY} className="w-80" />
@@ -242,10 +242,10 @@ export function SaasPatternsSection() {
             max={1000}
             unit="credits"
             tone="ai"
-            caption="Resets 1 Nov · Growth"
+            caption="Resets 1 Nov, Growth"
           />
           <Spec>
-            tone=ai caption · danger still takes over at 90% · caption font-sans text-xs font-medium
+            tone=ai caption; danger still takes over at 90%; caption font-sans text-xs font-medium
             opacity-70
           </Spec>
         </div>

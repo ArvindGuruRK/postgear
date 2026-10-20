@@ -227,7 +227,7 @@ export function AuditHistory({
                           </span>
                           <span className="font-sans text-xs font-medium text-ink opacity-70">
                             {mounted ? formatRelative(latest.createdAt) : ''}
-                            {site.audits.length > 1 ? ` · ${site.audits.length} runs` : ''}
+                            {site.audits.length > 1 ? `, ${site.audits.length} runs` : ''}
                           </span>
                         </span>
                         <Sparkline

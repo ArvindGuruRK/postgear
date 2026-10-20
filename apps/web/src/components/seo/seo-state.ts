@@ -298,11 +298,11 @@ function applyEvent(state: SeoState, event: SeoStreamEvent): SeoState {
 /** A detail for stages the API describes with status alone. */
 function defaultDetail(state: SeoState, stage: SeoStage, status: TrackerStatus): string | null {
   if (stage === 'crawl' && status === 'done' && state.crawl) {
-    return `${state.crawl.statusCode} · ${state.crawl.mode === 'browser' ? 'rendered' : 'HTML'} · ${state.crawl.responseTimeMs} ms`;
+    return `${state.crawl.statusCode}, ${state.crawl.mode === 'browser' ? 'rendered' : 'HTML'}, ${state.crawl.responseTimeMs} ms`;
   }
 
   if (stage === 'score' && status === 'done' && state.scores) {
-    return `${state.scores.overallScore} · grade ${state.scores.grade}`;
+    return `${state.scores.overallScore}, grade ${state.scores.grade}`;
   }
 
   if (stage === 'advise' && status === 'skipped') {

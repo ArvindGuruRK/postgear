@@ -44,7 +44,7 @@ const NAMED_ENTITIES: Record<string, string> = {
   laquo: '«',
   raquo: '»',
   bull: '•',
-  middot: '·',
+  middot: '\u00b7',
   euro: '€',
   pound: '£',
   yen: '¥',

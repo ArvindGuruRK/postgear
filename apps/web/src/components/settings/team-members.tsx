@@ -195,7 +195,7 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
                       <p className="truncate type-ui text-sm text-ink">
                         {name}
                         {isSelf ? <span className="opacity-60"> (you)</span> : null}
-                        {member.disabled ? <span className="opacity-60"> · Suspended</span> : null}
+                        {member.disabled ? <span className="opacity-60"> (suspended)</span> : null}
                       </p>
                       <Text size="xs" muted className="truncate">
                         {member.email}

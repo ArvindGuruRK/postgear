@@ -209,8 +209,8 @@ export function AnalyticsView({
             {channels.map((channel) => (
               <SelectItem key={channel.id} value={channel.id}>
                 <PlatformIcon platform={channel.providerIdentifier} className="me-1.5 inline-block align-[-2px]" />
-                {channel.name} · {channel.providerName}
-                {supported.has(channel.providerIdentifier) ? '' : ' (no metrics)'}
+                {channel.name} ({channel.providerName}
+                {supported.has(channel.providerIdentifier) ? '' : ', no metrics'})
               </SelectItem>
             ))}
           </SelectContent>

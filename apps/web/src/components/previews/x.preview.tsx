@@ -46,9 +46,8 @@ export function XPreview({
             <div className={last ? 'min-w-0 flex-1 pb-3' : 'min-w-0 flex-1 pb-5'}>
               <div className="flex items-baseline gap-1 truncate">
                 <span className="truncate font-bold">{channel.name}</span>
-                <span className="truncate opacity-60">
-                  {handleOf(channel)} · {shortDate(publishAt)}
-                </span>
+                <span className="truncate opacity-60">{handleOf(channel)}</span>
+                <span className="ms-1 shrink-0 opacity-60">{shortDate(publishAt)}</span>
               </div>
 
               <PreviewText

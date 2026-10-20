@@ -244,7 +244,7 @@ export function composerTimeFor(slot: SlotTime, now: Date): Date {
   return nextHour;
 }
 
-/** "October 2026" · "6 – 12 Oct 2026" · "Saturday, 11 October 2026". */
+/** "October 2026", "6 – 12 Oct 2026" or "Saturday, 11 October 2026". */
 export function rangeLabel(view: CalendarView, anchor: Date): string {
   switch (view) {
     case 'month':

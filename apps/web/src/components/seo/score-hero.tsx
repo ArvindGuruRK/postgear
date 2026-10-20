@@ -76,7 +76,7 @@ export function ScoreHero({
               key={category}
               label={SEO_CATEGORY_LABELS[category]}
               score={scores.scores[category]}
-              hint={detail?.estimated ? `${weight} · estimated` : weight}
+              hint={detail?.estimated ? `${weight}, estimated` : weight}
               data-testid="seo-category"
               data-category={category}
             />

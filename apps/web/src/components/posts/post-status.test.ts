@@ -39,7 +39,7 @@ describe('describePost', () => {
     );
 
     expect(shown.tone).toBe('retrying');
-    expect(shown.detail).toMatch(/^Attempt 2 of 5 failed · next try /);
+    expect(shown.detail).toMatch(/^Attempt 2 of 5 failed, next try /);
   });
 
   it('explains a failure, and a partial publish by its count', () => {

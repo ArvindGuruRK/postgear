@@ -100,7 +100,7 @@ export function ScoreBreakdown({
               <ScoreBar
                 label={SEO_CATEGORY_LABELS[id]}
                 score={category ? category.score : null}
-                hint={category?.estimated ? `${weight} · estimated` : weight}
+                hint={category?.estimated ? `${weight}, estimated` : weight}
               />
 
               {id === 'backlink' && category?.estimated ? (
@@ -118,7 +118,7 @@ export function ScoreBreakdown({
                 <Text size="xs" muted>
                   Domain authority {crawl.authority.domainAuthority ?? '–'}
                   {crawl.authority.pageRank !== null
-                    ? ` · PageRank ${crawl.authority.pageRank}`
+                    ? `, PageRank ${crawl.authority.pageRank}`
                     : ''}{' '}
                   via {AUTHORITY_SOURCE[crawl.authority.source]}.
                 </Text>

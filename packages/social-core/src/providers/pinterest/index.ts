@@ -230,7 +230,7 @@ export class PinterestProvider
         board.privacy && board.privacy !== 'PUBLIC' ? board.privacy.toLowerCase() : undefined,
       ]
         .filter(Boolean)
-        .join(' · '),
+        .join(', '),
     }));
   }
 

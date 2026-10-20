@@ -325,7 +325,7 @@ export function QueueView({
   );
 }
 
-/** "Today · Sat 11 Oct", "Tomorrow · …", or just the date. */
+/** "Today, Sat 11 Oct", "Tomorrow, …", or just the date. */
 function dayLabel(date: Date, now: Date): string {
   const formatted = date.toLocaleDateString(undefined, {
     weekday: 'short',
@@ -340,9 +340,9 @@ function dayLabel(date: Date, now: Date): string {
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
 
-  if (date.toDateString() === today.toDateString()) return `Today · ${formatted}`;
-  if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow · ${formatted}`;
-  if (date.toDateString() === yesterday.toDateString()) return `Yesterday · ${formatted}`;
+  if (date.toDateString() === today.toDateString()) return `Today, ${formatted}`;
+  if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${formatted}`;
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${formatted}`;
   return formatted;
 }
 

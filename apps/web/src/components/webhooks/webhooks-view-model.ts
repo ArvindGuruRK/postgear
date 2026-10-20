@@ -34,14 +34,14 @@ export function deliveryLabel(status: WebhookDeliveryStatus): string {
   }
 }
 
-/** "Delivered · 200" / "Failed · 404" / "Pending" for the list's status column. */
+/** "Delivered (200)" / "Failed (404)" / "Pending" for the list's status column. */
 export function describeLastDelivery(webhook: WebhookView): string {
   if (!webhook.lastDelivery) {
     return 'No deliveries yet';
   }
   const code = webhook.lastDelivery.statusCode;
   const label = deliveryLabel(webhook.lastDelivery.status);
-  return code === null ? label : `${label} · ${code}`;
+  return code === null ? label : `${label} (${code})`;
 }
 
 /** The host and path, with a long path cut, for the list. */

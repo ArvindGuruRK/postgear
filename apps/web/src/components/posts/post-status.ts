@@ -119,7 +119,7 @@ function describe(
           tone: 'retrying',
           label: 'Retrying',
           variant: 'accent',
-          detail: `Attempt ${retrying.attempt} of ${retrying.maxAttempts} failed · next try ${formatClock(
+          detail: `Attempt ${retrying.attempt} of ${retrying.maxAttempts} failed, next try ${formatClock(
             new Date(retrying.nextAttemptAt),
           )}`,
           live: true,

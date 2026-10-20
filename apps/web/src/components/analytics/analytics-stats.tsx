@@ -52,7 +52,7 @@ export function MetricCard({
           ? { value: `${trend.value} vs previous period`, direction: trend.direction }
           : undefined
       }
-      caption={captions.length > 0 ? captions.join(' · ') : undefined}
+      caption={captions.length > 0 ? captions.join(', ') : undefined}
     />
   );
 }

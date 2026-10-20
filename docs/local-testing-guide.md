@@ -246,7 +246,7 @@ thread for tomorrow, a published post, a failed one and a draft.
   Published; the X channel fails with "Channel needs reconnecting", because the
   seeded X account is deliberately broken. That is the dead-token branch.
 - Write a post whose text contains `[simulate:429x2]` and Post now. The queue
-  shows "Retrying · attempt 1 of 5", then attempt 2 after 30 seconds, then
+  shows "Retrying, attempt 1 of 5", then attempt 2 after 30 seconds, then
   Published a minute later. `[simulate:400]` fails at once as "Rejected by the
   platform"; `[simulate:429]` (no `x`) gives up after five attempts.
   `[simulate:401]` runs the dead-token branch and leaves that seeded channel
@@ -275,7 +275,7 @@ Open **<http://localhost:3000/seed-demo-org/ai-copilot>**.
 **Generate a post.** Type a topic ("three things we learned launching our
 newsletter"), pick a voice (*Personal* writes as "I", *Company* writes as "we"),
 a format, optionally the hero image, and at least one channel. The button says
-what it costs ("Generate · 5 credits", 15 with an image). Watch the stage
+what it costs ("Generate (5 credits)", 15 with an image). Watch the stage
 tracker: research → classify → hook → content → image. The result shows the
 category, the hook, the parts with their character counts against the strictest
 selected platform, the sources it was "backed by" (canned ones in simulation),
@@ -561,7 +561,7 @@ Settings → **Webhooks** → **Add webhook**: name it, URL
 (every channel). The **signing secret** (`whsec_…`) is shown once.
 
 - Kebab → **Send test**: the deliveries sheet opens; within a few seconds
-  the row says **Delivered · 200**, and the echo server shows a `POST` with
+  the row says **Delivered (200)**, and the echo server shows a `POST` with
   `X-PostGear-Event: webhook.test`, `X-PostGear-Delivery`,
   `X-PostGear-Timestamp` and `X-PostGear-Signature: v1=…`; the HMAC-SHA256
   of `"<timestamp>.<body>"` under the secret. `packages/sdk` verifies it

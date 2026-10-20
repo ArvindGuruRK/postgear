@@ -76,7 +76,7 @@ export function ChannelsTable({
                 label: channel.name,
                 value: channel.engagementRate,
                 display: formatPercent(channel.engagementRate),
-                hint: `${channel.providerName} · ${channel.posts} ${channel.posts === 1 ? 'post' : 'posts'}`,
+                hint: `${channel.providerName}, ${channel.posts} ${channel.posts === 1 ? 'post' : 'posts'}`,
                 tone: toneForIndex(index),
                 leading: (
                   <ChannelAvatar

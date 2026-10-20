@@ -80,7 +80,7 @@ export function CrawlFacts({
         <Chip title="HTTP status">
           <span className={cn('font-bold tabular-nums', statusTone)}>{crawl.statusCode}</span>
           {crawl.redirects.length > 0
-            ? ` · ${crawl.redirects.length} ${crawl.redirects.length === 1 ? 'redirect' : 'redirects'}`
+            ? `, ${crawl.redirects.length} ${crawl.redirects.length === 1 ? 'redirect' : 'redirects'}`
             : ''}
         </Chip>
       </li>
@@ -102,7 +102,7 @@ export function CrawlFacts({
             />
           )}
           {crawl.https ? 'HTTPS' : 'HTTP'}
-          {crawl.https && crawl.certificateValid === false ? ' · bad certificate' : ''}
+          {crawl.https && crawl.certificateValid === false ? ', bad certificate' : ''}
         </Chip>
       </li>
       <li>

@@ -704,14 +704,14 @@ is enforced by the logger rather than left to each call site.
 
 | Constant | Message | Used for |
 |---|---|---|
-| `INVALID_CREDENTIALS` | `Incorrect email or password` | wrong email · wrong password · unknown account · **locked account** · unactivated account |
+| `INVALID_CREDENTIALS` | `Incorrect email or password` | wrong email, wrong password, unknown account, **locked account**, unactivated account |
 | `INVALID_INPUT` | `Invalid input` | every validation/sanitization failure, naming no field |
 | `PASSWORD_RESET_SENT` | `If that email is registered, you'll receive a reset link` | reset request, always |
 | `REGISTRATION_ACCEPTED` | `Check your email to confirm your account` | registration, whether or not the email exists |
-| `RESET_LINK_INVALID` | `That reset link is no longer valid` | expired · used · unknown token |
-| `ACTIVATION_LINK_INVALID` | `That confirmation link is no longer valid` | expired · used · unknown token |
+| `RESET_LINK_INVALID` | `That reset link is no longer valid` | expired, used, unknown token |
+| `ACTIVATION_LINK_INVALID` | `That confirmation link is no longer valid` | expired, used, unknown token |
 | `SESSION_EXPIRED` | `Your session has expired. Please sign in again.` | 401 on a protected route |
-| `FORBIDDEN` | `You do not have permission to do that` | wrong role · foreign org · disabled membership |
+| `FORBIDDEN` | `You do not have permission to do that` | wrong role, foreign org, disabled membership |
 | `NO_ACTIVE_ORG` | `Select a workspace first` | role-guarded route with no workspace selected |
 | `TOO_MANY_REQUESTS` | `Too many requests. Please try again shortly.` | IP throttle |
 | `UNEXPECTED` | `Something went wrong. Please try again.` | any unhandled error |

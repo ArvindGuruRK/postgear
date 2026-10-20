@@ -235,8 +235,8 @@ export function reportAsText(detail: SeoAuditDetail): string {
   lines.push(`SEO audit: ${detail.finalUrl ?? detail.targetUrl}`);
   lines.push(
     detail.overallScore === null
-      ? `Not scored · ${day}`
-      : `Score ${Math.round(detail.overallScore)}/100 · Grade ${detail.grade ?? '–'} · ${day}`,
+      ? `Not scored, ${day}`
+      : `Score ${Math.round(detail.overallScore)}/100, Grade ${detail.grade ?? '–'}, ${day}`,
   );
 
   if (detail.previous?.overallScore !== null && detail.previous?.overallScore !== undefined) {
@@ -256,14 +256,14 @@ export function reportAsText(detail: SeoAuditDetail): string {
       const score = category ? Math.round(category.score) : '–';
       const estimated = category?.estimated ? ' (estimated)' : '';
       return `${SEO_CATEGORY_LABELS[id]} ${score}${estimated}`;
-    }).join(' · '),
+    }).join(', '),
   );
 
   if (detail.advice) {
     lines.push('');
     lines.push(
       detail.advice.source === 'ai'
-        ? `What to fix (AI advice${detail.advice.model ? ` · ${detail.advice.model}` : ''})`
+        ? `What to fix (AI advice${detail.advice.model ? `, ${detail.advice.model}` : ''})`
         : 'What to fix (rule-based)',
     );
     if (detail.advice.summary.trim().length > 0) {

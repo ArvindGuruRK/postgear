@@ -50,8 +50,8 @@ export function AnalyticsSection() {
         <ScoreGauge value={38} grade="F" label="Overall" size="sm" />
         <ScoreGauge value={null} label="Pending" size="sm" />
         <Spec>
-          role=meter · 240° arc, butt caps · stroke-actionSuccess ≥80 / actionSecondary ≥70 /
-          actionAccent ≥60 / actionDanger · number type-heading
+          role=meter; 240° arc, butt caps; stroke-actionSuccess ≥80 / actionSecondary ≥70 /
+          actionAccent ≥60 / actionDanger; number type-heading
         </Spec>
       </Row>
 
@@ -60,9 +60,9 @@ export function AnalyticsSection() {
           <ScoreBar label="On-page" score={88} hint="30% of total" />
           <ScoreBar label="Technical" score={72} hint="30% of total" />
           <ScoreBar label="Content" score={64} hint="25% of total" />
-          <ScoreBar label="Authority" score={41} hint="15% · estimated" />
+          <ScoreBar label="Authority" score={41} hint="15%, estimated" />
         </div>
-        <Spec>Progress striped=false animated=false · tone via toneForScore()</Spec>
+        <Spec>Progress striped=false animated=false; tone via toneForScore()</Spec>
       </Row>
 
       <Row label="Stat Card with trend">
@@ -94,8 +94,8 @@ export function AnalyticsSection() {
           />
         </div>
         <Spec>
-          stroke 3px miter · fill-actionPrimary/15 area · grid stroke-outline/20 dashed · axes
-          font-sans text-[10px] · tooltip = role=status live region
+          stroke 3px miter; fill-actionPrimary/15 area; grid stroke-outline/20 dashed; axes
+          font-sans text-[10px]; tooltip = role=status live region
         </Spec>
       </Row>
 
@@ -129,7 +129,7 @@ export function AnalyticsSection() {
         <Sparkline points={IMPRESSIONS} />
         <Sparkline points={ENGAGEMENTS} tone="ai" />
         <Sparkline points={[]} />
-        <Spec>96×28 · 2px stroke · aria-hidden (numbers sit beside it)</Spec>
+        <Spec>96×28; 2px stroke; aria-hidden (numbers sit beside it)</Spec>
       </Row>
 
       <Row label="Bar List (engagement rate by channel)">
@@ -141,7 +141,7 @@ export function AnalyticsSection() {
                 label: 'Acme Marketing',
                 value: 6.8,
                 display: '6.8%',
-                hint: 'LinkedIn · 12 posts',
+                hint: 'LinkedIn, 12 posts',
                 leading: (
                   <Avatar size="sm">
                     <AvatarFallback>AM</AvatarFallback>
@@ -153,7 +153,7 @@ export function AnalyticsSection() {
                 label: 'Acme Studio',
                 value: 4.1,
                 display: '4.1%',
-                hint: 'Instagram · 9 posts',
+                hint: 'Instagram, 9 posts',
                 tone: 'ai',
                 leading: (
                   <Avatar size="sm">
@@ -166,7 +166,7 @@ export function AnalyticsSection() {
                 label: 'Acme on X',
                 value: 1.9,
                 display: '1.9%',
-                hint: 'X · needs reconnect',
+                hint: 'X, needs reconnect',
                 tone: 'danger',
                 leading: (
                   <Avatar size="sm">
@@ -177,7 +177,7 @@ export function AnalyticsSection() {
             ]}
           />
         </div>
-        <Spec>track h-3 rounded-full border-2 · fill bg-action* · hard edge border-r-2</Spec>
+        <Spec>track h-3 rounded-full border-2; fill bg-action*; hard edge border-r-2</Spec>
       </Row>
     </Section>
   );

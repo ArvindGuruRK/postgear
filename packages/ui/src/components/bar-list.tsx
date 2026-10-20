@@ -27,7 +27,7 @@ export interface BarListItem {
   value: number;
   /** The value as shown; defaults to `value.toLocaleString()`. */
   display?: string;
-  /** One quiet line under the label ("LinkedIn · 12 posts"). */
+  /** One quiet line under the label ("LinkedIn, 12 posts"). */
   hint?: string;
   tone?: BarTone;
   leading?: React.ReactNode;

@@ -34,7 +34,7 @@ export function FacebookPreview({
         <div className="min-w-0">
           <div className="truncate font-bold">{channel.name}</div>
           <div className="flex items-center gap-1 text-xs opacity-60">
-            {shortDate(publishAt)} ·{' '}
+            {shortDate(publishAt)}
             <Globe className="h-3 w-3" strokeWidth={2.5} aria-label="Public" />
           </div>
         </div>

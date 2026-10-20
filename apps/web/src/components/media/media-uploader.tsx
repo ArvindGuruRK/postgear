@@ -169,7 +169,7 @@ export function MediaUploader({
             ? 'Drop files or click to upload'
             : 'Drop images or video here, or click to upload'
         }
-        helperText="JPEG, PNG, GIF, WebP or AVIF images up to 20 MB · MP4 or MOV video up to 250 MB. Images are resized and compressed automatically."
+        helperText="JPEG, PNG, GIF, WebP or AVIF images up to 20 MB, and MP4 or MOV video up to 250 MB. Images are resized and compressed automatically."
         className={compact ? '[&>button]:p-5' : undefined}
       />
       <UploadRows rows={rows} />

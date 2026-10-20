@@ -212,7 +212,7 @@ pass with the new fields.
 | 3.6 | Reschedule dialog with the channels' configured posting times as one-click suggestions | ✅ [New] |
 | 3.7 | Channel filter pills; live refresh while a post in view is publishing or retrying | ✅ [New] |
 | 3.8 | `/[orgId]/queue`: state tabs, channel / date-range / direction filters in the URL, rows grouped by day, pagination | ✅ [New] |
-| 3.9 | Queue row: time, state, the worker's own status line ("Attempt 2 of 5 failed · next try 10:32"), permalink, actions menu | ✅ [New] |
+| 3.9 | Queue row: time, state, the worker's own status line ("Attempt 2 of 5 failed, next try 10:32"), permalink, actions menu | ✅ [New] |
 | 3.10 | Scheduler status pill on both pages: online / no worker / unreachable, with an explanation | ✅ [New] |
 | 3.11 | `Badge` gained a `success` variant (the one new design-system token use); shown in the playground | ✅ [New] |
 | 3.12 | Composer accepts `?at=` and defaults the publish time to it | ✅ [New] |

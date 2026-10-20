@@ -124,7 +124,7 @@ export function GenerateResult({
         {request ? (
           <Text size="sm" muted as="span">
             {request.tone === 'company' ? 'Company voice' : 'Personal voice'}
-            {format ? ` · ${format.label}` : ''}
+            {format ? `, ${format.label}` : ''}
           </Text>
         ) : null}
       </div>

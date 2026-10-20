@@ -187,7 +187,7 @@ export function GenerateForm({
             <Label htmlFor={`${id}-image`}>Hero image</Label>
             <FormHelperText>
               {status.images
-                ? `One image on the first part · +${credits?.costs.generate_image ?? 10} credits`
+                ? `One image on the first part (+${credits?.costs.generate_image ?? 10} credits)`
                 : 'Image generation is not available in this setup.'}
             </FormHelperText>
           </div>
@@ -258,7 +258,7 @@ export function GenerateForm({
             ? 'Generating…'
             : cost === null
               ? 'Generate'
-              : `Generate · ${cost} ${cost === 1 ? 'credit' : 'credits'}`}
+              : `Generate (${cost} ${cost === 1 ? 'credit' : 'credits'})`}
         </Button>
         {running ? (
           <Button type="button" variant="secondary" onClick={onStop}>
@@ -268,7 +268,7 @@ export function GenerateForm({
         ) : null}
         <Text size="sm" muted className="sm:ms-auto">
           {status.research ? 'With web research' : 'Without web research'}
-          {status.model ? ` · ${status.model}` : ''}
+          {status.model ? `, ${status.model}` : ''}
         </Text>
       </div>
     </form>

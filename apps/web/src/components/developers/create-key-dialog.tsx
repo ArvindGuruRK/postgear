@@ -95,7 +95,7 @@ export function CreateKeyDialog({ open, apiUrl, onOpenChange, onCreated }: Creat
             <DialogHeader>
               <DialogTitle>Your new key</DialogTitle>
               <DialogDescription>
-                {created.key.name} · {created.key.prefix}…
+                {created.key.name} ({created.key.prefix}…)
               </DialogDescription>
             </DialogHeader>
             <div className="mt-4">

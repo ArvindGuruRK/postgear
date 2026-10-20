@@ -309,7 +309,7 @@ export function CopilotChat({
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <FormHelperText>
-              {cost} {cost === 1 ? 'credit' : 'credits'} per message · Enter to send, Shift+Enter
+              {cost} {cost === 1 ? 'credit' : 'credits'} per message. Enter to send, Shift+Enter
               for a new line
             </FormHelperText>
             <div className="flex items-center gap-2">

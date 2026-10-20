@@ -53,12 +53,12 @@ export function preflightUpload(file: File): string | null {
     : `${file.name}: upload a JPEG, PNG, GIF, WebP or AVIF image, or an MP4 or MOV video.`;
 }
 
-/** "JPEG · 708 KB · 2048×1536", for a tile or a tooltip. */
+/** "JPEG, 708 KB, 2048×1536", for a tile or a tooltip. */
 export function describeMedia(item: MediaItem): string {
   const format =
     item.mimeType?.split('/')[1]?.replace('quicktime', 'mov').toUpperCase() ??
     item.type.toUpperCase();
-  const dimensions = item.width && item.height ? ` · ${item.width}×${item.height}` : '';
+  const dimensions = item.width && item.height ? `, ${item.width}×${item.height}` : '';
 
-  return `${format} · ${formatBytes(item.fileSize)}${dimensions}`;
+  return `${format}, ${formatBytes(item.fileSize)}${dimensions}`;
 }

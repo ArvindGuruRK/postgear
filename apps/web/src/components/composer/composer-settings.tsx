@@ -397,7 +397,7 @@ function KeywordsField({
         error={error}
         hint={field.hint}
         count={`${words.length}/${field.max}${
-          field.maxTotalLength !== undefined ? ` · ${total}/${field.maxTotalLength} characters` : ''
+          field.maxTotalLength !== undefined ? `, ${total}/${field.maxTotalLength} characters` : ''
         }`}
       />
     </FormField>

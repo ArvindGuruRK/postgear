@@ -42,7 +42,7 @@ describe('webhooks view model', () => {
   it('describes the last delivery with its status code when there is one', () => {
     expect(describeLastDelivery(hook(null))).toBe('No deliveries yet');
     expect(describeLastDelivery(hook({ status: 'DELIVERED', at: 'x', statusCode: 200 }))).toBe(
-      'Delivered · 200',
+      'Delivered (200)',
     );
     expect(describeLastDelivery(hook({ status: 'PENDING', at: 'x', statusCode: null }))).toBe('Pending');
   });

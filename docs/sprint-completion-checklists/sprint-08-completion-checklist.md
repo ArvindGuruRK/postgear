@@ -74,7 +74,7 @@ and three typed notifications so the bell has every treatment.
 
 | # | Item | Status |
 |---|---|---|
-| 1.1 | `plans.ts`: the plan table as data (FREE · STANDARD · PRO · TEAM · ULTIMATE: price, channels, AI credits, members, features) and the pure `resolveEntitlement` (trial until `trialEndsAt`, cancellation until `cancelAt`, past-due keeps access, canceled/incomplete → FREE). **The single source of truth**: `ai/credits/credits.policy.ts` now derives `AI_CREDIT_ALLOWANCE` from it and keeps no numbers of its own | ✅ [New] |
+| 1.1 | `plans.ts`: the plan table as data (FREE / STANDARD / PRO / TEAM / ULTIMATE: price, channels, AI credits, members, features) and the pure `resolveEntitlement` (trial until `trialEndsAt`, cancellation until `cancelAt`, past-due keeps access, canceled/incomplete → FREE). **The single source of truth**: `ai/credits/credits.policy.ts` now derives `AI_CREDIT_ALLOWANCE` from it and keeps no numbers of its own | ✅ [New] |
 | 1.2 | `billing.config.ts`: mode: simulation → stripe → unconfigured; placeholder keys ignored with a boot warning (also re-applied here because `ConfigService.get` falls back to the raw environment) | ✅ [New] |
 | 1.3 | `stripe.client.ts`: a `StripeGateway` behind a token: the real client (stripe v23: Checkout Session with inline `price_data`, customer reuse via `paymentId` with an idempotency key, billing portal, `subscriptions.update` with `create_prorations` + `pending_if_incomplete`, a Subscription Schedule for downgrades, `invoices.createPreview`), the simulation (synthetic `sim_<uuid>` events applied through the same handler after 1–2 s), and the unconfigured gateway (503) | ✅ [New]; real client **not run** |
 | 1.4 | `stripe-webhook.service.ts`: `receive(rawBody, signature)` verifies with `stripe.webhooks.constructEvent` (400 + `billing.webhook_rejected`); `apply(event)` inserts the `BillingEvent` row first inside the transaction (duplicate → 200 `{ duplicate: true }` + `billing.webhook_duplicate`), ignores events older than `lastStripeEventAt` (`ignored:stale`), resolves the org from metadata → `client_reference_id` → `paymentId` → subscription id, handles `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`; a handler error is logged `billing.webhook_failed`, recorded `failed:<reason>`, and answered 200 so Stripe does not replay a half-effect for three days | ✅ [New] |
@@ -252,7 +252,7 @@ cd apps/api && npx jest src/modules/health src/common   # the health route, the 
 
 | # | Item | Status |
 |---|---|---|
-| 6.1 | `settings/layout.tsx` + `SettingsShell`: `SettingsNav` (Team · Billing · API keys · Webhooks · Notifications) around every settings page | ✅ [New] |
+| 6.1 | `settings/layout.tsx` + `SettingsShell`: `SettingsNav` (Team, Billing, API keys, Webhooks, Notifications) around every settings page | ✅ [New] |
 | 6.2 | `/settings/billing`: two states: subscribe (plan grid from `PlanCard`, Monthly/Yearly, trial banner, *Start free trial*) and manage (current-plan `Card` with a status `Badge`, next billing date, two `UsageMeter`s, Manage billing, Change plan with a proration preview, Cancel with reason + feedback, Resume, the scheduled-downgrade line); *Activating…* polls for ≤ 60 s after a checkout or change; simulation and unconfigured `Alert`s | ✅ [New] |
 | 6.3 | `/settings/api-keys`: the table, Create → one-time secret with Copy and a curl example, Rotate and Revoke behind `AlertDialog`s, the limit line, the `/api/docs` link | ✅ [New] |
 | 6.4 | `/settings/webhooks`: see 4.8 | ✅ [New] |

@@ -73,7 +73,7 @@ export function ComposerChannels({
             <TooltipHint
               key={channel.id}
               label={
-                note ? `${channel.name}: ${note}` : `${channel.name} · ${channel.providerName}`
+                note ? `${channel.name}: ${note}` : `${channel.name} (${channel.providerName})`
               }
               side="bottom"
               disabled={(unavailable && !isSelected) || disabled}

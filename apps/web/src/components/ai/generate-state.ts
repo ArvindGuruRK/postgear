@@ -158,7 +158,7 @@ export function generateReducer(state: GenerateState, action: GenerateAction): G
         phase: 'running',
         request: action.request,
         stages: mapStages(pendingStages(), (stage, id) =>
-          // The engine says so too, but a tracker that shows "Image · pending"
+          // The engine says so too, but a tracker that shows "Image: pending"
           // for a post nobody asked an image for is wrong from the first frame.
           id === 'image' && !action.request.withImage
             ? { status: 'skipped', detail: 'No image requested' }

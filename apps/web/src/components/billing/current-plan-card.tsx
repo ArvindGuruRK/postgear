@@ -151,7 +151,7 @@ export function CurrentPlanCard({
           tone="ai"
           caption={
             mounted
-              ? `Resets ${formatDate(usage.aiCredits.resetsAt) ?? 'next cycle'} · ${view.plan.name}`
+              ? `Resets ${formatDate(usage.aiCredits.resetsAt) ?? 'next cycle'}, ${view.plan.name}`
               : view.plan.name
           }
         />

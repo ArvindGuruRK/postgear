@@ -303,7 +303,7 @@ Where it fires: the worker's `writePublished` / `markPublishFailed` create `Webh
 ## 6. Web
 
 - Shared types: `apps/web/src/types/{billing,notifications,developers,webhooks}.ts` mirror the shapes above (the codebase never imports `@postgear/db` into the browser).
-- `settings/layout.tsx` wraps every settings page in a two-column layout with `SettingsNav` (Team · Billing · API keys · Webhooks · Notifications). Team stays the Sprint 2 stub.
+- `settings/layout.tsx` wraps every settings page in a two-column layout with `SettingsNav` (Team, Billing, API keys, Webhooks, Notifications). Team stays the Sprint 2 stub.
 - `settings/billing`: two states as the sprint document asks: **subscribe** (plan grid from `PlanCard`, Monthly/Yearly toggle, trial banner or *Start free trial*) and **manage** (current-plan card with status `Badge`, next billing date, two `UsageMeter`s, Manage billing → portal, Change plan with a proration preview dialog, Cancel with a reason + feedback dialog, Resume, scheduled-downgrade notice). `?checkout=success` → *Activating…* polling; simulation banner via `Alert`.
 - `settings/api-keys`: list (`Table`), Create dialog, the one-time secret in a copy box, Rotate (confirm dialog warning about live integrations) and Revoke; the `/api/docs` link and a curl example.
 - `settings/webhooks`: list, Create/Edit dialog (name, URL, events checkboxes, channel multi-select), one-time secret, Test, Deliveries sheet, Rotate secret, Delete.

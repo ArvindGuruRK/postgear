@@ -35,13 +35,13 @@ export function AiSection() {
           {VARIANTS.map((variant) =>
             TAILS.map((tail) => (
               <SpeechBubble key={`${variant}-${tail}`} variant={variant} tail={tail}>
-                <span className="font-semibold">{variant}</span> · tail {tail}
+                <span className="font-semibold">{variant}</span>, tail {tail}
               </SpeechBubble>
             )),
           )}
         </div>
         <Spec>
-          rounded-lg border-2 border-outline shadow-surfaceSm p-4 font-sans text-sm · tail = rotated
+          rounded-lg border-2 border-outline shadow-surfaceSm p-4 font-sans text-sm; tail = rotated
           bordered square, border-t-0 border-l-0, in the variant&apos;s fill
         </Spec>
       </Row>
@@ -75,7 +75,7 @@ export function AiSection() {
           </div>
         </div>
         <Spec>
-          user primary tail=right · assistant default tail=left + Sparkles avatar · hook ai · mb-2
+          user primary tail=right; assistant default tail=left + Sparkles avatar; hook ai; mb-2
           clears the tail
         </Spec>
       </Row>

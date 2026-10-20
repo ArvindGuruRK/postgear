@@ -84,7 +84,7 @@ export function PostDetailDialog({
           <DialogTitle className="mt-1">{formatWhen(when)}</DialogTitle>
           <DialogDescription>
             {formatRelative(when, now)}
-            {shown.detail ? ` · ${shown.detail}` : ''}
+            {shown.detail ? `. ${shown.detail}` : ''}
           </DialogDescription>
         </DialogHeader>
 

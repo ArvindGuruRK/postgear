@@ -218,11 +218,11 @@ describe('reportAsText', () => {
     expect(reportAsText(detail)).toBe(
       [
         'SEO audit: https://example.com/',
-        'Score 82/100 · Grade B · 2026-10-15',
+        'Score 82/100, Grade B, 2026-10-15',
         'vs last run (2026-10-08): +11 from 71',
-        'On-page 80 · Technical 90 · Content 75 · Authority 70 (estimated)',
+        'On-page 80, Technical 90, Content 75, Authority 70 (estimated)',
         '',
-        'What to fix (AI advice · simulation)',
+        'What to fix (AI advice, simulation)',
         'Two things to fix first.',
         '',
         'Critical (1)',
@@ -247,7 +247,7 @@ describe('reportAsText', () => {
     expect(rules).not.toContain('vs last run');
 
     const none = reportAsText({ ...detail, advice: null, overallScore: null, grade: null });
-    expect(none).toContain('Not scored · 2026-10-15');
+    expect(none).toContain('Not scored, 2026-10-15');
     expect(none).not.toContain('What to fix');
   });
 });

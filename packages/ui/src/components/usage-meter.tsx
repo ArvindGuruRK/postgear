@@ -8,7 +8,7 @@ import { Progress } from './progress';
  * ≥ 90% danger takeover is not a tone and can't be opted out of: a nearly
  * exhausted quota has to look the same everywhere, whatever colour the
  * feature wears. `caption` is one quiet line under the bar for the thing
- * the numbers don't say ("Resets 1 Nov · Growth").
+ * the numbers don't say ("Resets 1 Nov, Growth").
  */
 export interface UsageMeterProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string;

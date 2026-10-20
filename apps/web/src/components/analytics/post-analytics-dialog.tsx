@@ -142,7 +142,7 @@ function Ready({ post, now }: { post: PostAnalytics; now: Date }) {
       <DialogHeader>
         <DialogTitle>{formatWhen(when)}</DialogTitle>
         <DialogDescription>
-          Published {relativeTime(post.publishDate, now) ?? ''} · {post.channels.length}{' '}
+          Published {relativeTime(post.publishDate, now) ?? ''} to {post.channels.length}{' '}
           {post.channels.length === 1 ? 'channel' : 'channels'}
         </DialogDescription>
       </DialogHeader>

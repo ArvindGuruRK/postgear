@@ -39,7 +39,7 @@ export function CommentList({
           <ChannelAvatar channel={channel} size="sm" />
           <div className={cn('min-w-0 flex-1 rounded-xl px-3 py-2', bubbleClassName)}>
             <div className="text-xs font-bold">
-              {channel.name} <span className="font-medium opacity-60">· part {index + 2}</span>
+              {channel.name} <span className="font-medium opacity-60">(part {index + 2})</span>
             </div>
             <PreviewText
               text={part.text}

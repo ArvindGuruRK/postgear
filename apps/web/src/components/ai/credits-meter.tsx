@@ -93,7 +93,7 @@ export function CreditsMeter({
       caption={
         <span className="flex flex-wrap items-center gap-2">
           <span>
-            {mounted ? `Resets ${formatResetDate(credits.resetsAt)} · ` : ''}
+            {mounted ? `Resets ${formatResetDate(credits.resetsAt)}, ` : ''}
             {tierLabel(credits.tier)}
           </span>
           {credits.low ? <Badge variant="danger">Low</Badge> : null}

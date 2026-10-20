@@ -182,7 +182,7 @@ describe('seoReducer', () => {
 
     expect(state.audit).toBe(summary);
     expect(state.crawl).toBe(crawl);
-    expect(state.stages.crawl.detail).toBe('200 · HTML · 312 ms');
+    expect(state.stages.crawl.detail).toBe('200, HTML, 312 ms');
     expect(hasPartialResult(state)).toBe(true);
   });
 
@@ -200,7 +200,7 @@ describe('seoReducer', () => {
       scores: { onPage: 70, technical: 80, content: 50, backlink: 40 },
     });
     expect(state.categories).toBe(categories);
-    expect(state.stages.score.detail).toBe('64 · grade D');
+    expect(state.stages.score.detail).toBe('64, grade D');
     expect(state.stages.advise).toEqual({ status: 'skipped', detail: 'Rule-based advice' });
   });
 
