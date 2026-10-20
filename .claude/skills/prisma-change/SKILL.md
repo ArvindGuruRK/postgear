@@ -86,6 +86,7 @@ Only now wire code to the new fields.
 
 - **Seeds:** `packages/db/prisma/seeds/index.ts` (plus `analytics.seed.ts`, `seo.seed.ts`). They are idempotent: fixed ids such as `seed-demo-org` and `upsert`. Give new required fields a value there, then run `npm run db:seed`.
 - **`packages/db/prisma/SCHEMA_NOTES.md`:** update the model status tables, and add a short note for anything non-obvious (it has per-sprint sections such as "Sprint 8 additions").
+- **Read-only MCP role:** a new column or table that holds a secret (a token, hash, key or password) must be added to the hidden list in `infra/postgres/readonly-role.sql`. After any migration, run `npm run db:readonly-role` so the `claude_readonly` role used by the Postgres MCP server sees new columns and still cannot see secrets.
 
 ## 8. Verify
 

@@ -55,3 +55,5 @@ apps/api/uploads/
 e2e/.results/
 playwright-report/
 test-results/
+# Snapshots and logs from the Playwright MCP server (.mcp.json)
+.playwright-mcp/

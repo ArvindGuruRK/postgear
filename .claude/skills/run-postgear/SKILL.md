@@ -73,7 +73,7 @@ Only flip a flag to `"false"` when the user asks for a real run (for example a r
 
 ## 6. Screenshots and driving the browser
 
-Only for bigger UI or flow changes: the user checks small UI tweaks by hand, so do not screenshot those unless asked. When needed, write a small Playwright script in the scratchpad that signs in the way the specs do (`e2e/ai.spec.ts` `signIn`): go to `/login`, fill the `Email` label and `#password`, click the `Sign in` button, wait for a URL ending in `/home`, `/calendar` or `/channels`, then `page.goto('/seed-demo-org/<page>')` and `page.screenshot(...)`. Read the image back to check it, and test phone width (390 px) as well when layout changed.
+Only for bigger UI or flow changes: the user checks small UI tweaks by hand, so do not screenshot those unless asked. The `playwright` MCP server (`.mcp.json`, headless and isolated, so it starts signed out) is the quickest way: navigate, snapshot, click, screenshot. Otherwise write a small Playwright script in the scratchpad that signs in the way the specs do (`e2e/ai.spec.ts` `signIn`): go to `/login`, fill the `Email` label and `#password`, click the `Sign in` button, wait for a URL ending in `/home`, `/calendar` or `/channels`, then `page.goto('/seed-demo-org/<page>')` and `page.screenshot(...)`. Read the image back to check it, and test phone width (390 px) as well when layout changed.
 
 ## 7. The e2e suite
 

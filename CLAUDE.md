@@ -44,6 +44,8 @@ Local services from `docker-compose.yml`: Postgres 15, Redis, MinIO, Temporal (:
 
 In development, Claude runs migrations and `db:generate` itself rather than asking the user; the `.claude/hooks/prisma-schema-reminder.js` hook lists the steps after any `schema.prisma` edit.
 
+MCP servers (`.mcp.json`): `postgres` (Postgres MCP Pro in Docker, restricted mode) logs in as `claude_readonly`, a SELECT-only role that cannot see secret columns; create or refresh it with `npm run db:readonly-role` after a fresh database or a migration that adds a secret column (list it in `infra/postgres/readonly-role.sql`). `playwright` (headless, isolated) drives the local app; use it for bigger UI or flow changes only, since the user checks small tweaks by hand.
+
 ## Architecture
 
 **apps/api**: NestJS 11 on Express. One module per domain under `src/modules/*` (controller / service / repository / `*.messages.ts` for user-facing strings). Key cross-cutting rules, in `src/app.module.ts` and `src/common/`:
