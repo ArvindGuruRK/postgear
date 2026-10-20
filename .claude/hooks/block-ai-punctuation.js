@@ -11,8 +11,8 @@
  */
 
 const BANNED = [
-  { char: '—', name: 'em dash (U+2014)' },
-  { char: '·', name: 'middle dot (U+00B7)' },
+  { char: '\u2014', name: 'em dash (U+2014)' },
+  { char: '\u00b7', name: 'middle dot (U+00B7)' },
 ];
 
 /** The text a tool call would add to the project, or null when there is none to check. */

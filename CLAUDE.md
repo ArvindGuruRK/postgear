@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Use emojis in explanations, summaries and replies 🎯
 - Keep explanations simple and easy to understand: plain words, short sentences, no jargon unless it's needed (and explain it when it is) 🙂
+- Do not use em-dashes in any response. Prefer commas, hyphens, parentheses, or periods instead.
 
 ## What this is
 
