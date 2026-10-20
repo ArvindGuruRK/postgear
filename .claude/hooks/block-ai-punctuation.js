@@ -4,8 +4,11 @@
  * neither anywhere: UI copy, code, comments, docs, commit messages or PRs.
  *
  * Checks the text a tool is about to write (Write, Edit, MultiEdit,
- * NotebookEdit) and the command text of `git commit` / `gh pr` / `gh issue`
- * runs. Characters are written as escapes so this file passes its own check.
+ * NotebookEdit) and the full text of every Bash or PowerShell command, since a
+ * shell can write files too (sed -i, Set-Content, redirects) and commit or tag
+ * messages travel the same way. A command that has to mention either
+ * character, such as a search, uses an escape (\x{2014}, \x{00B7}) instead.
+ * Characters are written as escapes so this file passes its own check.
  * Any failure to parse the input lets the call through: a broken hook must
  * never block work.
  */
@@ -27,10 +30,8 @@ function textToCheck(toolName, input) {
     case 'NotebookEdit':
       return input.new_source ?? '';
     case 'Bash':
-    case 'PowerShell': {
-      const command = input.command ?? '';
-      return /\bgit\b[\s\S]*\bcommit\b|\bgh\s+(pr|issue)\b/.test(command) ? command : null;
-    }
+    case 'PowerShell':
+      return input.command ?? '';
     default:
       return null;
   }
