@@ -69,14 +69,12 @@
      dark mode can keep borders/shadows dark instead of inverting to white;
      see the header comment above --color-outline in colors.css. */
   --color-outline: var(--color-outline);
+  /* Neutral buttons' hover fill: grey in light, near-black in dark. */
+  --color-hoverFill: var(--color-hover-fill);
   --shadow-brutalSm: var(--shadow-brutal-sm);
   --shadow-brutalMd: var(--shadow-brutal-md);
   --shadow-brutalLg: var(--shadow-brutal-lg);
   --shadow-brutalPressed: var(--shadow-brutal-pressed);
-  /* Button2-only vertical "pushable" shadow: see the comment above
-     --shadow-brutal-btn in colors.css. */
-  --shadow-brutalBtn: var(--shadow-brutal-btn);
-  --shadow-brutalBtnHover: var(--shadow-brutal-btn-hover);
   /* Containers, fields and overlays: the same right-and-bottom diagonal as
      the brutal* family above, which is for things you press. Named apart so
      the two can diverge again. See --shadow-surface-* in colors.css. */

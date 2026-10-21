@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@animateicons/react": "^0.12.1",
+    "@gsap/react": "^2.1.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -43,6 +44,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.545.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.11.1",

@@ -1,0 +1,54 @@
+import { cva } from 'class-variance-authority';
+import { fillHoverNeutral } from '../lib/fill-hover-classes';
+import { pressMd } from '../lib/press';
+import { cn } from '../lib/utils';
+
+const variants = cva(
+  [
+    'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap',
+    'rounded-md border-2 border-outline type-ui',
+    // Sinks into its shadow on hover and press: see lib/press.ts.
+    pressMd,
+    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+    'disabled:opacity-50',
+  ],
+  {
+    // One blue primary per area, the neutral secondary for everything else
+    // (2026-10-21), red for deletes and violet for asking the AI.
+    variants: {
+      variant: {
+        primary: 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover',
+        // The card surface, told apart by its border and shadow, like the
+        // calendar's Add Channel tile. On hover a grey (light) or near-black
+        // (dark) fill wipes in from the pointer (lib/fill-hover.ts).
+        secondary: fillHoverNeutral,
+        danger: 'bg-actionDanger text-onActionLight active:brightness-90',
+        ai: 'bg-actionAi text-onActionAi active:brightness-90',
+      },
+      size: {
+        sm: 'h-9 px-4 text-xs',
+        md: 'h-11 px-6 text-sm',
+        lg: 'h-14 px-8 text-base',
+      },
+    },
+    defaultVariants: {
+      variant: 'primary',
+      size: 'md',
+    },
+  },
+);
+
+/**
+ * Exported (Sprint 4) for the one thing `<Button>` cannot be: a link. A
+ * navigation styled as a button must still be an `<a>`, so it can be opened in
+ * a new tab and is announced as a link, and hand-copying these classes onto it
+ * is exactly the per-screen drift design-system-rules.md exists to prevent.
+ *
+ * Its own module (2026-10-21) because Button is now a client component and
+ * server pages call this. Merged, so a variant's transition replaces the
+ * press's instead of competing with it. A link gets the plain CSS hover, not
+ * the animated fill.
+ */
+export function buttonVariants(props?: Parameters<typeof variants>[0]) {
+  return cn(variants(props));
+}

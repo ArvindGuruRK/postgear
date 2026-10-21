@@ -12,6 +12,7 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 ## Colour and themes
 
 - Surfaces: `bg-primary` is the page ground only, `bg-secondary` is every card, field, menu and dialog, `border-outline` is the one border and shadow colour, `text-ink` is the one text and icon colour. `bg-primary` inside a `bg-secondary` surface is a bug.
+- Buttons (2026-10-21): `primary` (blue) for the one main action per area, `secondary` (neutral card surface) for everything else, `danger` (solid red) for every delete, including the button that opens the confirm, `ai` (violet) for asking the AI, at most one per area. No yellow buttons. Rules doc section 7.
 - Fills: `actionPrimary` (blue), `actionSecondary` (yellow), `actionDanger`, `actionAi` (violet), `actionAccent` (orange), `actionSuccess`. Text on a fill is `text-onActionPrimary` for primary, `text-onActionLight` for the rest.
 - There are 12 light and 12 dark themes (`design-tokens.md` section 2a). A theme only changes base tokens, so a page built from tokens works in all 24 for free. Never write `dark:` classes and never style off `data-light-theme` / `data-dark-theme`. If something looks wrong in one theme, fix the token in that theme's block.
 - Check new work in at least Classic light and Classic dark.

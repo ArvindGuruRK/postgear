@@ -40,9 +40,12 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuTrigger,
+  fillHoverNeutral,
+  fillHoverNeutralLayer,
   MotionIcon,
   pressSm,
   TooltipHint,
+  useFillHover,
   useIconAnimation,
 } from '@postgear/ui';
 
@@ -125,6 +128,9 @@ export function ChannelsColumn({
   // offering what would come back 403.
   const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
   const atLimit = limit !== null && limit.used >= limit.max;
+  // Add Channel is a neutral tile, so it fills on hover like Button's
+  // secondary variant.
+  const addFill = useFillHover({ disabled: atLimit });
 
   // Expanded is the default; the stored preference is applied after mount so
   // server and first client render agree.
@@ -379,12 +385,14 @@ export function ChannelsColumn({
                 triggerClassName={collapsed ? undefined : 'flex-1'}
               >
                 <button
+                  ref={addFill.rootRef}
                   type="button"
                   onClick={() => setConnectOpen(true)}
                   disabled={atLimit}
                   aria-label="Add Channel"
-                  className={cn(TILE, 'bg-secondary text-ink', collapsed ? 'w-11' : 'flex-1 px-3')}
+                  className={cn(TILE, fillHoverNeutral, collapsed ? 'w-11' : 'flex-1 px-3')}
                 >
+                  <span ref={addFill.fillRef} aria-hidden className={fillHoverNeutralLayer} />
                   <MotionIcon icon={PlusIcon} className="h-4 w-4 shrink-0" />
                   {collapsed ? null : <span className="truncate">Add Channel</span>}
                 </button>
@@ -393,7 +401,8 @@ export function ChannelsColumn({
             <ColumnLink
               href={`/${orgId}/channels`}
               label="Manage channels"
-              className={cn(TILE, 'w-11 bg-secondary text-ink')}
+              fill
+              className={cn(TILE, 'w-11')}
             >
               <MotionIcon icon={SlidersHorizontalIcon} className="h-4 w-4" />
             </ColumnLink>
@@ -523,6 +532,7 @@ function ColumnLink({
   label,
   tooltip = true,
   triggers,
+  fill = false,
   className,
   children,
 }: {
@@ -532,12 +542,23 @@ function ColumnLink({
   tooltip?: boolean;
   /** An animated icon's `useIconAnimation().triggers`, played from the whole tile. */
   triggers?: ReturnType<typeof useIconAnimation>['triggers'];
+  /** A neutral tile: the card surface, filling on hover like Button's secondary. */
+  fill?: boolean;
   className: string;
   children: ReactNode;
 }) {
+  const { rootRef, fillRef } = useFillHover({ enabled: fill });
+
   return (
     <TooltipHint label={label} side="right" hidden={!tooltip}>
-      <Link href={href} aria-label={label} {...triggers} className={className}>
+      <Link
+        ref={rootRef}
+        href={href}
+        aria-label={label}
+        {...triggers}
+        className={cn(className, fill && fillHoverNeutral)}
+      >
+        {fill ? <span ref={fillRef} aria-hidden className={fillHoverNeutralLayer} /> : null}
         {children}
       </Link>
     </TooltipHint>

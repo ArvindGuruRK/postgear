@@ -1,5 +1,5 @@
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
-import { Badge, Button, Button2, MotionIcon } from '@postgear/ui';
+import { Badge, Button, MotionIcon } from '@postgear/ui';
 import { Row, Section } from '../shared';
 
 export function ButtonsSection() {
@@ -7,27 +7,27 @@ export function ButtonsSection() {
     <>
       <Section
         title="Buttons"
-        description="The reference press interaction: shadow-brutalMd collapses to shadow-brutalPressed on click."
+        description="One primary per area, secondary for everything else, red for deletes, violet for asking the AI. shadow-brutalMd collapses to shadow-brutalPressed on click."
       >
-        <Row label="Primary">
-          <Button size="sm">Connect Channel</Button>
-          <Button size="md">Connect Channel</Button>
-          <Button size="lg">Connect Channel</Button>
+        <Row label="Primary (one per area)">
+          <Button size="sm">Create Post</Button>
+          <Button size="md">Create Post</Button>
+          <Button size="lg">Create Post</Button>
           <Button disabled>Disabled</Button>
         </Row>
-        <Row label="Secondary">
-          <Button variant="secondary">Schedule Post</Button>
+        <Row label="Secondary (everything else)">
+          <Button variant="secondary">Add Channel</Button>
           <Button variant="secondary" disabled>
             Disabled
           </Button>
         </Row>
-        <Row label="Danger">
+        <Row label="Danger (deletes)">
           <Button variant="danger">Delete</Button>
           <Button variant="danger" disabled>
             Disabled
           </Button>
         </Row>
-        <Row label="AI">
+        <Row label="AI (asking the AI)">
           <Button variant="ai">
             <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
             Ask AI
@@ -35,50 +35,6 @@ export function ButtonsSection() {
           <Button variant="ai" disabled>
             Disabled
           </Button>
-        </Row>
-      </Section>
-
-      <Section
-        title="Buttons: 3D Push (Button2)"
-        description="A separate, parallel exploration living in button2.tsx, not a Button variant: shadow-brutalBtn is bottom-only (no x-offset), grows to shadow-brutalBtnHover on hover (lifts off its base), then collapses to shadow-brutalPressed on click (sinks flush)."
-      >
-        <Row label="Primary">
-          <Button2 size="sm">Connect Channel</Button2>
-          <Button2 size="md">Connect Channel</Button2>
-          <Button2 size="lg">Connect Channel</Button2>
-          <Button2 disabled>Disabled</Button2>
-        </Row>
-        <Row label="Secondary">
-          <Button2 variant="secondary">Schedule Post</Button2>
-          <Button2 variant="secondary" disabled>
-            Disabled
-          </Button2>
-        </Row>
-        <Row label="Danger">
-          <Button2 variant="danger">Delete</Button2>
-          <Button2 variant="danger" disabled>
-            Disabled
-          </Button2>
-        </Row>
-        <Row label="AI">
-          <Button2 variant="ai">
-            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
-            Ask AI
-          </Button2>
-          <Button2 variant="ai" disabled>
-            Disabled
-          </Button2>
-        </Row>
-        <Row label="Pressed state (static: the shadow sinks flush, hover/press disabled below)">
-          <Button2 className="pointer-events-none translate-y-1 shadow-brutalPressed">
-            Connect Channel
-          </Button2>
-          <Button2
-            variant="secondary"
-            className="pointer-events-none translate-y-1 shadow-brutalPressed"
-          >
-            Schedule Post
-          </Button2>
         </Row>
       </Section>
 

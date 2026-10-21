@@ -1,57 +1,50 @@
-import { type VariantProps, cva } from 'class-variance-authority';
-import { forwardRef } from 'react';
-import { pressMd } from '../lib/press';
-import { cn } from '../lib/utils';
+'use client';
 
-/**
- * Exported (Sprint 4) for the one thing `<Button>` cannot be: a link. A
- * navigation styled as a button must still be an `<a>`, so it can be opened in
- * a new tab and is announced as a link, and hand-copying these classes onto it
- * is exactly the per-screen drift design-system-rules.md exists to prevent.
- */
-export const buttonVariants = cva(
-  [
-    'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap',
-    'rounded-md border-2 border-outline type-ui',
-    // Sinks into its shadow on hover and press: see lib/press.ts.
-    pressMd,
-    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-    'disabled:opacity-50',
-  ],
-  {
-    variants: {
-      variant: {
-        primary: 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover',
-        secondary: 'bg-actionSecondary text-onActionLight active:brightness-95',
-        danger: 'bg-actionDanger text-onActionLight active:brightness-90',
-        ai: 'bg-actionAi text-onActionAi active:brightness-90',
-      },
-      size: {
-        sm: 'h-9 px-4 text-xs',
-        md: 'h-11 px-6 text-sm',
-        lg: 'h-14 px-8 text-base',
-      },
-    },
-    defaultVariants: {
-      variant: 'primary',
-      size: 'md',
-    },
-  },
-);
+import type { VariantProps } from 'class-variance-authority';
+import { forwardRef, useCallback } from 'react';
+import { fillHoverNeutralLayer } from '../lib/fill-hover-classes';
+import { useFillHover } from '../lib/fill-hover';
+import { cn } from '../lib/utils';
+import { buttonVariants } from './button-variants';
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {}
 
+/** The variants whose hover is a colour wiping in from the pointer. */
+const FILL_LAYER: Partial<Record<NonNullable<ButtonProps['variant']>, string>> = {
+  secondary: fillHoverNeutralLayer,
+};
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, type = 'button', ...props }, ref) => {
+  ({ className, variant, size, type = 'button', children, ...props }, ref) => {
+    const layer = variant ? FILL_LAYER[variant] : undefined;
+    const { rootRef, fillRef } = useFillHover({
+      enabled: layer !== undefined,
+      disabled: props.disabled,
+    });
+    const setRef = useCallback(
+      (node: HTMLButtonElement | null) => {
+        rootRef?.(node);
+        if (typeof ref === 'function') {
+          ref(node);
+        } else if (ref) {
+          ref.current = node;
+        }
+      },
+      [ref, rootRef],
+    );
+
     return (
       <button
-        ref={ref}
+        ref={setRef}
         type={type}
         className={cn(buttonVariants({ variant, size }), className)}
         {...props}
-      />
+      >
+        {layer ? <span ref={fillRef} aria-hidden className={layer} /> : null}
+        {children}
+      </button>
     );
   },
 );

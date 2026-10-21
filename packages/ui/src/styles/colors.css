@@ -151,6 +151,10 @@
     --color-success-ink: var(--color-brutal-success);
     --color-danger-ink: var(--color-brutal-danger);
     --color-accent-ink: var(--color-brutal-accent);
+    /* The hover fill of neutral buttons (2026-10-21, the user's pick over
+       inverting to white): the theme's near-black outline in dark, a grey
+       in light (see the .light block). The label keeps --color-ink on it. */
+    --color-hover-fill: var(--color-outline);
     /* The shadow offsets, as their own tokens (2026-10-18), so a pressable
        control can move by exactly its shadow's depth when it sinks into it
        (press-sm / press-md in packages/ui/src/lib/press.ts, after the
@@ -165,17 +169,6 @@
     /* The pressed state: the control has moved into the space its shadow
        occupied, so the shadow collapses to nothing. */
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
-    /* Button-only "pushable" shadow (added 2026-08-30, per a comic
-       component-sheet reference): bottom-offset only, reading as a solid
-       ink base the button sits on top of, not the diagonal offset every
-       other brutal-shadow surface (Card/Dialog/Input/etc.) uses. Hover
-       grows the offset (button looks like it lifts off its base); press
-       collapses back to --shadow-brutal-pressed (button sinks flush).
-       Deliberately scoped to Button: see button.tsx and
-       design-system-rules.md §6/§8 for why this doesn't replace the
-       diagonal family everywhere else. */
-    --shadow-brutal-btn: 0 4px 0 var(--color-outline);
-    --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
     /* Surface shadows: containers, fields and overlays (Card, Panel,
        Input, Calendar, menus, dialogs...). Named apart from the `brutal`
        family that pressable controls use, but the same diagonal in every
@@ -207,6 +200,10 @@
     --color-success-ink: #147537;
     --color-danger-ink: #c81e2c;
     --color-accent-ink: #b93d0b;
+    /* Grey for the neutral buttons' hover fill (see the .dark block): the
+       ink mixed into the card, so each light theme gets a grey of its own
+       tint, and ink text stays readable on it. */
+    --color-hover-fill: color-mix(in srgb, var(--color-ink) 15%, var(--color-secondary));
     /* Light mode runs lighter than dark (2026-10-17): on the pale page a
        solid black offset reads as heavy, so the diagonal is about a quarter
        smaller than dark mode's. Same direction as dark, right and bottom,
@@ -219,8 +216,6 @@
     --shadow-brutal-md: var(--brutal-offset-md) var(--brutal-offset-md) 0 var(--color-outline);
     --shadow-brutal-lg: var(--brutal-offset-lg) var(--brutal-offset-lg) 0 var(--color-outline);
     --shadow-brutal-pressed: 0 0 0 var(--color-outline);
-    --shadow-brutal-btn: 0 4px 0 var(--color-outline);
-    --shadow-brutal-btn-hover: 0 6px 0 var(--color-outline);
     --shadow-surface-sm: var(--shadow-brutal-sm);
     --shadow-surface-md: var(--shadow-brutal-md);
     --shadow-surface-lg: var(--shadow-brutal-lg);
@@ -581,7 +576,7 @@
   --color-brutal-secondary: #ffd100;
   --color-brutal-danger: #e63946;
   --color-brutal-accent: #ff6b35;
-  /* AI-powered surfaces only (Button/Button2/Badge/Alert/Toast "ai"
+  /* AI-powered surfaces only (Button/Badge/Alert/Toast "ai"
      variant); see the ADDENDUM above for why this replaced --new-ai-btn
      pink as the "ai" semantic's fill.
 

@@ -88,7 +88,7 @@ The style needs two things Tailwind's defaults don't provide: an outline color, 
 | `--brutal-offset-sm/md/lg` | `translate-x/y-(--brutal-offset-*)` | The shadow depths per scheme: light 2 / 3 / 4px, dark 2 / 4 / 6px, White and Sky 2px throughout. Every shadow below is built from them. |
 | `--shadow-brutal-sm/md/lg` | `shadow-brutalSm/Md/Lg` | The diagonal offset shadow scale, right and bottom, from the offsets above. |
 | `--shadow-brutal-pressed` | `shadow-brutalPressed` | Collapses to `0 0 0`. With a translate by the matching offset (`pressSm`/`pressMd` in `packages/ui/src/lib/press.ts`): the press interaction that is the system's signature. |
-| `--shadow-brutal-btn`, `--shadow-brutal-btn-hover` | `shadow-brutalBtn`, `shadow-brutalBtnHover` | Button2-only vertical base (`0 4px 0` → `0 6px 0`). See §7. |
+| `--color-hover-fill` | `bg-hoverFill` | The secondary button's hover fill (2026-10-21): grey in light (ink mixed 15% into the card), the near-black outline in dark. Button2's `--shadow-brutal-btn` pair was removed with Button2 the same day. |
 
 ## 4. Action palette
 
