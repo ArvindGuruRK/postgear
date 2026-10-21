@@ -14,7 +14,7 @@ const variants = cva(
   ],
   {
     // One blue primary per area, the neutral secondary for everything else
-    // (2026-10-21), red for deletes and violet for asking the AI.
+    // (2026-10-21), red for deletes and violet (highlight) for a standout action.
     variants: {
       variant: {
         primary: 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover',
@@ -23,7 +23,10 @@ const variants = cva(
         // (dark) fill wipes in from the pointer (lib/fill-hover.ts).
         secondary: fillHoverNeutral,
         danger: 'bg-actionDanger text-onActionLight active:brightness-90',
-        ai: 'bg-actionAi text-onActionAi active:brightness-90',
+        // The third button (2026-10-21): violet, for the one standout action that
+        // is not the main one. Asking the AI is its first use; the sparkle icon
+        // on the button says so, the colour does not have to.
+        highlight: 'bg-actionAi text-onActionAi active:brightness-90',
       },
       size: {
         sm: 'h-9 px-4 text-xs',

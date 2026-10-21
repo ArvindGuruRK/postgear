@@ -57,7 +57,7 @@ export function DayView({
         {rows.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <CalendarClock className="h-8 w-8 text-ink opacity-50" strokeWidth={2} />
-            <p className="max-w-sm font-sans text-sm text-ink opacity-70">
+            <p className="max-w-sm font-sans text-sm text-ink type-muted">
               Nothing goes out on this day, and no channel has a posting time set.
             </p>
             {isSameDay(day, now) || day.getTime() > now.getTime() ? (

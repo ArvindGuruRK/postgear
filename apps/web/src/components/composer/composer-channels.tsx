@@ -15,38 +15,32 @@
  * when queueing.
  */
 import { Avatar, AvatarFallback, AvatarImage, cn, TooltipHint } from '@postgear/ui';
-import { Radio } from 'lucide-react';
 import Link from 'next/link';
+import { NoChannelsNotice } from '@/components/channels/no-channels-notice';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
-import type { Channel } from '@/types/channel';
+import type { Channel, ProviderSummary } from '@/types/channel';
 
 export function ComposerChannels({
   orgId,
   channels,
+  providers,
   selected,
   onToggle,
   disabled = false,
 }: {
   orgId: string;
   channels: Channel[];
+  /** What can be connected: offered when there are no channels yet. */
+  providers: ProviderSummary[];
   selected: string[];
   onToggle: (channelId: string) => void;
   /** A published post: the picture still shows where it went, nothing changes. */
   disabled?: boolean;
 }) {
+  // No channel yet is not a dead end (2026-10-21): the post can be written
+  // here, and a platform can be picked to connect from right in this row.
   if (channels.length === 0) {
-    return (
-      <div className="flex items-center gap-3 rounded-lg border-2 border-dashed border-ink/30 p-4">
-        <Radio className="h-5 w-5 shrink-0 text-ink opacity-60" strokeWidth={2.25} />
-        <p className="m-0 font-sans text-sm text-ink">
-          No channels to post to yet.{' '}
-          <Link href={`/${orgId}/channels`} className="type-ui underline underline-offset-2">
-            Connect a channel
-          </Link>{' '}
-          first, then come back to write for it.
-        </p>
-      </div>
-    );
+    return <NoChannelsNotice providers={providers} />;
   }
 
   const reconnecting = channels.filter(

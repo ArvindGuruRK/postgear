@@ -5,7 +5,21 @@ import { Eye } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ChannelPreview } from '@/components/previews/channel-preview';
-import type { ChannelReport } from './channel-report';
+import { GenericPreview } from '@/components/previews/generic.preview';
+import type { PreviewChannel } from '@/components/previews/preview-parts';
+import type { ChannelReport, RenderedPart } from './channel-report';
+
+/** Who the general preview says is posting: no account yet, so a stand-in. */
+const DRAFT_CHANNEL: PreviewChannel = {
+  id: 'draft',
+  name: 'Your account',
+  profile: 'preview',
+  picture: null,
+  color: 0,
+};
+
+/** Far past any platform's limit, so the general preview never flags an overrun. */
+const DRAFT_MAX_LENGTH = 1_000_000;
 
 /**
  * The live preview, one selected channel at a time.
@@ -17,11 +31,18 @@ import type { ChannelReport } from './channel-report';
  */
 export function PreviewPanel({
   reports,
+  draft = null,
   publishAt,
   focusChannelId,
   settings,
 }: {
   reports: ChannelReport[];
+  /**
+   * The words and media to show in a general preview while no channel is
+   * connected (2026-10-21), or null when channels exist. A platform's own
+   * preview needs a platform; this one shows the post as plain text.
+   */
+  draft?: RenderedPart[] | null;
   publishAt: Date | null;
   /** The channel whose tab is open in the editor. Opening a tab previews that channel. */
   focusChannelId: string | null;
@@ -42,11 +63,34 @@ export function PreviewPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      {!active ? (
+      {!active &&
+      draft &&
+      draft.some((part) => part.text.trim() !== '' || part.media.length > 0) ? (
+        <div className="flex flex-col gap-2">
+          <div
+            className="overflow-hidden rounded-lg border-2 border-outline"
+            data-testid="preview-draft"
+          >
+            <GenericPreview
+              channel={DRAFT_CHANNEL}
+              parts={draft}
+              // No platform, so no platform limit to measure against.
+              maxLength={DRAFT_MAX_LENGTH}
+              lengthMethod="utf16"
+              publishAt={publishAt}
+            />
+          </div>
+          <Text size="xs" muted>
+            A general preview. Connect a channel to see it the way each platform shows it.
+          </Text>
+        </div>
+      ) : !active ? (
         <div className="flex flex-col items-center gap-2 px-4 py-16 text-center">
           <Eye className="h-7 w-7 text-ink opacity-40" strokeWidth={2} />
           <p className="m-0 font-sans text-sm text-ink opacity-70">
-            Pick a channel and start writing to see the post the way that platform shows it.
+            {draft
+              ? 'Start writing to see your post here.'
+              : 'Pick a channel and start writing to see the post the way that platform shows it.'}
           </p>
         </div>
       ) : (

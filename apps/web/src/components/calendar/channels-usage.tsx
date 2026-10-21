@@ -66,7 +66,7 @@ export function ChannelsUsage({
     <div data-testid="channels-usage" className={cn('flex shrink-0 flex-col gap-3', className)}>
       {unconnected.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <span className="type-label text-xs text-ink opacity-70">Connect channels</span>
+          <span className="type-label text-xs text-ink muted-tone">Connect channels</span>
           <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
             {unconnected.map((provider) => (
               <li key={provider.identifier}>
@@ -122,7 +122,7 @@ function UsageLine({
       data-max={limit.max}
     >
       <div className="flex items-baseline justify-between gap-2 font-sans text-xs text-ink">
-        <span className={cn(nearLimit ? 'text-dangerInk' : 'opacity-70')}>
+        <span className={cn(nearLimit ? 'text-dangerInk' : 'type-muted')}>
           {limit.used} of {limit.max} {limit.max === 1 ? 'channel' : 'channels'}
         </span>
         {atLimit && canManage ? (

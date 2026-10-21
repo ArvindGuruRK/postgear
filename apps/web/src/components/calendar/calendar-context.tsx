@@ -53,6 +53,9 @@ import {
 
 /** How often the visible range is refreshed while something on it is in motion. */
 const LIVE_POLL_MS = 10_000;
+
+/** How often "now" is re-read, so the time on the week view's line is never stale. */
+const CLOCK_MS = 15_000;
 /** How often otherwise, so a post published by the worker shows up without a reload. */
 const IDLE_POLL_MS = 60_000;
 
@@ -213,6 +216,15 @@ export function CalendarProvider({
     };
     window.addEventListener(POSTS_CHANGED_EVENT, reload);
     return () => window.removeEventListener(POSTS_CHANGED_EVENT, reload);
+  }, []);
+
+  // The clock, on its own beat (2026-10-21): the week view writes the time on
+  // its "now" line, and the data refresh below only runs every minute (or
+  // every ten seconds while something is publishing), which would leave the
+  // time up to a minute behind.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), CLOCK_MS);
+    return () => clearInterval(timer);
   }, []);
 
   // Refresh while the worker is expected to change something in view.

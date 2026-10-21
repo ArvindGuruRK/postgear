@@ -27,12 +27,12 @@ export function ButtonsSection() {
             Disabled
           </Button>
         </Row>
-        <Row label="AI (asking the AI)">
-          <Button variant="ai">
+        <Row label="Highlight (violet, the third button)">
+          <Button variant="highlight">
             <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
             Ask AI
           </Button>
-          <Button variant="ai" disabled>
+          <Button variant="highlight" disabled>
             Disabled
           </Button>
         </Row>

@@ -69,7 +69,7 @@ export function FeedbackSection() {
         </Button>
         <Button
           size="sm"
-          variant="ai"
+          variant="highlight"
           onClick={() =>
             toast({
               variant: 'ai',

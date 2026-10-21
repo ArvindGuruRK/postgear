@@ -51,7 +51,12 @@ export const viewport: Viewport = {
 // System.
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={brandFont.variable}>
+    // `suppressHydrationWarning` on <html> as well as <body>: browser extensions
+    // (a custom cursor, a dark-mode tool, a translator) add attributes such as
+    // `style` and `data-*` to <html> before React loads, and React then reports
+    // a mismatch that no code of ours caused. It only silences this element's
+    // own attributes, not anything inside it.
+    <html lang="en" className={brandFont.variable} suppressHydrationWarning>
       <body suppressHydrationWarning>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static no-flash theme script, no user input */}
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_APPEARANCE_SCRIPT }} />

@@ -68,7 +68,7 @@ export function AiSection() {
           </div>
           <div className="flex items-center gap-3">
             <TypingIndicator />
-            <Button size="sm" variant="ai">
+            <Button size="sm" variant="highlight">
               <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
               Generate
             </Button>

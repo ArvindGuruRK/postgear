@@ -37,6 +37,18 @@ export interface ChannelReport {
   channelProblem: string | null;
 }
 
+/**
+ * A post's parts as plain words and media, for the general preview shown while
+ * no channel is connected (2026-10-21). There is no platform to measure by, so
+ * a part's length is its plain character count.
+ */
+export function renderDraftParts(parts: DraftPart[]): RenderedPart[] {
+  return parts.map((part) => {
+    const text = renderPlainText(normalizeDocument(part.content));
+    return { key: part.key, text, media: part.media, length: text.length };
+  });
+}
+
 export function buildReport(
   channel: Channel,
   provider: ProviderSummary | undefined,

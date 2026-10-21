@@ -164,7 +164,7 @@ export function OverlaysSection() {
           </Button>
         </TooltipHint>
         <TooltipHint label="Generate with AI">
-          <Button variant="ai" size="sm" className="w-9 px-0" aria-label="Generate with AI">
+          <Button variant="highlight" size="sm" className="w-9 px-0" aria-label="Generate with AI">
             <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
           </Button>
         </TooltipHint>

@@ -326,7 +326,7 @@ export function CopilotChat({
               ) : null}
               <Button
                 type="submit"
-                variant="ai"
+                variant="highlight"
                 size="sm"
                 disabled={!canSend || draft.trim().length === 0}
               >

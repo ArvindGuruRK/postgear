@@ -48,13 +48,13 @@ describe('Button hover fill', () => {
     expect(button).not.toHaveAttribute('data-filled');
   });
 
-  it('leaves the filled variants (primary, red delete, AI) without the fill', () => {
+  it('leaves the filled variants (primary, red delete, highlight) without the fill', () => {
     mockMatchMedia(true);
     render(
       <>
         <Button>Create Post</Button>
         <Button variant="danger">Delete</Button>
-        <Button variant="ai">Ask AI</Button>
+        <Button variant="highlight">Ask AI</Button>
       </>,
     );
 

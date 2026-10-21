@@ -111,7 +111,7 @@ import { announcePostsChanged } from '@/lib/post-events';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
 import type { PostDetail, PostPart } from '@/types/post';
-import { buildReport, queueBlockers } from './channel-report';
+import { buildReport, queueBlockers, renderDraftParts } from './channel-report';
 import { ComposerChannels } from './composer-channels';
 import { RepeatControl } from './composer-repeat';
 import { SettingsBar, type SettingsBlock } from './composer-settings';
@@ -323,6 +323,13 @@ export function Composer({
   const dirty = isDirty(state);
   const publishDate = isValidPublishAt(state.publishAt) ? new Date(state.publishAt) : null;
   const locked = state.savedState === 'PUBLISHED';
+  // With no channel connected the post can still be written and previewed
+  // (2026-10-21): only saving and scheduling wait, via `noChannels` below.
+  // What the right-hand preview shows then is the general one.
+  const draftParts = useMemo(
+    () => (channels.length === 0 ? renderDraftParts(partsFor(state, SHARED)) : null),
+    [channels.length, state],
+  );
 
   // The reports that decide what the current tab's counters and issues show:
   // the shared thread speaks for every channel that follows it.
@@ -586,7 +593,9 @@ export function Composer({
       : saving === 'NOW'
         ? 'Publishing…'
         : noChannels
-          ? 'Pick a channel above'
+          ? channels.length === 0
+            ? 'Connect a channel first'
+            : 'Pick a channel above'
           : !state.group
             ? 'Add to calendar'
             : queued
@@ -722,6 +731,7 @@ export function Composer({
             <ComposerChannels
               orgId={orgId}
               channels={channels}
+              providers={providers}
               selected={state.selected}
               onToggle={(channelId) => dispatch({ type: 'toggleChannel', channelId })}
               disabled={locked}
@@ -930,6 +940,7 @@ export function Composer({
           <div className="p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto pg-scrollbar pg-scrollbar-primary">
             <PreviewPanel
               reports={reports}
+              draft={draftParts}
               publishAt={publishDate}
               focusChannelId={state.scope === SHARED ? null : state.scope}
               settings={state.settings}

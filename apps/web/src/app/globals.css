@@ -73,6 +73,31 @@
   letter-spacing: var(--type-ui-tracking);
 }
 
+/* Secondary text: day names, hour labels, helper lines (2026-10-21). The old
+   70% ink at a regular weight read as washed out on the light page, so light
+   mode takes a stronger tone and the UI weight; dark mode keeps the softer
+   look it already had and the person was happy with. `muted-tone` is the
+   same tone alone, for text that already has its own role (a caps label). */
+@utility type-muted {
+  font-weight: var(--type-ui-weight);
+  letter-spacing: var(--type-ui-tracking);
+  opacity: 0.88;
+
+  &:where(.dark, .dark *) {
+    font-weight: var(--type-body-weight);
+    letter-spacing: normal;
+    opacity: 0.7;
+  }
+}
+
+@utility muted-tone {
+  opacity: 0.88;
+
+  &:where(.dark, .dark *) {
+    opacity: 0.7;
+  }
+}
+
 /* Caps need positive tracking to stay legible at 10–14px. */
 @utility type-label {
   font-weight: var(--type-label-weight);

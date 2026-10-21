@@ -250,7 +250,7 @@ export function GenerateForm({
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="submit"
-          variant="ai"
+          variant="highlight"
           disabled={running || cannotAfford || channels.length === 0}
         >
           <MotionIcon icon={SparklesIcon} className="h-4 w-4" />

@@ -408,46 +408,47 @@ export function ChannelsColumn({
             </ColumnLink>
           </div>
 
-          {hasChannels ? (
-            <div className={cn('flex gap-2', collapsed && 'flex-col')}>
-              <ColumnLink
-                href={`/${orgId}/composer`}
-                label="Create Post"
-                // Expanded, the label is on the button already.
-                tooltip={collapsed}
-                className={cn(
-                  TILE,
-                  'bg-actionPrimary text-onActionPrimary',
-                  collapsed ? 'w-11' : 'flex-1 px-3',
-                )}
-              >
-                <MotionIcon icon={SquarePenIcon} className="h-4 w-4 shrink-0" />
-                {collapsed ? null : <span className="truncate">Create Post</span>}
-              </ColumnLink>
-              <ColumnLink
-                href={`/${orgId}/ai-copilot`}
-                label="Generate with AI"
-                triggers={aiIcon.triggers}
-                className={cn(TILE, 'w-11 bg-actionAi text-onActionAi')}
-              >
-                <BotIcon
-                  ref={aiIcon.ref}
-                  aria-hidden
-                  // Larger than the tile's other glyphs: the bot's face is
-                  // detailed, and at 16px it read as a smudge in a 44px tile.
-                  size={22}
-                  className={cn('h-[22px] w-[22px]', ANIMATED_ICON_CLASS)}
-                />
-              </ColumnLink>
-            </div>
-          ) : null}
+          {/* Always offered (2026-10-21), channels or not: the composer lets a
+              person start writing and connect a platform from inside it, so
+              nothing here is blocked behind Add Channel. */}
+          <div className={cn('flex gap-2', collapsed && 'flex-col')}>
+            <ColumnLink
+              href={`/${orgId}/composer`}
+              label="Create Post"
+              // Expanded, the label is on the button already.
+              tooltip={collapsed}
+              className={cn(
+                TILE,
+                'bg-actionPrimary text-onActionPrimary',
+                collapsed ? 'w-11' : 'flex-1 px-3',
+              )}
+            >
+              <MotionIcon icon={SquarePenIcon} className="h-4 w-4 shrink-0" />
+              {collapsed ? null : <span className="truncate">Create Post</span>}
+            </ColumnLink>
+            <ColumnLink
+              href={`/${orgId}/ai-copilot`}
+              label="Generate with AI"
+              triggers={aiIcon.triggers}
+              className={cn(TILE, 'w-11 bg-actionAi text-onActionAi')}
+            >
+              <BotIcon
+                ref={aiIcon.ref}
+                aria-hidden
+                // Larger than the tile's other glyphs: the bot's face is
+                // detailed, and at 16px it read as a smudge in a 44px tile.
+                size={22}
+                className={cn('h-[22px] w-[22px]', ANIMATED_ICON_CLASS)}
+              />
+            </ColumnLink>
+          </div>
         </div>
 
         {!hasChannels ? (
           collapsed ? null : (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-2 text-center">
               <p className="type-heading text-lg text-ink">No channels yet</p>
-              <p className="font-sans text-sm text-ink opacity-70">
+              <p className="font-sans text-sm text-ink type-muted">
                 Connect your social accounts to start posting.
               </p>
             </div>
@@ -456,7 +457,7 @@ export function ChannelsColumn({
           <div className={cn('flex flex-col gap-3', collapsed && 'items-center')}>
             {filtering && !collapsed ? (
               <div className="flex items-center justify-between gap-2 font-sans text-xs text-ink">
-                <span className="opacity-70">
+                <span className="type-muted">
                   Showing {channelFilter.length} of {channels.length}
                 </span>
                 <button

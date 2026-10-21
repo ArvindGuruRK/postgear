@@ -12,7 +12,8 @@
  * The grid sits on the page ground and scrolls inside its own region:
  * vertically through the hours, and sideways on a narrow screen rather than
  * squeezing seven days into a phone's width. It opens on the working morning
- * rather than midnight, with the present minute drawn across the current hour.
+ * rather than midnight, with the present minute drawn across the current hour
+ * and the time itself written on it, in the hour gutter (2026-10-21).
  */
 import { cn } from '@postgear/ui';
 import { useEffect, useRef } from 'react';
@@ -51,6 +52,8 @@ export function WeekView({
 }) {
   const days = visibleDays('week', anchor);
   const byHour = bucketPosts(posts, hourKey);
+  // "3:42 PM", in the viewer's own format.
+  const nowText = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const scroller = useRef<HTMLDivElement>(null);
   const header = useRef<HTMLDivElement>(null);
   const morning = useRef<HTMLDivElement>(null);
@@ -90,7 +93,7 @@ export function WeekView({
                     'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
                   )}
                 >
-                  <span className="truncate font-sans text-xs text-ink opacity-70">
+                  <span className="truncate font-sans text-xs text-ink type-muted">
                     <span className="md:hidden">
                       {day.toLocaleDateString(undefined, { weekday: 'short' })}
                     </span>
@@ -101,14 +104,11 @@ export function WeekView({
                   <span
                     className={cn(
                       'flex items-center gap-1.5 type-ui text-sm tabular-nums',
-                      today ? 'text-actionPrimary' : 'text-ink',
+                      today ? 'text-actionAi' : 'text-ink',
                     )}
                   >
                     {today ? (
-                      <span
-                        aria-hidden="true"
-                        className="h-1.5 w-1.5 rounded-full bg-actionPrimary"
-                      />
+                      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-actionAi" />
                     ) : null}
                     {day.toLocaleDateString()}
                   </span>
@@ -121,6 +121,10 @@ export function WeekView({
             {HOURS.map((hour) => {
               const currentHour =
                 now.getHours() === hour && days.some((day) => isSameDay(day, now));
+              // The hour's label sits at the middle of its row, so the time
+              // marker would land on it around the half hour: the marker says
+              // the time itself, and the label steps aside until it passes.
+              const labelCovered = currentHour && Math.abs(now.getMinutes() - 30) <= 16;
 
               return (
                 <div
@@ -130,7 +134,12 @@ export function WeekView({
                   ref={hour === MORNING_HOUR ? morning : undefined}
                   className={cn('relative grid gap-1', COLUMNS)}
                 >
-                  <div className="flex items-center justify-center px-2 font-sans text-xs tabular-nums text-ink opacity-70">
+                  <div
+                    className={cn(
+                      'flex items-center justify-center px-2 font-sans text-xs tabular-nums text-ink type-muted',
+                      labelCovered && 'invisible',
+                    )}
+                  >
                     {hourLabel(hour)}
                   </div>
 
@@ -160,12 +169,22 @@ export function WeekView({
                   })}
 
                   {currentHour ? (
-                    // The present minute, as a line across the whole hour row.
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-actionAccent"
-                      style={{ top: `${(now.getMinutes() / 60) * 100}%` }}
-                    />
+                    // The present minute, as a line across the whole hour row,
+                    // with the time itself in the hour gutter where the line starts.
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-actionAi"
+                        style={{ top: `${(now.getMinutes() / 60) * 100}%` }}
+                      />
+                      <span
+                        data-testid="now-time"
+                        className="pointer-events-none absolute start-0.5 z-10 -translate-y-1/2 rounded-md border border-outline bg-actionAi px-1 py-0.5 md:border-2 font-sans text-[11px] leading-none tabular-nums type-ui text-onActionAi"
+                        style={{ top: `${(now.getMinutes() / 60) * 100}%` }}
+                      >
+                        {nowText}
+                      </span>
+                    </>
                   ) : null}
                 </div>
               );

@@ -83,14 +83,14 @@ export function MonthView({
                           aria-current={today ? 'date' : undefined}
                           className={cn(
                             'flex items-center justify-center gap-1.5 pt-1.5 type-ui text-sm tabular-nums',
-                            today ? 'text-actionPrimary' : 'text-ink',
+                            today ? 'text-actionAi' : 'text-ink',
                             day.getMonth() !== month && !today && 'opacity-50',
                           )}
                         >
                           {today ? (
                             <span
                               aria-hidden="true"
-                              className="h-1.5 w-1.5 rounded-full bg-actionPrimary"
+                              className="h-1.5 w-1.5 rounded-full bg-actionAi"
                             />
                           ) : null}
                           {day.getDate()}
