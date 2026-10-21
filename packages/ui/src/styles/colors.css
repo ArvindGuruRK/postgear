@@ -151,10 +151,6 @@
     --color-success-ink: var(--color-brutal-success);
     --color-danger-ink: var(--color-brutal-danger);
     --color-accent-ink: var(--color-brutal-accent);
-    /* The hover fill of neutral buttons (2026-10-21, the user's pick over
-       inverting to white): the theme's near-black outline in dark, a grey
-       in light (see the .light block). The label keeps --color-ink on it. */
-    --color-hover-fill: var(--color-outline);
     /* The shadow offsets, as their own tokens (2026-10-18), so a pressable
        control can move by exactly its shadow's depth when it sinks into it
        (press-sm / press-md in packages/ui/src/lib/press.ts, after the
@@ -200,10 +196,6 @@
     --color-success-ink: #147537;
     --color-danger-ink: #c81e2c;
     --color-accent-ink: #b93d0b;
-    /* Grey for the neutral buttons' hover fill (see the .dark block): the
-       ink mixed into the card, so each light theme gets a grey of its own
-       tint, and ink text stays readable on it. */
-    --color-hover-fill: color-mix(in srgb, var(--color-ink) 15%, var(--color-secondary));
     /* Light mode runs lighter than dark (2026-10-17): on the pale page a
        solid black offset reads as heavy, so the diagonal is about a quarter
        smaller than dark mode's. Same direction as dark, right and bottom,

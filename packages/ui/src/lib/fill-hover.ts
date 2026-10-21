@@ -24,10 +24,10 @@ import { gsap, useGSAP } from './gsap';
  */
 
 const LIVE = '(prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine)';
-/** Slower than gsap.com's 0.4s / 0.3s, by request: a calm, even fill. */
-const GROW = 0.7;
-const FOLLOW = 0.5;
-const SHRINK = 0.55;
+/** gsap.com's own timings and ease, kept as they are (2026-10-21). */
+const GROW = 0.4;
+const FOLLOW = 0.4;
+const SHRINK = 0.3;
 const EASE = 'power2.out';
 /** How far past an edge the circle leaves by, as a share of the control. */
 const OVERSHOOT = 0.2;

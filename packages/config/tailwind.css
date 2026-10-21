@@ -69,8 +69,6 @@
      dark mode can keep borders/shadows dark instead of inverting to white;
      see the header comment above --color-outline in colors.css. */
   --color-outline: var(--color-outline);
-  /* Neutral buttons' hover fill: grey in light, near-black in dark. */
-  --color-hoverFill: var(--color-hover-fill);
   --shadow-brutalSm: var(--shadow-brutal-sm);
   --shadow-brutalMd: var(--shadow-brutal-md);
   --shadow-brutalLg: var(--shadow-brutal-lg);
