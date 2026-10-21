@@ -41,7 +41,7 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
       )}
       <p className="type-heading text-lg text-ink">{title}</p>
       {description && (
-        <p className="max-w-sm font-sans text-sm font-medium text-ink opacity-70">{description}</p>
+        <p className="max-w-sm font-sans text-sm font-medium text-ink muted-tone">{description}</p>
       )}
       {action && (
         <Button

@@ -30,7 +30,7 @@ export const BreadcrumbLink = forwardRef<HTMLAnchorElement, React.ComponentProps
     <a
       ref={ref}
       className={cn(
-        'font-medium opacity-70 outline-none hover:opacity-100 hover:underline',
+        'font-medium muted-tone outline-none hover:opacity-100 hover:underline',
         'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
         className,
       )}
@@ -42,12 +42,7 @@ BreadcrumbLink.displayName = 'BreadcrumbLink';
 
 export const BreadcrumbPage = forwardRef<HTMLSpanElement, React.ComponentPropsWithoutRef<'span'>>(
   ({ className, ...props }, ref) => (
-    <span
-      ref={ref}
-      aria-current="page"
-      className={cn('type-ui text-ink', className)}
-      {...props}
-    />
+    <span ref={ref} aria-current="page" className={cn('type-ui text-ink', className)} {...props} />
   ),
 );
 BreadcrumbPage.displayName = 'BreadcrumbPage';
@@ -63,8 +58,15 @@ export const BreadcrumbSeparator = ({
 );
 BreadcrumbSeparator.displayName = 'BreadcrumbSeparator';
 
-export const BreadcrumbEllipsis = ({ className, ...props }: React.ComponentPropsWithoutRef<'span'>) => (
-  <span aria-hidden="true" className={cn('flex h-8 w-8 items-center justify-center', className)} {...props}>
+export const BreadcrumbEllipsis = ({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'span'>) => (
+  <span
+    aria-hidden="true"
+    className={cn('flex h-8 w-8 items-center justify-center', className)}
+    {...props}
+  >
     <MoreHorizontal className="h-4 w-4" strokeWidth={3} />
     <span className="sr-only">More</span>
   </span>

@@ -158,6 +158,10 @@
      (16 * sqrt(2) = 22.63px), so the loop is seamless: any other value
      visibly jumps once per cycle. */
   --animate-progressStripes: progressStripes 1s linear infinite;
+  /* The same crawl for a row of separate cells (SegmentedProgress): same
+     distance and speed, but starting from each cell's own place in the row so
+     the bands flow across the gaps as one. See bg-stripes-flow. */
+  --animate-segmentStripes: segmentStripes 1s linear infinite;
   /* One tile's digit changing on a countdown tick. */
   --animate-digitTick: digitTick 0.35s cubic-bezier(0.33, 1, 0.68, 1);
   /* Accordion/Collapsible expand-collapse (Sprint 0 extension): each Radix
@@ -189,6 +193,12 @@
 @keyframes progressStripes {
   from { background-position: 0 0; }
   to { background-position: 22.63px 0; }
+}
+/* progressStripes, from wherever the cell's bands start (--stripe-x, set by
+   bg-stripes-flow) instead of from 0, so the loop stays seamless there too. */
+@keyframes segmentStripes {
+  from { background-position: var(--stripe-x, 0px) 0; }
+  to { background-position: calc(var(--stripe-x, 0px) + 22.63px) 0; }
 }
 @keyframes digitTick {
   0% { transform: translateY(-45%); opacity: 0; }
@@ -270,6 +280,27 @@
     color-mix(in srgb, var(--color-outline) 28%, transparent) 0 8px,
     transparent 8px 16px
   );
+}
+
+/* The same bands for a row of separate cells that must read as one bar
+   (SegmentedProgress, 2026-10-22). bg-stripes draws its bands from the
+   element's own corner, so every cell would start its pattern afresh and the
+   diagonal lines would jump at each gap. Here the pattern is a fixed tile
+   (22.63px = 16 * sqrt(2), the one size at which the -45deg bands repeat
+   seamlessly in both directions) shifted left by the cell's distance from the
+   row's start, so every cell shows its own slice of one shared pattern.
+
+   The cell supplies --i (its index), --n (how many cells), and the row
+   supplies --seg-gap, --seg-border and `@container` (so 100cqw is the row's
+   width): offset = i * (row + gap) / n, plus the cell's own border, since the
+   fill starts inside it. segmentStripes animates from that offset. */
+@utility bg-stripes-flow {
+  @apply bg-stripes;
+  background-size: 22.63px 22.63px;
+  --stripe-x: calc(
+    -1 * (var(--i, 0) * (100cqw + var(--seg-gap, 0px)) / var(--n, 1) + var(--seg-border, 0px))
+  );
+  background-position: var(--stripe-x) 0;
 }
 
 /* Fine diagonal hatching for calendar slots already behind us (UI revamp,

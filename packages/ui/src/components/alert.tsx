@@ -1,4 +1,4 @@
-import { type VariantProps, cva } from 'class-variance-authority';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
@@ -8,6 +8,10 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: 'bg-secondary text-ink',
+        // The primary button's blue (2026-10-22): for a notice that asks for a
+        // step without anything being wrong, such as "Connect a channel".
+        // Warning orange is for something that is stopping work.
+        info: 'bg-actionPrimary text-onActionPrimary',
         success: 'bg-actionSuccess text-onActionLight',
         danger: 'bg-actionDanger text-onActionLight',
         warning: 'bg-actionAccent text-onActionLight',
@@ -24,9 +28,11 @@ export interface AlertProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof alertVariants> {}
 
-export const Alert = forwardRef<HTMLDivElement, AlertProps>(({ className, variant, ...props }, ref) => (
-  <div ref={ref} role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
-));
+export const Alert = forwardRef<HTMLDivElement, AlertProps>(
+  ({ className, variant, ...props }, ref) => (
+    <div ref={ref} role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
+  ),
+);
 Alert.displayName = 'Alert';
 
 export const AlertTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(

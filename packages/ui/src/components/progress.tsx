@@ -2,29 +2,18 @@
 
 import * as ProgressPrimitive from '@radix-ui/react-progress';
 import { forwardRef } from 'react';
+import {
+  type ProgressSize,
+  type ProgressTone,
+  PROGRESS_SIZE as SIZE,
+  PROGRESS_TONE as TONE,
+} from '../lib/progress-styles';
 import { cn } from '../lib/utils';
-
-const TONE = {
-  primary: { fill: 'bg-actionPrimary', on: 'text-onActionPrimary' },
-  danger: { fill: 'bg-actionDanger', on: 'text-onActionLight' },
-  success: { fill: 'bg-actionSuccess', on: 'text-onActionLight' },
-  accent: { fill: 'bg-actionAccent', on: 'text-onActionLight' },
-  ai: { fill: 'bg-actionAi', on: 'text-onActionAi' },
-  // Sprint 7: the "fair" band of a score (ScoreBar/ScoreGauge), yellow between
-  // the green and the orange.
-  secondary: { fill: 'bg-actionSecondary', on: 'text-onActionLight' },
-} as const;
-
-const SIZE = {
-  sm: { track: 'h-3', label: 'text-[10px]' },
-  md: { track: 'h-5', label: 'text-xs' },
-  lg: { track: 'h-8', label: 'text-sm' },
-} as const;
 
 export interface ProgressProps
   extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root> {
-  tone?: keyof typeof TONE;
-  size?: keyof typeof SIZE;
+  tone?: ProgressTone;
+  size?: ProgressSize;
   /** Diagonal barber-pole banding on the fill. */
   striped?: boolean;
   /** Crawl the stripes. Ignored unless `striped`; always off under reduced motion. */

@@ -196,7 +196,7 @@ export function NotificationCenter({
                       )}
                     </span>
                     {notification.description && (
-                      <span className="line-clamp-2 font-sans text-xs font-medium text-ink opacity-70">
+                      <span className="line-clamp-2 font-sans text-xs font-medium text-ink muted-tone">
                         {notification.description}
                       </span>
                     )}

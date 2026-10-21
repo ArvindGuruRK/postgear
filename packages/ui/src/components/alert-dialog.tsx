@@ -40,11 +40,17 @@ export const AlertDialogContent = forwardRef<
 ));
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
-export const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+export const AlertDialogHeader = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('flex flex-col gap-1.5', className)} {...props} />
 );
 
-export const AlertDialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+export const AlertDialogFooter = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('mt-6 flex items-center justify-end gap-3', className)} {...props} />
 );
 
@@ -66,7 +72,7 @@ export const AlertDialogDescription = forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Description
     ref={ref}
-    className={cn('font-sans text-sm font-medium text-ink opacity-70', className)}
+    className={cn('font-sans text-sm font-medium text-ink muted-tone', className)}
     {...props}
   />
 ));

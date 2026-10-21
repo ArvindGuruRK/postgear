@@ -80,7 +80,7 @@ export const FileUpload = forwardRef<HTMLDivElement, FileUploadProps>(
               would be nested-interactive markup. */}
           <p className="font-sans text-sm font-bold text-ink">{label}</p>
           {helperText && (
-            <p className="font-sans text-xs font-medium text-ink opacity-70">{helperText}</p>
+            <p className="font-sans text-xs font-medium text-ink muted-tone">{helperText}</p>
           )}
         </button>
         <input

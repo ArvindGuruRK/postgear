@@ -46,7 +46,7 @@ export const BarList = forwardRef<HTMLUListElement, BarListProps>(
 
     if (items.length === 0) {
       return (
-        <p className={cn('m-0 font-sans text-sm font-medium text-ink opacity-70', className)}>
+        <p className={cn('m-0 font-sans text-sm font-medium text-ink muted-tone', className)}>
           {emptyMessage}
         </p>
       );
@@ -80,7 +80,7 @@ export const BarList = forwardRef<HTMLUListElement, BarListProps>(
                   />
                 </div>
                 {item.hint ? (
-                  <span className="font-sans text-xs font-medium text-ink opacity-70">
+                  <span className="font-sans text-xs font-medium text-ink muted-tone">
                     {item.hint}
                   </span>
                 ) : null}

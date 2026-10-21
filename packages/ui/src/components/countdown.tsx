@@ -88,14 +88,7 @@ function Tile({
         </span>
       </div>
       {showLabel && (
-        <span
-          className={cn(
-            'type-label text-ink opacity-70',
-            SIZE[size].label,
-          )}
-        >
-          {label}
-        </span>
+        <span className={cn('type-label text-ink muted-tone', SIZE[size].label)}>{label}</span>
       )}
     </div>
   );

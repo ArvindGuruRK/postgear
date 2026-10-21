@@ -360,7 +360,7 @@ export function TrendChart({
               y={scales.yFor(tick)}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-ink font-sans text-[10px] font-medium opacity-70"
+              className="fill-ink font-sans text-[10px] font-medium muted-tone"
             >
               {formatValue(tick)}
             </text>
@@ -373,7 +373,7 @@ export function TrendChart({
             x={scales.xFor(index)}
             y={scales.height - 8}
             textAnchor={index === 0 ? 'start' : index === scales.xs.length - 1 ? 'end' : 'middle'}
-            className="fill-ink font-sans text-[10px] font-medium opacity-70"
+            className="fill-ink font-sans text-[10px] font-medium muted-tone"
           >
             {formatX(scales.xs[index])}
           </text>
@@ -468,7 +468,7 @@ export function TrendChart({
                     className={cn('h-2 w-2 border border-outline', BG[value.tone])}
                     aria-hidden="true"
                   />
-                  <span className="opacity-70">{value.label}</span>
+                  <span className="muted-tone">{value.label}</span>
                   <span className="font-bold">{value.y === null ? '–' : formatValue(value.y)}</span>
                 </li>
               ))}

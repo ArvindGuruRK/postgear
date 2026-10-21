@@ -22,8 +22,10 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 - One font, Sora, loaded in `apps/web/src/app/fonts.ts`. Hierarchy comes from role utilities defined in `apps/web/src/app/globals.css`:
   - `type-heading`: card, dialog and sheet titles, big numbers. Or the `<Heading>` component.
   - `type-ui`: things you act on or scan (buttons, tabs, nav, names). Sentence case.
-  - `type-label`: small uppercase eyebrows naming a section or group.
+  - `type-label`: small uppercase chrome (menu group labels). **Not** for a page section's name.
   - Body text, form controls and table content: plain text, or `<Text>` (default weight medium).
+- Section names inside a page: sentence case, as typed ("First steps"), `type-heading text-lg`. Never all caps (2026-10-22).
+- Muted text is `text-ink type-muted` (no role) or `text-ink muted-tone` (already has a role or weight). Never a raw `opacity-60/70/75/80` on text. Rules doc section 1.
 - Never hand-write weight or tracking (`font-semibold tracking-tight`) to fake a role, and never stack them on a role. Retune the `--type-*` token instead.
 - Form labels: `font-sans text-sm font-bold text-ink`, sentence case, no role (rules doc section 1).
 

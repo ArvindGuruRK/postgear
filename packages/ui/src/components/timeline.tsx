@@ -2,7 +2,9 @@ import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
 export const Timeline = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => <div ref={ref} className={cn('flex flex-col', className)} {...props} />,
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('flex flex-col', className)} {...props} />
+  ),
 );
 Timeline.displayName = 'Timeline';
 
@@ -27,18 +29,23 @@ export const TimelineItem = forwardRef<HTMLDivElement, TimelineItemProps>(
 );
 TimelineItem.displayName = 'TimelineItem';
 
-export const TimelineTitle = forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('type-label text-sm text-ink', className)} {...props} />
-  ),
-);
+export const TimelineTitle = forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p ref={ref} className={cn('type-label text-sm text-ink', className)} {...props} />
+));
 TimelineTitle.displayName = 'TimelineTitle';
 
 export const TimelineDescription = forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn('font-sans text-sm font-medium text-ink opacity-70', className)} {...props} />
+  <p
+    ref={ref}
+    className={cn('font-sans text-sm font-medium text-ink muted-tone', className)}
+    {...props}
+  />
 ));
 TimelineDescription.displayName = 'TimelineDescription';
 

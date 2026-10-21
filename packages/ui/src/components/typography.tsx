@@ -1,4 +1,4 @@
-import { type VariantProps, cva } from 'class-variance-authority';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
@@ -26,9 +26,7 @@ export interface HeadingProps
 export const Heading = forwardRef<HTMLHeadingElement, HeadingProps>(
   ({ className, level = 'h2', as, ...props }, ref) => {
     const Comp = (as ?? level ?? 'h2') as React.ElementType;
-    return (
-      <Comp ref={ref} className={cn(headingVariants({ level }), className)} {...props} />
-    );
+    return <Comp ref={ref} className={cn(headingVariants({ level }), className)} {...props} />;
   },
 );
 Heading.displayName = 'Heading';
@@ -47,7 +45,7 @@ const textVariants = cva('font-sans text-ink', {
       bold: 'font-bold',
     },
     muted: {
-      true: 'opacity-70',
+      true: 'muted-tone',
       false: '',
     },
   },

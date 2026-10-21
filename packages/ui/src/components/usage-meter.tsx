@@ -37,15 +37,13 @@ export function UsageMeter({
     <div className={cn('flex flex-col gap-2', className)} {...props}>
       <div className="flex items-center justify-between font-sans text-sm text-ink">
         <span className="font-semibold">{label}</span>
-        <span
-          className={cn('opacity-70', isNearLimit && 'font-semibold text-dangerInk opacity-100')}
-        >
+        <span className={isNearLimit ? 'font-semibold text-dangerInk' : 'muted-tone'}>
           {value.toLocaleString()} / {max.toLocaleString()} {unit}
         </span>
       </div>
       <Progress value={percent} tone={isNearLimit ? 'danger' : tone} />
       {caption != null && (
-        <span className="font-sans text-xs font-medium text-ink opacity-70">{caption}</span>
+        <span className="font-sans text-xs font-medium text-ink muted-tone">{caption}</span>
       )}
     </div>
   );

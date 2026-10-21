@@ -29,7 +29,7 @@ export const FormHelperText = forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('font-sans text-xs font-medium text-ink opacity-70', className)}
+    className={cn('font-sans text-xs font-medium text-ink muted-tone', className)}
     {...props}
   />
 ));

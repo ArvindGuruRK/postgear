@@ -131,7 +131,7 @@ export const StageTracker = forwardRef<HTMLOListElement, StageTrackerProps>(
                   <span className="sr-only">, {STATUS_TEXT[stage.status]}</span>
                 </span>
                 {stage.detail && (
-                  <span className="font-sans text-xs font-medium text-ink opacity-70">
+                  <span className="font-sans text-xs font-medium text-ink muted-tone">
                     {stage.detail}
                   </span>
                 )}
