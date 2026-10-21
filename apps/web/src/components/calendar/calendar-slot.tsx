@@ -107,7 +107,7 @@ export function CalendarSlot({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 flex items-center justify-center text-center type-ui text-xs text-ink opacity-0 transition-opacity group-hover/slot:opacity-40"
         >
-          Date passed
+          Date Passed
         </span>
       ) : null}
     </div>

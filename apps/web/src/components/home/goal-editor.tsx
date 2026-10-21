@@ -21,7 +21,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  pressSm,
 } from '@postgear/ui';
 import { type FormEvent, type ReactElement, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
@@ -29,12 +28,12 @@ import { type DashboardGoalSetting, MAX_WEEKLY_GOAL, MIN_WEEKLY_GOAL } from '@/t
 import { clampGoal } from './home-model';
 import { FOCUS } from './home-ui';
 
-const STEP = cn(
-  'flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink',
-  pressSm,
-  'hover:bg-primary disabled:opacity-50',
-  FOCUS,
-);
+/**
+ * A square icon button: the design system's secondary at its normal height
+ * (`md`, 44px) with the width of a square and no side padding, so the stepper
+ * has the same fill-on-hover as every other secondary button.
+ */
+const STEP = 'w-11 shrink-0 px-0';
 
 const QUIET = cn(
   'rounded-sm font-sans text-sm font-bold text-ink underline underline-offset-2',
@@ -107,15 +106,16 @@ export function GoalEditor({
           <div className="flex flex-col gap-2">
             <Label htmlFor="home-weekly-goal">Posts a week</Label>
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 className={STEP}
                 aria-label="One fewer"
                 disabled={saving || value <= MIN_WEEKLY_GOAL}
                 onClick={() => setDraft(String(clampGoal(value - 1)))}
               >
                 <MotionIcon icon={MinusIcon} className="h-4 w-4" />
-              </button>
+              </Button>
               <Input
                 ref={input}
                 id="home-weekly-goal"
@@ -130,15 +130,16 @@ export function GoalEditor({
                 className="min-w-0 flex-1 text-center tabular-nums"
                 disabled={saving}
               />
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 className={STEP}
                 aria-label="One more"
                 disabled={saving || value >= MAX_WEEKLY_GOAL}
                 onClick={() => setDraft(String(clampGoal(value + 1)))}
               >
                 <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
             {error ? <FormErrorMessage>{error}</FormErrorMessage> : null}
           </div>
@@ -150,7 +151,7 @@ export function GoalEditor({
               disabled={saving || !goal.custom}
               onClick={() => void save(null)}
             >
-              Use suggested
+              Use Suggested
             </button>
             <Button type="submit" size="sm" disabled={saving}>
               {saving ? 'Saving…' : 'Save'}

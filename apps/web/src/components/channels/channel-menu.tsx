@@ -95,13 +95,13 @@ export function ChannelMenuContent({
         <DropdownMenuItem asChild>
           <Link href={`/${orgId}/composer?channel=${encodeURIComponent(channel.id)}`}>
             <MotionIcon icon={SquarePenIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-            Create a post
+            Create A Post
           </Link>
         </DropdownMenuItem>
       ) : null}
       <DropdownMenuItem onSelect={() => void copyChannelId(channel)}>
         <MotionIcon icon={CopyIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-        Copy channel ID
+        Copy Channel ID
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => handlers.onPreferences(channel)}>
         <MotionIcon icon={SettingsIcon} strokeWidth={2} className="me-2 h-4 w-4" />
@@ -109,7 +109,7 @@ export function ChannelMenuContent({
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => handlers.onEditTimes(channel)}>
         <MotionIcon icon={ClockIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-        Edit posting times
+        Edit Posting Times
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => handlers.onReconnect(channel)}>
         <MotionIcon icon={RefreshCwIcon} strokeWidth={2} className="me-2 h-4 w-4" />
@@ -118,7 +118,7 @@ export function ChannelMenuContent({
       {channel.inBetweenSteps ? (
         <DropdownMenuItem onSelect={() => handlers.onFinishSetup(channel)}>
           <MotionIcon icon={PlugIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-          Finish setup
+          Finish Setup
         </DropdownMenuItem>
       ) : null}
       <DropdownMenuSeparator />
@@ -133,12 +133,12 @@ export function ChannelMenuContent({
           }}
         >
           <MotionIcon icon={PowerIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-          Enable channel
+          Enable Channel
         </DropdownMenuItem>
       ) : (
         <DropdownMenuItem onSelect={() => handlers.onDisable(channel)}>
           <MotionIcon icon={PowerIcon} strokeWidth={2} className="me-2 h-4 w-4" />
-          Disable channel
+          Disable Channel
         </DropdownMenuItem>
       )}
       <DropdownMenuItem onSelect={() => handlers.onDisconnect(channel)}>

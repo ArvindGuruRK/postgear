@@ -50,8 +50,8 @@ export function TagFilter({ className }: { className?: string }) {
           </p>
         ) : (
           <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
-            <span id={listId} className="type-label text-xs text-ink opacity-70">
-              Show posts tagged
+            <span id={listId} className="type-ui text-xs text-ink opacity-70">
+              Show Posts Tagged
             </span>
             {count > 0 ? (
               <button

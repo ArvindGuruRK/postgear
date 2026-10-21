@@ -308,7 +308,7 @@ test('posts now through the main button’s menu', async () => {
 test('fills an empty post from the header’s Templates', async () => {
   await openComposer();
   await composer().getByRole('button', { name: 'Templates' }).click();
-  await page.getByRole('button', { name: /Three quick tips/ }).click();
+  await page.getByRole('button', { name: /Three Quick Tips/i }).click();
   await expect(part(1)).toContainText('3 quick tips for [your topic]:');
   await expect(part(1)).toContainText('1. [First tip]');
 });

@@ -121,7 +121,7 @@ export function RescheduleDialog({
             />
             {inPast ? (
               <FormErrorMessage>
-                That time has passed. Choose a time in the future, or use "Post now".
+                That time has passed. Choose a time in the future, or use "Post Now".
               </FormErrorMessage>
             ) : null}
           </FormField>
@@ -167,7 +167,7 @@ export function RescheduleDialog({
             onClick={() => valid && !inPast && onConfirm(chosen)}
             disabled={!valid || inPast || busy}
           >
-            {busy ? 'Moving…' : 'Move post'}
+            {busy ? 'Moving…' : 'Move Post'}
           </Button>
         </DialogFooter>
       </DialogContent>

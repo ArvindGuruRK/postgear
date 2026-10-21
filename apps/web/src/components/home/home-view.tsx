@@ -1,11 +1,13 @@
 'use client';
 
 /**
- * Home (UI revamp, 2026-10-19): Buffer's home dashboard with a Postiz-style
- * streak, in the order the owner approved ("Full Buffer + Postiz mix"):
+ * Home (UI revamp, 2026-10-19; tiles 2026-10-22): Buffer's home dashboard
+ * with a Postiz-style streak, in the order the owner approved ("Full Buffer
+ * + Postiz mix"):
  *
  * 1. the greeting, in place of a page title (the top bar already says Home);
- * 2. the week in three numbers: streak, weekly goal, AI credits;
+ * 2. four cards with their progress: streak, weekly goal, AI credits, and the
+ *    team, which is where an admin invites members;
  * 3. what needs attention, only when something does;
  * 4. the first steps, until all three are done;
  * 5. Up next beside Comments;
@@ -22,18 +24,20 @@ import { useMemo, useState } from 'react';
 import { ConnectChannelDialog } from '@/components/channels/connect-channel-dialog';
 import { FinishSetupDialog } from '@/components/channels/finish-setup-dialog';
 import { useWorkspace } from '@/components/navigation/workspace-provider';
+import { InviteMemberDialog } from '@/components/settings/invite-member-dialog';
 import { channelConnectUrl } from '@/lib/api';
 import type { AiCredits } from '@/types/ai';
 import type { Channel, ChannelLimit, ProviderSummary } from '@/types/channel';
 import type { DashboardSummary } from '@/types/dashboard';
 import type { QueuePage } from '@/types/post';
+import type { TeamMember } from '@/types/team';
 import { BlogRow } from './blog-row';
 import { FirstSteps } from './first-steps';
 import { Greeting } from './greeting';
 import { HomeBanners } from './home-banners';
 import { bannersFor } from './home-model';
 import { HomePanels } from './home-panels';
-import { StatsStrip } from './stats-strip';
+import { StatTiles } from './stat-tiles';
 import { TemplatesRow } from './templates-row';
 import { useClock, useDashboard, useUpNext } from './use-home-data';
 
@@ -46,6 +50,8 @@ export function HomeView({
   credits,
   initialQueue,
   initialSummary,
+  members,
+  memberLimit,
 }: {
   orgId: string;
   /**
@@ -62,9 +68,13 @@ export function HomeView({
   initialQueue: QueuePage | null;
   /** The dashboard counted in UTC: its first steps and failed count only. */
   initialSummary: DashboardSummary | null;
+  /** The workspace's members; null when the list failed to load. */
+  members: TeamMember[] | null;
+  /** The plan's seats: null for unlimited, undefined when the plan did not load. */
+  memberLimit: number | null | undefined;
 }) {
   const router = useRouter();
-  const { role, user } = useWorkspace();
+  const { role, user, organizations } = useWorkspace();
   // Presentation only: the API's RolesGuard is the real check.
   const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
   const atChannelLimit = limit !== null && limit.used >= limit.max;
@@ -75,6 +85,9 @@ export function HomeView({
 
   const [connectOpen, setConnectOpen] = useState(false);
   const [setupChannel, setSetupChannel] = useState<Channel | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const workspaceName =
+    organizations.find((organization) => organization.id === orgId)?.name ?? 'this workspace';
 
   const banners = useMemo(
     () =>
@@ -96,14 +109,18 @@ export function HomeView({
     <div className="flex min-w-0 flex-col gap-6 md:gap-8" data-testid="home">
       <div className="flex flex-col gap-4">
         <Greeting now={now} name={user.name} />
-        <StatsStrip
+        <StatTiles
+          orgId={orgId}
           summary={dashboard.summary}
           failed={dashboard.error !== null && !dashboard.loading}
           credits={credits}
-          creditsPending={pending}
+          pending={pending}
           mounted={now !== null}
-          canEditGoal={canManage}
+          canManage={canManage}
+          members={members}
+          memberLimit={memberLimit}
           onSaveGoal={dashboard.saveGoal}
+          onInvite={() => setInviteOpen(true)}
         />
         <HomeBanners
           orgId={orgId}
@@ -140,6 +157,12 @@ export function HomeView({
         open={connectOpen}
         onOpenChange={setConnectOpen}
         providers={providers}
+      />
+      <InviteMemberDialog
+        open={inviteOpen}
+        orgId={orgId}
+        workspaceName={workspaceName}
+        onOpenChange={setInviteOpen}
       />
       <FinishSetupDialog
         channel={setupChannel}

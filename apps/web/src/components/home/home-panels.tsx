@@ -15,7 +15,7 @@
  * worse than one that says what will be there.
  */
 import { ArrowRightIcon } from '@animateicons/react/lucide/arrow-right-icon';
-import { Card, cn, EmptyState, ErrorState, MotionIcon, Skeleton } from '@postgear/ui';
+import { cn, EmptyState, ErrorState, MotionIcon, Skeleton } from '@postgear/ui';
 import { CalendarDays, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -23,7 +23,7 @@ import { CHANNEL_STACK_HOVER_RING, ChannelStack } from '@/components/posts/chann
 import { formatClock } from '@/components/posts/post-status';
 import type { PostSummary } from '@/types/post';
 import { dayLabel, firstLine } from './home-model';
-import { FOCUS, HomeSection, TEXT_LINK } from './home-ui';
+import { FOCUS, HomePanel, HomeSection, TEXT_LINK } from './home-ui';
 import { UP_NEXT_COUNT } from './use-home-data';
 
 /** Both panels keep one height, so the pair reads as a row. */
@@ -47,29 +47,29 @@ export function HomePanels({
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-4">
       <HomeSection
-        title="Up next"
+        title="Up Next"
         data-testid="home-up-next"
         action={
           <Link href={`/${orgId}/queue`} className={TEXT_LINK}>
-            Open queue
+            Open Queue
             <MotionIcon icon={ArrowRightIcon} className="h-4 w-4" />
           </Link>
         }
       >
-        <Card className={PANEL}>
+        <HomePanel className={PANEL}>
           <UpNext orgId={orgId} posts={posts} error={error} now={now} onRetry={onRetry} />
-        </Card>
+        </HomePanel>
       </HomeSection>
 
       <HomeSection title="Comments" data-testid="home-comments">
-        <Card className={cn(PANEL, 'items-center justify-center')}>
+        <HomePanel className={cn(PANEL, 'items-center justify-center')}>
           <EmptyState
             icon={MessageCircle}
             title="No comments yet."
             description="You'll see the latest comments here."
             className="p-6"
           />
-        </Card>
+        </HomePanel>
       </HomeSection>
     </div>
   );
@@ -96,7 +96,7 @@ function UpNext({
         <ErrorState
           title="The queue didn't load"
           description={error}
-          action={{ label: 'Try again', onClick: onRetry, variant: 'secondary' }}
+          action={{ label: 'Try Again', onClick: onRetry, variant: 'secondary' }}
           className="p-6"
         />
       </div>
@@ -153,7 +153,7 @@ function UpNext({
               {/* Data, not chrome: the body face, like the queue's time column. */}
               <span className="flex w-20 shrink-0 flex-col font-sans leading-tight sm:w-24">
                 <span className="truncate text-xs font-bold text-ink">{dayLabel(when, now)}</span>
-                <span className="text-xs tabular-nums text-ink opacity-70">
+                <span className="text-xs tabular-nums text-ink type-muted">
                   {formatClock(when)}
                 </span>
               </span>
@@ -168,7 +168,7 @@ function UpNext({
               <span
                 className={cn(
                   'min-w-0 flex-1 truncate font-sans text-sm text-ink',
-                  !line && 'opacity-60',
+                  !line && 'type-muted',
                 )}
               >
                 {line ?? 'Empty post'}

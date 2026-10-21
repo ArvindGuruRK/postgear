@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * What needs attention, one line each, under the stats (Buffer's blue
+ * What needs attention, one line each, under the stats (after Buffer's
  * "Connect a channel..." banner). Only what is true right now is shown, and
  * each line carries the one action that fixes it:
  *
@@ -14,36 +14,39 @@
  *
  * Actions that need an admin (connecting, reconnecting) are only offered to
  * admins; members are told who can fix it instead of being handed a button
- * that answers 403. The tint is the action colour at low strength over the
- * page, the way the reference tints its banner, so the text stays `ink` in
- * every theme.
+ * that answers 403.
  */
 import { ArrowRightIcon } from '@animateicons/react/lucide/arrow-right-icon';
 import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import { RotateCwIcon } from '@animateicons/react/lucide/rotate-cw-icon';
-import { cn, MotionIcon } from '@postgear/ui';
+import { Alert, Button, MotionIcon } from '@postgear/ui';
 import type { LucideIcon } from 'lucide-react';
 import { CircleAlert, Plug, RefreshCw, TriangleAlert } from 'lucide-react';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { Channel } from '@/types/channel';
+import { ActionLink } from './home-actions';
 import type { HomeBanner } from './home-model';
-import { PLAIN_ACTION } from './home-ui';
 
-type Tone = 'primary' | 'accent' | 'danger';
+/**
+ * Only the design system's own alert fills, through its `Alert`: the info
+ * fill (the primary button blue) for a step to take while nothing is wrong
+ * (connect a channel), the warning fill (orange) for something that stops
+ * publishing, the danger fill (red) for a failure. No tint of any colour of
+ * our own: a hand-mixed blue or brown is not in the system and reads
+ * differently in every theme. The action on each stays the neutral secondary
+ * button (red buttons are for deleting).
+ */
+type Tone = 'info' | 'warning' | 'danger';
 
-const TINT: Record<Tone, string> = {
-  primary: 'bg-actionPrimary/15',
-  accent: 'bg-actionAccent/20',
-  danger: 'bg-actionDanger/15',
-};
-
-const ICON_TONE: Record<Tone, string> = {
-  primary: 'text-actionPrimary',
-  accent: 'text-accentInk',
-  danger: 'text-dangerInk',
-};
+/**
+ * The sentence in the blue "connect a channel" banner is set like the First
+ * steps card's lines look in light mode: the UI weight (600) and tracking, in
+ * both modes (the owner's call; `type-muted` itself drops to 400 in dark). It
+ * stays fully white because `type-ui` has no fade, unlike `type-muted`, which
+ * would grey the white on the blue.
+ */
+const INFO_TEXT = 'type-ui';
 
 export function HomeBanners({
   orgId,
@@ -73,19 +76,23 @@ export function HomeBanners({
         switch (banner.kind) {
           case 'no-channels':
             return (
-              <Banner key="no-channels" tone="primary" icon={Plug} kind={banner.kind}>
+              <Banner key="no-channels" tone="info" icon={Plug} kind={banner.kind}>
                 {canManage ? (
                   <>
-                    <span>Connect a channel to start tracking your posting streak and goal.</span>
+                    <span className={INFO_TEXT}>
+                      Connect a channel to start tracking your posting streak and goal.
+                    </span>
                     <Action
                       onClick={onConnect}
                       icon={<MotionIcon icon={PlugIcon} className="h-4 w-4" />}
                     >
-                      Connect a channel
+                      Connect A Channel
                     </Action>
                   </>
                 ) : (
-                  <span>No channels are connected yet. Ask a workspace admin to connect one.</span>
+                  <span className={INFO_TEXT}>
+                    No channels are connected yet. Ask a workspace admin to connect one.
+                  </span>
                 )}
               </Banner>
             );
@@ -93,7 +100,7 @@ export function HomeBanners({
             return (
               <Banner
                 key={`reconnect-${banner.channel.id}`}
-                tone="accent"
+                tone="warning"
                 icon={RefreshCw}
                 kind={banner.kind}
               >
@@ -116,7 +123,7 @@ export function HomeBanners({
             return (
               <Banner
                 key={`setup-${banner.channel.id}`}
-                tone="accent"
+                tone="warning"
                 icon={Plug}
                 kind={banner.kind}
               >
@@ -130,7 +137,7 @@ export function HomeBanners({
                     onClick={() => onFinishSetup(banner.channel)}
                     icon={<MotionIcon icon={PlugIcon} className="h-4 w-4" />}
                   >
-                    Finish setup
+                    Finish Setup
                   </Action>
                 ) : null}
               </Banner>
@@ -143,21 +150,21 @@ export function HomeBanners({
                     ? '1 post failed to publish.'
                     : `${banner.count} posts failed to publish.`}
                 </span>
-                <Link href={`/${orgId}/queue?state=ERROR`} className={PLAIN_ACTION}>
-                  View failed posts
+                <ActionLink href={`/${orgId}/queue?state=ERROR`}>
+                  View Failed Posts
                   <MotionIcon icon={ArrowRightIcon} className="h-4 w-4" />
-                </Link>
+                </ActionLink>
               </Banner>
             );
           case 'stats-error':
             return (
-              <Banner key="stats-error" tone="accent" icon={TriangleAlert} kind={banner.kind}>
+              <Banner key="stats-error" tone="warning" icon={TriangleAlert} kind={banner.kind}>
                 <span>The streak and weekly goal didn't load.</span>
                 <Action
                   onClick={onRetryStats}
                   icon={<MotionIcon icon={RotateCwIcon} className="h-4 w-4" />}
                 >
-                  Try again
+                  Try Again
                 </Action>
               </Banner>
             );
@@ -181,25 +188,18 @@ function Banner({
   children: ReactNode;
 }) {
   return (
-    <li
-      data-testid="home-banner"
-      data-kind={kind}
-      className={cn(
+    <li data-testid="home-banner" data-kind={kind}>
+      <Alert
+        variant={tone}
         // On a phone the action wraps under the copy, so the icon keeps to
         // the first line; from `md` everything fits one line and centres.
-        'flex items-start gap-3 rounded-lg border-2 border-outline px-4 py-3 md:items-center',
-        'font-sans text-sm text-ink',
-        TINT[tone],
-      )}
-    >
-      <Icon
-        aria-hidden="true"
-        strokeWidth={2.5}
-        className={cn('mt-0.5 h-4 w-4 shrink-0 md:mt-0', ICON_TONE[tone])}
-      />
-      <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        {children}
-      </span>
+        className="md:items-center"
+      >
+        <Icon aria-hidden="true" strokeWidth={2.5} className="mt-0.5 h-4 w-4 shrink-0 md:mt-0" />
+        <span className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          {children}
+        </span>
+      </Alert>
     </li>
   );
 }
@@ -214,9 +214,9 @@ function Action({
   children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} className={PLAIN_ACTION}>
+    <Button type="button" variant="secondary" size="sm" onClick={onClick}>
       {icon}
       {children}
-    </button>
+    </Button>
   );
 }

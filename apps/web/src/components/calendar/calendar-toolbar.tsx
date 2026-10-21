@@ -129,13 +129,13 @@ export function CalendarToolbar() {
 
         <fieldset className={GROUP}>
           <legend className="sr-only">Layout</legend>
-          <TooltipHint label="Calendar view" side="bottom">
+          <TooltipHint label="Calendar View" side="bottom">
             <span aria-current="page" className={cn(SEGMENT(true), 'w-9')}>
               <MotionIcon icon={CalendarDaysIcon} className="h-4 w-4" />
               <span className="sr-only">Calendar</span>
             </span>
           </TooltipHint>
-          <TooltipHint label="List view: every post in the Queue" side="bottom" align="end">
+          <TooltipHint label="List View: Every Post In The Queue" side="bottom" align="end">
             <Link
               href={`/${calendar.orgId}/queue`}
               aria-label="List"

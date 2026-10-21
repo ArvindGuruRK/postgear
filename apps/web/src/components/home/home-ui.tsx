@@ -1,25 +1,33 @@
 /**
- * Small pieces every Home section shares: its label, the plain action button
- * and the quiet text link, and the row that scrolls sideways on a phone.
+ * Small pieces every Home section shares: its label, the quiet text link, and
+ * the row that scrolls sideways on a phone.
+ *
+ * Buttons are not here on purpose. A button on Home is the design system's
+ * `Button` (secondary, `sm`), and a link that acts as one is `ActionLink`
+ * (`home-actions.tsx`). A hand-built button styled to match once lived here
+ * and lost the secondary button's hover animation; do not add one back.
  */
-import { cn, pressSm } from '@postgear/ui';
+import { Card, cn } from '@postgear/ui';
 import type { HTMLAttributes, ReactNode } from 'react';
+
+/**
+ * A card that takes the theme's colour (2026-10-22, "by role", on trial).
+ *
+ * The rule being tried: what organises or summarises takes the theme colour
+ * (the frame layer, `chrome`, which the sidebar and top bar use); what you read
+ * or type in stays light (the card layer, `secondary`, near-white in Lilac,
+ * Cream, Cool and Paper). So the KPI cards and the panels that hold lists (Up
+ * next, Comments, First steps) are `HomePanel`s, while the template and blog
+ * cards stay plain `Card`s. This is the one place the choice is made, so a
+ * change of mind is one line here. Classic and White have the same colour in
+ * both layers, so nothing differs there.
+ */
+export function HomePanel({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <Card className={cn('bg-chrome', className)} {...props} />;
+}
 
 export const FOCUS =
   'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
-
-/**
- * A plain action on a card ("Connect channel", "Create post"): Buffer's small
- * outlined button. The filled primary is kept for the page's one main action
- * per panel, so a row of three cards does not shout three times.
- */
-export const PLAIN_ACTION = cn(
-  'inline-flex h-9 select-none items-center justify-center gap-2 whitespace-nowrap rounded-md',
-  'border-2 border-outline bg-secondary px-3 type-ui text-xs text-ink',
-  pressSm,
-  'hover:bg-primary disabled:opacity-50',
-  FOCUS,
-);
 
 /** A quiet link beside a section label ("Open queue"), the onboarding "Skip" style. */
 export const TEXT_LINK = cn(
@@ -28,10 +36,12 @@ export const TEXT_LINK = cn(
 );
 
 /**
- * One Home section: a small label (Buffer's "First steps", "Up next") with
- * an optional link on its right, then the content. The label is a heading so
- * the page can be read by section; it is the section's name, never a
- * tagline.
+ * One Home section: its name ("First steps", "Up next") with an optional
+ * link or count on its right, then the content. The name is a heading so the
+ * page can be read by section; it is the section's name, never a tagline.
+ *
+ * Written as typed, in sentence case with the heading role (2026-10-22): the
+ * small uppercase `type-label` eyebrow it used to be read as shouting.
  */
 export function HomeSection({
   title,
@@ -54,7 +64,7 @@ export function HomeSection({
       {...props}
     >
       <div className="flex min-h-6 items-center justify-between gap-3">
-        <h2 id={id} className="type-label text-sm text-ink opacity-70">
+        <h2 id={id} className="m-0 type-heading text-lg text-ink">
           {title}
         </h2>
         {action}

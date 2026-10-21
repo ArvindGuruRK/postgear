@@ -9,9 +9,14 @@ import {
   dayLabel,
   firstLine,
   firstName,
+  firstStepsCount,
   firstStepsDone,
+  goalCaption,
   goalProgress,
   greeting,
+  seatSummary,
+  streakCaption,
+  streakChain,
   streakHint,
   timeOfDay,
 } from './home-model';
@@ -108,6 +113,72 @@ describe('firstStepsDone', () => {
   it('is done only when all three are', () => {
     expect(firstStepsDone({ channel: true, post: true, published: true })).toBe(true);
     expect(firstStepsDone({ channel: true, post: true, published: false })).toBe(false);
+  });
+
+  it('counts the steps done so far', () => {
+    expect(firstStepsCount({ channel: true, post: false, published: false })).toBe(1);
+    expect(firstStepsCount({ channel: true, post: true, published: true })).toBe(3);
+  });
+});
+
+describe('the streak tile', () => {
+  it('ends the chain on this week when it already has a post', () => {
+    expect(streakChain({ weeks: 2, postedThisWeek: true }, 4)).toEqual([
+      'empty',
+      'empty',
+      'done',
+      'done',
+    ]);
+  });
+
+  it('leaves this week open while the streak waits on it', () => {
+    expect(streakChain({ weeks: 2, postedThisWeek: false }, 4)).toEqual([
+      'empty',
+      'done',
+      'done',
+      'open',
+    ]);
+  });
+
+  it('stays empty with no streak, and full past its length', () => {
+    expect(streakChain({ weeks: 0, postedThisWeek: false }, 3)).toEqual([
+      'empty',
+      'empty',
+      'empty',
+    ]);
+    expect(streakChain({ weeks: 12, postedThisWeek: true }, 3)).toEqual(['done', 'done', 'done']);
+  });
+
+  it('says what this week needs', () => {
+    expect(streakCaption({ weeks: 0, postedThisWeek: false })).toBe('Publish a post to start one');
+    expect(streakCaption({ weeks: 3, postedThisWeek: true })).toBe('Posted this week');
+    expect(streakCaption({ weeks: 3, postedThisWeek: false })).toBe('Post this week to keep it');
+  });
+});
+
+describe('the goal and team tiles', () => {
+  it('counts down to the goal', () => {
+    expect(goalCaption(2, 5)).toBe('3 more posts to go');
+    expect(goalCaption(4, 5)).toBe('1 more post to go');
+    expect(goalCaption(6, 5)).toBe('Goal met this week');
+  });
+
+  it('measures members against the plan’s seats', () => {
+    expect(seatSummary(2, 3)).toEqual({
+      unit: 'of 3 seats',
+      progress: 2 / 3,
+      caption: '1 seat left',
+    });
+    expect(seatSummary(3, 3).caption).toBe('Every seat is taken');
+  });
+
+  it('draws no bar for an unlimited or unknown plan', () => {
+    expect(seatSummary(1, null)).toEqual({
+      unit: 'member',
+      progress: null,
+      caption: 'Unlimited seats on this plan',
+    });
+    expect(seatSummary(4, undefined).progress).toBeNull();
   });
 });
 

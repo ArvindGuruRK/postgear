@@ -33,9 +33,9 @@ const ACCOUNT_KIND: Record<string, string> = {
   linkedin: 'Profile',
   'linkedin-page': 'Company Page',
   facebook: 'Page',
-  instagram: 'Business or Creator',
+  instagram: 'Business Or Creator',
   youtube: 'Channel',
-  tiktok: 'Business or Personal',
+  tiktok: 'Business Or Personal',
   pinterest: 'Profile',
 };
 
@@ -123,7 +123,7 @@ export function ConnectChannelDialog({ open, onOpenChange, providers }: ConnectC
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader className="items-center px-8 text-center">
-          <DialogTitle>Connect a channel</DialogTitle>
+          <DialogTitle>Connect A Channel</DialogTitle>
           <DialogDescription className="sr-only">
             Pick a platform. You approve access on the platform, then come back here.
           </DialogDescription>

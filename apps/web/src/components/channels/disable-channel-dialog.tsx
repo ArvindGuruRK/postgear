@@ -79,7 +79,7 @@ export function DisableChannelDialog({ channel, onOpenChange, onDone }: DisableC
         ) : null}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={working}>Keep it</AlertDialogCancel>
+          <AlertDialogCancel disabled={working}>Keep It</AlertDialogCancel>
           <AlertDialogAction
             variant="danger"
             onClick={(event) => {
@@ -90,7 +90,7 @@ export function DisableChannelDialog({ channel, onOpenChange, onDone }: DisableC
             }}
             disabled={working}
           >
-            {working ? 'Disabling…' : 'Disable channel'}
+            {working ? 'Disabling…' : 'Disable Channel'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

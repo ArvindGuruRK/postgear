@@ -8,7 +8,9 @@ import {
   Countdown,
   EmptyState,
   ErrorState,
+  fillSegments,
   Progress,
+  SegmentedProgress,
   Skeleton,
   Spinner,
   StageTracker,
@@ -117,6 +119,12 @@ export function FeedbackSection() {
             <AlertTitle>Heads up</AlertTitle>
             <AlertDescription>Your LinkedIn token expires in 3 days.</AlertDescription>
           </Alert>
+          <Alert variant="info">
+            <AlertTitle>Connect a channel</AlertTitle>
+            <AlertDescription>
+              Link an account to start tracking your streak and goal.
+            </AlertDescription>
+          </Alert>
           <Alert variant="success">
             <AlertTitle>Connected</AlertTitle>
             <AlertDescription>TikTok is now linked to this workspace.</AlertDescription>
@@ -149,6 +157,35 @@ export function FeedbackSection() {
           <Progress value={60} striped={false} animated={false} />
         </div>
       </Row>
+      <Row label="Segmented Progress">
+        <div className="flex w-80 flex-col gap-4">
+          {/* The same bar cut into gapped cells. The stripes run through the
+              gaps as one pattern, at the same speed as Progress above. */}
+          <SegmentedProgress segments={fillSegments(5, 8)} aria-label="5 of 8 done" />
+          <SegmentedProgress
+            segments={fillSegments(7, 7)}
+            tone="success"
+            aria-label="7 of 7 published"
+          />
+          {/* "open" is a dashed, bare cell: a step still undecided. */}
+          <SegmentedProgress
+            segments={['empty', 'empty', 'full', 'full', 'full', 'open']}
+            tone="accent"
+            aria-label="3 weeks in a row, this week still open"
+          />
+          <SegmentedProgress
+            segments={fillSegments(2, 4)}
+            tone="ai"
+            size="lg"
+            aria-label="2 of 4 credits used"
+          />
+          {/* Stripes off: the cells keep their colour and gaps, and stand still. */}
+          <SegmentedProgress segments={fillSegments(3, 6)} animated={false} aria-label="3 of 6" />
+        </div>
+        <Spec>
+          cells = Progress per cell; one shared stripe pattern (bg-stripes-flow), i / n per cell
+        </Spec>
+      </Row>
       <Row label="Countdown">
         <div className="flex flex-col gap-5">
           <Countdown to={launchTarget} size="lg" />
@@ -172,18 +209,15 @@ export function FeedbackSection() {
         <div className="flex w-full flex-col gap-3">
           <StageTracker stages={PIPELINE_STAGES} />
           <Spec>
-            badge h-9 w-9 rounded-full border-2 border-outline type-ui; pending bg-secondary;
-            active bg-actionAi + Spinner; done bg-actionSuccess; skipped border-dashed opacity-60;
-            failed bg-actionDanger; connectors bg-outline
+            badge h-9 w-9 rounded-full border-2 border-outline type-ui; pending bg-secondary; active
+            bg-actionAi + Spinner; done bg-actionSuccess; skipped border-dashed opacity-60; failed
+            bg-actionDanger; connectors bg-outline
           </Spec>
         </div>
       </Row>
       <Row label="Stage Tracker (vertical)">
         <StageTracker orientation="vertical" stages={PIPELINE_STAGES} className="w-72" />
-        <Spec>
-          label type-label text-xs; detail font-sans text-xs font-medium
-          opacity-70
-        </Spec>
+        <Spec>label type-label text-xs; detail font-sans text-xs font-medium opacity-70</Spec>
       </Row>
       <Row label="Skeleton">
         <div className="flex w-56 flex-col gap-2">

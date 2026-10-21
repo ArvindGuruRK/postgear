@@ -108,7 +108,7 @@ export function PostAnalyticsDialog({
             aria-label="Loading post metrics"
           >
             <DialogHeader>
-              <DialogTitle>Post metrics</DialogTitle>
+              <DialogTitle>Post Metrics</DialogTitle>
               <DialogDescription>Fetching the latest snapshot…</DialogDescription>
             </DialogHeader>
             <Skeleton className="h-20" />
@@ -117,13 +117,13 @@ export function PostAnalyticsDialog({
         ) : state.kind === 'error' ? (
           <>
             <DialogHeader>
-              <DialogTitle>Post metrics</DialogTitle>
+              <DialogTitle>Post Metrics</DialogTitle>
               <DialogDescription>The numbers did not arrive.</DialogDescription>
             </DialogHeader>
             <ErrorState
               title="Couldn't load this post"
               description={state.message}
-              action={{ label: 'Try again', onClick: () => setAttempt((count) => count + 1) }}
+              action={{ label: 'Try Again', onClick: () => setAttempt((count) => count + 1) }}
             />
           </>
         ) : (

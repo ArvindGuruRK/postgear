@@ -108,7 +108,7 @@ export function FinishSetupDialog({ channel, onOpenChange, onDone }: FinishSetup
     <Dialog open={channel !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Finish setting up {channel?.providerName}</DialogTitle>
+          <DialogTitle>Finish Setting Up {channel?.providerName}</DialogTitle>
           <DialogDescription>
             Choose which account this channel should publish to.
           </DialogDescription>
@@ -187,7 +187,7 @@ export function FinishSetupDialog({ channel, onOpenChange, onDone }: FinishSetup
             Cancel
           </Button>
           <Button onClick={save} disabled={!selected || saving}>
-            {saving ? 'Saving…' : 'Use this account'}
+            {saving ? 'Saving…' : 'Use This Account'}
           </Button>
         </DialogFooter>
       </DialogContent>

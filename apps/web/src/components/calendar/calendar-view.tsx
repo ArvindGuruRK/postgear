@@ -172,7 +172,7 @@ export function CalendarView({
       toast({
         variant: 'danger',
         title: 'That time has passed',
-        description: 'Drop the post on a slot in the future, or use "Post now".',
+        description: 'Drop the post on a slot in the future, or use "Post Now".',
       });
       return;
     }
@@ -188,7 +188,7 @@ export function CalendarView({
       toast({
         variant: 'danger',
         title: 'That time has passed',
-        description: 'Drop the post on a slot in the future, or use "Post now".',
+        description: 'Drop the post on a slot in the future, or use "Post Now".',
       });
       return;
     }
@@ -298,7 +298,7 @@ export function CalendarView({
                   <ErrorState
                     title="The calendar didn't load"
                     description={calendar.error}
-                    action={{ label: 'Try again', onClick: calendar.reload }}
+                    action={{ label: 'Try Again', onClick: calendar.reload }}
                   />
                 </div>
               ) : (

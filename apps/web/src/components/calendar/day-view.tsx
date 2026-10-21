@@ -66,7 +66,7 @@ export function DayView({
                 onClick={() => handlers.onCreate({ day })}
                 className="rounded-md px-2 py-1 type-ui text-sm text-ink underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
               >
-                Create a post on this day
+                Create A Post On This Day
               </button>
             ) : null}
           </div>

@@ -40,7 +40,7 @@ export function Greeting({ now, name }: { now: Date | null; name: string | null 
         >
           {now ? greeting(now, name) : null}
         </p>
-        <p className="min-h-lh font-sans text-sm text-ink opacity-70" data-testid="home-date">
+        <p className="min-h-lh font-sans text-sm text-ink type-muted" data-testid="home-date">
           {now ? formatToday(now) : null}
         </p>
       </div>

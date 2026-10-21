@@ -66,7 +66,7 @@ export function ChannelsUsage({
     <div data-testid="channels-usage" className={cn('flex shrink-0 flex-col gap-3', className)}>
       {unconnected.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <span className="type-label text-xs text-ink muted-tone">Connect channels</span>
+          <span className="type-ui text-xs text-ink muted-tone">Connect Channels</span>
           <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
             {unconnected.map((provider) => (
               <li key={provider.identifier}>

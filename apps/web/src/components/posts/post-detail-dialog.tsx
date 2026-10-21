@@ -177,7 +177,7 @@ export function PostDetailDialog({
             {canPublishNow ? (
               <Button size="sm" onClick={() => onPublishNow(post)} disabled={busy}>
                 <MotionIcon icon={SendIcon} className="h-4 w-4" />
-                {post.state === 'ERROR' ? 'Retry now' : 'Post now'}
+                {post.state === 'ERROR' ? 'Retry Now' : 'Post Now'}
               </Button>
             ) : null}
             {!locked ? (
@@ -187,7 +187,7 @@ export function PostDetailDialog({
                 className="ms-auto"
                 onClick={() => onDelete(post)}
                 disabled={busy}
-                aria-label="Delete post"
+                aria-label="Delete Post"
               >
                 <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
               </Button>

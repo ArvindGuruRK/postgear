@@ -146,7 +146,7 @@ export function PostCard({
         )}
       >
         {!published && !overlay ? (
-          <StripAction label="Drag to reschedule">
+          <StripAction label="Drag To Reschedule">
             <button
               type="button"
               ref={setActivatorNodeRef}
@@ -215,10 +215,10 @@ export function PostCard({
         {overlay ? null : (
           <span className="ms-auto hidden shrink-0 items-center gap-0.5 group-focus-within/card:flex group-hover/card:flex">
             {onDuplicate ? (
-              <StripAction label="Duplicate post">
+              <StripAction label="Duplicate Post">
                 <button
                   type="button"
-                  aria-label="Duplicate post"
+                  aria-label="Duplicate Post"
                   onClick={() => onDuplicate(post)}
                   className={STRIP_ACTION}
                 >
@@ -227,10 +227,10 @@ export function PostCard({
               </StripAction>
             ) : null}
             {onPreview ? (
-              <StripAction label="Preview post">
+              <StripAction label="Preview Post">
                 <button
                   type="button"
-                  aria-label="Preview post"
+                  aria-label="Preview Post"
                   onClick={() => onPreview(post)}
                   className={STRIP_ACTION}
                 >
@@ -251,10 +251,10 @@ export function PostCard({
               </StripAction>
             ) : null}
             {onDelete && !locked ? (
-              <StripAction label="Delete post">
+              <StripAction label="Delete Post">
                 <button
                   type="button"
-                  aria-label="Delete post"
+                  aria-label="Delete Post"
                   onClick={() => onDelete(post)}
                   className={STRIP_ACTION}
                 >

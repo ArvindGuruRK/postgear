@@ -304,7 +304,7 @@ export function ChannelsColumn({
 
         {canManage && !collapsed ? (
           <DropdownMenu>
-            <TooltipHint label="Channel options" side="right">
+            <TooltipHint label="Channel Options" side="right">
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -353,11 +353,11 @@ export function ChannelsColumn({
           {collapsed ? null : (
             <h2 className="min-w-0 flex-1 truncate type-heading text-xl text-ink">Channels</h2>
           )}
-          <TooltipHint label={collapsed ? 'Expand channels' : 'Collapse channels'} side="right">
+          <TooltipHint label={collapsed ? 'Expand Channels' : 'Collapse Channels'} side="right">
             <button
               type="button"
               onClick={toggleCollapsed}
-              aria-label={collapsed ? 'Expand channels' : 'Collapse channels'}
+              aria-label={collapsed ? 'Expand Channels' : 'Collapse Channels'}
               aria-expanded={!collapsed}
               className={cn(
                 'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-primary',
@@ -400,7 +400,7 @@ export function ChannelsColumn({
             ) : null}
             <ColumnLink
               href={`/${orgId}/channels`}
-              label="Manage channels"
+              label="Manage Channels"
               fill
               className={cn(TILE, 'w-11')}
             >
@@ -428,7 +428,7 @@ export function ChannelsColumn({
             </ColumnLink>
             <ColumnLink
               href={`/${orgId}/ai-copilot`}
-              label="Generate with AI"
+              label="Generate With AI"
               triggers={aiIcon.triggers}
               className={cn(TILE, 'w-11 bg-actionAi text-onActionAi')}
             >
@@ -465,7 +465,7 @@ export function ChannelsColumn({
                   onClick={clearChannelFilter}
                   className={cn('rounded-sm type-ui underline underline-offset-2', FOCUS)}
                 >
-                  Show all
+                  Show All
                 </button>
               </div>
             ) : null}

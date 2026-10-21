@@ -102,7 +102,7 @@ export function PostingTimesDialog({ channel, onOpenChange, onDone }: PostingTim
     <Dialog open={channel !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Posting times for {channel?.name}</DialogTitle>
+          <DialogTitle>Posting Times For {channel?.name}</DialogTitle>
           <DialogDescription>
             Slots the scheduler will offer when you queue a post to this channel.
           </DialogDescription>
@@ -196,7 +196,7 @@ export function PostingTimesDialog({ channel, onOpenChange, onDone }: PostingTim
             Cancel
           </Button>
           <Button onClick={save} disabled={saving || times.length === 0}>
-            {saving ? 'Saving…' : 'Save times'}
+            {saving ? 'Saving…' : 'Save Times'}
           </Button>
         </DialogFooter>
       </DialogContent>

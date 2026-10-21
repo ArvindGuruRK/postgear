@@ -7,8 +7,9 @@
  * A server component that loads, in one round of parallel requests, what
  * does not depend on the viewer's clock: the channels (the banners, the
  * connect dialog's providers and the plan's limit), the AI credit balance,
- * the next queued posts, and the dashboard counted in UTC, whose first steps
- * and failed count no time zone changes. The streak and the weekly goal are
+ * the next queued posts, the dashboard counted in UTC, whose first steps
+ * and failed count no time zone changes, and the team with the plan's seats
+ * (2026-10-22). The streak and the weekly goal are
  * counted in the viewer's own weeks, so the client asks for those itself
  * (`use-home-data.ts`).
  *
@@ -29,9 +30,11 @@ import { HomeView } from '@/components/home/home-view';
 import { serverApi } from '@/lib/api';
 import { getActiveOrgId, getSessionCookieHeader } from '@/lib/session';
 import type { AiCredits } from '@/types/ai';
+import type { SubscriptionResponse } from '@/types/billing';
 import type { ChannelsResponse, ProviderSummary } from '@/types/channel';
 import type { DashboardSummary } from '@/types/dashboard';
 import type { QueuePage } from '@/types/post';
+import type { TeamMember } from '@/types/team';
 
 export const metadata: Metadata = { title: 'Home' };
 
@@ -52,17 +55,25 @@ export default async function HomePage({ params }: PageProps<'/[orgId]/home'>) {
     return pending ? Promise.resolve(null) : load().catch(() => null);
   }
 
-  const [channels, { providers }, credits, queue, summary] = await Promise.all([
-    scoped(() => serverApi<ChannelsResponse>('/channels', { cookie })),
-    serverApi<{ providers: ProviderSummary[] }>('/channels/providers', { cookie }).catch(() => ({
-      providers: [] as ProviderSummary[],
-    })),
-    scoped(() =>
-      serverApi<{ credits: AiCredits }>('/ai/credits', { cookie }).then((result) => result.credits),
-    ),
-    scoped(() => serverApi<QueuePage>(`/posts/queue?${upNext.toString()}`, { cookie })),
-    scoped(() => serverApi<DashboardSummary>('/dashboard', { cookie })),
-  ]);
+  const [channels, { providers }, credits, queue, summary, members, subscription] =
+    await Promise.all([
+      scoped(() => serverApi<ChannelsResponse>('/channels', { cookie })),
+      serverApi<{ providers: ProviderSummary[] }>('/channels/providers', { cookie }).catch(() => ({
+        providers: [] as ProviderSummary[],
+      })),
+      scoped(() =>
+        serverApi<{ credits: AiCredits }>('/ai/credits', { cookie }).then(
+          (result) => result.credits,
+        ),
+      ),
+      scoped(() => serverApi<QueuePage>(`/posts/queue?${upNext.toString()}`, { cookie })),
+      scoped(() => serverApi<DashboardSummary>('/dashboard', { cookie })),
+      // Read by the URL's workspace, so it needs no wait for the cookie.
+      serverApi<{ members: TeamMember[] }>(`/orgs/${encodeURIComponent(orgId)}/members`, { cookie })
+        .then((result) => result.members)
+        .catch(() => null),
+      scoped(() => serverApi<SubscriptionResponse>('/billing/subscription', { cookie })),
+    ]);
 
   return (
     <HomeView
@@ -74,6 +85,8 @@ export default async function HomePage({ params }: PageProps<'/[orgId]/home'>) {
       credits={credits}
       initialQueue={queue}
       initialSummary={summary}
+      members={members}
+      memberLimit={subscription ? subscription.subscription.plan.members : undefined}
     />
   );
 }

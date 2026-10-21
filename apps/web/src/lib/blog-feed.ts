@@ -12,6 +12,10 @@ export interface BlogArticle {
   /** Stable across fetches, for React keys. */
   id: string;
   title: string;
+  /** What the article is about, one or two words ("Planning"): the card's eyebrow. */
+  topic: string;
+  /** Minutes to read it, rounded up. */
+  readMinutes: number;
   /** One or two sentences; the card clamps it. */
   excerpt: string;
   /** Where the article lives. Null until it is published. */
@@ -23,21 +27,27 @@ export interface BlogArticle {
 export const BLOG_FEED: readonly BlogArticle[] = [
   {
     id: 'plan-a-week',
-    title: 'Plan a week of posts in one sitting',
+    topic: 'Planning',
+    readMinutes: 4,
+    title: 'Plan A Week Of Posts In One Sitting',
     excerpt: 'Batch the writing, schedule it once, and spend the rest of the week replying.',
     href: null,
     image: null,
   },
   {
     id: 'nothing-to-say',
-    title: 'What to post when you have nothing to say',
+    topic: 'Ideas',
+    readMinutes: 5,
+    title: 'What To Post When You Have Nothing To Say',
     excerpt: 'Five prompts that turn the work you already do into something worth sharing.',
     href: null,
     image: null,
   },
   {
     id: 'read-your-numbers',
-    title: 'Reading your analytics without the noise',
+    topic: 'Analytics',
+    readMinutes: 6,
+    title: 'Reading Your Analytics Without The Noise',
     excerpt: 'The three numbers that tell you what to post next, and the ones you can ignore.',
     href: null,
     image: null,

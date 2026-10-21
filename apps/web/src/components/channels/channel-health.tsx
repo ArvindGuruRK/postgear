@@ -29,9 +29,9 @@ export const CHANNEL_HEALTH: Record<ChannelHealth, HealthPresentation> = {
     explanation: null,
   },
   needs_setup: {
-    label: 'Finish setup',
+    label: 'Finish Setup',
     variant: 'accent',
-    action: 'Finish setup',
+    action: 'Finish Setup',
     explanation: 'Choose which account or page this channel posts to.',
   },
   needs_reconnect: {

@@ -68,6 +68,92 @@ export function goalProgress(published: number, target: number): number {
   return Math.min(1, Math.max(0, published / target));
 }
 
+/**
+ * One week in the streak tile's chain: published in, still open (this week,
+ * with a streak waiting on it), or nothing.
+ */
+export type StreakWeek = 'done' | 'open' | 'empty';
+
+/**
+ * The streak as a chain of the last `length` weeks, oldest first and this
+ * week last. A streak counted from last week (nothing out yet this week)
+ * leaves this week open rather than empty: it is not broken yet.
+ */
+export function streakChain(streak: DashboardStreak, length = 8): StreakWeek[] {
+  const chain: StreakWeek[] = Array.from({ length }, () => 'empty');
+
+  if (streak.postedThisWeek) {
+    for (let index = 0; index < Math.min(streak.weeks, length); index += 1) {
+      chain[length - 1 - index] = 'done';
+    }
+    return chain;
+  }
+
+  if (streak.weeks > 0) {
+    chain[length - 1] = 'open';
+  }
+  for (let index = 0; index < Math.min(streak.weeks, length - 1); index += 1) {
+    chain[length - 2 - index] = 'done';
+  }
+  return chain;
+}
+
+/** The line under the streak's chain: what this week needs, if anything. */
+export function streakCaption(streak: DashboardStreak): string {
+  if (streak.weeks === 0) return 'Publish a post to start one';
+  if (streak.postedThisWeek) return 'Posted this week';
+  return 'Post this week to keep it';
+}
+
+/** The line under the goal's bar. */
+export function goalCaption(published: number, target: number): string {
+  if (published >= target) return 'Goal met this week';
+  const left = target - published;
+  return `${left} more ${left === 1 ? 'post' : 'posts'} to go`;
+}
+
+/** "1 week", "3 weeks": the unit beside a count. */
+export function plural(count: number, one: string, many: string): string {
+  return count === 1 ? one : many;
+}
+
+/**
+ * The team tile's numbers: who is in, against the plan's seats. `limit` is
+ * null for an unlimited plan and undefined when the plan did not load.
+ */
+export function seatSummary(
+  members: number,
+  limit: number | null | undefined,
+): { unit: string; progress: number | null; caption: string } {
+  if (limit === undefined) {
+    return {
+      unit: plural(members, 'member', 'members'),
+      progress: null,
+      caption: 'In this workspace',
+    };
+  }
+
+  if (limit === null) {
+    return {
+      unit: plural(members, 'member', 'members'),
+      progress: null,
+      caption: 'Unlimited seats on this plan',
+    };
+  }
+
+  const left = Math.max(0, limit - members);
+  return {
+    unit: `of ${limit} ${plural(limit, 'seat', 'seats')}`,
+    progress: goalProgress(members, limit),
+    caption: left === 0 ? 'Every seat is taken' : `${left} ${plural(left, 'seat', 'seats')} left`,
+  };
+}
+
+/** How many of the first steps are done, for the section's "1 of 3 done". */
+export function firstStepsCount(steps: DashboardFirstSteps): number {
+  return [steps.channel, steps.post, steps.published].filter(Boolean).length;
+}
+
 /** The first non-empty line of a post's preview, or null for an empty post. */
 export function firstLine(preview: string): string | null {
   const line = preview

@@ -8,6 +8,9 @@
  * link, no arrow, nothing that invites a click to nowhere. Without an
  * `image`, the cover is a palette fill with a decorative icon, never a stock
  * photo. No dates are shown, since none of these were published.
+ *
+ * A card reads top to bottom: cover, topic and read time, title, excerpt
+ * (2026-10-22), the order the real feed will fill.
  */
 import { ArrowUpRightIcon } from '@animateicons/react/lucide/arrow-up-right-icon';
 import { cn, MotionIcon, pressSm } from '@postgear/ui';
@@ -32,7 +35,7 @@ export function BlogRow({ articles = BLOG_FEED }: { articles?: readonly BlogArti
   }
 
   return (
-    <HomeSection title="From the blog" data-testid="home-blog">
+    <HomeSection title="From The Blog" data-testid="home-blog">
       <CardRow columns={3}>
         {articles.map((article, index) => (
           <li key={article.id} className={CARD_ROW_ITEM}>
@@ -93,12 +96,15 @@ function ArticleBody({
           <Icon className="h-8 w-8" strokeWidth={2.25} />
         </span>
       )}
-      <div className="flex flex-1 flex-col gap-1 p-4 md:p-5">
+      <div className="flex flex-1 flex-col gap-2 p-4 md:p-5">
+        <span className="font-sans text-xs text-ink type-muted">
+          {article.topic}, {article.readMinutes} min read
+        </span>
         <div className="flex items-start justify-between gap-2">
           <h3 className="m-0 type-ui text-base">{article.title}</h3>
           {children}
         </div>
-        <p className="m-0 line-clamp-2 font-sans text-sm opacity-75">{article.excerpt}</p>
+        <p className="m-0 line-clamp-2 font-sans text-sm type-muted">{article.excerpt}</p>
       </div>
     </>
   );

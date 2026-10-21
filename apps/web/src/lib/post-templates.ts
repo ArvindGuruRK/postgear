@@ -24,7 +24,7 @@ export interface PostTemplate {
 export const POST_TEMPLATES = [
   {
     id: 'behind-the-scenes',
-    title: 'Show how the work gets made',
+    title: 'Show How The Work Gets Made',
     description: 'A look behind the scenes at something you are working on.',
     text: [
       "Here's a look behind the scenes at [what you're working on].",
@@ -38,7 +38,7 @@ export const POST_TEMPLATES = [
   },
   {
     id: 'lesson-learned',
-    title: 'Share a lesson learned the hard way',
+    title: 'Share A Lesson Learned The Hard Way',
     description: 'One mistake, what it taught you, and what you do now.',
     text: [
       'A lesson I learned the hard way: [the lesson].',
@@ -52,7 +52,7 @@ export const POST_TEMPLATES = [
   },
   {
     id: 'quick-tips',
-    title: 'Three quick tips',
+    title: 'Three Quick Tips',
     description: 'A short numbered list your audience can use today.',
     text: [
       '3 quick tips for [your topic]:',
@@ -66,7 +66,7 @@ export const POST_TEMPLATES = [
   },
   {
     id: 'ask-your-audience',
-    title: 'Ask your audience a question',
+    title: 'Ask Your Audience A Question',
     description: 'Start a conversation with one open question.',
     text: [
       'A question for [your audience]:',

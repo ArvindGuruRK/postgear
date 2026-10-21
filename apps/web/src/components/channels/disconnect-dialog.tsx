@@ -120,7 +120,7 @@ export function DisconnectDialog({ channel, onOpenChange, onDone }: DisconnectDi
         </Stack>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={working}>Keep it</AlertDialogCancel>
+          <AlertDialogCancel disabled={working}>Keep It</AlertDialogCancel>
           <AlertDialogAction variant="danger" onClick={confirm} disabled={working}>
             {working ? 'Disconnecting…' : 'Disconnect'}
           </AlertDialogAction>

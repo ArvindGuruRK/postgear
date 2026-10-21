@@ -200,7 +200,7 @@ function SortableChannelRow({
   } = useSortable({ id: channel.id });
 
   const grip = (
-    <TooltipHint label="Drag to reorder" side="top" hoverable={false}>
+    <TooltipHint label="Drag To Reorder" side="top" hoverable={false}>
       <button
         type="button"
         ref={setActivatorNodeRef}
