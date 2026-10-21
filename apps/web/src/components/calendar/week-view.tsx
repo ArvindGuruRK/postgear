@@ -169,20 +169,27 @@ export function WeekView({
                   })}
 
                   {currentHour ? (
-                    // The present minute, as a line across the whole hour row,
-                    // with the time itself in the hour gutter where the line starts.
+                    // The present minute, as a line across the days, with the time
+                    // centred in the hour gutter, in line with the hour labels
+                    // (2026-10-21). The line starts at the middle of the gutter,
+                    // under the time, so no stub of it shows to the time's left.
+                    // The two widths are the gutter's (`COLUMNS`): half of it.
                     <>
                       <span
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-actionAi"
+                        className="pointer-events-none absolute start-[1.875rem] end-0 z-10 h-0.5 bg-actionAi md:start-[2.75rem]"
                         style={{ top: `${(now.getMinutes() / 60) * 100}%` }}
                       />
                       <span
-                        data-testid="now-time"
-                        className="pointer-events-none absolute start-0.5 z-10 -translate-y-1/2 rounded-md border border-outline bg-actionAi px-1 py-0.5 md:border-2 font-sans text-[11px] leading-none tabular-nums type-ui text-onActionAi"
+                        className="pointer-events-none absolute start-0 z-10 flex w-[3.75rem] -translate-y-1/2 justify-center md:w-[5.5rem]"
                         style={{ top: `${(now.getMinutes() / 60) * 100}%` }}
                       >
-                        {nowText}
+                        <span
+                          data-testid="now-time"
+                          className="rounded-md border border-outline bg-actionAi px-1 py-0.5 font-sans text-[11px] leading-none tabular-nums type-ui text-onActionAi md:border-2"
+                        >
+                          {nowText}
+                        </span>
                       </span>
                     </>
                   ) : null}
