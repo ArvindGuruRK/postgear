@@ -34,6 +34,7 @@
  */
 import { Injectable } from '@nestjs/common';
 import { Prisma, type PrismaTransactionClient, prisma, State } from '@postgear/db';
+import { storedForms } from './post-search';
 import { canTransition } from './post-state';
 
 /** One stored row, as the service needs it. */
@@ -466,6 +467,68 @@ export class PostsRepository {
     });
 
     return { rows, total: all.length };
+  }
+
+  /**
+   * Groups that might match a search, most recently edited first (2026-10-21).
+   *
+   * Narrows by one word only (the caller passes the most selective one) and
+   * only ever returns a *superset*: the content column is a JSON document, so
+   * a `contains` also hits its keys and escapes, and a tag's name counts as
+   * part of its post. The service looks at the real text afterwards. Paged by
+   * group, like `listRecentGroups`, so a post sent to eight channels is one
+   * candidate.
+   */
+  async searchGroups(params: {
+    orgId: string;
+    term: string;
+    take: number;
+    skip: number;
+  }): Promise<string[]> {
+    const groups = await prisma.post.groupBy({
+      by: ['group'],
+      where: {
+        organizationId: params.orgId,
+        deletedAt: null,
+        OR: [
+          ...storedForms(params.term).map((form) => ({
+            content: { contains: form, mode: 'insensitive' as const },
+          })),
+          {
+            tags: {
+              some: {
+                tag: {
+                  orgId: params.orgId,
+                  deletedAt: null,
+                  name: { contains: params.term, mode: 'insensitive' as const },
+                },
+              },
+            },
+          },
+        ],
+      },
+      _max: { updatedAt: true },
+      // The group id breaks ties, so a page boundary between two posts saved in
+      // the same millisecond neither repeats one nor skips one.
+      orderBy: [{ _max: { updatedAt: 'desc' } }, { group: 'asc' }],
+      skip: params.skip,
+      take: params.take,
+    });
+
+    return groups.map((entry) => entry.group);
+  }
+
+  /** Every live row of the given groups, for building their summaries. */
+  async findGroups(orgId: string, groups: string[]): Promise<PostRow[]> {
+    if (groups.length === 0) {
+      return [];
+    }
+
+    return prisma.post.findMany({
+      where: { organizationId: orgId, deletedAt: null, group: { in: groups } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: rowSelect(orgId),
+    });
   }
 
   /**

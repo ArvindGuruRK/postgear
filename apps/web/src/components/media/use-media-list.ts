@@ -16,10 +16,14 @@ const SEARCH_DELAY_MS = 250;
  * library the same way. Responses are sequenced: typing "beach" fires several
  * searches, and a slow early one must not land after a fast later one and
  * replace its results.
+ *
+ * `initialSearch` (2026-10-21) is for arriving from the top bar's search with
+ * a word already chosen. Such a page is never rendered by the server (it has
+ * no list to hand over, `initial` is null), so the first fetch carries it.
  */
-export function useMediaList(initial?: MediaPage | null) {
-  const [search, setSearchValue] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+export function useMediaList(initial?: MediaPage | null, initialSearch = '') {
+  const [search, setSearchValue] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch.trim());
   const [type, setTypeValue] = useState<MediaFilter>('all');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<MediaPage | null>(initial ?? null);

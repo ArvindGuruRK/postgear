@@ -45,6 +45,7 @@ import {
   validateProviderSettings,
 } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
+import { matchesAllTerms, selectiveTerm, snippetAround } from '../../common/search-terms';
 import { type ChannelColors, colorOf } from '../channels/channel-colors';
 import type { ChannelView } from '../channels/channels.service';
 import { ChannelsService } from '../channels/channels.service';
@@ -59,6 +60,7 @@ import type {
   QueueQuery as QueueQueryInput,
   UpdatePostInput,
 } from './dto/posts.schema';
+import { documentSearchText } from './post-search';
 import { groupState } from './post-state';
 import { POST_MESSAGES } from './posts.messages';
 import {
@@ -77,6 +79,10 @@ export const QUEUE_PAGE_SIZE = 20;
 
 /** Characters of text shown for a post in a list. */
 const PREVIEW_LENGTH = 160;
+
+/** Search reads candidates this many groups at a time, and at most this many times. */
+const SEARCH_BATCH_SIZE = 40;
+const SEARCH_MAX_BATCHES = 5;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -152,6 +158,11 @@ export interface PostSummary {
     | 'releaseURL'
     | 'publishStatus'
   >[];
+}
+
+/** A post found by search: its summary, and the words around the match (2026-10-21). */
+export interface PostSearchHit extends PostSummary {
+  snippet: string;
 }
 
 export interface QueuePage {
@@ -292,6 +303,64 @@ export class PostsService {
     return [...byGroup.entries()]
       .map(([group, groupRows]) => this.summarize(group, groupRows, colors))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+
+  /**
+   * Posts whose words, or whose tags' names, contain every search term
+   * (2026-10-21), most recently edited first.
+   *
+   * The database hands back candidates a batch at a time and each is checked
+   * against its real text here (see `common/search-terms.ts` for why). The
+   * scan stops when `limit` posts are found; one more match than that sets
+   * `more`, so the caller can say "there are others" without counting them.
+   * A bounded number of batches is read, so a search that matches nothing real
+   * (say, a word that is only in the document's JSON keys) ends instead of
+   * walking the whole workspace.
+   */
+  async search(
+    orgId: string,
+    terms: string[],
+    limit: number,
+  ): Promise<{ posts: PostSearchHit[]; more: boolean }> {
+    const posts: PostSearchHit[] = [];
+    let colors: ChannelColors | null = null;
+
+    for (let round = 0; round < SEARCH_MAX_BATCHES; round += 1) {
+      const groups = await this.repository.searchGroups({
+        orgId,
+        term: selectiveTerm(terms),
+        take: SEARCH_BATCH_SIZE,
+        skip: round * SEARCH_BATCH_SIZE,
+      });
+
+      if (groups.length === 0) {
+        break;
+      }
+
+      const byGroup = groupRows(await this.repository.findGroups(orgId, groups));
+
+      for (const group of groups) {
+        const rows = byGroup.get(group);
+        const matched = rows ? matchPost(rows, terms) : null;
+
+        if (!rows || !matched) {
+          continue;
+        }
+
+        if (posts.length === limit) {
+          return { posts, more: true };
+        }
+
+        colors ??= await this.channels.colors(orgId);
+        posts.push({ ...this.summarize(group, rows, colors), snippet: matched.snippet });
+      }
+
+      if (groups.length < SEARCH_BATCH_SIZE) {
+        break;
+      }
+    }
+
+    return { posts, more: false };
   }
 
   async get(orgId: string, group: string): Promise<PostDetail> {
@@ -664,6 +733,27 @@ function publishView(chain: PostRow[]): ChannelPublishView {
     releaseURL: root?.releaseURL ?? null,
     publishStatus: parsePublishStatus(root?.error),
   };
+}
+
+/**
+ * Whether a post's text and tag names hold every term, and the snippet to
+ * show for it. The words of all its channels and thread parts count together:
+ * a search is for the post, not for one channel's copy of it.
+ */
+function matchPost(rows: PostRow[], terms: string[]): { snippet: string } | null {
+  const texts = rows.map((row) => documentSearchText(parseDocument(row.content)));
+  const tagNames = rows.flatMap((row) => row.tags.map(({ tag }) => tag.name));
+
+  if (!matchesAllTerms([...texts, ...tagNames].join('\n'), terms)) {
+    return null;
+  }
+
+  const shown =
+    texts.find((text) => terms.some((term) => text.toLowerCase().includes(term))) ??
+    texts.find((text) => text.trim() !== '') ??
+    '';
+
+  return { snippet: snippetAround(shown, terms) };
 }
 
 function groupRows(rows: PostRow[]): Map<string, PostRow[]> {

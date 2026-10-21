@@ -28,6 +28,7 @@ import {
 } from '@nestjs/common';
 import { securityLogger } from '../../common/logging/security-logger';
 import { stripControlChars } from '../../common/sanitize';
+import { matchesAllTerms, selectiveTerm } from '../../common/search-terms';
 import { type ListMediaQuery, MEDIA_PAGE_SIZE } from './dto/media.schema';
 import { SNIFF_BYTES, sniffMedia } from './file-type';
 import { processImage, UnreadableImageError } from './image-processor';
@@ -40,6 +41,12 @@ import {
 import { type MediaKind, type MediaRecord, MediaRepository } from './media.repository';
 import { STORAGE_BACKEND, type StorageBackend } from './storage/storage.interface';
 import { CONTENT_TYPES, createMediaKey, thumbnailKeyFor } from './storage/storage-keys';
+
+/** How many of the newest items a search looks through. */
+const SEARCH_CANDIDATES = 60;
+
+/** A library item as a search result shows it (2026-10-21). */
+export type MediaSearchHit = Pick<MediaView, 'id' | 'name' | 'type' | 'url' | 'thumbnailUrl'>;
 
 /** What a client sees for one item: URLs, never storage keys. */
 export interface MediaView {
@@ -272,6 +279,44 @@ export class MediaService {
       page: query.page,
       pageCount: Math.max(1, Math.ceil(total / MEDIA_PAGE_SIZE)),
       total,
+    };
+  }
+
+  /**
+   * Library items whose name contains every search term (2026-10-21), newest
+   * first.
+   *
+   * The database narrows by the most selective word over the newest
+   * `SEARCH_CANDIDATES` items and the rest is checked here, which also keeps
+   * a `%` or `_` in the search from acting as a wildcard. One more match than
+   * `limit` sets `more`.
+   */
+  async search(
+    orgId: string,
+    terms: string[],
+    limit: number,
+  ): Promise<{ media: MediaSearchHit[]; more: boolean }> {
+    const { items } = await this.repository.list({
+      orgId,
+      search: selectiveTerm(terms),
+      page: 1,
+      pageSize: SEARCH_CANDIDATES,
+    });
+
+    const matches = items.filter((item) => matchesAllTerms(item.name, terms));
+
+    return {
+      media: matches.slice(0, limit).map((item) => {
+        const view = this.toView(item);
+        return {
+          id: view.id,
+          name: view.name,
+          type: view.type,
+          url: view.url,
+          thumbnailUrl: view.thumbnailUrl,
+        };
+      }),
+      more: matches.length > limit,
     };
   }
 

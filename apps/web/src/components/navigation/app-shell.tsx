@@ -36,6 +36,7 @@ export function AppShell({
   navItems,
   sidebarBottomItems,
   pageTitle,
+  search,
   accountMenu,
   notifications,
   fullBleed = false,
@@ -44,6 +45,8 @@ export function AppShell({
   navItems: SidebarItem[];
   sidebarBottomItems?: SidebarItem[];
   pageTitle: string;
+  /** The workspace search (2026-10-21), a slot like the two below. */
+  search?: ReactNode;
   accountMenu?: ReactNode;
   notifications?: ReactNode;
   fullBleed?: boolean;
@@ -64,7 +67,12 @@ export function AppShell({
     >
       <Sidebar items={navItems} bottomItems={sidebarBottomItems} className="hidden md:flex" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <TopBar title={pageTitle} accountMenu={accountMenu} notifications={notifications} />
+        <TopBar
+          title={pageTitle}
+          search={search}
+          accountMenu={accountMenu}
+          notifications={notifications}
+        />
         <main
           className={cn(
             'min-h-0 flex-1 px-4 pt-2 md:px-3 md:pt-5',

@@ -2,33 +2,37 @@ import type { ReactNode } from 'react';
 import { ThemeToggle } from './theme-toggle';
 
 /**
- * `accountMenu` and `notifications` are slots rather than imports.
+ * `search`, `accountMenu` and `notifications` are slots rather than imports.
  *
- * Both of their real implementations read workspace context that only exists
- * inside `[orgId]/layout.tsx`. Importing them here would make the entire app
- * shell unrenderable anywhere else, which is exactly what happened to the
- * design-system playground at /dev/components when AccountMenu was wired in
- * directly: every showcase route 500'd with "useWorkspace must be used inside
- * a WorkspaceProvider".
+ * Their real implementations read workspace context that only exists inside
+ * `[orgId]/layout.tsx` (the search needs the workspace to link into, the
+ * account menu and the bell read the provider). Importing them here would
+ * make the entire app shell unrenderable anywhere else, which is exactly what
+ * happened to the design-system playground at /dev/components when AccountMenu
+ * was wired in directly: every showcase route 500'd with "useWorkspace must be
+ * used inside a WorkspaceProvider".
  *
  * As slots, the chrome stays context-free and each caller supplies whatever it
  * can: the dashboard passes the live components, the playground passes demo
- * ones.
+ * ones or none.
  *
  * Layout (UI revamp, 2026-10-18), after the reference's header: the page's
- * name on the left as the one h1, and the utilities on the right (theme,
- * notifications, and the account, which also holds the workspace switcher).
- * It sits on the page ground with no frame, no rule under it and no
- * dividers between its buttons: the title's size and the spacing do that
- * work, and decorative rules read as generated UI. The search field that
- * used to sit here is gone: it searched nothing.
+ * name on the left as the one h1, and the utilities on the right (search,
+ * theme, notifications, and the account, which also holds the workspace
+ * switcher). It sits on the page ground with no frame, no rule under it and
+ * no dividers between its buttons: the title's size and the spacing do that
+ * work, and decorative rules read as generated UI. The search field came back
+ * (2026-10-21) as the workspace search: see `components/search/global-search`.
  */
 export function TopBar({
   title,
+  search,
   accountMenu,
   notifications,
 }: {
   title: string;
+  /** The workspace search (2026-10-21): a slot for the same reason as the account menu. */
+  search?: ReactNode;
   accountMenu?: ReactNode;
   /** The notification bell (Sprint 8): a slot for the same reason as the account menu. */
   notifications?: ReactNode;
@@ -38,6 +42,7 @@ export function TopBar({
     <header className="flex h-16 shrink-0 items-center gap-3 px-4 md:h-20 md:gap-4 md:px-3">
       <h1 className="min-w-0 flex-1 truncate type-heading text-xl text-ink md:text-2xl">{title}</h1>
       <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        {search}
         <ThemeToggle saveToAccount />
         {notifications}
         {accountMenu}

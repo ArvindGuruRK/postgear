@@ -45,11 +45,14 @@ const FILTERS = [
 export function MediaLibrary({
   orgId,
   initialPage,
+  initialSearch = '',
 }: {
   orgId: string;
   initialPage: MediaPage | null;
+  /** The word the page was opened with (`?search=`, from the top bar's search). */
+  initialSearch?: string;
 }) {
-  const list = useMediaList(initialPage);
+  const list = useMediaList(initialPage, initialSearch);
   const { toast } = useToast();
   const [deleting, setDeleting] = useState<MediaItem | null>(null);
 

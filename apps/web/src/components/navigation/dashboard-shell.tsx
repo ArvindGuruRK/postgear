@@ -14,6 +14,7 @@ import type { AnimatedIcon } from '@postgear/ui';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { NotificationBell } from '../notifications/notification-bell';
+import { GlobalSearch } from '../search/global-search';
 import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
 import type { SidebarItem } from './sidebar';
@@ -107,6 +108,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
       // Both of these read WorkspaceProvider, which [orgId]/layout.tsx sets up
       // above this component. They are passed here rather than imported by
       // AppShell so the shell stays renderable without a workspace.
+      search={<GlobalSearch orgId={orgId} />}
       accountMenu={<AccountMenu />}
       notifications={<NotificationBell />}
     >

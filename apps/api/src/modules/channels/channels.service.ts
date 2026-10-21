@@ -27,6 +27,7 @@ import {
   supportsEntitySelection,
 } from '@postgear/social-core';
 import { securityLogger } from '../../common/logging/security-logger';
+import { matchesAllTerms } from '../../common/search-terms';
 import type { ChannelUsage } from '../billing/billing.types';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
@@ -55,6 +56,12 @@ export interface ChannelView extends ChannelSummary {
   /** The avatar palette slot, 0-based: see `channel-colors.ts`. */
   color: number;
 }
+
+/** A channel as a search result shows it (2026-10-21). */
+export type ChannelSearchHit = Pick<
+  ChannelView,
+  'id' | 'name' | 'profile' | 'picture' | 'providerIdentifier' | 'providerName' | 'color' | 'health'
+>;
 
 /** What `GET /channels` says about the plan's ceiling (Sprint 8). */
 export interface ChannelLimit {
@@ -99,6 +106,52 @@ export class ChannelsService {
         this.manager.find(channel.providerIdentifier)?.name ?? channel.providerIdentifier,
       color: colorOf(colors, channel.id),
     }));
+  }
+
+  /**
+   * Channels whose name, handle or platform contains every search term
+   * (2026-10-21), in the workspace's order but with names that start with the
+   * search first.
+   *
+   * Filtered in memory from `list`: a workspace's channels are capped by its
+   * plan, so a query would save nothing, and this way a search sees exactly the
+   * channels (and health) the rest of the app does. Only what a result row
+   * shows is returned; nothing here is a credential.
+   */
+  async search(
+    orgId: string,
+    terms: string[],
+    limit: number,
+  ): Promise<{ channels: ChannelSearchHit[]; more: boolean }> {
+    const matches = (await this.list(orgId)).filter((channel) =>
+      matchesAllTerms(
+        [
+          channel.name,
+          channel.profile ?? '',
+          channel.providerName,
+          channel.providerIdentifier,
+        ].join('\n'),
+        terms,
+      ),
+    );
+
+    const startsWith = (channel: ChannelView) => channel.name.toLowerCase().startsWith(terms[0]);
+    // `sort` is stable, so channels in each group keep the workspace's order.
+    const ranked = [...matches].sort((a, b) => Number(startsWith(b)) - Number(startsWith(a)));
+
+    return {
+      channels: ranked.slice(0, limit).map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+        profile: channel.profile,
+        picture: channel.picture,
+        providerIdentifier: channel.providerIdentifier,
+        providerName: channel.providerName,
+        color: channel.color,
+        health: channel.health,
+      })),
+      more: ranked.length > limit,
+    };
   }
 
   /**

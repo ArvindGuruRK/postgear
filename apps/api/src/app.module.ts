@@ -23,6 +23,7 @@ import { PostsModule } from './modules/posts/posts.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { SeoModule } from './modules/seo/seo.module';
+import { SearchModule } from './modules/search/search.module';
 import { SignaturesModule } from './modules/signatures/signatures.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { UsersModule } from './modules/users/users.module';
@@ -83,6 +84,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     // UI revamp (2026-10-19): post tags and saved signatures, after Postiz's.
     TagsModule,
     SignaturesModule,
+    // UI revamp (2026-10-21): the top bar's workspace search.
+    SearchModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
