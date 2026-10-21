@@ -339,7 +339,7 @@ export function ChannelsColumn({
     >
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden pg-scrollbar pg-scrollbar-chrome',
+          'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden pg-scrollbar-hidden',
           collapsed ? 'items-center px-3 py-5' : inSheet ? 'px-5 pb-5' : 'p-5',
         )}
       >

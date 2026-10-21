@@ -143,6 +143,14 @@
 .pg-scrollbar-chrome {
   --pg-scrollbar-track: var(--color-chrome);
 }
+/* Still scrolls with the wheel, touchpad, touch and keyboard; only the bar is
+   not drawn. Used where a visible bar would crowd the content (channel column). */
+.pg-scrollbar-hidden {
+  scrollbar-width: none;
+}
+.pg-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
 
 /* ── Single scroll surface ──────────────────────────────────────────────
    AppShell (apps/web/src/components/navigation/app-shell.tsx) renders
