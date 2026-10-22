@@ -44,7 +44,7 @@ Local services from `docker-compose.yml`: Postgres 15, Redis, MinIO, Temporal (:
 
 In development, Claude runs migrations and `db:generate` itself rather than asking the user; the `.claude/hooks/prisma-schema-reminder.js` hook lists the steps after any `schema.prisma` edit.
 
-MCP servers (`.mcp.json`): `postgres` (Postgres MCP Pro in Docker, restricted mode) logs in as `claude_readonly`, a SELECT-only role that cannot see secret columns; create or refresh it with `npm run db:readonly-role` after a fresh database or a migration that adds a secret column (list it in `infra/postgres/readonly-role.sql`). `playwright` (headless, isolated) drives the local app; use it for bigger UI or flow changes only, since the user checks small tweaks by hand.
+MCP servers (`.mcp.json`): the Postgres MCP was removed because every session left an orphan `crystaldba/postgres-mcp` container running; query the database with `docker exec postgear_postgres psql -U postgres -d postgear_db` instead. The `claude_readonly` role (`npm run db:readonly-role`, `infra/postgres/readonly-role.sql`) is kept so the MCP can be added back. `playwright` (headless, isolated) drives the local app; use it for bigger UI or flow changes only, since the user checks small tweaks by hand.
 
 ## Architecture
 
