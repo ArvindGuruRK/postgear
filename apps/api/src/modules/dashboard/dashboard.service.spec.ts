@@ -16,7 +16,9 @@ jest.mock('@postgear/db', () => ({
 import { PostingFrequency, prisma, Role, State } from '@postgear/db';
 import {
   DashboardService,
+  dayStreakFrom,
   isKnownTimeZone,
+  previousDay,
   previousWeek,
   streakFrom,
   suggestedGoal,
@@ -64,6 +66,46 @@ describe('streakFrom', () => {
   it('steps back across a month and a year boundary', () => {
     expect(previousWeek('2026-03-02')).toBe('2026-02-23');
     expect(previousWeek('2027-01-04')).toBe('2026-12-28');
+  });
+});
+
+describe('dayStreakFrom', () => {
+  it('counts back from today when it already has a post', () => {
+    const days = new Set(['2026-10-22', '2026-10-21', '2026-10-20', '2026-10-18']);
+
+    expect(dayStreakFrom(days, '2026-10-22')).toEqual({ days: 3, postedToday: true });
+  });
+
+  it('keeps yesterday alive while today has no post yet', () => {
+    const days = new Set(['2026-10-21', '2026-10-20']);
+
+    expect(dayStreakFrom(days, '2026-10-22')).toEqual({ days: 2, postedToday: false });
+  });
+
+  it('is broken by a whole day without a post', () => {
+    const days = new Set(['2026-10-20', '2026-10-19']);
+
+    expect(dayStreakFrom(days, '2026-10-22')).toEqual({ days: 0, postedToday: false });
+  });
+
+  it('is zero for a workspace that never published', () => {
+    expect(dayStreakFrom(new Set(), '2026-10-22')).toEqual({ days: 0, postedToday: false });
+  });
+
+  it('is one for a single post today', () => {
+    expect(dayStreakFrom(new Set(['2026-10-22']), '2026-10-22')).toEqual({
+      days: 1,
+      postedToday: true,
+    });
+  });
+
+  it('steps back across a month, a year and a leap day', () => {
+    expect(previousDay('2026-11-01')).toBe('2026-10-31');
+    expect(previousDay('2027-01-01')).toBe('2026-12-31');
+    expect(previousDay('2028-03-01')).toBe('2028-02-29');
+
+    const days = new Set(['2027-01-01', '2026-12-31', '2026-12-30']);
+    expect(dayStreakFrom(days, '2027-01-01')).toEqual({ days: 3, postedToday: true });
   });
 });
 
@@ -120,19 +162,21 @@ describe('DashboardService', () => {
     db.userOrganization.findFirst.mockResolvedValue({
       user: { onboarding: { postingFrequency: PostingFrequency.DAILY } },
     });
-    db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) =>
-      strings.join('?').includes('now()')
-        ? [{ week: '2026-10-19' }]
-        : [
-            { week: '2026-10-19', published: 2 },
-            { week: '2026-10-12', published: 4 },
-          ],
-    );
+    db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = strings.join('?');
+      if (sql.includes('now()')) return [{ week: '2026-10-19', today: '2026-10-22' }];
+      if (sql.includes('AS day')) return [{ day: '2026-10-22' }, { day: '2026-10-21' }];
+      return [
+        { week: '2026-10-19', published: 2 },
+        { week: '2026-10-12', published: 4 },
+      ];
+    });
   });
 
-  it('summarizes the streak, the goal, failures and the first steps', async () => {
+  it('summarizes the streaks, the goal, failures and the first steps', async () => {
     await expect(service.summary('org_1', 'Asia/Kolkata')).resolves.toEqual({
       streak: { weeks: 2, postedThisWeek: true },
+      dayStreak: { days: 2, postedToday: true },
       goal: { target: 7, custom: false, published: 2 },
       failed: 2,
       firstSteps: { channel: true, post: true, published: true },
@@ -142,14 +186,21 @@ describe('DashboardService', () => {
   it('buckets weeks in the viewer zone, root published posts of this workspace only', async () => {
     await service.summary('org_1', 'Asia/Kolkata');
 
-    const weeksCall = db.$queryRaw.mock.calls.find((call) => !sqlOf(call).includes('now()'));
+    const weeksCall = db.$queryRaw.mock.calls.find(
+      (call) => !sqlOf(call).includes('now()') && !sqlOf(call).includes('AS day'),
+    );
+    const daysCall = db.$queryRaw.mock.calls.find((call) => sqlOf(call).includes('AS day'));
     expect(weeksCall).toBeDefined();
-    const sql = sqlOf(weeksCall as unknown[]);
-    expect(sql).toContain(`AT TIME ZONE 'UTC') AT TIME ZONE ?`);
-    expect(sql).toContain(`"state" = 'PUBLISHED'`);
-    expect(sql).toContain('"parentPostId" IS NULL');
-    expect(sql).toContain('"deletedAt" IS NULL');
-    expect(weeksCall?.slice(1)).toEqual(['Asia/Kolkata', 'org_1']);
+    expect(daysCall).toBeDefined();
+
+    for (const call of [weeksCall, daysCall] as unknown[][]) {
+      const sql = sqlOf(call);
+      expect(sql).toContain(`AT TIME ZONE 'UTC') AT TIME ZONE ?`);
+      expect(sql).toContain(`"state" = 'PUBLISHED'`);
+      expect(sql).toContain('"parentPostId" IS NULL');
+      expect(sql).toContain('"deletedAt" IS NULL');
+      expect(call.slice(1)).toEqual(['Asia/Kolkata', 'org_1']);
+    }
 
     expect(db.post.count).toHaveBeenCalledWith({
       where: { organizationId: 'org_1', state: State.ERROR, parentPostId: null, deletedAt: null },
@@ -171,12 +222,15 @@ describe('DashboardService', () => {
       if (values.includes('Asia/Kolkata')) {
         throw new Error('time zone "Asia/Kolkata" not recognized');
       }
-      return strings.join('?').includes('now()') ? [{ week: '2026-10-19' }] : [];
+      return strings.join('?').includes('now()')
+        ? [{ week: '2026-10-19', today: '2026-10-22' }]
+        : [];
     });
 
     const summary = await service.summary('org_1', 'Asia/Kolkata');
 
     expect(summary.streak).toEqual({ weeks: 0, postedThisWeek: false });
+    expect(summary.dayStreak).toEqual({ days: 0, postedToday: false });
     expect(summary.firstSteps.published).toBe(false);
   });
 
@@ -185,7 +239,7 @@ describe('DashboardService', () => {
     db.post.findFirst.mockResolvedValue(null);
     db.integration.findFirst.mockResolvedValue(null);
     db.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) =>
-      strings.join('?').includes('now()') ? [{ week: '2026-10-19' }] : [],
+      strings.join('?').includes('now()') ? [{ week: '2026-10-19', today: '2026-10-22' }] : [],
     );
 
     const summary = await service.summary('org_1', 'UTC');

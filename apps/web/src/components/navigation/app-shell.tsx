@@ -36,6 +36,7 @@ export function AppShell({
   navItems,
   sidebarBottomItems,
   pageTitle,
+  streak,
   search,
   accountMenu,
   notifications,
@@ -45,6 +46,8 @@ export function AppShell({
   navItems: SidebarItem[];
   sidebarBottomItems?: SidebarItem[];
   pageTitle: string;
+  /** The posting-streak flame (2026-10-22), a slot like the ones below. */
+  streak?: ReactNode;
   /** The workspace search (2026-10-21), a slot like the two below. */
   search?: ReactNode;
   accountMenu?: ReactNode;
@@ -69,6 +72,7 @@ export function AppShell({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar
           title={pageTitle}
+          streak={streak}
           search={search}
           accountMenu={accountMenu}
           notifications={notifications}

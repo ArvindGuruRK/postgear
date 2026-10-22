@@ -26,11 +26,14 @@ import { ThemeToggle } from './theme-toggle';
  */
 export function TopBar({
   title,
+  streak,
   search,
   accountMenu,
   notifications,
 }: {
   title: string;
+  /** The posting-streak flame (2026-10-22): a slot for the same reason as the account menu. */
+  streak?: ReactNode;
   /** The workspace search (2026-10-21): a slot for the same reason as the account menu. */
   search?: ReactNode;
   accountMenu?: ReactNode;
@@ -42,6 +45,7 @@ export function TopBar({
     <header className="flex h-16 shrink-0 items-center gap-3 px-4 md:h-20 md:gap-4 md:px-3">
       <h1 className="min-w-0 flex-1 truncate type-heading text-xl text-ink md:text-2xl">{title}</h1>
       <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        {streak}
         {search}
         <ThemeToggle saveToAccount />
         {notifications}

@@ -17,6 +17,7 @@ import { NotificationBell } from '../notifications/notification-bell';
 import { GlobalSearch } from '../search/global-search';
 import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
+import { DayStreak } from './day-streak';
 import type { SidebarItem } from './sidebar';
 
 // Client wrapper around AppShell so [orgId]/layout.tsx can stay a server
@@ -108,6 +109,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
       // Both of these read WorkspaceProvider, which [orgId]/layout.tsx sets up
       // above this component. They are passed here rather than imported by
       // AppShell so the shell stays renderable without a workspace.
+      streak={<DayStreak />}
       search={<GlobalSearch orgId={orgId} />}
       accountMenu={<AccountMenu />}
       notifications={<NotificationBell />}

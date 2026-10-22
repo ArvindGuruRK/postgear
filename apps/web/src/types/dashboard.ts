@@ -19,6 +19,17 @@ export interface DashboardStreak {
   postedThisWeek: boolean;
 }
 
+/**
+ * The top bar's flame: consecutive days, in the viewer's time zone, with at
+ * least one published post. Counted back from today when it already has one,
+ * otherwise from yesterday, so the streak is still alive the morning before
+ * the day's first post.
+ */
+export interface DashboardDayStreak {
+  days: number;
+  postedToday: boolean;
+}
+
 /** The workspace's weekly goal. */
 export interface DashboardGoalSetting {
   target: number;
@@ -41,6 +52,7 @@ export interface DashboardFirstSteps {
 /** `GET /dashboard?tz=`. */
 export interface DashboardSummary {
   streak: DashboardStreak;
+  dayStreak: DashboardDayStreak;
   goal: DashboardGoal;
   /** Posts currently in the failed state (each channel's copy counts). */
   failed: number;

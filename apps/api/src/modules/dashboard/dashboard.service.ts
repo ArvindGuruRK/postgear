@@ -33,6 +33,8 @@ export interface DashboardGoal {
 
 export interface DashboardSummary {
   streak: { weeks: number; postedThisWeek: boolean };
+  /** The top bar's flame: days in a row with a published post. */
+  dayStreak: { days: number; postedToday: boolean };
   goal: DashboardGoal & { published: number };
   /** Posts currently failed, waiting for a retry or an edit. */
   failed: number;
@@ -69,10 +71,44 @@ export function isKnownTimeZone(zone: string): boolean {
   }
 }
 
-/** `YYYY-MM-DD` of the Monday seven days earlier. Calendar arithmetic, so no DST. */
+/** `YYYY-MM-DD` shifted back by `count` days. Calendar arithmetic, so no DST. */
+function daysBefore(date: string, count: number): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day - count)).toISOString().slice(0, 10);
+}
+
+/** `YYYY-MM-DD` of the Monday seven days earlier. */
 export function previousWeek(week: string): string {
-  const [year, month, day] = week.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day - 7)).toISOString().slice(0, 10);
+  return daysBefore(week, 7);
+}
+
+/** `YYYY-MM-DD` of the day before. */
+export function previousDay(day: string): string {
+  return daysBefore(day, 1);
+}
+
+/**
+ * Days in a row with at least one published post.
+ *
+ * Counted back from today when it already has a post; otherwise from
+ * yesterday, because a streak is not broken until a whole day passes without
+ * a post (so it still shows on the morning before the day's first post).
+ * `days` holds the dates (`YYYY-MM-DD`, the viewer's zone) that had a post.
+ */
+export function dayStreakFrom(
+  days: ReadonlySet<string>,
+  today: string,
+): { days: number; postedToday: boolean } {
+  const postedToday = days.has(today);
+  let day = postedToday ? today : previousDay(today);
+  let count = 0;
+
+  while (days.has(day)) {
+    count += 1;
+    day = previousDay(day);
+  }
+
+  return { days: count, postedToday };
 }
 
 /**
@@ -96,6 +132,14 @@ export function streakFrom(
   }
 
   return { weeks: count, postedThisWeek };
+}
+
+interface PublishedCalendar {
+  weeks: Map<string, number>;
+  currentWeek: string;
+  /** Dates (`YYYY-MM-DD`) that had a published post. */
+  days: Set<string>;
+  today: string;
 }
 
 @Injectable()
@@ -125,6 +169,7 @@ export class DashboardService {
 
     return {
       streak: streakFrom(weeks, published.currentWeek),
+      dayStreak: dayStreakFrom(published.days, published.today),
       goal: { ...goal, published: published.weeks.get(published.currentWeek) ?? 0 },
       failed,
       firstSteps: { channel: channel !== null, post: post !== null, published: weeks.size > 0 },
@@ -171,14 +216,12 @@ export class DashboardService {
   }
 
   /**
-   * Published posts per week (keyed by the week's Monday) and this week's
-   * Monday, both in `zone`. A zone Postgres turns out not to know falls back
-   * to UTC rather than failing the dashboard.
+   * Published posts per week (keyed by the week's Monday), this week's
+   * Monday, the days that had a post and today, all in `zone`. A zone
+   * Postgres turns out not to know falls back to UTC rather than failing the
+   * dashboard.
    */
-  private async publishedWeeks(
-    orgId: string,
-    zone: string,
-  ): Promise<{ weeks: Map<string, number>; currentWeek: string }> {
+  private async publishedWeeks(orgId: string, zone: string): Promise<PublishedCalendar> {
     try {
       return await this.publishedWeeksIn(orgId, zone);
     } catch (error) {
@@ -190,13 +233,10 @@ export class DashboardService {
     }
   }
 
-  private async publishedWeeksIn(
-    orgId: string,
-    zone: string,
-  ): Promise<{ weeks: Map<string, number>; currentWeek: string }> {
+  private async publishedWeeksIn(orgId: string, zone: string): Promise<PublishedCalendar> {
     // `state` is compared with a literal rather than a bound parameter: a
     // parameter arrives as text, and Postgres has no `"State" = text` operator.
-    const [rows, [current]] = await Promise.all([
+    const [rows, dayRows, [current]] = await Promise.all([
       prisma.$queryRaw<{ week: string; published: number }[]>`
         SELECT
           to_char(date_trunc('week', ("publishDate" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}), 'YYYY-MM-DD') AS week,
@@ -207,13 +247,25 @@ export class DashboardService {
           AND "parentPostId" IS NULL
           AND "deletedAt" IS NULL
         GROUP BY 1`,
-      prisma.$queryRaw<{ week: string }[]>`
-        SELECT to_char(date_trunc('week', now() AT TIME ZONE ${zone}), 'YYYY-MM-DD') AS week`,
+      prisma.$queryRaw<{ day: string }[]>`
+        SELECT DISTINCT
+          to_char(("publishDate" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day
+        FROM "Post"
+        WHERE "organizationId" = ${orgId}
+          AND "state" = 'PUBLISHED'
+          AND "parentPostId" IS NULL
+          AND "deletedAt" IS NULL`,
+      prisma.$queryRaw<{ week: string; today: string }[]>`
+        SELECT
+          to_char(date_trunc('week', now() AT TIME ZONE ${zone}), 'YYYY-MM-DD') AS week,
+          to_char(now() AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS today`,
     ]);
 
     return {
       weeks: new Map(rows.map((row) => [row.week, row.published])),
       currentWeek: current.week,
+      days: new Set(dayRows.map((row) => row.day)),
+      today: current.today,
     };
   }
 }
