@@ -9,14 +9,23 @@
  * to the same constraints that make the icon rule work, so it stays part of
  * the system rather than an exception to it:
  *
- * - No raw hex (§7). Every stroke is `stroke-ink` and every fill is a
- *   surface or action token, so the drawing re-colors with the theme for
- *   free: ink flips near-white in dark mode, keeping the linework visible
- *   against the panel, while the five flat action fills stay put (§12).
+ * - No raw hex (§7). Every stroke is a token and every fill is a surface or
+ *   action token, so the drawing re-colors with the theme for free. The five
+ *   flat action fills stay put (§12).
  * - Chunky linework matching `strokeWidth={2.5}`-and-up icon weight (§13)
  *   and the border scale (§4): 6px on the body, 3-4px on details.
  * - `aria-hidden`, because the panel beside it already says in words what
  *   this says in pictures: announcing it twice is noise, not access.
+ *
+ * The four coloured cards on the phone's screen each carry a small real logo
+ * of a launch platform (Instagram, Facebook, X, LinkedIn): the product's own
+ * artwork in `public/icon/`, the same files `PlatformIcon` draws. The card
+ * colour stays the loud part and the logo sits small on top of it. X swaps to
+ * its white tile in dark mode, as it does everywhere else.
+ *
+ * Dark mode keeps the near-white linework on purpose. The owner tried soft
+ * gray and dark outline alternatives, a mascot pinned to the light palette,
+ * and #2a2a2a outlines on 2026-10-22, and went back to this.
  */
 export function AuthIllustration({ className }: { className?: string }) {
   return (
@@ -90,12 +99,41 @@ export function AuthIllustration({ className }: { className?: string }) {
 
       {/* Channel tiles: the five action fills, one per square; the same
           palette the app uses for its own action surfaces. */}
-      <g className="stroke-ink" strokeWidth="3">
+      {/* Only these four outlines are #2a2a2a in dark mode (owner's pick,
+          2026-10-22). The one raw hex in this file; it is the default dark
+          theme's surface gray, written out so it stays this exact colour in
+          every dark theme. */}
+      <g className="stroke-ink dark:stroke-[#2a2a2a]" strokeWidth="3">
         <rect x="124" y="168" width="34" height="32" rx="8" className="fill-actionSecondary" />
         <rect x="164" y="168" width="34" height="32" rx="8" className="fill-actionAccent" />
         <rect x="124" y="206" width="34" height="32" rx="8" className="fill-actionSuccess" />
         <rect x="164" y="206" width="34" height="32" rx="8" className="fill-actionAi" />
       </g>
+
+      {/* The real logos, small, centred on their tile: Instagram, Facebook /
+          X, LinkedIn. Plain <image> elements: small static SVGs from /public.
+          twitter.svg draws its tile 4 units in from each edge of a 64-unit
+          canvas, so it is drawn 64/56 larger (and shifted back) to match the
+          others; twitterlight.svg fills its canvas. */}
+      <image href="/icon/instagram.svg" x="130" y="173" width="22" height="22" />
+      <image href="/icon/facebookplatform.svg" x="170" y="173" width="22" height="22" />
+      <image
+        href="/icon/twitter.svg"
+        x="128.43"
+        y="209.43"
+        width="25.14"
+        height="25.14"
+        className="dark:hidden"
+      />
+      <image
+        href="/icon/twitterlight.svg"
+        x="130"
+        y="211"
+        width="22"
+        height="22"
+        className="hidden dark:inline"
+      />
+      <image href="/icon/linkedin.svg" x="170" y="211" width="22" height="22" />
 
       {/* The scheduled post itself: a paper plane just let go of, clear of the
           hand below it so the two read as launch and launcher, not one shape. */}
