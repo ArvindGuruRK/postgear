@@ -99,11 +99,10 @@ export function AuthIllustration({ className }: { className?: string }) {
 
       {/* Channel tiles: the five action fills, one per square; the same
           palette the app uses for its own action surfaces. */}
-      {/* Only these four outlines are #2a2a2a in dark mode (owner's pick,
-          2026-10-22). The one raw hex in this file; it is the default dark
-          theme's surface gray, written out so it stays this exact colour in
-          every dark theme. */}
-      <g className="stroke-ink dark:stroke-[#2a2a2a]" strokeWidth="3">
+      {/* Only these four outlines change in dark mode (owner's pick,
+          2026-10-22): they take the surface gray token (#2a2a2a in the default
+          dark theme) instead of the near-white ink. */}
+      <g className="stroke-ink dark:stroke-secondary" strokeWidth="3">
         <rect x="124" y="168" width="34" height="32" rx="8" className="fill-actionSecondary" />
         <rect x="164" y="168" width="34" height="32" rx="8" className="fill-actionAccent" />
         <rect x="124" y="206" width="34" height="32" rx="8" className="fill-actionSuccess" />
