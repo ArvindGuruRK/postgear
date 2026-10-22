@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { niceCeiling } from '../lib/nice-ceiling';
 import { cn } from '../lib/utils';
 
 /**
@@ -77,15 +78,7 @@ const BG: Record<TrendTone, string> = {
 const PADDING = { top: 12, right: 12, bottom: 28, left: 44 };
 const DEFAULT_WIDTH = 640;
 
-/** A "nice" ceiling for the y axis: 0 → 10, 37 → 40, 1,204 → 1,400, 85,000 → 90,000. */
-export function niceCeiling(max: number): number {
-  if (!Number.isFinite(max) || max <= 0) return 10;
-  const magnitude = 10 ** Math.floor(Math.log10(max));
-  const normalised = max / magnitude;
-  const step = normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 5 ? 5 : 10;
-  const unit = (magnitude * step) / 5;
-  return Math.ceil(max / unit) * unit;
-}
+export { niceCeiling };
 
 const defaultFormatValue = (value: number): string =>
   Math.abs(value) >= 1_000_000
@@ -485,45 +478,80 @@ export interface SparklineProps extends Omit<React.SVGAttributes<SVGSVGElement>,
   tone?: TrendTone;
   width?: number;
   height?: number;
+  /** The flat 15% fill under the line, as `TrendChart` draws its area. */
+  area?: boolean;
+  /**
+   * Stretch to the container's width (a stat card's footer) instead of
+   * `width` pixels; `width` then only sets the drawing's proportions and the
+   * stroke keeps its thickness however wide the card is.
+   */
+  fluid?: boolean;
+  /**
+   * Scale between the lowest and highest value instead of from zero. For a
+   * level such as a follower count, which moves a little on a large number
+   * and is a flat line from zero. Draws no area: a fill down to an arbitrary
+   * floor would exaggerate the change.
+   */
+  fitRange?: boolean;
 }
 
 /**
- * A line in a table cell: the shape of a metric over the range, no axes.
- * Decorative: callers put the numbers next to it.
+ * A line in a table cell or under a stat: the shape of a metric over the
+ * range, no axes. Decorative: callers put the numbers next to it.
  */
 export function Sparkline({
   points,
   tone = 'primary',
   width = 96,
   height = 28,
+  area = false,
+  fluid = false,
+  fitRange = false,
   className,
   ...props
 }: SparklineProps) {
   const values = points.filter((value): value is number => value !== null);
-  const max = niceCeiling(values.length > 0 ? Math.max(...values) : 0);
+  const low = values.length > 0 ? Math.min(...values) : 0;
+  const high = values.length > 0 ? Math.max(...values) : 0;
+  // Fitted, a range with no spread is a level line through the middle.
+  const floor = fitRange ? (high === low ? low - 1 : low) : 0;
+  const scale = fitRange ? (high === low ? 2 : high - low) : niceCeiling(high);
   const step = points.length > 1 ? (width - 4) / (points.length - 1) : 0;
+  const base = height - 2;
   let d = '';
+  let fill = '';
   let open = false;
+  let lastX = 0;
   points.forEach((value, index) => {
+    const x = 2 + index * step;
     if (value === null) {
+      if (open) fill += ` L ${lastX.toFixed(1)} ${base} Z`;
       open = false;
       return;
     }
-    const x = 2 + index * step;
-    const y = height - 2 - (value / max) * (height - 4);
+    const y = height - 2 - ((value - floor) / scale) * (height - 4);
     d += `${open ? ' L' : ' M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    fill += open
+      ? ` L ${x.toFixed(1)} ${y.toFixed(1)}`
+      : ` M ${x.toFixed(1)} ${base} L ${x.toFixed(1)} ${y.toFixed(1)}`;
     open = true;
+    lastX = x;
   });
+  if (open) fill += ` L ${lastX.toFixed(1)} ${base} Z`;
 
   return (
     <svg
-      width={width}
+      width={fluid ? '100%' : width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={fluid ? 'none' : undefined}
       aria-hidden="true"
       className={cn('block overflow-visible', className)}
       {...props}
     >
+      {d && area && !fitRange ? (
+        <path d={fill.trim()} className={cn(FILL[tone], 'opacity-15')} stroke="none" />
+      ) : null}
       {d ? (
         <path
           d={d.trim()}
@@ -531,6 +559,7 @@ export function Sparkline({
           strokeWidth={2}
           strokeLinejoin="miter"
           className={STROKE[tone]}
+          vectorEffect={fluid ? 'non-scaling-stroke' : undefined}
         />
       ) : (
         <line
@@ -542,6 +571,7 @@ export function Sparkline({
           strokeOpacity={0.3}
           strokeWidth={2}
           strokeDasharray="3 3"
+          vectorEffect={fluid ? 'non-scaling-stroke' : undefined}
         />
       )}
     </svg>

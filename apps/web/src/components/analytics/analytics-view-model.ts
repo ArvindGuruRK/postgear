@@ -25,6 +25,7 @@ import type {
   ChannelSyncStatus,
   Comparison,
   MetricChange,
+  MetricPoint,
   PostMetricKey,
   PostMetrics,
 } from '@/types/analytics';
@@ -171,6 +172,112 @@ export function seriesForMetric(
     });
   });
   return lines;
+}
+
+/**
+ * One metric across every shown channel, by day, oldest first: what a stat
+ * card's sparkline draws. Each channel's value on a day is added up (for
+ * followers, a level, that is the audience across the channels that day).
+ */
+export function combinedPoints(overview: AnalyticsOverview, metric: ChannelMetric): MetricPoint[] {
+  const byDate = new Map<string, number>();
+  for (const channel of overview.channels) {
+    const series = channel.series.find((entry) => entry.metric === metric);
+    for (const point of series?.points ?? []) {
+      byDate.set(point.date, (byDate.get(point.date) ?? 0) + point.value);
+    }
+  }
+  return [...byDate.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([date, value]) => ({ date, value }));
+}
+
+/**
+ * The engagement rate by day across the shown channels, as percentages; null
+ * on a day with no impressions (no rate rather than a fake 0%).
+ */
+export function engagementRatePoints(overview: AnalyticsOverview): (number | null)[] {
+  const engagements = new Map(
+    combinedPoints(overview, 'engagements').map((point) => [point.date, point.value]),
+  );
+  return combinedPoints(overview, 'impressions').map((point) =>
+    point.value > 0 ? ((engagements.get(point.date) ?? 0) / point.value) * 100 : null,
+  );
+}
+
+/**
+ * One metric's figure for the range across the shown channels, with its move
+ * against the previous period: the number in the Performance header. Channels
+ * with no previous figure are left out of the comparison, and when none has
+ * one there is nothing to compare.
+ */
+export function metricSummary(overview: AnalyticsOverview, metric: ChannelMetric): MetricChange {
+  let value = 0;
+  let previous: number | null = null;
+  for (const channel of overview.channels) {
+    const series = channel.series.find((entry) => entry.metric === metric);
+    if (!series) continue;
+    value += series.total;
+    if (series.previous !== null) previous = (previous ?? 0) + series.previous;
+  }
+  if (previous === null) return { value, delta: null, percent: null };
+  const delta = value - previous;
+  return { value, delta, percent: previous === 0 ? null : (delta / previous) * 100 };
+}
+
+/** One channel's part of a metric, for the By Channel panel beside the chart. */
+export interface ChannelShare {
+  channel: ChannelAnalytics;
+  /** The channel's colour on this page (its position in the overview). */
+  tone: TrendTone;
+  value: number;
+  /** Percent of the shown channels' total, 0 when the total is 0. */
+  share: number;
+}
+
+/**
+ * Each channel's figure for a metric, biggest first. Channels that never
+ * reported the metric are left out: a 0% bar for a platform that cannot
+ * count clicks would read as "no clicks".
+ */
+export function channelShares(overview: AnalyticsOverview, metric: ChannelMetric): ChannelShare[] {
+  const rows: Omit<ChannelShare, 'share'>[] = [];
+  overview.channels.forEach((channel, index) => {
+    const series = channel.series.find((entry) => entry.metric === metric);
+    if (!series || series.points.length === 0) return;
+    rows.push({ channel, tone: toneForIndex(index), value: series.total });
+  });
+  const sum = rows.reduce((total, row) => total + row.value, 0);
+  return rows
+    .map((row) => ({ ...row, share: sum > 0 ? (row.value / sum) * 100 : 0 }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/**
+ * Whether the channel picker should say "(no metrics)" beside a channel.
+ *
+ * The overview's own verdict wins: it knows simulation mode, where every
+ * platform gets numbers, and a LinkedIn channel full of metrics was labelled
+ * "(no metrics)" from the platform list alone (2026-10-22). Only before the
+ * overview loads, or for a channel it does not list, does the platform list
+ * decide.
+ */
+export function lacksMetrics(
+  channel: { id: string; providerIdentifier: string },
+  overview: AnalyticsOverview | null,
+  supportedPlatforms: ReadonlySet<string>,
+): boolean {
+  const listed = overview?.channels.find((entry) => entry.channelId === channel.id);
+  if (listed) return listed.support === 'unsupported';
+  return !supportedPlatforms.has(channel.providerIdentifier);
+}
+
+/** How many top posts show before "Show All". */
+export const TOP_POSTS_PREVIEW = 5;
+
+/** "vs previous 30 days": what a trend is measured against. */
+export function comparedTo(range: AnalyticsRange): string {
+  return `vs previous ${range} days`;
 }
 
 /** The shape of a channel's impressions over the range, for the table's sparkline. */

@@ -1,54 +1,112 @@
 'use client';
 
 /**
- * The trend: one metric over the range, one line per channel.
+ * Performance (revamp, 2026-10-22): one metric over the range, one line per
+ * channel, with the metric's total and its move in the header; and beside it
+ * (under it below `xl`) the same metric split by channel.
  *
- * The metric switch is a `Tabs` list of only the metrics the data has: a
- * tab for "Clicks" that every platform left empty would be a tab to nothing.
- * The chart is `TrendChart` from the design system, which is restrained by
- * construction (§15); the card and the section header around it carry the
- * treatment. One channel gets the area fill, several get lines only, which
- * `TrendChart` decides for itself.
+ * Both panels follow one metric switch, so choosing "Engagements" redraws the
+ * chart and re-ranks the channels together. The switch lists only the metrics
+ * the data has: a tab for "Clicks" that every platform left empty would be a
+ * tab to nothing. The chosen metric is local state, not URL state: it is a
+ * way of looking, not a filter, and resets harmlessly on reload. When the
+ * data stops having it (a channel filter that leaves only X, say) the first
+ * available one takes over rather than an empty plot.
  *
- * The metric chosen is local state, not URL state: it is a way of looking,
- * not a filter, and resets harmlessly on reload. When the data stops having
- * the chosen metric (a channel filter that leaves only X, say) the first
- * available one takes over rather than showing an empty plot.
+ * The chart is the design system's `TrendChart` (restrained by construction,
+ * §15: its plot is a light box in the chrome panel). Colours follow each
+ * channel's position on the page, so a channel's line, its bar here and its
+ * sparkline in the table match.
  */
-import { Card, SectionHeader, Tabs, TabsList, TabsTrigger, Text, TrendChart } from '@postgear/ui';
+import { BarList, type BarListItem, Tabs, TabsList, TabsTrigger, TrendChart } from '@postgear/ui';
 import { useMemo, useState } from 'react';
 import type { AnalyticsOverview, ChannelMetric } from '@/types/analytics';
 import {
+  AnalyticsPanel,
+  PanelHeader,
+  SEGMENTED_LIST,
+  SEGMENTED_TRIGGER,
+  TrendLine,
+} from './analytics-ui';
+import {
+  channelShares,
+  comparedTo,
   formatMetric,
   metricLabel,
+  metricSummary,
   metricsAvailable,
-  RANGE_LABELS,
   seriesForMetric,
+  trendFor,
 } from './analytics-view-model';
+import { ChannelAvatar } from './channel-avatar';
 
 export function TrendSection({ overview }: { overview: AnalyticsOverview }) {
   const available = useMemo(() => metricsAvailable(overview), [overview]);
   const [chosen, setChosen] = useState<ChannelMetric>('impressions');
   const metric = available.includes(chosen) ? chosen : (available[0] ?? null);
+
+  return (
+    <div className="grid grid-cols-1 gap-3 md:gap-4 xl:grid-cols-3">
+      <Performance overview={overview} metric={metric} available={available} onMetric={setChosen} />
+      <ByChannel overview={overview} metric={metric} />
+    </div>
+  );
+}
+
+function Performance({
+  overview,
+  metric,
+  available,
+  onMetric,
+}: {
+  overview: AnalyticsOverview;
+  metric: ChannelMetric | null;
+  available: ChannelMetric[];
+  onMetric: (metric: ChannelMetric) => void;
+}) {
   const series = useMemo(
     () => (metric ? seriesForMetric(overview, metric) : []),
     [overview, metric],
   );
+  const summary = useMemo(
+    () => (metric ? metricSummary(overview, metric) : null),
+    [overview, metric],
+  );
 
   return (
-    <Card className="flex flex-col gap-4 p-5" aria-label="Trend">
-      <SectionHeader
-        title="Trend"
-        description={`${RANGE_LABELS[overview.range]}, by day. Arrow keys read the chart.`}
-        actions={
+    <AnalyticsPanel
+      className="flex flex-col gap-4 p-4 md:p-5 xl:col-span-2"
+      aria-labelledby="analytics-performance"
+    >
+      <PanelHeader
+        id="analytics-performance"
+        title="Performance"
+        sub={
+          metric && summary ? (
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="type-heading text-2xl leading-none text-ink tabular-nums">
+                {formatMetric(summary.value)}
+              </span>
+              <span className="font-sans text-sm text-ink type-muted">
+                {metricLabel(metric).toLowerCase()}
+              </span>
+              <TrendLine
+                trend={trendFor(summary)}
+                against={comparedTo(overview.range)}
+                fallback="No previous period"
+              />
+            </span>
+          ) : null
+        }
+        aside={
           available.length > 0 ? (
             <Tabs
               value={metric ?? undefined}
-              onValueChange={(value) => setChosen(value as ChannelMetric)}
+              onValueChange={(value) => onMetric(value as ChannelMetric)}
             >
-              <TabsList className="flex-wrap" aria-label="Metric">
+              <TabsList className={`${SEGMENTED_LIST} max-w-full flex-wrap`} aria-label="Metric">
                 {available.map((entry) => (
-                  <TabsTrigger key={entry} value={entry} className="px-3 py-1.5">
+                  <TabsTrigger key={entry} value={entry} className={SEGMENTED_TRIGGER}>
                     {metricLabel(entry)}
                   </TabsTrigger>
                 ))}
@@ -61,17 +119,70 @@ export function TrendSection({ overview }: { overview: AnalyticsOverview }) {
       {metric && series.length > 0 ? (
         <TrendChart
           series={series}
-          height={240}
+          height={260}
           formatValue={(value) => formatMetric(value)}
           aria-label={`${metricLabel(metric)} per day`}
         />
       ) : (
-        <div className="flex h-60 items-center justify-center rounded-md border-2 border-outline">
-          <Text size="sm" muted>
+        <div className="flex h-64 items-center justify-center rounded-md border-2 border-outline bg-secondary">
+          <span className="font-sans text-sm text-ink type-muted">
             No daily metrics in this range yet.
-          </Text>
+          </span>
         </div>
       )}
-    </Card>
+    </AnalyticsPanel>
+  );
+}
+
+function ByChannel({
+  overview,
+  metric,
+}: {
+  overview: AnalyticsOverview;
+  metric: ChannelMetric | null;
+}) {
+  const items = useMemo<BarListItem[]>(
+    () =>
+      metric
+        ? channelShares(overview, metric).map((share) => ({
+            id: share.channel.channelId,
+            label: share.channel.name,
+            value: share.value,
+            display: formatMetric(share.value),
+            hint: `${share.channel.providerName}, ${Math.round(share.share)}% of the total`,
+            tone: share.tone,
+            leading: (
+              <ChannelAvatar
+                id={share.channel.channelId}
+                color={share.channel.color}
+                name={share.channel.name}
+                picture={share.channel.picture}
+              />
+            ),
+          }))
+        : [],
+    [overview, metric],
+  );
+
+  return (
+    <AnalyticsPanel
+      className="flex flex-col gap-4 p-4 md:p-5"
+      aria-labelledby="analytics-by-channel"
+    >
+      <PanelHeader
+        id="analytics-by-channel"
+        title="By Channel"
+        sub={
+          metric ? (
+            <span className="font-sans text-sm text-ink type-muted">
+              {metricLabel(metric)}, biggest first
+            </span>
+          ) : null
+        }
+      />
+      <div className="flex-1 rounded-md border-2 border-outline bg-secondary p-4">
+        <BarList items={items} emptyMessage="No channel reported this metric in the range." />
+      </div>
+    </AnalyticsPanel>
   );
 }

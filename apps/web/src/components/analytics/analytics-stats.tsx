@@ -1,124 +1,174 @@
 'use client';
 
 /**
- * The four numbers at the top: followers, impressions, engagements and the
- * engagement rate, each with its move against the previous period.
+ * The four numbers at the top (revamp, 2026-10-22): followers, impressions,
+ * engagements and the engagement rate, laid out like Home's KPI cards.
  *
- * Four `StatCard`s. The arrow is a real move; the caption under it is what
- * the number cannot say on its own: "No change" when the delta is exactly
- * zero (a flat arrow would be a lie in either direction), "No previous
- * period" when the range began before the data did, "Not reported" when no
- * platform gave a follower count, and the posts count under the rate.
+ * Each card has the same four rows, so a row of them lines up: the metric's
+ * sticker and name (what it counts behind the info button), the number, its
+ * move against the previous period, and the shape of the range as a filled
+ * line in the sticker's colour. The chip is a real move; "No change" when the
+ * delta is exactly zero, "No previous period" when the range began before
+ * the data did, "Not reported" when no platform gave a follower count, and
+ * the posts count under the rate, which has no previous period of its own.
  *
- * Restrained (§15): a StatCard grid is a dense surface, so the icons are
- * muted and the only colour is the trend's success/danger.
+ * Two across on a phone, four from `xl`, as on Home.
  */
-import { Card, cn, Skeleton, StatCard } from '@postgear/ui';
+import { Skeleton, Sparkline, type TrendTone } from '@postgear/ui';
 import { Eye, Heart, type LucideIcon, Percent, Users } from 'lucide-react';
-import type { AnalyticsTotals } from '@/types/analytics';
-import { formatMetric, formatPercent, type Trend, trendFor } from './analytics-view-model';
+import type { AnalyticsOverview } from '@/types/analytics';
+import { AnalyticsPanel, InfoButton, Sticker, TrendLine } from './analytics-ui';
+import {
+  combinedPoints,
+  comparedTo,
+  engagementRatePoints,
+  formatMetric,
+  formatPercent,
+  type Trend,
+  trendFor,
+} from './analytics-view-model';
 
-export function MetricCard({
+const GRID = 'grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4';
+
+function MetricCard({
   metric,
   label,
-  value,
+  info,
   icon,
+  tone,
+  value,
   trend,
-  caption,
-  className,
+  against,
+  fallback,
+  points,
+  level = false,
 }: {
   metric: string;
   label: string;
-  value: string;
+  info: string;
   icon: LucideIcon;
+  tone: TrendTone;
+  value: string;
   trend: Trend;
-  caption?: string;
-  className?: string;
+  against: string;
+  fallback: string;
+  points: (number | null)[];
+  /** A count on a day (followers), not a flow: its line fits its own range. */
+  level?: boolean;
 }) {
-  const line =
-    trend.kind === 'even' ? trend.caption : trend.kind === 'none' ? 'No previous period' : null;
-  const captions = [line, caption].filter((text): text is string => Boolean(text));
-
   return (
-    <StatCard
-      className={cn('p-5', className)}
+    <AnalyticsPanel
+      className="flex flex-col gap-3 p-3 sm:p-4 md:p-5"
       data-testid="analytics-stat"
       data-metric={metric}
-      label={label}
-      value={value}
-      icon={icon}
-      trend={
-        trend.kind === 'trend'
-          ? { value: `${trend.value} vs previous period`, direction: trend.direction }
-          : undefined
-      }
-      caption={captions.length > 0 ? captions.join(', ') : undefined}
-    />
+    >
+      {/* On a phone two cards share the row and "Engagement Rate" wraps, so
+          the header keeps two lines either way and the numbers stay level
+          across the row (Home's tiles do the same). From `sm`, one line. */}
+      <div className="flex min-h-12 items-start justify-between gap-2 sm:min-h-8 sm:items-center">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="hidden sm:block">
+            <Sticker icon={icon} tone={tone} />
+          </span>
+          <span className="min-w-0 truncate type-heading text-base text-ink sm:text-lg">
+            {label}
+          </span>
+        </span>
+        <InfoButton label={label} info={info} />
+      </div>
+
+      <span className="type-heading text-3xl leading-none text-ink tabular-nums md:text-4xl">
+        {value}
+      </span>
+
+      <TrendLine trend={trend} against={against} fallback={fallback} />
+
+      <div className="mt-auto pt-1">
+        <Sparkline
+          points={points}
+          tone={tone}
+          area
+          fitRange={level}
+          fluid
+          width={240}
+          height={44}
+        />
+      </div>
+    </AnalyticsPanel>
   );
 }
 
-export function AnalyticsStats({
-  totals,
-  className,
-}: {
-  totals: AnalyticsTotals;
-  className?: string;
-}) {
+export function AnalyticsStats({ overview }: { overview: AnalyticsOverview }) {
+  const { totals } = overview;
+  const against = comparedTo(overview.range);
   const posts = `${formatMetric(totals.posts)} ${totals.posts === 1 ? 'post' : 'posts'}`;
 
   return (
-    <section
-      className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4', className)}
-      aria-label="Totals"
-    >
+    <section className={GRID} aria-label="Totals">
       <MetricCard
         metric="followers"
         label="Followers"
-        value={formatMetric(totals.followers?.value ?? null)}
+        info="Followers across the shown channels on the range's last day, against its first."
         icon={Users}
+        tone="success"
+        value={formatMetric(totals.followers?.value ?? null)}
         trend={trendFor(totals.followers)}
-        caption={totals.followers ? undefined : 'Not reported'}
+        against={against}
+        fallback={totals.followers ? 'No previous period' : 'Not reported'}
+        points={combinedPoints(overview, 'followers').map((point) => point.value)}
+        level
       />
       <MetricCard
         metric="impressions"
         label="Impressions"
-        value={formatMetric(totals.impressions.value)}
+        info="How many times your posts were seen in the range, as each platform counts it."
         icon={Eye}
+        tone="primary"
+        value={formatMetric(totals.impressions.value)}
         trend={trendFor(totals.impressions)}
+        against={against}
+        fallback="No previous period"
+        points={combinedPoints(overview, 'impressions').map((point) => point.value)}
       />
       <MetricCard
         metric="engagements"
         label="Engagements"
-        value={formatMetric(totals.engagements.value)}
+        info="Likes, comments, shares and saves on your posts in the range."
         icon={Heart}
+        tone="accent"
+        value={formatMetric(totals.engagements.value)}
         trend={trendFor(totals.engagements)}
+        against={against}
+        fallback="No previous period"
+        points={combinedPoints(overview, 'engagements').map((point) => point.value)}
       />
       <MetricCard
         metric="engagementRate"
         label="Engagement Rate"
-        value={formatPercent(totals.engagementRate)}
+        info="Engagements as a share of impressions: how often a view turned into an action."
         icon={Percent}
+        tone="secondary"
+        value={formatPercent(totals.engagementRate)}
         trend={{ kind: 'none' }}
-        caption={posts}
+        against={against}
+        fallback={`From ${posts}`}
+        points={engagementRatePoints(overview)}
       />
     </section>
   );
 }
 
 /** The same grid while the numbers are not there yet, so nothing moves when they arrive. */
-export function AnalyticsStatsSkeleton({ className }: { className?: string }) {
+export function AnalyticsStatsSkeleton() {
   return (
-    <section
-      className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4', className)}
-      aria-busy="true"
-      aria-label="Loading totals"
-    >
+    <section className={GRID} aria-busy="true" aria-label="Loading totals">
       {['followers', 'impressions', 'engagements', 'engagementRate'].map((metric) => (
-        <Card key={metric} className="flex h-[7.25rem] flex-col gap-2 p-5">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-8 w-28" />
-          <Skeleton className="h-3 w-16" />
-        </Card>
+        <AnalyticsPanel key={metric} className="flex flex-col gap-3 p-3 sm:p-4 md:p-5">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-11 w-full" />
+        </AnalyticsPanel>
       ))}
     </section>
   );

@@ -2,31 +2,35 @@
 
 /**
  * The leaderboard (user story 6.3): the posts that did best in the range,
- * ranked by engagement.
+ * ranked by engagement. Revamped 2026-10-22 from one tall card per post into
+ * a compact ranked list: the first five, then "Show All" for the rest.
  *
  * Each row is a button that opens the post's own numbers; the two links a
- * row carries ("Create similar", which hands the post's text to the AI
- * studio as a topic, and the platform permalink) sit beside the button
- * (under it on a phone), not inside it, because a link inside a button is reachable by neither
- * keyboard nor screen reader. The rank is `type-heading` (it is chrome: a
- * big number meant to be read from across the room); everything else in
- * the row is data and stays in the body face (§15).
+ * row carries ("Create Similar", which hands the post's text to the AI
+ * copilot as a topic, and the platform permalink) sit beside the button as
+ * icon links, not inside it, because a link inside a button is reachable by
+ * neither keyboard nor screen reader. From `md` the numbers line up as
+ * columns (views, engagements, rate); on a phone they run as one line under
+ * the post.
  */
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
-import { Card, cn, MotionIcon, SectionHeader, Text } from '@postgear/ui';
-import { Eye, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { Button, cn, MotionIcon, TooltipHint } from '@postgear/ui';
 import Link from 'next/link';
+import { useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { TopPost } from '@/types/analytics';
-import { formatMetric, formatPercent, relativeTime } from './analytics-view-model';
+import { AnalyticsPanel, FOCUS, PanelHeader } from './analytics-ui';
+import {
+  formatMetric,
+  formatPercent,
+  relativeTime,
+  TOP_POSTS_PREVIEW,
+} from './analytics-view-model';
 import { ChannelAvatar } from './channel-avatar';
 
-const FOCUS =
-  'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
-
-const LINK = cn(
-  'inline-flex w-fit items-center gap-1 rounded-sm font-sans text-xs font-bold text-ink underline underline-offset-2',
+const ICON_LINK = cn(
+  'flex h-8 w-8 items-center justify-center rounded-md border-2 border-transparent text-ink hover:border-outline hover:bg-primary',
   FOCUS,
 );
 
@@ -41,119 +45,187 @@ export function TopPosts({
   now: Date;
   onOpen: (post: TopPost) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? posts : posts.slice(0, TOP_POSTS_PREVIEW);
+  const hidden = posts.length - TOP_POSTS_PREVIEW;
+
   return (
-    <Card className="flex flex-col gap-4 p-5" aria-label="Top posts">
-      <SectionHeader
+    <AnalyticsPanel
+      className="flex flex-col gap-4 p-4 md:p-5"
+      aria-labelledby="analytics-top-posts"
+    >
+      <PanelHeader
+        id="analytics-top-posts"
         title="Top Posts"
-        description="Ranked by engagement in this range. Open one for its numbers against the channel's average."
+        sub={
+          <span className="font-sans text-sm text-ink type-muted">
+            Ranked by engagement. Open one to compare it with its channel's average.
+          </span>
+        }
       />
 
       {posts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-md border-2 border-outline p-8 text-center">
-          <Text size="sm" muted>
+        <div className="flex flex-col items-center gap-2 rounded-md border-2 border-outline bg-secondary p-8 text-center">
+          <span className="font-sans text-sm text-ink type-muted">
             No published posts with metrics in this range.
-          </Text>
-          <Link href={`/${orgId}/queue?state=PUBLISHED`} className={LINK}>
-            See what has published
+          </span>
+          <Link
+            href={`/${orgId}/queue?state=PUBLISHED`}
+            className={cn(
+              'rounded-sm font-sans text-sm font-bold text-ink underline underline-offset-2',
+              FOCUS,
+            )}
+          >
+            See What Has Published
           </Link>
         </div>
       ) : (
-        <ol className="m-0 flex list-none flex-col gap-2 p-0">
-          {posts.map((post) => {
-            const published = relativeTime(post.publishDate, now);
-
-            return (
-              <li
+        <>
+          <ol className="m-0 flex list-none flex-col overflow-hidden rounded-md border-2 border-outline bg-secondary p-0">
+            {shown.map((post) => (
+              <Row
                 key={`${post.channelId}:${post.postId}`}
-                data-testid="analytics-top-post"
-                data-rank={post.rank}
-                data-group={post.group}
-                // On a phone the links go under the post rather than beside
-                // it: as a column they took half the row and squeezed the
-                // post's text to a word a line.
-                className="flex flex-col rounded-md border-2 border-outline bg-secondary sm:flex-row sm:items-stretch sm:gap-2"
-              >
-                <button
-                  type="button"
-                  onClick={() => onOpen(post)}
-                  aria-label={`Open metrics for post ${post.rank}: ${post.preview.slice(0, 60)}`}
-                  className={cn(
-                    'flex min-w-0 flex-1 items-start gap-3 p-3 text-start hover:bg-actionPrimary/10 sm:gap-4',
-                    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
-                  )}
-                >
-                  <span
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary type-heading text-lg text-ink"
-                    aria-hidden="true"
-                  >
-                    {post.rank}
-                  </span>
-                  <ChannelAvatar
-                    id={post.channelId}
-                    color={post.color}
-                    name={post.channelName}
-                    picture={post.picture}
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="line-clamp-2 font-sans text-sm font-medium text-ink">
-                      {post.preview || <span className="opacity-60">Empty post</span>}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-ink opacity-70">
-                      <span className="font-bold">{post.channelName}</span>
-                      <span className="flex items-center gap-1">
-                        <PlatformIcon platform={post.providerIdentifier} className="h-3.5 w-3.5" />
-                        {post.providerName}
-                      </span>
-                      {published ? <span>Published {published}</span> : null}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 font-sans text-xs text-ink tabular-nums">
-                      <Chip icon={Eye} label="Impressions" value={post.metrics.impressions} />
-                      <Chip icon={Heart} label="Likes" value={post.metrics.likes} />
-                      <Chip icon={MessageCircle} label="Comments" value={post.metrics.comments} />
-                      <Chip icon={Share2} label="Shares" value={post.metrics.shares} />
-                      <span className="font-bold">
-                        {formatPercent(post.metrics.engagementRate)}
-                        <span className="sr-only"> engagement rate</span>
-                      </span>
-                    </span>
-                  </span>
-                </button>
+                orgId={orgId}
+                post={post}
+                now={now}
+                onOpen={onOpen}
+              />
+            ))}
+          </ol>
 
-                <span className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t-2 border-outline px-3 py-2.5 sm:flex-col sm:flex-nowrap sm:items-start sm:justify-center sm:gap-2 sm:border-t-0 sm:border-s-2 sm:p-3">
-                  <Link
-                    href={`/${orgId}/ai-copilot?topic=${encodeURIComponent(post.preview.slice(0, 200))}`}
-                    className={LINK}
-                  >
-                    <MotionIcon icon={SparklesIcon} size={12} strokeWidth={3} className="h-3 w-3" />
-                    Create similar
-                  </Link>
-                  {post.releaseURL ? (
-                    <a href={post.releaseURL} target="_blank" rel="noreferrer" className={LINK}>
-                      <MotionIcon
-                        icon={ExternalLinkIcon}
-                        size={12}
-                        strokeWidth={3}
-                        className="h-3 w-3"
-                      />
-                      View on {post.providerName}
-                    </a>
-                  ) : null}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+          {hidden > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="self-center"
+              onClick={() => setExpanded((current) => !current)}
+              aria-expanded={expanded}
+            >
+              {expanded ? 'Show Top 5' : `Show All ${posts.length}`}
+            </Button>
+          ) : null}
+        </>
       )}
-    </Card>
+    </AnalyticsPanel>
   );
 }
 
-function Chip({ icon: Icon, label, value }: { icon: typeof Eye; label: string; value: number }) {
+function Row({
+  orgId,
+  post,
+  now,
+  onOpen,
+}: {
+  orgId: string;
+  post: TopPost;
+  now: Date;
+  onOpen: (post: TopPost) => void;
+}) {
+  const published = relativeTime(post.publishDate, now);
+
   return (
-    <span className="inline-flex items-center gap-1">
-      <Icon className="h-3.5 w-3.5 opacity-70" strokeWidth={2.5} aria-hidden="true" />
-      <span className="sr-only">{label} </span>
-      {formatMetric(value)}
+    <li
+      data-testid="analytics-top-post"
+      data-rank={post.rank}
+      data-group={post.group}
+      // On a phone the two links sit in a strip under the post: beside it
+      // they took the room the numbers need.
+      className="flex flex-col border-b-2 border-outline last:border-b-0 sm:flex-row sm:items-stretch"
+    >
+      <button
+        type="button"
+        onClick={() => onOpen(post)}
+        aria-label={`Open metrics for post ${post.rank}: ${post.preview.slice(0, 60)}`}
+        className={cn(
+          'flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 text-start hover:bg-primary md:flex-nowrap md:gap-4 md:px-4',
+          'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-clip-padding type-heading text-base tabular-nums',
+            post.rank === 1 ? 'bg-actionSecondary text-onActionLight' : 'bg-secondary text-ink',
+          )}
+        >
+          {post.rank}
+        </span>
+        <ChannelAvatar
+          id={post.channelId}
+          color={post.color}
+          name={post.channelName}
+          picture={post.picture}
+        />
+        <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
+          <span className="truncate font-sans text-sm font-bold text-ink">
+            {post.preview || 'Empty post'}
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5 font-sans text-xs text-ink type-muted">
+            <PlatformIcon platform={post.providerIdentifier} className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {post.channelName}
+              {published ? `, published ${published}` : ''}
+            </span>
+          </span>
+        </span>
+
+        {/* Columns from md; one line under the post on a phone (the row wraps). */}
+        <span className="flex w-full items-center gap-4 ps-11 md:w-auto md:shrink-0 md:gap-0 md:ps-0">
+          <Figure label="Views" value={formatMetric(post.metrics.impressions)} />
+          <Figure label="Engagements" value={formatMetric(post.metrics.engagements)} />
+          <Figure label="Rate" value={formatPercent(post.metrics.engagementRate)} strong />
+        </span>
+      </button>
+
+      <span className="flex shrink-0 items-center justify-end gap-1 border-t-2 border-outline px-2 py-1 sm:border-t-0 sm:border-s-2 sm:py-0">
+        <TooltipHint label="Create Similar" side="left">
+          <Link
+            href={`/${orgId}/ai-copilot?topic=${encodeURIComponent(post.preview.slice(0, 200))}`}
+            aria-label={`Create similar to post ${post.rank}`}
+            className={ICON_LINK}
+          >
+            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
+          </Link>
+        </TooltipHint>
+        {post.releaseURL ? (
+          <TooltipHint label={`View On ${post.providerName}`} side="left">
+            <a
+              href={post.releaseURL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`View post ${post.rank} on ${post.providerName}`}
+              className={ICON_LINK}
+            >
+              <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
+            </a>
+          </TooltipHint>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
+/** One number in a row: its name small above it from md, beside the value's meaning on a phone. */
+function Figure({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <span className="flex flex-col md:w-24 md:items-end">
+      <span className="font-sans text-xs text-ink type-muted">{label}</span>
+      <span
+        className={cn(
+          'font-sans text-sm text-ink tabular-nums',
+          strong ? 'font-bold' : 'font-medium',
+        )}
+      >
+        {value}
+      </span>
     </span>
   );
 }

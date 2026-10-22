@@ -77,7 +77,7 @@ export function AnalyticsSyncPill({
           <button
             type="button"
             className={cn(
-              'rounded-full outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+              'rounded-lg outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
               className,
             )}
             data-testid="analytics-sync-status"
@@ -87,7 +87,9 @@ export function AnalyticsSyncPill({
             <StatusIndicator
               status={shown.status}
               label={shown.label}
-              className="rounded-full border-2 border-outline bg-secondary px-3 py-1 text-xs font-bold"
+              // The toolbar's control frame (revamp, 2026-10-22): the height
+              // and chrome of the range and channel controls beside it.
+              className="h-10 rounded-lg border-2 border-outline bg-chrome px-3 text-sm font-bold"
             />
           </button>
         </TooltipTrigger>

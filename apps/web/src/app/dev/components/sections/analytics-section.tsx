@@ -132,6 +132,13 @@ export function AnalyticsSection() {
         <Spec>96×28; 2px stroke; aria-hidden (numbers sit beside it)</Spec>
       </Row>
 
+      <Row label="Sparkline (area, fluid: a stat card's footer)">
+        <div className="w-full max-w-xs">
+          <Sparkline points={IMPRESSIONS} tone="accent" area fluid width={240} height={48} />
+        </div>
+        <Spec>100% wide, 15% fill under the line, stroke stays 2px at any width</Spec>
+      </Row>
+
       <Row label="Bar List (engagement rate by channel)">
         <div className="w-full max-w-md">
           <BarList

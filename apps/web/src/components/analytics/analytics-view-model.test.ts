@@ -14,12 +14,18 @@ import type {
 } from '@/types/analytics';
 import {
   apiQuery,
+  channelShares,
+  combinedPoints,
+  comparedTo,
+  engagementRatePoints,
   exportUrl,
   filtersFromParams,
   formatDelta,
   formatMetric,
   formatPercent,
   hasMetrics,
+  lacksMetrics,
+  metricSummary,
   metricsAvailable,
   paramsFromFilters,
   postMetricsToShow,
@@ -374,5 +380,146 @@ describe('syncFingerprint', () => {
       channel({ sync: { status: 'ok', lastSyncedAt: '2026-10-15T11:00:00.000Z', error: null } }),
     ]);
     expect(syncFingerprint(synced)).not.toBe(syncFingerprint(before));
+  });
+});
+
+describe('the revamp helpers (2026-10-22)', () => {
+  const instagram = () =>
+    channel({
+      channelId: 'ch_instagram',
+      name: 'Acme Studio',
+      providerIdentifier: 'instagram',
+      providerName: 'Instagram',
+      series: [
+        {
+          metric: 'impressions',
+          points: [
+            { date: '2026-10-14', value: 50 },
+            { date: '2026-10-15', value: 70 },
+          ],
+          total: 900,
+          previous: null,
+          recordedDays: 2,
+        },
+        {
+          metric: 'engagements',
+          points: [
+            { date: '2026-10-14', value: 5 },
+            { date: '2026-10-15', value: 0 },
+          ],
+          total: 5,
+          previous: null,
+          recordedDays: 2,
+        },
+      ],
+    });
+
+  it('adds every channel up by day, oldest first', () => {
+    expect(combinedPoints(overview([channel(), instagram()]), 'impressions')).toEqual([
+      { date: '2026-10-13', value: 100 },
+      { date: '2026-10-14', value: 250 },
+      { date: '2026-10-15', value: 70 },
+    ]);
+    expect(combinedPoints(overview([channel()]), 'clicks')).toEqual([]);
+  });
+
+  it('gives no rate on a day without impressions rather than 0%', () => {
+    const quiet = channel({
+      series: [
+        {
+          metric: 'impressions',
+          points: [
+            { date: '2026-10-13', value: 200 },
+            { date: '2026-10-14', value: 0 },
+          ],
+          total: 200,
+          previous: null,
+          recordedDays: 2,
+        },
+        {
+          metric: 'engagements',
+          points: [
+            { date: '2026-10-13', value: 10 },
+            { date: '2026-10-14', value: 0 },
+          ],
+          total: 10,
+          previous: null,
+          recordedDays: 2,
+        },
+      ],
+    });
+    expect(engagementRatePoints(overview([quiet]))).toEqual([5, null]);
+  });
+
+  it('sums a metric and compares only channels that had a previous period', () => {
+    expect(metricSummary(overview([channel(), instagram()]), 'impressions')).toEqual({
+      value: 1200,
+      delta: 950,
+      percent: 380,
+    });
+    expect(metricSummary(overview([instagram()]), 'impressions')).toEqual({
+      value: 900,
+      delta: null,
+      percent: null,
+    });
+  });
+
+  it('has no percentage against a previous period of zero', () => {
+    const fromZero = channel({
+      series: [{ metric: 'clicks', points: [], total: 40, previous: 0, recordedDays: 0 }],
+    });
+    expect(metricSummary(overview([fromZero]), 'clicks')).toEqual({
+      value: 40,
+      delta: 40,
+      percent: null,
+    });
+  });
+
+  it('ranks channels by their part of a metric and keeps their page colour', () => {
+    const shares = channelShares(overview([channel(), instagram()]), 'impressions');
+    expect(shares.map((share) => share.channel.name)).toEqual(['Acme Studio', 'Acme Marketing']);
+    expect(shares.map((share) => share.share)).toEqual([75, 25]);
+    // Colour follows the position in the overview, not the rank.
+    expect(shares.map((share) => share.tone)).toEqual([toneForIndex(1), toneForIndex(0)]);
+  });
+
+  it('leaves out channels that never reported the metric', () => {
+    expect(channelShares(overview([channel(), instagram()]), 'engagements')).toHaveLength(1);
+    expect(channelShares(overview([channel()]), 'clicks')).toEqual([]);
+  });
+
+  it('says what a trend is measured against', () => {
+    expect(comparedTo(7)).toBe('vs previous 7 days');
+  });
+});
+
+describe('lacksMetrics', () => {
+  const supported = new Set(['instagram']);
+
+  it("trusts the overview's verdict, which knows simulation mode", () => {
+    // LinkedIn has no reader of its own, but the overview says it is supported.
+    expect(
+      lacksMetrics({ id: 'ch_linkedin', providerIdentifier: 'linkedin' }, overview(), supported),
+    ).toBe(false);
+    const unsupported = overview([channel({ support: 'unsupported' })]);
+    expect(
+      lacksMetrics({ id: 'ch_linkedin', providerIdentifier: 'linkedin' }, unsupported, supported),
+    ).toBe(true);
+  });
+
+  it('falls back to the platform list before the overview loads', () => {
+    expect(
+      lacksMetrics({ id: 'ch_linkedin', providerIdentifier: 'linkedin' }, null, supported),
+    ).toBe(true);
+    expect(lacksMetrics({ id: 'ch_ig', providerIdentifier: 'instagram' }, null, supported)).toBe(
+      false,
+    );
+  });
+
+  it('does not call a channel that needs reconnecting metric-less', () => {
+    const broken = overview([channel({ support: 'needs_reconnect' })]);
+    expect(
+      lacksMetrics({ id: 'ch_linkedin', providerIdentifier: 'linkedin' }, broken, supported),
+    ).toBe(false);
   });
 });

@@ -110,6 +110,20 @@ export function PlatformIcon({ platform, className, title }: PlatformIconProps) 
   );
 }
 
+/**
+ * A platform's logo file for a scheme, for places that draw it outside the
+ * DOM (the analytics PDF rasterises it): the dark artwork where there is one
+ * (X's white tile), else the usual file; null for an unknown id.
+ */
+export function platformLogoSrc(
+  platform: string,
+  scheme: 'light' | 'dark' = 'light',
+): string | null {
+  const brand = BRANDS[platform];
+  if (!brand) return null;
+  return scheme === 'dark' ? (brand.darkSrc ?? brand.src) : brand.src;
+}
+
 /** The display name for a platform id, for places that only have the id. */
 export function platformLabel(platform: string): string {
   return BRANDS[platform]?.label ?? platform;

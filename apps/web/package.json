@@ -22,6 +22,7 @@
     "@postgear/config": "*",
     "@postgear/social-core": "*",
     "@postgear/ui": "*",
+    "@react-pdf/renderer": "^4.9.0",
     "@sentry/nextjs": "^11.8.0",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extensions": "^3.31.3",
