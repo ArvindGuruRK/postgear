@@ -112,7 +112,7 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
         {canManage ? (
           <Button onClick={() => setCreateOpen(true)} disabled={limitReached}>
             <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-            Create key
+            Create Key
           </Button>
         ) : null}
       </PageActions>
@@ -137,7 +137,7 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
             icon={KeyRound}
             title="Couldn't load your API keys"
             description="The API did not answer. Check that it is running, then try again."
-            action={{ label: 'Try again', onClick: () => void refresh() }}
+            action={{ label: 'Try Again', onClick: () => void refresh() }}
           />
         ) : null
       ) : keys.length === 0 ? (
@@ -145,7 +145,7 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
           icon={KeyRound}
           title="No API keys yet"
           description="Create a key to call the PostGear API from your own code: list channels, create posts, read analytics."
-          action={canManage ? { label: 'Create key', onClick: () => setCreateOpen(true) } : undefined}
+          action={canManage ? { label: 'Create Key', onClick: () => setCreateOpen(true) } : undefined}
         />
       ) : (
         <Table>
@@ -154,7 +154,7 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
               <TableHead>Name</TableHead>
               <TableHead>Key</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead>Last used</TableHead>
+              <TableHead>Last Used</TableHead>
               <TableHead>Status</TableHead>
               {/* `relative`: the sr-only label is absolutely positioned and must stay inside the cell, not widen the page. */}
               <TableHead className="relative">
@@ -250,7 +250,7 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New key for {rotated?.key.name}</DialogTitle>
+            <DialogTitle>New Key For {rotated?.key.name}</DialogTitle>
             <DialogDescription>
               The old secret has been revoked. Update your integration with this one.
             </DialogDescription>

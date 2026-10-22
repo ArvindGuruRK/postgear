@@ -19,7 +19,8 @@
      type-heading  page/card/dialog/sheet titles, wordmark, big numbers
      type-ui       things you act on or scan: buttons, tabs, nav, menu
                    chrome, names, step markers
-     type-label    small uppercase eyebrows that name a section or group
+     type-label    small labels that name a section or group, in Title Case
+                   as written (never uppercased since 2026-10-22)
 
    Body copy is plain inherited text at --type-body-weight. Trialling a
    different font = swap the loader in fonts.ts and retune the tokens below;
@@ -98,11 +99,13 @@
   }
 }
 
-/* Caps need positive tracking to stay legible at 10–14px. */
+/* Small labels that name a section or a group. Shown as written, in Title
+   Case (2026-10-22): the owner wants no all-caps text anywhere, so this role
+   no longer uppercases. Without caps the wide caps tracking reads loose, so it
+   takes the UI tracking; it keeps its own weight. */
 @utility type-label {
   font-weight: var(--type-label-weight);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
+  letter-spacing: var(--type-ui-tracking);
 }
 
 /* ── App scrollbar (single source of truth) ──────────────────────────────

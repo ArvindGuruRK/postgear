@@ -36,26 +36,26 @@ export const DEFAULT_DATE_RANGE_PRESETS: DateRangePreset[] = [
     },
   },
   {
-    label: 'Last 7 days',
+    label: 'Last 7 Days',
     getRange: () => ({ from: subDays(startOfDay(new Date()), 6), to: startOfDay(new Date()) }),
   },
   {
-    label: 'Last 30 days',
+    label: 'Last 30 Days',
     getRange: () => ({ from: subDays(startOfDay(new Date()), 29), to: startOfDay(new Date()) }),
   },
   {
-    label: 'This month',
+    label: 'This Month',
     getRange: () => ({ from: startOfMonth(new Date()), to: startOfDay(new Date()) }),
   },
   {
-    label: 'Last month',
+    label: 'Last Month',
     getRange: () => {
       const prev = subMonths(new Date(), 1);
       return { from: startOfMonth(prev), to: endOfMonth(prev) };
     },
   },
   {
-    label: 'Year to date',
+    label: 'Year To Date',
     getRange: () => ({ from: startOfYear(new Date()), to: startOfDay(new Date()) }),
   },
 ];

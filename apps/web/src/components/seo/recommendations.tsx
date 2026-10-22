@@ -58,7 +58,7 @@ export function Recommendations({
     if (running) {
       return (
         <section aria-label="Recommendations" aria-busy="true" className="flex flex-col gap-3">
-          <h2 className="type-label text-sm text-ink">What to fix</h2>
+          <h2 className="type-label text-sm text-ink">What To Fix</h2>
           <Skeleton
             className="h-20"
             aria-label={advising ? 'Writing advice' : 'Waiting for the scores'}
@@ -78,9 +78,9 @@ export function Recommendations({
   return (
     <section aria-label="Recommendations" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="type-label text-sm text-ink">What to fix</h2>
+        <h2 className="type-label text-sm text-ink">What To Fix</h2>
         {advice.source === 'ai' ? (
-          <Badge variant="ai">AI advice{advice.model ? ` (${advice.model})` : ''}</Badge>
+          <Badge variant="ai">AI Advice{advice.model ? ` (${advice.model})` : ''}</Badge>
         ) : (
           <Badge variant="outline">Rule-based</Badge>
         )}

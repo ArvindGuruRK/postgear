@@ -162,7 +162,7 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
         <PageActions>
           <Button onClick={() => setInviteOpen(true)} data-testid="team-invite">
             <MotionIcon icon={UserPlusIcon} className="h-4 w-4" />
-            Invite member
+            Invite Member
           </Button>
         </PageActions>
       ) : null}
@@ -172,7 +172,7 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
           icon={Users}
           title="Couldn't load the team"
           description="The API did not answer. Check that it is running, then try again."
-          action={{ label: 'Try again', onClick: () => void refresh() }}
+          action={{ label: 'Try Again', onClick: () => void refresh() }}
         />
       ) : (
         <Card className="overflow-hidden">
@@ -245,7 +245,7 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
                           onClick={() => setLeaveOpen(true)}
                           data-testid="team-leave"
                         >
-                          Leave workspace
+                          Leave Workspace
                         </Button>
                       ) : canRemove(role, member, isSelf) ? (
                         <Button

@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import { ResetPasswordForm } from '@/components/auth/reset-password-form';
 
 export const metadata: Metadata = {
-  title: 'Reset password',
+  title: 'Reset Password',
 };
 
 export default function ResetPasswordPage() {
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">Reset your password</Heading>
+        <Heading level="h2">Reset Your Password</Heading>
         <Text muted>We&apos;ll email you a link to choose a new one.</Text>
       </Stack>
 

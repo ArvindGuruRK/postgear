@@ -314,7 +314,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
               {showStart ? (
                 <>
                   {recent.length > 0 ? (
-                    <CommandGroup heading="Recent searches">
+                    <CommandGroup heading="Recent Searches">
                       {recent.map((text) => (
                         <CommandItem key={text} value={`recent:${text}`} onSelect={runEntry}>
                           <MotionIcon icon={SearchIcon} className="h-4 w-4 shrink-0" />
@@ -328,7 +328,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                     </CommandGroup>
                   ) : null}
 
-                  <CommandGroup heading="Quick actions">
+                  <CommandGroup heading="Quick Actions">
                     {quickActions().map((page) => (
                       <CommandItem key={page.id} value={`page:${page.id}`} onSelect={runEntry}>
                         <PageIcon icon={page.icon} />
@@ -567,7 +567,7 @@ function MediaRow({ item, terms }: { item: MediaSearchResult; terms: string[] })
           // biome-ignore lint/performance/noImgElement: a library thumbnail from the API's own storage
           <img src={preview} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
-          <span className="text-[10px] uppercase text-ink">{item.type}</span>
+          <span className="text-[10px] capitalize text-ink">{item.type}</span>
         )}
       </span>
       <span className="min-w-0 flex-1 truncate">

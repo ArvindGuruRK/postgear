@@ -154,7 +154,7 @@ function PickerBody({
           <ErrorState
             title="Media didn't load"
             description={list.error}
-            action={{ label: 'Try again', onClick: list.reload }}
+            action={{ label: 'Try Again', onClick: list.reload }}
           />
         ) : list.loading && media.length === 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -218,7 +218,7 @@ function PickerBody({
           Cancel
         </Button>
         <Button onClick={() => onAttach(selected)} disabled={selected.length === 0}>
-          Add selected media
+          Add Selected Media
         </Button>
       </div>
     </>

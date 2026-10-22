@@ -41,7 +41,7 @@ export function DeleteAuditDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Keep it</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>Keep It</AlertDialogCancel>
           <AlertDialogAction variant="danger" onClick={onConfirm} disabled={busy}>
             {busy ? 'Deleting…' : 'Delete'}
           </AlertDialogAction>

@@ -81,7 +81,7 @@ export function RemoveMemberDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={working}>Keep them</AlertDialogCancel>
+          <AlertDialogCancel disabled={working}>Keep Them</AlertDialogCancel>
           <AlertDialogAction variant="danger" onClick={confirm} disabled={working}>
             {working ? 'Removing…' : 'Remove'}
           </AlertDialogAction>

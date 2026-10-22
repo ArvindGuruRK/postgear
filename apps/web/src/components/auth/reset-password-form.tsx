@@ -84,7 +84,7 @@ export function ResetPasswordForm() {
         </FormField>
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? 'Sending…' : 'Send reset link'}
+          {pending ? 'Sending…' : 'Send Reset Link'}
         </Button>
       </Stack>
     </form>

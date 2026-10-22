@@ -131,8 +131,8 @@ One family for the whole platform (Sora, locked 2026-10-15), loaded once in `app
 |---|---|---|
 | `--font-sans` (→ `--font-brand`) | `font-sans` | The family itself; inherited everywhere, so rarely written out |
 | `--type-heading-weight`, `--type-heading-tracking` | `type-heading` | Page/card/dialog/sheet titles, wordmark, big numbers |
-| `--type-ui-weight`, `--type-ui-tracking` | `type-ui` | Buttons, tabs, nav, menu chrome, names, step markers; sentence case |
-| `--type-label-weight`, `--type-label-tracking` | `type-label` | Small uppercase eyebrows naming a section or group |
+| `--type-ui-weight`, `--type-ui-tracking` | `type-ui` | Buttons, tabs, nav, menu chrome, names, step markers; Title Case text |
+| `--type-label-weight` | `type-label` | Small labels naming a group, shown as written in Title Case (never uppercase since 2026-10-22; takes the UI tracking, so `--type-label-tracking` is unused) |
 | `--type-body-weight` | (on `body`) | Body copy, data, and **every part of a form control** |
 
 Both load through `next/font/google` in the root layout, which is what actually defines the custom properties; the theme entries just plug that runtime value into Tailwind.

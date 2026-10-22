@@ -746,7 +746,7 @@ export function Composer({
                     channel shares; each selected channel's tile edits that
                     channel's own version, marked with a dot once it has one. */}
                 <TabsList className="max-w-full flex-wrap justify-start gap-2 border-0 bg-transparent p-0 shadow-none">
-                  <TooltipHint label="All channels: one post for every channel" side="bottom">
+                  <TooltipHint label="All Channels: One Post For Every Channel" side="bottom">
                     <TabsTrigger value={SHARED} aria-label="All channels" className={SCOPE_TILE}>
                       <MotionIcon
                         icon={GlobeIcon}
@@ -821,21 +821,21 @@ export function Composer({
                   onClick={() => dispatch({ type: 'customize', channelId: scopeChannel.id })}
                   disabled={locked}
                 >
-                  Customize for {scopeChannel.name}
+                  Customize For {scopeChannel.name}
                 </Button>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {scopeChannel ? (
                   <div className="flex flex-wrap items-center gap-3">
-                    <Badge variant="secondary">Custom for {scopeChannel.name}</Badge>
+                    <Badge variant="secondary">Custom For {scopeChannel.name}</Badge>
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => setConfirmUseShared(scopeChannel.id)}
                       disabled={locked}
                     >
-                      Use the shared post instead
+                      Use The Shared Post Instead
                     </Button>
                   </div>
                 ) : state.selected.some((id) => isCustomized(state, id)) ? (
@@ -893,7 +893,7 @@ export function Composer({
             <h3 className="m-0 min-w-0 flex-1 truncate type-heading text-xl text-ink">
               Post Preview
             </h3>
-            <TooltipHint label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} side="bottom">
+            <TooltipHint label={fullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} side="bottom">
               <button
                 type="button"
                 onClick={toggleFullscreen}
@@ -1054,7 +1054,7 @@ export function Composer({
               disabled={busy || locked || noChannels}
               className="px-4 sm:px-6"
             >
-              {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move to drafts' : 'Save as draft'}
+              {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move To Drafts' : 'Save As Draft'}
             </Button>
 
             {/* The reference's split button: the main action, and a chevron
@@ -1080,7 +1080,7 @@ export function Composer({
                 <DropdownMenuContent side="top" align="end" className="w-44">
                   <DropdownMenuItem onSelect={() => void save('QUEUE', { publishNow: true })}>
                     <MotionIcon icon={SendIcon} className="h-4 w-4" />
-                    Post now
+                    Post Now
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

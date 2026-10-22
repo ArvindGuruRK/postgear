@@ -357,7 +357,7 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
   return (
     <>
       <Popover open={open} onOpenChange={openWith}>
-        <TooltipHint label={active ? 'Edit link' : 'Add link'} side="top">
+        <TooltipHint label={active ? 'Edit Link' : 'Add Link'} side="top">
           <PopoverTrigger asChild>
             <button
               type="button"
@@ -393,7 +393,7 @@ function LinkControl({ editor, active }: { editor: Editor | null; active: boolea
             ) : null}
             <div className="flex justify-end gap-2">
               <Button type="submit" size="sm">
-                {active ? 'Update link' : 'Add link'}
+                {active ? 'Update Link' : 'Add Link'}
               </Button>
             </div>
           </form>

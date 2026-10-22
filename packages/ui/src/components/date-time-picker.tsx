@@ -276,7 +276,7 @@ function TimeColumn({
     <div className="flex min-h-0 flex-col gap-1.5">
       <span
         aria-hidden="true"
-        className="text-center font-sans text-[11px] font-bold uppercase text-ink opacity-60"
+        className="text-center font-sans text-[11px] font-bold text-ink opacity-60"
       >
         {shortLabel ?? label}
       </span>

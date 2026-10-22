@@ -160,7 +160,7 @@ export function GenerateResult({
 
       {state.sources && state.sources.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <h3 className="type-label text-sm text-ink">Backed by research</h3>
+          <h3 className="type-label text-sm text-ink">Backed By Research</h3>
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {state.sources.map((source) => (
               <li key={source.url} className="flex flex-col gap-0.5">
@@ -192,7 +192,7 @@ export function GenerateResult({
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void openInComposer()} disabled={opening}>
             <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
-            {opening ? 'Opening…' : 'Open in composer'}
+            {opening ? 'Opening…' : 'Open In Composer'}
           </Button>
           <Button variant="secondary" onClick={() => void copy()} disabled={opening}>
             <MotionIcon icon={CopyIcon} className="h-4 w-4" />
@@ -229,7 +229,7 @@ function PartCard({
       <Card className="flex flex-col gap-3 border-2 p-4 shadow-surfaceSm">
         <div className="flex items-center justify-between gap-3">
           <span className="type-label text-sm text-ink">
-            {total > 1 ? `Part ${index + 1} of ${total}` : 'Post'}
+            {total > 1 ? `Part ${index + 1} Of ${total}` : 'Post'}
           </span>
           <span
             className={cn(

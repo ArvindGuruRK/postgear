@@ -30,7 +30,7 @@ import { MediaUploader } from './media-uploader';
 import { type MediaFilter, useMediaList } from './use-media-list';
 
 const FILTERS = [
-  { value: 'all', label: 'All media', animatedIcon: LayoutGridIcon },
+  { value: 'all', label: 'All Media', animatedIcon: LayoutGridIcon },
   { value: 'image', label: 'Images', animatedIcon: AnimatedImageIcon },
   { value: 'video', label: 'Videos', animatedIcon: VideoIcon },
 ];
@@ -94,7 +94,7 @@ export function MediaLibrary({
         <ErrorState
           title="Media didn't load"
           description={list.error}
-          action={{ label: 'Try again', onClick: list.reload }}
+          action={{ label: 'Try Again', onClick: list.reload }}
         />
       ) : list.loading && media.length === 0 ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">

@@ -159,7 +159,7 @@ export function ThreadEditor({
             disabled={parts.length >= MAX_PARTS}
           >
             <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-            Add to thread
+            Add To Thread
           </Button>
         </div>
       )}
@@ -287,7 +287,7 @@ function SortablePart({
                 label={
                   part.media.length >= MAX_MEDIA_PER_PART
                     ? 'This part has as many attachments as a post can take'
-                    : 'Add images or video from the Media Library'
+                    : 'Add Images Or Video From The Media Library'
                 }
                 side="top"
                 disabled={part.media.length >= MAX_MEDIA_PER_PART}
@@ -335,7 +335,7 @@ function SortablePart({
 
       {thread && !disabled ? (
         <div className="flex shrink-0 flex-col items-center gap-0.5 pt-1">
-          <TooltipHint label="Drag to reorder" side="left">
+          <TooltipHint label="Drag To Reorder" side="left">
             <button
               type="button"
               ref={setActivatorNodeRef}

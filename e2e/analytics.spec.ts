@@ -68,7 +68,7 @@ test.describe('analytics', () => {
 
     const x = page.locator('[data-testid="analytics-channel-row"][data-channel="seed-channel-x"]');
     await expect(x).toContainText('Acme on X');
-    await expect(x).toContainText('Needs reconnect');
+    await expect(x).toContainText('Needs Reconnect');
 
     // Metrics are the simulated stand-in locally, and the page says so.
     await expect(page.getByTestId('analytics-simulated')).toContainText('ANALYTICS_SIMULATION');
@@ -105,7 +105,7 @@ test.describe('analytics', () => {
     );
 
     // `exact`: the status pill's own label mentions "Sync now" when nothing has synced yet.
-    const sync = page.getByRole('button', { name: 'Sync now', exact: true });
+    const sync = page.getByRole('button', { name: 'Sync Now', exact: true });
     await expect(sync).toBeEnabled();
     await sync.click();
 

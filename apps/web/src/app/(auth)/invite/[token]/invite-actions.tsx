@@ -90,7 +90,7 @@ export function InviteActions({
           address this invitation was sent to.
         </Text>
         <Button size="lg" className="w-full" onClick={switchAccount} disabled={working}>
-          {working ? 'Signing out…' : 'Sign in with another account'}
+          {working ? 'Signing out…' : 'Sign In With Another Account'}
         </Button>
       </Stack>
     );

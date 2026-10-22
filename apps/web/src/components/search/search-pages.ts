@@ -42,7 +42,7 @@ export interface SearchPage {
 export const SEARCH_PAGES: SearchPage[] = [
   {
     id: 'create-post',
-    label: 'Create post',
+    label: 'Create Post',
     path: '/composer',
     icon: 'create',
     group: 'action',
@@ -50,7 +50,7 @@ export const SEARCH_PAGES: SearchPage[] = [
   },
   {
     id: 'connect-channel',
-    label: 'Connect a channel',
+    label: 'Connect A Channel',
     path: '/channels',
     icon: 'connect',
     group: 'action',
@@ -140,7 +140,7 @@ export const SEARCH_PAGES: SearchPage[] = [
   },
   {
     id: 'api-keys',
-    label: 'API keys',
+    label: 'API Keys',
     path: '/settings/api-keys',
     icon: 'key',
     group: 'page',

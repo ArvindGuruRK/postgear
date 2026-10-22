@@ -87,7 +87,7 @@ export function DraftsSheet({
         className="flex flex-col gap-4 overflow-y-auto pg-scrollbar pg-scrollbar-secondary"
       >
         <SheetHeader>
-          <SheetTitle>Saved posts</SheetTitle>
+          <SheetTitle>Saved Posts</SheetTitle>
           <SheetDescription>Drafts and queued posts, most recently edited first.</SheetDescription>
         </SheetHeader>
 
@@ -181,7 +181,7 @@ function PostList({
                     {channel.name}
                   </Badge>
                 ))}
-                {post.parts > 1 ? <Badge variant="secondary">{post.parts} parts</Badge> : null}
+                {post.parts > 1 ? <Badge variant="secondary">{post.parts} Parts</Badge> : null}
               </span>
               <span className="font-sans text-xs opacity-60">
                 {post.state === 'QUEUE' ? 'Scheduled for ' : 'Edited '}
@@ -207,9 +207,9 @@ function PostList({
  */
 export function DraftsButton({ onClick }: { onClick: () => void }) {
   return (
-    <Button variant="secondary" size="sm" onClick={onClick} aria-label="Saved posts">
+    <Button variant="secondary" size="sm" onClick={onClick} aria-label="Saved Posts">
       <MotionIcon icon={FileTextIcon} className="h-4 w-4" />
-      <span className="hidden sm:inline">Saved posts</span>
+      <span className="hidden sm:inline">Saved Posts</span>
     </Button>
   );
 }

@@ -67,7 +67,7 @@ export function CurrentPlanCard({
     <Card data-testid="billing-current-plan" data-tier={view.tier} data-state={manage ? 'manage' : 'subscribe'}>
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle>{view.plan.name} plan</CardTitle>
+          <CardTitle>{view.plan.name} Plan</CardTitle>
           <Badge
             variant={badge.variant}
             data-testid="billing-status"
@@ -163,16 +163,16 @@ export function CurrentPlanCard({
             <>
               {view.status === 'canceling' ? (
                 <Button onClick={onResume} disabled={busy !== null}>
-                  {busy === 'resume' ? 'Resuming…' : 'Resume plan'}
+                  {busy === 'resume' ? 'Resuming…' : 'Resume Plan'}
                 </Button>
               ) : (
                 <Button variant="danger" onClick={onCancel} disabled={busy !== null || view.isLifetime}>
-                  Cancel plan
+                  Cancel Plan
                 </Button>
               )}
               {view.portalAvailable ? (
                 <Button variant="secondary" onClick={onPortal} disabled={busy !== null}>
-                  {busy === 'portal' ? 'Opening…' : 'Manage billing'}
+                  {busy === 'portal' ? 'Opening…' : 'Manage Billing'}
                 </Button>
               ) : null}
               <Text size="sm" muted as="span" className="basis-full sm:basis-auto">
@@ -182,7 +182,7 @@ export function CurrentPlanCard({
           ) : view.canStartTrial ? (
             <>
               <Button onClick={onStartTrial} disabled={busy !== null} data-testid="billing-start-trial">
-                {busy === 'trial' ? 'Starting…' : 'Start free trial'}
+                {busy === 'trial' ? 'Starting…' : 'Start Free Trial'}
               </Button>
               <Text size="sm" muted as="span">
                 Pro for two weeks, no card needed.

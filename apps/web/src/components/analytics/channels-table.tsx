@@ -104,7 +104,7 @@ export function ChannelsTable({
               <TableHead className="text-right">Impressions</TableHead>
               <TableHead className="text-right">Engagements</TableHead>
               <TableHead className="text-right">Rate</TableHead>
-              <TableHead>Impressions, by day</TableHead>
+              <TableHead>Impressions, By Day</TableHead>
               <TableHead className="text-right">Posts</TableHead>
             </TableRow>
           </TableHeader>
@@ -220,7 +220,7 @@ export function ChannelsTable({
       </TooltipProvider>
 
       <section aria-label="Engagement rate by channel" className="flex flex-col gap-3">
-        <h3 className="m-0 type-label text-sm text-ink opacity-70">Engagement rate by channel</h3>
+        <h3 className="m-0 type-label text-sm text-ink opacity-70">Engagement Rate By Channel</h3>
         <BarList items={bars} emptyMessage="No channel has impressions in this range yet." />
       </section>
     </div>

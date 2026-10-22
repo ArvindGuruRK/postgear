@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { serverApi } from '@/lib/api';
 
 export const metadata: Metadata = {
-  title: 'Confirm your account',
+  title: 'Confirm Your Account',
 };
 
 /**
@@ -25,7 +25,7 @@ export default async function VerifyPage({ searchParams }: PageProps<'/verify'>)
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">{activated ? 'Account confirmed' : 'That link did not work'}</Heading>
+        <Heading level="h2">{activated ? 'Account Confirmed' : 'That link did not work'}</Heading>
         <Text muted>
           {activated
             ? 'Your email address is verified. Sign in to finish setting up your workspace.'
@@ -36,7 +36,7 @@ export default async function VerifyPage({ searchParams }: PageProps<'/verify'>)
       {activated ? (
         <Link href="/login">
           <Button size="lg" className="w-full">
-            Sign in
+            Sign In
           </Button>
         </Link>
       ) : (
@@ -48,7 +48,7 @@ export default async function VerifyPage({ searchParams }: PageProps<'/verify'>)
           <Stack direction="row" gap="sm">
             <Link href="/login" className="flex-1">
               <Button variant="secondary" className="w-full">
-                Sign in
+                Sign In
               </Button>
             </Link>
             <Link href="/register" className="flex-1">

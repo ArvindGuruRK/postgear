@@ -85,9 +85,9 @@ export function RotateKeyDialog({ apiKey, onOpenChange, onRotated }: RotateKeyDi
         ) : null}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={working}>Keep it</AlertDialogCancel>
+          <AlertDialogCancel disabled={working}>Keep It</AlertDialogCancel>
           <AlertDialogAction variant="primary" onClick={confirm} disabled={working}>
-            {working ? 'Rotating…' : 'Rotate key'}
+            {working ? 'Rotating…' : 'Rotate Key'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -79,7 +79,7 @@ export function PostDetailDialog({
         <DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={shown.variant}>{shown.label}</Badge>
-            {post.parts > 1 ? <Badge variant="outline">{post.parts} parts</Badge> : null}
+            {post.parts > 1 ? <Badge variant="outline">{post.parts} Parts</Badge> : null}
           </div>
           <DialogTitle className="mt-1">{formatWhen(when)}</DialogTitle>
           <DialogDescription>

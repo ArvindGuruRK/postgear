@@ -75,7 +75,7 @@ export function Calendar({
         // Weekday header and day rows share the same gap so the labels stay
         // aligned with the tiles beneath them.
         weekdays: 'flex gap-1',
-        weekday: 'w-9 text-center font-sans text-xs font-bold uppercase text-ink opacity-60',
+        weekday: 'w-9 text-center font-sans text-xs font-bold text-ink opacity-60',
         week: 'mt-1 flex w-full gap-1',
         day: 'p-0 text-center align-middle',
         // Every day is its own outlined tile, so the grid reads as a sheet of

@@ -217,12 +217,12 @@ export function QueueView({
           ) : (
             <MotionIcon icon={ArrowUp10Icon} className="h-4 w-4" />
           )}
-          {queue.filters.sort === 'asc' ? 'Soonest first' : 'Latest first'}
+          {queue.filters.sort === 'asc' ? 'Soonest First' : 'Latest First'}
         </Button>
 
         {filtered ? (
           <Button variant="secondary" size="sm" onClick={queue.reset}>
-            Clear filters
+            Clear Filters
           </Button>
         ) : null}
 
@@ -237,7 +237,7 @@ export function QueueView({
         <ErrorState
           title="The queue didn't load"
           description={queue.error}
-          action={{ label: 'Try again', onClick: queue.reload }}
+          action={{ label: 'Try Again', onClick: queue.reload }}
         />
       ) : !mounted || (queue.loading && posts.length === 0) ? (
         // Rows format times in the viewer's locale, which the server does not
@@ -252,7 +252,7 @@ export function QueueView({
           <Alert>
             Nothing matches these filters.
             <Button variant="secondary" size="sm" className="ms-3" onClick={queue.reset}>
-              Clear filters
+              Clear Filters
             </Button>
           </Alert>
         ) : (
@@ -260,7 +260,7 @@ export function QueueView({
             icon={ListOrdered}
             title="The queue is empty"
             description="Add a post to the queue from the composer and it lines up here."
-            action={{ label: 'Write a post', onClick: () => router.push(`/${orgId}/composer`) }}
+            action={{ label: 'Write A Post', onClick: () => router.push(`/${orgId}/composer`) }}
           />
         )
       ) : (

@@ -72,7 +72,7 @@ test.describe('ai studio', () => {
     }
     await expect(page.getByText(/Fits LinkedIn's/)).toBeVisible();
 
-    await page.getByRole('button', { name: /^Generate \(\d+ credits\)$/ }).click();
+    await page.getByRole('button', { name: /^Generate \(\d+ Credits\)$/ }).click();
 
     // The tracker follows the stream: writing finishes, then the run is done.
     const stage = (id: string) => page.locator(`[data-testid="ai-stage"][data-stage="${id}"]`);

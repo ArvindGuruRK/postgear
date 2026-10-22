@@ -164,7 +164,7 @@ export function RegisterForm({ next = null }: { next?: string | null }) {
         </Stack>
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? 'Creating account…' : 'Create account'}
+          {pending ? 'Creating account…' : 'Create Account'}
         </Button>
       </Stack>
     </form>

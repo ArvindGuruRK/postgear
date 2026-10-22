@@ -160,7 +160,7 @@ export function AnalyticsView({
           icon={RefreshCwIcon}
           className={cn('h-4 w-4', analytics.syncing && 'animate-spin motion-reduce:animate-none')}
         />
-        Sync now
+        Sync Now
       </Button>
       <Button
         variant="secondary"
@@ -188,7 +188,7 @@ export function AnalyticsView({
           <TabsList aria-label="Range" data-testid="analytics-range">
             {ANALYTICS_RANGES.map((range) => (
               <TabsTrigger key={range} value={String(range)}>
-                {range} days
+                {range} Days
               </TabsTrigger>
             ))}
           </TabsList>
@@ -229,13 +229,13 @@ export function AnalyticsView({
           icon={Plug}
           title="Connect a channel first"
           description="Analytics follow the accounts PostGear publishes to. Connect one and the worker starts syncing its metrics."
-          action={{ label: 'Go to Channels', onClick: () => router.push(`/${orgId}/channels`) }}
+          action={{ label: 'Go To Channels', onClick: () => router.push(`/${orgId}/channels`) }}
         />
       ) : analytics.error && !overview ? (
         <ErrorState
           title="The metrics didn't load"
           description={analytics.error}
-          action={{ label: 'Try again', onClick: analytics.reload }}
+          action={{ label: 'Try Again', onClick: analytics.reload }}
         />
       ) : !mounted || !overview ? (
         <DashboardSkeleton />
@@ -246,7 +246,7 @@ export function AnalyticsView({
             title="No metrics yet"
             description="The worker syncs every connected channel daily. Ask for a sync now and the first numbers appear within a minute or two."
             action={{
-              label: analytics.syncing ? 'Syncing…' : 'Sync now',
+              label: analytics.syncing ? 'Syncing…' : 'Sync Now',
               onClick: () => void syncNow(),
               variant: 'secondary',
             }}
@@ -268,7 +268,7 @@ export function AnalyticsView({
             <Alert variant="danger" className="py-3">
               {analytics.error} Showing the last numbers that loaded.
               <Button variant="secondary" size="sm" className="ms-3" onClick={analytics.reload}>
-                Try again
+                Try Again
               </Button>
             </Alert>
           ) : null}
@@ -288,7 +288,7 @@ export function AnalyticsView({
                     size="sm"
                     onClick={() => analytics.setFilters({ channelId: null })}
                   >
-                    Show all channels
+                    Show All Channels
                   </Button>
                 ) : null
               }

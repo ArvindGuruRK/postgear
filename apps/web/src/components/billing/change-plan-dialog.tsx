@@ -138,7 +138,7 @@ export function ChangePlanDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {kind === 'downgrade' ? 'Switch to' : 'Upgrade to'} {target?.plan.name}
+            {kind === 'downgrade' ? 'Switch To' : 'Upgrade To'} {target?.plan.name}
           </DialogTitle>
           <DialogDescription>
             {price ? `${price.amount}${price.per}` : ''}
@@ -183,7 +183,7 @@ export function ChangePlanDialog({
                 {previewError}
               </Text>
               <Button variant="secondary" size="sm" onClick={() => void loadPreview()}>
-                Try again
+                Try Again
               </Button>
             </div>
           ) : (
@@ -200,11 +200,11 @@ export function ChangePlanDialog({
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="secondary" disabled={working}>
-              Keep current plan
+              Keep Current Plan
             </Button>
           </DialogClose>
           <Button onClick={confirm} disabled={working || !preview}>
-            {working ? 'Applying…' : kind === 'downgrade' ? 'Schedule change' : 'Confirm upgrade'}
+            {working ? 'Applying…' : kind === 'downgrade' ? 'Schedule Change' : 'Confirm Upgrade'}
           </Button>
         </DialogFooter>
       </DialogContent>

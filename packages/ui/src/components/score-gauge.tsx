@@ -138,7 +138,7 @@ export const ScoreGauge = forwardRef<HTMLDivElement, ScoreGaugeProps>(
           {grade ? (
             <span
               className={cn(
-                'mt-1 rounded-full border-2 border-outline px-2 py-0.5 font-sans font-bold uppercase text-ink',
+                'mt-1 rounded-full border-2 border-outline px-2 py-0.5 font-sans font-bold text-ink',
                 sizes.grade,
               )}
             >
@@ -146,7 +146,7 @@ export const ScoreGauge = forwardRef<HTMLDivElement, ScoreGaugeProps>(
             </span>
           ) : null}
           {label ? (
-            <span className="mt-1 font-sans text-[10px] font-bold uppercase tracking-wide text-ink opacity-60">
+            <span className="mt-1 font-sans text-[10px] font-bold text-ink opacity-60">
               {label}
             </span>
           ) : null}

@@ -37,11 +37,11 @@ const DAY_MS = 24 * 60 * 60 * 1_000;
  * waiting to happen.
  */
 export const STATUS_PRESENTATION: Record<EntitlementStatus, { label: string; variant: BadgeTone }> = {
-  none: { label: 'No plan', variant: 'outline' },
+  none: { label: 'No Plan', variant: 'outline' },
   trialing: { label: 'Trial', variant: 'primary' },
-  trial_expired: { label: 'Trial ended', variant: 'outline' },
+  trial_expired: { label: 'Trial Ended', variant: 'outline' },
   active: { label: 'Active', variant: 'success' },
-  past_due: { label: 'Payment failed', variant: 'danger' },
+  past_due: { label: 'Payment Failed', variant: 'danger' },
   canceling: { label: 'Ending', variant: 'accent' },
   canceled: { label: 'Canceled', variant: 'outline' },
   incomplete: { label: 'Incomplete', variant: 'danger' },
@@ -175,13 +175,13 @@ export function planAction(
   const current = state === 'manage' && plan.tier === view.tier && period === view.period;
 
   if (current) {
-    return { kind: 'current', label: 'Current plan', variant: 'secondary', disabled: true };
+    return { kind: 'current', label: 'Current Plan', variant: 'secondary', disabled: true };
   }
 
   if (plan.tier === 'FREE') {
     return {
       kind: 'free',
-      label: view.tier === 'FREE' ? 'Current plan' : 'Included',
+      label: view.tier === 'FREE' ? 'Current Plan' : 'Included',
       variant: 'secondary',
       disabled: true,
     };

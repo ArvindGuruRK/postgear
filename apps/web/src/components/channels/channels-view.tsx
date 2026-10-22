@@ -129,7 +129,7 @@ export function ChannelsView({
       {canManage ? (
         <PageActions>
           <Button onClick={() => setConnectOpen(true)} disabled={atLimit}>
-            Connect a channel
+            Connect A Channel
           </Button>
         </PageActions>
       ) : null}
@@ -188,7 +188,7 @@ export function ChannelsView({
           title="No channels yet"
           description="Connect a social account and PostGear can start publishing to it."
           {...(canManage
-            ? { action: { label: 'Connect a channel', onClick: () => setConnectOpen(true) } }
+            ? { action: { label: 'Connect A Channel', onClick: () => setConnectOpen(true) } }
             : {})}
         />
       ) : (

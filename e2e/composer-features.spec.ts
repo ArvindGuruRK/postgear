@@ -324,7 +324,7 @@ test('inserts a saved signature at the cursor', async () => {
 
   await openComposer();
   await write('Thanks for reading');
-  await composer().getByRole('button', { name: 'Insert signature', exact: true }).click();
+  await composer().getByRole('button', { name: 'Insert Signature', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'Signatures' })
     .getByRole('button', { name: `Insert signature: ${content.split('\n')[0]}` })

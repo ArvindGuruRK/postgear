@@ -107,7 +107,7 @@ export function SignatureDialog({
       <DialogContent className="max-w-xl">
         <form id={formId} onSubmit={submit} noValidate>
           <DialogHeader>
-            <DialogTitle>{signature ? 'Edit signature' : 'Add signature'}</DialogTitle>
+            <DialogTitle>{signature ? 'Edit Signature' : 'Add Signature'}</DialogTitle>
             <DialogDescription className="sr-only">
               A sign-off you can add to posts from the composer.
             </DialogDescription>
@@ -167,7 +167,7 @@ export function SignatureDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={saving} data-testid="signature-save">
-              {saving ? 'Saving…' : signature ? 'Save changes' : 'Add signature'}
+              {saving ? 'Saving…' : signature ? 'Save Changes' : 'Add Signature'}
             </Button>
           </DialogFooter>
         </form>

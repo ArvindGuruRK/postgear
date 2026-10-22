@@ -103,11 +103,11 @@ export function SignatureControl({
 
   return (
     <Popover modal open={open} onOpenChange={openWith}>
-      <TooltipHint label="Insert signature" side="top">
+      <TooltipHint label="Insert Signature" side="top">
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label="Insert signature"
+            aria-label="Insert Signature"
             disabled={!editor}
             // Keeps the editor's selection, so the signature lands at the cursor.
             onMouseDown={(event) => event.preventDefault()}
@@ -250,11 +250,11 @@ export function EmojiControl({ editor }: { editor: Editor | null }) {
 
   return (
     <Popover modal open={open} onOpenChange={openWith}>
-      <TooltipHint label="Insert emoji" side="top">
+      <TooltipHint label="Insert Emoji" side="top">
         <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label="Insert emoji"
+            aria-label="Insert Emoji"
             disabled={!editor}
             onMouseDown={(event) => event.preventDefault()}
             className={TOOL}

@@ -258,7 +258,7 @@ export function GenerateForm({
             ? 'Generating…'
             : cost === null
               ? 'Generate'
-              : `Generate (${cost} ${cost === 1 ? 'credit' : 'credits'})`}
+              : `Generate (${cost} ${cost === 1 ? 'Credit' : 'Credits'})`}
         </Button>
         {running ? (
           <Button type="button" variant="secondary" onClick={onStop}>

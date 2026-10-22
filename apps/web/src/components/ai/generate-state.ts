@@ -93,16 +93,16 @@ export const STAGE_LABELS: Record<GenerateStage, string> = {
 };
 
 export const FORMAT_OPTIONS: readonly { value: PostFormat; label: string; hint: string }[] = [
-  { value: 'one_short', label: 'Short post', hint: 'One post, up to 280 characters.' },
-  { value: 'one_long', label: 'Long post', hint: 'One post of 800 to 1,500 characters.' },
+  { value: 'one_short', label: 'Short Post', hint: 'One post, up to 280 characters.' },
+  { value: 'one_long', label: 'Long Post', hint: 'One post of 800 to 1,500 characters.' },
   {
     value: 'thread_short',
-    label: 'Short thread',
+    label: 'Short Thread',
     hint: '3 to 5 parts, each up to 280 characters.',
   },
   {
     value: 'thread_long',
-    label: 'Long thread',
+    label: 'Long Thread',
     hint: '3 to 6 longer parts, each within the limit.',
   },
 ];

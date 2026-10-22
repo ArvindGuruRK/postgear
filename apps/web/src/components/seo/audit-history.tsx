@@ -105,7 +105,7 @@ export function AuditHistory({
       ? [
           {
             id: selected.targetUrl,
-            label: 'Overall score',
+            label: 'Overall Score',
             points: selected.trend,
             tone: 'primary',
           },
@@ -127,7 +127,7 @@ export function AuditHistory({
             data-points={selected.trend.length}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <h3 className="m-0 type-label text-xs text-ink">Score over time</h3>
+              <h3 className="m-0 type-label text-xs text-ink">Score Over Time</h3>
               <Text size="xs" muted as="span" className="truncate">
                 {selected.host}
               </Text>

@@ -286,7 +286,7 @@ export function AppearanceSettings({
             <AlertDescription>{loadError}</AlertDescription>
           </div>
           <Button size="sm" variant="secondary" onClick={() => void load()} disabled={loading}>
-            Try again
+            Try Again
           </Button>
         </Alert>
       ) : null}
@@ -391,7 +391,7 @@ export function AppearanceSettings({
           </DialogHeader>
           <DialogFooter>
             <Button variant="secondary" onClick={endPreview}>
-              Keep current
+              Keep Current
             </Button>
             <Link
               href={`/${orgId}/settings/billing`}

@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { NewPasswordForm } from '@/components/auth/new-password-form';
 
 export const metadata: Metadata = {
-  title: 'Choose a new password',
+  title: 'Choose A New Password',
 };
 
 /**
@@ -19,7 +19,7 @@ export default async function NewPasswordPage({ params }: PageProps<'/reset-pass
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">Choose a new password</Heading>
+        <Heading level="h2">Choose A New Password</Heading>
         <Text muted>Pick something you have not used here before.</Text>
       </Stack>
 

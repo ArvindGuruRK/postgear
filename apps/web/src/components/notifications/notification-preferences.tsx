@@ -136,7 +136,7 @@ export function NotificationPreferencesForm({
             onClick={() => void retry.current?.()}
             disabled={loading || saving !== null}
           >
-            Try again
+            Try Again
           </Button>
         </Alert>
       )}

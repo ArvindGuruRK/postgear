@@ -61,7 +61,7 @@ export function AuditProgress({ state, onRetry }: { state: SeoState; onRetry: ()
           title="The analysis didn't finish"
           description={state.error.message}
           className="p-4"
-          action={state.error.retryable ? { label: 'Try again', onClick: onRetry } : undefined}
+          action={state.error.retryable ? { label: 'Try Again', onClick: onRetry } : undefined}
         />
       ) : null}
     </section>

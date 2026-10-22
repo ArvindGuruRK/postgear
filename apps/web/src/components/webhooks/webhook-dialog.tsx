@@ -131,7 +131,7 @@ export function WebhookDialog({
         {created ? (
           <>
             <DialogHeader>
-              <DialogTitle>Webhook created</DialogTitle>
+              <DialogTitle>Webhook Created</DialogTitle>
               <DialogDescription>
                 {created.webhook.name} will receive{' '}
                 {created.webhook.events.map((event) => EVENT_LABELS[event].label.toLowerCase()).join(' and ')}{' '}
@@ -148,7 +148,7 @@ export function WebhookDialog({
         ) : (
           <form id={formId} onSubmit={submit} noValidate>
             <DialogHeader>
-              <DialogTitle>{webhook ? 'Edit webhook' : 'Add a webhook'}</DialogTitle>
+              <DialogTitle>{webhook ? 'Edit Webhook' : 'Add A Webhook'}</DialogTitle>
               <DialogDescription>
                 PostGear sends a signed JSON POST to this URL when the chosen events happen.
               </DialogDescription>
@@ -242,7 +242,7 @@ export function WebhookDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={saving} data-testid="webhook-save">
-                {saving ? 'Saving…' : webhook ? 'Save changes' : 'Create webhook'}
+                {saving ? 'Saving…' : webhook ? 'Save Changes' : 'Create Webhook'}
               </Button>
             </DialogFooter>
           </form>

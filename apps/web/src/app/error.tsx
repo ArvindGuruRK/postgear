@@ -30,9 +30,9 @@ export default function AppError({
             className="py-8"
           />
           <div className="flex justify-center gap-3 pb-8">
-            <Button onClick={reset}>Try again</Button>
+            <Button onClick={reset}>Try Again</Button>
             <Button variant="secondary" onClick={() => window.location.assign('/login')}>
-              Back to sign in
+              Back To Sign In
             </Button>
           </div>
           {error.digest ? (

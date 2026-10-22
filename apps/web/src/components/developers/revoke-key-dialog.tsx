@@ -78,7 +78,7 @@ export function RevokeKeyDialog({ apiKey, onOpenChange, onDone }: RevokeKeyDialo
         ) : null}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={working}>Keep it</AlertDialogCancel>
+          <AlertDialogCancel disabled={working}>Keep It</AlertDialogCancel>
           <AlertDialogAction variant="danger" onClick={confirm} disabled={working}>
             {working ? 'Revoking…' : 'Revoke'}
           </AlertDialogAction>

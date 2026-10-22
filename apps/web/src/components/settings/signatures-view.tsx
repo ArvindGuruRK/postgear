@@ -93,7 +93,7 @@ export function SignaturesView({ initialSignatures }: { initialSignatures: Signa
         <PageActions>
           <Button onClick={openAdd} data-testid="signature-add">
             <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-            Add signature
+            Add Signature
           </Button>
         </PageActions>
       ) : null}
@@ -110,7 +110,7 @@ export function SignaturesView({ initialSignatures }: { initialSignatures: Signa
           icon={SignatureGlyph}
           title="No signatures yet"
           description="A signature is a sign-off you add to posts: a closing line, a link, your hashtags. Make one the default and every new post starts with it."
-          {...(canManage ? { action: { label: 'Add signature', onClick: openAdd } } : {})}
+          {...(canManage ? { action: { label: 'Add Signature', onClick: openAdd } } : {})}
         />
       ) : (
         <Card>
@@ -137,11 +137,11 @@ export function SignaturesView({ initialSignatures }: { initialSignatures: Signa
 
                   {canManage ? (
                     <div className="flex shrink-0 items-center gap-2">
-                      <TooltipHint label="Edit signature" side="top">
+                      <TooltipHint label="Edit Signature" side="top">
                         <Button
                           variant="secondary"
                           size="sm"
-                          aria-label="Edit signature"
+                          aria-label="Edit Signature"
                           onClick={() => {
                             setEditing(signature);
                             setDialogOpen(true);
@@ -150,11 +150,11 @@ export function SignaturesView({ initialSignatures }: { initialSignatures: Signa
                           <MotionIcon icon={PencilIcon} className="h-4 w-4" />
                         </Button>
                       </TooltipHint>
-                      <TooltipHint label="Delete signature" side="top">
+                      <TooltipHint label="Delete Signature" side="top">
                         <Button
                           variant="secondary"
                           size="sm"
-                          aria-label="Delete signature"
+                          aria-label="Delete Signature"
                           onClick={() => setDeleting(signature)}
                         >
                           <MotionIcon icon={Trash2Icon} className="h-4 w-4" />

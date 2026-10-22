@@ -95,7 +95,7 @@ export function AnalyticsStats({
       />
       <MetricCard
         metric="engagementRate"
-        label="Engagement rate"
+        label="Engagement Rate"
         value={formatPercent(totals.engagementRate)}
         icon={Percent}
         trend={{ kind: 'none' }}

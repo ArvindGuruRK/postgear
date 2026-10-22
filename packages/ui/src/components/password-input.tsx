@@ -38,7 +38,7 @@ export interface PasswordInputProps extends Omit<InputProps, 'type'> {}
 export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
   ({ className, ...props }, ref) => {
     const [visible, setVisible] = useState(false);
-    const label = visible ? 'Hide password' : 'Show password';
+    const label = visible ? 'Hide Password' : 'Show Password';
     // Icon reflects current state, not the click action: closed eye while
     // masked (the default), open eye once revealed.
     const ToggleIcon = visible ? EyeIcon : EyeClosedIcon;

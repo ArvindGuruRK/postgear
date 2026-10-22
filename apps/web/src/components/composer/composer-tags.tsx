@@ -269,7 +269,7 @@ export function TagsControl({
                 onClick={() => setView({ kind: 'form', tag: null })}
               >
                 <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-                New tag
+                New Tag
               </Button>
             </div>
           </>
@@ -420,7 +420,7 @@ function TagForm({
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={saving}>
-          {saving ? 'Saving…' : tag ? 'Save tag' : 'Create tag'}
+          {saving ? 'Saving…' : tag ? 'Save Tag' : 'Create Tag'}
         </Button>
       </div>
     </form>
@@ -461,10 +461,10 @@ function DeleteTag({
       {error ? <FormErrorMessage>{error}</FormErrorMessage> : null}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onCancel}>
-          Keep it
+          Keep It
         </Button>
         <Button variant="danger" size="sm" onClick={() => void remove()} disabled={deleting}>
-          {deleting ? 'Deleting…' : 'Delete tag'}
+          {deleting ? 'Deleting…' : 'Delete Tag'}
         </Button>
       </div>
     </div>

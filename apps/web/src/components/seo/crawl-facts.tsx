@@ -107,7 +107,7 @@ export function CrawlFacts({
       </li>
       <li>
         <Badge variant="outline" title="How the page was fetched">
-          {crawl.mode === 'browser' ? 'Rendered' : 'HTML only'}
+          {crawl.mode === 'browser' ? 'Rendered' : 'HTML Only'}
         </Badge>
       </li>
       <li>

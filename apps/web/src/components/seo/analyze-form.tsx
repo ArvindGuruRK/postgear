@@ -133,7 +133,7 @@ export function AnalyzeForm({
               {running
                 ? 'Analyzing…'
                 : cost > 0
-                  ? `Analyze (${cost} ${cost === 1 ? 'credit' : 'credits'})`
+                  ? `Analyze (${cost} ${cost === 1 ? 'Credit' : 'Credits'})`
                   : 'Analyze'}
             </Button>
             {running ? (

@@ -203,7 +203,7 @@ export function CopilotChat({
         </Text>
         <Button variant="secondary" size="sm" onClick={clear} disabled={empty || state.streaming}>
           <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
-          Clear conversation
+          Clear Conversation
         </Button>
       </div>
 
@@ -265,7 +265,7 @@ export function CopilotChat({
             <span>{state.error.message}</span>
             {state.error.retryable && state.entries.at(-1)?.role === 'user' ? (
               <Button variant="secondary" size="sm" onClick={retry}>
-                Try again
+                Try Again
               </Button>
             ) : null}
           </div>

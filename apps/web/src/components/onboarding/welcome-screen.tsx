@@ -186,11 +186,11 @@ export function WelcomeScreen({
                 </picture>
               </span>
             </span>
-            <span>Welcome to PostGear</span>
+            <span>Welcome To PostGear</span>
           </h1>
 
           <Button size="lg" onClick={onStart}>
-            Let&apos;s start
+            Let&apos;s Start
             <MotionIcon icon={ArrowRightIcon} className="h-4 w-4" />
           </Button>
         </div>

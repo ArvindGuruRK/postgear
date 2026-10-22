@@ -47,14 +47,14 @@ export function ConfirmWebhookDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Keep it</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>Keep It</AlertDialogCancel>
           <AlertDialogAction
             variant={isDelete ? 'danger' : 'primary'}
             onClick={onConfirm}
             disabled={busy}
             data-testid={isDelete ? 'webhook-delete-confirm' : 'webhook-rotate-confirm'}
           >
-            {busy ? (isDelete ? 'Deleting…' : 'Rotating…') : isDelete ? 'Delete' : 'Rotate secret'}
+            {busy ? (isDelete ? 'Deleting…' : 'Rotating…') : isDelete ? 'Delete' : 'Rotate Secret'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

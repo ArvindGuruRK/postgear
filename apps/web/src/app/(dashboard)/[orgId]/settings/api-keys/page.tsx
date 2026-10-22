@@ -14,7 +14,7 @@ import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
 import type { ApiKeyView } from '@/types/developers';
 
-export const metadata: Metadata = { title: 'API keys' };
+export const metadata: Metadata = { title: 'API Keys' };
 
 export default async function ApiKeysPage(_props: PageProps<'/[orgId]/settings/api-keys'>) {
   const cookie = await getSessionCookieHeader();

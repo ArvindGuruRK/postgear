@@ -70,7 +70,7 @@ export function NewPasswordForm({ token }: { token: string }) {
       <Stack gap="sm">
         <Text>Your password has been changed.</Text>
         <Button size="lg" className="w-full" onClick={() => router.push('/login')}>
-          Sign in
+          Sign In
         </Button>
       </Stack>
     );
@@ -109,7 +109,7 @@ export function NewPasswordForm({ token }: { token: string }) {
         </FormField>
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? 'Saving…' : 'Set new password'}
+          {pending ? 'Saving…' : 'Set New Password'}
         </Button>
 
         <Text size="sm" muted className="text-center">

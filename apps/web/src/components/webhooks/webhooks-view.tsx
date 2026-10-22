@@ -170,7 +170,7 @@ export function WebhooksView({
             data-testid="webhook-add"
           >
             <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-            Add webhook
+            Add Webhook
           </Button>
         </PageActions>
       ) : null}
@@ -185,7 +185,7 @@ export function WebhooksView({
           />
           <div>
             <Button variant="secondary" size="sm" onClick={() => setRotated(null)}>
-              I have copied it
+              I Have Copied It
             </Button>
           </div>
         </Stack>
@@ -206,7 +206,7 @@ export function WebhooksView({
           {...(canManage
             ? {
                 action: {
-                  label: 'Add webhook',
+                  label: 'Add Webhook',
                   onClick: () => {
                     setEditing(null);
                     setDialogOpen(true);
@@ -224,7 +224,7 @@ export function WebhooksView({
                   <TableHead>Name</TableHead>
                   <TableHead>URL</TableHead>
                   <TableHead>Events</TableHead>
-                  <TableHead>Last delivery</TableHead>
+                  <TableHead>Last Delivery</TableHead>
                   {/* `relative`: the sr-only label is absolutely positioned and must stay inside the cell. */}
                   <TableHead className="relative w-12">
                     <span className="sr-only">Actions</span>
@@ -300,7 +300,7 @@ export function WebhooksView({
                           {canManage ? (
                             <>
                               <DropdownMenuItem onSelect={() => void sendTest(webhook)}>
-                                Send test
+                                Send Test
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onSelect={() => {
@@ -316,7 +316,7 @@ export function WebhooksView({
                               <DropdownMenuItem
                                 onSelect={() => setConfirm({ webhook, kind: 'rotate' })}
                               >
-                                Rotate secret
+                                Rotate Secret
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem

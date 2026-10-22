@@ -80,7 +80,7 @@ export function LeaveWorkspaceDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={working}>Stay</AlertDialogCancel>
           <AlertDialogAction variant="danger" onClick={confirm} disabled={working}>
-            {working ? 'Leaving…' : 'Leave workspace'}
+            {working ? 'Leaving…' : 'Leave Workspace'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

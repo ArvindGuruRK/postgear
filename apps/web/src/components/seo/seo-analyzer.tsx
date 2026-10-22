@@ -285,7 +285,7 @@ export function SeoAnalyzer({
         <ErrorState
           title="The analyzer didn't answer"
           description="The API could not say whether the SEO analyzer is available. Check that it is running, then try again."
-          action={{ label: 'Try again', onClick: () => router.refresh() }}
+          action={{ label: 'Try Again', onClick: () => router.refresh() }}
         />
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:items-start">

@@ -248,14 +248,14 @@ export function syncBadge(
   if (sync.status === 'needs_reconnect' || support === 'needs_reconnect') {
     return {
       variant: 'danger',
-      label: 'Needs reconnect',
+      label: 'Needs Reconnect',
       explanation: `${channel.providerName} no longer accepts the saved authorization. Reconnect the channel to resume syncing.`,
     };
   }
   if (sync.status === 'needs_permissions') {
     return {
       variant: 'danger',
-      label: 'Needs permissions',
+      label: 'Needs Permissions',
       explanation:
         sync.error ??
         `The ${channel.providerName} account did not grant the permission its metrics need. Reconnect and accept it.`,
@@ -264,21 +264,21 @@ export function syncBadge(
   if (support === 'needs_setup') {
     return {
       variant: 'outline',
-      label: 'Finish setup',
+      label: 'Finish Setup',
       explanation: 'The channel is not fully connected yet, so there is nothing to sync.',
     };
   }
   if (support === 'unsupported' || sync.status === 'unsupported') {
     return {
       variant: 'outline',
-      label: 'Not supported',
+      label: 'Not Supported',
       explanation: `${channel.providerName} does not expose metrics PostGear can read, so this channel is listed without numbers.`,
     };
   }
   if (sync.status === 'failed') {
     return {
       variant: 'danger',
-      label: 'Sync failed',
+      label: 'Sync Failed',
       explanation:
         sync.error ?? 'The last sync did not finish. The worker retries on its next run.',
     };
@@ -289,7 +289,7 @@ export function syncBadge(
   }
   return {
     variant: 'secondary',
-    label: 'Never synced',
+    label: 'Never Synced',
     explanation: 'The worker syncs metrics daily; use Sync now to fetch them straight away.',
   };
 }
@@ -336,7 +336,7 @@ export function syncPresentation(
   if (sync === 'unknown') {
     return {
       status: 'pending',
-      label: 'Checking sync',
+      label: 'Checking Sync',
       explanation: 'Asking the API when each channel last synced.',
       lines: [],
     };
@@ -344,7 +344,7 @@ export function syncPresentation(
   if (sync === null) {
     return {
       status: 'busy',
-      label: 'Sync status unavailable',
+      label: 'Sync Status Unavailable',
       explanation: 'The API did not answer. Metrics shown are whatever was synced before.',
       lines: [],
     };
@@ -364,7 +364,7 @@ export function syncPresentation(
   if (!sync.reachable) {
     return {
       status: 'away',
-      label: 'Scheduler unreachable',
+      label: 'Scheduler Unreachable',
       explanation:
         'The API cannot reach Temporal, so no sync can be queued. Metrics shown are whatever was synced before.',
       lines,
@@ -373,7 +373,7 @@ export function syncPresentation(
   if (sync.workerOnline === false) {
     return {
       status: 'away',
-      label: 'No worker running',
+      label: 'No Worker Running',
       explanation:
         'Temporal is up but no PostGear worker is polling it. Start one (npm run dev:worker) or nothing syncs.',
       lines,
@@ -393,7 +393,7 @@ export function syncPresentation(
   if (supported.length === 0) {
     return {
       status: 'away',
-      label: 'Nothing to sync',
+      label: 'Nothing To Sync',
       explanation:
         'None of the connected channels is on a platform PostGear can read metrics from.',
       lines,
@@ -415,7 +415,7 @@ export function syncPresentation(
   }
   return {
     status: 'away',
-    label: 'Not synced yet',
+    label: 'Not Synced Yet',
     explanation:
       'A supported channel has never synced. The worker runs daily; Sync now fetches straight away.',
     lines,

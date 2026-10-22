@@ -7,7 +7,7 @@ import { getSession } from '@/lib/session';
 import { safeNextPath, withNext } from '../login/safe-next';
 
 export const metadata: Metadata = {
-  title: 'Create account',
+  title: 'Create Account',
 };
 
 // Server component for the metadata export; the form is a client island. See
@@ -29,7 +29,7 @@ export default async function RegisterPage({ searchParams }: PageProps<'/registe
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">Create your account</Heading>
+        <Heading level="h2">Create Your Account</Heading>
         <Text muted>Start scheduling across every channel in a few minutes.</Text>
       </Stack>
 

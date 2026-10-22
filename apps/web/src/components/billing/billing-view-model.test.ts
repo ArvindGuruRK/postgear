@@ -59,7 +59,7 @@ describe('statusBadge', () => {
   it('gives every status a label and the Sprint 5 tone', () => {
     expect(statusBadge('active')).toEqual({ label: 'Active', variant: 'success' });
     expect(statusBadge('trialing')).toEqual({ label: 'Trial', variant: 'primary' });
-    expect(statusBadge('past_due')).toEqual({ label: 'Payment failed', variant: 'danger' });
+    expect(statusBadge('past_due')).toEqual({ label: 'Payment Failed', variant: 'danger' });
     expect(statusBadge('canceling')).toEqual({ label: 'Ending', variant: 'accent' });
     expect(statusBadge('none').variant).toBe('outline');
   });
@@ -110,7 +110,7 @@ describe('the two states and the plan buttons', () => {
 
   it('labels the cards for a workspace on Standard monthly', () => {
     const current = view();
-    expect(planAction(STANDARD, 'MONTHLY', current, true)).toMatchObject({ kind: 'current', label: 'Current plan', disabled: true });
+    expect(planAction(STANDARD, 'MONTHLY', current, true)).toMatchObject({ kind: 'current', label: 'Current Plan', disabled: true });
     expect(planAction(PRO, 'MONTHLY', current, true)).toMatchObject({ kind: 'upgrade', label: 'Upgrade', variant: 'primary', disabled: false });
     expect(planAction(STANDARD, 'YEARLY', current, true)).toMatchObject({ kind: 'upgrade' });
     expect(planAction(FREE, 'MONTHLY', current, true)).toMatchObject({ kind: 'free', disabled: true });
@@ -122,7 +122,7 @@ describe('the two states and the plan buttons', () => {
     expect(planAction(PRO, 'MONTHLY', trial, true)).toMatchObject({ kind: 'subscribe', label: 'Subscribe', variant: 'primary', disabled: false });
     expect(planAction(STANDARD, 'MONTHLY', trial, true)).toMatchObject({ kind: 'subscribe', variant: 'secondary' });
     expect(planAction(PRO, 'MONTHLY', trial, false).disabled).toBe(true);
-    expect(planAction(FREE, 'MONTHLY', view({ tier: 'FREE', status: 'none' }), true)).toMatchObject({ label: 'Current plan' });
+    expect(planAction(FREE, 'MONTHLY', view({ tier: 'FREE', status: 'none' }), true)).toMatchObject({ label: 'Current Plan' });
   });
 });
 

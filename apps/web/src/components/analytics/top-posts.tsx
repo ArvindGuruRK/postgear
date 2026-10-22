@@ -44,7 +44,7 @@ export function TopPosts({
   return (
     <Card className="flex flex-col gap-4 p-5" aria-label="Top posts">
       <SectionHeader
-        title="Top posts"
+        title="Top Posts"
         description="Ranked by engagement in this range. Open one for its numbers against the channel's average."
       />
 

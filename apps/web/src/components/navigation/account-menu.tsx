@@ -95,7 +95,7 @@ export function AccountMenu() {
               onSelect: () => void switchTo(organization.id),
             })),
             {
-              label: 'Create organization',
+              label: 'Create Organization',
               animatedIcon: PlusIcon,
               onSelect: () => router.push('/onboarding'),
             },
@@ -113,7 +113,7 @@ export function AccountMenu() {
           animatedIcon: SettingsIcon,
           onSelect: () => router.push(`/${activeOrgId}/settings/team`),
         },
-        { label: 'Log out', animatedIcon: LogOutIcon, danger: true, onSelect: signOut },
+        { label: 'Log Out', animatedIcon: LogOutIcon, danger: true, onSelect: signOut },
       ]}
     />
   );

@@ -149,11 +149,11 @@ export function CancelDialog({
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="secondary" disabled={working}>
-              Keep my plan
+              Keep My Plan
             </Button>
           </DialogClose>
           <Button variant="danger" onClick={confirm} disabled={working || !reason}>
-            {working ? 'Cancelling…' : 'Cancel plan'}
+            {working ? 'Cancelling…' : 'Cancel Plan'}
           </Button>
         </DialogFooter>
       </DialogContent>

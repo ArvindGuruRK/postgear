@@ -55,7 +55,7 @@ async function startWizard(page: Page, user: FixtureUser, workspace: string) {
   await signIn(page, user.email, user.password);
   await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
 
-  await expect(page.getByRole('heading', { name: /Welcome to PostGear/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome To PostGear/ })).toBeVisible();
   await page.getByRole('button', { name: "Let's start" }).click();
 
   await expect(heading(page, 'Name your workspace')).toBeVisible();
@@ -125,7 +125,7 @@ test.describe('route gates', () => {
     await signIn(page, 'onboarding@postgear.local', SEED_PASSWORD);
 
     await expect(page).toHaveURL(/\/onboarding$/, { timeout: 20_000 });
-    await expect(page.getByRole('heading', { name: /Welcome to PostGear/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome To PostGear/ })).toBeVisible();
   });
 
   test('a workspace the user does not belong to renders the 404', async ({ page }) => {
@@ -201,7 +201,7 @@ test.describe('the onboarding wizard', () => {
 
     // The workspace is named once: back from the first question is the welcome.
     await page.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('heading', { name: /Welcome to PostGear/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Welcome To PostGear/ })).toBeVisible();
     await page.getByRole('button', { name: "Let's start" }).click();
     await expect(heading(page, HEADINGS.role)).toBeVisible();
   });

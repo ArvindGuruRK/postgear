@@ -21,10 +21,10 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 
 - One font, Sora, loaded in `apps/web/src/app/fonts.ts`. Hierarchy comes from role utilities defined in `apps/web/src/app/globals.css`:
   - `type-heading`: card, dialog and sheet titles, big numbers. Or the `<Heading>` component.
-  - `type-ui`: things you act on or scan (buttons, tabs, nav, names). Sentence case.
-  - `type-label`: small uppercase chrome (menu group labels). **Not** for a page section's name.
+  - `type-ui`: things you act on or scan (buttons, tabs, nav, names). Title Case text.
+  - `type-label`: small chrome naming a group (menu group labels). Shown as written, never uppercase. **Not** for a page section's name.
   - Body text, form controls and table content: plain text, or `<Text>` (default weight medium).
-- Section names inside a page: sentence case, as typed ("First steps"), `type-heading text-lg`. Never all caps (2026-10-22).
+- Section names inside a page: Title Case ("First Steps"), `type-heading text-lg`. No all-caps text anywhere (2026-10-22).
 - Muted text is `text-ink type-muted` (no role) or `text-ink muted-tone` (already has a role or weight). Never a raw `opacity-60/70/75/80` on text. Rules doc section 1.
 - Never hand-write weight or tracking (`font-semibold tracking-tight`) to fake a role, and never stack them on a role. Retune the `--type-*` token instead.
 - Form labels: `font-sans text-sm font-bold text-ink`, sentence case, no role (rules doc section 1).
@@ -38,8 +38,11 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 ## Copy
 
 - Input placeholders read "Enter your ..." ("Enter your email"), never sample values like "Acme Media" or "you@company.com".
-- Never write an em dash or a middle dot anywhere (a project hook blocks both). Separate with a comma, parentheses or plain words: "Generate (5 credits)", "Published 2h ago to 3 channels".
-- Sentence case for buttons and labels. Short, plain words.
+- Never write an em dash or a middle dot anywhere (a project hook blocks both). Separate with a comma, parentheses or plain words: "Generate (5 Credits)", "Published 2h ago to 3 channels".
+- **Names are Title Case, every word** (2026-10-22): page, section, card, dialog and sheet titles, buttons, link-buttons, tabs, menu items, table headers, status badges, tooltips that name an action. "Create Post", "Connect A Channel", "From The Blog".
+- **Sentences stay sentence case**: descriptions, explaining tooltips, banners, errors, toasts, empty-state messages ("No channels yet"), questions ("Delete this post?"), greetings, form field labels and form choices.
+- Write the real text that way; never CSS `capitalize` or `uppercase`. `apps/web/src/lib/title-case.test.ts` fails on a name that is not Title Case (exceptions go in its `ALLOWED` list with a reason). Rules doc section 1.
+- Short, plain words.
 
 ## Do not
 

@@ -253,7 +253,7 @@ describe('syncBadge', () => {
         }),
         NOW,
       ),
-    ).toMatchObject({ variant: 'danger', label: 'Needs reconnect' });
+    ).toMatchObject({ variant: 'danger', label: 'Needs Reconnect' });
 
     expect(
       syncBadge(
@@ -263,7 +263,7 @@ describe('syncBadge', () => {
         }),
         NOW,
       ),
-    ).toMatchObject({ variant: 'outline', label: 'Not supported' });
+    ).toMatchObject({ variant: 'outline', label: 'Not Supported' });
 
     expect(syncBadge(channel(), NOW)).toEqual({
       variant: 'success',
@@ -273,14 +273,14 @@ describe('syncBadge', () => {
 
     expect(
       syncBadge(channel({ sync: { status: 'never', lastSyncedAt: null, error: null } }), NOW),
-    ).toMatchObject({ variant: 'secondary', label: 'Never synced' });
+    ).toMatchObject({ variant: 'secondary', label: 'Never Synced' });
 
     expect(
       syncBadge(
         channel({ sync: { status: 'failed', lastSyncedAt: null, error: 'Rate limited' } }),
         NOW,
       ),
-    ).toMatchObject({ variant: 'danger', label: 'Sync failed', explanation: 'Rate limited' });
+    ).toMatchObject({ variant: 'danger', label: 'Sync Failed', explanation: 'Rate limited' });
   });
 });
 
@@ -322,21 +322,21 @@ describe('syncPresentation', () => {
 
     expect(
       syncPresentation(sync([syncChannel({ status: 'never', lastSyncedAt: null })]), NOW),
-    ).toMatchObject({ status: 'away', label: 'Not synced yet' });
+    ).toMatchObject({ status: 'away', label: 'Not Synced Yet' });
 
     expect(
       syncPresentation(sync([syncChannel()], { reachable: false, workerOnline: null }), NOW),
     ).toMatchObject({
       status: 'away',
-      label: 'Scheduler unreachable',
+      label: 'Scheduler Unreachable',
     });
     expect(syncPresentation(sync([syncChannel()], { workerOnline: false }), NOW)).toMatchObject({
       status: 'away',
-      label: 'No worker running',
+      label: 'No Worker Running',
     });
     expect(
       syncPresentation(sync([syncChannel({ support: 'unsupported', status: 'unsupported' })]), NOW),
-    ).toMatchObject({ status: 'away', label: 'Nothing to sync' });
+    ).toMatchObject({ status: 'away', label: 'Nothing To Sync' });
   });
 });
 

@@ -92,12 +92,12 @@ export function AuditResult({
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={onAnalyzeAgain}>
             <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
-            Analyze again
+            Analyze Again
           </Button>
           {state.detail ? (
             <Button variant="secondary" onClick={() => void copy()}>
               <MotionIcon icon={CopyIcon} className="h-4 w-4" />
-              Copy report
+              Copy Report
             </Button>
           ) : null}
           {state.audit ? (

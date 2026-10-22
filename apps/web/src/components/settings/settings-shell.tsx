@@ -23,7 +23,7 @@ import { type ReactNode, useEffect, useRef } from 'react';
 const SECTIONS = [
   { segment: 'team', label: 'Team', icon: UsersIcon },
   { segment: 'billing', label: 'Billing', icon: CreditCardIcon },
-  { segment: 'api-keys', label: 'API keys', icon: KeyRoundIcon },
+  { segment: 'api-keys', label: 'API Keys', icon: KeyRoundIcon },
   { segment: 'webhooks', label: 'Webhooks', icon: WebhookIcon },
   // The workspace's saved sign-offs (2026-10-19), which the composer inserts.
   { segment: 'signatures', label: 'Signatures', icon: SignatureIcon },

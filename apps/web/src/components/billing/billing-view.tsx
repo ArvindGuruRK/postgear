@@ -298,7 +298,7 @@ export function BillingView({
         <ErrorState
           title="Billing didn't answer"
           description="The API could not say whether payments are set up. Check that it is running, then try again."
-          action={{ label: 'Try again', onClick: () => router.refresh() }}
+          action={{ label: 'Try Again', onClick: () => router.refresh() }}
         />
       ) : null}
 
@@ -358,7 +358,7 @@ export function BillingView({
               void reload();
             }}
           >
-            Check again
+            Check Again
           </Button>
         </Alert>
       ) : null}
@@ -367,7 +367,7 @@ export function BillingView({
         <ErrorState
           title="Couldn't load your plan"
           description="The API did not answer. Check that it is running, then try again."
-          action={{ label: 'Try again', onClick: () => void reload() }}
+          action={{ label: 'Try Again', onClick: () => void reload() }}
         />
       ) : null}
 

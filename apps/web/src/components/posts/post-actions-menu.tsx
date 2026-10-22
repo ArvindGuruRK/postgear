@@ -54,12 +54,12 @@ export function PostActionsMenu({
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => router.push(`/${orgId}/composer?group=${post.group}`)}>
           <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
-          {locked ? 'Open in composer' : 'Edit in composer'}
+          {locked ? 'Open In Composer' : 'Edit In Composer'}
         </DropdownMenuItem>
         {canPublishNow ? (
           <DropdownMenuItem onSelect={() => onPublishNow(post)}>
             <MotionIcon icon={SendIcon} className="h-4 w-4" />
-            {post.state === 'ERROR' ? 'Retry now' : 'Post now'}
+            {post.state === 'ERROR' ? 'Retry Now' : 'Post Now'}
           </DropdownMenuItem>
         ) : null}
         {canMove ? (

@@ -8,7 +8,7 @@ import { getSession } from '@/lib/session';
 import { safeNextPath, withNext } from './safe-next';
 
 export const metadata: Metadata = {
-  title: 'Sign in',
+  title: 'Sign In',
 };
 
 // The page stays a server component so it can export `metadata`: a client
@@ -40,7 +40,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">Sign in</Heading>
+        <Heading level="h2">Sign In</Heading>
         <Text muted>Welcome back. Pick up where your queue left off.</Text>
       </Stack>
 

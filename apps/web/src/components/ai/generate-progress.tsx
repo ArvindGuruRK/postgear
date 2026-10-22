@@ -64,7 +64,7 @@ export function GenerateProgress({
           title="Generation didn't finish"
           description={state.error.message}
           className="p-4"
-          action={state.error.retryable ? { label: 'Try again', onClick: onRetry } : undefined}
+          action={state.error.retryable ? { label: 'Try Again', onClick: onRetry } : undefined}
         />
       ) : null}
     </section>

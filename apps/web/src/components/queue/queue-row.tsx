@@ -71,7 +71,7 @@ export function QueueRow({
           <span className="font-sans text-lg font-bold leading-none tabular-nums text-ink">
             {formatClock(when)}
           </span>
-          <span className="mt-1 font-sans text-[10px] font-bold uppercase text-ink opacity-60">
+          <span className="mt-1 font-sans text-[10px] font-bold text-ink opacity-60">
             {when.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
           </span>
         </span>
@@ -79,7 +79,7 @@ export function QueueRow({
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="flex flex-wrap items-center gap-2">
             <Badge variant={shown.variant}>{shown.label}</Badge>
-            {post.parts > 1 ? <Badge variant="outline">{post.parts} parts</Badge> : null}
+            {post.parts > 1 ? <Badge variant="outline">{post.parts} Parts</Badge> : null}
             {shown.detail ? (
               <span className="font-sans text-xs font-medium text-ink opacity-70">
                 {shown.detail}

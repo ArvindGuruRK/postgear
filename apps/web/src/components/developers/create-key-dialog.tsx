@@ -110,7 +110,7 @@ export function CreateKeyDialog({ open, apiUrl, onOpenChange, onCreated }: Creat
         ) : (
           <form onSubmit={submit} noValidate>
             <DialogHeader>
-              <DialogTitle>Create an API key</DialogTitle>
+              <DialogTitle>Create An API Key</DialogTitle>
               <DialogDescription>
                 Name it after the integration that will use it, so you know what to revoke later.
                 Every key acts as an admin in this workspace, so treat it like a password.
@@ -143,7 +143,7 @@ export function CreateKeyDialog({ open, apiUrl, onOpenChange, onCreated }: Creat
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={working || name.trim().length === 0}>
-                {working ? 'Creating…' : 'Create key'}
+                {working ? 'Creating…' : 'Create Key'}
               </Button>
             </DialogFooter>
           </form>

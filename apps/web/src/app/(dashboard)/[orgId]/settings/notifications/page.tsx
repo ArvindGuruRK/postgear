@@ -11,7 +11,7 @@ import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
 import type { NotificationPreferences } from '@/types/notifications';
 
-export const metadata: Metadata = { title: 'Notification settings' };
+export const metadata: Metadata = { title: 'Notification Settings' };
 
 export default async function NotificationSettingsPage() {
   const cookie = await getSessionCookieHeader();

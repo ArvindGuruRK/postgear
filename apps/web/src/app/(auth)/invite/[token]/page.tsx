@@ -9,7 +9,7 @@ import { withNext } from '../../login/safe-next';
 import { InviteActions } from './invite-actions';
 
 export const metadata: Metadata = {
-  title: 'Join a workspace',
+  title: 'Join A Workspace',
 };
 
 /**

@@ -215,7 +215,7 @@ function ChannelMetrics({ channel, now }: { channel: PostChannelAnalytics; now: 
                 className="flex flex-col gap-0.5 rounded-md border-2 border-outline p-2.5"
                 data-metric={key}
               >
-                <dt className="font-sans text-[10px] font-bold uppercase tracking-wide text-ink opacity-60">
+                <dt className="font-sans text-[10px] font-bold text-ink opacity-60">
                   {POST_METRIC_LABELS[key]}
                 </dt>
                 <dd className="m-0 type-heading text-xl text-ink tabular-nums">

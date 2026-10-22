@@ -63,8 +63,8 @@ test('tooltips open on hover and focus, on the side asked for, even on a disable
   // sits: from the side would cross the neighbouring button first. Retried,
   // because on this long page a glide made before hydration finishes lands
   // on a button with no handlers yet.
-  async function glideOnto(name: string) {
-    const target = page.getByRole('button', { name, exact: true });
+  async function glideOnto(name: string, disabled?: boolean) {
+    const target = page.getByRole('button', { name, exact: true, disabled });
     await target.scrollIntoViewIfNeeded();
     await expect(async () => {
       const box = await target.boundingBox();
@@ -79,8 +79,9 @@ test('tooltips open on hover and focus, on the side asked for, even on a disable
   await expect(visible).toHaveAttribute('data-side', 'right');
   await expect(page.getByRole('tooltip')).toHaveText('Opens right');
 
-  // A disabled button gets no pointer events; the wrapper hovers for it.
-  await glideOnto('Add Channel');
+  // A disabled button gets no pointer events; the wrapper hovers for it. The
+  // buttons section has an enabled "Add Channel" too, hence `disabled`.
+  await glideOnto('Add Channel', true);
   await expect(page.getByRole('tooltip')).toHaveText('This plan’s channel limit is reached');
 
   // Keyboard focus opens it too: the icon-only AI button names itself.
@@ -90,7 +91,7 @@ test('tooltips open on hover and focus, on the side asked for, even on a disable
 });
 
 test('theme toggle is not covered by anything and flips the body class', async ({ page }) => {
-  const toggle = page.getByRole('button', { name: /Switch to (dark|light) mode/ });
+  const toggle = page.getByRole('button', { name: /Switch To (Dark|Light) Mode/ });
   await toggle.click();
   await expect(page.locator('body')).toHaveClass(/dark/);
   await toggle.click();
@@ -113,7 +114,7 @@ test('capture the playground in both themes', async ({ page }, testInfo) => {
   await page.locator('body.light, body.dark').first().waitFor();
   await page.screenshot({ path: testInfo.outputPath('playground-light.png'), fullPage: true });
 
-  await page.getByRole('button', { name: /Switch to dark mode/ }).click();
+  await page.getByRole('button', { name: /Switch To Dark Mode/i }).click();
   await expect(page.locator('body')).toHaveClass(/dark/);
   await page.screenshot({ path: testInfo.outputPath('playground-dark.png'), fullPage: true });
 });

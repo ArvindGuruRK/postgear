@@ -74,7 +74,7 @@ export function RepeatControl({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-60">
-        <DropdownMenuLabel>Repeat post</DropdownMenuLabel>
+        <DropdownMenuLabel>Repeat Post</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={value === null ? NONE : String(value)}
           onValueChange={(next) =>

@@ -185,7 +185,7 @@ export function InviteMemberDialog({
         ) : (
           <form onSubmit={submit} noValidate>
             <DialogHeader>
-              <DialogTitle>Invite a member</DialogTitle>
+              <DialogTitle>Invite A Member</DialogTitle>
               <DialogDescription>
                 They get a link to join {workspaceName}. It works once and expires in 7 days.
               </DialogDescription>
@@ -255,7 +255,7 @@ export function InviteMemberDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={working}>
-                {working ? 'Creating…' : sendEmail ? 'Send invitation' : 'Copy link'}
+                {working ? 'Creating…' : sendEmail ? 'Send Invitation' : 'Copy Link'}
               </Button>
             </DialogFooter>
           </form>

@@ -106,7 +106,7 @@ export function AiStudio({
         <ErrorState
           title="The AI service didn't answer"
           description="The API could not say whether a model is configured. Check that it is running, then try again."
-          action={{ label: 'Try again', onClick: () => router.refresh() }}
+          action={{ label: 'Try Again', onClick: () => router.refresh() }}
         />
       ) : !status.configured ? (
         <AiUnavailable />

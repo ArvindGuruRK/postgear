@@ -65,7 +65,7 @@ export function ThemeToggle({ saveToAccount = false }: { saveToAccount?: boolean
     }
   }
 
-  const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+  const label = isDark ? 'Switch To Light Mode' : 'Switch To Dark Mode';
   // `rotate` and `scale`, not `transform`: Tailwind v4's rotate-* and scale-*
   // set those properties, so a `transform` transition would snap the swap.
   const iconBase = cn(
