@@ -105,5 +105,31 @@ export function useMediaList(initial?: MediaPage | null, initialSearch = '') {
     );
   }, []);
 
-  return { search, setSearch, type, setType, page, setPage, data, loading, error, reload, prepend };
+  /** Takes a deleted item off the page at once, ahead of the refetch. */
+  const remove = useCallback((item: MediaItem) => {
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            media: current.media.filter((entry) => entry.id !== item.id),
+            total: Math.max(0, current.total - 1),
+          }
+        : current,
+    );
+  }, []);
+
+  return {
+    search,
+    setSearch,
+    type,
+    setType,
+    page,
+    setPage,
+    data,
+    loading,
+    error,
+    reload,
+    prepend,
+    remove,
+  };
 }

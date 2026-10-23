@@ -1,11 +1,11 @@
 'use client';
 
 import { formatBytes } from '@postgear/social-core/composer';
-import { FileUpload, Progress, Stack, Text } from '@postgear/ui';
+import { Progress, Text } from '@postgear/ui';
 import { useCallback, useState } from 'react';
 import { ApiError, uploadFile } from '@/lib/api';
 import type { MediaItem, UploadResult } from '@/types/media';
-import { preflightUpload, UPLOAD_ACCEPT } from './media-limits';
+import { preflightUpload } from './media-limits';
 
 export interface UploadRow {
   id: number;
@@ -19,8 +19,8 @@ let rowCounter = 0;
 
 /**
  * Uploads files and tracks each one's progress, for any surface that starts
- * uploads: the Media page's drop zone, and the composer's Media Library with
- * its Upload button.
+ * uploads: the Media page (its Upload button and page-wide drop), and the
+ * composer's Media Library with its Upload button.
  *
  * Files go one at a time. Parallel uploads would finish sooner in theory and,
  * on a home connection, mostly just compete for the same upstream bandwidth
@@ -95,7 +95,16 @@ export function useMediaUpload(onUploaded: (media: MediaItem) => void) {
     [onUploaded],
   );
 
-  return { rows, upload };
+  /** Drops the finished and failed rows; those still uploading stay. */
+  const clear = useCallback(
+    () =>
+      setRows((current) =>
+        current.filter((row) => row.status === 'uploading' || row.status === 'processing'),
+      ),
+    [],
+  );
+
+  return { rows, upload, clear };
 }
 
 /** Each file's progress and outcome, newest first. */
@@ -145,34 +154,5 @@ export function UploadRows({ rows }: { rows: UploadRow[] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-/** Drag-and-drop or pick files, and watch them upload: the Media page's drop zone. */
-export function MediaUploader({
-  onUploaded,
-  compact,
-}: {
-  onUploaded: (media: MediaItem) => void;
-  compact?: boolean;
-}) {
-  const { rows, upload } = useMediaUpload(onUploaded);
-
-  return (
-    <Stack gap="sm">
-      <FileUpload
-        accept={UPLOAD_ACCEPT}
-        multiple
-        onFilesSelected={(files) => void upload(files)}
-        label={
-          compact
-            ? 'Drop files or click to upload'
-            : 'Drop images or video here, or click to upload'
-        }
-        helperText="JPEG, PNG, GIF, WebP or AVIF images up to 20 MB, and MP4 or MOV video up to 250 MB. Images are resized and compressed automatically."
-        className={compact ? '[&>button]:p-5' : undefined}
-      />
-      <UploadRows rows={rows} />
-    </Stack>
   );
 }

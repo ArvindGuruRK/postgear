@@ -42,29 +42,37 @@ test.describe('media library', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Media', exact: true })).toBeVisible();
 
     const original = await noisyPhoto(4000, 3000);
+    // The drop box's file input (a drop anywhere on the page works too).
     await page
       .locator('input[type="file"]')
+      .first()
       .setInputFiles({ name: fileName, mimeType: 'image/jpeg', buffer: original });
 
     // Compressed, and smaller than it arrived.
     const report = page.getByText(/Compressed .* → /);
     await expect(report).toBeVisible({ timeout: 30_000 });
 
-    // Listed, searchable, and stored at the capped size.
+    // Listed, searchable, and stored at the capped size (the viewer's details).
     await page.getByRole('searchbox', { name: 'Search media' }).fill(fileName);
-    const tile = page.getByRole('figure').filter({ hasText: fileName });
+    const tile = page.getByTestId('media-tile').filter({ hasText: fileName });
     await expect(tile).toHaveCount(1);
     await expect(tile).toContainText('JPEG');
-    await expect(tile).toContainText('2048×1536');
+    await tile.getByRole('button', { name: `Open ${fileName}` }).click();
+    const viewer = page.getByRole('dialog', { name: fileName });
+    await expect(viewer).toContainText('2048 × 1536');
+    await expect(viewer).toContainText('Not used in any draft or queued post');
+    await page.keyboard.press('Escape');
+    await expect(viewer).toHaveCount(0);
 
     // Filtering to video hides it.
     await page.getByRole('button', { name: 'Videos' }).click();
-    await expect(page.getByRole('figure').filter({ hasText: fileName })).toHaveCount(0);
+    await expect(page.getByTestId('media-tile').filter({ hasText: fileName })).toHaveCount(0);
     await page.getByRole('button', { name: 'All media' }).click();
     await expect(tile).toHaveCount(1);
 
     // Reuse 1: one click from the library into a new post.
-    await tile.getByRole('link', { name: 'Use in a post' }).click();
+    await tile.hover();
+    await tile.getByRole('link', { name: 'Use In A Post' }).click();
     await expect(page).toHaveURL(/\/composer\?media=/);
     await expect(page.getByRole('img', { name: fileName }).first()).toBeVisible();
 
@@ -103,6 +111,7 @@ test.describe('media library', () => {
     // Deleting says how many posts it affects before anything is removed.
     await page.goto(`/${DEMO_ORG}/media`);
     await page.getByRole('searchbox', { name: 'Search media' }).fill(fileName);
+    await page.getByTestId('media-tile').filter({ hasText: fileName }).hover();
     await page.getByRole('button', { name: `Delete ${fileName}` }).click();
 
     const confirm = page.getByRole('alertdialog');
@@ -111,22 +120,25 @@ test.describe('media library', () => {
     ).toBeVisible();
     await confirm.getByRole('button', { name: 'Delete' }).click();
 
-    await expect(page.getByRole('figure').filter({ hasText: fileName })).toHaveCount(0);
+    await expect(page.getByTestId('media-tile').filter({ hasText: fileName })).toHaveCount(0);
   });
 
   test('refuses a file that is not really an image, whatever it is called', async ({ page }) => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/media`);
 
-    await page.locator('input[type="file"]').setInputFiles({
-      name: 'totally-a-photo.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>'),
-    });
+    await page
+      .locator('input[type="file"]')
+      .first()
+      .setInputFiles({
+        name: 'totally-a-photo.jpg',
+        mimeType: 'image/jpeg',
+        buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>'),
+      });
 
     await expect(page.getByText(/That file type is not supported/)).toBeVisible();
-    await expect(page.getByRole('figure').filter({ hasText: 'totally-a-photo.jpg' })).toHaveCount(
-      0,
-    );
+    await expect(
+      page.getByTestId('media-tile').filter({ hasText: 'totally-a-photo.jpg' }),
+    ).toHaveCount(0);
   });
 });

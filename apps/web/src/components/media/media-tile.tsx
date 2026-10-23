@@ -2,7 +2,6 @@
 
 import { Badge, cn } from '@postgear/ui';
 import { Check, Film } from 'lucide-react';
-import type { ReactNode } from 'react';
 import type { MediaItem } from '@/types/media';
 import { describeMedia } from './media-limits';
 
@@ -11,8 +10,6 @@ interface MediaTileProps {
   /** Present in the picker: the whole tile becomes a toggle. */
   selected?: boolean;
   onToggle?: (item: MediaItem) => void;
-  /** Present in the library: actions under the caption. */
-  actions?: ReactNode;
 }
 
 /**
@@ -23,7 +20,7 @@ interface MediaTileProps {
  * browser is asked for just enough of the file to paint its first frame
  * (`preload="metadata"`).
  */
-export function MediaTile({ item, selected, onToggle, actions }: MediaTileProps) {
+export function MediaTile({ item, selected, onToggle }: MediaTileProps) {
   const preview = (
     <div className="relative aspect-square overflow-hidden bg-primary">
       {item.type === 'image' ? (
@@ -98,11 +95,9 @@ export function MediaTile({ item, selected, onToggle, actions }: MediaTileProps)
   }
 
   return (
-    // A size container: the library's actions fit their labels to the tile.
-    <figure className={cn(frame, '@container m-0 flex flex-col')}>
+    <figure className={cn(frame, 'm-0 flex flex-col')}>
       {preview}
       <figcaption>{caption}</figcaption>
-      {actions ? <div className="mt-auto flex gap-2 px-3 pb-3">{actions}</div> : null}
     </figure>
   );
 }

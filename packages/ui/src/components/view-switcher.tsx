@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { AnimatedIcon } from '../lib/icon-animation';
 import { cn } from '../lib/utils';
 import { MotionIcon } from './motion-icon';
+import { TooltipHint } from './tooltip';
 
 /** Each option shows a static or an animated icon, never both. */
 export type ViewOption = { value: string; label: string } & (
@@ -33,26 +34,37 @@ export function ViewSwitcher({ options, value, onValueChange, className }: ViewS
         const Icon = option.icon;
         const isActive = option.value === value;
         return (
-          <button
+          // The icons alone do not say which is which: each names itself on
+          // hover and keyboard focus. Above the switch, clear of its border
+          // and shadow; not hoverable, because the buttons sit flush and an
+          // open tooltip would otherwise linger over the next one.
+          <TooltipHint
             key={option.value}
-            type="button"
-            aria-pressed={isActive}
-            aria-label={option.label}
-            onClick={() => onValueChange(option.value)}
-            className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
-              'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-              isActive
-                ? 'bg-actionPrimary text-onActionPrimary'
-                : 'text-ink hover:bg-actionPrimary/10',
-            )}
+            label={option.label}
+            side="top"
+            sideOffset={10}
+            hoverable={false}
           >
-            {option.animatedIcon ? (
-              <MotionIcon icon={option.animatedIcon} className="h-4 w-4" />
-            ) : Icon ? (
-              <Icon className="h-4 w-4" strokeWidth={2.5} />
-            ) : null}
-          </button>
+            <button
+              type="button"
+              aria-pressed={isActive}
+              aria-label={option.label}
+              onClick={() => onValueChange(option.value)}
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
+                'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                isActive
+                  ? 'bg-actionPrimary text-onActionPrimary'
+                  : 'text-ink hover:bg-actionPrimary/10',
+              )}
+            >
+              {option.animatedIcon ? (
+                <MotionIcon icon={option.animatedIcon} className="h-4 w-4" />
+              ) : Icon ? (
+                <Icon className="h-4 w-4" strokeWidth={2.5} />
+              ) : null}
+            </button>
+          </TooltipHint>
         );
       })}
     </div>
