@@ -1,12 +1,14 @@
 /**
  * Queue: every post in publish order, with how each one went (Sprint 5).
  *
- * The server renders the first page when no filter is in the URL, so the list
- * is there on first paint; with filters, the client fetches, because the date
- * filters are the viewer's local days. Channels are loaded for the filter and
+ * The server renders the first page of the default tab (queued, soonest
+ * first) when no filter is in the URL, so the list is there on first paint;
+ * with filters, the client fetches, because the date filters are the
+ * viewer's local days. Channels are loaded for the filter and
  * for the reschedule dialog's posting-time suggestions.
  */
 import type { Metadata } from 'next';
+import { apiQuery, DEFAULT_FILTERS } from '@/components/queue/queue-filters';
 import { QueueView } from '@/components/queue/queue-view';
 import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
@@ -32,7 +34,9 @@ export default async function QueuePage({ params, searchParams }: PageProps<'/[o
       channels: [] as Channel[],
     })),
     plain
-      ? serverApi<QueuePageData>('/posts/queue?sort=asc&page=1', { cookie }).catch(() => null)
+      ? serverApi<QueuePageData>(`/posts/queue?${apiQuery(DEFAULT_FILTERS).toString()}`, {
+          cookie,
+        }).catch(() => null)
       : Promise.resolve(null),
   ]);
 

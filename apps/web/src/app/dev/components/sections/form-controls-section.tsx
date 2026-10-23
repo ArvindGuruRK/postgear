@@ -13,6 +13,8 @@ import {
   FormField,
   FormHelperText,
   FormLabel,
+  IconSelect,
+  type IconSelectOption,
   Input,
   MultiSelect,
   type MultiSelectOption,
@@ -30,6 +32,7 @@ import {
   Toggle,
 } from '@postgear/ui';
 import { useState } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { DateRange } from 'react-day-picker';
 import { Row, Section } from '../shared';
 
@@ -41,6 +44,12 @@ const PLATFORM_OPTIONS: ComboboxOption[] = [
   { value: 'x', label: 'X (Twitter)' },
 ];
 
+/** The Select's platforms again, each with its logo, for the IconSelect specimen. */
+const ICON_OPTIONS: IconSelectOption[] = PLATFORM_OPTIONS.map((option) => ({
+  ...option,
+  icon: <PlatformIcon platform={option.value} />,
+}));
+
 export function FormControlsSection() {
   const [checked, setChecked] = useState(true);
   const [toggled, setToggled] = useState(true);
@@ -49,6 +58,7 @@ export function FormControlsSection() {
   const [sliderValue, setSliderValue] = useState([40]);
   const [rangeValue, setRangeValue] = useState([20, 70]);
   const [comboValue, setComboValue] = useState('linkedin');
+  const [iconValue, setIconValue] = useState('instagram');
   const [multiValue, setMultiValue] = useState<string[]>(['linkedin', 'tiktok']);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [laterDate, setLaterDate] = useState<Date | undefined>();
@@ -95,6 +105,24 @@ export function FormControlsSection() {
             <SelectItem value="youtube">YouTube</SelectItem>
           </SelectContent>
         </Select>
+      </Row>
+      <Row label="Icon Select">
+        {/* The chosen option keeps its icon in the field; the menu is the field's width. */}
+        <IconSelect
+          aria-label="Platform"
+          options={ICON_OPTIONS}
+          value={iconValue}
+          onValueChange={setIconValue}
+          className="w-64"
+        />
+        <IconSelect
+          aria-label="Platform"
+          options={ICON_OPTIONS}
+          value="linkedin"
+          onValueChange={() => undefined}
+          disabled
+          className="w-64"
+        />
       </Row>
       <Row label="Combobox">
         <Combobox

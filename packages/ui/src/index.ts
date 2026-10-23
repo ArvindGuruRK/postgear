@@ -33,6 +33,7 @@ export * from './components/filter-bar';
 export * from './components/form-field';
 export * from './components/grid';
 export * from './components/hover-card';
+export * from './components/icon-select';
 export * from './components/input';
 export * from './components/kbd';
 export * from './components/label';

@@ -68,6 +68,7 @@ import {
   orderChain,
   type PostRow,
   PostsRepository,
+  type QueueStateCounts,
   type StoredPart,
 } from './posts.repository';
 
@@ -170,6 +171,8 @@ export interface QueuePage {
   page: number;
   pageCount: number;
   total: number;
+  /** Posts per state tab under the same channel and date filters, for the tab counts. */
+  counts: QueueStateCounts;
 }
 
 @Injectable()
@@ -202,17 +205,21 @@ export class PostsService {
 
   /** One page of the queue, in publish order. */
   async queue(orgId: string, query: QueueQueryInput): Promise<QueuePage> {
-    const [{ rows, total }, colors] = await Promise.all([
+    const filters = {
+      orgId,
+      channelId: query.channelId,
+      from: query.from ? new Date(query.from) : undefined,
+      to: query.to ? new Date(query.to) : undefined,
+    };
+    const [{ rows, total }, counts, colors] = await Promise.all([
       this.repository.listQueue({
-        orgId,
+        ...filters,
         states: query.state ? [query.state] : undefined,
-        channelId: query.channelId,
-        from: query.from ? new Date(query.from) : undefined,
-        to: query.to ? new Date(query.to) : undefined,
         sort: query.sort,
         page: query.page,
         pageSize: QUEUE_PAGE_SIZE,
       }),
+      this.repository.countQueueStates(filters),
       this.channels.colors(orgId),
     ]);
 
@@ -229,6 +236,7 @@ export class PostsService {
       page: query.page,
       pageCount: Math.max(1, Math.ceil(total / QUEUE_PAGE_SIZE)),
       total,
+      counts,
     };
   }
 

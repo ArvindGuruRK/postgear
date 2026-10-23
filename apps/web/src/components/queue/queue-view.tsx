@@ -6,40 +6,39 @@ import { ArrowUp10Icon } from '@animateicons/react/lucide/arrow-up-1-0-icon';
  * The queue: every post in publish order, filtered and paged.
  *
  * The calendar answers "when"; this answers "what, in what order, and did it
- * work". Rows are grouped under day headings, and the filters (state tabs,
- * channel, date range, direction) live in the URL so a view of "failed posts
- * this week" can be bookmarked.
+ * work". Revamped 2026-10-23 as a timeline: it opens on the queued posts, and
+ * each day is a date tile beside one card of rows (`queue-timeline.ts`); the
+ * violet tile is today. The state tabs
+ * carry their counts, so "4 failed" is visible before anyone clicks. Filters
+ * live in the URL so a view such as "failed posts this week" can be bookmarked.
  */
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import {
   Alert,
+  Badge,
   Button,
   buttonVariants,
+  cn,
   DatePicker,
   EmptyState,
   ErrorState,
-  Label,
   localDayValue,
   MotionIcon,
   PageActions,
   Pagination,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Skeleton,
   Stack,
   Tabs,
   TabsList,
   TabsTrigger,
-  Text,
 } from '@postgear/ui';
-import { ListOrdered } from 'lucide-react';
+import { CircleCheck, FilePen, ListOrdered, type LucideIcon, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { SEGMENTED_LIST, SEGMENTED_TRIGGER } from '@/components/analytics/analytics-ui';
 import { toSummary } from '@/components/calendar/calendar-view';
+import { ChannelSelect } from '@/components/channels/channel-select';
 import type { Channel } from '@/types/channel';
 import type { PostSummary, QueuePage } from '@/types/post';
 import { DeletePostDialog } from '../posts/delete-post-dialog';
@@ -47,11 +46,22 @@ import { PostDetailDialog } from '../posts/post-detail-dialog';
 import { RescheduleDialog } from '../posts/reschedule-dialog';
 import { useMounted } from '../posts/use-mounted';
 import { usePostActions } from '../posts/use-post-actions';
-import { isFiltered, type QueueStateFilter, STATE_TABS } from './queue-filters';
+import { QueueDay, QueueSkeleton } from './queue-day';
+import { isNarrowed, type QueueStateFilter, STATE_TABS } from './queue-filters';
 import { QueueRow } from './queue-row';
+import { buildTimeline, emptyCopy } from './queue-timeline';
 import { useQueue } from './use-queue';
 
-const ALL_CHANNELS = '__all__';
+/** The toolbar's fields: the Analytics toolbar's look, so the two pages read as one. */
+const FIELD = 'h-10 rounded-lg bg-chrome text-sm shadow-none';
+
+const EMPTY_ICONS: Record<QueueStateFilter, LucideIcon> = {
+  QUEUE: ListOrdered,
+  ERROR: CircleCheck,
+  DRAFT: FilePen,
+  PUBLISHED: Send,
+  all: ListOrdered,
+};
 
 export function QueueView({
   orgId,
@@ -74,22 +84,10 @@ export function QueueView({
   const [deleting, setDeleting] = useState<PostSummary | null>(null);
 
   const posts = queue.data?.posts ?? [];
-  const filtered = isFiltered(queue.filters);
+  const narrowed = isNarrowed(queue.filters);
+  const counts = queue.data?.counts ?? null;
 
-  // Rows under the day they publish on, in the list's own order.
-  const days = useMemo(() => {
-    const groups = new Map<string, { label: string; posts: PostSummary[] }>();
-
-    for (const post of posts) {
-      const date = new Date(post.publishDate);
-      const key = date.toDateString();
-      const entry = groups.get(key) ?? { label: dayLabel(date, queue.now), posts: [] };
-      entry.posts.push(post);
-      groups.set(key, entry);
-    }
-
-    return [...groups.values()];
-  }, [posts, queue.now]);
+  const days = useMemo(() => buildTimeline(posts, queue.now), [posts, queue.now]);
 
   async function publishNow(post: PostSummary) {
     const detail = await actions.publishNow(post.group);
@@ -123,115 +121,123 @@ export function QueueView({
       queue.removePost(deleting.group);
       setDeleting(null);
       setOpen(null);
+      // The tab counts are the server's; a reload brings them in line.
+      queue.reload();
     }
   }
 
+  const empty = emptyCopy(queue.filters.state);
+  const ascending = queue.filters.sort === 'asc';
+
   return (
     <Stack gap="lg">
-      <PageActions>
-        <Link href={`/${orgId}/composer`} className={buttonVariants({ variant: 'primary' })}>
-          <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-          New post
-        </Link>
-      </PageActions>
-
-      <Tabs
-        value={queue.filters.state}
-        onValueChange={(value) => queue.setFilters({ state: value as QueueStateFilter })}
-      >
-        {/* One row, always: wrapped, "Drafts" sat alone on a second line on
-            a phone. Tighter tabs there fit all five across a 390px screen,
-            and anything narrower scrolls inside the list itself rather than
-            widening the page. */}
-        <TabsList
-          className="max-w-full overflow-x-auto pg-scrollbar pg-scrollbar-secondary"
-          aria-label="Filter by state"
-        >
-          {STATE_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="px-3 sm:px-4">
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      <div className="flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-3 shadow-surfaceSm md:flex-row md:flex-wrap md:items-end">
-        <div className="flex flex-col gap-1.5 md:w-56">
-          <Label htmlFor="queue-channel">Channel</Label>
-          <Select
-            value={queue.filters.channelId ?? ALL_CHANNELS}
-            onValueChange={(value) =>
-              queue.setFilters({ channelId: value === ALL_CHANNELS ? null : value })
-            }
+      <div className="flex flex-col gap-3">
+        <PageActions className="justify-between">
+          {/* One row, always: anything narrower than the five tabs scrolls
+              inside the list rather than widening the page. On a phone the
+              tabs drop under the New Post button. */}
+          <Tabs
+            className="order-last w-full min-w-0 md:order-none md:w-auto"
+            value={queue.filters.state}
+            onValueChange={(value) => queue.setState(value as QueueStateFilter)}
           >
-            <SelectTrigger id="queue-channel" className="h-9 text-xs">
-              <SelectValue placeholder="All channels" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_CHANNELS}>All channels</SelectItem>
-              {channels.map((channel) => (
-                <SelectItem key={channel.id} value={channel.id}>
-                  {channel.name}
-                </SelectItem>
+            <TabsList
+              aria-label="Filter by state"
+              className={cn(
+                SEGMENTED_LIST,
+                'flex w-full max-w-full overflow-x-auto pg-scrollbar pg-scrollbar-primary md:inline-flex md:w-auto',
+              )}
+            >
+              {STATE_TABS.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className={cn(
+                    SEGMENTED_TRIGGER,
+                    'group flex-1 gap-2 px-2.5 sm:px-3 md:flex-none',
+                  )}
+                >
+                  {tab.label}
+                  {counts ? <CountBadge state={tab.value} count={counts[tab.value]} /> : null}
+                </TabsTrigger>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
+            </TabsList>
+          </Tabs>
 
-        {/* Two pickers rather than one range: either end may stay open ("from
-            today on"), as the URL allows. Each greys out the days that would
-            put the range the wrong way round. */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="queue-from">From</Label>
+          <Link
+            href={`/${orgId}/composer`}
+            className={cn(buttonVariants({ variant: 'primary', size: 'sm' }), 'ms-auto h-10')}
+          >
+            <MotionIcon icon={PlusIcon} className="h-4 w-4" />
+            New Post
+          </Link>
+        </PageActions>
+
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <ChannelSelect
+            id="queue-channel"
+            channels={channels}
+            value={queue.filters.channelId}
+            onValueChange={(channelId) => queue.setFilters({ channelId })}
+            className={cn(FIELD, 'col-span-2 w-full sm:w-60')}
+          />
+
+          {/* Two pickers rather than one range: either end may stay open ("from
+              today on"), as the URL allows. Each greys out the days that would
+              put the range the wrong way round. */}
           <DatePicker
             id="queue-from"
             label="From"
-            placeholder="Any day"
+            placeholder="From any day"
             value={filterDay(queue.filters.from)}
             onValueChange={(date) => queue.setFilters({ from: date ? localDayValue(date) : null })}
             maxDate={filterDay(queue.filters.to)}
-            className="h-9 text-xs md:w-48"
+            className={cn(FIELD, 'sm:w-52')}
           />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="queue-to">To</Label>
           <DatePicker
             id="queue-to"
             label="To"
-            placeholder="Any day"
+            placeholder="To any day"
             value={filterDay(queue.filters.to)}
             onValueChange={(date) => queue.setFilters({ to: date ? localDayValue(date) : null })}
             minDate={filterDay(queue.filters.from)}
-            className="h-9 text-xs md:w-48"
+            className={cn(FIELD, 'sm:w-52')}
           />
+
+          {/* A full row of their own on a phone, so a lone button never sits
+              in half of one; from sm they join the line. */}
+          <div className="col-span-2 flex gap-2 sm:contents">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-10 flex-1 sm:flex-none"
+              onClick={() => queue.setFilters({ sort: ascending ? 'desc' : 'asc' })}
+              aria-label={ascending ? 'Sorted soonest first' : 'Sorted newest first'}
+            >
+              <MotionIcon icon={ascending ? ArrowUp01Icon : ArrowUp10Icon} className="h-4 w-4" />
+              {ascending ? 'Soonest First' : 'Newest First'}
+            </Button>
+
+            {narrowed ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-10 flex-1 sm:flex-none"
+                onClick={queue.reset}
+              >
+                <MotionIcon icon={XIcon} className="h-4 w-4" />
+                Clear Filters
+              </Button>
+            ) : null}
+          </div>
         </div>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => queue.setFilters({ sort: queue.filters.sort === 'asc' ? 'desc' : 'asc' })}
-          aria-label={queue.filters.sort === 'asc' ? 'Sorted soonest first' : 'Sorted latest first'}
-        >
-          {queue.filters.sort === 'asc' ? (
-            <MotionIcon icon={ArrowUp01Icon} className="h-4 w-4" />
-          ) : (
-            <MotionIcon icon={ArrowUp10Icon} className="h-4 w-4" />
-          )}
-          {queue.filters.sort === 'asc' ? 'Soonest First' : 'Latest First'}
-        </Button>
-
-        {filtered ? (
-          <Button variant="secondary" size="sm" onClick={queue.reset}>
-            Clear Filters
-          </Button>
-        ) : null}
-
-        {queue.data ? (
-          <Text size="sm" muted className="md:ms-auto" aria-live="polite">
-            {queue.data.total} {queue.data.total === 1 ? 'post' : 'posts'}
-          </Text>
-        ) : null}
       </div>
+
+      {queue.data ? (
+        <span className="sr-only" aria-live="polite">
+          {queue.data.total} {queue.data.total === 1 ? 'post' : 'posts'}
+        </span>
+      ) : null}
 
       {queue.error ? (
         <ErrorState
@@ -242,47 +248,44 @@ export function QueueView({
       ) : !mounted || (queue.loading && posts.length === 0) ? (
         // Rows format times in the viewer's locale, which the server does not
         // share; the server renders this skeleton and the browser the rows.
-        <Stack gap="sm" aria-busy="true" aria-label="Loading queue">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </Stack>
+        <QueueSkeleton />
       ) : posts.length === 0 ? (
-        filtered ? (
+        narrowed ? (
           <Alert>
-            Nothing matches these filters.
+            Nothing on this tab matches the channel and dates you picked.
             <Button variant="secondary" size="sm" className="ms-3" onClick={queue.reset}>
               Clear Filters
             </Button>
           </Alert>
         ) : (
           <EmptyState
-            icon={ListOrdered}
-            title="The queue is empty"
-            description="Add a post to the queue from the composer and it lines up here."
-            action={{ label: 'Write A Post', onClick: () => router.push(`/${orgId}/composer`) }}
+            icon={EMPTY_ICONS[queue.filters.state]}
+            title={empty.title}
+            description={empty.description}
+            action={
+              empty.create
+                ? { label: 'Create Post', onClick: () => router.push(`/${orgId}/composer`) }
+                : undefined
+            }
           />
         )
       ) : (
         <div className="flex flex-col gap-6" aria-busy={queue.loading}>
           {days.map((day) => (
-            <section key={day.label} aria-label={day.label} className="flex flex-col gap-2">
-              <h2 className="type-label text-sm text-ink opacity-70">{day.label}</h2>
-              <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                {day.posts.map((post) => (
-                  <QueueRow
-                    key={post.group}
-                    orgId={orgId}
-                    post={post}
-                    now={queue.now}
-                    onOpen={setOpen}
-                    onPublishNow={(target) => void publishNow(target)}
-                    onReschedule={setRescheduling}
-                    onDelete={setDeleting}
-                  />
-                ))}
-              </ul>
-            </section>
+            <QueueDay key={day.key} day={day}>
+              {day.posts.map((post) => (
+                <QueueRow
+                  key={post.group}
+                  orgId={orgId}
+                  post={post}
+                  now={queue.now}
+                  onOpen={setOpen}
+                  onPublishNow={(target) => void publishNow(target)}
+                  onReschedule={setRescheduling}
+                  onDelete={setDeleting}
+                />
+              ))}
+            </QueueDay>
           ))}
 
           {queue.data && queue.data.pageCount > 1 ? (
@@ -325,25 +328,44 @@ export function QueueView({
   );
 }
 
-/** "Today, Sat 11 Oct", "Tomorrow, …", or just the date. */
-function dayLabel(date: Date, now: Date): string {
-  const formatted = date.toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
-  });
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
+/**
+ * A tab's count, in the colour of the posts it counts: published is the
+ * success green of the row badge, failed the danger red (only while there is
+ * something to fix; a 0 stays an outline), and the rest the primary blue. On
+ * the chosen tab, which is itself blue, the badge turns to the card surface
+ * so it never disappears into the fill.
+ */
+const COUNT_VARIANT: Record<QueueStateFilter, 'primary' | 'success' | 'danger'> = {
+  QUEUE: 'primary',
+  DRAFT: 'primary',
+  all: 'primary',
+  PUBLISHED: 'success',
+  ERROR: 'danger',
+};
 
-  if (date.toDateString() === today.toDateString()) return `Today, ${formatted}`;
-  if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${formatted}`;
-  if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${formatted}`;
-  return formatted;
+function CountBadge({ state, count }: { state: QueueStateFilter; count: number }) {
+  const variant = state === 'ERROR' && count === 0 ? 'outline' : COUNT_VARIANT[state];
+
+  return (
+    <>
+      <Badge
+        aria-hidden="true"
+        variant={variant}
+        className={cn(
+          'min-w-6 justify-center px-1.5 py-0.5 leading-none tabular-nums',
+          variant === 'primary' &&
+            'group-data-[state=active]:bg-secondary group-data-[state=active]:text-ink',
+        )}
+      >
+        {count}
+      </Badge>
+      {/* Read as "Failed 4 posts" rather than "Failed 4". The tab adds the
+          space between its children, so none is written here. */}
+      <span className="sr-only">
+        {count} {count === 1 ? 'post' : 'posts'}
+      </span>
+    </>
+  );
 }
 
 /** A filter's `YYYY-MM-DD` as that local day, for the date pickers. */

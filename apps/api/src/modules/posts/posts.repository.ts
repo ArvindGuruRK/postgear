@@ -116,6 +116,12 @@ export interface QueueQuery {
   pageSize: number;
 }
 
+/** The queue's channel and date filters, without the state, order or page. */
+export type QueueCountQuery = Pick<QueueQuery, 'orgId' | 'channelId' | 'from' | 'to'>;
+
+/** Groups per state tab, and in all; see `countQueueStates`. */
+export type QueueStateCounts = Record<State | 'all', number>;
+
 export type RescheduleOutcome =
   | { outcome: 'saved'; roots: ChainRoot[] }
   | { outcome: 'not_found' }
@@ -165,6 +171,25 @@ function rowSelect(orgId: string) {
       },
     },
   } satisfies Prisma.PostSelect;
+}
+
+/** The queue's root rows under its filters; the list and the tab counts share it. */
+function queueWhere(query: QueueCountQuery & Pick<QueueQuery, 'states'>): Prisma.PostWhereInput {
+  return {
+    organizationId: query.orgId,
+    deletedAt: null,
+    parentPostId: null,
+    ...(query.states && query.states.length > 0 ? { state: { in: query.states } } : {}),
+    ...(query.channelId ? { integrationId: query.channelId } : {}),
+    ...(query.from || query.to
+      ? {
+          publishDate: {
+            ...(query.from ? { gte: query.from } : {}),
+            ...(query.to ? { lte: query.to } : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 /**
@@ -422,21 +447,7 @@ export class PostsRepository {
    * on another, which is exactly the post that needs attention.
    */
   async listQueue(query: QueueQuery): Promise<{ rows: PostRow[]; total: number }> {
-    const where: Prisma.PostWhereInput = {
-      organizationId: query.orgId,
-      deletedAt: null,
-      parentPostId: null,
-      ...(query.states && query.states.length > 0 ? { state: { in: query.states } } : {}),
-      ...(query.channelId ? { integrationId: query.channelId } : {}),
-      ...(query.from || query.to
-        ? {
-            publishDate: {
-              ...(query.from ? { gte: query.from } : {}),
-              ...(query.to ? { lte: query.to } : {}),
-            },
-          }
-        : {}),
-    };
+    const where = queueWhere(query);
 
     const [page, all] = await Promise.all([
       prisma.post.groupBy({
@@ -467,6 +478,35 @@ export class PostsRepository {
     });
 
     return { rows, total: all.length };
+  }
+
+  /**
+   * How many groups each of the queue's state tabs lists under the same
+   * channel and date filters (2026-10-23), for the counts on the tabs.
+   *
+   * Counted the way `listQueue` filters: a group is under a state when any of
+   * its channels is, so a post that published to one channel and failed on
+   * another counts under both tabs, as it shows under both.
+   */
+  async countQueueStates(query: QueueCountQuery): Promise<QueueStateCounts> {
+    const pairs = await prisma.post.groupBy({
+      by: ['group', 'state'],
+      where: queueWhere(query),
+    });
+
+    const counts: QueueStateCounts = {
+      all: new Set(pairs.map((pair) => pair.group)).size,
+      [State.QUEUE]: 0,
+      [State.PUBLISHED]: 0,
+      [State.ERROR]: 0,
+      [State.DRAFT]: 0,
+    };
+
+    for (const pair of pairs) {
+      counts[pair.state] += 1;
+    }
+
+    return counts;
   }
 
   /**

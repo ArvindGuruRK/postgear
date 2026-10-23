@@ -408,4 +408,27 @@ describe('orderChain', () => {
         .sort(),
     ).toEqual(['a', 'b', 'c']);
   });
+  describe('countQueueStates', () => {
+    it('counts a group under every state one of its channels is in, and once in all', async () => {
+      db.post.groupBy.mockResolvedValueOnce([
+        { group: 'g_1', state: 'PUBLISHED' },
+        { group: 'g_1', state: 'ERROR' },
+        { group: 'g_2', state: 'QUEUE' },
+        { group: 'g_3', state: 'QUEUE' },
+      ]);
+
+      await expect(
+        new PostsRepository().countQueueStates({ orgId: 'org_1', channelId: 'ch_x' }),
+      ).resolves.toEqual({ all: 3, QUEUE: 2, PUBLISHED: 1, ERROR: 1, DRAFT: 0 });
+
+      const { where } = db.post.groupBy.mock.calls[0][0];
+      expect(where).toMatchObject({
+        organizationId: 'org_1',
+        deletedAt: null,
+        parentPostId: null,
+        integrationId: 'ch_x',
+      });
+      expect(where).not.toHaveProperty('state');
+    });
+  });
 });

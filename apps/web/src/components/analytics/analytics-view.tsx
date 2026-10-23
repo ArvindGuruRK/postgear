@@ -43,11 +43,6 @@ import {
   ErrorState,
   MotionIcon,
   PageActions,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Skeleton,
   Stack,
   Tabs,
@@ -58,7 +53,7 @@ import {
 import { BarChart3, Plug } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { PlatformIcon } from '@/components/platforms/platform-icon';
+import { ChannelSelect } from '@/components/channels/channel-select';
 import { ApiError, api } from '@/lib/api';
 import type {
   AnalyticsOverview,
@@ -80,8 +75,6 @@ import { exportAnalyticsPdf } from './report/export-report';
 import { TopPosts } from './top-posts';
 import { TrendSection } from './trend-section';
 import { useAnalytics } from './use-analytics';
-
-const ALL_CHANNELS = '__all__';
 
 export function AnalyticsView({
   orgId,
@@ -201,34 +194,18 @@ export function AnalyticsView({
             </TabsList>
           </Tabs>
 
-          <Select
-            value={analytics.filters.channelId ?? ALL_CHANNELS}
-            onValueChange={(value) =>
-              analytics.setFilters({ channelId: value === ALL_CHANNELS ? null : value })
+          <ChannelSelect
+            channels={channels}
+            value={analytics.filters.channelId}
+            onValueChange={(channelId) => analytics.setFilters({ channelId })}
+            label={(channel) =>
+              lacksMetrics(channel, overview, supported)
+                ? `${channel.name} (no metrics)`
+                : channel.name
             }
             disabled={channels.length === 0}
-          >
-            <SelectTrigger
-              className="h-10 w-full rounded-lg bg-chrome shadow-none sm:w-64"
-              aria-label="Channel"
-            >
-              <SelectValue placeholder="All Channels" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_CHANNELS}>All Channels</SelectItem>
-              {channels.map((channel) => (
-                <SelectItem key={channel.id} value={channel.id}>
-                  {/* A flex row: the X logo's dark-mode image is a block,
-                      which on its own pushed the name onto a second line. */}
-                  <span className="flex items-center gap-1.5">
-                    <PlatformIcon platform={channel.providerIdentifier} />
-                    {channel.name}
-                    {lacksMetrics(channel, overview, supported) ? ' (no metrics)' : ''}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            className="h-10 w-full rounded-lg bg-chrome shadow-none sm:w-64"
+          />
         </div>
 
         <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">

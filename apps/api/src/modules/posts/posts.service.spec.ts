@@ -92,6 +92,7 @@ describe('PostsService', () => {
       | 'findRoots'
       | 'listCalendar'
       | 'listQueue'
+      | 'countQueueStates'
       | 'reschedule'
       | 'publishNow'
     >
@@ -112,6 +113,9 @@ describe('PostsService', () => {
       findRoots: jest.fn().mockResolvedValue([]),
       listCalendar: jest.fn().mockResolvedValue([]),
       listQueue: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
+      countQueueStates: jest
+        .fn()
+        .mockResolvedValue({ all: 0, QUEUE: 0, PUBLISHED: 0, ERROR: 0, DRAFT: 0 }),
       reschedule: jest.fn(),
       publishNow: jest.fn(),
     };
@@ -614,6 +618,31 @@ describe('PostsService', () => {
       expect(colours(summary.channels)).toEqual(expected);
       const page = await service.queue('org_1', { page: 1, sort: 'asc' });
       expect(colours(page.posts[0].channels)).toEqual(expected);
+    });
+
+    it('counts the state tabs under the same channel and dates as the list, but not its state', async () => {
+      const counts = { all: 9, QUEUE: 3, PUBLISHED: 4, ERROR: 1, DRAFT: 2 };
+      repository.countQueueStates.mockResolvedValueOnce(counts);
+
+      const page = await service.queue('org_1', {
+        page: 2,
+        sort: 'desc',
+        state: State.ERROR,
+        channelId: 'ch_x',
+        from: '2026-10-01T00:00:00.000Z',
+      });
+
+      expect(page.counts).toEqual(counts);
+      expect(repository.countQueueStates).toHaveBeenCalledWith({
+        orgId: 'org_1',
+        channelId: 'ch_x',
+        from: new Date('2026-10-01T00:00:00.000Z'),
+        to: undefined,
+      });
+      expect(repository.listQueue.mock.calls[0][0]).toMatchObject({
+        states: [State.ERROR],
+        channelId: 'ch_x',
+      });
     });
   });
 

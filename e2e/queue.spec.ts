@@ -60,10 +60,15 @@ test.describe('queue', () => {
     await signIn(page);
     await page.goto(`/${DEMO_ORG}/queue`);
 
-    // The page is named only by the top bar's h1 (no in-page title).
+    // The page is named only by the top bar's h1 (no in-page title), and it
+    // opens on the queued posts, with each tab's count beside its name.
     await expect(page.getByRole('heading', { level: 1, name: 'Queue' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /^Queued/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByRole('tab', { name: /^Failed \d+ posts?$/ })).toBeVisible();
     const rows = page.getByTestId('queue-row');
-    await expect(rows.first()).toBeVisible();
 
     // Soonest first. The workspace keeps whatever else people have posted
     // (the seed resets only its own rows), so the check is the seeded posts'
@@ -74,7 +79,7 @@ test.describe('queue', () => {
       date.setDate(date.getDate() + days);
       return localDay(date);
     };
-    await page.goto(`/${DEMO_ORG}/queue?from=${daysFromNow(-2)}&to=${daysFromNow(7)}`);
+    await page.goto(`/${DEMO_ORG}/queue?state=all&from=${daysFromNow(-2)}&to=${daysFromNow(7)}`);
     await expect(rows.first()).toBeVisible();
     const texts = await rows.allInnerTexts();
     const at = (text: string) => texts.findIndex((row) => row.includes(text));
@@ -88,7 +93,7 @@ test.describe('queue', () => {
     await expect(rows.nth(failedAt)).toHaveAttribute('data-tone', 'failed');
     await expect(rows.nth(failedAt)).toContainText('Channel needs reconnecting');
 
-    await page.getByRole('tab', { name: 'Failed' }).click();
+    await page.getByRole('tab', { name: /^Failed/ }).click();
     await expect(page).toHaveURL(/state=ERROR/);
     // Only failed posts, the seeded one among them. Not an exact count: the
     // "Post now" test runs alongside this one, and a worker may fail its post
@@ -99,7 +104,7 @@ test.describe('queue', () => {
       await expect(row).toHaveAttribute('data-tone', 'failed');
     }
 
-    await page.getByRole('tab', { name: 'Published' }).click();
+    await page.getByRole('tab', { name: /^Published/ }).click();
     await expect(page.getByTestId('queue-row').first()).toHaveAttribute('data-tone', 'published');
     await expect(
       page
@@ -108,11 +113,13 @@ test.describe('queue', () => {
         .getByRole('link', { name: 'View the published post' }),
     ).toHaveAttribute('href', /linkedin\.com/);
 
-    await page.getByRole('tab', { name: 'Drafts' }).click();
+    await page.getByRole('tab', { name: /^Drafts/ }).click();
     await expect(page.getByTestId('queue-row').first()).toHaveAttribute('data-tone', 'draft');
 
+    // Clearing drops the dates and keeps the tab.
     await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect(page).not.toHaveURL(/state=/);
+    await expect(page).not.toHaveURL(/from=/);
+    await expect(page).toHaveURL(/state=DRAFT/);
   });
 
   test('the date filter narrows the list to a day, and Reschedule moves a row off it', async ({

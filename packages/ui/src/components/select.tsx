@@ -44,9 +44,13 @@ export const SelectContent = forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-surfaceMd',
+        'z-50 overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-surfaceMd',
         'font-sans text-sm text-ink',
-        position === 'popper' && 'translate-y-1',
+        // A menu never narrower than its field (2026-10-23): it opened at its
+        // content's width, so a wide channel picker dropped a stub of a menu.
+        position === 'popper'
+          ? 'min-w-[max(8rem,var(--radix-select-trigger-width))] translate-y-1'
+          : 'min-w-[8rem]',
         className,
       )}
       {...props}

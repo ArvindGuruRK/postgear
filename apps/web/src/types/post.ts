@@ -135,6 +135,11 @@ export interface QueuePage {
   page: number;
   pageCount: number;
   total: number;
+  /**
+   * Posts per state tab under the same channel and date filters. A post that
+   * published to one channel and failed on another counts under both tabs.
+   */
+  counts: Record<PostState | 'all', number>;
 }
 
 /** `GET /scheduling/status`: whether anything would actually publish. */

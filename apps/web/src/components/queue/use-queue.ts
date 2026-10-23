@@ -15,10 +15,12 @@ import type { PostSummary, QueuePage } from '@/types/post';
 import { describePost } from '../posts/post-status';
 import {
   apiQuery,
-  DEFAULT_FILTERS,
+  clearNarrowing,
   filtersFromParams,
   paramsFromFilters,
   type QueueFilters,
+  type QueueStateFilter,
+  withState,
 } from './queue-filters';
 
 const LIVE_POLL_MS = 8_000;
@@ -106,7 +108,11 @@ export function useQueue(initial: QueuePage | null, initialParams: URLSearchPara
     }));
   }, []);
 
-  const reset = useCallback(() => setFiltersState(DEFAULT_FILTERS), []);
+  const setState = useCallback(
+    (state: QueueStateFilter) => setFiltersState((current) => withState(current, state)),
+    [],
+  );
+  const reset = useCallback(() => setFiltersState(clearNarrowing), []);
   const reload = useCallback(() => setVersion((current) => current + 1), []);
 
   // Reload at once when the composer, open as a modal over the queue, saves
@@ -139,5 +145,17 @@ export function useQueue(initial: QueuePage | null, initialParams: URLSearchPara
     );
   }, []);
 
-  return { filters, setFilters, reset, data, loading, error, now, reload, replacePost, removePost };
+  return {
+    filters,
+    setFilters,
+    setState,
+    reset,
+    data,
+    loading,
+    error,
+    now,
+    reload,
+    replacePost,
+    removePost,
+  };
 }
