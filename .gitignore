@@ -57,3 +57,5 @@ playwright-report/
 test-results/
 # Snapshots and logs from the Playwright MCP server (.mcp.json)
 .playwright-mcp/
+# Local design reference (a 24 MB PDF), kept on disk but out of the repo
+docs/pdf-inspiration-or-editing/
