@@ -273,13 +273,18 @@
 /* Diagonal barber-pole banding for filled bars (Sprint 0 extension). The
    8px/16px bands give a 16px period along the gradient axis;
    --animate-progressStripes scrolls it by exactly 16*sqrt(2)px so the loop
-   is seamless. */
+   is seamless. The image is a fixed 22.63px tile (see bg-stripes-flow below)
+   rather than the size of the element: an element-sized image is not a whole
+   number of bands wide, so once the crawl shifts it, the edge where it wraps
+   round showed as a cut in the stripes at the start of every bar (fixed
+   2026-10-26). */
 @utility bg-stripes {
   background-image: repeating-linear-gradient(
     -45deg,
     color-mix(in srgb, var(--color-outline) 28%, transparent) 0 8px,
     transparent 8px 16px
   );
+  background-size: 22.63px 22.63px;
 }
 
 /* The same bands for a row of separate cells that must read as one bar
@@ -296,7 +301,6 @@
    fill starts inside it. segmentStripes animates from that offset. */
 @utility bg-stripes-flow {
   @apply bg-stripes;
-  background-size: 22.63px 22.63px;
   --stripe-x: calc(
     -1 * (var(--i, 0) * (100cqw + var(--seg-gap, 0px)) / var(--n, 1) + var(--seg-border, 0px))
   );
