@@ -98,10 +98,36 @@ export type ChatAction =
 /** How much of the conversation goes back to the API with each message. */
 export const HISTORY_LIMIT = 20;
 
-export const SUGGESTIONS: readonly string[] = [
-  'What channels do I have connected?',
-  'Write a LinkedIn post about our new release',
-  'Generate an image of a sunrise over a city skyline',
+/** A starting point on the empty conversation: one per tool, so each shows what it can do. */
+export interface Suggestion {
+  tool: CopilotToolName;
+  /** What the card is called (Title Case). */
+  title: string;
+  /** What pressing it sends, word for word. */
+  prompt: string;
+}
+
+export const SUGGESTIONS: readonly Suggestion[] = [
+  {
+    tool: 'list_channels',
+    title: 'Check My Channels',
+    prompt: 'What channels do I have connected?',
+  },
+  {
+    tool: 'generate_post',
+    title: 'Write A Post',
+    prompt: 'Write a LinkedIn post about our new release',
+  },
+  {
+    tool: 'draft_post',
+    title: 'Draft It For Later',
+    prompt: 'Draft a short post with three tips for our audience and save it',
+  },
+  {
+    tool: 'generate_image',
+    title: 'Make An Image',
+    prompt: 'Generate an image of a sunrise over a city skyline',
+  },
 ];
 
 export function initialChatState(credits: AiCredits | null = null): ChatState {

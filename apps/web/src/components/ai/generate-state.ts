@@ -351,3 +351,12 @@ export function nextFullHour(now: Date): Date {
 export function partsAsText(parts: readonly GeneratedPart[]): string {
   return parts.map((part) => part.text).join('\n\n');
 }
+
+/** "example.com" for a source link, without "www."; the address itself when it does not parse. */
+export function sourceHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}

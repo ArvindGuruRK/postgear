@@ -220,7 +220,8 @@ was decided:
 - **`actionAi` violet marks what the model produced, nothing else.** The
   assistant's hook (`SpeechBubble variant="ai"`), the category `Badge
   variant="ai"`, the AI avatar, the Generate/Send `Button variant="ai"`, the
-  active stage on the tracker, and the credits meter (`UsageMeter tone="ai"`):
+  active stage on the tracker, and the credits meter (`Progress tone="ai"`, violet even when nearly spent)
+  and chip (`CreditsChip`):
   each is either model output or the act of asking for it. A violet surface
   that holds something the user typed is a bug.
 - **The user's own messages stay `primary`** (`SpeechBubble variant="primary"

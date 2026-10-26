@@ -2,16 +2,18 @@
 
 /**
  * What the model produced: the category, the hook, the parts, the image, the
- * sources, and the three things to do with it.
+ * sources, and the three things to do with it (one section since the
+ * 2026-10-26 revamp).
  *
  * Rendered from the reducer's partial fields rather than the final result,
  * so the hook appears the moment it streams and a run that failed at the
  * image stage still shows its parts. Violet marks the model's output (the
  * hook bubble, the category badge); the parts themselves are restrained
- * cards, because they are the composer's content next, not an exhibit
- * (design-system-rules.md §16b).
+ * cards on the light layer, because they are the composer's content next,
+ * not an exhibit (design-system-rules.md section 16b). Each part carries a
+ * length bar against the strictest channel's limit, red once it is over.
  *
- * "Open in composer" creates a real DRAFT through `POST /posts` (the same
+ * "Open In Composer" creates a real DRAFT through `POST /posts` (the same
  * payload the composer sends, one part per generated part, the hero image on
  * the first) and navigates to it. The composer is where the post is edited
  * and scheduled; this screen does not grow a second editor.
@@ -25,26 +27,27 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   cn,
   MotionIcon,
   Skeleton,
   SpeechBubble,
-  Text,
   useToast,
 } from '@postgear/ui';
+import { Globe } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import type { GeneratedPart } from '@/types/ai';
 import type { PostDetail } from '@/types/post';
 import type { SavePayload } from '../composer/composer-state';
+import { FOCUS, INSET, PanelHeader } from './ai-ui';
 import {
   type CharacterLimit,
   FORMAT_OPTIONS,
   type GenerateState,
   nextFullHour,
   partsAsText,
+  sourceHost,
 } from './generate-state';
 
 export function GenerateResult({
@@ -114,25 +117,56 @@ export function GenerateResult({
   }
 
   return (
-    <section aria-label="Generated post" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        {state.category ? (
-          <Badge variant="ai">{state.category}</Badge>
-        ) : running ? (
-          <Badge variant="outline">Classifying…</Badge>
-        ) : null}
-        {request ? (
-          <Text size="sm" muted as="span">
-            {request.tone === 'company' ? 'Company voice' : 'Personal voice'}
-            {format ? `, ${format.label}` : ''}
-          </Text>
-        ) : null}
-      </div>
+    <section aria-labelledby="ai-result" className="flex flex-col gap-5">
+      <PanelHeader
+        id="ai-result"
+        title="Your Post"
+        sub={
+          request ? (
+            <span className="font-sans text-sm text-ink type-muted">
+              {request.tone === 'company' ? 'Company voice' : 'Personal voice'}
+              {format ? `, ${format.label}` : ''}
+              {limit ? `, for ${limit.platform}` : ''}
+            </span>
+          ) : null
+        }
+        aside={
+          state.category ? (
+            <Badge variant="ai">{state.category}</Badge>
+          ) : running ? (
+            <Badge variant="outline">Classifying…</Badge>
+          ) : null
+        }
+      />
+
+      {/* Under the name rather than after the last part: a long thread would
+          otherwise put what to do with it a long scroll away. */}
+      {parts.length > 0 && !running ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => void openInComposer()} disabled={opening}>
+            <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
+            {opening ? 'Opening…' : 'Open In Composer'}
+          </Button>
+          <Button variant="secondary" onClick={() => void copy()} disabled={opening}>
+            <MotionIcon icon={CopyIcon} className="h-4 w-4" />
+            Copy
+          </Button>
+          <Button variant="secondary" onClick={onRegenerate} disabled={opening}>
+            <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
+            Regenerate
+          </Button>
+        </div>
+      ) : null}
+
+      {openError ? <Alert variant="danger">{openError}</Alert> : null}
 
       {state.hook ? (
-        <SpeechBubble variant="ai" className="whitespace-pre-wrap" aria-label="Hook">
-          {state.hook}
-        </SpeechBubble>
+        <div className="flex flex-col gap-2">
+          <span className="type-ui text-sm text-ink">Hook</span>
+          <SpeechBubble variant="ai" className="whitespace-pre-wrap text-base" aria-label="Hook">
+            {state.hook}
+          </SpeechBubble>
+        </div>
       ) : running ? (
         <Skeleton className="h-16" aria-label="Writing the hook" />
       ) : null}
@@ -159,50 +193,40 @@ export function GenerateResult({
       ) : null}
 
       {state.sources && state.sources.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <h3 className="type-label text-sm text-ink">Backed By Research</h3>
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        <div className="flex flex-col gap-3">
+          <h3 className="m-0 type-ui text-sm text-ink">Backed By Research</h3>
+          <ul className="m-0 grid list-none gap-3 p-0 sm:grid-cols-2">
             {state.sources.map((source) => (
-              <li key={source.url} className="flex flex-col gap-0.5">
+              <li key={source.url} className={cn(INSET, 'flex min-w-0 flex-col gap-1.5 p-3')}>
+                <span className="inline-flex min-w-0 items-center gap-1.5 font-sans text-xs text-ink type-muted">
+                  <Globe className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+                  <span className="truncate">{sourceHost(source.url)}</span>
+                </span>
                 <a
                   href={source.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 font-sans text-sm font-bold text-ink underline outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+                  className={cn(
+                    'inline-flex items-start gap-1.5 font-sans text-sm font-bold text-ink underline underline-offset-2',
+                    FOCUS,
+                  )}
                 >
-                  {source.title}
-                  <MotionIcon icon={ExternalLinkIcon} size={14} className="h-3.5 w-3.5" />
+                  <span className="min-w-0">{source.title}</span>
+                  <MotionIcon
+                    icon={ExternalLinkIcon}
+                    size={14}
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  />
                 </a>
-                <Text size="xs" muted>
+                <span className="line-clamp-3 font-sans text-xs text-ink type-muted">
                   {source.snippet}
-                </Text>
+                </span>
               </li>
             ))}
           </ul>
         </div>
       ) : state.phase !== 'running' && parts.length > 0 ? (
-        <Text size="xs" muted>
-          Written without web research.
-        </Text>
-      ) : null}
-
-      {openError ? <Alert variant="danger">{openError}</Alert> : null}
-
-      {parts.length > 0 && !running ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => void openInComposer()} disabled={opening}>
-            <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
-            {opening ? 'Opening…' : 'Open In Composer'}
-          </Button>
-          <Button variant="secondary" onClick={() => void copy()} disabled={opening}>
-            <MotionIcon icon={CopyIcon} className="h-4 w-4" />
-            Copy
-          </Button>
-          <Button variant="secondary" onClick={onRegenerate} disabled={opening}>
-            <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
-            Regenerate
-          </Button>
-        </div>
+        <span className="font-sans text-xs text-ink type-muted">Written without web research.</span>
       ) : null}
     </section>
   );
@@ -223,18 +247,19 @@ function PartCard({
 }) {
   const length = limit ? measureLength(part.text, limit.lengthMethod) : part.text.length;
   const over = limit !== null && length > limit.maxLength;
+  const share = limit ? Math.min(100, (length / limit.maxLength) * 100) : 0;
 
   return (
     <li data-testid="ai-result-part" data-index={index + 1}>
-      <Card className="flex flex-col gap-3 border-2 p-4 shadow-surfaceSm">
+      <div className={cn(INSET, 'flex flex-col gap-3 p-4 shadow-surfaceSm')}>
         <div className="flex items-center justify-between gap-3">
-          <span className="type-label text-sm text-ink">
+          <span className="type-ui text-sm text-ink">
             {total > 1 ? `Part ${index + 1} Of ${total}` : 'Post'}
           </span>
           <span
             className={cn(
-              'font-sans text-xs font-medium text-ink',
-              over ? 'font-bold text-dangerInk' : 'opacity-70',
+              'font-sans text-xs tabular-nums text-ink',
+              over ? 'font-bold text-dangerInk' : 'type-muted',
             )}
             title={
               limit
@@ -247,26 +272,40 @@ function PartCard({
           </span>
         </div>
 
-        <p className="m-0 whitespace-pre-wrap font-sans text-sm text-ink">{part.text}</p>
+        <p className="m-0 whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink">
+          {part.text}
+        </p>
 
         {part.image ? (
-          <figure className="m-0 flex flex-col gap-1">
+          <figure className="m-0 flex flex-col gap-1.5">
             {/* biome-ignore lint/performance/noImgElement: a library item served from media storage, as the media tile shows it */}
             <img
               src={part.image.url}
               alt={part.imagePrompt ?? 'Generated hero image'}
-              className="max-h-72 w-full rounded-md border-2 border-outline object-cover"
+              className="max-h-80 w-full rounded-md border-2 border-outline object-cover"
             />
             {part.imagePrompt ? (
-              <figcaption className="font-sans text-xs font-medium text-ink opacity-70">
+              <figcaption className="font-sans text-xs text-ink type-muted">
                 {part.imagePrompt}
               </figcaption>
             ) : null}
           </figure>
         ) : imagePending ? (
-          <Skeleton className="h-40 w-full" aria-label="Generating the hero image" />
+          <Skeleton className="h-48 w-full" aria-label="Generating the hero image" />
         ) : null}
-      </Card>
+
+        {limit ? (
+          <span
+            aria-hidden="true"
+            className="block h-2.5 w-full overflow-hidden rounded-full border-2 border-outline bg-chrome"
+          >
+            <span
+              className={cn('block h-full', over ? 'bg-actionDanger' : 'bg-actionSuccess')}
+              style={{ width: `${share}%` }}
+            />
+          </span>
+        ) : null}
+      </div>
     </li>
   );
 }

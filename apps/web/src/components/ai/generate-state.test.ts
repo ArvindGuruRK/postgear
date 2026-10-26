@@ -16,6 +16,7 @@ import {
   initialGenerateState,
   nextFullHour,
   partsAsText,
+  sourceHost,
   strictestLimit,
 } from './generate-state';
 
@@ -241,5 +242,11 @@ describe('helpers', () => {
 
   it('joins parts with a blank line for the clipboard', () => {
     expect(partsAsText([part, { ...part, text: 'Two' }])).toBe('Hello world\n\nTwo');
+  });
+
+  it('names a source by its host, without www', () => {
+    expect(sourceHost('https://www.example.com/a/b?c=1')).toBe('example.com');
+    expect(sourceHost('https://blog.example.org')).toBe('blog.example.org');
+    expect(sourceHost('not a url')).toBe('not a url');
   });
 });

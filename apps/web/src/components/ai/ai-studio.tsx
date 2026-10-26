@@ -5,8 +5,9 @@
  *
  * Generate is a form and a pipeline: a topic in, a researched post out.
  * Copilot is a conversation with an assistant that acts. They share the
- * credits meter in the header and nothing else, so each is its own island
- * below; the mode lives in the URL (`?mode=copilot`) the way the calendar's
+ * credits meter in the actions row (beside the mode switch, revamp
+ * 2026-10-26) and nothing else, so each is its own island below; the mode
+ * lives in the URL (`?mode=copilot`) the way the calendar's
  * view does, so a link lands on the right one.
  *
  * Both panels stay mounted and the inactive one is hidden rather than
@@ -21,6 +22,7 @@
 import { MessageSquareIcon } from '@animateicons/react/lucide/message-square-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
+  cn,
   ErrorState,
   MotionIcon,
   PageActions,
@@ -35,6 +37,7 @@ import { useEffect, useState } from 'react';
 import type { AiCredits, AiStatus } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import { useWorkspace } from '../navigation/workspace-provider';
+import { SEGMENTED_LIST, SEGMENTED_TRIGGER } from './ai-ui';
 import { AiUnavailable } from './ai-unavailable';
 import { CopilotChat } from './copilot-chat';
 import { CreditsMeter } from './credits-meter';
@@ -90,62 +93,76 @@ export function AiStudio({
   }, [mode]);
 
   const meter = useCredits(initialCredits);
+  const credits = (
+    <CreditsMeter
+      credits={meter.credits}
+      failed={meter.failed}
+      onRetry={() => void meter.refresh()}
+      className="w-full sm:w-72"
+    />
+  );
+
+  if (status === null || !status.configured) {
+    return (
+      <Stack gap="lg">
+        <PageActions>{credits}</PageActions>
+        {status === null ? (
+          <ErrorState
+            title="The AI service didn't answer"
+            description="The API could not say whether a model is configured. Check that it is running, then try again."
+            action={{ label: 'Try Again', onClick: () => router.refresh() }}
+          />
+        ) : (
+          <AiUnavailable />
+        )}
+      </Stack>
+    );
+  }
 
   return (
-    <Stack gap="lg">
-      <PageActions>
-        <CreditsMeter
-          credits={meter.credits}
-          failed={meter.failed}
-          onRetry={() => void meter.refresh()}
-          className="w-full sm:w-72"
-        />
+    <Tabs
+      value={mode}
+      onValueChange={(value) => {
+        if (isStudioMode(value)) {
+          setMode(value);
+        }
+      }}
+    >
+      {/* The page's actions row: the mode on the left, the balance both modes spend on the right. */}
+      <PageActions className="items-end justify-between gap-4">
+        <TabsList aria-label="Mode" className={cn(SEGMENTED_LIST, 'h-12 w-full sm:w-auto')}>
+          <TabsTrigger
+            value="generate"
+            className={cn(SEGMENTED_TRIGGER, 'h-10 flex-1 gap-2 px-5 sm:flex-none')}
+          >
+            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
+            Generate
+          </TabsTrigger>
+          <TabsTrigger
+            value="copilot"
+            className={cn(SEGMENTED_TRIGGER, 'h-10 flex-1 gap-2 px-5 sm:flex-none')}
+          >
+            <MotionIcon icon={MessageSquareIcon} className="h-4 w-4" />
+            Copilot
+          </TabsTrigger>
+        </TabsList>
+        {credits}
       </PageActions>
 
-      {status === null ? (
-        <ErrorState
-          title="The AI service didn't answer"
-          description="The API could not say whether a model is configured. Check that it is running, then try again."
-          action={{ label: 'Try Again', onClick: () => router.refresh() }}
+      <TabsContent value="generate" forceMount className="mt-8 data-[state=inactive]:hidden">
+        <GeneratePanel
+          orgId={orgId}
+          channels={channels}
+          providers={providers}
+          status={status}
+          credits={meter.credits}
+          workspaceName={workspaceName}
+          onCredits={meter.apply}
         />
-      ) : !status.configured ? (
-        <AiUnavailable />
-      ) : (
-        <Tabs
-          value={mode}
-          onValueChange={(value) => {
-            if (isStudioMode(value)) {
-              setMode(value);
-            }
-          }}
-        >
-          <TabsList aria-label="Mode">
-            <TabsTrigger value="generate" className="gap-2">
-              <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
-              Generate
-            </TabsTrigger>
-            <TabsTrigger value="copilot" className="gap-2">
-              <MotionIcon icon={MessageSquareIcon} className="h-4 w-4" />
-              Copilot
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="generate" forceMount className="data-[state=inactive]:hidden">
-            <GeneratePanel
-              orgId={orgId}
-              channels={channels}
-              providers={providers}
-              status={status}
-              credits={meter.credits}
-              workspaceName={workspaceName}
-              onCredits={meter.apply}
-            />
-          </TabsContent>
-          <TabsContent value="copilot" forceMount className="data-[state=inactive]:hidden">
-            <CopilotChat orgId={orgId} credits={meter.credits} onCredits={meter.apply} />
-          </TabsContent>
-        </Tabs>
-      )}
-    </Stack>
+      </TabsContent>
+      <TabsContent value="copilot" forceMount className="mt-8 data-[state=inactive]:hidden">
+        <CopilotChat orgId={orgId} credits={meter.credits} onCredits={meter.apply} />
+      </TabsContent>
+    </Tabs>
   );
 }

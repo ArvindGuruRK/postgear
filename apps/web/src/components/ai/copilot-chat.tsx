@@ -18,24 +18,15 @@
 import { CircleStopIcon } from '@animateicons/react/lucide/circle-stop-icon';
 import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
-import {
-  Alert,
-  Button,
-  EmptyState,
-  FormField,
-  FormHelperText,
-  FormLabel,
-  MotionIcon,
-  Text,
-  Textarea,
-} from '@postgear/ui';
-import { MessageSquare } from 'lucide-react';
+import { Alert, Button, cn, MotionIcon, Text, Textarea } from '@postgear/ui';
+import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { streamEvents } from '@/lib/sse';
 import type { AiCredits, CopilotChatBody, CopilotStreamEvent } from '@/types/ai';
 import { useWorkspace } from '../navigation/workspace-provider';
 import { useMounted } from '../posts/use-mounted';
+import { AiSticker, FOCUS, TOOL_ICONS } from './ai-ui';
 import { ChatMessage } from './chat-message';
 import {
   type ChatAction,
@@ -53,13 +44,6 @@ import { formatResetDate } from './credits-meter';
 
 const MESSAGE_MAX = 4000;
 
-function initials(name: string | null, email: string): string {
-  const source = name?.trim() || email;
-  const words = source.split(/\s+/).filter(Boolean);
-  const letters = words.length >= 2 ? `${words[0][0]}${words[1][0]}` : source.slice(0, 2);
-  return letters.toUpperCase();
-}
-
 export function CopilotChat({
   orgId,
   credits,
@@ -74,7 +58,7 @@ export function CopilotChat({
   const [state, dispatch] = useReducer(chatReducer, credits, initialChatState);
   const [draft, setDraft] = useState('');
   const controller = useRef<AbortController | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Bring back the conversation from this tab's session, once. The dispatch
@@ -104,12 +88,12 @@ export function CopilotChat({
     }
   }, [state.entries, state.hydrated, orgId]);
 
-  // Keep the latest turn in view as it streams.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `state.entries` is the trigger, not a value read
+  // Keep the latest turn in view as it streams. The page itself scrolls (one
+  // scrollbar, the shell's), so this brings the end of the column into view:
+  // the message box, pinned to the bottom, then sits right under the last turn.
   useEffect(() => {
-    const list = listRef.current;
-    if (list) {
-      list.scrollTop = list.scrollHeight;
+    if (state.entries.length > 0) {
+      endRef.current?.scrollIntoView({ block: 'end' });
     }
   }, [state.entries]);
 
@@ -193,72 +177,10 @@ export function CopilotChat({
   }
 
   const empty = state.entries.length === 0;
+  const me = { name: user.name ?? user.email, avatar: user.avatar };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Text size="sm" muted>
-          Ask for a post, an image, or what is connected. The copilot can check your channels,
-          write, draft and illustrate.
-        </Text>
-        <Button variant="secondary" size="sm" onClick={clear} disabled={empty || state.streaming}>
-          <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
-          Clear Conversation
-        </Button>
-      </div>
-
-      <div
-        ref={listRef}
-        className="flex max-h-[60vh] min-h-[16rem] flex-col overflow-y-auto rounded-lg border-2 border-outline p-4 pg-scrollbar pg-scrollbar-primary"
-        aria-live="polite"
-        aria-busy={state.streaming}
-      >
-        {!mounted ? null : empty ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4">
-            <EmptyState
-              icon={MessageSquare}
-              title="Ask the copilot"
-              description="It sees your channels and can act on them. Try one of these, or ask in your own words."
-              className="p-4"
-            />
-            <ul
-              className="m-0 flex list-none flex-wrap justify-center gap-2 p-0"
-              aria-label="Suggestions"
-            >
-              {SUGGESTIONS.map((suggestion) => (
-                <li key={suggestion}>
-                  <button
-                    type="button"
-                    onClick={() => send(suggestion)}
-                    disabled={!canSend}
-                    className="rounded-full border-2 border-outline bg-secondary px-3 py-1.5 font-sans text-sm font-bold text-ink shadow-brutalSm transition-[transform,box-shadow] duration-100 hover:bg-actionPrimary/10 active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
-                  >
-                    {suggestion}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <ol className="m-0 flex list-none flex-col gap-4 p-0">
-            {state.entries.map((entry) => (
-              <ChatMessage
-                key={entry.id}
-                entry={entry}
-                orgId={orgId}
-                userInitials={initials(user.name, user.email)}
-              />
-            ))}
-          </ol>
-        )}
-      </div>
-
-      {state.stopped ? (
-        <Text size="sm" muted>
-          Stopped.
-        </Text>
-      ) : null}
-
+  const alerts = (
+    <>
       {state.error ? (
         <Alert variant="danger">
           <div className="flex flex-wrap items-center gap-3">
@@ -278,65 +200,199 @@ export function CopilotChat({
           {mounted ? formatResetDate(credits.resetsAt) : 'next cycle'}.
         </Alert>
       ) : null}
+    </>
+  );
 
-      <form
-        className="flex flex-col gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          send(draft);
+  const composer = (
+    <form
+      // The design system's field (field colour, outline) at the size of the
+      // thing the page is for, with the hard shadow that marks what you act on.
+      // The focus ring moves from the borderless textarea to the whole box.
+      className={cn(
+        'flex flex-col gap-1 rounded-xl border-2 border-outline bg-field p-2 shadow-brutalSm',
+        'transition-[border-color,box-shadow] duration-150',
+        'focus-within:border-actionPrimary focus-within:ring-3 focus-within:ring-actionPrimary/20',
+      )}
+      onSubmit={(event) => {
+        event.preventDefault();
+        send(draft);
+      }}
+    >
+      <label htmlFor="copilot-input" className="sr-only">
+        Message
+      </label>
+      <Textarea
+        id="copilot-input"
+        ref={inputRef}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            send(draft);
+          }
         }}
-      >
-        <FormField>
-          <FormLabel htmlFor="copilot-input" className="sr-only">
-            Message
-          </FormLabel>
-          <Textarea
-            id="copilot-input"
-            ref={inputRef}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                send(draft);
-              }
-            }}
-            placeholder="Message the copilot…"
-            rows={2}
-            maxLength={MESSAGE_MAX}
-            disabled={cannotAfford}
-            className="min-h-[4.5rem]"
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <FormHelperText>
-              {cost} {cost === 1 ? 'credit' : 'credits'} per message. Enter to send, Shift+Enter
-              for a new line
-            </FormHelperText>
-            <div className="flex items-center gap-2">
-              {state.streaming ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => controller.current?.abort()}
-                >
-                  <MotionIcon icon={CircleStopIcon} className="h-4 w-4" />
-                  Stop
-                </Button>
-              ) : null}
-              <Button
-                type="submit"
-                variant="highlight"
-                size="sm"
-                disabled={!canSend || draft.trim().length === 0}
-              >
-                <MotionIcon icon={SendIcon} className="h-4 w-4" />
-                Send
-              </Button>
+        placeholder="Enter your message"
+        rows={2}
+        maxLength={MESSAGE_MAX}
+        disabled={cannotAfford}
+        aria-describedby="copilot-help"
+        // Grows with what is typed, up to a few lines, then scrolls inside.
+        className="field-sizing-content max-h-48 min-h-[3.5rem] resize-none border-0 bg-transparent p-2 text-base shadow-none focus-visible:ring-0"
+      />
+      <div className="flex items-center justify-between gap-3 px-1">
+        <div className="flex min-w-0 items-center gap-2">
+          {empty ? null : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={clear}
+              disabled={state.streaming}
+              aria-label="Clear Conversation"
+              className="shrink-0 px-2.5"
+            >
+              <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
+              <span className="hidden sm:inline">Clear</span>
+            </Button>
+          )}
+          <span id="copilot-help" className="min-w-0 font-sans text-xs text-ink type-muted">
+            {cost} {cost === 1 ? 'credit' : 'credits'} per message.
+            {/* Keyboard hints mean nothing on a touch keyboard. */}
+            <span className="hidden md:inline"> Enter to send, Shift+Enter for a new line.</span>
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {state.streaming ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => controller.current?.abort()}
+            >
+              <MotionIcon icon={CircleStopIcon} className="h-4 w-4" />
+              Stop
+            </Button>
+          ) : null}
+          <Button
+            type="submit"
+            variant="highlight"
+            size="sm"
+            disabled={!canSend || draft.trim().length === 0}
+          >
+            <MotionIcon icon={SendIcon} className="h-4 w-4" />
+            Send
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+
+  return (
+    <section
+      aria-labelledby="copilot-title"
+      // One column on the page ground, no card and no scroll box of its own
+      // (the owner's calls, 2026-10-26): the page is the one thing that
+      // scrolls, as in ChatGPT and Claude. Empty, it fills the screen below the
+      // mode row and centres the greeting and the message box in it.
+      className={cn(
+        'mx-auto flex w-full max-w-5xl flex-col',
+        mounted &&
+          empty &&
+          'min-h-[calc(100dvh-20rem)] justify-center md:min-h-[calc(100dvh-16rem)]',
+      )}
+    >
+      <h2 id="copilot-title" className="sr-only">
+        PostGear Copilot
+      </h2>
+
+      {!mounted ? null : empty ? (
+        <div className="flex flex-col items-center gap-7 py-4">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <AiSticker icon={Sparkles} tone="ai" size="lg" className="-rotate-6" />
+            <div className="flex flex-col gap-2">
+              <h3 className="m-0 type-heading text-2xl text-ink sm:text-3xl">
+                What should we make today?
+              </h3>
+              <p className="m-0 font-sans text-sm text-ink type-muted">
+                The copilot sees your channels, writes, drafts and makes images.
+              </p>
             </div>
           </div>
-        </FormField>
-      </form>
-    </div>
+
+          <div className="flex w-full flex-col gap-4">
+            {alerts}
+            {composer}
+            <ul
+              className="m-0 grid w-full list-none gap-1 p-0 sm:grid-cols-2 sm:gap-2"
+              aria-label="Suggestions"
+            >
+              {SUGGESTIONS.map((suggestion) => (
+                <li key={suggestion.prompt} className="flex">
+                  <button
+                    type="button"
+                    onClick={() => send(suggestion.prompt)}
+                    disabled={!canSend}
+                    // A row, as in ChatGPT's start screen: no frame until the
+                    // pointer is on it, then the design system's bordered box.
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg border-2 border-transparent p-2.5 text-start text-ink',
+                      'transition-[background-color,border-color,box-shadow] duration-100',
+                      'hover:border-outline hover:bg-secondary hover:shadow-brutalSm',
+                      'active:translate-x-[1px] active:translate-y-[1px] active:shadow-brutalPressed',
+                      FOCUS,
+                      'disabled:pointer-events-none disabled:opacity-50',
+                    )}
+                  >
+                    <AiSticker icon={TOOL_ICONS[suggestion.tool]} />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="type-ui text-sm">{suggestion.title}</span>
+                      <span className="truncate font-sans text-xs type-muted">
+                        {suggestion.prompt}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ol
+            className="m-0 flex w-full list-none flex-col gap-5 p-0 pb-6"
+            aria-live="polite"
+            aria-busy={state.streaming}
+          >
+            {state.entries.map((entry) => (
+              <ChatMessage key={entry.id} entry={entry} orgId={orgId} user={me} />
+            ))}
+          </ol>
+
+          {state.stopped ? (
+            <Text size="sm" muted className="pb-4">
+              Stopped.
+            </Text>
+          ) : null}
+
+          <div
+            // Pinned to the bottom of the screen while the conversation scrolls
+            // under it, on the page colour with a short fade above, so the
+            // turns run out of sight instead of being cut by a line. It reaches
+            // down over the page's own bottom padding (-bottom-6, -mb-6 with
+            // pb-6 inside), or the turns would show through under the box.
+            className={cn(
+              'sticky -bottom-6 z-10 -mb-6 flex flex-col gap-3 bg-primary pt-2 pb-6',
+              'before:pointer-events-none before:absolute before:inset-x-0 before:-top-6 before:h-6',
+              'before:bg-linear-to-t before:from-primary before:to-transparent',
+            )}
+          >
+            {alerts}
+            {composer}
+          </div>
+          <div ref={endRef} aria-hidden="true" />
+        </>
+      )}
+    </section>
   );
 }

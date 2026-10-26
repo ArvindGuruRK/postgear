@@ -26,17 +26,16 @@ import {
   Alert,
   AlertTitle,
   Button,
-  cn,
   FormErrorMessage,
   FormHelperText,
   Input,
   MotionIcon,
 } from '@postgear/ui';
-import { Code2, Globe, Sparkles } from 'lucide-react';
+import { Code2, Globe } from 'lucide-react';
 import { useId, useState } from 'react';
 import type { AiCredits } from '@/types/ai';
 import type { SeoStatus } from '@/types/seo';
-import { formatResetDate } from '../ai/credits-meter';
+import { CreditsChip, formatResetDate } from '../ai/credits-meter';
 import { useMounted } from '../posts/use-mounted';
 import { SeoPanel } from './seo-ui';
 import { isValidUrlInput } from './seo-view-model';
@@ -183,7 +182,7 @@ export function AnalyzeForm({
                 credits={credits}
                 failed={creditsFailed}
                 onRetry={onRetryCredits}
-                mounted={mounted}
+                testId="seo-credits"
               />
             ) : null}
           </div>
@@ -212,53 +211,5 @@ export function AnalyzeForm({
         ) : null}
       </form>
     </SeoPanel>
-  );
-}
-
-/**
- * The balance beside the button that spends it: "77 of 100 credits left",
- * violet like everything the AI does, red when it runs low, and when the
- * balance resets.
- */
-function CreditsChip({
-  credits,
-  failed,
-  onRetry,
-  mounted,
-}: {
-  credits: AiCredits | null;
-  failed: boolean;
-  onRetry: () => void;
-  mounted: boolean;
-}) {
-  if (!credits) {
-    return failed ? (
-      <button
-        type="button"
-        onClick={onRetry}
-        className="font-sans text-xs font-bold text-ink underline underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
-      >
-        Credits didn't load, retry
-      </button>
-    ) : null;
-  }
-
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        data-testid="seo-credits"
-        data-remaining={credits.remaining}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border-2 border-outline bg-clip-padding px-2.5 py-0.5 font-bold tabular-nums',
-          credits.low ? 'bg-actionDanger text-onActionLight' : 'bg-actionAi text-onActionAi',
-        )}
-      >
-        <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
-        {credits.remaining} of {credits.allowance} credits left
-      </span>
-      {mounted ? (
-        <span className="type-muted">Resets {formatResetDate(credits.resetsAt)}</span>
-      ) : null}
-    </span>
   );
 }
