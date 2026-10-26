@@ -24,6 +24,13 @@
  * component, which is harmless: this island keeps its state, and a run in
  * progress keeps streaming.
  *
+ * ## Layout (revamped 2026-10-23)
+ *
+ * The analyze bar opens the page with the credits beside its button (the
+ * meter that used to sit alone above it is gone), then the result's panels
+ * on the left and the history on the right from `xl`. Before any audit, the
+ * left column previews the four scores (`AuditPreview`).
+ *
  * ## What the page shows for each way the API can answer
  *
  * `/seo/status` unanswered is an `ErrorState` with a retry: nothing else can
@@ -33,19 +40,19 @@
  * is an alert under the form, with the reset date when credits are the
  * reason. Mid-stream errors are the progress section's to show.
  */
-import { Alert, EmptyState, ErrorState, PageActions, Stack, useToast } from '@postgear/ui';
-import { Search } from 'lucide-react';
+import { Alert, ErrorState, Stack, useToast } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import { streamEvents } from '@/lib/sse';
 import type { AiCredits } from '@/types/ai';
 import type { SeoAuditDetail, SeoAuditSummary, SeoStatus, SeoStreamEvent } from '@/types/seo';
-import { CreditsMeter, formatResetDate } from '../ai/credits-meter';
+import { formatResetDate } from '../ai/credits-meter';
 import { useCredits } from '../ai/use-credits';
 import { useMounted } from '../posts/use-mounted';
 import { AnalyzeForm } from './analyze-form';
 import { AuditHistory } from './audit-history';
+import { AuditPreview } from './audit-preview';
 import { AuditProgress } from './audit-progress';
 import { AuditResult } from './audit-result';
 import { DeleteAuditDialog } from './delete-audit-dialog';
@@ -270,17 +277,6 @@ export function SeoAnalyzer({
 
   return (
     <Stack gap="lg">
-      {status?.ai ? (
-        <PageActions>
-          <CreditsMeter
-            credits={meter.credits}
-            failed={meter.failed}
-            onRetry={() => void meter.refresh()}
-            className="w-full sm:w-72"
-          />
-        </PageActions>
-      ) : null}
-
       {status === null ? (
         <ErrorState
           title="The analyzer didn't answer"
@@ -288,11 +284,13 @@ export function SeoAnalyzer({
           action={{ label: 'Try Again', onClick: () => router.refresh() }}
         />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:items-start">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] xl:items-start">
           <div className="flex min-w-0 flex-col gap-4">
             <AnalyzeForm
               status={status}
               credits={meter.credits}
+              creditsFailed={meter.failed}
+              onRetryCredits={() => void meter.refresh()}
               value={url}
               running={running}
               fieldError={state.error?.onField ? state.error.message : null}
@@ -313,12 +311,7 @@ export function SeoAnalyzer({
             ) : null}
 
             {state.phase === 'idle' ? (
-              <EmptyState
-                icon={Search}
-                title="Your audit will appear here"
-                description="Enter a page's address above. The crawl, the four scores and the prioritised fixes show up as each stage finishes, in about half a minute for most sites."
-                className="rounded-lg border-2 border-dashed border-outline"
-              />
+              <AuditPreview />
             ) : (
               <>
                 <AuditProgress state={state} onRetry={analyzeAgain} />

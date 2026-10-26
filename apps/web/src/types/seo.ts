@@ -19,7 +19,7 @@ export const SEO_CATEGORIES: readonly SeoCategory[] = [
 ] as const;
 
 export const SEO_CATEGORY_LABELS: Record<SeoCategory, string> = {
-  onPage: 'On-page',
+  onPage: 'On-Page',
   technical: 'Technical',
   content: 'Content',
   backlink: 'Authority',

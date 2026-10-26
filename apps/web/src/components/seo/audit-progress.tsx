@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Where the analysis is: the four stages as a tracker, and what happened if
- * it did not reach the end.
+ * Where the analysis is (revamped 2026-10-23): the four stages as a tracker
+ * in their own panel, and what happened if the run did not reach the end.
  *
  * Shown only for a run started in this session: a tracker for an audit
  * loaded from the history would be four green ticks saying nothing. A stop
@@ -12,9 +12,10 @@
  * that came before the stream are the form's (on the field) or the
  * analyzer's (an alert) to show.
  */
-import { ErrorState, type Stage, StageTracker, Text } from '@postgear/ui';
+import { ErrorState, type Stage, StageTracker } from '@postgear/ui';
 import { SEO_STAGES } from '@/types/seo';
 import { type SeoState, STAGE_LABELS } from './seo-state';
+import { SeoPanel } from './seo-ui';
 
 export function AuditProgress({ state, onRetry }: { state: SeoState; onRetry: () => void }) {
   if (state.phase === 'idle' || !state.live || state.error?.beforeStream) {
@@ -38,22 +39,22 @@ export function AuditProgress({ state, onRetry }: { state: SeoState; onRetry: ()
           : "Didn't finish";
 
   return (
-    <section
+    <SeoPanel
       aria-label="Analysis progress"
       aria-busy={state.phase === 'running'}
-      className="flex flex-col gap-4 rounded-md border-2 border-outline bg-secondary p-4"
+      className="flex flex-col gap-4 p-4 sm:p-5"
     >
-      <h2 className="type-label text-sm text-ink" aria-live="polite">
+      <h2 className="m-0 type-heading text-lg text-ink" aria-live="polite">
         {heading}
       </h2>
 
       <StageTracker stages={stages} aria-label="Analysis stages" />
 
       {state.phase === 'aborted' ? (
-        <Text size="sm" muted>
+        <p className="m-0 font-sans text-sm text-ink type-muted">
           Stopped. Anything already measured is kept below; nothing was charged for advice that was
           not written.
-        </Text>
+        </p>
       ) : null}
 
       {state.error && !state.error.beforeStream ? (
@@ -64,6 +65,6 @@ export function AuditProgress({ state, onRetry }: { state: SeoState; onRetry: ()
           action={state.error.retryable ? { label: 'Try Again', onClick: onRetry } : undefined}
         />
       ) : null}
-    </section>
+    </SeoPanel>
   );
 }

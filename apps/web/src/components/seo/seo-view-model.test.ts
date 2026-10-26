@@ -158,8 +158,9 @@ describe('formatting', () => {
   it('says how long ago in the nearest unit', () => {
     expect(formatRelative('2026-10-15T11:59:50.000Z', now)).toBe('just now');
     expect(formatRelative('2026-10-15T11:55:00.000Z', now)).toBe('5 min ago');
-    expect(formatRelative('2026-10-15T09:00:00.000Z', now)).toBe('3 h ago');
-    expect(formatRelative('2026-10-13T12:00:00.000Z', now)).toBe('2 d ago');
+    expect(formatRelative('2026-10-15T09:00:00.000Z', now)).toBe('3 hours ago');
+    expect(formatRelative('2026-10-13T12:00:00.000Z', now)).toBe('2 days ago');
+    expect(formatRelative('2026-10-15T11:00:00.000Z', now)).toBe('1 hour ago');
     expect(formatRelative('not a date', now)).toBe('');
   });
 
@@ -220,7 +221,7 @@ describe('reportAsText', () => {
         'SEO audit: https://example.com/',
         'Score 82/100, Grade B, 2026-10-15',
         'vs last run (2026-10-08): +11 from 71',
-        'On-page 80, Technical 90, Content 75, Authority 70 (estimated)',
+        'On-Page 80, Technical 90, Content 75, Authority 70 (estimated)',
         '',
         'What to fix (AI advice, simulation)',
         'Two things to fix first.',
