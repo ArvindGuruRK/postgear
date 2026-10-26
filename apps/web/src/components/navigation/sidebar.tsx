@@ -12,7 +12,8 @@ import {
 } from '@postgear/ui';
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
+import { BrandMark } from '@/components/brand/brand-mark';
 
 interface SidebarItemBase {
   label: string;
@@ -92,16 +93,13 @@ const TILE_LABEL = 'line-clamp-2 w-full break-words text-center type-ui text-[10
 export function Sidebar({
   items,
   bottomItems = [],
-  brand = 'P',
   brandLabel = 'PostGear',
   className,
 }: {
   items: SidebarItem[];
   /** Pinned to the bottom of the rail (e.g. Billing, Settings). */
   bottomItems?: SidebarItem[];
-  /** Monogram shown in the brand tile. */
-  brand?: ReactNode;
-  /** Accessible name of the brand tile. */
+  /** Accessible name of the brand mark. */
   brandLabel?: string;
   className?: string;
 }) {
@@ -109,17 +107,17 @@ export function Sidebar({
     <aside
       aria-label="Main"
       className={cn(
-        'flex w-20 shrink-0 flex-col items-center gap-6 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd',
+        'flex w-20 shrink-0 flex-col items-center gap-4 rounded-2xl border-2 border-outline bg-chrome pt-1 pb-3 shadow-surfaceMd',
         className,
       )}
     >
-      <span
-        role="img"
-        aria-label={brandLabel}
-        title={brandLabel}
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-outline bg-actionPrimary shadow-brutalSm"
-      >
-        <span className="type-heading text-2xl leading-none text-onActionPrimary">{brand}</span>
+      {/* The logo's Cog Badge in place of the old "P" tile. It carries its own
+          outline, so no tile border or shadow around it. 68px, a touch wider
+          than the nav tiles (w-16) so the brand leads the column; the gear's
+          teeth stop about as far from the top edge (pt-1 plus the mark's own
+          margin) as from the sides. */}
+      <span title={brandLabel} className="flex h-17 w-17 shrink-0 items-center justify-center">
+        <BrandMark label={brandLabel} className="h-17 w-17" />
       </span>
 
       <nav

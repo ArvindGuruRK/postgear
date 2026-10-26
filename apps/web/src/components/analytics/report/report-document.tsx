@@ -34,6 +34,7 @@ import {
   View,
 } from '@react-pdf/renderer';
 import type { ComponentProps, ReactNode } from 'react';
+import { BRAND_MARK, BRAND_WORDMARK } from '@/components/brand/brand-paths';
 import {
   chartGeometry,
   type ReportChannel,
@@ -85,8 +86,6 @@ const styles = StyleSheet.create({
     fontSize: 7.5,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  brandLetter: { color: C.onPrimary, fontSize: 9, fontWeight: 800, lineHeight: 1 },
-  brandName: { fontSize: 10, fontWeight: 700, letterSpacing: -0.3 },
   // Yellow, not blue: small blue text is too faint on the dark ground (violet
   // was tried on 2026-10-23 and the owner kept yellow).
   eyebrow: {
@@ -146,20 +145,52 @@ function Frame({
   );
 }
 
-/** The running header: the brand on the left, the report and page number on the right. */
+/**
+ * The logo's Cog Badge (components/brand/brand-mark.tsx) in the PDF's
+ * colours. The renderer has no `paint-order`, so each letter is drawn twice:
+ * stroked first, then filled on top, which leaves only the outer half of its
+ * outline showing, as on screen.
+ */
+function BrandMarkPdf({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox={BRAND_MARK.viewBox}>
+      <Path
+        d={BRAND_MARK.gear}
+        fill={C.primary}
+        stroke={C.outline}
+        strokeWidth={BRAND_MARK.outline}
+        strokeLinejoin="round"
+      />
+      {BRAND_MARK.letters.map((d) => (
+        <Path
+          key={`outline-${d}`}
+          d={d}
+          fill={C.onPrimary}
+          stroke={C.outline}
+          strokeWidth={BRAND_MARK.letterOutline}
+          strokeLinejoin="round"
+        />
+      ))}
+      {BRAND_MARK.letters.map((d) => (
+        <Path key={`fill-${d}`} d={d} fill={C.onPrimary} />
+      ))}
+    </Svg>
+  );
+}
+
+/** The running header: the logo on the left, the report and page number on the right. */
 function Header() {
   return (
     <View style={styles.header} fixed>
       <View style={styles.brand}>
-        <Frame
-          fill={C.primary}
-          radius={4}
-          style={{ width: 16, height: 16 }}
-          inner={{ alignItems: 'center', justifyContent: 'center' }}
+        <BrandMarkPdf size={20} />
+        <Svg
+          width={(10 * BRAND_WORDMARK.width) / BRAND_WORDMARK.height}
+          height={10}
+          viewBox={BRAND_WORDMARK.viewBox}
         >
-          <Text style={styles.brandLetter}>P</Text>
-        </Frame>
-        <Text style={styles.brandName}>PostGear</Text>
+          <Path d={BRAND_WORDMARK.d} fill={C.ink} />
+        </Svg>
       </View>
       <Text
         style={[styles.muted, { fontSize: 8 }]}

@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { ArrowRightIcon } from '@animateicons/react/lucide/arrow-right-icon';
 import { Button, cn, FormErrorMessage, MotionIcon, pressSm, Spinner } from '@postgear/ui';
 import type { ReactNode, Ref } from 'react';
+import { BrandMark, BrandWordmark } from '@/components/brand/brand-mark';
 import { ThemeToggle } from '@/components/navigation/theme-toggle';
 
 /**
@@ -74,18 +75,13 @@ export function OnboardingHeader({
   );
 }
 
-/** The rail's brand tile at header size, with the wordmark beside it from `sm`. */
+/** The rail's logo mark at header size, with the wordmark beside it from `sm`. */
 function Brand() {
   return (
-    <span className="flex min-w-0 items-center gap-2">
-      <span
-        aria-hidden
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-outline bg-actionPrimary"
-      >
-        <span className="type-heading text-base leading-none text-onActionPrimary">P</span>
-      </span>
-      <span className="hidden truncate type-heading text-lg text-ink sm:inline">PostGear</span>
-      <span className="sr-only sm:hidden">PostGear</span>
+    <span className="flex min-w-0 items-center gap-2 text-ink">
+      <BrandMark className="h-11 w-11" />
+      <BrandWordmark className="hidden h-5 sm:block" />
+      <span className="sr-only">PostGear</span>
     </span>
   );
 }

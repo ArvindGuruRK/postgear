@@ -1,6 +1,7 @@
 import { Heading, Text } from '@postgear/ui';
 import type { ReactNode } from 'react';
 import { AuthIllustration } from '@/components/auth/auth-illustration';
+import { BrandMark, BrandWordmark } from '@/components/brand/brand-mark';
 import { ThemeToggle } from '@/components/navigation/theme-toggle';
 
 // Unauthenticated shell: a two-panel split; illustration on the left, form on
@@ -36,14 +37,16 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen lg:grid lg:grid-cols-2">
       <div className="flex min-h-screen flex-col bg-secondary lg:min-h-0 lg:border-l-4 lg:border-outline">
         <header className="flex items-center justify-between gap-4 p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pr-[max(1.5rem,env(safe-area-inset-right))] pl-[max(1.5rem,env(safe-area-inset-left))]">
-          {/* No colour override: Heading already defaults to text-ink, the
-              system's normal foreground. The wordmark previously forced
+          {/* The logo: the Cog Badge and the wordmark. The wordmark stays in
+              text-ink, the system's normal foreground. It once forced
               text-actionPrimary, which put the page's loudest colour on
               something you only read, competing with the primary button
               below it: the one thing on these screens meant to be blue. */}
-          <Heading as="h1" level="h4">
-            PostGear
-          </Heading>
+          <h1 className="flex items-center gap-2 text-ink">
+            <BrandMark className="h-12 w-12" />
+            <BrandWordmark className="h-6" />
+            <span className="sr-only">PostGear</span>
+          </h1>
           <ThemeToggle />
         </header>
 
