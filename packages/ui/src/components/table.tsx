@@ -3,7 +3,9 @@ import { cn } from '../lib/utils';
 
 export const Table = forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="w-full overflow-x-auto rounded-md border-2 border-outline pg-scrollbar pg-scrollbar-primary">
+    // The card surface under the rows (2026-10-27, after the logo guide's
+    // table), the header and footer set into it on the inset layer.
+    <div className="w-full overflow-x-auto rounded-md border-2 border-outline bg-secondary pg-scrollbar pg-scrollbar-secondary">
       <table ref={ref} className={cn('w-full caption-bottom font-sans text-sm text-ink', className)} {...props} />
     </div>
   ),
@@ -14,7 +16,7 @@ export const TableHeader = forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('border-b-2 border-outline bg-secondary', className)} {...props} />
+  <thead ref={ref} className={cn('border-b-2 border-outline bg-inset', className)} {...props} />
 ));
 TableHeader.displayName = 'TableHeader';
 
@@ -29,7 +31,7 @@ export const TableFooter = forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tfoot ref={ref} className={cn('border-t-2 border-outline bg-secondary font-semibold', className)} {...props} />
+  <tfoot ref={ref} className={cn('border-t-2 border-outline bg-inset font-semibold', className)} {...props} />
 ));
 TableFooter.displayName = 'TableFooter';
 

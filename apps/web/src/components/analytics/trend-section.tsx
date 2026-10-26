@@ -124,7 +124,7 @@ function Performance({
           aria-label={`${metricLabel(metric)} per day`}
         />
       ) : (
-        <div className="flex h-64 items-center justify-center rounded-md border-2 border-outline bg-secondary">
+        <div className="flex h-64 items-center justify-center rounded-md border-2 border-outline bg-inset">
           <span className="font-sans text-sm text-ink type-muted">
             No daily metrics in this range yet.
           </span>
@@ -180,7 +180,7 @@ function ByChannel({
           ) : null
         }
       />
-      <div className="flex-1 rounded-md border-2 border-outline bg-secondary p-4">
+      <div className="flex-1 rounded-md border-2 border-outline bg-inset p-4">
         <BarList items={items} emptyMessage="No channel reported this metric in the range." />
       </div>
     </AnalyticsPanel>

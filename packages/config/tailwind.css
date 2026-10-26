@@ -46,6 +46,17 @@
    Path is relative to this file. */
 @source "../ui/src";
 
+/* ── Card corner (2026-10-27) ───────────────────────────────────────────
+   The one radius outside Tailwind's default scale: `rounded-card`, 12px,
+   for Card (and the panels built on it), a touch rounder than the 8px
+   `rounded-lg` it replaces, after the logo guide's cards. Only cards: the
+   owner tried the guide's corners on every component (a retuned scale) and
+   kept the original ones for buttons, menus, toggles, the sidebar and the
+   calendar. A fixed size, the same in every theme, so plain `@theme`. */
+@theme {
+  --radius-card: 0.75rem;
+}
+
 /* ── Theme mapping ──────────────────────────────────────────────────────
    `@theme inline` (rather than plain `@theme`) is used deliberately: it
    tells Tailwind to reference these CSS variables live at paint time
@@ -60,6 +71,8 @@
   /* App frame (sidebar, top bar) and form fields: see colors.css. */
   --color-chrome: var(--color-chrome);
   --color-field: var(--color-field);
+  /* A box you read inside a card, panel or dialog: see colors.css. */
+  --color-inset: var(--color-inset);
 
   /* Neubrutalism structural tokens (Sprint 0): see
      docs/sprint-documents/sprint-00-design-system.md and the header comment

@@ -147,7 +147,7 @@ function Ready({ post, now }: { post: PostAnalytics; now: Date }) {
         </DialogDescription>
       </DialogHeader>
 
-      <blockquote className="m-0 line-clamp-4 whitespace-pre-wrap break-words rounded-md border-2 border-outline bg-secondary p-4 font-sans text-sm font-medium text-ink">
+      <blockquote className="m-0 line-clamp-4 whitespace-pre-wrap break-words rounded-md border-2 border-outline bg-inset p-4 font-sans text-sm font-medium text-ink">
         {post.preview || <span className="opacity-60">Empty post</span>}
       </blockquote>
 
@@ -171,7 +171,7 @@ function ChannelMetrics({ channel, now }: { channel: PostChannelAnalytics; now: 
 
   return (
     <li
-      className="flex flex-col gap-3 rounded-md border-2 border-outline bg-secondary p-4"
+      className="flex flex-col gap-3 rounded-md border-2 border-outline bg-inset p-4"
       data-testid="post-analytics-channel"
       data-channel={channel.channelId}
     >

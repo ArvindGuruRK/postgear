@@ -18,14 +18,19 @@ const LAYER = 'pointer-events-none absolute left-0 top-0 -z-10 size-0 rounded-fu
 
 /**
  * The neutral control (Button's `secondary`, the calendar's Add Channel
- * tile): the card surface, filling with `bg-primary` (the page ground) on
- * hover, the same colour the calendar's Today button, week arrows and the
- * other chrome controls already hover to (the user's pick, 2026-10-21). The
- * label keeps the ink colour, which reads on it in every theme.
+ * tile): the card surface, filling with the brand yellow on hover, as the
+ * logo guide's buttons do (the owner's pick, 2026-10-27; it filled with the
+ * page ground before). Yellow is a flat fill, the same in every theme, so the
+ * label flips to the fixed black that pairs with it (`onActionLight`) once
+ * the circle covers the control (`data-filled`), and on the plain CSS hover.
  */
 export const fillHoverNeutral = cn(
   ROOT,
-  'bg-secondary text-ink',
-  'not-data-fill-hover:hover:bg-primary active:bg-primary',
+  'bg-secondary text-ink data-filled:text-onActionLight',
+  // The label fades over 100ms, beside the press's own move (lib/press.ts),
+  // so its flip keeps pace with the fill instead of snapping.
+  'transition-[translate,box-shadow,color] duration-100 ease-out',
+  'not-data-fill-hover:hover:bg-actionSecondary not-data-fill-hover:hover:text-onActionLight',
+  'active:bg-actionSecondary active:text-onActionLight',
 );
-export const fillHoverNeutralLayer = cn(LAYER, 'bg-primary');
+export const fillHoverNeutralLayer = cn(LAYER, 'bg-actionSecondary');

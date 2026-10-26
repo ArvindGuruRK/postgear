@@ -17,11 +17,16 @@ import { extendTailwindMerge } from 'tailwind-merge';
  * see the `--shadow-*` tokens there). Read as a shadow *colour*, they
  * survived a later `shadow-none`, so a component could never drop its
  * default shadow. They are box shadows, in the `shadow` group.
+ *
+ * And the card corner (`rounded-card`, packages/config/tailwind.css): a
+ * radius, so a `rounded-*` passed to a Card replaces it rather than both
+ * landing in the class list.
  */
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
       'bg-image': ['bg-stripes', 'bg-stripes-flow', 'bg-halftone'],
+      rounded: [{ rounded: ['card'] }],
       shadow: [
         {
           shadow: [

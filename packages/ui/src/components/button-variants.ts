@@ -19,8 +19,8 @@ const variants = cva(
       variant: {
         primary: 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover',
         // The card surface, told apart by its border and shadow, like the
-        // calendar's Add Channel tile. On hover a grey (light) or near-black
-        // (dark) fill wipes in from the pointer (lib/fill-hover.ts).
+        // calendar's Add Channel tile. On hover a yellow fill wipes in from
+        // the pointer and the label turns black (lib/fill-hover.ts).
         secondary: fillHoverNeutral,
         danger: 'bg-actionDanger text-onActionLight active:brightness-90',
         // The third button (2026-10-21): violet, for the one standout action that

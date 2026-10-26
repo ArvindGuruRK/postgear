@@ -152,7 +152,7 @@ export function ChangePlanDialog({
         <Stack gap="sm" className="mt-4">
           {preview ? (
             <div
-              className="rounded-md border-2 border-outline bg-secondary p-4"
+              className="rounded-md border-2 border-outline bg-inset p-4"
               data-testid="billing-preview"
               data-effective={preview.effective}
               data-amount={preview.amountDueCents}
@@ -178,7 +178,7 @@ export function ChangePlanDialog({
               )}
             </div>
           ) : previewError ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border-2 border-outline bg-secondary p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border-2 border-outline bg-inset p-4">
               <Text size="sm" className="text-dangerInk">
                 {previewError}
               </Text>

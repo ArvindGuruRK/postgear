@@ -87,7 +87,7 @@ export function SecretPanel({ secret, apiUrl }: SecretPanelProps) {
         <Text size="sm" weight="bold">
           Try it
         </Text>
-        <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border-2 border-outline bg-secondary p-3 font-sans text-xs text-ink">
+        <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border-2 border-outline bg-inset p-3 font-sans text-xs text-ink">
           {curlExample(apiUrl, secret)}
         </pre>
       </Stack>

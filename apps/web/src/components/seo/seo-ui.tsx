@@ -41,8 +41,8 @@ export const CATEGORY_META: Record<SeoCategory, { icon: LucideIcon; covers: stri
   },
 };
 
-/** A light box inside a panel: the card layer, for what you read. */
-export const INSET = 'rounded-lg border-2 border-outline bg-secondary';
+/** A box set into its panel (the inset layer), for what you read. */
+export const INSET = 'rounded-lg border-2 border-outline bg-inset';
 
 /** "Thu 22 Oct, 09:15" in the viewer's locale: a run's moment. */
 export function formatRunMoment(iso: string): string {

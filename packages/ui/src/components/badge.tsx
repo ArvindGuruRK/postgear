@@ -2,8 +2,10 @@ import { type VariantProps, cva } from 'class-variance-authority';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 
+// A tag, not a pill (2026-10-27): the logo guide's 6px corners and tighter
+// padding, which the owner preferred to the round sticker.
 const badgeVariants = cva(
-  'inline-flex select-none items-center gap-1.5 rounded-full border-2 border-outline px-3 py-1 text-xs font-bold',
+  'inline-flex select-none items-center gap-1.5 rounded-md border-2 border-outline px-2 py-0.5 text-xs font-bold',
   {
     variants: {
       variant: {

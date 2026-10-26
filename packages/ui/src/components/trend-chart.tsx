@@ -309,7 +309,7 @@ export function TrendChart({
         height={height}
         viewBox={`0 0 ${scales.width} ${scales.height}`}
         preserveAspectRatio="none"
-        className="block select-none overflow-visible rounded-md border-2 border-outline bg-secondary outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+        className="block select-none overflow-visible rounded-md border-2 border-outline bg-inset outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
         onPointerMove={(event) =>
           hasData && setCursor(nearestIndex(event.clientX, event.currentTarget))
         }

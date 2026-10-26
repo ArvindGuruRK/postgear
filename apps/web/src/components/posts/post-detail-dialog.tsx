@@ -89,7 +89,7 @@ export function PostDetailDialog({
         </DialogHeader>
 
         <div className="mt-4 flex flex-col gap-4">
-          <blockquote className="m-0 whitespace-pre-wrap break-words rounded-md border-2 border-outline bg-secondary p-4 font-sans text-sm font-medium text-ink shadow-surfaceSm">
+          <blockquote className="m-0 whitespace-pre-wrap break-words rounded-md border-2 border-outline bg-inset p-4 font-sans text-sm font-medium text-ink shadow-surfaceSm">
             {post.preview || <span className="opacity-60">Empty post</span>}
           </blockquote>
 
@@ -101,7 +101,7 @@ export function PostDetailDialog({
               return (
                 <li
                   key={channel.channelId}
-                  className="flex items-start gap-3 rounded-md border-2 border-outline bg-secondary p-3"
+                  className="flex items-start gap-3 rounded-md border-2 border-outline bg-inset p-3"
                 >
                   <Avatar size="sm">
                     {channel.picture ? <AvatarImage src={channel.picture} alt="" /> : null}

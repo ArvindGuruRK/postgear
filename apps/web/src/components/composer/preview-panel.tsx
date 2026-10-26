@@ -175,7 +175,7 @@ export function PreviewPanel({
           </section>
 
           {active.channelProblem || active.issues.length > 0 ? (
-            <div className="rounded-md border-2 border-outline bg-secondary p-3">
+            <div className="rounded-md border-2 border-outline bg-inset p-3">
               <Text size="sm" weight="bold">
                 Before this can be queued for {active.channel.name}
               </Text>

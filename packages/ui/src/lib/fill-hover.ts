@@ -9,8 +9,10 @@ import { gsap, useGSAP } from './gsap';
  * until it covers the control, trails the pointer while it moves, and on
  * leaving drifts out through the edge the pointer left by as it shrinks.
  * While it is open the control carries `data-filled`, so its label can flip
- * colour; that flag drops only once the circle has fully gone, so a label
- * never matches the fill it still sits on.
+ * colour. The flag follows the fill, not the pointer: it lands a beat into
+ * the grow, once the circle is under the label, and drops a beat into the
+ * shrink, as it pulls away (2026-10-27; it used to wait for the whole shrink,
+ * which left the label dark on the bare card for 0.3s after leaving).
  *
  * Only with a real mouse, and never under reduced motion. When the effect is
  * live the control carries `data-fill-hover`; style the plain CSS hover with
@@ -33,6 +35,9 @@ const EASE = 'power2.out';
 const OVERSHOOT = 0.2;
 /** Px beyond the edge's blur (0.5rem in fill-hover-classes.ts) to cover. */
 const FEATHER = 16;
+/** Seconds into the grow, and into the shrink, that the label flips. */
+const LABEL_IN = 0.08;
+const LABEL_OUT = 0.08;
 
 export function useFillHover({
   enabled = true,
@@ -53,6 +58,16 @@ export function useFillHover({
       mm.add(LIVE, () => {
         root.dataset.fillHover = '';
 
+        /** The pending label flip, so a quick in-and-out never lands out of order. */
+        let flip: gsap.core.Tween | null = null;
+        const flipLabel = (filled: boolean, delay: number) => {
+          flip?.kill();
+          flip = gsap.delayedCall(delay, () => {
+            if (filled) root.dataset.filled = '';
+            else delete root.dataset.filled;
+          });
+        };
+
         /** The pointer inside the control, clamped to its box. */
         const point = (event: PointerEvent) => {
           const box = root.getBoundingClientRect();
@@ -70,7 +85,7 @@ export function useFillHover({
           // wherever it sits inside it, square icon buttons included, plus
           // room for the soft edge so no far corner is left half-filled.
           const size = 2 * (Math.hypot(width, height) + FEATHER);
-          root.dataset.filled = '';
+          flipLabel(true, LABEL_IN);
           gsap.killTweensOf(fill);
           gsap.set(fill, { width: size, height: size, x, y, xPercent: -50, yPercent: -50, scale: 0 });
           gsap.to(fill, { scale: 1, duration: GROW, ease: EASE });
@@ -87,15 +102,13 @@ export function useFillHover({
           const past = (at: number, span: number) =>
             at > span * 0.9 ? at + span * OVERSHOOT : at < span * 0.1 ? at - span * OVERSHOOT : at;
           gsap.killTweensOf(fill);
+          flipLabel(false, LABEL_OUT);
           gsap.to(fill, {
             x: past(x, width),
             y: past(y, height),
             scale: 0,
             duration: SHRINK,
             ease: EASE,
-            onComplete: () => {
-              delete root.dataset.filled;
-            },
           });
         };
 
@@ -106,6 +119,7 @@ export function useFillHover({
           root.removeEventListener('pointerenter', enter);
           root.removeEventListener('pointermove', move);
           root.removeEventListener('pointerleave', leave);
+          flip?.kill();
           delete root.dataset.fillHover;
           delete root.dataset.filled;
           gsap.killTweensOf(fill);

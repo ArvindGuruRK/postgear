@@ -64,6 +64,14 @@
        dark look is unchanged; the dark themes further down set all four. */
     --color-chrome: #2a2a2a;
     --color-field: #2a2a2a;
+    /* Inset (2026-10-27): a box you read inside a card, panel, dialog or
+       sheet (a table's header, a chart's well, quoted post text, a code
+       sample). Between the page and the card, so it reads as set into its
+       container: page #121212, card #2a2a2a, inset #1e1e1e, the owner's
+       three-shade dark from the logo guide. Each dark theme below sets its
+       own, halfway from its page to its frame. Never for something you
+       press or type in: those stay on the card and field layers. */
+    --color-inset: #1e1e1e;
     --color-forth: #1d4ed8;
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
@@ -77,6 +85,9 @@
     --color-secondary: #ffffff;
     --color-chrome: #ffffff;
     --color-field: #ffffff;
+    /* Light keeps an inset box on its card colour (the look before the token
+       existed), so this follows each light theme's --color-secondary. */
+    --color-inset: var(--color-secondary);
     --color-forth: #1d4ed8;
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
@@ -231,7 +242,9 @@
 
    Each theme is a whole system, four layers deep: page (--color-primary),
    frame (--color-chrome: sidebar, top bar), cards (--color-secondary) and
-   fields (--color-field), plus an ink and outline tinted toward the hue and,
+   fields (--color-field), plus, in dark, the inset box (--color-inset)
+   halfway from the page to the frame (Aurora's from its page to its teal
+   cards, since its frame is violet), plus an ink and outline tinted toward the hue and,
    for some, a shadow weight that suits it. In light, the frame sits a shade
    deeper than the page, the cards a shade lighter and the fields pure white.
    In dark, the page is the deepest layer and each one above it a step
@@ -403,6 +416,7 @@
     --color-chrome: #131c33;
     --color-secondary: #18223c;
     --color-field: #232e4e;
+    --color-inset: #0f172a;
     --color-ink: #e6ebf7;
     --color-outline: #02050d;
   }
@@ -414,6 +428,7 @@
     --color-chrome: #12221a;
     --color-secondary: #17291f;
     --color-field: #1e3428;
+    --color-inset: #0f1c15;
     --color-ink: #e4f1e8;
     --color-outline: #020805;
   }
@@ -424,6 +439,7 @@
     --color-chrome: #1f142b;
     --color-secondary: #261a33;
     --color-field: #352641;
+    --color-inset: #1a1124;
     --color-ink: #f0e7f7;
     --color-outline: #07030b;
   }
@@ -434,6 +450,7 @@
     --color-chrome: #0e2226;
     --color-secondary: #12292e;
     --color-field: #183439;
+    --color-inset: #0b1c1f;
     --color-ink: #e0f2f3;
     --color-outline: #010708;
   }
@@ -445,6 +462,7 @@
     --color-chrome: #231a14;
     --color-secondary: #2a2019;
     --color-field: #392c23;
+    --color-inset: #1d1510;
     --color-ink: #f5ebe1;
     --color-outline: #070402;
   }
@@ -457,6 +475,7 @@
     --color-chrome: #0a0a0a;
     --color-secondary: #141414;
     --color-field: #1c1c1c;
+    --color-inset: #050505;
     --color-ink: #f2f2f2;
     --color-outline: #3d3d3d;
   }
@@ -468,6 +487,7 @@
     --color-chrome: #1c1538;
     --color-secondary: #221a40;
     --color-field: #2f2656;
+    --color-inset: #17112d;
     --color-ink: #ece8ff;
     --color-outline: #05030d;
   }
@@ -479,6 +499,7 @@
     --color-chrome: #261310;
     --color-secondary: #2d1814;
     --color-field: #3e2520;
+    --color-inset: #1f0f0d;
     --color-ink: #f8e9e4;
     --color-outline: #080302;
   }
@@ -490,6 +511,7 @@
     --color-chrome: #1d1638;
     --color-secondary: #102629;
     --color-field: #17343c;
+    --color-inset: #0c1f22;
     --color-ink: #e3f4f2;
     --color-outline: #02080a;
   }
@@ -501,6 +523,7 @@
     --color-chrome: #1a2029;
     --color-secondary: #1f2630;
     --color-field: #28303c;
+    --color-inset: #151a22;
     --color-ink: #e8edf3;
     --color-outline: #04060a;
   }
@@ -512,6 +535,7 @@
     --color-chrome: #291029;
     --color-secondary: #311631;
     --color-field: #432241;
+    --color-inset: #200d20;
     --color-ink: #fbe8f7;
     --color-outline: #060206;
   }

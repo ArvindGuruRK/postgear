@@ -65,7 +65,7 @@ export function TopPosts({
       />
 
       {posts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-md border-2 border-outline bg-secondary p-8 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-md border-2 border-outline bg-inset p-8 text-center">
           <span className="font-sans text-sm text-ink type-muted">
             No published posts with metrics in this range.
           </span>
@@ -81,7 +81,7 @@ export function TopPosts({
         </div>
       ) : (
         <>
-          <ol className="m-0 flex list-none flex-col overflow-hidden rounded-md border-2 border-outline bg-secondary p-0">
+          <ol className="m-0 flex list-none flex-col overflow-hidden rounded-md border-2 border-outline bg-inset p-0">
             {shown.map((post) => (
               <Row
                 key={`${post.channelId}:${post.postId}`}

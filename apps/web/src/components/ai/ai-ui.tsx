@@ -24,8 +24,8 @@ export {
   SEGMENTED_TRIGGER,
 } from '../analytics/analytics-ui';
 
-/** A light bordered box: the card layer, for what you read or pick. */
-export const INSET = 'rounded-lg border-2 border-outline bg-secondary';
+/** A box set into its panel (the inset layer), for what you read or pick. */
+export const INSET = 'rounded-lg border-2 border-outline bg-inset';
 
 /** What each copilot tool looks like, wherever it is named. */
 export const TOOL_ICONS: Record<CopilotToolName, LucideIcon> = {

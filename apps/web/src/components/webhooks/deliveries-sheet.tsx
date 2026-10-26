@@ -101,7 +101,7 @@ export function DeliveriesSheet({
                   data-testid="webhook-delivery"
                   data-status={delivery.status}
                   data-event={delivery.event}
-                  className="rounded-md border-2 border-outline bg-secondary p-3"
+                  className="rounded-md border-2 border-outline bg-inset p-3"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-sans text-sm font-semibold text-ink">{delivery.event}</span>

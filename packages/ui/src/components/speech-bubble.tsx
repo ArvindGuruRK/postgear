@@ -18,7 +18,7 @@ import { cn } from '../lib/utils';
  * repeated on the tail: a rotated box-shadow would point the wrong way.
  */
 const bubbleVariants = cva(
-  'relative rounded-lg border-2 border-outline p-4 font-sans text-sm shadow-surfaceSm',
+  'relative rounded-card border-2 border-outline p-4 font-sans text-sm shadow-surfaceSm',
   {
     variants: {
       variant: {

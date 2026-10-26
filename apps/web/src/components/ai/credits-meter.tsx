@@ -69,7 +69,7 @@ export function CreditsMeter({
         data-state={failed ? 'failed' : 'loading'}
       >
         {failed ? (
-          <div className="flex items-center justify-between gap-3 rounded-md border-2 border-outline bg-secondary px-3 py-2">
+          <div className="flex items-center justify-between gap-3 rounded-md border-2 border-outline bg-inset px-3 py-2">
             <Text size="sm" muted as="span">
               Credits unavailable
             </Text>
