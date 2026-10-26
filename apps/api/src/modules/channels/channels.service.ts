@@ -63,6 +63,9 @@ export type ChannelSearchHit = Pick<
   'id' | 'name' | 'profile' | 'picture' | 'providerIdentifier' | 'providerName' | 'color' | 'health'
 >;
 
+/** A page / channel / board as the browser's picker sees it: never its token. */
+export type PublicProviderEntity = Omit<ProviderEntity, 'accessToken'>;
+
 /** What `GET /channels` says about the plan's ceiling (Sprint 8). */
 export interface ChannelLimit {
   used: number;
@@ -335,8 +338,16 @@ export class ChannelsService {
     }
   }
 
-  /** The pages / channels / boards a half-connected channel can be pointed at. */
-  async listEntities(orgId: string, channelId: string): Promise<ProviderEntity[]> {
+  /**
+   * The pages / channels / boards a half-connected channel can be pointed at.
+   *
+   * This goes to the browser, so it is built from the fields the picker shows
+   * and nothing else: Facebook and Instagram return each Page's own publishing
+   * token with the list, and an allow-list (rather than deleting that one
+   * field) keeps any secret a provider adds later on the server too. The token
+   * is only ever used server-side, in `selectEntity`, which fetches it afresh.
+   */
+  async listEntities(orgId: string, channelId: string): Promise<PublicProviderEntity[]> {
     const channel = await this.requireCredentials(orgId, channelId);
     const provider = this.manager.get(channel.providerIdentifier);
 
@@ -344,7 +355,15 @@ export class ChannelsService {
       return [];
     }
 
-    return provider.listEntities(channel.token);
+    const entities = await provider.listEntities(channel.token);
+
+    return entities.map(({ id, name, picture, username, detail }) => ({
+      id,
+      name,
+      picture,
+      username,
+      detail,
+    }));
   }
 
   /** Commits the user's choice and makes the channel publishable. */

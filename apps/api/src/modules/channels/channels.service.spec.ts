@@ -21,7 +21,7 @@ jest.mock('@postgear/social-core', () => ({
   })),
 }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { prisma } from '@postgear/db';
 import {
@@ -232,5 +232,72 @@ describe('ChannelsService: order and disabling', () => {
       id: 'a',
       disabled: true,
     });
+  });
+});
+
+/**
+ * The page picker's list goes to the browser. Facebook and Instagram return
+ * each Page's own publishing token with it, so the service sends only the
+ * fields the picker shows, and the token stays on the server.
+ */
+describe('ChannelsService: the page picker list', () => {
+  const listEntities = jest.fn();
+  let repository: { getWithCredentials: jest.Mock };
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    listEntities.mockResolvedValue([
+      {
+        id: 'page-1',
+        name: 'Acme Page',
+        picture: 'https://cdn.example/acme.png',
+        detail: '1,200 followers',
+        accessToken: 'page-token-secret',
+      },
+    ]);
+    Object.assign(fakeProvider, { listEntities, selectEntity: jest.fn() });
+    repository = {
+      getWithCredentials: jest.fn().mockResolvedValue({
+        id: 'ch_1',
+        providerIdentifier: 'facebook',
+        token: 'user-token',
+      }),
+    };
+    service = new ChannelsService(
+      repository as unknown as ChannelsRepository,
+      {} as unknown as ChannelOAuthService,
+      { get: () => 'http://localhost:3001' } as unknown as ConfigService,
+      {} as unknown as SchedulingService,
+      {} as unknown as EntitlementsService,
+    );
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(fakeProvider, 'listEntities');
+    Reflect.deleteProperty(fakeProvider, 'selectEntity');
+  });
+
+  it('never sends a page token to the browser', async () => {
+    const entities = await service.listEntities('org_1', 'ch_1');
+
+    expect(listEntities).toHaveBeenCalledWith('user-token');
+    expect(entities).toEqual([
+      {
+        id: 'page-1',
+        name: 'Acme Page',
+        picture: 'https://cdn.example/acme.png',
+        username: undefined,
+        detail: '1,200 followers',
+      },
+    ]);
+    expect(JSON.stringify(entities)).not.toContain('page-token-secret');
+  });
+
+  it('is scoped to the workspace: another workspace’s channel is a 404', async () => {
+    repository.getWithCredentials.mockResolvedValue(null);
+
+    await expect(service.listEntities('org_2', 'ch_1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(repository.getWithCredentials).toHaveBeenCalledWith('org_2', 'ch_1');
+    expect(listEntities).not.toHaveBeenCalled();
   });
 });
