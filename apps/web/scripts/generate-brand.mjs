@@ -1,7 +1,7 @@
 /**
  * Generates the PostGear logo: the shapes the app draws and every icon file.
  *
- *     node apps/web/scripts/generate-brand.mjs --mark-font <LuckiestGuy.ttf> --word-font <Baby Barbie.otf>
+ *     node apps/web/scripts/generate-brand.mjs --mark-font <LuckiestGuy.ttf> --word-font <Jumping Chick.ttf>
  *
  * Run once by hand; everything it writes is committed. Nothing loads a logo
  * font at runtime: the letters are outlined to SVG paths here, so the logo
@@ -12,36 +12,34 @@
  * - The mark, the "Cog Badge": a ten-tooth blue gear with an ink outline and
  *   no hard shadow, holding "PG" in Luckiest Guy, white with a thin ink
  *   border on each letter.
- * - The wordmark: "PostGear" in Baby Barbie, one colour (the component fills
- *   it with the surrounding text colour).
+ * - The wordmark: "POSTGEAR" in Jumping Chick capitals, one colour (the
+ *   component fills it with the surrounding text colour). It replaced Baby
+ *   Barbie on 2026-10-27, whose licence is personal use only.
  *
  * ## The fonts and their licences
  *
  * Neither font file is committed: only the outlined shapes are.
  * - Luckiest Guy (Astigmatic): SIL Open Font License, commercial use fine.
  *   From Google Fonts (github.com/google/fonts, ofl/luckiestguy).
- * - Baby Barbie: 1001Fonts "Free For Personal Use". A logo for a business
- *   needs the author's written permission; the owner asked for it on
- *   2026-10-26. If the answer is no, swap the wordmark (see WORD below) and
- *   re-run.
+ * - Jumping Chick (Khurasan Studio, khurasanstudio.com): its notes say "100%
+ *   free for personal use & commercial use".
  *
  * ## What it writes
  *
  * - src/components/brand/brand-paths.ts: the path data `BrandMark` and
  *   `BrandWordmark` (src/components/brand/brand-mark.tsx) and the PDF draw.
- * - src/app/icon.svg (the tab icon, from the tab cut: TAB_GEAR below) and
- *   src/app/apple-icon.png (180, on a white ground): Next's app icon
- *   file conventions.
+ * - src/app/icon.svg and src/app/favicon.ico (the tab icon: the Monogram
+ *   Tile, TAB_TILE below) and src/app/apple-icon.png (180, on a white
+ *   ground): Next's app icon file conventions.
  * - public/brand/icon-192.png, icon-512.png, icon-maskable-512.png: the web
  *   manifest's icons (src/app/manifest.ts).
  * - public/logo.svg: the mark on its own, for anything outside the app.
  *
- * It does not write src/app/favicon.ico. That file is the owner's own
- * favicon.io export (2026-10-27), kept with the rest of that set in
- * public/favicon_io/; it is only the fallback for browsers without SVG
- * icons. Keep it small (16 to 48 px): a bigger frame makes Next announce the
- * .ico at that size, and Chrome then prefers it over icon.svg and shrinks the
- * bitmap, which looks blurry in the tab.
+ * favicon.ico is only the fallback for browsers without SVG icons. Keep its
+ * frames small (16 to 48 px): a bigger frame makes Next announce the .ico at
+ * that size, and Chrome then prefers it over icon.svg and shrinks the bitmap,
+ * which looks blurry in the tab. The owner's earlier favicon.io export is
+ * kept in public/favicon_io/.
  *
  * The icon files carry literal colours because they are images, read before
  * any stylesheet; they match the flat brand tokens in
@@ -69,15 +67,33 @@ const GROUND = WHITE;
 const GRID = 64;
 const OUTLINE = 3; // the gear's outline, the app's border-2 scaled to the grid
 const LETTER_OUTLINE = 2.4; // painted under each letter, so 1.2 shows outside it
+// The badge wears a sticker (the owner's pick, 2026-10-27): a white band and
+// an ink rim round the gear's own outline, so 2 of band and then 1.2 of rim
+// show outside it, over a hard ink shadow 2 down and right (the app's 2px
+// drop shadow at the 64px sidebar size). The app icons and logo.svg wear it
+// too, the browser-tab icon does not (see `tab` below); the wordmark stays
+// plain.
+const MARK_BAND = 7;
+const MARK_RIM = 9.4;
+const MARK_SHADOW = 2;
 const GEAR = { cx: 32, cy: 32, rOut: 27.5, rRoot: 22.5, teeth: 10, halfRoot: 10, halfTip: 6.5 };
 const LETTERS = { text: 'PG', cx: 32, cy: 32, w: 29, h: 22 };
-// The browser-tab cut (icon.svg): the same badge pushed to the
-// edge of the square with shallower teeth and bigger letters, so it is as big
-// in a 16 px tab as the full-bleed icons beside it. The inner circle (26 less
-// half the outline) still clears the letters' corners and their border.
-const TAB_GEAR = { ...GEAR, rOut: 30.4, rRoot: 26 };
-const TAB_LETTERS = { ...LETTERS, w: 36, h: 27.5 };
-const WORD = 'PostGear';
+// The browser-tab icon is not the gear but a Monogram Tile (the owner's pick,
+// 2026-10-27): a blue rounded square to the edge of the square, white PG
+// filling it. At 16 px the round gear filled only 69% of the square and its
+// teeth and small letters read as clutter beside other sites' square icons;
+// a white tile behind the gear was tried and still looked small. The border
+// is 4 units, one crisp ink pixel at 16 px.
+const TAB_TILE = { border: 4, radius: 12 };
+const TAB_LETTERS = { ...LETTERS, w: 46, h: 34 };
+// Luckiest Guy is very heavy, so the tab's PG is thinned (the owner asked,
+// 2026-10-27): this much is shaved off each letter, half from each side of
+// every stroke, and the thin ink edge follows the new edge.
+const TAB_THIN = 3;
+// The tab icon's frames in favicon.ico (see the note at the top on sizes).
+const ICO_SIZES = [16, 32, 48];
+// All capitals (the owner's pick, 2026-10-27); screen readers still get "PostGear" from `label`.
+const WORD = 'POSTGEAR';
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -161,20 +177,83 @@ function wordmark(face) {
   };
 }
 
-/** The mark as a standalone SVG body (literal colours, for image files). */
+/** One white letter with its thin ink border (literal colours, for image files). */
+const letterSvg = (d) =>
+  `<path fill="${WHITE}" stroke="${INK}" stroke-width="${LETTER_OUTLINE}" stroke-linejoin="round" paint-order="stroke" d="${d}"/>`;
+
+/**
+ * The mark as a standalone SVG body (literal colours, for image files), in
+ * its sticker: the shadow, the rim and the band under the gear, as the app
+ * draws it (src/components/brand/brand-mark.tsx).
+ */
 function markBody(gear, letters) {
-  const letter = (d) =>
-    `<path fill="${WHITE}" stroke="${INK}" stroke-width="${LETTER_OUTLINE}" stroke-linejoin="round" paint-order="stroke" d="${d}"/>`;
-  return `<path fill="${BLUE}" stroke="${INK}" stroke-width="${OUTLINE}" stroke-linejoin="round" d="${gear}"/>${letters.map(letter).join('')}`;
+  const layer = (fill, width, extra = '') =>
+    `<path fill="${fill}" stroke="${fill}" stroke-width="${width}" stroke-linejoin="round"${extra} d="${gear}"/>`;
+  return [
+    layer(INK, MARK_RIM, ` transform="translate(${MARK_SHADOW} ${MARK_SHADOW})"`),
+    layer(INK, MARK_RIM),
+    layer(WHITE, MARK_BAND),
+    `<path fill="${BLUE}" stroke="${INK}" stroke-width="${OUTLINE}" stroke-linejoin="round" d="${gear}"/>`,
+    ...letters.map(letterSvg),
+  ].join('');
 }
 
-const svg = (body, ground) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${GRID} ${GRID}"><title>PostGear</title>${ground ? `<rect width="${GRID}" height="${GRID}" fill="${ground}"/>` : ''}${body}</svg>`;
+/**
+ * The square the sticker fills, as [x, y, size]: the rim reaches half its
+ * width past the gear's teeth, and the shadow a little further down and right.
+ */
+const stickerBox = ({ cx, cy, rOut }) => {
+  const r = rOut + MARK_RIM / 2;
+  return [round(cx - r, 2), round(cy - r, 2), round(2 * r + MARK_SHADOW, 2)];
+};
 
-/** The mark scaled down onto a solid ground, for home-screen and install icons. */
-function padded(body, scale) {
-  const t = round((GRID - GRID * scale) / 2, 2);
-  return svg(`<g transform="translate(${t} ${t}) scale(${scale})">${body}</g>`, GROUND);
+const svg = (body, ground, [x, y, size] = [0, 0, GRID]) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${size} ${size}"><title>PostGear</title>${ground ? `<rect x="${x}" y="${y}" width="${size}" height="${size}" fill="${ground}"/>` : ''}${body}</svg>`;
+
+/**
+ * The mark on a solid ground, for home-screen and install icons: the sticker
+ * spans `scale` of the square, centred.
+ */
+function padded(body, box, scale) {
+  const s = round((GRID * scale) / box[2], 4);
+  const tx = round((GRID - box[2] * s) / 2 - box[0] * s, 2);
+  const ty = round((GRID - box[2] * s) / 2 - box[1] * s, 2);
+  return svg(`<g transform="translate(${tx} ${ty}) scale(${s})">${body}</g>`, GROUND);
+}
+
+/** The Monogram Tile, for the browser tab (icon.svg and favicon.ico). */
+function monogram(letters) {
+  const { border, radius } = TAB_TILE;
+  const edge = GRID - border;
+  const d = letters.join('');
+  // A mask keeps the inside of the letters less a band along their edge, so
+  // a layer drawn through it is the letters shaved by half the band's width.
+  const shaved = (id, band) =>
+    `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${GRID}" height="${GRID}"><path fill="${WHITE}" stroke="#000" stroke-width="${band}" stroke-linejoin="round" d="${d}"/></mask>`;
+  return svg(
+    `<defs>${shaved('ink', TAB_THIN - LETTER_OUTLINE)}${shaved('white', TAB_THIN)}</defs>` +
+      `<rect x="${border / 2}" y="${border / 2}" width="${edge}" height="${edge}" rx="${radius}" fill="${BLUE}" stroke="${INK}" stroke-width="${border}"/>` +
+      `<path fill="${INK}" mask="url(#ink)" d="${d}"/><path fill="${WHITE}" mask="url(#white)" d="${d}"/>`,
+  );
+}
+
+/** An .ico holding one PNG frame per size (PNG frames work in every current browser). */
+function ico(frames) {
+  const head = Buffer.alloc(6 + 16 * frames.length);
+  head.writeUInt16LE(1, 2); // type: icon
+  head.writeUInt16LE(frames.length, 4);
+  let offset = head.length;
+  frames.forEach(({ size, data }, i) => {
+    const at = 6 + 16 * i;
+    head.writeUInt8(size, at);
+    head.writeUInt8(size, at + 1);
+    head.writeUInt16LE(1, at + 4); // colour planes
+    head.writeUInt16LE(32, at + 6); // bits per pixel
+    head.writeUInt32LE(data.length, at + 8);
+    head.writeUInt32LE(offset, at + 12);
+    offset += data.length;
+  });
+  return Buffer.concat([head, ...frames.map((f) => f.data)]);
 }
 
 const png = (text, size) =>
@@ -192,13 +271,15 @@ const word = wordmark(wordFace);
 
 const ts = `// Generated by apps/web/scripts/generate-brand.mjs: do not edit by hand.
 // The PostGear logo as path data. The mark's letters are Luckiest Guy (OFL),
-// the wordmark is Baby Barbie; both outlined, so no font is ever loaded.
+// the wordmark is Jumping Chick; both outlined, so no font is ever loaded.
 
 /** The Cog Badge on a ${GRID} x ${GRID} grid: the gear, then one path per letter of "PG". */
 export const BRAND_MARK = {
   viewBox: '0 0 ${GRID} ${GRID}',
   outline: ${OUTLINE},
   letterOutline: ${LETTER_OUTLINE},
+  band: ${MARK_BAND},
+  rim: ${MARK_RIM},
   gear: '${gear}',
   letters: [${letters.map((d) => `\n    '${d}'`).join(',')},\n  ],
 } as const;
@@ -213,21 +294,26 @@ export const BRAND_WORDMARK = {
 `;
 
 const body = markBody(gear, letters);
-const flat = svg(body);
-const tab = svg(markBody(gearPath(TAB_GEAR), letterPaths(markFace, TAB_LETTERS)));
+const box = stickerBox(GEAR);
+const flat = svg(body, null, box);
+const tab = monogram(letterPaths(markFace, TAB_LETTERS));
 
 const out = (...p) => join(WEB, ...p);
 await mkdir(out('src', 'components', 'brand'), { recursive: true });
 await mkdir(out('public', 'brand'), { recursive: true });
 await writeFile(out('src', 'components', 'brand', 'brand-paths.ts'), ts);
 await writeFile(out('src', 'app', 'icon.svg'), tab);
-await writeFile(out('src', 'app', 'apple-icon.png'), await png(padded(body, 0.78), 180));
-await writeFile(out('public', 'brand', 'icon-192.png'), await png(padded(body, 0.78), 192));
-await writeFile(out('public', 'brand', 'icon-512.png'), await png(padded(body, 0.78), 512));
+await writeFile(
+  out('src', 'app', 'favicon.ico'),
+  ico(await Promise.all(ICO_SIZES.map(async (size) => ({ size, data: await png(tab, size) })))),
+);
+await writeFile(out('src', 'app', 'apple-icon.png'), await png(padded(body, box, 0.8), 180));
+await writeFile(out('public', 'brand', 'icon-192.png'), await png(padded(body, box, 0.8), 192));
+await writeFile(out('public', 'brand', 'icon-512.png'), await png(padded(body, box, 0.8), 512));
 // Maskable icons get cropped to a circle or squircle, so the mark sits inside the safe zone.
 await writeFile(
   out('public', 'brand', 'icon-maskable-512.png'),
-  await png(padded(body, 0.62), 512),
+  await png(padded(body, box, 0.64), 512),
 );
 await writeFile(out('public', 'logo.svg'), flat);
 

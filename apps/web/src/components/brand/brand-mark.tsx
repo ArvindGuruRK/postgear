@@ -7,11 +7,17 @@ import { BRAND_MARK, BRAND_WORDMARK } from './brand-paths';
  * `apps/web/scripts/generate-brand.mjs` with the favicon and app icons, so
  * every copy of the logo comes from one source. Never redraw it with text.
  *
- * Colours are the flat brand tokens, which no theme changes, so the logo
+ * Colours are the flat brand tokens, which no theme changes, so the mark
  * looks the same in every theme like the browser-tab icon does: the gear is
  * actionPrimary blue, the letters white, and both outlines the fixed ink of
  * onActionLight (not the theme's outline). The wordmark is the one part that
- * follows the theme: it takes the surrounding text colour (`fill-current`).
+ * follows the theme: it takes the surrounding text colour (`fill-current`),
+ * so it is ink in light mode and white in dark mode.
+ *
+ * The mark wears a sticker: an ink rim and a white band round the gear's own
+ * outline, with a hard 2px ink shadow under it all. It is the same in light
+ * and dark mode. The wordmark stays plain (the owner's pick, 2026-10-27,
+ * after comparing a sticker on both).
  *
  * Both are decorative by default. Pass `label` when the logo is the only
  * thing naming the product in that spot, and it is announced as an image.
@@ -20,12 +26,29 @@ export function BrandMark({ className, label }: { className?: string; label?: st
   return (
     <svg
       viewBox={BRAND_MARK.viewBox}
-      className={cn('shrink-0', className)}
+      // overflow-visible: the sticker reaches past the gear's own box.
+      className={cn(
+        'shrink-0 overflow-visible drop-shadow-[2px_2px_0_var(--color-onActionLight)]',
+        className,
+      )}
       role="img"
       aria-label={label}
       aria-hidden={label ? undefined : true}
       focusable="false"
     >
+      {/* The sticker's rim and white band, under the gear's own outline. */}
+      <path
+        d={BRAND_MARK.gear}
+        className="fill-onActionLight stroke-onActionLight"
+        strokeWidth={BRAND_MARK.rim}
+        strokeLinejoin="round"
+      />
+      <path
+        d={BRAND_MARK.gear}
+        className="fill-onActionPrimary stroke-onActionPrimary"
+        strokeWidth={BRAND_MARK.band}
+        strokeLinejoin="round"
+      />
       <path
         d={BRAND_MARK.gear}
         className="fill-actionPrimary stroke-onActionLight"

@@ -112,12 +112,12 @@ export function Sidebar({
       )}
     >
       {/* The logo's Cog Badge in place of the old "P" tile. It carries its own
-          outline, so no tile border or shadow around it. 68px, a touch wider
-          than the nav tiles (w-16) so the brand leads the column; the gear's
-          teeth stop about as far from the top edge (pt-1 plus the mark's own
-          margin) as from the sides. */}
-      <span title={brandLabel} className="flex h-17 w-17 shrink-0 items-center justify-center">
-        <BrandMark label={brandLabel} className="h-17 w-17" />
+          outline, so no tile border or shadow around it. 64px, as wide as the
+          nav tiles (w-16), the owner's pick (2026-10-27, down from 68px).
+          The gear's teeth stop about as far from the top edge (pt-1 plus the
+          mark's own margin) as from the sides. */}
+      <span title={brandLabel} className="flex h-16 w-16 shrink-0 items-center justify-center">
+        <BrandMark label={brandLabel} className="h-16 w-16" />
       </span>
 
       <nav

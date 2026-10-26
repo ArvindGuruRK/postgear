@@ -24,10 +24,10 @@ describe('BrandMark', () => {
     expect(screen.getByRole('img', { name: 'PostGear' }).getAttribute('aria-hidden')).toBeNull();
   });
 
-  it('draws the gear and one path per letter of PG', () => {
+  it('draws the sticker rim and band, the gear, and one path per letter of PG', () => {
     const { container } = render(<BrandMark />);
     expect(BRAND_MARK.letters).toHaveLength(2);
-    expect(container.querySelectorAll('path')).toHaveLength(3);
+    expect(container.querySelectorAll('path')).toHaveLength(5);
   });
 });
 
