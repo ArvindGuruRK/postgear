@@ -185,7 +185,7 @@ export function firstStepsDone(steps: DashboardFirstSteps): boolean {
   return steps.channel && steps.post && steps.published;
 }
 
-/** A banner under the stats. Each is true right now; none is decoration. */
+/** A banner under Up next and Comments. Each is true right now; none is decoration. */
 export type HomeBanner =
   | { kind: 'no-channels' }
   | { kind: 'reconnect'; channel: Channel }

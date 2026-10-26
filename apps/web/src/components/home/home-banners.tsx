@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * What needs attention, one line each, under the stats (after Buffer's
+ * What needs attention, one line each, under Up next and Comments (after Buffer's
  * "Connect a channel..." banner). Only what is true right now is shown, and
  * each line carries the one action that fixes it:
  *

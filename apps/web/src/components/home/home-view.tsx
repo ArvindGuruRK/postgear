@@ -8,9 +8,10 @@
  * 1. the greeting, in place of a page title (the top bar already says Home);
  * 2. four cards with their progress: streak, weekly goal, AI credits, and the
  *    team, which is where an admin invites members;
- * 3. what needs attention, only when something does;
- * 4. the first steps, until all three are done;
- * 5. Up next beside Comments;
+ * 3. the first steps, until all three are done;
+ * 4. Up next beside Comments;
+ * 5. what needs attention, only when something does (moved under the panels
+ *    2026-10-26, the owner's call);
  * 6. starter templates that open the composer with text in it;
  * 7. from the blog.
  *
@@ -122,15 +123,6 @@ export function HomeView({
           onSaveGoal={dashboard.saveGoal}
           onInvite={() => setInviteOpen(true)}
         />
-        <HomeBanners
-          orgId={orgId}
-          banners={banners}
-          canManage={canManage}
-          onConnect={() => setConnectOpen(true)}
-          onReconnect={reconnect}
-          onFinishSetup={setSetupChannel}
-          onRetryStats={dashboard.reload}
-        />
       </div>
 
       <FirstSteps
@@ -147,6 +139,16 @@ export function HomeView({
         error={upNext.error}
         now={now}
         onRetry={upNext.reload}
+      />
+
+      <HomeBanners
+        orgId={orgId}
+        banners={banners}
+        canManage={canManage}
+        onConnect={() => setConnectOpen(true)}
+        onReconnect={reconnect}
+        onFinishSetup={setSetupChannel}
+        onRetryStats={dashboard.reload}
       />
 
       <TemplatesRow orgId={orgId} />
