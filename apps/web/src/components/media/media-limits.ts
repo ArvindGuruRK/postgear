@@ -15,6 +15,9 @@ const MB = 1024 * 1024;
 export const UPLOAD_ACCEPT =
   'image/jpeg,image/png,image/gif,image/webp,image/avif,video/mp4,video/quicktime';
 
+/** For a picker that takes pictures only: a Studio slide cannot hold a video. */
+export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/avif';
+
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
 const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime']);
 
@@ -51,6 +54,13 @@ export function preflightUpload(file: File): string | null {
   return file.type === ''
     ? null
     : `${file.name}: upload a JPEG, PNG, GIF, WebP or AVIF image, or an MP4 or MOV video.`;
+}
+
+/** `preflightUpload` for a picker that takes pictures only. */
+export function preflightImage(file: File): string | null {
+  return VIDEO_TYPES.has(file.type)
+    ? `${file.name}: choose an image. A video cannot go here.`
+    : preflightUpload(file);
 }
 
 /** "JPEG, 708 KB, 2048×1536", for a tile or a tooltip. */

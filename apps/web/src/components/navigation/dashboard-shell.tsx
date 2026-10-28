@@ -7,6 +7,7 @@ import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
 import { HouseIcon } from '@animateicons/react/lucide/house-icon';
 import { ImageIcon } from '@animateicons/react/lucide/image-icon';
 import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
+import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
@@ -32,6 +33,8 @@ import type { SidebarItem } from './sidebar';
  * the AI (its "Agent"), then the read-and-manage pages. `label` is what fits
  * under a 20px icon in a 64px tile; the top bar shows the page's full name.
  *
+ * Studio (Sprint 9) sits right after Media: it makes the images Media keeps.
+ *
  * Composer and Channels are not here, as in the reference: both are reached
  * from the calendar's channel card (Create Post, Add Channel, the channels
  * page button and each channel's menu) and from Home, and their routes stay
@@ -44,6 +47,7 @@ const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
   { segment: 'queue', label: 'Queue', icon: ListOrderedIcon },
   { segment: 'analytics', label: 'Analytics', icon: ChartColumnIcon },
   { segment: 'media', label: 'Media', icon: ImageIcon },
+  { segment: 'studio', label: 'Studio', icon: PaletteIcon },
   { segment: 'seo-analyzer', label: 'SEO', icon: SearchIcon },
 ];
 
@@ -55,6 +59,7 @@ const TITLES: Record<string, string> = {
   queue: 'Queue',
   analytics: 'Analytics',
   media: 'Media',
+  studio: 'Design Studio',
   'seo-analyzer': 'SEO Analyzer',
   channels: 'Channels',
   settings: 'Settings',
@@ -63,24 +68,33 @@ const TITLES: Record<string, string> = {
 /** Pages that lay out their own height-filling blocks: see AppShell. */
 const FULL_BLEED = new Set(['calendar']);
 
+/**
+ * Studio's editor (`studio/{designId}`, Sprint 9) fills the height too: its
+ * slide rail and properties panel scroll on their own beside a canvas that
+ * stays in view. The landing page and the wizard (`studio/new`) scroll as one.
+ */
+function bleeds(page: string): boolean {
+  const [segment, child, ...deeper] = page.split('/');
+  if (FULL_BLEED.has(segment ?? '')) return true;
+  return segment === 'studio' && !!child && child !== 'new' && deeper.length === 0;
+}
+
 export function DashboardShell({ orgId, children }: { orgId: string; children: ReactNode }) {
   const pathname = usePathname();
   const base = `/${orgId}`;
-  // `/acme/settings/billing` → `settings`; the org's own root → ''.
-  const urlSegment = pathname.startsWith(`${base}/`)
-    ? (pathname.slice(base.length + 1).split('/')[0] ?? '')
-    : '';
+  // `/acme/settings/billing` → `settings/billing`, whose segment is
+  // `settings`; the org's own root → ''.
+  const urlPage = pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1) : '';
+  const urlSegment = urlPage.split('/')[0] ?? '';
   // The composer is a modal, not a page, so the shell follows the page beneath
   // it. Opened in-app, that is whatever page the URL showed before; loaded
   // directly, it is the calendar (`[orgId]/composer/page.tsx`). Adjusting
   // state while rendering is React's pattern for "remember the last value".
-  const [pageSegment, setPageSegment] = useState(
-    urlSegment === 'composer' ? 'calendar' : urlSegment,
-  );
-  if (urlSegment !== 'composer' && urlSegment !== pageSegment) {
-    setPageSegment(urlSegment);
+  const [page, setPage] = useState(urlSegment === 'composer' ? 'calendar' : urlPage);
+  if (urlSegment !== 'composer' && urlPage !== page) {
+    setPage(urlPage);
   }
-  const segment = pageSegment;
+  const segment = page.split('/')[0] ?? '';
 
   const navItems: SidebarItem[] = RAIL.map((item) => ({
     label: item.label,
@@ -105,7 +119,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
       navItems={navItems}
       sidebarBottomItems={bottomItems}
       pageTitle={TITLES[segment] ?? 'Dashboard'}
-      fullBleed={FULL_BLEED.has(segment)}
+      fullBleed={bleeds(page)}
       // Both of these read WorkspaceProvider, which [orgId]/layout.tsx sets up
       // above this component. They are passed here rather than imported by
       // AppShell so the shell stays renderable without a workspace.

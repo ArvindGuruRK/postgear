@@ -14,6 +14,7 @@
 import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
 import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
 import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
@@ -26,11 +27,12 @@ import {
   DialogDescription,
   DialogTitle,
   MotionIcon,
+  Spinner,
   useToast,
 } from '@postgear/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { ApiError, api, downloadFile } from '@/lib/api';
 import type { MediaItem } from '@/types/media';
 import { detailsOf, usageLine } from './media-details';
 
@@ -58,6 +60,8 @@ export function MediaViewer({
   const item = index === null ? null : (items[index] ?? null);
   const id = item?.id ?? null;
   const [usage, setUsage] = useState<number | null>(null);
+  // Keyed by file, so stepping to the next one mid-download does not show it busy.
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     setUsage(null);
@@ -90,6 +94,26 @@ export function MediaViewer({
       toast({ title: 'Link copied', description: item.name });
     } catch {
       toast({ title: 'The link could not be copied', variant: 'danger' });
+    }
+  }
+
+  /**
+   * Through the API rather than a `download` link: the file lives on another
+   * origin, where a browser ignores `download` and opens the picture instead.
+   */
+  async function download() {
+    if (!item) return;
+    setDownloadingId(item.id);
+    try {
+      await downloadFile(`/media/${encodeURIComponent(item.id)}/download`, item.name);
+    } catch (error) {
+      toast({
+        title: 'The file could not be downloaded',
+        description: error instanceof ApiError ? error.message : 'Please try again.',
+        variant: 'danger',
+      });
+    } finally {
+      setDownloadingId((current) => (current === item.id ? null : current));
     }
   }
 
@@ -176,6 +200,30 @@ export function MediaViewer({
                   Use In A Post
                 </Link>
                 <div className="grid grid-cols-2 gap-2">
+                  {item.type === 'image' ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="col-span-2"
+                      // Busy, not disabled: a disabled button drops the keyboard user's focus.
+                      aria-disabled={downloadingId === item.id || undefined}
+                      onClick={() => {
+                        if (downloadingId !== item.id) void download();
+                      }}
+                    >
+                      {downloadingId === item.id ? (
+                        <Spinner
+                          size="sm"
+                          role="presentation"
+                          aria-hidden="true"
+                          className="motion-reduce:animate-none"
+                        />
+                      ) : (
+                        <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+                      )}
+                      {downloadingId === item.id ? 'Downloading…' : 'Download'}
+                    </Button>
+                  ) : null}
                   <Button variant="secondary" size="sm" onClick={() => void copyLink()}>
                     <MotionIcon icon={CopyIcon} className="h-4 w-4" />
                     Copy Link

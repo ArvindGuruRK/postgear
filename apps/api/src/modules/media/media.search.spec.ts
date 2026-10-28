@@ -31,6 +31,7 @@ describe('MediaService.search', () => {
       kind: 'local',
       put: jest.fn(),
       delete: jest.fn(),
+      read: jest.fn(),
       publicUrl: (key: string) => `http://localhost:3001/uploads/${key}`,
     };
     service = new MediaService(repository as unknown as MediaRepository, storage);

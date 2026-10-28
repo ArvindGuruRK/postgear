@@ -55,6 +55,10 @@ async function bootstrap(): Promise<void> {
     // Without this the browser drops the Set-Cookie on every auth response,
     // and login appears to succeed while leaving the user signed out.
     credentials: true,
+    // Studio's Download All (Sprint 9) is fetched, not followed as a link, so
+    // a refusal arrives as a sentence; the browser may only read the zip's
+    // own name from this header when the API says it can.
+    exposedHeaders: ['Content-Disposition'],
   });
 
   // A post is sent whole: every part of a thread, for every channel that has

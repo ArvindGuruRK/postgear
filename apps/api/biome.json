@@ -7,6 +7,9 @@
     }
   },
   "linter": {
+    "domains": {
+      "react": "none"
+    },
     "rules": {
       "style": {
         "useImportType": "off"

@@ -146,7 +146,14 @@ export type SecurityEvent =
   | 'webhook.unsafe_url'
   | 'webhook.delivery_failed'
   // Notifications (Sprint 8): an email the dispatcher could not send.
-  | 'notification.email_failed';
+  | 'notification.email_failed'
+  // Design Studio (Sprint 9). Brand extraction fetches a user-supplied URL
+  // server-side, the SEO analyzer's SSRF surface again; a logo upload is the
+  // media upload's smuggling surface again; and a design or kit naming
+  // another workspace's id is the stale-client-or-probe question once more.
+  | 'studio.unsafe_url'
+  | 'studio.logo_rejected'
+  | 'studio.foreign_reference';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

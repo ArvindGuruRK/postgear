@@ -33,4 +33,6 @@ export const MEDIA_MESSAGES = {
   VIDEO_TOO_LARGE: `Videos can be at most ${formatBytes(MAX_VIDEO_UPLOAD_BYTES)}.`,
   NOT_FOUND: 'Media not found',
   DELETED: 'Media deleted',
+  DOWNLOAD_IMAGES_ONLY:
+    'Only images can be downloaded here. Open the video and save it from its player instead.',
 } as const;

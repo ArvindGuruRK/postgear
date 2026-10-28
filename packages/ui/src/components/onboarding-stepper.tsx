@@ -21,7 +21,9 @@ export function OnboardingStepper({ className, steps, currentStep, ...props }: O
         const isLast = index === steps.length - 1;
 
         return (
-          <li key={step.label} className="relative flex flex-1 flex-col items-center gap-2 last:flex-none">
+          // Every step as wide as the next, so a connector (this step's width,
+          // from its centre) ends exactly at the next step's centre.
+          <li key={step.label} className="relative flex flex-1 flex-col items-center gap-2">
             <div
               aria-current={isActive ? 'step' : undefined}
               className={cn(

@@ -26,6 +26,7 @@ import {
   UnprocessableEntityException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
+import { fileNameParts } from '../../common/attachment';
 import { securityLogger } from '../../common/logging/security-logger';
 import { stripControlChars } from '../../common/sanitize';
 import { matchesAllTerms, selectiveTerm } from '../../common/search-terms';
@@ -79,6 +80,20 @@ export interface GeneratedFileInput {
   name: string;
   /** Alt text: the (possibly rewritten) prompt the image was made from. */
   alt?: string | null;
+  /**
+   * The format and quality to store, when the producer has a reason to care
+   * (Sprint 9: a Studio export's JPEG or PNG choice, at the quality the
+   * sprint fixed). Omitted everywhere else, which keeps the library's own
+   * rule: JPEG unless the image genuinely uses transparency.
+   */
+  encode?: { prefer?: 'jpeg' | 'png'; quality?: number };
+}
+
+/** One image to save, and the name to save it under. */
+export interface MediaDownload {
+  bytes: Buffer;
+  mimeType: string;
+  fileName: string;
 }
 
 const MAX_NAME_LENGTH = 200;
@@ -225,7 +240,7 @@ export class MediaService {
     const storedKeys: string[] = [];
 
     try {
-      const processed = await processImage(file.data, sniffed);
+      const processed = await processImage(file.data, sniffed, file.encode ?? {});
       const key = createMediaKey(processed.extension);
       const thumbnailKey = thumbnailKeyFor(key);
 
@@ -370,6 +385,68 @@ export class MediaService {
   async findViews(orgId: string, ids: string[]): Promise<Map<string, MediaView>> {
     const records = await this.repository.findByIds(orgId, [...new Set(ids)]);
     return new Map(records.map((record) => [record.id, this.toView(record)]));
+  }
+
+  /**
+   * Reads one image's bytes back, for the Design Studio exporter (Sprint 9).
+   *
+   * Scoped by workspace like every other read here, so an id from another
+   * workspace is simply absent rather than readable, and limited to images: a
+   * slide draws pictures, so a video id in a design is a missing picture, not
+   * a file to inline. Null for an item that is gone from the library or from
+   * storage, which the exporter draws as an empty slot and warns about. A
+   * storage that cannot be read at all throws instead, so an outage fails the
+   * export rather than quietly producing slides with holes in them.
+   */
+  async readImageBytes(
+    orgId: string,
+    id: string,
+  ): Promise<{ bytes: Buffer; mimeType: string } | null> {
+    const records = await this.repository.findByIds(orgId, [id]);
+    const record = records[0];
+    if (record?.type !== 'image') return null;
+
+    const bytes = await this.storage.read(record.path);
+    if (!bytes) return null;
+
+    return { bytes, mimeType: record.mimeType ?? 'application/octet-stream' };
+  }
+
+  /**
+   * One image as a file to save (DS-8.3: each exported slide can be downloaded
+   * from Media). The browser could not do this alone: media lives on another
+   * origin, where it ignores a link's `download` and opens the picture instead.
+   *
+   * Images only. They are stored small (2048 px at most, a GIF 15 MB at most),
+   * so one read into memory is cheap; a video can be 250 MB, and its player
+   * already offers its own save. A row whose stored object is gone is a 404
+   * like a missing row, and is logged, because the two disagreeing is a fault.
+   */
+  async download(orgId: string, id: string): Promise<MediaDownload> {
+    const media = await this.repository.findById(orgId, id);
+
+    if (!media) {
+      throw new NotFoundException(MEDIA_MESSAGES.NOT_FOUND);
+    }
+
+    if (media.type !== 'image') {
+      throw new BadRequestException(MEDIA_MESSAGES.DOWNLOAD_IMAGES_ONLY);
+    }
+
+    const bytes = await this.storage.read(media.path);
+
+    if (!bytes) {
+      this.logger.warn(`Media ${media.id} has a row but no stored object at ${media.path}`);
+      throw new NotFoundException(MEDIA_MESSAGES.NOT_FOUND);
+    }
+
+    const { stem, extension } = fileNameParts(media.name, media.mimeType, 'Image');
+
+    return {
+      bytes,
+      mimeType: media.mimeType ?? 'application/octet-stream',
+      fileName: extension ? `${stem}.${extension}` : stem,
+    };
   }
 
   toView(record: MediaRecord): MediaView {

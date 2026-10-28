@@ -139,6 +139,28 @@ describe('streamEvents', () => {
     expect(failure).toMatchObject({ status: 402, message: /AI credits/ });
   });
 
+  it('keeps the code the API attached to a refusal', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: 'This design is already being exported.', code: 'export_busy' }),
+        { status: 409 },
+      ),
+    );
+
+    const failure = await streamEvents(
+      '/studio/designs/d/export',
+      {},
+      {
+        onEvent: () => undefined,
+      },
+    ).then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+
+    expect(failure).toMatchObject({ status: 409, code: 'export_busy' });
+  });
+
   it('skips a frame whose data is not JSON and resolves when the stream ends', async () => {
     fetchSpy.mockResolvedValueOnce(
       streamOf(['event: token\ndata: not json\n\nevent: token\ndata: {"text":"ok"}\n\n']),

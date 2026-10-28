@@ -44,6 +44,7 @@ function fakeStorage() {
     kind: 'local' as const,
     put: jest.fn(async () => undefined),
     delete: jest.fn(async () => undefined),
+    read: jest.fn(async () => null),
     publicUrl: jest.fn((key: string) => `${BASE}${key}`),
   };
   return storage satisfies StorageBackend;

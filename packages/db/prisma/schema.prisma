@@ -50,6 +50,10 @@ model Organization {
   apiKeys             ApiKey[]
   webhookDeliveries   WebhookDelivery[]
   billingEvents       BillingEvent[]
+  // Sprint 9
+  brandKits           BrandKit[]
+  designs             Design[]
+  designFavourites    DesignFavourite[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -115,6 +119,11 @@ model User {
   oauthAuthorizations   OAuthAuthorization[]
   // Sprint 8: where this user has read up to, per workspace.
   notificationCursors   NotificationCursor[]
+  // Sprint 9: what this user made in Studio.
+  brandKits             BrandKit[]           @relation("BrandKitAuthor")
+  designs               Design[]             @relation("DesignAuthor")
+  designShares          DesignShare[]        @relation("DesignShareAuthor")
+  designFavourites      DesignFavourite[]    @relation("DesignFavouriteAuthor")
 
   // --- Sprint 2: auth lifecycle -------------------------------------------
   // Tokens are stored as SHA-256 hashes, never as the value mailed to the
@@ -238,6 +247,9 @@ model Media {
   organization       Organization        @relation(fields: [organizationId], references: [id])
   userPicture        User[]
   oauthApps          OAuthApp[]
+  // Sprint 9: a brand kit's logo. Exported slides are ordinary Media rows and
+  // need no relation: `Design.exportedMediaIds` holds their ids in order.
+  brandKitLogos      BrandKit[]          @relation("BrandKitLogo")
 
   @@index([name])
   @@index([organizationId])
@@ -964,4 +976,148 @@ model SEOAudit {
 
   @@index([organizationId, createdAt])
   @@index([organizationId, targetUrl, createdAt])
+}
+
+// ===========================================================================
+// Sprint 9: Design Studio
+// ===========================================================================
+
+/// How a brand kit's colours and logo were obtained.
+enum BrandKitSource {
+  MANUAL
+  EXTRACTED
+}
+
+/// The four shapes a design can be exported at. Mirrors `FormatId` in
+/// `@postgear/design-engine`; the Zod schema on the API maps between the two,
+/// and `studio.schema.spec.ts` asserts that the mapping is total.
+enum DesignFormat {
+  SQUARE
+  PORTRAIT
+  STORY
+  LANDSCAPE
+}
+
+/// Where a design has got to. `EXPORTED` means its slides are Media rows,
+/// `SENT` that a draft post was created from them.
+enum DesignStatus {
+  DRAFT
+  EXPORTED
+  SENT
+}
+
+/// One brand's name, logo and colours.
+///
+/// Several per workspace, because an agency runs a kit per client and must
+/// never be able to put one client's logo on another's post. Editing a kit
+/// changes new designs only: a design copies the five colours into its own
+/// document when the kit is applied, and the editor offers Update Colours
+/// rather than rewriting work somebody already approved.
+model BrandKit {
+  id             String         @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  /// As submitted, normalised. Kept so Extract From Website can be re-run.
+  websiteUrl     String?
+  logoMediaId    String?
+  /// `BrandColors` from the design engine: primary, secondary, accent,
+  /// background and text, each a `#RRGGBB`. A JSON column rather than five
+  /// text columns because the engine's Zod schema is the real contract, and
+  /// five nullable columns would let half a palette exist.
+  colors         Json
+  source         BrandKitSource @default(MANUAL)
+  createdById    String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  logo           Media?         @relation("BrandKitLogo", fields: [logoMediaId], references: [id])
+  createdBy      User?          @relation("BrandKitAuthor", fields: [createdById], references: [id])
+  designs        Design[]
+
+  @@index([organizationId, deletedAt, updatedAt])
+}
+
+/// One user's design: a single post or a carousel.
+///
+/// The slides live inside `document`, not in a `DesignSlide` table. Two
+/// reasons: a design is edited and saved as one unit (the autosave writes the
+/// whole thing 1.5 s after the last keystroke, and a dozen tiny row writes per
+/// pause would be the slowest part of the editor), and the shape is already
+/// defined and versioned by `designDocumentSchema` in
+/// `@postgear/design-engine`, which validates every write. The column is a
+/// value, not a bag: nothing reads it without parsing it.
+///
+/// `revision` is the optimistic lock. The editor sends the revision it loaded;
+/// a mismatch is a 409 and that tab is told to reload, so two tabs cannot
+/// silently overwrite each other.
+model Design {
+  id                   String        @id @default(uuid())
+  organizationId       String
+  title                String
+  format               DesignFormat
+  /// The preset it was created from, or "blank". Not a foreign key: templates
+  /// are data in code, versioned with git, and never database rows.
+  presetId             String
+  brandKitId           String?
+  document             Json
+  /// Bumped on every accepted write. Starts at 1.
+  revision             Int           @default(1)
+  status               DesignStatus  @default(DRAFT)
+  /// Media ids, one per slide, in slide order, from the last export.
+  exportedMediaIds     String[]      @default([])
+  /// The `revision` those media were rendered from. A design edited since is
+  /// re-exported before Send rather than sending stale pictures.
+  lastExportedRevision Int?
+  /// The slide the editor was last on, so reopening lands where work stopped.
+  lastSlideIndex       Int           @default(0)
+  createdById          String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  deletedAt            DateTime?
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brandKit             BrandKit?     @relation(fields: [brandKitId], references: [id], onDelete: SetNull)
+  createdBy            User?         @relation("DesignAuthor", fields: [createdById], references: [id])
+  shares               DesignShare[]
+
+  @@index([organizationId, deletedAt, updatedAt])
+  @@index([organizationId, format])
+}
+
+/// A read-only link to a design, for someone without an account.
+///
+/// Only the hash is stored, the same rule as activation and reset tokens: a
+/// database leak yields no working link. The token is shown once, when it is
+/// created.
+model DesignShare {
+  id           String    @id @default(uuid())
+  designId     String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  lastViewedAt DateTime?
+  design       Design    @relation(fields: [designId], references: [id], onDelete: Cascade)
+  createdBy    User?     @relation("DesignShareAuthor", fields: [createdById], references: [id])
+
+  @@index([designId, revokedAt])
+}
+
+/// A template somebody on the team starred, so the gallery's Favourites filter
+/// is shared across the workspace rather than living in one browser.
+///
+/// `presetId` is a string from the code-side library, not a foreign key, for
+/// the same reason `Design.presetId` is: there is no templates table.
+model DesignFavourite {
+  id             String       @id @default(uuid())
+  organizationId String
+  presetId       String
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?        @relation("DesignFavouriteAuthor", fields: [createdById], references: [id])
+
+  @@unique([organizationId, presetId])
 }

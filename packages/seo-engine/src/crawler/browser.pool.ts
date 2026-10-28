@@ -53,11 +53,59 @@ export interface PooledPage {
   release(): Promise<void>;
 }
 
+export interface RenderOptions {
+  /** A complete, self-contained document. Nothing in it may need the network. */
+  html: string;
+  width: number;
+  height: number;
+  type: 'jpeg' | 'png';
+  /** JPEG only, 0-100. */
+  quality?: number;
+  /**
+   * A browser-side expression the render waits to become truthy before the
+   * shot, asked from outside the page every 20 ms (`waitUntilTrue` says
+   * why). The design exporter waits for its text fitter with it.
+   */
+  waitForFunction?: string;
+  /**
+   * A browser-side expression evaluated after the wait and before the shot.
+   * Its value (anything JSON can carry) comes back as `value`: the exporter
+   * reads which slots still overflow this way.
+   */
+  collect?: string;
+  /** Each step (load, wait, shot) gets this long. Default 20 s. */
+  timeoutMs?: number;
+  /** Aborting closes the page at once, whichever step it is in. */
+  signal?: AbortSignal;
+}
+
+export interface RenderResult {
+  image: Buffer;
+  /** What `collect` evaluated to; undefined without one. */
+  value: unknown;
+}
+
 export interface BrowserPool {
   acquire(options?: { signal?: AbortSignal }): Promise<PooledPage>;
   release(lease: PooledPage): Promise<void>;
   /** Probes a launch once and caches the answer. */
   available(): Promise<boolean>;
+  /**
+   * Paints a self-contained HTML document and screenshots it at an exact size.
+   *
+   * Sprint 9's design export (`apps/api/src/modules/studio/design-exporter.ts`)
+   * is the caller. It is here, on the pool the SEO crawler already runs,
+   * rather than in a second Chromium of its own: one browser process, one
+   * place that knows how to launch it, and one answer to `available()`.
+   *
+   * The render context is stricter than a crawl's, not looser. Every network
+   * request is aborted, whatever its host, because the page is handed its
+   * fonts and pictures as `data:` URIs and has no legitimate reason to fetch
+   * anything; that makes a user's picture incapable of making this browser
+   * reach anywhere at all. JavaScript stays on for the one inline script the
+   * exporter ships, the shared text fitter.
+   */
+  render(options: RenderOptions): Promise<RenderResult>;
   close(): Promise<void>;
 }
 
@@ -79,8 +127,8 @@ const SKIPPED_RESOURCE_TYPES = new Set([
 type Playwright = typeof import('playwright');
 
 class AbortedError extends Error {
-  constructor() {
-    super('The wait for a browser page was cancelled.');
+  constructor(message = 'The wait for a browser page was cancelled.') {
+    super(message);
     this.name = 'AbortError';
   }
 }
@@ -101,20 +149,23 @@ class Semaphore {
       return;
     }
     await new Promise<void>((resolve, reject) => {
-      const waiter = { resolve, reject };
+      // The object queued is the one the abort handler looks for: a waiter
+      // that was cancelled has to leave the queue, or the next release would
+      // hand its slot to a promise nobody is waiting on and the slot is lost.
+      const waiter = {
+        resolve: () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve();
+        },
+        reject,
+      };
       const onAbort = () => {
         const index = this.waiters.indexOf(waiter);
         if (index !== -1) this.waiters.splice(index, 1);
         reject(new AbortedError());
       };
       signal?.addEventListener('abort', onAbort, { once: true });
-      this.waiters.push({
-        resolve: () => {
-          signal?.removeEventListener('abort', onAbort);
-          resolve();
-        },
-        reject,
-      });
+      this.waiters.push(waiter);
     });
   }
 
@@ -125,6 +176,50 @@ class Semaphore {
       return;
     }
     this.free = Math.min(this.size, this.free + 1);
+  }
+}
+
+/** How often a render asks its page whether it is ready (`waitForFunction`). */
+const READY_POLL_MS = 20;
+
+/** Named like Playwright's own, so a caller that tells a timeout apart still does. */
+class ReadyTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Timeout ${timeoutMs}ms exceeded waiting for the page to be ready.`);
+    this.name = 'TimeoutError';
+  }
+}
+
+/**
+ * Waits until `expression` is truthy in the page, asking from here.
+ *
+ * Not `page.waitForFunction`: when its first look finds the page not ready,
+ * it goes on polling from inside the page and evaluates a string expression
+ * afresh each time, and a page whose Content-Security-Policy leaves out
+ * 'unsafe-eval' (the design export page) refuses that eval. A slide whose
+ * fonts were still loading at the first look then failed its render, about
+ * once in a thousand. A `page.evaluate` call runs through the DevTools
+ * protocol, which the page's policy does not govern, so the page keeps its
+ * policy and the wait still works.
+ *
+ * Each ask also races the deadline: a page stuck in a script of its own
+ * never answers one.
+ */
+async function waitUntilTrue(page: Page, expression: string, timeoutMs: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ReadyTimeoutError(timeoutMs)), timeoutMs);
+  });
+
+  try {
+    while (!(await Promise.race([page.evaluate(expression), expired]))) {
+      await Promise.race([
+        new Promise<void>((resolve) => setTimeout(resolve, READY_POLL_MS)),
+        expired,
+      ]);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -244,6 +339,82 @@ export function createBrowserPool(options: BrowserPoolOptions = {}): BrowserPool
 
     async release(lease) {
       await lease.release();
+    },
+
+    async render(renderOptions) {
+      const { signal } = renderOptions;
+      const timeoutMs = renderOptions.timeoutMs ?? 20_000;
+      const cancelled = () => new AbortedError('The render was cancelled.');
+
+      await semaphore.acquire(signal);
+      let context: BrowserContext | null = null;
+
+      // Closing the context is what interrupts a page mid-load or mid-wait:
+      // every pending call on it rejects at once, so a cancelled export does
+      // not hold a browser slot until its timeouts run out.
+      const onAbort = () => {
+        void context?.close().catch(() => undefined);
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+
+      try {
+        const instance = await getBrowser();
+        if (signal?.aborted) throw cancelled();
+
+        context = await instance.newContext({
+          viewport: { width: renderOptions.width, height: renderOptions.height },
+          deviceScaleFactor: 1,
+          serviceWorkers: 'block',
+          // Nothing in an export page comes off the network, so nothing is
+          // allowed to: a request here would mean a picture or a font was
+          // not inlined, and a silent fallback is the one failure mode a
+          // "what you edit is what you get" promise cannot survive.
+          offline: true,
+          javaScriptEnabled: true,
+          colorScheme: 'light',
+          reducedMotion: 'reduce',
+        });
+        // An abort that landed while the context was being made found
+        // nothing to close.
+        if (signal?.aborted) throw cancelled();
+
+        await context.route('**/*', (route: Route) => {
+          void route.abort('blockedbyclient').catch(() => undefined);
+        });
+
+        const page = await context.newPage();
+        page.setDefaultTimeout(timeoutMs);
+        await page.setContent(renderOptions.html, { waitUntil: 'load', timeout: timeoutMs });
+
+        if (renderOptions.waitForFunction) {
+          await waitUntilTrue(page, renderOptions.waitForFunction, timeoutMs);
+        }
+
+        const value = renderOptions.collect
+          ? await page.evaluate(renderOptions.collect)
+          : undefined;
+
+        const image = await page.screenshot({
+          type: renderOptions.type,
+          quality: renderOptions.type === 'jpeg' ? (renderOptions.quality ?? 92) : undefined,
+          clip: { x: 0, y: 0, width: renderOptions.width, height: renderOptions.height },
+          animations: 'disabled',
+          caret: 'hide',
+          scale: 'css',
+          timeout: timeoutMs,
+        });
+
+        return { image, value };
+      } catch (error) {
+        // The page dies with a "target closed" error when the abort closes
+        // it; the caller asked for the cancel, so say that instead.
+        if (signal?.aborted) throw cancelled();
+        throw error;
+      } finally {
+        signal?.removeEventListener('abort', onAbort);
+        await context?.close().catch(() => undefined);
+        semaphore.release();
+      }
     },
 
     async available() {

@@ -24,6 +24,8 @@
 | 6 | [AI Content Engine & Copilot](sprint-06-ai-content-engine.md) | 5.5 AI-Powered Content Engine | Sprint 4 |
 | 7 | [Analytics & SEO Score Prediction](sprint-07-analytics-and-seo-engine.md) | 5.6 Analytics, 5.7 SEO (net-new) | Sprint 3, 5 |
 | 8 | [Billing, Notifications, Public API & Launch](sprint-08-billing-notifications-api-launch.md) | 5.8 Billing, 5.9 Notifications, 5.10 API/Webhooks, 5.12 (remainder) | Sprint 2–7 |
+| 9 | [Design Studio (Template-Based Posts and Carousels)](sprint-09-design-studio.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 4, 7 |
+| 10 | [Workflow Builder (Visual Automations)](sprint-10-workflow-builder.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 5, 6, 8 (9 for the Render Design node) |
 
 ## Cross-Cutting Notes
 

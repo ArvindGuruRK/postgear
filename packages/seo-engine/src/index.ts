@@ -31,6 +31,8 @@ export {
   DEFAULT_LAUNCH_TIMEOUT_MS,
   DEFAULT_MAX_PAGES,
   type PooledPage,
+  type RenderOptions,
+  type RenderResult,
 } from './crawler/browser.pool';
 export {
   crawlStageLabels,
@@ -48,6 +50,7 @@ export {
   countWords,
   decodeEntities,
   fleschReadingEase,
+  type HtmlToken,
   parseHtml,
   STOP_WORDS,
   siteKey,
@@ -66,6 +69,7 @@ export {
   DEFAULT_MAX_REDIRECTS,
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_USER_AGENT,
+  fetchBinarySafely,
   fetchUrlSafely,
   headUrlSafely,
   isHtmlContentType,

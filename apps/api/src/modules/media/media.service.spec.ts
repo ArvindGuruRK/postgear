@@ -41,6 +41,7 @@ describe('MediaService', () => {
       kind: 'local',
       put: jest.fn().mockResolvedValue(undefined),
       delete: jest.fn().mockResolvedValue(undefined),
+      read: jest.fn().mockResolvedValue(null),
       publicUrl: jest.fn((key: string) => `http://localhost:3001/uploads/${key}`),
     };
 
@@ -299,6 +300,91 @@ describe('MediaService', () => {
     expect(view.thumbnailUrl).toContain('.thumb.webp');
     expect(view).not.toHaveProperty('path');
     expect(view).not.toHaveProperty('thumbnail');
+  });
+
+  describe('readImageBytes (the Design Studio exporter)', () => {
+    it("reads an image's bytes back, looked up in this workspace only", async () => {
+      repository.findByIds.mockResolvedValue([record({ mimeType: 'image/png' })]);
+      storage.read.mockResolvedValue(Buffer.from('png bytes'));
+
+      const picture = await service.readImageBytes('org_1', 'm1');
+
+      expect(repository.findByIds).toHaveBeenCalledWith('org_1', ['m1']);
+      expect(storage.read).toHaveBeenCalledWith('2026/09/abcdefabcdefabcdefabcdefabcdefab.jpg');
+      expect(picture?.bytes.toString()).toBe('png bytes');
+      expect(picture?.mimeType).toBe('image/png');
+    });
+
+    it('answers null for media from another workspace, a video, or a file gone from storage', async () => {
+      repository.findByIds.mockResolvedValueOnce([]);
+      expect(await service.readImageBytes('org_1', 'other-org-media')).toBeNull();
+
+      repository.findByIds.mockResolvedValueOnce([record({ type: 'video' })]);
+      expect(await service.readImageBytes('org_1', 'm1')).toBeNull();
+
+      repository.findByIds.mockResolvedValueOnce([record({})]);
+      storage.read.mockResolvedValueOnce(null);
+      expect(await service.readImageBytes('org_1', 'm1')).toBeNull();
+    });
+
+    it('lets a storage outage fail the export rather than drawing an empty slot', async () => {
+      repository.findByIds.mockResolvedValue([record({})]);
+      storage.read.mockRejectedValue(new Error('disk unreadable'));
+
+      await expect(service.readImageBytes('org_1', 'm1')).rejects.toThrow('disk unreadable');
+    });
+  });
+
+  describe('download (DS-8.3, one image from the library)', () => {
+    it("hands back the image's bytes and type under its library name", async () => {
+      repository.findById.mockResolvedValue(record({ name: 'Spring Sale 01.jpg' }));
+      storage.read.mockResolvedValue(Buffer.from('jpeg bytes'));
+
+      const file = await service.download('org_1', 'm1');
+
+      expect(repository.findById).toHaveBeenCalledWith('org_1', 'm1');
+      expect(storage.read).toHaveBeenCalledWith('2026/09/abcdefabcdefabcdefabcdefabcdefab.jpg');
+      expect(file).toEqual({
+        bytes: Buffer.from('jpeg bytes'),
+        mimeType: 'image/jpeg',
+        fileName: 'Spring Sale 01.jpg',
+      });
+    });
+
+    it('names the file after what was stored, not what was uploaded', async () => {
+      repository.findById.mockResolvedValue(record({ name: 'beach.webp' }));
+      storage.read.mockResolvedValue(Buffer.from('jpeg bytes'));
+
+      expect((await service.download('org_1', 'm1')).fileName).toBe('beach.jpg');
+    });
+
+    it('is a 404 for media in another workspace, and never reads storage for it', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.download('org_1', 'other-org-media')).rejects.toThrow(
+        new NotFoundException(MEDIA_MESSAGES.NOT_FOUND),
+      );
+      expect(storage.read).not.toHaveBeenCalled();
+    });
+
+    it('refuses a video, which its player already saves', async () => {
+      repository.findById.mockResolvedValue(record({ type: 'video', mimeType: 'video/mp4' }));
+
+      await expect(service.download('org_1', 'm1')).rejects.toThrow(
+        new BadRequestException(MEDIA_MESSAGES.DOWNLOAD_IMAGES_ONLY),
+      );
+      expect(storage.read).not.toHaveBeenCalled();
+    });
+
+    it('is a 404 when the stored file is gone, and lets a storage outage through', async () => {
+      repository.findById.mockResolvedValue(record({}));
+
+      storage.read.mockResolvedValueOnce(null);
+      await expect(service.download('org_1', 'm1')).rejects.toBeInstanceOf(NotFoundException);
+
+      storage.read.mockRejectedValueOnce(new Error('bucket unreachable'));
+      await expect(service.download('org_1', 'm1')).rejects.toThrow('bucket unreachable');
+    });
   });
 });
 

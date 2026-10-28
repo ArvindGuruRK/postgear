@@ -110,6 +110,12 @@ function mockPool(options: {
     async release(lease: PooledPage) {
       await lease.release();
     },
+    // The crawler never renders; the pool's render path is the design
+    // exporter's (Sprint 9), and a fake that silently returned bytes here
+    // would hide a crawler that started using it by mistake.
+    async render() {
+      throw new Error('The crawler does not render.');
+    },
     async close() {},
   };
   return pool;

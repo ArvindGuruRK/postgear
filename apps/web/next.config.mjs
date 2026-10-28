@@ -6,8 +6,9 @@ const nextConfig = {
   // packages/ui and packages/social-core ship raw TypeScript source (no build
   // step): Next needs to transpile them itself rather than treating them as
   // pre-built. Only social-core's `composer` entry point is imported here; see
-  // the path alias in tsconfig.json for why never its root.
-  transpilePackages: ['@postgear/ui', '@postgear/social-core'],
+  // the path alias in tsconfig.json for why never its root. design-engine is
+  // Studio's renderer (Sprint 9), browser-safe source like the other two.
+  transpilePackages: ['@postgear/ui', '@postgear/social-core', '@postgear/design-engine'],
   // TODO: Configure remaining Next.js settings
   // - Image optimization domains
   // - Environment variable exposure

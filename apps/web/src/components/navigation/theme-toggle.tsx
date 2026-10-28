@@ -69,7 +69,7 @@ export function ThemeToggle({ saveToAccount = false }: { saveToAccount?: boolean
   // `rotate` and `scale`, not `transform`: Tailwind v4's rotate-* and scale-*
   // set those properties, so a `transform` transition would snap the swap.
   const iconBase = cn(
-    'absolute h-4 w-4 text-ink transition-[rotate,scale,opacity] duration-200 ease-out group-hover:text-onActionPrimary',
+    'absolute h-4 w-4 text-ink transition-[rotate,scale,opacity] duration-200 ease-out group-hover:text-onActionPrimary motion-reduce:transition-none',
     ANIMATED_ICON_CLASS,
   );
 

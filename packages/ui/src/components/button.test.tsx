@@ -29,7 +29,8 @@ describe('Button hover fill', () => {
 
     expect(button).toHaveAttribute('data-fill-hover');
     fireEvent.pointerEnter(button);
-    expect(button).toHaveAttribute('data-filled');
+    // The label flips a beat into the grow, once the circle is under it.
+    await waitFor(() => expect(button).toHaveAttribute('data-filled'), { timeout: 2000 });
     fireEvent.pointerMove(button);
     fireEvent.pointerLeave(button);
     // Still filled while the circle shrinks away, so a label never flips
@@ -65,13 +66,13 @@ describe('Button hover fill', () => {
     }
   });
 
-  it('closes the fill when the button turns disabled under the pointer', () => {
+  it('closes the fill when the button turns disabled under the pointer', async () => {
     mockMatchMedia(true);
     const { rerender } = render(<Button variant="secondary">Sync</Button>);
     const button = screen.getByRole('button', { name: 'Sync' });
 
     fireEvent.pointerEnter(button);
-    expect(button).toHaveAttribute('data-filled');
+    await waitFor(() => expect(button).toHaveAttribute('data-filled'), { timeout: 2000 });
     rerender(
       <Button variant="secondary" disabled>
         Sync

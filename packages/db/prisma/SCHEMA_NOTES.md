@@ -50,6 +50,10 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `BillingEvent` | Processed Stripe events, keyed on the event id (Sprint 8). | Sprint 8 |
 | `NotificationCursor` | Per-(user, workspace) read marker for the notification feed (Sprint 8). | Sprint 8 |
 | `OAuthApp` / `OAuthAuthorization` | PostGear acting as an OAuth *provider* for its public API. | Not yet: PRD P2. Sprint 8 built API keys instead. |
+| `BrandKit` | A brand's name, logo and five colours. Several per workspace, one per client for an agency. See [Sprint 9 additions](#sprint-9-additions). | Sprint 9 |
+| `Design` | One post or carousel. Slides live in the `document` JSON, guarded by the design engine's Zod schema; `revision` is the optimistic lock. | Sprint 9 |
+| `DesignShare` | A read-only share link to a design, token stored hashed. | Sprint 9 |
+| `DesignFavourite` | A template starred by the workspace, keyed on the code-side preset id. | Sprint 9 |
 
 ### Kept, though not yet used
 
@@ -275,6 +279,81 @@ or renamed. The design is in
 
 Every read of the new soft-deletable rows (`Webhooks`) still filters
 `deletedAt: null`; the new tables cascade with their organization.
+
+## Sprint 9 additions
+
+Migration `20261027120000_sprint9_design_studio`. Additive only: four tables
+and three enums, nothing changed on an existing model. The design is in
+[`docs/sprint-documents/sprint-09-design-studio.md`](../../../docs/sprint-documents/sprint-09-design-studio.md).
+
+- **`BrandKit`**: a name, a logo and five colours, several per workspace. An
+  agency runs one kit per client, and the kit is what stops one client's logo
+  reaching another client's post. `colors` is one JSON value rather than five
+  text columns because the real contract is `brandColorsSchema` in
+  `@postgear/design-engine`, and five nullable columns would make half a
+  palette representable. `source` records whether the colours were typed in or
+  read off a website. Editing a kit **changes new designs only**: a design
+  copies the five colours into its own document when the kit is applied, and
+  the editor offers Update Colours instead of rewriting approved work.
+
+- **`Design`**: one post or carousel. The slides live in `document`, a JSON
+  value validated on every read and every write by `designDocumentSchema`.
+  There is deliberately no `DesignSlide` table:
+
+  1. A design is edited and saved as a unit. The autosave fires 1.5 s after
+     the last keystroke and writes the whole thing; a row per slide would turn
+     one save into a dozen writes for no gain anyone can see.
+  2. The shape is already defined, versioned (`schemaVersion` plus
+     `upgrade()`) and `.strict()`-validated in the engine. A client cannot
+     store a style, a URL or an unknown slot, so the column is a value, not a
+     bag.
+  3. Nothing queries inside it. Every list, filter and count the product needs
+     reads a column: `title`, `format`, `status`, `updatedAt`.
+
+  `revision` is the optimistic lock behind "This design changed in another
+  tab." (DS-6.2): a `PATCH` carries the revision the editor loaded, a mismatch
+  is a 409, and nothing is merged. `exportedMediaIds` holds one Media id per
+  slide in slide order, and `lastExportedRevision` is the revision those were
+  rendered from, which is how Send knows whether to re-export first.
+
+  `lastSlideIndex` is the slide the editor reopens on. It is written only with
+  a document save (the API clamps it to the slide count), so moving between
+  slides never costs a write of its own.
+
+- **`DesignShare`**: a read-only link for somebody without an account. Only
+  `tokenHash` is stored, the same rule as activation and password-reset tokens
+  (see [The encryption boundary](#the-encryption-boundary)): the token is shown
+  once, at creation, and a database leak yields no working link.
+
+  It has no `organizationId`, `updatedAt` or `deletedAt`, on purpose. A link is
+  only ever reached through its design, whose `organizationId` scopes every
+  query, and it goes with the design (`onDelete: Cascade`). It is never edited,
+  only revoked, and `revokedAt` is that state: a soft-delete column beside it
+  would be a second way to say the same thing. A deleted design's links stop
+  resolving because the public route refuses a deleted design.
+  `lastViewedAt` feeds "Last viewed 5 hours ago" in the Share dialog; the
+  public route writes it at most once a minute per link, so a link passed
+  around a team does not turn every page view into a write.
+
+- **`createdById` is nullable on all three tables** (Prisma's default for an
+  optional relation, `SET NULL`). Kits, designs and links belong to the
+  workspace, not to the member who made them, so deleting a user row never
+  takes a client's brand kit or an approved carousel with it.
+
+- **`DesignFavourite`**: a starred template, unique per (workspace, preset), so
+  Favourites is a team filter rather than something in one person's browser.
+
+**`presetId` on `Design` and `DesignFavourite` is plain text, not a foreign
+key.** Templates are data in code (`packages/design-engine/src/presets.ts`),
+reviewed and versioned with git, so there is no templates table to point at.
+That is also what makes "choosing a template never changes the template" true
+by construction: a design holds its own copy of the content from the moment it
+is created, and the preset id is a provenance label used by Reset.
+
+**Slide layouts are versioned inside the document**, as `"split-picture@1"`.
+An old version stays in the code library when a layout changes, so a design
+made a year ago still renders the way its author saw it; moving it forward is
+a deliberate step in `upgrade()`.
 
 ## A user may legitimately belong to zero organizations
 

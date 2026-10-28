@@ -29,7 +29,11 @@ let rowCounter = 0;
  * A finished upload says how much compression saved: the number is the
  * visible proof that the server really did something to the file.
  */
-export function useMediaUpload(onUploaded: (media: MediaItem) => void) {
+export function useMediaUpload(
+  onUploaded: (media: MediaItem) => void,
+  /** Why a file will be refused before it is sent; Studio's picker takes images only. */
+  check: (file: File) => string | null = preflightUpload,
+) {
   const [rows, setRows] = useState<UploadRow[]>([]);
 
   const upload = useCallback(
@@ -44,7 +48,7 @@ export function useMediaUpload(onUploaded: (media: MediaItem) => void) {
           name: file.name,
           progress: 0,
           status: 'uploading' as const,
-          message: preflightUpload(file),
+          message: check(file),
         },
       }));
 
@@ -92,7 +96,7 @@ export function useMediaUpload(onUploaded: (media: MediaItem) => void) {
         }
       }
     },
-    [onUploaded],
+    [onUploaded, check],
   );
 
   /** Drops the finished and failed rows; those still uploading stay. */

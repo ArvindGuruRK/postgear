@@ -10,7 +10,12 @@
  * upload with a new key, never an overwrite.
  */
 import { createReadStream } from 'node:fs';
-import { DeleteObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import type { StorageBackend, StorageBody } from './storage.interface';
 import { assertValidKey } from './storage-keys';
 
@@ -47,6 +52,28 @@ export class S3Storage implements StorageBackend {
   async delete(key: string): Promise<void> {
     assertValidKey(key);
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  async read(key: string): Promise<Buffer | null> {
+    assertValidKey(key);
+
+    try {
+      const result = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      const body = result.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
+      if (!body?.transformToByteArray) return null;
+
+      return Buffer.from(await body.transformToByteArray());
+    } catch (error) {
+      // A missing object is an answer: the exporter draws the empty slot and
+      // says which picture was deleted. An unreachable bucket is a fault, and
+      // passing it off as "deleted" would send the user looking for a problem
+      // they do not have.
+      const failure = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (failure?.name === 'NoSuchKey' || failure?.$metadata?.httpStatusCode === 404) return null;
+      throw error;
+    }
   }
 
   publicUrl(key: string): string {

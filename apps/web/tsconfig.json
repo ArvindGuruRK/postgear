@@ -19,6 +19,10 @@
       // bundled for the browser, so the web app is given this entry point and
       // not the root. See packages/social-core/src/composer/index.ts.
       "@postgear/social-core/composer": ["../../packages/social-core/src/composer/index.ts"],
+      // Studio (Sprint 9): the template library and the slide renderer. Browser-safe
+      // by design (no Node built-ins in its src/), so the editor draws a slide with
+      // the same code the API exports it with.
+      "@postgear/design-engine": ["../../packages/design-engine/src"],
       "@postgear/config/*": ["../../packages/config/*"]
     }
   },

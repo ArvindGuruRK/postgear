@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { BrowserPoolModule } from './common/browser/browser-pool.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -25,6 +26,7 @@ import { SchedulingModule } from './modules/scheduling/scheduling.module';
 import { SeoModule } from './modules/seo/seo.module';
 import { SearchModule } from './modules/search/search.module';
 import { SignaturesModule } from './modules/signatures/signatures.module';
+import { StudioModule } from './modules/studio/studio.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { UsersModule } from './modules/users/users.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
@@ -58,6 +60,9 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
       ignoreEnvFile: true,
     }),
     RedisModule,
+    // The one headless browser this process runs: the SEO crawler's and the
+    // Design Studio exporter's. Global, and launched lazily on first use.
+    BrowserPoolModule,
     // Sprint 8: the per-address rate limit on every route, and the throttler
     // store the public API's per-key limit shares.
     ThrottlingModule,
@@ -86,6 +91,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     SignaturesModule,
     // UI revamp (2026-10-21): the top bar's workspace search.
     SearchModule,
+    // Sprint 9: the Design Studio.
+    StudioModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

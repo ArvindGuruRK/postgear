@@ -1,7 +1,16 @@
 'use client';
 
 import { UserMenu } from '@postgear/ui';
-import { BarChart3, Calendar, LayoutGrid, Palette, Search, Settings, Users } from 'lucide-react';
+import {
+  BarChart3,
+  Calendar,
+  LayoutGrid,
+  LayoutTemplate,
+  Palette,
+  Search,
+  Settings,
+  Users,
+} from 'lucide-react';
 import { useState } from 'react';
 import { AppShell } from '@/components/navigation/app-shell';
 import type { SidebarItem } from '@/components/navigation/sidebar';
@@ -24,6 +33,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { label: 'SEO', href: '#seo', icon: Search },
   { label: 'Team', href: '#team', icon: Users },
   { label: 'Design System', href: '/dev/components', icon: Palette, active: true },
+  { label: 'Templates', href: '/dev/studio', icon: LayoutTemplate },
 ];
 
 const BOTTOM_ITEMS: SidebarItem[] = [{ label: 'Settings', href: '#settings', icon: Settings }];
@@ -45,6 +55,8 @@ export function ComponentsShowcase() {
       navItems={NAV_ITEMS}
       sidebarBottomItems={BOTTOM_ITEMS}
       pageTitle="Design System"
+      // The theme button switches the theme here only: no account to save it to.
+      saveThemeToAccount={false}
       accountMenu={
         <UserMenu
           name="Ada Lovelace"

@@ -9,7 +9,12 @@
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
-import { DeleteObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { validateEnv } from '../../../config/env';
 import { LocalStorage } from './local.storage';
 import { S3Storage } from './s3.storage';
@@ -125,6 +130,18 @@ describe('LocalStorage', () => {
   it('treats deleting a missing object as success', async () => {
     await expect(storage.delete(createMediaKey('gif'))).resolves.toBeUndefined();
   });
+
+  it('reads an object back, and answers null for one that is gone', async () => {
+    const key = createMediaKey('png');
+    await storage.put(key, Buffer.from('png bytes'), 'image/png');
+
+    expect((await storage.read(key))?.toString()).toBe('png bytes');
+    expect(await storage.read(createMediaKey('png'))).toBeNull();
+  });
+
+  it('refuses to read a key that could escape the directory', async () => {
+    await expect(storage.read('../../outside.jpg')).rejects.toThrow(/did not generate/);
+  });
 });
 
 describe('S3Storage', () => {
@@ -160,6 +177,35 @@ describe('S3Storage', () => {
 
   it('refuses a foreign key', async () => {
     await expect(storage.put('../x', Buffer.from(''), 'image/jpeg')).rejects.toThrow();
+    await expect(storage.read('../x')).rejects.toThrow();
+  });
+
+  it('reads an object back as bytes, and answers null for a missing key', async () => {
+    const key = createMediaKey('jpg');
+    client.send.mockResolvedValueOnce({
+      Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) },
+    });
+
+    expect(await storage.read(key)).toEqual(Buffer.from([1, 2, 3]));
+    const command = client.send.mock.calls.at(-1)?.[0] as GetObjectCommand;
+    expect(command).toBeInstanceOf(GetObjectCommand);
+    expect(command.input).toEqual({ Bucket: 'media', Key: key });
+
+    client.send.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'NoSuchKey' }));
+    expect(await storage.read(key)).toBeNull();
+
+    client.send.mockRejectedValueOnce(
+      Object.assign(new Error('not found'), { $metadata: { httpStatusCode: 404 } }),
+    );
+    expect(await storage.read(key)).toBeNull();
+  });
+
+  it('reports a bucket it cannot reach, rather than calling the object deleted', async () => {
+    client.send.mockRejectedValueOnce(
+      Object.assign(new Error('socket hang up'), { $metadata: { httpStatusCode: 503 } }),
+    );
+
+    await expect(storage.read(createMediaKey('jpg'))).rejects.toThrow('socket hang up');
   });
 });
 

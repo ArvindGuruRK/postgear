@@ -1,10 +1,20 @@
 /**
  * The storage contract every backend implements.
  *
- * Three operations, and deliberately no `get`: nothing in PostGear reads media
- * back through the API. Browsers and social platforms fetch it from
- * `publicUrl()` directly (a CDN for S3, a static route for local disk), so
- * the API never proxies bytes it has already stored.
+ * Browsers and social platforms fetch media from `publicUrl()` directly (a CDN
+ * for S3, a static route for local disk), so the API never proxies bytes it
+ * has already stored for showing them, and `read` is not a general way in.
+ *
+ * Its main caller is the Design Studio exporter (Sprint 9). It paints a slide
+ * in a headless browser whose every network request is blocked, which is what
+ * makes an export reproducible and what stops a user's picture making the
+ * server reach anywhere; a picture on a slide therefore has to be inlined as
+ * a `data:` URI, and inlining means reading the bytes back. The other two
+ * callers are downloads, which a browser cannot start on its own for a file
+ * on another origin: Download All, which zips a design's exported images, and
+ * a single image's Download in the media library. Both read images only,
+ * which are stored small. Nothing else should call it: media is served, not
+ * proxied.
  */
 
 /** Bytes in memory, or a file already on disk (a video straight from the upload). */
@@ -18,6 +28,15 @@ export interface StorageBackend {
 
   /** Removes an object. Succeeds when the object is already gone. */
   delete(key: string): Promise<void>;
+
+  /**
+   * Reads an object back. Null when it is not there; throws when the storage
+   * itself cannot be read, which is a fault rather than an answer.
+   *
+   * Used to inline pictures into a Design Studio export, to build its
+   * Download All zip, and for one image's Download; see the note above.
+   */
+  read(key: string): Promise<Buffer | null>;
 
   /** Where a browser or a platform can fetch the object. */
   publicUrl(key: string): string;

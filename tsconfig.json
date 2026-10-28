@@ -22,6 +22,7 @@
       "@postgear/social-core": ["packages/social-core/src"],
       "@postgear/scheduling": ["packages/scheduling/src"],
       "@postgear/seo-engine": ["packages/seo-engine/src"],
+      "@postgear/design-engine": ["packages/design-engine/src"],
       "@postgear/ai-engine": ["packages/ai-engine/src"],
       "@postgear/ui": ["packages/ui/src"],
       "@postgear/config": ["packages/config"]

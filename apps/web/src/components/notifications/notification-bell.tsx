@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { ApiError } from '@/lib/api';
+import { leaveThen } from '@/lib/leave-guard';
 import { useWorkspace } from '../navigation/workspace-provider';
 import { useMounted } from '../posts/use-mounted';
 import { formatTimestamp, linkKind, titleOf } from './notifications-state';
@@ -55,7 +56,8 @@ export function NotificationBell() {
       switch (linkKind(item.link)) {
         case 'app':
           setOpen(false);
-          router.push(item.link as string);
+          // Unsaved work on the page (the Studio editor) is saved first.
+          leaveThen(() => router.push(item.link as string));
           return;
         case 'external':
           window.open(item.link as string, '_blank', 'noopener');

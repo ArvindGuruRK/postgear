@@ -16,24 +16,28 @@
  * over under a handful of users. Guards run before interceptors in Nest, so an
  * unauthenticated request is refused before a single byte is written.
  */
+
+import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
 import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@postgear/db';
 import { diskStorage } from 'multer';
+import { contentDisposition } from '../../common/attachment';
 import { type ActiveOrg, CurrentOrg } from '../../common/decorators/current-org.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodQuery } from '../../common/pipes/zod-validation.pipe';
@@ -84,6 +88,22 @@ export class MediaController {
   @Get(':id')
   async get(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
     return { media: await this.media.get(org.id, id) };
+  }
+
+  /**
+   * One image as a file to save, under its library name (DS-8.3). Fetched by
+   * the web app with the session, which then hands the bytes to the browser.
+   */
+  @Get(':id/download')
+  @Header('Cache-Control', 'no-store')
+  async download(@CurrentOrg() org: ActiveOrg, @Param('id') id: string): Promise<StreamableFile> {
+    const file = await this.media.download(org.id, id);
+
+    return new StreamableFile(file.bytes, {
+      type: file.mimeType,
+      length: file.bytes.length,
+      disposition: contentDisposition(file.fileName),
+    });
   }
 
   /** What deleting would affect, so the confirmation can say it. */

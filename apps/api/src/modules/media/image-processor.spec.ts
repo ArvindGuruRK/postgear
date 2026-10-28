@@ -115,6 +115,41 @@ describe('processImage', () => {
     expect(result.mimeType).toBe('image/jpeg');
   });
 
+  it('keeps an opaque PNG as PNG when the producer asks for one (a Studio PNG export)', async () => {
+    const original = await sharp({
+      create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+
+    const result = await processImage(original, sniffImage(original), { prefer: 'png' });
+
+    expect([result.mimeType, result.extension]).toEqual(['image/png', 'png']);
+    expect((await sharp(result.data).metadata()).format).toBe('png');
+  });
+
+  it('still keeps transparency as PNG when JPEG is asked for, rather than painting it black', async () => {
+    const original = await sharp({
+      create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+
+    const result = await processImage(original, sniffImage(original), { prefer: 'jpeg' });
+
+    expect(result.mimeType).toBe('image/png');
+  });
+
+  it('encodes a JPEG at the quality asked for', async () => {
+    const original = await photo(600, 400);
+
+    const low = await processImage(original, sniffImage(original), { quality: 40 });
+    const high = await processImage(original, sniffImage(original), { quality: 92 });
+
+    expect([low.mimeType, high.mimeType]).toEqual(['image/jpeg', 'image/jpeg']);
+    expect(high.data.length).toBeGreaterThan(low.data.length);
+  });
+
   it('converts WebP, which several platforms refuse, to JPEG', async () => {
     const original = await sharp({
       create: { width: 80, height: 60, channels: 3, background: '#0a0' },

@@ -17,7 +17,12 @@ import {
 } from '@postgear/ui';
 import { Image as ImageIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { UPLOAD_ACCEPT } from '@/components/media/media-limits';
+import {
+  IMAGE_ACCEPT,
+  preflightImage,
+  preflightUpload,
+  UPLOAD_ACCEPT,
+} from '@/components/media/media-limits';
 import { MediaTile } from '@/components/media/media-tile';
 import { UploadRows, useMediaUpload } from '@/components/media/media-uploader';
 import { useMediaList } from '@/components/media/use-media-list';
@@ -33,36 +38,54 @@ import type { MediaItem } from '@/types/media';
  * library afterwards and reusable in any other post, which is the point of a
  * library. A fresh upload is selected automatically: the person uploaded it in
  * order to attach it.
+ *
+ * Studio (Sprint 9) opens the same library to fill a picture or a logo:
+ * `single` makes a click replace the choice rather than add to it, and
+ * `imagesOnly` lists and accepts images alone, since a slide cannot hold a
+ * video.
  */
 export function MediaPickerDialog({
   open,
   onOpenChange,
-  alreadyAttached,
-  remaining,
+  alreadyAttached = [],
+  remaining = 1,
   onAttach,
+  single = false,
+  imagesOnly = false,
+  title = 'Media Library',
+  description = 'Choose media from the library to add to this part of the post, or upload new files.',
+  confirmLabel = 'Add Selected Media',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Ids already on the part, shown as selected and not attached twice. */
-  alreadyAttached: string[];
+  alreadyAttached?: string[];
   /** How many more attachments the part can take. */
-  remaining: number;
+  remaining?: number;
   onAttach: (media: MediaItem[]) => void;
+  /** One item at most: choosing another replaces the choice. */
+  single?: boolean;
+  imagesOnly?: boolean;
+  title?: string;
+  /** Read by screen readers only. */
+  description?: string;
+  confirmLabel?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[85vh] max-w-5xl flex-col gap-0 p-0">
         <div className="flex flex-col gap-1 px-6 pt-6 pb-4 pe-14">
-          <DialogTitle>Media Library</DialogTitle>
-          <DialogDescription className="sr-only">
-            Choose media from the library to add to this part of the post, or upload new files.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">{description}</DialogDescription>
         </div>
         {/* Mounted only while open, so each opening starts from a fresh library page and selection. */}
         {open ? (
           <PickerBody
             alreadyAttached={alreadyAttached}
-            remaining={remaining}
+            remaining={single ? 1 : remaining}
+            single={single}
+            imagesOnly={imagesOnly}
+            confirmLabel={confirmLabel}
             onCancel={() => onOpenChange(false)}
             onAttach={(media) => {
               onAttach(media);
@@ -78,31 +101,47 @@ export function MediaPickerDialog({
 function PickerBody({
   alreadyAttached,
   remaining,
+  single,
+  imagesOnly,
+  confirmLabel,
   onCancel,
   onAttach,
 }: {
   alreadyAttached: string[];
   remaining: number;
+  single: boolean;
+  imagesOnly: boolean;
+  confirmLabel: string;
   onCancel: () => void;
   onAttach: (media: MediaItem[]) => void;
 }) {
-  const list = useMediaList();
+  const list = useMediaList(null, '', imagesOnly ? 'image' : 'all');
   const [selected, setSelected] = useState<MediaItem[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
   const media = list.data?.media ?? [];
 
-  const { rows, upload } = useMediaUpload((item) => {
-    list.prepend(item);
-    setSelected((current) => (current.length >= remaining ? current : [...current, item]));
-  });
+  const { rows, upload } = useMediaUpload(
+    (item) => {
+      // The server decides what a file is; one that turned out to be a video
+      // is in the library, but has no place in an images-only list.
+      if (imagesOnly && item.type !== 'image') return;
+      list.prepend(item);
+      setSelected((current) =>
+        single ? [item] : current.length >= remaining ? current : [...current, item],
+      );
+    },
+    imagesOnly ? preflightImage : preflightUpload,
+  );
 
   function toggle(item: MediaItem) {
     setSelected((current) =>
       current.some((entry) => entry.id === item.id)
         ? current.filter((entry) => entry.id !== item.id)
-        : current.length >= remaining
-          ? current
-          : [...current, item],
+        : single
+          ? [item]
+          : current.length >= remaining
+            ? current
+            : [...current, item],
     );
   }
 
@@ -115,12 +154,16 @@ function PickerBody({
               value={list.search}
               onChange={(event) => list.setSearch(event.target.value)}
               onClear={() => list.setSearch('')}
-              placeholder="Search by file name"
+              placeholder="Enter your search"
               aria-label="Search media"
             />
           </div>
           <TooltipHint
-            label="Images up to 20 MB, video up to 250 MB. Images are resized and compressed."
+            label={
+              imagesOnly
+                ? 'Images up to 20 MB. They are resized and compressed.'
+                : 'Images up to 20 MB, video up to 250 MB. Images are resized and compressed.'
+            }
             side="bottom"
             align="end"
           >
@@ -132,8 +175,8 @@ function PickerBody({
           <input
             ref={fileInput}
             type="file"
-            accept={UPLOAD_ACCEPT}
-            multiple
+            accept={imagesOnly ? IMAGE_ACCEPT : UPLOAD_ACCEPT}
+            multiple={!single}
             className="sr-only"
             tabIndex={-1}
             aria-label="Upload files"
@@ -166,9 +209,19 @@ function PickerBody({
         ) : media.length === 0 ? (
           <EmptyState
             icon={ImageIcon}
-            title={list.search ? 'Nothing matches that name' : 'The library is empty'}
+            title={
+              list.search
+                ? 'Nothing matches that name'
+                : imagesOnly
+                  ? 'The library has no images yet'
+                  : 'The library is empty'
+            }
             description={
-              list.search ? 'Try another file name.' : 'Upload an image or video to attach it.'
+              list.search
+                ? 'Try another file name.'
+                : imagesOnly
+                  ? 'Upload an image to use it here.'
+                  : 'Upload an image or video to attach it.'
             }
           />
         ) : (
@@ -207,18 +260,24 @@ function PickerBody({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-t-2 border-outline px-6 py-4">
-        <span className="me-auto font-sans text-xs text-ink opacity-70">
-          {remaining <= 0
-            ? 'This part already has as many attachments as a post can take.'
-            : selected.length > 0
-              ? `${selected.length} selected, up to ${remaining}`
-              : `Select up to ${remaining}`}
+        <span className="me-auto min-w-0 truncate font-sans text-xs text-ink opacity-70">
+          {single
+            ? selected[0]
+              ? `${selected[0].name} selected`
+              : imagesOnly
+                ? 'Select an image'
+                : 'Select one item'
+            : remaining <= 0
+              ? 'This part already has as many attachments as a post can take.'
+              : selected.length > 0
+                ? `${selected.length} selected, up to ${remaining}`
+                : `Select up to ${remaining}`}
         </span>
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
         <Button onClick={() => onAttach(selected)} disabled={selected.length === 0}>
-          Add Selected Media
+          {confirmLabel}
         </Button>
       </div>
     </>

@@ -21,10 +21,15 @@ const SEARCH_DELAY_MS = 250;
  * a word already chosen. Such a page is never rendered by the server (it has
  * no list to hand over, `initial` is null), so the first fetch carries it.
  */
-export function useMediaList(initial?: MediaPage | null, initialSearch = '') {
+export function useMediaList(
+  initial?: MediaPage | null,
+  initialSearch = '',
+  /** Studio's picker lists images only, from its first fetch. */
+  initialType: MediaFilter = 'all',
+) {
   const [search, setSearchValue] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch.trim());
-  const [type, setTypeValue] = useState<MediaFilter>('all');
+  const [type, setTypeValue] = useState<MediaFilter>(initialType);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<MediaPage | null>(initial ?? null);
   const [loading, setLoading] = useState(!initial);

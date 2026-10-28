@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { avatarSrc } from '@/lib/avatars';
+import { leaveThen, mayLeave } from '@/lib/leave-guard';
 import { useWorkspace } from './workspace-provider';
 
 /**
@@ -38,6 +39,13 @@ import { useWorkspace } from './workspace-provider';
  * while the cookie kept working on the next reload. `router.refresh()` after
  * it invalidates the server-rendered layouts, so route gate 1 re-runs against
  * the now-absent session instead of the router replaying a cached tree.
+ *
+ * ## Unsaved work (Sprint 9)
+ *
+ * Every item asks the page first (`lib/leave-guard.ts`): the Studio editor
+ * saves what is unsaved, or asks when it cannot. For a switch or a sign-out
+ * that has to happen before the session changes, since a save sent after it
+ * would land in the other workspace, or in none.
  */
 export function AccountMenu() {
   const router = useRouter();
@@ -47,6 +55,9 @@ export function AccountMenu() {
 
   async function switchTo(nextId: string) {
     if (nextId === activeOrgId) {
+      return;
+    }
+    if (!(await mayLeave())) {
       return;
     }
 
@@ -66,6 +77,10 @@ export function AccountMenu() {
   }
 
   async function signOut() {
+    if (!(await mayLeave())) {
+      return;
+    }
+
     try {
       await api('/auth/logout', { method: 'POST' });
     } finally {
@@ -97,7 +112,7 @@ export function AccountMenu() {
             {
               label: 'Create Organization',
               animatedIcon: PlusIcon,
-              onSelect: () => router.push('/onboarding'),
+              onSelect: () => leaveThen(() => router.push('/onboarding')),
             },
           ],
         },
@@ -106,12 +121,12 @@ export function AccountMenu() {
         {
           label: 'Profile',
           animatedIcon: UserIcon,
-          onSelect: () => router.push(`/${activeOrgId}/settings/team`),
+          onSelect: () => leaveThen(() => router.push(`/${activeOrgId}/settings/team`)),
         },
         {
           label: 'Settings',
           animatedIcon: SettingsIcon,
-          onSelect: () => router.push(`/${activeOrgId}/settings/team`),
+          onSelect: () => leaveThen(() => router.push(`/${activeOrgId}/settings/team`)),
         },
         { label: 'Log Out', animatedIcon: LogOutIcon, danger: true, onSelect: signOut },
       ]}

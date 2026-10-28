@@ -84,9 +84,26 @@ export class UnreadableImageError extends Error {
   }
 }
 
+export interface ProcessImageOptions {
+  /**
+   * What the producer wants out, when the bytes allow it.
+   *
+   * Only the Design Studio's export sets this (Sprint 9), and only because
+   * its PNG choice is a real one a user made: a slide is opaque, so the
+   * transparency rule below would otherwise turn every PNG export into a
+   * JPEG and the option would quietly do nothing. An image that genuinely
+   * uses transparency is still a PNG whatever is asked for, because JPEG
+   * would paint it black.
+   */
+  prefer?: 'jpeg' | 'png';
+  /** JPEG quality. Defaults to the library's own 82. */
+  quality?: number;
+}
+
 export async function processImage(
   input: Buffer | string,
   sniffed: Extract<SniffedMedia, { kind: 'image' }>,
+  encode: ProcessImageOptions = {},
 ): Promise<ProcessedImage> {
   const options = { failOn: 'error' as const, limitInputPixels: MAX_INPUT_PIXELS };
 
@@ -140,20 +157,21 @@ export async function processImage(
 
     const raw = { raw: { width: info.width, height: info.height, channels: info.channels } };
     const transparent = usesTransparency(pixels, info.channels);
+    const asPng = transparent || encode.prefer === 'png';
 
-    const encoded = transparent
+    const encoded = asPng
       ? await sharp(pixels, raw).png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer()
       : await sharp(pixels, raw)
           // An alpha channel that is fully opaque everywhere is dropped rather
           // than kept as a reason to store a PNG.
           .removeAlpha()
-          .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+          .jpeg({ quality: encode.quality ?? JPEG_QUALITY, mozjpeg: true })
           .toBuffer();
 
     return {
       data: encoded,
-      mimeType: transparent ? 'image/png' : 'image/jpeg',
-      extension: transparent ? 'png' : 'jpg',
+      mimeType: asPng ? 'image/png' : 'image/jpeg',
+      extension: asPng ? 'png' : 'jpg',
       width: info.width,
       height: info.height,
       thumbnail: await thumbnailOf(sharp(encoded)),

@@ -8,17 +8,23 @@
  *
  * The engine is a provider behind a token, built once from the environment
  * by `seo.engine.factory.ts`, so the service never knows whether it has a
- * browser and a test hands it a fake. The module owns the crawler's
- * lifetime: a headless browser left running after shutdown is a process
- * that never exits, so it is closed on destroy.
+ * browser and a test hands it a fake.
+ *
+ * The headless browser is **not** this module's any more (Sprint 9): it is
+ * the process-wide pool in `common/browser/browser-pool.module.ts`, shared
+ * with the Design Studio exporter, which also owns closing it. Two Chromiums
+ * for two features would double the heaviest thing the API runs and give two
+ * answers to "is a browser available".
  */
-import { Inject, Logger, Module, type OnModuleDestroy } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { BrowserPool } from '@postgear/seo-engine';
+import { BROWSER_POOL } from '../../common/browser/browser-pool.module';
 import type { Env } from '../../config/env';
 import { AiModule } from '../ai/ai.module';
 import { readSeoConfig, SEO_CONFIG, type SeoConfig } from './seo.config';
 import { SeoController } from './seo.controller';
-import { SEO_ENGINE, type SeoEngine } from './seo.engine';
+import { SEO_ENGINE } from './seo.engine';
 import { createSeoEngine } from './seo.engine.factory';
 import { SeoGate } from './seo.gate';
 import { SeoRepository } from './seo.repository';
@@ -42,23 +48,10 @@ import { SeoService } from './seo.service';
     },
     {
       provide: SEO_ENGINE,
-      inject: [SEO_CONFIG],
-      useFactory: (config: SeoConfig) => createSeoEngine(config, new Logger('SeoEngine')),
+      inject: [SEO_CONFIG, BROWSER_POOL],
+      useFactory: (config: SeoConfig, pool: BrowserPool) =>
+        createSeoEngine(config, new Logger('SeoEngine'), pool),
     },
   ],
 })
-export class SeoModule implements OnModuleDestroy {
-  private readonly logger = new Logger(SeoModule.name);
-
-  constructor(@Inject(SEO_ENGINE) private readonly engine: SeoEngine) {}
-
-  async onModuleDestroy(): Promise<void> {
-    try {
-      await this.engine.crawler.close();
-    } catch (error) {
-      this.logger.warn(
-        `Could not close the SEO crawler: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-}
+export class SeoModule {}

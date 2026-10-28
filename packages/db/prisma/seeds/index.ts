@@ -35,6 +35,7 @@ import * as argon2 from 'argon2';
 import { encrypt } from '../../src/crypto';
 import { seedAnalytics } from './analytics.seed';
 import { seedSeoAudits } from './seo.seed';
+import { seedStudio } from './studio.seed';
 
 const prisma = new PrismaClient();
 
@@ -336,6 +337,9 @@ async function main() {
     ],
   );
   const seededSeo = await seedSeoAudits(prisma, organization.id);
+  // Sprint 9: a brand kit and two designs, so Studio opens on something to
+  // click rather than on its empty state.
+  const seededStudio = await seedStudio(prisma, organization.id, user.id);
 
   console.log('Seed complete:', {
     organizationId: organization.id,
@@ -351,6 +355,7 @@ async function main() {
     notifications: seededNotifications,
     analytics: seededAnalytics,
     seoAudits: seededSeo,
+    studio: seededStudio,
   });
 }
 

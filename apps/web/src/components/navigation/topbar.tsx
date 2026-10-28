@@ -23,6 +23,11 @@ import { ThemeToggle } from './theme-toggle';
  * no dividers between its buttons: the title's size and the spacing do that
  * work, and decorative rules read as generated UI. The search field came back
  * (2026-10-21) as the workspace search: see `components/search/global-search`.
+ *
+ * The theme button switches light and dark in this browser and, in the
+ * dashboard, also saves the mode to the signed-in account. The /dev pages
+ * turn that off (`saveThemeToAccount`): they may have no session at all, and
+ * trying a theme there must never change anyone's account.
  */
 export function TopBar({
   title,
@@ -30,6 +35,7 @@ export function TopBar({
   search,
   accountMenu,
   notifications,
+  saveThemeToAccount = true,
 }: {
   title: string;
   /** The posting-streak flame (2026-10-22): a slot for the same reason as the account menu. */
@@ -39,6 +45,8 @@ export function TopBar({
   accountMenu?: ReactNode;
   /** The notification bell (Sprint 8): a slot for the same reason as the account menu. */
   notifications?: ReactNode;
+  /** Whether the theme button also saves the mode to the account; false on the /dev pages. */
+  saveThemeToAccount?: boolean;
 }) {
   return (
     // Shorter on a phone, where 80px of bar is a tenth of the screen.
@@ -47,7 +55,7 @@ export function TopBar({
       <div className="flex shrink-0 items-center gap-2 md:gap-3">
         {streak}
         {search}
-        <ThemeToggle saveToAccount />
+        <ThemeToggle saveToAccount={saveThemeToAccount} />
         {notifications}
         {accountMenu}
       </div>

@@ -10,7 +10,7 @@
  * `localhost`: and those four fetch the media themselves.
  */
 import { constants } from 'node:fs';
-import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import type { StorageBackend, StorageBody } from './storage.interface';
 import { assertValidKey } from './storage-keys';
@@ -45,6 +45,20 @@ export class LocalStorage implements StorageBackend {
 
   async delete(key: string): Promise<void> {
     await rm(this.pathFor(key), { force: true });
+  }
+
+  async read(key: string): Promise<Buffer | null> {
+    // `pathFor` validates the key first, so this cannot read outside the
+    // upload directory however the key was arrived at.
+    const path = this.pathFor(key);
+
+    try {
+      return await readFile(path);
+    } catch (error) {
+      // Gone is an answer; a disk that cannot be read is a fault to report.
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+      throw error;
+    }
   }
 
   publicUrl(key: string): string {

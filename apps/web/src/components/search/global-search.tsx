@@ -48,6 +48,7 @@ import { ChannelMark } from '@/components/channels/channel-mark';
 import { PlatformIcon, platformLabel } from '@/components/platforms/platform-icon';
 import { ChannelStack } from '@/components/posts/channel-stack';
 import { describePost, formatWhen } from '@/components/posts/post-status';
+import { leaveThen } from '@/lib/leave-guard';
 import type {
   ChannelSearchResult,
   MediaSearchResult,
@@ -162,7 +163,8 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
 
     navigating.current = true;
     changeOpen(false);
-    router.push(href);
+    // Unsaved work on the page (the Studio editor) is saved first (`lib/leave-guard.ts`).
+    leaveThen(() => router.push(href));
   }
 
   function forgetRecent() {

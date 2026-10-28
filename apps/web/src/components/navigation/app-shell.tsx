@@ -31,6 +31,11 @@ import { TopBar } from './topbar';
  * `fullBleed` is for pages that lay out their own blocks to fill the height
  * (the calendar's channel card beside its grid): the region does not scroll,
  * and each block scrolls itself. Every other page scrolls as one.
+ *
+ * `saveThemeToAccount` is the top bar's theme button saving the mode to the
+ * signed-in account, as it does in the dashboard. The /dev playgrounds pass
+ * false: they may have no session, and the button there only switches the
+ * theme in this browser.
  */
 export function AppShell({
   navItems,
@@ -41,6 +46,7 @@ export function AppShell({
   accountMenu,
   notifications,
   fullBleed = false,
+  saveThemeToAccount = true,
   children,
 }: {
   navItems: SidebarItem[];
@@ -53,6 +59,8 @@ export function AppShell({
   accountMenu?: ReactNode;
   notifications?: ReactNode;
   fullBleed?: boolean;
+  /** Whether the theme button also saves the mode to the account (default true); false on /dev. */
+  saveThemeToAccount?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -76,6 +84,7 @@ export function AppShell({
           search={search}
           accountMenu={accountMenu}
           notifications={notifications}
+          saveThemeToAccount={saveThemeToAccount}
         />
         <main
           className={cn(

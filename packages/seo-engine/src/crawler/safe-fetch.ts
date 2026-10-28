@@ -468,6 +468,53 @@ export async function fetchUrlSafely(
 }
 
 /**
+ * GET a file and keep its bytes.
+ *
+ * The same guard, redirect handling and size cap as {@link fetchUrlSafely};
+ * the only difference is that the body comes back as a Buffer instead of
+ * being decoded as UTF-8 text, because the caller wants an image. Sprint 9's
+ * brand extractor uses it for logo candidates, which are fetched from a
+ * stranger's website and must go through exactly the same SSRF checks as the
+ * page they were found on.
+ *
+ * `requireHtml` is forced off: by definition this is not HTML. The content
+ * type is returned rather than enforced, because the only honest reading of
+ * what a file is comes from sniffing its bytes, which the caller does.
+ */
+export async function fetchBinarySafely(
+  url: string,
+  options: Omit<SafeFetchOptions, 'requireHtml'> = {},
+): Promise<Omit<SafeFetchResponse, 'body'> & { body: Buffer }> {
+  const result = await follow(url, {
+    ...options,
+    requireHtml: false,
+    method: 'GET',
+    discardBody: false,
+  });
+  const host = bareHostname(result.finalUrl);
+
+  if ((options.rejectBadStatus ?? true) && result.statusCode >= 400) {
+    throw badStatusError(result.statusCode, host);
+  }
+
+  return {
+    requestedUrl: url,
+    finalUrl: result.finalUrl.toString(),
+    statusCode: result.statusCode,
+    headers: result.headers,
+    body: result.body,
+    bytes: result.bytes,
+    contentType: result.headers['content-type'] ?? null,
+    compressed: result.compressed,
+    https: result.finalUrl.protocol === 'https:',
+    certificateValid: result.certificateValid,
+    responseTimeMs: Math.round(result.responseTimeMs),
+    redirects: result.redirects,
+    addresses: result.addresses,
+  };
+}
+
+/**
  * Asks whether a URL exists without downloading it: HEAD first, and a ranged
  * GET whose body is dropped at the first byte when the server refuses HEAD
  * (405/501, or no answer at all). Used for link checks and the sitemap probe.

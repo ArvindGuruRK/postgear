@@ -62,10 +62,15 @@ export interface ApiOptions {
   cookie?: string;
   /** Set false to get `null` instead of a throw on 401. */
   throwOnUnauthorized?: boolean;
+  /**
+   * Lets the request finish after the page is gone: the Studio editor's last
+   * save as someone leaves it. Browsers cap such a body at 64 KB.
+   */
+  keepalive?: boolean;
 }
 
 async function request<T>(baseUrl: string, path: string, options: ApiOptions = {}): Promise<T> {
-  const { method = 'GET', body, cookie, throwOnUnauthorized = true } = options;
+  const { method = 'GET', body, cookie, throwOnUnauthorized = true, keepalive } = options;
 
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -78,6 +83,7 @@ async function request<T>(baseUrl: string, path: string, options: ApiOptions = {
     // Session-dependent by definition; a cached response would show one user
     // another user's data.
     cache: 'no-store',
+    keepalive,
   });
 
   if (response.status === 401 && !throwOnUnauthorized) {
@@ -180,6 +186,71 @@ export function uploadFile<T>(
 }
 
 /**
+ * Fetches a file the API builds on request (Studio's Download All zip) and
+ * hands it to the browser as a download.
+ *
+ * A fetch rather than a link, so a refusal ("Export this design first, then
+ * download it.") arrives as the API's sentence instead of a JSON page the
+ * browser saves to disk. The name is the API's own, read from
+ * `Content-Disposition` (UTF-8 form first), or `fallbackName` without one.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const response = await fetch(`${BROWSER_API_URL}${path}`, {
+    credentials: 'include',
+    cache: 'no-store',
+  }).catch(() => {
+    throw new ApiError('The download was interrupted. Check your connection and try again.', 0);
+  });
+
+  if (!response.ok) {
+    let message = 'Something went wrong. Please try again.';
+    let code: string | undefined;
+
+    try {
+      const payload = (await response.json()) as Record<string, unknown>;
+      if (typeof payload.error === 'string') message = payload.error;
+      if (typeof payload.code === 'string') code = payload.code;
+    } catch {
+      // A proxy's HTML error page; the status still says what happened.
+    }
+
+    throw new ApiError(message, response.status, code);
+  }
+
+  // A connection cut halfway (the API stops a zip it cannot finish) rejects
+  // here, so a truncated file is never saved as if it were whole.
+  const blob = await response.blob().catch(() => {
+    throw new ApiError('The download was interrupted. Please try again.', 0);
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileNameFrom(response.headers.get('Content-Disposition')) ?? fallbackName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // After the click has handed the blob to the download, not before.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** The file name a `Content-Disposition` header carries, preferring its UTF-8 form. */
+export function fileNameFrom(header: string | null): string | null {
+  if (!header) return null;
+
+  const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded.trim());
+    } catch {
+      // A malformed escape; the plain name below still works.
+    }
+  }
+
+  return /filename\s*=\s*"([^"]*)"/i.exec(header)?.[1] ?? null;
+}
+
+/**
  * Where the browser should navigate to begin an OAuth handshake.
  *
  * A full navigation, not a fetch: the provider's consent screen is a page the
@@ -211,7 +282,5 @@ export function oauthStartUrl(provider: 'google' | 'facebook'): string {
 export function channelConnectUrl(provider: string, reconnectChannelId?: string): string {
   const base = `${BROWSER_API_URL}/channels/connect/${encodeURIComponent(provider)}`;
 
-  return reconnectChannelId
-    ? `${base}?reconnect=${encodeURIComponent(reconnectChannelId)}`
-    : base;
+  return reconnectChannelId ? `${base}?reconnect=${encodeURIComponent(reconnectChannelId)}` : base;
 }

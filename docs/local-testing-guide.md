@@ -31,6 +31,7 @@ placeholders.
 | **Notifications** (Sprint 8): the bell with live updates, "Mark all as read", email on a failed post (printed to the API console locally), email preferences | Weekly digest |
 | **API keys and the public API** (Sprint 8): create / rotate / revoke keys, `/v1` with Swagger docs at `/api/docs`, per-key rate limiting, the Node SDK | OAuth apps, Zapier/Make connectors |
 | **Outbound webhooks** (Sprint 8): signed deliveries on post published / failed, retries, a test send, delivery history | |
+| **Design Studio** (Sprint 9): brand kits by hand or read from a website, 47 templates in four formats, an editor with autosave and undo, preview in platform frames, export to Media, Send To Composer as a draft, share links | AI-written slides, LinkedIn PDF carousels, approvals on share links |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
@@ -607,11 +608,102 @@ Traces are off (`SENTRY_TRACES_SAMPLE_RATE=0`); set `0.1` to sample
 performance data once there is a quota to spend. The `/dev/*` routes are
 excluded from production builds.
 
+### 5k. The Design Studio (Sprint 9)
+
+Nothing to add to `.env`, and nothing here costs money. Templates are code,
+not paid assets. Export draws each slide in the same headless Chromium the SEO
+analyzer uses (`npx playwright install chromium` once; without it Export says
+"Export is not available right now. Please try again later." and the API
+console prints that command). Brand extraction only reads a public website.
+
+Open **<http://localhost:3000/seed-demo-org/studio>** (**Studio** on the rail,
+after Media). The seed adds a brand kit, **Lotus Flow Yoga**, and two
+designs: **5 Morning Stretches** (a five-slide portrait carousel) and
+**Saturday Classes Are Back** (a single landscape post).
+
+- **Create Design** walks Brand, Format and Template, one question per
+  screen. The step lives in the URL, so a refresh keeps your place.
+  - **Brand**: pick Lotus Flow Yoga, make a **New Brand Kit** (name, website,
+    a logo up to 5 MB, five colours with a picker and a hex field each), or
+    **Skip** to keep the template's own colours. **Extract From Website**
+    with a real site fills a review screen, and nothing is saved until
+    **Save Brand Kit**. A local or private address (`localhost:3000`,
+    `http://[::1]/`, `http://169.254.169.254/`) is refused with "That address
+    is not public." (the SSRF guard, logged as `studio.unsafe_url`). Five
+    extractions a minute per workspace.
+  - **Format**: Square, Portrait, Story and Landscape, drawn at their real
+    shapes, each with the platforms it suits.
+  - **Template**: 47 templates. Search, filter by category, format and
+    style, and star favourites (shared by the whole workspace; with none
+    starred, **Favourites** says "No favourites yet"). The thumbnails wear
+    the chosen kit's colours (**Show original colours** turns that off).
+    **Start From Blank** is the plain layout.
+- **The editor** (`/seed-demo-org/studio/<id>`): slides on the left, the
+  canvas in the middle, the properties on the right (Element, Slide,
+  Design).
+  - Click a text on the canvas to type, or use the panel. Drag an element:
+    it stops at the edge of its area. Or nudge it with the arrow keys (Shift
+    for 5 %).
+  - Long text shrinks, then gets a warning ring. A colour that makes text
+    hard to read shows a contrast warning with **Fix Contrast**.
+  - Add Slide (by layout), Duplicate, Move Up, Move Down, and Delete with
+    Undo in the toast (Undo brings the slide back and puts focus on its
+    thumbnail), up to 20 slides.
+  - Ctrl+Z and Shift+Ctrl+Z (Cmd on a Mac) undo and redo; **Reset** puts a
+    slide or the whole design back to its template.
+  - The save state reads Saving, then Saved once the API has confirmed.
+  - In a narrow window the slides and the properties open as drawers.
+- **Two tabs**: open the same design twice and edit in both. The second save
+  says "This design changed in another tab." with **Reload** and **Keep This
+  Version**.
+- **Leave guard**: type, then at once click a rail link. It saves first; if
+  the save has not landed within 10 seconds it asks "Leave without saving?"
+  (**Stay** or **Leave Anyway**, and Leave Anyway never asks a second time).
+  The top bar waits the same way: switching workspace, signing out, Profile,
+  Settings, a search result and a notification. A design deleted in another
+  tab never asks.
+- **Preview** (the eye): Instagram, Facebook, LinkedIn and X frames (only
+  the ones that take the format), swipeable slides, no counts, a Preview
+  badge. On a phone the arrows sit below the slide, at each end of the dots.
+  The caption written here goes to the composer.
+- **Export**: JPEG (the default, what Instagram takes) or PNG, with progress
+  per slide. The images land in **Media** as `{title} 01.jpg`, `{title}
+  02.jpg` and so on. A text still too long is named before you start.
+  **Download All** zips them (by keyboard, focus stays on it while it
+  works); to save one, open it in **Media** and press **Download**.
+- **Send To Composer**: choose channels. It exports first if the design
+  changed, creates a draft for the next full hour, and opens the composer
+  over the editor with the images in order and the caption. With
+  `PUBLISH_SIMULATION="true"` the seeded channels publish to the stand-in as
+  usual.
+- **Share**: make a link (1 to 30 days, 7 by default). It is shown once, so
+  copy it. Open it in a private window: no sign-in, the slides in the
+  platform frames, not indexed. Revoke it: the link answers 404 with "This
+  link is no longer available."
+- **Templates playground**: <http://localhost:3000/dev/studio> draws every
+  template in every format (860 slides) and lists any slot whose sample text
+  does not fit. Its light and dark theme selects (Lilac included) change only
+  that page.
+
+Automated checks:
+
+```powershell
+npm test --workspace=@postgear/design-engine     # the engine
+npm test --workspace=@postgear/api -- studio      # the API module
+# Real Chromium (opt-in): exact sizes, pixels, and every template fitting with the real fonts
+$env:SEO_BROWSER_TESTS = "true"; npm test --workspace=@postgear/api -- design-exporter.browser presets.browser; Remove-Item Env:SEO_BROWSER_TESTS
+npm run test:e2e -- e2e/studio.spec.ts            # create, edit, export, send, share (API in dev:api:e2e, section 3a)
+```
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 
 - Upload an image. It should appear as a tile.
 - Upload something that is not an image or video. It should be rejected.
+- Open an image and press **Download**: it saves under its library name, with
+  the extension of what is stored (an uploaded `.webp` saves as `.jpg`).
+  Videos have no Download; their player's menu saves them. Pressed by
+  keyboard, the button keeps focus while it downloads.
 - Delete one.
 - With `STORAGE_PROVIDER="local"`, files are stored in `apps/api/uploads/`.
 
@@ -787,6 +879,9 @@ A real upload needs a video and is not worth testing from the UI yet.
 | `npm run test:e2e` sign-ins fail with "Too many requests" (429) | The API was started with `npm run dev:api` or `npm run dev`. Use `npm run dev:api:e2e`: section 3a. |
 | `/v1` answers 429 | The per-key ceiling (`API_RATE_LIMIT_PER_MIN`, 60/min) or the per-address one (`RATE_LIMIT_PER_MIN`, 300/min). Wait for `Retry-After`. |
 | No notification email in the console | The member's preference is off (Settings → Notifications), or `SMTP_HOST` is set and mail went to a real server. The dispatcher's log line names the row and the outcome. |
+| Studio Export says "Export is not available right now" | Playwright's Chromium is not installed where the API runs. `npx playwright install chromium`, then export again; the API console prints the same hint once. |
+| Extract From Website says "That address is not public." | The address is localhost, a private network or a cloud metadata address, refused on purpose. Use a public website. |
+| Extract From Website says "That is a lot of websites at once." | Five extractions a minute per workspace. Wait a minute. |
 
 ---
 

@@ -12,6 +12,7 @@
 import type { Logger } from '@nestjs/common';
 import {
   assertSafeUrl,
+  type BrowserPool,
   createOpenPageRankProvider,
   createSeoCrawler,
   createSimulatedAuthorityProvider,
@@ -24,7 +25,16 @@ import { redact } from '../../common/logging/security-logger';
 import { AUTHORITY_TIMEOUT_MS, SEO_MAX_LINK_CHECKS, type SeoConfig } from './seo.config';
 import type { SeoEngine } from './seo.engine';
 
-export function createSeoEngine(config: SeoConfig, logger: Logger): SeoEngine {
+export function createSeoEngine(
+  config: SeoConfig,
+  logger: Logger,
+  /**
+   * The process-wide pool (Sprint 9). Injected rather than left for the
+   * crawler to create, so the Design Studio's exporter shares one Chromium
+   * with the crawler instead of launching a second.
+   */
+  pool?: BrowserPool,
+): SeoEngine {
   const line = (message: string, meta?: Record<string, unknown>): string =>
     meta ? `${message} ${JSON.stringify(redact(meta))}` : message;
   // Built as a value rather than inline so the crawler's own logger shape,
@@ -44,6 +54,7 @@ export function createSeoEngine(config: SeoConfig, logger: Logger): SeoEngine {
     maxLinkChecks: SEO_MAX_LINK_CHECKS,
     maxPages: 1,
     logger: crawlerLogger,
+    pool,
   });
 
   const authority =

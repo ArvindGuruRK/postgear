@@ -123,17 +123,23 @@ export async function streamEvents<T extends { type: string }>(
   if (!response.ok) {
     const text = await response.text();
     let message = 'Something went wrong. Please try again.';
+    let code: string | undefined;
 
     try {
       const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
       if (typeof payload.error === 'string') {
         message = payload.error;
       }
+      // The same machine-readable reason `api()` passes on (Studio's
+      // `export_busy`, `export_unavailable`), so a caller can branch on it.
+      if (typeof payload.code === 'string') {
+        code = payload.code;
+      }
     } catch {
       // A proxy's HTML error page; the status still says what happened.
     }
 
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, code);
   }
 
   if (!response.body) {

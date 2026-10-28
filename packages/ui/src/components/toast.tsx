@@ -50,6 +50,8 @@ const toastVariants = cva(
     'font-sans text-sm will-change-transform',
     'transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
     'data-[state=open]:animate-toastIn data-[state=closed]:animate-toastOut',
+    // Reduced motion: the toast appears and goes without sliding.
+    'motion-reduce:transition-none motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none',
   ],
   {
     variants: {

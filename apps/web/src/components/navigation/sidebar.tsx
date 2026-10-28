@@ -149,9 +149,9 @@ const TAB_SLOTS = 5;
  *
  * A bottom bar rather than a menu button: every main destination stays one
  * tap away and within a thumb's reach, where a menu would hide all of them
- * behind a tap at the top of the screen. Eight entries do not fit five 70px
+ * behind a tap at the top of the screen. Nine entries do not fit five 70px
  * slots, so the first four sections stay (Home, Calendar, Copilot, Queue)
- * and the rest (Analytics, Media, SEO, Settings)
+ * and the rest (Analytics, Media, Studio, SEO, Settings)
  * open from More in a sheet; More takes the active fill while one of those is
  * the current page. Its bottom margin is at least the safe-area inset, so the
  * bar clears the home indicator now that the page reaches under it
