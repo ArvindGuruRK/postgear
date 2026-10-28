@@ -34,10 +34,19 @@
  * the browser by the effect below, at export by the script the export page
  * carries. This component puts every box in place and hands the fitter a base
  * size.
+ *
+ * ## The layers
+ *
+ * The canvas's own colour is the ground. Over it sits either a photo and its
+ * overlay or the design's background art (never both: art is for slides that
+ * are not photos), then the layout's painted blocks, then the slots. Text is
+ * set in the theme's type with the user's font choices resolved
+ * (`typography.ts`).
  */
 import { type CSSProperties, type ReactNode, type RefObject, useLayoutEffect, useRef } from 'react';
+import { artById, artColors, artDataUri, artSvg } from '../art';
 import { isTypeable, slotText } from '../bindings';
-import { photoGround, slideGround } from '../brand';
+import { photoGround, photoOverlayColor, slideGround } from '../brand';
 import { rgba } from '../color';
 import { baseFontSize, MIN_FIT_SCALE } from '../fit';
 import { fontStack, resolveWeight } from '../fonts';
@@ -59,7 +68,10 @@ import {
   type SlotDef,
   type SlotId,
   type Theme,
+  type TypeRole,
+  type TypeStyle,
 } from '../types';
+import { resolveTypeStyle } from '../typography';
 import { EditableText } from './EditableText';
 import { fitSlots } from './fit-runtime';
 
@@ -137,12 +149,18 @@ export function SlideView({
     return ground;
   };
 
-  // A photo that cannot be drawn shows the darkest ground its overlay
-  // promises, so the light text the slide was set in still reads.
+  // A photo that cannot be drawn shows the ground its overlay promises (the
+  // lightest a dark tint allows, the darkest a light one does), so the text
+  // the slide was set in still reads.
   const canvasGround =
     background.kind === 'media' && !photo
-      ? photoGround(background.overlay)
+      ? photoGround(background.overlay, background.tint)
       : slideGround(palette, slide);
+
+  const art =
+    background.kind === 'media'
+      ? null
+      : artSource(design.art, theme, palette, canvasGround, spec.width, spec.height);
 
   return (
     <div
@@ -157,8 +175,16 @@ export function SlideView({
       {background.kind === 'media' && photo ? (
         <>
           <img src={photo} alt="" style={fill({ objectFit: 'cover' })} />
-          <div style={fill({ background: rgba('#000000', background.overlay) })} />
+          <div
+            style={fill({
+              background: rgba(photoOverlayColor(background.tint), background.overlay),
+            })}
+          />
         </>
+      ) : null}
+
+      {art ? (
+        <img data-art={art.id} src={art.src} alt="" style={fill({ objectFit: 'cover' })} />
       ) : null}
 
       {layout.decor?.map((decor, decorIndex) => {
@@ -215,7 +241,7 @@ export function SlideView({
             align={state?.align ?? frame.align ?? 'start'}
             text={slotText(design, index, slot)}
             color={ink.color}
-            theme={theme}
+            typeStyle={resolveTypeStyle(theme, slot.type ?? 'body', design, state)}
             short={short}
             mode={mode}
             typing={typing}
@@ -226,6 +252,40 @@ export function SlideView({
       })}
     </div>
   );
+}
+
+/**
+ * The design's background art as an `<img>` source, drawn in this slide's
+ * colours (`artColors`): a hand-made original's own colours on its home
+ * ground, the theme's pinned colours on the theme's own background, and
+ * colours derived from the ground and the accent anywhere else, which is how
+ * a brand kit recolours the art. Null for no art, or an id the library does
+ * not have.
+ */
+function artSource(
+  id: string | null,
+  theme: Theme,
+  palette: Palette,
+  ground: string,
+  width: number,
+  height: number,
+): { id: string; src: string } | null {
+  const art = artById(id);
+  if (!art) return null;
+
+  const svg = artSvg(
+    art.id,
+    artColors({
+      ground,
+      accent: palette.accent,
+      pinned: theme.art ? { background: theme.colors.background, ...theme.art } : null,
+      home: art.home ?? null,
+    }),
+    width,
+    height,
+  );
+
+  return svg ? { id: art.id, src: artDataUri(svg) } : null;
 }
 
 /**
@@ -363,6 +423,25 @@ function PictureSlot({
 // Text and lists
 // ---------------------------------------------------------------------------
 
+/**
+ * The roles set as a few short lines, balanced so none ends on a word left
+ * alone ("Plan A Month Of Posts In One / Afternoon"). Body copy and lists keep
+ * the ordinary break: balanced, every line of a paragraph would come up short.
+ * Balancing never adds a line, so it cannot make a slot overflow, and every
+ * current browser supports it, so the editor shows the breaks the export
+ * makes.
+ */
+const BALANCED_ROLES: ReadonlySet<TypeRole> = new Set<TypeRole>([
+  'eyebrow',
+  'headline',
+  'subheadline',
+  'quote',
+  'attribution',
+  'statLabel',
+  'cta',
+  'footer',
+]);
+
 interface TextSlotProps {
   slot: SlotDef;
   state: ElementState | undefined;
@@ -370,7 +449,8 @@ interface TextSlotProps {
   align: Align;
   text: string;
   color: string;
-  theme: Theme;
+  /** The slot's type role, with the user's font choices resolved (`typography.ts`). */
+  typeStyle: TypeStyle;
   short: number;
   mode: SlideMode;
   typing: boolean;
@@ -385,14 +465,13 @@ function TextSlot({
   align,
   text,
   color,
-  theme,
+  typeStyle: style,
   short,
   mode,
   typing,
   onTextInput,
   onTextCommit,
 }: TextSlotProps) {
-  const style = theme.type[slot.type ?? 'body'];
   const base = baseFontSize(style, short, slot.resizable ? state?.size : undefined);
 
   const outer: CSSProperties = {
@@ -417,6 +496,8 @@ function TextSlot({
   const inner: CSSProperties = {
     flex: '0 0 auto',
     whiteSpace: 'pre-wrap',
+    // After `whiteSpace`, which in newer browsers also sets how text wraps.
+    textWrap: BALANCED_ROLES.has(slot.type ?? 'body') ? 'balance' : undefined,
     overflowWrap: 'break-word',
   };
 

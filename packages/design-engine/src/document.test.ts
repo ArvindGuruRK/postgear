@@ -1,8 +1,12 @@
+import { ART_STYLES } from './art';
 import {
   addSlide,
   applyBrandKit,
+  applyCtaDefaults,
+  applyPhotoToAllSlides,
   applyTheme,
   BLANK_PRESET_ID,
+  blankDocument,
   detachBrandKit,
   documentFromPreset,
   duplicateSlide,
@@ -11,9 +15,13 @@ import {
   resetDocument,
   resetElement,
   resetSlide,
+  setArt,
   setBackground,
   setBrandName,
   setCaption,
+  setDocumentFonts,
+  setElementFont,
+  setFormat,
   setHandle,
   setLogoPlacement,
   setSlideLayout,
@@ -22,15 +30,18 @@ import {
   updateElement,
 } from './document';
 import { findLayout, findSlot, latestLayout, layoutKey, slotPlacement } from './layouts';
-import { SAMPLE_HANDLE } from './presets';
+import { presetById, SAMPLE_HANDLE } from './presets';
 import { designDocumentSchema } from './schema';
 import {
   type DesignBrand,
   type DesignDocument,
+  type FontId,
+  type FormatId,
   MAX_CAPTION_LENGTH,
   MAX_HANDLE_LENGTH,
   MAX_SLIDES,
   MAX_TEXT_LENGTH,
+  type SlideBackground,
 } from './types';
 
 let counter = 0;
@@ -59,7 +70,35 @@ const KIT: DesignBrand = {
   logoMediaId: 'media-logo-1',
   name: 'Lotus Flow Yoga',
   kitVersion: '2026-10-27T10:00:00.000Z',
+  fonts: { heading: 'playfair-display', body: null },
 };
+
+/**
+ * Runs `body` with one preset's art set to `art`, then puts the preset back.
+ * The library has no preset with art until the template batches land, and a
+ * test should not depend on which one it is; jest gives each test file its
+ * own copy of the library, so the change cannot reach another file.
+ */
+function withPresetArt<T>(art: string | undefined, body: () => T): T {
+  const preset = presetById('tips-steps-ink');
+  if (!preset) throw new Error('tips-steps-ink is missing from the library.');
+
+  const before = preset.art;
+  preset.art = art;
+
+  try {
+    return body();
+  } finally {
+    if (before === undefined) delete preset.art;
+    else preset.art = before;
+  }
+}
+
+/** Two different art styles from the library, when it has them. */
+const [ART, OTHER_ART] = ART_STYLES;
+
+/** ART_STYLES is filled by the art tasks; until they land, the art tests have nothing to set. */
+const withArt = ART && OTHER_ART ? it : it.skip;
 
 describe('slideId', () => {
   it('makes ids the schema accepts, and does not repeat them', () => {
@@ -137,6 +176,40 @@ describe('documentFromPreset', () => {
       newId: ids,
     });
     expect(document.slides[0].elements.headline?.text).toBeTruthy();
+    valid(document);
+  });
+
+  it('starts without art or a font choice of its own, blank or from a preset', () => {
+    for (const document of [fresh(), blankDocument({ format: 'story', newId: ids })]) {
+      expect(document.art).toBeNull();
+      expect(document.fonts).toBeNull();
+      expect(document.brand.fonts).toBeNull();
+      valid(document);
+    }
+  });
+
+  withArt('copies the art a preset names', () => {
+    withPresetArt(ART.id, () => {
+      const document = fresh();
+
+      expect(document.art).toBe(ART.id);
+      valid(document);
+    });
+  });
+
+  it('starts without art when the preset names art the library does not have', () => {
+    withPresetArt('retired-art', () => expect(fresh().art).toBeNull());
+  });
+
+  it('copies the brand kit fonts with its colours', () => {
+    const document = documentFromPreset({
+      presetId: 'tips-steps-ink',
+      format: 'square',
+      brand: KIT,
+    });
+
+    expect(document.brand.fonts).toEqual(KIT.fonts);
+    expect(document.brand.fonts).not.toBe(KIT.fonts);
     valid(document);
   });
 });
@@ -447,6 +520,44 @@ describe('reset', () => {
     expect(resetElement(coloured, id, 'headline').slides[0].elements.headline).toBeUndefined();
   });
 
+  it('clears an element font with the rest of the element', () => {
+    const document = fresh();
+    const id = document.slides[0].id;
+    const set = setElementFont(document, id, 'headline', 'jetbrains-mono');
+
+    expect(set.slides[0].elements.headline?.font).toBe('jetbrains-mono');
+    expect(resetElement(set, id, 'headline').slides[0].elements.headline?.font).toBeUndefined();
+  });
+
+  withArt('puts the art back and clears the design fonts, keeping the brand kit fonts', () => {
+    withPresetArt(ART.id, () => {
+      const document = applyBrandKit(fresh(), KIT);
+      const edited = setElementFont(
+        setDocumentFonts(setArt(document, OTHER_ART.id), { heading: 'inter', body: 'poppins' }),
+        document.slides[0].id,
+        'headline',
+        'jetbrains-mono',
+      );
+
+      const reset = resetDocument(edited);
+
+      expect(reset.art).toBe(ART.id);
+      expect(reset.fonts).toBeNull();
+      expect(reset.slides[0].elements.headline?.font).toBeUndefined();
+      expect(reset.brand.fonts).toEqual(KIT.fonts);
+      valid(reset);
+    });
+  });
+
+  it('puts the art back to none for a preset without any', () => {
+    withPresetArt(undefined, () => {
+      const document = fresh();
+      const edited = ART ? setArt(document, ART.id) : { ...document, art: 'stale' };
+
+      expect(resetDocument(edited).art).toBeNull();
+    });
+  });
+
   it('puts the whole design and its theme back, keeping the brand, handle and caption', () => {
     const document = fresh();
     const edited = setCaption(
@@ -513,7 +624,18 @@ describe('brand and theme', () => {
       logoMediaId: null,
       name: null,
       kitVersion: null,
+      fonts: null,
     });
+  });
+
+  it('copies a kit fonts, sharing nothing, and leaves a family the library lacks to the theme', () => {
+    const fonts = { heading: 'inter' as FontId, body: 'retired-family' as FontId };
+    const branded = applyBrandKit(fresh(), { ...KIT, fonts });
+
+    expect(branded.brand.fonts).toEqual({ heading: 'inter', body: null });
+    fonts.heading = 'poppins';
+    expect(branded.brand.fonts?.heading).toBe('inter');
+    valid(branded);
   });
 
   it('stops following a kit, keeping the brand name and logo on the slides', () => {
@@ -526,10 +648,18 @@ describe('brand and theme', () => {
       logoMediaId: KIT.logoMediaId,
       name: 'Lotus',
       kitVersion: null,
+      fonts: null,
     });
     valid(detached);
     // Nothing to detach is no change at all, so no empty undo step.
     expect(detachBrandKit(detached)).toBe(detached);
+  });
+
+  it('detaches a design whose only trace of the kit is its fonts', () => {
+    const document = fresh();
+    const fontsOnly = { ...document, brand: { ...document.brand, fonts: KIT.fonts } };
+
+    expect(detachBrandKit(fontsOnly).brand.fonts).toBeNull();
   });
 
   it('takes a kit newer colours and nothing else', () => {
@@ -541,6 +671,254 @@ describe('brand and theme', () => {
     expect(updated.brand.kitVersion).toBe('2026-11-01T00:00:00.000Z');
     expect(updated.brand.name).toBe('Lotus');
     expect(updated.brand.logoMediaId).toBe(KIT.logoMediaId);
+    // No fonts given: the ones the design copied from the kit stay.
+    expect(updated.brand.fonts).toEqual(KIT.fonts);
+  });
+
+  it('takes a kit newer fonts on Update when they are given, and clears them for null', () => {
+    const branded = applyBrandKit(fresh(), KIT);
+    const colors = KIT.colors as NonNullable<DesignBrand['colors']>;
+    const version = '2026-11-01T00:00:00.000Z';
+
+    const newer = updateBrandColors(branded, colors, version, { heading: null, body: 'inter' });
+    expect(newer.brand.fonts).toEqual({ heading: null, body: 'inter' });
+    valid(newer);
+
+    expect(updateBrandColors(branded, colors, version, null).brand.fonts).toBeNull();
+  });
+});
+
+describe('background art', () => {
+  withArt('sets, swaps and clears the art without touching a slide', () => {
+    const document = fresh();
+    const set = setArt(document, ART.id);
+
+    expect(set.art).toBe(ART.id);
+    expect(set.slides).toBe(document.slides);
+    valid(set);
+
+    expect(setArt(set, OTHER_ART.id).art).toBe(OTHER_ART.id);
+    expect(setArt(set, null).art).toBeNull();
+    expect(setArt(set, ART.id)).toBe(set);
+  });
+
+  it('ignores art the library does not draw, and none for a design without any', () => {
+    const document = fresh();
+
+    for (const id of ['nope', 'toString', '__proto__', '']) {
+      expect(setArt(document, id)).toBe(document);
+    }
+    expect(setArt(document, null)).toBe(document);
+  });
+});
+
+describe('design fonts', () => {
+  it('sets the heading and body faces for the whole design, sharing nothing', () => {
+    const document = fresh();
+    const fonts = { heading: 'playfair-display' as FontId, body: 'inter' as FontId };
+    const set = setDocumentFonts(document, fonts);
+
+    expect(set.fonts).toEqual({ heading: 'playfair-display', body: 'inter' });
+    fonts.heading = 'poppins';
+    expect(set.fonts?.heading).toBe('playfair-display');
+    expect(set.slides).toBe(document.slides);
+    valid(set);
+  });
+
+  it('keeps one face to the one beneath it, and stores a choice of neither as none', () => {
+    const document = fresh();
+    const heading = setDocumentFonts(document, { heading: 'poppins', body: null });
+
+    expect(heading.fonts).toEqual({ heading: 'poppins', body: null });
+    expect(setDocumentFonts(heading, { heading: null, body: null }).fonts).toBeNull();
+    expect(setDocumentFonts(heading, null).fonts).toBeNull();
+  });
+
+  it('returns the same design when the faces do not change', () => {
+    const document = fresh();
+    const set = setDocumentFonts(document, { heading: 'poppins', body: null });
+
+    expect(setDocumentFonts(document, null)).toBe(document);
+    expect(setDocumentFonts(document, { heading: null, body: null })).toBe(document);
+    expect(setDocumentFonts(set, { heading: 'poppins', body: null })).toBe(set);
+  });
+
+  it('refuses a family the library does not have', () => {
+    const document = fresh();
+    expect(setDocumentFonts(document, { heading: 'wingdings' as FontId, body: 'inter' })).toBe(
+      document,
+    );
+  });
+});
+
+describe('element fonts', () => {
+  it('sets one element font on a text slot and a list slot, and clears it with null', () => {
+    const document = fresh();
+    const cover = document.slides[0].id;
+    const list = document.slides[1].id;
+
+    const set = setElementFont(
+      setElementFont(document, cover, 'headline', 'playfair-display'),
+      list,
+      'list',
+      'inter',
+    );
+
+    expect(set.slides[0].elements.headline?.font).toBe('playfair-display');
+    // The words stay: a font is a choice on the element, not a new element.
+    expect(set.slides[0].elements.headline?.text).toBe(document.slides[0].elements.headline?.text);
+    expect(set.slides[1].elements.list?.font).toBe('inter');
+    valid(set);
+
+    const cleared = setElementFont(set, cover, 'headline', null);
+    expect(cleared.slides[0].elements.headline).not.toHaveProperty('font');
+    expect(cleared.slides[0].elements.headline?.text).toBe(
+      document.slides[0].elements.headline?.text,
+    );
+  });
+
+  it('returns the same design for a slot with no words, an unknown family or no change', () => {
+    const document = fresh();
+    const id = document.slides[0].id;
+    const set = setElementFont(document, id, 'headline', 'poppins');
+
+    expect(setElementFont(document, id, 'logo', 'inter')).toBe(document);
+    expect(setElementFont(document, id, 'quote', 'inter')).toBe(document);
+    expect(setElementFont(document, 'no-such-slide', 'headline', 'inter')).toBe(document);
+    expect(setElementFont(document, id, 'headline', 'wingdings' as FontId)).toBe(document);
+    expect(setElementFont(document, id, 'headline', null)).toBe(document);
+    expect(setElementFont(set, id, 'headline', 'poppins')).toBe(set);
+  });
+
+  it('drops a font sent through updateElement to a slot with no words', () => {
+    const document = fresh();
+    const id = document.slides[0].id;
+    const edited = updateElement(document, id, 'logo', { font: 'inter', hidden: true });
+
+    expect(edited.slides[0].elements.logo).toEqual({ hidden: true });
+    valid(edited);
+  });
+
+  it('carries an element font to the same slot of a new layout', () => {
+    const document = fresh();
+    const id = document.slides[2].id;
+    const typed = setElementFont(document, id, 'headline', 'playfair-display');
+    const target = latestLayout('split-panel');
+    const switched = setSlideLayout(typed, id, target ? layoutKey(target) : '');
+
+    expect(switched.slides[2].elements.headline?.font).toBe('playfair-display');
+    valid(switched);
+  });
+});
+
+describe('setFormat', () => {
+  it('changes the shape of the whole design, keeping every slide', () => {
+    const document = fresh();
+    const story = setFormat(document, 'story');
+
+    expect(story.format).toBe('story');
+    expect(story.slides).toHaveLength(document.slides.length);
+    // No nudge to move, so every slide is the one it was.
+    for (const [index, slide] of story.slides.entries()) {
+      expect(slide).toBe(document.slides[index]);
+    }
+    valid(story);
+  });
+
+  it('returns the same design for its own format or one that does not exist', () => {
+    const document = fresh();
+
+    expect(setFormat(document, 'square')).toBe(document);
+    expect(setFormat(document, 'toString' as FormatId)).toBe(document);
+    expect(setFormat(document, 'banner' as FormatId)).toBe(document);
+  });
+
+  it('refuses a format one slide layout does not take', () => {
+    const document = fresh();
+    const layout = findLayout(document.slides[3].layoutId);
+    if (!layout) throw new Error('The statistic slide has no layout.');
+
+    const formats = layout.formats;
+    layout.formats = formats.filter((format) => format !== 'landscape');
+
+    try {
+      expect(setFormat(document, 'landscape')).toBe(document);
+      expect(setFormat(document, 'story').format).toBe('story');
+    } finally {
+      layout.formats = formats;
+    }
+  });
+
+  it('clamps every nudge again, the way the schema does', () => {
+    const document = fresh();
+    const [cover, ...rest] = document.slides;
+    // Past the region on purpose, as only a document made by hand can be.
+    const headline = { ...cover.elements.headline, offset: { x: 150, y: -150 } };
+    const raw: DesignDocument = {
+      ...document,
+      slides: [{ ...cover, elements: { ...cover.elements, headline } }, ...rest],
+    };
+
+    const moved = setFormat(raw, 'portrait');
+    const offset = moved.slides[0].elements.headline?.offset;
+
+    expect(offset).toEqual(designDocumentSchema.parse(raw).slides[0].elements.headline?.offset);
+    expect(offset).not.toEqual({ x: 150, y: -150 });
+    expect(moved.slides[0].elements.headline?.text).toBe(headline.text);
+    expect(moved.slides[1]).toBe(raw.slides[1]);
+    valid(moved);
+  });
+});
+
+describe('applyPhotoToAllSlides', () => {
+  const PHOTO: SlideBackground = { kind: 'media', mediaId: 'media-1', overlay: 0.7, tint: 'light' };
+
+  it('puts one slide photo, overlay and tint on every slide, sharing nothing', () => {
+    const document = fresh();
+    const photo = setBackground(document, document.slides[1].id, PHOTO);
+    const all = applyPhotoToAllSlides(photo, photo.slides[1].id);
+
+    for (const slide of all.slides) expect(slide.background).toEqual(PHOTO);
+    expect(all.slides[0].background).not.toBe(all.slides[1].background);
+    // The slide it came from already had it.
+    expect(all.slides[1]).toBe(photo.slides[1]);
+    valid(all);
+  });
+
+  it('returns the same design when every slide already has that photo', () => {
+    const document = fresh();
+    const once = applyPhotoToAllSlides(
+      setBackground(document, document.slides[0].id, PHOTO),
+      document.slides[0].id,
+    );
+
+    expect(applyPhotoToAllSlides(once, once.slides[3].id)).toBe(once);
+  });
+
+  it('treats a photo with no tint as the dark one', () => {
+    const document = fresh();
+    const dark = setBackground(document, document.slides[0].id, {
+      kind: 'media',
+      mediaId: 'media-1',
+      overlay: 0.6,
+    });
+    const darkTinted = setBackground(dark, dark.slides[1].id, {
+      kind: 'media',
+      mediaId: 'media-1',
+      overlay: 0.6,
+      tint: 'dark',
+    });
+    const all = applyPhotoToAllSlides(darkTinted, darkTinted.slides[0].id);
+
+    expect(all.slides[1]).toBe(darkTinted.slides[1]);
+    expect(all.slides[2].background).toEqual({ kind: 'media', mediaId: 'media-1', overlay: 0.6 });
+  });
+
+  it('does nothing for a slide without a photo, or one that does not exist', () => {
+    const document = fresh();
+
+    expect(applyPhotoToAllSlides(document, document.slides[0].id)).toBe(document);
+    expect(applyPhotoToAllSlides(document, 'no-such-slide')).toBe(document);
   });
 });
 
@@ -568,5 +946,76 @@ describe('the design own words', () => {
     const document = setCaption(fresh(), 'x'.repeat(MAX_CAPTION_LENGTH + 50));
     expect(document.caption).toHaveLength(MAX_CAPTION_LENGTH);
     valid(document);
+  });
+});
+
+describe('applyCtaDefaults', () => {
+  const DEFAULTS = { text: 'Book a free call', url: 'acme.example/offer' };
+
+  /** tips-steps-ink (its closing slide is the fifth) with a Signature closing slide after it. */
+  function withSignatureClosing(): DesignDocument {
+    const layout = latestLayout('signature-closing');
+    if (!layout) throw new Error('The Signature closing layout is missing.');
+
+    return addSlide(fresh(), { layoutId: layoutKey(layout), newId: ids });
+  }
+
+  it('writes the call to action and the link into every closing slide, and nowhere else', () => {
+    const document = withSignatureClosing();
+    const next = applyCtaDefaults(document, DEFAULTS);
+    const [template, signature] = [next.slides[4], next.slides[5]];
+
+    expect(findLayout(template.layoutId)?.role).toBe('closing');
+    expect(template.elements).toEqual({
+      ...document.slides[4].elements,
+      cta: { ...document.slides[4].elements.cta, text: 'Book a free call' },
+    });
+    expect(signature.elements.cta?.text).toBe('Book a free call');
+    expect(signature.elements.footer?.text).toBe('acme.example/offer');
+    for (let index = 0; index < 4; index++) expect(next.slides[index]).toBe(document.slides[index]);
+    valid(next);
+  });
+
+  it('shows a Link slot the template hid', () => {
+    const base = withSignatureClosing();
+    const hidden = updateElement(base, base.slides[5].id, 'footer', { hidden: true });
+    expect(hidden.slides[5].elements.footer?.hidden).toBe(true);
+
+    const next = applyCtaDefaults(hidden, { text: null, url: 'acme.example' });
+
+    expect(next.slides[5].elements.footer).toEqual({ text: 'acme.example' });
+    expect(next.slides[4]).toBe(hidden.slides[4]);
+    valid(next);
+  });
+
+  it('leaves a slot alone for a blank default, and changes nothing the second time', () => {
+    const document = withSignatureClosing();
+
+    expect(applyCtaDefaults(document, { text: null, url: null })).toBe(document);
+    expect(applyCtaDefaults(document, { text: '  ', url: '\n' })).toBe(document);
+
+    const once = applyCtaDefaults(document, DEFAULTS);
+    expect(applyCtaDefaults(once, DEFAULTS)).toBe(once);
+
+    const linkOnly = applyCtaDefaults(document, { text: null, url: 'acme.example' });
+    expect(linkOnly.slides[5].elements.cta).toEqual(document.slides[5].elements.cta);
+    expect(linkOnly.slides[4]).toBe(document.slides[4]);
+  });
+
+  it('keeps a default on one line and inside the limit', () => {
+    const next = applyCtaDefaults(fresh(), {
+      text: `Book\na call ${'x'.repeat(MAX_TEXT_LENGTH)}`,
+      url: null,
+    });
+    const cta = next.slides[4].elements.cta?.text ?? '';
+
+    expect(cta.startsWith('Book a call x')).toBe(true);
+    expect(cta).toHaveLength(MAX_TEXT_LENGTH);
+    valid(next);
+  });
+
+  it('does nothing to a design without a closing slide', () => {
+    const document = blankDocument({ format: 'square', newId: ids });
+    expect(applyCtaDefaults(document, DEFAULTS)).toBe(document);
   });
 });

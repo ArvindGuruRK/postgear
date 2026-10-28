@@ -19,7 +19,14 @@ const SAMPLE_TEXT: Partial<Record<SlotId, string>> = {
   stat: '42%',
   statLabel: 'of the people you asked said something worth knowing',
   cta: 'Follow for more',
+  footer: 'Swipe for more',
 };
+
+/**
+ * A footer that a layout labels as a link (a Signature closing slide's) wants
+ * an address, not a line: "Swipe for more" under "Book your call" reads wrong.
+ */
+const SAMPLE_LINK = 'yourbrand.com';
 
 const SAMPLE_ITEMS: Partial<Record<SlotId, string[]>> = {
   list: ['The first point', 'The second point', 'The third point'],
@@ -32,8 +39,9 @@ export function sampleState(layout: SlideLayout, slotId: SlotId): ElementState |
 
   const state: ElementState = {};
 
-  if (slot.kind === 'text' && !slot.bind && SAMPLE_TEXT[slot.id] !== undefined) {
-    state.text = SAMPLE_TEXT[slot.id];
+  const text = slot.label === 'Link' ? SAMPLE_LINK : SAMPLE_TEXT[slot.id];
+  if (slot.kind === 'text' && !slot.bind && text !== undefined) {
+    state.text = text;
   }
 
   if (slot.kind === 'list') {

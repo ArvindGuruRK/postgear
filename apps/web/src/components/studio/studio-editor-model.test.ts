@@ -37,8 +37,10 @@ import {
   placeOf,
   returnFocus,
   type ShortcutPress,
+  STORY_FAILED_MESSAGE,
   settleWithin,
   shortcutOf,
+  storyVersionProblem,
   withKitLogo,
   withMediaRef,
   withOverflow,
@@ -51,6 +53,7 @@ const BRAND: DesignBrand = {
   logoMediaId: 'brand-logo',
   name: null,
   kitVersion: null,
+  fonts: null,
 };
 
 /**
@@ -92,6 +95,11 @@ function kit(overrides: Partial<BrandKitView> = {}): BrandKitView {
     source: 'MANUAL',
     createdAt: '2026-10-27T10:00:00.000Z',
     updatedAt: '2026-10-27T10:00:00.000Z',
+    headingFont: null,
+    bodyFont: null,
+    lockLook: false,
+    ctaText: null,
+    ctaUrl: null,
     ...overrides,
   };
 }
@@ -459,6 +467,23 @@ describe('pickedMediaId and withPickedMedia', () => {
     });
   });
 
+  it('keeps a Light tint when the photo is replaced', () => {
+    const background = { kind: 'background', slideId: 's6' } as const;
+    const light = setBackground(design(), 's6', {
+      kind: 'media',
+      mediaId: 'media-1',
+      overlay: 0.4,
+      tint: 'light',
+    });
+
+    expect(withPickedMedia(light, background, 'media-2').slides[5]?.background).toEqual({
+      kind: 'media',
+      mediaId: 'media-2',
+      overlay: 0.4,
+      tint: 'light',
+    });
+  });
+
   it('changes nothing for a slide that is gone', () => {
     const start = design();
     const gone = { kind: 'background', slideId: 'gone' } as const;
@@ -577,6 +602,16 @@ describe('loading and saving problems', () => {
     );
     expect(latestProblem(new ApiError('Please sign in again.', 401))).toBe('Please sign in again.');
     expect(latestProblem(new TypeError('Failed to fetch'))).toBe(LATEST_FAILED_MESSAGE);
+  });
+
+  it("says why no story version was made, in the API's words for a layout that has none", () => {
+    const layout = "Slide 3's layout has no Story version.";
+    expect(storyVersionProblem(new ApiError(layout, 400))).toBe(layout);
+    expect(storyVersionProblem(new ApiError(' ', 400))).toBe(STORY_FAILED_MESSAGE);
+    expect(storyVersionProblem(new ApiError('Something went wrong.', 500))).toBe(
+      STORY_FAILED_MESSAGE,
+    );
+    expect(storyVersionProblem(new TypeError('Failed to fetch'))).toBe(STORY_FAILED_MESSAGE);
   });
 });
 

@@ -11,6 +11,18 @@
  * reaches into the package's folders and the public surface is one list.
  */
 
+export {
+  ART_STYLES,
+  type ArtColors,
+  type ArtKind,
+  type ArtStyle,
+  artById,
+  artColors,
+  artDataUri,
+  artSvg,
+  isArtId,
+  isDarkGround,
+} from './art';
 export { boundText, clampText, isTypeable, singleLine, slotText } from './bindings';
 export {
   applyBrand,
@@ -18,10 +30,13 @@ export {
   type ContrastVerdict,
   checkContrast,
   PHOTO_INK,
+  PHOTO_INK_DARK,
+  PHOTO_INK_DARK_MUTED,
   PHOTO_INK_MUTED,
   paletteForSlide,
   photoGround,
   photoNeedsDarkening,
+  photoOverlayColor,
   SAFE_PHOTO_OVERLAY,
   slideGround,
 } from './brand';
@@ -60,10 +75,13 @@ export {
 export {
   addSlide,
   applyBrandKit,
+  applyCtaDefaults,
+  applyPhotoToAllSlides,
   applyTheme,
   BLANK_PRESET_ID,
   blankDocument,
   type CreateDocumentInput,
+  type CtaDefaults,
   detachBrandKit,
   documentFromPreset,
   duplicateSlide,
@@ -73,9 +91,13 @@ export {
   resetDocument,
   resetElement,
   resetSlide,
+  setArt,
   setBackground,
   setBrandName,
   setCaption,
+  setDocumentFonts,
+  setElementFont,
+  setFormat,
   setHandle,
   setLogoPlacement,
   setSlideLayout,
@@ -96,13 +118,20 @@ export {
   wrapText,
 } from './fit';
 export {
+  FONT_CATEGORIES,
+  FONT_CATEGORY_LABELS,
   FONT_IDS,
+  FONT_LICENCE_LABELS,
   FONTS,
   type FontDef,
   type FontFace,
+  type FontLicence,
+  type FontSource,
   faceWeight,
   filesFor,
+  fontLabel,
   fontStack,
+  fontsInCategory,
   resolveWeight,
 } from './fonts';
 export {
@@ -168,14 +197,24 @@ export {
 export { designMediaIds, slideMediaIds } from './media';
 export {
   FEATURED_PRESET_IDS,
+  isPresetPremium,
+  LOOK_NONE,
   matchesPresetQuery,
   PRESETS,
   presetById,
+  presetCollection,
+  presetFamily,
   presetFormats,
+  presetLook,
   presetStyle,
   presetsByCategory,
   SAMPLE_HANDLE,
 } from './presets';
+export {
+  type TypingKeyAction,
+  type TypingKeyPress,
+  typingKeyAction,
+} from './render/EditableText';
 export {
   buildExportPage,
   buildFontStylesheet,
@@ -197,12 +236,25 @@ export {
   DesignVersionError,
   designBrandSchema,
   designDocumentSchema,
+  designFontsSchema,
   designSlideSchema,
   elementStateSchema,
+  fontIdSchema,
   parseDesignDocument,
   safeParseDesignDocument,
   slideBackgroundSchema,
   upgrade,
 } from './schema';
-export { DEFAULT_THEME_ID, fontsOf, isThemeId, THEMES, themeById } from './themes';
+export {
+  CLASSIC_THEME_IDS,
+  DEFAULT_THEME_ID,
+  fontsOf,
+  isThemeId,
+  LUXURY_THEME_IDS,
+  SIGNATURE_THEME_IDS,
+  THEMES,
+  themeById,
+  themeCollection,
+} from './themes';
 export * from './types';
+export { documentFonts, type FontChoices, resolveTypeStyle } from './typography';

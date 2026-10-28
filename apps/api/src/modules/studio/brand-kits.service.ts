@@ -39,6 +39,9 @@ import {
   brandColorsSchema,
   brandFromTheme,
   DEFAULT_THEME_ID,
+  type DesignFonts,
+  type FontId,
+  fontIdSchema,
   themeById,
 } from '@postgear/design-engine';
 import {
@@ -70,6 +73,7 @@ import {
   type BrandKitBody,
   DEFAULT_SHARE_DAYS,
   MAX_ACTIVE_SHARES,
+  MAX_KIT_NAME_LENGTH,
   MAX_SHARE_DAYS,
   MIN_SHARE_DAYS,
   type UpdateBrandKitInput,
@@ -133,6 +137,7 @@ export class BrandKitsService {
   }
 
   async create(orgId: string, userId: string | null, body: BrandKitBody): Promise<BrandKitView> {
+    const ctaUrl = ctaLinkOrThrow(body.ctaUrl);
     const logoMediaId = await this.verifyLogo(orgId, body.logoMediaId ?? null);
     const websiteUrl = body.websiteUrl ? websiteOrThrow(body.websiteUrl) : null;
 
@@ -144,6 +149,11 @@ export class BrandKitsService {
       logoMediaId,
       colors: { ...body.colors },
       source: body.source === 'EXTRACTED' ? BrandKitSource.EXTRACTED : BrandKitSource.MANUAL,
+      headingFont: body.headingFont ?? null,
+      bodyFont: body.bodyFont ?? null,
+      lockLook: body.lockLook ?? false,
+      ctaText: body.ctaText || null,
+      ctaUrl,
       createdById: userId,
     });
 
@@ -162,6 +172,11 @@ export class BrandKitsService {
     if (body.source !== undefined) {
       data.source = body.source === 'EXTRACTED' ? BrandKitSource.EXTRACTED : BrandKitSource.MANUAL;
     }
+    if (body.headingFont !== undefined) data.headingFont = body.headingFont;
+    if (body.bodyFont !== undefined) data.bodyFont = body.bodyFont;
+    if (body.lockLook !== undefined) data.lockLook = body.lockLook;
+    if (body.ctaText !== undefined) data.ctaText = body.ctaText || null;
+    if (body.ctaUrl !== undefined) data.ctaUrl = ctaLinkOrThrow(body.ctaUrl);
     if (body.logoMediaId !== undefined) {
       data.logoMediaId = await this.verifyLogo(orgId, body.logoMediaId);
     }
@@ -170,6 +185,37 @@ export class BrandKitsService {
     if (!saved) throw new NotFoundException(STUDIO_MESSAGES.BRAND_KIT_NOT_FOUND);
 
     return this.toView(saved, await this.logoViews(orgId, [saved]));
+  }
+
+  /**
+   * Duplicate on a kit card (Sprint 9b): a new kit with everything the
+   * original has but its id, named "Name (Copy)" like a duplicated design.
+   *
+   * The logo is the same library item rather than a second file, because a
+   * kit points at media and does not own it. The colours go through the same
+   * reading the kit's card uses, so a copy of a hand-damaged row is a working
+   * kit rather than a second damaged one.
+   */
+  async duplicate(orgId: string, userId: string | null, id: string): Promise<BrandKitView> {
+    const source = await this.require(orgId, id);
+
+    const row = await this.repository.createBrandKit({
+      orgId,
+      name: STUDIO_MESSAGES.copyName(source.name, MAX_KIT_NAME_LENGTH),
+      description: source.description,
+      websiteUrl: source.websiteUrl,
+      logoMediaId: source.logoMediaId,
+      colors: { ...this.readColors(source) },
+      source: source.source,
+      headingFont: knownFont(source.headingFont),
+      bodyFont: knownFont(source.bodyFont),
+      lockLook: source.lockLook,
+      ctaText: source.ctaText,
+      ctaUrl: source.ctaUrl,
+      createdById: userId,
+    });
+
+    return this.toView(row, await this.logoViews(orgId, [row]));
   }
 
   async remove(orgId: string, id: string): Promise<void> {
@@ -494,6 +540,11 @@ export class BrandKitsService {
       logoMediaId: row.logoMediaId,
       logoUrl: logo?.type === 'image' ? logo.url : null,
       colors: this.readColors(row),
+      headingFont: knownFont(row.headingFont),
+      bodyFont: knownFont(row.bodyFont),
+      lockLook: row.lockLook,
+      ctaText: row.ctaText,
+      ctaUrl: row.ctaUrl,
       source: row.source,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -512,6 +563,46 @@ export class BrandKitsService {
     this.logger.warn(`studio.brand_kit_colors_unreadable ${row.id}`);
     return brandFromTheme(themeById(DEFAULT_THEME_ID));
   }
+}
+
+/**
+ * A stored font id, or null for one the font library no longer has. Every
+ * write is checked against the library, so this only matters after a later
+ * release retires a face: the kit then follows its theme again rather than
+ * handing the editor a face it cannot draw.
+ */
+export function knownFont(value: string | null): FontId | null {
+  if (value === null) return null;
+
+  const parsed = fontIdSchema.safeParse(value);
+  return parsed.success ? (parsed.data as FontId) : null;
+}
+
+/**
+ * A kit's faces as a design copies them into `brand.fonts`: null when the kit
+ * sets neither, so a design made with it follows its theme exactly as before
+ * kits had fonts.
+ */
+export function kitFonts(kit: {
+  headingFont: string | null;
+  bodyFont: string | null;
+}): DesignFonts | null {
+  const heading = knownFont(kit.headingFont);
+  const body = knownFont(kit.bodyFont);
+
+  return heading === null && body === null ? null : { heading, body };
+}
+
+/**
+ * The call to action link as stored: null when cleared, refused with a
+ * sentence when it has a space in it. It is drawn on a slide as one word
+ * ("yourbrand.com/offer"), and a space would read as two.
+ */
+function ctaLinkOrThrow(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/\s/.test(value)) throw new BadRequestException(STUDIO_MESSAGES.CTA_URL_INVALID);
+
+  return value;
 }
 
 function toShareView(row: DesignShareRow): ShareView {

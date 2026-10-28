@@ -7,11 +7,13 @@
  * show what a kit looks like on a slide rather than five swatches alone. The
  * slide is a template's own, drawn by the same renderer as everything else;
  * its ids are fixed, so typing in a colour field updates the slide in place
- * instead of building a new one.
+ * instead of building a new one. A kit's fonts (Sprint 9b) draw it too, as
+ * a design using the kit would.
  */
 import {
   BRAND_COLOR_KEYS,
   type BrandColors,
+  type DesignFonts,
   documentFromPreset,
   type FormatId,
 } from '@postgear/design-engine';
@@ -30,6 +32,7 @@ export function KitPreview({
   name,
   colors,
   logoUrl,
+  fonts = null,
   presetId = KIT_PREVIEW_PRESET_ID,
   format = 'square',
   index = 0,
@@ -41,6 +44,8 @@ export function KitPreview({
   /** Valid colours only: the caller falls back for a field still being typed. */
   colors: BrandColors;
   logoUrl: string | null;
+  /** The kit's heading and body fonts; null, or a null face, keeps the template's. */
+  fonts?: DesignFonts | null;
   presetId?: string;
   format?: FormatId;
   index?: number;
@@ -51,6 +56,8 @@ export function KitPreview({
   const colorKey = BRAND_COLOR_KEYS.map((key) => colors[key]).join(',');
   const brandName = name.trim() || null;
   const hasLogo = logoUrl !== null;
+  const heading = fonts?.heading ?? null;
+  const body = fonts?.body ?? null;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: colorKey stands for colors, which is a new object on every render
   const design = useMemo(() => {
@@ -65,10 +72,11 @@ export function KitPreview({
         colors: { ...colors },
         logoMediaId: hasLogo ? PREVIEW_LOGO_ID : null,
         name: brandName,
+        fonts: heading || body ? { heading, body } : null,
       },
       newId: () => `kit-preview-${next++}`,
     });
-  }, [presetId, format, colorKey, hasLogo, brandName]);
+  }, [presetId, format, colorKey, hasLogo, brandName, heading, body]);
 
   const resolveMedia = useCallback(
     (id: string) => (id === PREVIEW_LOGO_ID ? logoUrl : null),

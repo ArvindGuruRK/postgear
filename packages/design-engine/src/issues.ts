@@ -11,8 +11,9 @@
  * answers it (`render/fit-runtime.ts`) and its answer is reported through
  * `issueMessage` like the rest.
  */
-import { photoNeedsDarkening } from './brand';
+
 import { slotText } from './bindings';
+import { photoNeedsDarkening } from './brand';
 import { inkOf } from './ink';
 import { findLayout } from './layouts';
 import type { DesignDocument, SlotId } from './types';

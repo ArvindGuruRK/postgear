@@ -49,7 +49,8 @@ export function slidePalette(
 /**
  * The colour text in `region` is read against: the slide's ground, with any
  * painted block that covers the region laid over it. On a photo the ground is
- * the lightest the photo can be under its overlay.
+ * the worst the photo can be for its inks under its overlay: the lightest
+ * under a dark tint, the darkest under a light one.
  */
 export function regionGround(
   layout: SlideLayout,
@@ -60,7 +61,7 @@ export function regionGround(
 ): string {
   let ground =
     slide.background.kind === 'media'
-      ? photoGround(slide.background.overlay)
+      ? photoGround(slide.background.overlay, slide.background.tint)
       : slideGround(palette, slide);
 
   const region = findRegion(layout, regionId);

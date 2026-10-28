@@ -61,7 +61,7 @@ const BRANDS: BrandColors[] = [
 ];
 
 function brandOf(colors: BrandColors | null): DesignBrand {
-  return { kitId: null, colors, logoMediaId: null, name: 'Brand', kitVersion: null };
+  return { kitId: null, colors, logoMediaId: null, name: 'Brand', kitVersion: null, fonts: null };
 }
 
 /** Every default ink on one slide that does not read on its ground. */
@@ -150,6 +150,22 @@ describe('a template default ink', () => {
 
     expect(found).toEqual([]);
   });
+
+  it('reads on a light-tinted photo at the safe overlay, whatever the photo is', () => {
+    const background: SlideBackground = {
+      kind: 'media',
+      mediaId: 'media-1',
+      overlay: SAFE_PHOTO_OVERLAY,
+      tint: 'light',
+    };
+    const found = THEMES.flatMap((theme) =>
+      [null, BRANDS[1]].flatMap((brand) =>
+        LAYOUTS.flatMap((layout) => failures(layout, theme.id, brand, background)),
+      ),
+    );
+
+    expect(found).toEqual([]);
+  });
 });
 
 describe('regionGround', () => {
@@ -193,6 +209,23 @@ describe('regionGround', () => {
 
     expect(at(0)).toBe(photoGround(SAFE_PHOTO_OVERLAY));
     expect(at(0.8)).toBe(photoGround(0.8));
+  });
+
+  it('is the darkest a light-tinted photo can promise, never darker than the safe overlay allows', () => {
+    const layout = latestLayout('cover-headline') as SlideLayout;
+    const colors = palette();
+    const at = (overlay: number) =>
+      regionGround(
+        layout,
+        'square',
+        colors,
+        { background: { kind: 'media', mediaId: 'm', overlay, tint: 'light' } },
+        'body',
+      );
+
+    expect(at(0)).toBe(photoGround(SAFE_PHOTO_OVERLAY, 'light'));
+    expect(at(0.8)).toBe(photoGround(0.8, 'light'));
+    expect(at(0)).not.toBe(photoGround(SAFE_PHOTO_OVERLAY));
   });
 });
 
@@ -269,6 +302,22 @@ describe('a colour the user picked', () => {
     const dark = updateElement(onPhoto, id, 'headline', { color: '#111111' });
 
     expect(inkOf(dark, dark.slides[0], 'headline')?.readable).toBe(false);
+  });
+
+  it('is judged against a light-tinted photo the other way round', () => {
+    const document = design();
+    const id = document.slides[0].id;
+    const onPhoto = setBackground(document, id, {
+      kind: 'media',
+      mediaId: 'm',
+      overlay: 0.6,
+      tint: 'light',
+    });
+    const light = updateElement(onPhoto, id, 'headline', { color: '#FFFFFF' });
+    const dark = updateElement(onPhoto, id, 'headline', { color: '#111111' });
+
+    expect(inkOf(light, light.slides[0], 'headline')?.readable).toBe(false);
+    expect(inkOf(dark, dark.slides[0], 'headline')?.readable).toBe(true);
   });
 
   it('has no ink for a slot that draws no text', () => {

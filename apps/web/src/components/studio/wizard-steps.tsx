@@ -5,6 +5,10 @@
  * (DS-3.1). Both show rather than ask (rule 2): each brand kit is a real
  * slide in its colours and logo, and each format is that same slide drawn
  * at its true shape, so the choice is made by looking.
+ *
+ * Both start on the answer given last time: the format last chosen on this
+ * browser, and the kit this workspace last created a design with (Sprint 9b,
+ * remembered by the gallery), each marked Last Used.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { ArrowRightIcon } from '@animateicons/react/lucide/arrow-right-icon';
@@ -34,7 +38,14 @@ import { FOCUS } from './design-card';
 import { KIT_PREVIEW_PRESET_ID, KitPreview, KitSwatches } from './kit-preview';
 import { SlideFrame } from './slide-frame';
 import { INSET } from './studio-ui';
-import { brandFromKitView, formatHint, formatName, kitLogoResolver } from './studio-view-model';
+import {
+  brandFromKitView,
+  formatHint,
+  formatName,
+  kitLogoResolver,
+  preselectedKit,
+  readLastKit,
+} from './studio-view-model';
 
 /** The ring a chosen tile wears, offset by the panel's own colour. */
 export const CHOSEN = 'ring-4 ring-actionPrimary ring-offset-2 ring-offset-chrome';
@@ -93,6 +104,7 @@ export function StepHeader({
 
 export function BrandStep({
   headingRef,
+  orgId,
   kits,
   error,
   onRetry,
@@ -103,6 +115,8 @@ export function BrandStep({
   onKitSaved,
 }: {
   headingRef: Ref<HTMLHeadingElement>;
+  /** Whose remembered kit to start on: kits belong to a workspace. */
+  orgId: string;
   kits: BrandKitView[] | null;
   error: string | null;
   onRetry: () => void;
@@ -115,7 +129,13 @@ export function BrandStep({
 }) {
   const [dialog, setDialog] = useState(0);
   const [creating, setCreating] = useState(false);
-  const chosen = kits?.find((kit) => kit.id === chosenId) ?? null;
+  // Read after hydration: the server cannot know what this browser remembers.
+  const [lastKitId, setLastKitId] = useState<string | null>(null);
+  useEffect(() => setLastKitId(readLastKit(orgId)), [orgId]);
+
+  // The kit in the URL, else the one last used here (if it still exists).
+  const preselected = preselectedKit(kits, chosenId, lastKitId);
+  const chosen = preselected?.kit ?? null;
 
   return (
     <section aria-labelledby="wizard-brand" className="flex flex-col gap-5">
@@ -150,14 +170,14 @@ export function BrandStep({
               type="button"
               data-testid="wizard-kit"
               aria-label={`Use ${kit.name}`}
-              // The label hides the Chosen badge, so the chosen kit says so here.
-              aria-current={kit.id === chosenId ? 'true' : undefined}
+              // The label hides the badge, so the kit Continue would use says so here.
+              aria-current={kit.id === chosen?.id ? 'true' : undefined}
               onClick={() => onChoose(kit)}
               className={cn(
                 'flex w-full flex-col gap-3 rounded-card border-2 border-outline bg-secondary p-3 text-left',
                 pressSm,
                 FOCUS,
-                kit.id === chosenId && CHOSEN,
+                kit.id === chosen?.id && CHOSEN,
               )}
             >
               <span className={cn(INSET, 'block bg-halftone p-4')}>
@@ -178,7 +198,11 @@ export function BrandStep({
                 >
                   {kit.name}
                 </span>
-                {kit.id === chosenId ? <Badge variant="primary">Chosen</Badge> : null}
+                {kit.id === chosen?.id ? (
+                  <Badge variant="primary">
+                    {preselected?.remembered ? 'Last Used' : 'Chosen'}
+                  </Badge>
+                ) : null}
               </span>
               <KitSwatches colors={kit.colors} />
             </button>

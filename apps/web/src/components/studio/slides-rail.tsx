@@ -2,7 +2,8 @@
 
 /**
  * The editor's slide rail (Sprint 9, DS-5.1 and DS-5.2): every slide in
- * order, drawn by the real renderer, with its number.
+ * order, drawn by the real renderer, with its name: its number and what its
+ * layout makes of it, "1. Cover" (Sprint 9b, `slideName`).
  *
  * - A click shows the slide on the canvas. The rail is one stop for the Tab
  *   key: the arrow keys (and Home, End) move through the slides, showing each.
@@ -81,6 +82,7 @@ import {
 } from 'react';
 import { FOCUS } from './design-card';
 import { type ApplyChange, restoreSlide } from './editor-state';
+import { slideName } from './rail-model';
 import { SlideFrame } from './slide-frame';
 import { StudioPanel } from './studio-ui';
 import { SLIDE_LIMIT_MESSAGE } from './studio-view-model';
@@ -169,18 +171,23 @@ export function SlidesRail({
   }, [activeId]);
 
   const position = (id: UniqueIdentifier) => ids.current.indexOf(String(id)) + 1;
+  // The slide by the name the rail shows it under, as it was when the drag began.
+  const named = (id: UniqueIdentifier) => {
+    const slide = slides.find((entry) => entry.id === String(id));
+    return slide ? slideName(slide, position(id) - 1) : 'The slide';
+  };
 
   const announcements: Announcements = {
-    onDragStart: ({ active }) => `Picked up slide ${position(active.id)}.`,
+    onDragStart: ({ active }) => `Picked up ${named(active.id)}.`,
     onDragOver: ({ active, over }) =>
       over
-        ? `Slide ${position(active.id)} is over position ${position(over.id)}.`
-        : `Slide ${position(active.id)} is not over a position.`,
+        ? `${named(active.id)} is over position ${position(over.id)}.`
+        : `${named(active.id)} is not over a position.`,
     onDragEnd: ({ active, over }) =>
       over && over.id !== active.id
-        ? `Slide ${position(active.id)} moved to position ${position(over.id)}.`
-        : `Slide ${position(active.id)} stayed in place.`,
-    onDragCancel: ({ active }) => `Slide ${position(active.id)} stayed in place.`,
+        ? `${named(active.id)} moved to position ${position(over.id)}.`
+        : `${named(active.id)} stayed in place.`,
+    onDragCancel: ({ active }) => `${named(active.id)} stayed in place.`,
   };
 
   function onDragEnd({ active, over }: DragEndEvent) {
@@ -373,7 +380,7 @@ function RailSlide({
   // Set by Duplicate and Delete, after which the rail focuses another slide,
   // so the menu does not hand focus back to its button as it closes.
   const movesFocus = useRef(false);
-  const label = `Slide ${index + 1}`;
+  const label = slideName(slide, index);
   const spec = FORMATS[document.format];
   const fit = useCallback((slots: SlotId[]) => onOverflow(slide.id, slots), [onOverflow, slide.id]);
 
@@ -408,16 +415,6 @@ function RailSlide({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('flex items-start gap-2', isDragging && 'relative z-10')}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          'w-5 shrink-0 pt-1 text-end font-sans text-xs font-bold tabular-nums',
-          active ? 'text-ink' : 'text-ink type-muted',
-        )}
-      >
-        {index + 1}
-      </span>
-
       <div className="min-w-0 flex-1">
         <div
           className="relative mx-auto"
@@ -459,6 +456,17 @@ function RailSlide({
               </span>
             </>
           ) : null}
+
+          {/* The thumbnail's own name says it to a screen reader. */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              'mt-1.5 block truncate font-sans text-xs font-bold tabular-nums',
+              active ? 'text-ink' : 'text-ink type-muted',
+            )}
+          >
+            {label}
+          </span>
         </div>
       </div>
 

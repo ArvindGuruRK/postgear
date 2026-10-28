@@ -11,13 +11,21 @@
  *   Remove, and a Darkening slider; below the level white text needs to read
  *   on any photo, the panel says so and offers to darken it. A photo deleted
  *   from the media library says so, with the way to choose another.
+ * - A photo's Tint (Sprint 9b): Dark lays the overlay in black under light
+ *   text, Light in white under dark text, and the slider and its warning
+ *   say Lightening then. Apply To All Slides puts the photo, its overlay
+ *   and its tint behind every slide (`slide-panel-model.ts`). Both are
+ *   ordinary edits, so Undo takes either back.
  * - Elements: every optional element, ticked when it shows on the slide.
  */
 import { ImagePlusIcon } from '@animateicons/react/lucide/image-plus-icon';
+import { LayersIcon } from '@animateicons/react/lucide/layers-icon';
 import { LayoutGridIcon } from '@animateicons/react/lucide/layout-grid-icon';
 import { SunDimIcon } from '@animateicons/react/lucide/sun-dim-icon';
+import { SunIcon } from '@animateicons/react/lucide/sun-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
 import {
+  applyPhotoToAllSlides,
   type DesignDocument,
   type DesignSlide,
   normalizeHex,
@@ -47,14 +55,18 @@ import {
 import type { ApplyChange } from './editor-state';
 import {
   CustomColorField,
+  GroupLabel,
   NOTE,
   PanelSection,
   PercentSlider,
   PictureMissing,
   PictureRow,
+  Segmented,
   type SwatchChoice,
   SwatchPicker,
+  useBrandLookLocked,
 } from './panel-ui';
+import { canApplyPhotoToAll, TINT_OPTIONS, tintOf, tintWords, withTint } from './slide-panel-model';
 
 const ICON = 'h-4 w-4';
 
@@ -126,13 +138,21 @@ function BackgroundSection({
   onPickMedia: (purpose: MediaPurpose) => void;
 }) {
   const headingId = useId();
+  const tintId = useId();
   const slideId = slide.id;
   const { background } = slide;
   const photo = background.kind === 'media' ? mediaOf(media, background.mediaId) : null;
   const pickPhoto = () => onPickMedia({ kind: 'background', slideId });
+  const tint = tintOf(background);
+  const words = tintWords(tint);
+  const several = document.slides.length > 1;
+  const canApplyToAll = canApplyPhotoToAll(document, slideId);
+  // A brand kit with Lock Brand Look keeps grounds to the kit's own colours,
+  // as the Design tab does: no custom swatch, no hex field.
+  const lookLocked = useBrandLookLocked();
 
   const options: SwatchChoice[] = [
-    ...backgroundSwatches(document, slide),
+    ...backgroundSwatches(document, slide, { custom: !lookLocked }),
     {
       value: PHOTO_BACKGROUND,
       label: 'Photo',
@@ -154,7 +174,7 @@ function BackgroundSection({
         }}
       />
 
-      {background.kind === 'color' ? (
+      {background.kind === 'color' && !lookLocked ? (
         <CustomColorField
           value={normalizeHex(background.hex)}
           onApply={(hex) =>
@@ -191,8 +211,17 @@ function BackgroundSection({
               Remove Photo
             </Button>
           </div>
+          <div className="flex flex-col gap-2">
+            <GroupLabel id={tintId}>Tint</GroupLabel>
+            <Segmented
+              labelledBy={tintId}
+              options={TINT_OPTIONS}
+              value={tint}
+              onValueChange={(next) => onChange((latest) => withTint(latest, slideId, next))}
+            />
+          </div>
           <PercentSlider
-            label="Darkening"
+            label={words.strength}
             value={overlayPercent(background.overlay)}
             onValueChange={(percent) =>
               onChange((latest) => withOverlay(latest, slideId, percent / 100), {
@@ -207,18 +236,35 @@ function BackgroundSection({
               className="flex-wrap items-center justify-between"
             >
               <AlertDescription>
-                White text can be hard to read on a light photo. Darken it to at least{' '}
-                {overlayPercent(SAFE_PHOTO_OVERLAY)}%.
+                {words.warning(overlayPercent(SAFE_PHOTO_OVERLAY))}
               </AlertDescription>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => onChange((latest) => withSafeOverlay(latest, slideId))}
               >
-                <MotionIcon icon={SunDimIcon} className={ICON} />
-                Darken Photo
+                <MotionIcon icon={tint === 'light' ? SunIcon : SunDimIcon} className={ICON} />
+                {words.fix}
               </Button>
             </Alert>
+          ) : null}
+          {several ? (
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="self-start"
+                disabled={!canApplyToAll}
+                onClick={() => onChange((latest) => applyPhotoToAllSlides(latest, slideId))}
+              >
+                <MotionIcon icon={LayersIcon} className={ICON} />
+                Apply To All Slides
+              </Button>
+              {/* Said once it is true, so pressing the button is answered. */}
+              <p role="status" className={NOTE}>
+                {canApplyToAll ? null : 'Every slide has this photo, with the same tint.'}
+              </p>
+            </div>
           ) : null}
         </div>
       ) : null}

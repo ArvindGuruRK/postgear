@@ -10,6 +10,7 @@ import type {
   BrandColors,
   DesignDocument,
   DesignIssueKind,
+  FontId,
   FormatId,
 } from '@postgear/design-engine';
 import type { LengthMethod } from '@postgear/social-core';
@@ -18,6 +19,24 @@ import type { StudioStreamFailure } from './studio.messages';
 export type DesignStatusView = 'DRAFT' | 'EXPORTED' | 'SENT';
 
 export type ExportImageFormat = 'jpeg' | 'png';
+
+/** 2 paints every slide at twice the format's pixels (Sprint 9b). */
+export type ExportScale = 1 | 2;
+
+/** What `GET /studio/access` answers: whether premium looks are open to this workspace. */
+export interface StudioAccess {
+  premium: boolean;
+}
+
+/** One design in the top bar's search (Sprint 9b), in the `designs` group of `GET /search`. */
+export interface DesignSearchHit {
+  id: string;
+  title: string;
+  format: FormatId;
+  updatedAt: string;
+  /** The first exported slide's thumbnail, while it is still in the library. */
+  thumbnailUrl: string | null;
+}
 
 /**
  * A picture a design draws, as the browser loads it. Keyed by media id in
@@ -40,6 +59,8 @@ export interface DesignSummary {
   presetId: string;
   themeId: string | null;
   brandKitId: string | null;
+  /** The linked kit's name as it is now, for the card (Sprint 9b). Null without a live kit. */
+  brandKitName: string | null;
   status: DesignStatusView;
   slideCount: number;
   revision: number;
@@ -111,9 +132,20 @@ export interface BrandKitView {
   /** Null when there is no logo, or when the media item behind it was deleted. */
   logoUrl: string | null;
   colors: BrandColors;
+  /**
+   * The kit's faces (Sprint 9b), copied into a design with its colours. Null
+   * keeps the theme's, and so does a face the font library no longer has.
+   */
+  headingFont: FontId | null;
+  bodyFont: FontId | null;
+  /** Lock Brand Look: while this kit is applied, the editor hides what would change it. */
+  lockLook: boolean;
+  /** What a new design's closing slide starts with, and the link shown under it. */
+  ctaText: string | null;
+  ctaUrl: string | null;
   source: 'MANUAL' | 'EXTRACTED';
   createdAt: string;
-  /** The editor compares this with a design's `brand.kitVersion` to offer Update Colours. */
+  /** The editor compares this with a design's `brand.kitVersion` to offer Update From Kit. */
   updatedAt: string;
 }
 
@@ -194,9 +226,11 @@ export type StudioExportEvent =
       type: 'start';
       slides: number;
       format: FormatId;
+      /** The pictures' own pixels: the format's size times `scale`. */
       width: number;
       height: number;
       imageFormat: ExportImageFormat;
+      scale: ExportScale;
     }
   | { type: 'warning'; kind: DesignIssueKind; slideIndex: number; message: string }
   | { type: 'slide'; index: number; total: number; label: string }

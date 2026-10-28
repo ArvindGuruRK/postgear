@@ -10,11 +10,17 @@
  * the list at the top, and a report re-renders only that slide.
  */
 import {
+  artById,
   CATEGORY_LABELS,
+  COLLECTION_LABELS,
+  COLOR_FAMILY_LABELS,
   type DesignDocument,
   FORMATS,
   type FormatId,
+  isPresetPremium,
   type Preset,
+  presetCollection,
+  presetFamily,
   presetFormats,
   type SlotId,
   themeById,
@@ -24,7 +30,7 @@ import { TriangleAlert } from 'lucide-react';
 import { memo, type ReactNode, useCallback, useSyncExternalStore } from 'react';
 import { SlideFrame } from '@/components/studio/slide-frame';
 import { PanelHeader, StudioPanel } from '@/components/studio/studio-ui';
-import { formatName, STYLE_LABELS } from '@/components/studio/studio-view-model';
+import { formatName, NO_ART_LABEL, STYLE_LABELS } from '@/components/studio/studio-view-model';
 import { documentKey, type FitStore, slideDomId, slideKey, slotNames } from './playground-model';
 
 /**
@@ -68,8 +74,12 @@ export const PresetSection = memo(function PresetSection({
         sub={
           <dl className="m-0 flex flex-wrap gap-x-5 gap-y-1 font-sans text-xs text-ink">
             <Fact term="Category">{CATEGORY_LABELS[preset.category]}</Fact>
+            <Fact term="Collection">{COLLECTION_LABELS[presetCollection(preset)]}</Fact>
             <Fact term="Theme">{theme.name}</Fact>
             <Fact term="Style">{STYLE_LABELS[theme.style]}</Fact>
+            <Fact term="Look">{artById(preset.art)?.name ?? NO_ART_LABEL}</Fact>
+            <Fact term="Colour">{COLOR_FAMILY_LABELS[presetFamily(preset)]}</Fact>
+            <Fact term="Plan">{isPresetPremium(preset) ? 'Premium' : 'Free'}</Fact>
             <Fact term="Formats">
               {presetFormats(preset)
                 .map((format) => FORMATS[format].label)

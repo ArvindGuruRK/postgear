@@ -2,29 +2,47 @@
  * Studio's display logic (Sprint 9), kept pure so it can be tested without a
  * browser: badges and labels, the "Updated 2 hours ago" line, the create
  * wizard's state in the URL, the brand kit form's checks, the gallery's
- * filters, the save indicator, the brand kit update offer and share expiry.
+ * filters, order, pages and locks (Sprint 9b), the kit the wizard remembers,
+ * the save indicator, the brand kit update offer and share expiry.
  *
  * The API answers a malformed body with "Invalid input" and nothing more (a
  * project rule), so every rule a form can break is checked here first, in the
  * sentences the API itself uses where it has one.
  */
 import {
+  ART_STYLES,
+  type ArtKind,
   BRAND_COLOR_KEYS,
   type BrandColors,
   brandFromTheme,
+  COLOR_FAMILIES,
+  COLOR_FAMILY_LABELS,
+  type ColorFamily,
   DEFAULT_THEME_ID,
   type DesignBrand,
+  type DesignFonts,
   exportSizeLabel,
+  FEATURED_PRESET_IDS,
   FORMATS,
   type FormatId,
+  isArtId,
   isFormatId,
+  isPresetPremium,
+  LOOK_NONE,
   MAX_SLIDES,
   matchesPresetQuery,
   normalizeHex,
+  PRESET_CATEGORIES,
+  PRESET_COLLECTIONS,
+  PRESETS,
   type Preset,
   type PresetCategory,
+  type PresetCollection,
   presetById,
+  presetCollection,
+  presetFamily,
   presetFormats,
+  presetLook,
   presetStyle,
   type ThemeStyle,
   themeById,
@@ -308,8 +326,9 @@ export type KitNotice = { kind: 'deleted' } | { kind: 'newer'; kit: BrandKitView
 /**
  * What the design panel says about the design's brand kit (DS-2.5, and the
  * deleted-kit edge case). A kit edited since the design copied it is offered
- * only when its colours really differ: Update Colours takes nothing else, so
- * offering it for a renamed kit would be a button that changes nothing.
+ * only when its colours or fonts really differ: Update From Kit takes nothing
+ * else, so offering it for a renamed kit would be a button that changes
+ * nothing.
  */
 export function kitNotice(brand: DesignBrand, kits: BrandKitView[] | null): KitNotice {
   if (!brand.kitId || !kits) return null;
@@ -321,7 +340,14 @@ export function kitNotice(brand: DesignBrand, kits: BrandKitView[] | null): KitN
   const edited = Date.parse(kit.updatedAt);
   const newer = Number.isNaN(copied) || edited > copied;
 
-  return newer && !sameColors(kit.colors, brand.colors) ? { kind: 'newer', kit } : null;
+  const same =
+    sameColors(kit.colors, brand.colors) && sameFonts(brandFromKitView(kit).fonts, brand.fonts);
+  return newer && !same ? { kind: 'newer', kit } : null;
+}
+
+/** Null and a choice of neither face mean the same: the theme's fonts. */
+function sameFonts(a: DesignFonts | null, b: DesignFonts | null): boolean {
+  return (a?.heading ?? null) === (b?.heading ?? null) && (a?.body ?? null) === (b?.body ?? null);
 }
 
 export function sameColors(a: BrandColors | null, b: BrandColors | null): boolean {
@@ -333,17 +359,28 @@ export function sameColors(a: BrandColors | null, b: BrandColors | null): boolea
 // The template gallery
 // ---------------------------------------------------------------------------
 
+/** What every filter but the search and Favourites reads when it is off. */
+export const ALL = 'all';
+
 export interface GalleryFilter {
   query: string;
-  category: PresetCategory | 'all';
-  style: ThemeStyle | 'all';
+  category: PresetCategory | typeof ALL;
+  style: ThemeStyle | typeof ALL;
+  /** An art style's id, `LOOK_NONE` for templates without art, or every look. */
+  look: string;
+  /** The colour family of the template's theme (the Colour filter). */
+  family: ColorFamily | typeof ALL;
+  collection: PresetCollection | typeof ALL;
   favourites: boolean;
 }
 
 export const NO_FILTER: GalleryFilter = {
   query: '',
-  category: 'all',
-  style: 'all',
+  category: ALL,
+  style: ALL,
+  look: ALL,
+  family: ALL,
+  collection: ALL,
   favourites: false,
 };
 
@@ -363,8 +400,11 @@ export function filterPresets(
   return presets.filter(
     (preset) =>
       presetFormats(preset).includes(format) &&
-      (filter.category === 'all' || preset.category === filter.category) &&
-      (filter.style === 'all' || presetStyle(preset) === filter.style) &&
+      (filter.category === ALL || preset.category === filter.category) &&
+      (filter.style === ALL || presetStyle(preset) === filter.style) &&
+      (filter.look === ALL || presetLook(preset) === filter.look) &&
+      (filter.family === ALL || presetFamily(preset) === filter.family) &&
+      (filter.collection === ALL || presetCollection(preset) === filter.collection) &&
       (!filter.favourites || favourites.has(preset.id)) &&
       matchesPresetQuery(preset, filter.query),
   );
@@ -373,10 +413,320 @@ export function filterPresets(
 export function isFiltered(filter: GalleryFilter): boolean {
   return (
     filter.query.trim() !== '' ||
-    filter.category !== 'all' ||
-    filter.style !== 'all' ||
+    filter.category !== ALL ||
+    filter.style !== ALL ||
+    filter.look !== ALL ||
+    filter.family !== ALL ||
+    filter.collection !== ALL ||
     filter.favourites
   );
+}
+
+// The Selects hand back strings; each is read back into its filter here, and
+// anything the library does not know (a stale link, `toString`) reads as off.
+
+export function parseCategory(value: string): PresetCategory | typeof ALL {
+  return (PRESET_CATEGORIES as readonly string[]).includes(value) ? (value as PresetCategory) : ALL;
+}
+
+export function parseStyle(value: string): ThemeStyle | typeof ALL {
+  return Object.hasOwn(STYLE_LABELS, value) ? (value as ThemeStyle) : ALL;
+}
+
+export function parseLook(value: string): string {
+  return value === LOOK_NONE || isArtId(value) ? value : ALL;
+}
+
+export function parseFamily(value: string): ColorFamily | typeof ALL {
+  return (COLOR_FAMILIES as readonly string[]).includes(value) ? (value as ColorFamily) : ALL;
+}
+
+export function parseCollection(value: string): PresetCollection | typeof ALL {
+  return (PRESET_COLLECTIONS as readonly string[]).includes(value)
+    ? (value as PresetCollection)
+    : ALL;
+}
+
+/** One choice in the Look filter. */
+export interface LookOption {
+  id: string;
+  name: string;
+}
+
+/** The Look filter's choices of one kind of art, under its own heading. */
+export interface LookGroup {
+  kind: ArtKind;
+  label: string;
+  looks: LookOption[];
+}
+
+export const LOOK_KIND_LABELS: Record<ArtKind, string> = {
+  pattern: 'Patterns',
+  original: 'Hand-Made',
+  luxury: 'Luxury',
+};
+
+/** What the Look filter calls templates without background art. */
+export const NO_ART_LABEL = 'None';
+
+/**
+ * The art styles some template wears, grouped by kind in the art library's
+ * own order. A style no template uses is left out: choosing it could only
+ * ever show "No templates match".
+ */
+export function lookGroups(presets: readonly Preset[] = PRESETS): LookGroup[] {
+  const worn = new Set(presets.map(presetLook));
+  const groups: LookGroup[] = [];
+
+  for (const art of ART_STYLES) {
+    if (!worn.has(art.id)) continue;
+
+    let group = groups.find((entry) => entry.kind === art.kind);
+    if (!group) {
+      group = { kind: art.kind, label: LOOK_KIND_LABELS[art.kind], looks: [] };
+      groups.push(group);
+    }
+    group.looks.push({ id: art.id, name: art.name });
+  }
+
+  return groups;
+}
+
+/** True when some template has no background art, so None is worth offering. */
+export function hasNoArtTemplates(presets: readonly Preset[] = PRESETS): boolean {
+  return presets.some((preset) => presetLook(preset) === LOOK_NONE);
+}
+
+/** The colour families some template's theme belongs to, in `COLOR_FAMILIES` order. */
+export function familyOptions(presets: readonly Preset[] = PRESETS): ColorFamily[] {
+  const worn = new Set(presets.map(presetFamily));
+  return COLOR_FAMILIES.filter((family) => worn.has(family));
+}
+
+export function familyLabel(family: ColorFamily): string {
+  return COLOR_FAMILY_LABELS[family];
+}
+
+/** The collections the library has templates in, in `PRESET_COLLECTIONS` order. */
+export function collectionOptions(presets: readonly Preset[] = PRESETS): PresetCollection[] {
+  const worn = new Set(presets.map(presetCollection));
+  return PRESET_COLLECTIONS.filter((collection) => worn.has(collection));
+}
+
+/** The collections in the order the gallery shows them, after favourites and the featured. */
+export const COLLECTION_ORDER: readonly PresetCollection[] = ['signature', 'luxury', 'classic'];
+
+/**
+ * The gallery's order (Sprint 9b): a template chosen before the wizard first,
+ * then the workspace's favourites, then the featured templates in the order
+ * they are featured, then Signature, Luxury and Classic. Within a group the
+ * registry's own order holds (the sort is stable), so a new template lands
+ * where its collection's file puts it.
+ */
+export function orderPresets(
+  presets: readonly Preset[],
+  favourites: ReadonlySet<string>,
+  leading: string | null = null,
+  featured: readonly string[] = FEATURED_PRESET_IDS,
+): Preset[] {
+  const rank = (preset: Preset): [number, number] => {
+    if (preset.id === leading) return [0, 0];
+    if (favourites.has(preset.id)) return [1, 0];
+
+    const place = featured.indexOf(preset.id);
+    if (place >= 0) return [2, place];
+
+    return [3 + COLLECTION_ORDER.indexOf(presetCollection(preset)), 0];
+  };
+
+  return presets
+    .map((preset) => ({ preset, rank: rank(preset) }))
+    .sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1])
+    .map(({ preset }) => preset);
+}
+
+/** Tiles to a gallery page: rows of 2, 3 and 4 come out full. */
+export const GALLERY_PAGE_SIZE = 24;
+
+/** How many pages `total` items take, never fewer than one. */
+export function pageCountOf(total: number, size: number): number {
+  return Math.max(1, Math.ceil(total / size));
+}
+
+/** A page the list has: a whole number from 1 to the last page. */
+export function clampPage(page: number, pageCount: number): number {
+  if (!Number.isFinite(page)) return 1;
+  return Math.min(Math.max(1, Math.floor(page)), Math.max(1, pageCount));
+}
+
+/** One page of a list, numbered from 1; a page past the end is the last one. */
+export function pageOf<T>(items: readonly T[], page: number, size: number): T[] {
+  const start = (clampPage(page, pageCountOf(items.length, size)) - 1) * size;
+  return items.slice(start, start + size);
+}
+
+/**
+ * A premium template in a workspace whose plan is known not to include them
+ * (`premium-lock.tsx`). An unknown plan (`null`) locks nothing: the API
+ * refuses what it does not allow, and the page catches up from that.
+ */
+export function isLocked(preset: Preset, premium: boolean | null): boolean {
+  return premium === false && isPresetPremium(preset);
+}
+
+/** A control's accessible name, saying "locked" when it is: the lock itself is hidden from screen readers. */
+export function withLock(label: string, locked: boolean): string {
+  return locked ? `${label}, locked` : label;
+}
+
+/** A template card's name: what choosing it does, and that it is locked when it is. */
+export function templateCardLabel(name: string, locked: boolean): string {
+  return withLock(`Use ${name}`, locked);
+}
+
+/** One place in the gallery's grid. */
+export type GalleryTile =
+  | { kind: 'blank' }
+  | { kind: 'template'; preset: Preset; locked: boolean; label: string };
+
+export interface GalleryView {
+  /** How many templates match (Start From Blank is not one of them). */
+  count: number;
+  /** The page shown: the one asked for, or the last there is. */
+  page: number;
+  pageCount: number;
+  tiles: GalleryTile[];
+}
+
+/**
+ * One page of the gallery: the templates the format and the filters leave,
+ * in `orderPresets` order, `GALLERY_PAGE_SIZE` places a page, each card
+ * locked or not for this workspace's plan.
+ *
+ * Start From Blank leads while nothing is filtered (a filtered list answers
+ * a question, and blank is not an answer to one) and takes a place like a
+ * template, so page one is full too: blank and the first 23. `ranked` is the
+ * set of favourites the order puts first, which the gallery holds still
+ * while someone is starring (see `template-gallery.tsx`); the Favourites
+ * filter always reads `favourites` itself.
+ */
+export function galleryView({
+  presets = PRESETS,
+  format,
+  filter,
+  favourites,
+  ranked = favourites,
+  leading = null,
+  page,
+  premium,
+}: {
+  presets?: readonly Preset[];
+  format: FormatId;
+  filter: GalleryFilter;
+  favourites: ReadonlySet<string>;
+  ranked?: ReadonlySet<string>;
+  /** A template chosen before the wizard: it leads the list. */
+  leading?: string | null;
+  page: number;
+  /** `StudioAccess.premium`: null while unknown, when nothing is locked. */
+  premium: boolean | null;
+}): GalleryView {
+  const matching = orderPresets(
+    filterPresets(presets, format, filter, favourites),
+    ranked,
+    leading,
+  );
+  const templates = matching.map((preset): GalleryTile => {
+    const locked = isLocked(preset, premium);
+    return { kind: 'template', preset, locked, label: templateCardLabel(preset.name, locked) };
+  });
+  const tiles: GalleryTile[] = isFiltered(filter) ? templates : [{ kind: 'blank' }, ...templates];
+  const pageCount = pageCountOf(tiles.length, GALLERY_PAGE_SIZE);
+  const current = clampPage(page, pageCount);
+
+  return {
+    count: matching.length,
+    page: current,
+    pageCount,
+    tiles: pageOf(tiles, current, GALLERY_PAGE_SIZE),
+  };
+}
+
+/** "155 templates" beside the step's name. */
+export function templateCountLabel(count: number): string {
+  return count === 1 ? '1 template' : `${count} templates`;
+}
+
+/** What a screen reader hears after the count when the list has pages: ", page 2 of 7". */
+export function pageAnnouncement(page: number, pageCount: number): string {
+  return pageCount > 1 ? `, page ${page} of ${pageCount}` : '';
+}
+
+// ---------------------------------------------------------------------------
+// The kit the wizard remembers
+// ---------------------------------------------------------------------------
+
+const LAST_KIT_KEY = 'postgear.studio.lastKit';
+
+/** One key per workspace: a kit belongs to one, and an id from another would never match. */
+export function lastKitKey(orgId: string): string {
+  return `${LAST_KIT_KEY}.${orgId}`;
+}
+
+/**
+ * Where the remembered kit is kept. A function, because merely reading
+ * `window.localStorage` throws where storage is blocked; tests pass their own.
+ */
+export type KitStorage = () => Pick<Storage, 'getItem' | 'setItem'>;
+
+const browserStorage: KitStorage = () => window.localStorage;
+
+/** The kit last used to create a design in this workspace, on this browser. */
+export function readLastKit(orgId: string, storage: KitStorage = browserStorage): string | null {
+  try {
+    const value = storage().getItem(lastKitKey(orgId));
+    return value && ID_PATTERN.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remembers the kit a design was just created with. Skip For Now (no kit)
+ * leaves the one remembered before: one quick design without a brand should
+ * not make the next one start from nothing.
+ */
+export function rememberKit(
+  orgId: string,
+  kitId: string | null,
+  storage: KitStorage = browserStorage,
+): void {
+  if (!kitId || !ID_PATTERN.test(kitId)) return;
+
+  try {
+    storage().setItem(lastKitKey(orgId), kitId);
+  } catch {
+    // Private browsing or storage turned off: the kit is simply not remembered.
+  }
+}
+
+/**
+ * The kit the brand step starts on: the one in the URL, else the one last
+ * used here, whichever the workspace still has (a deleted kit is never
+ * offered). Nothing while the kits are still loading.
+ */
+export function preselectedKit<Kit extends { id: string }>(
+  kits: readonly Kit[] | null,
+  chosenId: string | null,
+  lastId: string | null,
+): { kit: Kit; remembered: boolean } | null {
+  if (!kits) return null;
+
+  const chosen = chosenId ? kits.find((kit) => kit.id === chosenId) : undefined;
+  if (chosen) return { kit: chosen, remembered: false };
+
+  const last = lastId ? kits.find((kit) => kit.id === lastId) : undefined;
+  return last ? { kit: last, remembered: true } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -606,12 +956,18 @@ export function extractionSummary(extraction: {
  * logo deleted from the library is left out rather than drawn broken.
  */
 export function brandFromKitView(kit: BrandKitView): DesignBrand {
+  const heading = kit.headingFont ?? null;
+  const body = kit.bodyFont ?? null;
+
   return {
     kitId: kit.id,
     colors: { ...kit.colors },
     logoMediaId: kit.logoUrl ? kit.logoMediaId : null,
     name: kit.name,
     kitVersion: kit.updatedAt,
+    // Its faces too (Sprint 9b). A kit that sets neither leaves the design
+    // on its theme's, as the API's own `kitFonts` does.
+    fonts: heading || body ? { heading, body } : null,
   };
 }
 

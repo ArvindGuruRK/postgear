@@ -24,7 +24,8 @@ function response(query: string): SearchResponse {
     posts: [],
     channels: [],
     media: [],
-    more: { posts: false, channels: false, media: false },
+    designs: [],
+    more: { posts: false, channels: false, media: false, designs: false },
     unavailable: [],
   };
 }

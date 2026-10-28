@@ -1,14 +1,17 @@
 /**
- * The template playground's logic (Sprint 9, Task 1), kept pure so it can be
- * tested without a browser: which presets and formats the filters leave, the
- * documents the slides are drawn from, the store the overflow check collects
- * into, what that check says, and the app themes the page can wear.
+ * The template playground's logic (Sprint 9, Task 1; pages in Sprint 9b),
+ * kept pure so it can be tested without a browser: which presets and formats
+ * the filters leave, the page of them shown and how it is written in the URL,
+ * the documents the slides are drawn from, the store the overflow check
+ * collects into, what that check says, and the app themes the page can wear.
  *
  * The filters are the gallery's own (`filterPresets` and its vocabulary in
  * `studio-view-model.ts`), applied once per format, so a template the gallery
- * would hide in a format is hidden here too.
+ * would hide in a format is hidden here too. The playground keeps the
+ * library's own order, not the gallery's: it is for walking the files.
  */
 import {
+  type ColorFamily,
   type DesignDocument,
   documentFromPreset,
   FORMAT_IDS,
@@ -16,21 +19,32 @@ import {
   findLayout,
   findSlot,
   isFormatId,
-  PRESET_CATEGORIES,
   PRESETS,
   type Preset,
   type PresetCategory,
+  type PresetCollection,
   presetFormats,
   type SlotId,
   type ThemeStyle,
 } from '@postgear/design-engine';
 import {
+  ALL,
+  clampPage,
   filterPresets,
   type GalleryFilter,
   NO_FILTER,
-  STYLE_LABELS,
+  pageCountOf,
+  parseCategory,
+  parseCollection,
+  parseFamily,
+  parseLook,
+  parseStyle,
   slideCountLabel,
 } from '@/components/studio/studio-view-model';
+
+// The Select parsers are the gallery's; these are here so the playground's
+// files import from one place.
+export { parseCategory, parseCollection, parseFamily, parseLook, parseStyle };
 
 // ---------------------------------------------------------------------------
 // Filters
@@ -38,40 +52,40 @@ import {
 
 export interface PlaygroundFilter {
   query: string;
-  format: FormatId | 'all';
-  category: PresetCategory | 'all';
-  style: ThemeStyle | 'all';
+  format: FormatId | typeof ALL;
+  category: PresetCategory | typeof ALL;
+  style: ThemeStyle | typeof ALL;
+  /** An art id, `LOOK_NONE`, or every look. */
+  look: string;
+  family: ColorFamily | typeof ALL;
+  collection: PresetCollection | typeof ALL;
 }
 
 export const SHOW_ALL: PlaygroundFilter = {
   query: '',
-  format: 'all',
-  category: 'all',
-  style: 'all',
+  format: ALL,
+  category: ALL,
+  style: ALL,
+  look: ALL,
+  family: ALL,
+  collection: ALL,
 };
 
 export function isFiltered(filter: PlaygroundFilter): boolean {
   return (
     filter.query.trim() !== '' ||
-    filter.format !== 'all' ||
-    filter.category !== 'all' ||
-    filter.style !== 'all'
+    filter.format !== ALL ||
+    filter.category !== ALL ||
+    filter.style !== ALL ||
+    filter.look !== ALL ||
+    filter.family !== ALL ||
+    filter.collection !== ALL
   );
 }
 
 /** A Select's value as a format, or every format for anything else. */
-export function parseFormat(value: string): FormatId | 'all' {
-  return isFormatId(value) ? value : 'all';
-}
-
-export function parseCategory(value: string): PresetCategory | 'all' {
-  return (PRESET_CATEGORIES as readonly string[]).includes(value)
-    ? (value as PresetCategory)
-    : 'all';
-}
-
-export function parseStyle(value: string): ThemeStyle | 'all' {
-  return Object.hasOwn(STYLE_LABELS, value) ? (value as ThemeStyle) : 'all';
+export function parseFormat(value: string): FormatId | typeof ALL {
+  return isFormatId(value) ? value : ALL;
 }
 
 export interface ShownPreset {
@@ -96,6 +110,9 @@ export function shownPresets(
     query: filter.query,
     category: filter.category,
     style: filter.style,
+    look: filter.look,
+    family: filter.family,
+    collection: filter.collection,
   };
   const formats = filter.format === 'all' ? FORMAT_IDS : [filter.format];
   const passing = formats.map((format) => ({
@@ -118,6 +135,125 @@ export function slideTotal(shown: readonly ShownPreset[]): number {
 export function shownLabel(shown: readonly ShownPreset[]): string {
   const presets = shown.length === 1 ? '1 preset' : `${shown.length} presets`;
   return `${presets}, ${slideCountLabel(slideTotal(shown))}`;
+}
+
+// ---------------------------------------------------------------------------
+// Pages, and the URL that keeps them
+// ---------------------------------------------------------------------------
+
+/** Presets to a page. Each draws every format it is shown in, so 24 is a long page. */
+export const PAGE_SIZES = [6, 12, 24] as const;
+
+export type PageSize = (typeof PAGE_SIZES)[number];
+
+export const DEFAULT_PAGE_SIZE: PageSize = 12;
+
+export function parsePageSize(value: string | null | undefined): PageSize {
+  return PAGE_SIZES.find((size) => String(size) === value) ?? DEFAULT_PAGE_SIZE;
+}
+
+/** Everything the playground's URL holds: the filters, the page and its size. */
+export interface PlaygroundView {
+  filter: PlaygroundFilter;
+  /** Numbered from 1. Clamped to the list once the list is known (`clampPage`). */
+  page: number;
+  size: PageSize;
+}
+
+export const FIRST_VIEW: PlaygroundView = { filter: SHOW_ALL, page: 1, size: DEFAULT_PAGE_SIZE };
+
+type SearchParamsLike = Record<string, string | string[] | undefined>;
+
+function first(value: string | string[] | undefined): string | null {
+  const text = Array.isArray(value) ? value[0] : value;
+  return typeof text === 'string' ? text : null;
+}
+
+/** The query string's parameter for each filter: short, and what a person would type. */
+const PARAMS = {
+  query: 'q',
+  format: 'format',
+  category: 'category',
+  style: 'style',
+  look: 'look',
+  family: 'colour',
+  collection: 'collection',
+} as const satisfies Record<keyof PlaygroundFilter, string>;
+
+/**
+ * Reads the playground from its URL (`?page=3&size=24&collection=luxury`),
+ * so a reload or a shared link lands on the same page of the same list.
+ * Anything malformed reads as its default rather than being trusted.
+ */
+export function parsePlaygroundView(params: SearchParamsLike): PlaygroundView {
+  const read = (key: keyof PlaygroundFilter) => first(params[PARAMS[key]]) ?? '';
+  const page = Number.parseInt(first(params.page) ?? '', 10);
+
+  return {
+    filter: {
+      query: read('query').slice(0, 200),
+      format: parseFormat(read('format')),
+      category: parseCategory(read('category')),
+      style: parseStyle(read('style')),
+      look: parseLook(read('look')),
+      family: parseFamily(read('family')),
+      collection: parseCollection(read('collection')),
+    },
+    page: Number.isFinite(page) && page > 1 ? page : 1,
+    size: parsePageSize(first(params.size)),
+  };
+}
+
+/**
+ * The query string for a view, the inverse of `parsePlaygroundView`, with
+ * every default left out: the first page of everything is the bare address.
+ */
+export function playgroundQuery(view: PlaygroundView): string {
+  const query = new URLSearchParams();
+
+  for (const key of Object.keys(PARAMS) as (keyof PlaygroundFilter)[]) {
+    const value = key === 'query' ? view.filter.query.trim() : view.filter[key];
+    if (value && value !== SHOW_ALL[key]) query.set(PARAMS[key], value);
+  }
+  if (view.page > 1) query.set('page', String(view.page));
+  if (view.size !== DEFAULT_PAGE_SIZE) query.set('size', String(view.size));
+
+  return query.toString();
+}
+
+/** One page of the shown presets, and where it sits among the rest. */
+export interface ShownPage {
+  /** The page shown: the one asked for, or the last there is. */
+  page: number;
+  pageCount: number;
+  presets: ShownPreset[];
+}
+
+export function shownPage(shown: readonly ShownPreset[], page: number, size: PageSize): ShownPage {
+  const pageCount = pageCountOf(shown.length, size);
+  const current = clampPage(page, pageCount);
+  const start = (current - 1) * size;
+
+  return { page: current, pageCount, presets: shown.slice(start, start + size) };
+}
+
+/**
+ * The page that still shows the first preset of the page you were on after
+ * the page size changes: from page 3 of 6 (presets 13 to 18) to 12 a page
+ * is page 2 (13 to 24), not back to the start.
+ */
+export function pageAfterResize(page: number, from: PageSize, to: PageSize): number {
+  return Math.floor(((Math.max(1, Math.floor(page)) - 1) * from) / to) + 1;
+}
+
+/** The page a preset is on, or null when the filters hide it. */
+export function pageOfPreset(
+  shown: readonly ShownPreset[],
+  presetId: string,
+  size: PageSize,
+): number | null {
+  const index = shown.findIndex(({ preset }) => preset.id === presetId);
+  return index < 0 ? null : Math.floor(index / size) + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +373,8 @@ export function slotNames(
 export interface Overflow {
   key: string;
   domId: string;
+  /** For finding its page: Go To Slide may have to turn to it first. */
+  presetId: string;
   presetName: string;
   format: FormatId;
   /** Numbered from 1, as the page shows it. */
@@ -279,6 +417,7 @@ export function fitReport(
         overflowing.push({
           key,
           domId: slideDomId(preset.id, format, index),
+          presetId: preset.id,
           presetName: preset.name,
           format,
           slide: index + 1,
@@ -301,10 +440,16 @@ export function fitHeadline(report: FitReport): string {
   return sofar ? 'No slide overflows so far.' : 'Every slide fits its sample content.';
 }
 
-/** How far the check has got. Slides are drawn as they scroll near, so it grows. */
-export function fitProgress(report: FitReport): string {
+/**
+ * How far the check has got. Slides are drawn as they scroll near, and only
+ * on the page shown, so it grows as the pages are walked; what a page
+ * reported stays counted after turning past it.
+ */
+export function fitProgress(report: FitReport, pageCount = 1): string {
   if (report.checked >= report.total) return `${slideCountLabel(report.total)} drawn and checked.`;
-  return `${report.checked} of ${slideCountLabel(report.total)} drawn. Scroll down to draw the rest.`;
+
+  const rest = pageCount > 1 ? 'Scroll down and turn the pages' : 'Scroll down';
+  return `${report.checked} of ${slideCountLabel(report.total)} drawn. ${rest} to draw the rest.`;
 }
 
 // ---------------------------------------------------------------------------

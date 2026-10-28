@@ -5,9 +5,10 @@
  *
  * The first slide is drawn by the real renderer on a small stage, so a card
  * shows the design as it is now, in its own fonts and colours. Under it the
- * title, the format and status badges, the slide count and when it changed.
- * The card opens the editor (which lands on the slide last edited); the
- * corner menu holds Open, Duplicate, Rename and Delete, a sibling of the
+ * title, the format and status badges, then one muted line: the slide count,
+ * the brand kit it was made with (Sprint 9b, when it has one) and when it
+ * changed. The card opens the editor (which lands on the slide last edited);
+ * the corner menu holds Open, Duplicate, Rename and Delete, a sibling of the
  * link so each is its own tab stop.
  */
 import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
@@ -27,7 +28,7 @@ import {
   DropdownMenuTrigger,
   MotionIcon,
 } from '@postgear/ui';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, Palette } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
@@ -88,8 +89,17 @@ export function DesignCard({
             <Badge variant="outline">{formatName(design.format)}</Badge>
             <Badge variant={status.variant}>{status.label}</Badge>
           </span>
-          <span className="flex flex-wrap gap-x-3 gap-y-0.5 font-sans text-xs text-ink type-muted">
+          <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-0.5 font-sans text-xs text-ink type-muted">
             <span>{slideCountLabel(design.slideCount)}</span>
+            {design.brandKitName ? (
+              // The palette says it is a kit's name, not part of the title.
+              <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+                <Palette aria-hidden="true" className="h-3 w-3 shrink-0" strokeWidth={2.5} />
+                <span className="truncate" title={design.brandKitName}>
+                  {design.brandKitName}
+                </span>
+              </span>
+            ) : null}
             {now ? <span>{updatedLabel(design.updatedAt, now)}</span> : null}
           </span>
         </span>

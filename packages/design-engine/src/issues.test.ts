@@ -58,6 +58,7 @@ describe('findDesignIssues', () => {
       logoMediaId: 'logo-gone',
       name: 'Brand',
       kitVersion: null,
+      fonts: null,
     });
     const issues = findDesignIssues(document, (mediaId) => mediaId !== 'logo-gone');
 
@@ -74,6 +75,7 @@ describe('findDesignIssues', () => {
       logoMediaId: 'logo-gone',
       name: 'Brand',
       kitVersion: null,
+      fonts: null,
     });
     const hidden = document.slides.reduce(
       (next, slide) => updateElement(next, slide.id, 'logo', { hidden: true }),
@@ -96,6 +98,18 @@ describe('findDesignIssues', () => {
     expect(findDesignIssues(safe, () => false)).toEqual([
       { kind: 'missingPicture', slideIndex: 0, slot: null },
     ]);
+  });
+
+  it('warns about a light-tinted photo the same way: by its overlay, not its tint', () => {
+    const document = design();
+    const id = document.slides[0].id;
+    const photo = (overlay: number) =>
+      setBackground(document, id, { kind: 'media', mediaId: 'photo', overlay, tint: 'light' });
+
+    expect(findDesignIssues(photo(0.2), always)).toEqual([
+      { kind: 'photoTooLight', slideIndex: 0, slot: null },
+    ]);
+    expect(findDesignIssues(photo(0.6), always)).toEqual([]);
   });
 
   it('reports a colour the user picked that does not read', () => {

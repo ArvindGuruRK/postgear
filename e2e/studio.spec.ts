@@ -161,7 +161,8 @@ test('edits the cover headline on the canvas, autosaves it and keeps it after a 
     await expect(typing).toBeFocused();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type(HEADLINE);
-    await page.keyboard.press('Escape');
+    // Escape cancels typing (Sprint 9b); Ctrl or Cmd plus Enter keeps it.
+    await page.keyboard.press('ControlOrMeta+Enter');
     await expect(typing).toHaveCount(0);
   });
 

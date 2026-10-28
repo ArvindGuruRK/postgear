@@ -22,9 +22,9 @@ import {
   type FormatId,
   LOGO_PLACEMENTS,
   type LogoPlacement,
+  REGION_LABELS,
   type Rect,
   type RegionDef,
-  REGION_LABELS,
   type RegionId,
   type SlideLayout,
   type SlideRole,
@@ -35,6 +35,7 @@ import { CONTENT_LAYOUTS } from './content';
 import { COVER_LAYOUTS } from './covers';
 import { LIST_LAYOUTS } from './lists';
 import { QUOTE_LAYOUTS } from './quotes';
+import { SIGNATURE_LAYOUTS } from './signature';
 import { STAT_LAYOUTS } from './stats';
 
 export const LAYOUTS: SlideLayout[] = [
@@ -44,6 +45,7 @@ export const LAYOUTS: SlideLayout[] = [
   ...QUOTE_LAYOUTS,
   ...STAT_LAYOUTS,
   ...CLOSING_LAYOUTS,
+  ...SIGNATURE_LAYOUTS,
 ];
 
 /** The layout Start From Blank and every fallback use. */
@@ -251,5 +253,6 @@ export {
   COVER_LAYOUTS,
   LIST_LAYOUTS,
   QUOTE_LAYOUTS,
+  SIGNATURE_LAYOUTS,
   STAT_LAYOUTS,
 };

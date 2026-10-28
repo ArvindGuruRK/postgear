@@ -1,36 +1,72 @@
 import {
+  ART_STYLES,
   addSlide,
+  applyBrandKit,
+  artDataUri,
+  artSvg,
+  brandFromTheme,
+  COLLECTION_LABELS,
   type DesignDocument,
   type DesignSlide,
   documentFromPreset,
+  FONT_IDS,
+  FONT_LICENCE_LABELS,
+  FORMAT_IDS,
+  FORMATS,
+  type FontId,
   findLayout,
   inkOf,
+  normalizeHex,
+  PRESET_COLLECTIONS,
   resetElement,
   SAFE_PHOTO_OVERLAY,
+  type SlideBackground,
   type SlotDef,
   type SlotId,
   setBackground,
+  setElementFont,
   setLogoPlacement,
   slidePalette,
+  THEMES,
+  themeById,
+  themeCollection,
   updateElement,
 } from '@postgear/design-engine';
 import type { BrandKitView, StudioMediaRef } from '@/types/studio';
 import {
+  ART_GROUPS,
   AUTO_COLOR,
   alignOf,
   alignPatch,
+  artGroupOf,
+  artTileColors,
+  artTileGround,
+  artTileSource,
   backgroundChoiceOf,
   backgroundSwatches,
+  brandLocksLook,
   CUSTOM_COLOR,
   canResetElement,
   characterCount,
   clip,
   colorChoiceOf,
+  colorResetOf,
   customColorOf,
+  DESIGN_LOCK_NOTE,
+  designColors,
+  designFontDefault,
+  designFontOf,
+  designTextReads,
+  elementFontOf,
+  elementLockNote,
   elementPreview,
   elementSwatches,
   findSlide,
+  fontLicenceRows,
+  formatBlocker,
+  formatChoices,
   groundOf,
+  hasOwnFonts,
   inkLabel,
   kitSelectValue,
   lengthHint,
@@ -40,6 +76,7 @@ import {
   logoView,
   mediaOf,
   NO_KIT,
+  offersStoryVersion,
   optionalSlots,
   overflowAdvice,
   overlayPercent,
@@ -47,16 +84,25 @@ import {
   shownSlots,
   sizeOf,
   sizePatch,
+  THEME_GROUPS,
+  TYPE_FACES,
+  takesFont,
   textRows,
   withAlign,
   withBackgroundChoice,
   withColorChoice,
+  withColorReset,
   withContrastFixed,
   withCustomBackground,
   withCustomColor,
+  withDesignColor,
+  withDesignFont,
   withElementReset,
   withItemAdded,
   withItemRemoved,
+  withKit,
+  withKitFonts,
+  withKitUpdate,
   withListItem,
   withOverlay,
   withPhotoRemoved,
@@ -64,6 +110,7 @@ import {
   withShown,
   withSize,
 } from './editor-panel-model';
+import { brandFromKitView, formatName } from './studio-view-model';
 
 /**
  * Tips Steps (Ink), portrait: s1 cover headline, s2 numbered list (five of
@@ -100,7 +147,11 @@ function element(document: DesignDocument, slideId: string, slotId: SlotId) {
   return slideOf(document, slideId).elements[slotId];
 }
 
-function kit(id: string, updatedAt = '2026-10-01T00:00:00.000Z'): BrandKitView {
+function kit(
+  id: string,
+  updatedAt = '2026-10-01T00:00:00.000Z',
+  overrides: Partial<BrandKitView> = {},
+): BrandKitView {
   return {
     id,
     name: 'Acme',
@@ -118,8 +169,21 @@ function kit(id: string, updatedAt = '2026-10-01T00:00:00.000Z'): BrandKitView {
     source: 'MANUAL',
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt,
+    headingFont: null,
+    bodyFont: null,
+    lockLook: false,
+    ctaText: null,
+    ctaUrl: null,
+    ...overrides,
   };
 }
+
+/** A plain slide on the design's own background, which a theme's pinned art colours are drawn for. */
+const ON_BACKGROUND: Pick<DesignSlide, 'background'> = {
+  background: { kind: 'role', role: 'background' },
+};
+
+const PHOTO: SlideBackground = { kind: 'media', mediaId: 'm1', overlay: 0.6 };
 
 describe('text hints', () => {
   it('counts characters the way a person does', () => {
@@ -358,6 +422,7 @@ describe('an element colour', () => {
         logoMediaId: null,
         name: 'Acme',
         kitVersion: null,
+        fonts: null,
       },
     };
     const slide = slideOf(branded, 's1');
@@ -593,7 +658,7 @@ describe('reset element', () => {
 describe('the logo', () => {
   const brand = (logoMediaId: string | null) => ({
     ...design(),
-    brand: { kitId: null, colors: null, logoMediaId, name: null, kitVersion: null },
+    brand: { kitId: null, colors: null, logoMediaId, name: null, kitVersion: null, fonts: null },
   });
 
   it('shows the brand logo when the slot has none of its own', () => {
@@ -648,5 +713,395 @@ describe('mediaOf', () => {
     expect(mediaOf(media, 'm2')).toBeNull();
     expect(mediaOf(media, null)).toBeNull();
     expect(mediaOf(media, 'toString')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sprint 9b: the Design and Element tabs
+// ---------------------------------------------------------------------------
+
+describe('theme and art groups', () => {
+  it('puts every theme in its collection once, in the gallery order', () => {
+    const ids = THEME_GROUPS.flatMap((group) => group.themes.map((theme) => theme.id));
+    expect([...ids].sort()).toEqual(THEMES.map((theme) => theme.id).sort());
+
+    const order = THEME_GROUPS.map((group) => PRESET_COLLECTIONS.indexOf(group.collection));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    for (const group of THEME_GROUPS) {
+      expect(group.label).toBe(COLLECTION_LABELS[group.collection]);
+      expect(group.themes.every((theme) => themeCollection(theme.id) === group.collection)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('puts every art style in its group once, patterns first', () => {
+    expect(ART_GROUPS.flatMap((group) => group.arts)).toEqual(ART_STYLES);
+    expect(ART_GROUPS.map((group) => group.label)).toEqual(['Patterns', 'Originals', 'Luxury']);
+  });
+
+  it("opens Background Art on the design's own art's group", () => {
+    const luxury = ART_STYLES.find((art) => art.kind === 'luxury');
+    expect(artGroupOf(luxury?.id ?? null)).toBe('luxury');
+    expect(artGroupOf(null)).toBe('pattern');
+    expect(artGroupOf('no-such-art')).toBe('pattern');
+  });
+});
+
+describe('art tiles', () => {
+  const PATTERN = ART_STYLES.find((art) => art.kind === 'pattern');
+  const ORIGINAL = ART_STYLES.find((art) => art.kind === 'original' && art.home);
+  const PINNED = THEMES.find((theme) => theme.art);
+  if (!PATTERN || !ORIGINAL || !PINNED) throw new Error('The art library is missing a kind.');
+
+  it("draws a pattern in the theme's pinned colours on the theme's background", () => {
+    const document = { ...design(), themeId: PINNED.id };
+    const colors = artTileColors(document, ON_BACKGROUND, PATTERN);
+
+    expect(colors.background).toBe(normalizeHex(PINNED.colors.background));
+    expect(colors.mid).toBe(PINNED.art?.mid);
+    expect(colors.highlight).toBe(PINNED.art?.highlight);
+  });
+
+  it('recolours the tiles with a brand kit, as the slides are', () => {
+    const document = applyBrandKit(
+      { ...design(), themeId: PINNED.id },
+      brandFromKitView(kit('k1')),
+    );
+    const colors = artTileColors(document, ON_BACKGROUND, PATTERN);
+
+    expect(colors.background).toBe('#FFFFFF');
+    expect(colors.highlight).toBe(slidePalette(document, ON_BACKGROUND).accent);
+    expect(colors.mid).not.toBe(PINNED.art?.mid);
+  });
+
+  it("keeps an original's own colours on the ground it was drawn on", () => {
+    const home = ORIGINAL.home;
+    if (!home) throw new Error('No home colours');
+
+    const document = withDesignColor(design(), 'background', home.background);
+    const colors = artTileColors(document, ON_BACKGROUND, ORIGINAL);
+    expect(colors).toMatchObject({ mid: home.mid, highlight: home.highlight });
+  });
+
+  it("paints a photo slide's tiles on the design's own background", () => {
+    const document = design();
+    const ground = artTileGround(document, ON_BACKGROUND);
+
+    expect(artTileGround(document, { background: PHOTO })).toBe(ground);
+    expect(artTileGround(document, undefined)).toBe(ground);
+    expect(artTileColors(document, { background: PHOTO }, PATTERN)).toEqual(
+      artTileColors(document, ON_BACKGROUND, PATTERN),
+    );
+
+    const primary = setBackground(document, 's1', { kind: 'role', role: 'primary' });
+    expect(artTileGround(primary, slideOf(primary, 's1'))).toBe(
+      groundOf(primary, { kind: 'role', role: 'primary' }),
+    );
+  });
+
+  it('draws a tile at the format size, the picture the slide draws', () => {
+    const document = design();
+    const colors = artTileColors(document, ON_BACKGROUND, PATTERN);
+    const { width, height } = FORMATS[document.format];
+
+    const source = artTileSource(PATTERN, colors, document.format);
+    expect(source).toBe(artDataUri(artSvg(PATTERN.id, colors, width, height) ?? ''));
+    expect(source?.startsWith('data:image/svg+xml')).toBe(true);
+    expect(artTileSource({ id: 'no-such-art' }, colors, document.format)).toBeNull();
+  });
+});
+
+describe('fonts', () => {
+  it('offers Heading then Body', () => {
+    expect(TYPE_FACES.map((entry) => entry.label)).toEqual(['Heading', 'Body']);
+  });
+
+  it('sets one face for the design and keeps the other', () => {
+    const document = design();
+    expect(designFontOf(document, 'heading')).toBeNull();
+
+    const heading = withDesignFont(document, 'heading', 'inter');
+    expect(heading.fonts).toEqual({ heading: 'inter', body: null });
+
+    const both = withDesignFont(heading, 'body', 'sora');
+    expect(both.fonts).toEqual({ heading: 'inter', body: 'sora' });
+    expect(designFontOf(both, 'body')).toBe('sora');
+    expect(withDesignFont(both, 'body', 'sora')).toBe(both);
+
+    // Neither face chosen is stored as no choice at all.
+    const none = withDesignFont(withDesignFont(both, 'heading', null), 'body', null);
+    expect(none.fonts).toBeNull();
+  });
+
+  it('refuses a family the library does not have', () => {
+    const document = design();
+    expect(withDesignFont(document, 'heading', 'no-such-font' as FontId)).toBe(document);
+  });
+
+  it('names the first option after what the design falls back to', () => {
+    expect(designFontDefault({ fonts: null }, 'heading')).toBe('Theme Font');
+    const kitFace = { fonts: { heading: 'inter' as FontId, body: null } };
+    expect(designFontDefault(kitFace, 'heading')).toBe('Brand Kit Font');
+    expect(designFontDefault(kitFace, 'body')).toBe('Theme Font');
+  });
+
+  it("reads an element's own font, and offers one only where there are words", () => {
+    const document = setElementFont(design(), 's1', 'headline', 'inter');
+    expect(elementFontOf(element(document, 's1', 'headline'))).toBe('inter');
+    expect(elementFontOf(undefined)).toBeNull();
+
+    expect(takesFont(slotOf(document, 's1', 'headline'))).toBe(true);
+    expect(takesFont(slotOf(document, 's2', 'list'))).toBe(true);
+    expect(takesFont(slotOf(document, 's1', 'logo'))).toBe(false);
+  });
+
+  it("clears an element's font with Reset Style", () => {
+    const document = setElementFont(design(), 's1', 'headline', 'inter');
+    expect(canResetElement(element(document, 's1', 'headline'))).toBe(true);
+
+    const reset = withElementReset(document, 's1', 'headline');
+    expect(element(reset, 's1', 'headline')?.font).toBeUndefined();
+  });
+
+  it("takes a kit's newer colours and fonts with Update From Kit", () => {
+    const document = applyBrandKit(design(), brandFromKitView(kit('k1')));
+    const newer = kit('k1', '2026-10-20T00:00:00.000Z', {
+      colors: { ...kit('k1').colors, accent: '#7C3AED' },
+      bodyFont: 'sora',
+    });
+
+    const updated = withKitUpdate(document, newer);
+    expect(updated.brand.kitVersion).toBe(newer.updatedAt);
+    expect(updated.brand.colors?.accent).toBe('#7C3AED');
+    // The same faces a design takes when the kit is applied.
+    expect(updated.brand.fonts).toEqual(brandFromKitView(newer).fonts);
+
+    // A kit that has dropped its faces takes the design back to its theme's.
+    expect(withKitUpdate(updated, kit('k1', '2026-10-21T00:00:00.000Z')).brand.fonts).toBeNull();
+    // A design that has left the kit since stays as it is.
+    expect(withKitUpdate(document, kit('k2'))).toBe(document);
+  });
+
+  it('lists every family once, by name, with its licence and notice', () => {
+    const rows = fontLicenceRows();
+    const labels = rows.map((row) => row.label);
+
+    expect(rows).toHaveLength(FONT_IDS.length);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b, 'en')));
+    for (const row of rows) {
+      expect(Object.values(FONT_LICENCE_LABELS)).toContain(row.licence);
+      expect(row.copyright.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('custom colours', () => {
+  it("are the theme's five until the design has its own", () => {
+    const document = design();
+    expect(designColors(document)).toEqual(brandFromTheme(themeById(document.themeId)));
+
+    const own = withDesignColor(document, 'accent', '#ff0000');
+    expect(designColors(own)).toEqual({ ...designColors(document), accent: '#FF0000' });
+    expect(own.brand).toMatchObject({ kitId: null, kitVersion: null });
+  });
+
+  it('ignores anything that is not a colour, and the colour it already is', () => {
+    const document = design();
+    expect(withDesignColor(document, 'accent', 'red')).toBe(document);
+
+    const accent = designColors(document).accent.toLowerCase();
+    expect(withDesignColor(document, 'accent', accent)).toBe(document);
+  });
+
+  it("keeps the design on its kit, and the kit's version, so Update From Kit still works", () => {
+    const document = applyBrandKit(design(), brandFromKitView(kit('k1')));
+    const changed = withDesignColor(document, 'primary', '#123456');
+
+    expect(changed.brand).toMatchObject({
+      kitId: 'k1',
+      kitVersion: '2026-10-01T00:00:00.000Z',
+      colors: { ...kit('k1').colors, primary: '#123456' },
+    });
+  });
+
+  it('go back to the theme, or to the kit the design is on', () => {
+    const kits = [kit('k1')];
+    const own = withDesignColor(design(), 'accent', '#FF0000');
+
+    expect(colorResetOf(design().brand, kits)).toBeNull();
+    expect(colorResetOf(own.brand, null)).toEqual({ kind: 'theme' });
+    expect(withColorReset(own, { kind: 'theme' }).brand.colors).toBeNull();
+
+    const onKit = applyBrandKit(design(), brandFromKitView(kit('k1')));
+    expect(colorResetOf(onKit.brand, kits)).toBeNull();
+
+    const changed = withDesignColor(onKit, 'accent', '#FF0000');
+    const reset = colorResetOf(changed.brand, kits);
+    expect(reset).toEqual({ kind: 'kit', kit: kits[0] });
+    if (!reset) throw new Error('No reset');
+
+    const back = withColorReset(changed, reset);
+    expect(back.brand.colors).toEqual(kit('k1').colors);
+    expect(back.brand.kitVersion).toBe(changed.brand.kitVersion);
+  });
+
+  it('offer nothing while the kits load or for a kit that was deleted', () => {
+    const changed = withDesignColor(
+      applyBrandKit(design(), brandFromKitView(kit('k1'))),
+      'accent',
+      '#FF0000',
+    );
+    expect(colorResetOf(changed.brand, null)).toBeNull();
+    expect(colorResetOf(changed.brand, [kit('k2')])).toBeNull();
+  });
+
+  it('say when the text colour will not read on the background', () => {
+    expect(designTextReads({ text: '#0A0A0A', background: '#FFFFFF' })).toBe(true);
+    expect(designTextReads({ text: '#FFFFFF', background: '#FFFF00' })).toBe(false);
+    // Half typed: nothing to judge yet.
+    expect(designTextReads({ text: '#FF', background: '#FFFFFF' })).toBe(true);
+  });
+});
+
+describe('lock brand look', () => {
+  const locking = kit('k1', undefined, { lockLook: true });
+
+  it('locks only while the design is on a kit that locks its look', () => {
+    expect(brandLocksLook({ kitId: 'k1' }, [locking])).toBe(true);
+    expect(brandLocksLook({ kitId: 'k1' }, [kit('k1')])).toBe(false);
+    expect(brandLocksLook({ kitId: null }, [locking])).toBe(false);
+    // While the kits load, and on a kit that was deleted, there is nothing to lock to.
+    expect(brandLocksLook({ kitId: 'k1' }, null)).toBe(false);
+    expect(brandLocksLook({ kitId: 'gone' }, [locking])).toBe(false);
+  });
+
+  it('says what the kit locks in one sentence', () => {
+    expect(DESIGN_LOCK_NOTE).toBe("This brand kit locks this design's colours, fonts and logo.");
+
+    const document = design();
+    expect(elementLockNote(slotOf(document, 's1', 'logo'))).toBe('This brand kit locks the logo.');
+    expect(elementLockNote(slotOf(document, 's1', 'headline'))).toBe(
+      "This brand kit locks this element's font and custom colours.",
+    );
+    expect(elementLockNote({ kind: 'text', colorable: false })).toBe(
+      "This brand kit locks this element's font.",
+    );
+    expect(elementLockNote({ kind: 'image' })).toBeNull();
+  });
+
+  it('takes Custom out of the swatches, unless the element is on one already', () => {
+    const document = design();
+    const slide = slideOf(document, 's1');
+    const headline = slotOf(document, 's1', 'headline');
+
+    const locked = elementSwatches(document, slide, headline, { custom: false });
+    expect(locked.map((swatch) => swatch.value)).not.toContain(CUSTOM_COLOR);
+    expect(locked.length).toBe(elementSwatches(document, slide, headline).length - 1);
+
+    const custom = withCustomColor(document, 's1', 'headline', '#C2410C');
+    const kept = elementSwatches(custom, slideOf(custom, 's1'), headline, { custom: false });
+    expect(kept.at(-1)).toEqual({ value: CUSTOM_COLOR, label: 'Custom', color: '#C2410C' });
+  });
+
+  it("takes the design's own fonts out when a locking kit is applied, and only then", () => {
+    const own = setElementFont(
+      withDesignFont(design(), 'heading', 'inter'),
+      's1',
+      'headline',
+      'sora',
+    );
+    expect(hasOwnFonts(own)).toBe(true);
+
+    const strict = kit('k1', undefined, { lockLook: true, headingFont: 'manrope' });
+    const locked = withKit(own, strict);
+    expect(locked.brand.kitId).toBe('k1');
+    expect(locked.brand.fonts).toEqual(brandFromKitView(strict).fonts);
+    expect(locked.fonts).toBeNull();
+    expect(element(locked, 's1', 'headline')?.font).toBeUndefined();
+    expect(hasOwnFonts(locked)).toBe(false);
+
+    // A kit that does not lock the look leaves the person's choices on the design.
+    const open = withKit(own, kit('k1'));
+    expect(open.brand.kitId).toBe('k1');
+    expect(open.fonts).toEqual({ heading: 'inter', body: null });
+    expect(element(open, 's1', 'headline')?.font).toBe('sora');
+  });
+
+  it('takes them out with Update From Kit once the kit has been locked', () => {
+    const own = withDesignFont(withKit(design(), kit('k1')), 'body', 'inter');
+    const lockedSince = kit('k1', '2026-10-20T00:00:00.000Z', { lockLook: true });
+
+    const updated = withKitUpdate(own, lockedSince);
+    expect(updated.brand.kitVersion).toBe(lockedSince.updatedAt);
+    expect(updated.fonts).toBeNull();
+  });
+
+  it('offers Use Kit Fonts only while there is a font to take out, and keeps the rest', () => {
+    const plain = design();
+    expect(hasOwnFonts(plain)).toBe(false);
+    expect(withKitFonts(plain)).toBe(plain);
+
+    const fonted = setElementFont(
+      withCustomColor(plain, 's1', 'headline', '#C2410C'),
+      's1',
+      'headline',
+      'inter',
+    );
+    const colour = element(fonted, 's1', 'headline')?.color;
+    expect(colour).toBeDefined();
+    expect(hasOwnFonts(fonted)).toBe(true);
+
+    const cleared = withKitFonts(fonted);
+    expect(hasOwnFonts(cleared)).toBe(false);
+    expect(element(cleared, 's1', 'headline')?.font).toBeUndefined();
+    expect(element(cleared, 's1', 'headline')?.color).toEqual(colour);
+  });
+
+  it('takes Custom out of the background swatches the same way', () => {
+    const document = design();
+    const values = backgroundSwatches(document, slideOf(document, 's1'), { custom: false }).map(
+      (swatch) => swatch.value,
+    );
+    expect(values).not.toContain(CUSTOM_COLOR);
+
+    const custom = setBackground(document, 's1', { kind: 'color', hex: '#abcdef' });
+    expect(backgroundSwatches(custom, slideOf(custom, 's1'), { custom: false }).at(-1)).toEqual({
+      value: CUSTOM_COLOR,
+      label: 'Custom',
+      color: '#ABCDEF',
+    });
+  });
+});
+
+describe('format', () => {
+  it('offers every format, each one the design can take', () => {
+    const document = design();
+    expect(formatChoices(document)).toEqual(
+      FORMAT_IDS.map((format) => ({ format, label: formatName(format), reason: null })),
+    );
+  });
+
+  it('says which slide stops a format, as setFormat refuses it', () => {
+    const base = design();
+    const first = base.slides[0];
+    if (!first) throw new Error('No slide');
+    const document = {
+      ...base,
+      slides: [...base.slides, { ...first, id: 'old', layoutId: 'retired-layout@1' }],
+    };
+
+    expect(formatBlocker(document, 'story')).toBe("Slide 6's layout has no Story version.");
+    // The format it is in already is never refused.
+    expect(formatBlocker(document, document.format)).toBeNull();
+    expect(formatChoices(document).find((choice) => choice.format === 'story')?.reason).toBe(
+      "Slide 6's layout has no Story version.",
+    );
+  });
+
+  it('offers a story version of every design that is not a story', () => {
+    expect(offersStoryVersion('portrait')).toBe(true);
+    expect(offersStoryVersion('square')).toBe(true);
+    expect(offersStoryVersion('story')).toBe(false);
   });
 });

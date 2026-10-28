@@ -9,6 +9,7 @@
 import sharp from 'sharp';
 import { sniffMedia } from './file-type';
 import {
+  GENERATED_MAX_EDGE,
   IMAGE_MAX_EDGE,
   processImage,
   THUMBNAIL_EDGE,
@@ -62,6 +63,31 @@ describe('processImage', () => {
     const result = await processImage(original, sniffImage(original));
 
     expect([result.width, result.height]).toEqual([640, 480]);
+  });
+
+  it('keeps a picture past 2048 px when the producer asks (a Studio 2x export), up to 4096', async () => {
+    // A 2x story slide: 2160 x 3840. Flat colour, so the encode is quick.
+    const slide = await sharp({
+      create: { width: 2160, height: 3840, channels: 3, background: '#123456' },
+    })
+      .png()
+      .toBuffer();
+
+    const kept = await processImage(slide, sniffImage(slide), { prefer: 'png', maxEdge: 3840 });
+    expect([kept.width, kept.height]).toEqual([2160, 3840]);
+
+    const tall = await sharp({
+      create: { width: 2000, height: 5000, channels: 3, background: '#123456' },
+    })
+      .png()
+      .toBuffer();
+    const capped = await processImage(tall, sniffImage(tall), { maxEdge: 99_999 });
+    expect(capped.height).toBe(GENERATED_MAX_EDGE);
+
+    for (const maxEdge of [undefined, 0, -1, 2.5]) {
+      const library = await processImage(slide, sniffImage(slide), { maxEdge });
+      expect(library.height).toBe(IMAGE_MAX_EDGE);
+    }
   });
 
   it('applies EXIF orientation, then strips every metadata block', async () => {

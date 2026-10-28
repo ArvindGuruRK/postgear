@@ -11,6 +11,11 @@
  * needs fixing is listed up front and never blocks. At the end: Download
  * All as one zip, the Media page, and Done.
  *
+ * Sprint 9b: a Size choice, 1x or 2x (twice the pixels, the size shown when
+ * the editor passes the format), and Download PDF beside Download All once
+ * the export is done, which is when the API has a current export to print.
+ * The zip also carries the caption as captions.txt, which the dialog says.
+ *
  * What is on screen is saved first, so the images show the design the
  * person sees. The run lives in the dialog's content, so closing the dialog
  * (Cancel, Escape, the close button) ends the stream with it; while it runs,
@@ -21,8 +26,10 @@
  */
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { FileArchiveIcon } from '@animateicons/react/lucide/file-archive-icon';
+import { FileDownIcon } from '@animateicons/react/lucide/file-down-icon';
 import { ImageIcon } from '@animateicons/react/lucide/image-icon';
 import { RotateCcwIcon } from '@animateicons/react/lucide/rotate-ccw-icon';
+import type { FormatId } from '@postgear/design-engine';
 import {
   Alert,
   Button,
@@ -56,15 +63,24 @@ import { ActionLink } from '@/components/home/home-actions';
 import { useWorkspace } from '@/components/navigation/workspace-provider';
 import { ApiError, downloadFile } from '@/lib/api';
 import { streamEvents } from '@/lib/sse';
-import type { DesignStatusView, ExportImageFormat, StudioExportEvent } from '@/types/studio';
+import type {
+  DesignDownloadFormat,
+  DesignStatusView,
+  ExportImageFormat,
+  ExportScale,
+  StudioExportBody,
+  StudioExportEvent,
+} from '@/types/studio';
 import { FOCUS } from './design-card';
 import {
+  DOWNLOAD_NOTE,
   type ExportState,
   exportReducer,
   formatDetail,
   initialExportState,
   isImageFormat,
   isRunning,
+  pdfFileName,
   progressFraction,
   progressLabel,
   type RunMode,
@@ -73,6 +89,8 @@ import {
   type SlideSlot,
   type SlotStatus,
   savedLine,
+  scaleChoices,
+  scaleOf,
   slideSlots,
   UNEXPECTED_MESSAGE,
   warningLead,
@@ -92,6 +110,8 @@ export interface ExportDialogProps {
   /** What still needs fixing, by slide id, in the engine's sentences. Shown, never blocking. */
   issues: ReadonlyMap<string, readonly string[]>;
   onExported: (result: { status: DesignStatusView; revision: number; mediaIds: string[] }) => void;
+  /** The design's format, so the Size choice can show its pixels. Without it, it says them in words. */
+  format?: FormatId;
 }
 
 export function ExportDialog(props: ExportDialogProps) {
@@ -119,11 +139,15 @@ function ExportDialogContent({
   flush,
   issues,
   onExported,
+  format,
 }: ExportDialogProps) {
   const { activeOrgId } = useWorkspace();
-  const { state, run, choose } = useStudioRun('export');
-  const [download, setDownload] = useState<{ busy: boolean; error: string | null }>({
-    busy: false,
+  const { state, run, choose, chooseScale } = useStudioRun('export');
+  const [download, setDownload] = useState<{
+    busy: DesignDownloadFormat | null;
+    error: string | null;
+  }>({
+    busy: null,
     error: null,
   });
   const progressRef = useRef<HTMLElement>(null);
@@ -142,10 +166,10 @@ function ExportDialogContent({
   const lines = warningLines(issues, state.warnings);
 
   function exportSlides() {
-    setDownload({ busy: false, error: null });
+    setDownload({ busy: null, error: null });
     void run({
       path: `/studio/designs/${encodeURIComponent(designId)}/export`,
-      body: { imageFormat: state.imageFormat },
+      body: { imageFormat: state.imageFormat, scale: state.scale } satisfies StudioExportBody,
       flush: () => handlers.current.flush(),
       onEvent: (event) => {
         if (event.type === 'done') {
@@ -159,18 +183,20 @@ function ExportDialogContent({
     });
   }
 
-  async function downloadAll() {
-    setDownload({ busy: true, error: null });
+  /** Download All (the zip) or Download PDF: both need the export just made, which the API checks. */
+  async function downloadAs(kind: DesignDownloadFormat) {
+    if (download.busy) return;
+    setDownload({ busy: kind, error: null });
 
+    const path = `/studio/designs/${encodeURIComponent(designId)}/download`;
     try {
-      await downloadFile(
-        `/studio/designs/${encodeURIComponent(designId)}/download`,
-        zipFileName(title),
-      );
-      setDownload({ busy: false, error: null });
+      await (kind === 'pdf'
+        ? downloadFile(`${path}?format=pdf`, pdfFileName(title))
+        : downloadFile(path, zipFileName(title)));
+      setDownload({ busy: null, error: null });
     } catch (cause) {
       setDownload({
-        busy: false,
+        busy: null,
         error:
           cause instanceof ApiError
             ? cause.message
@@ -214,7 +240,32 @@ function ExportDialogContent({
         <RunPanel state={state} panelRef={progressRef} />
 
         {state.phase === 'idle' || failed ? (
-          <FormatChoice value={state.imageFormat} onChange={choose} />
+          <>
+            <ChoiceTiles
+              label="Image format"
+              choices={FORMAT_CHOICES}
+              value={state.imageFormat}
+              onChange={(next) => {
+                if (isImageFormat(next)) choose(next);
+              }}
+            />
+            <ChoiceTiles
+              label="Size"
+              choices={scaleChoices(format ?? null).map((choice) => ({
+                ...choice,
+                value: String(choice.value),
+              }))}
+              value={String(state.scale)}
+              onChange={(next) => {
+                const scale = scaleOf(next);
+                if (scale) chooseScale(scale);
+              }}
+            />
+          </>
+        ) : null}
+
+        {state.phase === 'done' ? (
+          <p className="m-0 font-sans text-xs text-ink type-muted">{DOWNLOAD_NOTE}</p>
         ) : null}
 
         {download.error ? (
@@ -225,29 +276,24 @@ function ExportDialogContent({
         ) : null}
       </div>
 
-      <DialogFooter className="flex-wrap">
+      <DialogFooter
+        // Four buttons when done: two even rows of two, or one column on a
+        // phone, instead of a ragged wrap.
+        className={cn('flex-wrap', state.phase === 'done' && 'grid grid-cols-1 sm:grid-cols-2')}
+      >
         {state.phase === 'done' ? (
           <>
             {/* Busy, not disabled: a disabled button drops the keyboard user's focus. */}
-            <Button
-              variant="secondary"
-              aria-disabled={download.busy || undefined}
-              onClick={() => {
-                if (!download.busy) void downloadAll();
-              }}
-            >
-              {download.busy ? (
-                <Spinner
-                  size="sm"
-                  role="presentation"
-                  aria-hidden="true"
-                  className="motion-reduce:animate-none"
-                />
-              ) : (
-                <MotionIcon icon={FileArchiveIcon} className="h-4 w-4" />
-              )}
-              {download.busy ? 'Downloading…' : 'Download All'}
-            </Button>
+            <DownloadButton
+              kind="zip"
+              busy={download.busy}
+              onDownload={(kind) => void downloadAs(kind)}
+            />
+            <DownloadButton
+              kind="pdf"
+              busy={download.busy}
+              onDownload={(kind) => void downloadAs(kind)}
+            />
             {/* The footer's buttons are the default size; the link matches them. */}
             <ActionLink href={`/${activeOrgId}/media`} className="h-11 px-6 text-sm">
               <MotionIcon icon={ImageIcon} className="h-4 w-4" />
@@ -360,7 +406,9 @@ export function useStudioRun(mode: RunMode) {
     [],
   );
 
-  return { state, run, choose };
+  const chooseScale = useCallback((scale: ExportScale) => dispatch({ type: 'scale', scale }), []);
+
+  return { state, run, choose, chooseScale };
 }
 
 /**
@@ -577,17 +625,58 @@ function SlotTile({ slot }: { slot: SlideSlot }) {
   );
 }
 
+/** Download All or Download PDF; busy while either one is on its way. */
+function DownloadButton({
+  kind,
+  busy,
+  onDownload,
+}: {
+  kind: DesignDownloadFormat;
+  busy: DesignDownloadFormat | null;
+  onDownload: (kind: DesignDownloadFormat) => void;
+}) {
+  const mine = busy === kind;
+
+  return (
+    <Button
+      variant="secondary"
+      aria-disabled={busy !== null || undefined}
+      onClick={() => {
+        if (busy === null) onDownload(kind);
+      }}
+    >
+      {mine ? (
+        <Spinner
+          size="sm"
+          role="presentation"
+          aria-hidden="true"
+          className="motion-reduce:animate-none"
+        />
+      ) : (
+        <MotionIcon icon={kind === 'pdf' ? FileDownIcon : FileArchiveIcon} className="h-4 w-4" />
+      )}
+      {mine ? 'Downloading…' : kind === 'pdf' ? 'Download PDF' : 'Download All'}
+    </Button>
+  );
+}
+
 /**
- * JPEG or PNG, as two tiles with radio semantics: the whole tile is the
- * label, the radio inside keeps the keyboard behaviour (arrow keys move the
- * choice), and the tiles press and wear the ring as the wizard's do.
+ * One choice of a few (the image format, the size), as tiles with radio
+ * semantics: the whole tile is the label, the radio inside keeps the
+ * keyboard behaviour (arrow keys move the choice), and the tiles press and
+ * wear the ring as the wizard's do.
  */
-function FormatChoice({
+function ChoiceTiles({
+  label,
+  choices,
   value,
   onChange,
 }: {
-  value: ExportImageFormat;
-  onChange: (value: ExportImageFormat) => void;
+  /** A form label: sentence case. */
+  label: string;
+  choices: ReadonlyArray<{ value: string; title: string; hint: string }>;
+  value: string;
+  onChange: (value: string) => void;
 }) {
   const id = useId();
 
@@ -595,17 +684,15 @@ function FormatChoice({
     <div className="flex flex-col gap-2">
       {/* Names a group of radios, not one control, so `Label`'s classes rather than `Label`. */}
       <p id={`${id}-label`} className="m-0 font-sans text-sm font-bold text-ink">
-        Image format
+        {label}
       </p>
       <RadioGroup
         value={value}
-        onValueChange={(next) => {
-          if (isImageFormat(next)) onChange(next);
-        }}
+        onValueChange={onChange}
         aria-labelledby={`${id}-label`}
         className="grid gap-3 sm:grid-cols-2"
       >
-        {FORMAT_CHOICES.map((choice) => {
+        {choices.map((choice) => {
           const itemId = `${id}-${choice.value}`;
 
           return (

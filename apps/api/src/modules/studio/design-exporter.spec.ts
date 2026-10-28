@@ -30,6 +30,7 @@ function design(): DesignDocument {
     logoMediaId: LOGO_ID,
     name: 'Acme',
     kitVersion: null,
+    fonts: null,
   });
 }
 
@@ -47,6 +48,10 @@ function fakePool(
     render: jest.fn(async (options: RenderOptions) => {
       calls.push(options);
       return { image: Buffer.from('a png'), value: await render(options) };
+    }),
+    // The exporter renders; printing is the PDF download's (Sprint 9b).
+    printImages: jest.fn(async () => {
+      throw new Error('The exporter does not print.');
     }),
   };
 
@@ -97,12 +102,30 @@ describe('DesignExport', () => {
     expect(calls[0]).toMatchObject({
       width: spec.width,
       height: spec.height,
+      scale: 1,
       type: 'png',
       waitForFunction: 'window.__pgFitDone === true',
     });
     expect(calls[0].html).toContain(`data:image/png;base64,${logo.bytes.toString('base64')}`);
     expect(calls[0].html).toContain('data:font/woff2;base64,');
     expect(calls[0].html).not.toMatch(/(?:src|href)="https?:/);
+  });
+
+  it('lays a 2x slide out at the format size and asks for twice the pixels', async () => {
+    const document = design();
+    const { pool, calls } = fakePool();
+    const exporter = new DesignExport(document, {
+      pool,
+      loadPicture: async () => logo,
+      scale: 2,
+    });
+
+    await exporter.renderSlide(0, signal());
+
+    // The page, and so every line break, is the 1x page; only the paint doubles.
+    const spec = formatSpec('square');
+    expect(calls[0]).toMatchObject({ width: spec.width, height: spec.height, scale: 2 });
+    expect(calls[0].html).toContain(`width:${spec.width}px`);
   });
 
   it('reads each picture once for the whole export', async () => {

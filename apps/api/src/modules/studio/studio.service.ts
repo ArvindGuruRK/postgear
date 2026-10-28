@@ -42,6 +42,7 @@ import {
 } from '@nestjs/common';
 import { type Design, DesignStatus, type Prisma } from '@postgear/db';
 import {
+  applyCtaDefaults,
   BLANK_PRESET_ID,
   brandColorsSchema,
   type DesignBrand,
@@ -49,13 +50,16 @@ import {
   type DesignIssue,
   designMediaIds,
   documentFromPreset,
+  type FormatId,
   findDesignIssues,
   findLayout,
   formatSpec,
+  isPresetPremium,
   issueMessage,
   presetById,
   presetFormats,
   safeParseDesignDocument,
+  setFormat,
   slideId,
   slideMediaIds,
   slotText,
@@ -71,14 +75,17 @@ import {
   selectiveTerm,
 } from '../../common/search-terms';
 import type { SseStream } from '../../common/sse';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { ChannelsService } from '../channels/channels.service';
 import { MediaService, type MediaView } from '../media/media.service';
 import { createPostSchema, postDocumentSchema } from '../posts/dto/posts.schema';
 import { PostsService } from '../posts/posts.service';
+import { kitFonts } from './brand-kits.service';
 import {
   type ArchiveEntry,
   archiveFileName,
   archiveNames,
+  captionEntry,
   type DesignArchive,
 } from './design-archive';
 import {
@@ -87,10 +94,12 @@ import {
   INSTALL_HINT,
   SlideRenderError,
 } from './design-exporter';
+import { type DesignPdfFile, pdfFileName, pdfPageSize } from './design-pdf';
 import {
   COLUMN_TO_FORMAT,
   type CreateDesignInput,
   DESIGNS_PAGE_SIZE,
+  type DuplicateDesignInput,
   type ExportDesignInput,
   FORMAT_TO_COLUMN,
   type ListDesignsQuery,
@@ -100,6 +109,7 @@ import {
 } from './dto/studio.schema';
 import { previewPlatforms } from './preview-platforms';
 import { SLIDE_FAILURE_REASONS, STUDIO_MESSAGES } from './studio.messages';
+import { hasPremiumLook, PremiumLookRequiredException, premiumLookAdded } from './studio.premium';
 import {
   type DesignFilters,
   type DesignWrite,
@@ -110,10 +120,13 @@ import type {
   DesignDetail,
   DesignPage,
   DesignSaveResult,
+  DesignSearchHit,
   DesignStatusView,
   DesignSummary,
   ExportImageFormat,
+  ExportScale,
   SharedDesignView,
+  StudioAccess,
   StudioExportEvent,
   StudioMediaRef,
 } from './studio.types';
@@ -123,6 +136,12 @@ const SEARCH_CANDIDATES = 200;
 
 /** JPEG quality for an exported slide: higher than the library's own 82, as the sprint fixed. */
 export const EXPORT_JPEG_QUALITY = 92;
+
+/**
+ * The whole PDF print, every slide included. Generous: a twenty-slide set at
+ * 2x hands the browser twenty large pictures to decode before it prints.
+ */
+export const PDF_TIMEOUT_MS = 120_000;
 
 /** A streaming route's work, once everything that can be an HTTP error has been checked. */
 export type StudioRun = (stream: SseStream) => Promise<void>;
@@ -145,6 +164,12 @@ export class StudioService {
   private warnedAboutBrowser = false;
   /** Designs with an export in flight in this process, so two tabs cannot render one twice. */
   private readonly exporting = new Set<string>();
+  /**
+   * Designs with a PDF print in flight in this process, so clicking Download
+   * PDF again (or in a second tab) cannot hold a second browser page for the
+   * same file.
+   */
+  private readonly printing = new Set<string>();
 
   constructor(
     private readonly repository: StudioRepository,
@@ -152,7 +177,25 @@ export class StudioService {
     private readonly posts: PostsService,
     private readonly channels: ChannelsService,
     @Inject(BROWSER_POOL) private readonly pool: BrowserPool,
+    private readonly entitlements: EntitlementsService,
   ) {}
+
+  // -------------------------------------------------------------------------
+  // Premium (Sprint 9b, see `studio.premium.ts`)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Whether this workspace may start from a premium look: any paid tier, a
+   * trial included. Asked only when a premium look is actually involved, so
+   * an ordinary create or autosave costs no billing read.
+   */
+  async premiumUnlocked(orgId: string): Promise<boolean> {
+    return (await this.entitlements.entitlement(orgId)).tier !== 'FREE';
+  }
+
+  async access(orgId: string): Promise<StudioAccess> {
+    return { premium: await this.premiumUnlocked(orgId) };
+  }
 
   // -------------------------------------------------------------------------
   // Designs
@@ -207,12 +250,56 @@ export class StudioService {
   }
 
   /**
+   * The top bar's search (Sprint 9b): designs whose title has every word,
+   * newest first, matched the way Recent Designs' own search matches them.
+   *
+   * A design shows its first exported slide while that picture is still in
+   * the library; drawing the real cover here, as the grid does, would hand a
+   * search box whole documents to render.
+   */
+  async search(
+    orgId: string,
+    terms: string[],
+    limit: number,
+  ): Promise<{ designs: DesignSearchHit[]; more: boolean }> {
+    const candidates = await this.repository.searchDesigns(
+      orgId,
+      selectiveTerm(terms),
+      {},
+      SEARCH_CANDIDATES,
+    );
+    const matches = candidates.filter((row) => matchesAllTerms(row.title, terms));
+    const shown = matches.slice(0, limit);
+
+    const covers = shown.flatMap((row) => row.exportedMediaIds.slice(0, 1));
+    const views: Map<string, MediaView> =
+      covers.length > 0 ? await this.media.findViews(orgId, covers) : new Map();
+
+    return {
+      designs: shown.map((row) => {
+        const cover = views.get(row.exportedMediaIds[0] ?? '');
+
+        return {
+          id: row.id,
+          title: row.title,
+          format: COLUMN_TO_FORMAT[row.format],
+          updatedAt: row.updatedAt.toISOString(),
+          thumbnailUrl: isImage(cover) ? (cover.thumbnailUrl ?? cover.url) : null,
+        };
+      }),
+      more: matches.length > limit,
+    };
+  }
+
+  /**
    * Creates a design from a preset, or the blank one.
    *
    * The brand kit, if one was chosen, is copied into the document here: the
-   * five colours, the logo, the name and the kit's `updatedAt`. That last one
-   * is what later lets the editor offer Update Colours when the kit changes,
-   * without ever changing a design on its own.
+   * five colours, the fonts, the logo, the name and the kit's `updatedAt`.
+   * That last one is what later lets the editor offer Update From Kit when the
+   * kit changes, without ever changing a design on its own. The kit's call
+   * to action is written into the closing slide once, here (Sprint 9b): from
+   * then on it is the design's own text, to change like any other.
    */
   async create(
     orgId: string,
@@ -226,13 +313,21 @@ export class StudioService {
     if (preset && !presetFormats(preset).includes(input.format)) {
       throw new UnprocessableEntityException(STUDIO_MESSAGES.TEMPLATE_WRONG_FORMAT);
     }
+    if (preset && isPresetPremium(preset) && !(await this.premiumUnlocked(orgId))) {
+      throw new PremiumLookRequiredException();
+    }
 
     const kit = input.brandKitId ? await this.requireKit(orgId, input.brandKitId) : null;
     const brand = kit ? await this.brandFromKit(orgId, kit) : null;
 
-    const document = this.checked(
-      documentFromPreset({ presetId: preset?.id ?? BLANK_PRESET_ID, format: input.format, brand }),
-    );
+    let built = documentFromPreset({
+      presetId: preset?.id ?? BLANK_PRESET_ID,
+      format: input.format,
+      brand,
+    });
+    if (kit) built = applyCtaDefaults(built, { text: kit.ctaText, url: kit.ctaUrl });
+
+    const document = this.checked(built);
 
     const row = await this.repository.createDesign({
       orgId,
@@ -255,6 +350,8 @@ export class StudioService {
 
     if (input.document !== undefined) {
       const document = input.document;
+
+      await this.assertPremiumKept(orgId, id, input.revision, document);
 
       data.document = toJson(document);
       // The format and preset live on the row as well as in the document, and
@@ -297,14 +394,46 @@ export class StudioService {
     };
   }
 
-  async duplicate(orgId: string, userId: string | null, id: string): Promise<DesignDetail> {
+  /**
+   * Duplicate, and Make A Story Version: a copy, in another format when one
+   * is asked for (Sprint 9b).
+   *
+   * The new format goes through the engine's `setFormat`, the same operation
+   * as the Design tab's Format select, so a copy is never in a shape one of
+   * its layouts cannot draw: a slide whose layout has no such version is a
+   * 400 that names it. A copy in a new format is called "Title (Story)", a
+   * plain one "Title (Copy)".
+   *
+   * Allowed in a workspace without a paid plan even for a premium design: the
+   * copy holds nothing the workspace does not already have, and refusing it
+   * would make a downgrade take work away, which the premium rule promises it
+   * never does (see `studio.premium.ts`).
+   */
+  async duplicate(
+    orgId: string,
+    userId: string | null,
+    id: string,
+    input: DuplicateDesignInput = {},
+  ): Promise<DesignDetail> {
     const source = await this.require(orgId, id);
-    const document = this.documentOf(source);
+    let document = this.documentOf(source);
+    const format = input.format && input.format !== document.format ? input.format : null;
+
+    if (format) {
+      const moved = setFormat(document, format);
+      if (moved === document) throw this.formatRefusal(document, format);
+
+      document = moved;
+    }
 
     const row = await this.repository.createDesign({
       orgId,
-      title: copyTitle(source.title),
-      format: source.format,
+      title: STUDIO_MESSAGES.copyName(
+        source.title,
+        MAX_TITLE_LENGTH,
+        format ? formatSpec(format).label : undefined,
+      ),
+      format: FORMAT_TO_COLUMN[document.format],
       presetId: source.presetId,
       brandKitId: source.brandKitId,
       // Fresh slide ids, so nothing that identifies a slide of one design can
@@ -327,7 +456,8 @@ export class StudioService {
 
   /**
    * Download All (DS-8.3): the last export's slides, in slide order, for
-   * `design-archive.ts` to zip.
+   * `design-archive.ts` to zip, then the caption as `captions.txt` when there
+   * is one (Sprint 9b).
    *
    * Everything that can be refused is checked here, before the first byte of
    * the zip: that there is an export, and that every slide of it is still an
@@ -335,24 +465,7 @@ export class StudioService {
    * be a status code, only a cut connection.
    */
   async prepareArchive(orgId: string, id: string): Promise<DesignArchive> {
-    const design = await this.require(orgId, id);
-    const ids = [...design.exportedMediaIds];
-
-    if (ids.length === 0) {
-      throw new ConflictException({
-        message: STUDIO_MESSAGES.DOWNLOAD_NOTHING,
-        code: 'download_nothing',
-      });
-    }
-
-    const views = await this.media.findViews(orgId, ids);
-
-    if (ids.some((mediaId) => views.get(mediaId)?.type !== 'image')) {
-      throw new ConflictException({
-        message: STUDIO_MESSAGES.DOWNLOAD_MISSING,
-        code: 'download_missing',
-      });
-    }
+    const { design, ids, views } = await this.lastExport(orgId, id);
 
     const names = archiveNames(
       ids.map((mediaId) => {
@@ -360,21 +473,66 @@ export class StudioService {
         return { name: view.name, mimeType: view.mimeType };
       }),
     );
-    const media = this.media;
+    // The caption as it is now, which Preview may have changed since the
+    // export: it is not drawn on any slide, so it is never stale.
+    const caption = captionEntry(readDocument(design)?.caption ?? '');
+    const slides = this.exportedSlides(orgId, ids);
 
     async function* entries(): AsyncGenerator<ArchiveEntry> {
-      for (const [index, mediaId] of ids.entries()) {
-        const file = await media.readImageBytes(orgId, mediaId);
+      let index = 0;
 
-        // Checked above a moment ago; a slide deleted since then fails the
-        // download rather than leaving a gap in it.
-        if (!file) throw new Error(`Exported slide ${index + 1} is no longer readable.`);
-
-        yield { name: names[index], bytes: file.bytes };
-      }
+      for await (const slide of slides) yield { name: names[index++], bytes: slide.bytes };
+      if (caption) yield caption;
     }
 
     return { fileName: archiveFileName(design.title), entries: entries() };
+  }
+
+  /**
+   * PDF Download (Sprint 9b): the last export's slides as one PDF, a page
+   * each at the slide's own size (see `design-pdf.ts`).
+   *
+   * Needs what Download All needs, an export whose slides are all still in
+   * the library, and a browser to print with. One print of a design runs at
+   * a time, and none while it is being exported, since that export is about
+   * to replace the slides this print would read. The print finishes before
+   * anything is sent, so its failure is a JSON error like the checks. Null
+   * when `signal` stopped it: the person went away, and there is nobody left
+   * to answer.
+   */
+  async printPdf(orgId: string, id: string, signal: AbortSignal): Promise<DesignPdfFile | null> {
+    const { design, ids, views } = await this.lastExport(orgId, id);
+    await this.assertBrowser();
+    this.assertNotExporting(design.id);
+    if (this.printing.has(design.id)) {
+      throw new ConflictException({ message: STUDIO_MESSAGES.PDF_BUSY, code: 'pdf_busy' });
+    }
+
+    const first = views.get(ids[0]) as MediaView;
+    const spec = formatSpec(COLUMN_TO_FORMAT[design.format]);
+    const page = pdfPageSize(first.width ?? spec.width, first.height ?? spec.height);
+
+    this.printing.add(design.id);
+    try {
+      const bytes = await this.pool.printImages({
+        images: this.exportedSlides(orgId, ids),
+        ...page,
+        timeoutMs: PDF_TIMEOUT_MS,
+        signal,
+      });
+
+      return { fileName: pdfFileName(design.title), bytes };
+    } catch (error) {
+      if (signal.aborted) return null;
+
+      this.logger.warn(`studio.pdf_failed design=${design.id}: ${messageOf(error)}`);
+      throw new ServiceUnavailableException({
+        message: STUDIO_MESSAGES.PDF_FAILED,
+        code: 'pdf_failed',
+      });
+    } finally {
+      this.printing.delete(design.id);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -460,7 +618,7 @@ export class StudioService {
     this.assertNotExporting(design.id);
 
     return async (stream) => {
-      await this.runExport(orgId, design, document, input.imageFormat, stream);
+      await this.runExport(orgId, design, document, input.imageFormat, input.scale, stream);
     };
   }
 
@@ -468,6 +626,10 @@ export class StudioService {
    * Send To Composer: export if the design changed since the last export,
    * then create a draft post holding every slide in order and the caption,
    * for the composer to open.
+   *
+   * Always at 1x: the platforms serve the format's own size, and a 2x set
+   * would only be scaled down again on the way, or refused by a platform's
+   * size limit. A current export at 2x is therefore drawn again at 1x.
    */
   async prepareSend(orgId: string, id: string, input: SendDesignInput): Promise<StudioRun> {
     const design = await this.require(orgId, id);
@@ -499,7 +661,7 @@ export class StudioService {
           reused: true,
         });
       } else {
-        mediaIds = await this.runExport(orgId, design, document, input.imageFormat, stream);
+        mediaIds = await this.runExport(orgId, design, document, input.imageFormat, 1, stream);
         if (!mediaIds) return;
       }
 
@@ -551,6 +713,7 @@ export class StudioService {
     design: Design,
     document: DesignDocument,
     imageFormat: ExportImageFormat,
+    scale: ExportScale,
     stream: SseStream,
   ): Promise<string[] | null> {
     if (this.exporting.has(design.id)) {
@@ -570,14 +733,17 @@ export class StudioService {
     try {
       const spec = formatSpec(document.format);
       const total = document.slides.length;
+      const width = spec.width * scale;
+      const height = spec.height * scale;
 
       this.send(stream, {
         type: 'start',
         slides: total,
         format: document.format,
-        width: spec.width,
-        height: spec.height,
+        width,
+        height,
         imageFormat,
+        scale,
       });
 
       // Everything that can be found without drawing: deleted or empty
@@ -592,6 +758,7 @@ export class StudioService {
       const exporter = new DesignExport(document, {
         pool: this.pool,
         loadPicture: (mediaId) => this.media.readImageBytes(orgId, mediaId),
+        scale,
       });
 
       for (let index = 0; index < total; index++) {
@@ -628,7 +795,13 @@ export class StudioService {
             mimeType: 'image/png',
             name: exportFileName(design.title, index, imageFormat),
             alt: altFor(document, index, design.title),
-            encode: { prefer: imageFormat, quality: EXPORT_JPEG_QUALITY },
+            // The slide's own size is the cap, so a 2x slide (3840 px at its
+            // longest) keeps every pixel past the library's usual 2048.
+            encode: {
+              prefer: imageFormat,
+              quality: EXPORT_JPEG_QUALITY,
+              maxEdge: Math.max(width, height),
+            },
           });
         } catch (error) {
           throw new SlideSaveError(index, { cause: error });
@@ -752,7 +925,103 @@ export class StudioService {
     return kit;
   }
 
-  /** A kit's colours, logo, name and version, as a design copies them. */
+  /**
+   * Refuses a save that changes a design's theme or art to a premium one in
+   * a workspace without a paid plan. A design that already had that look
+   * saves normally.
+   *
+   * Only a document with a premium look in it costs the extra read of the
+   * stored one, so an ordinary autosave stays one write. That read must be
+   * the very design this save replaces, so any other revision is refused
+   * here with the write's own conflict answer. Waved through, a revision sent
+   * ahead of the row would race a second save: once that one lands, the write
+   * below (conditional on the same revision) would match and store a premium
+   * look nobody checked.
+   */
+  private async assertPremiumKept(
+    orgId: string,
+    id: string,
+    revision: number,
+    document: DesignDocument,
+  ): Promise<void> {
+    if (!hasPremiumLook(document)) return;
+
+    const stored = await this.repository.findDesign(orgId, id);
+    if (!stored) throw new NotFoundException(STUDIO_MESSAGES.DESIGN_NOT_FOUND);
+    if (stored.revision !== revision) {
+      throw new ConflictException({
+        message: STUDIO_MESSAGES.DESIGN_CONFLICT,
+        code: 'design_conflict',
+      });
+    }
+    if (!premiumLookAdded(readDocument(stored), document)) return;
+    if (await this.premiumUnlocked(orgId)) return;
+
+    throw new PremiumLookRequiredException();
+  }
+
+  /**
+   * The last export, checked for Download All and the PDF alike: there is
+   * one, and every slide of it is still an image in the library.
+   */
+  private async lastExport(
+    orgId: string,
+    id: string,
+  ): Promise<{ design: Design; ids: string[]; views: Map<string, MediaView> }> {
+    const design = await this.require(orgId, id);
+    const ids = [...design.exportedMediaIds];
+
+    if (ids.length === 0) {
+      throw new ConflictException({
+        message: STUDIO_MESSAGES.DOWNLOAD_NOTHING,
+        code: 'download_nothing',
+      });
+    }
+
+    const views = await this.media.findViews(orgId, ids);
+
+    if (ids.some((mediaId) => views.get(mediaId)?.type !== 'image')) {
+      throw new ConflictException({
+        message: STUDIO_MESSAGES.DOWNLOAD_MISSING,
+        code: 'download_missing',
+      });
+    }
+
+    return { design, ids, views };
+  }
+
+  /**
+   * The exported slides' bytes, read one at a time in slide order, so a
+   * twenty-slide set is never in memory whole.
+   */
+  private async *exportedSlides(
+    orgId: string,
+    ids: string[],
+  ): AsyncGenerator<{ bytes: Buffer; mimeType: string }> {
+    for (const [index, mediaId] of ids.entries()) {
+      const file = await this.media.readImageBytes(orgId, mediaId);
+
+      // Checked a moment ago; a slide deleted since then fails the download
+      // rather than leaving a gap in it.
+      if (!file) throw new Error(`Exported slide ${index + 1} is no longer readable.`);
+
+      yield file;
+    }
+  }
+
+  /** Why a design cannot take a format: its first slide whose layout has no such shape. */
+  private formatRefusal(document: DesignDocument, format: FormatId): BadRequestException {
+    const index = document.slides.findIndex(
+      (slide) => !findLayout(slide.layoutId)?.formats.includes(format),
+    );
+
+    return new BadRequestException({
+      message: STUDIO_MESSAGES.formatUnavailable(Math.max(0, index), formatSpec(format).label),
+      code: 'format_unavailable',
+    });
+  }
+
+  /** A kit's colours, fonts, logo, name and version, as a design copies them. */
   private async brandFromKit(
     orgId: string,
     kit: {
@@ -760,6 +1029,8 @@ export class StudioService {
       name: string;
       colors: Prisma.JsonValue;
       logoMediaId: string | null;
+      headingFont: string | null;
+      bodyFont: string | null;
       updatedAt: Date;
     },
   ): Promise<DesignBrand> {
@@ -775,6 +1046,8 @@ export class StudioService {
       logoMediaId: isImage(logo) ? kit.logoMediaId : null,
       name: kit.name,
       kitVersion: kit.updatedAt.toISOString(),
+      // Null when the kit sets no faces, so the design follows its theme's.
+      fonts: kitFonts(kit),
     };
   }
 
@@ -809,8 +1082,9 @@ export class StudioService {
 
   /**
    * The last export's pictures, when Send can use them as they are: drawn
-   * from this very revision, one per slide, still in the library, and in the
-   * format asked for (a PNG set must not reach an Instagram draft).
+   * from this very revision, one per slide, still in the library, in the
+   * format asked for (a PNG set must not reach an Instagram draft), and at
+   * 1x (a 2x set is drawn again: see `prepareSend`).
    */
   private async reusableExport(
     orgId: string,
@@ -824,9 +1098,12 @@ export class StudioService {
     if (ids.length === 0 || ids.length !== document.slides.length) return null;
 
     const mimeType = imageFormat === 'png' ? 'image/png' : 'image/jpeg';
+    const spec = formatSpec(document.format);
     const views = await this.media.findViews(orgId, ids);
+    const usable = (view: MediaView | undefined) =>
+      view?.mimeType === mimeType && view.width === spec.width && view.height === spec.height;
 
-    return ids.every((id) => views.get(id)?.mimeType === mimeType) ? [...ids] : null;
+    return ids.every((id) => usable(views.get(id))) ? [...ids] : null;
   }
 
   private async assertBrowser(): Promise<void> {
@@ -905,10 +1182,13 @@ export class StudioService {
 
   private async summaries(orgId: string, rows: Design[]): Promise<DesignSummary[]> {
     const parsed = rows.map((row) => ({ row, document: readDocument(row) }));
-    const media = await this.mediaRefs(
-      orgId,
-      parsed.flatMap(({ document }) => (document ? slideMediaIds(document, 0) : [])),
-    );
+    const [media, kitNames] = await Promise.all([
+      this.mediaRefs(
+        orgId,
+        parsed.flatMap(({ document }) => (document ? slideMediaIds(document, 0) : [])),
+      ),
+      this.repository.brandKitNames(orgId, linkedKitIds(rows)),
+    ]);
 
     return parsed.map(({ row, document }) => {
       // The first slide only: a grid of twenty-four cards should not carry
@@ -916,7 +1196,7 @@ export class StudioService {
       const cover = document ? { ...document, slides: document.slides.slice(0, 1) } : null;
 
       return {
-        ...baseView(row, document),
+        ...baseView(row, document, kitNames),
         cover,
         coverMedia: pick(media, cover ? slideMediaIds(cover, 0) : []),
       };
@@ -928,10 +1208,13 @@ export class StudioService {
     const ids = designMediaIds(document);
     if (document.brand.logoMediaId) ids.push(document.brand.logoMediaId);
 
-    const media = await this.mediaRefs(orgId, ids);
+    const [media, kitNames] = await Promise.all([
+      this.mediaRefs(orgId, ids),
+      this.repository.brandKitNames(orgId, linkedKitIds([row])),
+    ]);
 
     return {
-      ...baseView(row, document),
+      ...baseView(row, document, kitNames),
       document,
       media: pick(media, ids),
       platforms: previewPlatforms(document.format, this.channels.listProviders()),
@@ -974,8 +1257,11 @@ function readDocument(row: Design): DesignDocument | null {
   return parsed.ok ? parsed.document : null;
 }
 
-/** What a card and a detail share. `document` is null for one that cannot be read. */
-function baseView(row: Design, document: DesignDocument | null) {
+/**
+ * What a card and a detail share. `document` is null for one that cannot be
+ * read; `kitNames` holds the live kits' names by id.
+ */
+function baseView(row: Design, document: DesignDocument | null, kitNames: Map<string, string>) {
   return {
     id: row.id,
     title: row.title,
@@ -983,6 +1269,7 @@ function baseView(row: Design, document: DesignDocument | null) {
     presetId: row.presetId,
     themeId: document?.themeId ?? null,
     brandKitId: row.brandKitId,
+    brandKitName: row.brandKitId ? (kitNames.get(row.brandKitId) ?? null) : null,
     status: row.status,
     slideCount: document?.slides.length ?? 0,
     revision: row.revision,
@@ -992,6 +1279,11 @@ function baseView(row: Design, document: DesignDocument | null) {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/** The kits a page of rows links to, each once. */
+function linkedKitIds(rows: Design[]): string[] {
+  return [...new Set(rows.flatMap((row) => (row.brandKitId ? [row.brandKitId] : [])))];
 }
 
 /** A slide index that exists, even after slides were deleted in another tab. */
@@ -1020,12 +1312,6 @@ function isImage(view: MediaView | undefined): view is MediaView {
 
 function toJson(document: DesignDocument): Prisma.InputJsonValue {
   return document as unknown as Prisma.InputJsonValue;
-}
-
-/** "Spring Sale (Copy)", kept inside the title limit by shortening the original. */
-function copyTitle(title: string): string {
-  const suffix = ' (Copy)';
-  return `${title.slice(0, MAX_TITLE_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
 
 /**

@@ -36,14 +36,13 @@
 import {
   buildExportPage,
   type DesignDocument,
-  fontsOf,
+  documentFonts,
   formatSpec,
   type InlineFont,
   SLOT_IDS,
   SlideView,
   type SlotId,
   slideMediaIds,
-  themeById,
 } from '@postgear/design-engine';
 import type { BrowserPool, RenderResult } from '@postgear/seo-engine';
 import { createElement } from 'react';
@@ -109,11 +108,17 @@ export interface DesignExporterDeps {
    * instead of exporting a hole.
    */
   loadPicture: (mediaId: string) => Promise<ExportPicture | null>;
+  /**
+   * 2 paints each slide at twice the format's pixels (Sprint 9b). The page is
+   * still laid out at the format's own size, so the text fits and breaks
+   * exactly as it does at 1, only sharper. Default 1.
+   */
+  scale?: 1 | 2;
 }
 
 export interface RenderedSlide {
   index: number;
-  /** A PNG at exactly the format's export size. */
+  /** A PNG at exactly the format's export size, times the export's scale. */
   png: Buffer;
   /** Text slots still too long for their space at the smallest size. */
   overflowing: SlotId[];
@@ -168,6 +173,7 @@ export class DesignExport {
           html,
           width: spec.width,
           height: spec.height,
+          scale: this.deps.scale === 2 ? 2 : 1,
           type: 'png',
           // The fitter sets this once the faces are loaded, the pictures are
           // decoded and the text is fitted. A shot before it would catch the
@@ -220,7 +226,9 @@ export class DesignExport {
   }
 
   private async fonts(index: number): Promise<InlineFont[]> {
-    this.fontsLoad ??= inlineFonts(fontsOf(themeById(this.document.themeId)));
+    // Every family the design draws with: the theme's, as the design's, the
+    // kit's and each element's own choices replace them.
+    this.fontsLoad ??= inlineFonts(documentFonts(this.document));
 
     try {
       return await this.fontsLoad;

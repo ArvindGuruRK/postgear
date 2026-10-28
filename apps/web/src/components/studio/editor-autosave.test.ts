@@ -3,8 +3,10 @@ import { ApiError } from '@/lib/api';
 import type { DesignSaveResult } from '@/types/studio';
 import {
   Autosave,
+  type AutosaveDeps,
   KEEPALIVE_MAX_BYTES,
   keepaliveFits,
+  PREMIUM_REFUSAL_MESSAGE,
   RETRY_DELAYS_MS,
   refusalOf,
   SAVE_DELAY_MS,
@@ -42,7 +44,7 @@ function answer(revision: number, title = 'Launch'): DesignSaveResult {
   };
 }
 
-function setup() {
+function setup(premium: Pick<AutosaveDeps, 'isPremiumRefusal' | 'premiumHeld'> = {}) {
   const calls: Call[] = [];
   const statuses: SaveState[] = [];
   const problems: (SaveRefusal | null)[] = [];
@@ -61,6 +63,7 @@ function setup() {
     },
     onSaved: (result) => saved.push(result),
     isOnline: () => online,
+    ...premium,
   });
 
   return {
@@ -467,6 +470,174 @@ describe('Autosave', () => {
 
     autosave.dispose();
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('Autosave and a premium look the plan does not include', () => {
+  const CODE = 'premium_look_requires_plan';
+  const refused = () => new ApiError('Premium templates come with a paid plan.', 402, CODE);
+  const isPremiumRefusal = (error: unknown) => error instanceof ApiError && error.code === CODE;
+  /** A fake document is "premium" by its label, standing in for `addsPremiumLook`. */
+  const premiumHeld = (_saved: DesignDocument, screen: DesignDocument) =>
+    (screen as unknown as { label: string }).label.startsWith('premium');
+
+  it('holds the refused change, says why, and never sends it again on its own', async () => {
+    const { autosave, calls, problems } = setup({ isPremiumRefusal, premiumHeld });
+
+    autosave.update({ document: doc('premium-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(refused());
+    await flushPromises();
+
+    expect(autosave.status).toBe('failed');
+    expect(problems.at(-1)).toEqual({ kind: 'premium', message: PREMIUM_REFUSAL_MESSAGE });
+
+    // No retry clock, and further edits that keep the look stay on screen only.
+    jest.advanceTimersByTime((RETRY_DELAYS_MS.at(-1) ?? 0) * 3);
+    autosave.update({ document: doc('premium-theme-new-words'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS * 3);
+    expect(calls).toHaveLength(1);
+    expect(autosave.status).toBe('failed');
+
+    // The edits are still unsaved: leaving asks, and closing sends nothing.
+    expect(autosave.unsaved).toBe(true);
+    await expect(autosave.flush()).resolves.toBe(false);
+    autosave.keepalive();
+    autosave.dispose();
+    expect(calls).toHaveLength(1);
+  });
+
+  it('sends the held change as it is on Try Again, for a plan upgraded in another tab', async () => {
+    const { autosave, calls, problems } = setup({ isPremiumRefusal, premiumHeld });
+    const premium = doc('premium-theme');
+
+    autosave.update({ document: premium, title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(refused());
+    await flushPromises();
+    expect(autosave.status).toBe('failed');
+
+    autosave.retry();
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.body.document).toBe(premium);
+    expect(problems.at(-1)).toBeNull();
+
+    calls[1]?.resolve(answer(2, 'Launch'));
+    await flushPromises();
+    expect(autosave.status).toBe('saved');
+    expect(autosave.unsaved).toBe(false);
+  });
+
+  it('lifts the hold once the look is taken out, and saves everything on screen', async () => {
+    const { autosave, calls, problems } = setup({ isPremiumRefusal, premiumHeld });
+
+    autosave.update({ document: doc('premium-art'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(refused());
+    await flushPromises();
+
+    const undone = doc('free-art-new-words');
+    autosave.update({ document: undone, title: 'Renamed', slideIndex: 1 });
+    expect(autosave.status).toBe('pending');
+    expect(problems.at(-1)).toBeNull();
+
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.body).toEqual({
+      revision: 1,
+      title: 'Renamed',
+      document: undone,
+      lastSlideIndex: 1,
+    });
+    calls[1]?.resolve(answer(2, 'Renamed'));
+    await flushPromises();
+    expect(autosave.status).toBe('saved');
+  });
+
+  it('says Saved again when an undo goes all the way back to what the server has', async () => {
+    const { autosave, calls, base } = setup({ isPremiumRefusal, premiumHeld });
+
+    autosave.update({ document: doc('premium-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(refused());
+    await flushPromises();
+
+    autosave.update({ document: base, title: 'Launch', slideIndex: 0 });
+    expect(autosave.status).toBe('saved');
+    await expect(autosave.flush()).resolves.toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('goes on with an edit that took the look out while the refused save was on its way', async () => {
+    const { autosave, calls, statuses } = setup({ isPremiumRefusal, premiumHeld });
+
+    autosave.update({ document: doc('premium-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    const free = doc('free-theme');
+    autosave.update({ document: free, title: 'Launch', slideIndex: 0 });
+    calls[0]?.reject(refused());
+    await flushPromises();
+
+    expect(autosave.status).toBe('pending');
+    expect(statuses).not.toContain('failed');
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.body.document).toBe(free);
+  });
+
+  it('without a check of its own, lifts the hold on any change, and Try Again sends once more', async () => {
+    const { autosave, calls } = setup({ isPremiumRefusal });
+
+    autosave.update({ document: doc('premium-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(refused());
+    await flushPromises();
+
+    // Try Again, for a plan upgraded in another tab: sent at once.
+    autosave.retry();
+    expect(calls).toHaveLength(2);
+    calls[1]?.reject(refused());
+    await flushPromises();
+    expect(autosave.status).toBe('failed');
+
+    autosave.update({ document: doc('anything'), title: 'Launch', slideIndex: 0 });
+    expect(autosave.status).toBe('pending');
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('waits for the pause after a refusal that followed a dropped connection', async () => {
+    const { autosave, calls } = setup({ isPremiumRefusal, premiumHeld });
+
+    autosave.update({ document: doc('premium-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(new ApiError('Service unavailable', 503));
+    await flushPromises();
+    expect(autosave.status).toBe('retrying');
+
+    jest.advanceTimersByTime(RETRY_DELAYS_MS[0] ?? 0);
+    calls[1]?.reject(refused());
+    await flushPromises();
+    expect(autosave.status).toBe('failed');
+
+    autosave.update({ document: doc('free-theme'), title: 'Launch', slideIndex: 0 });
+    expect(autosave.status).toBe('pending');
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('treats the refusal as any other where nothing tells premium refusals apart', async () => {
+    const { autosave, calls, problems } = setup();
+
+    autosave.update({ document: doc('premium-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    calls[0]?.reject(refused());
+    await flushPromises();
+
+    expect(problems.at(-1)?.kind).toBe('retry');
+    autosave.update({ document: doc('free-theme'), title: 'Launch', slideIndex: 0 });
+    jest.advanceTimersByTime(SAVE_DELAY_MS);
+    expect(calls).toHaveLength(1);
   });
 });
 

@@ -1,7 +1,20 @@
-import { applyBrand, checkContrast, paletteForSlide, slideGround } from './brand';
+import {
+  applyBrand,
+  checkContrast,
+  PHOTO_INK,
+  PHOTO_INK_DARK,
+  PHOTO_INK_DARK_MUTED,
+  PHOTO_INK_MUTED,
+  paletteForSlide,
+  photoGround,
+  photoNeedsDarkening,
+  photoOverlayColor,
+  SAFE_PHOTO_OVERLAY,
+  slideGround,
+} from './brand';
 import { AA_CONTRAST, contrastRatio, meetsAA, normalizeHex, rgbToHex } from './color';
 import { THEMES, themeById } from './themes';
-import type { BrandColors, DesignSlide } from './types';
+import type { BrandColors, DesignSlide, PhotoTint } from './types';
 
 const TEAL: BrandColors = {
   primary: '#0F766E',
@@ -166,6 +179,84 @@ describe('paletteForSlide', () => {
     // Fills keep the brand's colours: only the ground and what is written on it change.
     expect(palette.primary).toBe(ink.colors.primary);
     expect(palette.accent).toBe(ink.colors.accent);
+  });
+});
+
+describe('photo tints', () => {
+  /** Every overlay from the safe strength to solid, in steps of 0.01 (integers, so no drift). */
+  const safe = Math.round(SAFE_PHOTO_OVERLAY * 100);
+  const SAFE_AND_UP = Array.from({ length: 100 - safe + 1 }, (_, step) => (safe + step) / 100);
+
+  const photo = (overlay: number, tint?: PhotoTint) =>
+    slide(
+      tint
+        ? { kind: 'media', mediaId: 'media-1', overlay, tint }
+        : { kind: 'media', mediaId: 'media-1', overlay },
+    );
+
+  it('lays the overlay in black for the dark tint and in white for the light one', () => {
+    expect(photoOverlayColor()).toBe('#000000');
+    expect(photoOverlayColor('dark')).toBe('#000000');
+    expect(photoOverlayColor('light')).toBe('#FFFFFF');
+  });
+
+  it('judges a dark-tinted photo as before: a white photo under the black overlay', () => {
+    expect(photoGround(SAFE_PHOTO_OVERLAY)).toBe('#666666');
+
+    for (const overlay of [0, 0.3, ...SAFE_AND_UP]) {
+      expect(photoGround(overlay, 'dark')).toBe(photoGround(overlay));
+    }
+    // A weaker overlay is the warning's business, not a lighter ground.
+    expect(photoGround(0.2)).toBe(photoGround(SAFE_PHOTO_OVERLAY));
+  });
+
+  it('judges a light-tinted photo against the darkest a white overlay can leave it', () => {
+    expect(photoGround(SAFE_PHOTO_OVERLAY, 'light')).toBe('#999999');
+    expect(photoGround(1, 'light')).toBe('#FFFFFF');
+    expect(photoGround(0.2, 'light')).toBe(photoGround(SAFE_PHOTO_OVERLAY, 'light'));
+  });
+
+  it('gives a light-tinted photo dark inks that clear AA from the safe overlay to solid', () => {
+    for (const overlay of SAFE_AND_UP) {
+      const ground = photoGround(overlay, 'light');
+
+      expect(contrastRatio(PHOTO_INK_DARK, ground)).toBeGreaterThanOrEqual(AA_CONTRAST);
+      expect(contrastRatio(PHOTO_INK_DARK_MUTED, ground)).toBeGreaterThanOrEqual(AA_CONTRAST);
+    }
+  });
+
+  it('keeps the dark tint light inks, which clear AA over the same range', () => {
+    for (const overlay of SAFE_AND_UP) {
+      const ground = photoGround(overlay);
+
+      expect(contrastRatio(PHOTO_INK, ground)).toBeGreaterThanOrEqual(AA_CONTRAST);
+      expect(contrastRatio(PHOTO_INK_MUTED, ground)).toBeGreaterThanOrEqual(AA_CONTRAST);
+    }
+  });
+
+  it('turns the inks dark under a light tint and light under a dark one, whatever the theme', () => {
+    for (const theme of THEMES) {
+      for (const brand of [null, TEAL]) {
+        const light = paletteForSlide(theme, brand, photo(0.6, 'light'));
+        const dark = paletteForSlide(theme, brand, photo(0.6, 'dark'));
+        const untinted = paletteForSlide(theme, brand, photo(0.6));
+
+        expect([light.text, light.textMuted]).toEqual([PHOTO_INK_DARK, PHOTO_INK_DARK_MUTED]);
+        expect([dark.text, dark.textMuted]).toEqual([PHOTO_INK, PHOTO_INK_MUTED]);
+        expect(untinted).toEqual(dark);
+        // Only the inks written on the photo change; the fills stay the brand's.
+        expect(light.primary).toBe(dark.primary);
+        expect(light.accent).toBe(dark.accent);
+      }
+    }
+  });
+
+  it('calls an overlay too weak below the safe strength, whichever way it is tinted', () => {
+    for (const tint of [undefined, 'dark', 'light'] as const) {
+      expect(photoNeedsDarkening(photo(0.2, tint))).toBe(true);
+      expect(photoNeedsDarkening(photo(SAFE_PHOTO_OVERLAY, tint))).toBe(false);
+    }
+    expect(photoNeedsDarkening(slide({ kind: 'role', role: 'background' }))).toBe(false);
   });
 });
 

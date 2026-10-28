@@ -1,3 +1,4 @@
+import { ART_STYLES } from './art';
 import { documentFromPreset } from './document';
 import { findLayout, findSlot, slotPlacement } from './layouts';
 import { PRESETS, presetFormats } from './presets';
@@ -8,7 +9,7 @@ import {
   safeParseDesignDocument,
   upgrade,
 } from './schema';
-import { DESIGN_SCHEMA_VERSION, type DesignDocument } from './types';
+import { DESIGN_SCHEMA_VERSION, type DesignDocument, type FontId } from './types';
 
 let counter = 0;
 const stableId = () => `s-${++counter}`;
@@ -20,6 +21,71 @@ function document(): DesignDocument {
 }
 
 const accepts = (value: unknown) => designDocumentSchema.safeParse(value).success;
+
+/**
+ * A design as Sprint 9 stored it, at schema 1: shaped like the demo seed's
+ * carousel, with a photo cover, a nudged and recoloured headline, a list and
+ * a quote on the surface colour. Written out, because the engine no longer
+ * builds this version.
+ */
+const VERSION_1 = {
+  schemaVersion: 1,
+  format: 'portrait',
+  presetId: 'tips-steps-ink',
+  themeId: 'ink',
+  brand: {
+    kitId: 'seed-brand-kit-lotus',
+    colors: {
+      primary: '#0F766E',
+      secondary: '#115E59',
+      accent: '#C2410C',
+      background: '#FFFFFF',
+      text: '#0F1A19',
+    },
+    logoMediaId: null,
+    name: 'Lotus Flow Yoga',
+    kitVersion: '2026-10-27T09:00:00.000Z',
+  },
+  handle: '@lotusflowyoga',
+  caption: 'Five stretches that take ten minutes. Save this one for tomorrow morning.',
+  slides: [
+    {
+      id: 'seed-slide-1',
+      layoutId: 'cover-headline@1',
+      background: { kind: 'media', mediaId: 'seed-media-1', overlay: 0.6 },
+      elements: {
+        eyebrow: { text: 'Start here' },
+        headline: {
+          text: '5 Morning Stretches For Beginners',
+          size: 'lg',
+          offset: { x: 0, y: 4 },
+          color: '#FFFFFF',
+        },
+      },
+      origin: 0,
+    },
+    {
+      id: 'seed-slide-2',
+      layoutId: 'list-numbered@1',
+      background: { kind: 'role', role: 'background' },
+      elements: {
+        headline: { text: 'The Five Stretches' },
+        list: { items: ['Neck rolls, slowly', 'Shoulder openers', 'Low lunge, both sides'] },
+      },
+      origin: 1,
+    },
+    {
+      id: 'seed-slide-3',
+      layoutId: 'quote-centre@1',
+      background: { kind: 'role', role: 'surface' },
+      elements: {
+        quote: { text: '"I stopped waking up stiff within a fortnight."' },
+        attribution: { text: 'Asha, Tuesday class' },
+      },
+      origin: 3,
+    },
+  ],
+};
 
 describe('designDocumentSchema', () => {
   it('accepts every document the engine builds, for every preset and format', () => {
@@ -255,6 +321,111 @@ describe('designDocumentSchema', () => {
     expect(accepts(bad)).toBe(false);
   });
 
+  it('refuses a current design that does not say whether it has art or fonts', () => {
+    for (const key of ['art', 'fonts'] as const) {
+      const value: Record<string, unknown> = { ...document() };
+      delete value[key];
+      expect(accepts(value)).toBe(false);
+    }
+
+    const brand: Record<string, unknown> = { ...document().brand };
+    delete brand.fonts;
+    expect(accepts({ ...document(), brand })).toBe(false);
+  });
+
+  it('accepts no art, and every art the library draws', () => {
+    expect(accepts({ ...document(), art: null })).toBe(true);
+    for (const art of ART_STYLES) expect(accepts({ ...document(), art: art.id })).toBe(true);
+  });
+
+  it('refuses art the library does not draw, including names from the prototype', () => {
+    for (const art of ['nope', 'toString', '__proto__', 'constructor', '', 'x'.repeat(65), 7]) {
+      expect(accepts({ ...document(), art })).toBe(false);
+    }
+  });
+
+  it('accepts a choice of faces from the library, either face left to the one beneath', () => {
+    for (const fonts of [
+      { heading: 'playfair-display', body: 'inter' },
+      { heading: null, body: 'poppins' },
+      { heading: null, body: null },
+    ]) {
+      expect(accepts({ ...document(), fonts })).toBe(true);
+      expect(accepts({ ...document(), brand: { ...document().brand, fonts } })).toBe(true);
+    }
+  });
+
+  it('refuses a font the library does not have, a missing face and anything else in a choice', () => {
+    for (const fonts of [
+      { heading: 'comic-sans', body: null },
+      { heading: 'toString', body: null },
+      { heading: 'inter' },
+      { heading: 'inter', body: null, weight: 800 },
+      'inter',
+    ]) {
+      expect(accepts({ ...document(), fonts })).toBe(false);
+      expect(accepts({ ...document(), brand: { ...document().brand, fonts } })).toBe(false);
+    }
+  });
+
+  it('accepts an element font on text and list slots', () => {
+    const value = document();
+    value.slides[0].elements.headline = {
+      ...value.slides[0].elements.headline,
+      font: 'playfair-display',
+    };
+    value.slides[1].elements.list = { ...value.slides[1].elements.list, font: 'inter' };
+    expect(accepts(value)).toBe(true);
+  });
+
+  it('refuses an element font on a slot with no words, and says why', () => {
+    const value = document();
+    value.slides[0].elements.logo = { font: 'inter' };
+
+    const result = designDocumentSchema.safeParse(value);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toContain(
+      'That element has no text to set in a font.',
+    );
+  });
+
+  it('refuses an element font the library does not have', () => {
+    const value = document();
+    value.slides[0].elements.headline = {
+      ...value.slides[0].elements.headline,
+      font: 'wingdings' as FontId,
+    };
+    expect(accepts(value)).toBe(false);
+  });
+
+  it('accepts a dark or a light tint on a photo, and nothing else', () => {
+    const tinted = (tint: unknown) => {
+      const value = document();
+      (value.slides[0] as { background: unknown }).background = {
+        kind: 'media',
+        mediaId: 'media-1',
+        overlay: 0.6,
+        tint,
+      };
+      return value;
+    };
+
+    expect(accepts(tinted('dark'))).toBe(true);
+    expect(accepts(tinted('light'))).toBe(true);
+    expect(accepts(tinted('sepia'))).toBe(false);
+    expect(accepts(tinted(null))).toBe(false);
+  });
+
+  it('refuses a tint on a background that is not a photo', () => {
+    const value = document();
+    (value.slides[0] as { background: unknown }).background = {
+      kind: 'role',
+      role: 'background',
+      tint: 'light',
+    };
+    expect(accepts(value)).toBe(false);
+  });
+
   it('never throws, whatever it is handed', () => {
     for (const value of [
       null,
@@ -275,6 +446,40 @@ describe('upgrade', () => {
   it('passes the current version through untouched', () => {
     const value = document();
     expect(upgrade(value)).toEqual(value);
+  });
+
+  it('moves a version 1 design to version 2 by adding no art and no fonts, and nothing else', () => {
+    const stored = structuredClone(VERSION_1);
+
+    expect(upgrade(VERSION_1)).toEqual({
+      ...VERSION_1,
+      schemaVersion: 2,
+      art: null,
+      fonts: null,
+      brand: { ...VERSION_1.brand, fonts: null },
+    });
+    // The stored row is only read, never changed in place.
+    expect(VERSION_1).toEqual(stored);
+  });
+
+  it('reads a version 1 design as the same design at the current version', () => {
+    const parsed = parseDesignDocument(VERSION_1);
+
+    expect(parsed.schemaVersion).toBe(DESIGN_SCHEMA_VERSION);
+    expect(parsed.art).toBeNull();
+    expect(parsed.fonts).toBeNull();
+    expect(parsed.brand).toEqual({ ...VERSION_1.brand, fonts: null });
+    expect(parsed.slides).toEqual(VERSION_1.slides);
+    expect([parsed.handle, parsed.caption]).toEqual([VERSION_1.handle, VERSION_1.caption]);
+    // What is written back is current, so the next read takes no step.
+    expect(upgrade(parsed)).toEqual(parsed);
+  });
+
+  it('leaves a version 1 brand that is not an object for the schema to refuse', () => {
+    const broken = { ...VERSION_1, brand: 'Lotus' };
+
+    expect((upgrade(broken) as Record<string, unknown>).brand).toBe('Lotus');
+    expect(safeParseDesignDocument(broken).ok).toBe(false);
   });
 
   it('refuses a document from a newer PostGear rather than guessing', () => {

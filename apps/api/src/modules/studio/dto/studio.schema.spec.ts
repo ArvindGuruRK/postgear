@@ -5,7 +5,12 @@
  */
 
 import { DesignFormat } from '@postgear/db';
-import { documentFromPreset, FORMAT_IDS, MAX_CAPTION_LENGTH } from '@postgear/design-engine';
+import {
+  documentFromPreset,
+  FONT_IDS,
+  FORMAT_IDS,
+  MAX_CAPTION_LENGTH,
+} from '@postgear/design-engine';
 import { STUDIO_MESSAGES } from '../studio.messages';
 import {
   brandKitBodySchema,
@@ -13,10 +18,15 @@ import {
   createDesignSchema,
   createShareSchema,
   DEFAULT_SHARE_DAYS,
+  downloadQuerySchema,
+  duplicateDesignSchema,
+  exportDesignSchema,
   extractBrandSchema,
   FORMAT_TO_COLUMN,
   favouriteSchema,
   listDesignsQuerySchema,
+  MAX_CTA_TEXT_LENGTH,
+  MAX_CTA_URL_LENGTH,
   MAX_TITLE_LENGTH,
   sendDesignSchema,
   updateBrandKitSchema,
@@ -103,6 +113,26 @@ describe('updateDesignSchema', () => {
 
   it('accepts a document the engine built', () => {
     expect(updateDesignSchema.safeParse({ revision: 3, document }).success).toBe(true);
+  });
+
+  it('brings a document from an editor opened before the last release up to date', () => {
+    const { art: _art, fonts: _fonts, ...older } = document;
+    const versionOne = {
+      ...older,
+      schemaVersion: 1,
+      brand: { ...document.brand, fonts: undefined },
+    };
+    delete (versionOne.brand as { fonts?: unknown }).fonts;
+
+    const result = updateDesignSchema.safeParse({ revision: 3, document: versionOne });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.document).toEqual({ ...document, art: null, fonts: null });
+  });
+
+  it('refuses a document from a newer release than this one', () => {
+    const newer = { ...document, schemaVersion: document.schemaVersion + 1 };
+    expect(updateDesignSchema.safeParse({ revision: 3, document: newer }).success).toBe(false);
   });
 
   it('says there is nothing to save when only the revision came', () => {
@@ -195,10 +225,94 @@ describe('brandKitBodySchema', () => {
   });
 });
 
+describe('brand kit fonts, lock and call to action (Sprint 9b)', () => {
+  const [heading, body] = FONT_IDS;
+
+  it('accepts faces from the library, the lock, and a cleaned call to action', () => {
+    expect(
+      brandKitBodySchema.parse({
+        name: 'Acme',
+        colors: COLORS,
+        headingFont: heading,
+        bodyFont: null,
+        lockLook: true,
+        ctaText: '  Book a\n call  ',
+        ctaUrl: ' acme.com/book ',
+      }),
+    ).toMatchObject({
+      headingFont: heading,
+      bodyFont: null,
+      lockLook: true,
+      ctaText: 'Book a call',
+      ctaUrl: 'acme.com/book',
+    });
+    expect(updateBrandKitSchema.parse({ bodyFont: body })).toEqual({ bodyFont: body });
+  });
+
+  it.each([
+    ['a face the library does not have', { headingFont: 'comic-sans' }],
+    ['a lock that is not a yes or no', { lockLook: 'yes' }],
+    [
+      'a call to action longer than one line can hold',
+      { ctaText: 'a'.repeat(MAX_CTA_TEXT_LENGTH + 1) },
+    ],
+    ['a link longer than one line can hold', { ctaUrl: 'a'.repeat(MAX_CTA_URL_LENGTH + 1) }],
+  ])('refuses %s', (_label, fields) => {
+    expect(brandKitBodySchema.safeParse({ name: 'Acme', colors: COLORS, ...fields }).success).toBe(
+      false,
+    );
+  });
+
+  it('keeps a link with a space for the service to answer with a sentence', () => {
+    // "Invalid input" would not say what is wrong; the service says it.
+    expect(
+      brandKitBodySchema.parse({ name: 'Acme', colors: COLORS, ctaUrl: 'acme.com/spring sale' })
+        .ctaUrl,
+    ).toBe('acme.com/spring sale');
+  });
+});
+
 describe('updateBrandKitSchema', () => {
   it('accepts one field, and says there is nothing to save for none', () => {
     expect(updateBrandKitSchema.parse({ logoMediaId: null })).toEqual({ logoMediaId: null });
     expect(messages(updateBrandKitSchema.safeParse({}))).toEqual([STUDIO_MESSAGES.NOTHING_TO_SAVE]);
+  });
+});
+
+describe('exportDesignSchema (Sprint 9b)', () => {
+  it('exports at 1x JPEG unless told otherwise, and takes 2x', () => {
+    expect(exportDesignSchema.parse({})).toEqual({ imageFormat: 'jpeg', scale: 1 });
+    expect(exportDesignSchema.parse({ imageFormat: 'png', scale: 2 })).toEqual({
+      imageFormat: 'png',
+      scale: 2,
+    });
+  });
+
+  it.each([[3], [1.5], ['2'], [0]])('refuses a scale of %p', (scale) => {
+    expect(exportDesignSchema.safeParse({ scale }).success).toBe(false);
+  });
+});
+
+describe('duplicateDesignSchema (Sprint 9b)', () => {
+  it('reads no body, or an empty one, as a plain copy', () => {
+    expect(duplicateDesignSchema.parse(undefined)).toEqual({});
+    expect(duplicateDesignSchema.parse(null)).toEqual({});
+    expect(duplicateDesignSchema.parse({})).toEqual({});
+  });
+
+  it('takes a format the engine knows, and nothing else', () => {
+    expect(duplicateDesignSchema.parse({ format: 'story' })).toEqual({ format: 'story' });
+    expect(duplicateDesignSchema.safeParse({ format: 'banner' }).success).toBe(false);
+    expect(duplicateDesignSchema.safeParse({ format: 'story', title: 'Mine' }).success).toBe(false);
+  });
+});
+
+describe('downloadQuerySchema (Sprint 9b)', () => {
+  it('downloads the zip unless the PDF is asked for', () => {
+    expect(downloadQuerySchema.parse({})).toEqual({ format: 'zip' });
+    expect(downloadQuerySchema.parse({ format: 'pdf' })).toEqual({ format: 'pdf' });
+    expect(downloadQuerySchema.safeParse({ format: 'docx' }).success).toBe(false);
+    expect(downloadQuerySchema.safeParse({ format: 'pdf', page: '2' }).success).toBe(false);
   });
 });
 

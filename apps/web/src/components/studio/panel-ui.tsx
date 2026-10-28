@@ -18,7 +18,9 @@
  *
  * The panel sits on the frame colour beside the canvas and on the card
  * colour inside a drawer; `PanelSurface` says which, so a chosen tile's ring
- * is offset by the colour actually behind it.
+ * is offset by the colour actually behind it. `BrandLookLock` says whether a
+ * brand kit locks the design's look (Sprint 9b), which every tab reads with
+ * `useBrandLookLocked` to hide what the kit decides.
  */
 import type { AnimatedIcon } from '@postgear/ui';
 import {
@@ -67,6 +69,28 @@ export function PanelSurface({
 /** The ring a chosen tile wears, offset by the colour behind the panel. */
 export function useChosenRing(): string {
   return useContext(SurfaceContext) === 'secondary' ? cn(CHOSEN, 'ring-offset-secondary') : CHOSEN;
+}
+
+// ---------------------------------------------------------------------------
+// Lock Brand Look (Sprint 9b)
+// ---------------------------------------------------------------------------
+
+const BrandLookContext = createContext(false);
+
+/** Tells the tabs inside whether a brand kit locks the design's look (`brandLocksLook`). */
+export function BrandLookLock({ locked, children }: { locked: boolean; children: ReactNode }) {
+  return <BrandLookContext.Provider value={locked}>{children}</BrandLookContext.Provider>;
+}
+
+/**
+ * True while the design is on a brand kit that locks its look. A tab then
+ * hides the custom colour swatches and hex fields, Custom Colours, the
+ * logo's Choose From Media and every font picker, and says once, in a
+ * sentence, that the kit locks them. Pass `{ custom: !locked }` to
+ * `elementSwatches` and `backgroundSwatches`.
+ */
+export function useBrandLookLocked(): boolean {
+  return useContext(BrandLookContext);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +340,12 @@ export function SwatchPicker({
 }
 
 /**
+ * The grid for colour fields that show their label beside them: the labels
+ * share the first column, as wide as the longest, and the fields the rest.
+ */
+export const COLOR_ROWS = 'grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-3';
+
+/**
  * The hex field behind Custom. What is typed is applied as soon as it is a
  * colour; until then it stays in the field only, and leaving the field with
  * something that is not a colour says how to write one. When the colour
@@ -325,6 +355,7 @@ export function CustomColorField({
   value,
   onApply,
   label = 'Custom',
+  labelBeside = false,
   className,
 }: {
   /** The hex in use, or null when there is none yet. */
@@ -332,6 +363,13 @@ export function CustomColorField({
   onApply: (hex: string) => void;
   /** Read, not shown: the swatch above already says Custom. */
   label?: string;
+  /**
+   * Shows the label beside the field, where nothing else names it (Custom
+   * Colours). The field takes a row of its parent's two-column grid
+   * (`COLOR_ROWS`), so every label shares one column and the hex keeps the
+   * room it needs in a narrow panel.
+   */
+  labelBeside?: boolean;
   className?: string;
 }) {
   const [draft, setDraft] = useState(value ?? '');
@@ -349,7 +387,7 @@ export function CustomColorField({
   return (
     <ColorField
       label={label}
-      hideLabel
+      hideLabel={!labelBeside}
       value={draft}
       onChange={(next) => {
         setDraft(next);
@@ -358,7 +396,12 @@ export function CustomColorField({
       }}
       onBlur={() => setLeft(true)}
       error={left && !hexFromInput(draft) ? HEX_ERROR : null}
-      className={className}
+      // A row of the parent's grid: the label in its first column, the
+      // swatch and hex in the second, and an error under them.
+      className={cn(
+        labelBeside && 'col-span-2 grid grid-cols-subgrid items-center [&>p]:col-start-2',
+        className,
+      )}
     />
   );
 }

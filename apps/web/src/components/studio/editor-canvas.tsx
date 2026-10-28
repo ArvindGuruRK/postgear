@@ -11,13 +11,24 @@
  *   area's outline and name show, and an edge it stops at lights up.
  * - Arrow keys nudge the selected element by 1% of its area (Shift: 5%),
  *   Delete hides an optional one, Enter starts typing, Escape lets go.
+ * - Typing ends with Escape, which puts the words back as they were, or with
+ *   Ctrl or Cmd and Enter, which keeps them (Sprint 9b). A cancel is a step
+ *   of its own, so Undo can still bring the typed words back.
  * - Text still too long at its smallest size has a warning ring and says so.
+ * - A selected element that looks other than its template draws it (what
+ *   the Element tab's Reset Style clears) carries a Changed marker (9b).
+ * - Zoom Out, Zoom In and Fit, also on minus, plus and 0 (9b). Fit is the
+ *   canvas as it always was: the slide whole, as large as it fits. Past
+ *   that, the slide scrolls inside the canvas. See `canvas-model.ts`.
  *
  * A drag is shown as a preview and becomes one undo step when it ends, so
  * neither the history nor the autosave sees every pointer move.
  */
 import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
 import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
+import { ScanIcon } from '@animateicons/react/lucide/scan-icon';
+import { ZoomInIcon } from '@animateicons/react/lucide/zoom-in-icon';
+import { ZoomOutIcon } from '@animateicons/react/lucide/zoom-out-icon';
 import {
   type ClampReport,
   clampWithReport,
@@ -39,7 +50,7 @@ import {
   slotPlacement,
   updateElement,
 } from '@postgear/design-engine';
-import { Button, cn, MotionIcon } from '@postgear/ui';
+import { Button, cn, Kbd, MotionIcon, TooltipHint } from '@postgear/ui';
 import {
   type KeyboardEvent,
   type PointerEvent,
@@ -50,6 +61,20 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  endsTyping,
+  isFitted,
+  type ScrollAnchor,
+  scrollAnchor,
+  scrollToAnchor,
+  type Zoom,
+  zoomIn,
+  zoomKeyOf,
+  zoomLabel,
+  zoomOut,
+  zoomScale,
+} from './canvas-model';
+import { canResetElement } from './editor-panel-model';
 import { type ApplyChange, nudge, slotAfterHiding, withOffset, withText } from './editor-state';
 import { StudioPanel } from './studio-ui';
 
@@ -124,13 +149,19 @@ export function EditorCanvas({
   onShowSlide,
   className,
 }: EditorCanvasProps) {
+  /** The canvas's room for the slide, which never scrolls, so Fit is measured from it. */
   const stage = useRef<HTMLDivElement>(null);
+  /** Inside the stage: where a slide zoomed past Fit scrolls. */
+  const scroller = useRef<HTMLDivElement>(null);
   /** The layer over the slide: exactly the slide's area on screen. */
   const layer = useRef<HTMLDivElement>(null);
   const size = useBoxSize(stage);
   const drag = useRef<Drag | null>(null);
   const refocus = useRef<SlotId | null>(null);
   const afterHide = useRef<SlotId | typeof CANVAS | null>(null);
+  /** The point of the slide in the middle of the view as a zoom began, put back once it is done. */
+  const zoomAnchor = useRef<ScrollAnchor | null>(null);
+  const [zoom, setZoom] = useState<Zoom>('fit');
   const [preview, setPreview] = useState<{ slotId: SlotId; offset: Offset } | null>(null);
   const [guide, setGuide] = useState<Guide | null>(null);
   const [hovered, setHovered] = useState<SlotId | null>(null);
@@ -140,9 +171,13 @@ export function EditorCanvas({
 
   const spec = FORMATS[document.format];
   // The frame's 2px border on each side is outside the slide.
-  const scale = size ? Math.min((size.width - 4) / spec.width, (size.height - 4) / spec.height) : 0;
+  const fit = size ? Math.min((size.width - 4) / spec.width, (size.height - 4) / spec.height) : 0;
+  const scale = zoomScale(zoom, fit);
   const width = Math.max(0, Math.floor(spec.width * scale));
   const height = Math.round(spec.height * (width / spec.width));
+  const fitted = isFitted(zoom, fit);
+  const nextIn = fit > 0 ? zoomIn(zoom, fit) : null;
+  const nextOut = fit > 0 ? zoomOut(zoom, fit) : null;
 
   const shown = useMemo(
     () => (preview ? withOffset(document, slideId, preview.slotId, preview.offset) : document),
@@ -154,8 +189,9 @@ export function EditorCanvas({
 
   useEffect(() => () => clearTimeout(flashTimer.current ?? undefined), []);
 
-  // After typing ends with Enter or Escape, the element's hit area takes focus
-  // back, so a keyboard user carries on from where they were.
+  // After typing ends with a key (Escape, Ctrl or Cmd and Enter, Enter on
+  // one line), the element's hit area takes focus back, so a keyboard user
+  // carries on from where they were.
   useLayoutEffect(() => {
     if (editing === null && refocus.current) {
       const slot = refocus.current;
@@ -179,6 +215,24 @@ export function EditorCanvas({
         : layer.current?.querySelector<HTMLElement>(`[data-canvas-element="${target}"]`);
     element?.focus({ preventScroll: true });
   });
+
+  // A zoom keeps the middle of the view where it was on the slide, the way
+  // a zoom from the corner of an image viewer does not.
+  useLayoutEffect(() => {
+    const box = scroller.current;
+    const anchor = zoomAnchor.current;
+    zoomAnchor.current = null;
+    if (!box || !anchor || width === 0) return;
+
+    const { left, top } = scrollToAnchor(box, anchor);
+    box.scrollTo({ left, top });
+  }, [width]);
+
+  function changeZoom(next: Zoom | null) {
+    if (next === null || next === zoom) return;
+    if (scroller.current) zoomAnchor.current = scrollAnchor(scroller.current);
+    setZoom(next);
+  }
 
   function flash(next: Guide) {
     setGuide(next);
@@ -274,6 +328,14 @@ export function EditorCanvas({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLElement>) {
+    // Typing keeps its keys to itself (`EditableText`), so this is never a letter typed.
+    const zoomKey = editing ? null : zoomKeyOf(event);
+    if (zoomKey) {
+      event.preventDefault();
+      changeZoom(zoomKey === 'in' ? nextIn : zoomKey === 'out' ? nextOut : 'fit');
+      return;
+    }
+
     if (!selected || !slide || !layout || editing) return;
     const slot = layout.slots.find((entry) => entry.id === selected);
     if (!slot) return;
@@ -337,160 +399,318 @@ export function EditorCanvas({
       aria-label="Slide canvas"
       // Focus lands here when Delete hid the last element left to take it.
       tabIndex={-1}
-      className={cn('flex min-h-0 flex-col gap-3 bg-inset bg-halftone p-3 sm:p-5', className)}
+      className={cn(
+        '@container flex min-h-0 flex-col gap-3 bg-inset bg-halftone p-3 sm:p-5',
+        className,
+      )}
       onKeyDown={onKeyDown}
       onKeyDownCapture={(event) => {
-        // Typing ends with Escape, or Enter on one line: focus then returns
-        // to the element (see the layout effect above).
-        if (editing && (event.key === 'Escape' || event.key === 'Enter')) refocus.current = editing;
+        // Typing ends with Escape, Ctrl or Cmd and Enter, or Enter on one
+        // line: focus then returns to the element (see the layout effect
+        // above). Enter's new line in a multi-line slot ends nothing, and a
+        // click elsewhere keeps the focus it moved.
+        if (!editing || !(event.target instanceof HTMLElement)) return;
+        const multiline = event.target.getAttribute('aria-multiline') === 'true';
+        const press = {
+          key: event.key,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          isComposing: event.nativeEvent.isComposing,
+          keyCode: event.keyCode,
+        };
+        if (endsTyping(press, multiline)) refocus.current = editing;
       }}
       onPointerDown={(event) => {
         const target = event.target as Element;
-        if (target.closest('[data-canvas-element], [contenteditable]')) return;
+        // Zooming keeps the selection: it is how a person looks closer at it.
+        if (target.closest('[data-canvas-element], [contenteditable], [data-keep-selection]')) {
+          return;
+        }
+        // A press on the zoomed canvas's scroll bars is scrolling, not letting go.
+        const box = scroller.current;
+        if (box && target === box) {
+          const bounds = box.getBoundingClientRect();
+          const onBar =
+            event.clientX - bounds.left >= box.clientWidth ||
+            event.clientY - bounds.top >= box.clientHeight;
+          if (onBar) return;
+        }
         if (selected) onSelect(null);
       }}
     >
-      <div ref={stage} className="relative flex min-h-0 flex-1 items-center justify-center">
-        {slide && layout && width > 0 ? (
-          <div
-            className="relative border-2 border-outline shadow-brutalMd"
-            style={{ width: width + 4, height: height + 4 }}
-          >
-            <ScaledSlide
-              // A fresh drawing per slide, so each one reports what overflows on it.
-              key={slideId}
-              width={width}
-              design={shown}
-              index={slideIndex}
-              mode="edit"
-              resolveMedia={resolveMedia}
-              editing={editing}
-              onTextInput={(slot, text) =>
-                onChange((document) => withText(document, slideId, slot, text), {
-                  coalesceKey: `text:${slideId}:${slot}`,
-                })
-              }
-              onTextCommit={(slot, text) => {
-                onChange((document) => withText(document, slideId, slot, text), {
-                  coalesceKey: `text:${slideId}:${slot}`,
-                });
-                onEdit(null);
-              }}
-              onFit={onOverflow}
-            />
+      <div ref={stage} className="relative min-h-0 flex-1">
+        {/* `m-auto` centres a slide smaller than the view and, unlike centring
+            with flex, lets one larger than it scroll to its every edge. */}
+        <div
+          ref={scroller}
+          data-testid="canvas-scroller"
+          className={cn(
+            'absolute inset-0 flex overscroll-contain',
+            fitted ? 'overflow-hidden' : 'overflow-auto',
+          )}
+        >
+          {slide && layout && width > 0 ? (
+            <div
+              className="relative m-auto shrink-0 border-2 border-outline shadow-brutalMd"
+              style={{ width: width + 4, height: height + 4 }}
+            >
+              <ScaledSlide
+                // A fresh drawing per slide, so each one reports what overflows on it.
+                key={slideId}
+                width={width}
+                design={shown}
+                index={slideIndex}
+                mode="edit"
+                resolveMedia={resolveMedia}
+                editing={editing}
+                onTextInput={(slot, text) =>
+                  onChange((document) => withText(document, slideId, slot, text), {
+                    coalesceKey: `text:${slideId}:${slot}`,
+                  })
+                }
+                onTextCommit={(slot, text) => {
+                  // A step of its own: after Escape the words go back as they
+                  // were, and Undo brings the typed ones back. A commit that
+                  // only keeps what was typed changes nothing, so adds no step.
+                  onChange((document) => withText(document, slideId, slot, text));
+                  onEdit(null);
+                }}
+                onFit={onOverflow}
+              />
 
-            <div ref={layer} className="pointer-events-none absolute inset-0">
-              {guide ? <AreaGuide guide={guide} /> : null}
-              {!guide && hovered && hovered !== selected
-                ? (() => {
-                    const slot = layout.slots.find((entry) => entry.id === hovered);
-                    const frame = slot ? frameOf(slot) : null;
-                    return frame ? <AreaOutline region={frame.regionRect} faint /> : null;
-                  })()
-                : null}
+              <div ref={layer} className="pointer-events-none absolute inset-0">
+                {guide ? <AreaGuide guide={guide} /> : null}
+                {!guide && hovered && hovered !== selected
+                  ? (() => {
+                      const slot = layout.slots.find((entry) => entry.id === hovered);
+                      const frame = slot ? frameOf(slot) : null;
+                      return frame ? <AreaOutline region={frame.regionRect} faint /> : null;
+                    })()
+                  : null}
 
-              {layout.slots.map((slot) => {
-                if (slide.elements[slot.id]?.hidden) return null;
-                const frame = frameOf(slot);
-                if (!frame) return null;
+                {layout.slots.map((slot) => {
+                  const state = slide.elements[slot.id];
+                  if (state?.hidden) return null;
+                  const frame = frameOf(slot);
+                  if (!frame) return null;
 
-                const isSelected = selected === slot.id;
-                const isEditing = editing === slot.id;
-                const tooLong = overflow.includes(slot.id);
+                  const isSelected = selected === slot.id;
+                  const isEditing = editing === slot.id;
+                  const tooLong = overflow.includes(slot.id);
+                  // The same test as Reset Style in the Element tab, so the
+                  // marker and the button that clears it always agree.
+                  const changed = canResetElement(state);
 
-                return (
-                  <button
-                    key={slot.id}
-                    type="button"
-                    data-canvas-element={slot.id}
-                    data-testid="canvas-element"
-                    aria-label={tooLong ? `${slot.label}, too long for its space` : slot.label}
-                    aria-pressed={isSelected}
-                    tabIndex={isEditing ? -1 : 0}
-                    style={{
-                      left: `${frame.rect.x}%`,
-                      top: `${frame.rect.y}%`,
-                      width: `${frame.rect.w}%`,
-                      height: `${frame.rect.h}%`,
-                    }}
-                    className={cn(
-                      'pointer-events-auto absolute touch-none rounded-sm outline-none',
-                      // The runtime names: `@theme inline` keeps the camelCase ones out of the page.
-                      'focus-visible:shadow-[0_0_0_3px_var(--color-focus-ring)]',
-                      isEditing ? 'pointer-events-none' : 'cursor-move',
-                      // A thin halo under the outline, in the colour that reads on it,
-                      // keeps it visible on a slide of the outline's own colour.
-                      isSelected
-                        ? 'outline-2 outline-offset-2 outline-solid outline-actionPrimary shadow-[0_0_0_1px_var(--color-on-action-primary)]'
-                        : 'hover:outline-2 hover:outline-offset-2 hover:outline-dashed hover:outline-actionPrimary/70',
-                      tooLong &&
-                        !isSelected &&
-                        'outline-2 outline-offset-2 outline-dashed outline-actionDanger',
-                    )}
-                    onPointerEnter={() => setHovered(slot.id)}
-                    onPointerLeave={() =>
-                      setHovered((current) => (current === slot.id ? null : current))
-                    }
-                    onPointerDown={(event) => startDrag(event, slot)}
-                    onPointerMove={moveDrag}
-                    onPointerUp={(event) => endDrag(event, slot, false)}
-                    onPointerCancel={(event) => endDrag(event, slot, true)}
-                    onClick={(event) => {
-                      // Pointer clicks are handled on release; this is Enter or Space.
-                      if (event.detail === 0) activate(slot);
-                    }}
-                    onDoubleClick={() => {
-                      if (slot.kind === 'image') onPickImage(slot.id);
-                    }}
-                  >
-                    {tooLong ? (
-                      <span
-                        aria-hidden="true"
-                        className="absolute -top-3 end-0 rounded-sm border-2 border-outline bg-actionDanger px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none text-onActionLight"
-                      >
-                        Too Long
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      data-canvas-element={slot.id}
+                      data-testid="canvas-element"
+                      aria-label={[
+                        slot.label,
+                        tooLong ? 'too long for its space' : null,
+                        changed ? 'changed from the template' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                      aria-pressed={isSelected}
+                      tabIndex={isEditing ? -1 : 0}
+                      style={{
+                        left: `${frame.rect.x}%`,
+                        top: `${frame.rect.y}%`,
+                        width: `${frame.rect.w}%`,
+                        height: `${frame.rect.h}%`,
+                      }}
+                      className={cn(
+                        'pointer-events-auto absolute touch-none rounded-sm outline-none',
+                        // The runtime names: `@theme inline` keeps the camelCase ones out of the page.
+                        'focus-visible:shadow-[0_0_0_3px_var(--color-focus-ring)]',
+                        isEditing ? 'pointer-events-none' : 'cursor-move',
+                        // A thin halo under the outline, in the colour that reads on it,
+                        // keeps it visible on a slide of the outline's own colour.
+                        isSelected
+                          ? 'outline-2 outline-offset-2 outline-solid outline-actionPrimary shadow-[0_0_0_1px_var(--color-on-action-primary)]'
+                          : 'hover:outline-2 hover:outline-offset-2 hover:outline-dashed hover:outline-actionPrimary/70',
+                        tooLong &&
+                          !isSelected &&
+                          'outline-2 outline-offset-2 outline-dashed outline-actionDanger',
+                      )}
+                      onPointerEnter={() => setHovered(slot.id)}
+                      onPointerLeave={() =>
+                        setHovered((current) => (current === slot.id ? null : current))
+                      }
+                      onPointerDown={(event) => startDrag(event, slot)}
+                      onPointerMove={moveDrag}
+                      onPointerUp={(event) => endDrag(event, slot, false)}
+                      onPointerCancel={(event) => endDrag(event, slot, true)}
+                      onClick={(event) => {
+                        // Pointer clicks are handled on release; this is Enter or Space.
+                        if (event.detail === 0) activate(slot);
+                      }}
+                      onDoubleClick={() => {
+                        if (slot.kind === 'image') onPickImage(slot.id);
+                      }}
+                    >
+                      {tooLong ? (
+                        <span
+                          aria-hidden="true"
+                          className="absolute -top-3 end-0 rounded-sm border-2 border-outline bg-actionDanger px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none text-onActionLight"
+                        >
+                          Too Long
+                        </span>
+                      ) : null}
+                      {/* Not while it moves, when the area's own name sits in the same corner. */}
+                      {changed && isSelected && !isEditing && !guide ? (
+                        <span
+                          aria-hidden="true"
+                          data-testid="changed-marker"
+                          className={cn(
+                            'absolute start-0 rounded-sm border-2 border-outline bg-actionPrimary px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none text-onActionPrimary',
+                            // Below, when Too Long has the top.
+                            tooLong ? '-bottom-3' : '-top-3',
+                          )}
+                        >
+                          Changed
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
-      {count > 1 ? (
-        <div className="flex shrink-0 items-center justify-center gap-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label="Previous slide"
-            className="w-9 px-0"
-            disabled={slideIndex === 0}
-            onClick={() => onShowSlide(slideIndex - 1)}
-          >
-            <MotionIcon icon={ChevronLeftIcon} className="h-4 w-4" />
-          </Button>
-          <span className="min-w-20 text-center font-sans text-xs font-bold tabular-nums text-ink">
-            Slide {slideIndex + 1} of {count}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            aria-label="Next slide"
-            className="w-9 px-0"
-            disabled={slideIndex >= count - 1}
-            onClick={() => onShowSlide(slideIndex + 1)}
-          >
-            <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : null}
+      {/* On a canvas wide enough for one row: the slide controls in the
+          middle, as before zoom, and the zoom at the end. Narrower, the two
+          groups share the middle, wrapping onto two rows on a phone. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-2 @[40rem]:grid @[40rem]:grid-cols-[1fr_auto_1fr]">
+        <span aria-hidden="true" className="hidden @[40rem]:block" />
+        {count > 1 ? (
+          <div className="flex items-center justify-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Previous slide"
+              className="w-9 px-0"
+              disabled={slideIndex === 0}
+              onClick={() => onShowSlide(slideIndex - 1)}
+            >
+              <MotionIcon icon={ChevronLeftIcon} className="h-4 w-4" />
+            </Button>
+            <span className="min-w-20 text-center font-sans text-xs font-bold tabular-nums text-ink">
+              Slide {slideIndex + 1} of {count}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label="Next slide"
+              className="w-9 px-0"
+              disabled={slideIndex >= count - 1}
+              onClick={() => onShowSlide(slideIndex + 1)}
+            >
+              <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <span aria-hidden="true" className="hidden @[40rem]:block" />
+        )}
+        <ZoomControls
+          scale={scale}
+          fitted={fitted}
+          disabled={fit <= 0}
+          canZoomIn={nextIn !== null}
+          canZoomOut={nextOut !== null}
+          onZoomIn={() => changeZoom(nextIn)}
+          onZoomOut={() => changeZoom(nextOut)}
+          onFit={() => changeZoom('fit')}
+        />
+      </div>
 
       <span role="status" className="sr-only">
         {hiddenNote ? <span key={hiddenNote.id}>{hiddenNote.text}</span> : null}
       </span>
     </StudioPanel>
+  );
+}
+
+interface ZoomControlsProps {
+  /** The scale on screen, as a share of the slide's real size. */
+  scale: number;
+  /** The slide is whole: there is nothing to zoom out to, and Fit would change nothing. */
+  fitted: boolean;
+  /** The canvas has not been measured yet. */
+  disabled: boolean;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onFit: () => void;
+}
+
+/** Zoom Out, the level, Zoom In and Fit. The same keys work anywhere on the canvas (`zoomKeyOf`). */
+function ZoomControls({
+  scale,
+  fitted,
+  disabled,
+  canZoomIn,
+  canZoomOut,
+  onZoomIn,
+  onZoomOut,
+  onFit,
+}: ZoomControlsProps) {
+  const outOff = disabled || !canZoomOut;
+  const inOff = disabled || !canZoomIn;
+  const fitOff = disabled || fitted;
+
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a fieldset is for form fields; these are buttons named as one group.
+    <div
+      role="group"
+      aria-label="Zoom"
+      data-keep-selection=""
+      className="flex items-center justify-center gap-1 @[40rem]:justify-self-end"
+    >
+      <TooltipHint label="Zoom Out" side="top" disabled={outOff} shortcut={<Kbd>-</Kbd>}>
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Zoom Out"
+          className="w-9 px-0"
+          disabled={outOff}
+          onClick={onZoomOut}
+        >
+          <MotionIcon icon={ZoomOutIcon} className="h-4 w-4" />
+        </Button>
+      </TooltipHint>
+      <span
+        role="status"
+        className="min-w-12 text-center font-sans text-xs font-bold tabular-nums text-ink"
+      >
+        <span className="sr-only">Zoom </span>
+        {disabled ? null : zoomLabel(scale)}
+      </span>
+      <TooltipHint label="Zoom In" side="top" disabled={inOff} shortcut={<Kbd>+</Kbd>}>
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label="Zoom In"
+          className="w-9 px-0"
+          disabled={inOff}
+          onClick={onZoomIn}
+        >
+          <MotionIcon icon={ZoomInIcon} className="h-4 w-4" />
+        </Button>
+      </TooltipHint>
+      <TooltipHint label="Fit" side="top" disabled={fitOff} shortcut={<Kbd>0</Kbd>}>
+        <Button variant="secondary" size="sm" disabled={fitOff} onClick={onFit}>
+          <MotionIcon icon={ScanIcon} className="h-4 w-4" />
+          Fit
+        </Button>
+      </TooltipHint>
+    </div>
   );
 }
 

@@ -15,11 +15,19 @@
  *   Send aimed at one that was disconnected meanwhile is refused with a
  *   sentence before anything is rendered.
  *
+ * - **`BillingModule`** (Sprint 9b) answers whether the workspace is on a
+ *   paid plan, which is what opens the premium looks. It imports no feature
+ *   module, so importing it here makes no cycle.
+ *
  * The headless browser comes from the process-wide `BrowserPoolModule`, which
  * is global, shared with the SEO crawler, and owns closing it. Redis (the
  * extraction limit) comes from the global `RedisModule`.
+ *
+ * `StudioService` is exported for the top bar's search, which asks it for
+ * designs the way it asks the posts and media modules for theirs.
  */
 import { Module } from '@nestjs/common';
+import { BillingModule } from '../billing/billing.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { MediaModule } from '../media/media.module';
 import { PostsModule } from '../posts/posts.module';
@@ -31,8 +39,9 @@ import { StudioService } from './studio.service';
 import { StudioFontsController } from './studio-fonts.controller';
 
 @Module({
-  imports: [ChannelsModule, MediaModule, PostsModule],
+  imports: [BillingModule, ChannelsModule, MediaModule, PostsModule],
   controllers: [StudioController, DesignSharesController, StudioFontsController],
   providers: [StudioService, BrandKitsService, StudioRepository],
+  exports: [StudioService],
 })
 export class StudioModule {}

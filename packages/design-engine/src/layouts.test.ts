@@ -10,23 +10,45 @@
  * - The design-wide slots (brand name, handle, slide number) are bound, and
  *   nothing else is.
  */
-import { contentBox, coversRect, nest, overlapsRect } from './formats';
+import {
+  contentBox,
+  coversRect,
+  FORMAT_IDS,
+  FORMATS,
+  nest,
+  overlapsRect,
+  shortEdge,
+} from './formats';
 import {
   decorRect,
   defaultLayoutFor,
   findLayout,
   findRegion,
+  findSlot,
   LAYOUTS,
   latestLayout,
   layoutKey,
   layoutsForRole,
   logoPlacements,
   parseLayoutKey,
+  regionLabel,
   regionRect,
   SLIDE_ROLES,
+  slotFrame,
   slotPlacement,
 } from './layouts';
-import { MAX_LIST_ITEMS, type Rect, type RegionId, type SlotBinding, type SlotId } from './types';
+import {
+  type ColorRole,
+  type FormatId,
+  MAX_LIST_ITEMS,
+  type Rect,
+  type RegionId,
+  type SlideLayout,
+  type SlideRole,
+  type SlotBinding,
+  type SlotId,
+  type TypeRole,
+} from './types';
 
 const EPSILON = 0.01;
 
@@ -220,5 +242,234 @@ describe.each(LAYOUTS.map((layout) => [layoutKey(layout), layout] as const))('%s
         if (region) expect(inside(WHOLE, nest(regionRect(region, format), slot.box))).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * The Signature family, ported from CarouselClick's stacked layout. The rules
+ * above already hold it to everything every layout keeps; these pin what the
+ * port promises: the six layouts and their slots, the bands they sit on, the
+ * roles the signature themes are tuned for, the accent rule, and a logo that
+ * covers no word wherever it goes.
+ */
+describe('the Signature family', () => {
+  /** Each layout's role and slots, in panel order, as the sprint document lists them. */
+  const FAMILY: Record<string, { role: SlideRole; slots: SlotId[] }> = {
+    'signature-cover': {
+      role: 'cover',
+      slots: ['logo', 'eyebrow', 'headline', 'subheadline', 'footer'],
+    },
+    'signature-content': {
+      role: 'content',
+      slots: ['logo', 'eyebrow', 'headline', 'body', 'footer'],
+    },
+    'signature-list': { role: 'list', slots: ['logo', 'headline', 'list', 'footer'] },
+    'signature-stat': {
+      role: 'statistic',
+      slots: ['logo', 'eyebrow', 'stat', 'statLabel', 'footer'],
+    },
+    'signature-quote': { role: 'quote', slots: ['logo', 'quote', 'attribution', 'footer'] },
+    'signature-closing': {
+      role: 'closing',
+      slots: ['logo', 'headline', 'body', 'cta', 'footer'],
+    },
+  };
+
+  /** CarouselClick's bands, as fractions of the slide (its `editor/layout.ts`). */
+  const BANDS: Record<FormatId, Record<'header' | 'title' | 'body' | 'footer', Rect>> = {
+    square: {
+      header: { x: 0.075, y: 0.06, w: 0.85, h: 0.15 },
+      title: { x: 0.075, y: 0.22, w: 0.85, h: 0.3 },
+      body: { x: 0.075, y: 0.53, w: 0.85, h: 0.2 },
+      footer: { x: 0.075, y: 0.75, w: 0.85, h: 0.19 },
+    },
+    portrait: {
+      header: { x: 0.075, y: 0.055, w: 0.85, h: 0.14 },
+      title: { x: 0.075, y: 0.2, w: 0.85, h: 0.25 },
+      body: { x: 0.075, y: 0.46, w: 0.85, h: 0.19 },
+      footer: { x: 0.075, y: 0.665, w: 0.85, h: 0.26 },
+    },
+    story: {
+      header: { x: 0.075, y: 0.1, w: 0.85, h: 0.12 },
+      title: { x: 0.075, y: 0.24, w: 0.85, h: 0.24 },
+      body: { x: 0.075, y: 0.5, w: 0.85, h: 0.16 },
+      footer: { x: 0.075, y: 0.68, w: 0.85, h: 0.16 },
+    },
+    landscape: {
+      header: { x: 0.06, y: 0.08, w: 0.4, h: 0.2 },
+      title: { x: 0.06, y: 0.3, w: 0.4, h: 0.6 },
+      body: { x: 0.53, y: 0.12, w: 0.41, h: 0.5 },
+      footer: { x: 0.53, y: 0.66, w: 0.41, h: 0.24 },
+    },
+  };
+
+  /** Which region holds each band, and what the editor calls it while dragging. */
+  const BAND_REGIONS = [
+    { band: 'header', region: 'header', label: 'Header' },
+    { band: 'title', region: 'body', label: 'Title' },
+    { band: 'body', region: 'aside', label: 'Body' },
+    { band: 'footer', region: 'footer', label: 'Footer' },
+  ] as const;
+
+  function family(): SlideLayout[] {
+    return Object.keys(FAMILY).map((id) => {
+      const layout = latestLayout(id);
+      if (!layout) throw new Error(`The ${id} layout is missing.`);
+      return layout;
+    });
+  }
+
+  /** The part of `rect` inside `box`. */
+  function clampInto(rect: Rect, box: Rect): Rect {
+    const x = Math.max(rect.x, box.x);
+    const y = Math.max(rect.y, box.y);
+    const right = Math.min(rect.x + rect.w, box.x + box.w);
+    const bottom = Math.min(rect.y + rect.h, box.y + box.h);
+    return { x, y, w: right - x, h: bottom - y };
+  }
+
+  it('has all six, at version 1, with the role and the slots each one promises', () => {
+    for (const [id, expected] of Object.entries(FAMILY)) {
+      const layout = latestLayout(id);
+
+      expect(layout?.version).toBe(1);
+      expect(layout?.role).toBe(expected.role);
+      // The slide number is an extra a layout may add, hidden until asked for.
+      const slots = layout?.slots.map((slot) => slot.id).filter((slot) => slot !== 'pageNumber');
+      expect(slots).toEqual(expected.slots);
+    }
+  });
+
+  it('draws every one in all four formats', () => {
+    for (const layout of family()) {
+      expect([...layout.formats].sort()).toEqual([...FORMAT_IDS].sort());
+    }
+  });
+
+  it("lays its regions on CarouselClick's bands, clamped into the safe area", () => {
+    for (const layout of family()) {
+      expect(layout.regions.map((region) => region.id).sort()).toEqual(
+        BAND_REGIONS.map((entry) => entry.region).sort(),
+      );
+
+      for (const format of FORMAT_IDS) {
+        for (const { band, region: id, label } of BAND_REGIONS) {
+          const fraction = BANDS[format][band];
+          const expected = clampInto(
+            { x: fraction.x * 100, y: fraction.y * 100, w: fraction.w * 100, h: fraction.h * 100 },
+            contentBox(format),
+          );
+          const region = findRegion(layout, id);
+          if (!region) throw new Error(`${layout.id} has no ${id} region.`);
+
+          const actual = regionRect(region, format);
+          expect(actual.x).toBeCloseTo(expected.x, 2);
+          expect(actual.y).toBeCloseTo(expected.y, 2);
+          expect(actual.w).toBeCloseTo(expected.w, 2);
+          expect(actual.h).toBeCloseTo(expected.h, 2);
+          expect(regionLabel(region)).toBe(label);
+        }
+      }
+    }
+  });
+
+  it('sets each slot in the type and colour role the signature themes are tuned for', () => {
+    const ROLES: Partial<Record<SlotId, [TypeRole, ColorRole]>> = {
+      eyebrow: ['eyebrow', 'primary'],
+      headline: ['headline', 'text'],
+      subheadline: ['subheadline', 'textMuted'],
+      // Supporting text whatever its slot is called.
+      body: ['subheadline', 'textMuted'],
+      list: ['list', 'textMuted'],
+      stat: ['stat', 'text'],
+      statLabel: ['statLabel', 'textMuted'],
+      quote: ['quote', 'text'],
+      attribution: ['attribution', 'textMuted'],
+      // CarouselClick sets its footer line at call-to-action size.
+      footer: ['cta', 'primary'],
+      cta: ['cta', 'primary'],
+      pageNumber: ['pageNumber', 'textMuted'],
+    };
+
+    for (const layout of family()) {
+      for (const slot of layout.slots) {
+        if (slot.kind === 'logo') continue;
+
+        const expected = ROLES[slot.id];
+        expect(expected).toBeDefined();
+        expect([layout.id, slot.id, slot.type, slot.colorRole]).toEqual([
+          layout.id,
+          slot.id,
+          ...(expected ?? []),
+        ]);
+        if (slot.kind === 'list') expect(slot.marker).toBe('number');
+        if (slot.id === 'pageNumber') expect(slot.defaultHidden).toBe(true);
+      }
+    }
+  });
+
+  it('opens the footer with the accent rule: a round-ended pill in primary, inside the footer', () => {
+    for (const layout of family()) {
+      const rules = (layout.decor ?? []).filter((decor) => decor.kind === 'rule');
+      expect(rules).toHaveLength(1);
+
+      const [rule] = rules;
+      expect(rule.region).toBe('footer');
+      expect(rule.colorRole).toBe('primary');
+      expect([rule.box.x, rule.box.y]).toEqual([0, 0]);
+
+      const footer = findRegion(layout, 'footer');
+      if (!footer) throw new Error(`${layout.id} has no footer region.`);
+
+      for (const format of layout.formats) {
+        const box = decorRect(layout, rule, format);
+        if (!box) throw new Error(`${layout.id} draws no rule in ${format}.`);
+
+        expect(inside(regionRect(footer, format), box)).toBe(true);
+
+        // Rounded by at least half its thickness, so CSS draws round ends.
+        const thickness = (box.h / 100) * FORMATS[format].height;
+        const rounding = ((rule.radius ?? 0) / 100) * shortEdge(format);
+        expect(rounding).toBeGreaterThanOrEqual(thickness / 2);
+      }
+    }
+  });
+
+  it('offers the logo in the header, the centre and the footer, starting in the header', () => {
+    for (const layout of family()) {
+      const logo = findSlot(layout, 'logo');
+
+      expect(logo && logoPlacements(logo)).toEqual(['header', 'centre', 'footer']);
+      expect(logo?.placement).toBe('header');
+    }
+  });
+
+  it('never puts the logo over a word, in any spot and any format', () => {
+    const clashes: string[] = [];
+
+    for (const layout of family()) {
+      const logo = findSlot(layout, 'logo');
+      if (!logo) throw new Error(`${layout.id} has no logo.`);
+
+      for (const format of layout.formats) {
+        for (const placement of logoPlacements(logo)) {
+          // On the canvas, not in region percentages, so a spot cannot hide
+          // over a word that belongs to another region.
+          const spot = slotFrame(layout, logo, format, { placement });
+          if (!spot) throw new Error(`${layout.id} cannot place its logo in ${placement}.`);
+
+          for (const slot of layout.slots) {
+            if (slot.kind !== 'text' && slot.kind !== 'list') continue;
+
+            const frame = slotFrame(layout, slot, format, null);
+            if (frame && overlapsRect(spot.rect, frame.rect)) {
+              clashes.push(`${layout.id} in ${format}, logo in ${placement}, over ${slot.id}`);
+            }
+          }
+        }
+      }
+    }
+
+    expect(clashes).toEqual([]);
   });
 });

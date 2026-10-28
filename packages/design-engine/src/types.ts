@@ -126,7 +126,15 @@ export const BRAND_COLOR_KEYS: readonly (keyof BrandColors)[] = [
 // Type
 // ---------------------------------------------------------------------------
 
+/**
+ * Every family a design can be set in. `fonts/index.ts` holds a `FontDef` for
+ * each, and a family can only be added with its licence (see
+ * `fonts/LICENSES.md`): the files are served to browsers and inlined into
+ * customers' exports, so a family needs web embedding and redistribution
+ * rights, not just "free for commercial use".
+ */
 export type FontId =
+  // Sprint 9
   | 'sora'
   | 'inter'
   | 'poppins'
@@ -134,7 +142,76 @@ export type FontId =
   | 'archivo-black'
   | 'dm-serif-display'
   | 'playfair-display'
-  | 'jetbrains-mono';
+  | 'jetbrains-mono'
+  // The Logo Lab's Google families
+  | 'manrope'
+  | 'dm-sans'
+  | 'montserrat'
+  | 'outfit'
+  | 'plus-jakarta-sans'
+  | 'grandstander'
+  | 'comic-relief'
+  | 'comic-neue'
+  | 'bangers'
+  | 'gluten'
+  | 'sniglet'
+  | 'luckiest-guy'
+  | 'chewy'
+  | 'pacifico'
+  | 'shrikhand'
+  | 'sriracha'
+  | 'kalam'
+  | 'damion'
+  | 'satisfy'
+  | 'rancho'
+  | 'titan-one'
+  | 'bubblegum-sans'
+  | 'boogaloo'
+  | 'leckerli-one'
+  | 'kavoon'
+  | 'lobster'
+  | 'oleo-script'
+  | 'margarine'
+  | 'lora'
+  // The luxury set
+  | 'cormorant-garamond'
+  | 'bodoni-moda'
+  | 'cinzel'
+  | 'italiana'
+  | 'marcellus'
+  | 'fraunces'
+  | 'instrument-serif'
+  | 'syne'
+  | 'unbounded'
+  | 'bricolage-grotesque'
+  | 'bebas-neue'
+  | 'anton'
+  | 'oswald'
+  | 'great-vibes'
+  | 'allura';
+
+/** How the font picker groups the families. */
+export type FontCategory =
+  | 'sans'
+  | 'serif'
+  | 'display'
+  | 'script'
+  | 'handwritten'
+  | 'comic'
+  | 'mono';
+
+/**
+ * Which of a theme's two faces a type role is set in. A design's own font
+ * choice (`DesignDocument.fonts`) replaces a face, so every role that uses
+ * it changes together and the theme's hierarchy survives the swap.
+ */
+export type TypeFace = 'heading' | 'body';
+
+/** A design's or a brand kit's choice of faces. Null keeps the one beneath it. */
+export interface DesignFonts {
+  heading: FontId | null;
+  body: FontId | null;
+}
 
 /**
  * What a slot's text is *for*. The theme turns a role into a family, weight,
@@ -157,7 +234,10 @@ export type TypeRole =
   | 'pageNumber';
 
 export interface TypeStyle {
+  /** The theme's own family for this role. A design's font choice can replace it. */
   font: FontId;
+  /** Which of the theme's two faces `font` is, so a font choice knows what it replaces. */
+  face: TypeFace;
   weight: number;
   /**
    * Size as a percentage of the canvas's *short* edge, so text keeps its
@@ -404,12 +484,64 @@ export interface DecorDef {
 
 export type ThemeStyle = 'light' | 'dark' | 'colourful';
 
+/** The gallery's colour filter. Stated on each theme, not guessed from a hue. */
+export type ColorFamily =
+  | 'green'
+  | 'teal'
+  | 'blue'
+  | 'purple'
+  | 'pink'
+  | 'red'
+  | 'orange'
+  | 'yellow'
+  | 'gold'
+  | 'neutral'
+  | 'mono';
+
+export const COLOR_FAMILIES: readonly ColorFamily[] = [
+  'green',
+  'teal',
+  'blue',
+  'purple',
+  'pink',
+  'red',
+  'orange',
+  'yellow',
+  'gold',
+  'neutral',
+  'mono',
+];
+
+export const COLOR_FAMILY_LABELS: Record<ColorFamily, string> = {
+  green: 'Green',
+  teal: 'Teal',
+  blue: 'Blue',
+  purple: 'Purple',
+  pink: 'Pink',
+  red: 'Red',
+  orange: 'Orange',
+  yellow: 'Yellow',
+  gold: 'Gold',
+  neutral: 'Neutral',
+  mono: 'Mono',
+};
+
 export interface Theme {
   id: string;
   name: string;
   style: ThemeStyle;
+  family: ColorFamily;
   colors: Palette;
   type: Record<TypeRole, TypeStyle>;
+  /**
+   * The exact colours this theme's background art is drawn in, while a slide
+   * is on the theme's own background. Without it (and on any other ground, a
+   * brand kit's included) the art derives them from the ground and the
+   * accent: see `artColors` in `art/index.ts`.
+   */
+  art?: { mid: string; highlight: string };
+  /** Locked to paid plans. A design that already uses it keeps working. */
+  premium?: boolean;
 }
 
 export type PresetCategory =
@@ -465,6 +597,21 @@ export interface PresetSlide {
   hidden?: SlotId[];
 }
 
+/**
+ * Which family of the library a preset belongs to, for the gallery's filter:
+ * the Sprint 9 originals, the pattern and hand-made art set ported from
+ * CarouselClick, and the luxury set.
+ */
+export type PresetCollection = 'classic' | 'signature' | 'luxury';
+
+export const PRESET_COLLECTIONS: readonly PresetCollection[] = ['classic', 'signature', 'luxury'];
+
+export const COLLECTION_LABELS: Record<PresetCollection, string> = {
+  classic: 'Classic',
+  signature: 'Signature',
+  luxury: 'Luxury',
+};
+
 export interface Preset {
   id: string;
   /** Title Case; also the title a new design is given. */
@@ -474,16 +621,29 @@ export interface Preset {
   /** Words the gallery search matches besides the name. */
   tags: string[];
   slides: PresetSlide[];
+  /** The background art a design made from it starts with. Absent is none. */
+  art?: string;
+  /** Absent is `classic`. */
+  collection?: PresetCollection;
+  /** Locked to paid plans. A design that already uses it keeps working. */
+  premium?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // The stored document
 // ---------------------------------------------------------------------------
 
+/**
+ * What a photo background is laid over with: black (the default, for light
+ * text) or white (for dark text). Either way `SAFE_PHOTO_OVERLAY` is the
+ * strength at which the text is guaranteed to read.
+ */
+export type PhotoTint = 'dark' | 'light';
+
 export type SlideBackground =
   | { kind: 'role'; role: ColorRole }
   | { kind: 'color'; hex: string }
-  | { kind: 'media'; mediaId: string; overlay: number };
+  | { kind: 'media'; mediaId: string; overlay: number; tint?: PhotoTint };
 
 export interface ElementState {
   /** Text slots. Plain text; a newline is allowed, markup is not. */
@@ -503,6 +663,8 @@ export interface ElementState {
   colorRole?: ColorRole;
   /** A colour of the user's own, when a role will not do. `#RRGGBB`. */
   color?: string;
+  /** Text and list slots: a family of the user's own over the design's. */
+  font?: FontId;
   /** Logo slots only. */
   placement?: LogoPlacement;
 }
@@ -532,20 +694,37 @@ export interface DesignBrand {
   name: string | null;
   /**
    * The kit's `updatedAt` when these colours were copied in. The editor
-   * compares it with the kit's current one to offer Update Colours, and never
+   * compares it with the kit's current one to offer Update From Kit, and never
    * changes a design's colours on its own.
    */
   kitVersion: string | null;
+  /**
+   * The kit's fonts, copied in with its colours. Below the design's own
+   * choice (`DesignDocument.fonts`) and above the theme's. Null when the kit
+   * chooses none, or no kit is applied.
+   */
+  fonts: DesignFonts | null;
 }
 
-/** The current schema. Bump with every shape change, and extend `upgrade()`. */
-export const DESIGN_SCHEMA_VERSION = 1;
+/**
+ * The current schema. Bump with every shape change, and extend `upgrade()`.
+ * 2 added the background art, the design's fonts and the brand kit's fonts.
+ */
+export const DESIGN_SCHEMA_VERSION = 2;
 
 export interface DesignDocument {
   schemaVersion: number;
   format: FormatId;
   presetId: string;
   themeId: string;
+  /**
+   * The background art drawn on every slide that is not a photo, by its id in
+   * `art/index.ts`. Null is none. Swapping it, like swapping the theme,
+   * changes no words.
+   */
+  art: string | null;
+  /** The faces the user chose for the whole design. Null follows the kit, then the theme. */
+  fonts: DesignFonts | null;
   brand: DesignBrand;
   /** The social handle every handle slot shows, typed once. */
   handle: string;

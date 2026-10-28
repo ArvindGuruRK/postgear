@@ -6,9 +6,11 @@
  * and slot), each with a button that brings it into view.
  *
  * Slides are drawn as they scroll near, so the check covers what has been
- * drawn so far and says how far it has got. The count and the list are a
- * `role="status"` region; the progress line sits outside it, so scrolling
- * does not make a screen reader read the region again for every slide.
+ * drawn so far and says how far it has got. It covers every page walked so
+ * far, not only the one shown: a slide's report stays in the store after its
+ * page is turned. The count and the list are a `role="status"` region; the
+ * progress line sits outside it, so scrolling does not make a screen reader
+ * read the region again for every slide.
  */
 import { LocateFixedIcon } from '@animateicons/react/lucide/locate-fixed-icon';
 import type { DesignDocument } from '@postgear/design-engine';
@@ -29,11 +31,15 @@ export function FitStatus({
   store,
   shown,
   documents,
+  pageCount,
   onGoTo,
 }: {
   store: FitStore;
+  /** Every preset the filters show, on every page. */
   shown: readonly ShownPreset[];
   documents: ReadonlyMap<string, DesignDocument>;
+  /** How many pages they take, for saying where the undrawn rest is. */
+  pageCount: number;
   onGoTo: (overflow: Overflow) => void;
 }) {
   const fits = useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
@@ -91,7 +97,9 @@ export function FitStatus({
             </ul>
           ) : null}
         </div>
-        <AlertDescription data-testid="overflow-progress">{fitProgress(report)}</AlertDescription>
+        <AlertDescription data-testid="overflow-progress">
+          {fitProgress(report, pageCount)}
+        </AlertDescription>
       </Alert>
     </div>
   );

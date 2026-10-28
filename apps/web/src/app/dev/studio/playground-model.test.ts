@@ -2,9 +2,13 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   FORMAT_IDS,
+  LOOK_NONE,
   PRESETS,
   presetById,
+  presetCollection,
+  presetFamily,
   presetFormats,
+  presetLook,
   presetStyle,
   type SlotId,
 } from '@postgear/design-engine';
@@ -12,19 +16,32 @@ import {
   APP_DARK_THEMES,
   APP_LIGHT_THEMES,
   createFitStore,
+  DEFAULT_PAGE_SIZE,
   documentKey,
+  FIRST_VIEW,
   type FitReport,
   fitHeadline,
   fitProgress,
   fitReport,
   isFiltered,
+  PAGE_SIZES,
+  type PlaygroundView,
+  pageAfterResize,
+  pageOfPreset,
   parseCategory,
+  parseCollection,
+  parseFamily,
   parseFormat,
+  parseLook,
+  parsePageSize,
+  parsePlaygroundView,
   parseStyle,
   playgroundDocuments,
+  playgroundQuery,
   SHOW_ALL,
   sameSlots,
   shownLabel,
+  shownPage,
   shownPresets,
   slideDomId,
   slideKey,
@@ -60,6 +77,19 @@ describe('shownPresets', () => {
     expect(dark.every(({ preset }) => presetStyle(preset) === 'dark')).toBe(true);
   });
 
+  it('narrows by look, colour and collection with the gallery filter', () => {
+    const plain = shownPresets({ ...SHOW_ALL, look: LOOK_NONE });
+    expect(plain.length).toBeGreaterThan(0);
+    expect(plain.every(({ preset }) => presetLook(preset) === LOOK_NONE)).toBe(true);
+
+    const gold = shownPresets({ ...SHOW_ALL, family: 'gold' });
+    expect(gold.every(({ preset }) => presetFamily(preset) === 'gold')).toBe(true);
+
+    const luxury = shownPresets({ ...SHOW_ALL, collection: 'luxury' });
+    expect(luxury.length).toBeGreaterThan(0);
+    expect(luxury.every(({ preset }) => presetCollection(preset) === 'luxury')).toBe(true);
+  });
+
   it('searches names, categories and tags, and can leave nothing', () => {
     const hiring = shownPresets({ ...SHOW_ALL, query: 'hiring' });
     expect(hiring.length).toBeGreaterThan(0);
@@ -83,6 +113,9 @@ describe('shownPresets', () => {
     expect(isFiltered(SHOW_ALL)).toBe(false);
     expect(isFiltered({ ...SHOW_ALL, query: '  ' })).toBe(false);
     expect(isFiltered({ ...SHOW_ALL, style: 'light' })).toBe(true);
+    expect(isFiltered({ ...SHOW_ALL, look: LOOK_NONE })).toBe(true);
+    expect(isFiltered({ ...SHOW_ALL, family: 'teal' })).toBe(true);
+    expect(isFiltered({ ...SHOW_ALL, collection: 'signature' })).toBe(true);
   });
 });
 
@@ -94,6 +127,114 @@ describe('the Select values', () => {
     expect(parseCategory('constructor')).toBe('all');
     expect(parseStyle('colourful')).toBe('colourful');
     expect(parseStyle('hasOwnProperty')).toBe('all');
+    expect(parseLook(LOOK_NONE)).toBe(LOOK_NONE);
+    expect(parseLook('__proto__')).toBe('all');
+    expect(parseFamily('gold')).toBe('gold');
+    expect(parseCollection('signature')).toBe('signature');
+  });
+});
+
+describe('pages', () => {
+  const all = shownPresets(SHOW_ALL);
+
+  it('offers 6, 12 or 24 a page, 12 unless the URL says otherwise', () => {
+    expect([...PAGE_SIZES]).toEqual([6, 12, 24]);
+    expect(DEFAULT_PAGE_SIZE).toBe(12);
+    expect(parsePageSize('24')).toBe(24);
+    expect(parsePageSize('7')).toBe(12);
+    expect(parsePageSize(null)).toBe(12);
+  });
+
+  it('shows one page of presets, and the last one for a page past the end', () => {
+    const second = shownPage(all, 2, 6);
+
+    expect(second.page).toBe(2);
+    expect(second.pageCount).toBe(Math.ceil(all.length / 6));
+    expect(second.presets.map(({ preset }) => preset.id)).toEqual(
+      all.slice(6, 12).map(({ preset }) => preset.id),
+    );
+
+    const past = shownPage(all, 999, 24);
+    expect(past.page).toBe(past.pageCount);
+    expect(past.presets.length).toBeGreaterThan(0);
+    expect(shownPage([], 3, 12)).toEqual({ page: 1, pageCount: 1, presets: [] });
+  });
+
+  it('walks every preset once across the pages', () => {
+    const { pageCount } = shownPage(all, 1, 12);
+    const seen = Array.from({ length: pageCount }, (_, index) =>
+      shownPage(all, index + 1, 12).presets.map(({ preset }) => preset.id),
+    ).flat();
+
+    expect(seen).toEqual(all.map(({ preset }) => preset.id));
+  });
+
+  it('finds the page a preset is on', () => {
+    const seventh = all[6]?.preset.id ?? '';
+
+    expect(pageOfPreset(all, all[0]?.preset.id ?? '', 6)).toBe(1);
+    expect(pageOfPreset(all, seventh, 6)).toBe(2);
+    expect(pageOfPreset(all, seventh, 12)).toBe(1);
+    expect(pageOfPreset(all, 'not-shown', 6)).toBeNull();
+  });
+
+  it('keeps the first preset of the page in view when the size changes', () => {
+    // Page 3 of 6 starts at the 13th preset: page 2 of 12, page 1 of 24.
+    expect(pageAfterResize(3, 6, 12)).toBe(2);
+    expect(pageAfterResize(3, 6, 24)).toBe(1);
+    // Page 2 of 24 starts at the 25th: page 3 of 12, page 5 of 6.
+    expect(pageAfterResize(2, 24, 12)).toBe(3);
+    expect(pageAfterResize(2, 24, 6)).toBe(5);
+    expect(pageAfterResize(1, 12, 6)).toBe(1);
+  });
+});
+
+describe('the URL', () => {
+  const view: PlaygroundView = {
+    filter: {
+      query: 'launch',
+      format: 'story',
+      category: 'tips',
+      style: 'dark',
+      look: LOOK_NONE,
+      family: 'gold',
+      collection: 'luxury',
+    },
+    page: 3,
+    size: 24,
+  };
+
+  it('reads every part back', () => {
+    const query = playgroundQuery(view);
+
+    expect(query).toBe(
+      'q=launch&format=story&category=tips&style=dark&look=none&colour=gold&collection=luxury&page=3&size=24',
+    );
+    expect(parsePlaygroundView(Object.fromEntries(new URLSearchParams(query)))).toEqual(view);
+  });
+
+  it('leaves the defaults out: the first page of everything is the bare address', () => {
+    expect(playgroundQuery(FIRST_VIEW)).toBe('');
+    expect(playgroundQuery({ ...FIRST_VIEW, page: 2 })).toBe('page=2');
+    expect(playgroundQuery({ ...FIRST_VIEW, size: 6 })).toBe('size=6');
+    expect(playgroundQuery({ ...FIRST_VIEW, filter: { ...SHOW_ALL, query: '  ' } })).toBe('');
+  });
+
+  it('drops what it cannot trust', () => {
+    expect(parsePlaygroundView({})).toEqual(FIRST_VIEW);
+    expect(
+      parsePlaygroundView({
+        page: '-4',
+        size: '1000',
+        format: 'huge',
+        look: 'constructor',
+        colour: 'beige',
+        collection: 'premium',
+      }),
+    ).toEqual(FIRST_VIEW);
+    expect(parsePlaygroundView({ page: 'two' }).page).toBe(1);
+    expect(parsePlaygroundView({ page: ['4', '9'] }).page).toBe(4);
+    expect(parsePlaygroundView({ q: 'x'.repeat(500) }).filter.query).toHaveLength(200);
   });
 });
 
@@ -186,6 +327,7 @@ describe('fitReport', () => {
       'story 2',
     ]);
     expect(report.overflowing[0]).toMatchObject({
+      presetId: preset.id,
       presetName: preset.name,
       domId: slideDomId(preset.id, 'square', 0),
       slots: [
@@ -210,7 +352,11 @@ describe('fitReport', () => {
     );
 
     expect(fitProgress(base)).toBe('4 of 10 slides drawn. Scroll down to draw the rest.');
+    expect(fitProgress(base, 3)).toBe(
+      '4 of 10 slides drawn. Scroll down and turn the pages to draw the rest.',
+    );
     expect(fitProgress({ ...base, checked: 10 })).toBe('10 slides drawn and checked.');
+    expect(fitProgress({ ...base, checked: 10 }, 3)).toBe('10 slides drawn and checked.');
   });
 });
 

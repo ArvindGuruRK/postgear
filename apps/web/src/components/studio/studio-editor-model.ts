@@ -287,6 +287,38 @@ export function settleWithin(saving: Promise<boolean>, ms: number): Promise<bool
 }
 
 // ---------------------------------------------------------------------------
+// Make A Story Version (Sprint 9b)
+// ---------------------------------------------------------------------------
+
+/**
+ * The copy is made from the saved design, on the server, so what is on
+ * screen is saved first; a save that does not land would leave the latest
+ * changes out of the copy.
+ */
+export const STORY_UNSAVED_MESSAGE =
+  'Your latest changes are not saved yet, so the story version would leave them out. Try again once they are saved.';
+export const STORY_FAILED_MESSAGE = 'The story version could not be made. Please try again.';
+
+/** What Make A Story Version came to, for the button that asked. */
+export interface StoryVersionResult {
+  /** True once the copy is made and the editor is on its way to it: the button stays busy. */
+  opening: boolean;
+  /** Why no copy was made, in a sentence; null when there is nothing to say. */
+  problem: string | null;
+}
+
+/**
+ * Why the API made no story version, in a sentence. A 400 names the slide
+ * whose layout has no story version, in the API's own words; anything else
+ * may pass, so it is worth another try.
+ */
+export function storyVersionProblem(error: unknown): string {
+  return error instanceof ApiError && error.status === 400 && error.message.trim() !== ''
+    ? error.message
+    : STORY_FAILED_MESSAGE;
+}
+
+// ---------------------------------------------------------------------------
 // Pictures (DS-4.6)
 // ---------------------------------------------------------------------------
 
@@ -344,9 +376,10 @@ export function pickedMediaId(document: DesignDocument, purpose: MediaPurpose): 
 }
 
 /**
- * The design with the chosen picture in place. A background photo keeps the
- * darkening the slide's photo had, or starts at the level white text reads
- * on, whatever the photo.
+ * The design with the chosen picture in place. A new background photo is
+ * laid under the words as the slide's old photo was, with its overlay and its
+ * tint, so Replace Photo keeps a Light tint light. A first photo starts on
+ * the dark tint, at the level white text reads on, whatever the photo.
  */
 export function withPickedMedia(
   document: DesignDocument,
@@ -363,8 +396,13 @@ export function withPickedMedia(
       if (!slide) return document;
 
       const { background } = slide;
-      const overlay = background.kind === 'media' ? background.overlay : SAFE_PHOTO_OVERLAY;
-      return setBackground(document, purpose.slideId, { kind: 'media', mediaId, overlay });
+      return setBackground(
+        document,
+        purpose.slideId,
+        background.kind === 'media'
+          ? { ...background, mediaId }
+          : { kind: 'media', mediaId, overlay: SAFE_PHOTO_OVERLAY },
+      );
     }
   }
 }

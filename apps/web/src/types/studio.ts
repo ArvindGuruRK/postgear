@@ -11,6 +11,7 @@ import type {
   BrandColors,
   DesignDocument,
   DesignIssueKind,
+  FontId,
   FormatId,
 } from '@postgear/design-engine';
 import type { LengthMethod } from '@postgear/social-core/composer';
@@ -18,6 +19,46 @@ import type { LengthMethod } from '@postgear/social-core/composer';
 export type DesignStatusView = 'DRAFT' | 'EXPORTED' | 'SENT';
 
 export type ExportImageFormat = 'jpeg' | 'png';
+
+/** 2 paints every slide at twice the format's pixels (Sprint 9b). Default 1. */
+export type ExportScale = 1 | 2;
+
+/** What `POST /studio/designs/:id/export` takes. Both fields are optional. */
+export interface StudioExportBody {
+  /** Default 'jpeg'. */
+  imageFormat?: ExportImageFormat;
+  /** Default 1. Send always exports at 1x, whatever the last export used. */
+  scale?: ExportScale;
+}
+
+/**
+ * The `format` query of `GET /studio/designs/:id/download` (Sprint 9b).
+ * 'zip' (the default) is Download All, with `captions.txt` beside the slides
+ * when the caption is not empty; 'pdf' is one PDF, a page per slide. Both
+ * need an export first and answer 409 without one.
+ */
+export type DesignDownloadFormat = 'zip' | 'pdf';
+
+/**
+ * What `POST /studio/designs/:id/duplicate` takes (Sprint 9b): no body, or
+ * `{}`, for a plain copy; `{ format }` for Make A Story Version and the like,
+ * which re-lays the copy out in that format and names it "Title (Story)".
+ * A layout that cannot take the format answers 400 `format_unavailable`.
+ */
+export interface DuplicateDesignBody {
+  format?: FormatId;
+}
+
+/**
+ * What `GET /studio/access` answers (Sprint 9b): whether premium templates,
+ * themes and art are open to this workspace (any paid plan). In a locked
+ * workspace, creating from a premium template or saving a change to a
+ * premium theme or art answers 402 with code `premium_look_requires_plan`;
+ * a design that already had the look saves as before, and duplicates.
+ */
+export interface StudioAccess {
+  premium: boolean;
+}
 
 /**
  * A picture a design draws, as the browser loads it. Keyed by media id in
@@ -40,6 +81,8 @@ export interface DesignSummary {
   presetId: string;
   themeId: string | null;
   brandKitId: string | null;
+  /** The linked kit's name as it is now, for the card (Sprint 9b). Null without a live kit. */
+  brandKitName: string | null;
   status: DesignStatusView;
   slideCount: number;
   revision: number;
@@ -112,13 +155,28 @@ export interface BrandKitView {
   /** Null when there is no logo, or when the media item behind it was deleted. */
   logoUrl: string | null;
   colors: BrandColors;
+  /**
+   * The kit's faces (Sprint 9b), copied into a design with its colours. Null
+   * keeps the theme's, and so does a face the font library no longer has.
+   */
+  headingFont: FontId | null;
+  bodyFont: FontId | null;
+  /** Lock Brand Look: while this kit is applied, the editor hides what would change it. */
+  lockLook: boolean;
+  /** What a new design's closing slide starts with, and the link shown under it. */
+  ctaText: string | null;
+  ctaUrl: string | null;
   source: BrandKitSource;
   createdAt: string;
-  /** Compared with a design's `brand.kitVersion` to offer Update Colours. */
+  /** Compared with a design's `brand.kitVersion` to offer Update From Kit. */
   updatedAt: string;
 }
 
-/** What `POST` and `PATCH /studio/brand-kits` take. */
+/**
+ * What `POST` and `PATCH /studio/brand-kits` take. `POST
+ * /studio/brand-kits/:id/duplicate` takes no body and answers
+ * `{ brandKit }`, a copy named "Name (Copy)".
+ */
 export interface BrandKitBody {
   name: string;
   description?: string | null;
@@ -126,6 +184,14 @@ export interface BrandKitBody {
   logoMediaId?: string | null;
   colors: BrandColors;
   source?: BrandKitSource;
+  /** Sprint 9b. Ids from the font library; null clears a face. */
+  headingFont?: FontId | null;
+  bodyFont?: FontId | null;
+  lockLook?: boolean;
+  /** One line, up to 60 characters. Empty or null clears it. */
+  ctaText?: string | null;
+  /** Up to 60 characters with no spaces (a short link or a handle). Empty or null clears it. */
+  ctaUrl?: string | null;
 }
 
 /** One logo found on a website, before anything is saved. */
@@ -207,9 +273,11 @@ export type StudioExportEvent =
       type: 'start';
       slides: number;
       format: FormatId;
+      /** The pictures' own pixels: the format's size times `scale`. */
       width: number;
       height: number;
       imageFormat: ExportImageFormat;
+      scale: ExportScale;
     }
   | { type: 'warning'; kind: DesignIssueKind; slideIndex: number; message: string }
   | { type: 'slide'; index: number; total: number; label: string }

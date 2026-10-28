@@ -8,7 +8,8 @@
  * With no designs at all, the designs panel is the first step instead (DS-1.2):
  * one sentence, Create Design, and three templates drawn as small decks, each
  * opening the wizard with it already chosen. Nothing in it pretends to be one
- * of the user's own designs.
+ * of the user's own designs. A premium one in a workspace whose plan does not
+ * include it would wear the lock and open the lock dialog, as in the gallery.
  */
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
@@ -30,7 +31,6 @@ import {
   ErrorState,
   MotionIcon,
   PageActions,
-  Pagination,
   SearchInput,
   Select,
   SelectContent,
@@ -38,23 +38,32 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  TooltipHint,
   toast,
 } from '@postgear/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
-import type { BrandKitView, DesignDetail, DesignPage, DesignSummary } from '@/types/studio';
+import type {
+  BrandKitView,
+  DesignDetail,
+  DesignPage,
+  DesignSummary,
+  StudioAccess,
+} from '@/types/studio';
 import { BrandKitDialog } from './brand-kit-dialog';
 import { BrandKitsStrip, DeleteBrandKitDialog } from './brand-kits-strip';
 import { DesignCard, FOCUS } from './design-card';
 import { DeleteDesignDialog, RenameDesignDialog } from './design-dialogs';
+import { PREMIUM_LOCK_MESSAGE, PremiumLockDialog, PremiumLockMark } from './premium-lock';
 import { SlideFrame } from './slide-frame';
+import { StudioPagination } from './studio-pagination';
 import { INSET, PanelHeader, StudioPanel, useNow } from './studio-ui';
-import { formatName, slideCountLabel, wizardQuery } from './studio-view-model';
+import { formatName, isLocked, slideCountLabel, withLock, wizardQuery } from './studio-view-model';
 import { useDialog } from './use-dialog';
-import { type FormatFilter, useBrandKits, useDesigns } from './use-studio-data';
+import { type FormatFilter, useBrandKits, useDesigns, useStudioAccess } from './use-studio-data';
 
 const GRID = 'grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5';
 
@@ -71,14 +80,17 @@ export function StudioLanding({
   orgId,
   initialDesigns,
   initialKits,
+  initialAccess,
 }: {
   orgId: string;
   initialDesigns: DesignPage | null;
   initialKits: BrandKitView[] | null;
+  initialAccess: StudioAccess | null;
 }) {
   const router = useRouter();
   const designs = useDesigns(initialDesigns);
   const kits = useBrandKits(initialKits);
+  const access = useStudioAccess(initialAccess);
   const now = useNow();
   // Each dialog gives focus back to the card control or button that opened
   // it, or, after a delete, to the card that took the deleted one's place.
@@ -145,6 +157,7 @@ export function StudioLanding({
         onNew={() => openKit(null)}
         onEdit={openKit}
         onDelete={deletingKit.open}
+        onDuplicated={kits.upsert}
       />
 
       <StudioPanel className="flex flex-col gap-4 p-4 sm:p-5" aria-labelledby="studio-designs">
@@ -214,7 +227,7 @@ export function StudioLanding({
             ))}
           </div>
         ) : firstRun ? (
-          <FirstSteps orgId={orgId} />
+          <FirstSteps orgId={orgId} premium={access.premium} />
         ) : list.length === 0 ? (
           <EmptyState
             icon={Search}
@@ -239,8 +252,9 @@ export function StudioLanding({
           </ul>
         )}
 
-        {page && page.pageCount > 1 ? (
-          <Pagination
+        {page ? (
+          <StudioPagination
+            label="Design pages"
             page={designs.page}
             pageCount={page.pageCount}
             onPageChange={designs.setPage}
@@ -304,7 +318,9 @@ export function StudioLanding({
 }
 
 /** The first step, for a workspace with no designs yet (DS-1.2). */
-function FirstSteps({ orgId }: { orgId: string }) {
+function FirstSteps({ orgId, premium }: { orgId: string; premium: boolean | null }) {
+  const [lockOpen, setLockOpen] = useState(false);
+
   return (
     <div className="flex flex-col items-center gap-8 py-6 text-center">
       <div className="flex flex-col items-center gap-4">
@@ -322,18 +338,40 @@ function FirstSteps({ orgId }: { orgId: string }) {
         className="m-0 grid w-full max-w-4xl list-none grid-cols-1 gap-4 p-0 sm:grid-cols-3"
       >
         {FEATURED_PRESET_IDS.map((presetId) => (
-          <FeaturedTemplate key={presetId} orgId={orgId} presetId={presetId} />
+          <FeaturedTemplate
+            key={presetId}
+            orgId={orgId}
+            presetId={presetId}
+            premium={premium}
+            onLocked={() => setLockOpen(true)}
+          />
         ))}
       </ul>
+
+      <PremiumLockDialog open={lockOpen} onOpenChange={setLockOpen} />
     </div>
   );
 }
 
+const FEATURED_CARD =
+  'group flex h-full w-full flex-col gap-3 rounded-card border-2 border-outline bg-secondary p-3 text-left shadow-surfaceMd';
+
 /**
  * One template to start from, drawn as a small deck: its cover in front and
- * the next two slides fanned out behind, so a carousel reads as one.
+ * the next two slides fanned out behind, so a carousel reads as one. A
+ * locked one is a button that opens the lock dialog instead of the wizard.
  */
-function FeaturedTemplate({ orgId, presetId }: { orgId: string; presetId: string }) {
+function FeaturedTemplate({
+  orgId,
+  presetId,
+  premium,
+  onLocked,
+}: {
+  orgId: string;
+  presetId: string;
+  premium: boolean | null;
+  onLocked: () => void;
+}) {
   const preset = presetById(presetId);
   const formats = preset ? presetFormats(preset) : [];
   const format: FormatId | null = formats.includes('square') ? 'square' : (formats[0] ?? null);
@@ -352,44 +390,67 @@ function FeaturedTemplate({ orgId, presetId }: { orgId: string; presetId: string
 
   const query = wizardQuery({ step: 'brand', kitId: null, format: null, presetId: preset.id });
   const fanned = Math.min(design.slides.length - 1, 2);
+  const locked = isLocked(preset, premium);
+  const label = withLock(`Start with ${preset.name}`, locked);
+
+  const content: ReactNode = (
+    <>
+      <span
+        className={cn(
+          INSET,
+          'relative flex aspect-[4/3] items-center justify-center bg-halftone p-6',
+        )}
+      >
+        <span className="relative block w-1/2">
+          {fanned >= 2 ? (
+            <span className="absolute inset-0 block translate-x-6 rotate-6 border-2 border-outline shadow-brutalSm transition-[translate,rotate] duration-200 group-hover:translate-x-8 group-hover:rotate-12 motion-reduce:transition-none">
+              <SlideFrame design={design} index={2} lazy />
+            </span>
+          ) : null}
+          {fanned >= 1 ? (
+            <span className="absolute inset-0 block translate-x-3 rotate-3 border-2 border-outline shadow-brutalSm transition-[translate,rotate] duration-200 group-hover:translate-x-4 group-hover:rotate-6 motion-reduce:transition-none">
+              <SlideFrame design={design} index={1} lazy />
+            </span>
+          ) : null}
+          <span className="relative block border-2 border-outline shadow-brutalSm">
+            <SlideFrame design={design} lazy />
+          </span>
+        </span>
+        {/* After the deck, so the fanned slides never cover it. */}
+        {locked ? <PremiumLockMark className="absolute start-2 top-2" /> : null}
+      </span>
+
+      <span className="flex flex-col gap-0.5">
+        <span className="type-ui text-sm text-ink">{preset.name}</span>
+        <span className="font-sans text-xs text-ink type-muted">
+          {CATEGORY_LABELS[preset.category]}, {slideCountLabel(preset.slides.length)}
+        </span>
+      </span>
+    </>
+  );
 
   return (
     <li className="min-w-0">
-      <Link
-        href={`/${orgId}/studio/new?${query}`}
-        aria-label={`Start with ${preset.name}`}
-        className={cn(
-          'group flex h-full flex-col gap-3 rounded-card border-2 border-outline bg-secondary p-3 text-left shadow-surfaceMd',
-          FOCUS,
-        )}
-      >
-        <span
-          className={cn(INSET, 'flex aspect-[4/3] items-center justify-center bg-halftone p-6')}
+      {locked ? (
+        <TooltipHint label={PREMIUM_LOCK_MESSAGE}>
+          <button
+            type="button"
+            aria-label={label}
+            onClick={onLocked}
+            className={cn(FEATURED_CARD, FOCUS)}
+          >
+            {content}
+          </button>
+        </TooltipHint>
+      ) : (
+        <Link
+          href={`/${orgId}/studio/new?${query}`}
+          aria-label={label}
+          className={cn(FEATURED_CARD, FOCUS)}
         >
-          <span className="relative block w-1/2">
-            {fanned >= 2 ? (
-              <span className="absolute inset-0 block translate-x-6 rotate-6 border-2 border-outline shadow-brutalSm transition-[translate,rotate] duration-200 group-hover:translate-x-8 group-hover:rotate-12 motion-reduce:transition-none">
-                <SlideFrame design={design} index={2} lazy />
-              </span>
-            ) : null}
-            {fanned >= 1 ? (
-              <span className="absolute inset-0 block translate-x-3 rotate-3 border-2 border-outline shadow-brutalSm transition-[translate,rotate] duration-200 group-hover:translate-x-4 group-hover:rotate-6 motion-reduce:transition-none">
-                <SlideFrame design={design} index={1} lazy />
-              </span>
-            ) : null}
-            <span className="relative block border-2 border-outline shadow-brutalSm">
-              <SlideFrame design={design} lazy />
-            </span>
-          </span>
-        </span>
-
-        <span className="flex flex-col gap-0.5">
-          <span className="type-ui text-sm text-ink">{preset.name}</span>
-          <span className="font-sans text-xs text-ink type-muted">
-            {CATEGORY_LABELS[preset.category]}, {slideCountLabel(preset.slides.length)}
-          </span>
-        </span>
-      </Link>
+          {content}
+        </Link>
+      )}
     </li>
   );
 }

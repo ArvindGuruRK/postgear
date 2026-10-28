@@ -20,9 +20,10 @@
  * the point a slot is drawn, against the ground it actually sits on.
  *
  * A slide whose background is a photo is the one case the palette cannot
- * reason about, so `paletteForSlide` turns its inks light and the darkening
- * overlay does the rest; `SAFE_PHOTO_OVERLAY` is the strength at which that
- * is a guarantee rather than a hope.
+ * reason about, so `paletteForSlide` gives it the inks its overlay is for
+ * (light under a dark tint, dark under a light one) and the overlay does the
+ * rest; `SAFE_PHOTO_OVERLAY` is the strength at which that is a guarantee
+ * rather than a hope.
  */
 import {
   ensureReadable,
@@ -33,33 +34,51 @@ import {
   readableInk,
   surfaceFrom,
 } from './color';
-import type { BrandColors, ColorRole, DesignSlide, Palette, Theme } from './types';
+import type { BrandColors, ColorRole, DesignSlide, Palette, PhotoTint, Theme } from './types';
 
 /**
  * The overlay strength a photo background starts at, and below which the
  * panel warns that text on it may be hard to read.
  *
- * The overlay is black, so the lightest a photo can be under it is white
- * darkened by this much: `#666666` at 0.6. White ink clears 5.7:1 on that and
- * `PHOTO_INK_MUTED` clears 4.8:1, whatever the photo is.
+ * Under the default dark tint the overlay is black, so the lightest a photo
+ * can be under it is white darkened by this much: `#666666` at 0.6. White
+ * ink clears 5.7:1 on that and `PHOTO_INK_MUTED` clears 4.8:1, whatever the
+ * photo is. A light tint is the mirror: the overlay is white, the darkest a
+ * photo can be under it is black lightened by this much, `#999999`, and
+ * `PHOTO_INK_DARK` clears 6.6:1 on that, `PHOTO_INK_DARK_MUTED` 4.8:1.
  */
 export const SAFE_PHOTO_OVERLAY = 0.6;
 
-/** The inks a photo slide takes. */
+/** The inks a photo slide takes under the dark tint. */
 export const PHOTO_INK = '#FFFFFF';
 export const PHOTO_INK_MUTED = '#EBEBEB';
 
-/**
- * The colour text on a photo is judged against: the lightest the photo can
- * be under its overlay, taking the overlay as at least the safe strength. A
- * weaker overlay is the photo warning's business, not a reason to switch the
- * slide to dark ink that a dark photo would swallow.
- */
-export function photoGround(overlay: number): string {
-  return mix('#FFFFFF', '#000000', Math.max(overlay, SAFE_PHOTO_OVERLAY));
+/** The inks a photo slide takes under the light tint. */
+export const PHOTO_INK_DARK = '#111111';
+export const PHOTO_INK_DARK_MUTED = '#2E2E2E';
+
+/** The colour a photo's overlay is laid in: black for the dark tint, white for the light one. */
+export function photoOverlayColor(tint: PhotoTint = 'dark'): string {
+  return tint === 'light' ? '#FFFFFF' : '#000000';
 }
 
-/** True when a photo's overlay is too weak to promise readable text. */
+/**
+ * The colour text on a photo is judged against: the photo its inks read
+ * worst on, under its overlay, taking the overlay as at least the safe
+ * strength. That is a white photo under a dark tint and a black one under a
+ * light tint. A weaker overlay is the photo warning's business, not a reason
+ * to switch the slide to inks that the opposite kind of photo would swallow.
+ */
+export function photoGround(overlay: number, tint: PhotoTint = 'dark'): string {
+  const worst = tint === 'light' ? '#000000' : '#FFFFFF';
+  return mix(worst, photoOverlayColor(tint), Math.max(overlay, SAFE_PHOTO_OVERLAY));
+}
+
+/**
+ * True when a photo's overlay is too weak to promise readable text. The name
+ * predates the light tint, which lightens rather than darkens; the rule is
+ * the same for both: an overlay below the safe strength.
+ */
 export function photoNeedsDarkening(slide: Pick<DesignSlide, 'background'>): boolean {
   return slide.background.kind === 'media' && slide.background.overlay < SAFE_PHOTO_OVERLAY;
 }
@@ -107,7 +126,8 @@ export function applyBrand(theme: Theme, brand: BrandColors | null | undefined):
  *    role such as the brand's primary), which the text inks then have to
  *    read on instead;
  * 3. a photo background, which darkens under a black overlay and so takes
- *    light ink whatever the theme says.
+ *    light ink, or lightens under a white one (the light tint) and takes
+ *    dark ink, whatever the theme says.
  *
  * The inks that belong to a fill (`onPrimary`, `onAccent`, `onSurface`) are
  * left alone in every case except a new surface: a painted panel is opaque,
@@ -121,7 +141,9 @@ export function paletteForSlide(
   const base = applyBrand(theme, brand);
 
   if (slide.background.kind === 'media') {
-    return { ...base, text: PHOTO_INK, textMuted: PHOTO_INK_MUTED };
+    return slide.background.tint === 'light'
+      ? { ...base, text: PHOTO_INK_DARK, textMuted: PHOTO_INK_DARK_MUTED }
+      : { ...base, text: PHOTO_INK, textMuted: PHOTO_INK_MUTED };
   }
 
   if (slide.background.kind === 'color') {

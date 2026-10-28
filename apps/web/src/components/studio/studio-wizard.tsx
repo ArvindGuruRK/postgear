@@ -6,18 +6,22 @@
  * Every answer lives in the URL, so the browser's Back, a refresh and a link
  * shared mid-way all land on the same step with the same choices. Each step
  * before the editor can be skipped or comes with a default (rule 1): Skip
- * For Now keeps the templates' own colours, the format last used is chosen
- * already, and a template picked on the Studio page leads the gallery.
+ * For Now keeps the templates' own colours, the kit and the format last used
+ * are chosen already, and a template picked on the Studio page leads the
+ * gallery.
+ *
+ * Whether the plan includes premium templates is loaded with the first data
+ * (`initialAccess`), so the gallery's locks are right on first paint.
  */
 import { OnboardingStepper, PageActions } from '@postgear/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { ActionLink } from '@/components/home/home-actions';
-import type { BrandKitView } from '@/types/studio';
+import type { BrandKitView, StudioAccess } from '@/types/studio';
 import { StudioPanel } from './studio-ui';
 import { parseWizard, WIZARD_STEPS, type WizardState, wizardQuery } from './studio-view-model';
 import { TemplateGallery } from './template-gallery';
-import { useBrandKits, useFavourites } from './use-studio-data';
+import { useBrandKits, useFavourites, useStudioAccess } from './use-studio-data';
 import { BrandStep, FormatStep } from './wizard-steps';
 
 const STEPS = [{ label: 'Brand' }, { label: 'Format' }, { label: 'Template' }];
@@ -26,10 +30,12 @@ export function StudioWizard({
   orgId,
   initialKits,
   initialFavourites,
+  initialAccess,
 }: {
   orgId: string;
   initialKits: BrandKitView[] | null;
   initialFavourites: string[] | null;
+  initialAccess: StudioAccess | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -37,6 +43,7 @@ export function StudioWizard({
   const state = parseWizard(Object.fromEntries(params.entries()));
   const kits = useBrandKits(initialKits);
   const favourites = useFavourites(initialFavourites);
+  const access = useStudioAccess(initialAccess);
   const heading = useRef<HTMLHeadingElement>(null);
   const opened = useRef(false);
 
@@ -77,6 +84,7 @@ export function StudioWizard({
         {state.step === 'brand' ? (
           <BrandStep
             headingRef={heading}
+            orgId={orgId}
             kits={kits.kits}
             error={kits.error}
             onRetry={kits.reload}
@@ -110,6 +118,8 @@ export function StudioWizard({
             starProblem={favourites.problem}
             onStar={(presetId, starred) => void favourites.toggle(presetId, starred)}
             onBack={() => go({ step: 'format' })}
+            premium={access.premium}
+            onLocked={access.markLocked}
           />
         ) : null}
       </StudioPanel>

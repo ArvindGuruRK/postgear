@@ -31,7 +31,7 @@ placeholders.
 | **Notifications** (Sprint 8): the bell with live updates, "Mark all as read", email on a failed post (printed to the API console locally), email preferences | Weekly digest |
 | **API keys and the public API** (Sprint 8): create / rotate / revoke keys, `/v1` with Swagger docs at `/api/docs`, per-key rate limiting, the Node SDK | OAuth apps, Zapier/Make connectors |
 | **Outbound webhooks** (Sprint 8): signed deliveries on post published / failed, retries, a test send, delivery history | |
-| **Design Studio** (Sprint 9): brand kits by hand or read from a website, 47 templates in four formats, an editor with autosave and undo, preview in platform frames, export to Media, Send To Composer as a draft, share links | AI-written slides, LinkedIn PDF carousels, approvals on share links |
+| **Design Studio** (Sprints 9 and 9b): brand kits by hand or read from a website, 167 templates in four formats (Classic, Signature and a premium Luxury set, with background art), 52 fonts, an editor with autosave and undo, preview in platform frames, export to Media at 1x or 2x, PDF download, Send To Composer as a draft, share links | AI-written slides, LinkedIn PDF carousels, approvals on share links |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
@@ -695,6 +695,67 @@ $env:SEO_BROWSER_TESTS = "true"; npm test --workspace=@postgear/api -- design-ex
 npm run test:e2e -- e2e/studio.spec.ts            # create, edit, export, send, share (API in dev:api:e2e, section 3a)
 ```
 
+### 5l. The Studio Premium Pack (Sprint 9b)
+
+Nothing to add to `.env`. After pulling, hard-refresh the Studio once
+(Ctrl+Shift+R): three font files changed but kept their names (Sora,
+JetBrains Mono, Playfair Display), and the API lets a browser keep them for a
+week.
+
+- **Templates**: 167 in three collections. **Classic** (59: Sprint 9's 47
+  and 12 with a pattern), **Signature** (50 free, the CarouselClick looks,
+  and 16 premium ones on the hand-made backgrounds) and **Luxury** (42,
+  premium). The gallery adds **Collection**, **Look** (the background art)
+  and **Colour** beside Search, Category, Style and Favourites, 24 a page,
+  back to page 1 on any change.
+- **Premium locks**: the demo workspace is on Standard, so nothing is locked
+  there. Switch to **PostGear Second Org** (the top bar's workspace menu; it
+  has no plan): Luxury and hand-made cards show a lock, and choosing one
+  opens **Premium Templates** with **See Plans**. In a design there, the
+  Design tab's luxury themes and art lock the same way. Switch back and they
+  open.
+- **Design tab**: **Theme** by collection, **Background Art** (None,
+  Patterns, Originals, Luxury, drawn in the design's colours), **Fonts**
+  (Heading and Body, with **Font Licences**), **Custom Colours** (with Use
+  Kit Colours or Use Theme Colours), **Format**, and **Make A Story
+  Version**, which opens a 9:16 copy.
+- **Element tab**: **Font**, with "Design Font" first.
+- **Slide tab**: a photo's **Tint** (Dark or Light) and **Apply To All
+  Slides**.
+- **Canvas**: **Zoom Out**, **Zoom In** and **Fit** (also +, - and 0 while
+  not typing). Escape cancels typing (Undo brings the words back); Ctrl or
+  Cmd plus Enter keeps it. A **Changed** marker sits on an element that
+  differs from its template, and the rail reads "1. Cover".
+- **Brand kits**: **Fonts**, **CTA text** and **Link** (written into a new
+  design's closing slide), **Lock Brand Look**, **From One Colour**, and
+  **Duplicate** on a kit card. With Lock Brand Look, the editor hides
+  custom colours, fonts and the logo's Choose From Media; applying the kit
+  takes the design's own fonts out, and a design that still has some
+  offers **Use Kit Fonts**.
+- **Export**: **Size** 1x or 2x; **Download PDF** (one page per slide, from
+  the last export); **Download All** adds `captions.txt` when there is a
+  caption.
+- **Search**: the top bar has a **Designs** group.
+- **Templates playground**: <http://localhost:3000/dev/studio> now pages at
+  6, 12 or 24 with the gallery's filters, and keeps the page and size in the
+  URL.
+
+Automated checks:
+
+```powershell
+npm test --workspace=@postgear/design-engine
+npm test --workspace=@postgear/api -- studio search
+npm test --workspace=@postgear/web -- studio search playground
+# Real Chromium (opt-in): every template in every format, overflow and pixel contrast
+$env:SEO_BROWSER_TESTS = "true"; $env:PRESET_AT_ONCE = "6"; npm test --workspace=@postgear/api -- presets.browser; Remove-Item Env:SEO_BROWSER_TESTS, Env:PRESET_AT_ONCE
+# A few templates, or one check: PRESET_IDS takes ids or prefixes ending in *, PRESET_CHECKS takes overflow, contrast or both
+$env:SEO_BROWSER_TESTS = "true"; $env:PRESET_IDS = "luxury-*"; $env:PRESET_CHECKS = "contrast"; npm test --workspace=@postgear/api -- presets.browser; Remove-Item Env:SEO_BROWSER_TESTS, Env:PRESET_IDS, Env:PRESET_CHECKS
+```
+
+The whole library took 31 minutes with `PRESET_AT_ONCE=6` on 2026-10-28
+(overflow 12.5, contrast 18); two named templates take under a minute. The
+default of 2 pages at once leaves room for the app running beside it.
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 
@@ -882,6 +943,9 @@ A real upload needs a video and is not worth testing from the UI yet.
 | Studio Export says "Export is not available right now" | Playwright's Chromium is not installed where the API runs. `npx playwright install chromium`, then export again; the API console prints the same hint once. |
 | Extract From Website says "That address is not public." | The address is localhost, a private network or a cloud metadata address, refused on purpose. Use a public website. |
 | Extract From Website says "That is a lot of websites at once." | Five extractions a minute per workspace. Wait a minute. |
+| Studio text still looks like the old Sora or Playfair | The browser kept Sprint 9's font files (cached for a week). Hard-refresh the page (Ctrl+Shift+R). |
+| No premium lock anywhere in the Studio | The demo workspace is on a paid plan. Switch to **PostGear Second Org**, which has none. |
+| Download PDF says "Export this design first, then download it." | PDF and Download All use the last export. Export, then download. |
 
 ---
 

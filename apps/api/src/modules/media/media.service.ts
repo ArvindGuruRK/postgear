@@ -84,9 +84,11 @@ export interface GeneratedFileInput {
    * The format and quality to store, when the producer has a reason to care
    * (Sprint 9: a Studio export's JPEG or PNG choice, at the quality the
    * sprint fixed). Omitted everywhere else, which keeps the library's own
-   * rule: JPEG unless the image genuinely uses transparency.
+   * rule: JPEG unless the image genuinely uses transparency. `maxEdge` lets
+   * a 2x Studio export keep its size past the library's 2048 px cap
+   * (Sprint 9b; see `ProcessImageOptions`).
    */
-  encode?: { prefer?: 'jpeg' | 'png'; quality?: number };
+  encode?: { prefer?: 'jpeg' | 'png'; quality?: number; maxEdge?: number };
 }
 
 /** One image to save, and the name to save it under. */

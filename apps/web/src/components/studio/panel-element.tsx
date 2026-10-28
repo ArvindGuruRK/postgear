@@ -14,12 +14,18 @@
  *   button per row. A list keeps at least one row.
  * - Size, alignment and colour where the slot offers them. A colour that does
  *   not read on its background says so, with Fix Contrast.
+ * - Font, for an element with words (Sprint 9b): its own family over the
+ *   design's, or Design Font to follow the design again.
  * - A picture: its preview and name, with Choose, Replace and Remove. A logo
  *   uses the brand kit's logo first. A picture deleted from the media library
  *   says so, with the way to choose another (section 5).
  * - Hide (optional elements), Reset Position (after a nudge), and Reset
  *   Style, which puts back the template's look and keeps the words and
  *   picture: an emptied headline is not what "reset" promises.
+ *
+ * While the brand kit locks the design's look (`useBrandLookLocked`), the
+ * Font field, Custom's swatch and hex field and the logo's Choose From Media
+ * are left out, and one sentence says what the kit keeps.
  *
  * Every edit is a function of the design as it is when it lands, and typing
  * is one undo step per burst, as on the canvas. A choice made here that
@@ -52,6 +58,7 @@ import {
   type SlideLayout,
   type SlotDef,
   type SlotId,
+  setElementFont,
   setLogoPlacement,
   slotPlacement,
   slotText,
@@ -83,6 +90,8 @@ import {
   clip,
   colorChoiceOf,
   customColorOf,
+  elementFontOf,
+  elementLockNote,
   elementPreview,
   elementSwatches,
   findSlide,
@@ -96,6 +105,7 @@ import {
   PLACEMENT_LABELS,
   shownSlots,
   sizeOf,
+  takesFont,
   textRows,
   withAlign,
   withColorChoice,
@@ -109,6 +119,7 @@ import {
   withSize,
 } from './editor-panel-model';
 import { type ApplyChange, withText } from './editor-state';
+import { FontSelect } from './font-select';
 import {
   CustomColorField,
   GroupLabel,
@@ -118,6 +129,7 @@ import {
   Segmented,
   type SegmentOption,
   SwatchPicker,
+  useBrandLookLocked,
 } from './panel-ui';
 
 /** How much of an element's words its row in the list shows. */
@@ -358,11 +370,14 @@ function ElementEditor({
 }: EditorProps) {
   const sizeId = useId();
   const alignId = useId();
+  const fontId = useId();
+  const locked = useBrandLookLocked();
   const slideId = slide.id;
   const slotId = slot.id;
   const state = slide.elements[slotId];
-  const hasWords = slot.kind === 'text' || slot.kind === 'list';
+  const hasWords = takesFont(slot);
   const resettable = canResetElement(state);
+  const lockNote = locked ? elementLockNote(slot) : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -444,9 +459,23 @@ function ElementEditor({
         </div>
       ) : null}
 
+      {hasWords && !locked ? (
+        <FormField>
+          <FormLabel htmlFor={fontId}>Font</FormLabel>
+          <FontSelect
+            id={fontId}
+            value={elementFontOf(state)}
+            defaultLabel="Design Font"
+            onChange={(font) => onChange((latest) => setElementFont(latest, slideId, slotId, font))}
+          />
+        </FormField>
+      ) : null}
+
       {slot.colorable && hasWords ? (
         <ColorChoice document={document} slide={slide} slot={slot} onChange={onChange} />
       ) : null}
+
+      {lockNote ? <p className={NOTE}>{lockNote}</p> : null}
 
       <div className="flex flex-wrap gap-2">
         {slot.optional ? (
@@ -470,7 +499,7 @@ function ElementEditor({
         <TooltipHint
           label={
             resettable
-              ? 'Puts back the size, alignment, colour and place its template gives it. The words stay.'
+              ? 'Puts back the font, size, alignment, colour and place its template gives it. The words stay.'
               : 'This element already looks the way its template draws it.'
           }
           disabled={!resettable}
@@ -680,6 +709,7 @@ function ColorChoice({
   onChange: ApplyChange;
 }) {
   const labelId = useId();
+  const locked = useBrandLookLocked();
   const slideId = slide.id;
   const slotId = slot.id;
   const state = slide.elements[slotId];
@@ -691,13 +721,13 @@ function ColorChoice({
       <GroupLabel id={labelId}>Colour</GroupLabel>
       <SwatchPicker
         labelledBy={labelId}
-        options={elementSwatches(document, slide, slot)}
+        options={elementSwatches(document, slide, slot, { custom: !locked })}
         value={choice}
         onValueChange={(next) =>
           onChange((latest) => withColorChoice(latest, slideId, slotId, next))
         }
       />
-      {choice === CUSTOM_COLOR ? (
+      {choice === CUSTOM_COLOR && !locked ? (
         <CustomColorField
           value={customColorOf(state)}
           onApply={(hex) =>
@@ -810,6 +840,8 @@ function LogoField({
   onPickMedia: (purpose: MediaPurpose) => void;
 }) {
   const placementId = useId();
+  // A kit that locks the look keeps its own logo: no other is offered.
+  const locked = useBrandLookLocked();
   const slideId = slide.id;
   const slotId = slot.id;
   const state = slide.elements[slotId];
@@ -820,7 +852,7 @@ function LogoField({
   const placement = slotPlacement(slot, state).placement;
   const choose = () => onPickMedia({ kind: 'logo', slideId });
 
-  const chooseButton = (
+  const chooseButton = locked ? null : (
     <Button variant="secondary" size="sm" onClick={choose}>
       <MotionIcon icon={ImagePlusIcon} className={ICON} />
       Choose From Media
@@ -831,8 +863,9 @@ function LogoField({
     <div className="flex flex-col gap-4">
       {view.mediaId === null ? (
         <p className={NOTE}>
-          There is no logo yet. Apply a brand kit with a logo in the Design tab, or choose one from
-          your media library.
+          {locked
+            ? 'This brand kit has no logo yet.'
+            : 'There is no logo yet. Apply a brand kit with a logo in the Design tab, or choose one from your media library.'}
         </p>
       ) : picture ? (
         <PictureRow
@@ -845,7 +878,7 @@ function LogoField({
         <PictureMissing>{chooseButton}</PictureMissing>
       )}
 
-      {view.canUseBrand || !missing ? (
+      {view.canUseBrand || (!missing && chooseButton) ? (
         <div className="flex flex-wrap gap-2">
           {view.canUseBrand ? (
             <Button

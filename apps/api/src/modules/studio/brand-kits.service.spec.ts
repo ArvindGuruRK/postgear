@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { BrandKitSource, type Prisma } from '@postgear/db';
-import { brandFromTheme, DEFAULT_THEME_ID, themeById } from '@postgear/design-engine';
+import { brandFromTheme, DEFAULT_THEME_ID, FONT_IDS, themeById } from '@postgear/design-engine';
 import { type BrowserPool, SeoCrawlError } from '@postgear/seo-engine';
 import sharp from 'sharp';
 import { securityLogger } from '../../common/logging/security-logger';
@@ -19,7 +19,7 @@ import type { RedisService } from '../redis/redis.service';
 import type { ExtractDeps } from './brand-extractor';
 import { BrandKitsService, EXTRACT_LIMIT_PER_MINUTE, websiteAddress } from './brand-kits.service';
 import { MAX_LOGO_BYTES } from './brand-logo';
-import { MAX_ACTIVE_SHARES } from './dto/studio.schema';
+import { MAX_ACTIVE_SHARES, MAX_KIT_NAME_LENGTH } from './dto/studio.schema';
 import { STUDIO_MESSAGES } from './studio.messages';
 import type {
   BrandKitRow,
@@ -50,6 +50,11 @@ function kitRow(overrides: Partial<BrandKitRow> = {}): BrandKitRow {
     websiteUrl: null,
     logoMediaId: null,
     colors: COLORS as Prisma.JsonValue,
+    headingFont: null,
+    bodyFont: null,
+    lockLook: false,
+    ctaText: null,
+    ctaUrl: null,
     source: BrandKitSource.MANUAL,
     createdById: USER,
     createdAt: new Date('2026-10-01T00:00:00Z'),
@@ -577,9 +582,162 @@ describe('brand kits', () => {
       logoMediaId: 'media-1',
       colors: COLORS,
       source: BrandKitSource.MANUAL,
+      headingFont: null,
+      bodyFont: null,
+      lockLook: false,
+      ctaText: null,
+      ctaUrl: null,
       createdById: USER,
     });
     expect(view.logoUrl).toBe(mediaView().url);
+    expect(view).toMatchObject({
+      headingFont: null,
+      bodyFont: null,
+      lockLook: false,
+      ctaText: null,
+      ctaUrl: null,
+    });
+  });
+
+  it('keeps the fonts, lock and call to action of a kit, and shows them back', async () => {
+    const [heading, body] = FONT_IDS;
+    const { service, repository } = setup();
+
+    const view = await service.create(ORG, USER, {
+      name: 'Acme',
+      colors: COLORS,
+      headingFont: heading,
+      bodyFont: body,
+      lockLook: true,
+      ctaText: 'Book a call',
+      ctaUrl: 'acme.com/book',
+    });
+
+    expect(repository.createBrandKit.mock.calls[0][0]).toMatchObject({
+      headingFont: heading,
+      bodyFont: body,
+      lockLook: true,
+      ctaText: 'Book a call',
+      ctaUrl: 'acme.com/book',
+    });
+    expect(view).toMatchObject({
+      headingFont: heading,
+      bodyFont: body,
+      lockLook: true,
+      ctaText: 'Book a call',
+      ctaUrl: 'acme.com/book',
+    });
+  });
+
+  it('refuses a call to action link with a space in it, with a sentence', async () => {
+    const { service, repository } = setup();
+
+    expect(
+      await refusal(
+        service.create(ORG, USER, { name: 'Acme', colors: COLORS, ctaUrl: 'acme.com/spring sale' }),
+      ),
+    ).toMatchObject({ status: 400, message: STUDIO_MESSAGES.CTA_URL_INVALID });
+    expect(await refusal(service.update(ORG, 'kit-1', { ctaUrl: 'a b' }))).toMatchObject({
+      status: 400,
+      message: STUDIO_MESSAGES.CTA_URL_INVALID,
+    });
+    expect(repository.createBrandKit).not.toHaveBeenCalled();
+    expect(repository.updateBrandKit).not.toHaveBeenCalled();
+  });
+
+  it('writes the new fields only when an edit sends them, clearing with null or an empty string', async () => {
+    const { service, repository } = setup();
+    const [heading] = FONT_IDS;
+
+    await service.update(ORG, 'kit-1', { headingFont: heading, lockLook: true });
+    await service.update(ORG, 'kit-1', { bodyFont: null, ctaText: '', ctaUrl: '' });
+
+    expect(repository.updateBrandKit).toHaveBeenNthCalledWith(1, ORG, 'kit-1', {
+      headingFont: heading,
+      lockLook: true,
+    });
+    expect(repository.updateBrandKit).toHaveBeenNthCalledWith(2, ORG, 'kit-1', {
+      bodyFont: null,
+      ctaText: null,
+      ctaUrl: null,
+    });
+  });
+
+  it('shows a face the font library no longer has as none', async () => {
+    const { service, repository } = setup();
+    repository.findBrandKit.mockResolvedValue(
+      kitRow({ headingFont: 'retired-face', bodyFont: FONT_IDS[0] }),
+    );
+
+    expect(await service.get(ORG, 'kit-1')).toMatchObject({
+      headingFont: null,
+      bodyFont: FONT_IDS[0],
+    });
+  });
+
+  it('duplicates a kit with everything but its id, named as a copy', async () => {
+    const { service, repository, media } = setup();
+    const [heading, body] = FONT_IDS;
+    repository.findBrandKit.mockResolvedValue(
+      kitRow({
+        name: 'Acme Spring',
+        description: 'Warm and bright',
+        websiteUrl: 'https://acme.example/',
+        logoMediaId: 'media-1',
+        headingFont: heading,
+        bodyFont: body,
+        lockLook: true,
+        ctaText: 'Book a call',
+        ctaUrl: 'acme.com/book',
+        source: BrandKitSource.EXTRACTED,
+      }),
+    );
+    media.findViews.mockResolvedValue(new Map([['media-1', mediaView()]]));
+
+    const view = await service.duplicate(ORG, 'user-2', 'kit-1');
+
+    expect(repository.findBrandKit).toHaveBeenCalledWith(ORG, 'kit-1');
+    expect(repository.createBrandKit).toHaveBeenCalledWith({
+      orgId: ORG,
+      name: 'Acme Spring (Copy)',
+      description: 'Warm and bright',
+      websiteUrl: 'https://acme.example/',
+      logoMediaId: 'media-1',
+      colors: COLORS,
+      source: BrandKitSource.EXTRACTED,
+      headingFont: heading,
+      bodyFont: body,
+      lockLook: true,
+      ctaText: 'Book a call',
+      ctaUrl: 'acme.com/book',
+      createdById: 'user-2',
+    });
+    expect(view).toMatchObject({
+      id: 'kit-new',
+      name: 'Acme Spring (Copy)',
+      logoUrl: mediaView().url,
+    });
+  });
+
+  it('keeps a copy of a kit name at the limit inside the limit', async () => {
+    const { service, repository } = setup();
+    repository.findBrandKit.mockResolvedValue(kitRow({ name: 'k'.repeat(MAX_KIT_NAME_LENGTH) }));
+
+    await service.duplicate(ORG, USER, 'kit-1');
+
+    const { name } = repository.createBrandKit.mock.calls[0][0] as { name: string };
+    expect(name).toHaveLength(MAX_KIT_NAME_LENGTH);
+    expect(name).toMatch(/k \(Copy\)$/);
+  });
+
+  it('will not duplicate a kit this workspace does not have', async () => {
+    const { service, repository } = setup();
+
+    expect(await refusal(service.duplicate(ORG, USER, 'kit-x'))).toMatchObject({
+      status: 404,
+      message: STUDIO_MESSAGES.BRAND_KIT_NOT_FOUND,
+    });
+    expect(repository.createBrandKit).not.toHaveBeenCalled();
   });
 
   it.each([

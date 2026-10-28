@@ -20,7 +20,8 @@
  * 3. **Fit within 2048 px** on its long edge, never enlarged. 2048 is one of
  *    Facebook's recommended photo widths, well above the 1080 px Instagram
  *    displays, and inside X's 4096 px maximum, so feeds lose nothing visible,
- *    and only X's full-screen zoom on a very large original would.
+ *    and only X's full-screen zoom on a very large original would. A producer
+ *    may ask for more, up to 4096 (a Studio slide exported at 2x).
  * 4. **Re-encoded** as JPEG (quality 82, mozjpeg), or as PNG when the image
  *    genuinely uses transparency, since JPEG would paint it black. Every
  *    platform PostGear publishes to accepts both; WebP and AVIF inputs are
@@ -98,6 +99,27 @@ export interface ProcessImageOptions {
   prefer?: 'jpeg' | 'png';
   /** JPEG quality. Defaults to the library's own 82. */
   quality?: number;
+  /**
+   * The long-edge cap, for a producer whose pictures are meant to be larger
+   * than the library's 2048 px (Sprint 9b: a Studio slide exported at 2x is
+   * 3840 px on a story's long edge, and is stored as it was drawn). Never
+   * more than `GENERATED_MAX_EDGE`, and an image is still never enlarged.
+   */
+  maxEdge?: number;
+}
+
+/**
+ * The largest long edge a producer may ask for: X's 4096 px maximum, which a
+ * Studio slide at 2x (3840 px at most) fits inside.
+ */
+export const GENERATED_MAX_EDGE = 4096;
+
+/** The cap one call resizes to: the library's own unless a producer asked for another. */
+function maxEdgeFor(encode: ProcessImageOptions): number {
+  const asked = encode.maxEdge;
+  if (asked === undefined || !Number.isInteger(asked) || asked < 1) return IMAGE_MAX_EDGE;
+
+  return Math.min(asked, GENERATED_MAX_EDGE);
 }
 
 export async function processImage(
@@ -142,11 +164,12 @@ export async function processImage(
     // Decode, orient and resize once, into raw pixels. Both the transparency
     // check and the encode then work from the same small buffer instead of
     // decoding a 50 MP original twice.
+    const edge = maxEdgeFor(encode);
     const { data: pixels, info } = await sharp(input, options)
       .rotate()
       .resize({
-        width: IMAGE_MAX_EDGE,
-        height: IMAGE_MAX_EDGE,
+        width: edge,
+        height: edge,
         fit: 'inside',
         withoutEnlargement: true,
       })

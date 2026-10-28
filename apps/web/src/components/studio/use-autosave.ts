@@ -15,7 +15,9 @@
  * Each save asks for `keepalive` only while its body fits the browser's cap
  * for one (`keepaliveFits`), and a save answered 404 points the API back at
  * the design's own workspace before it calls the design gone
- * (`saveInWorkspace`).
+ * (`saveInWorkspace`). A save refused for a premium look the workspace's plan
+ * does not include is held until the look is taken out (`addsPremiumLook`),
+ * never sent again as it was.
  *
  * The controller is made in an effect, not during render, so React's double
  * mount in development closes the first one (which has nothing to send) and
@@ -33,6 +35,8 @@ import {
   type ScreenVersion,
   saveInWorkspace,
 } from './editor-autosave';
+import { isPremiumRefusal } from './premium-lock';
+import { addsPremiumLook } from './premium-model';
 import type { SaveState } from './studio-view-model';
 
 export interface AutosaveHandle {
@@ -100,6 +104,8 @@ export function useAutosave({
       },
       onSaved: (result) => saved.current(result),
       isOnline: () => typeof navigator === 'undefined' || navigator.onLine !== false,
+      isPremiumRefusal,
+      premiumHeld: addsPremiumLook,
     });
     controller.current = autosave;
 

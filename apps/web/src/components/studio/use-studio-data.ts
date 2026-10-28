@@ -14,7 +14,7 @@ import type { FormatId } from '@postgear/design-engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspaceScope } from '@/components/navigation/workspace-provider';
 import { ApiError, api } from '@/lib/api';
-import type { BrandKitView, DesignPage, DesignSummary } from '@/types/studio';
+import type { BrandKitView, DesignPage, DesignSummary, StudioAccess } from '@/types/studio';
 
 /** How long typing pauses before a search is sent. */
 const SEARCH_DELAY_MS = 250;
@@ -188,6 +188,25 @@ export function useBrandKits(initial: BrandKitView[] | null) {
   );
 
   return { ...request, kits: request.data?.brandKits ?? null, upsert, remove };
+}
+
+/**
+ * Whether the workspace's plan opens the premium looks (`premium-lock.tsx`).
+ * Null until it is known: nothing shows as locked meanwhile, and the API
+ * refuses a premium look it does not allow anyway, which opens the same
+ * dialog and calls `markLocked` so the rest of the page catches up.
+ */
+export function useStudioAccess(initial: StudioAccess | null) {
+  const request = useScopedGet<StudioAccess>(
+    '/studio/access',
+    initial,
+    'Your plan could not be checked.',
+  );
+  const { setData } = request;
+
+  const markLocked = useCallback(() => setData({ premium: false }), [setData]);
+
+  return { ...request, premium: request.data?.premium ?? null, markLocked };
 }
 
 /**

@@ -2,7 +2,9 @@
  * Edit Design (Sprint 9, Screen 4): the Design Studio editor.
  *
  * The server loads the design and the brand kits so the editor is there on
- * first paint. A design that is not there, or is another workspace's, is the
+ * first paint, with whether the plan includes premium looks (Sprint 9b), so
+ * the Design tab's premium themes and art are locked from the first paint
+ * too. A design that is not there, or is another workspace's, is the
  * not-found page: the API answers both alike, so nothing about it is shown.
  * One this version cannot read is handed down with the API's sentence. Any
  * other failure is handed down as `null`, and the editor tries again itself.
@@ -21,7 +23,7 @@ import {
 } from '@/components/studio/studio-editor-model';
 import { serverApi } from '@/lib/api';
 import { getActiveOrgId, getSessionCookieHeader } from '@/lib/session';
-import type { BrandKitView, DesignDetail } from '@/types/studio';
+import type { BrandKitView, DesignDetail, StudioAccess } from '@/types/studio';
 
 export const metadata: Metadata = { title: 'Edit Design' };
 
@@ -42,13 +44,15 @@ export default async function EditDesignPage({ params }: PageProps<'/[orgId]/stu
   const cookie = await getSessionCookieHeader();
   const pending = (await getActiveOrgId()) !== orgId;
 
-  const [loaded, kits] = pending
-    ? [null, null]
+  const [loaded, kits, access] = pending
+    ? [null, null, null]
     : await Promise.all([
         loadDesign(designId, cookie),
         serverApi<{ brandKits: BrandKitView[] }>('/studio/brand-kits', { cookie })
           .then((result) => result.brandKits)
           .catch(() => null),
+        // Not known is no lock at all: the island asks again, and the API has the last word.
+        serverApi<StudioAccess>('/studio/access', { cookie }).catch(() => null),
       ]);
 
   // Outside any try: `notFound()` works by throwing.
@@ -63,6 +67,7 @@ export default async function EditDesignPage({ params }: PageProps<'/[orgId]/stu
       designId={designId}
       initial={initial}
       initialKits={kits}
+      initialAccess={access}
     />
   );
 }

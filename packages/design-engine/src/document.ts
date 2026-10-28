@@ -17,8 +17,10 @@
  * it was given, unchanged and by reference, so the editor can tell "nothing
  * happened" apart from a change with `===`.
  */
+import { isArtId } from './art';
 import { clampText, singleLine } from './bindings';
 import { clampToRegion } from './constraints';
+import { isFormatId } from './formats';
 import {
   defaultLayoutFor,
   findLayout,
@@ -36,8 +38,10 @@ import {
   DESIGN_SCHEMA_VERSION,
   type DesignBrand,
   type DesignDocument,
+  type DesignFonts,
   type DesignSlide,
   type ElementState,
+  type FontId,
   type FormatId,
   type LogoPlacement,
   MAX_BRAND_NAME_LENGTH,
@@ -53,6 +57,7 @@ import {
   type SlotDef,
   type SlotId,
 } from './types';
+import { isKnownFont } from './typography';
 
 export const BLANK_PRESET_ID = 'blank';
 
@@ -75,11 +80,45 @@ export function slideId(): string {
 }
 
 export function emptyBrand(): DesignBrand {
-  return { kitId: null, colors: null, logoMediaId: null, name: null, kitVersion: null };
+  return {
+    kitId: null,
+    colors: null,
+    logoMediaId: null,
+    name: null,
+    kitVersion: null,
+    fonts: null,
+  };
 }
 
 function copyBrand(brand: DesignBrand): DesignBrand {
-  return { ...brand, colors: brand.colors ? { ...brand.colors } : null };
+  return {
+    ...brand,
+    colors: brand.colors ? { ...brand.colors } : null,
+    fonts: storedFonts(brand.fonts),
+  };
+}
+
+/**
+ * A choice of faces as a design keeps it: a copy, null when it chooses
+ * nothing, and a family the library does not have left to the face beneath
+ * rather than refused at the next autosave. A brand kit's fonts come through
+ * here, and a kit is edited elsewhere (possibly by a later release), so its
+ * choice is taken as far as it goes.
+ */
+function storedFonts(fonts: DesignFonts | null | undefined): DesignFonts | null {
+  const heading = fonts?.heading;
+  const body = fonts?.body;
+  const choice: DesignFonts = {
+    heading: isKnownFont(heading) ? heading : null,
+    body: isKnownFont(body) ? body : null,
+  };
+
+  return choice.heading === null && choice.body === null ? null : choice;
+}
+
+/** Whether two choices of faces set the same text. None at all and two nulls are the same. */
+function sameFonts(a: DesignFonts | null | undefined, b: DesignFonts | null | undefined): boolean {
+  return (a?.heading ?? null) === (b?.heading ?? null) && (a?.body ?? null) === (b?.body ?? null);
 }
 
 function copyBackground(background: SlideBackground): SlideBackground {
@@ -101,8 +140,9 @@ function defined(state: ElementState): ElementState {
  * Drops whatever a slot does not allow, so no edit made through this file can
  * produce an element the schema would refuse at the next autosave: text on a
  * bound or non-text slot, items past the slot's limit, a size step on a slot
- * without one, and so on. The schema still refuses all of these from a
- * client; this is the engine keeping its own writes valid.
+ * without one, a font on a slot with no words, and so on. The schema still
+ * refuses all of these from a client; this is the engine keeping its own
+ * writes valid.
  */
 function allowedBy(slot: SlotDef, state: ElementState): ElementState {
   const next = { ...state };
@@ -123,6 +163,7 @@ function allowedBy(slot: SlotDef, state: ElementState): ElementState {
     delete next.colorRole;
     delete next.color;
   }
+  if ((slot.kind !== 'text' && slot.kind !== 'list') || !isKnownFont(next.font)) delete next.font;
   if (slot.kind !== 'logo' || !next.placement || !slot.spots?.[next.placement])
     delete next.placement;
   if (next.hidden === false) delete next.hidden;
@@ -167,6 +208,11 @@ export function documentFromPreset(input: CreateDocumentInput): DesignDocument {
     format: input.format,
     presetId: preset.id,
     themeId: themeById(preset.themeId).id,
+    // Art the library does not have is a bug the preset tests catch; at run
+    // time the design simply starts without any.
+    art: isArtId(preset.art) ? preset.art : null,
+    // No font choice of its own: the brand kit's fonts, then the theme's.
+    fonts: null,
     brand: copyBrand(input.brand ?? emptyBrand()),
     handle: input.handle ?? SAMPLE_HANDLE,
     caption: '',
@@ -235,6 +281,8 @@ export function blankDocument(input: {
     format: input.format,
     presetId: BLANK_PRESET_ID,
     themeId: DEFAULT_THEME_ID,
+    art: null,
+    fonts: null,
     brand: copyBrand(input.brand ?? emptyBrand()),
     handle: input.handle ?? '',
     caption: '',
@@ -301,7 +349,10 @@ export function updateElement(
   });
 }
 
-/** Puts one element back to how its layout draws it. */
+/**
+ * Puts one element back to how its layout draws it: everything stored on it
+ * goes, its own font included.
+ */
 export function resetElement(document: DesignDocument, id: string, slotId: SlotId): DesignDocument {
   return updateSlide(document, id, (slide) => {
     if (!(slotId in slide.elements)) return slide;
@@ -310,6 +361,28 @@ export function resetElement(document: DesignDocument, id: string, slotId: SlotI
     delete elements[slotId];
     return { ...slide, elements };
   });
+}
+
+/**
+ * One element's own font over the design's (Element tab, Font), or null for
+ * the design's font again. Text and list slots only, since a picture has no
+ * words to set; a family the library does not have is ignored.
+ */
+export function setElementFont(
+  document: DesignDocument,
+  id: string,
+  slotId: SlotId,
+  font: FontId | null,
+): DesignDocument {
+  if (font !== null && !isKnownFont(font)) return document;
+
+  const slide = document.slides.find((entry) => entry.id === id);
+  const layout = slide ? findLayout(slide.layoutId) : null;
+  const slot = layout ? findSlot(layout, slotId) : null;
+  if (!slide || !slot || (slot.kind !== 'text' && slot.kind !== 'list')) return document;
+  if ((slide.elements[slotId]?.font ?? null) === font) return document;
+
+  return updateElement(document, id, slotId, { font: font ?? undefined });
 }
 
 /** Moves a logo to another place its layout offers. */
@@ -335,6 +408,40 @@ export function setBackground(
     ...slide,
     background: copyBackground(background),
   }));
+}
+
+/**
+ * Apply To All Slides: one slide's photo background, with its overlay and
+ * its tint, on every slide. A slide that already has exactly that photo is
+ * left as it is; a slide whose background is not a photo has none to give,
+ * so nothing changes.
+ */
+export function applyPhotoToAllSlides(document: DesignDocument, id: string): DesignDocument {
+  const photo = document.slides.find((slide) => slide.id === id)?.background;
+  if (photo?.kind !== 'media') return document;
+
+  let changed = false;
+  const slides = document.slides.map((slide) => {
+    if (samePhoto(slide.background, photo)) return slide;
+
+    changed = true;
+    return { ...slide, background: copyBackground(photo) };
+  });
+
+  return changed ? { ...document, slides } : document;
+}
+
+/** The same picture, overlay and tint. No tint is the dark one. */
+function samePhoto(
+  background: SlideBackground,
+  photo: Extract<SlideBackground, { kind: 'media' }>,
+): boolean {
+  return (
+    background.kind === 'media' &&
+    background.mediaId === photo.mediaId &&
+    background.overlay === photo.overlay &&
+    (background.tint ?? 'dark') === (photo.tint ?? 'dark')
+  );
 }
 
 /**
@@ -382,6 +489,7 @@ export function setSlideLayout(
       if (slot.colorable && old.color) carried.color = old.color;
       if (slot.resizable && old.size) carried.size = old.size;
       if (slot.alignable && old.align) carried.align = old.align;
+      if ((slot.kind === 'text' || slot.kind === 'list') && old.font) carried.font = old.font;
       if (slot.optional && old.hidden) carried.hidden = true;
       if (old.placement && slot.spots?.[old.placement]) carried.placement = old.placement;
 
@@ -477,11 +585,87 @@ export function applyTheme(document: DesignDocument, themeId: string): DesignDoc
 }
 
 /**
+ * The background art every slide that is not a photo draws, or null for
+ * None. Like a theme swap it changes no words; an id the library does not
+ * have is ignored.
+ */
+export function setArt(document: DesignDocument, id: string | null): DesignDocument {
+  if (id !== null && !isArtId(id)) return document;
+  return id === document.art ? document : { ...document, art: id };
+}
+
+/**
+ * The heading and body faces for the whole design (Design tab, Fonts), over
+ * the brand kit's and the theme's, or null to follow those again. A face
+ * left null keeps the one beneath it, and a choice of neither is stored as
+ * none at all. A family the library does not have is refused, as an unknown
+ * theme is.
+ */
+export function setDocumentFonts(
+  document: DesignDocument,
+  fonts: DesignFonts | null,
+): DesignDocument {
+  if (fonts && [fonts.heading, fonts.body].some((face) => face !== null && !isKnownFont(face))) {
+    return document;
+  }
+
+  const next = storedFonts(fonts);
+  return sameFonts(next, document.fonts) ? document : { ...document, fonts: next };
+}
+
+/**
+ * A new shape for the whole design (Design tab, Format).
+ *
+ * Refused, by returning the design unchanged, when any slide's layout cannot
+ * be drawn in that format. Otherwise every nudge is clamped again, the way
+ * the schema clamps it. A nudge and a slot's box are both percentages of the
+ * slot's region, so with today's layouts the clamp gives the same answer in
+ * every format; it runs anyway, so a design never comes out of a format
+ * change holding a position the schema would move at the next save.
+ */
+export function setFormat(document: DesignDocument, format: FormatId): DesignDocument {
+  if (!isFormatId(format) || format === document.format) return document;
+
+  const slides: DesignSlide[] = [];
+
+  for (const slide of document.slides) {
+    const layout = findLayout(slide.layoutId);
+    if (!layout?.formats.includes(format)) return document;
+
+    slides.push(withNudgesClamped(slide, layout));
+  }
+
+  return { ...document, format, slides };
+}
+
+/** A slide with every nudge clamped to its slot's region: the same slide when none moved. */
+function withNudgesClamped(slide: DesignSlide, layout: SlideLayout): DesignSlide {
+  let elements: DesignSlide['elements'] | null = null;
+
+  for (const [id, state] of Object.entries(slide.elements) as Array<
+    [SlotId, ElementState | undefined]
+  >) {
+    const slot = state?.offset ? findSlot(layout, id) : null;
+    if (!state?.offset || !slot) continue;
+
+    const offset = clampToRegion(slotPlacement(slot, state).box, state.offset);
+    if (offset.x === state.offset.x && offset.y === state.offset.y) continue;
+
+    elements ??= { ...slide.elements };
+    elements[id] = { ...state, offset };
+  }
+
+  return elements ? { ...slide, elements } : slide;
+}
+
+/**
  * Applies a brand kit to a design, or removes one.
  *
- * Only the design's `brand` changes. Slots keep their colour *roles*, which is
- * what makes a brand swap instant and reversible; a slot the user gave a
- * custom hex keeps that hex, because they asked for it by name.
+ * Only the design's `brand` changes, the kit's fonts with it (a font the user
+ * chose for the design or for one element still wins over them). Slots keep
+ * their colour *roles*, which is what makes a brand swap instant and
+ * reversible; a slot the user gave a custom hex keeps that hex, because they
+ * asked for it by name.
  */
 export function applyBrandKit(document: DesignDocument, brand: DesignBrand | null): DesignDocument {
   return { ...document, brand: brand ? copyBrand(brand) : emptyBrand() };
@@ -489,26 +673,109 @@ export function applyBrandKit(document: DesignDocument, brand: DesignBrand | nul
 
 /**
  * No Brand Kit: the design stops following a kit and takes its theme's own
- * colours again. The brand name and logo stay, as they do when a kit is
- * deleted: they are on the slides, where the person can see and change them.
+ * colours and fonts again. The brand name and logo stay, as they do when a
+ * kit is deleted: they are on the slides, where the person can see and
+ * change them.
  */
 export function detachBrandKit(document: DesignDocument): DesignDocument {
   const { brand } = document;
-  if (brand.kitId === null && brand.colors === null && brand.kitVersion === null) return document;
+  if (
+    brand.kitId === null &&
+    brand.colors === null &&
+    brand.kitVersion === null &&
+    brand.fonts === null
+  ) {
+    return document;
+  }
 
-  return { ...document, brand: { ...brand, kitId: null, colors: null, kitVersion: null } };
+  return {
+    ...document,
+    brand: { ...brand, kitId: null, colors: null, kitVersion: null, fonts: null },
+  };
 }
 
 /**
- * Takes a brand kit's newer colours (DS-2.5's Update Colours) and nothing
- * else: the design's brand name and logo stay as the user left them.
+ * Takes a brand kit's newer colours (DS-2.5, the editor's Update From Kit),
+ * and its newer fonts when they are given, and nothing else: the design's
+ * brand name and logo stay as the user left them. `fonts` left out keeps the
+ * fonts the design copied from the kit before; null clears them.
  */
 export function updateBrandColors(
   document: DesignDocument,
   colors: BrandColors,
   kitVersion: string,
+  fonts?: DesignFonts | null,
 ): DesignDocument {
-  return { ...document, brand: { ...document.brand, colors: { ...colors }, kitVersion } };
+  return {
+    ...document,
+    brand: {
+      ...document.brand,
+      colors: { ...colors },
+      kitVersion,
+      fonts: fonts === undefined ? document.brand.fonts : storedFonts(fonts),
+    },
+  };
+}
+
+/**
+ * The label a closing layout gives the text slot that holds a web address
+ * (the Signature closing slide's), the same one `samples.ts` reads to give
+ * that slot an address rather than a line.
+ */
+const LINK_LABEL = 'Link';
+
+/** A brand kit's call to action and link, as `applyCtaDefaults` takes them. */
+export interface CtaDefaults {
+  /** For a closing slide's `cta` slot. Null or blank leaves the slot as it is. */
+  text: string | null;
+  /** For the text slot a closing layout labels Link. Null or blank leaves it. */
+  url: string | null;
+}
+
+/**
+ * A brand kit's CTA defaults, written into every closing slide: `text` into
+ * its `cta` slot and `url` into the slot its layout labels Link. A layout
+ * with neither slot is left as it is.
+ *
+ * The API runs this once, when a design is created with a kit, so what those
+ * slots hold at that moment is the template's sample copy ("Book your call",
+ * "yourbrand.com"), never anything the person typed. It is replaced rather
+ * than kept: the kit's own call to action is the reason the kit has one. A
+ * Link slot the template hides is shown, because a kit with a link wants it
+ * seen. A blank default leaves its slot alone, so a kit with only a link
+ * keeps the template's call to action. Nothing to change returns the same
+ * document, by reference.
+ */
+export function applyCtaDefaults(document: DesignDocument, defaults: CtaDefaults): DesignDocument {
+  const text = ctaLine(defaults.text);
+  const url = ctaLine(defaults.url);
+  if (text === null && url === null) return document;
+
+  let next = document;
+
+  for (const slide of document.slides) {
+    const layout = findLayout(slide.layoutId);
+    if (layout?.role !== 'closing') continue;
+
+    for (const slot of layout.slots) {
+      // Bound slots take their words from the design, never from a slide.
+      if (slot.kind !== 'text' || slot.bind) continue;
+
+      const value = slot.label === LINK_LABEL ? url : slot.id === 'cta' ? text : null;
+      const state = slide.elements[slot.id];
+      if (value === null || (state?.text === value && !state.hidden)) continue;
+
+      next = updateElement(next, slide.id, slot.id, { text: value, hidden: undefined });
+    }
+  }
+
+  return next;
+}
+
+/** One line of a CTA default, cut to what a slot holds, or null when there is nothing to write. */
+function ctaLine(value: string | null | undefined): string | null {
+  const line = clampText(singleLine(value ?? '').trim(), MAX_TEXT_LENGTH);
+  return line === '' ? null : line;
 }
 
 /** The handle every handle slot shows. One line, trimmed to the limit. */
@@ -554,9 +821,11 @@ export function resetSlide(document: DesignDocument, id: string): DesignDocument
 }
 
 /**
- * Restores the whole design to its template: every slide and the theme. The
- * brand, the handle and the caption are the user's, not the template's, so
- * they stay. Slide ids are reused where they can be, so a selection survives.
+ * Restores the whole design to its template: every slide, the theme and the
+ * art, with the design's own font choice cleared. The brand (the kit's fonts
+ * included), the handle and the caption are the user's, not the template's,
+ * so they stay. Slide ids are reused where they can be, so a selection
+ * survives.
  */
 export function resetDocument(document: DesignDocument): DesignDocument {
   const ids = document.slides.map((slide) => slide.id);

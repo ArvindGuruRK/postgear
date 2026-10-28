@@ -12,7 +12,13 @@
  *   editor sends whatever is still unsaved. A save that met a newer version
  *   stops and asks (DS-6.2); one that was refused says why, with what is left
  *   to do: Try Again, Sign In for a session that ended, or Back To Studio for
- *   a design that was deleted.
+ *   a design that was deleted. A save refused for a premium look the plan
+ *   does not include (Sprint 9b) opens the dialog that says why and locks
+ *   premium looks from then on; the edits stay on screen, undoable, and the
+ *   save waits until the look is taken out, or until Try Again finds the
+ *   plan upgraded (See Plans opens in a new tab, so the edits stay here).
+ * - Make A Story Version (Design tab) saves, has the API copy the design as
+ *   a story, and opens the copy.
  * - A link that leaves the editor while something is unsaved saves it first,
  *   and asks only when that fails (DS-6.3). So does a move from the top bar
  *   (a workspace switch, signing out, a menu item, a search result, a
@@ -26,6 +32,7 @@
  * then loads it itself once the workspace is ready. A design that is not
  * there is the route's not-found page (`design-missing.tsx`).
  */
+import { CrownIcon } from '@animateicons/react/lucide/crown-icon';
 import { LogInIcon } from '@animateicons/react/lucide/log-in-icon';
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import { RotateCcwIcon } from '@animateicons/react/lucide/rotate-ccw-icon';
@@ -70,7 +77,7 @@ import { useWorkspaceScope } from '@/components/navigation/workspace-provider';
 import { api } from '@/lib/api';
 import { registerLeaveGuard } from '@/lib/leave-guard';
 import type { MediaItem } from '@/types/media';
-import type { BrandKitView, DesignDetail } from '@/types/studio';
+import type { BrandKitView, DesignDetail, StudioAccess } from '@/types/studio';
 import { ALERT_ICON, ALERT_TEXT, BackToStudio, DesignMissing } from './design-missing';
 import type { SaveRefusal, ScreenVersion } from './editor-autosave';
 import { EditorCanvas } from './editor-canvas';
@@ -88,6 +95,7 @@ import {
 import { EditorTopBar } from './editor-top-bar';
 import { ExportDialog } from './export-dialog';
 import { LayoutPickerDialog, type LayoutPickerMode } from './layout-picker-dialog';
+import { isPremiumRefusal, PremiumLockDialog } from './premium-lock';
 import { PreviewDialog } from './preview-dialog';
 import { SendDialog } from './send-dialog';
 import { ShareDialog } from './share-dialog';
@@ -113,13 +121,16 @@ import {
   mediaRefOf,
   mergeMedia,
   NO_OVERFLOW,
-  openerOf,
   type OverflowMap,
+  openerOf,
   pickedMediaId,
   pickerCopy,
   SAVE_FAILED_MESSAGE,
+  STORY_UNSAVED_MESSAGE,
+  type StoryVersionResult,
   settleWithin,
   shortcutOf,
+  storyVersionProblem,
   withKitLogo,
   withMediaRef,
   withOverflow,
@@ -129,7 +140,7 @@ import { StudioPanel } from './studio-ui';
 import { mediaResolver } from './studio-view-model';
 import { useAutosave } from './use-autosave';
 import { useDialog } from './use-dialog';
-import { useBrandKits } from './use-studio-data';
+import { useBrandKits, useStudioAccess } from './use-studio-data';
 
 /** What the canvas and the panel get for a slide with nothing too long on it. */
 const NO_SLOTS: readonly SlotId[] = [];
@@ -146,15 +157,29 @@ export interface StudioEditorProps {
   /** The server's answer, or null to load the design here. */
   initial: DesignOutcome | null;
   initialKits: BrandKitView[] | null;
+  /** Whether the plan includes premium looks, or null to ask here (Sprint 9b). */
+  initialAccess: StudioAccess | null;
 }
 
-export function StudioEditor({ orgId, designId, initial, initialKits }: StudioEditorProps) {
+export function StudioEditor({
+  orgId,
+  designId,
+  initial,
+  initialKits,
+  initialAccess,
+}: StudioEditorProps) {
   const { load, retry } = useDesignLoad(designId, initial);
 
   switch (load.kind) {
     case 'ready':
       return (
-        <EditorBody key={designId} orgId={orgId} design={load.design} initialKits={initialKits} />
+        <EditorBody
+          key={designId}
+          orgId={orgId}
+          design={load.design}
+          initialKits={initialKits}
+          initialAccess={initialAccess}
+        />
       );
     case 'loading':
       return <EditorSkeleton />;
@@ -207,10 +232,12 @@ function EditorBody({
   orgId,
   design,
   initialKits,
+  initialAccess,
 }: {
   orgId: string;
   design: DesignDetail;
   initialKits: BrandKitView[] | null;
+  initialAccess: StudioAccess | null;
 }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(editorReducer, design, (start) =>
@@ -230,6 +257,7 @@ function EditorBody({
   const resolveFull = useMemo(() => mediaResolver(media, 'full'), [media]);
   const resolveThumb = useMemo(() => mediaResolver(media, 'thumbnail'), [media]);
   const brandKits = useBrandKits(initialKits);
+  const { premium, markLocked, reload: reloadAccess } = useStudioAccess(initialAccess);
   const [tab, setTab] = useState<PanelTab>('element');
   const mac = useApplePlatform();
 
@@ -271,8 +299,10 @@ function EditorBody({
   const sending = useDialog<true>();
   const slidesSheet = useDialog<true>();
   const panelSheet = useDialog<true>();
+  const premiumLock = useDialog<true>();
   const [shareOpen, setShareOpen] = useState(false);
 
+  const openPremiumLock = premiumLock.open;
   const openPicker = picker.open;
   const openLayoutPicker = layoutPicker.open;
   const openReset = reset.open;
@@ -340,6 +370,32 @@ function EditorBody({
       openReset(what === 'slide' ? { what: 'slide', slideId } : { what: 'design' }),
     [openReset, slideId],
   );
+  const showPremiumLock = useCallback(() => openPremiumLock(true), [openPremiumLock]);
+
+  // ---- Make A Story Version (Sprint 9b) ---------------------------------------
+
+  // The API copies the saved design, so what is on screen is saved first.
+  const makeStoryVersion = useCallback(async (): Promise<StoryVersionResult> => {
+    if (!(await settleWithin(flush(), LEAVE_WAIT_MS))) {
+      return { opening: false, problem: STORY_UNSAVED_MESSAGE };
+    }
+
+    try {
+      const { design: copy } = await api<{ design: { id: string } }>(
+        `/studio/designs/${encodeURIComponent(design.id)}/duplicate`,
+        { method: 'POST', body: { format: 'story' } },
+      );
+      router.push(`/${orgId}/studio/${encodeURIComponent(copy.id)}`);
+      return { opening: true, problem: null };
+    } catch (cause) {
+      if (isPremiumRefusal(cause)) {
+        markLocked();
+        showPremiumLock();
+        return { opening: false, problem: null };
+      }
+      return { opening: false, problem: storyVersionProblem(cause) };
+    }
+  }, [flush, design.id, router, orgId, markLocked, showPremiumLock]);
 
   // ---- Undo and Redo from the keyboard (DS-4.8) ------------------------------
 
@@ -469,6 +525,20 @@ function EditorBody({
     if (href) router.push(href);
   }
 
+  // ---- A premium look the plan does not include (Sprint 9b) --------------------
+
+  // The panel thought the look was open (a plan that lapsed in another tab, or
+  // access not known yet) and the API refused the save. Premium looks lock
+  // from now on, and the dialog says why; the autosave holds the save until
+  // the look is taken out, so this runs once per refusal, not in a loop.
+  const premiumRefused = status === 'failed' && refusal?.kind === 'premium';
+
+  useEffect(() => {
+    if (!premiumRefused) return;
+    markLocked();
+    showPremiumLock();
+  }, [premiumRefused, markLocked, showPremiumLock]);
+
   // ---- A save that met a newer version (DS-6.2) ------------------------------
 
   // A save problem's alert goes once it is answered, and the pressed button
@@ -488,6 +558,9 @@ function EditorBody({
 
   function retrySave() {
     answered.current = true;
+    // A plan upgraded in another tab: the save goes through, and asking for
+    // access again unlocks the premium tiles with it.
+    if (refusal?.kind === 'premium') reloadAccess();
     retry();
   }
 
@@ -627,6 +700,9 @@ function EditorBody({
     onPickMedia: openPicker,
     onChangeLayout: openChangeLayout,
     onKitApplied: addKitLogo,
+    premium,
+    onPremiumLocked: showPremiumLock,
+    onMakeStoryVersion: makeStoryVersion,
   };
 
   return (
@@ -758,6 +834,7 @@ function EditorBody({
         flush={flush}
         issues={issues}
         onExported={ignore}
+        format={doc.format}
       />
 
       <SendDialog
@@ -778,6 +855,12 @@ function EditorBody({
         designId={design.id}
         title={title}
         flush={flush}
+      />
+
+      <PremiumLockDialog
+        newTab
+        open={premiumLock.value !== null}
+        onOpenChange={premiumLock.onOpenChange}
       />
 
       <AlertDialog open={resetTarget !== null} onOpenChange={reset.onOpenChange}>
@@ -928,11 +1011,14 @@ function ConflictAlert({ onChoose }: { onChoose: (choice: ConflictChoice) => Pro
 }
 
 /**
- * A save the server refused (DS-6.2): why, and the one thing left to do.
- * Try Again only where another try can work. A session that ended signs in
+ * A save the server refused (DS-6.2): why, and what is left to do. Try
+ * Again only where another try can work. A session that ended signs in
  * again and comes back to this design; a design that was deleted (the save
  * has already pointed the API back at this workspace once, see
- * `saveInWorkspace`) goes back to Studio, since nothing can save it.
+ * `saveInWorkspace`) goes back to Studio, since nothing can save it. A
+ * premium look the plan does not include points at the plans, in a new tab
+ * so the edits stay here, with Try Again for once the plan is upgraded there;
+ * taking the look out (Undo, or a free one) saves on its own.
  */
 function RefusalAlert({
   orgId,
@@ -958,6 +1044,17 @@ function RefusalAlert({
           <MotionIcon icon={LogInIcon} className="h-4 w-4" />
           Sign In
         </ActionLink>
+      ) : kind === 'premium' ? (
+        <div className="flex flex-wrap gap-2">
+          <ActionLink href={`/${orgId}/settings/billing`} target="_blank" rel="noopener">
+            <MotionIcon icon={CrownIcon} className="h-4 w-4" />
+            See Plans
+          </ActionLink>
+          <Button variant="secondary" size="sm" onClick={onRetry}>
+            <MotionIcon icon={RotateCcwIcon} className="h-4 w-4" />
+            Try Again
+          </Button>
+        </div>
       ) : (
         <Button variant="secondary" size="sm" onClick={onRetry}>
           <MotionIcon icon={RotateCcwIcon} className="h-4 w-4" />

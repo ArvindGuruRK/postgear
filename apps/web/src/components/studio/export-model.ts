@@ -17,11 +17,17 @@
  *   are real files, and the API keeps them for the same reason.
  * - **Late events are dropped.** An event that arrives once the run has
  *   ended belongs to a stream nobody is following any more.
+ *
+ * Sprint 9b adds the image size (1x, or 2x: twice the pixels of the format,
+ * for print and sharp screens) and the downloads' names: the zip, and the
+ * PDF of the same images.
  */
+import { FORMATS, type FormatId } from '@postgear/design-engine';
 import type {
   DesignStatusView,
   ExportedSlideView,
   ExportImageFormat,
+  ExportScale,
   StudioExportEvent,
 } from '@/types/studio';
 
@@ -95,6 +101,7 @@ export interface ExportState {
   mode: RunMode;
   phase: RunPhase;
   imageFormat: ExportImageFormat;
+  scale: ExportScale;
   /** How many slides the design has, from `start`; null before it, and for a reused export. */
   total: number | null;
   /** The export size in pixels, from `start`. */
@@ -116,6 +123,8 @@ export interface ExportState {
 export type ExportAction =
   /** JPEG or PNG. Ignored while a run is going. */
   | { type: 'choose'; imageFormat: ExportImageFormat }
+  /** 1x or 2x. Ignored while a run is going. */
+  | { type: 'scale'; scale: ExportScale }
   /** Export or Send was pressed: what is on screen is saved first. Clears the last run. */
   | { type: 'begin' }
   /** That save did not reach the server. */
@@ -148,6 +157,8 @@ export function initialExportState(mode: RunMode): ExportState {
     // The composer's Instagram rule takes JPEG only, so JPEG is what a
     // person who never looks at the choice should get.
     imageFormat: 'jpeg',
+    // The size every platform shows; 2x is for print and sharp screens.
+    scale: 1,
     total: null,
     size: null,
     current: null,
@@ -162,6 +173,11 @@ export function initialExportState(mode: RunMode): ExportState {
 
 export function isImageFormat(value: string): value is ExportImageFormat {
   return value === 'jpeg' || value === 'png';
+}
+
+/** The radio group's value ("1" or "2") as a scale, or null. */
+export function scaleOf(value: string): ExportScale | null {
+  return value === '1' ? 1 : value === '2' ? 2 : null;
 }
 
 /** Something is happening that closing the dialog would stop. */
@@ -181,8 +197,18 @@ export function exportReducer(state: ExportState, action: ExportAction): ExportS
         ? state
         : { ...state, imageFormat: action.imageFormat };
 
+    case 'scale':
+      return isRunning(state) || state.scale === action.scale
+        ? state
+        : { ...state, scale: action.scale };
+
     case 'begin':
-      return { ...initialExportState(state.mode), imageFormat: state.imageFormat, phase: 'saving' };
+      return {
+        ...initialExportState(state.mode),
+        imageFormat: state.imageFormat,
+        scale: state.scale,
+        phase: 'saving',
+      };
 
     case 'unsaved':
       return state.phase === 'saving'
@@ -510,11 +536,11 @@ function slideNumberOf(text: string): number {
 const UNSAFE_FILE_CHARACTERS = /[\u0000-\u001f\u007f<>:"/\\|?*]+/g;
 
 /**
- * What Download All saves the zip as when the API's own name does not come
+ * What a download is saved as when the API's own name does not come
  * through: the design's title made safe for every file system, as the API
  * makes it.
  */
-export function zipFileName(title: string): string {
+function downloadName(title: string, extension: 'zip' | 'pdf'): string {
   const cleaned = title
     .replace(UNSAFE_FILE_CHARACTERS, ' ')
     .replace(/\s+/g, ' ')
@@ -523,5 +549,52 @@ export function zipFileName(title: string): string {
     .replace(/[. ]+$/g, '');
   const name = Array.from(cleaned).slice(0, 150).join('').trim();
 
-  return `${name || 'Design'}.zip`;
+  return `${name || 'Design'}.${extension}`;
+}
+
+/** Download All's zip. */
+export function zipFileName(title: string): string {
+  return downloadName(title, 'zip');
+}
+
+/** Download PDF's file (Sprint 9b): the same images, a page each. */
+export function pdfFileName(title: string): string {
+  return downloadName(title, 'pdf');
+}
+
+/** Said beside the downloads: the zip carries the caption too, as the API packs it. */
+export const DOWNLOAD_NOTE =
+  'Download All also holds the caption as captions.txt, when the design has one.';
+
+/** "2160 x 2700": the pixels an image of this format is drawn at, at this scale. */
+export function scaledSizeLabel(format: FormatId, scale: ExportScale): string {
+  const { width, height } = FORMATS[format];
+  return `${width * scale} x ${height * scale}`;
+}
+
+export interface ScaleChoice {
+  value: ExportScale;
+  title: string;
+  hint: string;
+}
+
+/**
+ * The size tiles: 1x and 2x, with the pixels each makes when the format is
+ * known (the editor passes it), and in words when it is not.
+ */
+export function scaleChoices(format: FormatId | null): ScaleChoice[] {
+  const size = (scale: ExportScale) => (format ? `${scaledSizeLabel(format, scale)}. ` : '');
+
+  return [
+    {
+      value: 1,
+      title: '1x',
+      hint: `${size(1)}The size every platform shows.`,
+    },
+    {
+      value: 2,
+      title: '2x',
+      hint: `${size(2)}Twice the pixels, for print and sharp screens. The files are bigger.`,
+    },
+  ];
 }

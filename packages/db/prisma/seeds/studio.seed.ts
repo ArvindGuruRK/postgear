@@ -31,7 +31,7 @@ const BRAND_KIT_ID = 'seed-brand-kit-lotus';
 const CAROUSEL_ID = 'seed-design-carousel';
 const SINGLE_ID = 'seed-design-single';
 
-/** The kit's `updatedAt`, fixed so re-seeding never offers Update Colours against itself. */
+/** The kit's `updatedAt`, fixed so re-seeding never offers Update From Kit against itself. */
 const KIT_VERSION = '2026-10-27T09:00:00.000Z';
 
 const BRAND_COLORS = {
@@ -51,6 +51,8 @@ function brand() {
     // every brand-name and handle slot shows these (`bindings.ts`).
     name: 'Lotus Flow Yoga',
     kitVersion: KIT_VERSION,
+    // The kit sets no fonts of its own, so the theme's stay (schema version 2).
+    fonts: null,
   };
 }
 
@@ -61,10 +63,12 @@ function brand() {
  * the statistic layout to a quote, as a user might.
  */
 const CAROUSEL_DOCUMENT = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   format: 'portrait',
   presetId: 'tips-steps-ink',
   themeId: 'ink',
+  art: null,
+  fonts: null,
   brand: brand(),
   handle: '@lotusflowyoga',
   caption:
@@ -144,10 +148,12 @@ const CAROUSEL_DOCUMENT = {
  * so it has no `origin` and Reset Slide gives it the layout's sample words.
  */
 const SINGLE_DOCUMENT = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   format: 'landscape',
   presetId: 'announcement-launch-ink',
   themeId: 'slate',
+  art: null,
+  fonts: null,
   brand: brand(),
   handle: '@lotusflowyoga',
   caption: 'Saturday mornings are back, 8am, all levels. Booking link in our bio.',

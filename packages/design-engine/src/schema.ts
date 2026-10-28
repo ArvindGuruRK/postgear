@@ -25,6 +25,7 @@
  * ("split-picture@1"), so a layout can change without every document moving.
  */
 import { z } from 'zod';
+import { isArtId } from './art';
 import { isHexColor, normalizeHex } from './color';
 import { clampToRegion } from './constraints';
 import { FORMAT_IDS } from './formats';
@@ -44,6 +45,7 @@ import {
   MAX_TEXT_LENGTH,
   SLOT_IDS,
 } from './types';
+import { isKnownFont } from './typography';
 
 const hex = z
   .string()
@@ -116,6 +118,24 @@ export const brandColorsSchema = z
   })
   .strict();
 
+/**
+ * A family the library ships. Refused rather than dropped, like a theme: a
+ * font id is only ever written by a font picker, so an unknown one is a stale
+ * client or a forged request, not a typo to forgive.
+ */
+export const fontIdSchema = z
+  .string()
+  .max(64)
+  .refine(isKnownFont, 'That font is not one PostGear offers.');
+
+/** A design's or a brand kit's choice of faces. Null keeps the one beneath it. */
+export const designFontsSchema = z
+  .object({
+    heading: fontIdSchema.nullable(),
+    body: fontIdSchema.nullable(),
+  })
+  .strict();
+
 export const elementStateSchema = z
   .object({
     text: plainText.optional(),
@@ -135,6 +155,7 @@ export const elementStateSchema = z
     align: z.enum(['start', 'center', 'end']).optional(),
     colorRole: colorRole.optional(),
     color: hex.optional(),
+    font: fontIdSchema.optional(),
     placement: logoPlacement.optional(),
   })
   .strict();
@@ -146,8 +167,10 @@ export const slideBackgroundSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('media'),
       mediaId: rowId,
-      /** 0 is the bare photo, 1 is black. The slider offers 0 to 0.8. */
+      /** 0 is the bare photo, 1 is the tint's own colour. The slider offers 0 to 0.8. */
       overlay: z.number().finite().min(0).max(1),
+      /** Black under light ink, or white under dark ink. Absent is the dark tint. */
+      tint: z.enum(['dark', 'light']).optional(),
     })
     .strict(),
 ]);
@@ -219,6 +242,9 @@ export const designSlideSchema = z
       if ((state.colorRole !== undefined || state.color !== undefined) && !slot.colorable) {
         issue([id, 'color'], 'That element has the colour its layout gives it.');
       }
+      if (state.font !== undefined && slot.kind !== 'text' && slot.kind !== 'list') {
+        issue([id, 'font'], 'That element has no text to set in a font.');
+      }
       if (state.placement !== undefined && !slot.spots?.[state.placement]) {
         issue([id, 'placement'], 'That layout does not offer the logo in that place.');
       }
@@ -253,6 +279,7 @@ export const designBrandSchema = z
     name: oneLine(MAX_BRAND_NAME_LENGTH).nullable(),
     /** The kit's `updatedAt`, as an ISO timestamp. */
     kitVersion: z.string().datetime().nullable(),
+    fonts: designFontsSchema.nullable(),
   })
   .strict();
 
@@ -267,6 +294,13 @@ export const designDocumentSchema = z
       .max(80)
       .regex(/^[a-z0-9-]+$/, 'That is not a template id.'),
     themeId: z.string().refine(isThemeId, 'That theme is not one PostGear offers.'),
+    /** Held to the library like the theme: a design names art PostGear draws, or none. */
+    art: z
+      .string()
+      .max(64)
+      .refine(isArtId, 'That background art is not one PostGear offers.')
+      .nullable(),
+    fonts: designFontsSchema.nullable(),
     brand: designBrandSchema,
     handle: oneLine(MAX_HANDLE_LENGTH).default(''),
     caption: z.string().max(MAX_CAPTION_LENGTH).transform(clean),
@@ -337,13 +371,26 @@ type UpgradeStep = (document: Record<string, unknown>) => Record<string, unknown
 
 /**
  * One entry per version, taking the shape at N and returning the shape at
- * N+1. Empty today, which is the point: the table exists, is called on every
- * read and has a test, so the first real migration is a line here rather than
- * an archaeology exercise.
+ * N+1. A step is written against the stored shape, never against today's
+ * types, and once released it never changes: a row saved at version 1 is
+ * moved forward the same way however many versions later it is read.
  */
 const UPGRADE_STEPS: Record<number, UpgradeStep> = {
-  // 1: (document) => ({ ...document, schemaVersion: 2, ... }),
+  // 2 added the background art, the design's fonts and the brand kit's
+  // fonts. A design saved before had none of them, which is exactly null.
+  // A brand that is not an object is left for the schema to refuse.
+  1: (document) => ({
+    ...document,
+    schemaVersion: 2,
+    art: null,
+    fonts: null,
+    brand: isRecord(document.brand) ? { ...document.brand, fonts: null } : document.brand,
+  }),
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 /** Moves a stored document up to the current schema, one version at a time. */
 export function upgrade(value: unknown): unknown {

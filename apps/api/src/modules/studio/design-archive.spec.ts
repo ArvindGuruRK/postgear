@@ -9,6 +9,8 @@ import {
   type ArchiveEntry,
   archiveFileName,
   archiveNames,
+  CAPTION_FILE_NAME,
+  captionEntry,
   sendArchive,
   zipStored,
 } from './design-archive';
@@ -137,6 +139,45 @@ describe('archiveFileName', () => {
   it('names the zip after the design', () => {
     expect(archiveFileName('Spring Sale')).toBe('Spring Sale.zip');
     expect(archiveFileName('  /// ')).toBe('Design.zip');
+  });
+});
+
+describe('captionEntry (Sprint 9b)', () => {
+  const text = (entry: ArchiveEntry | null) => new TextDecoder().decode(entry?.bytes);
+
+  it('writes the caption as UTF-8 text with one line break at the end', () => {
+    const entry = captionEntry(`Five tips\r\nfor spring at the ${CAFE}\rsee you there`);
+
+    expect(entry?.name).toBe(CAPTION_FILE_NAME);
+    expect(text(entry)).toBe(`Five tips\nfor spring at the ${CAFE}\nsee you there\n`);
+    // No byte order mark: the file starts with the caption itself.
+    expect(entry?.bytes[0]).toBe('F'.charCodeAt(0));
+  });
+
+  it('is left out for a caption that is empty or only space', () => {
+    expect(captionEntry('')).toBeNull();
+    expect(captionEntry(' \n\t ')).toBeNull();
+  });
+
+  it('cannot take a slide name: every slide ends in an image extension', () => {
+    const slides = archiveNames([
+      { name: 'captions.txt', mimeType: 'image/jpeg' },
+      { name: 'captions', mimeType: 'image/png' },
+    ]);
+
+    expect(slides).toEqual(['captions.txt.jpg', 'captions.png']);
+    expect(slides).not.toContain(CAPTION_FILE_NAME);
+  });
+
+  it('unzips next to the slides', async () => {
+    const caption = captionEntry('Save this for later') as ArchiveEntry;
+    const zip = await collect(
+      zipStored(from([{ name: 'Slide 01.jpg', bytes: bytes('jpg') }, caption])),
+    );
+
+    const files = unzipSync(zip);
+    expect(Object.keys(files)).toEqual(['Slide 01.jpg', CAPTION_FILE_NAME]);
+    expect(new TextDecoder().decode(files[CAPTION_FILE_NAME])).toBe('Save this for later\n');
   });
 });
 

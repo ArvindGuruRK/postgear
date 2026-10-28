@@ -25,11 +25,20 @@ export const STUDIO_MESSAGES = {
   TEMPLATE_NOT_FOUND: 'That template could not be found.',
   TEMPLATE_WRONG_FORMAT: 'That template is not available in this format.',
 
+  // Premium (Sprint 9b)
+  /**
+   * The lock's tooltip in the gallery, and the 402 the API answers when a
+   * workspace without a paid plan starts from a premium look.
+   */
+  PREMIUM_LOCKED: 'Premium templates come with a paid plan.',
+
   // Brand kits
   BRAND_KIT_NOT_FOUND: 'That brand kit could not be found.',
   BRAND_KIT_DELETED: 'Brand kit deleted. Designs that used it keep their colours.',
   BRAND_KIT_NAME_REQUIRED: 'Enter a name for this brand kit.',
   WEBSITE_INVALID: 'Enter a website address like https://example.com.',
+  /** The kit's call to action link is shown on a slide as text, so it is one word. */
+  CTA_URL_INVALID: 'Enter the link without spaces, like yourbrand.com/offer.',
   LOGO_NOT_FOUND: 'That logo is no longer in your media library.',
   LOGO_NO_FILE: 'Choose a logo to upload.',
   /** The stories' exact sentence for a logo of the wrong type or size. */
@@ -53,10 +62,12 @@ export const STUDIO_MESSAGES = {
   CHANNEL_UNAVAILABLE:
     'One of the chosen channels is no longer connected. Choose your channels again.',
 
-  // Download All
+  // Download All and PDF
   DOWNLOAD_NOTHING: 'Export this design first, then download it.',
   DOWNLOAD_MISSING:
     'Some exported slides are no longer in your media library. Export again to download them all.',
+  PDF_FAILED: 'The PDF could not be made. Please try again.',
+  PDF_BUSY: 'The PDF of this design is already being made. Wait for it to finish.',
 
   // Share links
   SHARE_NOT_FOUND: 'That share link could not be found.',
@@ -82,6 +93,24 @@ export const STUDIO_MESSAGES = {
 
   shareLimit(max: number): string {
     return `This design already has ${max} working share links. Revoke one to make another.`;
+  },
+
+  /**
+   * Make A Story Version (or any duplicate in a new format) when a slide's
+   * layout has no such shape. Names the slide, so the fix is one click away.
+   */
+  formatUnavailable(slideIndex: number, format: string): string {
+    return `Slide ${slideIndex + 1} uses a layout with no ${format} version. Change its layout, then try again.`;
+  },
+
+  /**
+   * What a copy is called: "Spring Sale (Copy)", or "Spring Sale (Story)" for
+   * a copy in another format. The original is shortened, never the label, so
+   * the name stays inside `max` and still says what it is.
+   */
+  copyName(name: string, max: number, label = 'Copy'): string {
+    const suffix = ` (${label})`;
+    return `${name.slice(0, max - suffix.length).trimEnd()}${suffix}`;
   },
 } as const;
 

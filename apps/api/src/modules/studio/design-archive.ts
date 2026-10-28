@@ -31,6 +31,24 @@ export function archiveFileName(title: string): string {
 }
 
 /**
+ * The caption file Download All adds after the slides (Sprint 9b). No slide
+ * can take this name: every slide name ends in an image extension.
+ */
+export const CAPTION_FILE_NAME = 'captions.txt';
+
+/**
+ * The design's caption as a text file, or null when there is no caption to
+ * put in one. UTF-8 without a byte order mark (every current editor reads
+ * it, emoji included), with the line breaks Preview shows and one at the end.
+ */
+export function captionEntry(caption: string): ArchiveEntry | null {
+  const text = caption.replace(/\r\n?/g, '\n').trim();
+  if (!text) return null;
+
+  return { name: CAPTION_FILE_NAME, bytes: new TextEncoder().encode(`${text}\n`) };
+}
+
+/**
  * The name of each slide inside the zip, in order: the library's own name
  * ("Spring Sale 01.jpg"), made safe, given the extension its type calls for
  * when it lacks one, and made unique (an unzip would otherwise overwrite one

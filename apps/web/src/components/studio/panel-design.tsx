@@ -2,71 +2,99 @@
 
 /**
  * The Design tab of the editor's properties panel (Sprint 9, DS-4.5 and
- * DS-2.5): what every slide of the design shares.
+ * DS-2.5; Sprint 9b): what every slide of the design shares.
  *
- * - Theme: every theme as a tile drawing the slide on the canvas in it. The
- *   tiles follow the design a beat behind (`useDeferredValue`) and each one
- *   redraws only when what it shows changes, so typing stays smooth.
+ * - Theme and Background Art: tiles drawn in the design's own colours, one
+ *   collection or group at a time (`theme-tiles.tsx`, `art-tiles.tsx`).
+ *   Premium looks a plan does not include show the lock.
  * - Brand kit: apply one, or none. A kit deleted since says so, and the
  *   design keeps its colours and logo; a kit edited since offers Update
  *   Colours, and never changes the design on its own (section 5, DS-2.5).
+ * - Custom Colours: the five colours every slide is drawn in, the design's
+ *   own from here on, with the way back to its kit's or its theme's.
+ * - Fonts: a heading and a body face for the whole design, over the kit's
+ *   and the theme's, with every family's licence one click away.
  * - The brand name and the handle every slide shows, typed once.
- * - The format, for information (its name, ratio and export size): it is
- *   chosen when a design is created.
+ * - Format: the design's shape, changed in place (a layout without that
+ *   shape says so), or Make A Story Version, a 9:16 copy opened beside it.
+ *
+ * While the brand kit locks the design's look (`useBrandLookLocked`), Custom
+ * Colours and Fonts are left out and one sentence says why; the kit's
+ * colours show in the Brand Kit section instead.
  */
+import { CopyPlusIcon } from '@animateicons/react/lucide/copy-plus-icon';
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
+import { RotateCcwIcon } from '@animateicons/react/lucide/rotate-ccw-icon';
 import {
-  applyBrandKit,
-  applyTheme,
+  BRAND_COLOR_KEYS,
   type DesignDocument,
   detachBrandKit,
-  FORMATS,
+  isFormatId,
   MAX_BRAND_NAME_LENGTH,
   MAX_HANDLE_LENGTH,
   setBrandName,
+  setFormat,
   setHandle,
-  THEMES,
-  updateBrandColors,
 } from '@postgear/design-engine';
 import {
   Alert,
   AlertDescription,
   Button,
-  cn,
   FormField,
   FormHelperText,
   FormLabel,
   Input,
   MotionIcon,
-  pressSm,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Spinner,
 } from '@postgear/ui';
-import { Check } from 'lucide-react';
-import { memo, useCallback, useDeferredValue, useId, useMemo } from 'react';
+import { useId, useState } from 'react';
 import type { BrandKitView, StudioMediaRef } from '@/types/studio';
-import { FOCUS } from './design-card';
-import { kitSelectValue, NO_KIT } from './editor-panel-model';
-import type { ApplyChange } from './editor-state';
-import { KitSwatches } from './kit-preview';
-import { GroupLabel, NOTE, PanelSection, useChosenRing } from './panel-ui';
-import { SlideFrame } from './slide-frame';
-import { INSET } from './studio-ui';
+import { ArtSection } from './art-tiles';
 import {
-  brandFromKitView,
-  formatHint,
-  formatName,
-  kitNotice,
-  mediaResolver,
-} from './studio-view-model';
+  colorResetOf,
+  DESIGN_LOCK_NOTE,
+  designColors,
+  designFontDefault,
+  designFontOf,
+  designTextReads,
+  formatChoices,
+  hasOwnFonts,
+  kitSelectValue,
+  NO_KIT,
+  offersStoryVersion,
+  TYPE_FACES,
+  withColorReset,
+  withDesignColor,
+  withDesignFont,
+  withKit,
+  withKitFonts,
+  withKitUpdate,
+} from './editor-panel-model';
+import type { ApplyChange } from './editor-state';
+import { FontLicencesDialog } from './font-licences-dialog';
+import { FontSelect } from './font-select';
+import { KitSwatches } from './kit-preview';
+import {
+  COLOR_ROWS,
+  CustomColorField,
+  GroupLabel,
+  NOTE,
+  PanelSection,
+  useBrandLookLocked,
+} from './panel-ui';
+import type { StoryVersionResult } from './studio-editor-model';
+import { COLOR_LABELS, formatHint, kitNotice } from './studio-view-model';
+import { ThemeSection } from './theme-tiles';
 
 export interface DesignPanelProps {
   document: DesignDocument;
-  /** The slide on the canvas, which the theme tiles draw. */
+  /** The slide on the canvas, which the theme and art tiles draw. */
   slideId: string;
   /** Every picture the design draws, by media id. */
   media: Readonly<Record<string, StudioMediaRef>>;
@@ -77,9 +105,15 @@ export interface DesignPanelProps {
   onChange: ApplyChange;
   /** A kit was applied: the editor adds its logo to the pictures it knows. */
   onKitApplied: (kit: BrandKitView) => void;
+  /** Whether the plan includes premium looks; null while that is not known (nothing is locked). */
+  premium: boolean | null;
+  /** A locked look was chosen: the editor opens the dialog that says why. */
+  onPremiumLocked: () => void;
+  /** Saves, has the API copy the design as a story, and opens the copy. */
+  onMakeStoryVersion: () => Promise<StoryVersionResult>;
 }
 
-/** The Design tab: theme, brand kit, brand name and handle, format. */
+/** The Design tab: theme, art, brand kit, colours, fonts, brand name and handle, format. */
 export function DesignPanel({
   document,
   slideId,
@@ -89,154 +123,49 @@ export function DesignPanel({
   onReloadKits,
   onChange,
   onKitApplied,
+  premium,
+  onPremiumLocked,
+  onMakeStoryVersion,
 }: DesignPanelProps) {
+  const locked = useBrandLookLocked();
+
   return (
     <div className="flex flex-col gap-6">
-      <ThemeSection document={document} slideId={slideId} media={media} onChange={onChange} />
+      <ThemeSection
+        document={document}
+        slideId={slideId}
+        media={media}
+        premium={premium}
+        onChange={onChange}
+        onLocked={onPremiumLocked}
+      />
+      <ArtSection
+        document={document}
+        slideId={slideId}
+        premium={premium}
+        onChange={onChange}
+        onLocked={onPremiumLocked}
+      />
       <BrandKitSection
         document={document}
         kits={kits}
         kitsError={kitsError}
+        locked={locked}
         onReloadKits={onReloadKits}
         onChange={onChange}
         onKitApplied={onKitApplied}
       />
+      {locked ? null : <ColorsSection document={document} kits={kits} onChange={onChange} />}
+      {locked ? null : <FontsSection document={document} onChange={onChange} />}
       <NameSection document={document} onChange={onChange} />
-      <PanelSection title="Format">
-        <p className="m-0 type-ui text-sm text-ink">{formatName(document.format)}</p>
-        <p className={NOTE}>{formatHint(document.format)}</p>
-        <p className={NOTE}>The format is chosen when a design is created.</p>
-      </PanelSection>
+      <FormatSection
+        document={document}
+        onChange={onChange}
+        onMakeStoryVersion={onMakeStoryVersion}
+      />
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Theme
-// ---------------------------------------------------------------------------
-
-/** Every theme, each drawn on the slide on the canvas (DS-4.5). */
-function ThemeSection({
-  document,
-  slideId,
-  media,
-  onChange,
-}: {
-  document: DesignDocument;
-  slideId: string;
-  media: Readonly<Record<string, StudioMediaRef>>;
-  onChange: ApplyChange;
-}) {
-  const headingId = useId();
-  // The tiles draw this, a beat behind the design: React draws them when the
-  // typing that changed it has been shown, and drops a drawing overtaken by
-  // the next keystroke.
-  const deferred = useDeferredValue(document);
-  const resolveMedia = useMemo(() => mediaResolver(media, 'thumbnail'), [media]);
-  const index = Math.max(
-    0,
-    deferred.slides.findIndex((slide) => slide.id === slideId),
-  );
-  const pick = useCallback(
-    (themeId: string) => onChange((latest) => applyTheme(latest, themeId)),
-    [onChange],
-  );
-
-  return (
-    <PanelSection title="Theme" headingId={headingId}>
-      <ul aria-labelledby={headingId} className="m-0 grid list-none grid-cols-2 gap-3 p-0">
-        {THEMES.map((theme) => (
-          <li key={theme.id} className="min-w-0">
-            <ThemeTile
-              design={deferred}
-              index={index}
-              themeId={theme.id}
-              name={theme.name}
-              current={theme.id === document.themeId}
-              resolveMedia={resolveMedia}
-              onPick={pick}
-            />
-          </li>
-        ))}
-      </ul>
-    </PanelSection>
-  );
-}
-
-interface ThemeTileProps {
-  design: DesignDocument;
-  index: number;
-  themeId: string;
-  name: string;
-  current: boolean;
-  resolveMedia: (mediaId: string) => string | null;
-  onPick: (themeId: string) => void;
-}
-
-/**
- * One theme, drawn on the slide by the real renderer. It redraws only when
- * what it shows changes: that slide, its number, or the brand, handle or
- * format every slide shares. The design's own theme is not among them, since
- * the tile draws its own.
- */
-const ThemeTile = memo(
-  function ThemeTile({
-    design,
-    index,
-    themeId,
-    name,
-    current,
-    resolveMedia,
-    onPick,
-  }: ThemeTileProps) {
-    const ring = useChosenRing();
-    const preview = useMemo(() => applyTheme(design, themeId), [design, themeId]);
-    const spec = FORMATS[design.format];
-
-    return (
-      <button
-        type="button"
-        aria-current={current ? 'true' : undefined}
-        onClick={() => onPick(themeId)}
-        className={cn(
-          'flex w-full flex-col gap-2 rounded-card border-2 border-outline bg-secondary p-2 text-left',
-          pressSm,
-          FOCUS,
-          current && ring,
-        )}
-      >
-        <span
-          className={cn(INSET, 'flex aspect-square items-center justify-center bg-halftone p-2')}
-        >
-          <span
-            className="block border-2 border-outline shadow-brutalSm"
-            style={{ width: `${Math.min(1, spec.width / spec.height) * 100}%` }}
-          >
-            <SlideFrame design={preview} index={index} resolveMedia={resolveMedia} lazy />
-          </span>
-        </span>
-        <span className="flex min-w-0 items-center gap-1">
-          {current ? (
-            <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-          ) : null}
-          <span className="min-w-0 type-ui text-xs text-ink wrap-anywhere">{name}</span>
-        </span>
-      </button>
-    );
-  },
-  (before, after) =>
-    before.index === after.index &&
-    before.themeId === after.themeId &&
-    before.name === after.name &&
-    before.current === after.current &&
-    before.resolveMedia === after.resolveMedia &&
-    before.onPick === after.onPick &&
-    before.design.slides[before.index] === after.design.slides[after.index] &&
-    before.design.slides.length === after.design.slides.length &&
-    before.design.format === after.design.format &&
-    before.design.handle === after.design.handle &&
-    before.design.brand === after.design.brand,
-);
 
 // ---------------------------------------------------------------------------
 // Brand kit
@@ -244,13 +173,17 @@ const ThemeTile = memo(
 
 /**
  * Apply a brand kit, or none (DS-2.5). The design keeps a copy of the kit's
- * colours and logo, so a kit deleted or edited since never changes it on its
- * own: the panel says what happened and, for an edit, offers Update Colours.
+ * colours, logo and fonts, so a kit deleted or edited since never changes it
+ * on its own: the panel says what happened and, for an edit, offers Update
+ * From Kit, which takes the kit's fonts along. Under a kit that locks the
+ * look, a design that still has fonts of its own (chosen before the kit was
+ * locked) is offered Use Kit Fonts.
  */
 function BrandKitSection({
   document,
   kits,
   kitsError,
+  locked,
   onReloadKits,
   onChange,
   onKitApplied,
@@ -258,6 +191,8 @@ function BrandKitSection({
   document: DesignDocument;
   kits: BrandKitView[] | null;
   kitsError: string | null;
+  /** The kit locks the design's look: say so, and show its colours here. */
+  locked: boolean;
   onReloadKits: () => void;
   onChange: ApplyChange;
   onKitApplied: (kit: BrandKitView) => void;
@@ -276,7 +211,7 @@ function BrandKitSection({
     if (!kit) return;
 
     onKitApplied(kit);
-    onChange((latest) => applyBrandKit(latest, brandFromKitView(kit)));
+    onChange((latest) => withKit(latest, kit));
   };
 
   return (
@@ -294,16 +229,10 @@ function BrandKitSection({
           <Button
             variant="secondary"
             size="sm"
-            onClick={() =>
-              onChange((latest) =>
-                latest.brand.kitId === newer.id
-                  ? updateBrandColors(latest, newer.colors, newer.updatedAt)
-                  : latest,
-              )
-            }
+            onClick={() => onChange((latest) => withKitUpdate(latest, newer))}
           >
             <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
-            Update Colours
+            Update From Kit
           </Button>
         </Alert>
       ) : null}
@@ -349,12 +278,122 @@ function BrandKitSection({
         </>
       )}
 
-      {colors ? (
+      {/* Unlocked, Custom Colours shows the five and changes them. */}
+      {locked ? <p className={NOTE}>{DESIGN_LOCK_NOTE}</p> : null}
+      {locked && hasOwnFonts(document) ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={NOTE}>This design still has fonts of its own.</p>
+          <Button variant="secondary" size="sm" onClick={() => onChange(withKitFonts)}>
+            <MotionIcon icon={RotateCcwIcon} className="h-4 w-4" />
+            Use Kit Fonts
+          </Button>
+        </div>
+      ) : null}
+      {locked && colors ? (
         <div className="flex flex-col gap-2">
           <GroupLabel>Brand Colours</GroupLabel>
           <KitSwatches colors={colors} />
         </div>
       ) : null}
+    </PanelSection>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Custom Colours
+// ---------------------------------------------------------------------------
+
+/**
+ * The five colours every slide is drawn in. A change makes them the design's
+ * own: on a kit it stays on that kit (and Update From Kit still offers the
+ * kit's newer ones), with Use Kit Colours to go back; on no kit, Use Theme
+ * Colours goes back to the theme's. Typing in one field is one undo step per
+ * burst, as everywhere in the editor.
+ */
+function ColorsSection({
+  document,
+  kits,
+  onChange,
+}: {
+  document: DesignDocument;
+  kits: BrandKitView[] | null;
+  onChange: ApplyChange;
+}) {
+  const colors = designColors(document);
+  const reset = colorResetOf(document.brand, kits);
+
+  return (
+    <PanelSection
+      title="Custom Colours"
+      aside={
+        reset ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onChange((latest) => withColorReset(latest, reset))}
+          >
+            <MotionIcon icon={RotateCcwIcon} className="h-4 w-4" />
+            {reset.kind === 'kit' ? 'Use Kit Colours' : 'Use Theme Colours'}
+          </Button>
+        ) : null
+      }
+    >
+      <div className={COLOR_ROWS}>
+        {BRAND_COLOR_KEYS.map((key) => (
+          <CustomColorField
+            key={key}
+            label={COLOR_LABELS[key]}
+            labelBeside
+            value={colors[key]}
+            onApply={(hex) =>
+              onChange((latest) => withDesignColor(latest, key, hex), {
+                coalesceKey: `designColor:${key}`,
+              })
+            }
+          />
+        ))}
+      </div>
+      {designTextReads(colors) ? null : (
+        <Alert variant="warning" role="status">
+          <AlertDescription>
+            This text colour is hard to read on this background, so the slides use a readable one
+            instead.
+          </AlertDescription>
+        </Alert>
+      )}
+    </PanelSection>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Fonts
+// ---------------------------------------------------------------------------
+
+/**
+ * A heading and a body face for the whole design. Each picker's first option
+ * is what the design falls back to: the brand kit's face where the kit sets
+ * one, else the theme's. An element's own font (Element tab) wins over both.
+ */
+function FontsSection({ document, onChange }: { document: DesignDocument; onChange: ApplyChange }) {
+  const baseId = useId();
+
+  return (
+    <PanelSection title="Fonts" aside={<FontLicencesDialog />}>
+      {TYPE_FACES.map(({ face, label }) => {
+        const id = `${baseId}-${face}`;
+
+        return (
+          <FormField key={face}>
+            <FormLabel htmlFor={id}>{label}</FormLabel>
+            <FontSelect
+              id={id}
+              value={designFontOf(document, face)}
+              defaultLabel={designFontDefault(document.brand, face)}
+              onChange={(font) => onChange((latest) => withDesignFont(latest, face, font))}
+            />
+          </FormField>
+        );
+      })}
     </PanelSection>
   );
 }
@@ -405,6 +444,110 @@ function NameSection({ document, onChange }: { document: DesignDocument; onChang
       <FormHelperText id={hintId}>
         Every slide that shows a brand name or a handle uses these.
       </FormHelperText>
+    </PanelSection>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Format
+// ---------------------------------------------------------------------------
+
+/**
+ * The design's shape, changed in place and undone like any edit. A format a
+ * slide's layout cannot be drawn in is offered disabled, with the reason.
+ * Make A Story Version keeps this design as it is: the API copies it as a
+ * story and the editor opens the copy, or says inline why it could not.
+ */
+function FormatSection({
+  document,
+  onChange,
+  onMakeStoryVersion,
+}: {
+  document: DesignDocument;
+  onChange: ApplyChange;
+  onMakeStoryVersion: () => Promise<StoryVersionResult>;
+}) {
+  const selectId = useId();
+  const hintId = useId();
+  const [making, setMaking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  async function makeStoryVersion() {
+    if (making) return;
+    setMaking(true);
+    setProblem(null);
+
+    const result = await onMakeStoryVersion();
+    // On its way to the copy: the button stays busy until the editor goes.
+    if (result.opening) return;
+    setMaking(false);
+    setProblem(result.problem);
+  }
+
+  return (
+    <PanelSection title="Format">
+      <FormField>
+        <FormLabel htmlFor={selectId}>Change the format</FormLabel>
+        <Select
+          value={document.format}
+          onValueChange={(next) => {
+            if (isFormatId(next)) onChange((latest) => setFormat(latest, next));
+          }}
+        >
+          <SelectTrigger id={selectId} aria-describedby={hintId}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {formatChoices(document).map((choice) => (
+              <SelectItem
+                key={choice.format}
+                value={choice.format}
+                disabled={choice.reason !== null}
+              >
+                {choice.reason ? (
+                  <span className="flex flex-col">
+                    <span>{choice.label}</span>
+                    <span className="font-sans text-xs">{choice.reason}</span>
+                  </span>
+                ) : (
+                  choice.label
+                )}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <FormHelperText id={hintId}>{formatHint(document.format)}</FormHelperText>
+      </FormField>
+
+      {offersStoryVersion(document.format) ? (
+        <div className="flex flex-col gap-2">
+          <p className={NOTE}>Makes a 9:16 copy and opens it. This design stays as it is.</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={making}
+            onClick={makeStoryVersion}
+            className="self-start"
+          >
+            {making ? (
+              <Spinner
+                size="sm"
+                role="presentation"
+                aria-hidden="true"
+                className="motion-reduce:animate-none"
+              />
+            ) : (
+              <MotionIcon icon={CopyPlusIcon} className="h-4 w-4" />
+            )}
+            Make A Story Version
+          </Button>
+          {problem ? (
+            <Alert variant="danger" role="alert">
+              <AlertDescription>{problem}</AlertDescription>
+            </Alert>
+          ) : null}
+        </div>
+      ) : null}
     </PanelSection>
   );
 }

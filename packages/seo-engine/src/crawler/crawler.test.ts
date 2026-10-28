@@ -116,6 +116,10 @@ function mockPool(options: {
     async render() {
       throw new Error('The crawler does not render.');
     },
+    // Nor prints: that is the Studio's PDF download (Sprint 9b).
+    async printImages() {
+      throw new Error('The crawler does not print.');
+    },
     async close() {},
   };
   return pool;

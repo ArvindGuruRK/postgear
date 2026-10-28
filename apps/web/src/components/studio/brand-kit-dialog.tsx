@@ -14,12 +14,18 @@
  * A real slide in the kit's colours sits beside both screens and follows
  * every change. The API answers a malformed body with "Invalid input" only,
  * so every rule is checked here first, in the API's own sentences.
+ *
+ * Sprint 9b adds, on both screens: the kit's Fonts (Heading and Body, Theme
+ * Font for none), its Call To Action (the words and the link a new design's
+ * closing slide starts with) and Lock Brand Look. The form's Colours also
+ * offer From One Colour, which fills all five from one (`kit-from-color.tsx`).
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { GlobeIcon } from '@animateicons/react/lucide/globe-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
+import { WandSparklesIcon } from '@animateicons/react/lucide/wand-sparkles-icon';
 import { BRAND_COLOR_KEYS, type BrandColors } from '@postgear/design-engine';
 import {
   Alert,
@@ -48,12 +54,25 @@ import {
   SelectValue,
   Spinner,
   Textarea,
+  Toggle,
   toast,
 } from '@postgear/ui';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import type { BrandExtraction, BrandKitView, LogoCandidate } from '@/types/studio';
 import { ColorField } from './color-field';
+import { FontSelect } from './font-select';
+import {
+  ctaUrlProblem,
+  extrasBody,
+  extrasDraft,
+  type KitExtrasDraft,
+  LOCK_LOOK_NOTE,
+  MAX_CTA_TEXT_LENGTH,
+  MAX_CTA_URL_LENGTH,
+} from './kit-extras-model';
+import { KitFromColor } from './kit-from-color';
+import { groundOf } from './kit-palette-model';
 import { KitPreview, KitSwatches } from './kit-preview';
 import { LOGO_ACCEPT, LOGO_RULE, LogoField, LogoTile, logoProblem, uploadLogo } from './logo-field';
 import {
@@ -134,6 +153,7 @@ export function BrandKitDialog({
   const form = useRef<HTMLFormElement>(null);
   const reviewTop = useRef<HTMLDivElement>(null);
   const websiteInput = useRef<HTMLInputElement>(null);
+  const fromOneButton = useRef<HTMLButtonElement>(null);
 
   const [fallback] = useState<BrandColors>(() => kit?.colors ?? newKitDraft().colors);
   const [draft, setDraft] = useState<BrandKitDraft>(() =>
@@ -157,6 +177,9 @@ export function BrandKitDialog({
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
   const [submitted, setSubmitted] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+  const [extras, setExtras] = useState<KitExtrasDraft>(() => extrasDraft(kit));
+  /** From One Colour is open under the Colours fields. */
+  const [fromOne, setFromOne] = useState(false);
 
   /** Bumped by every reading and by anything that makes one stale. */
   const ticket = useRef(0);
@@ -182,6 +205,7 @@ export function BrandKitDialog({
   const byRole = reviewing && rows.length > 0;
   const typedColors = byRole ? kitColors(rows, base) : draft.colors;
   const problems = brandKitProblems({ ...draft, colors: typedColors });
+  const ctaProblem = ctaUrlProblem(extras.ctaUrl);
   const previewColors = validColors(typedColors, base);
   const shows = (key: string) => submitted || touched.has(key);
 
@@ -197,6 +221,20 @@ export function BrandKitDialog({
   function changeColor(key: keyof BrandColors, value: string) {
     setDraft((current) => ({ ...current, colors: { ...current.colors, [key]: value } }));
     setSaveError(null);
+  }
+
+  function changeExtras(patch: Partial<KitExtrasDraft>) {
+    setExtras((current) => ({ ...current, ...patch }));
+    setSaveError(null);
+  }
+
+  /** From One Colour's Use These Colours: all five fields at once, which can still be changed after. */
+  function applyColors(colors: BrandColors) {
+    setDraft((current) => ({ ...current, colors: { ...colors } }));
+    setSaveError(null);
+    setFromOne(false);
+    setAnnouncement(`The five colours were filled in from ${colors.primary}.`);
+    requestAnimationFrame(() => fromOneButton.current?.focus());
   }
 
   function urlOf(choice: LogoPick): string | null {
@@ -365,7 +403,7 @@ export function BrandKitDialog({
     setSubmitted(true);
     setSaveError(null);
 
-    if (hasProblems(problems)) {
+    if (hasProblems(problems) || ctaProblem) {
       setAnnouncement('Some fields need a fix before this brand kit can be saved.');
       requestAnimationFrame(() =>
         form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
@@ -392,7 +430,7 @@ export function BrandKitDialog({
 
       const { brandKit } = await api<{ brandKit: BrandKitView }>(
         kit ? `/studio/brand-kits/${encodeURIComponent(kit.id)}` : '/studio/brand-kits',
-        { method: kit ? 'PATCH' : 'POST', body },
+        { method: kit ? 'PATCH' : 'POST', body: { ...body, ...extrasBody(extras) } },
       );
 
       toast(
@@ -400,7 +438,7 @@ export function BrandKitDialog({
           ? {
               title: 'Brand kit updated',
               description:
-                'New designs use it. Designs made before keep their colours until you choose Update Colours.',
+                'New designs use it. Designs made before keep their colours and fonts until you choose Update From Kit.',
             }
           : {
               title: 'Brand kit saved',
@@ -481,6 +519,124 @@ export function BrandKitDialog({
     </div>
   );
 
+  const fromOneId = `${id}-from-one`;
+  const fromOneColour = (
+    <div className="flex flex-col gap-3">
+      <div>
+        <Button
+          ref={fromOneButton}
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={saving}
+          aria-expanded={fromOne}
+          aria-controls={fromOne ? fromOneId : undefined}
+          onClick={() => setFromOne((open) => !open)}
+        >
+          <MotionIcon icon={WandSparklesIcon} className="h-4 w-4" />
+          From One Colour
+        </Button>
+      </div>
+      {fromOne ? (
+        <KitFromColor
+          id={fromOneId}
+          start={base.primary}
+          startGround={groundOf(base.background)}
+          disabled={saving}
+          onUse={applyColors}
+          onCancel={() => {
+            setFromOne(false);
+            requestAnimationFrame(() => fromOneButton.current?.focus());
+          }}
+        />
+      ) : null}
+    </div>
+  );
+
+  const ctaUrlError = shows('cta-url') ? ctaProblem : null;
+  const extraFields = (
+    <>
+      <Group label="Fonts">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField>
+            <FormLabel htmlFor={`${id}-heading-font`}>Heading</FormLabel>
+            <FontSelect
+              id={`${id}-heading-font`}
+              value={extras.headingFont}
+              defaultLabel="Theme Font"
+              disabled={saving}
+              className="w-full"
+              onChange={(headingFont) => changeExtras({ headingFont })}
+            />
+          </FormField>
+          <FormField>
+            <FormLabel htmlFor={`${id}-body-font`}>Body</FormLabel>
+            <FontSelect
+              id={`${id}-body-font`}
+              value={extras.bodyFont}
+              defaultLabel="Theme Font"
+              disabled={saving}
+              className="w-full"
+              onChange={(bodyFont) => changeExtras({ bodyFont })}
+            />
+          </FormField>
+        </div>
+      </Group>
+
+      <Group label="Call To Action">
+        <p id={`${id}-cta-note`} className="m-0 font-sans text-sm text-ink type-muted">
+          Optional. A new design's closing slide starts with these.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField>
+            <FormLabel htmlFor={`${id}-cta-text`}>CTA text</FormLabel>
+            <Input
+              id={`${id}-cta-text`}
+              value={extras.ctaText}
+              maxLength={MAX_CTA_TEXT_LENGTH}
+              placeholder="Enter your call to action"
+              aria-describedby={`${id}-cta-note`}
+              onChange={(event) => changeExtras({ ctaText: event.target.value })}
+            />
+          </FormField>
+          <FormField>
+            <FormLabel htmlFor={`${id}-cta-url`}>Link</FormLabel>
+            <Input
+              id={`${id}-cta-url`}
+              value={extras.ctaUrl}
+              maxLength={MAX_CTA_URL_LENGTH}
+              inputMode="url"
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="Enter your link"
+              aria-invalid={ctaUrlError ? true : undefined}
+              aria-describedby={ctaUrlError ? `${id}-cta-url-error` : `${id}-cta-note`}
+              onChange={(event) => changeExtras({ ctaUrl: event.target.value })}
+              onBlur={() => touch('cta-url')}
+            />
+            {ctaUrlError ? (
+              <FormErrorMessage id={`${id}-cta-url-error`}>{ctaUrlError}</FormErrorMessage>
+            ) : null}
+          </FormField>
+        </div>
+      </Group>
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <FormLabel htmlFor={`${id}-lock`}>Lock brand look</FormLabel>
+          <FormHelperText id={`${id}-lock-note`}>{LOCK_LOOK_NOTE}</FormHelperText>
+        </div>
+        <Toggle
+          id={`${id}-lock`}
+          checked={extras.lockLook}
+          disabled={saving}
+          aria-describedby={`${id}-lock-note`}
+          onCheckedChange={(lockLook) => changeExtras({ lockLook })}
+        />
+      </div>
+    </>
+  );
+
   const title = reviewing ? 'Review Your Brand' : kit ? 'Edit Brand Kit' : 'New Brand Kit';
   const description = reviewing
     ? `${found?.summary ?? ''} Change anything you like. Nothing is saved until you choose Save Brand Kit.`
@@ -553,6 +709,8 @@ export function BrandKitDialog({
                       </>
                     )}
                   </Group>
+
+                  {extraFields}
                 </>
               ) : (
                 <>
@@ -640,7 +798,12 @@ export function BrandKitDialog({
                     ) : null}
                   </Group>
 
-                  <Group label="Colours">{colorFields}</Group>
+                  <Group label="Colours">
+                    {fromOneColour}
+                    {colorFields}
+                  </Group>
+
+                  {extraFields}
                 </>
               )}
             </div>
@@ -654,6 +817,7 @@ export function BrandKitDialog({
                   name={draft.name}
                   colors={previewColors}
                   logoUrl={urlOf(pick)}
+                  fonts={{ heading: extras.headingFont, body: extras.bodyFont }}
                   label={`A slide in the colours of ${draft.name.trim() || 'this brand kit'}`}
                 />
               </div>

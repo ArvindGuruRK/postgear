@@ -11,26 +11,31 @@
  * - **Before anything is typed**: the person's recent searches in this
  *   workspace, and the two things most often started from here.
  * - **While typing**: pages and quick actions are matched in the browser at
- *   once; posts, channels and media come from `GET /search` after typing
- *   pauses. The last answer stays up (dimmed) while the next loads, so the
- *   list never flashes empty between keystrokes.
+ *   once; posts, channels, media and Studio designs (Sprint 9b) come from
+ *   `GET /search` after typing pauses. The last answer stays up (dimmed)
+ *   while the next loads, so the list never flashes empty between keystrokes.
  * - **Filtering is the API's**, so `cmdk`'s own is off (`shouldFilter`). The
  *   selected row is therefore controlled: whenever the list changes, the top
  *   row is selected, so Enter always opens what is at the top.
  * - A search too short to run (`MIN_SEARCH_LENGTH`) sends nothing.
  * - **What a result opens**: a post in the composer, a channel's posts in the
  *   queue (or the Channels page when the channel needs attention), a media
- *   item in the library filtered to its name, a page itself.
+ *   item in the library filtered to its name, a design in the Studio editor,
+ *   a page itself.
+ * - **A design's row** shows its first exported slide in the slide's own
+ *   shape when there is one, then its title and format. The format names
+ *   come from `design-results.ts`, not the design engine, which would bring
+ *   every template into every page's top bar.
  */
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import {
   Badge,
-  cn,
   Command,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -41,7 +46,7 @@ import {
   pressSm,
   Skeleton,
 } from '@postgear/ui';
-import { CornerDownLeft, TriangleAlert } from 'lucide-react';
+import { CornerDownLeft, Palette, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChannelMark } from '@/components/channels/channel-mark';
@@ -51,10 +56,12 @@ import { describePost, formatWhen } from '@/components/posts/post-status';
 import { leaveThen } from '@/lib/leave-guard';
 import type {
   ChannelSearchResult,
+  DesignSearchResult,
   MediaSearchResult,
   PostSearchResult,
   SearchKind,
 } from '@/types/search';
+import { designFormat, designHref, thumbSize } from './design-results';
 import { Highlight, termsOf } from './highlight';
 import { PageIcon } from './page-icon';
 import { clearRecent, readRecent, rememberSearch } from './recent-searches';
@@ -68,6 +75,7 @@ const KIND_LABELS: Record<SearchKind, string> = {
   posts: 'posts',
   channels: 'channels',
   media: 'media',
+  designs: 'designs',
 };
 
 /** One selectable row: what cmdk calls it, and what choosing it does. */
@@ -177,9 +185,10 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
   const posts = data?.posts ?? [];
   const channels = data?.channels ?? [];
   const media = data?.media ?? [];
+  const designs = data?.designs ?? [];
   const unavailable = data?.unavailable ?? [];
   const now = new Date();
-  const total = pages.length + posts.length + channels.length + media.length;
+  const total = pages.length + posts.length + channels.length + media.length + designs.length;
 
   // A page whose name starts with the search ("queue", "bill") is almost
   // certainly what was meant, so it leads; otherwise content leads and pages
@@ -223,6 +232,10 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
       ...channels.map((channel) => ({
         value: `channel:${channel.id}`,
         run: () => go(channelHref(base, channel)),
+      })),
+      ...designs.map((design) => ({
+        value: `design:${design.id}`,
+        run: () => go(designHref(base, design.id)),
       })),
       ...media.map((item) => ({
         value: `media:${item.id}`,
@@ -288,8 +301,8 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
         >
           <DialogTitle className="sr-only">Search</DialogTitle>
           <DialogDescription className="sr-only">
-            Search your posts, channels, media and pages. Use the arrow keys to move and Enter to
-            open.
+            Search your posts, channels, media, designs and pages. Use the arrow keys to move and
+            Enter to open.
           </DialogDescription>
 
           <Command
@@ -379,6 +392,25 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                     </CommandGroup>
                   ) : null}
 
+                  {/* Designs before Media: a design's exported images carry its
+                      title, so they would otherwise come first in a search for
+                      the design itself. */}
+                  {designs.length > 0 ? (
+                    <CommandGroup heading="Designs">
+                      {designs.map((design) => (
+                        <CommandItem
+                          key={design.id}
+                          value={`design:${design.id}`}
+                          onSelect={runEntry}
+                          className="gap-3"
+                        >
+                          <DesignRow design={design} terms={terms} />
+                        </CommandItem>
+                      ))}
+                      {data?.more.designs ? <MoreNote kind="designs" /> : null}
+                    </CommandGroup>
+                  ) : null}
+
                   {media.length > 0 ? (
                     <CommandGroup heading="Media">
                       {media.map((item) => (
@@ -424,7 +456,8 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
 
                   {search.active || pages.length > 0 ? null : (
                     <p className="px-3 py-6 text-center font-sans text-sm text-ink">
-                      Type at least {MIN_SEARCH_LENGTH} letters to search posts, channels and media.
+                      Type at least {MIN_SEARCH_LENGTH} letters to search posts, channels, media and
+                      designs.
                     </p>
                   )}
                 </div>
@@ -576,6 +609,42 @@ function MediaRow({ item, terms }: { item: MediaSearchResult; terms: string[] })
         <Highlight text={item.name} terms={terms} />
       </span>
       <span className="shrink-0 text-xs capitalize">{item.type}</span>
+    </>
+  );
+}
+
+/** Row tiles are 36px (`h-9 w-9`); a design's thumbnail fits inside one in its own shape. */
+const DESIGN_TILE = 36;
+
+function DesignRow({ design, terms }: { design: DesignSearchResult; terms: string[] }) {
+  const format = designFormat(design.format);
+
+  return (
+    <>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden>
+        <span
+          className="flex items-center justify-center overflow-hidden rounded-md border-2 border-outline bg-primary text-ink"
+          style={thumbSize(format, DESIGN_TILE)}
+        >
+          {design.thumbnailUrl ? (
+            // biome-ignore lint/performance/noImgElement: the first slide as exported to the API's own storage
+            <img
+              src={design.thumbnailUrl}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Palette className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+          )}
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate">
+          <Highlight text={design.title} terms={terms} />
+        </span>
+        {format ? <span className="truncate text-xs">{format.label}</span> : null}
+      </span>
     </>
   );
 }

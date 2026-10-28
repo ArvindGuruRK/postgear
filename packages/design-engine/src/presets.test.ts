@@ -14,13 +14,13 @@ import { documentFromPreset } from './document';
 import {
   approximateMeasure,
   baseFontSize,
-  MIN_FIT_SCALE,
+  fitText,
   type MeasuredStyle,
+  MIN_FIT_SCALE,
   wrapText,
 } from './fit';
-import { fitText } from './fit';
-import { FORMAT_IDS, formatSpec, shortEdge } from './formats';
 import { fontStack } from './fonts';
+import { FORMAT_IDS, formatSpec, shortEdge } from './formats';
 import { findLayout, latestLayout, slotFrame } from './layouts';
 import {
   FEATURED_PRESET_IDS,
@@ -28,8 +28,8 @@ import {
   PRESETS,
   presetById,
   presetFormats,
-  presetsByCategory,
   presetStyle,
+  presetsByCategory,
 } from './presets';
 import { SlideView } from './render/SlideView';
 import { designDocumentSchema } from './schema';
@@ -37,8 +37,8 @@ import { isThemeId, themeById } from './themes';
 import { type DesignDocument, type ListMarker, PRESET_CATEGORIES } from './types';
 
 describe('the preset library', () => {
-  it('ships at least the forty the sprint asks for', () => {
-    expect(PRESETS.length).toBeGreaterThanOrEqual(40);
+  it('ships at least the 150 Sprint 9b asks for', () => {
+    expect(PRESETS.length).toBeGreaterThanOrEqual(150);
   });
 
   it('has unique ids and names', () => {

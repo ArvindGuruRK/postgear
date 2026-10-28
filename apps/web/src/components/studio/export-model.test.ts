@@ -1,5 +1,6 @@
 import type { ExportedSlideView, StudioExportEvent } from '@/types/studio';
 import {
+  DOWNLOAD_NOTE,
   doneLine,
   type ExportState,
   exportReducer,
@@ -10,12 +11,16 @@ import {
   LOST_DRAFT_MESSAGE,
   LOST_EXPORT_MESSAGE,
   LOST_SEND_MESSAGE,
+  pdfFileName,
   progressFraction,
   progressLabel,
   type RunMode,
   runNote,
   SENT_MESSAGE,
   savedLine,
+  scaleChoices,
+  scaledSizeLabel,
+  scaleOf,
   slideSlots,
   UNSAVED_MESSAGE,
   warningLead,
@@ -40,6 +45,7 @@ const start = (slides: number): StudioExportEvent => ({
   width: 1080,
   height: 1350,
   imageFormat: 'jpeg',
+  scale: 1,
 });
 
 const slide = (index: number, total: number): StudioExportEvent => ({
@@ -452,5 +458,80 @@ describe('zipFileName', () => {
   it('falls back to Design when nothing usable is left', () => {
     expect(zipFileName('')).toBe('Design.zip');
     expect(zipFileName(' ?* ')).toBe('Design.zip');
+  });
+});
+
+describe('pdfFileName', () => {
+  it('names the PDF as the zip is named', () => {
+    expect(pdfFileName('Q3: Plans/Ideas?')).toBe('Q3 Plans Ideas.pdf');
+    expect(pdfFileName('')).toBe('Design.pdf');
+  });
+
+  it('says the zip carries the caption, and only when there is one', () => {
+    expect(DOWNLOAD_NOTE).toBe(
+      'Download All also holds the caption as captions.txt, when the design has one.',
+    );
+  });
+});
+
+describe('image scale', () => {
+  it('starts at 1x and keeps a 2x choice into the run, but not a change during it', () => {
+    const idle = initialExportState('export');
+    expect(idle.scale).toBe(1);
+
+    const double = exportReducer(idle, { type: 'scale', scale: 2 });
+    expect(double.scale).toBe(2);
+    expect(exportReducer(double, { type: 'scale', scale: 2 })).toBe(double);
+
+    const saving = exportReducer(double, { type: 'begin' });
+    expect(saving.scale).toBe(2);
+    expect(exportReducer(saving, { type: 'scale', scale: 1 })).toBe(saving);
+  });
+
+  it('keeps the scale for Try Again after a failed run', () => {
+    const begun = exportReducer(
+      exportReducer(initialExportState('export'), { type: 'scale', scale: 2 }),
+      {
+        type: 'begin',
+      },
+    );
+    const failed = exportReducer(begun, { type: 'unsaved' });
+
+    expect(exportReducer(failed, { type: 'begin' }).scale).toBe(2);
+  });
+
+  it('reads the radio value as a scale', () => {
+    expect(scaleOf('1')).toBe(1);
+    expect(scaleOf('2')).toBe(2);
+    expect(scaleOf('3')).toBeNull();
+  });
+
+  it("shows the pixels each scale makes in the design's format", () => {
+    expect(scaledSizeLabel('square', 1)).toBe('1080 x 1080');
+    expect(scaledSizeLabel('square', 2)).toBe('2160 x 2160');
+    expect(scaledSizeLabel('portrait', 2)).toBe('2160 x 2700');
+  });
+
+  it('offers 1x and 2x, with their pixels when the format is known', () => {
+    const choices = scaleChoices('portrait');
+    expect(choices.map((choice) => choice.title)).toEqual(['1x', '2x']);
+    expect(choices[0].hint).toBe('1080 x 1350. The size every platform shows.');
+    expect(choices[1].hint).toBe(
+      '2160 x 2700. Twice the pixels, for print and sharp screens. The files are bigger.',
+    );
+
+    expect(scaleChoices(null)[1].hint).toBe(
+      'Twice the pixels, for print and sharp screens. The files are bigger.',
+    );
+  });
+
+  it('reports the size the stream says, which is already the scaled one', () => {
+    const state = feed(asked(), {
+      ...start(3),
+      width: 2160,
+      height: 2700,
+      scale: 2,
+    } as StudioExportEvent);
+    expect(formatDetail(state)).toBe('2160 x 2700, JPEG');
   });
 });

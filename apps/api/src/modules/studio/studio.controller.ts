@@ -55,6 +55,7 @@ import { openSseStream } from '../../common/sse';
 import { BrandKitsService } from './brand-kits.service';
 import { type LogoFile, MAX_LOGO_BYTES } from './brand-logo';
 import { sendArchive } from './design-archive';
+import { sendPdf } from './design-pdf';
 import {
   type BrandKitBody,
   brandKitBodySchema,
@@ -62,6 +63,10 @@ import {
   type CreateShareInput,
   createDesignSchema,
   createShareSchema,
+  type DownloadQuery,
+  type DuplicateDesignInput,
+  downloadQuerySchema,
+  duplicateDesignSchema,
   type ExportDesignInput,
   type ExtractBrandInput,
   exportDesignSchema,
@@ -115,6 +120,16 @@ export class StudioController {
     private readonly brandKits: BrandKitsService,
   ) {}
 
+  /**
+   * Whether premium looks are open to this workspace (Sprint 9b), so the
+   * gallery and the Design tab can show their locks before anything is
+   * chosen. The API enforces the same rule on create and save regardless.
+   */
+  @Get('access')
+  access(@CurrentOrg() org: ActiveOrg) {
+    return this.studio.access(org.id);
+  }
+
   // -------------------------------------------------------------------------
   // Designs
   // -------------------------------------------------------------------------
@@ -151,13 +166,15 @@ export class StudioController {
     return { design: await this.studio.update(org.id, id, dto) };
   }
 
+  /** Duplicate, or Make A Story Version with `{ format: 'story' }` (Sprint 9b). */
   @Post('designs/:id/duplicate')
   async duplicate(
     @CurrentOrg() org: ActiveOrg,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Body(new ZodBody(duplicateDesignSchema, 'studio/designs/duplicate')) dto: DuplicateDesignInput,
   ) {
-    return { design: await this.studio.duplicate(org.id, user.id, id) };
+    return { design: await this.studio.duplicate(org.id, user.id, id, dto) };
   }
 
   @Delete('designs/:id')
@@ -179,17 +196,40 @@ export class StudioController {
   }
 
   /**
-   * Download All: the last export as one zip, slides in order. Fetched by the
+   * Download All: the last export as one zip, slides in order, or with
+   * `?format=pdf` as one PDF, a page per slide (Sprint 9b). Fetched by the
    * export dialog rather than opened as a link, so a refusal ("Export this
    * design first") arrives as a sentence the dialog can show.
+   *
+   * The PDF is printed before a byte is sent; a browser that goes away while
+   * it prints stops the print rather than leaving it to finish for nobody.
    */
   @Get('designs/:id/download')
   async download(
     @CurrentOrg() org: ActiveOrg,
     @Param('id') id: string,
+    @Query(new ZodQuery(downloadQuerySchema, 'studio/designs/download')) query: DownloadQuery,
     @Res() response: Response,
   ): Promise<void> {
-    await sendArchive(await this.studio.prepareArchive(org.id, id), response);
+    if (query.format === 'zip') {
+      await sendArchive(await this.studio.prepareArchive(org.id, id), response);
+      return;
+    }
+
+    const gone = new AbortController();
+    // `close` also fires after a response that ended normally; only an
+    // unfinished one means the browser left.
+    const leave = () => {
+      if (!response.writableFinished) gone.abort();
+    };
+    response.on('close', leave);
+
+    try {
+      const pdf = await this.studio.printPdf(org.id, id, gone.signal);
+      if (pdf) sendPdf(pdf, response);
+    } finally {
+      response.off('close', leave);
+    }
   }
 
   @Post('designs/:id/send')
@@ -291,6 +331,16 @@ export class StudioController {
     @Body(new ZodBody(updateBrandKitSchema, 'studio/brand-kits/update')) dto: UpdateBrandKitInput,
   ) {
     return { brandKit: await this.brandKits.update(org.id, id, dto) };
+  }
+
+  /** Duplicate on a kit card (Sprint 9b): everything but the id, named "Name (Copy)". */
+  @Post('brand-kits/:id/duplicate')
+  async duplicateKit(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return { brandKit: await this.brandKits.duplicate(org.id, user.id, id) };
   }
 
   @Delete('brand-kits/:id')

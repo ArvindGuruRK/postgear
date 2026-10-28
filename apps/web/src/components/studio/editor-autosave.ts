@@ -16,7 +16,11 @@
  * - `failed`: the server refused the save in a way trying again unchanged
  *   would not fix. The refusal says why and what is left to do
  *   (`SaveRefusal`): try again, sign in again, or go back to Studio for a
- *   design that is gone;
+ *   design that is gone. A premium look the workspace's plan does not
+ *   include (a plan that lapsed while the editor was open) is held rather
+ *   than sent again: the next change that takes the look out (Undo, or a
+ *   free look) lifts the hold and saves everything on screen, and Try Again
+ *   sends it as it is, for a plan upgraded in another tab;
  * - `saved`: nothing is waiting and the server confirmed the last save.
  *
  * Every save is one request at a time. Title and document travel together
@@ -64,10 +68,16 @@ export interface ScreenVersion {
 
 /**
  * What is left to do after a refusal: send it again (`retry`), sign in again
- * (`signIn`, the session ended), or leave (`gone`, the design is not there
- * any more, so no try can succeed).
+ * (`signIn`, the session ended), leave (`gone`, the design is not there any
+ * more, so no try can succeed), or take out a premium look the workspace's
+ * plan does not include (`premium`; Try Again stays, for a plan upgraded
+ * in another tab meanwhile).
  */
-export type RefusalKind = 'retry' | 'signIn' | 'gone';
+export type RefusalKind = 'retry' | 'signIn' | 'gone' | 'premium';
+
+/** What the editor says while a premium look holds the save back. */
+export const PREMIUM_REFUSAL_MESSAGE =
+  'Premium templates come with a paid plan, so your latest changes are not saved. Undo the premium look or choose a free one to keep saving.';
 
 /** A refused save: why, in words a person can act on, and what is left to do. */
 export interface SaveRefusal {
@@ -83,6 +93,19 @@ export interface AutosaveDeps {
   onSaved: (result: DesignSaveResult) => void;
   /** Whether the browser thinks it has a connection. */
   isOnline?: () => boolean;
+  /**
+   * True for the API's "needs a paid plan" refusal (`isPremiumRefusal`). Such
+   * a save is held, never retried on its own: sent again unchanged, it would
+   * be refused the same way unless the plan changed, which only the person
+   * knows (Try Again, after an upgrade in another tab).
+   */
+  isPremiumRefusal?: (error: unknown) => boolean;
+  /**
+   * While a premium refusal holds the save: true as long as what is on screen
+   * still brings in a premium look the server's version does not have
+   * (`addsPremiumLook`). Without it, any change on screen lifts the hold.
+   */
+  premiumHeld?: (saved: DesignDocument, screen: DesignDocument) => boolean;
   delay?: number;
   retryDelays?: readonly number[];
 }
@@ -222,7 +245,13 @@ export class Autosave {
     this.screen = screen;
     // Moving between slides is not worth a save of its own: the index rides
     // along with the next document save.
-    if (!changed || this.halt) return;
+    if (!changed) return;
+    if (this.halt) {
+      // A held premium look is the one halt the person lifts by editing:
+      // every other halt waits for a choice (Reload, Try Again, Sign In).
+      if (!this.premiumLifted()) return;
+      this.halt = null;
+    }
 
     if (!this.dirty()) {
       this.clearTimer();
@@ -386,7 +415,7 @@ export class Autosave {
 
     this.deps.send(body, { keepalive }).then(
       (result) => this.succeeded(generation, sent, result),
-      (error: unknown) => this.failed(generation, error),
+      (error: unknown) => this.failed(generation, sent, error),
     );
   }
 
@@ -416,7 +445,11 @@ export class Autosave {
     if (this.state === 'saved') this.settle(true);
   }
 
-  private failed(generation: number, error: unknown): void {
+  private failed(
+    generation: number,
+    sent: { document: DesignDocument; title: string },
+    error: unknown,
+  ): void {
     if (generation !== this.generation) return;
 
     this.inFlight = false;
@@ -425,6 +458,24 @@ export class Autosave {
     if (error instanceof ApiError && error.status === 409) {
       this.halt = { kind: 'conflict' };
       this.clearTimer();
+    } else if (this.deps.isPremiumRefusal?.(error)) {
+      this.halt = {
+        kind: 'failed',
+        refusal: { kind: 'premium', message: PREMIUM_REFUSAL_MESSAGE },
+      };
+      this.clearTimer();
+      // An answer came back, so the connection is fine: once the hold lifts,
+      // the next save waits for the pause like any other.
+      this.attempt = 0;
+      this.offline = false;
+      // An edit made while the refused save was on its way may have taken the
+      // look out already: it goes on as any edit would. Only a change since
+      // that save counts, so the refused save itself is never sent again.
+      const since = this.screen.document !== sent.document || this.screen.title !== sent.title;
+      if (since && this.premiumLifted()) {
+        this.halt = null;
+        if (this.dirty()) this.schedule();
+      }
     } else if (!retryable(error)) {
       this.halt = { kind: 'failed', refusal: refusalOf(error as ApiError) };
       this.clearTimer();
@@ -443,6 +494,16 @@ export class Autosave {
 
     this.emit();
     this.settle(false);
+  }
+
+  /**
+   * True once a save held for a premium look may go: what is on screen no
+   * longer brings in a premium look the server's version lacks
+   * (`premiumHeld`), or, with no such check, it has changed at all.
+   */
+  private premiumLifted(): boolean {
+    if (this.halt?.kind !== 'failed' || this.halt.refusal.kind !== 'premium') return false;
+    return !this.deps.premiumHeld?.(this.saved.document, this.screen.document);
   }
 
   private derive(): SaveState {

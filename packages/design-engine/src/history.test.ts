@@ -1,7 +1,7 @@
 import {
+  COALESCE_MS,
   canRedo,
   canUndo,
-  COALESCE_MS,
   createHistory,
   current,
   HISTORY_LIMIT,

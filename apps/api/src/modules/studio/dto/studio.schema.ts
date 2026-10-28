@@ -19,8 +19,10 @@ import {
   designDocumentSchema,
   FORMAT_IDS,
   type FormatId,
+  fontIdSchema,
   MAX_CAPTION_LENGTH,
   MAX_SLIDES,
+  upgrade,
 } from '@postgear/design-engine';
 import { z } from 'zod';
 import { collapseWhitespace, stripControlChars } from '../../../common/sanitize';
@@ -101,12 +103,28 @@ export const createDesignSchema = z
   })
   .strict();
 
+/**
+ * A design as an editor sends it, brought up to the current schema version
+ * first. An editor tab opened before a release still holds the older shape
+ * and saves it every few seconds; reading a design already upgrades it
+ * (`safeParseDesignDocument`), so a save does the same rather than refusing
+ * the tab's work with a 400 until somebody reloads. A version this release
+ * cannot read is left as it came, and the schema refuses it.
+ */
+const savedDocumentSchema = z.preprocess((value) => {
+  try {
+    return upgrade(value);
+  } catch {
+    return value;
+  }
+}, designDocumentSchema);
+
 export const updateDesignSchema = z
   .object({
     /** The revision the editor loaded. A mismatch is a 409, never a merge. */
     revision: z.number().int().min(1),
     title: oneLine(MAX_TITLE_LENGTH, STUDIO_MESSAGES.TITLE_REQUIRED).optional(),
-    document: designDocumentSchema.optional(),
+    document: savedDocumentSchema.optional(),
     /** Where the editor was, so reopening lands on the same slide. */
     lastSlideIndex: z
       .number()
@@ -137,6 +155,16 @@ export const listDesignsQuerySchema = z
   })
   .strict();
 
+/**
+ * Duplicate, and Make A Story Version (Sprint 9b): an optional format for the
+ * copy. The plain Duplicate sends no body at all, which Express 5 leaves as
+ * `undefined`, so a missing body is read as an empty one.
+ */
+export const duplicateDesignSchema = z.preprocess(
+  (value) => value ?? {},
+  z.object({ format: formatSchema.optional() }).strict(),
+);
+
 const imageFormatSchema = z.enum(['jpeg', 'png']);
 
 export const exportDesignSchema = z
@@ -146,6 +174,23 @@ export const exportDesignSchema = z
      * only. PNG is offered for everything else.
      */
     imageFormat: imageFormatSchema.default('jpeg'),
+    /**
+     * 2 draws every slide at twice the format's size (2160 x 2160 for a
+     * square), for print and for screens that show more than the platforms
+     * serve (Sprint 9b). The layout is the same either way: the page is laid
+     * out at the format's size and only painted at twice the pixels.
+     */
+    scale: z.union([z.literal(1), z.literal(2)]).default(1),
+  })
+  .strict();
+
+/**
+ * Download All's choice of file (Sprint 9b): the zip of slides, or one PDF
+ * with a page per slide.
+ */
+export const downloadQuerySchema = z
+  .object({
+    format: z.enum(['zip', 'pdf']).default('zip'),
   })
   .strict();
 
@@ -183,6 +228,13 @@ export const sendDesignSchema = z
 export const MAX_KIT_NAME_LENGTH = 120;
 export const MAX_KIT_DESCRIPTION_LENGTH = 500;
 export const MAX_URL_LENGTH = 2_048;
+/**
+ * The call to action a kit fills into a new design's closing slide (Sprint
+ * 9b). One line each: the closing layouts give the call to action about 36
+ * characters before the fitter starts shrinking it, and the link about 22.
+ */
+export const MAX_CTA_TEXT_LENGTH = 60;
+export const MAX_CTA_URL_LENGTH = 60;
 
 /**
  * A website as a person types it, with or without `https://`. Only bounded
@@ -208,6 +260,24 @@ export const brandKitBodySchema = z
     logoMediaId: idSchema.nullable().optional(),
     colors: brandColorsSchema,
     source: z.enum(['MANUAL', 'EXTRACTED']).optional(),
+    /** The kit's faces, from the engine's library; null keeps the theme's. */
+    headingFont: fontIdSchema.nullable().optional(),
+    bodyFont: fontIdSchema.nullable().optional(),
+    /** Lock Brand Look: while this kit is applied, the editor hides what would change it. */
+    lockLook: z.boolean().optional(),
+    ctaText: oneLine(MAX_CTA_TEXT_LENGTH).nullable().optional(),
+    /**
+     * Shown on the slide as text ("yourbrand.com/offer"), never followed, so
+     * it is not checked as an address; only that it is one word, which the
+     * service answers with a sentence.
+     */
+    ctaUrl: z
+      .string()
+      .max(MAX_CTA_URL_LENGTH * 4)
+      .transform((value) => stripControlChars(value).trim())
+      .pipe(z.string().max(MAX_CTA_URL_LENGTH))
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -248,7 +318,9 @@ export const createShareSchema = z
 export type CreateDesignInput = z.infer<typeof createDesignSchema>;
 export type UpdateDesignInput = z.infer<typeof updateDesignSchema>;
 export type ListDesignsQuery = z.infer<typeof listDesignsQuerySchema>;
+export type DuplicateDesignInput = z.infer<typeof duplicateDesignSchema>;
 export type ExportDesignInput = z.infer<typeof exportDesignSchema>;
+export type DownloadQuery = z.infer<typeof downloadQuerySchema>;
 export type SendDesignInput = z.infer<typeof sendDesignSchema>;
 export type BrandKitBody = z.infer<typeof brandKitBodySchema>;
 export type UpdateBrandKitInput = z.infer<typeof updateBrandKitSchema>;

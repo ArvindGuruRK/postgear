@@ -7,22 +7,29 @@
  *
  * - Element: the element selected on the canvas (`ElementPanel`).
  * - Slide: the slide's layout, background and optional elements (`SlidePanel`).
- * - Design: theme, brand kit, brand name and handle, format (`DesignPanel`).
+ * - Design: theme, art, brand kit, colours, fonts, brand name and handle,
+ *   format (`DesignPanel`).
  *
  * The panel keeps no copy of the design. It draws the document it is given
  * and hands every edit to the editor as a function of the latest document
  * (`ApplyChange`), so the canvas, the rail and the panel never disagree and
  * every edit can be undone. Only the open tab is drawn, and each scrolls on
  * its own, with room at its edges for focus rings and the chosen ring.
+ *
+ * Whether the design's brand kit locks its look (Sprint 9b) is worked out
+ * here once, from the design and the kits, and every tab reads it with
+ * `useBrandLookLocked`.
  */
 import type { DesignDocument, SlotId } from '@postgear/design-engine';
 import { cn, Tabs, TabsContent, TabsList, TabsTrigger } from '@postgear/ui';
 import type { BrandKitView, StudioMediaRef } from '@/types/studio';
+import { brandLocksLook } from './editor-panel-model';
 import type { ApplyChange } from './editor-state';
 import { DesignPanel } from './panel-design';
 import { ElementPanel } from './panel-element';
 import { SlidePanel } from './panel-slide';
-import { PanelSurface } from './panel-ui';
+import { BrandLookLock, PanelSurface } from './panel-ui';
+import type { StoryVersionResult } from './studio-editor-model';
 import { StudioPanel } from './studio-ui';
 
 export type PanelTab = 'element' | 'slide' | 'design';
@@ -56,6 +63,12 @@ export interface EditorPanelProps {
   onChangeLayout: () => void;
   /** The island adds the kit's logo to the media map. */
   onKitApplied: (kit: BrandKitView) => void;
+  /** Whether the plan includes premium looks; null while that is not known (nothing is locked). */
+  premium: boolean | null;
+  /** A locked look was chosen: the island opens the dialog that says why. */
+  onPremiumLocked: () => void;
+  /** Make A Story Version: the island saves, has the API copy the design, and opens the copy. */
+  onMakeStoryVersion: () => Promise<StoryVersionResult>;
   /** Inside a drawer, which brings its own surface and title: no panel around the tabs. */
   bare?: boolean;
   className?: string;
@@ -91,6 +104,9 @@ export function EditorPanel({
   onPickMedia,
   onChangeLayout,
   onKitApplied,
+  premium,
+  onPremiumLocked,
+  onMakeStoryVersion,
   bare = false,
   className,
 }: EditorPanelProps) {
@@ -99,60 +115,65 @@ export function EditorPanel({
 
   return (
     <PanelSurface surface={bare ? 'secondary' : 'chrome'}>
-      <Frame className={cn('flex min-h-0 flex-col', !bare && 'p-3', className)}>
-        {/* The drawer names itself; beside the canvas, the tabs need a name above them. */}
-        {bare ? null : <h2 className="sr-only">Properties</h2>}
-        <Tabs
-          value={tab}
-          onValueChange={(value) => {
-            if (isPanelTab(value)) onTabChange(value);
-          }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <TabsList className="grid w-full shrink-0 grid-cols-3">
-            <TabsTrigger value="element">Element</TabsTrigger>
-            <TabsTrigger value="slide">Slide</TabsTrigger>
-            <TabsTrigger value="design">Design</TabsTrigger>
-          </TabsList>
+      <BrandLookLock locked={brandLocksLook(document.brand, kits)}>
+        <Frame className={cn('flex min-h-0 flex-col', !bare && 'p-3', className)}>
+          {/* The drawer names itself; beside the canvas, the tabs need a name above them. */}
+          {bare ? null : <h2 className="sr-only">Properties</h2>}
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              if (isPanelTab(value)) onTabChange(value);
+            }}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <TabsList className="grid w-full shrink-0 grid-cols-3">
+              <TabsTrigger value="element">Element</TabsTrigger>
+              <TabsTrigger value="slide">Slide</TabsTrigger>
+              <TabsTrigger value="design">Design</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="element" className={scroll}>
-            <ElementPanel
-              document={document}
-              slideId={slideId}
-              selected={selected}
-              overflow={overflow}
-              media={media}
-              onSelect={onSelect}
-              onChange={onChange}
-              onPickMedia={onPickMedia}
-            />
-          </TabsContent>
+            <TabsContent value="element" className={scroll}>
+              <ElementPanel
+                document={document}
+                slideId={slideId}
+                selected={selected}
+                overflow={overflow}
+                media={media}
+                onSelect={onSelect}
+                onChange={onChange}
+                onPickMedia={onPickMedia}
+              />
+            </TabsContent>
 
-          <TabsContent value="slide" className={scroll}>
-            <SlidePanel
-              document={document}
-              slideId={slideId}
-              media={media}
-              onChange={onChange}
-              onPickMedia={onPickMedia}
-              onChangeLayout={onChangeLayout}
-            />
-          </TabsContent>
+            <TabsContent value="slide" className={scroll}>
+              <SlidePanel
+                document={document}
+                slideId={slideId}
+                media={media}
+                onChange={onChange}
+                onPickMedia={onPickMedia}
+                onChangeLayout={onChangeLayout}
+              />
+            </TabsContent>
 
-          <TabsContent value="design" className={scroll}>
-            <DesignPanel
-              document={document}
-              slideId={slideId}
-              media={media}
-              kits={kits}
-              kitsError={kitsError}
-              onReloadKits={onReloadKits}
-              onChange={onChange}
-              onKitApplied={onKitApplied}
-            />
-          </TabsContent>
-        </Tabs>
-      </Frame>
+            <TabsContent value="design" className={scroll}>
+              <DesignPanel
+                document={document}
+                slideId={slideId}
+                media={media}
+                kits={kits}
+                kitsError={kitsError}
+                onReloadKits={onReloadKits}
+                onChange={onChange}
+                onKitApplied={onKitApplied}
+                premium={premium}
+                onPremiumLocked={onPremiumLocked}
+                onMakeStoryVersion={onMakeStoryVersion}
+              />
+            </TabsContent>
+          </Tabs>
+        </Frame>
+      </BrandLookLock>
     </PanelSurface>
   );
 }

@@ -1026,6 +1026,20 @@ model BrandKit {
   /// text columns because the engine's Zod schema is the real contract, and
   /// five nullable columns would let half a palette exist.
   colors         Json
+  /// Sprint 9b: the kit's own fonts, as `FontId`s from the design engine;
+  /// null keeps the theme's. Plain strings rather than an enum because the
+  /// font library is code and grows without a migration; the API checks
+  /// every id against the engine's list.
+  headingFont    String?
+  bodyFont       String?
+  /// Sprint 9b: while this kit is applied to a design, its colours, logo and
+  /// fonts are the kit's alone; the editor hides the controls that would
+  /// change them.
+  lockLook       Boolean        @default(false)
+  /// Sprint 9b: what a new design's closing slide asks for, and where it
+  /// points.
+  ctaText        String?
+  ctaUrl         String?
   source         BrandKitSource @default(MANUAL)
   createdById    String?
   createdAt      DateTime       @default(now())

@@ -21,6 +21,7 @@ function withKitLogo(document: DesignDocument, logoMediaId: string | null): Desi
     logoMediaId,
     name: 'Brand',
     kitVersion: null,
+    fonts: null,
   });
 }
 

@@ -63,6 +63,28 @@ export interface BrandKitWrite {
   logoMediaId?: string | null;
   colors?: Prisma.InputJsonValue;
   source?: BrandKitSource;
+  headingFont?: string | null;
+  bodyFont?: string | null;
+  lockLook?: boolean;
+  ctaText?: string | null;
+  ctaUrl?: string | null;
+}
+
+/** Everything a new kit is made of: a created one, or a duplicate of another. */
+export interface BrandKitCreate {
+  orgId: string;
+  name: string;
+  description: string | null;
+  websiteUrl: string | null;
+  logoMediaId: string | null;
+  colors: Prisma.InputJsonValue;
+  source: BrandKitSource;
+  headingFont: string | null;
+  bodyFont: string | null;
+  lockLook: boolean;
+  ctaText: string | null;
+  ctaUrl: string | null;
+  createdById: string | null;
 }
 
 /** A share link's `lastViewedAt` is written at most this often. */
@@ -247,16 +269,7 @@ export class StudioRepository {
     return row.deletedAt ? 'deleted' : 'live';
   }
 
-  createBrandKit(data: {
-    orgId: string;
-    name: string;
-    description: string | null;
-    websiteUrl: string | null;
-    logoMediaId: string | null;
-    colors: Prisma.InputJsonValue;
-    source: BrandKitSource;
-    createdById: string | null;
-  }): Promise<BrandKitRow> {
+  createBrandKit(data: BrandKitCreate): Promise<BrandKitRow> {
     return prisma.brandKit.create({
       data: {
         organizationId: data.orgId,
@@ -266,9 +279,30 @@ export class StudioRepository {
         logoMediaId: data.logoMediaId,
         colors: data.colors,
         source: data.source,
+        headingFont: data.headingFont,
+        bodyFont: data.bodyFont,
+        lockLook: data.lockLook,
+        ctaText: data.ctaText,
+        ctaUrl: data.ctaUrl,
         createdById: data.createdById,
       },
     });
+  }
+
+  /**
+   * The names of live kits, by id, for the design cards (Sprint 9b). One
+   * query for a whole page of cards; a kit deleted meanwhile is simply
+   * absent, and its card shows no kit.
+   */
+  async brandKitNames(orgId: string, ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+
+    const rows = await prisma.brandKit.findMany({
+      where: { id: { in: [...new Set(ids)] }, organizationId: orgId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.name]));
   }
 
   async updateBrandKit(

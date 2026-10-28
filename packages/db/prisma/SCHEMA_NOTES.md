@@ -50,7 +50,7 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `BillingEvent` | Processed Stripe events, keyed on the event id (Sprint 8). | Sprint 8 |
 | `NotificationCursor` | Per-(user, workspace) read marker for the notification feed (Sprint 8). | Sprint 8 |
 | `OAuthApp` / `OAuthAuthorization` | PostGear acting as an OAuth *provider* for its public API. | Not yet: PRD P2. Sprint 8 built API keys instead. |
-| `BrandKit` | A brand's name, logo and five colours. Several per workspace, one per client for an agency. See [Sprint 9 additions](#sprint-9-additions). | Sprint 9 |
+| `BrandKit` | A brand's name, logo and five colours. Several per workspace, one per client for an agency. See [Sprint 9 additions](#sprint-9-additions); fonts, Lock Brand Look and CTA defaults in [Sprint 9b additions](#sprint-9b-additions). | Sprint 9, 9b |
 | `Design` | One post or carousel. Slides live in the `document` JSON, guarded by the design engine's Zod schema; `revision` is the optimistic lock. | Sprint 9 |
 | `DesignShare` | A read-only share link to a design, token stored hashed. | Sprint 9 |
 | `DesignFavourite` | A template starred by the workspace, keyed on the code-side preset id. | Sprint 9 |
@@ -344,7 +344,7 @@ and three enums, nothing changed on an existing model. The design is in
   Favourites is a team filter rather than something in one person's browser.
 
 **`presetId` on `Design` and `DesignFavourite` is plain text, not a foreign
-key.** Templates are data in code (`packages/design-engine/src/presets.ts`),
+key.** Templates are data in code (`packages/design-engine/src/presets/`),
 reviewed and versioned with git, so there is no templates table to point at.
 That is also what makes "choosing a template never changes the template" true
 by construction: a design holds its own copy of the content from the moment it
@@ -354,6 +354,27 @@ is created, and the preset id is a provenance label used by Reset.
 An old version stays in the code library when a layout changes, so a design
 made a year ago still renders the way its author saw it; moving it forward is
 a deliberate step in `upgrade()`.
+
+## Sprint 9b additions
+
+Migration `20261028120000_sprint9b_brand_kit_fonts_and_cta`. Additive only:
+five columns on `BrandKit`, each nullable or defaulted, so every existing kit
+keeps working. The design is in
+[`docs/sprint-documents/sprint-09b-studio-premium-pack.md`](../../../docs/sprint-documents/sprint-09b-studio-premium-pack.md).
+
+- **`headingFont` and `bodyFont`** are font ids from the design engine
+  (`FontId`), null meaning "keep the theme's". They are plain text rather than
+  an enum because the font library is code that grows without a migration;
+  the API checks every id against the engine's `FONT_IDS` on write, the same
+  way `Design.presetId` is a code id and not a foreign key. Applying a kit
+  copies them into the design's own document (`brand.fonts`), so, like the
+  colours, editing a kit changes new designs only until Update is pressed.
+- **`lockLook`**: while a locked kit is applied to a design, the design's
+  colours, logo and fonts are the kit's alone. It is enforced in the editor
+  (the controls are hidden), not by refusing saves, because the kit's own
+  colours and fonts are already in the document.
+- **`ctaText` and `ctaUrl`**: what a new design's closing slide asks for and
+  where it points, filled in once at creation and the design's own after.
 
 ## A user may legitimately belong to zero organizations
 
