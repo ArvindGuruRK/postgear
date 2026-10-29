@@ -4,8 +4,7 @@ import type { GraphIndex } from '../plan/build-index';
 
 /**
  * Stable issue codes. The UI keys copy and focus on them, so a code never
- * changes meaning; Module 02 adds the `token.*`, `condition.*` and
- * `schedule.*` codes here.
+ * changes meaning.
  */
 export type IssueCode =
   | 'graph.no_trigger'
@@ -29,7 +28,17 @@ export type IssueCode =
   | 'node.channel_wrong_platform'
   | 'node.filter_channel_missing'
   | 'node.duplicate_name'
-  | 'node.disabled_output_used';
+  | 'node.disabled_output_used'
+  | 'token.unknown_node'
+  | 'token.not_upstream'
+  | 'token.unknown_field'
+  | 'token.bad_filter'
+  | 'token.maybe_empty'
+  | 'token.too_many'
+  | 'condition.empty'
+  | 'condition.missing_value'
+  | 'condition.type_mismatch'
+  | 'schedule.too_frequent_for_ai';
 
 export interface ValidationIssue {
   /** Errors block tests and activation; warnings do not. */
@@ -41,6 +50,8 @@ export interface ValidationIssue {
   edgeId?: string;
   /** The config path to focus ("message", "cases.0.name"). */
   field?: string;
+  /** `token.*`: the chip's text inside that field, so the UI paints that one chip red. */
+  token?: string;
 }
 
 /** A saved connection as validation sees it: never its credentials. */

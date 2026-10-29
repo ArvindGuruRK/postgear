@@ -34,6 +34,7 @@
       "@postgear/db": ["packages/db/src"],
       "@postgear/social-core": ["packages/social-core/src"],
       "@postgear/scheduling": ["packages/scheduling/src"],
+      "@postgear/automation": ["packages/automation/src"],
       "@postgear/seo-engine": ["packages/seo-engine/src"],
       "@postgear/design-engine": ["packages/design-engine/src"],
       "@postgear/ai-engine": ["packages/ai-engine/src"]

@@ -44,11 +44,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string = AUTH_MESSAGES.UNEXPECTED;
     let code: string | null = null;
+    let details: Record<string, number> | null = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       message = normalizeMessage(exception.getResponse());
       code = normalizeCode(exception.getResponse());
+      details = code ? normalizeDetails(exception.getResponse()) : null;
     } else {
       // Anything not deliberately thrown as an HttpException is a bug or a
       // driver-level failure. The client gets the generic string; the stack
@@ -67,10 +69,39 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
-    response
-      .status(status)
-      .json({ error: message, statusCode: status, ...(code ? { code } : {}) });
+    response.status(status).json({
+      error: message,
+      statusCode: status,
+      ...(code ? { code } : {}),
+      ...(details ? { details } : {}),
+    });
   }
+}
+
+/**
+ * Numbers a coded refusal chose to carry, such as the current revision on a
+ * workflow save conflict (Sprint 10), so the client can act without a second
+ * request. Whole numbers under short identifier keys only: nothing here can
+ * carry text, so nothing here can leak the detail this filter hides.
+ */
+function normalizeDetails(body: string | object): Record<string, number> | null {
+  if (typeof body !== 'object') {
+    return null;
+  }
+
+  const raw = (body as { details?: unknown }).details;
+
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return null;
+  }
+
+  const details = Object.fromEntries(
+    Object.entries(raw).filter(
+      ([key, value]) => /^[a-zA-Z][a-zA-Z0-9]{0,31}$/.test(key) && Number.isSafeInteger(value),
+    ),
+  ) as Record<string, number>;
+
+  return Object.keys(details).length > 0 ? details : null;
 }
 
 /**

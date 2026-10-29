@@ -20,7 +20,8 @@ function sourceFiles(directory: string): string[] {
 
 const FORBIDDEN: [RegExp, string][] = [
   [/from ['"]node:/, 'a Node built-in'],
-  [/from ['"](fs|path|crypto|os|util|events|stream|http|https|url)['"]/, 'a Node built-in'],
+  [/from ['"](fs|path|crypto|os|util|events|stream|http|https|url|vm)['"]/, 'a Node built-in'],
+  [/\bvm\.|\brequire\(/, 'a code sandbox or require'],
   [/from ['"]@prisma\//, 'Prisma'],
   [/from ['"]@temporalio\//, 'Temporal'],
   [/from ['"]react/, 'React'],
@@ -79,6 +80,24 @@ describe('the public surface', () => {
       'VALIDATION_RULES',
       'LIMITS',
       'EXECUTABLE_TYPES',
+      'parseTemplate',
+      'serializeSegments',
+      'resolveTemplate',
+      'resolveValue',
+      'availableData',
+      'evaluateCondition',
+      'describeCondition',
+      'nextRuns',
+      'describeSchedule',
+      'toTemporalScheduleSpec',
+      'redact',
+      'findSecretLikeValues',
+      'describeWorkflow',
+      'riskSummary',
+      'sampleScope',
+      'TEMPLATES',
+      'instantiateTemplate',
+      'rekeyGraph',
     ]) {
       expect(automation).toHaveProperty(name);
     }

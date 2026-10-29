@@ -1,6 +1,6 @@
 # Module 02: Engine Data, Tokens, Conditions, Schedules And Templates
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: L (one session)
+> **Sprint 10, Workflow Builder** | Status: Done (2026-10-29, see the README decision log for the calls made) | Size: L (one session)
 > **Depends on**: [Module 01](module-01-engine-graph-and-catalog.md)
 > **Stories**: WF-1.2, WF-3.2, WF-3.3, WF-5.1, WF-6.1, WF-7.3, WF-5.3 (redaction)
 > **Next**: [Module 03](module-03-data-model-and-api.md)
@@ -165,14 +165,14 @@ Templates are positioned left to right on a 280 px column grid so they open tidy
 
 ## Tasks
 
-- [ ] `tokens/` (parse, serialize, resolve, filters, available data) and its validation rules.
-- [ ] `conditions/` with the operator table, `evaluateCondition`, `describeCondition`, rules.
-- [ ] `schedule/` with `nextRuns`, `describeSchedule`, `toTemporalScheduleSpec`, the AI frequency rule. Add the date dependency only if it is pure.
-- [ ] `redact/`.
-- [ ] `describe/` with `describeWorkflow`, `riskSummary`, and each catalog `summary()` filled in.
-- [ ] `samples/`.
-- [ ] `templates/` with `instantiateTemplate`.
-- [ ] Export everything from `src/index.ts`; keep the surface documented.
+- [x] `tokens/` (parse, serialize, resolve, filters, available data) and its validation rules.
+- [x] `conditions/` with the operator table, `evaluateCondition`, `describeCondition`, rules.
+- [x] `schedule/` with `nextRuns`, `describeSchedule`, `toTemporalScheduleSpec`, the AI frequency rule. Add the date dependency only if it is pure.
+- [x] `redact/`.
+- [x] `describe/` with `describeWorkflow`, `riskSummary`, and each catalog `summary()` filled in.
+- [x] `samples/`.
+- [x] `templates/` with `instantiateTemplate`.
+- [x] Export everything from `src/index.ts`; keep the surface documented.
 
 ## Tests
 

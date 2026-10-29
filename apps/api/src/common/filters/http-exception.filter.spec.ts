@@ -69,6 +69,34 @@ describe('HttpExceptionFilter', () => {
     expect(freeText.response.json).toHaveBeenCalledWith({ error: 'No', statusCode: 409 });
   });
 
+  it('passes whole-number details of a coded refusal, and nothing that could be text', () => {
+    const conflict = host({ method: 'PATCH', url: '/automations/x' });
+    filter.catch(
+      new HttpException(
+        {
+          message: 'Changed elsewhere',
+          code: 'automation_conflict',
+          details: { currentRevision: 7, note: 'leak', ratio: 0.5, 'bad key': 1 },
+        },
+        409,
+      ),
+      conflict.host,
+    );
+    expect(conflict.response.json).toHaveBeenCalledWith({
+      error: 'Changed elsewhere',
+      statusCode: 409,
+      code: 'automation_conflict',
+      details: { currentRevision: 7 },
+    });
+
+    const uncoded = host({ method: 'PATCH', url: '/x' });
+    filter.catch(
+      new HttpException({ message: 'No', details: { currentRevision: 7 } }, 409),
+      uncoded.host,
+    );
+    expect(uncoded.response.json).toHaveBeenCalledWith({ error: 'No', statusCode: 409 });
+  });
+
   it('does not report an HttpException', () => {
     const { host: h, response } = host({ method: 'GET', url: '/posts/x' });
 

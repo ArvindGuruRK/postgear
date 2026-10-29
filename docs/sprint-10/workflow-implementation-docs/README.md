@@ -32,8 +32,8 @@ If two documents disagree: user stories win on behaviour, the UX blueprint wins 
 |---|---|---|---|---|---|
 | 00 | [UX Blueprint](00-ux-blueprint.md) (read, do not build) | - | - | all UI stories | Reference |
 | 01 | [Engine Core: Graph And Node Catalog](module-01-engine-graph-and-catalog.md) | L | - | WF-2.x foundations | Done |
-| 02 | [Engine Data: Tokens, Conditions, Schedules, Templates](module-02-engine-data-tokens-conditions.md) | L | 01 | WF-3.2, 3.3, 7.3 | Not started |
-| 03 | [Data Model And Automations API](module-03-data-model-and-api.md) | M | 01, 02 | WF-1.3, 1.4, 2.7 | Not started |
+| 02 | [Engine Data: Tokens, Conditions, Schedules, Templates](module-02-engine-data-tokens-conditions.md) | L | 01 | WF-3.2, 3.3, 7.3 | Done |
+| 03 | [Data Model And Automations API](module-03-data-model-and-api.md) | M | 01, 02 | WF-1.3, 1.4, 2.7 | Done |
 | 04 | [Connections](module-04-connections.md) | M | 03 | WF-4.1, 4.2, 4.3 | Not started |
 | 05 | [List, Templates And The Canvas](module-05-list-templates-and-canvas.md) | XL | 03 | WF-1.x, 2.x | Not started |
 | 06 | [Step Panel, Data Mapping And Live Checks](module-06-step-panel-and-data-mapping.md) | XL | 04, 05 | WF-3.x, 5.1 | Not started |
@@ -177,9 +177,9 @@ Each session updates its row. Status: Not started, In progress, Done, Done with 
 
 | # | Status | Date | Commit | Notes (exports, endpoints, gaps) |
 |---|---|---|---|---|
-| 01 | Done | 2026-10-29 | uncommitted | `packages/automation` (`@postgear/automation`, Zod only, 199 tests; `src/plan` and `src/validate` 100% lines). 31 catalog types, 4 Coming Soon. Exports listed below. Not imported by any app yet (Modules 03, 05, 07 wire it in) |
-| 02 | Not started | | | |
-| 03 | Not started | | | |
+| 01 | Done | 2026-10-29 | `842b23e` | `packages/automation` (`@postgear/automation`, Zod only, 199 tests; `src/plan` and `src/validate` 100% lines). 31 catalog types, 4 Coming Soon. Exports listed below. Not imported by any app yet (Modules 03, 05, 07 wire it in) |
+| 02 | Done | 2026-10-29 | uncommitted | Tokens, conditions, schedules, redaction, plain-words summaries, samples, 5 templates, all in `@postgear/automation` (still Zod only, no date library). 459 tests in the package; lines covered: tokens 95.8%, conditions 98.0%, schedule 100%, redact 98.1%. 10 new issue codes. Exports listed below |
+| 03 | Done | 2026-10-29 | uncommitted | Migration `20261029120000_sprint10_workflow_builder` (4 tables, 4 enums, additive). `apps/api/src/modules/automations`: all 13 routes below, 45 specs. Seed: "Publishing Report" draft on `seed-demo-org`. Checked live with curl as the demo admin and the member. No web page yet (Module 05) |
 | 04 | Not started | | | |
 | 05 | Not started | | | |
 | 06 | Not started | | | |
@@ -205,6 +205,43 @@ Import from the package root only. Each line is one export (types in italics).
 - **Connecting**: `canConnect(graph, { source, sourcePort, target, targetPort? })` returns `{ ok: true } | { ok: false, reason }`, `CONNECT_REASONS`; *`ProposedEdge`, `ConnectCheck`*
 - **Planning**: `buildIndex(graph)`, `edgesFrom(index, key, port)`, `topologicalOrder(graph)`, `upstreamOf(graph, key)` (run order), `branchConditions(graph)`, `areExclusive(graph, edgeA, edgeB)`, `exclusiveGroups(graph)`, `planNext(graph, state)`; *`GraphIndex`, `GraphInput` (a graph or an index), `BranchConditions`, `ExclusiveGroup`, `RunPlanState`, `PlanStepState`, `PlanStepStatus`, `PlanResult`, `PlanOutcome`, `SkippedStep`, `SkipReason`*
 - **Validation**: `validateGraph(graph, ctx?, rules?)`, `hasBlockingIssues(issues)`, `VALIDATION_RULES` (Module 02 appends); *`ValidationIssue`, `IssueCode`, `ValidationContext`, `ConnectionState`, `ChannelState`, `ValidationRule`*
+
+### `@postgear/automation` Public API (Module 02)
+
+- **Data tokens**: `parseTemplate(text)` (lossless: segments keep `raw`), `serializeSegments(segments)` (exact round trip), `formatToken`, `sameSegments`, `tokensIn(text)`, `singleToken(segments)`, `tokenSource(path)` (`{ root, nodeKey?, field, wellFormed }`), `nodeTokenPath(key, field)`, `TOKEN_ROOTS`, `MAX_TOKENS_PER_FIELD` (50), `MAX_FIELD_DEPTH` (8); *`Segment`, `TextSegment`, `TokenSegment`, `TokenFilter`, `TokenSource`*
+- **Filling tokens in**: `resolveTemplate(text, scope, { timeZone? })` returns `{ value, missing, unknownFilters }`, `resolveConfig(config, scope)` (missing listed per config field), `resolveValue(path, scope)` (own fields only), `isEmptyValue`, `toText`, `toNumber` (strict), `toEpoch`; *`RunScope`, `Resolved`, `ResolvedConfig`*
+- **Data formats**: `TOKEN_FILTERS` (name, label, description, argument), `FILTER_NAMES`, `isKnownFilter`, `applyFilter`. Final list: `truncate: n` (Shorten), `upper` (Upper Case), `lower` (Lower Case), `trim` (Trim Spaces), `date: "pattern"` (Date Format), `default: "text"` (If Empty Use), `json` (As JSON), `join: "sep"` (Join List), `first` (First Item), `count` (Count), `urlencode` (For A Link)
+- **Insert Data**: `availableData(graph, nodeKey, { scope? })` (upstream groups then Run and Workspace, each with `turnedOff`, `maybeEmpty`, a field tree of at most 3 levels and samples), `sourceFields`, `lookupField`, `tokenLabeler(graph)`, `RUN_FIELDS`, `WORKSPACE_FIELDS`, `renameNodesInText`, `renameNodesInConfig`; *`DataGroup`, `DataField`*
+- **Conditions**: `evaluateCondition(group, scope, { now?, timeZone? })` returns `{ result, details }`, `describeCondition(group, { tokenLabel? })`, `describeRule`, `OPERATORS`, `OPERATORS_BY_TYPE`, `operatorsFor(type)`, `conditionTypeOf`, `operatorFamily`; *`ConditionType`, `RuleResult`, `ConditionResult`*
+- **Schedules**: `nextRuns(config, fromIso, count = 3)` (DST-correct, strictly after `from`), `describeSchedule(config, { timeZone? })`, `scheduleNotes`, `toTemporalScheduleSpec(config)`, `scheduleIntervalMinutes`, `HOURLY_STEPS`; *`ScheduleSpecShape`, `CalendarSpecShape`, `SpecRange`*
+- **Secrets**: `redact(value, { connectionValues?, capBytes? })` returns `{ value, truncated, hidden }`, `HIDDEN`, `findSecretLikeValues(graph)`, `SECRET_REFUSED_MESSAGE` (Module 03's save refusal), `isSecretKey`; *`SecretFinding`, `Redacted`*
+- **Plain words**: `describeWorkflow(graph, ctx)` (the activation sentence), `riskSummary(graph)` (`{ external, publishes, publishesWithoutReview, aiCreditsPerRun }`); *`NodeRef`, `RiskSummary`*
+- **Samples**: `triggerSample`, `stepSample`, `sampleScope(graph, workspaceName?)`, `SAMPLE_RUN`
+- **Templates**: `TEMPLATES` (Publishing Report, AI Weekly Post, Failed Post Alert, Repurpose For X, Blog To Draft), `getTemplate`, `listTemplates`, `instantiateTemplate(template, makeKey, { timeZone? })`; *`AutomationTemplate`, `TemplateSummary`, `TemplateNeed`*
+- **Graph and plan**: `rekeyGraph(graph, makeKey)` (Duplicate and templates; rewrites lines and tokens), `certainBefore(graph, key)` (steps that surely ran before this one)
+- **Time helpers**: `isValidTimeZone`, `zonedTime`, `zonedToEpoch`, `offsetMinutes`, `formatDate(ms, pattern, zone)`, `parseIsoDate`, `toIsoString`
+- **Validation**: `VALIDATION_RULES` now also runs `tokensResolve`, `conditionsComplete`, `scheduleFitsAi`; `aiScheduleLimit(minutes)` builds the AI rule for another limit. Issues gain `token` (the chip's raw text, so the UI paints the exact chip)
+
+### Automations API (Module 03)
+
+Migration `20261029120000_sprint10_workflow_builder`. Models `Automation`, `AutomationVersion`, `AutomationRun`, `AutomationRunStep`; enums `AutomationStatus`, `AutomationRunMode`, `AutomationRunStatus`, `AutomationStepStatus` (all re-exported from `@postgear/db`). Notes in `packages/db/prisma/SCHEMA_NOTES.md`, "Sprint 10 additions".
+
+| Route | Who | Answers |
+|---|---|---|
+| `GET /automations?search=&status=&cursor=` | members | `{ automations, nextCursor }`; rows carry `runs30d` (one grouped query); `status` is `DRAFT`, `ACTIVE` or `PAUSED`; pages of 50 by cursor, a search is one page |
+| `GET /automations/catalog` | members | `{ steps, connectedPlatforms }`; each step has `state` (`ready`, `needsConnection`, `comingSoon`), `runnable`, `reason` |
+| `GET /automations/templates` | members | `{ templates }` (`listTemplates()`, no graphs) |
+| `POST /automations` | members | body `{ name?, templateId?, timeZone? }`, 201 `{ automation }` |
+| `GET /automations/:id` | members | `{ automation }` with `draftGraph`, `draftRevision`, `pinned: { nodeKey, pinnedAt }[]`, `activeVersion` (number or null) |
+| `PATCH /automations/:id` | members | body `{ draftRevision, name?, draftGraph? }`, `{ automation: { id, name, draftRevision, triggerType, hasUnpublishedChanges, updatedAt } }`; 409 `code: automation_conflict, details: { currentRevision }`; 422 `unknown_step` or `secret_in_step` |
+| `DELETE /automations/:id` | members | soft delete; calls `AutomationTriggers.stop()` first when active |
+| `POST /automations/:id/duplicate` | members | 201 `{ automation }`, "{name} (Copy)" |
+| `POST /automations/:id/validate` | members | `{ issues, blocking }` for the saved draft |
+| `PUT /automations/:id/pinned/:nodeKey` | members | body `{ output }`, `{ pinned }`; 422 `pinned_too_large` past 64 KB; 404 when the step is not in the draft |
+| `DELETE /automations/:id/pinned/:nodeKey` | members | `{ message }` |
+| `POST /automations/:id/activate`, `/pause` | admins | 501 "Turning workflows on arrives in a later step of this sprint." |
+
+For later modules: `AutomationsModule` exports `AutomationContextService` (`forOrg(orgId)` builds the `ValidationContext`; Module 04 fills `connections`) and `AutomationTriggers` (`stop(orgId, id)`, Module 09 fills it in). Server step keys come from `freshKeyMaker()` in `automation-keys.ts` (10 characters, a letter first).
 
 `planNext` contract for Module 07: state is `{ [nodeKey]: { status, ports? } }` with status `running`, `succeeded`, `handled` (On Error continue or branch; ports `['out']` or `['error']`), `failed` (On Error stop), `skipped`, `off`. Omitted ports mean `['out']`; a Filter that does not pass reports `ports: []`; Manual Review reports `['approved']` or `['rejected']`. It returns `{ ready, skipped: { key, reason: 'branchNotTaken' | 'upstreamFailed' }[], bypassed, finished, outcome? }`. Record `skipped` as skipped and `bypassed` (turned-off steps) as `off`; both are only reported once they are missing from the state.
 
@@ -258,3 +295,29 @@ Every choice a session made that a later session must know. Newest last. One or 
 | 2026-10-29 | 01 | `node.disabled_output_used` finds tokens with its own narrow pattern; Module 02 should switch it to `parseTemplate` | Tokens arrive in Module 02 |
 | 2026-10-29 | 01 | Generate Video is priority P2 (the doc said "-"); Render Design is category `ai` (id `studio.renderDesign`); Merge's `outputShape` is empty (its output is keyed by step at run time, Module 07 decides) | Smallest choices that fit the types |
 | 2026-10-29 | 01 | Summaries are short literal lines now ("Every Monday at 09:00", "Message to Marketing Slack"); Module 02 replaces schedule and condition ones with `describeSchedule` and `describeCondition` | Module 02 owns the full sentences |
+| 2026-10-29 | 02 | No date library: time is hand-rolled (`src/time`), with zone offsets read from `Intl.DateTimeFormat` and cached per zone. A time that falls in a daylight saving gap moves forward to the first real minute; a time that happens twice takes the first one | `@date-fns/tz` is pure but the package stays Zod only; tested on London and New York changes and Kolkata |
+| 2026-10-29 | 02 | Time zones: the Schedule step's own IANA zone is the only zone. Token `date` formats and "within the last N days" use the zone passed in (`timeZone` option), else UTC | Same call as the plan row; no workspace zone yet |
+| 2026-10-29 | 02 | Filters are the doc's 11, unchanged (list in the API section). `truncate` keeps at most n characters including the "…"; `default` also counts a filled-in value as not missing | Fixed list, nothing to evaluate |
+| 2026-10-29 | 02 | Hourly runs every 1, 2, 3, 4, 6, 8 or 12 hours (`HOURLY_STEPS`), not any of 1 to 12 | Temporal's hour step restarts at midnight, so "every 5 hours" would leave a 4 hour gap each night |
+| 2026-10-29 | 02 | Temporal has no "last day": days 29 to 31 and `last` become one calendar per month, February lists the 28th and 29th and a skip drops the 28th in leap years (2028 to 2096). A test runs the spec through a small evaluator and checks it equals `nextRuns` | Keeps Module 09 a straight pass-through |
+| 2026-10-29 | 02 | Escaping: `\{{` is literal braces; a run of backslashes before `{{` halves. Segments keep `raw`, so `serializeSegments(parseTemplate(x)) === x` for any text; edited segments fall back to canonical spelling | Exact round trip as asked, even for odd hand-typed text |
+| 2026-10-29 | 02 | Token paths: `trigger.<field>`, `nodes.<key>.output.<field>`, `run.id`, `run.startedAt`, `run.mode` (`test` or `live`), `workspace.name`. Only own fields are read; `__proto__`, `constructor` and `prototype` never resolve | No path can reach JavaScript internals |
+| 2026-10-29 | 02 | "May be empty" means the source step is not certain to run before this one (`certainBefore`: through the trigger, single-port steps, ports fixed by the branch, or a step whose every port leads here). A token with a `default` format, or from a turned-off step, gets no `maybe_empty` warning | The doc's rejoin case, without flagging every step after a Filter's only output |
+| 2026-10-29 | 02 | Extra issue codes: `token.too_many` (over 50 chips in one field), `condition.missing_value` is also used for "Enter a whole number.", `condition.type_mismatch` also says "This check does not fit this kind of data." and "Enter a date like 2026-11-03." (warnings) | Small gaps in the doc's table |
+| 2026-10-29 | 02 | A group with no rules is `condition.empty` (error) and, if it ever ran, "all" matches and "any" does not. "Does not equal" with an empty or non-number side is false too | Every number comparison with a non-number is false, as the doc says |
+| 2026-10-29 | 02 | Redaction: secret-named keys keep numbers, yes/no, null and empty text (`maxTokens: 500`); `{ name, value }` pairs count by their name (HTTP headers); connection values under 8 characters are not matched inside text; a link with a secret in its query keeps `scheme://host/[hidden]`. The 64 KB cap cuts long text first (16 KB, 4 KB, 1 KB, 256, 64 characters), then lists (100, 20, 5 items) | Hides what matters without hiding counts and settings |
+| 2026-10-29 | 02 | Two secret checks: `redact` is generous (also hides `key`, `code`, `auth` query values); `findSecretLikeValues` (Module 03's save refusal) only flags typed text in secret-named fields and clear secret shapes (bearer, Slack and Discord webhooks, `sk-`, Stripe, GitHub, Google, AWS keys, JWTs), and scans configs, step names and notes. Data chips are never flagged | Saving must not refuse normal text like "code: SPRING10" |
+| 2026-10-29 | 02 | The trigger summary is `describeSchedule` without the zone (the panel shows the zone); condition summaries get step names through a new optional `SummaryContext.tokenLabel` | Short canvas cards; the full sentence still has the zone |
+| 2026-10-29 | 02 | Templates use real catalog types and fill only what they know; connections, channels and the sheet are left for the setup panel. `instantiateTemplate` sets the browser zone on Schedule and Add To Queue steps. Failed Post Alert runs Slack and In-App in parallel after the Filter | A template must validate with zero errors once its connections are picked (tested) |
+| 2026-10-29 | 02 | Samples use a made-up workspace "Bloom Bakery" and a sample image link for media fields; Set Fields samples are resolved against the samples before them | Hover previews and Test Step read like a real run |
+| 2026-10-29 | 02 | `node.disabled_output_used` now finds chips with `parseTemplate` (the narrow pattern is gone). The purity test also bans `vm.` and `require(` | Closes the Module 01 handoff; the doc's no-sandbox guard |
+| 2026-10-29 | 03 | Model field changes from the doc: `createdById`, `updatedById` (Automation), `createdById` (Version) and `startedById` (Run) are nullable foreign keys to `User` with `ON DELETE SET NULL`, as in Studio; `AutomationRun` also relates to `Organization` and `AutomationVersion`. No field was renamed | A workflow belongs to the workspace; deleting a user must not take it or be blocked by it |
+| 2026-10-29 | 03 | The secret refusal is `findSecretLikeValues` (Module 02, strict mode): secret-named fields holding typed text (`password`, `token`, `apiKey`, `secret`, `authorization`, `cookie`, `signature`, `client_secret` and kin, also as `{ name, value }` pairs), and text shaped like a bearer or basic token, a Slack or Discord webhook, a Teams or Logic Apps `sig` link, an `sk-` key, Stripe `sk_`/`rk_` keys, `xox` Slack tokens, GitHub tokens, Google `AIza` keys, AWS `AKIA` keys or a JWT, in configs, step names, step notes and sticky notes. Answers 422 `secret_in_step` | The rule "secrets never live in graph JSON", without refusing ordinary text |
+| 2026-10-29 | 03 | 51 steps save (validation reports `graph.too_many_nodes`); the request schema refuses past the hard cap of 100 | The doc's test said 51 is refused; Module 01's code saves it so a paste never loses work. Trusted the code |
+| 2026-10-29 | 03 | The global exception filter now passes `details` on a coded refusal, whole numbers only (so the 409 can say `currentRevision`). No text can pass through it | The filter dropped every field but `error`, `statusCode` and `code` |
+| 2026-10-29 | 03 | `POST /automations` also takes `timeZone` (IANA, checked), handed to `instantiateTemplate` for Schedule and Add To Queue steps | AI Weekly Post has a Schedule; the server has no zone of its own |
+| 2026-10-29 | 03 | The catalog adds `connectedPlatforms`; Publish (one definition for every platform) is `needsConnection` only when no platform has an active channel. A channel that needs reconnecting, is half connected or turned off does not count | One card per platform needs the list; the single definition cannot carry a per-platform state |
+| 2026-10-29 | 03 | Pinned data: refused past 64 KB (not cut), redacted, written with `jsonb_set` one key at a time; pinning never bumps `draftRevision` or `updatedAt`; pins of deleted steps stay in the row but are not listed | Cut test data would test something else; pinning is not an edit and must not conflict with autosave |
+| 2026-10-29 | 03 | `hasUnpublishedChanges` compares graphs ignoring key order (`sameJson`) | Postgres JSONB reorders keys, so a plain string compare would always say "changed" |
+| 2026-10-29 | 03 | Activate and pause still look the workflow up first (404 for a foreign id) before answering 501 | Keeps tenancy answers the same on every route |
+| 2026-10-29 | 03 | The seed loads `@postgear/automation` with `require` at run time (as the Studio seed loads the design engine) and keeps the template's own step keys; the seeded workflow has a fixed UUID id | `packages/db` does not depend on the package; the API treats non-UUID ids as not found |

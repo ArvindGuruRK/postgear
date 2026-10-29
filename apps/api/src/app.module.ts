@@ -10,6 +10,7 @@ import { validateEnv } from './config/env';
 import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AutomationsModule } from './modules/automations/automations.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -93,6 +94,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     SearchModule,
     // Sprint 9: the Design Studio.
     StudioModule,
+    // Sprint 10: the Workflow Builder.
+    AutomationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

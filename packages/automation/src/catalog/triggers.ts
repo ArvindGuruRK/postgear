@@ -4,6 +4,7 @@
  * turned off and have no On Error setting.
  */
 import { z } from 'zod';
+import { describeSchedule } from '../schedule/describe';
 import { scheduleConfigSchema } from '../schedule/schema';
 import { channelFields, channelIdsField, channelNames, count } from './fields';
 import { PUBLISH_FAILURE_REASON_IDS, PUBLISH_FAILURE_REASONS } from './platforms';
@@ -124,16 +125,6 @@ export const postFailed = defineNode({
   },
 });
 
-const DAY_NAMES = {
-  mon: 'Monday',
-  tue: 'Tuesday',
-  wed: 'Wednesday',
-  thu: 'Thursday',
-  fri: 'Friday',
-  sat: 'Saturday',
-  sun: 'Sunday',
-} as const;
-
 export const schedule = defineNode({
   ...TRIGGER_BASICS,
   type: 'trigger.schedule',
@@ -149,29 +140,7 @@ export const schedule = defineNode({
     { path: 'scheduledFor', label: 'Scheduled Time', type: 'date', sample: '2026-11-03T09:00:00Z' },
     { path: 'timeZone', label: 'Time Zone', type: 'text', sample: 'Asia/Kolkata' },
   ],
-  summary: (config) => {
-    const at = config.time ? ` at ${config.time}` : '';
-    switch (config.frequency) {
-      case 'hourly':
-        return config.everyHours && config.everyHours > 1
-          ? `Every ${config.everyHours} hours`
-          : 'Every hour';
-      case 'daily':
-        return `Every day${at}`;
-      case 'weekdays':
-        return `Every weekday${at}`;
-      case 'weekly': {
-        const days = (config.days ?? []).map((day) => DAY_NAMES[day]);
-        const list =
-          days.length > 1 ? `${days.slice(0, -1).join(', ')} and ${days.at(-1)}` : days[0];
-        return `Every ${list ?? 'week'}${at}`;
-      }
-      case 'monthly':
-        return config.dayOfMonth === 'last'
-          ? `On the last day of every month${at}`
-          : `On day ${config.dayOfMonth ?? 1} of every month${at}`;
-    }
-  },
+  summary: (config) => describeSchedule(config, { timeZone: false }),
 });
 
 const manualFieldSchema = z

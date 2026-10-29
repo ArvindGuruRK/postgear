@@ -1,6 +1,6 @@
 # Module 03: Data Model And Automations API
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: M (one session)
+> **Sprint 10, Workflow Builder** | Status: Done (2026-10-29, see the README decision log for the calls made) | Size: M (one session)
 > **Depends on**: [Module 01](module-01-engine-graph-and-catalog.md), [Module 02](module-02-engine-data-tokens-conditions.md)
 > **Stories**: WF-1.2, WF-1.3, WF-1.4, WF-2.7, WF-5.1 (server side), WF-6.4 (route guard only)
 > **Next**: [Module 04](module-04-connections.md)
@@ -184,15 +184,15 @@ Add the Publishing Report template as a `DRAFT` named "Publishing Report" for `s
 
 ## Tasks
 
-- [ ] Models, enums and relations through the `prisma-change` skill; run the migration and `db:generate` yourself.
-- [ ] `SCHEMA_NOTES.md` entry with the notes above.
-- [ ] `EXECUTABLE_TYPES` in `packages/automation` (empty set) and its export.
-- [ ] `automations` module: controller, service, repository, `automation-context.service.ts`, DTOs (`.strict()` Zod, the graph schema imported from `@postgear/automation`), messages.
-- [ ] Secret detector (reuse the patterns from Module 02's `redact`; add a `findSecretLikeValues(graph)` helper in `packages/automation` so the web app can warn before saving).
-- [ ] List query with run stats in one or two queries.
-- [ ] Activate and pause routes answering 501, admin only.
-- [ ] Seed.
-- [ ] Register the module in `app.module.ts`.
+- [x] Models, enums and relations through the `prisma-change` skill; run the migration and `db:generate` yourself.
+- [x] `SCHEMA_NOTES.md` entry with the notes above.
+- [x] `EXECUTABLE_TYPES` in `packages/automation` (empty set) and its export.
+- [x] `automations` module: controller, service, repository, `automation-context.service.ts`, DTOs (`.strict()` Zod, the graph schema imported from `@postgear/automation`), messages.
+- [x] Secret detector (reuse the patterns from Module 02's `redact`; add a `findSecretLikeValues(graph)` helper in `packages/automation` so the web app can warn before saving).
+- [x] List query with run stats in one or two queries.
+- [x] Activate and pause routes answering 501, admin only.
+- [x] Seed.
+- [x] Register the module in `app.module.ts`.
 
 ## Tests
 

@@ -370,7 +370,7 @@ describe('step summaries', () => {
     );
     expect(say('trigger.schedule', { frequency: 'weekdays' })).toBe('Every weekday at 09:00');
     expect(say('trigger.schedule', { frequency: 'monthly', dayOfMonth: 5 })).toBe(
-      'On day 5 of every month at 09:00',
+      'On the 5th of every month at 09:00',
     );
     expect(say('trigger.schedule', { frequency: 'monthly', dayOfMonth: 'last' })).toBe(
       'On the last day of every month at 09:00',

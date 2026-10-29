@@ -4,10 +4,15 @@
  * (a durable timer and a signal), not by an activity.
  */
 import { z } from 'zod';
-import { conditionGroupSchema, emptyConditionGroup } from '../conditions/schema';
+import { describeCondition } from '../conditions/describe';
+import {
+  type ConditionGroup,
+  conditionGroupSchema,
+  emptyConditionGroup,
+} from '../conditions/schema';
 import { CASE_ID_PATTERN, type PortId } from '../graph/schema';
 import { count, isBlank, OUT, templateField } from './fields';
-import { defineNode, type OutputField, type PortSpec } from './types';
+import { defineNode, type OutputField, type PortSpec, type SummaryContext } from './types';
 
 const LOGIC_BASICS = {
   typeVersion: 1,
@@ -20,10 +25,10 @@ const LOGIC_BASICS = {
   canHandleErrors: true,
 } as const;
 
-function rulesWords(rules: number, match: 'all' | 'any'): string {
-  if (rules === 0) return 'Add a rule';
-  if (rules === 1) return 'Checks 1 rule';
-  return match === 'all' ? `All of ${rules} rules must match` : `Any of ${rules} rules can match`;
+/** The condition as a sentence, or a nudge when it has no rules yet. */
+function conditionWords(condition: ConditionGroup, ctx: SummaryContext): string {
+  if (condition.rules.length === 0) return 'Add a rule';
+  return describeCondition(condition, { tokenLabel: ctx.tokenLabel });
 }
 
 const conditionConfig = z.object({ condition: conditionGroupSchema }).strict();
@@ -45,7 +50,7 @@ export const ifElse = defineNode({
   defaultConfig: { condition: emptyConditionGroup() },
   outputShape: [{ path: 'result', label: 'Result', type: 'boolean', sample: true }],
   canDisable: false,
-  summary: (config) => rulesWords(config.condition.rules.length, config.condition.match),
+  summary: (config, ctx) => conditionWords(config.condition, ctx),
 });
 
 const switchCaseSchema = z
@@ -126,7 +131,7 @@ export const filter = defineNode({
   defaultConfig: { condition: emptyConditionGroup() },
   outputShape: [{ path: 'passed', label: 'Passed', type: 'boolean', sample: true }],
   canDisable: true,
-  summary: (config) => rulesWords(config.condition.rules.length, config.condition.match),
+  summary: (config, ctx) => conditionWords(config.condition, ctx),
 });
 
 const DELAY_MAX = { minutes: 30 * 24 * 60, hours: 30 * 24, days: 30 } as const;

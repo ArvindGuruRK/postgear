@@ -54,6 +54,9 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `Design` | One post or carousel. Slides live in the `document` JSON, guarded by the design engine's Zod schema; `revision` is the optimistic lock. | Sprint 9 |
 | `DesignShare` | A read-only share link to a design, token stored hashed. | Sprint 9 |
 | `DesignFavourite` | A template starred by the workspace, keyed on the code-side preset id. | Sprint 9 |
+| `Automation` | One workflow (the UI says Workflow). The draft lives in the `draftGraph` JSON, guarded by `@postgear/automation`'s graph schema; `draftRevision` is the optimistic lock; soft deleted. See [Sprint 10 additions](#sprint-10-additions). | Sprint 10 |
+| `AutomationVersion` | An immutable snapshot of a workflow, made when it is turned on. Live runs read only these. | Sprint 10 (rows from Module 09) |
+| `AutomationRun` / `AutomationRunStep` | One run of a workflow and each step's attempt in it, inputs and outputs redacted and capped. | Sprint 10 (rows from Module 07) |
 
 ### Kept, though not yet used
 
@@ -375,6 +378,54 @@ keeps working. The design is in
   colours and fonts are already in the document.
 - **`ctaText` and `ctaUrl`**: what a new design's closing slide asks for and
   where it points, filled in once at creation and the design's own after.
+
+## Sprint 10 additions
+
+Migration `20261029120000_sprint10_workflow_builder`. Additive only: four
+tables and four enums, nothing changed on an existing model. The UI says
+Workflow and Step; the code and these tables say Automation and node. The
+design is in
+[`docs/sprint-10/workflow-implementation-docs/`](../../../docs/sprint-10/workflow-implementation-docs/README.md)
+(Module 03). The run tables are created before anything runs, so the run
+engine (Module 07) only adds code.
+
+- **`Automation.draftGraph`** is one JSON value, for the reasons
+  `Design.document` is: the builder autosaves the whole graph, and the shape is
+  defined, versioned (`schemaVersion` plus `upgradeGraph`) and `.strict()`
+  validated by `automationGraphSchema` in `@postgear/automation` on every
+  write. The API also refuses any graph holding something that looks like a
+  secret (`findSecretLikeValues`): **secrets never live in graph JSON**, they
+  go in a connection. `draftRevision` is the optimistic lock, as in Studio: a
+  stale save is a 409 with the current revision, and nothing is merged.
+- **`pinnedData` lives on the row, not in the graph**, so a version never
+  carries test data and a live run can never read it. It is redacted and
+  capped at 64 KB per step before it is stored.
+- **`triggerType`, `lastRun*` and `hasUnpublishedChanges`** are copies kept
+  for the list, so listing workflows never parses a graph or scans runs.
+  `hasUnpublishedChanges` only flips for an active or paused workflow whose
+  draft differs from its active version.
+- **`AutomationVersion.graph` is never updated after insert.** Turning a
+  workflow on snapshots the draft; live runs read only versions, so editing a
+  live workflow's draft never changes what is running.
+- **REJECTED and EXPIRED are outcomes, not failures.** A Manual Review that
+  says no, or that nobody answers in time, ends the run that way; the list and
+  `consecutiveFailures` (the auto-pause counter) count only `FAILED`.
+- **`graphSnapshot` on TEST runs**: a test runs the draft as it was at that
+  moment; keeping it lets the run inspector paint the right graph after the
+  draft moves on. Live runs point at their version instead.
+- **`triggerEventId`** dedupes trigger events (`post.published:<rootPostId>`,
+  Module 09) through `@@unique([automationId, triggerEventId])`. Manual and
+  test runs leave it null, and Postgres lets many nulls share a unique index.
+- **`nodeName` and `nodeType` are copied onto each run step**, so a step that
+  was renamed or deleted since still reads correctly in old runs.
+- **Run rows cascade from `Automation`**, which is itself soft deleted: the
+  rows go only when the 30-day prune hard deletes it. `organizationId` is
+  copied onto `AutomationRun` so workspace-wide run queries need no join.
+- **User columns are nullable, `ON DELETE SET NULL`** (`createdById`,
+  `updatedById`, `startedById`), as in Studio: a workflow belongs to the
+  workspace, so deleting a user never takes it with them.
+- **`templateId` is plain text**, like `Design.presetId`: starter templates
+  are code in `packages/automation/src/templates`, not rows.
 
 ## A user may legitimately belong to zero organizations
 

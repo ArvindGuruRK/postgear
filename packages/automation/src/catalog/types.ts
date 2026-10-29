@@ -98,6 +98,9 @@ export const ICON_KEYS = [
   'youtube',
   'tiktok',
   'pinterest',
+  // Insert Data groups that are not steps.
+  'run',
+  'workspace',
 ] as const;
 
 export type IconKey = (typeof ICON_KEYS)[number];
@@ -153,6 +156,11 @@ export interface ConnectionUse {
 export interface SummaryContext {
   channels?: readonly { id: string; name: string; provider: string }[];
   connections?: readonly { id: string; name: string; kind: ConnectionKind }[];
+  /**
+   * Plain words for a data token's path ("Post Link"), so condition
+   * summaries read well. `tokenLabeler(graph)` makes one.
+   */
+  tokenLabel?(path: string): string | undefined;
 }
 
 export interface NodeDefinition<C extends object = Record<string, unknown>> {

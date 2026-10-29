@@ -1,5 +1,6 @@
 import type { ValidationRule } from '../types';
 import { channelsReady } from './channels';
+import { conditionsComplete } from './conditions';
 import { configIsValid } from './config';
 import { connectionsReady } from './connections';
 import { noCycles } from './cycles';
@@ -11,12 +12,14 @@ import { uniqueNames } from './names';
 import { knownRunnableTypes } from './node-types';
 import { portsExist } from './ports';
 import { reachableFromTrigger } from './reachability';
+import { scheduleFitsAi } from './schedule';
+import { tokensResolve } from './tokens';
 import { exactlyOneTrigger } from './triggers';
 
 /**
  * Every rule `validateGraph` runs, in the order their issues are listed:
- * the shape of the graph first, then each step. Module 02 appends its
- * token, condition and schedule rules here.
+ * the shape of the graph first, then each step, then its data chips,
+ * conditions and schedule.
  */
 export const VALIDATION_RULES: readonly ValidationRule[] = [
   graphSize,
@@ -32,4 +35,7 @@ export const VALIDATION_RULES: readonly ValidationRule[] = [
   uniqueNames,
   disabledOutputUsed,
   ifElseDeadEnds,
+  tokensResolve,
+  conditionsComplete,
+  scheduleFitsAi,
 ];

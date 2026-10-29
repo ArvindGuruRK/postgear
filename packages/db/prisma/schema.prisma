@@ -54,6 +54,9 @@ model Organization {
   brandKits           BrandKit[]
   designs             Design[]
   designFavourites    DesignFavourite[]
+  // Sprint 10
+  automations         Automation[]
+  automationRuns      AutomationRun[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -124,6 +127,11 @@ model User {
   designs               Design[]             @relation("DesignAuthor")
   designShares          DesignShare[]        @relation("DesignShareAuthor")
   designFavourites      DesignFavourite[]    @relation("DesignFavouriteAuthor")
+  // Sprint 10: the workflows this user made, edited, turned on or ran.
+  automationsCreated    Automation[]         @relation("AutomationAuthor")
+  automationsUpdated    Automation[]         @relation("AutomationEditor")
+  automationVersions    AutomationVersion[]  @relation("AutomationVersionAuthor")
+  automationRuns        AutomationRun[]      @relation("AutomationRunStarter")
 
   // --- Sprint 2: auth lifecycle -------------------------------------------
   // Tokens are stored as SHA-256 hashes, never as the value mailed to the
@@ -1134,4 +1142,193 @@ model DesignFavourite {
   createdBy      User?        @relation("DesignFavouriteAuthor", fields: [createdById], references: [id])
 
   @@unique([organizationId, presetId])
+}
+
+// ===========================================================================
+// Sprint 10: Workflow Builder (the UI says Workflow and Step; the code says
+// Automation and node)
+// ===========================================================================
+
+/// Draft, on or paused. A paused workflow keeps its active version.
+enum AutomationStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+/// A test runs the draft with outside effects dry; a live run is the real
+/// thing, from the active version.
+enum AutomationRunMode {
+  TEST
+  LIVE
+}
+
+/// `REJECTED` (a Manual Review said no) and `EXPIRED` (nobody reviewed in
+/// time) are outcomes, not failures: only `FAILED` counts towards alerts and
+/// the auto-pause.
+enum AutomationRunStatus {
+  QUEUED
+  RUNNING
+  WAITING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+/// One step's state in one run. `DRY_RUN` is a test that stood in for an
+/// outside effect; `HANDLED_ERROR` failed but its On Error setting carried on.
+enum AutomationStepStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  DRY_RUN
+  HANDLED_ERROR
+  FAILED
+  SKIPPED
+  WAITING
+  CANCELLED
+}
+
+/// One workflow: a trigger and the steps after it.
+///
+/// The draft is one JSON value (`AutomationGraph` from
+/// `@postgear/automation`), the same reasoning as `Design.document`: the
+/// builder autosaves the whole graph, and the package's Zod schema validates
+/// every write. `draftRevision` is the optimistic lock, as in Studio.
+///
+/// Turning a workflow on snapshots the draft into an `AutomationVersion`;
+/// live runs only ever read a version, never the draft.
+model Automation {
+  id                    String               @id @default(uuid())
+  organizationId        String
+  /// "Untitled Workflow" unless named.
+  name                  String
+  status                AutomationStatus     @default(DRAFT)
+  draftGraph            Json
+  /// Bumped on every accepted write. Starts at 1.
+  draftRevision         Int                  @default(1)
+  /// Test data pinned per step: `{ [nodeKey]: { output, pinnedAt, pinnedById } }`.
+  /// On the row, not in the graph, so versions never carry it and live runs
+  /// cannot read it. Redacted and capped before it is stored.
+  pinnedData            Json                 @default("{}")
+  activeVersionId       String?              @unique
+  /// True when an active or paused workflow's draft differs from its active
+  /// version (the list's Unpublished Changes badge).
+  hasUnpublishedChanges Boolean              @default(false)
+  /// Copied from the draft's trigger (`trigger.postPublished`) for the list.
+  triggerType           String?
+  lastRunAt             DateTime?
+  lastRunStatus         AutomationRunStatus?
+  /// One sentence, for the list's hover.
+  lastRunError          String?
+  /// Live runs only. Module 09 pauses the workflow at 5 in a row.
+  consecutiveFailures   Int                  @default(0)
+  /// The starter template it came from, if any. Templates are code, so this
+  /// is plain text, not a foreign key.
+  templateId            String?
+  createdById           String?
+  updatedById           String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deletedAt             DateTime?
+  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activeVersion         AutomationVersion?   @relation("ActiveVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+  createdBy             User?                @relation("AutomationAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy             User?                @relation("AutomationEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+  versions              AutomationVersion[]  @relation("AutomationVersions")
+  runs                  AutomationRun[]
+
+  @@index([organizationId, deletedAt, updatedAt])
+  @@index([organizationId, status])
+}
+
+/// An immutable snapshot of a workflow, made when it is turned on. Never
+/// updated after insert.
+model AutomationVersion {
+  id           String          @id @default(uuid())
+  automationId String
+  version      Int
+  graph        Json
+  triggerType  String
+  /// Optional, typed in the activation dialog.
+  note         String?
+  createdById  String?
+  createdAt    DateTime        @default(now())
+  automation   Automation      @relation("AutomationVersions", fields: [automationId], references: [id], onDelete: Cascade)
+  activeFor    Automation?     @relation("ActiveVersion")
+  createdBy    User?           @relation("AutomationVersionAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  runs         AutomationRun[]
+
+  @@unique([automationId, version])
+}
+
+/// One run of a workflow, test or live.
+model AutomationRun {
+  id             String              @id @default(uuid())
+  automationId   String
+  /// Null only for draft test runs.
+  versionId      String?
+  organizationId String
+  mode           AutomationRunMode
+  status         AutomationRunStatus @default(QUEUED)
+  triggerType    String
+  /// Dedupes trigger events ("post.published:<rootPostId>", Module 09).
+  /// Null for manual and test runs; Postgres lets many nulls share the
+  /// unique index.
+  triggerEventId String?
+  /// Redacted and capped.
+  triggerPayload Json
+  /// Test runs only: the draft as it was when the test started.
+  graphSnapshot  Json?
+  /// Manual and test runs.
+  startedById    String?
+  creditsUsed    Int                 @default(0)
+  stepCount      Int                 @default(0)
+  /// One sentence.
+  error          String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  automation     Automation          @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  version        AutomationVersion?  @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  startedBy      User?               @relation("AutomationRunStarter", fields: [startedById], references: [id], onDelete: SetNull)
+  steps          AutomationRunStep[]
+
+  @@unique([automationId, triggerEventId])
+  @@index([automationId, createdAt])
+  @@index([organizationId, status])
+  // Reconcile and prune.
+  @@index([status, createdAt])
+}
+
+/// One step's attempt in one run. Name and type are copied in, so a step
+/// renamed or deleted since still reads correctly in old runs.
+model AutomationRunStep {
+  id         String               @id @default(uuid())
+  runId      String
+  nodeKey    String
+  nodeType   String
+  nodeName   String
+  status     AutomationStepStatus
+  attempt    Int                  @default(1)
+  /// Redacted, capped at 64 KB.
+  input      Json?
+  /// Redacted, capped at 64 KB.
+  output     Json?
+  truncated  Boolean              @default(false)
+  /// `{ message, code, retryable, details? }`.
+  error      Json?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  durationMs Int?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  run        AutomationRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, nodeKey, attempt])
+  // Live run polling (Module 07).
+  @@index([runId, updatedAt])
 }

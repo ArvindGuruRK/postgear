@@ -5,7 +5,7 @@
  * Fields that the chosen frequency does not use may stay (switching from
  * Weekly to Daily and back keeps the picked days); the refinement only
  * asks for the fields the frequency needs. Next run times, the plain-words
- * sentence and the Temporal spec are Module 02's, next to this file.
+ * sentence and the Temporal spec live next to this file.
  *
  * The time zone is an IANA name stored on the step itself, because
  * PostGear has no workspace time zone and `User.timezone` is a fixed
@@ -18,6 +18,12 @@ export type ScheduleFrequency = (typeof SCHEDULE_FREQUENCIES)[number];
 
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
+
+/**
+ * Hourly steps. Only ones that divide a day, so "Every 3 hours" is true
+ * across midnight too (every 5 hours would run at 20:00 and then 00:00).
+ */
+export const HOURLY_STEPS = [1, 2, 3, 4, 6, 8, 12] as const;
 
 /** `HH:mm`, 24 hour. */
 export const TIME_OF_DAY_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -32,7 +38,13 @@ export const scheduleConfigSchema = z
   .object({
     frequency: z.enum(SCHEDULE_FREQUENCIES),
     /** Hourly only: every N hours. */
-    everyHours: z.number().int().min(1).max(12).optional(),
+    everyHours: z
+      .number()
+      .int()
+      .refine((hours) => (HOURLY_STEPS as readonly number[]).includes(hours), {
+        message: 'Choose how many hours apart.',
+      })
+      .optional(),
     /** Every frequency but hourly. */
     time: z.string().regex(TIME_OF_DAY_PATTERN, 'Pick a time.').optional(),
     /** Weekly only. */

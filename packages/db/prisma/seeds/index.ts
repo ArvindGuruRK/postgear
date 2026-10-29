@@ -34,6 +34,7 @@ import * as argon2 from 'argon2';
 // there. Under the root ESNext config, ts-node cannot resolve it at all.
 import { encrypt } from '../../src/crypto';
 import { seedAnalytics } from './analytics.seed';
+import { seedAutomations } from './automations.seed';
 import { seedSeoAudits } from './seo.seed';
 import { seedStudio } from './studio.seed';
 
@@ -340,6 +341,9 @@ async function main() {
   // Sprint 9: a brand kit and two designs, so Studio opens on something to
   // click rather than on its empty state.
   const seededStudio = await seedStudio(prisma, organization.id, user.id);
+  // Sprint 10: the Publishing Report starter as a draft, its Sheets and Slack
+  // steps left unconnected so the canvas shows Finish Setup.
+  const seededAutomations = await seedAutomations(prisma, organization.id, user.id);
 
   console.log('Seed complete:', {
     organizationId: organization.id,
@@ -356,6 +360,7 @@ async function main() {
     analytics: seededAnalytics,
     seoAudits: seededSeo,
     studio: seededStudio,
+    automations: seededAutomations,
   });
 }
 
