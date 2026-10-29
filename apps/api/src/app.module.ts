@@ -11,6 +11,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AutomationsModule } from './modules/automations/automations.module';
+import { AutomationRunsModule } from './modules/automations/runs/automation-runs.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -96,6 +97,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     StudioModule,
     // Sprint 10: the Workflow Builder.
     AutomationsModule,
+    // Sprint 10, Module 07: test runs, run history, live progress, cancel, review.
+    AutomationRunsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

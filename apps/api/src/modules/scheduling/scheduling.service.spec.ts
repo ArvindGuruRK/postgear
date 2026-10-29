@@ -8,15 +8,21 @@
 import type { ConfigService } from '@nestjs/config';
 import {
   ANALYTICS_SYNC_WORKFLOW,
+  AUTOMATION_RUN_WORKFLOW,
   CANCEL_SIGNAL,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
+  REVIEW_DECISION_SIGNAL,
   SCHEDULING_TASK_QUEUE,
   SYNC_NOW_SIGNAL,
   TOKEN_REFRESH_WORKFLOW,
   WAKE_SIGNAL,
 } from '@postgear/scheduling';
-import { WorkflowNotFoundError } from '@temporalio/client';
+import {
+  WorkflowExecutionAlreadyStartedError,
+  WorkflowIdReusePolicy,
+  WorkflowNotFoundError,
+} from '@temporalio/client';
 import type { Env } from '../../config/env';
 import { type SchedulingClient, SchedulingService } from './scheduling.service';
 
@@ -30,6 +36,7 @@ function fakeClient() {
     workflow: {
       signalWithStart: jest.fn().mockResolvedValue({}),
       getHandle: jest.fn().mockReturnValue({ signal }),
+      start: jest.fn().mockResolvedValue({}),
     },
     workflowService: {
       describeTaskQueue: jest.fn().mockResolvedValue({ pollers: [{ identity: 'worker-1' }] }),
@@ -123,6 +130,54 @@ describe('SchedulingService', () => {
     // Nothing to ask for is not a failure.
     await expect(service.syncAnalyticsNow([])).resolves.toBe(true);
     expect(raw.workflow.signalWithStart).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts one run workflow per workflow run row, with a 30-day timeout and no duplicate (Sprint 10)', async () => {
+    const { client, raw } = fakeClient();
+    const service = new SchedulingService(config, async () => client);
+
+    await expect(service.startAutomationRun('run-1', 'org-1')).resolves.toBe(true);
+
+    expect(raw.workflow.start).toHaveBeenCalledWith(AUTOMATION_RUN_WORKFLOW, {
+      workflowId: 'automation-run:run-1',
+      taskQueue: SCHEDULING_TASK_QUEUE,
+      args: [{ runId: 'run-1', organizationId: 'org-1' }],
+      workflowExecutionTimeout: 30 * 24 * 60 * 60 * 1000,
+      workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+    });
+
+    // A workflow already there for this row is the job done, not a failure.
+    raw.workflow.start.mockRejectedValueOnce(
+      new WorkflowExecutionAlreadyStartedError('started', 'automation-run:run-1', 'automationRunWorkflow'),
+    );
+    await expect(service.startAutomationRun('run-1', 'org-1')).resolves.toBe(true);
+  });
+
+  it('signals cancel and review decisions to a run, telling a missing workflow from an unreachable server', async () => {
+    const { client, raw, signal } = fakeClient();
+    const service = new SchedulingService(config, async () => client);
+
+    await expect(service.cancelAutomationRun('run-1')).resolves.toBe('signalled');
+    expect(raw.workflow.getHandle).toHaveBeenCalledWith('automation-run:run-1');
+    expect(signal).toHaveBeenCalledWith(CANCEL_SIGNAL);
+
+    await expect(
+      service.signalReviewDecision('run-1', { nodeKey: 'review1', decision: 'approved' }),
+    ).resolves.toBe('signalled');
+    expect(signal).toHaveBeenLastCalledWith(REVIEW_DECISION_SIGNAL, {
+      nodeKey: 'review1',
+      decision: 'approved',
+    });
+
+    signal.mockRejectedValueOnce(
+      new WorkflowNotFoundError('gone', 'automation-run:run-1', undefined),
+    );
+    await expect(service.cancelAutomationRun('run-1')).resolves.toBe('notFound');
+
+    signal.mockRejectedValueOnce(new Error('14 UNAVAILABLE'));
+    await expect(
+      service.signalReviewDecision('run-1', { nodeKey: 'review1', decision: 'rejected' }),
+    ).resolves.toBe('unavailable');
   });
 
   it('reports false instead of throwing when Temporal is unreachable, then reconnects', async () => {

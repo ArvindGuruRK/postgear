@@ -8,6 +8,7 @@
  * exactly this reason; activities reach the outside world.
  */
 export { analyticsSyncWorkflow } from './analytics-sync.workflow';
+export { automationRunWorkflow } from './automation-run.workflow';
 export { maintenanceWorkflow } from './maintenance.workflow';
 export { postPublishWorkflow } from './post-publish.workflow';
 export { tokenRefreshWorkflow } from './token-refresh.workflow';

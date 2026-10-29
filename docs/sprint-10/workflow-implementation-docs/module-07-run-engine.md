@@ -1,6 +1,6 @@
 # Module 07: Run Engine On Temporal
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: XL (may need a second session)
+> **Sprint 10, Workflow Builder** | Status: Done | Size: XL (may need a second session)
 > **Depends on**: [Module 03](module-03-data-model-and-api.md) (and Modules 01, 02 through it). Independent of Modules 04 to 06 except for the connection reads, which degrade to "no connection" until Module 04 lands.
 > **Stories**: WF-5.2 (engine side), WF-10.1, WF-12.2 (cancel), WF-7.4 (engine side), edge cases "worker restarts", "same event twice"
 > **Next**: [Module 08](module-08-test-runs-history-and-review.md)
@@ -147,14 +147,14 @@ Extend `reconcileSchedules` in `maintenance.activities.ts`: start any `QUEUED` r
 
 ## Tasks
 
-- [ ] Contract in `packages/scheduling` plus its unit test (ids, policy values).
-- [ ] `AutomationRun.seedOutputs` and `options` migration.
-- [ ] `RunStore` (Prisma and memory), executor registry, the shipped executors, `EXECUTABLE_TYPES` updated.
-- [ ] Provider interface, simulation flag in both env schemas and `.env.example`, shared marker parser.
-- [ ] `executeNodeActivity`, `loadRunPlan`, `claimRunSlot`, `recordSkipped`, `prepareDelay`, `openReview`, `closeReview`, `completeStep`, `finishRun`, registered in `activities/index.ts`.
-- [ ] `automationRunWorkflow`, exported from `workflows/index.ts`.
-- [ ] Run API routes, the SSE poller, the throttle.
-- [ ] Maintenance reconcile.
+- [x] Contract in `packages/scheduling` plus its unit test (ids, policy values).
+- [x] `AutomationRun.seedOutputs` and `options` migration.
+- [x] `RunStore` (Prisma and memory), executor registry, the shipped executors, `EXECUTABLE_TYPES` updated.
+- [x] Provider interface, simulation flag in both env schemas and `.env.example`, shared marker parser.
+- [x] `executeNodeActivity`, `loadRunPlan`, `claimRunSlot`, `recordSkipped`, `prepareDelay`, `openReview`, `closeReview`, `completeStep`, `finishRun`, registered in `activities/index.ts`.
+- [x] `automationRunWorkflow`, exported from `workflows/index.ts`.
+- [x] Run API routes, the SSE poller, the throttle.
+- [x] Maintenance reconcile.
 
 ## Tests
 

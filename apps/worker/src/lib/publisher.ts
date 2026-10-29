@@ -45,6 +45,7 @@ import {
 } from '@postgear/social-core';
 import { Context } from '@temporalio/activity';
 import type { WorkerEnv } from '../config/env';
+import { directiveApplies, parseSimulationDirective } from './simulation-markers';
 
 /** The slice of a provider the publish and refresh activities use. */
 export type PublishingProvider = Pick<
@@ -75,31 +76,8 @@ export function createPublisher(env: Pick<WorkerEnv, 'PUBLISH_SIMULATION'>): Pub
   };
 }
 
-const DIRECTIVE = /\[simulate:(429|5xx|401|400|403|slow)(?::(\d+)|x(\d+))?\]/i;
-
-export interface SimulationDirective {
-  kind: '429' | '5xx' | '401' | '400' | '403' | 'slow';
-  /** For failures: fail attempts up to and including this one. Absent means always. */
-  untilAttempt?: number;
-  /** For `slow`: seconds to wait. */
-  seconds?: number;
-}
-
-export function parseSimulationDirective(message: string): SimulationDirective | null {
-  const match = DIRECTIVE.exec(message);
-
-  if (!match) {
-    return null;
-  }
-
-  const kind = match[1].toLowerCase() as SimulationDirective['kind'];
-
-  return {
-    kind,
-    ...(match[3] ? { untilAttempt: Number(match[3]) } : {}),
-    ...(kind === 'slow' ? { seconds: match[2] ? Number(match[2]) : 5 } : {}),
-  };
-}
+// The marker grammar is shared with the workflow steps' stand-in (Sprint 10).
+export { parseSimulationDirective, type SimulationDirective } from './simulation-markers';
 
 /** The attempt Temporal is on, or 1 when called outside an activity (tests). */
 function currentAttempt(): number {
@@ -134,7 +112,7 @@ export class SimulatedProvider implements PublishingProvider {
     const directive = parseSimulationDirective(posts.map((post) => post.message).join('\n'));
     const attempt = currentAttempt();
 
-    if (directive && (directive.untilAttempt === undefined || attempt <= directive.untilAttempt)) {
+    if (directive && directiveApplies(directive, attempt)) {
       switch (directive.kind) {
         case '429':
           throw new RetryableError(

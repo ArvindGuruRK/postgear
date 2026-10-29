@@ -1,6 +1,6 @@
 # Module 04: Connections
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: M (one session)
+> **Sprint 10, Workflow Builder** | Status: Done (2026-10-29, see the README decision log for the calls made) | Size: M (one session)
 > **Depends on**: [Module 03](module-03-data-model-and-api.md)
 > **Stories**: WF-4.1, WF-4.2, WF-4.3, edge case "A connection stops working"
 > **Next**: [Module 05](module-05-list-templates-and-canvas.md)
@@ -116,13 +116,13 @@ Follow `channel-oauth.service.ts`: `state` is an opaque random key; the payload 
 
 ## Tasks
 
-- [ ] Model and migration through `prisma-change`; `SCHEMA_NOTES.md` (why credentials are one encrypted blob, why usage is scanned).
-- [ ] Provider credential schemas, masks and URL checks; `CONNECTION_KINDS` mirror in `packages/automation`.
-- [ ] Connections API with `toSafeConnection()`, admin guards, delete refusal while live.
-- [ ] `connectionUsage()` in the context service; validation context now includes real connections.
-- [ ] OAuth framework with the fake provider and single-use state.
-- [ ] Connections page, connect dialogs with help, `ConnectionPicker` (render it on `/dev/components` so it can be checked before Module 06).
-- [ ] Catalog `needsConnection` state now driven by real connections.
+- [x] Model and migration through `prisma-change`; `SCHEMA_NOTES.md` (why credentials are one encrypted blob, why usage is scanned).
+- [x] Provider credential schemas, masks and URL checks; `CONNECTION_KINDS` mirror in `packages/automation`.
+- [x] Connections API with `toSafeConnection()`, admin guards, delete refusal while live.
+- [x] `connectionUsage()` in the context service; validation context now includes real connections.
+- [x] OAuth framework with the fake provider and single-use state.
+- [x] Connections page, connect dialogs with help, `ConnectionPicker` (render it on `/dev/components` so it can be checked before Module 06).
+- [x] Catalog `needsConnection` state now driven by real connections.
 
 ## Tests
 

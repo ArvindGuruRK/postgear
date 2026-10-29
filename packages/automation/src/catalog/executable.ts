@@ -10,5 +10,23 @@ import type { NodeType } from './types';
  * Each module that ships an executor adds its types here in the same
  * commit; a worker test (Module 07) checks this list and the executor
  * registry match exactly.
+ *
+ * Module 07: every trigger (its data passes through as `trigger`), the logic
+ * steps (Delay and Manual Review are handled by the run workflow itself, not
+ * an executor) and In-App Notification.
  */
-export const EXECUTABLE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>([]);
+export const EXECUTABLE_TYPES: ReadonlySet<NodeType> = new Set<NodeType>([
+  'trigger.postPublished',
+  'trigger.postFailed',
+  'trigger.schedule',
+  'trigger.manual',
+  'trigger.webhook',
+  'logic.ifElse',
+  'logic.switch',
+  'logic.filter',
+  'logic.delay',
+  'logic.manualReview',
+  'logic.setFields',
+  'logic.merge',
+  'notify.inApp',
+]);

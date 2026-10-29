@@ -22,15 +22,21 @@
  */
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { LIMITS } from '@postgear/automation';
 import {
   ANALYTICS_SYNC_WORKFLOW,
+  AUTOMATION_RUN_WORKFLOW,
+  type AutomationRunInput,
   analyticsSyncWorkflowId,
+  automationRunWorkflowId,
   CANCEL_SIGNAL,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
   PUBLISH_RETRY_POLICY,
   publishWorkflowId,
+  REVIEW_DECISION_SIGNAL,
   type RetryPolicyValues,
+  type ReviewDecisionPayload,
   SCHEDULING_TASK_QUEUE,
   SYNC_NOW_SIGNAL,
   TOKEN_REFRESH_WORKFLOW,
@@ -43,6 +49,7 @@ import {
   Client,
   Connection,
   WorkflowExecutionAlreadyStartedError,
+  WorkflowIdReusePolicy,
   WorkflowNotFoundError,
 } from '@temporalio/client';
 import type { Env } from '../../config/env';
@@ -68,6 +75,13 @@ export interface SchedulerStatus {
   retryPolicy: RetryPolicyValues;
 }
 
+/**
+ * What a signal to one workflow run found (Sprint 10): it arrived, there is
+ * no such workflow (never started, or already closed), or Temporal could not
+ * be reached. The caller decides what each means for its row.
+ */
+export type RunSignalOutcome = 'signalled' | 'notFound' | 'unavailable';
+
 /** The minimal client surface this service uses: what a test substitutes. */
 export interface SchedulingClient {
   workflow: Pick<Client['workflow'], 'signalWithStart' | 'getHandle' | 'start'>;
@@ -84,6 +98,8 @@ const STATUS_TIMEOUT_MS = 3_000;
  * scheduler and the maintenance loop catches up.
  */
 const CALL_TIMEOUT_MS = 5_000;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type TemporalConnect = (address: string, namespace: string) => Promise<SchedulingClient>;
 
@@ -216,6 +232,49 @@ export class SchedulingService implements OnModuleDestroy {
     });
   }
 
+  /**
+   * Sprint 10: starts the run workflow for an `AutomationRun` row the API
+   * created (a test run or a step test). Plain `start` with the id reuse
+   * policy set to reject a duplicate, so one row can only ever have one
+   * workflow: a start that finds one already there (running or closed) has
+   * nothing left to do and counts as done. Best-effort: the worker's
+   * reconcile starts any run still QUEUED a minute later.
+   */
+  async startAutomationRun(runId: string, organizationId: string): Promise<boolean> {
+    return this.attempt('automation run', async (client) => {
+      try {
+        await client.workflow.start(AUTOMATION_RUN_WORKFLOW, {
+          workflowId: automationRunWorkflowId(runId),
+          taskQueue: SCHEDULING_TASK_QUEUE,
+          args: [{ runId, organizationId } satisfies AutomationRunInput],
+          workflowExecutionTimeout: LIMITS.runTimeoutDays * DAY_MS,
+          workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+          throw error;
+        }
+      }
+    });
+  }
+
+  /** Sprint 10: asks a running workflow run to stop. The workflow writes CANCELLED itself. */
+  async cancelAutomationRun(runId: string): Promise<RunSignalOutcome> {
+    return this.signalAutomationRun(runId, 'automation cancel', CANCEL_SIGNAL, []);
+  }
+
+  /**
+   * Sprint 10: tells a run waiting at a Manual Review which way to go. The
+   * API has already written the decision on the step row; the workflow only
+   * learns the port.
+   */
+  async signalReviewDecision(
+    runId: string,
+    payload: ReviewDecisionPayload,
+  ): Promise<RunSignalOutcome> {
+    return this.signalAutomationRun(runId, 'automation review', REVIEW_DECISION_SIGNAL, [payload]);
+  }
+
   /** What the UI shows in its scheduler pill. Never throws. */
   async status(): Promise<SchedulerStatus> {
     const base = {
@@ -284,6 +343,31 @@ export class SchedulingService implements OnModuleDestroy {
         ),
       );
     });
+  }
+
+  /** One signal to one run's workflow, telling "no such workflow" apart from "unreachable". */
+  private async signalAutomationRun(
+    runId: string,
+    label: string,
+    signal: string,
+    args: unknown[],
+  ): Promise<RunSignalOutcome> {
+    let found = true;
+    const reached = await this.attempt(label, async (client) => {
+      try {
+        await client.workflow.getHandle(automationRunWorkflowId(runId)).signal(signal, ...args);
+      } catch (error) {
+        if (!(error instanceof WorkflowNotFoundError)) {
+          throw error;
+        }
+        found = false;
+      }
+    });
+
+    if (!reached) {
+      return 'unavailable';
+    }
+    return found ? 'signalled' : 'notFound';
   }
 
   /**

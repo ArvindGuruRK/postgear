@@ -239,6 +239,13 @@ const envSchema = z
     // through. Refused in production below.
     WEBHOOK_ALLOW_PRIVATE_URLS: blankAsUnset(z.enum(['true', 'false']).default('false')),
 
+    // Workflows (Sprint 10). The worker runs every step; with this on, a step
+    // that reaches an outside app (Slack, Sheets, an HTTP call) talks to a
+    // stand-in that logs the request instead. The worker reads the same
+    // variable; the API validates it too, so a deployment with it switched on
+    // dies at boot on both sides. Refused in production below.
+    AUTOMATION_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+
     // Error tracking (Sprint 8). Absent DSN = no Sentry at all, which is the
     // local default; traces stay off unless asked for.
     SENTRY_DSN: blankAsUnset(z.string().url().optional()),
@@ -291,6 +298,15 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['WEBHOOK_ALLOW_PRIVATE_URLS'],
         message: 'WEBHOOK_ALLOW_PRIVATE_URLS cannot be "true" when NODE_ENV=production',
+      });
+    }
+    // A workflow whose Slack message "succeeded" against a stand-in would
+    // hide, on a real deployment, that nobody was ever told (Sprint 10).
+    if (env.NODE_ENV === 'production' && env.AUTOMATION_SIMULATION === 'true') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AUTOMATION_SIMULATION'],
+        message: 'AUTOMATION_SIMULATION cannot be "true" when NODE_ENV=production',
       });
     }
     // Stripe needs both halves: a secret key to call it and a signing secret

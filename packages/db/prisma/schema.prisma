@@ -57,6 +57,7 @@ model Organization {
   // Sprint 10
   automations         Automation[]
   automationRuns      AutomationRun[]
+  automationConnections AutomationConnection[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -132,6 +133,8 @@ model User {
   automationsUpdated    Automation[]         @relation("AutomationEditor")
   automationVersions    AutomationVersion[]  @relation("AutomationVersionAuthor")
   automationRuns        AutomationRun[]      @relation("AutomationRunStarter")
+  automationConnectionsCreated AutomationConnection[] @relation("AutomationConnectionAuthor")
+  automationConnectionsUpdated AutomationConnection[] @relation("AutomationConnectionEditor")
 
   // --- Sprint 2: auth lifecycle -------------------------------------------
   // Tokens are stored as SHA-256 hashes, never as the value mailed to the
@@ -1282,6 +1285,12 @@ model AutomationRun {
   triggerPayload Json
   /// Test runs only: the draft as it was when the test started.
   graphSnapshot  Json?
+  /// Step tests only: upstream outputs the tested step reads, `{ [nodeKey]: output }`
+  /// (pinned data, else the last test run, else samples). Redacted and capped.
+  seedOutputs    Json?
+  /// Test runs: `AutomationRunOptions` from `@postgear/scheduling`
+  /// (`{ scope, sendForReal, triggerData }`). Null for live runs.
+  options        Json?
   /// Manual and test runs.
   startedById    String?
   creditsUsed    Int                 @default(0)
@@ -1331,4 +1340,53 @@ model AutomationRunStep {
   @@unique([runId, nodeKey, attempt])
   // Live run polling (Module 07).
   @@index([runId, updatedAt])
+}
+
+/// `NEEDS_RECONNECT` is set when the app refused the stored credentials (a
+/// 401, 403 or 404, or a revoked Google token); `ERROR` when a check failed
+/// for another reason.
+enum AutomationConnectionStatus {
+  CONNECTED
+  NEEDS_RECONNECT
+  ERROR
+}
+
+/// An outside app linked to a workspace once (a Slack or Discord link, a
+/// Teams Workflows link, secret HTTP headers, a Google account) and picked by
+/// any workflow. A step's config holds only the id.
+///
+/// `credentials` is the one encrypted column: the provider's validated
+/// credentials as one JSON value through `encrypt()`, never returned and
+/// never logged. `maskedHint` and `meta` are safe to show.
+///
+/// "Used by N workflows" is scanned from the graphs, not stored (see
+/// SCHEMA_NOTES.md). Names are unique per workspace and app among rows that
+/// are not deleted, checked by the API.
+model AutomationConnection {
+  id             String                     @id @default(uuid())
+  organizationId String
+  /// 'slack' | 'teams' | 'discord' | 'http' | 'google'.
+  provider       String
+  /// "Marketing Slack".
+  name           String
+  /// encrypt(JSON.stringify(credentials)).
+  credentials    String
+  /// "hooks.slack.com/...a9F2", computed once at save.
+  maskedHint     String
+  status         AutomationConnectionStatus @default(CONNECTED)
+  lastCheckedAt  DateTime?
+  /// One sentence, safe to show.
+  lastError      String?
+  /// Non-secret extras (the Google account email).
+  meta           Json?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  deletedAt      DateTime?
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?                      @relation("AutomationConnectionAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?                      @relation("AutomationConnectionEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, provider, deletedAt])
 }

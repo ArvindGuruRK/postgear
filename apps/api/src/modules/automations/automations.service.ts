@@ -86,10 +86,14 @@ export interface AutomationListItem {
   updatedAt: string;
 }
 
-/** A step's pinned test data, as the editor lists it (the data itself stays on the server). */
+/**
+ * A step's pinned test data, as the editor lists it. `output` is the stored,
+ * redacted copy: the Input and Output panes show it after a reload (Module 06).
+ */
 export interface PinnedSummary {
   nodeKey: string;
   pinnedAt: string;
+  output: unknown;
 }
 
 export interface AutomationDetail extends Omit<AutomationListItem, 'runs30d'> {
@@ -318,7 +322,7 @@ export class AutomationsService {
       pinnedById: userId,
     });
     if (!stored) throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
-    return { nodeKey, pinnedAt };
+    return { nodeKey, pinnedAt, output: safe.value };
   }
 
   async unpin(orgId: string, id: string, nodeKey: string): Promise<void> {
@@ -438,8 +442,10 @@ function pinnedSummary(pinnedData: unknown, graph: AutomationGraph): PinnedSumma
   return Object.entries(pinnedData as Record<string, unknown>)
     .filter(([nodeKey]) => keys.has(nodeKey))
     .flatMap(([nodeKey, entry]) => {
-      const pinnedAt = (entry as { pinnedAt?: unknown } | null)?.pinnedAt;
-      return typeof pinnedAt === 'string' ? [{ nodeKey, pinnedAt }] : [];
+      const stored = entry as { pinnedAt?: unknown; output?: unknown } | null;
+      return typeof stored?.pinnedAt === 'string'
+        ? [{ nodeKey, pinnedAt: stored.pinnedAt, output: stored.output ?? null }]
+        : [];
     })
     .sort((a, b) => (a.nodeKey < b.nodeKey ? -1 : 1));
 }

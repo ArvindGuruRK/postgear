@@ -74,6 +74,27 @@ export const postPublished = defineNode({
     const where = config.channels.length ? channelNames(config.channels, ctx) : 'Any channel';
     return config.tags.length ? `${where}, ${count(config.tags.length, 'tag')}` : where;
   },
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'channels',
+          kind: 'channels',
+          label: 'Channels',
+          help: 'Only posts on these channels start this workflow.',
+          emptyLabel: 'Any channel',
+        },
+        {
+          path: 'tags',
+          kind: 'tags',
+          label: 'Tags',
+          help: 'Only posts with one of these tags start it.',
+          emptyLabel: 'Any post',
+        },
+      ],
+    },
+  },
 });
 
 const postFailedConfig = z
@@ -123,6 +144,31 @@ export const postFailed = defineNode({
     }
     return `${where}, ${count(config.reasons.length, 'reason')}`;
   },
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'channels',
+          kind: 'channels',
+          label: 'Channels',
+          help: 'Only failures on these channels start this workflow.',
+          emptyLabel: 'Any channel',
+        },
+        {
+          path: 'reasons',
+          kind: 'multiSelect',
+          label: 'Reasons',
+          help: 'Only these problems start it.',
+          emptyLabel: 'Any reason',
+          options: PUBLISH_FAILURE_REASONS.map((reason) => ({
+            value: reason.id,
+            label: reason.label,
+          })),
+        },
+      ],
+    },
+  },
 });
 
 export const schedule = defineNode({
@@ -141,6 +187,12 @@ export const schedule = defineNode({
     { path: 'timeZone', label: 'Time Zone', type: 'text', sample: 'Asia/Kolkata' },
   ],
   summary: (config) => describeSchedule(config, { timeZone: false }),
+  form: {
+    tabs: {
+      setup: [],
+      configure: [{ path: '', kind: 'schedule', label: 'When it runs', required: true }],
+    },
+  },
 });
 
 const manualFieldSchema = z
@@ -203,6 +255,20 @@ export const manual = defineNode({
     config.fields.length
       ? `Run Now with ${count(config.fields.length, 'field')}`
       : 'Started with Run Now',
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'fields',
+          kind: 'manualInputs',
+          label: 'Fields to fill in',
+          help: 'Asked for each time someone clicks Run Now. Later steps can use the answers.',
+          max: 5,
+        },
+      ],
+    },
+  },
 });
 
 export const webhook = defineNode({

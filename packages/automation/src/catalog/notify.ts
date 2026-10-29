@@ -53,6 +53,37 @@ export const inApp = defineNode({
   sideEffect: 'internal',
   retry: 'safe',
   summary: () => 'Notifies everyone in the workspace',
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'title',
+          kind: 'text',
+          label: 'Title',
+          placeholder: 'Enter your notification title',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'message',
+          kind: 'longText',
+          label: 'Message',
+          placeholder: 'Enter your message',
+          acceptsData: true,
+        },
+        {
+          path: 'link',
+          kind: 'text',
+          label: 'Link',
+          help: 'Optional. Opens when someone clicks the notification.',
+          placeholder: 'Enter your link',
+          acceptsData: true,
+        },
+      ],
+    },
+    notes: ['Everyone in this workspace gets this notification.'],
+  },
 });
 
 const slackConfig = z
@@ -85,6 +116,37 @@ export const slack = defineNode({
   ],
   connection: { kind: 'slack', field: 'connectionId' },
   summary: (config, ctx) => sendsTo('Slack', config.connectionId, ctx),
+  form: {
+    tabs: {
+      setup: [
+        { path: 'connectionId', kind: 'connection', label: 'Slack connection', required: true },
+      ],
+      configure: [
+        {
+          path: 'message',
+          kind: 'longText',
+          label: 'Message',
+          placeholder: 'Enter your message',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'includeLink',
+          kind: 'text',
+          label: 'Button link',
+          help: 'Optional. Adds a button that opens this link.',
+          placeholder: 'Enter your link',
+          acceptsData: true,
+        },
+        {
+          path: 'footer',
+          kind: 'toggle',
+          label: 'Say which workflow sent it',
+          help: 'Adds a short line with this workflow’s name under the message.',
+        },
+      ],
+    },
+  },
 });
 
 export const teams = defineNode({

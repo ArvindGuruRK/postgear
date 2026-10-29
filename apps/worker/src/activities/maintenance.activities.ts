@@ -12,10 +12,13 @@
  * scheduled weeks out would hit Temporal's history limit before its day came.
  */
 
-import { prisma, State, WebhookDeliveryStatus } from '@postgear/db';
+import { LIMITS } from '@postgear/automation';
+import { AutomationRunStatus, prisma, State, WebhookDeliveryStatus } from '@postgear/db';
 import {
   ANALYTICS_SYNC_WORKFLOW,
+  AUTOMATION_RUN_WORKFLOW,
   analyticsSyncWorkflowId,
+  automationRunWorkflowId,
   POST_PUBLISH_WORKFLOW,
   publishWorkflowId,
   SCHEDULING_TASK_QUEUE,
@@ -24,7 +27,14 @@ import {
   WEBHOOK_DELIVERY_WORKFLOW,
   webhookDeliveryWorkflowId,
 } from '@postgear/scheduling';
-import { WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
+import {
+  type Client,
+  WorkflowExecutionAlreadyStartedError,
+  WorkflowNotFoundError,
+} from '@temporalio/client';
+import { finalizeRun, INTERRUPTED_MESSAGE } from '../automation/finish';
+import { PrismaRunStore } from '../automation/prisma-run-store';
+import type { RunStore } from '../automation/run-store';
 import type { ActivityDeps } from './deps';
 
 export interface ReconcileReport {
@@ -34,8 +44,15 @@ export interface ReconcileReport {
   analyticsChannels: number;
   /** Sprint 8: pending webhook deliveries whose workflow was ensured. */
   webhookDeliveries: number;
+  /** Sprint 10: workflow runs still QUEUED a minute after they were created, started here. */
+  queuedAutomationRuns: number;
+  /** Sprint 10: RUNNING or WAITING runs whose Temporal workflow was gone, marked FAILED. */
+  interruptedAutomationRuns: number;
   failures: number;
 }
+
+/** A queued run younger than this is still being started by the API. */
+const AUTOMATION_RUN_RECONCILE_MIN_AGE_MS = 60_000;
 
 /**
  * A pending delivery younger than this is still being started by whoever
@@ -161,15 +178,104 @@ export function createMaintenanceActivities(deps: ActivityDeps) {
         }
       });
 
+      // Sprint 10: workflow runs. The API writes the run row first and starts
+      // its workflow best-effort, so a run still QUEUED a minute later is
+      // started here. A run the database calls RUNNING or WAITING whose
+      // workflow is gone (or closed without finishing it) never ends on its
+      // own: it is marked FAILED.
+      const automation = await reconcileAutomationRuns(client, new PrismaRunStore(), now);
+      failures += automation.failures;
+
       return {
         queuedPosts: roots.length,
         refreshableChannels: channels.length,
         analyticsChannels: analyticsChannels.length,
         webhookDeliveries: deliveries.length,
+        queuedAutomationRuns: automation.queued,
+        interruptedAutomationRuns: automation.interrupted,
         failures,
       };
     },
   };
+}
+
+/** True when the run's Temporal workflow exists and is still running. */
+async function workflowRunning(client: Client, runId: string): Promise<boolean> {
+  try {
+    const description = await client.workflow.getHandle(automationRunWorkflowId(runId)).describe();
+    return description.status.name === 'RUNNING';
+  } catch (error) {
+    if (error instanceof WorkflowNotFoundError) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export async function reconcileAutomationRuns(
+  client: Client,
+  store: RunStore,
+  now: number,
+): Promise<{ queued: number; interrupted: number; failures: number }> {
+  let failures = 0;
+  let interrupted = 0;
+
+  const interrupt = async (run: { id: string; organizationId: string }) => {
+    const ended = await finalizeRun(
+      store,
+      { runId: run.id, organizationId: run.organizationId },
+      { status: AutomationRunStatus.FAILED, error: INTERRUPTED_MESSAGE, finishedAt: new Date() },
+    );
+    if (ended) interrupted += 1;
+  };
+
+  const queued = await prisma.automationRun.findMany({
+    where: {
+      status: AutomationRunStatus.QUEUED,
+      createdAt: { lt: new Date(now - AUTOMATION_RUN_RECONCILE_MIN_AGE_MS) },
+    },
+    select: { id: true, organizationId: true },
+  });
+
+  await inBatches(queued, async (run) => {
+    try {
+      await client.workflow.start(AUTOMATION_RUN_WORKFLOW, {
+        workflowId: automationRunWorkflowId(run.id),
+        taskQueue: SCHEDULING_TASK_QUEUE,
+        args: [{ runId: run.id, organizationId: run.organizationId }],
+        workflowExecutionTimeout: `${LIMITS.runTimeoutDays} days`,
+        workflowIdReusePolicy: 'REJECT_DUPLICATE',
+      });
+    } catch (error) {
+      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+        failures += 1;
+        return;
+      }
+      // Its workflow already ran and closed without picking the run up: it
+      // can never start again under this id.
+      try {
+        if (!(await workflowRunning(client, run.id))) await interrupt(run);
+      } catch {
+        failures += 1;
+      }
+    }
+  });
+
+  const open = await prisma.automationRun.findMany({
+    where: { status: { in: [AutomationRunStatus.RUNNING, AutomationRunStatus.WAITING] } },
+    select: { id: true, organizationId: true },
+  });
+
+  await inBatches(open, async (run) => {
+    try {
+      if (!(await workflowRunning(client, run.id))) await interrupt(run);
+    } catch {
+      // Temporal did not answer: try again on the next pass.
+      failures += 1;
+    }
+  });
+
+  return { queued: queued.length, interrupted, failures };
 }
 
 export type MaintenanceActivities = ReturnType<typeof createMaintenanceActivities>;

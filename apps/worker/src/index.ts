@@ -49,6 +49,11 @@ async function main(): Promise<void> {
       '[worker] ANALYTICS_SIMULATION=true: channel and post metrics come from a stand-in, not from the platforms.',
     );
   }
+  if (env.AUTOMATION_SIMULATION === 'true') {
+    console.warn(
+      '[worker] AUTOMATION_SIMULATION=true: workflow steps that leave PostGear send to a stand-in, not to the outside apps.',
+    );
+  }
 
   const connection = await connectWorker(env);
 

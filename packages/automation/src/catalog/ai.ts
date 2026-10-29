@@ -91,6 +91,63 @@ export const generateText = defineNode({
     const voice = config.voice === 'personal' ? 'personal voice' : 'company voice';
     return `${what} for ${platformWords(config.platform)}, ${voice}`;
   },
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'prompt',
+          kind: 'longText',
+          label: 'Prompt',
+          help: 'What the post should be about. Insert data to use earlier steps.',
+          placeholder: 'Enter your prompt',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'platform',
+          kind: 'select',
+          label: 'Platform',
+          options: [
+            { value: 'generic', label: 'Any platform' },
+            ...PUBLISH_PLATFORM_IDS.map((id) => ({ value: id, label: platformById(id)?.title ?? id })),
+          ],
+        },
+        {
+          path: 'voice',
+          kind: 'select',
+          label: 'Voice',
+          options: [
+            { value: 'company', label: 'Company' },
+            { value: 'personal', label: 'Personal' },
+          ],
+        },
+        {
+          path: 'format',
+          kind: 'select',
+          label: 'Length',
+          options: [
+            { value: 'one_short', label: 'One short post' },
+            { value: 'one_long', label: 'One long post' },
+            { value: 'thread_short', label: 'A short thread' },
+            { value: 'thread_long', label: 'A long thread' },
+          ],
+        },
+        {
+          path: 'research',
+          kind: 'toggle',
+          label: 'Web research',
+          help: 'Looks up recent facts on the web before writing.',
+        },
+        {
+          path: 'withImage',
+          kind: 'toggle',
+          label: 'Make an image too',
+          help: 'Also makes an image to go with the post.',
+        },
+      ],
+    },
+  },
 });
 
 const IMAGE_STYLE_WORDS = {

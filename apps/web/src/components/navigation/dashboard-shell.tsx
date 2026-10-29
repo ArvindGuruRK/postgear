@@ -11,6 +11,7 @@ import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
+import { WorkflowIcon } from '@animateicons/react/lucide/workflow-icon';
 import type { AnimatedIcon } from '@postgear/ui';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
@@ -34,6 +35,7 @@ import type { SidebarItem } from './sidebar';
  * under a 20px icon in a 64px tile; the top bar shows the page's full name.
  *
  * Studio (Sprint 9) sits right after Media: it makes the images Media keeps.
+ * Workflows (Sprint 10) follows Studio: it puts the other pages to work.
  *
  * Composer and Channels are not here, as in the reference: both are reached
  * from the calendar's channel card (Create Post, Add Channel, the channels
@@ -48,6 +50,7 @@ const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
   { segment: 'analytics', label: 'Analytics', icon: ChartColumnIcon },
   { segment: 'media', label: 'Media', icon: ImageIcon },
   { segment: 'studio', label: 'Studio', icon: PaletteIcon },
+  { segment: 'workflows', label: 'Workflows', icon: WorkflowIcon },
   { segment: 'seo-analyzer', label: 'SEO', icon: SearchIcon },
 ];
 
@@ -60,6 +63,7 @@ const TITLES: Record<string, string> = {
   analytics: 'Analytics',
   media: 'Media',
   studio: 'Design Studio',
+  workflows: 'Workflows',
   'seo-analyzer': 'SEO Analyzer',
   channels: 'Channels',
   settings: 'Settings',
@@ -72,11 +76,15 @@ const FULL_BLEED = new Set(['calendar']);
  * Studio's editor (`studio/{designId}`, Sprint 9) fills the height too: its
  * slide rail and properties panel scroll on their own beside a canvas that
  * stays in view. The landing page and the wizard (`studio/new`) scroll as one.
+ * The workflow builder (`workflows/{id}`, Sprint 10) is a canvas between two
+ * panels, so it fills the height as well; the list and Connections scroll.
  */
 function bleeds(page: string): boolean {
   const [segment, child, ...deeper] = page.split('/');
   if (FULL_BLEED.has(segment ?? '')) return true;
-  return segment === 'studio' && !!child && child !== 'new' && deeper.length === 0;
+  if (!child || deeper.length > 0) return false;
+  if (segment === 'studio') return child !== 'new';
+  return segment === 'workflows' && child !== 'connections';
 }
 
 export function DashboardShell({ orgId, children }: { orgId: string; children: ReactNode }) {

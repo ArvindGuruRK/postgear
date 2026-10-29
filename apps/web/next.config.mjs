@@ -8,7 +8,13 @@ const nextConfig = {
   // pre-built. Only social-core's `composer` entry point is imported here; see
   // the path alias in tsconfig.json for why never its root. design-engine is
   // Studio's renderer (Sprint 9), browser-safe source like the other two.
-  transpilePackages: ['@postgear/ui', '@postgear/social-core', '@postgear/design-engine'],
+  // automation is the Workflow Builder's pure engine (Sprint 10).
+  transpilePackages: [
+    '@postgear/ui',
+    '@postgear/social-core',
+    '@postgear/design-engine',
+    '@postgear/automation',
+  ],
   // TODO: Configure remaining Next.js settings
   // - Image optimization domains
   // - Environment variable exposure

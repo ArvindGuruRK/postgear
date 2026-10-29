@@ -279,8 +279,49 @@ export function oauthStartUrl(provider: 'google' | 'facebook'): string {
  * id, so the API can verify the user re-authorized the same account rather
  * than silently swapping a different one into an existing channel.
  */
+/**
+ * Where the browser goes to connect an outside app by signing in (Sprint 10,
+ * Google in Module 13). `returnTo` is the workflow page to land back on
+ * (`/[orgId]/workflows/abc?step=...`); the API refuses anything outside the
+ * workspace's workflows. A full navigation, for the same reasons as above.
+ */
+export function connectionOAuthUrl(
+  provider: string,
+  returnTo: string,
+  connectionId?: string,
+): string {
+  const query = new URLSearchParams({ returnTo });
+  if (connectionId) query.set('connectionId', connectionId);
+  return `${BROWSER_API_URL}/automation-connections/oauth/${encodeURIComponent(provider)}/start?${query}`;
+}
+
 export function channelConnectUrl(provider: string, reconnectChannelId?: string): string {
   const base = `${BROWSER_API_URL}/channels/connect/${encodeURIComponent(provider)}`;
 
   return reconnectChannelId ? `${base}?reconnect=${encodeURIComponent(reconnectChannelId)}` : base;
+}
+
+/**
+ * A workflow step's pinned test data (Sprint 10, Module 06): Test Step and
+ * test runs use it instead of running the step; live runs never read it.
+ * The API refuses more than 64 KB with code `pinned_too_large` (422), and
+ * 404 when the step is not in the saved draft yet. Answers with the stored,
+ * redacted copy of the data.
+ */
+export function pinStepData(
+  automationId: string,
+  nodeKey: string,
+  output: unknown,
+): Promise<{ pinned: { nodeKey: string; pinnedAt: string; output: unknown } }> {
+  return api(
+    `/automations/${encodeURIComponent(automationId)}/pinned/${encodeURIComponent(nodeKey)}`,
+    { method: 'PUT', body: { output } },
+  );
+}
+
+export function unpinStepData(automationId: string, nodeKey: string): Promise<{ message: string }> {
+  return api(
+    `/automations/${encodeURIComponent(automationId)}/pinned/${encodeURIComponent(nodeKey)}`,
+    { method: 'DELETE' },
+  );
 }

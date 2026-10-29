@@ -60,6 +60,23 @@ export {
   type RequiredField,
   type SummaryContext,
 } from './catalog';
+// Step panel forms (Module 06)
+export {
+  configErrors,
+  FIELD_KINDS,
+  type FieldKind,
+  type FieldOption,
+  type FieldPlace,
+  type FieldSpec,
+  FORM_TABS,
+  type FormSpec,
+  type FormTab,
+  fieldSpecFor,
+  isFieldShown,
+  type KeyValueRow,
+  tabComplete,
+  tabForField,
+} from './catalog/form';
 // Conditions (If / Else, Filter, Paths)
 export {
   type DescribeConditionOptions,

@@ -98,6 +98,14 @@ export interface ChannelRow {
   inBetweenSteps: boolean;
 }
 
+export interface UsageGraphRow {
+  id: string;
+  name: string;
+  status: AutomationStatus;
+  draftGraph: Prisma.JsonValue;
+  activeVersion: { graph: Prisma.JsonValue } | null;
+}
+
 @Injectable()
 export class AutomationsRepository {
   /** One page of the list, newest edit first. Asks for one extra row to know whether there is a next page. */
@@ -245,6 +253,21 @@ export class AutomationsRepository {
         disabled: true,
         refreshNeeded: true,
         inBetweenSteps: true,
+      },
+    });
+  }
+
+  /** Every workflow's draft and running graph, for the connections' Used By scan. */
+  async usageGraphs(orgId: string): Promise<UsageGraphRow[]> {
+    return prisma.automation.findMany({
+      where: { organizationId: orgId, deletedAt: null },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        draftGraph: true,
+        activeVersion: { select: { graph: true } },
       },
     });
   }

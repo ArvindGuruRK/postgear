@@ -6,6 +6,7 @@
  */
 import type { ZodType, ZodTypeDef } from 'zod';
 import type { PortId } from '../graph/schema';
+import type { FormSpec } from './form';
 
 /** Every step type id. The UI says "step"; the code says "node". */
 export const NODE_TYPES = [
@@ -235,6 +236,11 @@ export interface NodeDefinition<C extends object = Record<string, unknown>> {
   summary(config: C, ctx: SummaryContext): string;
   /** The card title when it depends on the config: "Publish To Instagram". */
   titleFor?(config: C): string;
+  /**
+   * How the step panel asks for the config: fields per tab (Module 06).
+   * Steps without one get no generated fields yet.
+   */
+  form?: FormSpec;
 }
 
 /** Declares a step type with its config type checked against its schema. */

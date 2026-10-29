@@ -13,6 +13,8 @@ export type NotificationType =
   | 'billing.canceled'
   | 'billing.trial_started'
   | 'webhook.failed'
+  | 'automation'
+  | 'automation.review'
   | 'info';
 
 export interface NotificationView {

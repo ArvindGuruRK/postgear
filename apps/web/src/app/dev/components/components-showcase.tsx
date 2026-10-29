@@ -25,6 +25,8 @@ import { LayoutSection } from './sections/layout-section';
 import { NavigationSection } from './sections/navigation-section';
 import { OverlaysSection } from './sections/overlays-section';
 import { SaasPatternsSection } from './sections/saas-patterns-section';
+import { WorkflowFieldsSection } from './sections/workflow-fields-section';
+import { WorkflowsSection } from './sections/workflows-section';
 
 const NAV_ITEMS: SidebarItem[] = [
   { label: 'Dashboard', href: '#dashboard', icon: LayoutGrid },
@@ -96,6 +98,8 @@ export function ComponentsShowcase() {
         <AnalyticsSection />
         <SaasPatternsSection />
         <AiSection />
+        <WorkflowsSection />
+        <WorkflowFieldsSection />
       </div>
     </AppShell>
   );

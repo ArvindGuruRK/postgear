@@ -57,6 +57,7 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `Automation` | One workflow (the UI says Workflow). The draft lives in the `draftGraph` JSON, guarded by `@postgear/automation`'s graph schema; `draftRevision` is the optimistic lock; soft deleted. See [Sprint 10 additions](#sprint-10-additions). | Sprint 10 |
 | `AutomationVersion` | An immutable snapshot of a workflow, made when it is turned on. Live runs read only these. | Sprint 10 (rows from Module 09) |
 | `AutomationRun` / `AutomationRunStep` | One run of a workflow and each step's attempt in it, inputs and outputs redacted and capped. | Sprint 10 (rows from Module 07) |
+| `AutomationConnection` | An outside app (Slack, Teams, Discord, secret HTTP headers, Google) linked to a workspace once and picked by any workflow. `credentials` is one encrypted blob, never returned; soft deleted. | Sprint 10 |
 
 ### Kept, though not yet used
 
@@ -426,6 +427,37 @@ engine (Module 07) only adds code.
   workspace, so deleting a user never takes it with them.
 - **`templateId` is plain text**, like `Design.presetId`: starter templates
   are code in `packages/automation/src/templates`, not rows.
+- **`options` and `seedOutputs` on test runs** (Module 07, migration
+  `20261029140000_sprint10_automation_run_options`): `options` is
+  `AutomationRunOptions` from `@postgear/scheduling` (whole run or one step,
+  the steps sent for real, where the trigger data came from); `seedOutputs`
+  holds the upstream data a step test reads. JSON, not columns, because only
+  the API writes them and only the worker reads them, both through that type.
+- **A review's decision lives in the step's `output`** (`AutomationReviewOutput`:
+  decision, `decidedById`, `decidedAt`), not in columns: one step type uses
+  it, and the run inspector already reads outputs.
+
+### Connections (Module 04)
+
+Migration `20261029130000_sprint10_automation_connections`, additive: the
+`AutomationConnection` table and the `AutomationConnectionStatus` enum.
+
+- **`credentials` is one encrypted blob**: the provider's credentials, already
+  checked by its strict Zod schema, as one JSON value through `encrypt()`.
+  Every provider has a different shape (a link, a list of headers, OAuth
+  tokens), so one column keeps the table the same for all of them, and only
+  one column has to be hidden from every select, every response and the
+  read-only role (`infra/postgres/readonly-role.sql`). A step's config in the
+  graph holds only the connection id.
+- **`maskedHint` is computed once at save**, so listing connections never
+  decrypts anything.
+- **"Used by N workflows" is scanned, not stored.** The API reads the
+  workspace's draft graphs and active version graphs and looks for the id.
+  A join table would have to be rewritten on every autosave (every few
+  seconds while someone edits), which is where drift comes from; tens of
+  workflows of under 50 steps each are cheap to scan.
+- **Names are unique per workspace and app among live rows**, checked by the
+  API rather than an index, so a deleted connection's name can be reused.
 
 ## A user may legitimately belong to zero organizations
 

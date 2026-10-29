@@ -46,7 +46,8 @@ BEGIN
       ('Webhooks',           ARRAY['secret']),
       ('ApiKey',             ARRAY['keyHash']),
       ('OAuthApp',           ARRAY['clientSecret']),
-      ('OAuthAuthorization', ARRAY['accessToken'])
+      ('OAuthAuthorization', ARRAY['accessToken']),
+      ('AutomationConnection', ARRAY['credentials'])
     ) AS t(table_name, hidden)
     WHERE EXISTS (
       SELECT FROM information_schema.tables

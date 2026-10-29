@@ -4,6 +4,7 @@ import { BellIcon } from '@animateicons/react/lucide/bell-icon';
 import { CreditCardIcon } from '@animateicons/react/lucide/credit-card-icon';
 import { KeyRoundIcon } from '@animateicons/react/lucide/key-round-icon';
 import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
+import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
 import { SignatureIcon } from '@animateicons/react/lucide/signature-icon';
 import { UsersIcon } from '@animateicons/react/lucide/users-icon';
 import { WebhookIcon } from '@animateicons/react/lucide/webhook-icon';
@@ -25,6 +26,9 @@ const SECTIONS = [
   { segment: 'billing', label: 'Billing', icon: CreditCardIcon },
   { segment: 'api-keys', label: 'API Keys', icon: KeyRoundIcon },
   { segment: 'webhooks', label: 'Webhooks', icon: WebhookIcon },
+  // The apps workflows use (Sprint 10); the page lives under Workflows and
+  // this entry redirects there.
+  { segment: 'connections', label: 'Connections', icon: PlugIcon },
   // The workspace's saved sign-offs (2026-10-19), which the composer inserts.
   { segment: 'signatures', label: 'Signatures', icon: SignatureIcon },
   { segment: 'notifications', label: 'Notifications', icon: BellIcon },

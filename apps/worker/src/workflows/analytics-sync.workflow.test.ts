@@ -33,6 +33,16 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     reconcileSchedules: jest.fn(),
     deliverWebhook: jest.fn(),
     markWebhookDeliveryFailed: jest.fn(),
+    loadRunPlan: jest.fn(),
+    claimRunSlot: jest.fn(),
+    recordSkipped: jest.fn(),
+    executeNodeActivity: jest.fn(),
+    settleStepFailure: jest.fn(),
+    prepareDelay: jest.fn(),
+    openReview: jest.fn(),
+    closeReview: jest.fn(),
+    completeStep: jest.fn(),
+    finishRun: jest.fn(),
     ...overrides,
   };
 }

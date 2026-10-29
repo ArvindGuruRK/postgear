@@ -1,6 +1,6 @@
 # Module 06: Step Panel, Data Mapping And Live Checks
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: XL (may need a second session)
+> **Sprint 10, Workflow Builder** | Status: Done with gaps | Size: XL (may need a second session)
 > **Depends on**: [Module 04](module-04-connections.md) (ConnectionPicker), [Module 05](module-05-list-templates-and-canvas.md) (canvas, panel shell)
 > **Stories**: WF-2.2 (state badges), WF-3.1, WF-3.2, WF-3.3, WF-4.1 (in-panel connect), WF-5.1, WF-7.3 (schedule panel), WF-7.4 (manual inputs)
 > **Next**: [Module 07](module-07-run-engine.md) (can run in parallel), then [Module 08](module-08-test-runs-history-and-review.md)
@@ -134,16 +134,16 @@ The Setup tab's connection field uses Module 04's `ConnectionPicker`: existing c
 
 ## Tasks
 
-- [ ] `FormSpec` on `NodeDefinition` in `packages/automation` (+ the paths-exist test).
-- [ ] Field registry and `schema-form.tsx`.
-- [ ] `chip-input.tsx` with round-trip tests, hover card and Format menu.
-- [ ] `insert-data.tsx`.
-- [ ] Condition builder, schedule builder, key-value list, recipients, duration, manual inputs editor, channels and connection fields.
-- [ ] Panels for every row of the P0 table above.
-- [ ] Expanded view with Input and Output panes and drag to map.
-- [ ] Pinned data: sticker, edit in Raw, unpin, wired to the API.
-- [ ] Live validation hook, tab "!" markers, issues popover, focus-the-field, deep links, Finish Setup focus.
-- [ ] Placeholders "Enter your ..."; labels sentence case; names Title Case.
+- [x] `FormSpec` on `NodeDefinition` in `packages/automation` (+ the paths-exist test).
+- [x] Field registry and `schema-form.tsx`.
+- [x] `chip-input.tsx` with round-trip tests, hover card and Format menu.
+- [x] `insert-data.tsx`.
+- [x] Condition builder, schedule builder, key-value list, recipients, duration, manual inputs editor, channels and connection fields.
+- [x] Panels for every row of the P0 table above.
+- [x] Expanded view with Input and Output panes and drag to map.
+- [x] Pinned data: sticker, edit in Raw, unpin, wired to the API.
+- [x] Live validation hook, tab "!" markers, issues popover, focus-the-field, deep links, Finish Setup focus.
+- [x] Placeholders "Enter your ..."; labels sentence case; names Title Case.
 
 ## Tests
 

@@ -11,6 +11,7 @@
  * worker's workflow code is bundled into a sandbox that allows none of those,
  * and keeping this package free of them is what lets a workflow import it.
  */
+export * from './automations';
 export * from './publish-status';
 export * from './retry-policy';
 export * from './workflows';

@@ -72,6 +72,47 @@ export const createDraft = defineNode({
     config.channels.length
       ? `Draft for ${channelNames(config.channels, ctx)}`
       : 'Choose channels for the draft',
+  form: {
+    tabs: {
+      setup: [
+        {
+          path: 'channels',
+          kind: 'channels',
+          label: 'Channels',
+          help: 'The draft is written for these channels.',
+          required: true,
+        },
+      ],
+      configure: [
+        {
+          path: 'text',
+          kind: 'longText',
+          label: 'Text',
+          help: 'Add text, media or both.',
+          placeholder: 'Enter your post text',
+          acceptsData: true,
+        },
+        {
+          path: 'media',
+          kind: 'text',
+          label: 'Media',
+          help: 'Insert an image from an earlier step, like Generate Image.',
+          placeholder: 'Enter your image link',
+          acceptsData: true,
+        },
+        {
+          path: 'parts',
+          kind: 'select',
+          label: 'Post as',
+          options: [
+            { value: 'single', label: 'One post' },
+            { value: 'splitOnBlankLines', label: 'A thread, one part per paragraph' },
+          ],
+        },
+        { path: 'tags', kind: 'tags', label: 'Tags', emptyLabel: 'No tags' },
+      ],
+    },
+  },
 });
 
 const queueConfig = draftConfig

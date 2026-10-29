@@ -118,6 +118,8 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   'billing.canceled': 'Subscription canceled',
   'billing.trial_started': 'Trial started',
   'webhook.failed': 'Webhook delivery failed',
+  automation: 'Workflow message',
+  'automation.review': 'Review needed',
   info: 'Notification',
 };
 

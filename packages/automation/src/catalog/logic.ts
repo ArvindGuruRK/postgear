@@ -51,6 +51,21 @@ export const ifElse = defineNode({
   outputShape: [{ path: 'result', label: 'Result', type: 'boolean', sample: true }],
   canDisable: false,
   summary: (config, ctx) => conditionWords(config.condition, ctx),
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'condition',
+          kind: 'condition',
+          label: 'Rules',
+          help: 'When the rules match, the run goes the True way; otherwise the False way.',
+          lead: 'Goes the True way if',
+          required: true,
+        },
+      ],
+    },
+  },
 });
 
 const switchCaseSchema = z
@@ -115,6 +130,22 @@ export const switchPaths = defineNode({
   outputShape: [{ path: 'path', label: 'Chosen Path', type: 'text', sample: 'Path A' }],
   canDisable: false,
   summary: (config) => `${count(config.cases.length, 'path')} and Otherwise`,
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'cases',
+          kind: 'cases',
+          label: 'Paths',
+          help: 'Each run takes the first path whose rules match, or Otherwise when none do.',
+          lead: 'Takes this path if',
+          max: 10,
+          required: true,
+        },
+      ],
+    },
+  },
 });
 
 export const filter = defineNode({
@@ -132,6 +163,21 @@ export const filter = defineNode({
   outputShape: [{ path: 'passed', label: 'Passed', type: 'boolean', sample: true }],
   canDisable: true,
   summary: (config, ctx) => conditionWords(config.condition, ctx),
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'condition',
+          kind: 'condition',
+          label: 'Rules',
+          help: 'The run stops here when the rules do not match.',
+          lead: 'Only continue if',
+          required: true,
+        },
+      ],
+    },
+  },
 });
 
 const DELAY_MAX = { minutes: 30 * 24 * 60, hours: 30 * 24, days: 30 } as const;
@@ -180,6 +226,46 @@ export const delay = defineNode({
     if (config.mode === 'until') return 'Waits until a set time';
     const unit = config.unit.slice(0, -1);
     return `Waits ${count(config.amount, unit)}`;
+  },
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'mode',
+          kind: 'select',
+          label: 'How to wait',
+          options: [
+            { value: 'for', label: 'Wait for a while' },
+            { value: 'until', label: 'Wait until a date and time' },
+          ],
+        },
+        {
+          path: 'amount',
+          kind: 'duration',
+          label: 'Wait for',
+          help: 'At most 30 days.',
+          unitPath: 'unit',
+          min: 1,
+          options: [
+            { value: 'minutes', label: 'Minutes' },
+            { value: 'hours', label: 'Hours' },
+            { value: 'days', label: 'Days' },
+          ],
+          showIf: { path: 'mode', equals: 'for' },
+        },
+        {
+          path: 'until',
+          kind: 'text',
+          label: 'Wait until',
+          help: 'Write it like 2026-11-03 09:00 (UTC), or insert a date from an earlier step.',
+          placeholder: 'Enter your date and time',
+          acceptsData: true,
+          required: true,
+          showIf: { path: 'mode', equals: 'until' },
+        },
+      ],
+    },
   },
 });
 
@@ -234,6 +320,41 @@ export const manualReview = defineNode({
   canDisable: false,
   canHandleErrors: false,
   summary: () => 'Waits for approval, up to 7 days',
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'text',
+          kind: 'longText',
+          label: 'Text to review',
+          help: 'Usually the text an AI step wrote.',
+          placeholder: 'Enter your text for the reviewer',
+          acceptsData: true,
+        },
+        {
+          path: 'image',
+          kind: 'text',
+          label: 'Image to review',
+          help: 'Insert an image from an earlier step, like Generate Image.',
+          placeholder: 'Enter your image link',
+          acceptsData: true,
+        },
+        {
+          path: 'instructions',
+          kind: 'longText',
+          label: 'Instructions',
+          help: 'What the reviewer should check before approving.',
+          placeholder: 'Enter your instructions for the reviewer',
+          acceptsData: true,
+        },
+      ],
+    },
+    notes: [
+      'Everyone in this workspace is asked to review.',
+      'A review waits up to 7 days, then the run ends as expired.',
+    ],
+  },
 });
 
 const FIELD_NAME = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
@@ -295,6 +416,28 @@ export const setFields = defineNode({
   canDisable: true,
   summary: (config) =>
     config.fields.length ? `Sets ${count(config.fields.length, 'field')}` : 'Add fields',
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'fields',
+          kind: 'keyValue',
+          label: 'Fields',
+          help: 'Later steps can use each field by its name. Names use letters, numbers and _.',
+          required: true,
+          max: 20,
+          row: { key: 'name', value: 'value', type: 'type', keyLabel: 'Name', valueLabel: 'Value' },
+          options: [
+            { value: 'text', label: 'Text' },
+            { value: 'number', label: 'Number' },
+            { value: 'boolean', label: 'Yes or no' },
+            { value: 'list', label: 'List' },
+          ],
+        },
+      ],
+    },
+  },
 });
 
 export const merge = defineNode({

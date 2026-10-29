@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   Unplug,
   Webhook,
+  Workflow,
   XCircle,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -67,6 +68,7 @@ const ICONS: Array<{ match: (type: string) => boolean; icon: LucideIcon; tone: s
   { match: (t) => t === 'billing.payment_failed', icon: CreditCard, tone: 'text-actionDanger' },
   { match: (t) => t.startsWith('billing.'), icon: CreditCard, tone: 'text-ink' },
   { match: (t) => t === 'webhook.failed', icon: Webhook, tone: 'text-actionDanger' },
+  { match: (t) => t.startsWith('automation'), icon: Workflow, tone: 'text-ink' },
   { match: (t) => t === 'info', icon: Info, tone: 'text-ink' },
 ];
 

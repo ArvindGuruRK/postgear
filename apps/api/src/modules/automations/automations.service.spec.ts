@@ -25,6 +25,7 @@ import { AutomationContextService, toChannelState } from './automation-context.s
 import { AutomationTriggers } from './automation-triggers';
 import type { AutomationRow, AutomationsRepository } from './automations.repository';
 import { AutomationsService, copyName, sameJson } from './automations.service';
+import type { ConnectionsRepository } from './connections/connections.repository';
 import { updateAutomationSchema } from './dto/automations.schema';
 
 const ORG = 'org_1';
@@ -85,6 +86,7 @@ describe('AutomationsService', () => {
   let repository: jest.Mocked<AutomationsRepository>;
   let triggers: AutomationTriggers;
   let service: AutomationsService;
+  let connectionRows: jest.Mock;
 
   beforeEach(() => {
     repository = {
@@ -121,11 +123,14 @@ describe('AutomationsService', () => {
       removePinned: jest.fn().mockResolvedValue(true),
       channels: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<AutomationsRepository>;
+    connectionRows = jest.fn().mockResolvedValue([]);
     triggers = new AutomationTriggers();
     jest.spyOn(triggers, 'stop');
     service = new AutomationsService(
       repository,
-      new AutomationContextService(repository),
+      new AutomationContextService(repository, {
+        list: connectionRows,
+      } as unknown as ConnectionsRepository),
       triggers,
     );
   });
@@ -464,10 +469,11 @@ describe('AutomationsService', () => {
   });
 
   describe('validate and catalog', () => {
-    it('reports node.not_runnable while the worker has no executors', async () => {
+    it('reports node.not_runnable for the steps the worker cannot run yet', async () => {
       const result = await service.validate(ORG, ID);
       const notRunnable = result.issues.filter((issue) => issue.code === 'node.not_runnable');
-      expect(notRunnable.length).toBe(4);
+      // Module 07 runs the trigger and Set Fields; Slack and Sheets arrive later.
+      expect(notRunnable.length).toBe(2);
       expect(result.blocking).toBe(true);
     });
 
@@ -475,10 +481,11 @@ describe('AutomationsService', () => {
       const { steps, connectedPlatforms } = await service.catalog(ORG);
       const byType = new Map(steps.map((step) => [step.type, step]));
 
-      expect(byType.get('logic.setFields')).toMatchObject({
+      expect(byType.get('logic.setFields')).toMatchObject({ state: 'ready', runnable: true });
+      expect(byType.get('postgear.createDraft')).toMatchObject({
         state: 'ready',
         runnable: false,
-        reason: 'Set Fields cannot run yet in this version of PostGear.',
+        reason: 'Create Draft cannot run yet in this version of PostGear.',
       });
       expect(byType.get('notify.slack')).toMatchObject({
         state: 'needsConnection',
@@ -496,6 +503,22 @@ describe('AutomationsService', () => {
         reason: 'Connect a channel first.',
       });
       expect(connectedPlatforms).toEqual([]);
+    });
+
+    it('marks Slack ready once a working Slack connection exists, not a broken one', async () => {
+      const slack = { id: 'c1', provider: 'slack', name: 'Marketing Slack' };
+      connectionRows.mockResolvedValueOnce([{ ...slack, status: 'NEEDS_RECONNECT' }]);
+      const broken = await service.catalog(ORG);
+      expect(broken.steps.find((step) => step.type === 'notify.slack')?.state).toBe(
+        'needsConnection',
+      );
+
+      connectionRows.mockResolvedValueOnce([{ ...slack, status: 'CONNECTED' }]);
+      const working = await service.catalog(ORG);
+      expect(working.steps.find((step) => step.type === 'notify.slack')).toMatchObject({
+        state: 'ready',
+        reason: 'Slack cannot run yet in this version of PostGear.',
+      });
     });
 
     it('marks Publish ready once a channel is active, and lists its platform', async () => {
@@ -548,17 +571,18 @@ describe('AutomationsService', () => {
       const entry = repository.setPinned.mock.lastCall?.[3] as { output: Record<string, unknown> };
       expect(entry.output).toEqual({ link: 'https://x.example', apiKey: '[hidden]' });
       expect(pinned.nodeKey).toBe('fields');
+      expect(pinned.output).toEqual(entry.output);
 
       repository.find.mockResolvedValueOnce(
         row({
           pinnedData: {
-            fields: { output: {}, pinnedAt: pinned.pinnedAt },
+            fields: { output: { link: 'https://x.example' }, pinnedAt: pinned.pinnedAt },
             gone: { output: {}, pinnedAt: pinned.pinnedAt },
           },
         }),
       );
       expect((await service.get(ORG, ID)).pinned).toEqual([
-        { nodeKey: 'fields', pinnedAt: pinned.pinnedAt },
+        { nodeKey: 'fields', pinnedAt: pinned.pinnedAt, output: { link: 'https://x.example' } },
       ]);
     });
 

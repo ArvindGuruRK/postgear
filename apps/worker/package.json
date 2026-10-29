@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@postgear/ai-engine": "*",
+    "@postgear/automation": "*",
     "@postgear/db": "*",
     "@postgear/scheduling": "*",
     "@postgear/seo-engine": "*",

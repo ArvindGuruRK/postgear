@@ -64,6 +64,19 @@ const envSchema = z
       .optional(),
 
     /**
+     * Workflow steps that leave PostGear (Slack, Sheets, HTTP) send to a
+     * stand-in instead of the outside app (Sprint 10). The stand-in logs what
+     * the step would send and answers like the app would; `[simulate:429]`
+     * and the other markers of lib/simulation-markers.ts in a step's text
+     * force a failure. Test runs stay dry either way unless a step is sent for
+     * real. Refused in production.
+     */
+    AUTOMATION_SIMULATION: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.enum(['true', 'false']).default('false'),
+    ),
+
+    /**
      * Let outbound webhooks target localhost and private addresses (Sprint 8).
      * The delivery sender runs the same SSRF guard as the SEO crawler on every
      * send, which refuses exactly the receiver a developer runs on their own
@@ -100,6 +113,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['ANALYTICS_SIMULATION'],
         message: 'ANALYTICS_SIMULATION cannot be enabled in production',
+      });
+    }
+
+    if (env.AUTOMATION_SIMULATION === 'true' && env.NODE_ENV === 'production') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AUTOMATION_SIMULATION'],
+        message: 'AUTOMATION_SIMULATION cannot be enabled in production',
       });
     }
 

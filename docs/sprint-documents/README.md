@@ -26,6 +26,7 @@
 | 8 | [Billing, Notifications, Public API & Launch](sprint-08-billing-notifications-api-launch.md) | 5.8 Billing, 5.9 Notifications, 5.10 API/Webhooks, 5.12 (remainder) | Sprint 2–7 |
 | 9 | [Design Studio (Template-Based Posts and Carousels)](sprint-09-design-studio.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 4, 7 |
 | 10 | [Workflow Builder (Visual Automations)](sprint-10-workflow-builder.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 5, 6, 8 (9 for the Render Design node) |
+| 10b | [Workflow Builder UI Revamp (Immersive Canvas)](sprint-10b-workflow-builder-ui-revamp.md) | None (look and feel of Sprint 10's builder; behaviour unchanged) | Sprint 10 (best after its Module 14) |
 
 ## Cross-Cutting Notes
 

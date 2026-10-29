@@ -13,6 +13,7 @@ export type {
   Announcement,
   ApiKey,
   Automation,
+  AutomationConnection,
   AutomationRun,
   AutomationRunStep,
   AutomationVersion,
@@ -55,6 +56,7 @@ export type {
 export {
   AnalyticsSyncStatus,
   AnnouncementColor,
+  AutomationConnectionStatus,
   AutomationRunMode,
   AutomationRunStatus,
   AutomationStatus,

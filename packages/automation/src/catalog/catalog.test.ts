@@ -158,8 +158,15 @@ describe('the node catalog', () => {
     expect(hits).toEqual(['data.googleSheetsAppendRow', 'data.excelAppendRow']);
   });
 
-  it('runs nothing yet: executors arrive with the run engine', () => {
-    expect(EXECUTABLE_TYPES.size).toBe(0);
+  it('runs only ready steps, and the run engine has every trigger and logic step', () => {
+    for (const type of EXECUTABLE_TYPES) {
+      expect(getDefinition(type)?.status).toBe('ready');
+    }
+    for (const definition of listDefinitions()) {
+      if (definition.category === 'trigger' || definition.category === 'logic') {
+        expect(EXECUTABLE_TYPES.has(definition.type)).toBe(true);
+      }
+    }
   });
 
   it('has one Social Channels card per platform and the seven failure reasons', () => {

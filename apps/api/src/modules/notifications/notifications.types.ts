@@ -23,6 +23,9 @@ export const NOTIFICATION_TYPES = [
   'billing.canceled',
   'billing.trial_started',
   'webhook.failed',
+  // Sprint 10: an In-App Notification step, and a Manual Review waiting for an answer.
+  'automation',
+  'automation.review',
   'info',
 ] as const;
 
@@ -51,6 +54,9 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   'billing.canceled': 'admins',
   'billing.trial_started': 'admins',
   'webhook.failed': 'admins',
+  // The existing opt-ins: a workflow's message is news, a review needs someone.
+  automation: 'success_emails',
+  'automation.review': 'failure_emails',
   info: 'none',
 };
 
@@ -64,6 +70,8 @@ export const DEFAULT_TITLES: Record<NotificationType, string> = {
   'billing.canceled': 'Subscription canceled',
   'billing.trial_started': 'Trial started',
   'webhook.failed': 'Webhook delivery failed',
+  automation: 'Workflow message',
+  'automation.review': 'Review needed',
   info: 'Notification',
 };
 
@@ -207,6 +215,8 @@ function subjectFor(type: NotificationType, title: string, meta: NotificationMet
       return `${SUBJECT_PREFIX} Your free trial has started`;
     case 'webhook.failed':
       return `${SUBJECT_PREFIX} Webhook ${meta.webhookName ? `"${meta.webhookName}" ` : ''}could not be delivered`;
+    case 'automation':
+    case 'automation.review':
     case 'info':
       return `${SUBJECT_PREFIX} ${title}`;
   }
@@ -262,6 +272,8 @@ function detailLines(type: NotificationType, meta: NotificationMeta): string[] {
         lines.push(`Plan: ${meta.tier}`);
       }
       return lines;
+    case 'automation':
+    case 'automation.review':
     case 'info':
       return lines;
   }
@@ -282,6 +294,10 @@ function linkLabel(type: NotificationType): string {
       return 'Manage billing:';
     case 'webhook.failed':
       return 'Check the webhook:';
+    case 'automation':
+      return 'Open the run:';
+    case 'automation.review':
+      return 'Review it here:';
     case 'info':
       return 'Open:';
   }

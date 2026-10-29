@@ -126,6 +126,11 @@ export function useWorkspace(): WorkspaceContextValue {
   return value;
 }
 
+/** The same, or null outside a provider: for a component the playground shows too. */
+export function useOptionalWorkspace(): WorkspaceContextValue | null {
+  return useContext(WorkspaceContext);
+}
+
 /**
  * The active workspace's scope status, re-rendering when it changes. An
  * effect gated on it must also re-check `scope.status()` when it runs: the

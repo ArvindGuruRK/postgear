@@ -1,6 +1,6 @@
 # Module 05: Workflows List, Templates And The Canvas
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: XL (may need a second session)
+> **Sprint 10, Workflow Builder** | Status: Done with gaps (2026-10-29: no component test for the step card yet; see the README progress row and decision log) | Size: XL (may need a second session)
 > **Depends on**: [Module 03](module-03-data-model-and-api.md) (API), Modules 01 and 02 (package)
 > **Stories**: WF-1.1, WF-1.2, WF-1.3, WF-1.4, WF-2.1, WF-2.2, WF-2.3, WF-2.4, WF-2.5, WF-2.6, WF-2.7
 > **Next**: [Module 06](module-06-step-panel-and-data-mapping.md)
@@ -137,18 +137,18 @@ Below `lg`: Steps panel and step panel become `Sheet`s; a dismissible `Alert` "T
 
 ## Tasks
 
-- [ ] Add dependencies; `icons.ts` map.
-- [ ] Rail entry and mobile menu; routes and not-found.
-- [ ] List page, template gallery, create, duplicate, delete, row menu.
-- [ ] `builder-state.ts` reducer with undo and redo (+ tests, including the stale-closure test).
-- [ ] `builder-autosave.ts` (+ tests: debounce, Saved only after 200, 409 conflict, offline retry).
-- [ ] Canvas: step card, ports, flow edge, connect rules, drop-to-add, insert on line, minimap, controls, zoom detail.
-- [ ] Step picker in three placements (+ search tests).
-- [ ] Notes, Tidy Up (+ tests), clipboard (+ tests), context menus, shortcuts, shortcuts sheet, command palette.
-- [ ] Finish Setup checklist.
-- [ ] Step panel shell with Settings working.
-- [ ] Leave guard; small screen drawers.
-- [ ] Title Case test passes for every new name (`title-case.test.ts`).
+- [x] Add dependencies; `icons.ts` map.
+- [x] Rail entry and mobile menu; routes and not-found.
+- [x] List page, template gallery, create, duplicate, delete, row menu.
+- [x] `builder-state.ts` reducer with undo and redo (+ tests, including the stale-closure test).
+- [x] `builder-autosave.ts` (+ tests: debounce, Saved only after 200, 409 conflict, offline retry).
+- [x] Canvas: step card, ports, flow edge, connect rules, drop-to-add, insert on line, minimap, controls, zoom detail.
+- [x] Step picker in three placements (+ search tests).
+- [x] Notes, Tidy Up (+ tests), clipboard (+ tests), context menus, shortcuts, shortcuts sheet, command palette.
+- [x] Finish Setup checklist.
+- [x] Step panel shell with Settings working.
+- [x] Leave guard; small screen drawers.
+- [x] Title Case test passes for every new name (`title-case.test.ts`).
 
 ## Tests
 

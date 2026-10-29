@@ -1,0 +1,98 @@
+/*
+ * The workflow canvas (Sprint 10, Module 05).
+ *
+ * React Flow's own base rules (positioning, panes, handles) go in the base
+ * layer, so the design system's Tailwind utilities always win over them.
+ * Everything below is scoped to `.pg-canvas`: Next keeps a stylesheet loaded
+ * after leaving the page, so nothing here may reach other screens.
+ */
+@import "@xyflow/react/dist/base.css" layer(base);
+
+@layer components {
+  /* A new card scales in. First, so the focus ring below outranks it. */
+  .pg-canvas .pg-step-card {
+    animation: pg-card-in 200ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pg-canvas .pg-step-card {
+      animation: none;
+    }
+  }
+
+  .pg-canvas .react-flow__node {
+    cursor: default;
+  }
+
+  .pg-canvas .react-flow__node:focus-visible {
+    outline: none;
+  }
+
+  .pg-canvas .react-flow__node:focus-visible .pg-step-card {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+
+  .pg-canvas .react-flow__handle {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* While a line is drawn: the inputs it may end on glow. */
+  .pg-canvas .pg-handle-fits {
+    box-shadow: 0 0 0 4px var(--color-focus-ring);
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+
+  .pg-canvas .react-flow__connection-path {
+    stroke: var(--color-ink);
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+  }
+
+  .pg-canvas .react-flow__selection,
+  .pg-canvas .react-flow__nodesselection-rect {
+    background: color-mix(in srgb, var(--color-focus-ring) 12%, transparent);
+    border: 2px dashed var(--color-focus-ring);
+  }
+
+  .pg-canvas .react-flow__minimap {
+    border: 2px solid var(--color-outline);
+    border-radius: 6px;
+    box-shadow: var(--shadow-brutal-sm);
+    overflow: hidden;
+  }
+
+  .pg-canvas .react-flow__attribution {
+    background: transparent;
+    font-size: 10px;
+  }
+
+  .pg-canvas .react-flow__attribution a {
+    color: var(--color-ink);
+    opacity: 0.6;
+  }
+
+  /* Tidy Up glides the cards to their places. */
+  .pg-canvas.pg-tidying .react-flow__node {
+    transition: transform 300ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pg-canvas.pg-tidying .react-flow__node {
+      transition: none;
+    }
+  }
+}
+
+@keyframes pg-card-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0.4;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

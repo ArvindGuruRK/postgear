@@ -23,6 +23,9 @@
       // by design (no Node built-ins in its src/), so the editor draws a slide with
       // the same code the API exports it with.
       "@postgear/design-engine": ["../../packages/design-engine/src"],
+      // Workflows (Sprint 10): the graph, the step catalog and validation, pure
+      // by design, so the canvas checks a workflow with the API's own rules.
+      "@postgear/automation": ["../../packages/automation/src"],
       "@postgear/config/*": ["../../packages/config/*"]
     }
   },
