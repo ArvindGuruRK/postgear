@@ -26,6 +26,9 @@ export const NOTIFICATION_TYPES = [
   // Sprint 10: an In-App Notification step, and a Manual Review waiting for an answer.
   'automation',
   'automation.review',
+  // Sprint 10, Module 09: a live run failed (grouped), and a workflow paused itself.
+  'automation.failed',
+  'automation.paused',
   'info',
 ] as const;
 
@@ -57,6 +60,9 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   // The existing opt-ins: a workflow's message is news, a review needs someone.
   automation: 'success_emails',
   'automation.review': 'failure_emails',
+  // Both mean a workflow needs fixing.
+  'automation.failed': 'failure_emails',
+  'automation.paused': 'failure_emails',
   info: 'none',
 };
 
@@ -72,6 +78,8 @@ export const DEFAULT_TITLES: Record<NotificationType, string> = {
   'webhook.failed': 'Webhook delivery failed',
   automation: 'Workflow message',
   'automation.review': 'Review needed',
+  'automation.failed': 'Workflow failed',
+  'automation.paused': 'Workflow paused',
   info: 'Notification',
 };
 
@@ -217,6 +225,8 @@ function subjectFor(type: NotificationType, title: string, meta: NotificationMet
       return `${SUBJECT_PREFIX} Webhook ${meta.webhookName ? `"${meta.webhookName}" ` : ''}could not be delivered`;
     case 'automation':
     case 'automation.review':
+    case 'automation.failed':
+    case 'automation.paused':
     case 'info':
       return `${SUBJECT_PREFIX} ${title}`;
   }
@@ -274,6 +284,8 @@ function detailLines(type: NotificationType, meta: NotificationMeta): string[] {
       return lines;
     case 'automation':
     case 'automation.review':
+    case 'automation.failed':
+    case 'automation.paused':
     case 'info':
       return lines;
   }
@@ -295,9 +307,12 @@ function linkLabel(type: NotificationType): string {
     case 'webhook.failed':
       return 'Check the webhook:';
     case 'automation':
+    case 'automation.failed':
       return 'Open the run:';
     case 'automation.review':
       return 'Review it here:';
+    case 'automation.paused':
+      return 'Open the workflow:';
     case 'info':
       return 'Open:';
   }

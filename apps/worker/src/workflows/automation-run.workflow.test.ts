@@ -26,12 +26,24 @@ import {
   AUTOMATION_SLOT_RETRY_MS,
   AUTOMATION_STEP_RETRY_POLICY,
   type AutomationRunScope,
+  type AutomationRunWorkflowInput,
 } from '@postgear/scheduling';
 import type { WorkflowHandle } from '@temporalio/client';
-import { ApplicationFailure } from '@temporalio/common';
+import {
+  ApplicationFailure,
+  defineSearchAttributeKey,
+  SearchAttributeType,
+  TypedSearchAttributes,
+} from '@temporalio/common';
 import { TestWorkflowEnvironment } from '@temporalio/testing';
 import { bundleWorkflowCode, Worker } from '@temporalio/worker';
-import type { AutomationActivities, NodeRunResult, StepRef } from '../automation/activity-contract';
+import type { WorkflowInfo } from '@temporalio/workflow';
+import type {
+  AutomationActivities,
+  NodeRunResult,
+  SeededStep,
+  StepRef,
+} from '../automation/activity-contract';
 import {
   automationCancelSignal,
   automationRunWorkflow,
@@ -39,6 +51,7 @@ import {
   reviewDecisionSignal,
   STEP_LIMIT_MESSAGE,
   STEP_MISSING_MESSAGE,
+  scheduledStartIso,
 } from './automation-run.workflow';
 
 jest.setTimeout(180_000);
@@ -138,6 +151,8 @@ interface Setup {
   graph: AutomationGraph;
   mode?: 'test' | 'live';
   scope?: AutomationRunScope;
+  /** Retry From Here: steps the run starts with as finished. */
+  seeded?: Record<string, SeededStep>;
   steps?: Record<string, StepBehaviour>;
   overrides?: Partial<Mocks>;
 }
@@ -152,6 +167,7 @@ function harness({
   graph,
   mode = 'test',
   scope = { kind: 'run' },
+  seeded,
   steps = {},
   overrides = {},
 }: Setup): Harness {
@@ -159,7 +175,15 @@ function harness({
   const callsOf = (key: string) => executed.filter((k) => k === key).length;
 
   const activities: Mocks = {
-    loadRunPlan: jest.fn(async () => ({ skip: false, graph, mode, scope, sendForReal: [] })),
+    startScheduledRun: jest.fn(async () => ({ runId: input.runId })),
+    loadRunPlan: jest.fn(async () => ({
+      skip: false,
+      graph,
+      mode,
+      scope,
+      sendForReal: [],
+      ...(seeded ? { seeded } : {}),
+    })),
     claimRunSlot: jest.fn(async () => true),
     recordSkipped: jest.fn(async () => undefined),
     executeNodeActivity: jest.fn(async (ref: StepRef) => {
@@ -200,6 +224,7 @@ afterAll(async () => {
 async function withRun<T>(
   activities: Mocks,
   drive: (handle: WorkflowHandle<typeof automationRunWorkflow>) => Promise<T>,
+  args: [AutomationRunWorkflowInput] = [input],
 ): Promise<T> {
   seq += 1;
   const taskQueue = `test-automation-${seq}`;
@@ -214,7 +239,7 @@ async function withRun<T>(
     const handle = await env.client.workflow.start(automationRunWorkflow, {
       taskQueue,
       workflowId: `automation-run:test-${seq}`,
-      args: [input],
+      args,
     });
     return drive(handle);
   });
@@ -968,6 +993,140 @@ describe('automationRunWorkflow: step tests', () => {
       error: STEP_MISSING_MESSAGE,
       stepCount: 0,
     });
+  });
+});
+
+describe('automationRunWorkflow: Retry From Here', () => {
+  // trigger -> draft (a side effect) -> post (failed last time) -> after,
+  // and trigger -> side (finished last time, on its own branch).
+  const graph = graphOf(
+    [
+      trigger(),
+      step('draft', 'notify.inApp'),
+      step('post', 'notify.slack', { onError: { mode: 'branch' } }),
+      step('after', 'notify.inApp'),
+      step('alert', 'notify.inApp'),
+      step('side', 'logic.setFields'),
+    ],
+    [
+      line('trigger', 'draft'),
+      line('draft', 'post'),
+      line('post', 'after'),
+      line('post', 'alert', 'error'),
+      line('trigger', 'side'),
+    ],
+  );
+
+  it('starts at the retried step and never runs a seeded step again', async () => {
+    const { activities, executed } = harness({
+      graph,
+      mode: 'live',
+      seeded: {
+        trigger: { status: 'succeeded', ports: ['out'] },
+        draft: { status: 'succeeded', ports: ['out'] },
+        side: { status: 'succeeded', ports: ['out'] },
+      },
+    });
+
+    await expect(runToEnd(activities)).resolves.toEqual({ outcome: 'succeeded' });
+
+    expect(executed).toEqual(['post', 'after']);
+    // Only the On Error branch the retried step did not take is written.
+    expect(skippedCalls(activities)).toEqual([[{ nodeKey: 'alert', reason: 'branchNotTaken' }]]);
+    expect(finishedWith(activities)).toMatchObject({ outcome: 'succeeded', stepCount: 2 });
+  });
+
+  it('follows the ports a seeded step fired, a handled error included', async () => {
+    const { activities, executed } = harness({
+      graph,
+      seeded: {
+        trigger: { status: 'succeeded', ports: ['out'] },
+        draft: { status: 'succeeded', ports: ['out'] },
+        post: { status: 'handled', ports: ['error'] },
+      },
+    });
+
+    await expect(runToEnd(activities)).resolves.toEqual({ outcome: 'succeeded' });
+
+    expect(executed.sort()).toEqual(['alert', 'side']);
+    expect(skippedCalls(activities)).toEqual([[{ nodeKey: 'after', reason: 'branchNotTaken' }]]);
+  });
+});
+
+describe('automationRunWorkflow: scheduled runs', () => {
+  const graph = graphOf(
+    [step('trigger', 'trigger.schedule'), step('notify', 'notify.inApp')],
+    [line('trigger', 'notify')],
+  );
+  const scheduled: AutomationRunWorkflowInput = {
+    scheduled: { automationId: 'auto-1', versionId: 'ver-1' },
+    organizationId: 'org-1',
+  };
+
+  it('creates its run row first, then runs it like any other', async () => {
+    const { activities, executed } = harness({
+      graph,
+      mode: 'live',
+      overrides: { startScheduledRun: jest.fn(async () => ({ runId: 'run-scheduled' })) },
+    });
+
+    const outcome = await withRun(activities, (handle) => handle.result(), [scheduled]);
+
+    expect(outcome).toEqual({ outcome: 'succeeded' });
+    const [call] = activities.startScheduledRun.mock.calls[0];
+    expect(call).toMatchObject({
+      organizationId: 'org-1',
+      automationId: 'auto-1',
+      versionId: 'ver-1',
+      workflowId: `automation-run:test-${seq}`,
+    });
+    // Started by hand here, so the workflow's own start time stands in.
+    expect(Number.isNaN(Date.parse(call.scheduledAt))).toBe(false);
+    expect(activities.loadRunPlan).toHaveBeenCalledWith({
+      runId: 'run-scheduled',
+      organizationId: 'org-1',
+    });
+    expect(executed).toEqual(['trigger', 'notify']);
+    expect(finishedWith(activities)).toMatchObject({
+      runId: 'run-scheduled',
+      outcome: 'succeeded',
+    });
+  });
+
+  it('ends without a run when the workflow is no longer on that version', async () => {
+    const { activities } = harness({
+      graph,
+      mode: 'live',
+      overrides: {
+        startScheduledRun: jest.fn(async () => ({ skip: true, reason: 'notActive' })),
+      },
+    });
+
+    const outcome = await withRun(activities, (handle) => handle.result(), [scheduled]);
+
+    expect(outcome).toEqual({ outcome: 'skipped' });
+    expect(activities.loadRunPlan).not.toHaveBeenCalled();
+    expect(activities.finishRun).not.toHaveBeenCalled();
+  });
+
+  it('reads the scheduled time from the search attribute the Schedule sets', () => {
+    const scheduledAt = new Date('2026-11-03T09:00:00.000Z');
+    const startTime = new Date('2026-11-03T09:00:41.000Z');
+    const key = defineSearchAttributeKey(
+      'TemporalScheduledStartTime',
+      SearchAttributeType.DATETIME,
+    );
+    const withAttribute = {
+      startTime,
+      typedSearchAttributes: new TypedSearchAttributes([{ key, value: scheduledAt }]),
+    } as unknown as WorkflowInfo;
+    const without = {
+      startTime,
+      typedSearchAttributes: new TypedSearchAttributes(),
+    } as unknown as WorkflowInfo;
+
+    expect(scheduledStartIso(withAttribute)).toBe('2026-11-03T09:00:00.000Z');
+    expect(scheduledStartIso(without)).toBe('2026-11-03T09:00:41.000Z');
   });
 });
 

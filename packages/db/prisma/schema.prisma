@@ -1285,12 +1285,17 @@ model AutomationRun {
   triggerPayload Json
   /// Test runs only: the draft as it was when the test started.
   graphSnapshot  Json?
-  /// Step tests only: upstream outputs the tested step reads, `{ [nodeKey]: output }`
-  /// (pinned data, else the last test run, else samples). Redacted and capped.
+  /// Step tests and Retry From Here: outputs of steps that count as already
+  /// finished, `{ [nodeKey]: output }` (pinned data, else the last test run,
+  /// else samples; or the retried run's outputs). Redacted and capped.
   seedOutputs    Json?
-  /// Test runs: `AutomationRunOptions` from `@postgear/scheduling`
-  /// (`{ scope, sendForReal, triggerData }`). Null for live runs.
+  /// `AutomationRunOptions` from `@postgear/scheduling`
+  /// (`{ scope, sendForReal, triggerData, retry? }`). Null for live runs,
+  /// except a live Retry From Here.
   options        Json?
+  /// The Temporal workflow id when it is not `automationRunWorkflowId(id)`:
+  /// runs a Schedule starts (Module 09), so Cancel can find them.
+  temporalWorkflowId String?
   /// Manual and test runs.
   startedById    String?
   creditsUsed    Int                 @default(0)
@@ -1311,6 +1316,8 @@ model AutomationRun {
   @@index([organizationId, status])
   // Reconcile and prune.
   @@index([status, createdAt])
+  // Prune finished runs after 30 days (Module 09).
+  @@index([finishedAt])
 }
 
 /// One step's attempt in one run. Name and type are copied in, so a step
@@ -1333,6 +1340,10 @@ model AutomationRunStep {
   startedAt  DateTime?
   finishedAt DateTime?
   durationMs Int?
+  /// The output ports the step fired ('out', 'true', a Paths case id, 'error',
+  /// 'approved'): the run view lights the lines taken, and Retry From Here
+  /// seeds finished steps with them (Module 08). Empty until it finishes.
+  ports      String[]             @default([])
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
   run        AutomationRun        @relation(fields: [runId], references: [id], onDelete: Cascade)

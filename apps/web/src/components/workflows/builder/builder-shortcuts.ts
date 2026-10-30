@@ -24,7 +24,9 @@ export type ShortcutCommand =
   | 'next'
   | 'previous'
   | 'shortcuts'
-  | 'escape';
+  | 'escape'
+  /** Module 08: Ctrl/Cmd+Enter runs Test Workflow. */
+  | 'testWorkflow';
 
 export interface ShortcutKeys {
   key: string;
@@ -59,6 +61,7 @@ export function shortcutFor(event: ShortcutKeys): ShortcutCommand | null {
     if (key === 'd') return 'duplicate';
     if (key === 'k') return 'palette';
     if (key === 'a') return 'selectAll';
+    if (key === 'Enter' && !event.shiftKey) return 'testWorkflow';
     return null;
   }
 
@@ -95,7 +98,7 @@ export function shortcutFor(event: ShortcutKeys): ShortcutCommand | null {
   }
 }
 
-/** What the shortcuts sheet lists, in its order. Pin Data and Test arrive with Module 08. */
+/** What the shortcuts sheet lists, in its order. */
 export const SHORTCUTS: readonly { keys: string; label: string }[] = [
   { keys: 'N', label: 'Open the step picker' },
   { keys: 'Shift+S', label: 'Add a sticky note' },
@@ -107,6 +110,7 @@ export const SHORTCUTS: readonly { keys: string; label: string }[] = [
   { keys: 'Ctrl+Z, Ctrl+Shift+Z', label: 'Undo, redo' },
   { keys: 'Ctrl+A', label: 'Select every step' },
   { keys: 'Ctrl+K', label: 'Open the command palette' },
+  { keys: 'Ctrl+Enter', label: 'Test the workflow (Stop while it runs)' },
   { keys: '1, 0', label: 'Fit to screen, reset zoom' },
   { keys: 'Arrow keys', label: 'Move to the next or previous step along the lines' },
   { keys: 'Space+drag', label: 'Pan the canvas' },

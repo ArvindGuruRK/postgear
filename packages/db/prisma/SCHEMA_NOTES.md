@@ -436,6 +436,15 @@ engine (Module 07) only adds code.
 - **A review's decision lives in the step's `output`** (`AutomationReviewOutput`:
   decision, `decidedById`, `decidedAt`), not in columns: one step type uses
   it, and the run inspector already reads outputs.
+- **`AutomationRunStep.ports`, `AutomationRun.temporalWorkflowId` and the
+  `finishedAt` index** (Modules 08 and 09, migration
+  `20261029160000_sprint10_runs_ports_and_schedules`, additive): `ports` are
+  the output ports a finished step fired, so the run view lights the lines
+  taken and Retry From Here seeds finished steps without running them again
+  (a retry stores `options.retry` and the seeds in `seedOutputs`).
+  `temporalWorkflowId` is set only on runs a Temporal Schedule starts, whose
+  workflow id is not `automationRunWorkflowId(id)`. The index serves the
+  30 day prune of finished runs.
 
 ### Connections (Module 04)
 

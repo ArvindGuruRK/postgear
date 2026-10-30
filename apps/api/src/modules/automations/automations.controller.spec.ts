@@ -1,10 +1,12 @@
 /**
  * Who may call what, read from the controller's real metadata through the
- * real `RolesGuard`: any member edits workflows, only an admin turns one on
- * or off. The fixed paths come before `:id`, so `catalog` is never read as
- * an id.
+ * real `RolesGuard`: any member edits workflows, discards changes, reads and
+ * restores versions; only an admin turns one on or off. The fixed paths come
+ * before `:id`, so `catalog` is never read as an id. Versions have no route
+ * that changes or deletes one.
  */
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, RequestMethod } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { Role } from '@postgear/db';
@@ -55,6 +57,10 @@ describe('AutomationsController roles', () => {
       'duplicate',
       'validate',
       'pin',
+      'discard',
+      'versions',
+      'version',
+      'restore',
     ] as const) {
       await expect(guard().canActivate(contextFor(handler))).resolves.toBe(true);
     }
@@ -70,10 +76,37 @@ describe('AutomationsController roles', () => {
     );
   });
 
-  it('lets an admin through to activate (which answers 501 until Module 09)', async () => {
+  it('lets an admin through to activate and pause', async () => {
     memberAs(Role.ADMIN);
     await expect(guard().canActivate(contextFor('activate'))).resolves.toBe(true);
     await expect(guard().canActivate(contextFor('pause'))).resolves.toBe(true);
+  });
+
+  it('has no route that changes or deletes a version', () => {
+    const routes = Object.getOwnPropertyNames(AutomationsController.prototype)
+      .filter((name) => name !== 'constructor')
+      .map((name) => {
+        const handler = AutomationsController.prototype[name as keyof AutomationsController];
+        return {
+          path: Reflect.getMetadata(PATH_METADATA, handler) as string | undefined,
+          method: Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod | undefined,
+        };
+      })
+      .filter((route) => route.path?.includes('versions'));
+
+    expect(routes).toEqual(
+      expect.arrayContaining([
+        { path: ':id/versions', method: RequestMethod.GET },
+        { path: ':id/versions/:version', method: RequestMethod.GET },
+        { path: ':id/versions/:version/restore', method: RequestMethod.POST },
+      ]),
+    );
+    expect(routes).toHaveLength(3);
+    for (const route of routes) {
+      expect([RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE]).not.toContain(
+        route.method,
+      );
+    }
   });
 
   it('declares catalog and templates before :id', () => {

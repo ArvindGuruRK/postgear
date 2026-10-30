@@ -2,7 +2,10 @@
 
 /**
  * The Output pane (blueprint 5.2) and the pin controls it shares with the
- * Test tab. Until Module 08 runs a step, its output is what is pinned:
+ * Test tab. Once a test ran the step (Module 08), the pane shows that
+ * result (`step-result.tsx`, labelled "Last Test 14:02") with Pin This
+ * Result, and the pin controls when it is pinned too. Before that, its
+ * output is what is pinned:
  *
  * - nothing pinned: "Test this step to see its result." and **Pin Data**,
  *   which opens the editor on the built-in sample;
@@ -19,8 +22,16 @@ import { Badge, Button, MotionIcon, Text } from '@postgear/ui';
 import { useState } from 'react';
 import type { PinnedStep } from '@/types/workflows';
 import { DataTable, DataTree, type DataViewKind, DataViews, RawView } from './data-view';
-import { OUTPUT_EMPTY, PIN_NOTE, rawText, sampleOutput, valueTree } from './panel-view-model';
+import {
+  OUTPUT_EMPTY,
+  PIN_NOTE,
+  rawText,
+  type StepRunResult,
+  sampleOutput,
+  valueTree,
+} from './panel-view-model';
 import { PinnedDataEditor } from './pinned-data-editor';
+import { StepResultView } from './step-result';
 
 export interface PinControls {
   pinned: PinnedStep | undefined;
@@ -155,10 +166,16 @@ export function OutputPane({
   node,
   scope,
   pin,
+  result = null,
+  workflowName = '',
 }: {
   node: GraphNode;
   scope: RunScope;
   pin: PinControls;
+  /** This step's latest test result (Module 08). */
+  result?: StepRunResult | null;
+  /** For Copy Details. */
+  workflowName?: string;
 }) {
   return (
     <section aria-label="Output" className="flex min-h-0 flex-1 flex-col gap-3 p-4">
@@ -166,7 +183,14 @@ export function OutputPane({
         <h3 className="type-heading text-base text-ink">Output</h3>
         {pin.pinned ? <Badge variant="outline">Pinned</Badge> : null}
       </div>
-      <PinArea node={node} scope={scope} pin={pin} />
+      {result ? (
+        <>
+          <StepResultView node={node} result={result} workflowName={workflowName} pin={pin} />
+          {pin.pinned ? <PinArea node={node} scope={scope} pin={pin} compact /> : null}
+        </>
+      ) : (
+        <PinArea node={node} scope={scope} pin={pin} />
+      )}
     </section>
   );
 }

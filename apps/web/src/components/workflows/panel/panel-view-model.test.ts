@@ -4,13 +4,21 @@ import {
   instantiateTemplate,
   resolveValue,
 } from '@postgear/automation';
+import type { RunStep } from '@/types/workflows';
 import {
   buildScope,
   checkPinnedShape,
+  copyDetailsText,
+  dryRunContent,
   flattenFields,
+  inputSourceLine,
+  liveEffectSentence,
   locateDataError,
   neighbours,
   parsePinnedText,
+  runsDryInTests,
+  type StepRunResult,
+  skippedSentence,
   sourceLabel,
   valueWords,
   walkOrder,
@@ -168,5 +176,134 @@ describe('words', () => {
       ['Post', 0],
       ['Post Link', 1],
     ]);
+  });
+});
+
+function result(nodeKey: string, status: RunStep['status'], output: unknown): StepRunResult {
+  return {
+    runId: 'run-1',
+    at: '2026-11-03T14:02:00Z',
+    live: false,
+    step: {
+      id: `${nodeKey}-1`,
+      nodeKey,
+      nodeType: 'logic.setFields',
+      nodeName: nodeKey,
+      status,
+      attempt: 1,
+      attempts: 1,
+      input: null,
+      output,
+      truncated: false,
+      error: null,
+      ports: ['out'],
+      startedAt: '2026-11-03T14:01:59Z',
+      finishedAt: '2026-11-03T14:02:00Z',
+      durationMs: 900,
+      updatedAt: '2026-11-03T14:02:00Z',
+    },
+  };
+}
+
+describe('buildScope with the last test (Module 08)', () => {
+  it('uses the last test where nothing is pinned, and pinned data over it', () => {
+    const graph = report();
+    const lastTest = {
+      fields: result('fields', 'SUCCEEDED', { channel: 'From The Test' }),
+      published: result('published', 'SUCCEEDED', { post: { url: 'tested' } }),
+      sheet: result('sheet', 'FAILED', null),
+    };
+    const tested = buildScope(graph, [], undefined, lastTest);
+    expect(resolveValue('nodes.fields.output.channel', tested.scope)).toBe('From The Test');
+    expect(resolveValue('trigger.post.url', tested.scope)).toBe('tested');
+    expect(tested.scopeSource.fields).toEqual({ kind: 'lastTest', at: '2026-11-03T14:02:00Z' });
+    expect(tested.scopeSource.trigger).toEqual({ kind: 'lastTest', at: '2026-11-03T14:02:00Z' });
+    // A failed step hands nothing on: its sample stays.
+    expect(tested.scopeSource.sheet).toEqual({ kind: 'sample' });
+
+    const pinned = buildScope(
+      graph,
+      [{ nodeKey: 'fields', pinnedAt: '2026-11-03T09:00:00Z', output: { channel: 'Pinned' } }],
+      undefined,
+      lastTest,
+    );
+    expect(resolveValue('nodes.fields.output.channel', pinned.scope)).toBe('Pinned');
+    expect(pinned.scopeSource.fields).toEqual({ kind: 'pinned', at: '2026-11-03T09:00:00Z' });
+  });
+});
+
+describe('the Test tab words', () => {
+  it('says where Test Step takes its input from', () => {
+    const graph = report();
+    const slack = graph.nodes.find((node) => node.type === 'notify.slack');
+    const fields = graph.nodes.find((node) => node.key === 'fields');
+    if (!slack || !fields) throw new Error('template changed');
+    const parent = graph.edges.find((edge) => edge.target === slack.key)?.source ?? '';
+    const parentName = graph.nodes.find((node) => node.key === parent)?.name;
+
+    expect(inputSourceLine(graph, slack.key, {})).toBe(`Using: sample data from ${parentName}.`);
+    expect(
+      inputSourceLine(graph, slack.key, { [parent]: { kind: 'pinned', at: '2026-11-03' } }),
+    ).toBe(`Using: pinned data from ${parentName}.`);
+    expect(
+      inputSourceLine(graph, slack.key, { [parent]: { kind: 'lastTest', at: '2026-11-03' } }),
+    ).toBe(`Using: the last test's data from ${parentName}.`);
+    expect(inputSourceLine(graph, 'published', { published: { kind: 'pinned', at: 'x' } })).toBe(
+      'Using: the data pinned on this trigger.',
+    );
+    expect(inputSourceLine(graph, 'missing', {})).toBeNull();
+  });
+
+  it('knows which steps run dry and what sending for real does', () => {
+    expect(runsDryInTests({ type: 'notify.slack', typeVersion: 1 })).toBe(true);
+    expect(runsDryInTests({ type: 'notify.inApp', typeVersion: 1 })).toBe(false);
+    expect(runsDryInTests({ type: 'logic.setFields', typeVersion: 1 })).toBe(false);
+    expect(liveEffectSentence({ type: 'notify.slack', typeVersion: 1 })).toBe(
+      'This test will really send a Slack message.',
+    );
+    expect(liveEffectSentence({ type: 'data.httpRequest', typeVersion: 1 })).toBe(
+      'This test will really send the request.',
+    );
+  });
+
+  it('reads a dry run and a skip in plain words', () => {
+    expect(dryRunContent({ dryRun: true, wouldSend: { text: 'New post', channel: 'x' } })).toEqual({
+      text: 'New post',
+      data: { text: 'New post', channel: 'x' },
+    });
+    expect(dryRunContent({ dryRun: true, wouldSend: 'Plain' })).toEqual({
+      text: 'Plain',
+      data: 'Plain',
+    });
+    expect(dryRunContent({ dryRun: true, wouldSend: { rows: [1] } }).text).toBeNull();
+    expect(skippedSentence({ skipped: 'branchNotTaken' })).toBe(
+      'Skipped: its branch was not taken in this run.',
+    );
+    expect(skippedSentence({ skipped: 'off' })).toBe('Skipped: this step is turned off.');
+    expect(skippedSentence(null)).toBe('Skipped in this run.');
+  });
+
+  it('copies the details someone needs to get help', () => {
+    const failed = result('slack', 'FAILED', null).step;
+    expect(
+      copyDetailsText({
+        workflowName: 'Publishing Report',
+        runId: 'run-1',
+        step: {
+          ...failed,
+          nodeName: 'Slack',
+          error: { message: 'The link was refused.', code: 'http_404', retryable: false },
+        },
+      }),
+    ).toBe(
+      [
+        'Workflow: Publishing Report',
+        'Run: run-1',
+        'Step: Slack',
+        'Error code: http_404',
+        'Time: 2026-11-03T14:02:00Z',
+        'Error: The link was refused.',
+      ].join('\n'),
+    );
   });
 });

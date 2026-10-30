@@ -3,8 +3,9 @@
  * inside fields never deletes the selected canvas step"). The builder
  * listens on the window for its shortcuts; a panel stops a key on its way
  * up unless it is one the builder should still hear: Esc (close the
- * panel) and undo, redo and the command palette, and only while the
- * person is not typing, since a field keeps its own undo.
+ * panel) and undo, redo, the command palette and Test Workflow
+ * (Ctrl/Cmd+Enter), and only while the person is not typing, since a
+ * field keeps its own undo.
  */
 import type { KeyboardEvent } from 'react';
 
@@ -22,7 +23,10 @@ export function keyLeavesPanel(
   if (isEditable(event.target)) return false;
   if (event.key === 'Escape') return true;
   const key = event.key.toLowerCase();
-  return (event.ctrlKey || event.metaKey) && (key === 'z' || key === 'y' || key === 'k');
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    (key === 'z' || key === 'y' || key === 'k' || key === 'enter')
+  );
 }
 
 /** The panel's `onKeyDown`: keeps every other key inside it. */

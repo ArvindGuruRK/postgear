@@ -76,6 +76,32 @@ export const pinDataSchema = z
   .strict()
   .refine((value) => value.output !== undefined, 'Nothing to pin');
 
+/** A version note typed in the activation dialog. */
+export const MAX_VERSION_NOTE_LENGTH = 280;
+
+/**
+ * Turning a workflow on (Module 09): exactly the draft revision the admin
+ * saw, an optional note for the version, and the tick that says posts may
+ * go out with no one reviewing them.
+ */
+export const activateAutomationSchema = z
+  .object({
+    draftRevision: z.number().int().min(1),
+    note: z
+      .string()
+      .max(MAX_VERSION_NOTE_LENGTH * 4)
+      .transform((text) => foldWhitespace(stripControlChars(text)))
+      .pipe(z.string().max(MAX_VERSION_NOTE_LENGTH))
+      .optional(),
+    acceptAutomaticPosting: z.boolean().optional(),
+  })
+  .strict();
+
+/** Restore As Draft: checked against the revision the editor has, like a save. */
+export const restoreVersionSchema = z.object({ draftRevision: z.number().int().min(1) }).strict();
+
+export type ActivateAutomationInput = z.infer<typeof activateAutomationSchema>;
+export type RestoreVersionInput = z.infer<typeof restoreVersionSchema>;
 export type CreateAutomationInput = z.infer<typeof createAutomationSchema>;
 export type UpdateAutomationInput = z.infer<typeof updateAutomationSchema>;
 export type ListAutomationsQuery = z.infer<typeof listAutomationsQuerySchema>;

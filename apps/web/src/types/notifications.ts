@@ -15,6 +15,8 @@ export type NotificationType =
   | 'webhook.failed'
   | 'automation'
   | 'automation.review'
+  | 'automation.failed'
+  | 'automation.paused'
   | 'info';
 
 export interface NotificationView {

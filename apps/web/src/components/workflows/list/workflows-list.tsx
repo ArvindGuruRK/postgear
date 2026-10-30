@@ -11,9 +11,15 @@
  *
  * Search and the filter ask the API (it pages and matches every word), a
  * moment after the last key, so typing does not send a request per letter.
+ *
+ * Module 09: admins turn a workflow on or off from its row menu. Activate
+ * loads the draft and the API's issues for it, then opens the builder's own
+ * activation dialog: the issues list (each one opens the builder on its
+ * step) when the draft is not ready, the confirm otherwise.
  */
 import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import type { ValidationIssue } from '@postgear/automation';
 import {
   Alert,
   AlertDialog,
@@ -61,6 +67,9 @@ import type {
   AutomationStatus,
   TemplateSummary,
 } from '@/types/workflows';
+import { ActivationDialog } from '../activation/activation-dialog';
+import { showsUnpublishedChanges } from '../activation/activation-model';
+import { PauseDialog } from '../activation/pause-dialog';
 import { AppIcon } from '../app-icon';
 import { TemplateGallery } from './template-gallery';
 import { WorkflowRowMenu } from './workflow-row-menu';
@@ -106,9 +115,23 @@ export interface WorkflowsListProps {
   orgId: string;
   initialWorkflows: AutomationListItem[] | null;
   templates: TemplateSummary[];
+  /** Workspace admins turn workflows on and off from the row menu. */
+  canManage: boolean;
 }
 
-export function WorkflowsList({ orgId, initialWorkflows, templates }: WorkflowsListProps) {
+/** Activate from a row: the draft as saved and the API's issues for it. */
+interface Activating {
+  item: AutomationListItem;
+  detail: AutomationDetail;
+  issues: ValidationIssue[];
+}
+
+export function WorkflowsList({
+  orgId,
+  initialWorkflows,
+  templates,
+  canManage,
+}: WorkflowsListProps) {
   const router = useRouter();
   const [workflows, setWorkflows] = useState<AutomationListItem[] | null>(initialWorkflows);
   const [search, setSearch] = useState('');
@@ -117,6 +140,9 @@ export function WorkflowsList({ orgId, initialWorkflows, templates }: WorkflowsL
   const [deleting, setDeleting] = useState<AutomationListItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [preparing, setPreparing] = useState<string | null>(null);
+  const [activating, setActivating] = useState<Activating | null>(null);
+  const [pausing, setPausing] = useState<AutomationListItem | null>(null);
   const first = useRef(true);
   const filtered = search.trim().length > 0 || status !== 'ALL';
 
@@ -174,6 +200,31 @@ export function WorkflowsList({ orgId, initialWorkflows, templates }: WorkflowsL
       toast({ title: 'Workflow duplicated' });
     } catch (cause) {
       toast({ title: failure(cause, 'That did not work. Try again.'), variant: 'danger' });
+    }
+  }
+
+  /** Swaps in what activate or pause answered, keeping the row's run count. */
+  function replaceRow(detail: AutomationDetail) {
+    setWorkflows((current) =>
+      (current ?? []).map((entry) =>
+        entry.id === detail.id ? { ...toListItem(detail), runs30d: entry.runs30d } : entry,
+      ),
+    );
+  }
+
+  async function startActivate(workflow: AutomationListItem) {
+    setPreparing(workflow.id);
+    const path = `/automations/${encodeURIComponent(workflow.id)}`;
+    try {
+      const [{ automation }, { issues }] = await Promise.all([
+        api<{ automation: AutomationDetail }>(path),
+        api<{ issues: ValidationIssue[] }>(`${path}/validate`, { method: 'POST' }),
+      ]);
+      setActivating({ item: workflow, detail: automation, issues });
+    } catch (cause) {
+      toast({ title: failure(cause, 'That did not work. Try again.'), variant: 'danger' });
+    } finally {
+      setPreparing(null);
     }
   }
 
@@ -303,8 +354,8 @@ export function WorkflowsList({ orgId, initialWorkflows, templates }: WorkflowsL
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-1">
                           <Badge variant={state.variant}>{state.label}</Badge>
-                          {workflow.hasUnpublishedChanges ? (
-                            <Badge variant="outline">Unpublished Changes</Badge>
+                          {showsUnpublishedChanges(workflow) ? (
+                            <Badge variant="accent">Unpublished Changes</Badge>
                           ) : null}
                         </div>
                       </TableCell>
@@ -345,8 +396,12 @@ export function WorkflowsList({ orgId, initialWorkflows, templates }: WorkflowsL
                       <TableCell>
                         <WorkflowRowMenu
                           workflow={workflow}
+                          canManage={canManage}
+                          busy={preparing === workflow.id}
                           onOpen={() => router.push(href)}
                           onDuplicate={() => void duplicate(workflow)}
+                          onActivate={() => void startActivate(workflow)}
+                          onPause={() => setPausing(workflow)}
                           onDelete={() => setDeleting(workflow)}
                         />
                       </TableCell>
@@ -358,6 +413,38 @@ export function WorkflowsList({ orgId, initialWorkflows, templates }: WorkflowsL
           </CardContent>
         </Card>
       )}
+
+      {activating ? (
+        <ActivationDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setActivating(null);
+          }}
+          automationId={activating.item.id}
+          mode="turnOn"
+          graph={activating.detail.draftGraph}
+          issues={activating.issues}
+          // Nothing is unsaved here: the list activates the draft as stored.
+          flush={async () => activating.detail.draftRevision}
+          onActivated={(result) => replaceRow(result.automation)}
+          onOpenIssue={(issue) => {
+            const step = issue.nodeKey ? `?step=${encodeURIComponent(issue.nodeKey)}` : '';
+            router.push(`/${orgId}/workflows/${activating.item.id}${step}`);
+          }}
+        />
+      ) : null}
+
+      {pausing ? (
+        <PauseDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setPausing(null);
+          }}
+          automationId={pausing.id}
+          triggerType={pausing.triggerType}
+          onPaused={replaceRow}
+        />
+      ) : null}
 
       <AlertDialog
         open={deleting !== null}

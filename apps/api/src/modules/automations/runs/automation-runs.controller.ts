@@ -1,9 +1,10 @@
 /**
  * One run of a workflow (Sprint 10, Module 07): its detail, its live
- * progress, Cancel, and the answer to a Manual Review.
+ * progress, Cancel, the answer to a Manual Review, and Retry From Here
+ * (Module 08).
  *
- * `@Roles(ADMIN, USER)`: any member watches, cancels and reviews, as the
- * user stories ask ("the workspace gets a notification"). Every handler
+ * `@Roles(ADMIN, USER)`: any member watches, cancels, reviews and retries,
+ * as the user stories ask ("the workspace gets a notification"). Every handler
  * scopes on `@CurrentOrg()`; another workspace's run is a 404.
  *
  * ## The events stream
@@ -28,7 +29,12 @@ import { ZodBody } from '../../../common/pipes/zod-validation.pipe';
 import { openSseStream } from '../../../common/sse';
 import { AutomationRunEventsService } from './automation-run-events.service';
 import { AutomationRunsService } from './automation-runs.service';
-import { type ReviewDecisionInput, reviewDecisionSchema } from './dto/automation-runs.schema';
+import {
+  type RetryRunInput,
+  type ReviewDecisionInput,
+  retryRunSchema,
+  reviewDecisionSchema,
+} from './dto/automation-runs.schema';
 
 @Controller('automation-runs')
 @Roles(Role.ADMIN, Role.USER)
@@ -66,6 +72,22 @@ export class AutomationRunsController {
   @HttpCode(HttpStatus.OK)
   async cancel(@CurrentOrg() org: ActiveOrg, @Param('runId') runId: string) {
     return { run: await this.runs.cancel(org.id, runId) };
+  }
+
+  /**
+   * Retry From Here (Module 08): a new run starting at a failed step. 409
+   * `run_not_finished`; 422 `retry_step_not_failed`, `retry_not_safe` or
+   * `retry_old_version`; 429 for a test run past the throttle.
+   */
+  @Post(':runId/retry')
+  @HttpCode(HttpStatus.CREATED)
+  async retry(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('runId') runId: string,
+    @Body(new ZodBody(retryRunSchema, 'automation-runs/retry')) dto: RetryRunInput,
+  ) {
+    return { run: await this.runs.retry(org.id, user.id, runId, dto.fromNodeKey) };
   }
 
   /** 409 `review_not_waiting` or `review_answered`; 503 `engine_unavailable` when the run could not be told. */

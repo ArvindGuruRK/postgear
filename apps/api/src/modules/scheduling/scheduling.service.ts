@@ -19,16 +19,28 @@
  * "schedule", "reschedule" and "post now" are each one call, with no listing,
  * no terminate-and-recreate, and no race between the two. The workflow treats
  * the database as the truth and only needs to be *told to look*.
+ *
+ * ## Temporal Schedules (Sprint 10, Module 09)
+ *
+ * A workflow whose trigger is Schedule has one Temporal Schedule, created or
+ * replaced when it is turned on and deleted when it is paused or deleted.
+ * Best-effort like the rest: the worker's reconcile recreates a missing one
+ * and deletes one whose workflow is no longer on, with the same options
+ * (`automationScheduleOptions`).
  */
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LIMITS } from '@postgear/automation';
+import { LIMITS, type ScheduleSpecShape } from '@postgear/automation';
 import {
   ANALYTICS_SYNC_WORKFLOW,
   AUTOMATION_RUN_WORKFLOW,
+  AUTOMATION_SCHEDULE_POLICIES,
   type AutomationRunInput,
+  type AutomationScheduledRunInput,
   analyticsSyncWorkflowId,
   automationRunWorkflowId,
+  automationScheduledWorkflowIdPrefix,
+  automationScheduleId,
   CANCEL_SIGNAL,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
@@ -48,6 +60,9 @@ import {
 import {
   Client,
   Connection,
+  ScheduleAlreadyRunning,
+  ScheduleNotFoundError,
+  type ScheduleOptions,
   WorkflowExecutionAlreadyStartedError,
   WorkflowIdReusePolicy,
   WorkflowNotFoundError,
@@ -85,8 +100,48 @@ export type RunSignalOutcome = 'signalled' | 'notFound' | 'unavailable';
 /** The minimal client surface this service uses: what a test substitutes. */
 export interface SchedulingClient {
   workflow: Pick<Client['workflow'], 'signalWithStart' | 'getHandle' | 'start'>;
+  schedule: Pick<Client['schedule'], 'create' | 'getHandle'>;
   workflowService: Pick<Client['workflowService'], 'describeTaskQueue'>;
   connection: { close(): Promise<void> };
+}
+
+/** What a workflow's Temporal Schedule is built from (Sprint 10, Module 09). */
+export interface AutomationScheduleRequest {
+  automationId: string;
+  organizationId: string;
+  /** The active version the scheduled runs execute. */
+  versionId: string;
+  /** `toTemporalScheduleSpec(config)` from `@postgear/automation`, with its IANA zone. */
+  spec: ScheduleSpecShape;
+}
+
+/**
+ * The Temporal Schedule of a workflow whose trigger is Schedule. The worker
+ * builds the same options when its reconcile recreates a missing schedule:
+ * one schedule per workflow, a run per firing (`automationRunWorkflow` with
+ * the scheduled input, the workflow creating its own run row), never two
+ * at once (`SKIP`), and a one minute catch-up so nothing piles up.
+ */
+export function automationScheduleOptions(request: AutomationScheduleRequest): ScheduleOptions {
+  const input: AutomationScheduledRunInput = {
+    scheduled: { automationId: request.automationId, versionId: request.versionId },
+    organizationId: request.organizationId,
+  };
+  return {
+    scheduleId: automationScheduleId(request.automationId),
+    spec: request.spec,
+    action: {
+      type: 'startWorkflow',
+      workflowType: AUTOMATION_RUN_WORKFLOW,
+      taskQueue: SCHEDULING_TASK_QUEUE,
+      workflowId: automationScheduledWorkflowIdPrefix(request.automationId),
+      args: [input],
+    },
+    policies: {
+      overlap: AUTOMATION_SCHEDULE_POLICIES.overlap,
+      catchupWindow: AUTOMATION_SCHEDULE_POLICIES.catchupWindowMs,
+    },
+  };
 }
 
 /** How long a status probe may take before the scheduler counts as unreachable. */
@@ -258,21 +313,80 @@ export class SchedulingService implements OnModuleDestroy {
     });
   }
 
-  /** Sprint 10: asks a running workflow run to stop. The workflow writes CANCELLED itself. */
-  async cancelAutomationRun(runId: string): Promise<RunSignalOutcome> {
-    return this.signalAutomationRun(runId, 'automation cancel', CANCEL_SIGNAL, []);
+  /**
+   * Sprint 10: asks a running workflow run to stop. The workflow writes
+   * CANCELLED itself. `workflowId` is the run's `temporalWorkflowId` (a run
+   * a Schedule started has its own id); null means `automationRunWorkflowId`.
+   */
+  async cancelAutomationRun(runId: string, workflowId?: string | null): Promise<RunSignalOutcome> {
+    return this.signalAutomationRun(
+      workflowId ?? automationRunWorkflowId(runId),
+      'automation cancel',
+      CANCEL_SIGNAL,
+      [],
+    );
   }
 
   /**
    * Sprint 10: tells a run waiting at a Manual Review which way to go. The
    * API has already written the decision on the step row; the workflow only
-   * learns the port.
+   * learns the port. `workflowId` as for `cancelAutomationRun`.
    */
   async signalReviewDecision(
     runId: string,
     payload: ReviewDecisionPayload,
+    workflowId?: string | null,
   ): Promise<RunSignalOutcome> {
-    return this.signalAutomationRun(runId, 'automation review', REVIEW_DECISION_SIGNAL, [payload]);
+    return this.signalAutomationRun(
+      workflowId ?? automationRunWorkflowId(runId),
+      'automation review',
+      REVIEW_DECISION_SIGNAL,
+      [payload],
+    );
+  }
+
+  /**
+   * Sprint 10, Module 09: creates a workflow's Temporal Schedule, or replaces
+   * the one it has (re-activating a new version, or a changed time). Create
+   * first; a schedule that already exists is updated in place to the same
+   * options, so there is never a moment without one. False when Temporal
+   * could not be reached: the worker's reconcile creates it within 15 minutes.
+   */
+  async putAutomationSchedule(request: AutomationScheduleRequest): Promise<boolean> {
+    return this.attempt('automation schedule', async (client) => {
+      const options = automationScheduleOptions(request);
+      try {
+        await client.schedule.create(options);
+      } catch (error) {
+        if (!(error instanceof ScheduleAlreadyRunning)) {
+          throw error;
+        }
+        await client.schedule.getHandle(options.scheduleId).update(() => ({
+          spec: options.spec,
+          action: options.action,
+          policies: options.policies,
+          state: {},
+        }));
+      }
+    });
+  }
+
+  /**
+   * Sprint 10, Module 09: deletes a workflow's Temporal Schedule (pause,
+   * delete, a trigger that is no longer Schedule). Deleting rather than
+   * pausing means turning it back on never catches up on missed runs. A
+   * schedule that is not there counts as deleted.
+   */
+  async deleteAutomationSchedule(automationId: string): Promise<boolean> {
+    return this.attempt('automation schedule delete', async (client) => {
+      try {
+        await client.schedule.getHandle(automationScheduleId(automationId)).delete();
+      } catch (error) {
+        if (!(error instanceof ScheduleNotFoundError)) {
+          throw error;
+        }
+      }
+    });
   }
 
   /** What the UI shows in its scheduler pill. Never throws. */
@@ -347,7 +461,7 @@ export class SchedulingService implements OnModuleDestroy {
 
   /** One signal to one run's workflow, telling "no such workflow" apart from "unreachable". */
   private async signalAutomationRun(
-    runId: string,
+    workflowId: string,
     label: string,
     signal: string,
     args: unknown[],
@@ -355,7 +469,7 @@ export class SchedulingService implements OnModuleDestroy {
     let found = true;
     const reached = await this.attempt(label, async (client) => {
       try {
-        await client.workflow.getHandle(automationRunWorkflowId(runId)).signal(signal, ...args);
+        await client.workflow.getHandle(workflowId).signal(signal, ...args);
       } catch (error) {
         if (!(error instanceof WorkflowNotFoundError)) {
           throw error;

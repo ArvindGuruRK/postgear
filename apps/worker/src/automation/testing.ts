@@ -14,6 +14,7 @@ import {
   type PortId,
 } from '@postgear/automation';
 import type { AutomationRunOptions } from '@postgear/scheduling';
+import type { Client } from '@temporalio/client';
 import { createAutomationActivities } from '../activities/automation.activities';
 import type { ActivityDeps } from '../activities/deps';
 import type { ExecutorRegistry } from './executors/types';
@@ -82,7 +83,12 @@ export interface Harness {
 export function harness(
   graph: AutomationGraph,
   run: Partial<SeedRun> = {},
-  options: { simulation?: boolean; executors?: ExecutorRegistry } = {},
+  options: {
+    simulation?: boolean;
+    executors?: ExecutorRegistry;
+    /** What `deps.temporalClient()` returns (the auto-pause deletes a schedule through it). */
+    temporalClient?: () => Promise<Client>;
+  } = {},
 ): Harness {
   const store = new MemoryRunStore();
   store.addRun({
@@ -99,8 +105,14 @@ export function harness(
   });
   const attempt = { value: 1 };
   const clock = { now: NOW };
+  store.now = () => clock.now;
   const deps = {
     env: { AUTOMATION_SIMULATION: options.simulation ? 'true' : 'false' },
+    temporalClient:
+      options.temporalClient ??
+      (async () => {
+        throw new Error('No Temporal client in this test.');
+      }),
   } as unknown as ActivityDeps;
   const activities = createAutomationActivities(deps, {
     store,

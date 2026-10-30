@@ -4,10 +4,12 @@
  * The Expanded view (blueprint 5.2, n8n's node detail view): a near
  * full-screen dialog with three resizable columns, **Input** (the data
  * this step can use), **Settings** (the same tabs as the docked panel) and
- * **Output** (its result; pinned data until Module 08 runs steps).
+ * **Output** (its latest test result, else its pinned data).
  *
  * Opens from Expand in the panel header, a double-click on a card, or
- * Enter on a card whose panel is open. The header's arrows walk to the
+ * Enter on a card whose panel is open. From a step's result badge on the
+ * painted canvas (Module 08) it opens on that run: Input shows what the
+ * step got (This Run) and Output what it gave. The header's arrows walk to the
  * previous and next step in run order without closing.
  */
 import { ChevronLeftIcon } from '@animateicons/react/lucide/chevron-left-icon';
@@ -35,10 +37,11 @@ import type { FieldContext } from '../fields/contract';
 import { InputPane } from './input-pane';
 import { OutputPane, type PinControls } from './output-pane';
 import { keepKeysInPanel } from './panel-keys';
-import { neighbours } from './panel-view-model';
+import { neighbours, type StepRunResult } from './panel-view-model';
 import { ResizeHandle } from './resize-handle';
 import { StepNameField } from './step-panel';
 import { StepTabs } from './step-tabs';
+import type { StepTestControls } from './test-tab';
 
 /** Column widths in percent: Input, Settings, Output. */
 const DEFAULT_COLUMNS: [number, number, number] = [30, 40, 30];
@@ -70,6 +73,10 @@ export interface ExpandedViewProps {
   onClose: () => void;
   /** Walks to another step (the arrows). */
   onNavigate: (key: string) => void;
+  /** Module 08: Test Step, the result and Send For Real In Tests. */
+  test?: StepTestControls;
+  /** Opened from a result badge: the step's row in that run. */
+  runResult?: StepRunResult | null;
 }
 
 export function ExpandedView({
@@ -81,6 +88,8 @@ export function ExpandedView({
   pin,
   onClose,
   onNavigate,
+  test,
+  runResult = null,
 }: ExpandedViewProps) {
   return (
     <Dialog open={node !== undefined} onOpenChange={(open) => !open && onClose()}>
@@ -94,6 +103,8 @@ export function ExpandedView({
           pin={pin}
           onClose={onClose}
           onNavigate={onNavigate}
+          test={test}
+          runResult={runResult}
         />
       ) : null}
     </Dialog>
@@ -109,6 +120,8 @@ function ExpandedBody({
   pin,
   onClose,
   onNavigate,
+  test,
+  runResult = null,
 }: Omit<ExpandedViewProps, 'node'> & { node: GraphNode }) {
   const def = getDefinition(node.type, node.typeVersion);
   const { previous, next } = neighbours(graph, node.key);
@@ -200,11 +213,12 @@ function ExpandedBody({
           className="flex min-h-80 min-w-0 flex-col border-b-2 border-outline bg-chrome md:min-h-0 md:shrink-0 md:basis-(--col) md:overflow-y-auto md:border-b-0"
         >
           <InputPane
-            key={node.key}
+            key={`${node.key}:${runResult?.runId ?? ''}`}
             graph={graph}
             node={node}
             scope={context.scope}
             scopeSource={context.scopeSource}
+            runInput={runResult}
           />
         </div>
         <ResizeHandle
@@ -229,6 +243,7 @@ function ExpandedBody({
               context={context}
               dispatch={dispatch}
               pin={pin}
+              test={test}
             />
           </section>
         </div>
@@ -248,7 +263,14 @@ function ExpandedBody({
           style={column(right)}
           className="flex min-h-80 min-w-0 flex-col border-t-2 border-outline bg-chrome md:min-h-0 md:shrink-0 md:basis-(--col) md:overflow-y-auto md:border-t-0"
         >
-          <OutputPane key={node.key} node={node} scope={context.scope} pin={pin} />
+          <OutputPane
+            key={node.key}
+            node={node}
+            scope={context.scope}
+            pin={pin}
+            result={runResult ?? test?.result ?? null}
+            workflowName={test?.workflowName}
+          />
         </div>
       </div>
     </DialogContent>

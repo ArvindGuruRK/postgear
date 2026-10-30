@@ -148,4 +148,50 @@ describe('BuilderAutosave', () => {
     await expect(saver.flush()).resolves.toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
   });
+
+  it('adopts a draft the server changed (restore, discard) without saving it back', async () => {
+    let answer: (value: AutomationSaveResult) => void = () => undefined;
+    const send = jest.fn<Promise<AutomationSaveResult>, [SaveBody, { keepalive: boolean }]>(
+      () =>
+        new Promise<AutomationSaveResult>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    const { saver } = setup(send);
+    saver.update({ graph: edited(), name: 'Report' });
+    jest.advanceTimersByTime(1_000);
+    expect(saver.status).toBe('saving');
+
+    const restored = edited();
+    saver.reset({ graph: restored, name: 'Restored', revision: 9 });
+    saver.update({ graph: restored, name: 'Restored' });
+    expect(saver.status).toBe('saved');
+    expect(saver.unsaved).toBe(false);
+    expect(saver.currentRevision).toBe(9);
+
+    // The save sent before the restore answers late: it changes nothing.
+    answer(result(4));
+    await Promise.resolve();
+    expect(saver.currentRevision).toBe(9);
+
+    // The next edit goes out against the adopted revision.
+    send.mockImplementation(async (body: SaveBody) => result(body.draftRevision + 1));
+    saver.update({ graph: edited(), name: 'Restored' });
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ draftRevision: 9 }), {
+      keepalive: false,
+    });
+  });
+
+  it('clears a conflict when the draft is adopted again', async () => {
+    const send = jest.fn(async () => {
+      throw new ApiError('Changed elsewhere', 409);
+    });
+    const { saver } = setup(send);
+    saver.update({ graph: edited(), name: 'Report' });
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(saver.status).toBe('conflict');
+    saver.reset({ graph: edited(), name: 'Report', revision: 5 });
+    expect(saver.status).toBe('saved');
+  });
 });

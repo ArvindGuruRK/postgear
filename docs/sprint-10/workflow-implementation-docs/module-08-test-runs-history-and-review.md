@@ -1,6 +1,6 @@
 # Module 08: Test, Live Run View, Run History And Manual Review
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: L
+> **Sprint 10, Workflow Builder** | Status: Done with gaps | Size: L
 > **Depends on**: [Module 06](module-06-step-panel-and-data-mapping.md) (panel, Output pane slots), [Module 07](module-07-run-engine.md) (run engine, run endpoints, run events stream)
 > **Stories**: WF-3.4, WF-5.2, WF-5.3, WF-10.1, WF-12.2 (Cancel; Retry From Here is P1 here)
 > **Next**: [Module 09](module-09-triggers-activation-versions.md)
@@ -95,16 +95,16 @@ The Expanded view's Output pane and Input pane now read the last test run of thi
 
 ## Tasks
 
-- [ ] `run-model.ts` reducer (+ recorded-event tests).
-- [ ] Test Workflow button, sample source menu, Manual inputs dialog, Stop, throttling message.
-- [ ] SSE subscription with polling fallback; canvas painting, result badges, line animation, run bar.
-- [ ] Test tab: Test Step, dry run rendering, Send For Real In Tests with confirm, Pin This Result; hover toolbar Test Step.
-- [ ] Runs tab: list, filters, pagination, read-only version canvas, step list, Copy Details, deep link.
-- [ ] Debug In Editor.
-- [ ] Cancel Run.
-- [ ] (P1) Retry From Here: API route, worker seed and startAt, UI rules (+ workflow test in the worker).
-- [ ] Review card in run view and canvas, notification link, Edit Then Approve (P1), Reject, decided-by line.
-- [ ] Output and Input panes fed from the last test.
+- [x] `run-model.ts` reducer (+ recorded-event tests).
+- [x] Test Workflow button, sample source menu, Manual inputs dialog, Stop, throttling message.
+- [x] SSE subscription with polling fallback; canvas painting, result badges, line animation, run bar.
+- [x] Test tab: Test Step, dry run rendering, Send For Real In Tests with confirm, Pin This Result; hover toolbar Test Step.
+- [x] Runs tab: list, filters, pagination, read-only version canvas, step list, Copy Details, deep link.
+- [x] Debug In Editor.
+- [x] Cancel Run.
+- [x] (P1) Retry From Here: API route, worker seed and startAt, UI rules (+ workflow test in the worker).
+- [x] Review card in run view and canvas, notification link, Edit Then Approve (P1), Reject, decided-by line.
+- [x] Output and Input panes fed from the last test.
 
 ## Tests
 

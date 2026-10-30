@@ -6,6 +6,10 @@
  *
  * Nothing is fetched while the active-workspace cookie names another
  * workspace (see the Studio page): the list loads once the switch has landed.
+ *
+ * The viewer's role comes along (Module 09): only workspace admins turn
+ * workflows on and off, so members get no Activate or Pause in the row menu.
+ * The API's guard is the real check; this only avoids offering a 403.
  */
 import { listTemplates } from '@postgear/automation';
 import type { Metadata } from 'next';
@@ -21,11 +25,26 @@ export default async function WorkflowsPage({ params }: PageProps<'/[orgId]/work
   const cookie = await getSessionCookieHeader();
   const pending = (await getActiveOrgId()) !== orgId;
 
-  const workflows = pending
-    ? null
-    : await serverApi<{ automations: AutomationListItem[] }>('/automations', { cookie })
-        .then((result) => result.automations)
-        .catch(() => null);
+  const [workflows, me] = await Promise.all([
+    pending
+      ? null
+      : serverApi<{ automations: AutomationListItem[] }>('/automations', { cookie })
+          .then((result) => result.automations)
+          .catch(() => null),
+    serverApi<{ organizations: { id: string; role: string }[] }>('/orgs', { cookie })
+      .then(
+        (result) => result.organizations.find((organization) => organization.id === orgId) ?? null,
+      )
+      .catch(() => null),
+  ]);
+  const canManage = me?.role === 'ADMIN' || me?.role === 'SUPERADMIN';
 
-  return <WorkflowsList orgId={orgId} initialWorkflows={workflows} templates={listTemplates()} />;
+  return (
+    <WorkflowsList
+      orgId={orgId}
+      initialWorkflows={workflows}
+      templates={listTemplates()}
+      canManage={canManage}
+    />
+  );
 }

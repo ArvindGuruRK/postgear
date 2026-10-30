@@ -45,6 +45,10 @@ export interface BuilderApi {
   copy: (keys: string[]) => void;
   /** Right-click on a card, a note or the canvas. */
   contextMenu: (target: ContextTarget, at: ScreenPoint) => void;
+  /** Module 08: steps this builder's tests send for real (the red Live In Tests sticker). */
+  liveInTests?: ReadonlySet<string>;
+  /** Module 08: Test Step from a card's hover toolbar. */
+  testStep?: (key: string) => void;
 }
 
 export type ContextTarget =
@@ -61,4 +65,9 @@ export function useBuilder(): BuilderApi {
   const value = useContext(BuilderContext);
   if (!value) throw new Error('useBuilder must be used inside the workflow builder');
   return value;
+}
+
+/** Null outside the builder: a read-only canvas (a run or a version) has no builder. */
+export function useOptionalBuilder(): BuilderApi | null {
+  return useContext(BuilderContext);
 }

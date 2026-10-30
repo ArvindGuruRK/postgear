@@ -1,5 +1,6 @@
 /*
- * The workflow canvas (Sprint 10, Module 05).
+ * The workflow canvas (Sprint 10, Module 05), and the read-only run canvas
+ * (Module 08), which shares it.
  *
  * React Flow's own base rules (positioning, panes, handles) go in the base
  * layer, so the design system's Tailwind utilities always win over them.
@@ -82,6 +83,68 @@
     .pg-canvas.pg-tidying .react-flow__node {
       transition: none;
     }
+  }
+
+  /*
+   * A painted run (Module 08, blueprint 7.1 and 7.2). The line into a
+   * running step carries React Flow's `animated` class: its dashes flow
+   * from source to target on a 1 s loop. A line on the branch not taken is
+   * dashed (and faded by its group). A running step's icon tile has
+   * marching dashes and its stripe pulses; a step waiting for review pulses
+   * amber. Reduced motion keeps every look and stops every movement: the
+   * badge's words carry the state.
+   */
+  .pg-canvas .react-flow__edge.animated .pg-edge-path {
+    stroke-dasharray: 6 4;
+    animation: pg-flow 1s linear infinite;
+  }
+
+  .pg-canvas .pg-edge-skipped {
+    stroke-dasharray: 4 6;
+  }
+
+  .pg-canvas .pg-run-ants {
+    stroke-dasharray: 6 4;
+    animation: pg-flow 1s linear infinite;
+  }
+
+  .pg-canvas .pg-run-pulse {
+    animation: pg-run-pulse 1s ease-in-out infinite;
+  }
+
+  .pg-canvas .pg-run-waiting {
+    border: 3px solid var(--color-brutal-accent);
+    animation: pg-run-pulse 1.4s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pg-canvas .react-flow__edge.animated .pg-edge-path,
+    .pg-canvas .pg-run-ants,
+    .pg-canvas .pg-run-pulse,
+    .pg-canvas .pg-run-waiting {
+      animation: none;
+    }
+  }
+}
+
+@keyframes pg-flow {
+  from {
+    stroke-dashoffset: 20;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pg-run-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
   }
 }
 

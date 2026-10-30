@@ -22,7 +22,14 @@
  * publishing a second time.
  */
 
-import { decryptNullable, NotificationEmailStatus, prisma, State } from '@postgear/db';
+import { publishFailureReasonText } from '@postgear/automation';
+import {
+  decryptNullable,
+  NotificationEmailStatus,
+  type PrismaTransactionClient,
+  prisma,
+  State,
+} from '@postgear/db';
 import {
   backoffAfterAttempt,
   type PostPublishInput,
@@ -30,6 +37,8 @@ import {
   PUBLISH_RETRY_POLICY,
   type PublishFailureReason,
   type PublishSkipReason,
+  postFailedTriggerEventId,
+  postPublishedTriggerEventId,
   serializePublishStatus,
 } from '@postgear/scheduling';
 import {
@@ -44,13 +53,19 @@ import {
 } from '@postgear/social-core';
 import { ApplicationFailure, Context } from '@temporalio/activity';
 import {
+  enqueueAutomationRuns,
+  type PostTriggerPayload,
+  postLink,
+  startAutomationRuns,
+} from '../lib/automation-enqueue';
+import {
   buildPostDetails,
   orderChain,
   parseImageIds,
   previewOf,
   previousAttemptInFlight,
 } from '../lib/publish-details';
-import { enqueueWebhookDeliveries } from '../lib/webhook-payload';
+import { enqueueWebhookDeliveries, type WebhookPostPayload } from '../lib/webhook-payload';
 import { startWebhookDeliveries } from '../lib/webhook-start';
 import type { ActivityDeps } from './deps';
 
@@ -319,11 +334,17 @@ export function createPublishActivities(deps: ActivityDeps) {
       const now = new Date();
       const { root, rows, integration } = chain;
       const details = await renderChain(rows, input.organizationId, deps.publicUrl).catch(() => []);
+      // Sprint 10: the publish workflow's run id is the same for every retry
+      // of this activity and new when the post is queued again, so a replay
+      // starts no second workflow run and a fresh failure alerts again.
+      const { info } = Context.current();
+      const publishRunId = info.workflowExecution?.runId ?? info.activityId;
 
-      // One transaction for the rows, the error record, the notification and
-      // the webhook deliveries (Sprint 8), so a crash between them cannot
-      // leave a failed post that nobody was told about.
-      const deliveryIds = await prisma.$transaction(async (tx) => {
+      // One transaction for the rows, the error record, the notification,
+      // the webhook deliveries (Sprint 8) and the workflow runs (Sprint 10),
+      // so a crash between them cannot leave a failed post that nobody was
+      // told about.
+      const { deliveryIds, runIds } = await prisma.$transaction(async (tx) => {
         await tx.post.updateMany({
           where: {
             id: { in: rows.map((row) => row.id) },
@@ -381,28 +402,57 @@ export function createPublishActivities(deps: ActivityDeps) {
           });
         }
 
-        return enqueueWebhookDeliveries(tx, {
+        const post: WebhookPostPayload = {
+          id: root.group,
+          rootId: root.id,
+          state: 'ERROR',
+          publishAt: root.publishDate.toISOString(),
+          url: null,
+          preview: previewOf(details),
+          channel: {
+            id: integration.id,
+            name: integration.name,
+            provider: integration.providerIdentifier,
+          },
+        };
+        const error = { reason: input.reason, message: input.message, attempts: input.attempts };
+
+        const deliveryIds = await enqueueWebhookDeliveries(tx, {
           organizationId: input.organizationId,
           event: 'post.failed',
           integrationId: integration.id,
           subjectId: root.id,
-          post: {
-            id: root.group,
-            rootId: root.id,
-            state: 'ERROR',
-            publishAt: root.publishDate.toISOString(),
-            url: null,
-            preview: previewOf(details),
-            channel: { id: integration.id, name: integration.name, provider: integration.providerIdentifier },
-          },
-          error: { reason: input.reason, message: input.message, attempts: input.attempts },
+          post,
+          error,
           now,
         });
+
+        const tags = await rootTags(tx, input.organizationId, root.id);
+        const payload: PostTriggerPayload = {
+          post,
+          tags: tags.map((tag) => tag.name),
+          link: postLink(deps.env.WEB_URL, input.organizationId, root.group),
+          error: { ...error, reasonText: publishFailureReasonText(input.reason) },
+        };
+        const runIds = await enqueueAutomationRuns(tx, {
+          event: 'trigger.postFailed',
+          organizationId: input.organizationId,
+          triggerEventId: postFailedTriggerEventId(root.id, publishRunId),
+          payload,
+          filter: {
+            channelId: integration.id,
+            tagIds: tags.map((tag) => tag.id),
+            reason: input.reason,
+          },
+        });
+
+        return { deliveryIds, runIds };
       });
 
-      await startWebhookDeliveries(deps.temporalClient, input.organizationId, deliveryIds, (message, meta) =>
-        Context.current().log.warn(message, meta),
-      );
+      const warn = (message: string, meta: Record<string, unknown>) =>
+        Context.current().log.warn(message, meta);
+      await startWebhookDeliveries(deps.temporalClient, input.organizationId, deliveryIds, warn);
+      await startAutomationRuns(deps.temporalClient, input.organizationId, runIds, warn);
     },
   };
 }
@@ -562,7 +612,7 @@ async function writePublished(
   const releaseURL = first?.releaseURL ?? null;
   const now = new Date();
 
-  const deliveryIds = await prisma.$transaction(async (tx) => {
+  const { deliveryIds, runIds } = await prisma.$transaction(async (tx) => {
     for (const row of rows) {
       const result = byRow.get(row.id);
       await tx.post.updateMany({
@@ -595,27 +645,70 @@ async function writePublished(
       },
     });
 
-    return enqueueWebhookDeliveries(tx, {
+    const post: WebhookPostPayload = {
+      id: root.group,
+      rootId: root.id,
+      state: 'PUBLISHED',
+      publishAt: root.publishDate.toISOString(),
+      url: releaseURL,
+      preview,
+      channel: {
+        id: integration.id,
+        name: integration.name,
+        provider: integration.providerIdentifier,
+      },
+    };
+
+    const deliveryIds = await enqueueWebhookDeliveries(tx, {
       organizationId: input.organizationId,
       event: 'post.published',
       integrationId: integration.id,
       subjectId: root.id,
-      post: {
-        id: root.group,
-        rootId: root.id,
-        state: 'PUBLISHED',
-        publishAt: root.publishDate.toISOString(),
-        url: releaseURL,
-        preview,
-        channel: { id: integration.id, name: integration.name, provider: integration.providerIdentifier },
-      },
+      post,
       now,
     });
+
+    // Sprint 10: Post Published workflows, once per chain root.
+    const tags = await rootTags(tx, input.organizationId, root.id);
+    const payload: PostTriggerPayload = {
+      post,
+      tags: tags.map((tag) => tag.name),
+      link: postLink(deps.env.WEB_URL, input.organizationId, root.group),
+      publishedAt: now.toISOString(),
+    };
+    const runIds = await enqueueAutomationRuns(tx, {
+      event: 'trigger.postPublished',
+      organizationId: input.organizationId,
+      triggerEventId: postPublishedTriggerEventId(root.id),
+      payload,
+      filter: { channelId: integration.id, tagIds: tags.map((tag) => tag.id) },
+    });
+
+    return { deliveryIds, runIds };
   });
 
-  await startWebhookDeliveries(deps.temporalClient, input.organizationId, deliveryIds, (message, meta) =>
-    Context.current().log.warn(message, meta),
-  );
+  const warn = (message: string, meta: Record<string, unknown>) =>
+    Context.current().log.warn(message, meta);
+  await startWebhookDeliveries(deps.temporalClient, input.organizationId, deliveryIds, warn);
+  await startAutomationRuns(deps.temporalClient, input.organizationId, runIds, warn);
+}
+
+/**
+ * The live tags of a chain root, in the order the composer shows them
+ * (tags hang off the root only). Workflow trigger filters read the ids, the
+ * trigger's data carries the names.
+ */
+async function rootTags(
+  tx: PrismaTransactionClient,
+  organizationId: string,
+  rootId: string,
+): Promise<{ id: string; name: string }[]> {
+  const links = await tx.tagsPosts.findMany({
+    where: { postId: rootId, tag: { orgId: organizationId, deletedAt: null } },
+    orderBy: [{ createdAt: 'asc' }, { tagId: 'asc' }],
+    select: { tag: { select: { id: true, name: true } } },
+  });
+  return links.map((link) => link.tag);
 }
 
 /**

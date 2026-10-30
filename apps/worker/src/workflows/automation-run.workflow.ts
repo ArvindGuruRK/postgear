@@ -34,6 +34,17 @@
  * - A plain failure with On Error `stop` only ends its branch; `planNext`
  *   skips what depends on it and the other branches finish.
  *
+ * ## Scheduled runs and retries (Modules 08 and 09)
+ *
+ * - A Temporal Schedule starts this workflow with `{ scheduled }` instead of
+ *   a run id: `startScheduledRun` creates the run row first (once per
+ *   scheduled time, read from the `TemporalScheduledStartTime` search
+ *   attribute), then the run goes on as any other. A workflow that is no
+ *   longer on, or on another version, ends without a run.
+ * - A Retry From Here run starts with its seeded steps already finished
+ *   (`plan.seeded`, with the ports they fired): they never run again, and
+ *   the interpreter carries on from the retried step.
+ *
  * ## Versioning
  *
  * Runs wait up to 30 days. A change that would make an asleep run take a
@@ -53,14 +64,16 @@ import {
 } from '@postgear/automation';
 import {
   AUTOMATION_SLOT_RETRY_MS,
-  type AutomationRunInput,
   type AutomationRunOutcome,
+  type AutomationRunWorkflowInput,
   type AutomationSkipReason,
   CANCEL_SIGNAL,
+  isScheduledRunInput,
   REVIEW_DECISION_SIGNAL,
   type ReviewDecision,
   type ReviewDecisionPayload,
 } from '@postgear/scheduling';
+import { defineSearchAttributeKey, SearchAttributeType } from '@temporalio/common';
 import {
   ActivityFailure,
   CancellationScope,
@@ -69,6 +82,8 @@ import {
   isCancellation,
   proxyActivities,
   setHandler,
+  type WorkflowInfo,
+  workflowInfo,
 } from '@temporalio/workflow';
 import type { AutomationActivities, RunRef, StepRef } from '../automation/activity-contract';
 import {
@@ -85,6 +100,7 @@ export const REVIEW_EXPIRED_MESSAGE = `No one answered the review within ${LIMIT
 export const STEP_MISSING_MESSAGE = 'This step is no longer in the workflow.';
 
 const {
+  startScheduledRun,
   loadRunPlan,
   claimRunSlot,
   recordSkipped,
@@ -98,6 +114,27 @@ const {
 
 export type AutomationRunResult = { outcome: AutomationRunOutcome | 'skipped' };
 
+/** Set by Temporal on every workflow a Schedule starts: the time it was meant to start. */
+const SCHEDULED_START_TIME = defineSearchAttributeKey(
+  'TemporalScheduledStartTime',
+  SearchAttributeType.DATETIME,
+);
+
+/**
+ * When a scheduled run was meant to start (ISO): the search attribute the
+ * Schedule sets, else the workflow's own start time. A late or retried start
+ * keeps the scheduled time, so its run row is the same one.
+ */
+export function scheduledStartIso(info: WorkflowInfo): string {
+  let at: Date | undefined;
+  try {
+    at = info.typedSearchAttributes.get(SCHEDULED_START_TIME);
+  } catch {
+    at = undefined;
+  }
+  return (at instanceof Date && !Number.isNaN(at.getTime()) ? at : info.startTime).toISOString();
+}
+
 /** Why a run stops early, other than the cancel signal. */
 interface StopState {
   /** A Manual Review waited `reviewTimeoutDays` without an answer. */
@@ -109,10 +146,8 @@ interface StopState {
 }
 
 export async function automationRunWorkflow(
-  input: AutomationRunInput,
+  input: AutomationRunWorkflowInput,
 ): Promise<AutomationRunResult> {
-  const run: RunRef = { runId: input.runId, organizationId: input.organizationId };
-
   let cancelled = false;
   const decisions = new Map<string, ReviewDecision>();
   let reviewKeys: ReadonlySet<string> | null = null;
@@ -128,6 +163,23 @@ export async function automationRunWorkflow(
     if (payload.decision !== 'approved' && payload.decision !== 'rejected') return;
     decisions.set(payload.nodeKey, payload.decision);
   });
+
+  // A Schedule's start: the run row is made here, once per scheduled time.
+  let run: RunRef;
+  if (isScheduledRunInput(input)) {
+    const info = workflowInfo();
+    const started = await startScheduledRun({
+      organizationId: input.organizationId,
+      automationId: input.scheduled.automationId,
+      versionId: input.scheduled.versionId,
+      workflowId: info.workflowId,
+      scheduledAt: scheduledStartIso(info),
+    });
+    if ('skip' in started) return { outcome: 'skipped' };
+    run = { runId: started.runId, organizationId: input.organizationId };
+  } else {
+    run = { runId: input.runId, organizationId: input.organizationId };
+  }
 
   let stepCount = 0;
 
@@ -172,6 +224,13 @@ export async function automationRunWorkflow(
 
     /** Per step: what `planNext` needs, nothing more. */
     const state: Record<string, PlanStepState> = {};
+
+    // Retry From Here: seeded steps start finished and never run again.
+    if (scope.kind === 'run' && plan.seeded) {
+      for (const [key, seeded] of Object.entries(plan.seeded)) {
+        if (index.nodes.has(key)) state[key] = { status: seeded.status, ports: [...seeded.ports] };
+      }
+    }
 
     /**
      * A step test runs its one step; its upstream data was seeded on the

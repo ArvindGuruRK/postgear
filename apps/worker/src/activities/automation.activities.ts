@@ -14,6 +14,7 @@
 import {
   type GraphNode,
   getDefinition,
+  isPortId,
   LIMITS,
   type PortId,
   redact,
@@ -23,8 +24,10 @@ import {
 } from '@postgear/automation';
 import {
   AUTOMATION_FAILURE_TYPES,
+  AUTOMATION_NOTIFICATION_TYPES,
   type AutomationSkipReason,
   type AutomationStepError,
+  scheduleTriggerEventId,
 } from '@postgear/scheduling';
 import { Context } from '@temporalio/activity';
 import type {
@@ -33,7 +36,10 @@ import type {
   NodeRunResult,
   RunPlan,
   RunRef,
+  SeededStep,
   SettleFailureInput,
+  StartScheduledRunInput,
+  StartScheduledRunResult,
   StepRef,
 } from '../automation/activity-contract';
 import {
@@ -50,7 +56,7 @@ import {
   stepRow,
 } from '../automation/engine';
 import { EXECUTORS } from '../automation/executors';
-import { runLink } from '../automation/executors/in-app';
+import { reviewLink } from '../automation/executors/in-app';
 import type { ExecLog, ExecutorRegistry } from '../automation/executors/types';
 import {
   codeOfType,
@@ -62,10 +68,15 @@ import {
 import { finalizeRun, OUTCOME_STATUS } from '../automation/finish';
 import { PrismaRunStore } from '../automation/prisma-run-store';
 import type { RunStore, StepRecord } from '../automation/run-store';
-import { missingRequired, readRunOptions, runMode } from '../automation/scope';
+import {
+  missingRequired,
+  readRunOptions,
+  runMode,
+  runTimeZone,
+  triggerOf,
+} from '../automation/scope';
+import { deleteAutomationSchedule } from '../lib/automation-schedules';
 import type { ActivityDeps } from './deps';
-
-export const REVIEW_NOTIFICATION_TYPE = 'automation.review';
 
 const DAY_MS = 24 * 60 * 60_000;
 const UNIT_MS = { minutes: 60_000, hours: 60 * 60_000, days: DAY_MS } as const;
@@ -167,6 +178,31 @@ function delayEnd(config: Record<string, unknown>, at: Date): number {
   return at.getTime() + amount * unit;
 }
 
+/**
+ * Retry From Here (Module 08): the steps a retry starts with as finished.
+ * `handled` when the row the API copied in is HANDLED_ERROR, so `planNext`
+ * reads it the way the first run did.
+ */
+async function seededSteps(
+  store: RunStore,
+  ref: RunRef,
+  ports: Record<string, string[]>,
+  nodes: readonly GraphNode[],
+): Promise<Record<string, SeededStep>> {
+  const keys = new Set(nodes.map((node) => node.key));
+  const rows = await store.listSteps(ref);
+  const seeded: Record<string, SeededStep> = {};
+  for (const [nodeKey, fired] of Object.entries(ports)) {
+    if (!keys.has(nodeKey)) continue;
+    const latest = latestOf(rows.filter((row) => row.nodeKey === nodeKey));
+    seeded[nodeKey] = {
+      status: latest?.status === 'HANDLED_ERROR' ? 'handled' : 'succeeded',
+      ports: fired.filter(isPortId),
+    };
+  }
+  return seeded;
+}
+
 export function createAutomationActivities(
   deps: ActivityDeps,
   options: AutomationActivityOptions = {},
@@ -185,6 +221,46 @@ export function createAutomationActivities(
   };
 
   return {
+    async startScheduledRun(input: StartScheduledRunInput): Promise<StartScheduledRunResult> {
+      const automation = await store.loadAutomation(input.organizationId, input.automationId);
+      if (
+        !automation ||
+        automation.deleted ||
+        automation.status !== 'ACTIVE' ||
+        automation.activeVersionId !== input.versionId
+      ) {
+        return { skip: true, reason: 'notActive' };
+      }
+
+      let graph: ReturnType<typeof upgradeGraph>;
+      try {
+        graph = upgradeGraph(
+          await store.loadVersionGraph(input.organizationId, input.automationId, input.versionId),
+        );
+      } catch {
+        return { skip: true, reason: 'notSchedule' };
+      }
+      if (triggerOf(graph)?.type !== 'trigger.schedule') {
+        return { skip: true, reason: 'notSchedule' };
+      }
+
+      const row = await store.createLiveRun({
+        organizationId: input.organizationId,
+        automationId: input.automationId,
+        versionId: input.versionId,
+        triggerType: 'trigger.schedule',
+        triggerEventId: scheduleTriggerEventId(input.automationId, input.scheduledAt),
+        // The Schedule trigger's output shape: `scheduledFor`, `timeZone`.
+        triggerPayload: { scheduledFor: input.scheduledAt, timeZone: runTimeZone(graph) },
+        temporalWorkflowId: input.workflowId,
+      });
+      // Another workflow already runs this scheduled time: never run it twice.
+      if (row.temporalWorkflowId && row.temporalWorkflowId !== input.workflowId) {
+        return { skip: true, reason: 'otherWorkflow' };
+      }
+      return { runId: row.id };
+    },
+
     async loadRunPlan(input: RunRef): Promise<RunPlan> {
       let run = await store.loadRun(input);
       if (!run) return { skip: true, reason: 'gone' };
@@ -217,6 +293,9 @@ export function createAutomationActivities(
       }
 
       const runOptions = readRunOptions(run.options);
+      const seeded = runOptions.retry
+        ? await seededSteps(store, input, runOptions.retry.ports, graph.nodes)
+        : undefined;
       return {
         skip: false,
         graph,
@@ -224,6 +303,7 @@ export function createAutomationActivities(
         scope: runOptions.scope,
         // Only test runs hold anything back; a live run sends everything.
         sendForReal: runOptions.sendForReal,
+        ...(seeded ? { seeded } : {}),
       };
     },
 
@@ -267,6 +347,7 @@ export function createAutomationActivities(
           startedAt: null,
           finishedAt: at,
           durationMs: null,
+          ports: [],
         });
       }
     },
@@ -318,6 +399,7 @@ export function createAutomationActivities(
             startedAt: null,
             finishedAt: at,
             durationMs: null,
+            ports: [],
           });
         }
         rows = await store.listSteps(input, input.nodeKey);
@@ -331,7 +413,11 @@ export function createAutomationActivities(
           input,
           { runId: input.runId, nodeKey: input.nodeKey, attempt: latest.attempt },
           ['FAILED'],
-          { status: 'HANDLED_ERROR', output: { error: { message, code } } },
+          {
+            status: 'HANDLED_ERROR',
+            output: { error: { message, code } },
+            ports: [input.mode === 'branch' ? 'error' : 'out'],
+          },
         );
       }
 
@@ -384,6 +470,7 @@ export function createAutomationActivities(
                 startedAt: at,
                 finishedAt: at,
                 durationMs: 0,
+                ports: ['out'],
               }),
             );
             return { waitMs: 0 };
@@ -458,6 +545,7 @@ export function createAutomationActivities(
                 startedAt: at,
                 finishedAt: at,
                 durationMs: 0,
+                ports: ['approved'],
               }),
             );
             return { waiting: false };
@@ -478,10 +566,10 @@ export function createAutomationActivities(
             await tx.updateRun(input, ['RUNNING'], { status: 'WAITING' });
             await tx.createNotification({
               organizationId: run.organizationId,
-              type: REVIEW_NOTIFICATION_TYPE,
+              type: AUTOMATION_NOTIFICATION_TYPES.review,
               title: mode === 'test' ? 'Review needed (Test)' : 'Review needed',
               content: `Your ${run.automationName} is ready for review.`,
-              link: runLink(run.organizationId, run.automationId, run.id),
+              link: reviewLink(run.organizationId, run.automationId, run.id),
               meta: {
                 automationId: run.automationId,
                 automationName: run.automationName,
@@ -540,7 +628,13 @@ export function createAutomationActivities(
           input,
           { runId: input.runId, nodeKey: input.nodeKey, attempt: waiting.attempt },
           ['WAITING'],
-          { status: 'SUCCEEDED', output, finishedAt: at, durationMs: since(waiting.startedAt, at) },
+          {
+            status: 'SUCCEEDED',
+            output,
+            finishedAt: at,
+            durationMs: since(waiting.startedAt, at),
+            ports: [...ports],
+          },
         );
         // The run waits on as long as another Manual Review is still open.
         const open = (await tx.listSteps(input)).some(
@@ -560,17 +654,34 @@ export function createAutomationActivities(
         input,
         { runId: input.runId, nodeKey: input.nodeKey, attempt: waiting.attempt },
         ['WAITING'],
-        { status: 'SUCCEEDED', finishedAt: at, durationMs: since(waiting.startedAt, at) },
+        {
+          status: 'SUCCEEDED',
+          finishedAt: at,
+          durationMs: since(waiting.startedAt, at),
+          ports: ['out'],
+        },
       );
     },
 
     async finishRun(input: FinishRunInput): Promise<void> {
-      await finalizeRun(store, input, {
+      const result = await finalizeRun(store, input, {
         status: OUTCOME_STATUS[input.outcome],
         stepCount: input.stepCount,
         finishedAt: now(),
         ...(input.error ? { error: input.error } : {}),
       });
+      // Auto-paused (Module 09): no more scheduled runs. Best effort: the
+      // maintenance reconcile deletes a schedule whose workflow is not active.
+      if (result.finished && result.paused) {
+        try {
+          await deleteAutomationSchedule(await deps.temporalClient(), result.automationId);
+        } catch (error) {
+          log.warn('automation.schedule_delete_failed', {
+            automationId: result.automationId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
     },
   } satisfies AutomationActivities;
 }

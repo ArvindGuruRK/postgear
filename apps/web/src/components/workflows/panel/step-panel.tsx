@@ -36,6 +36,7 @@ import { FIELD_PATH_ATTRIBUTE, type FieldContext } from '../fields/contract';
 import type { PinControls } from './output-pane';
 import { keepKeysInPanel } from './panel-keys';
 import { type FocusRequest, StepTabs } from './step-tabs';
+import type { StepTestControls } from './test-tab';
 
 export { ON_ERROR_OPTIONS } from './step-tabs';
 
@@ -112,6 +113,10 @@ export interface StepPanelProps {
   renameSignal: number;
   /** Land on a field (the issues list, Finish Setup, a deep link). */
   focus?: FocusRequest | null;
+  /** Module 08: Test Step, its result and Send For Real In Tests. */
+  test?: StepTestControls;
+  /** Bumped to show the Test tab. */
+  showTest?: number;
 }
 
 export function StepPanel({
@@ -125,6 +130,8 @@ export function StepPanel({
   onExpand,
   renameSignal,
   focus = null,
+  test,
+  showTest,
 }: StepPanelProps) {
   const def = getDefinition(node.type, node.typeVersion);
   const nameField = useRef<HTMLInputElement>(null);
@@ -198,6 +205,8 @@ export function StepPanel({
           pin={pin}
           focus={focus}
           onFocusName={focusName}
+          test={test}
+          showTest={showTest}
         />
       </div>
     </aside>

@@ -3,8 +3,11 @@
  * automation.
  *
  * `@Roles(ADMIN, USER)`: any member builds and edits workflows, as any member
- * writes posts. Turning one on or off is admin only, because a live workflow
- * acts for the whole workspace (it publishes, messages, spends credits).
+ * writes posts, and may Discard Changes or Restore As Draft (they only
+ * touch the draft). Turning one on or off is admin only, because a live
+ * workflow acts for the whole workspace (it publishes, messages, spends
+ * credits); deleting an active one is too (checked in the service, since a
+ * member may delete a draft through the same route).
  * Every handler scopes on `@CurrentOrg()`; the `:id` in a path is only the
  * workflow being acted on.
  *
@@ -35,12 +38,16 @@ import { ZodBody, ZodQuery } from '../../common/pipes/zod-validation.pipe';
 import { AUTOMATION_MESSAGES } from './automations.messages';
 import { AutomationsService } from './automations.service';
 import {
+  type ActivateAutomationInput,
+  activateAutomationSchema,
   type CreateAutomationInput,
   createAutomationSchema,
   type ListAutomationsQuery,
   listAutomationsQuerySchema,
   type PinDataInput,
   pinDataSchema,
+  type RestoreVersionInput,
+  restoreVersionSchema,
   type UpdateAutomationInput,
   updateAutomationSchema,
 } from './dto/automations.schema';
@@ -97,9 +104,10 @@ export class AutomationsController {
     return { automation: await this.automations.update(org.id, user.id, id, dto) };
   }
 
+  /** Members delete drafts and paused workflows; an active one is admin only (403). */
   @Delete(':id')
   async remove(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
-    await this.automations.remove(org.id, id);
+    await this.automations.remove(org.id, org.role, id);
     return { message: AUTOMATION_MESSAGES.DELETED };
   }
 
@@ -140,18 +148,69 @@ export class AutomationsController {
     return { message: AUTOMATION_MESSAGES.UNPINNED };
   }
 
-  /** Module 09. Admin only already, so the guard is in place before the behaviour. */
+  /**
+   * Turn On, or Activate Changes (Module 09). 409 `automation_conflict` on a
+   * stale revision; 422 `activation_blocked`, `confirm_automatic_posting` or
+   * `schedule_too_frequent`. 200 with `warnings` when the schedule could not
+   * be set up yet.
+   */
   @Post(':id/activate')
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
-  activate(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
-    return this.automations.activate(org.id, id);
+  activate(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body(new ZodBody(activateAutomationSchema, 'automations/activate'))
+    dto: ActivateAutomationInput,
+  ) {
+    return this.automations.activate(org.id, user.id, id, dto);
   }
 
+  /** Turn Off: deletes the schedule; runs in progress finish. */
   @Post(':id/pause')
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
-  pause(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
-    return this.automations.pause(org.id, id);
+  async pause(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
+    return { automation: await this.automations.pause(org.id, id) };
+  }
+
+  /** Discard Changes: the draft becomes the live version. 409 `no_active_version`. */
+  @Post(':id/discard')
+  @HttpCode(HttpStatus.OK)
+  async discard(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return { automation: await this.automations.discard(org.id, user.id, id) };
+  }
+
+  /** Versions are read here and never changed: no route updates or deletes one. */
+  @Get(':id/versions')
+  async versions(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
+    return { versions: await this.automations.versions(org.id, id) };
+  }
+
+  @Get(':id/versions/:version')
+  async version(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('id') id: string,
+    @Param('version') version: string,
+  ) {
+    return { version: await this.automations.version(org.id, id, version) };
+  }
+
+  /** Restore As Draft: writes the draft only (revision checked); what is live never changes. */
+  @Post(':id/versions/:version/restore')
+  @HttpCode(HttpStatus.OK)
+  async restore(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('version') version: string,
+    @Body(new ZodBody(restoreVersionSchema, 'automations/restore')) dto: RestoreVersionInput,
+  ) {
+    return { automation: await this.automations.restore(org.id, user.id, id, version, dto) };
   }
 }

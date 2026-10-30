@@ -37,6 +37,11 @@ const envSchema = z
     API_URL: z.string().url().default('http://localhost:3001'),
     S3_PUBLIC_URL: z.string().url().optional(),
 
+    // The web app, for links in workflow data (Sprint 10, Module 09: a
+    // post's PostGear link that a Slack step can send). Same variable as the
+    // API's.
+    WEB_URL: z.string().url().default('http://localhost:3000'),
+
     /**
      * Publish to a stand-in instead of real platforms.
      *

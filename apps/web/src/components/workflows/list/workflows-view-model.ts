@@ -69,6 +69,29 @@ export function usesText(template: Pick<TemplateSummary, 'needs'>): string | nul
   return names.length ? `Uses: ${names.join(', ')}` : null;
 }
 
+export type RowAction = 'open' | 'duplicate' | 'activate' | 'pause' | 'delete';
+
+/**
+ * A row's menu (blueprint 9): Open, Duplicate, then Activate or Pause for
+ * workspace admins only (members cannot turn workflows on or off), then
+ * Delete.
+ */
+export function rowActions(
+  item: Pick<AutomationListItem, 'status'>,
+  canManage: boolean,
+): RowAction[] {
+  const live: RowAction[] = canManage ? [item.status === 'ACTIVE' ? 'pause' : 'activate'] : [];
+  return ['open', 'duplicate', ...live, 'delete'];
+}
+
+export const ROW_ACTION_LABELS: Record<RowAction, string> = {
+  open: 'Open',
+  duplicate: 'Duplicate',
+  activate: 'Activate',
+  pause: 'Pause',
+  delete: 'Delete',
+};
+
 /** The delete confirm's sentence, warning when the workflow is on. */
 export function deleteWorkflowWarning(item: Pick<AutomationListItem, 'status'>): string {
   return item.status === 'ACTIVE'

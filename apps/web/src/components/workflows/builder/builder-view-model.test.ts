@@ -1,6 +1,13 @@
 import { getTemplate, instantiateTemplate, validateGraph } from '@postgear/automation';
 import type { Connection } from '@/types/workflows';
-import { issuesChip, setupItems, validationContext } from './builder-view-model';
+import {
+  builderSearch,
+  initialTab,
+  issuesChip,
+  setupItems,
+  structureKey,
+  validationContext,
+} from './builder-view-model';
 
 function report() {
   const template = getTemplate('publishing-report');
@@ -74,5 +81,47 @@ describe('builder view model', () => {
     const issues = validateGraph(graph, validationContext([], []));
     const slackItem = setupItems(graph, issues).find((item) => item.nodeKey === 'slack');
     expect(slackItem?.issue.field).toBe('connectionId');
+  });
+});
+
+describe('builder tabs and the painted run', () => {
+  it('opens the Runs tab for ?tab=runs or a ?run= link alone', () => {
+    expect(initialTab('runs', null)).toBe('runs');
+    expect(initialTab(undefined, 'run-1')).toBe('runs');
+    expect(initialTab(undefined, undefined)).toBe('editor');
+    expect(initialTab('editor', '')).toBe('editor');
+  });
+
+  it('writes its own params and keeps the others', () => {
+    expect(
+      builderSearch('?step=slack&tab=runs&run=r1&review=1', {
+        tab: 'editor',
+        runId: 'r1',
+        review: true,
+      }),
+    ).toBe('?step=slack');
+    expect(builderSearch('', { tab: 'runs', runId: 'r2', review: true })).toBe(
+      '?tab=runs&run=r2&review=1',
+    );
+    expect(builderSearch('?setup=1', { tab: 'runs', runId: null, review: true })).toBe(
+      '?setup=1&tab=runs',
+    );
+  });
+
+  it('changes its structure key on a new step or line, not on a move or an edit', () => {
+    const graph = report();
+    const key = structureKey(graph);
+    const moved = {
+      ...graph,
+      nodes: graph.nodes.map((node) => ({ ...node, position: { x: node.position.x + 48, y: 0 } })),
+    };
+    const edited = {
+      ...graph,
+      nodes: graph.nodes.map((node) => ({ ...node, config: { ...node.config, extra: 1 } })),
+    };
+    expect(structureKey(moved)).toBe(key);
+    expect(structureKey(edited)).toBe(key);
+    expect(structureKey({ ...graph, edges: graph.edges.slice(1) })).not.toBe(key);
+    expect(structureKey({ ...graph, nodes: graph.nodes.slice(1) })).not.toBe(key);
   });
 });

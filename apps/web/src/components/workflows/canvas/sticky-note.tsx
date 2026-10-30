@@ -5,12 +5,15 @@
  * markdown, resizable when selected. Double-click to write in it; it saves
  * when the text field loses focus. Notes are never validated and never run.
  * Moved by its top strip, so selecting text in it does not drag it.
+ *
+ * Outside the builder or on a read-only canvas (Module 08) it only reads.
  */
 import { NOTE_COLOURS, type NoteColour } from '@postgear/automation';
 import { cn } from '@postgear/ui';
 import { type NodeProps, NodeResizer } from '@xyflow/react';
 import { memo, useEffect, useRef, useState } from 'react';
-import { useBuilder } from '../builder/builder-context';
+import { useOptionalBuilder } from '../builder/builder-context';
+import { useCanvasMode } from './canvas-mode';
 import { NOTE_COLOUR_NAMES, NOTE_FILL, NOTE_TEXT, type NoteFlowNode } from './flow-model';
 import { NoteText } from './note-text';
 
@@ -20,7 +23,10 @@ export const StickyNoteCard = memo(function StickyNoteCard({
   data,
   selected,
 }: NodeProps<NoteFlowNode>) {
-  const builder = useBuilder();
+  const builder = useOptionalBuilder();
+  const mode = useCanvasMode();
+  // The builder's editing hands: none on a read-only canvas.
+  const editor = mode.readOnly ? null : builder;
   const { note } = data;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.text);
@@ -36,8 +42,8 @@ export const StickyNoteCard = memo(function StickyNoteCard({
 
   function save() {
     setEditing(false);
-    if (draft !== note.text) {
-      builder.dispatch({
+    if (editor && draft !== note.text) {
+      editor.dispatch({
         type: 'updateNote',
         id: note.id,
         patch: { text: draft },
@@ -47,7 +53,7 @@ export const StickyNoteCard = memo(function StickyNoteCard({
   }
 
   function colour(next: NoteColour) {
-    builder.dispatch({ type: 'updateNote', id: note.id, patch: { colour: next }, now: Date.now() });
+    editor?.dispatch({ type: 'updateNote', id: note.id, patch: { colour: next }, now: Date.now() });
   }
 
   return (
@@ -59,14 +65,17 @@ export const StickyNoteCard = memo(function StickyNoteCard({
         NOTE_TEXT[note.colour],
         selected ? 'outline-solid outline-[3px] outline-offset-2 outline-focusRing' : '',
       )}
-      onDoubleClick={() => setEditing(true)}
+      onDoubleClick={() => {
+        if (editor) setEditing(true);
+      }}
       onContextMenu={(event) => {
+        if (!editor) return;
         event.preventDefault();
-        builder.contextMenu({ kind: 'note', id: note.id }, { x: event.clientX, y: event.clientY });
+        editor.contextMenu({ kind: 'note', id: note.id }, { x: event.clientX, y: event.clientY });
       }}
     >
       <NodeResizer
-        isVisible={selected && !builder.locked}
+        isVisible={selected && editor !== null && !editor.locked}
         minWidth={80}
         minHeight={40}
         maxWidth={2_000}
@@ -74,7 +83,7 @@ export const StickyNoteCard = memo(function StickyNoteCard({
         lineClassName="border-focusRing!"
         handleClassName="h-2.5! w-2.5! rounded-sm! border-2! border-outline! bg-secondary!"
         onResizeEnd={(_event, params) =>
-          builder.dispatch({
+          editor?.dispatch({
             type: 'updateNote',
             id: note.id,
             patch: {
@@ -85,8 +94,13 @@ export const StickyNoteCard = memo(function StickyNoteCard({
           })
         }
       />
-      <div className="pg-note-handle flex h-6 shrink-0 cursor-grab items-center justify-end gap-1 border-b-2 border-outline px-1.5">
-        {selected
+      <div
+        className={cn(
+          'pg-note-handle flex h-6 shrink-0 items-center justify-end gap-1 border-b-2 border-outline px-1.5',
+          editor ? 'cursor-grab' : '',
+        )}
+      >
+        {selected && editor
           ? NOTE_COLOURS.map((option) => (
               <button
                 key={option}
@@ -103,7 +117,7 @@ export const StickyNoteCard = memo(function StickyNoteCard({
             ))
           : null}
       </div>
-      {editing ? (
+      {editing && editor ? (
         <textarea
           ref={field}
           value={draft}
@@ -124,9 +138,9 @@ export const StickyNoteCard = memo(function StickyNoteCard({
         <div className="nowheel h-full overflow-auto p-2 font-sans text-sm">
           {note.text ? (
             <NoteText text={note.text} />
-          ) : (
+          ) : editor ? (
             <span className="opacity-70">Double-click to write a note.</span>
-          )}
+          ) : null}
         </div>
       )}
     </div>

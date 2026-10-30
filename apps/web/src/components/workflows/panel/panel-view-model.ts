@@ -11,6 +11,7 @@ import {
   type DataGroup,
   type FieldType,
   type GraphNode,
+  getDefinition,
   humanise,
   isTriggerType,
   type OutputField,
@@ -21,7 +22,7 @@ import {
   topologicalOrder,
   triggerSample,
 } from '@postgear/automation';
-import type { PinnedStep } from '@/types/workflows';
+import type { AutomationStepStatus, PinnedStep, RunStep } from '@/types/workflows';
 import type { DataSource } from '../fields/contract';
 
 // ---- Copy ----------------------------------------------------------------------------
@@ -40,24 +41,60 @@ export const CLICK_A_FIELD_FIRST =
 
 // ---- The data fields see ---------------------------------------------------------------
 
+/** A step's latest test result as the panes show it (Module 08). */
+export interface StepRunResult {
+  step: RunStep;
+  runId: string;
+  /** When it ran (finished, else last changed): "Last Test 14:02". */
+  at: string;
+  /** From the test running now. */
+  live: boolean;
+}
+
+/** Results later steps read, as the worker's run scope does. */
+const OUTPUT_STATUSES: ReadonlySet<AutomationStepStatus> = new Set([
+  'SUCCEEDED',
+  'DRY_RUN',
+  'HANDLED_ERROR',
+]);
+
+/** Whether a result hands data on to the steps after it. */
+export function handsDataOn(result: StepRunResult | undefined): result is StepRunResult {
+  return (
+    result !== undefined &&
+    OUTPUT_STATUSES.has(result.step.status) &&
+    result.step.output !== undefined &&
+    result.step.output !== null
+  );
+}
+
 /**
  * Data for chips, Insert Data and the Input pane: each step's pinned data
- * when this browser knows it, else the built-in sample (Module 02). The
- * last test run joins in Module 08. `scopeSource` says where each step's
- * data came from, keyed by step key (and `trigger` for the trigger).
+ * when this browser knows it, else its output in the last test run (Module
+ * 08), else the built-in sample (Module 02). `scopeSource` says where each
+ * step's data came from, keyed by step key (and `trigger` for the trigger).
  */
 export function buildScope(
   graph: AutomationGraph,
   pinned: readonly PinnedStep[],
   workspaceName?: string,
+  lastTest: Readonly<Record<string, StepRunResult>> = {},
 ): { scope: RunScope; scopeSource: Record<string, DataSource> } {
   const base = sampleScope(graph, workspaceName);
   const trigger = graph.nodes.find((node) => isTriggerType(node.type));
   const nodes: Record<string, { output?: unknown } | undefined> = { ...(base.nodes ?? {}) };
   let triggerData = base.trigger;
   const scopeSource: Record<string, DataSource> = {};
-  for (const node of graph.nodes) scopeSource[node.key] = { kind: 'sample' };
+  for (const node of graph.nodes) {
+    scopeSource[node.key] = { kind: 'sample' };
+    const result = lastTest[node.key];
+    if (node.disabled || !handsDataOn(result)) continue;
+    if (node.key === trigger?.key) triggerData = result.step.output;
+    else nodes[node.key] = { output: result.step.output };
+    scopeSource[node.key] = { kind: 'lastTest', at: result.at };
+  }
 
+  // Pinned data wins: tests use it instead of running the step.
   for (const pin of pinned) {
     if (pin.output === undefined) continue;
     const node = graph.nodes.find((candidate) => candidate.key === pin.nodeKey);
@@ -407,4 +444,120 @@ export function checkPinnedShape(
     }
   }
   return { error: null, warnings };
+}
+
+// ---- The Test tab (Module 08) ------------------------------------------------------------
+
+function sourceWords(source: DataSource | undefined): string {
+  if (source?.kind === 'pinned') return 'pinned data';
+  if (source?.kind === 'lastTest') return "the last test's data";
+  return 'sample data';
+}
+
+/**
+ * Where Test Step's input comes from, as the API seeds it (pinned data,
+ * else the last test, else a sample), for the steps right before this one:
+ * "Using: pinned data from Set Fields." Null when nothing comes before it.
+ */
+export function inputSourceLine(
+  graph: AutomationGraph,
+  nodeKey: string,
+  scopeSource: Readonly<Record<string, DataSource>>,
+): string | null {
+  const node = graph.nodes.find((candidate) => candidate.key === nodeKey);
+  if (!node) return null;
+  if (isTriggerType(node.type)) {
+    const source = scopeSource[node.key];
+    if (source?.kind === 'pinned') return 'Using: the data pinned on this trigger.';
+    if (source?.kind === 'lastTest') return "Using: the last test's data.";
+    return 'Using: a built-in sample.';
+  }
+  const parents = new Set(
+    graph.edges.filter((edge) => edge.target === nodeKey).map((edge) => edge.source),
+  );
+  const order = walkOrder(graph).filter((key) => parents.has(key));
+  if (order.length === 0) return null;
+  const parts = order.map((key) => {
+    const name = graph.nodes.find((candidate) => candidate.key === key)?.name ?? 'an earlier step';
+    return `${sourceWords(scopeSource[key])} from ${name}`;
+  });
+  const list =
+    parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+  return `Using: ${list}.`;
+}
+
+/** Steps that leave PostGear (or publish): they run dry in tests unless sent for real. */
+export function runsDryInTests(node: Pick<GraphNode, 'type' | 'typeVersion'>): boolean {
+  const def = getDefinition(node.type, node.typeVersion);
+  return def?.sideEffect === 'external' || def?.publishes === true;
+}
+
+const LIVE_EFFECT: Record<string, string> = {
+  'notify.slack': 'This test will really send a Slack message.',
+  'notify.teams': 'This test will really send a Microsoft Teams message.',
+  'notify.discord': 'This test will really send a Discord message.',
+  'notify.email': 'This test will really send an email.',
+  'notify.whatsapp': 'This test will really send a WhatsApp message.',
+  'data.googleSheetsAppendRow': 'This test will really add a row to the spreadsheet.',
+  'data.excelAppendRow': 'This test will really add a row to the spreadsheet.',
+  'data.httpRequest': 'This test will really send the request.',
+  'postgear.addToQueue': 'This test will really add the post to the queue.',
+  'postgear.publish': 'This test will really publish the post.',
+};
+
+/** What turning on Send For Real In Tests does, in one sentence for the confirm. */
+export function liveEffectSentence(node: Pick<GraphNode, 'type' | 'typeVersion'>): string {
+  const known = LIVE_EFFECT[node.type];
+  if (known) return known;
+  const def = getDefinition(node.type, node.typeVersion);
+  if (def?.publishes) return 'This test will really publish the post.';
+  return `This test will really run ${def?.title ?? 'this step'}.`;
+}
+
+/** Why a step was skipped in a run, in one sentence. */
+export function skippedSentence(output: unknown): string {
+  const reason =
+    typeof output === 'object' && output !== null
+      ? (output as Record<string, unknown>).skipped
+      : undefined;
+  if (reason === 'branchNotTaken') return 'Skipped: its branch was not taken in this run.';
+  if (reason === 'upstreamFailed') return 'Skipped: an earlier step failed.';
+  if (reason === 'off') return 'Skipped: this step is turned off.';
+  return 'Skipped in this run.';
+}
+
+const READABLE_KEYS = ['text', 'message', 'preview', 'body', 'content'];
+
+/**
+ * A dry run's would-send content (`{ dryRun: true, wouldSend }`): the
+ * message as text when it has one, and the whole of it for the data views.
+ */
+export function dryRunContent(output: unknown): { text: string | null; data: unknown } {
+  const record =
+    typeof output === 'object' && output !== null ? (output as Record<string, unknown>) : null;
+  const data = record && 'wouldSend' in record ? record.wouldSend : output;
+  if (typeof data === 'string') return { text: data, data };
+  if (typeof data === 'object' && data !== null) {
+    const fields = data as Record<string, unknown>;
+    const key = READABLE_KEYS.find((candidate) => typeof fields[candidate] === 'string');
+    return { text: key ? (fields[key] as string) : null, data };
+  }
+  return { text: null, data };
+}
+
+/** Copy Details: a plain text block someone can paste into a message for help. */
+export function copyDetailsText(details: {
+  workflowName: string;
+  runId: string;
+  step: Pick<RunStep, 'nodeName' | 'error' | 'finishedAt' | 'updatedAt'>;
+}): string {
+  const { step } = details;
+  return [
+    `Workflow: ${details.workflowName}`,
+    `Run: ${details.runId}`,
+    `Step: ${step.nodeName}`,
+    `Error code: ${step.error?.code ?? 'none'}`,
+    `Time: ${step.finishedAt ?? step.updatedAt}`,
+    `Error: ${step.error?.message ?? 'none'}`,
+  ].join('\n');
 }

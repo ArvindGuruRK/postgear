@@ -16,6 +16,8 @@ import type { AutomationGraph, SummaryContext, ValidationIssue } from '@postgear
  * - Deleting goes through the reducer too (`deleteKeyCode` is off), so
  *   every delete can be undone.
  * - Steps dragged from the picker drop where they land.
+ * - Module 08: a run (`run`) paints the cards and lines while a test plays
+ *   or after it ends; its result badges call `onRunBadgeClick`.
  */
 import { CONNECT_REASONS, canConnect, type PortId } from '@postgear/automation';
 import {
@@ -33,6 +35,8 @@ import {
 import { type DragEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useBuilder } from '../builder/builder-context';
 import type { Position, Selection } from '../builder/builder-state';
+import type { RunModel } from '../runs/run-model';
+import { type CanvasMode, CanvasModeProvider, useMarkerId } from './canvas-mode';
 import {
   type CanvasNode,
   FAMILY_FILL,
@@ -79,6 +83,10 @@ export interface WorkflowCanvasProps {
   /** Shown over an empty canvas (Add A Trigger). */
   empty?: ReactNode;
   children?: ReactNode;
+  /** Module 08: the test run painted on the cards and lines (null clears the paint). */
+  run?: RunModel | null;
+  /** Module 08: a step's result badge was clicked (opens the Expanded view on that run). */
+  onRunBadgeClick?: (nodeKey: string) => void;
 }
 
 export function WorkflowCanvas({
@@ -93,16 +101,24 @@ export function WorkflowCanvas({
   onInit,
   empty,
   children,
+  run = null,
+  onRunBadgeClick,
 }: WorkflowCanvasProps) {
   const builder = useBuilder();
+  const markerId = useMarkerId();
+  const mode = useMemo<CanvasMode>(
+    () => ({ readOnly: false, markerId, onRunBadgeClick }),
+    [markerId, onRunBadgeClick],
+  );
+  const paint = run?.paint ?? null;
   const flow = useReactFlow<CanvasNode, FlowEdge>();
   const appearance = useBodyAppearance();
   const [drag, setDrag] = useState<Record<string, Position> | null>(null);
   const [sizes, setSizes] = useState<Record<string, { w: number; h: number }> | null>(null);
 
   const derived = useMemo(
-    () => toFlowNodes(graph, { selection, issues, summary, drag }),
-    [graph, selection, issues, summary, drag],
+    () => toFlowNodes(graph, { selection, issues, summary, drag, paint }),
+    [graph, selection, issues, summary, drag, paint],
   );
   const nodes = useMemo(
     () =>
@@ -113,7 +129,7 @@ export function WorkflowCanvas({
         : derived,
     [derived, sizes],
   );
-  const edges = useMemo(() => toFlowEdges(graph, selection), [graph, selection]);
+  const edges = useMemo(() => toFlowEdges(graph, selection, run), [graph, selection, run]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<CanvasNode>[]) => {
@@ -265,86 +281,88 @@ export function WorkflowCanvas({
   }
 
   return (
-    <div className={`pg-canvas relative h-full w-full bg-primary${tidying ? ' pg-tidying' : ''}`}>
-      <EdgeMarkers />
-      <ReactFlow<CanvasNode, FlowEdge>
-        colorMode={appearance.scheme}
-        data-light-theme={appearance.lightTheme}
-        data-dark-theme={appearance.darkTheme}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={NODE_TYPES}
-        edgeTypes={EDGE_TYPES}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeDragStop={(event, _node, dragged) => finishDrag(event, dragged)}
-        onSelectionDragStop={finishDrag}
-        onConnect={onConnect}
-        onConnectEnd={onConnectEnd}
-        isValidConnection={isValidConnection}
-        onPaneClick={onPaneClick}
-        onPaneContextMenu={(event) => {
-          event.preventDefault();
-          builder.contextMenu(
-            {
-              kind: 'canvas',
-              flowAt: flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
-            },
-            { x: event.clientX, y: event.clientY },
-          );
-        }}
-        onInit={onInit}
-        snapToGrid
-        snapGrid={SNAP}
-        selectionOnDrag
-        panOnDrag={PAN_BUTTONS}
-        panOnScroll
-        zoomOnPinch
-        minZoom={0.2}
-        maxZoom={1.5}
-        fitView
-        fitViewOptions={FIT}
-        deleteKeyCode={null}
-        multiSelectionKeyCode={MULTI_SELECT}
-        nodesDraggable={!builder.locked}
-        nodesConnectable={!builder.locked}
-        attributionPosition="top-right"
-        aria-label="Workflow canvas"
-      >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={24}
-          size={1.5}
-          color="var(--color-outline)"
-          className="opacity-40"
-        />
-        {graph.nodes.length > 0 ? (
-          <MiniMap<CanvasNode>
-            pannable
-            zoomable
-            position="bottom-right"
-            className="max-md:hidden"
-            bgColor="var(--color-secondary)"
-            maskColor="color-mix(in srgb, var(--color-ink) 10%, transparent)"
-            nodeColor={(node) =>
-              node.type === 'step'
-                ? FAMILY_FILL[node.data.def?.family ?? 'ink']
-                : 'var(--color-brutal-secondary)'
-            }
-            nodeStrokeColor="var(--color-outline)"
-            nodeStrokeWidth={2}
-            ariaLabel="Minimap"
+    <CanvasModeProvider value={mode}>
+      <div className={`pg-canvas relative h-full w-full bg-primary${tidying ? ' pg-tidying' : ''}`}>
+        <EdgeMarkers id={markerId} />
+        <ReactFlow<CanvasNode, FlowEdge>
+          colorMode={appearance.scheme}
+          data-light-theme={appearance.lightTheme}
+          data-dark-theme={appearance.darkTheme}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeDragStop={(event, _node, dragged) => finishDrag(event, dragged)}
+          onSelectionDragStop={finishDrag}
+          onConnect={onConnect}
+          onConnectEnd={onConnectEnd}
+          isValidConnection={isValidConnection}
+          onPaneClick={onPaneClick}
+          onPaneContextMenu={(event) => {
+            event.preventDefault();
+            builder.contextMenu(
+              {
+                kind: 'canvas',
+                flowAt: flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+              },
+              { x: event.clientX, y: event.clientY },
+            );
+          }}
+          onInit={onInit}
+          snapToGrid
+          snapGrid={SNAP}
+          selectionOnDrag
+          panOnDrag={PAN_BUTTONS}
+          panOnScroll
+          zoomOnPinch
+          minZoom={0.2}
+          maxZoom={1.5}
+          fitView
+          fitViewOptions={FIT}
+          deleteKeyCode={null}
+          multiSelectionKeyCode={MULTI_SELECT}
+          nodesDraggable={!builder.locked}
+          nodesConnectable={!builder.locked}
+          attributionPosition="top-right"
+          aria-label="Workflow canvas"
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={24}
+            size={1.5}
+            color="var(--color-outline)"
+            className="opacity-40"
           />
+          {graph.nodes.length > 0 ? (
+            <MiniMap<CanvasNode>
+              pannable
+              zoomable
+              position="bottom-right"
+              className="max-md:hidden"
+              bgColor="var(--color-secondary)"
+              maskColor="color-mix(in srgb, var(--color-ink) 10%, transparent)"
+              nodeColor={(node) =>
+                node.type === 'step'
+                  ? FAMILY_FILL[node.data.def?.family ?? 'ink']
+                  : 'var(--color-brutal-secondary)'
+              }
+              nodeStrokeColor="var(--color-outline)"
+              nodeStrokeWidth={2}
+              ariaLabel="Minimap"
+            />
+          ) : null}
+          {children}
+        </ReactFlow>
+        {empty ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
+            <div className="pointer-events-auto">{empty}</div>
+          </div>
         ) : null}
-        {children}
-      </ReactFlow>
-      {empty ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-          <div className="pointer-events-auto">{empty}</div>
-        </div>
-      ) : null}
-    </div>
+      </div>
+    </CanvasModeProvider>
   );
 }

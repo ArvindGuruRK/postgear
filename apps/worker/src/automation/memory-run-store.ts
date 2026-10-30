@@ -8,11 +8,15 @@ import type {
   AutomationConnectionStatus,
   AutomationRunMode,
   AutomationRunStatus,
+  AutomationStatus,
   AutomationStepStatus,
 } from '@postgear/db';
 import type { RunRef } from './activity-contract';
 import type {
+  AutomationRecord,
   AutomationRunSummary,
+  LiveRunRow,
+  NewLiveRun,
   NotificationWrite,
   PriorOutput,
   RunChange,
@@ -22,6 +26,7 @@ import type {
   StepKey,
   StepRecord,
   StoredConnection,
+  StoredNotification,
 } from './run-store';
 
 const OUTPUT_STATUSES: AutomationStepStatus[] = ['SUCCEEDED', 'DRY_RUN', 'HANDLED_ERROR'];
@@ -31,6 +36,9 @@ export interface MemoryAutomation {
   id: string;
   organizationId: string;
   name: string;
+  status: AutomationStatus;
+  deletedAt: Date | null;
+  activeVersionId: string | null;
   lastRunAt: Date | null;
   lastRunStatus: AutomationRunStatus | null;
   lastRunError: string | null;
@@ -47,6 +55,18 @@ export interface MemoryNotification extends NotificationWrite {
   id: string;
   emailStatus: 'PENDING';
   createdAt: Date;
+}
+
+/** A live run a trigger created (Module 09), with what the interface has no field for. */
+export interface MemoryLiveRun extends NewLiveRun {
+  id: string;
+}
+
+export interface MemoryVersion {
+  id: string;
+  automationId: string;
+  organizationId: string;
+  graph: unknown;
 }
 
 function clone<T>(value: T): T {
@@ -75,6 +95,12 @@ export class MemoryRunStore implements RunStore {
   readonly connections: MemoryConnection[] = [];
   readonly notifications: MemoryNotification[] = [];
   readonly automations = new Map<string, MemoryAutomation>();
+  readonly versions: MemoryVersion[] = [];
+  /** Run rows a trigger created, keyed by id; they are also in `runs`. */
+  readonly liveRuns = new Map<string, MemoryLiveRun>();
+  /** The clock notifications are stamped with when they bring no time of their own. */
+  now: () => Date = () => new Date();
+  private sequence = 0;
   /** Extra run facts the interface has no field for (finishedAt, stepCount). */
   readonly runExtras = new Map<
     string,
@@ -104,6 +130,9 @@ export class MemoryRunStore implements RunStore {
         id: run.automationId,
         organizationId: run.organizationId,
         name: run.automationName,
+        status: 'ACTIVE',
+        deletedAt: null,
+        activeVersionId: null,
         lastRunAt: null,
         lastRunStatus: null,
         lastRunError: null,
@@ -111,6 +140,29 @@ export class MemoryRunStore implements RunStore {
       });
     }
     return run;
+  }
+
+  /** Adds a workflow (an active one unless told otherwise). */
+  addAutomation(
+    automation: Pick<MemoryAutomation, 'id' | 'organizationId'> & Partial<MemoryAutomation>,
+  ): MemoryAutomation {
+    const row: MemoryAutomation = {
+      name: 'Test Workflow',
+      status: 'ACTIVE',
+      deletedAt: null,
+      activeVersionId: null,
+      lastRunAt: null,
+      lastRunStatus: null,
+      lastRunError: null,
+      consecutiveFailures: 0,
+      ...automation,
+    };
+    this.automations.set(row.id, row);
+    return row;
+  }
+
+  addVersion(version: MemoryVersion): void {
+    this.versions.push(clone(version));
   }
 
   addConnection(connection: MemoryConnection): void {
@@ -279,7 +331,7 @@ export class MemoryRunStore implements RunStore {
       ...clone(notification),
       id,
       emailStatus: 'PENDING',
-      createdAt: new Date(),
+      createdAt: notification.createdAt ?? this.now(),
     });
     return { id };
   }
@@ -296,6 +348,103 @@ export class MemoryRunStore implements RunStore {
     row.lastRunError = summary.lastRunError;
     if (summary.consecutiveFailures === 'increment') row.consecutiveFailures += 1;
     if (summary.consecutiveFailures === 'reset') row.consecutiveFailures = 0;
+  }
+
+  async loadAutomation(
+    organizationId: string,
+    automationId: string,
+  ): Promise<AutomationRecord | null> {
+    const row = this.automations.get(automationId);
+    if (!row || row.organizationId !== organizationId) return null;
+    return {
+      id: row.id,
+      organizationId: row.organizationId,
+      name: row.name,
+      status: row.status,
+      deleted: row.deletedAt !== null,
+      activeVersionId: row.activeVersionId,
+      consecutiveFailures: row.consecutiveFailures,
+    };
+  }
+
+  async loadVersionGraph(
+    organizationId: string,
+    automationId: string,
+    versionId: string,
+  ): Promise<unknown> {
+    const version = this.versions.find(
+      (candidate) =>
+        candidate.id === versionId &&
+        candidate.automationId === automationId &&
+        candidate.organizationId === organizationId,
+    );
+    return version ? clone(version.graph) : null;
+  }
+
+  async createLiveRun(run: NewLiveRun): Promise<LiveRunRow> {
+    const existing = [...this.liveRuns.values()].find(
+      (row) => row.automationId === run.automationId && row.triggerEventId === run.triggerEventId,
+    );
+    if (existing) {
+      const stored = this.runs.get(existing.id);
+      return {
+        id: existing.id,
+        status: stored?.status ?? 'QUEUED',
+        temporalWorkflowId: existing.temporalWorkflowId,
+        created: false,
+      };
+    }
+    this.sequence += 1;
+    const id = `live_${this.sequence}`;
+    this.liveRuns.set(id, { ...clone(run), id });
+    const automation = this.automations.get(run.automationId);
+    this.addRun({
+      id,
+      organizationId: run.organizationId,
+      automationId: run.automationId,
+      automationName: automation?.name,
+      mode: 'LIVE',
+      status: 'QUEUED',
+      graph: this.versions.find((version) => version.id === run.versionId)?.graph ?? null,
+      triggerPayload: run.triggerPayload,
+      createdAt: this.now(),
+    });
+    return { id, status: 'QUEUED', temporalWorkflowId: run.temporalWorkflowId, created: true };
+  }
+
+  async pauseAutomation(organizationId: string, automationId: string): Promise<boolean> {
+    const row = this.automations.get(automationId);
+    if (!row || row.organizationId !== organizationId) return false;
+    if (row.status !== 'ACTIVE' || row.deletedAt !== null) return false;
+    row.status = 'PAUSED';
+    return true;
+  }
+
+  async latestNotification(
+    organizationId: string,
+    type: string,
+    automationId: string,
+  ): Promise<StoredNotification | null> {
+    const latest = this.notifications
+      .filter(
+        (row) =>
+          row.organizationId === organizationId &&
+          row.type === type &&
+          row.meta.automationId === automationId,
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return latest ? { id: latest.id, createdAt: latest.createdAt, meta: clone(latest.meta) } : null;
+  }
+
+  async updateNotificationMeta(
+    organizationId: string,
+    notificationId: string,
+    meta: Record<string, unknown>,
+  ): Promise<void> {
+    const row = this.notifications.find(
+      (candidate) => candidate.id === notificationId && candidate.organizationId === organizationId,
+    );
+    if (row) row.meta = clone(meta);
   }
 
   transaction<T>(work: (store: RunStore) => Promise<T>): Promise<T> {

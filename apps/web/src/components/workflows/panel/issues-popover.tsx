@@ -6,12 +6,13 @@
  * ("2 Issues": they block a test and turning on) beside the warnings in
  * amber ("1 Warning": they do not). The list shows each issue with its
  * step's icon and name and the sentence; choosing one closes the list and
- * lands on the field (focus-the-field, `builder/issue-focus.ts`).
+ * lands on the field (focus-the-field, `builder/issue-focus.ts`). A test
+ * refused for its issues opens the list (`openSignal`, Module 08).
  */
 import { type AutomationGraph, getDefinition, type ValidationIssue } from '@postgear/automation';
 import { Button, cn, Popover, PopoverContent, PopoverTrigger } from '@postgear/ui';
 import { CircleCheck, TriangleAlert } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppIcon } from '../app-icon';
 import { issuesChip } from '../builder/builder-view-model';
 
@@ -25,12 +26,19 @@ export function IssuesPopover({
   issues,
   graph,
   onOpenIssue,
+  openSignal = 0,
 }: {
   issues: readonly ValidationIssue[];
   graph: AutomationGraph;
   onOpenIssue: (issue: ValidationIssue) => void;
+  /** Bumped to open the list (a test refused for these issues). */
+  openSignal?: number;
 }) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (openSignal > 0) setOpen(true);
+  }, [openSignal]);
   // Set when an issue was chosen: focus belongs to its field, not back on the chip.
   const picked = useRef(false);
   const chip = issuesChip(issues);

@@ -1,5 +1,6 @@
 /**
- * Server-sent events over a POST, for the AI endpoints (Sprint 6).
+ * Server-sent events over a POST, for the AI endpoints (Sprint 6), and over
+ * a GET for a workflow run's live progress (Sprint 10, Module 08).
  *
  * ## Why not `EventSource`
  *
@@ -8,7 +9,10 @@
  * the response body read as it arrives, and the SSE wire format parsed by
  * hand. The format is small (`event:` and `data:` lines, blank-line
  * delimited, `:` comments for the API's heartbeat) and the parser below is
- * the whole of it.
+ * the whole of it. The GET stream (`streamGetEvents`) takes the same path
+ * rather than `EventSource`, so a refusal before the stream opens (a 404 for
+ * a run of another workspace) is the same `ApiError`, and the caller, not
+ * the browser, decides when to reconnect.
  *
  * ## The two kinds of failure
  *
@@ -106,15 +110,43 @@ export interface StreamOptions<T> {
  * dropped rather than thrown: one malformed heartbeat must not end a
  * generation that is otherwise going fine.
  */
-export async function streamEvents<T extends { type: string }>(
+export function streamEvents<T extends { type: string }>(
   path: string,
   body: unknown,
+  options: StreamOptions<T>,
+): Promise<void> {
+  return openStream(
+    path,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify(body),
+    },
+    options,
+  );
+}
+
+/**
+ * Opens `path` with a GET and delivers each streamed event to `onEvent`,
+ * typed as `streamEvents` types them. Resolves when the server closes the
+ * stream (a run's stream closes after its final event), rejects with an
+ * `ApiError` before the stream opens and with the abort reason when the
+ * signal fires. It never reconnects on its own.
+ */
+export function streamGetEvents<T extends { type: string }>(
+  path: string,
+  options: StreamOptions<T>,
+): Promise<void> {
+  return openStream(path, { method: 'GET', headers: { Accept: 'text/event-stream' } }, options);
+}
+
+async function openStream<T extends { type: string }>(
+  path: string,
+  init: Pick<RequestInit, 'method' | 'headers' | 'body'>,
   { signal, onEvent }: StreamOptions<T>,
 ): Promise<void> {
   const response = await fetch(`${BROWSER_API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify(body),
+    ...init,
     credentials: 'include',
     cache: 'no-store',
     signal,

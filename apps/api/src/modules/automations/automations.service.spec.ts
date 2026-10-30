@@ -3,30 +3,57 @@
  * `@postgear/automation` package: creating blank and from a template, the
  * revision guard, tenancy as 404s, Duplicate, soft delete, the refusals a
  * save always makes (unknown steps, secrets, schema violations), the
- * catalog states, pinned data and the activation routes waiting for
- * Module 09.
+ * catalog states and pinned data. Module 09: turning on (the revision
+ * check, what blocks it, the automatic posting tick, the version written,
+ * the schedule), turning off, Discard Changes, versions read but never
+ * changed, Restore As Draft, and who may delete what.
+ *
+ * `validateGraph` is the real one, wrapped so a test can stand in for a
+ * rule the shipped limits cannot reach today (an AI step on a schedule more
+ * often than hourly) or for steps the worker cannot run yet.
  */
 import {
   ConflictException,
+  ForbiddenException,
+  HttpStatus,
   NotFoundException,
-  NotImplementedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   type AutomationGraph,
   emptyGraph,
+  type GraphEdge,
+  type GraphNode,
+  getDefinition,
   getTemplate,
   instantiateTemplate,
+  type NodeType,
   SECRET_REFUSED_MESSAGE,
   tokensIn,
+  validateGraph,
 } from '@postgear/automation';
-import { AutomationStatus } from '@postgear/db';
+import { AutomationStatus, Role } from '@postgear/db';
 import { AutomationContextService, toChannelState } from './automation-context.service';
-import { AutomationTriggers } from './automation-triggers';
-import type { AutomationRow, AutomationsRepository } from './automations.repository';
+import type { AutomationTriggers } from './automation-triggers';
+import type {
+  AutomationRow,
+  AutomationsRepository,
+  VersionDetailRow,
+} from './automations.repository';
 import { AutomationsService, copyName, sameJson } from './automations.service';
 import type { ConnectionsRepository } from './connections/connections.repository';
-import { updateAutomationSchema } from './dto/automations.schema';
+import {
+  activateAutomationSchema,
+  restoreVersionSchema,
+  updateAutomationSchema,
+} from './dto/automations.schema';
+
+jest.mock('@postgear/automation', () => {
+  const actual = jest.requireActual('@postgear/automation');
+  return { ...actual, validateGraph: jest.fn(actual.validateGraph) };
+});
+
+const validateGraphMock = validateGraph as jest.MockedFunction<typeof validateGraph>;
 
 const ORG = 'org_1';
 const USER = 'user_1';
@@ -73,6 +100,69 @@ function reversedKeys(value: unknown): unknown {
   );
 }
 
+function node(key: string, type: NodeType, config: Record<string, unknown> = {}): GraphNode {
+  const definition = getDefinition(type);
+  if (!definition) throw new Error(`No definition for ${type}`);
+  return {
+    key,
+    type,
+    typeVersion: definition.typeVersion,
+    name: key,
+    position: { x: 0, y: 0 },
+    config: { ...JSON.parse(JSON.stringify(definition.defaultConfig)), ...config },
+  };
+}
+
+function edge(source: string, target: string): GraphEdge {
+  return { id: `${source}:out->${target}`, source, sourcePort: 'out', target, targetPort: 'in' };
+}
+
+/** Steps in a chain, top to bottom. */
+function chain(...nodes: GraphNode[]): AutomationGraph {
+  return {
+    ...emptyGraph(),
+    nodes: nodes.map((item, i) => ({ ...item, position: { x: 0, y: i * 100 } })),
+    edges: nodes.slice(1).map((item, i) => edge(nodes[i].key, item.key)),
+  };
+}
+
+/** Manual, then an In-App Notification: nothing blocks turning it on. */
+function cleanGraph(): AutomationGraph {
+  return chain(
+    node('trig01', 'trigger.manual'),
+    node('bell01', 'notify.inApp', { title: 'Hello', message: 'World' }),
+  );
+}
+
+/** Every day at 08:00, then an In-App Notification. */
+function scheduledGraph(): AutomationGraph {
+  return chain(
+    node('trig01', 'trigger.schedule', { frequency: 'daily', time: '08:00', timeZone: 'UTC' }),
+    node('bell01', 'notify.inApp', { title: 'Hello', message: 'World' }),
+  );
+}
+
+/** Manual, then Publish with no Manual Review before it. */
+function publishGraph(): AutomationGraph {
+  return chain(node('trig01', 'trigger.manual'), node('post01', 'postgear.publish'));
+}
+
+const VERSION_ID = '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a';
+const OLD_VERSION_ID = '6e5d4c3b-2a1f-4e0d-9c8b-7a6f5e4d3c2b';
+
+function versionRow(overrides: Partial<VersionDetailRow> = {}): VersionDetailRow {
+  return {
+    id: VERSION_ID,
+    version: 4,
+    note: 'Weekly copy',
+    triggerType: 'trigger.manual',
+    createdAt: NOW,
+    createdBy: { id: USER, name: 'Priya', lastName: 'Shah', email: 'priya@example.test' },
+    graph: cleanGraph() as unknown as VersionDetailRow['graph'],
+    ...overrides,
+  };
+}
+
 /** Sets one Set Fields value, the place a user would paste a secret. */
 function withFieldValue(name: string, value: string): AutomationGraph {
   const graph = reportGraph();
@@ -84,7 +174,11 @@ function withFieldValue(name: string, value: string): AutomationGraph {
 
 describe('AutomationsService', () => {
   let repository: jest.Mocked<AutomationsRepository>;
-  let triggers: AutomationTriggers;
+  let triggers: {
+    start: jest.Mock<Promise<boolean>>;
+    stop: jest.Mock<Promise<boolean>>;
+    stopRuns: jest.Mock<Promise<void>>;
+  };
   let service: AutomationsService;
   let connectionRows: jest.Mock;
 
@@ -122,16 +216,28 @@ describe('AutomationsService', () => {
       setPinned: jest.fn().mockResolvedValue(true),
       removePinned: jest.fn().mockResolvedValue(true),
       channels: jest.fn().mockResolvedValue([]),
+      activate: jest
+        .fn()
+        .mockImplementation(async () => ({ outcome: 'activated', version: versionRow() })),
+      pause: jest.fn().mockResolvedValue(true),
+      discard: jest.fn().mockResolvedValue({ outcome: 'no_active_version' }),
+      listVersions: jest.fn().mockResolvedValue([]),
+      findVersion: jest.fn().mockResolvedValue(null),
+      openRuns: jest.fn().mockResolvedValue([]),
+      closeRun: jest.fn().mockResolvedValue(true),
     } as unknown as jest.Mocked<AutomationsRepository>;
     connectionRows = jest.fn().mockResolvedValue([]);
-    triggers = new AutomationTriggers();
-    jest.spyOn(triggers, 'stop');
+    triggers = {
+      start: jest.fn().mockResolvedValue(true),
+      stop: jest.fn().mockResolvedValue(true),
+      stopRuns: jest.fn().mockResolvedValue(undefined),
+    };
     service = new AutomationsService(
       repository,
       new AutomationContextService(repository, {
         list: connectionRows,
       } as unknown as ConnectionsRepository),
-      triggers,
+      triggers as unknown as AutomationTriggers,
     );
   });
 
@@ -362,12 +468,15 @@ describe('AutomationsService', () => {
       const calls: Array<() => Promise<unknown>> = [
         () => service.get(ORG, OTHER_ID),
         () => service.update(ORG, USER, OTHER_ID, { draftRevision: 1, name: 'x' }),
-        () => service.remove(ORG, OTHER_ID),
+        () => service.remove(ORG, Role.ADMIN, OTHER_ID),
         () => service.duplicate(ORG, USER, OTHER_ID),
         () => service.validate(ORG, OTHER_ID),
         () => service.pin(ORG, USER, OTHER_ID, 'fields', { a: 1 }),
-        () => service.activate(ORG, OTHER_ID),
+        () => service.activate(ORG, USER, OTHER_ID, { draftRevision: 3 }),
         () => service.pause(ORG, OTHER_ID),
+        () => service.versions(ORG, OTHER_ID),
+        () => service.version(ORG, OTHER_ID, '1'),
+        () => service.restore(ORG, USER, OTHER_ID, '1', { draftRevision: 3 }),
       ];
       for (const call of calls) await expect(call()).rejects.toBeInstanceOf(NotFoundException);
 
@@ -420,14 +529,53 @@ describe('AutomationsService', () => {
       expect(copied.endsWith(' (Copy)')).toBe(true);
     });
 
-    it('soft deletes, stopping the trigger of an active workflow first', async () => {
-      await service.remove(ORG, ID);
-      expect(triggers.stop).not.toHaveBeenCalled();
-      expect(repository.softDelete).toHaveBeenCalledWith(ORG, ID);
+    it('lets a member delete a draft: no schedule to delete, open test runs cancelled', async () => {
+      await service.remove(ORG, Role.USER, ID);
 
+      expect(triggers.stop).not.toHaveBeenCalled();
+      expect(triggers.stopRuns).toHaveBeenCalledWith(ORG, ID);
+      expect(repository.softDelete).toHaveBeenCalledWith(ORG, ID);
+    });
+
+    it('stops an active workflow first: schedule, then open runs, then the soft delete', async () => {
+      const order: string[] = [];
+      triggers.stop.mockImplementation(async () => {
+        order.push('schedule');
+        return true;
+      });
+      triggers.stopRuns.mockImplementation(async () => {
+        order.push('runs');
+      });
+      repository.softDelete.mockImplementation(async () => {
+        order.push('delete');
+        return true;
+      });
       repository.find.mockResolvedValueOnce(row({ status: AutomationStatus.ACTIVE }));
-      await service.remove(ORG, ID);
+
+      await service.remove(ORG, Role.ADMIN, ID);
+
       expect(triggers.stop).toHaveBeenCalledWith(ORG, ID);
+      expect(triggers.stopRuns).toHaveBeenCalledWith(ORG, ID);
+      expect(order).toEqual(['schedule', 'runs', 'delete']);
+    });
+
+    it('refuses a member deleting an active workflow with 403, but not a paused one', async () => {
+      repository.find.mockResolvedValueOnce(row({ status: AutomationStatus.ACTIVE }));
+      const error = await service.remove(ORG, Role.USER, ID).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).message).toBe(
+        'Only workspace admins can delete an active workflow.',
+      );
+      expect(triggers.stop).not.toHaveBeenCalled();
+      expect(triggers.stopRuns).not.toHaveBeenCalled();
+      expect(repository.softDelete).not.toHaveBeenCalled();
+
+      repository.find.mockResolvedValueOnce(row({ status: AutomationStatus.PAUSED }));
+      await service.remove(ORG, Role.USER, ID);
+      // A paused workflow should have no schedule; deleting it again costs nothing.
+      expect(triggers.stop).toHaveBeenCalledWith(ORG, ID);
+      expect(repository.softDelete).toHaveBeenCalledWith(ORG, ID);
     });
   });
 
@@ -600,11 +748,370 @@ describe('AutomationsService', () => {
     });
   });
 
-  it('answers 501 for activate and pause until Module 09', async () => {
-    await expect(service.activate(ORG, ID)).rejects.toBeInstanceOf(NotImplementedException);
-    await expect(service.pause(ORG, ID)).rejects.toThrow(
-      'Turning workflows on arrives in a later step of this sprint.',
-    );
+  describe('turning on (Module 09)', () => {
+    /** The draft the admin is looking at, at revision 3. */
+    function draft(graph: AutomationGraph, overrides: Partial<AutomationRow> = {}) {
+      repository.find.mockResolvedValue(
+        row({ draftGraph: graph as unknown as AutomationRow['draftGraph'], ...overrides }),
+      );
+    }
+
+    it('writes the next version, makes it live and sets up its trigger', async () => {
+      draft(cleanGraph());
+
+      const result = await service.activate(ORG, USER, ID, {
+        draftRevision: 3,
+        note: 'Weekly copy',
+      });
+
+      expect(repository.activate).toHaveBeenCalledWith(ORG, ID, {
+        expectedRevision: 3,
+        graph: cleanGraph(),
+        triggerType: 'trigger.manual',
+        note: 'Weekly copy',
+        createdById: USER,
+      });
+      expect(triggers.start).toHaveBeenCalledWith(ORG, ID, {
+        id: VERSION_ID,
+        graph: cleanGraph(),
+      });
+      expect(result.version).toEqual({
+        version: 4,
+        note: 'Weekly copy',
+        triggerType: 'trigger.manual',
+        createdAt: NOW.toISOString(),
+        createdBy: { id: USER, name: 'Priya Shah' },
+        active: true,
+      });
+      expect(result.warnings).toEqual([]);
+      expect(result.automation.id).toBe(ID);
+    });
+
+    it('stores an empty note as no note', async () => {
+      draft(cleanGraph());
+      await service.activate(ORG, USER, ID, { draftRevision: 3, note: '' });
+      expect(repository.activate.mock.lastCall?.[2].note).toBeNull();
+    });
+
+    it('still turns on, with a warning, when the schedule cannot be set up yet', async () => {
+      draft(scheduledGraph());
+      triggers.start.mockResolvedValue(false);
+
+      const result = await service.activate(ORG, USER, ID, { draftRevision: 3 });
+
+      expect(repository.activate.mock.lastCall?.[2].triggerType).toBe('trigger.schedule');
+      expect(result.warnings).toEqual([
+        'The schedule is not set up yet. PostGear will set it up within 15 minutes.',
+      ]);
+    });
+
+    it('answers a stale revision with 409 before anything is written', async () => {
+      draft(cleanGraph());
+      const error = await service
+        .activate(ORG, USER, ID, { draftRevision: 2 })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        code: 'automation_conflict',
+        details: { currentRevision: 3 },
+      });
+      expect(repository.activate).not.toHaveBeenCalled();
+      expect(triggers.start).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 when the draft changed inside the write itself', async () => {
+      draft(cleanGraph());
+      repository.activate.mockResolvedValueOnce({ outcome: 'conflict', currentRevision: 4 });
+
+      await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: 'automation_conflict', details: { currentRevision: 4 } },
+      });
+      expect(triggers.start).not.toHaveBeenCalled();
+    });
+
+    it('is blocked by every error, steps this workspace cannot run yet included', async () => {
+      // Slack has no executor yet (Module 12), and no connection is chosen.
+      const graph = chain(
+        node('trig01', 'trigger.manual'),
+        node('slack1', 'notify.slack', { connectionId: '', message: 'Hi', footer: true }),
+      );
+      draft(graph);
+      const context = await new AutomationContextService(repository, {
+        list: connectionRows,
+      } as unknown as ConnectionsRepository).forOrg(ORG);
+      const errors = validateGraph(graph, context).filter((issue) => issue.severity === 'error');
+      expect(errors.map((issue) => issue.code)).toContain('node.not_runnable');
+
+      await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        response: {
+          code: 'activation_blocked',
+          message: 'Fix the problems in this workflow before you turn it on.',
+          details: { issues: errors.length },
+        },
+      });
+      expect(repository.activate).not.toHaveBeenCalled();
+    });
+
+    it('says when an AI schedule is the only problem, and blocks when there are others', async () => {
+      draft(scheduledGraph());
+      const tooOften = {
+        severity: 'error' as const,
+        code: 'schedule.too_frequent_for_ai' as const,
+        message: 'Workflows with AI steps can run at most every 2 hours.',
+        nodeKey: 'trig01',
+      };
+      validateGraphMock.mockReturnValueOnce([tooOften]);
+
+      await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        response: {
+          code: 'schedule_too_frequent',
+          message: 'Workflows with AI steps can run at most every 2 hours.',
+        },
+      });
+
+      validateGraphMock.mockReturnValueOnce([
+        tooOften,
+        { severity: 'error', code: 'node.not_runnable', message: 'x', nodeKey: 'bell01' },
+        { severity: 'warning', code: 'node.not_runnable', message: 'y', nodeKey: 'bell01' },
+      ] as ReturnType<typeof validateGraph>);
+      await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
+        response: { code: 'activation_blocked', details: { issues: 2 } },
+      });
+      expect(repository.activate).not.toHaveBeenCalled();
+    });
+
+    it('needs the automatic posting tick when a post can go out unreviewed', async () => {
+      // Publish cannot run yet either; this test is about the tick alone.
+      draft(publishGraph());
+      validateGraphMock.mockReturnValueOnce([]);
+
+      await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        response: {
+          code: 'confirm_automatic_posting',
+          message: 'Confirm that posts will go out automatically.',
+        },
+      });
+      expect(repository.activate).not.toHaveBeenCalled();
+
+      validateGraphMock.mockReturnValueOnce([]);
+      await service.activate(ORG, USER, ID, { draftRevision: 3, acceptAutomaticPosting: true });
+      expect(repository.activate).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes a strict body with a short, clean note', () => {
+      expect(activateAutomationSchema.safeParse({ draftRevision: 3 }).success).toBe(true);
+      expect(activateAutomationSchema.safeParse({ draftRevision: 0 }).success).toBe(false);
+      expect(activateAutomationSchema.safeParse({ draftRevision: 3, force: true }).success).toBe(
+        false,
+      );
+      expect(
+        activateAutomationSchema.safeParse({ draftRevision: 3, acceptAutomaticPosting: 'yes' })
+          .success,
+      ).toBe(false);
+      expect(
+        activateAutomationSchema.safeParse({ draftRevision: 3, note: 'x'.repeat(281) }).success,
+      ).toBe(false);
+      expect(
+        activateAutomationSchema.safeParse({ draftRevision: 3, note: '  New\u0000   copy ' }),
+      ).toEqual({ success: true, data: { draftRevision: 3, note: 'New copy' } });
+    });
+  });
+
+  describe('turning off and discarding (Module 09)', () => {
+    it('pauses, then deletes the schedule', async () => {
+      repository.find.mockResolvedValue(row({ status: AutomationStatus.ACTIVE }));
+      const order: string[] = [];
+      repository.pause.mockImplementation(async () => {
+        order.push('pause');
+        return true;
+      });
+      triggers.stop.mockImplementation(async () => {
+        order.push('schedule');
+        return true;
+      });
+
+      const automation = await service.pause(ORG, ID);
+
+      expect(repository.pause).toHaveBeenCalledWith(ORG, ID);
+      expect(triggers.stop).toHaveBeenCalledWith(ORG, ID);
+      expect(order).toEqual(['pause', 'schedule']);
+      expect(automation.id).toBe(ID);
+    });
+
+    it('is a 409 for a draft that was never turned on', async () => {
+      await expect(service.pause(ORG, ID)).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { code: 'no_active_version' },
+      });
+      expect(repository.pause).not.toHaveBeenCalled();
+      expect(triggers.stop).not.toHaveBeenCalled();
+    });
+
+    it('discards the draft back to the live version', async () => {
+      repository.discard.mockResolvedValueOnce({
+        outcome: 'discarded',
+        row: row({ status: AutomationStatus.ACTIVE, draftRevision: 4 }),
+      });
+
+      const automation = await service.discard(ORG, USER, ID);
+
+      expect(repository.discard).toHaveBeenCalledWith(ORG, ID, USER);
+      expect(automation.draftRevision).toBe(4);
+      // The live version is not touched, so nothing is scheduled again.
+      expect(repository.activate).not.toHaveBeenCalled();
+      expect(triggers.start).not.toHaveBeenCalled();
+    });
+
+    it('is a 409 with nothing live to go back to, and a 404 for another workspace', async () => {
+      await expect(service.discard(ORG, USER, ID)).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: {
+          code: 'no_active_version',
+          message: 'This workflow has no live version to go back to.',
+        },
+      });
+
+      repository.discard.mockResolvedValueOnce({ outcome: 'not_found' });
+      await expect(service.discard(ORG, USER, OTHER_ID)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.discard(ORG, USER, 'nope')).rejects.toBeInstanceOf(NotFoundException);
+      expect(repository.discard).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('versions (Module 09)', () => {
+    it('lists versions newest first with the live one marked and names shown', async () => {
+      repository.find.mockResolvedValue(
+        row({ status: AutomationStatus.ACTIVE, activeVersion: { id: VERSION_ID, version: 4 } }),
+      );
+      repository.listVersions.mockResolvedValueOnce([
+        versionRow(),
+        versionRow({
+          id: OLD_VERSION_ID,
+          version: 3,
+          note: null,
+          createdBy: { id: 'u2', name: null, lastName: null, email: 'sam@example.test' },
+        }),
+      ]);
+
+      const versions = await service.versions(ORG, ID);
+
+      expect(repository.listVersions).toHaveBeenCalledWith(ORG, ID);
+      expect(versions).toEqual([
+        {
+          version: 4,
+          note: 'Weekly copy',
+          triggerType: 'trigger.manual',
+          createdAt: NOW.toISOString(),
+          createdBy: { id: USER, name: 'Priya Shah' },
+          active: true,
+        },
+        {
+          version: 3,
+          note: null,
+          triggerType: 'trigger.manual',
+          createdAt: NOW.toISOString(),
+          createdBy: { id: 'u2', name: 'sam@example.test' },
+          active: false,
+        },
+      ]);
+      // The list never carries graphs.
+      expect(versions[0]).not.toHaveProperty('graph');
+    });
+
+    it('opens one version with its graph, and 404s a number that is not one', async () => {
+      repository.findVersion.mockResolvedValueOnce(
+        versionRow({ graph: scheduledGraph() as never }),
+      );
+
+      const found = await service.version(ORG, ID, '4');
+      expect(repository.findVersion).toHaveBeenCalledWith(ORG, ID, 4);
+      expect(found).toMatchObject({ version: 4, active: false, graph: scheduledGraph() });
+
+      for (const bad of ['0', '04', '-1', '1.5', 'abc', '1e3', '9999999999']) {
+        await expect(service.version(ORG, ID, bad)).rejects.toThrow('Version not found');
+      }
+      await expect(service.version(ORG, ID, '7')).rejects.toBeInstanceOf(NotFoundException);
+      expect(repository.findVersion).toHaveBeenCalledTimes(2);
+    });
+
+    it('restores a version as the draft, checked against the revision', async () => {
+      repository.findVersion.mockResolvedValue(
+        versionRow({ version: 2, graph: scheduledGraph() as never }),
+      );
+
+      const automation = await service.restore(ORG, USER, ID, '2', { draftRevision: 3 });
+
+      expect(repository.findVersion).toHaveBeenCalledWith(ORG, ID, 2);
+      expect(repository.update).toHaveBeenCalledWith(ORG, ID, 3, {
+        updatedById: USER,
+        draftGraph: scheduledGraph(),
+        triggerType: 'trigger.schedule',
+        hasUnpublishedChanges: false,
+      });
+      expect(automation.draftRevision).toBe(4);
+      // Restoring writes the draft only: nothing goes live, no schedule changes.
+      expect(repository.activate).not.toHaveBeenCalled();
+      expect(triggers.start).not.toHaveBeenCalled();
+      expect(triggers.stop).not.toHaveBeenCalled();
+    });
+
+    it('works out Unpublished Changes against the live version', async () => {
+      const live = cleanGraph();
+      repository.findSaveState.mockResolvedValue({
+        status: AutomationStatus.ACTIVE,
+        draftRevision: 3,
+        activeVersion: { graph: live as never },
+      });
+
+      repository.findVersion.mockResolvedValueOnce(versionRow({ graph: live as never }));
+      await service.restore(ORG, USER, ID, '4', { draftRevision: 3 });
+      expect(repository.update.mock.lastCall?.[3].hasUnpublishedChanges).toBe(false);
+
+      repository.findVersion.mockResolvedValueOnce(
+        versionRow({ version: 2, graph: scheduledGraph() as never }),
+      );
+      await service.restore(ORG, USER, ID, '2', { draftRevision: 3 });
+      expect(repository.update.mock.lastCall?.[3].hasUnpublishedChanges).toBe(true);
+    });
+
+    it('answers a stale revision or a lost race with 409, and an unknown version with 404', async () => {
+      repository.findVersion.mockResolvedValue(versionRow());
+
+      await expect(service.restore(ORG, USER, ID, '4', { draftRevision: 2 })).rejects.toMatchObject(
+        {
+          status: HttpStatus.CONFLICT,
+          response: { code: 'automation_conflict', details: { currentRevision: 3 } },
+        },
+      );
+      expect(repository.update).not.toHaveBeenCalled();
+
+      repository.update.mockResolvedValueOnce(null);
+      repository.findSaveState
+        .mockResolvedValueOnce({
+          status: AutomationStatus.DRAFT,
+          draftRevision: 3,
+          activeVersion: null,
+        })
+        .mockResolvedValueOnce({
+          status: AutomationStatus.DRAFT,
+          draftRevision: 5,
+          activeVersion: null,
+        });
+      await expect(service.restore(ORG, USER, ID, '4', { draftRevision: 3 })).rejects.toMatchObject(
+        { response: { details: { currentRevision: 5 } } },
+      );
+
+      repository.findVersion.mockResolvedValue(null);
+      await expect(service.restore(ORG, USER, ID, '9', { draftRevision: 3 })).rejects.toThrow(
+        'Version not found',
+      );
+      expect(restoreVersionSchema.safeParse({ draftRevision: 3, graph: {} }).success).toBe(false);
+    });
   });
 });
 

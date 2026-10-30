@@ -38,4 +38,25 @@ export const RUN_MESSAGES = {
   // Live progress (sent as `error` events)
   STREAM_STOPPED: 'Live updates stopped. Open the run again to see where it is.',
   RUN_GONE: 'This run is no longer available.',
+
+  // Retry From Here (Module 08)
+  RUN_NOT_FINISHED: 'This run has not finished yet. Wait for it to end, or cancel it.',
+  RETRY_STEP_NOT_FAILED: 'Only a step that failed in this run can be retried from here.',
+  RETRY_PUBLISH_NOT_SAFE: 'Publishing steps cannot be retried from here. Start a new run instead.',
+  RETRY_NOT_SAFE: 'This step cannot be retried from here. Start a new run instead.',
+  RETRY_OLD_VERSION: 'This run used an older version.',
+
+  // Run Now (Module 09)
+  RUN_NOW_UNAVAILABLE:
+    'Run Now works only for a workflow that is on and starts with a Manual trigger.',
+} as const;
+
+/**
+ * The trigger phrase of a run in the Runs list (Module 08), more than the
+ * trigger's own title says. Sentence case: it reads as a description.
+ */
+export const TRIGGER_SUMMARIES = {
+  postPublished: (platform: string) => `Post published on ${platform}`,
+  postFailed: (platform: string) => `Post failed on ${platform}`,
+  scheduledFor: (time: string) => `Scheduled for ${time}`,
 } as const;

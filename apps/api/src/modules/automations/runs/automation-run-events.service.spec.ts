@@ -53,6 +53,9 @@ function runRow(
     startedAt: T0,
     finishedAt: null,
     createdAt: T0,
+    versionId: null,
+    temporalWorkflowId: null,
+    version: null,
     ...overrides,
   };
 }
@@ -78,6 +81,7 @@ function latest(
       startedAt: T0,
       finishedAt: null,
       durationMs: null,
+      ports: [],
       createdAt: T0,
       updatedAt,
       ...extra,

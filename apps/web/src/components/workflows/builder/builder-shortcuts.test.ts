@@ -14,6 +14,9 @@ describe('builder shortcuts', () => {
     expect(shortcutFor({ key: '?', shiftKey: true })).toBe('shortcuts');
     expect(shortcutFor({ key: '1' })).toBe('fit');
     expect(shortcutFor({ key: 'ArrowRight' })).toBe('next');
+    expect(shortcutFor({ key: 'Enter', ctrlKey: true })).toBe('testWorkflow');
+    expect(shortcutFor({ key: 'Enter', metaKey: true })).toBe('testWorkflow');
+    expect(shortcutFor({ key: 'Enter' })).toBe('openStep');
   });
 
   it('ignores other keys and Alt combinations', () => {

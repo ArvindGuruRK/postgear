@@ -118,3 +118,151 @@ export interface ConnectionCheckResult {
   connection: Connection;
   message: string;
 }
+
+/* Runs (Modules 07 and 08): mirrored from `runs/run-views.ts`. */
+
+export type AutomationRunMode = 'TEST' | 'LIVE';
+
+/**
+ * `AutomationRunOptions` from `@postgear/scheduling`, declared here for the
+ * reason `post.ts` gives: the browser bundle imports no server package.
+ */
+export interface RunOptions {
+  scope: { kind: 'run' } | { kind: 'step'; nodeKey: string };
+  sendForReal: string[];
+  triggerData: 'last' | 'sample' | 'pinned';
+  /** A Retry From Here run: the run it retried and the step it started at. */
+  retry?: { of: string; fromNodeKey: string; ports: Record<string, string[]> };
+}
+
+export type AutomationStepStatus =
+  | 'QUEUED'
+  | 'RUNNING'
+  | 'SUCCEEDED'
+  | 'DRY_RUN'
+  | 'HANDLED_ERROR'
+  | 'FAILED'
+  | 'SKIPPED'
+  | 'WAITING'
+  | 'CANCELLED';
+
+/** One row of the run list, and the head of the detail. */
+export interface RunSummary {
+  id: string;
+  automationId: string;
+  mode: AutomationRunMode;
+  status: AutomationRunStatus;
+  triggerType: string;
+  /** Test runs and retries: what the run covered. */
+  options: RunOptions | null;
+  startedById: string | null;
+  stepCount: number;
+  creditsUsed: number;
+  /** One sentence. */
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  /** Module 08: the version a live run executed ("v3"); null for a test run. */
+  version: number | null;
+  /** Module 08: "Post published on Instagram"; null when the trigger says nothing more than its title. */
+  triggerSummary: string | null;
+}
+
+/** `AutomationRunStep.error`. */
+export interface RunStepError {
+  message: string;
+  code: string;
+  retryable: boolean;
+  details?: unknown;
+}
+
+/** One step of a run: its latest attempt. The `step` stream event has this shape too. */
+export interface RunStep {
+  id: string;
+  nodeKey: string;
+  nodeType: string;
+  nodeName: string;
+  status: AutomationStepStatus;
+  attempt: number;
+  attempts: number;
+  input: unknown;
+  output: unknown;
+  truncated: boolean;
+  error: RunStepError | null;
+  /** Module 08: the output ports the step fired (`out`, `true`, `approved`, `error`, ...). */
+  ports: string[];
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
+  updatedAt: string;
+}
+
+export interface RunDetail extends RunSummary {
+  triggerPayload: unknown;
+  /** The graph the run executed: a test run's draft snapshot, a live run's version. */
+  graph: AutomationGraph | null;
+  steps: RunStep[];
+}
+
+/** The `run` stream event. */
+export interface RunEvent {
+  id: string;
+  status: AutomationRunStatus;
+  error: string | null;
+  stepCount: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface RunPage {
+  runs: RunSummary[];
+  nextCursor: string | null;
+}
+
+/**
+ * A Manual Review step's output once answered: `{ decision, decidedById,
+ * decidedAt, reviewedBy, reason?, editedText?, text, image }`. While it
+ * waits, its `input` holds the resolved `{ text, image, instructions }`.
+ */
+export interface ReviewOutput {
+  decision: 'approved' | 'rejected';
+  decidedById?: string;
+  decidedAt?: string;
+  /** The reviewer's name, written by the API ("Approved by Priya, 09:14"). */
+  reviewedBy?: string;
+  reason?: string;
+  editedText?: string;
+  text?: string;
+  image?: string;
+}
+
+export interface ReviewAnswer {
+  nodeKey: string;
+  decision: 'approved' | 'rejected';
+  decidedAt: string;
+}
+
+/* Activation and versions (Module 09). */
+
+export interface VersionSummary {
+  version: number;
+  note: string | null;
+  triggerType: string;
+  createdAt: string;
+  createdBy: { id: string; name: string } | null;
+  /** The version live runs use now. */
+  active: boolean;
+}
+
+export interface VersionDetail extends VersionSummary {
+  graph: AutomationGraph;
+}
+
+/** `POST /automations/:id/activate` answers this. */
+export interface ActivationResult {
+  automation: AutomationDetail;
+  version: VersionSummary;
+  /** "The schedule is not set up yet. PostGear will set it up within 15 minutes." */
+  warnings: string[];
+}

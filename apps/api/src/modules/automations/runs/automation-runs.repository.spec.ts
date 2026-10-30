@@ -2,7 +2,11 @@
  * The run rules that live in the queries: every read scoped to the
  * workspace (step rows through their run), runs of deleted workflows hidden,
  * the latest attempt per step, the newest test run's outputs, and the
- * conditional writes behind a review decision and a direct cancel.
+ * conditional writes behind a review decision and a direct cancel. Module
+ * 08 and 09: a retry run created with its copied steps in one transaction,
+ * the retry source and Run Now reads scoped like the rest, live runs, the
+ * reviewer name, and the trigger phrase fields read in SQL so a list never
+ * loads trigger data.
  */
 jest.mock('@postgear/db', () => {
   const actual = jest.requireActual('@postgear/db');
@@ -17,9 +21,16 @@ jest.mock('@postgear/db', () => {
         create: jest.fn(),
         updateMany: jest.fn(),
       },
-      automationRunStep: { findMany: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn() },
+      automationRunStep: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
+        createMany: jest.fn(),
+      },
       automationConnection: { findMany: jest.fn() },
+      user: { findUnique: jest.fn() },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn(),
     },
   };
 });
@@ -30,9 +41,11 @@ import { AutomationRunsRepository } from './automation-runs.repository';
 type PrismaMock = {
   automation: { findFirst: jest.Mock };
   automationRun: Record<'findFirst' | 'findMany' | 'create' | 'updateMany', jest.Mock>;
-  automationRunStep: Record<'findMany' | 'findFirst' | 'updateMany', jest.Mock>;
+  automationRunStep: Record<'findMany' | 'findFirst' | 'updateMany' | 'createMany', jest.Mock>;
   automationConnection: { findMany: jest.Mock };
+  user: { findUnique: jest.Mock };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 };
 
 const db = prisma as unknown as PrismaMock;
@@ -55,6 +68,7 @@ describe('AutomationRunsRepository', () => {
 
     await repository.findAutomation(ORG, ID);
     await repository.automationExists(ORG, ID);
+    await repository.findLiveAutomation(ORG, ID);
 
     for (const [query] of db.automation.findFirst.mock.calls) {
       expect(query.where).toEqual({ id: ID, organizationId: ORG, deletedAt: null });
@@ -66,6 +80,7 @@ describe('AutomationRunsRepository', () => {
 
     await repository.findRun(ORG, RUN_ID);
     await repository.findRunSummary(ORG, RUN_ID);
+    await repository.findRetrySource(ORG, RUN_ID);
 
     for (const [query] of db.automationRun.findFirst.mock.calls) {
       expect(query.where).toEqual({
@@ -258,6 +273,157 @@ describe('AutomationRunsRepository', () => {
     expect(db.automationConnection.findMany.mock.calls[0][0]).toEqual({
       where: { organizationId: ORG },
       select: { credentials: true },
+    });
+  });
+
+  it('creates a live run on its version when asked', async () => {
+    db.automationRun.create.mockResolvedValue({ id: RUN_ID });
+
+    await repository.createRun(ORG, {
+      automationId: ID,
+      mode: 'LIVE',
+      versionId: 'ver_3',
+      triggerType: 'trigger.manual',
+      triggerPayload: { inputs: { topic: 'Bread' } },
+      startedById: 'user_1',
+    });
+
+    expect(db.automationRun.create.mock.calls[0][0].data).toEqual({
+      organizationId: ORG,
+      status: 'QUEUED',
+      automationId: ID,
+      mode: 'LIVE',
+      versionId: 'ver_3',
+      triggerType: 'trigger.manual',
+      triggerPayload: { inputs: { topic: 'Bread' } },
+      startedById: 'user_1',
+    });
+  });
+
+  it('creates a retry run and its copied steps in one transaction, each as attempt 1', async () => {
+    db.automationRun.create.mockResolvedValue({ id: 'run_new' });
+    const copy = {
+      nodeKey: 'trig',
+      nodeType: 'trigger.manual',
+      nodeName: 'Manual',
+      status: 'SUCCEEDED' as const,
+      input: null,
+      output: { inputs: { topic: 'Bread' } },
+      error: null,
+      ports: ['out'],
+      truncated: false,
+      durationMs: 4,
+      startedAt: T0,
+      finishedAt: T0,
+    };
+
+    await expect(
+      repository.createRetryRun(
+        ORG,
+        {
+          automationId: ID,
+          mode: 'TEST',
+          triggerType: 'trigger.manual',
+          triggerPayload: { inputs: { topic: 'Bread' } },
+          seedOutputs: { trig: { inputs: { topic: 'Bread' } } },
+          options: { scope: { kind: 'run' }, retry: { of: RUN_ID, fromNodeKey: 'bell' } },
+          startedById: 'user_1',
+        },
+        [copy],
+      ),
+    ).resolves.toEqual({ id: 'run_new' });
+
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.automationRun.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: ORG,
+      status: 'QUEUED',
+      mode: 'TEST',
+    });
+    expect(db.automationRunStep.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          runId: 'run_new',
+          nodeKey: 'trig',
+          nodeType: 'trigger.manual',
+          nodeName: 'Manual',
+          status: 'SUCCEEDED',
+          attempt: 1,
+          input: Prisma.DbNull,
+          output: { inputs: { topic: 'Bread' } },
+          error: Prisma.DbNull,
+          ports: ['out'],
+          truncated: false,
+          durationMs: 4,
+          startedAt: T0,
+          finishedAt: T0,
+        },
+      ],
+    });
+
+    // Nothing to copy: no step write at all.
+    await repository.createRetryRun(
+      ORG,
+      { automationId: ID, triggerType: 'trigger.manual', triggerPayload: {}, startedById: null },
+      [],
+    );
+    expect(db.automationRunStep.createMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the retry source with its seeds and the workflow live version', async () => {
+    db.automationRun.findFirst.mockResolvedValue(null);
+
+    await repository.findRetrySource(ORG, RUN_ID);
+
+    expect(db.automationRun.findFirst.mock.calls[0][0].select).toMatchObject({
+      seedOutputs: true,
+      graphSnapshot: true,
+      automation: { select: { activeVersionId: true } },
+    });
+  });
+
+  it('reads only the trigger phrase fields of a page of runs, in the workspace, as bound values', async () => {
+    await expect(repository.triggerFacts(ORG, [])).resolves.toEqual(new Map());
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+
+    db.$queryRaw.mockResolvedValueOnce([
+      { id: RUN_ID, provider: 'instagram', scheduledFor: null, timeZone: null },
+    ]);
+    await expect(repository.triggerFacts(ORG, [RUN_ID, 'run_2'])).resolves.toEqual(
+      new Map([[RUN_ID, { provider: 'instagram', scheduledFor: null, timeZone: null }]]),
+    );
+
+    const [strings, ...values] = db.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    const sql = strings.join('?');
+    expect(sql).toContain(`"triggerPayload" #>> '{post,channel,provider}'`);
+    expect(sql).toContain('FROM "AutomationRun"');
+    expect(sql).toContain('"organizationId" = ?');
+    expect(sql).not.toMatch(/SELECT\s+\*/);
+    expect(values[0]).toBe(ORG);
+    expect((values[1] as Prisma.Sql).values).toEqual([RUN_ID, 'run_2']);
+  });
+
+  it('loads the trigger data on the detail and the retry source only', async () => {
+    db.automationRun.findFirst.mockResolvedValue(null);
+
+    await repository.findRun(ORG, RUN_ID);
+    await repository.findRunSummary(ORG, RUN_ID);
+
+    expect(db.automationRun.findFirst.mock.calls[0][0].select).toHaveProperty('triggerPayload');
+    expect(db.automationRun.findFirst.mock.calls[1][0].select).not.toHaveProperty('triggerPayload');
+  });
+
+  it('names a reviewer by first and last name, else email, and null when they are gone', async () => {
+    db.user.findUnique
+      .mockResolvedValueOnce({ name: 'Priya', lastName: 'Shah', email: 'p@example.test' })
+      .mockResolvedValueOnce({ name: null, lastName: null, email: 'sam@example.test' })
+      .mockResolvedValueOnce(null);
+
+    await expect(repository.userName('u1')).resolves.toBe('Priya Shah');
+    await expect(repository.userName('u2')).resolves.toBe('sam@example.test');
+    await expect(repository.userName('u3')).resolves.toBeNull();
+    expect(db.user.findUnique.mock.calls[0][0]).toEqual({
+      where: { id: 'u1' },
+      select: { name: true, lastName: true, email: true },
     });
   });
 });

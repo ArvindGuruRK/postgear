@@ -56,8 +56,9 @@ import { focusField } from '../builder/issue-focus';
 import { ConnectionPicker } from '../connection-picker';
 import { FIELD_PATH_ATTRIBUTE, type FieldContext } from '../fields/contract';
 import { SchemaForm } from '../fields/schema-form';
-import { PinArea, type PinControls } from './output-pane';
+import type { PinControls } from './output-pane';
 import { sourceLabel } from './panel-view-model';
+import { type StepTestControls, TestTab } from './test-tab';
 
 export const ON_ERROR_OPTIONS: readonly { id: OnErrorPolicy['mode']; label: string }[] = [
   { id: 'stop', label: 'Stop The Workflow' },
@@ -115,6 +116,10 @@ export interface StepTabsProps {
   focus?: FocusRequest | null;
   /** A focus request for the step's name: the header that holds it focuses it. */
   onFocusName?: () => void;
+  /** Module 08: Test Step, the result and Send For Real In Tests. */
+  test?: StepTestControls;
+  /** Bumped to show the Test tab (Test Step from a card's hover toolbar). */
+  showTest?: number;
   className?: string;
 }
 
@@ -127,6 +132,8 @@ export function StepTabs({
   pin,
   focus = null,
   onFocusName,
+  test,
+  showTest = 0,
   className,
 }: StepTabsProps) {
   const ids = useId();
@@ -155,7 +162,9 @@ export function StepTabs({
     (issue) => issue.field === undefined && issue.code !== 'node.not_runnable',
   );
 
-  const [tab, setTab] = useState<PanelTab>(() => (hasSetup && !setupDone ? 'setup' : 'configure'));
+  const [tab, setTab] = useState<PanelTab>(() =>
+    showTest > 0 ? 'test' : hasSetup && !setupDone ? 'setup' : 'configure',
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const pending = useRef<FocusRequest | null>(null);
@@ -172,6 +181,10 @@ export function StepTabs({
     if (focus.place === 'settings') setSettingsOpen(true);
     else setTab(focus.place === 'setup' && !hasSetup ? 'configure' : focus.place);
   }, [focus, onFocusName, hasSetup]);
+
+  useEffect(() => {
+    if (showTest > 0) setTab('test');
+  }, [showTest]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs again once the tab or Settings has opened, when the field is drawn
   useEffect(() => {
@@ -308,10 +321,7 @@ export function StepTabs({
         </TabsContent>
 
         <TabsContent value="test" className="mt-0 flex flex-col gap-4">
-          <Text size="sm" muted>
-            Testing a step arrives with test runs.
-          </Text>
-          <PinArea node={node} scope={context.scope} pin={pin} compact />
+          <TestTab node={node} scope={context.scope} pin={pin} test={test} />
         </TabsContent>
       </Tabs>
 

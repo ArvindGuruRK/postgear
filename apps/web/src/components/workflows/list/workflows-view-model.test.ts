@@ -3,6 +3,8 @@ import {
   ago,
   deleteWorkflowWarning,
   lastRunText,
+  ROW_ACTION_LABELS,
+  rowActions,
   runsText,
   triggerText,
   usesText,
@@ -40,6 +42,28 @@ describe('workflows view model', () => {
     expect(deleteWorkflowWarning({ status: 'DRAFT' })).toBe(
       'Its runs are kept. This cannot be undone.',
     );
+  });
+
+  it('offers Activate or Pause in the row menu to admins only', () => {
+    expect(rowActions({ status: 'DRAFT' }, true)).toEqual([
+      'open',
+      'duplicate',
+      'activate',
+      'delete',
+    ]);
+    expect(rowActions({ status: 'PAUSED' }, true)).toContain('activate');
+    expect(rowActions({ status: 'ACTIVE' }, true)).toEqual([
+      'open',
+      'duplicate',
+      'pause',
+      'delete',
+    ]);
+    for (const status of ['DRAFT', 'ACTIVE', 'PAUSED'] as const) {
+      expect(rowActions({ status }, false)).toEqual(['open', 'duplicate', 'delete']);
+    }
+    expect(
+      rowActions({ status: 'ACTIVE' }, true).map((action) => ROW_ACTION_LABELS[action]),
+    ).toEqual(['Open', 'Duplicate', 'Pause', 'Delete']);
   });
 
   it('says how long ago', () => {

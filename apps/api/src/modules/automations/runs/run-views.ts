@@ -12,7 +12,7 @@
  * The detail route and the `step` event share one step shape, so the web
  * app applies a live event exactly as it would a fresh fetch.
  */
-import { redact } from '@postgear/automation';
+import { formatDate, isValidTimeZone, PUBLISH_PLATFORMS, redact } from '@postgear/automation';
 import {
   type AutomationRunMode,
   AutomationRunStatus,
@@ -21,7 +21,13 @@ import {
   type Prisma,
 } from '@postgear/db';
 import type { AutomationRunOptions } from '@postgear/scheduling';
-import type { LatestStep, RunDetailRow, RunSummaryRow } from './automation-runs.repository';
+import { TRIGGER_SUMMARIES } from './automation-runs.messages';
+import type {
+  LatestStep,
+  RunDetailRow,
+  RunSummaryRow,
+  TriggerFacts,
+} from './automation-runs.repository';
 
 /** A run that will not change again. */
 export const TERMINAL_RUN_STATUSES: ReadonlySet<AutomationRunStatus> = new Set([
@@ -39,7 +45,7 @@ export interface RunSummary {
   mode: AutomationRunMode;
   status: AutomationRunStatus;
   triggerType: string;
-  /** Test runs: what the test covered. Null for live runs. */
+  /** Test runs and retries: what the run covered. Null for other live runs. */
   options: AutomationRunOptions | null;
   startedById: string | null;
   stepCount: number;
@@ -49,6 +55,10 @@ export interface RunSummary {
   startedAt: string | null;
   finishedAt: string | null;
   createdAt: string;
+  /** The version number a live run executed ("v3"); null for a test run. */
+  version: number | null;
+  /** "Post published on Instagram"; null when there is nothing beyond the trigger's title. */
+  triggerSummary: string | null;
 }
 
 /** One step of a run: its latest attempt. */
@@ -67,6 +77,8 @@ export interface RunStepView {
   truncated: boolean;
   /** `AutomationStepError`: `{ message, code, retryable, details? }`. */
   error: unknown;
+  /** The output ports the step fired (`out`, `true`, `approved`, `error`, ...); empty until it finishes. */
+  ports: string[];
   startedAt: string | null;
   finishedAt: string | null;
   durationMs: number | null;
@@ -77,8 +89,6 @@ export interface RunDetail extends RunSummary {
   triggerPayload: unknown;
   /** The graph the run executed: the draft snapshot of a test run, the version of a live one. */
   graph: unknown;
-  /** The version number of a live run; null for a test run. */
-  version: number | null;
   steps: RunStepView[];
 }
 
@@ -92,7 +102,12 @@ export interface RunEvent {
   finishedAt: string | null;
 }
 
-export function toRunSummary(row: RunSummaryRow): RunSummary {
+/**
+ * A run summary. `facts` are the few trigger data fields its trigger phrase
+ * needs (`AutomationRunsRepository.triggerFacts`); without them the phrase
+ * is null.
+ */
+export function toRunSummary(row: RunSummaryRow, facts?: TriggerFacts | null): RunSummary {
   return {
     id: row.id,
     automationId: row.automationId,
@@ -107,6 +122,8 @@ export function toRunSummary(row: RunSummaryRow): RunSummary {
     startedAt: row.startedAt?.toISOString() ?? null,
     finishedAt: row.finishedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
+    version: row.version?.version ?? null,
+    triggerSummary: facts ? triggerSummaryOf(row.triggerType, facts) : null,
   };
 }
 
@@ -116,12 +133,60 @@ export function toRunDetail(
   connectionValues: readonly string[],
 ): RunDetail {
   return {
-    ...toRunSummary(row),
+    ...toRunSummary(row, triggerFactsOf(row.triggerPayload)),
     triggerPayload: hide(row.triggerPayload, connectionValues),
     graph: row.graphSnapshot ?? row.version?.graph ?? null,
-    version: row.version?.version ?? null,
     steps: steps.map((entry) => toStepView(entry, connectionValues)),
   };
+}
+
+/** The trigger types whose runs have a phrase beyond the trigger's title. */
+export const PHRASED_TRIGGER_TYPES: ReadonlySet<string> = new Set([
+  'trigger.postPublished',
+  'trigger.postFailed',
+  'trigger.schedule',
+]);
+
+/** The trigger phrase fields of a run's full trigger data (the detail has it loaded). */
+export function triggerFactsOf(payload: unknown): TriggerFacts {
+  const data = isRecord(payload) ? payload : {};
+  const post = isRecord(data.post) ? data.post : null;
+  const channel = post && isRecord(post.channel) ? post.channel : null;
+  return {
+    provider: typeof channel?.provider === 'string' ? channel.provider : null,
+    scheduledFor: typeof data.scheduledFor === 'string' ? data.scheduledFor : null,
+    timeZone: typeof data.timeZone === 'string' ? data.timeZone : null,
+  };
+}
+
+/**
+ * The trigger phrase of a run: the platform a post event happened on, or
+ * the time a schedule fired (in the schedule's own zone). Null when there
+ * is nothing more than the trigger's title (a Manual run, a webhook, a post
+ * with no known platform).
+ */
+export function triggerSummaryOf(triggerType: string, facts: TriggerFacts): string | null {
+  switch (triggerType) {
+    case 'trigger.postPublished':
+    case 'trigger.postFailed': {
+      const { provider } = facts;
+      const platform = provider
+        ? PUBLISH_PLATFORMS.find((entry) => entry.providers.includes(provider))
+        : undefined;
+      if (!platform) return null;
+      return triggerType === 'trigger.postPublished'
+        ? TRIGGER_SUMMARIES.postPublished(platform.title)
+        : TRIGGER_SUMMARIES.postFailed(platform.title);
+    }
+    case 'trigger.schedule': {
+      const at = facts.scheduledFor ? Date.parse(facts.scheduledFor) : Number.NaN;
+      if (!Number.isFinite(at)) return null;
+      const zone = facts.timeZone && isValidTimeZone(facts.timeZone) ? facts.timeZone : 'UTC';
+      return TRIGGER_SUMMARIES.scheduledFor(formatDate(at, 'HH:mm', zone));
+    }
+    default:
+      return null;
+  }
 }
 
 export function toStepView(
@@ -140,6 +205,7 @@ export function toStepView(
     output: hide(step.output, connectionValues),
     truncated: step.truncated,
     error: hide(step.error, connectionValues),
+    ports: step.ports,
     startedAt: step.startedAt?.toISOString() ?? null,
     finishedAt: step.finishedAt?.toISOString() ?? null,
     durationMs: step.durationMs,
@@ -202,6 +268,10 @@ export function connectionValuesOf(encrypted: readonly string[]): {
  * text would hide far more than it protects.
  */
 const NOT_SECRET_KEYS = new Set(['name', 'scope']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function textsIn(value: unknown): string[] {
   if (typeof value === 'string') return [value];

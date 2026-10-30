@@ -12,14 +12,17 @@
  *   current revision, and nothing is merged.
  * - **Tenancy**: every read and write is scoped to the active workspace, and
  *   another workspace's workflow is a 404, never a 403.
- * - **Turning workflows on and off** arrives in Module 09; the routes exist
- *   now and answer 501.
+ * - **Turning workflows on and off** (Module 09): activating stores an
+ *   immutable version of exactly the draft the admin saw and points the
+ *   workflow at it; editing afterwards only changes the draft (Unpublished
+ *   Changes), which Activate Changes, Discard Changes and Restore As Draft
+ *   act on. Triggers are set up after the version is stored, best-effort.
  */
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  NotImplementedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -36,13 +39,14 @@ import {
   NODE_KEY_PATTERN,
   redact,
   rekeyGraph,
+  riskSummary,
   type TemplateSummary,
   upgradeGraph,
   utf8Bytes,
   type ValidationIssue,
   validateGraph,
 } from '@postgear/automation';
-import { type AutomationRunStatus, AutomationStatus, type Prisma } from '@postgear/db';
+import { type AutomationRunStatus, AutomationStatus, type Prisma, Role } from '@postgear/db';
 import {
   MIN_SEARCH_LENGTH,
   matchesAllTerms,
@@ -59,13 +63,17 @@ import {
   type AutomationRow,
   AutomationsRepository,
   type AutomationWrite,
+  type VersionDetailRow,
+  type VersionRow,
 } from './automations.repository';
 import {
+  type ActivateAutomationInput,
   AUTOMATIONS_PAGE_SIZE,
   type CreateAutomationInput,
   DEFAULT_AUTOMATION_NAME,
   type ListAutomationsQuery,
   MAX_AUTOMATION_NAME_LENGTH,
+  type RestoreVersionInput,
   type UpdateAutomationInput,
 } from './dto/automations.schema';
 
@@ -113,7 +121,36 @@ export interface AutomationSaveResult {
   updatedAt: string;
 }
 
+/** One row of the Versions drawer (Module 09). */
+export interface VersionSummary {
+  version: number;
+  note: string | null;
+  triggerType: string;
+  createdAt: string;
+  createdBy: { id: string; name: string } | null;
+  /** The version live runs use now. */
+  active: boolean;
+}
+
+export interface VersionDetail extends VersionSummary {
+  graph: AutomationGraph;
+}
+
+/** `POST /automations/:id/activate` answers this. */
+export interface ActivationResult {
+  automation: AutomationDetail;
+  version: VersionSummary;
+  /** "The schedule is not set up yet. PostGear will set it up within 15 minutes." */
+  warnings: string[];
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A version number in a path: a whole number from 1, without leading zeros. */
+const VERSION_NUMBER_PATTERN = /^[1-9]\d{0,8}$/;
+
+/** Module 02's AI frequency rule, enforced again on activation. */
+const TOO_FREQUENT_FOR_AI = 'schedule.too_frequent_for_ai';
 
 /** A search reads this many newest matches, then checks every word. */
 const SEARCH_CANDIDATES = 200;
@@ -247,10 +284,20 @@ export class AutomationsService {
     };
   }
 
-  /** Soft delete. An active workflow's trigger is stopped first, so nothing starts a run of a deleted one. */
-  async remove(orgId: string, id: string): Promise<void> {
+  /**
+   * Soft delete that really stops the workflow (Module 09): its schedule is
+   * deleted and its runs in progress are cancelled first, so nothing runs
+   * for a deleted workflow. Any member deletes a draft or a paused one; an
+   * active one acts for the whole workspace, so only an admin may.
+   */
+  async remove(orgId: string, role: Role, id: string): Promise<void> {
     const row = await this.findOrThrow(orgId, id);
-    if (row.status === AutomationStatus.ACTIVE) await this.triggers.stop(orgId, id);
+    if (row.status === AutomationStatus.ACTIVE && !isAdmin(role)) {
+      throw new ForbiddenException(AUTOMATION_MESSAGES.DELETE_ACTIVE_ADMIN_ONLY);
+    }
+    // A draft never had a schedule; a paused one should not, but a missed delete costs nothing to repeat.
+    if (row.status !== AutomationStatus.DRAFT) await this.triggers.stop(orgId, id);
+    await this.triggers.stopRuns(orgId, id);
     if (!(await this.repository.softDelete(orgId, id))) {
       throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
     }
@@ -334,15 +381,179 @@ export class AutomationsService {
     }
   }
 
-  /** Module 09. The workflow is still checked, so a foreign id stays a 404. */
-  async activate(orgId: string, id: string): Promise<never> {
-    await this.findOrThrow(orgId, id);
-    throw new NotImplementedException(AUTOMATION_MESSAGES.ACTIVATION_LATER);
+  /**
+   * Turns a workflow on, or makes its draft the new live version (Module 09).
+   *
+   * 1. The draft must be at the revision the admin saw (409 otherwise).
+   * 2. The full server check with the workspace's connections and channels:
+   *    any error refuses it (422 `activation_blocked`, or
+   *    `schedule_too_frequent` when the AI frequency rule is the only one).
+   * 3. A workflow that can publish without a review needs the tick.
+   * 4. One transaction stores version n + 1 and points the workflow at it.
+   * 5. Then the trigger is set up. A Temporal blip never undoes a version:
+   *    the answer carries a warning and the reconcile finishes the job.
+   */
+  async activate(
+    orgId: string,
+    userId: string | null,
+    id: string,
+    input: ActivateAutomationInput,
+  ): Promise<ActivationResult> {
+    const row = await this.findOrThrow(orgId, id);
+    if (row.draftRevision !== input.draftRevision) throw conflict(row.draftRevision);
+
+    const graph = upgradeGraph(row.draftGraph);
+    const errors = validateGraph(graph, await this.context.forOrg(orgId)).filter(
+      (issue) => issue.severity === 'error',
+    );
+    if (errors.length > 0) {
+      if (errors.every((issue) => issue.code === TOO_FREQUENT_FOR_AI)) {
+        throw new UnprocessableEntityException({
+          message: errors[0].message,
+          code: 'schedule_too_frequent',
+        });
+      }
+      throw new UnprocessableEntityException({
+        message: AUTOMATION_MESSAGES.ACTIVATION_BLOCKED,
+        code: 'activation_blocked',
+        details: { issues: errors.length },
+      });
+    }
+
+    if (riskSummary(graph).publishesWithoutReview && input.acceptAutomaticPosting !== true) {
+      throw new UnprocessableEntityException({
+        message: AUTOMATION_MESSAGES.CONFIRM_AUTOMATIC_POSTING,
+        code: 'confirm_automatic_posting',
+      });
+    }
+
+    const triggerType = triggerTypeOf(graph);
+    if (!triggerType) {
+      // validateGraph reports a missing trigger as an error; this is the type guard.
+      throw new UnprocessableEntityException({
+        message: AUTOMATION_MESSAGES.ACTIVATION_BLOCKED,
+        code: 'activation_blocked',
+        details: { issues: 1 },
+      });
+    }
+
+    const result = await this.repository.activate(orgId, id, {
+      expectedRevision: input.draftRevision,
+      graph: toJson(graph),
+      triggerType,
+      note: input.note ? input.note : null,
+      createdById: userId,
+    });
+    if (result.outcome === 'not_found') throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
+    if (result.outcome === 'conflict') throw conflict(result.currentRevision);
+
+    const warnings: string[] = [];
+    const started = await this.triggers.start(orgId, id, { id: result.version.id, graph });
+    if (!started) warnings.push(AUTOMATION_MESSAGES.SCHEDULE_NOT_SET_UP);
+
+    return {
+      automation: await this.get(orgId, id),
+      version: toVersionSummary(result.version, result.version.id),
+      warnings,
+    };
   }
 
-  async pause(orgId: string, id: string): Promise<never> {
-    await this.findOrThrow(orgId, id);
-    throw new NotImplementedException(AUTOMATION_MESSAGES.ACTIVATION_LATER);
+  /**
+   * Turns a workflow off: no new runs from now on, its schedule deleted (so
+   * turning it back on never catches up). Runs in progress finish; they can
+   * be cancelled from the Runs tab. Pausing a paused workflow changes
+   * nothing; a draft was never on (409).
+   */
+  async pause(orgId: string, id: string): Promise<AutomationDetail> {
+    const row = await this.findOrThrow(orgId, id);
+    if (row.status === AutomationStatus.DRAFT) {
+      throw new ConflictException({
+        message: AUTOMATION_MESSAGES.NOT_TURNED_ON,
+        code: 'no_active_version',
+      });
+    }
+    await this.repository.pause(orgId, id);
+    // Best-effort: the reconcile deletes a schedule whose workflow is not on.
+    await this.triggers.stop(orgId, id);
+    return this.get(orgId, id);
+  }
+
+  /** Discard Changes: the draft becomes the live version again. Never changes what is live. */
+  async discard(orgId: string, userId: string | null, id: string): Promise<AutomationDetail> {
+    if (!UUID_PATTERN.test(id)) throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
+    const result = await this.repository.discard(orgId, id, userId);
+    if (result.outcome === 'not_found') throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
+    if (result.outcome === 'no_active_version') {
+      throw new ConflictException({
+        message: AUTOMATION_MESSAGES.NO_ACTIVE_VERSION,
+        code: 'no_active_version',
+      });
+    }
+    return toDetail(result.row);
+  }
+
+  /** The Versions drawer: newest first, the live one marked. */
+  async versions(orgId: string, id: string): Promise<VersionSummary[]> {
+    const row = await this.findOrThrow(orgId, id);
+    const rows = await this.repository.listVersions(orgId, id);
+    return rows.map((version) => toVersionSummary(version, row.activeVersion?.id ?? null));
+  }
+
+  /** One version with its graph, for a read-only preview on the canvas. */
+  async version(orgId: string, id: string, number: string): Promise<VersionDetail> {
+    const row = await this.findOrThrow(orgId, id);
+    const found = await this.findVersionOrThrow(orgId, id, number);
+    return {
+      ...toVersionSummary(found, row.activeVersion?.id ?? null),
+      graph: upgradeGraph(found.graph),
+    };
+  }
+
+  /**
+   * Restore As Draft: copies a version's graph into the draft, checked
+   * against the editor's revision like a save. What is live never changes;
+   * Unpublished Changes is worked out again against the live version.
+   */
+  async restore(
+    orgId: string,
+    userId: string | null,
+    id: string,
+    number: string,
+    input: RestoreVersionInput,
+  ): Promise<AutomationDetail> {
+    if (!UUID_PATTERN.test(id)) throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
+    const current = await this.repository.findSaveState(orgId, id);
+    if (!current) throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
+    const found = await this.findVersionOrThrow(orgId, id, number);
+    if (current.draftRevision !== input.draftRevision) throw conflict(current.draftRevision);
+
+    const graph = upgradeGraph(found.graph);
+    const saved = await this.repository.update(orgId, id, input.draftRevision, {
+      updatedById: userId,
+      draftGraph: toJson(graph),
+      triggerType: triggerTypeOf(graph),
+      hasUnpublishedChanges:
+        current.status !== AutomationStatus.DRAFT &&
+        !sameJson(graph, current.activeVersion?.graph ?? null),
+    });
+    if (!saved) {
+      const now = await this.repository.findSaveState(orgId, id);
+      if (!now) throw new NotFoundException(AUTOMATION_MESSAGES.NOT_FOUND);
+      throw conflict(now.draftRevision);
+    }
+    return toDetail(saved);
+  }
+
+  private async findVersionOrThrow(
+    orgId: string,
+    id: string,
+    number: string,
+  ): Promise<VersionDetailRow> {
+    const found = VERSION_NUMBER_PATTERN.test(number)
+      ? await this.repository.findVersion(orgId, id, Number(number))
+      : null;
+    if (!found) throw new NotFoundException(AUTOMATION_MESSAGES.VERSION_NOT_FOUND);
+    return found;
   }
 
   private async findOrThrow(orgId: string, id: string): Promise<AutomationRow> {
@@ -376,6 +587,27 @@ function assertStepInDraft(row: AutomationRow, nodeKey: string): void {
   if (!graph?.nodes.some((node) => node.key === nodeKey)) {
     throw new NotFoundException(AUTOMATION_MESSAGES.STEP_NOT_FOUND);
   }
+}
+
+/** Admins and superadmins act for the whole workspace. */
+function isAdmin(role: Role): boolean {
+  return role === Role.ADMIN || role === Role.SUPERADMIN;
+}
+
+/** A person's name as the drawer shows it: first and last name, else their email. */
+function personName(user: { name: string | null; lastName: string | null; email: string }): string {
+  return [user.name, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+}
+
+function toVersionSummary(row: VersionRow, activeVersionId: string | null): VersionSummary {
+  return {
+    version: row.version,
+    note: row.note,
+    triggerType: row.triggerType,
+    createdAt: row.createdAt.toISOString(),
+    createdBy: row.createdBy ? { id: row.createdBy.id, name: personName(row.createdBy) } : null,
+    active: row.id === activeVersionId,
+  };
 }
 
 function conflict(currentRevision: number): ConflictException {

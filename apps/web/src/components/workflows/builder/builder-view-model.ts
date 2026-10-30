@@ -146,3 +146,54 @@ export const SMALL_SCREEN_MESSAGE = 'The builder works best on a wider screen.';
 export const LOOP_REFUSED = 'Workflows cannot loop back to an earlier step.';
 export const WORKFLOW_MISSING_MESSAGE = 'This workflow is not here. It may have been deleted.';
 export const WORKFLOW_LOAD_FAILED = 'The workflow could not be loaded.';
+
+/* ---- Module 08: the builder's tabs and the painted test run ---- */
+
+export type BuilderTab = 'editor' | 'runs';
+
+/** Where the builder opens: `?tab=runs`, or a `?run=` link on its own, opens the Runs tab. */
+export function initialTab(
+  tab: string | null | undefined,
+  run: string | null | undefined,
+): BuilderTab {
+  return tab === 'runs' || (typeof run === 'string' && run.length > 0) ? 'runs' : 'editor';
+}
+
+/**
+ * The address for a tab: the builder's own params (`tab`, `run`, `review`)
+ * written for it, everything else (`step`, `setup`) left as it was. The
+ * Editor drops all three; the Runs tab keeps the chosen run and the review
+ * flag of a notification link.
+ */
+export function builderSearch(
+  current: string,
+  view: { tab: BuilderTab; runId: string | null; review: boolean },
+): string {
+  const params = new URLSearchParams(current);
+  params.delete('tab');
+  params.delete('run');
+  params.delete('review');
+  if (view.tab === 'runs') {
+    params.set('tab', 'runs');
+    if (view.runId) params.set('run', view.runId);
+    if (view.runId && view.review) params.set('review', '1');
+  }
+  const search = params.toString();
+  return search ? `?${search}` : '';
+}
+
+/**
+ * The shape of a graph: its steps and lines, not where they sit or how they
+ * are set up. A painted test run stays on the canvas while this holds, so
+ * moving a step keeps the paint and adding, removing or reconnecting one
+ * clears it.
+ */
+export function structureKey(graph: AutomationGraph): string {
+  const steps = graph.nodes.map((node) => node.key).sort();
+  const lines = graph.edges.map((edge) => edge.id).sort();
+  return `${steps.join(',')}|${lines.join(',')}`;
+}
+
+/** A flush that could not save: Activate, Restore and Run Now wait for the save. */
+export const NOT_SAVED_YET =
+  'Your latest changes are not saved yet. Wait a moment for the workflow to save, then try again.';

@@ -1,7 +1,8 @@
 /**
  * Who may call the run routes, read from the controllers' real metadata
- * through the real `RolesGuard`: any member tests, watches, cancels and
- * reviews; someone outside the workspace gets nothing. The events stream
+ * through the real `RolesGuard`: any member tests, watches, cancels,
+ * reviews, retries from a failed step and uses Run Now (the service decides
+ * whether the workflow allows it); someone outside the workspace gets nothing. The events stream
  * skips the per-address throttle, as the bell's does.
  */
 import { ForbiddenException } from '@nestjs/common';
@@ -49,6 +50,8 @@ const ROUTES: [AnyController, string][] = [
   [AutomationRunsController, 'stream'],
   [AutomationRunsController, 'cancel'],
   [AutomationRunsController, 'review'],
+  [AutomationRunsController, 'retry'],
+  [AutomationTestRunsController, 'runNow'],
 ];
 
 describe('Run route roles', () => {

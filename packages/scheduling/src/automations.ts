@@ -37,6 +37,87 @@ export interface AutomationRunInput {
   organizationId: string;
 }
 
+/**
+ * Module 09: a run started by a Temporal Schedule. A schedule cannot know a
+ * run row in advance, so the workflow creates its own row first, keyed on
+ * `scheduleTriggerEventId(automationId, scheduledAt)`: a retried start
+ * creates nothing new. The row stores the Temporal workflow id
+ * (`AutomationRun.temporalWorkflowId`) so Cancel can find it.
+ */
+export interface AutomationScheduledRunInput {
+  scheduled: { automationId: string; versionId: string };
+  organizationId: string;
+}
+
+export type AutomationRunWorkflowInput = AutomationRunInput | AutomationScheduledRunInput;
+
+export function isScheduledRunInput(
+  input: AutomationRunWorkflowInput,
+): input is AutomationScheduledRunInput {
+  return 'scheduled' in input && input.scheduled !== undefined;
+}
+
+/** The Temporal Schedule of a workflow whose trigger is Schedule: one per workflow. */
+export function automationScheduleId(automationId: string): string {
+  return `automation-schedule:${automationId}`;
+}
+
+/** The workflow id a schedule gives its runs; Temporal appends the scheduled time. */
+export function automationScheduledWorkflowIdPrefix(automationId: string): string {
+  return `automation-scheduled:${automationId}`;
+}
+
+/**
+ * Never two scheduled runs of one workflow at once (`SKIP`), and a one minute
+ * catch-up window: a short worker outage loses no run, but nothing piles up.
+ * Pausing deletes the schedule, so a paused workflow never catches up.
+ */
+export const AUTOMATION_SCHEDULE_POLICIES = {
+  overlap: 'SKIP',
+  catchupWindowMs: 60_000,
+} as const;
+
+/**
+ * `AutomationRun.triggerEventId`, unique per workflow, so a replayed publish
+ * activity or a retried schedule start inserts no second run.
+ * - Post Published: the chain's root row publishes once; a repeat spawns new roots.
+ * - Post Failed: the publish workflow's Temporal run id, stable across retries of
+ *   the failing activity and new when the post is queued again (never a timestamp).
+ * - Schedule: the scheduled start time, not the actual one.
+ */
+export function postPublishedTriggerEventId(rootPostId: string): string {
+  return `post.published:${rootPostId}`;
+}
+
+export function postFailedTriggerEventId(rootPostId: string, publishRunId: string): string {
+  return `post.failed:${rootPostId}:${publishRunId}`;
+}
+
+export function scheduleTriggerEventId(automationId: string, scheduledAtIso: string): string {
+  return `schedule:${automationId}:${scheduledAtIso}`;
+}
+
+/** Notification `type` values workflows write (the API's catalogue lists them). */
+export const AUTOMATION_NOTIFICATION_TYPES = {
+  /** An In-App Notification step. */
+  message: 'automation',
+  /** A Manual Review is waiting. */
+  review: 'automation.review',
+  /** A live run failed (grouped: at most one an hour per workflow). */
+  failed: 'automation.failed',
+  /** The workflow was paused after too many failed runs in a row. */
+  paused: 'automation.paused',
+} as const;
+
+/** Finished runs older than this are pruned with their steps. */
+export const AUTOMATION_RUN_RETENTION_DAYS = 30;
+
+/** Live runs failing in a row before the worker pauses the workflow. */
+export const AUTOMATION_AUTO_PAUSE_AFTER_FAILURES = 5;
+
+/** One failure alert per workflow per window; later failures are counted into the next. */
+export const AUTOMATION_FAILURE_ALERT_WINDOW_MS = 60 * 60_000;
+
 /** How a run ended. `rejected` and `expired` are outcomes, not failures. */
 export type AutomationRunOutcome = 'succeeded' | 'failed' | 'rejected' | 'cancelled' | 'expired';
 
@@ -56,6 +137,23 @@ export interface AutomationRunOptions {
   /** Steps with an outside effect that a test sends for real (the user said so per step). */
   sendForReal: string[];
   triggerData: AutomationTriggerData;
+  /** Set on a Retry From Here run (Module 08), live or test. */
+  retry?: AutomationRetryOptions;
+}
+
+/**
+ * Retry From Here (Module 08): a new run of the same version and trigger
+ * payload. Every step that finished before `fromNodeKey` is seeded as
+ * finished, its output in `AutomationRun.seedOutputs` and the ports it fired
+ * here, and is never run again; the interpreter carries on from there. A
+ * live run's retry is live too (`triggerData` is then `'last'`).
+ */
+export interface AutomationRetryOptions {
+  /** The run being retried. */
+  of: string;
+  fromNodeKey: string;
+  /** Seeded step key to the output ports it fired (`AutomationRunStep.ports`). */
+  ports: Record<string, string[]>;
 }
 
 /**
@@ -189,6 +287,10 @@ export interface AutomationReviewOutput {
   decision: ReviewDecision;
   decidedById: string;
   decidedAt: string;
+  /** The reviewer's name, the catalog's `reviewedBy` output (Module 08). */
+  reviewedBy?: string;
+  /** Rejections only: the reviewer's reason, the catalog's `reason` output (Module 08). */
+  reason?: string;
   /** P1: the reviewer's edited text. */
   editedText?: string;
 }

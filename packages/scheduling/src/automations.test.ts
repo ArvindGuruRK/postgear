@@ -1,13 +1,21 @@
 import {
   AUTOMATION_FAILURE_TYPES,
+  AUTOMATION_NOTIFICATION_TYPES,
   AUTOMATION_RUN_WORKFLOW,
+  AUTOMATION_SCHEDULE_POLICIES,
   AUTOMATION_STEP_RETRY_POLICY,
   AUTOMATION_STEP_TIMEOUTS,
   automationRunWorkflowId,
+  automationScheduledWorkflowIdPrefix,
+  automationScheduleId,
   automationStepRetryPolicy,
+  isScheduledRunInput,
   NON_RETRYABLE_AUTOMATION_FAILURES,
+  postFailedTriggerEventId,
+  postPublishedTriggerEventId,
   REVIEW_DECISION_SIGNAL,
   RUN_STOPPING_AUTOMATION_FAILURES,
+  scheduleTriggerEventId,
 } from './automations';
 import { backoffAfterAttempt } from './retry-policy';
 import { CANCEL_SIGNAL } from './workflows';
@@ -54,6 +62,45 @@ describe('automation run contract', () => {
   it('gives fast steps 30 s and slow steps 5 minutes with heartbeats', () => {
     expect(AUTOMATION_STEP_TIMEOUTS.fast.startToCloseMs).toBe(30_000);
     expect(AUTOMATION_STEP_TIMEOUTS.slow).toEqual({ startToCloseMs: 300_000, heartbeatMs: 30_000 });
+  });
+});
+
+describe('Module 09 triggers', () => {
+  it('names the schedule and its runs from the workflow id', () => {
+    expect(automationScheduleId('a1')).toBe('automation-schedule:a1');
+    expect(automationScheduledWorkflowIdPrefix('a1')).toBe('automation-scheduled:a1');
+    expect(automationScheduleId('a1')).not.toBe(automationRunWorkflowId('a1'));
+  });
+
+  it('tells a scheduled start from a run row start', () => {
+    expect(isScheduledRunInput({ runId: 'r1', organizationId: 'o1' })).toBe(false);
+    expect(
+      isScheduledRunInput({
+        scheduled: { automationId: 'a1', versionId: 'v1' },
+        organizationId: 'o1',
+      }),
+    ).toBe(true);
+  });
+
+  it('builds one dedupe key per event', () => {
+    expect(postPublishedTriggerEventId('p1')).toBe('post.published:p1');
+    expect(postFailedTriggerEventId('p1', 'run-a')).not.toBe(
+      postFailedTriggerEventId('p1', 'run-b'),
+    );
+    expect(scheduleTriggerEventId('a1', '2026-11-03T08:00:00.000Z')).toBe(
+      'schedule:a1:2026-11-03T08:00:00.000Z',
+    );
+  });
+
+  it('never runs two scheduled runs at once', () => {
+    expect(AUTOMATION_SCHEDULE_POLICIES.overlap).toBe('SKIP');
+    expect(AUTOMATION_SCHEDULE_POLICIES.catchupWindowMs).toBe(60_000);
+  });
+
+  it('keeps notification types apart', () => {
+    const types = Object.values(AUTOMATION_NOTIFICATION_TYPES);
+    expect(new Set(types).size).toBe(types.length);
+    for (const type of types) expect(type.startsWith('automation')).toBe(true);
   });
 });
 

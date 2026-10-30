@@ -4,6 +4,7 @@
  * markup; a provider message is interpolated as the text it is.
  */
 import { NotificationEmailStatus } from '@postgear/db';
+import { AUTOMATION_NOTIFICATION_TYPES } from '@postgear/scheduling';
 import {
   AUDIENCE_BY_TYPE,
   composeEmail,
@@ -131,6 +132,14 @@ describe('the catalogue', () => {
     expect(AUDIENCE_BY_TYPE['billing.payment_failed']).toBe('admins');
     expect(AUDIENCE_BY_TYPE['webhook.failed']).toBe('admins');
     expect(AUDIENCE_BY_TYPE.info).toBe('none');
+  });
+
+  it('lists every type workflows write, the Module 09 failure and pause alerts included', () => {
+    for (const type of Object.values(AUTOMATION_NOTIFICATION_TYPES)) {
+      expect(isNotificationType(type)).toBe(true);
+    }
+    expect(AUDIENCE_BY_TYPE['automation.failed']).toBe('failure_emails');
+    expect(AUDIENCE_BY_TYPE['automation.paused']).toBe('failure_emails');
   });
 
   it('recognises its own types and nothing else', () => {

@@ -77,6 +77,12 @@ export {
   tabComplete,
   tabForField,
 } from './catalog/form';
+// Trigger filters and failure reason words (Module 09)
+export {
+  matchesTriggerFilters,
+  publishFailureReasonText,
+  type TriggerEvent,
+} from './catalog/trigger-filters';
 // Conditions (If / Else, Filter, Paths)
 export {
   type DescribeConditionOptions,

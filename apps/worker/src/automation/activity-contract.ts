@@ -19,6 +19,8 @@
  *   conditional write, so a late activity cannot overwrite a run that was
  *   cancelled or finished meanwhile.
  * - Skipped rows (`SKIPPED`) carry `output: { skipped: AutomationSkipReason }`.
+ * - Every finished row stores the output ports it fired in `ports` (the
+ *   ones fed to `planNext`; `[]` for skipped rows and stop failures).
  */
 import type { AutomationGraph, PortId } from '@postgear/automation';
 import type {
@@ -51,7 +53,35 @@ export type RunPlan =
       mode: 'test' | 'live';
       scope: AutomationRunScope;
       sendForReal: string[];
+      /**
+       * Retry From Here (Module 08): steps that start finished, with the
+       * ports they fired in the retried run. Never executed again; the API
+       * copied their rows into this run. Absent on every other run.
+       */
+      seeded?: Record<string, SeededStep>;
     };
+
+/** A step a Retry From Here run starts with as finished. */
+export interface SeededStep {
+  /** `handled` when its copied row is HANDLED_ERROR. */
+  status: 'succeeded' | 'handled';
+  ports: PortId[];
+}
+
+/** A run a Temporal Schedule started (Module 09): the schedule knows no run row yet. */
+export interface StartScheduledRunInput {
+  organizationId: string;
+  automationId: string;
+  versionId: string;
+  /** This workflow's id, stored on the row so Cancel can find it. */
+  workflowId: string;
+  /** When the schedule meant it to start (ISO), the run's dedupe key. */
+  scheduledAt: string;
+}
+
+export type StartScheduledRunResult =
+  | { runId: string }
+  | { skip: true; reason: 'notActive' | 'notSchedule' | 'otherWorkflow' };
 
 /** What a finished step tells the workflow: small, so history stays short. */
 export interface NodeRunResult {
@@ -87,6 +117,13 @@ export interface FinishRunInput extends RunRef {
 }
 
 export interface AutomationActivities {
+  /**
+   * A scheduled start (Module 09): creates the QUEUED live run row once,
+   * keyed on `scheduleTriggerEventId(automationId, scheduledAt)`, and returns
+   * its id. Skips when the workflow is no longer ACTIVE on that version, or
+   * when another Temporal workflow already owns the row.
+   */
+  startScheduledRun(input: StartScheduledRunInput): Promise<StartScheduledRunResult>;
   /** Reads the run and marks it RUNNING with `startedAt` (QUEUED only). */
   loadRunPlan(input: RunRef): Promise<RunPlan>;
   /**
@@ -132,6 +169,8 @@ export interface AutomationActivities {
    * `error`, marks any QUEUED, RUNNING or WAITING step rows CANCELLED, and
    * updates `lastRunAt`, `lastRunStatus`, `lastRunError` on the Automation
    * (plus `consecutiveFailures` for live runs: +1 on failed, 0 on succeeded).
+   * A failed live run also writes its grouped alert and, at the limit,
+   * pauses the workflow and deletes its schedule (Module 09).
    */
   finishRun(input: FinishRunInput): Promise<void>;
 }

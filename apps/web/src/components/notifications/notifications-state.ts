@@ -10,8 +10,8 @@
  */
 import type {
   NotificationConnectionState,
-  NotificationsPage,
   NotificationStreamEvent,
+  NotificationsPage,
   NotificationType,
   NotificationView,
 } from '@/types/notifications';
@@ -120,6 +120,8 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   'webhook.failed': 'Webhook delivery failed',
   automation: 'Workflow message',
   'automation.review': 'Review needed',
+  'automation.failed': 'Workflow failed',
+  'automation.paused': 'Workflow paused',
   info: 'Notification',
 };
 

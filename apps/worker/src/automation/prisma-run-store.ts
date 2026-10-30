@@ -10,6 +10,7 @@ import {
   AutomationConnectionStatus,
   AutomationRunMode,
   AutomationRunStatus,
+  AutomationStatus,
   AutomationStepStatus,
   decrypt,
   NotificationEmailStatus,
@@ -20,7 +21,10 @@ import {
 import type { AutomationStepError } from '@postgear/scheduling';
 import type { RunRef } from './activity-contract';
 import type {
+  AutomationRecord,
   AutomationRunSummary,
+  LiveRunRow,
+  NewLiveRun,
   NotificationWrite,
   PriorOutput,
   RunChange,
@@ -30,6 +34,7 @@ import type {
   StepKey,
   StepRecord,
   StoredConnection,
+  StoredNotification,
 } from './run-store';
 
 type Db = typeof prisma | PrismaTransactionClient;
@@ -60,6 +65,7 @@ const STEP_SELECT = {
   startedAt: true,
   finishedAt: true,
   durationMs: true,
+  ports: true,
 } as const;
 
 type StepRow = Prisma.AutomationRunStepGetPayload<{ select: typeof STEP_SELECT }>;
@@ -86,6 +92,7 @@ function stepData(change: StepChange): Prisma.AutomationRunStepUpdateManyMutatio
   if (change.startedAt !== undefined) data.startedAt = change.startedAt;
   if (change.finishedAt !== undefined) data.finishedAt = change.finishedAt;
   if (change.durationMs !== undefined) data.durationMs = change.durationMs;
+  if (change.ports !== undefined) data.ports = change.ports;
   return data;
 }
 
@@ -222,6 +229,7 @@ export class PrismaRunStore implements RunStore {
           startedAt: step.startedAt,
           finishedAt: step.finishedAt,
           durationMs: step.durationMs,
+          ports: step.ports,
         },
       ],
       skipDuplicates: true,
@@ -335,6 +343,7 @@ export class PrismaRunStore implements RunStore {
         link: notification.link,
         emailStatus: NotificationEmailStatus.PENDING,
         meta: notification.meta as Prisma.InputJsonValue,
+        ...(notification.createdAt ? { createdAt: notification.createdAt } : {}),
       },
       select: { id: true },
     });
@@ -358,6 +367,121 @@ export class PrismaRunStore implements RunStore {
             ? { consecutiveFailures: 0 }
             : {}),
       },
+    });
+  }
+
+  async loadAutomation(
+    organizationId: string,
+    automationId: string,
+  ): Promise<AutomationRecord | null> {
+    const row = await this.db.automation.findFirst({
+      where: { id: automationId, organizationId },
+      select: {
+        id: true,
+        organizationId: true,
+        name: true,
+        status: true,
+        deletedAt: true,
+        activeVersionId: true,
+        consecutiveFailures: true,
+      },
+    });
+    if (!row) return null;
+    const { deletedAt, ...rest } = row;
+    return { ...rest, deleted: deletedAt !== null };
+  }
+
+  async loadVersionGraph(
+    organizationId: string,
+    automationId: string,
+    versionId: string,
+  ): Promise<unknown> {
+    const row = await this.db.automationVersion.findFirst({
+      where: { id: versionId, automationId, automation: { organizationId } },
+      select: { graph: true },
+    });
+    return row?.graph ?? null;
+  }
+
+  async createLiveRun(run: NewLiveRun): Promise<LiveRunRow> {
+    const id = crypto.randomUUID();
+    // ON CONFLICT DO NOTHING on (automationId, triggerEventId), so a second
+    // start of the same event inside a transaction never aborts it.
+    const inserted = await this.db.automationRun.createMany({
+      data: [
+        {
+          id,
+          automationId: run.automationId,
+          versionId: run.versionId,
+          organizationId: run.organizationId,
+          mode: AutomationRunMode.LIVE,
+          status: AutomationRunStatus.QUEUED,
+          triggerType: run.triggerType,
+          triggerEventId: run.triggerEventId,
+          triggerPayload: (run.triggerPayload ?? {}) as Prisma.InputJsonValue,
+          temporalWorkflowId: run.temporalWorkflowId,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    const row = await this.db.automationRun.findFirst({
+      where: {
+        automationId: run.automationId,
+        organizationId: run.organizationId,
+        triggerEventId: run.triggerEventId,
+      },
+      select: { id: true, status: true, temporalWorkflowId: true },
+    });
+    if (!row) {
+      throw new Error('The run for this trigger event could not be read back.');
+    }
+    return { ...row, created: inserted.count > 0 && row.id === id };
+  }
+
+  async pauseAutomation(organizationId: string, automationId: string): Promise<boolean> {
+    const result = await this.db.automation.updateMany({
+      where: {
+        id: automationId,
+        organizationId,
+        status: AutomationStatus.ACTIVE,
+        deletedAt: null,
+      },
+      data: { status: AutomationStatus.PAUSED },
+    });
+    return result.count > 0;
+  }
+
+  async latestNotification(
+    organizationId: string,
+    type: string,
+    automationId: string,
+  ): Promise<StoredNotification | null> {
+    const row = await this.db.notifications.findFirst({
+      where: {
+        organizationId,
+        type,
+        deletedAt: null,
+        meta: { path: ['automationId'], equals: automationId },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, createdAt: true, meta: true },
+    });
+    if (!row) return null;
+    const meta =
+      typeof row.meta === 'object' && row.meta !== null && !Array.isArray(row.meta)
+        ? (row.meta as Record<string, unknown>)
+        : {};
+    return { id: row.id, createdAt: row.createdAt, meta };
+  }
+
+  async updateNotificationMeta(
+    organizationId: string,
+    notificationId: string,
+    meta: Record<string, unknown>,
+  ): Promise<void> {
+    await this.db.notifications.updateMany({
+      where: { id: notificationId, organizationId },
+      data: { meta: meta as Prisma.InputJsonValue },
     });
   }
 

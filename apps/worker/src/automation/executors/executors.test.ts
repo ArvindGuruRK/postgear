@@ -307,7 +307,7 @@ describe('In-App Notification', () => {
       type: 'automation',
       title: 'Ready: Sourdough (Test)',
       content: 'Have a look.',
-      link: '/org_test/workflows/auto_1?run=run_1',
+      link: '/org_test/workflows/auto_1?tab=runs&run=run_1',
       emailStatus: 'PENDING',
     });
     expect(h.store.latest('run_1', 'bell')?.output).toMatchObject({ sent: true });
@@ -341,5 +341,6 @@ function stepRowFor(nodeKey: string, nodeType: string) {
     startedAt: null,
     finishedAt: null,
     durationMs: null,
+    ports: [] as string[],
   };
 }

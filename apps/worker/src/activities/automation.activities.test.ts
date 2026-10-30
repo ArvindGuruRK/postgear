@@ -41,6 +41,7 @@ function row(nodeKey: string, overrides: Partial<StepRecord> = {}): StepRecord {
     startedAt: NOW,
     finishedAt: NOW,
     durationMs: 5,
+    ports: [],
     ...overrides,
   };
 }
@@ -372,7 +373,7 @@ describe('Manual Review', () => {
       type: 'automation.review',
       title: 'Review needed (Test)',
       content: 'Your Publishing Report is ready for review.',
-      link: '/org_test/workflows/auto_1?run=run_1',
+      link: '/org_test/workflows/auto_1?tab=runs&run=run_1&review=1',
       emailStatus: 'PENDING',
     });
   });

@@ -9,7 +9,7 @@
  * so chunk boundaries land exactly where each case wants them.
  */
 import { ApiError } from './api';
-import { createSseParser, type SseFrame, streamEvents } from './sse';
+import { createSseParser, type SseFrame, streamEvents, streamGetEvents } from './sse';
 
 function collect(): { frames: SseFrame[]; parser: ReturnType<typeof createSseParser> } {
   const frames: SseFrame[] = [];
@@ -208,5 +208,53 @@ describe('streamEvents', () => {
 
     await expect(run).rejects.toMatchObject({ name: 'AbortError' });
     expect(events).toHaveLength(1);
+  });
+});
+
+describe('streamGetEvents', () => {
+  // Made here, not when the file loads: the POST tests restore theirs first.
+  let fetchSpy: jest.SpyInstance<Promise<Response>, Parameters<typeof fetch>>;
+
+  beforeAll(() => {
+    fetchSpy = jest.spyOn(globalThis, 'fetch');
+  });
+  afterAll(() => fetchSpy.mockRestore());
+
+  it('opens a GET with credentials and no body, and resolves when the server closes', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      streamOf([
+        'event: step\ndata: {"nodeKey":"trig","status":"SUCCEEDED"}\n\n',
+        ': ping\n\nevent: run\ndata: {"id":"r1","status":"SUCCEEDED"}\n\n',
+      ]),
+    );
+    const events: { type: string }[] = [];
+
+    await streamGetEvents('/automation-runs/r1/events', {
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(events).toEqual([
+      { type: 'step', nodeKey: 'trig', status: 'SUCCEEDED' },
+      { type: 'run', id: 'r1', status: 'SUCCEEDED' },
+    ]);
+    const init = fetchSpy.mock.calls.at(-1)?.[1];
+    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
+    expect(init?.body).toBeUndefined();
+  });
+
+  it('throws the API refusal before the stream opens', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Run not found' }), { status: 404 }),
+    );
+
+    const failure = await streamGetEvents('/automation-runs/x/events', {
+      onEvent: () => undefined,
+    }).then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect(failure).toMatchObject({ status: 404, message: 'Run not found' });
   });
 });

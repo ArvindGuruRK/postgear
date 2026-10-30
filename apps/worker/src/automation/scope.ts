@@ -6,7 +6,8 @@
  *
  * - `trigger`: the run's trigger data (a step test: the seeded trigger output);
  * - `nodes.<key>.output`: each earlier step's latest output (SUCCEEDED,
- *   DRY_RUN or HANDLED_ERROR), or the seeded outputs of a step test;
+ *   DRY_RUN or HANDLED_ERROR), or the seeded outputs of a step test; a
+ *   Retry From Here run reads its seeded steps from `seedOutputs` too;
  * - `run`: `{ id, startedAt, mode }`; `workspace`: `{ name }`.
  */
 import {
@@ -24,11 +25,29 @@ import {
   tokenSource,
   tokensIn,
 } from '@postgear/automation';
-import type { AutomationRunOptions, AutomationRunScope } from '@postgear/scheduling';
+import type {
+  AutomationRetryOptions,
+  AutomationRunOptions,
+  AutomationRunScope,
+} from '@postgear/scheduling';
 import { permanent, type StepFailure } from './failures';
 import type { PriorOutput, RunRecord } from './run-store';
 
 const TRIGGER_DATA = ['last', 'sample', 'pinned'] as const;
+
+/** Retry From Here (Module 08), read leniently: anything malformed means no retry. */
+function readRetry(raw: unknown): AutomationRetryOptions | undefined {
+  const record = asRecord(raw);
+  if (!record || typeof record.of !== 'string' || typeof record.fromNodeKey !== 'string') {
+    return undefined;
+  }
+  const ports: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(asRecord(record.ports) ?? {})) {
+    if (key === record.fromNodeKey || !Array.isArray(value)) continue;
+    ports[key] = value.filter((port): port is string => typeof port === 'string');
+  }
+  return { of: record.of, fromNodeKey: record.fromNodeKey, ports };
+}
 
 /** `AutomationRun.options` read leniently: a live run has none. */
 export function readRunOptions(raw: unknown): AutomationRunOptions {
@@ -45,7 +64,9 @@ export function readRunOptions(raw: unknown): AutomationRunOptions {
     ? record.sendForReal.filter((key): key is string => typeof key === 'string')
     : [];
   const triggerData = TRIGGER_DATA.find((value) => value === record.triggerData) ?? 'sample';
-  return { scope, sendForReal, triggerData };
+  // A retry runs the whole workflow from one step; a step test has no use for it.
+  const retry = scope.kind === 'run' ? readRetry(record.retry) : undefined;
+  return { scope, sendForReal, triggerData, ...(retry ? { retry } : {}) };
 }
 
 export function runMode(run: Pick<RunRecord, 'mode'>): 'test' | 'live' {
@@ -75,19 +96,32 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 /**
  * Earlier steps' outputs: from the database for a whole run, from the
  * seeded outputs (pinned data, the last test, or samples) for a step test.
+ *
+ * A Retry From Here run (Module 08) reads both: its seeded steps' outputs
+ * come from `seedOutputs` (the API also copies their rows into the run,
+ * whose status says whether the step handled an error), and every step it
+ * runs again comes from its own rows.
  */
 export function priorOutputs(
   run: Pick<RunRecord, 'seedOutputs'>,
   options: AutomationRunOptions,
   stored: Record<string, PriorOutput>,
 ): Record<string, PriorOutput> {
-  if (options.scope.kind !== 'step') {
+  const seeds = asRecord(run.seedOutputs) ?? {};
+  if (options.scope.kind === 'step') {
+    return Object.fromEntries(
+      Object.entries(seeds).map(([key, output]) => [key, { output, status: 'SUCCEEDED' as const }]),
+    );
+  }
+  if (!options.retry) {
     return stored;
   }
-  const seeds = asRecord(run.seedOutputs) ?? {};
-  return Object.fromEntries(
-    Object.entries(seeds).map(([key, output]) => [key, { output, status: 'SUCCEEDED' as const }]),
-  );
+  const merged: Record<string, PriorOutput> = { ...stored };
+  for (const [key, output] of Object.entries(seeds)) {
+    if (key === options.retry.fromNodeKey) continue;
+    merged[key] = { output, status: stored[key]?.status ?? 'SUCCEEDED' };
+  }
+  return merged;
 }
 
 /** The trigger's data: the run's payload, or a step test's seeded trigger output. */

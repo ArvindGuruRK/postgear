@@ -1,6 +1,6 @@
 # Module 09: Triggers, Activation And Versions
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: L (one session)
+> **Sprint 10, Workflow Builder** | Status: Done | Size: L (one session)
 > **Depends on**: [Module 08](module-08-test-runs-history-and-review.md) (and Module 07's engine through it)
 > **Stories**: WF-6.1, WF-6.2, WF-6.3, WF-6.4, WF-7.1, WF-7.2, WF-7.3, WF-7.4, WF-12.1, WF-12.3, WF-1.4 (delete stops an active workflow)
 > **Next**: Modules [10](module-10-postgear-and-social-steps.md), [11](module-11-ai-steps-and-credits.md), [12](module-12-notify-steps-and-simulation.md) (any order)
@@ -124,14 +124,14 @@ Body `{ draftRevision, note?, acceptAutomaticPosting? }`.
 
 ## Tasks
 
-- [ ] `matchesTriggerFilters` and reason labels in `packages/automation`; `automationScheduleId` in `packages/scheduling`.
-- [ ] `automation-enqueue.ts` (`enqueueAutomationRuns`, `startAutomationRuns`) wired into both transactions in `publish.activities.ts`.
-- [ ] `AutomationRun.temporalWorkflowId` migration; scheduled runs create their row in `loadRunPlan`.
-- [ ] Schedule service (API side for activate and pause, worker side for auto-pause), reconcile of schedules.
-- [ ] Activate, pause, discard, versions, restore, Run Now routes; delete now stops triggers and runs.
-- [ ] Grouped failure notifications and auto-pause in `finishRun`; `EXECUTABLE_TYPES` gains the three triggers.
-- [ ] `pruneAutomationRuns` in the maintenance workflow.
-- [ ] UI: Activate switch and dialog, pause dialog, badges, Activate Changes, Discard Changes, Versions drawer and preview, Run Now, list row menu.
+- [x] `matchesTriggerFilters` and reason labels in `packages/automation`; `automationScheduleId` in `packages/scheduling`.
+- [x] `automation-enqueue.ts` (`enqueueAutomationRuns`, `startAutomationRuns`) wired into both transactions in `publish.activities.ts`.
+- [x] `AutomationRun.temporalWorkflowId` migration; scheduled runs create their row in `loadRunPlan`.
+- [x] Schedule service (API side for activate and pause, worker side for auto-pause), reconcile of schedules.
+- [x] Activate, pause, discard, versions, restore, Run Now routes; delete now stops triggers and runs.
+- [x] Grouped failure notifications and auto-pause in `finishRun`; `EXECUTABLE_TYPES` gains the three triggers.
+- [x] `pruneAutomationRuns` in the maintenance workflow.
+- [x] UI: Activate switch and dialog, pause dialog, badges, Activate Changes, Discard Changes, Versions drawer and preview, Run Now, list row menu.
 
 ## Tests
 

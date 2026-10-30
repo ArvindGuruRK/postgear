@@ -18,12 +18,18 @@
  *   else a sample built from the seeds before it. The worker reads them
  *   from `AutomationRun.seedOutputs` and runs only that step.
  * - **The row comes first, the workflow second.** A failed start leaves the
- *   run QUEUED and the worker's reconcile starts it within a minute.
+ *   run QUEUED and the worker's reconcile starts it within 15 minutes.
  * - **Throttled per person**: three test runs a minute, counted only once
  *   a test passed its checks, so fixing a refused test never uses one up.
  * - **A review decision is written before the signal, and undone if the
  *   signal fails**, with a conditional write, so two people answering at
- *   once get one decision and one 409.
+ *   once get one decision and one 409. It records who decided by name
+ *   (`reviewedBy`) and a rejection's reason (Module 08).
+ * - **Retry From Here** (Module 08) makes a new run that copies the steps
+ *   finished before the failed one; **Run Now** (Module 09) makes a LIVE run
+ *   of an active Manual workflow. Both are started like test runs.
+ * - **A run a Schedule started has its own Temporal workflow id**
+ *   (`temporalWorkflowId`); Cancel and the review signal use it.
  * - **Tenancy**: every read is scoped to the active workspace; another
  *   workspace's workflow, run or step is a 404, never a 403.
  */
@@ -55,7 +61,13 @@ import {
   type ValidationIssue,
   validateGraph,
 } from '@postgear/automation';
-import { AutomationRunStatus, AutomationStepStatus, Prisma } from '@postgear/db';
+import {
+  AutomationRunMode,
+  AutomationRunStatus,
+  AutomationStatus,
+  AutomationStepStatus,
+  Prisma,
+} from '@postgear/db';
 import type {
   AutomationReviewOutput,
   AutomationRunOptions,
@@ -71,22 +83,26 @@ import {
   type ReviewStepRow,
   type RunSummaryRow,
   type TestableAutomation,
+  type TriggerFacts,
 } from './automation-runs.repository';
 import {
   type ListRunsQuery,
   type ReviewDecisionInput,
   RUNS_PAGE_SIZE,
+  type RunNowInput,
   type StartTestRunInput,
   type StepTestInput,
 } from './dto/automation-runs.schema';
 import { applyManualInputs } from './manual-inputs';
 import {
   connectionValuesOf,
+  PHRASED_TRIGGER_TYPES,
   type RunDetail,
   type RunSummary,
   TERMINAL_RUN_STATUSES,
   toRunDetail,
   toRunSummary,
+  triggerFactsOf,
 } from './run-views';
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -115,6 +131,13 @@ const OPEN_RUN_STATUSES = [
 
 const MANUAL_REVIEW_TYPE = 'logic.manualReview';
 const MANUAL_TRIGGER_TYPE = 'trigger.manual';
+
+/** Steps Retry From Here copies into the new run as finished: they left an output. */
+const SEEDABLE_STEP_STATUSES: ReadonlySet<AutomationStepStatus> = new Set([
+  AutomationStepStatus.SUCCEEDED,
+  AutomationStepStatus.DRY_RUN,
+  AutomationStepStatus.HANDLED_ERROR,
+]);
 
 export interface ReviewAnswer {
   nodeKey: string;
@@ -251,8 +274,13 @@ export class AutomationRunsService {
       take: RUNS_PAGE_SIZE,
     });
     const rows = page.slice(0, RUNS_PAGE_SIZE);
+    const phrased = rows.filter((row) => PHRASED_TRIGGER_TYPES.has(row.triggerType));
+    const facts = await this.repository.triggerFacts(
+      orgId,
+      phrased.map((row) => row.id),
+    );
     return {
-      runs: rows.map(toRunSummary),
+      runs: rows.map((row) => toRunSummary(row, facts.get(row.id))),
       nextCursor: page.length > RUNS_PAGE_SIZE ? rows[rows.length - 1].id : null,
     };
   }
@@ -280,7 +308,7 @@ export class AutomationRunsService {
     const run = await this.findRunOrThrow(orgId, runId);
     if (TERMINAL_RUN_STATUSES.has(run.status)) throw runFinished();
 
-    const outcome = await this.scheduling.cancelAutomationRun(runId);
+    const outcome = await this.scheduling.cancelAutomationRun(runId, run.temporalWorkflowId);
     if (outcome !== 'signalled') {
       const statuses = outcome === 'notFound' ? OPEN_RUN_STATUSES : [AutomationRunStatus.QUEUED];
       if (!(await this.repository.cancelRun(orgId, runId, statuses))) {
@@ -322,10 +350,14 @@ export class AutomationRunsService {
       throw reviewNotWaiting();
     }
 
+    const reviewedBy = await this.repository.userName(userId);
+    const reason = input.reason?.trim();
     const output: AutomationReviewOutput = {
       decision: input.decision,
       decidedById: userId,
       decidedAt: new Date().toISOString(),
+      ...(reviewedBy ? { reviewedBy } : {}),
+      ...(reason ? { reason } : {}),
       ...(input.editedText ? { editedText: input.editedText } : {}),
     };
     const recorded = await this.repository.recordReview(
@@ -338,16 +370,169 @@ export class AutomationRunsService {
       throw now && isAnsweredReview(now) ? reviewAnswered() : reviewNotWaiting();
     }
 
-    const outcome = await this.scheduling.signalReviewDecision(runId, {
-      nodeKey,
-      decision: input.decision,
-    });
+    const outcome = await this.scheduling.signalReviewDecision(
+      runId,
+      { nodeKey, decision: input.decision },
+      run.temporalWorkflowId,
+    );
     if (outcome !== 'signalled') {
       await this.repository.clearReview(orgId, step.id);
       throw engineUnavailable(RUN_MESSAGES.REVIEW_NOT_SENT);
     }
 
     return { nodeKey, decision: input.decision, decidedAt: output.decidedAt };
+  }
+
+  /**
+   * Retry From Here (Module 08): a new run of the same graph and trigger
+   * data that starts at a failed step. Every step that finished before it
+   * (and does not come after it) is copied into the new run as it ended,
+   * its output in `seedOutputs` and its ports in `options.retry.ports`, so
+   * the worker never runs it again; the failed step and everything after it
+   * run normally.
+   *
+   * Refused while the run is still going, for a step that did not fail, for
+   * a step that is not safe to repeat (publishing steps never are), and for
+   * a live run of a version that is no longer live. A test retry counts
+   * against the test-run throttle.
+   */
+  async retry(
+    orgId: string,
+    userId: string,
+    runId: string,
+    fromNodeKey: string,
+  ): Promise<RunSummary> {
+    const run = UUID_PATTERN.test(runId)
+      ? await this.repository.findRetrySource(orgId, runId)
+      : null;
+    if (!run) throw new NotFoundException(RUN_MESSAGES.RUN_NOT_FOUND);
+    if (!TERMINAL_RUN_STATUSES.has(run.status)) {
+      throw new ConflictException({
+        message: RUN_MESSAGES.RUN_NOT_FINISHED,
+        code: 'run_not_finished',
+      });
+    }
+
+    const live = run.mode === AutomationRunMode.LIVE;
+    const stored = live ? (run.version?.graph ?? null) : run.graphSnapshot;
+    const graph = stored === null ? null : upgradeGraph(stored);
+    const node = graph?.nodes.find((candidate) => candidate.key === fromNodeKey);
+    const steps = node ? await this.repository.latestSteps(orgId, runId) : [];
+    const failed = steps.find((entry) => entry.step.nodeKey === fromNodeKey);
+    if (!graph || !node || failed?.step.status !== AutomationStepStatus.FAILED) {
+      throw unprocessable(RUN_MESSAGES.RETRY_STEP_NOT_FAILED, 'retry_step_not_failed');
+    }
+
+    const definition = getDefinition(node.type, node.typeVersion);
+    if (definition?.publishes) {
+      throw unprocessable(RUN_MESSAGES.RETRY_PUBLISH_NOT_SAFE, 'retry_not_safe');
+    }
+    if (definition?.retry !== 'safe') {
+      throw unprocessable(RUN_MESSAGES.RETRY_NOT_SAFE, 'retry_not_safe');
+    }
+    if (live && (!run.versionId || run.versionId !== run.automation.activeVersionId)) {
+      throw unprocessable(RUN_MESSAGES.RETRY_OLD_VERSION, 'retry_old_version');
+    }
+
+    if (!live) await this.throttle(userId);
+
+    const index = buildIndex(graph);
+    const after = reachableFrom(index, fromNodeKey);
+    const seeded = steps
+      .map((entry) => entry.step)
+      .filter(
+        (step) =>
+          SEEDABLE_STEP_STATUSES.has(step.status) &&
+          index.nodes.has(step.nodeKey) &&
+          !after.has(step.nodeKey),
+      );
+
+    // A step test's retry still needs the seeds its tested step started from.
+    const previous = (run.options as AutomationRunOptions | null) ?? null;
+    const baseSeeds =
+      previous?.scope.kind === 'step' && isRecord(run.seedOutputs) ? run.seedOutputs : {};
+    const seedOutputs: Record<string, unknown> = { ...baseSeeds };
+    const ports: Record<string, string[]> = {};
+    for (const step of seeded) {
+      seedOutputs[step.nodeKey] = step.output;
+      ports[step.nodeKey] = [...step.ports];
+    }
+
+    const options: AutomationRunOptions = {
+      ...(previous ?? { scope: { kind: 'run' }, sendForReal: [], triggerData: 'last' }),
+      retry: { of: run.id, fromNodeKey, ports },
+    };
+    const created = await this.repository.createRetryRun(
+      orgId,
+      {
+        automationId: run.automationId,
+        mode: run.mode,
+        versionId: run.versionId,
+        triggerType: run.triggerType,
+        triggerPayload: toJsonInput(run.triggerPayload),
+        ...(run.graphSnapshot === null
+          ? {}
+          : { graphSnapshot: run.graphSnapshot as Prisma.InputJsonValue }),
+        seedOutputs: seedOutputs as Prisma.InputJsonValue,
+        options: options as unknown as Prisma.InputJsonValue,
+        startedById: userId,
+      },
+      seeded.map((step) => ({
+        nodeKey: step.nodeKey,
+        nodeType: step.nodeType,
+        nodeName: step.nodeName,
+        status: step.status,
+        input: step.input,
+        output: step.output,
+        error: step.error,
+        ports: step.ports,
+        truncated: step.truncated,
+        durationMs: step.durationMs,
+        startedAt: step.startedAt,
+        finishedAt: step.finishedAt,
+      })),
+    );
+    return this.start(orgId, created, triggerFactsOf(run.triggerPayload));
+  }
+
+  /**
+   * Run Now (Module 09): a LIVE run of a workflow that is on and starts with
+   * a Manual trigger, on its live version, with the inputs checked against
+   * that version's fields. Started like a test run: the row first, then the
+   * workflow, best-effort.
+   */
+  async runNow(
+    orgId: string,
+    userId: string,
+    automationId: string,
+    input: RunNowInput = {},
+  ): Promise<RunSummary> {
+    const automation = UUID_PATTERN.test(automationId)
+      ? await this.repository.findLiveAutomation(orgId, automationId)
+      : null;
+    if (!automation) throw new NotFoundException(RUN_MESSAGES.WORKFLOW_NOT_FOUND);
+
+    const version = automation.activeVersion;
+    const trigger =
+      automation.status === AutomationStatus.ACTIVE && version?.triggerType === MANUAL_TRIGGER_TYPE
+        ? buildIndex(upgradeGraph(version.graph)).triggers[0]
+        : undefined;
+    if (!version || trigger?.type !== MANUAL_TRIGGER_TYPE) {
+      throw unprocessable(RUN_MESSAGES.RUN_NOW_UNAVAILABLE, 'run_now_unavailable');
+    }
+
+    const applied = applyManualInputs(trigger.config, {}, input.inputs ?? {});
+    if (!applied.ok) throw unprocessable(applied.message, 'invalid_inputs');
+
+    const run = await this.repository.createRun(orgId, {
+      automationId: automation.id,
+      mode: AutomationRunMode.LIVE,
+      versionId: version.id,
+      triggerType: trigger.type,
+      triggerPayload: toJsonInput(capped(applied.payload)),
+      startedById: userId,
+    });
+    return this.start(orgId, run);
   }
 
   /** The workspace's connection values, decrypted only to hide them in run data. */
@@ -364,10 +549,14 @@ export class AutomationRunsService {
   }
 
   /** Starts the workflow for a new run, best-effort, and answers with the run. */
-  private async start(orgId: string, run: RunSummaryRow): Promise<RunSummary> {
+  private async start(
+    orgId: string,
+    run: RunSummaryRow,
+    facts?: TriggerFacts,
+  ): Promise<RunSummary> {
     // False is logged by the scheduler; the reconcile starts the run later.
     await this.scheduling.startAutomationRun(run.id, orgId);
-    return toRunSummary(run);
+    return toRunSummary(run, facts);
   }
 
   /** Three test runs a minute per person (`LIMITS.testRunsPerMinutePerUser`). */
@@ -495,6 +684,23 @@ export function runsDry(node: GraphNode, sendForReal: ReadonlySet<string>): bool
   const definition = getDefinition(node.type, node.typeVersion);
   if (!definition || sendForReal.has(node.key)) return false;
   return definition.sideEffect === 'external' || definition.publishes === true;
+}
+
+/**
+ * `from` and every step its lines lead to: what a retry from `from` runs
+ * again. (`reaches` in `@postgear/automation` answers one pair at a time and
+ * is not exported from the package root.)
+ */
+export function reachableFrom(index: GraphIndex, from: string): Set<string> {
+  const seen = new Set<string>();
+  const stack = [from];
+  while (stack.length > 0) {
+    const key = stack.pop() as string;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    for (const edge of index.outgoing.get(key) ?? []) stack.push(edge.target);
+  }
+  return seen;
 }
 
 /** Whether an issue stops a test: every error, except account problems of dry steps. */

@@ -2,32 +2,51 @@
  * The workflow rules that live in the queries: every read and write scoped
  * to the workspace and to live rows, the revision check inside the save, run
  * counts as one grouped query, and pinned data written one key at a time.
+ * Module 09: activation writes the next version and makes it live in one
+ * transaction (a stale revision or a lost race is a conflict), pause and
+ * Discard Changes, versions read through the workflow, the runs a delete
+ * closes, and no query anywhere in the API that changes or deletes a version.
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
 jest.mock('@postgear/db', () => {
   const actual = jest.requireActual('@postgear/db');
 
-  return {
-    ...actual,
-    prisma: {
-      automation: {
-        findMany: jest.fn(),
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        updateMany: jest.fn(),
-      },
-      automationRun: { groupBy: jest.fn() },
-      integration: { findMany: jest.fn() },
-      $executeRaw: jest.fn(),
+  const prisma: Record<string, unknown> = {
+    automation: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      updateMany: jest.fn(),
     },
+    automationVersion: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
+    automationRun: { groupBy: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+    automationRunStep: { updateMany: jest.fn() },
+    integration: { findMany: jest.fn() },
+    $executeRaw: jest.fn(),
   };
+  // An interactive transaction runs against the same mocked client.
+  prisma.$transaction = jest.fn(async (run: (tx: unknown) => unknown) => run(prisma));
+
+  return { ...actual, prisma };
 });
 
-import { prisma } from '@postgear/db';
+import {
+  AutomationRunStatus,
+  AutomationStatus,
+  AutomationStepStatus,
+  Prisma,
+  prisma,
+} from '@postgear/db';
 import { AutomationsRepository } from './automations.repository';
 
 type PrismaMock = {
   automation: Record<'findMany' | 'findFirst' | 'create' | 'updateMany', jest.Mock>;
-  automationRun: { groupBy: jest.Mock };
+  automationVersion: Record<'findMany' | 'findFirst' | 'create', jest.Mock>;
+  automationRun: Record<'groupBy' | 'findMany' | 'updateMany', jest.Mock>;
+  automationRunStep: { updateMany: jest.Mock };
+  $transaction: jest.Mock;
   integration: { findMany: jest.Mock };
   $executeRaw: jest.Mock;
 };
@@ -201,5 +220,279 @@ describe('AutomationsRepository', () => {
     });
     // Never a credential column.
     expect(db.integration.findMany.mock.calls[0][0].select).not.toHaveProperty('token');
+  });
+
+  describe('activation (Module 09)', () => {
+    const GRAPH = { schemaVersion: 1, nodes: [], edges: [], notes: [] };
+    const WRITE = {
+      expectedRevision: 3,
+      graph: GRAPH,
+      triggerType: 'trigger.manual',
+      note: 'Weekly copy',
+      createdById: 'user_1',
+    };
+    const VERSION = { id: 'ver_5', version: 5 };
+
+    it('writes the next version and makes it live, all in one transaction', async () => {
+      db.automation.findFirst.mockResolvedValueOnce({ draftRevision: 3 });
+      db.automationVersion.findFirst.mockResolvedValueOnce({ version: 4 });
+      db.automationVersion.create.mockResolvedValueOnce(VERSION);
+      db.automation.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await expect(repository.activate(ORG, ID, WRITE)).resolves.toEqual({
+        outcome: 'activated',
+        version: VERSION,
+      });
+
+      expect(db.$transaction).toHaveBeenCalledTimes(1);
+      expect(db.automation.findFirst.mock.calls[0][0].where).toEqual({
+        id: ID,
+        organizationId: ORG,
+        deletedAt: null,
+      });
+      expect(db.automationVersion.findFirst.mock.calls[0][0]).toMatchObject({
+        where: { automationId: ID },
+        orderBy: { version: 'desc' },
+      });
+      const created = db.automationVersion.create.mock.calls[0][0];
+      expect(created.data).toEqual({
+        automationId: ID,
+        version: 5,
+        graph: GRAPH,
+        triggerType: 'trigger.manual',
+        note: 'Weekly copy',
+        createdById: 'user_1',
+      });
+      // The answer never carries the graph back.
+      expect(created.select).not.toHaveProperty('graph');
+      expect(db.automation.updateMany).toHaveBeenCalledWith({
+        where: { id: ID, organizationId: ORG, deletedAt: null, draftRevision: 3 },
+        data: {
+          activeVersionId: 'ver_5',
+          status: AutomationStatus.ACTIVE,
+          hasUnpublishedChanges: false,
+          consecutiveFailures: 0,
+        },
+      });
+    });
+
+    it('numbers the first version 1', async () => {
+      db.automation.findFirst.mockResolvedValueOnce({ draftRevision: 3 });
+      db.automationVersion.findFirst.mockResolvedValueOnce(null);
+      db.automationVersion.create.mockResolvedValueOnce({ id: 'ver_1', version: 1 });
+      db.automation.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await repository.activate(ORG, ID, WRITE);
+      expect(db.automationVersion.create.mock.calls[0][0].data.version).toBe(1);
+    });
+
+    it('is a conflict before writing when the revision is stale, and not found for another workspace', async () => {
+      db.automation.findFirst.mockResolvedValueOnce({ draftRevision: 4 });
+      await expect(repository.activate(ORG, ID, WRITE)).resolves.toEqual({
+        outcome: 'conflict',
+        currentRevision: 4,
+      });
+
+      db.automation.findFirst.mockResolvedValueOnce(null);
+      await expect(repository.activate(ORG, ID, WRITE)).resolves.toEqual({
+        outcome: 'not_found',
+      });
+      expect(db.automationVersion.create).not.toHaveBeenCalled();
+      expect(db.automation.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rolls back and answers a conflict when a save lands between the read and the write', async () => {
+      db.automation.findFirst
+        .mockResolvedValueOnce({ draftRevision: 3 })
+        .mockResolvedValueOnce({ status: 'DRAFT', draftRevision: 5, activeVersion: null });
+      db.automationVersion.findFirst.mockResolvedValueOnce({ version: 4 });
+      db.automationVersion.create.mockResolvedValueOnce(VERSION);
+      db.automation.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(repository.activate(ORG, ID, WRITE)).resolves.toEqual({
+        outcome: 'conflict',
+        currentRevision: 5,
+      });
+    });
+
+    it('answers a conflict when another activation took the same version number', async () => {
+      db.automation.findFirst
+        .mockResolvedValueOnce({ draftRevision: 3 })
+        .mockResolvedValueOnce({ status: 'ACTIVE', draftRevision: 3, activeVersion: null });
+      db.automationVersion.findFirst.mockResolvedValueOnce({ version: 4 });
+      db.automationVersion.create.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(repository.activate(ORG, ID, WRITE)).resolves.toEqual({
+        outcome: 'conflict',
+        currentRevision: 3,
+      });
+    });
+
+    it('lets any other failure through', async () => {
+      db.automation.findFirst.mockResolvedValueOnce({ draftRevision: 3 });
+      db.automationVersion.findFirst.mockRejectedValueOnce(new Error('connection lost'));
+
+      await expect(repository.activate(ORG, ID, WRITE)).rejects.toThrow('connection lost');
+    });
+
+    it('pauses only an active workflow of the workspace', async () => {
+      db.automation.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({
+        count: 0,
+      });
+
+      await expect(repository.pause(ORG, ID)).resolves.toBe(true);
+      await expect(repository.pause(ORG, ID)).resolves.toBe(false);
+      expect(db.automation.updateMany.mock.calls[0][0]).toEqual({
+        where: { id: ID, organizationId: ORG, deletedAt: null, status: AutomationStatus.ACTIVE },
+        data: { status: AutomationStatus.PAUSED },
+      });
+    });
+
+    it('discards the draft back to the live graph and bumps the revision', async () => {
+      db.automation.findFirst
+        .mockResolvedValueOnce({ activeVersion: { graph: GRAPH, triggerType: 'trigger.manual' } })
+        .mockResolvedValueOnce({ id: ID, draftRevision: 4 });
+      db.automation.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await expect(repository.discard(ORG, ID, 'user_1')).resolves.toEqual({
+        outcome: 'discarded',
+        row: { id: ID, draftRevision: 4 },
+      });
+      expect(db.automation.updateMany).toHaveBeenCalledWith({
+        where: { id: ID, organizationId: ORG, deletedAt: null },
+        data: {
+          draftGraph: GRAPH,
+          triggerType: 'trigger.manual',
+          hasUnpublishedChanges: false,
+          updatedById: 'user_1',
+          draftRevision: { increment: 1 },
+        },
+      });
+      // Only the draft is written: no version is created or changed.
+      expect(db.automationVersion.create).not.toHaveBeenCalled();
+    });
+
+    it('has nothing to discard to without a live version, and nothing for another workspace', async () => {
+      db.automation.findFirst.mockResolvedValueOnce({ activeVersion: null });
+      await expect(repository.discard(ORG, ID, null)).resolves.toEqual({
+        outcome: 'no_active_version',
+      });
+
+      db.automation.findFirst.mockResolvedValueOnce(null);
+      await expect(repository.discard(ORG, ID, null)).resolves.toEqual({ outcome: 'not_found' });
+      expect(db.automation.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('versions (Module 09)', () => {
+    it('lists versions newest first through the live workflow, without their graphs', async () => {
+      db.automationVersion.findMany.mockResolvedValueOnce([]);
+
+      await repository.listVersions(ORG, ID);
+
+      const query = db.automationVersion.findMany.mock.calls[0][0];
+      expect(query.where).toEqual({
+        automationId: ID,
+        automation: { organizationId: ORG, deletedAt: null },
+      });
+      expect(query.orderBy).toEqual({ version: 'desc' });
+      expect(query.take).toBe(100);
+      expect(query.select).not.toHaveProperty('graph');
+    });
+
+    it('reads one version with its graph, through the live workflow', async () => {
+      db.automationVersion.findFirst.mockResolvedValueOnce(null);
+
+      await expect(repository.findVersion(ORG, ID, 3)).resolves.toBeNull();
+
+      const query = db.automationVersion.findFirst.mock.calls[0][0];
+      expect(query.where).toEqual({
+        automationId: ID,
+        version: 3,
+        automation: { organizationId: ORG, deletedAt: null },
+      });
+      expect(query.select).toMatchObject({ graph: true, version: true });
+    });
+
+    it('never changes or deletes a version anywhere in the API', () => {
+      const root = join(__dirname, '..', '..');
+      const sources: string[] = [];
+      const walk = (dir: string) => {
+        for (const name of readdirSync(dir)) {
+          const path = join(dir, name);
+          if (statSync(path).isDirectory()) walk(path);
+          else if (/\.ts$/.test(name) && !/\.(spec|test)\.ts$/.test(name)) sources.push(path);
+        }
+      };
+      walk(root);
+      expect(sources.length).toBeGreaterThan(50);
+
+      const offenders = sources.filter((path) => {
+        const text = readFileSync(path, 'utf8');
+        return (
+          /automationVersion\s*\.\s*(update|updateMany|upsert|delete|deleteMany)\b/.test(text) ||
+          /(UPDATE|DELETE\s+FROM)\s+"AutomationVersion"/i.test(text)
+        );
+      });
+      expect(offenders).toEqual([]);
+
+      // And the repository has no method that would.
+      const methods = Object.getOwnPropertyNames(AutomationsRepository.prototype);
+      expect(methods.filter((name) => /version/i.test(name))).toEqual([
+        'listVersions',
+        'findVersion',
+      ]);
+    });
+  });
+
+  describe('closing runs on delete (Module 09)', () => {
+    it('reads the open runs of one workflow in the workspace', async () => {
+      db.automationRun.findMany.mockResolvedValueOnce([]);
+
+      await repository.openRuns(ORG, ID);
+
+      expect(db.automationRun.findMany.mock.calls[0][0]).toMatchObject({
+        where: {
+          organizationId: ORG,
+          automationId: ID,
+          status: {
+            in: [
+              AutomationRunStatus.QUEUED,
+              AutomationRunStatus.RUNNING,
+              AutomationRunStatus.WAITING,
+            ],
+          },
+        },
+        select: { id: true, status: true, temporalWorkflowId: true },
+      });
+    });
+
+    it('closes a run and its open steps only while it has one of the given statuses', async () => {
+      db.automationRun.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({
+        count: 0,
+      });
+
+      await expect(repository.closeRun(ORG, 'run_1', [AutomationRunStatus.QUEUED])).resolves.toBe(
+        true,
+      );
+      expect(db.automationRun.updateMany.mock.calls[0][0]).toEqual({
+        where: { id: 'run_1', organizationId: ORG, status: { in: [AutomationRunStatus.QUEUED] } },
+        data: { status: AutomationRunStatus.CANCELLED, finishedAt: expect.any(Date) },
+      });
+      expect(db.automationRunStep.updateMany.mock.calls[0][0]).toMatchObject({
+        where: { runId: 'run_1' },
+        data: { status: AutomationStepStatus.CANCELLED },
+      });
+
+      await expect(repository.closeRun(ORG, 'run_2', [AutomationRunStatus.QUEUED])).resolves.toBe(
+        false,
+      );
+      expect(db.automationRunStep.updateMany).toHaveBeenCalledTimes(1);
+    });
   });
 });

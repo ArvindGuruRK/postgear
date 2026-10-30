@@ -13,9 +13,17 @@
  */
 
 import { LIMITS } from '@postgear/automation';
-import { AutomationRunStatus, prisma, State, WebhookDeliveryStatus } from '@postgear/db';
+import {
+  AutomationRunStatus,
+  AutomationStatus,
+  type Prisma,
+  prisma,
+  State,
+  WebhookDeliveryStatus,
+} from '@postgear/db';
 import {
   ANALYTICS_SYNC_WORKFLOW,
+  AUTOMATION_RUN_RETENTION_DAYS,
   AUTOMATION_RUN_WORKFLOW,
   analyticsSyncWorkflowId,
   automationRunWorkflowId,
@@ -35,6 +43,11 @@ import {
 import { finalizeRun, INTERRUPTED_MESSAGE } from '../automation/finish';
 import { PrismaRunStore } from '../automation/prisma-run-store';
 import type { RunStore } from '../automation/run-store';
+import {
+  type ActiveScheduledAutomation,
+  deleteAutomationSchedule,
+  reconcileAutomationSchedules,
+} from '../lib/automation-schedules';
 import type { ActivityDeps } from './deps';
 
 export interface ReconcileReport {
@@ -48,8 +61,29 @@ export interface ReconcileReport {
   queuedAutomationRuns: number;
   /** Sprint 10: RUNNING or WAITING runs whose Temporal workflow was gone, marked FAILED. */
   interruptedAutomationRuns: number;
+  /** Sprint 10, Module 09: missing (or outdated) workflow schedules created again. */
+  recreatedAutomationSchedules: number;
+  /** Sprint 10, Module 09: schedules of workflows no longer on, or no longer on a Schedule, deleted. */
+  deletedAutomationSchedules: number;
   failures: number;
 }
+
+/** What `pruneAutomationRuns` deleted. */
+export interface PruneReport {
+  runs: number;
+}
+
+/** Finished runs are deleted this many at a time (their steps cascade). */
+export const AUTOMATION_PRUNE_BATCH = 500;
+
+/** Run statuses that never change again: only these are ever pruned. */
+const TERMINAL_RUN_STATUSES: AutomationRunStatus[] = [
+  AutomationRunStatus.SUCCEEDED,
+  AutomationRunStatus.FAILED,
+  AutomationRunStatus.CANCELLED,
+  AutomationRunStatus.REJECTED,
+  AutomationRunStatus.EXPIRED,
+];
 
 /** A queued run younger than this is still being started by the API. */
 const AUTOMATION_RUN_RECONCILE_MIN_AGE_MS = 60_000;
@@ -186,6 +220,18 @@ export function createMaintenanceActivities(deps: ActivityDeps) {
       const automation = await reconcileAutomationRuns(client, new PrismaRunStore(), now);
       failures += automation.failures;
 
+      // Sprint 10, Module 09: every workflow that is on and starts on a
+      // Schedule has its Temporal Schedule; no other workflow does. The API
+      // registers it on activate, best effort; this finishes what it missed.
+      let schedules = { recreated: 0, deleted: 0, failures: 0 };
+      try {
+        schedules = await reconcileAutomationSchedules(client, activeScheduledAutomations);
+      } catch {
+        // Listing schedules failed: try again next pass.
+        schedules.failures += 1;
+      }
+      failures += schedules.failures;
+
       return {
         queuedPosts: roots.length,
         refreshableChannels: channels.length,
@@ -193,16 +239,93 @@ export function createMaintenanceActivities(deps: ActivityDeps) {
         webhookDeliveries: deliveries.length,
         queuedAutomationRuns: automation.queued,
         interruptedAutomationRuns: automation.interrupted,
+        recreatedAutomationSchedules: schedules.recreated,
+        deletedAutomationSchedules: schedules.deleted,
         failures,
       };
+    },
+
+    /** Sprint 10, Module 09: finished workflow runs older than the retention go. */
+    async pruneAutomationRuns(): Promise<PruneReport> {
+      return pruneAutomationRuns(prisma, new Date());
     },
   };
 }
 
+/** ACTIVE, not deleted workflows whose active version starts on a Schedule. */
+async function activeScheduledAutomations(): Promise<ActiveScheduledAutomation[]> {
+  const rows = await prisma.automation.findMany({
+    where: {
+      status: AutomationStatus.ACTIVE,
+      deletedAt: null,
+      activeVersion: { is: { triggerType: 'trigger.schedule' } },
+    },
+    select: {
+      id: true,
+      organizationId: true,
+      activeVersion: { select: { id: true, graph: true } },
+    },
+  });
+  return rows.flatMap((row) =>
+    row.activeVersion
+      ? [
+          {
+            automationId: row.id,
+            organizationId: row.organizationId,
+            versionId: row.activeVersion.id,
+            graph: row.activeVersion.graph,
+          },
+        ]
+      : [],
+  );
+}
+
+/** The subset of a Prisma client the prune needs. */
+export type PruneClient = {
+  automationRun: {
+    findMany: Prisma.AutomationRunDelegate['findMany'];
+    deleteMany: Prisma.AutomationRunDelegate['deleteMany'];
+  };
+};
+
+/**
+ * Deletes finished runs (and, by cascade, their steps) whose `finishedAt`
+ * is older than `AUTOMATION_RUN_RETENTION_DAYS`, 500 at a time. QUEUED,
+ * RUNNING and WAITING runs are never touched, whatever their age; runs of
+ * deleted workflows go the same way.
+ */
+export async function pruneAutomationRuns(client: PruneClient, now: Date): Promise<PruneReport> {
+  const cutoff = new Date(now.getTime() - AUTOMATION_RUN_RETENTION_DAYS * 24 * 60 * 60_000);
+  let runs = 0;
+  for (;;) {
+    const batch = await client.automationRun.findMany({
+      where: { status: { in: TERMINAL_RUN_STATUSES }, finishedAt: { lt: cutoff } },
+      select: { id: true },
+      orderBy: { finishedAt: 'asc' },
+      take: AUTOMATION_PRUNE_BATCH,
+    });
+    if (batch.length === 0) break;
+    const { count } = await client.automationRun.deleteMany({
+      where: { id: { in: batch.map((run) => run.id) }, status: { in: TERMINAL_RUN_STATUSES } },
+    });
+    runs += count;
+    if (batch.length < AUTOMATION_PRUNE_BATCH || count === 0) break;
+  }
+  return { runs };
+}
+
+/**
+ * The run's Temporal workflow: `automationRunWorkflowId(id)`, or the id a
+ * Schedule gave it (stored on the row, Module 09).
+ */
+function runWorkflowId(run: { id: string; temporalWorkflowId?: string | null }): string {
+  return run.temporalWorkflowId ?? automationRunWorkflowId(run.id);
+}
+
 /** True when the run's Temporal workflow exists and is still running. */
-async function workflowRunning(client: Client, runId: string): Promise<boolean> {
+async function workflowRunning(client: Client, workflowId: string): Promise<boolean> {
   try {
-    const description = await client.workflow.getHandle(automationRunWorkflowId(runId)).describe();
+    const description = await client.workflow.getHandle(workflowId).describe();
     return description.status.name === 'RUNNING';
   } catch (error) {
     if (error instanceof WorkflowNotFoundError) {
@@ -226,7 +349,10 @@ export async function reconcileAutomationRuns(
       { runId: run.id, organizationId: run.organizationId },
       { status: AutomationRunStatus.FAILED, error: INTERRUPTED_MESSAGE, finishedAt: new Date() },
     );
-    if (ended) interrupted += 1;
+    if (!ended.finished) return;
+    interrupted += 1;
+    // An interrupted live run counts as failed and may auto-pause its workflow.
+    if (ended.paused) await deleteAutomationSchedule(client, ended.automationId);
   };
 
   const queued = await prisma.automationRun.findMany({
@@ -234,10 +360,20 @@ export async function reconcileAutomationRuns(
       status: AutomationRunStatus.QUEUED,
       createdAt: { lt: new Date(now - AUTOMATION_RUN_RECONCILE_MIN_AGE_MS) },
     },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, temporalWorkflowId: true },
   });
 
   await inBatches(queued, async (run) => {
+    // A scheduled run's own workflow made the row: never start a second one
+    // for it. Still running, it picks the row up; gone, the run ends.
+    if (run.temporalWorkflowId) {
+      try {
+        if (!(await workflowRunning(client, run.temporalWorkflowId))) await interrupt(run);
+      } catch {
+        failures += 1;
+      }
+      return;
+    }
     try {
       await client.workflow.start(AUTOMATION_RUN_WORKFLOW, {
         workflowId: automationRunWorkflowId(run.id),
@@ -254,7 +390,7 @@ export async function reconcileAutomationRuns(
       // Its workflow already ran and closed without picking the run up: it
       // can never start again under this id.
       try {
-        if (!(await workflowRunning(client, run.id))) await interrupt(run);
+        if (!(await workflowRunning(client, runWorkflowId(run)))) await interrupt(run);
       } catch {
         failures += 1;
       }
@@ -263,12 +399,12 @@ export async function reconcileAutomationRuns(
 
   const open = await prisma.automationRun.findMany({
     where: { status: { in: [AutomationRunStatus.RUNNING, AutomationRunStatus.WAITING] } },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, temporalWorkflowId: true },
   });
 
   await inBatches(open, async (run) => {
     try {
-      if (!(await workflowRunning(client, run.id))) await interrupt(run);
+      if (!(await workflowRunning(client, runWorkflowId(run)))) await interrupt(run);
     } catch {
       // Temporal did not answer: try again on the next pass.
       failures += 1;

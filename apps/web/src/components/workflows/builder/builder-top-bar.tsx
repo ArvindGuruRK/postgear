@@ -2,20 +2,20 @@
 
 /**
  * The builder's PageActions row (blueprint 3): the workflow's name (click
- * to rename), the save state in words, the status badge, the issues chip
- * (its list lands on the step's field, `panel/issues-popover.tsx`), and a
- * menu with Duplicate and Delete. The top
- * bar above already says Workflows, so there is no page title.
+ * to rename), the save state in words, the Editor and Runs switch, the
+ * issues chip (its list lands on the step's field,
+ * `panel/issues-popover.tsx`), Test Workflow (Module 08), the live state
+ * and the Activate switch (Module 09's `WorkflowLiveControls`), and a menu
+ * with Versions, Duplicate and Delete. The top bar above already says
+ * Workflows, so there is no page title.
  *
- * Test Workflow, the Activate switch and the Editor and Runs switch arrive
- * with Modules 08 and 09; until then they are left out rather than shown
- * disabled.
+ * The page hands Test Workflow and the live controls in as slots, so this
+ * row only lays them out.
  */
 import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
 import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import type { AutomationGraph, ValidationIssue } from '@postgear/automation';
 import {
-  Badge,
   Button,
   cn,
   DropdownMenu,
@@ -26,14 +26,15 @@ import {
   Input,
   MotionIcon,
   PageActions,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from '@postgear/ui';
 import { CircleCheck, CloudOff, LoaderCircle, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import type { AutomationStatus } from '@/types/workflows';
-import { WORKFLOW_STATUS } from '../list/workflows-view-model';
+import { type ReactNode, useEffect, useState } from 'react';
 import { IssuesPopover } from '../panel/issues-popover';
 import type { SaveStatus } from './builder-autosave';
-import { SAVE_STATE_WORDS } from './builder-view-model';
+import { type BuilderTab, SAVE_STATE_WORDS } from './builder-view-model';
 
 const MAX_NAME = 80;
 
@@ -76,11 +77,15 @@ export function BuilderTopBar({
   onRename,
   status,
   message,
-  workflowStatus,
-  hasUnpublishedChanges,
+  tab,
+  onTabChange,
   issues,
   graph,
   onOpenIssue,
+  issuesSignal = 0,
+  testControls,
+  liveControls,
+  onVersions,
   onDuplicate,
   onDelete,
   stepsHidden,
@@ -90,11 +95,19 @@ export function BuilderTopBar({
   onRename: (name: string) => void;
   status: SaveStatus;
   message: string | null;
-  workflowStatus: AutomationStatus;
-  hasUnpublishedChanges: boolean;
+  /** The Editor and Runs switch (`?tab=runs`). */
+  tab: BuilderTab;
+  onTabChange: (tab: BuilderTab) => void;
   issues: ValidationIssue[];
   graph: AutomationGraph;
   onOpenIssue: (issue: ValidationIssue) => void;
+  /** Bumped to open the issues list (a test refused for them). */
+  issuesSignal?: number;
+  /** Test Workflow, or Stop while a test runs. */
+  testControls: ReactNode;
+  /** The status badge, Unpublished Changes, Run Now and the Activate switch. */
+  liveControls: ReactNode;
+  onVersions: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   /** Below `lg` the Steps panel is a drawer, opened from here. */
@@ -102,7 +115,6 @@ export function BuilderTopBar({
   onShowSteps: () => void;
 }) {
   const [draft, setDraft] = useState(name);
-  const state = WORKFLOW_STATUS[workflowStatus];
 
   useEffect(() => {
     setDraft(name);
@@ -119,7 +131,7 @@ export function BuilderTopBar({
 
   return (
     <PageActions className="justify-start">
-      {stepsHidden ? (
+      {stepsHidden && tab === 'editor' ? (
         <Button
           variant="secondary"
           size="sm"
@@ -155,9 +167,24 @@ export function BuilderTopBar({
         <SaveState status={status} message={message} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={state.variant}>{state.label}</Badge>
-        {hasUnpublishedChanges ? <Badge variant="outline">Unpublished Changes</Badge> : null}
-        <IssuesPopover issues={issues} graph={graph} onOpenIssue={onOpenIssue} />
+        <Tabs value={tab} onValueChange={(value) => onTabChange(value as BuilderTab)}>
+          <TabsList aria-label="Builder view" data-testid="builder-tabs">
+            <TabsTrigger value="editor" className="px-3 py-1.5">
+              Editor
+            </TabsTrigger>
+            <TabsTrigger value="runs" className="px-3 py-1.5">
+              Runs
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <IssuesPopover
+          issues={issues}
+          graph={graph}
+          onOpenIssue={onOpenIssue}
+          openSignal={issuesSignal}
+        />
+        {testControls}
+        {liveControls}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="sm" aria-label="Workflow actions">
@@ -165,6 +192,7 @@ export function BuilderTopBar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={onVersions}>Versions</DropdownMenuItem>
             <DropdownMenuItem onSelect={onDuplicate}>Duplicate</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-dangerInk" onSelect={onDelete}>

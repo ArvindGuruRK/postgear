@@ -20,6 +20,15 @@
  * the Expanded view, pinned test data, and focus-the-field: an issue, a
  * Finish Setup line or a `?step=<key>&field=<path>` link selects the step,
  * centres it, opens the panel on the right tab and focuses the field.
+ *
+ * Module 08 adds testing: Test Workflow (or Ctrl/Cmd+Enter) and Test Step
+ * run the saved draft (`runs/use-test-run.ts`), the canvas paints the test
+ * with the run bar under it until Close or a change to the steps or lines,
+ * and the panels show each step's last result. The Editor and Runs switch
+ * keeps `?tab=runs&run=<id>` in the address bar without a navigation.
+ *
+ * Module 09 adds the live controls (status, Activate, Run Now), Versions
+ * with a read-only preview, and swaps a changed workflow in without a reload.
  */
 import {
   type AutomationGraph,
@@ -43,6 +52,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -66,30 +79,43 @@ import { registerLeaveGuard } from '@/lib/leave-guard';
 import type { Channel } from '@/types/channel';
 import type {
   AutomationDetail,
+  AutomationStatus,
   Connection,
   PinnedStep,
+  RunSummary,
   TemplateSummary,
+  VersionDetail,
   WorkspaceCatalog,
 } from '@/types/workflows';
 import { useOptionalWorkspace } from '../../navigation/workspace-provider';
+import { WorkflowLiveControls } from '../activation/live-controls';
+import { VersionPreviewBanner, VersionsDrawer } from '../activation/versions-drawer';
 import { CanvasControls } from '../canvas/canvas-controls';
 import { copySteps, pasteSteps, readClipboard } from '../canvas/clipboard';
 import { CanvasContextMenu, type MenuItem } from '../canvas/context-menu';
 import { type CanvasNode, type FlowEdge, issuesByStep } from '../canvas/flow-model';
+import { RunCanvas } from '../canvas/run-canvas';
 import { tidyPositions } from '../canvas/tidy-up';
 import { WorkflowCanvas } from '../canvas/workflow-canvas';
 import type { FieldContext } from '../fields/contract';
 import { TemplateGallery } from '../list/template-gallery';
 import { ExpandedView } from '../panel/expanded-view';
 import type { PinControls } from '../panel/output-pane';
-import { buildScope } from '../panel/panel-view-model';
+import { buildScope, inputSourceLine } from '../panel/panel-view-model';
 import { pinErrorMessage } from '../panel/pinned-data-editor';
 import { ResizeHandle } from '../panel/resize-handle';
 import { StepPanel } from '../panel/step-panel';
 import type { FocusRequest } from '../panel/step-tabs';
+import type { StepTestControls } from '../panel/test-tab';
 import { PANEL_MAX, PANEL_MIN, PANEL_STEP, usePanelWidth } from '../panel/use-panel-width';
 import { type PickerItem, pickerItems, pushRecent, RECENT_LIMIT } from '../picker/picker-search';
 import { StepPicker } from '../picker/step-picker';
+import { ReviewCard } from '../runs/review-card';
+import { RunBar } from '../runs/run-bar';
+import { isTerminalRun } from '../runs/run-model';
+import { RunsTab } from '../runs/runs-tab';
+import { TestControls } from '../runs/test-controls';
+import { stepResult, useTestRun } from '../runs/use-test-run';
 import {
   type BuilderApi,
   BuilderProvider,
@@ -100,10 +126,14 @@ import { isTyping, shortcutFor } from './builder-shortcuts';
 import { builderReducer, initialState, type Position, type Selection } from './builder-state';
 import { BuilderTopBar } from './builder-top-bar';
 import {
+  type BuilderTab,
+  builderSearch,
   CONFLICT_MESSAGE,
   LOOP_REFUSED,
+  NOT_SAVED_YET,
   SMALL_SCREEN_MESSAGE,
   setupItems,
+  structureKey,
   summaryContext,
   validationContext,
 } from './builder-view-model';
@@ -131,6 +161,18 @@ export interface BuilderPageProps {
   setup: boolean;
   /** `?step=<key>`: open this step. */
   initialStep: string | null;
+  /**
+   * Workspace admins turn workflows on and off. Worked out on the server
+   * from the member's role; null or left out falls back to the workspace
+   * session in the browser.
+   */
+  canManage?: boolean | null;
+  /** `?tab=runs`, or a `?run=` link on its own: open on the Runs tab. */
+  initialTab?: BuilderTab;
+  /** `?run=<id>`: the run the Runs tab shows. */
+  initialRunId?: string | null;
+  /** `?review=1`: open that run's waiting review card at once. */
+  initialReview?: boolean;
 }
 
 type PickerState = {
@@ -216,6 +258,10 @@ function Builder({
   initialChannels,
   setup,
   initialStep,
+  canManage: canManageProp = null,
+  initialTab = 'editor',
+  initialRunId = null,
+  initialReview = false,
 }: BuilderPageProps) {
   const router = useRouter();
   const flow = useReactFlow<CanvasNode, FlowEdge>();
@@ -265,6 +311,25 @@ function Builder({
   );
   const [recent, setRecent] = useState<string[]>([]);
   const [unpublished, setUnpublished] = useState(automation.hasUnpublishedChanges);
+  // Activate, Pause, Discard and Restore change these; the page swaps them in.
+  const [live, setLive] = useState<{ status: AutomationStatus; activeVersion: number | null }>({
+    status: automation.status,
+    activeVersion: automation.activeVersion,
+  });
+  const [tab, setTab] = useState<BuilderTab>(initialTab);
+  const [runId, setRunId] = useState<string | null>(initialRunId);
+  const [review, setReview] = useState(initialReview && initialRunId !== null);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [preview, setPreview] = useState<VersionDetail | null>(null);
+  const [issuesSignal, setIssuesSignal] = useState(0);
+  const [startSignal, setStartSignal] = useState(0);
+  // Test Step from a card: that step's panel opens on its Test tab.
+  const [showTest, setShowTest] = useState<{ key: string; seq: number } | null>(null);
+  // The Expanded view was opened from a result badge: it shows that run.
+  const [fromBadge, setFromBadge] = useState(false);
+  const [reviewKey, setReviewKey] = useState<string | null>(null);
+  // Debug In Editor's step, selected once the Editor is back on screen.
+  const [pendingFocus, setPendingFocus] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [leaveAsk, setLeaveAsk] = useState<((leave: boolean) => void) | null>(null);
@@ -283,6 +348,98 @@ function Builder({
     name: state.name,
     onSaved: (result) => setUnpublished(result.hasUnpublishedChanges),
   });
+
+  // ---- Tests (Module 08) -------------------------------------------------------------
+
+  const currentGraph = useCallback(() => graphRef.current, []);
+  const openIssues = useCallback(() => setIssuesSignal((count) => count + 1), []);
+  const testRun = useTestRun({
+    automationId: automation.id,
+    flush: autosave.flush,
+    graph: currentGraph,
+    onBlocked: openIssues,
+  });
+  const testRef = useRef(testRun);
+  useLayoutEffect(() => {
+    testRef.current = testRun;
+  });
+
+  // Moving a step keeps the paint; adding, removing or reconnecting one clears it.
+  const shape = useMemo(() => structureKey(state.graph), [state.graph]);
+  const paintedShape = useRef(shape);
+  const { unpaint } = testRun;
+  useEffect(() => {
+    if (paintedShape.current === shape) return;
+    paintedShape.current = shape;
+    unpaint();
+  }, [shape, unpaint]);
+
+  /** Activate, Run Now and Restore save first, then name the revision the server has. */
+  const { flush: flushDraft, revision: savedRevision, reset: resetDraft } = autosave;
+  const flushRevision = useCallback(async () => {
+    if (!(await flushDraft())) throw new Error(NOT_SAVED_YET);
+    return savedRevision();
+  }, [flushDraft, savedRevision]);
+
+  /**
+   * The workflow changed on the server (activate, pause, discard, restore):
+   * swap it in without a reload. A draft that is the same as the one on
+   * screen keeps the undo history; a different one starts afresh.
+   */
+  const adopt = useCallback(
+    (detail: AutomationDetail) => {
+      resetDraft({ graph: detail.draftGraph, name: detail.name, revision: detail.draftRevision });
+      const current = stateRef.current;
+      if (
+        current.name !== detail.name ||
+        JSON.stringify(current.graph) !== JSON.stringify(detail.draftGraph)
+      ) {
+        dispatch({ type: 'load', graph: detail.draftGraph, name: detail.name });
+      }
+      setLive({ status: detail.status, activeVersion: detail.activeVersion });
+      setUnpublished(detail.hasUnpublishedChanges);
+      if (detail.pinned) setPinned(detail.pinned);
+      setPreview(null);
+    },
+    [resetDraft],
+  );
+
+  // ---- Tabs: the address bar follows them, without a navigation --------------------
+
+  useEffect(() => {
+    const search = builderSearch(window.location.search, { tab, runId, review });
+    if (search === window.location.search) return;
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${search}${window.location.hash}`,
+    );
+  }, [tab, runId, review]);
+
+  // RunsTab's rows skip re-renders only while this stays the same function.
+  const selectRun = useCallback((id: string | null) => {
+    setRunId(id);
+    setReview(false);
+  }, []);
+
+  const showRun = useCallback((run: RunSummary) => {
+    setPreview(null);
+    setRunId(run.id);
+    setReview(false);
+    setTab('runs');
+  }, []);
+
+  /** Debug In Editor: RunsTab saved the pins and said so; swap them in and land on the step. */
+  const debugInEditor = useCallback(
+    ({ pinned: next, focusKey }: { pinned: PinnedStep[]; focusKey: string | null }) => {
+      const replaced = new Set(next.map((pin) => pin.nodeKey));
+      setPinned((current) => [...current.filter((pin) => !replaced.has(pin.nodeKey)), ...next]);
+      setPreview(null);
+      setTab('editor');
+      setPendingFocus(focusKey);
+    },
+    [],
+  );
 
   // ---- Loading what the first paint did not have -----------------------------
 
@@ -328,11 +485,12 @@ function Builder({
 
   const workspace = useOptionalWorkspace();
   const workspaceName = workspace?.organizations.find((org) => org.id === orgId)?.name;
-  const canManage = workspace ? workspace.role !== 'USER' : false;
+  const canManage = canManageProp ?? (workspace ? workspace.role !== 'USER' : false);
   const timeZone = useMemo(browserZone, []);
+  // Pinned data first, then each step's last test, then samples.
   const { scope, scopeSource } = useMemo(
-    () => buildScope(checkedGraph, pinned, workspaceName),
-    [checkedGraph, pinned, workspaceName],
+    () => buildScope(checkedGraph, pinned, workspaceName, testRun.lastTest),
+    [checkedGraph, pinned, workspaceName, testRun.lastTest],
   );
   const fieldContext = useMemo(
     (): FieldContext => ({
@@ -411,6 +569,17 @@ function Builder({
     (key: string) => {
       open(key);
       setExpandedKey(key);
+      setFromBadge(false);
+    },
+    [open],
+  );
+
+  /** A result badge on the painted canvas: the Expanded view on that run's input and output. */
+  const expandRun = useCallback(
+    (key: string) => {
+      open(key);
+      setExpandedKey(key);
+      setFromBadge(true);
     },
     [open],
   );
@@ -478,6 +647,15 @@ function Builder({
     if (expandedKey && !state.graph.nodes.some((node) => node.key === expandedKey))
       setExpandedKey(null);
   }, [expandedKey, state.graph]);
+
+  // Debug In Editor: once the canvas is back, select the step and open its panel.
+  useEffect(() => {
+    if (tab !== 'editor' || preview || !pendingFocus) return;
+    setPendingFocus(null);
+    if (!graphRef.current.nodes.some((node) => node.key === pendingFocus)) return;
+    open(pendingFocus);
+    centre(pendingFocus);
+  }, [tab, preview, pendingFocus, open, centre]);
 
   // ---- Pinned test data ------------------------------------------------------------
 
@@ -682,6 +860,16 @@ function Builder({
 
   // ---- The API the cards, lines and notes use ---------------------------------------
 
+  /** Test Step from a card: its panel opens on the Test tab, where the result lands. */
+  const testStepFromCard = useCallback(
+    (key: string) => {
+      open(key);
+      setShowTest((current) => ({ key, seq: (current?.seq ?? 0) + 1 }));
+      void testRef.current.testStep(key);
+    },
+    [open],
+  );
+
   const builderApi = useMemo(
     (): BuilderApi => ({
       dispatch,
@@ -700,13 +888,29 @@ function Builder({
       duplicate,
       copy,
       contextMenu: (target, at) => setMenu({ target, at }),
+      liveInTests: testRun.liveInTests,
+      testStep: testStepFromCard,
     }),
-    [locked, open, expand, pinnedKeys, removeItems, duplicate, copy],
+    [
+      locked,
+      open,
+      expand,
+      pinnedKeys,
+      removeItems,
+      duplicate,
+      copy,
+      testRun.liveInTests,
+      testStepFromCard,
+    ],
   );
 
   // ---- Keyboard ------------------------------------------------------------------------
 
+  // The Runs tab and a version preview have no editor: its shortcuts sleep there.
+  const editing = tab === 'editor' && preview === null;
+
   useEffect(() => {
+    if (!editing) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || isTyping(event.target)) return;
       const command = shortcutFor(event);
@@ -799,6 +1003,14 @@ function Builder({
           case 'shortcuts':
             setShortcuts(true);
             return true;
+          case 'testWorkflow': {
+            // The same as the button: Stop while a test runs, else Test Workflow.
+            const test = testRef.current;
+            if (test.running) {
+              if (!test.stopping) void test.stop();
+            } else if (!test.busy) setStartSignal((count) => count + 1);
+            return true;
+          }
           case 'escape':
             if (picker) setPicker(null);
             else if (panelKey) setPanelKey(null);
@@ -811,6 +1023,7 @@ function Builder({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
+    editing,
     showSteps,
     addNote,
     open,
@@ -1011,6 +1224,18 @@ function Builder({
     />
   );
 
+  /** Test Step, its result and Send For Real In Tests, for a step's Test tab and Output pane. */
+  const stepTest = (node: GraphNode): StepTestControls => ({
+    result: stepResult(node.key, testRun.model, testRun.lastTest),
+    busy: testRun.busy,
+    testing: testRun.testingStep === node.key,
+    onTestStep: () => void testRun.testStep(node.key),
+    liveInTests: testRun.liveInTests.has(node.key),
+    onLiveInTestsChange: (on) => testRun.setLiveInTests(node.key, on),
+    inputLine: inputSourceLine(state.graph, node.key, scopeSource),
+    workflowName: state.name,
+  });
+
   const panel = panelNode ? (
     <StepPanel
       key={panelNode.key}
@@ -1024,11 +1249,32 @@ function Builder({
       onExpand={() => expand(panelNode.key)}
       renameSignal={renameSignal}
       focus={focusRequest?.key === panelNode.key ? focusRequest.request : null}
+      test={stepTest(panelNode)}
+      showTest={showTest?.key === panelNode.key ? showTest.seq : 0}
     />
   ) : null;
   const expandedNode = expandedKey
     ? state.graph.nodes.find((node) => node.key === expandedKey)
     : undefined;
+
+  const trigger = state.graph.nodes.find((node) => isTriggerType(node.type));
+  // The run bar: the painted test, or one still going after an edit cleared the paint.
+  const barRun =
+    testRun.painted ??
+    (testRun.model && !isTerminalRun(testRun.model.runStatus) ? testRun.model : null);
+  const barSteps = barRun
+    ? testRun.stepTestKey
+      ? 1
+      : (barRun.graph ?? state.graph).nodes.length
+    : 0;
+  const reviewStep = reviewKey && testRun.model ? testRun.model.steps[reviewKey] : undefined;
+
+  /** An issue from the top bar or the live controls: back to the Editor, then to its field. */
+  function openIssue(issue: ValidationIssue) {
+    setPreview(null);
+    setTab('editor');
+    goToIssue(issue);
+  }
 
   const empty =
     state.graph.nodes.length === 0 ? (
@@ -1089,14 +1335,53 @@ function Builder({
           onRename={(name) => dispatch({ type: 'rename', name })}
           status={autosave.status}
           message={autosave.message}
-          workflowStatus={automation.status}
-          hasUnpublishedChanges={unpublished}
+          tab={tab}
+          onTabChange={(next) => {
+            setPreview(null);
+            setTab(next);
+          }}
           issues={issues}
           graph={state.graph}
-          onOpenIssue={goToIssue}
+          onOpenIssue={openIssue}
+          issuesSignal={issuesSignal}
+          testControls={
+            editing ? (
+              <TestControls
+                trigger={trigger}
+                hasPinnedTrigger={trigger ? pinnedKeys.has(trigger.key) : false}
+                busy={testRun.busy}
+                running={testRun.running}
+                stopping={testRun.stopping}
+                onStart={(options) => void testRun.start(options)}
+                onStop={() => void testRun.stop()}
+                startSignal={startSignal}
+              />
+            ) : null
+          }
+          liveControls={
+            <WorkflowLiveControls
+              automation={{
+                id: automation.id,
+                name: state.name,
+                status: live.status,
+                activeVersion: live.activeVersion,
+                hasUnpublishedChanges: unpublished,
+              }}
+              graph={state.graph}
+              issues={issues}
+              catalog={catalog}
+              canManage={canManage}
+              flush={flushRevision}
+              onChanged={adopt}
+              onOpenIssue={openIssue}
+              onRunStarted={showRun}
+              summary={summary}
+            />
+          }
+          onVersions={() => setVersionsOpen(true)}
           onDuplicate={() => void duplicateWorkflow()}
           onDelete={() => setDeleting(true)}
-          stepsHidden={!wide}
+          stepsHidden={!wide && preview === null}
           onShowSteps={() => setStepsSheet(true)}
         />
 
@@ -1138,99 +1423,146 @@ function Builder({
           </Alert>
         ) : null}
 
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
-          {wide ? (
-            stepsOpen ? (
-              <div
-                data-steps-panel
-                className="flex w-70 shrink-0 flex-col border-r-2 border-outline bg-chrome"
-              >
-                {stepsPicker}
-              </div>
-            ) : (
-              <StepPicker
-                placement="panel"
+        {tab === 'runs' ? (
+          <RunsTab
+            orgId={orgId}
+            automationId={automation.id}
+            automationName={state.name}
+            catalog={catalog}
+            activeVersion={live.activeVersion}
+            runId={runId}
+            openReview={review}
+            onSelectRun={selectRun}
+            onDebugInEditor={debugInEditor}
+          />
+        ) : preview ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="version-preview">
+            <VersionPreviewBanner
+              automationId={automation.id}
+              version={preview}
+              flush={flushRevision}
+              onRestored={adopt}
+              onClose={() => setPreview(null)}
+            />
+            <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
+              <RunCanvas
+                key={preview.version}
+                graph={preview.graph}
+                run={null}
                 catalog={catalog}
-                hasTrigger={hasTrigger}
-                recent={recent}
-                orgId={orgId}
-                onPick={(item) => addItem(item)}
-                onCollapse={() => setStepsOpen(true)}
-                collapsed
+                className="min-h-0 flex-1"
               />
-            )
-          ) : null}
-
-          <div ref={canvasBox} className="relative min-w-0 flex-1">
-            <WorkflowCanvas
-              graph={state.graph}
-              selection={state.selection}
-              issues={issuesMap}
-              summary={summary}
-              tidying={tidying}
-              onConnectRefused={(reason) =>
-                toast({ title: reason || LOOP_REFUSED, variant: 'danger' })
-              }
-              onDropStep={(itemId, at) => {
-                const item = catalog
-                  ? pickerItems(catalog, { placement: 'panel', hasTrigger }).find(
-                      (entry) => entry.id === itemId,
-                    )
-                  : undefined;
-                if (item) addItem(item, { position: at });
-              }}
-              onPaneClick={() => {
-                setPanelKey(null);
-                setPicker(null);
-              }}
-              empty={empty}
-            >
-              <CanvasControls
-                canUndo={state.past.length > 0}
-                canRedo={state.future.length > 0}
-                onUndo={() => dispatch({ type: 'undo' })}
-                onRedo={() => dispatch({ type: 'redo' })}
-                onTidy={tidy}
-                locked={locked}
-                onLock={() => setLocked((value) => !value)}
-                hasSteps={state.graph.nodes.length > 0}
-              />
-              {showSetup && state.graph.nodes.length > 0 ? (
-                <Panel position="top-left" className="m-3!">
-                  <FinishSetup
-                    items={setupList}
-                    onOpen={(item) => goToIssue(item.issue)}
-                    onDismiss={() => setShowSetup(false)}
-                  />
-                </Panel>
-              ) : null}
-            </WorkflowCanvas>
-          </div>
-
-          {wide && panel ? (
-            <div
-              className="relative flex shrink-0 flex-col border-l-2 border-outline"
-              style={{ width: panelWidth }}
-              data-testid="step-panel-dock"
-            >
-              <ResizeHandle
-                label="Resize Step Panel"
-                value={panelWidth}
-                min={PANEL_MIN}
-                max={PANEL_MAX}
-                step={PANEL_STEP}
-                grows="left"
-                valueText={`${panelWidth} pixels wide`}
-                onChange={setPanelWidth}
-                className="absolute inset-y-0 -left-1.5 w-3"
-              />
-              {panel}
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
+            {wide ? (
+              stepsOpen ? (
+                <div
+                  data-steps-panel
+                  className="flex w-70 shrink-0 flex-col border-r-2 border-outline bg-chrome"
+                >
+                  {stepsPicker}
+                </div>
+              ) : (
+                <StepPicker
+                  placement="panel"
+                  catalog={catalog}
+                  hasTrigger={hasTrigger}
+                  recent={recent}
+                  orgId={orgId}
+                  onPick={(item) => addItem(item)}
+                  onCollapse={() => setStepsOpen(true)}
+                  collapsed
+                />
+              )
+            ) : null}
+
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div ref={canvasBox} className="relative min-h-0 min-w-0 flex-1">
+                <WorkflowCanvas
+                  graph={state.graph}
+                  selection={state.selection}
+                  issues={issuesMap}
+                  summary={summary}
+                  tidying={tidying}
+                  run={testRun.painted}
+                  onRunBadgeClick={expandRun}
+                  onConnectRefused={(reason) =>
+                    toast({ title: reason || LOOP_REFUSED, variant: 'danger' })
+                  }
+                  onDropStep={(itemId, at) => {
+                    const item = catalog
+                      ? pickerItems(catalog, { placement: 'panel', hasTrigger }).find(
+                          (entry) => entry.id === itemId,
+                        )
+                      : undefined;
+                    if (item) addItem(item, { position: at });
+                  }}
+                  onPaneClick={() => {
+                    setPanelKey(null);
+                    setPicker(null);
+                  }}
+                  empty={empty}
+                >
+                  <CanvasControls
+                    canUndo={state.past.length > 0}
+                    canRedo={state.future.length > 0}
+                    onUndo={() => dispatch({ type: 'undo' })}
+                    onRedo={() => dispatch({ type: 'redo' })}
+                    onTidy={tidy}
+                    locked={locked}
+                    onLock={() => setLocked((value) => !value)}
+                    hasSteps={state.graph.nodes.length > 0}
+                  />
+                  {showSetup && state.graph.nodes.length > 0 ? (
+                    <Panel position="top-left" className="m-3!">
+                      <FinishSetup
+                        items={setupList}
+                        onOpen={(item) => goToIssue(item.issue)}
+                        onDismiss={() => setShowSetup(false)}
+                      />
+                    </Panel>
+                  ) : null}
+                </WorkflowCanvas>
+              </div>
+              {barRun ? (
+                <RunBar
+                  run={barRun}
+                  totalSteps={barSteps}
+                  stopping={testRun.stopping}
+                  onStop={() => void testRun.stop()}
+                  onClose={testRun.unpaint}
+                  onOpenReview={setReviewKey}
+                />
+              ) : null}
+            </div>
+
+            {wide && panel ? (
+              <div
+                className="relative flex shrink-0 flex-col border-l-2 border-outline"
+                style={{ width: panelWidth }}
+                data-testid="step-panel-dock"
+              >
+                <ResizeHandle
+                  label="Resize Step Panel"
+                  value={panelWidth}
+                  min={PANEL_MIN}
+                  max={PANEL_MAX}
+                  step={PANEL_STEP}
+                  grows="left"
+                  valueText={`${panelWidth} pixels wide`}
+                  onChange={setPanelWidth}
+                  className="absolute inset-y-0 -left-1.5 w-3"
+                />
+                {panel}
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
-      {!wide ? (
+      {!wide && editing ? (
         <>
           <Sheet open={stepsSheet} onOpenChange={setStepsSheet}>
             <SheetContent side="left" className="flex w-80 flex-col p-0" data-steps-panel>
@@ -1251,7 +1583,7 @@ function Builder({
         </>
       ) : null}
 
-      {picker ? (
+      {picker && editing ? (
         <PickerPopover left={pickerLeft} top={pickerTop} onClose={() => setPicker(null)}>
           <StepPicker
             placement={picker.placement}
@@ -1293,6 +1625,16 @@ function Builder({
         onCommand={onPalette}
       />
       <ShortcutsSheet open={shortcuts} onOpenChange={setShortcuts} />
+      <VersionsDrawer
+        open={versionsOpen}
+        onOpenChange={setVersionsOpen}
+        automationId={automation.id}
+        previewing={preview?.version ?? null}
+        onPreview={(version) => {
+          setPreview(version);
+          if (version) setTab('editor');
+        }}
+      />
 
       <ExpandedView
         node={expandedNode}
@@ -1301,20 +1643,51 @@ function Builder({
         context={fieldContext}
         dispatch={dispatch}
         pin={pinControls(expandedNode?.key ?? '')}
-        onClose={() => setExpandedKey(null)}
+        onClose={() => {
+          setExpandedKey(null);
+          setFromBadge(false);
+        }}
         onNavigate={(key) => {
           open(key);
           setExpandedKey(key);
           reveal(key);
         }}
+        test={expandedNode ? stepTest(expandedNode) : undefined}
+        runResult={
+          fromBadge && expandedNode ? stepResult(expandedNode.key, testRun.model, {}) : null
+        }
       />
+
+      <Dialog
+        open={reviewStep !== undefined}
+        onOpenChange={(value) => !value && setReviewKey(null)}
+      >
+        {reviewStep && testRun.model ? (
+          <DialogContent className="flex max-w-xl flex-col gap-3" data-testid="test-review-dialog">
+            <DialogTitle className="type-heading pr-10 text-lg text-ink">Manual Review</DialogTitle>
+            <DialogDescription className="sr-only">
+              This test waits for an answer before it goes on.
+            </DialogDescription>
+            <ReviewCard
+              runId={testRun.model.runId}
+              step={reviewStep}
+              autoFocus
+              onAnswered={() => {
+                testRun.refresh();
+                setReviewKey(null);
+              }}
+              className="border-0 p-0 shadow-none"
+            />
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {state.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {automation.status === 'ACTIVE'
+              {live.status === 'ACTIVE'
                 ? 'It is on now: it stops at once and its runs are kept. This cannot be undone.'
                 : 'Its runs are kept. This cannot be undone.'}
             </AlertDialogDescription>

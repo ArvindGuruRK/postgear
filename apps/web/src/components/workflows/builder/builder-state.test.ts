@@ -307,4 +307,23 @@ describe('builderReducer', () => {
     expect(state.graph.notes[0].text).toBe('Check **Monday**');
     expect(run(state, { type: 'undo' }, { type: 'undo' }).graph.notes).toHaveLength(0);
   });
+
+  it('loads a draft the server swapped in (restore, discard) as a fresh start', () => {
+    const edited = run(
+      initialState(emptyGraph(), 'Untitled Workflow'),
+      { type: 'addStep', stepType: 'trigger.manual', key: 'trigger001' },
+      { type: 'select', selection: { nodes: ['trigger001'], edges: [], notes: [] } },
+    );
+    expect(edited.past).toHaveLength(1);
+
+    const restored = report();
+    const state = builderReducer(edited, { type: 'load', graph: restored, name: 'Report v2' });
+    expect(state.graph).toBe(restored);
+    expect(state.name).toBe('Report v2');
+    // Undo never walks back across a restore into a draft the server replaced.
+    expect(state.past).toEqual([]);
+    expect(state.future).toEqual([]);
+    expect(state.selection).toEqual({ nodes: [], edges: [], notes: [] });
+    expect(builderReducer(state, { type: 'undo' })).toBe(state);
+  });
 });

@@ -68,6 +68,8 @@ const ICONS: Array<{ match: (type: string) => boolean; icon: LucideIcon; tone: s
   { match: (t) => t === 'billing.payment_failed', icon: CreditCard, tone: 'text-actionDanger' },
   { match: (t) => t.startsWith('billing.'), icon: CreditCard, tone: 'text-ink' },
   { match: (t) => t === 'webhook.failed', icon: Webhook, tone: 'text-actionDanger' },
+  { match: (t) => t === 'automation.failed', icon: Workflow, tone: 'text-actionDanger' },
+  { match: (t) => t === 'automation.paused', icon: Workflow, tone: 'text-actionAccent' },
   { match: (t) => t.startsWith('automation'), icon: Workflow, tone: 'text-ink' },
   { match: (t) => t === 'info', icon: Info, tone: 'text-ink' },
 ];

@@ -15,7 +15,15 @@ export const AUTOMATION_MESSAGES = {
   /** Shared with the web app, which warns before it saves. */
   SECRET_REFUSED: SECRET_REFUSED_MESSAGE,
   PINNED_TOO_LARGE: 'Pinned data can be at most 64 KB.',
-  ACTIVATION_LATER: 'Turning workflows on arrives in a later step of this sprint.',
+
+  // Activation, pause, versions and delete (Module 09)
+  ACTIVATION_BLOCKED: 'Fix the problems in this workflow before you turn it on.',
+  CONFIRM_AUTOMATIC_POSTING: 'Confirm that posts will go out automatically.',
+  SCHEDULE_NOT_SET_UP: 'The schedule is not set up yet. PostGear will set it up within 15 minutes.',
+  NOT_TURNED_ON: 'This workflow has not been turned on yet.',
+  NO_ACTIVE_VERSION: 'This workflow has no live version to go back to.',
+  VERSION_NOT_FOUND: 'Version not found',
+  DELETE_ACTIVE_ADMIN_ONLY: 'Only workspace admins can delete an active workflow.',
 } as const;
 
 /** Why a step in the catalog cannot be used as it is. */

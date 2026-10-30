@@ -83,6 +83,8 @@ export class BuilderAutosave {
   private disposed = false;
   private state: SaveStatus = 'saved';
   private waiters: ((saved: boolean) => void)[] = [];
+  /** Bumped by `reset`: an answer to a request sent before it is stale. */
+  private generation = 0;
 
   constructor(
     saved: Version & { revision: number },
@@ -162,6 +164,29 @@ export class BuilderAutosave {
     this.sendNow(true);
   }
 
+  /**
+   * The server's draft changed under the builder on purpose (activate,
+   * discard, restore a version): it is now both saved and on screen, at its
+   * new revision. Anything waiting is dropped, an answer still on its way
+   * is ignored, and a conflict or refusal is cleared.
+   */
+  reset(saved: Version & { revision: number }): void {
+    if (this.disposed) return;
+    this.generation += 1;
+    this.clearTimer();
+    this.clearRetry();
+    this.saved = { graph: saved.graph, name: saved.name };
+    this.screen = { ...this.saved };
+    this.revision = saved.revision;
+    this.inFlight = false;
+    this.sendAfter = false;
+    this.attempt = 0;
+    this.offline = false;
+    this.halt = null;
+    this.emit();
+    this.settle(true);
+  }
+
   /** The editor is closing: whatever is unsaved goes on a request that outlives the page. */
   dispose(): void {
     if (this.disposed) return;
@@ -208,12 +233,17 @@ export class BuilderAutosave {
       return;
     }
     const sent = { ...this.screen };
+    const generation = this.generation;
     this.inFlight = true;
     this.sendAfter = false;
     this.emit();
     this.deps.send(body, { keepalive }).then(
-      (result) => this.succeeded(sent, result),
-      (error: unknown) => this.failed(error),
+      (result) => {
+        if (generation === this.generation) this.succeeded(sent, result);
+      },
+      (error: unknown) => {
+        if (generation === this.generation) this.failed(error);
+      },
     );
   }
 

@@ -19,6 +19,7 @@ import type {
   AutomationConnectionStatus,
   AutomationRunMode,
   AutomationRunStatus,
+  AutomationStatus,
   AutomationStepStatus,
 } from '@postgear/db';
 import type { AutomationStepError } from '@postgear/scheduling';
@@ -70,6 +71,14 @@ export interface StepRecord {
   startedAt: Date | null;
   finishedAt: Date | null;
   durationMs: number | null;
+  /**
+   * The output ports a finished step fired (the ones fed to `planNext`):
+   * `['out']`, `['true']`, `['approved']`, `['error']`; `[]` while it runs,
+   * when it was skipped, or when it failed and stopped its branch. The run
+   * view lights the lines taken from them, and Retry From Here seeds
+   * finished steps with them (Module 08).
+   */
+  ports: string[];
 }
 
 export interface StepKey {
@@ -89,6 +98,7 @@ export type StepChange = Partial<
     | 'startedAt'
     | 'finishedAt'
     | 'durationMs'
+    | 'ports'
   >
 >;
 
@@ -115,6 +125,46 @@ export interface NotificationWrite {
   content: string;
   link: string | null;
   meta: Record<string, unknown>;
+  /** Defaults to now; failure alerts pass the run's finish time so the alert window uses one clock. */
+  createdAt?: Date;
+}
+
+/** A notification as the failure alerts read it back (Module 09). */
+export interface StoredNotification {
+  id: string;
+  createdAt: Date;
+  meta: Record<string, unknown>;
+}
+
+/** The workflow a run belongs to, as the alerts, the auto-pause and scheduled runs read it. */
+export interface AutomationRecord {
+  id: string;
+  organizationId: string;
+  name: string;
+  status: AutomationStatus;
+  deleted: boolean;
+  activeVersionId: string | null;
+  consecutiveFailures: number;
+}
+
+/** A live run a trigger starts (Module 09): Schedule here, events in lib/automation-enqueue.ts. */
+export interface NewLiveRun {
+  organizationId: string;
+  automationId: string;
+  versionId: string;
+  triggerType: string;
+  triggerEventId: string;
+  triggerPayload: unknown;
+  /** The Temporal workflow id when it is not `automationRunWorkflowId(id)`. */
+  temporalWorkflowId: string | null;
+}
+
+/** The run row for a trigger event, whether this call created it or an earlier one did. */
+export interface LiveRunRow {
+  id: string;
+  status: AutomationRunStatus;
+  temporalWorkflowId: string | null;
+  created: boolean;
 }
 
 export interface AutomationRunSummary {
@@ -170,6 +220,33 @@ export interface RunStore {
     organizationId: string,
     automationId: string,
     summary: AutomationRunSummary,
+  ): Promise<void>;
+  /** The workflow, scoped by workspace; null when it does not exist. Deleted ones are returned with `deleted`. */
+  loadAutomation(organizationId: string, automationId: string): Promise<AutomationRecord | null>;
+  /** A version's graph as stored; null unless the version belongs to this workflow of this workspace. */
+  loadVersionGraph(
+    organizationId: string,
+    automationId: string,
+    versionId: string,
+  ): Promise<unknown>;
+  /**
+   * Inserts the QUEUED live run for a trigger event once: idempotent on the
+   * unique `(automationId, triggerEventId)`. Returns the row either way.
+   */
+  createLiveRun(run: NewLiveRun): Promise<LiveRunRow>;
+  /** ACTIVE to PAUSED (the auto-pause). True when it changed. */
+  pauseAutomation(organizationId: string, automationId: string): Promise<boolean>;
+  /** The newest notification of this type about this workflow (`meta.automationId`). */
+  latestNotification(
+    organizationId: string,
+    type: string,
+    automationId: string,
+  ): Promise<StoredNotification | null>;
+  /** Replaces a notification's `meta` (the failure alert's suppressed count). */
+  updateNotificationMeta(
+    organizationId: string,
+    notificationId: string,
+    meta: Record<string, unknown>,
   ): Promise<void>;
   /** Runs `work` atomically where the backend can (a database transaction). */
   transaction<T>(work: (store: RunStore) => Promise<T>): Promise<T>;

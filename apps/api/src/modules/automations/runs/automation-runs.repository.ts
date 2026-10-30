@@ -1,9 +1,10 @@
 /**
  * Persistence for workflow runs on the API side (Module 07). The worker
- * writes almost every run and step row; the API creates test runs, reads
- * them back, and makes the three writes a person can cause: a review
- * decision, its undo when the signal fails, and cancelling a run whose
- * workflow cannot be told.
+ * writes almost every run and step row; the API creates test runs, Run Now
+ * runs and Retry From Here runs (with copies of the steps a retry starts
+ * from, Modules 08 and 09), reads them back, and makes the three writes a
+ * person can cause: a review decision, its undo when the signal fails, and
+ * cancelling a run whose workflow cannot be told.
  *
  * - **Every read carries the workspace.** Runs filter on `organizationId`
  *   and step rows on `run.organizationId` (the step table has no column of
@@ -22,11 +23,17 @@ import { Injectable } from '@nestjs/common';
 import {
   AutomationRunMode,
   AutomationRunStatus,
+  type AutomationStatus,
   AutomationStepStatus,
   Prisma,
   prisma,
 } from '@postgear/db';
 
+/**
+ * A run as lists and events send it. Never the trigger data (up to 64 KB a
+ * run): the list's trigger phrase (Module 08) reads only the few fields it
+ * needs, through `triggerFacts`.
+ */
 const RUN_SUMMARY_SELECT = {
   id: true,
   automationId: true,
@@ -41,6 +48,9 @@ const RUN_SUMMARY_SELECT = {
   startedAt: true,
   finishedAt: true,
   createdAt: true,
+  versionId: true,
+  temporalWorkflowId: true,
+  version: { select: { version: true } },
 } as const;
 
 const RUN_DETAIL_SELECT = {
@@ -48,6 +58,13 @@ const RUN_DETAIL_SELECT = {
   triggerPayload: true,
   graphSnapshot: true,
   version: { select: { version: true, graph: true } },
+} as const;
+
+/** What Retry From Here copies from the run it retries. */
+const RETRY_SOURCE_SELECT = {
+  ...RUN_DETAIL_SELECT,
+  seedOutputs: true,
+  automation: { select: { activeVersionId: true } },
 } as const;
 
 const STEP_SELECT = {
@@ -64,12 +81,14 @@ const STEP_SELECT = {
   startedAt: true,
   finishedAt: true,
   durationMs: true,
+  ports: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
 export type RunSummaryRow = Prisma.AutomationRunGetPayload<{ select: typeof RUN_SUMMARY_SELECT }>;
 export type RunDetailRow = Prisma.AutomationRunGetPayload<{ select: typeof RUN_DETAIL_SELECT }>;
+export type RetrySourceRow = Prisma.AutomationRunGetPayload<{ select: typeof RETRY_SOURCE_SELECT }>;
 export type StepRow = Prisma.AutomationRunStepGetPayload<{ select: typeof STEP_SELECT }>;
 
 /** A step's latest attempt, and how many attempts it took. */
@@ -94,14 +113,54 @@ export interface ReviewStepRow {
   output: Prisma.JsonValue;
 }
 
+/**
+ * A new run. TEST unless `mode` says LIVE; a live run names its version
+ * and has no snapshot (the worker loads the version by id), and no options
+ * unless it is a retry.
+ */
 export interface RunCreate {
   automationId: string;
+  mode?: AutomationRunMode;
+  versionId?: string | null;
   triggerType: string;
   triggerPayload: Prisma.InputJsonValue | typeof Prisma.JsonNull;
-  graphSnapshot: Prisma.InputJsonValue;
+  graphSnapshot?: Prisma.InputJsonValue;
   seedOutputs?: Prisma.InputJsonValue;
-  options: Prisma.InputJsonValue;
+  options?: Prisma.InputJsonValue;
   startedById: string | null;
+}
+
+/** A finished step copied into a Retry From Here run, as it ended in the run retried. */
+export interface SeededStepCopy {
+  nodeKey: string;
+  nodeType: string;
+  nodeName: string;
+  status: AutomationStepStatus;
+  input: Prisma.JsonValue;
+  output: Prisma.JsonValue;
+  error: Prisma.JsonValue;
+  ports: string[];
+  truncated: boolean;
+  durationMs: number | null;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+}
+
+/**
+ * The few trigger data fields a run's trigger phrase is made from: the
+ * platform of a post event, and when a schedule fired, in which zone.
+ */
+export interface TriggerFacts {
+  provider: string | null;
+  scheduledFor: string | null;
+  timeZone: string | null;
+}
+
+/** A workflow as Run Now needs it: on, with its live version. */
+export interface LiveAutomation {
+  id: string;
+  status: AutomationStatus;
+  activeVersion: { id: string; graph: Prisma.JsonValue; triggerType: string } | null;
 }
 
 /** Statuses whose step rows still carry an output a later step can read. */
@@ -135,6 +194,18 @@ export class AutomationRunsRepository {
         draftGraph: true,
         pinnedData: true,
         organization: { select: { name: true } },
+      },
+    });
+  }
+
+  /** Run Now (Module 09): the workflow's status and its live version. */
+  async findLiveAutomation(orgId: string, id: string): Promise<LiveAutomation | null> {
+    return prisma.automation.findFirst({
+      where: { id, organizationId: orgId, deletedAt: null },
+      select: {
+        id: true,
+        status: true,
+        activeVersion: { select: { id: true, graph: true, triggerType: true } },
       },
     });
   }
@@ -220,12 +291,100 @@ export class AutomationRunsRepository {
     return prisma.automationRun.create({
       data: {
         organizationId: orgId,
-        mode: AutomationRunMode.TEST,
         status: AutomationRunStatus.QUEUED,
         ...data,
+        mode: data.mode ?? AutomationRunMode.TEST,
       },
       select: RUN_SUMMARY_SELECT,
     });
+  }
+
+  /**
+   * Retry From Here (Module 08): the new run and copies of the steps it
+   * starts from, in one transaction, so the worker never sees the run
+   * without its finished steps. Each copy is attempt 1 of the new run, with
+   * the status, data, ports and times it ended with in the run retried.
+   */
+  async createRetryRun(
+    orgId: string,
+    data: RunCreate,
+    steps: readonly SeededStepCopy[],
+  ): Promise<RunSummaryRow> {
+    return prisma.$transaction(async (tx) => {
+      const run = await tx.automationRun.create({
+        data: {
+          organizationId: orgId,
+          status: AutomationRunStatus.QUEUED,
+          ...data,
+          mode: data.mode ?? AutomationRunMode.TEST,
+        },
+        select: RUN_SUMMARY_SELECT,
+      });
+      if (steps.length > 0) {
+        await tx.automationRunStep.createMany({
+          data: steps.map((step) => ({
+            runId: run.id,
+            nodeKey: step.nodeKey,
+            nodeType: step.nodeType,
+            nodeName: step.nodeName,
+            status: step.status,
+            attempt: 1,
+            input: nullableJson(step.input),
+            output: nullableJson(step.output),
+            error: nullableJson(step.error),
+            ports: step.ports,
+            truncated: step.truncated,
+            durationMs: step.durationMs,
+            startedAt: step.startedAt,
+            finishedAt: step.finishedAt,
+          })),
+        });
+      }
+      return run;
+    });
+  }
+
+  /** The run Retry From Here starts from, with what it copies and the workflow's live version. */
+  async findRetrySource(orgId: string, runId: string): Promise<RetrySourceRow | null> {
+    return prisma.automationRun.findFirst({
+      where: { id: runId, organizationId: orgId, automation: { deletedAt: null } },
+      select: RETRY_SOURCE_SELECT,
+    });
+  }
+
+  /**
+   * A person's name as a review records it ("Approved by Priya Shah"): first
+   * and last name, else the email they signed up with. Null when the user
+   * is gone.
+   */
+  async userName(userId: string): Promise<string | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, lastName: true, email: true },
+    });
+    if (!user) return null;
+    return [user.name, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+  }
+
+  /**
+   * The trigger phrase fields of some runs of the workspace, read out of
+   * their trigger data in SQL so a page of runs never loads the data itself.
+   */
+  async triggerFacts(orgId: string, runIds: readonly string[]): Promise<Map<string, TriggerFacts>> {
+    if (runIds.length === 0) return new Map();
+    const rows = await prisma.$queryRaw<Array<TriggerFacts & { id: string }>>`
+      SELECT "id",
+        "triggerPayload" #>> '{post,channel,provider}' AS "provider",
+        "triggerPayload" ->> 'scheduledFor' AS "scheduledFor",
+        "triggerPayload" ->> 'timeZone' AS "timeZone"
+      FROM "AutomationRun"
+      WHERE "organizationId" = ${orgId} AND "id" IN (${Prisma.join([...runIds])})`;
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        { provider: row.provider, scheduledFor: row.scheduledFor, timeZone: row.timeZone },
+      ]),
+    );
   }
 
   /** One page of a workflow's runs, newest first. Asks for one extra row to know whether there is a next page. */
@@ -412,4 +571,9 @@ export class AutomationRunsRepository {
     });
     return rows.map((row) => row.credentials);
   }
+}
+
+/** A nullable JSON column's value for a write: SQL NULL for null. */
+function nullableJson(value: Prisma.JsonValue): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return value === null ? Prisma.DbNull : (value as Prisma.InputJsonValue);
 }

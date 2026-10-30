@@ -27,6 +27,9 @@ const MAX_INPUT_TEXT = 2_000;
 /** A reviewer's edited post text. The longest platform allows about 63,000 characters. */
 export const MAX_EDITED_TEXT = 64_000;
 
+/** A reviewer's reason for a rejection: a sentence or two. */
+export const MAX_REVIEW_REASON = 500;
+
 const nodeKey = z.string().regex(NODE_KEY_PATTERN);
 
 const triggerData = z.enum(['last', 'sample', 'pinned']);
@@ -74,14 +77,35 @@ export const reviewDecisionSchema = z
     decision: z.enum(['approved', 'rejected']),
     /** P1: the reviewer's edit of the text, approvals only. */
     editedText: z.string().max(MAX_EDITED_TEXT).transform(stripControlChars).optional(),
+    /** Module 08: why it was rejected, rejections only. */
+    reason: z.string().max(MAX_REVIEW_REASON).transform(stripControlChars).optional(),
   })
   .strict()
   .refine(
     (value) => value.editedText === undefined || value.decision === 'approved',
     'Only an approval can carry edited text',
+  )
+  .refine(
+    (value) => value.reason === undefined || value.decision === 'rejected',
+    'Only a rejection can carry a reason',
   );
+
+/** Retry From Here (Module 08): the failed step the new run starts at. */
+export const retryRunSchema = z.object({ fromNodeKey: nodeKey }).strict();
+
+const runNowBody = z
+  .object({
+    /** The Manual trigger's fields, checked against the live version's trigger. */
+    inputs: manualInputs.optional(),
+  })
+  .strict();
+
+/** Run Now (Module 09). Optional like the test bodies: no body means no inputs. */
+export const runNowSchema = runNowBody.optional();
 
 export type StartTestRunInput = z.infer<typeof startTestRunBody>;
 export type StepTestInput = z.infer<typeof stepTestBody>;
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
 export type ReviewDecisionInput = z.infer<typeof reviewDecisionSchema>;
+export type RetryRunInput = z.infer<typeof retryRunSchema>;
+export type RunNowInput = z.infer<typeof runNowBody>;

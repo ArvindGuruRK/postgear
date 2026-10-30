@@ -8,9 +8,8 @@
  * after the title.
  */
 import { toText } from '@postgear/automation';
+import { AUTOMATION_NOTIFICATION_TYPES } from '@postgear/scheduling';
 import type { Executor } from './types';
-
-export const AUTOMATION_NOTIFICATION_TYPE = 'automation';
 
 const TITLE_MAX = 200;
 const MESSAGE_MAX = 2_000;
@@ -19,9 +18,14 @@ function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 3)}...` : text;
 }
 
-/** The link to the run on the workflow's page. */
+/** The link to the run in the workflow's Runs tab (Module 08's deep link). */
 export function runLink(organizationId: string, automationId: string, runId: string): string {
-  return `/${organizationId}/workflows/${automationId}?run=${encodeURIComponent(runId)}`;
+  return `/${organizationId}/workflows/${automationId}?tab=runs&run=${encodeURIComponent(runId)}`;
+}
+
+/** The link that opens a waiting Manual Review's card straight away. */
+export function reviewLink(organizationId: string, automationId: string, runId: string): string {
+  return `${runLink(organizationId, automationId, runId)}&review=1`;
 }
 
 /**
@@ -48,7 +52,7 @@ export const inAppExecutor: Executor = {
 
     const { id } = await ctx.deps.store.createNotification({
       organizationId: ctx.run.organizationId,
-      type: AUTOMATION_NOTIFICATION_TYPE,
+      type: AUTOMATION_NOTIFICATION_TYPES.message,
       title: shownTitle,
       content: message,
       link,

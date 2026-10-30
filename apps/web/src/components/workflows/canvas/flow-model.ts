@@ -26,6 +26,8 @@ import {
 import type { Edge, Node } from '@xyflow/react';
 import type { Position, Selection } from '../builder/builder-state';
 import { CARD_HEIGHT, CARD_WIDTH } from '../builder/graph-ops';
+import type { RunModel, StepPaint } from '../runs/run-model';
+import { stepBadgeText } from '../runs/run-words';
 
 /** Stripe colours by family. Social steps show the platform's logo on an ink stripe. */
 export const FAMILY_STRIPE: Record<ColourFamily, string> = {
@@ -89,16 +91,26 @@ export interface StepNodeData extends Record<string, unknown> {
   /** Output ports with at least one line, so the others show their "+". */
   usedPorts: string[];
   isTrigger: boolean;
+  /** Module 08: the step's state in the painted run (absent: not started, or no run). */
+  paint?: StepPaint;
 }
 
 export interface NoteNodeData extends Record<string, unknown> {
   note: StickyNote;
 }
 
+/** How a painted run drew a line (blueprint 7.2). */
+export type EdgeRunState = 'active' | 'taken' | 'skipped';
+
 export interface FlowEdgeData extends Record<string, unknown> {
   edge: GraphEdge;
   isError: boolean;
+  /** Module 08: absent when no run is painted, or the run has not reached the line. */
+  run?: EdgeRunState;
 }
+
+/** The line sets of a run model, all a canvas needs to draw its lines. */
+export type EdgeRunSets = Pick<RunModel, 'edgesTaken' | 'edgesSkipped' | 'edgesActive'>;
 
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 export type NoteFlowNode = Node<NoteNodeData, 'note'>;
@@ -131,6 +143,8 @@ export function toFlowNodes(
     issues: Map<string, ValidationIssue[]>;
     summary: SummaryContext;
     drag: Record<string, Position> | null;
+    /** Module 08: the painted run's step states, by step key. */
+    paint?: Record<string, StepPaint> | null;
   },
 ): CanvasNode[] {
   const used = new Map<string, Set<string>>();
@@ -169,6 +183,8 @@ export function toFlowNodes(
       usedPorts: [...(used.get(node.key) ?? [])],
       isTrigger: isTriggerType(node.type),
     };
+    const paint = options.paint?.[node.key];
+    if (paint) data.paint = paint;
     return {
       id: node.key,
       type: 'step',
@@ -185,24 +201,59 @@ export function toFlowNodes(
   return [...notes, ...steps];
 }
 
-export function toFlowEdges(graph: AutomationGraph, selection: Selection): FlowEdge[] {
-  const selected = new Set(selection.edges);
-  return graph.edges.map((edge) => ({
-    id: edge.id,
-    type: 'flow',
-    source: edge.source,
-    sourceHandle: edge.sourcePort,
-    target: edge.target,
-    targetHandle: edge.targetPort,
-    selected: selected.has(edge.id),
-    data: { edge, isError: edge.sourcePort === 'error' },
-  }));
+/**
+ * A line's state in a painted run. A line into a running step is also
+ * taken (the run model puts it in both sets); it flows until that step ends.
+ */
+export function edgeRunState(
+  run: EdgeRunSets | null | undefined,
+  id: string,
+): EdgeRunState | undefined {
+  if (!run) return undefined;
+  if (run.edgesActive.has(id)) return 'active';
+  if (run.edgesTaken.has(id)) return 'taken';
+  if (run.edgesSkipped.has(id)) return 'skipped';
+  return undefined;
 }
 
-/** The plain-words label a screen reader hears for a card. */
-export function stepAriaLabel(data: Pick<StepNodeData, 'node' | 'issues' | 'isTrigger'>): string {
+export function toFlowEdges(
+  graph: AutomationGraph,
+  selection: Selection,
+  run?: EdgeRunSets | null,
+): FlowEdge[] {
+  const selected = new Set(selection.edges);
+  return graph.edges.map((edge) => {
+    const state = edgeRunState(run, edge.id);
+    const data: FlowEdgeData = { edge, isError: edge.sourcePort === 'error' };
+    if (state) data.run = state;
+    return {
+      id: edge.id,
+      type: 'flow',
+      source: edge.source,
+      sourceHandle: edge.sourcePort,
+      target: edge.target,
+      targetHandle: edge.targetPort,
+      selected: selected.has(edge.id),
+      // React Flow's own `animated` class: the dashes that flow into a running step.
+      animated: state === 'active',
+      data,
+    };
+  });
+}
+
+/**
+ * The plain-words label a screen reader hears for a card (blueprint 13):
+ * "Slack step, Failed: the link was not accepted".
+ */
+export function stepAriaLabel(
+  data: Pick<StepNodeData, 'node' | 'issues' | 'isTrigger' | 'paint'>,
+): string {
   const kind = data.isTrigger ? 'trigger' : 'step';
   const off = data.node.disabled ? ', turned off' : '';
+  if (data.paint) {
+    const error = data.paint.error ? `: ${data.paint.error}` : '';
+    return `${data.node.name} ${kind}${off}, ${stepBadgeText(data.paint)}${error}`;
+  }
   const first = data.issues[0];
   const problem = first
     ? `, ${first.severity === 'error' ? 'needs attention' : 'warning'}: ${first.message}`

@@ -21,6 +21,7 @@ import {
   type AutomationGraph,
   type GraphNode,
   getDefinition,
+  isPortId,
   LIMITS,
   type NodeDefinition,
   redact,
@@ -161,6 +162,7 @@ export function stepRow(
     startedAt: null,
     finishedAt: null,
     durationMs: null,
+    ports: [],
     ...change,
   };
 }
@@ -297,9 +299,10 @@ export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRun
     if (definition.sideEffect !== 'none') {
       const done = await store.findSucceededStep(ref, ref.nodeKey);
       if (done) {
+        const stored = done.ports.filter(isPortId);
         return {
           status: done.status === 'DRY_RUN' ? 'dryRun' : 'succeeded',
-          ports: ['out'],
+          ports: stored.length > 0 ? stored : ['out'],
           attempt: done.attempt,
         };
       }
@@ -391,6 +394,7 @@ export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRun
     });
 
     const status = result.status ?? 'succeeded';
+    const ports = result.ports ?? ['out'];
     const safeOutput = redact(result.output ?? null, {
       connectionValues: secrets,
       capBytes: LIMITS.stepIoCapBytes,
@@ -402,9 +406,11 @@ export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRun
       truncated: stepInput.truncated || safeOutput.truncated,
       finishedAt,
       durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
+      // The same ports the workflow feeds to planNext (Module 08's lines).
+      ports: [...ports],
     });
 
-    return { status, ports: result.ports ?? ['out'], attempt };
+    return { status, ports, attempt };
   } catch (error) {
     throw await recordFailure({
       env,

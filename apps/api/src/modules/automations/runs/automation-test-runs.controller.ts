@@ -1,8 +1,9 @@
 /**
  * The run routes that hang off a workflow (Sprint 10, Module 07): Test
- * Workflow, Test Step and the workflow's run history.
+ * Workflow, Test Step, the workflow's run history, and Run Now (Module 09).
  *
- * `@Roles(ADMIN, USER)`: any member tests, as any member edits. Every
+ * `@Roles(ADMIN, USER)`: any member tests and runs a Manual workflow that
+ * an admin turned on, as any member edits. Every
  * handler scopes on `@CurrentOrg()`; the `:id` is only the workflow acted
  * on, and another workspace's is a 404. These paths sit under
  * `/automations` beside Module 03's routes, which never take a second path
@@ -21,6 +22,8 @@ import { AutomationRunsService } from './automation-runs.service';
 import {
   type ListRunsQuery,
   listRunsQuerySchema,
+  type RunNowInput,
+  runNowSchema,
   type StartTestRunInput,
   type StepTestInput,
   startTestRunSchema,
@@ -56,6 +59,22 @@ export class AutomationTestRunsController {
     @Body(new ZodBody(stepTestSchema, 'automation-runs/step-test')) dto: StepTestInput | undefined,
   ) {
     return { run: await this.runs.startStepTest(org.id, user.id, id, nodeKey, dto ?? {}) };
+  }
+
+  /**
+   * Run Now (Module 09): a LIVE run of an active Manual workflow. 422
+   * `run_now_unavailable` for a draft, a paused workflow or another
+   * trigger; 422 `invalid_inputs` when the inputs do not fit its fields.
+   */
+  @Post(':id/runs')
+  @HttpCode(HttpStatus.CREATED)
+  async runNow(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body(new ZodBody(runNowSchema, 'automation-runs/run-now')) dto: RunNowInput | undefined,
+  ) {
+    return { run: await this.runs.runNow(org.id, user.id, id, dto ?? {}) };
   }
 
   @Get(':id/runs')

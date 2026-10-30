@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AutomationContextService } from './automation-context.service';
 import { AutomationTriggers } from './automation-triggers';
 import { AutomationsController } from './automations.controller';
@@ -22,8 +23,12 @@ import { ConnectionsService } from './connections/connections.service';
  * `AutomationTriggers` is the hook activation fills in; `ConnectionsRepository`
  * carries `markConnectionBroken` for the steps that send (12 and 13).
  * `CONNECTION_OAUTH_PLUGINS` is empty until Google arrives in Module 13.
+ * `SchedulingModule` gives `AutomationTriggers` the Temporal client for
+ * schedules and for cancelling runs of a deleted workflow (Module 09); it
+ * depends on nothing but config, so there is no cycle.
  */
 @Module({
+  imports: [SchedulingModule],
   controllers: [AutomationsController, ConnectionsController],
   providers: [
     AutomationsService,

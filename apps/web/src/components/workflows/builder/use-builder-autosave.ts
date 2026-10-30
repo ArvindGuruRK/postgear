@@ -37,6 +37,10 @@ export interface BuilderAutosaveHandle {
   unsaved: () => boolean;
   /** Leave Anyway was chosen: closing the page does not ask again. */
   letGo: () => void;
+  /** The draft revision the server last confirmed. */
+  revision: () => number;
+  /** The server's draft changed on purpose (activate, discard, restore): adopt it as saved. */
+  reset: (saved: { graph: AutomationGraph; name: string; revision: number }) => void;
 }
 
 export function useBuilderAutosave({
@@ -113,6 +117,15 @@ export function useBuilderAutosave({
   const letGo = useCallback(() => {
     letGoAsked.current = true;
   }, []);
+  const revision = useCallback(
+    () => controller.current?.currentRevision ?? start.current.revision,
+    [],
+  );
+  const reset = useCallback((saved: { graph: AutomationGraph; name: string; revision: number }) => {
+    // A remount in development makes a new controller from `start`: keep it current too.
+    start.current = saved;
+    controller.current?.reset(saved);
+  }, []);
 
-  return { status, message, flush, retry, unsaved, letGo };
+  return { status, message, flush, retry, unsaved, letGo, revision, reset };
 }
