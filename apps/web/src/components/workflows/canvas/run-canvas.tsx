@@ -89,7 +89,7 @@ function ZoomButton({
   return (
     <TooltipHint label={label}>
       <Button
-        variant="secondary"
+        variant="ghost"
         size="sm"
         className="h-9 w-9 px-0"
         aria-label={label}

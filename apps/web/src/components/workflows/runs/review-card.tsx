@@ -118,7 +118,7 @@ export function ReviewCard({ runId, step, onAnswered, autoFocus, className }: Re
   }
 
   const frame = cn(
-    'flex flex-col gap-3 rounded-card border-2 border-outline bg-secondary p-4 shadow-surfaceSm',
+    'flex flex-col gap-3 rounded-card border-2 border-outline bg-inset p-4 shadow-surfaceSm',
     className,
   );
 

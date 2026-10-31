@@ -290,7 +290,7 @@ export function SpreadsheetField(props: FieldControlProps) {
       className="flex flex-col gap-3"
     >
       {step.spreadsheet ? (
-        <div className="flex items-center gap-3 rounded-md border-2 border-outline bg-chrome p-3">
+        <div className="flex items-center gap-3 rounded-md border-2 border-outline bg-inset p-3">
           <FileSpreadsheet
             aria-hidden="true"
             className="h-5 w-5 shrink-0 text-ink"
@@ -617,7 +617,7 @@ export function SheetColumnsField(props: FieldControlProps) {
                 // biome-ignore lint/suspicious/noArrayIndexKey: two columns may share a header; their place is their identity
                 key={i}
                 {...{ [FIELD_PATH_ATTRIBUTE]: path }}
-                className={`flex flex-col gap-2 rounded-md border-2 bg-chrome p-3 ${
+                className={`flex flex-col gap-2 rounded-md border-2 bg-inset p-3 ${
                   gone ? 'border-actionDanger' : 'border-outline'
                 }`}
                 data-missing={gone || undefined}

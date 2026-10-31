@@ -214,7 +214,8 @@
      register form is taller than a short viewport, and with a hidden body
      its submit button became unreachable. `:has()` keeps the shell's
      behaviour exactly as it was while letting ordinary pages scroll. */
-  body:has([data-app-shell]) {
+  body:has([data-app-shell]),
+  body:has([data-immersive]) {
     overflow: hidden;
   }
 }

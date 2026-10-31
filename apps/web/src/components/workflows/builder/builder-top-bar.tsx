@@ -13,10 +13,12 @@
  * row only lays them out.
  */
 import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import type { AutomationGraph, ValidationIssue } from '@postgear/automation';
 import {
   Button,
+  buttonVariants,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -29,8 +31,10 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  TooltipHint,
 } from '@postgear/ui';
 import { CircleCheck, CloudOff, LoaderCircle, TriangleAlert } from 'lucide-react';
+import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
 import { IssuesPopover } from '../panel/issues-popover';
 import type { SaveStatus } from './builder-autosave';
@@ -73,6 +77,7 @@ function SaveState({ status, message }: { status: SaveStatus; message: string | 
 }
 
 export function BuilderTopBar({
+  orgId,
   name,
   onRename,
   status,
@@ -91,6 +96,7 @@ export function BuilderTopBar({
   stepsHidden,
   onShowSteps,
 }: {
+  orgId: string;
   name: string;
   onRename: (name: string) => void;
   status: SaveStatus;
@@ -131,6 +137,16 @@ export function BuilderTopBar({
 
   return (
     <PageActions className="justify-start">
+      <TooltipHint label="Back To Workflows" side="bottom">
+        <Link
+          href={`/${orgId}/workflows`}
+          aria-label="Back To Workflows"
+          data-testid="builder-back"
+          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'w-9 shrink-0 px-0')}
+        >
+          <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
+        </Link>
+      </TooltipHint>
       {stepsHidden && tab === 'editor' ? (
         <Button
           variant="secondary"

@@ -52,7 +52,7 @@ describe('builderReducer', () => {
         targetPort: 'in',
       },
     ]);
-    expect(state.graph.nodes[1].position).toEqual({ x: 276, y: 0 });
+    expect(state.graph.nodes[1].position).toEqual({ x: 324, y: 0 });
     expect(state.selection.nodes).toEqual(['slackstep1']);
     expect(state.past).toHaveLength(2);
   });

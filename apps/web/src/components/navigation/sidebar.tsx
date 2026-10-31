@@ -122,7 +122,7 @@ export function Sidebar({
 
       <nav
         aria-label="Sections"
-        className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden pg-scrollbar pg-scrollbar-chrome"
+        className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden pg-scrollbar-hidden"
       >
         {items.map((item) => (
           <RailItem key={item.href} {...item} />

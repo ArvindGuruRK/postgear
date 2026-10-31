@@ -142,7 +142,6 @@ export const SAVE_STATE_WORDS: Record<SaveStatus, string> = {
 };
 
 export const CONFLICT_MESSAGE = 'This workflow changed somewhere else.';
-export const SMALL_SCREEN_MESSAGE = 'The builder works best on a wider screen.';
 export const LOOP_REFUSED = 'Workflows cannot loop back to an earlier step.';
 export const WORKFLOW_MISSING_MESSAGE = 'This workflow is not here. It may have been deleted.';
 export const WORKFLOW_LOAD_FAILED = 'The workflow could not be loaded.';

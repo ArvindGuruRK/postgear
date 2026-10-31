@@ -37,7 +37,7 @@ export const RUN_WORDS: Record<AutomationRunStatus, { label: string; variant: Ba
 };
 
 export const NO_WORKFLOWS = 'No workflows yet. Start from a template or build your own.';
-export const NO_MATCHES = 'No workflows match that search.';
+export const NO_MATCHES = 'No workflows match that filter.';
 
 /** The trigger column: its title and icon, or a prompt when there is none yet. */
 export function triggerText(triggerType: string | null): { title: string; icon: string | null } {
@@ -62,7 +62,7 @@ export function runsText(count: number): string {
 /** "Uses: Google Sheets, Slack" from what a template needs. */
 export function usesText(template: Pick<TemplateSummary, 'needs'>): string | null {
   const names = template.needs.map((need) => {
-    if (need === 'channel') return 'A Channel';
+    if (need === 'channel') return 'Channel';
     if (need === 'google') return 'Google Sheets';
     return CONNECTION_KINDS.find((kind) => kind.kind === need)?.title ?? need;
   });

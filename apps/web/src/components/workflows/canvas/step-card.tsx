@@ -92,7 +92,7 @@ function portTop(index: number, count: number): string {
 }
 
 const HANDLE =
-  'pg-handle h-3.5! w-3.5! rounded-full! border-2! border-outline! bg-secondary! transition-transform';
+  'pg-handle h-3! w-3! rounded-full! border-2! border-outline! bg-secondary! transition-transform';
 
 /** The small stickers on a card's edges. */
 const STICKER =
@@ -182,7 +182,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         {editor.testStep ? (
           <TooltipHint label="Test Step">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-8 px-2"
               aria-label={`Test ${node.name}`}
@@ -195,7 +195,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         {canDisable ? (
           <TooltipHint label={node.disabled ? 'Turn On' : 'Turn Off'} shortcut="D">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-8 px-2"
               aria-label={node.disabled ? `Turn on ${node.name}` : `Turn off ${node.name}`}
@@ -208,7 +208,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         {isTrigger ? null : (
           <TooltipHint label="Duplicate">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-8 px-2"
               aria-label={`Duplicate ${node.name}`}
@@ -232,7 +232,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-8 px-2"
               aria-label={`More actions for ${node.name}`}
@@ -273,7 +273,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         data-testid="run-badge"
         data-state={look.state}
         className={cn(
-          'gap-1 whitespace-nowrap px-1.5 text-[10px] leading-none shadow-brutalSm',
+          'gap-1 whitespace-nowrap px-1.5 text-[10px] leading-none',
           look.tone === 'neutral' ? 'bg-secondary' : '',
         )}
       >
@@ -330,10 +330,10 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
 
       <div
         className={cn(
-          'pg-step-card relative flex h-full w-full items-center gap-3 overflow-hidden border-2 border-outline bg-secondary pe-3 shadow-brutalMd transition-shadow',
+          'pg-step-card relative flex h-full w-full items-center gap-3 overflow-hidden border-2 border-outline bg-secondary pe-3 shadow-surfaceSm transition-shadow',
           isTrigger ? 'rounded-l-3xl rounded-r-card' : 'rounded-card',
           selected
-            ? 'shadow-brutalLg outline-solid outline-[3px] outline-offset-2 outline-focusRing'
+            ? 'shadow-surfaceMd outline-solid outline-[3px] outline-offset-2 outline-focusRing'
             : '',
           node.disabled ? 'opacity-50' : '',
           look?.card,
@@ -494,7 +494,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
                 <span aria-hidden="true" className="h-0.5 w-5 bg-outline" />
                 <button
                   type="button"
-                  className="nodrag nopan flex h-6 w-6 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink shadow-brutalSm hover:bg-actionSecondary hover:text-onActionLight"
+                  className="nodrag nopan flex h-6 w-6 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-primary"
                   aria-label={`Add a step after ${node.name}${labelled ? `, ${port.label}` : ''}`}
                   onClick={(event) => {
                     event.stopPropagation();

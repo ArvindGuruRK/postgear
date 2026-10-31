@@ -1,7 +1,7 @@
 /**
  * Starter templates: finished workflows that only ask for the missing
  * pieces (a connection, a channel, a spreadsheet). Each is graph JSON
- * laid out left to right on a 280 px grid so it opens tidy, and each
+ * laid out left to right on a 320 px grid so it opens tidy, and each
  * validates clean once those pieces are filled (a unit test checks).
  *
  * Keys here are fixed and readable; `instantiateTemplate` gives every
@@ -42,7 +42,7 @@ export interface AutomationTemplate {
 /** A template without its graph, for the list. */
 export type TemplateSummary = Omit<AutomationTemplate, 'graph'> & { steps: number };
 
-export const TEMPLATE_COLUMN = 280;
+export const TEMPLATE_COLUMN = 320;
 export const TEMPLATE_ROW = 160;
 
 function step(

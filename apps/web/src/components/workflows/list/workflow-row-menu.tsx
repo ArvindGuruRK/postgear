@@ -52,8 +52,9 @@ export function WorkflowRowMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
+          className="w-9 px-0"
           aria-label={`Actions for ${workflow.name}`}
           disabled={busy}
         >

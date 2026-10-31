@@ -26,7 +26,7 @@ export function FinishSetup({
     <section
       aria-label="Finish Setup"
       data-testid="finish-setup"
-      className="w-72 rounded-card border-2 border-outline bg-secondary p-3 shadow-brutalMd"
+      className="w-72 rounded-card border-2 border-outline bg-secondary p-3 shadow-surfaceMd"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="type-heading text-base text-ink">Finish Setup</h2>

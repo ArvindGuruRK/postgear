@@ -61,7 +61,7 @@ describe('starter templates', () => {
   });
 
   it.each(TEMPLATES.map((t) => [t.title, t] as const))(
-    '%s is a valid graph laid out on the 280 px grid',
+    '%s is a valid graph laid out on the 320 px grid',
     (_title, template) => {
       expect(automationGraphSchema.safeParse(template.graph).success).toBe(true);
       for (const node of template.graph.nodes) {

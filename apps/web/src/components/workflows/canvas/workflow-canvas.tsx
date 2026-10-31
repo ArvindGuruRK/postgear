@@ -26,6 +26,7 @@ import {
   type Connection,
   type EdgeChange,
   type FinalConnectionState,
+  getNodesBounds,
   MiniMap,
   type NodeChange,
   ReactFlow,
@@ -60,6 +61,32 @@ const SNAP: [number, number] = [12, 12];
 const PAN_BUTTONS = [1, 2];
 const MULTI_SELECT = ['Shift', 'Meta', 'Control'];
 const FIT = { padding: 0.25, maxZoom: 1 };
+
+/**
+ * A flow too wide to fit at a readable size opens at this zoom with its first
+ * step in view, not shrunk until every card is a name-sized speck (a six-step
+ * flow opened at about 60%). Fit To Screen still fits everything.
+ */
+const OPEN_ZOOM = 0.75;
+const OPEN_MARGIN = 48;
+
+/** Steps from which the minimap earns its corner; fewer fit the screen anyway. */
+const MINIMAP_FROM = 8;
+
+/** Opens a flow that fit too small at a readable zoom, trigger end in view. */
+function openReadable(instance: ReactFlowInstance<CanvasNode, FlowEdge>) {
+  requestAnimationFrame(() => {
+    const nodes = instance.getNodes();
+    if (nodes.length === 0 || instance.getZoom() >= OPEN_ZOOM) return;
+    const bounds = getNodesBounds(nodes);
+    const height = document.querySelector('.pg-canvas')?.clientHeight ?? 600;
+    void instance.setViewport({
+      x: OPEN_MARGIN - bounds.x * OPEN_ZOOM,
+      y: height / 2 - (bounds.y + bounds.height / 2) * OPEN_ZOOM,
+      zoom: OPEN_ZOOM,
+    });
+  });
+}
 
 function splitIds(ids: string[]): { nodes: string[]; notes: string[] } {
   const nodes: string[] = [];
@@ -318,7 +345,10 @@ export function WorkflowCanvas({
               { x: event.clientX, y: event.clientY },
             );
           }}
-          onInit={onInit}
+          onInit={(instance) => {
+            openReadable(instance);
+            onInit?.(instance);
+          }}
           snapToGrid
           snapGrid={SNAP}
           selectionOnDrag
@@ -341,16 +371,17 @@ export function WorkflowCanvas({
             variant={BackgroundVariant.Dots}
             gap={24}
             size={1.5}
-            color="var(--color-outline)"
-            className="opacity-40"
+            className="pg-canvas-dots"
+            color="currentColor"
           />
-          {graph.nodes.length > 0 ? (
+          {graph.nodes.length >= MINIMAP_FROM ? (
             <MiniMap<CanvasNode>
               pannable
               zoomable
               position="bottom-right"
               className="max-md:hidden"
-              bgColor="var(--color-secondary)"
+              style={{ width: 168, height: 104 }}
+              bgColor="var(--color-chrome)"
               maskColor="color-mix(in srgb, var(--color-ink) 10%, transparent)"
               nodeColor={(node) =>
                 node.type === 'step'

@@ -328,7 +328,7 @@ export function StepTabs({
       <Collapsible
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        className="mt-6 rounded-md border-2 border-outline"
+        className="mt-6 rounded-md border-2 border-outline bg-inset"
       >
         <CollapsibleTrigger className="group flex w-full items-center justify-between px-3 py-2 type-ui text-sm text-ink">
           <span className="flex items-center">

@@ -6,8 +6,9 @@
  * Layout: the PageActions row (name, save state, status, issues, menu),
  * then the work area: the Steps panel on the left (collapsible to an icon
  * strip), the canvas, and the step panel on the right when a step is open.
- * Below `lg` both panels are drawers and an Alert says the builder works
- * best on a wider screen.
+ * Below `lg` both panels are drawers (a narrow window, not a phone layout:
+ * the builder is desktop only, see design-system-rules.md section 11).
+ * It takes the whole window, without the app rail (DashboardShell).
  *
  * State lives in one reducer (`builder-state.ts`); the canvas draws it,
  * autosave sends it (`use-builder-autosave.ts`), and the browser checks it
@@ -132,7 +133,6 @@ import {
   CONFLICT_MESSAGE,
   LOOP_REFUSED,
   NOT_SAVED_YET,
-  SMALL_SCREEN_MESSAGE,
   setupItems,
   structureKey,
   summaryContext,
@@ -334,7 +334,6 @@ function Builder({
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [leaveAsk, setLeaveAsk] = useState<((leave: boolean) => void) | null>(null);
-  const [narrowDismissed, setNarrowDismissed] = useState(false);
   const canvasBox = useRef<HTMLDivElement>(null);
   const askedConnections = useRef(new Set<string>());
 
@@ -1328,7 +1327,7 @@ function Builder({
               at: { x: rect.left + rect.width / 2 - PICKER_WIDTH / 2 - 8, y: rect.top + 40 },
             });
           }}
-          className="flex w-72 flex-col items-center gap-2 rounded-card border-2 border-dashed border-outline bg-secondary p-6 text-center outline-none hover:bg-actionSecondary hover:text-onActionLight focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+          className="flex w-72 flex-col items-center gap-2 rounded-card border-2 border-dashed border-outline bg-secondary p-6 text-center outline-none hover:bg-primary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
         >
           <span className="flex h-11 w-11 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink">
             <Plus aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
@@ -1369,6 +1368,7 @@ function Builder({
     <BuilderProvider value={builderApi}>
       <div className="flex min-w-0 flex-1 flex-col gap-3" data-testid="workflow-builder">
         <BuilderTopBar
+          orgId={orgId}
           name={state.name}
           onRename={(name) => dispatch({ type: 'rename', name })}
           status={autosave.status}
@@ -1452,15 +1452,6 @@ function Builder({
             </Button>
           </Alert>
         ) : null}
-        {!wide && !narrowDismissed ? (
-          <Alert variant="warning" className="flex-wrap items-center">
-            <span className="min-w-0 grow basis-40">{SMALL_SCREEN_MESSAGE}</span>
-            <Button variant="secondary" size="sm" onClick={() => setNarrowDismissed(true)}>
-              Got It
-            </Button>
-          </Alert>
-        ) : null}
-
         {tab === 'runs' ? (
           <RunsTab
             orgId={orgId}

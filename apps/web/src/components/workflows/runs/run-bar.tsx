@@ -167,7 +167,7 @@ export function RunBar({
         {ended ? (
           <TooltipHint label="Close">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-9 w-9 px-0"
               aria-label="Close"

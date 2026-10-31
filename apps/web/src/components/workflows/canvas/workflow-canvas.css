@@ -35,8 +35,8 @@
   }
 
   .pg-canvas .react-flow__handle {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
   }
 
   /* While a line is drawn: the inputs it may end on glow. */
@@ -62,6 +62,16 @@
     border-radius: 6px;
     box-shadow: var(--shadow-brutal-sm);
     overflow: hidden;
+  }
+
+  /*
+   * The ground's dots: ink at a low strength, so they read in every theme.
+   * They used the outline colour, which is near-black in the dark themes and
+   * so vanished there. 24px apart, two snap steps of the 12px grid, so a
+   * dragged card lands on a dot.
+   */
+  .pg-canvas .pg-canvas-dots {
+    color: color-mix(in srgb, var(--color-ink) 28%, transparent);
   }
 
   .pg-canvas .react-flow__attribution {

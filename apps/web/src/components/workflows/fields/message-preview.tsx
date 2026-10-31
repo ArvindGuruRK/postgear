@@ -88,7 +88,7 @@ function SlackLike({ preview }: { preview: MessagePreview }) {
 
 function TeamsLike({ preview }: { preview: MessagePreview }) {
   return (
-    <div className="flex flex-col gap-2 rounded-md border-2 border-outline bg-secondary p-3">
+    <div className="flex flex-col gap-2 rounded-md border-2 border-outline bg-inset p-3">
       {preview.title ? (
         <p className="m-0 break-words font-sans text-sm font-bold text-ink">{preview.title}</p>
       ) : null}
@@ -178,7 +178,7 @@ export function MessagePreviewBox({
         <AppIcon icon={APP[kind].icon} />
         {APP[kind].words}
       </span>
-      <div className="rounded-md border-2 border-outline bg-chrome p-3">
+      <div className="rounded-md border-2 border-outline bg-inset p-3">
         {kind === 'slack' ? <SlackLike preview={preview} /> : null}
         {kind === 'teams' ? <TeamsLike preview={preview} /> : null}
         {kind === 'discord' ? <DiscordLike preview={preview} /> : null}

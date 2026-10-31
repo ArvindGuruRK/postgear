@@ -7,6 +7,9 @@
  * Nothing is fetched while the active-workspace cookie names another
  * workspace (see the Studio page): the list loads once the switch has landed.
  *
+ * `?connections=1` opens the Connections modal on arrival (the old
+ * Connections address and an OAuth return both land here).
+ *
  * The viewer's role comes along (Module 09): only workspace admins turn
  * workflows on and off, so members get no Activate or Pause in the row menu.
  * The API's guard is the real check; this only avoids offering a 403.
@@ -20,8 +23,12 @@ import type { AutomationListItem } from '@/types/workflows';
 
 export const metadata: Metadata = { title: 'Workflows' };
 
-export default async function WorkflowsPage({ params }: PageProps<'/[orgId]/workflows'>) {
+export default async function WorkflowsPage({
+  params,
+  searchParams,
+}: PageProps<'/[orgId]/workflows'>) {
   const { orgId } = await params;
+  const { connections, connectError, connection } = await searchParams;
   const cookie = await getSessionCookieHeader();
   const pending = (await getActiveOrgId()) !== orgId;
 
@@ -45,6 +52,9 @@ export default async function WorkflowsPage({ params }: PageProps<'/[orgId]/work
       initialWorkflows={workflows}
       templates={listTemplates()}
       canManage={canManage}
+      connectionsOpen={connections === '1'}
+      connectErrorCode={typeof connectError === 'string' ? connectError : null}
+      connectedId={typeof connection === 'string' && connection ? connection : null}
     />
   );
 }

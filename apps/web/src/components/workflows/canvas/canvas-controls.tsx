@@ -37,7 +37,7 @@ function Control({
   return (
     <TooltipHint label={label} shortcut={shortcut} disabled={disabled}>
       <Button
-        variant="secondary"
+        variant="ghost"
         size="sm"
         className="h-9 w-9 px-0"
         aria-label={label}

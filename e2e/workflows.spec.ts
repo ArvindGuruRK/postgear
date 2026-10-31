@@ -126,7 +126,7 @@ async function caretAtEnd(): Promise<void> {
 
 test('creates a workflow from the Failed Post Alert template and Finish Setup lists Slack', async () => {
   await page.goto(`/${DEMO_ORG}/workflows`);
-  const gallery = page.getByRole('region', { name: 'Start From A Template' });
+  const gallery = page.getByRole('region', { name: 'Templates' });
   const template = gallery.getByRole('button', { name: /Failed Post Alert/ });
   await expect(template).toBeVisible({ timeout: 30_000 });
 

@@ -161,7 +161,7 @@ export function KeyValueList({ spec, value, onChange, errors, ids }: FieldContro
             // biome-ignore lint/suspicious/noArrayIndexKey: rows have no ids; their place is their identity
             key={i}
             {...at(rowPath)}
-            className="flex flex-col gap-2 rounded-md border-2 border-outline bg-chrome p-3"
+            className="flex flex-col gap-2 rounded-md border-2 border-outline bg-inset p-3"
           >
             <div className="flex items-start gap-2">
               <div {...at(`${rowPath}.${row.key}`)} className="min-w-0 flex-1">
@@ -357,7 +357,7 @@ export function ManualInputsEditor({ spec, value, onChange, errors, ids }: Field
             // biome-ignore lint/suspicious/noArrayIndexKey: a field's key changes with its label; its place is its identity
             key={i}
             {...at(path)}
-            className="flex flex-col gap-2 rounded-md border-2 border-outline bg-chrome p-3"
+            className="flex flex-col gap-2 rounded-md border-2 border-outline bg-inset p-3"
           >
             <div className="flex items-end gap-2">
               <div {...at(`${path}.label`)} className="flex min-w-0 flex-1 flex-col gap-1.5">

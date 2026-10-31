@@ -205,7 +205,7 @@ export function ScheduleBuilder({ spec, value, onChange, errors, ids }: FieldCon
         </div>
       </Part>
 
-      <div className="flex flex-col gap-2 rounded-md border-2 border-dashed border-outline px-3 py-2">
+      <div className="flex flex-col gap-2 rounded-md border-2 border-dashed border-outline bg-inset px-3 py-2">
         <span className="font-sans text-sm text-ink" aria-live="polite">
           {describeSchedule(config)}
         </span>

@@ -16,8 +16,6 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
-  CardContent,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -216,126 +214,123 @@ export function WebhooksView({
             : {})}
         />
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Events</TableHead>
-                  <TableHead>Last Delivery</TableHead>
-                  {/* `relative`: the sr-only label is absolutely positioned and must stay inside the cell. */}
-                  <TableHead className="relative w-12">
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {webhooks.map((webhook) => (
-                  <TableRow
-                    key={webhook.id}
-                    data-testid="webhook-row"
-                    data-webhook-id={webhook.id}
-                    data-disabled={webhook.disabled}
-                  >
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold">{webhook.name}</span>
-                        <span className="flex flex-wrap gap-1">
-                          {webhook.disabled ? <Badge variant="outline">Paused</Badge> : null}
-                          {webhook.channelIds.length > 0 ? (
-                            <Text size="xs" muted as="span">
-                              {webhook.channelIds.map(channelName).join(', ')}
-                            </Text>
-                          ) : (
-                            <Text size="xs" muted as="span">
-                              Every channel
-                            </Text>
-                          )}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs" title={webhook.url}>
-                        {shortUrl(webhook.url)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex flex-wrap gap-1">
-                        {webhook.events.map((event) => (
-                          <Badge key={event} variant="outline">
-                            {EVENT_LABELS[event].label}
-                          </Badge>
-                        ))}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {webhook.lastDelivery ? (
-                        <Badge variant={deliveryTone(webhook.lastDelivery.status)}>
-                          {describeLastDelivery(webhook)}
-                        </Badge>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>URL</TableHead>
+              <TableHead>Events</TableHead>
+              <TableHead>Last Delivery</TableHead>
+              {/* `relative`: the sr-only label is absolutely positioned and must stay inside the cell. */}
+              <TableHead className="relative w-12">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {webhooks.map((webhook) => (
+              <TableRow
+                key={webhook.id}
+                data-testid="webhook-row"
+                data-webhook-id={webhook.id}
+                data-disabled={webhook.disabled}
+              >
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-semibold">{webhook.name}</span>
+                    <span className="flex flex-wrap gap-1">
+                      {webhook.disabled ? <Badge variant="outline">Paused</Badge> : null}
+                      {webhook.channelIds.length > 0 ? (
+                        <Text size="xs" muted as="span">
+                          {webhook.channelIds.map(channelName).join(', ')}
+                        </Text>
                       ) : (
                         <Text size="xs" muted as="span">
-                          {describeLastDelivery(webhook)}
+                          Every channel
                         </Text>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            aria-label={`Actions for ${webhook.name}`}
-                          >
-                            <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setHistory(webhook)}>
-                            <MotionIcon icon={HistoryIcon} className="h-4 w-4" />
-                            Deliveries
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <span className="font-mono text-xs" title={webhook.url}>
+                    {shortUrl(webhook.url)}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <span className="flex flex-wrap gap-1">
+                    {webhook.events.map((event) => (
+                      <Badge key={event} variant="outline">
+                        {EVENT_LABELS[event].label}
+                      </Badge>
+                    ))}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {webhook.lastDelivery ? (
+                    <Badge variant={deliveryTone(webhook.lastDelivery.status)}>
+                      {describeLastDelivery(webhook)}
+                    </Badge>
+                  ) : (
+                    <Text size="xs" muted as="span">
+                      {describeLastDelivery(webhook)}
+                    </Text>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-9 px-0"
+                        aria-label={`Actions for ${webhook.name}`}
+                      >
+                        <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setHistory(webhook)}>
+                        <MotionIcon icon={HistoryIcon} className="h-4 w-4" />
+                        Deliveries
+                      </DropdownMenuItem>
+                      {canManage ? (
+                        <>
+                          <DropdownMenuItem onSelect={() => void sendTest(webhook)}>
+                            Send Test
                           </DropdownMenuItem>
-                          {canManage ? (
-                            <>
-                              <DropdownMenuItem onSelect={() => void sendTest(webhook)}>
-                                Send Test
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  setEditing(webhook);
-                                  setDialogOpen(true);
-                                }}
-                              >
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => void toggleDisabled(webhook)}>
-                                {webhook.disabled ? 'Resume' : 'Pause'}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => setConfirm({ webhook, kind: 'rotate' })}
-                              >
-                                Rotate Secret
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-dangerInk"
-                                onSelect={() => setConfirm({ webhook, kind: 'delete' })}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setEditing(webhook);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => void toggleDisabled(webhook)}>
+                            {webhook.disabled ? 'Resume' : 'Pause'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => setConfirm({ webhook, kind: 'rotate' })}
+                          >
+                            Rotate Secret
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-dangerInk"
+                            onSelect={() => setConfirm({ webhook, kind: 'delete' })}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       <Text size="sm" muted>

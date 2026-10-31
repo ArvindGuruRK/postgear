@@ -168,7 +168,7 @@ export function WebhookLinkField({ ids }: FieldControlProps) {
         <span className="font-sans text-sm font-bold text-ink">Secret</span>
         {secret ? (
           <div
-            className="flex flex-col gap-2 rounded-md border-2 border-outline bg-chrome p-3"
+            className="flex flex-col gap-2 rounded-md border-2 border-outline bg-inset p-3"
             data-testid="webhook-secret-once"
           >
             <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export function WebhookLinkField({ ids }: FieldControlProps) {
 
       <div className="flex flex-col gap-2">
         <span className="font-sans text-sm font-bold text-ink">Example</span>
-        <pre className="m-0 overflow-x-auto rounded-md border-2 border-outline bg-chrome p-3 font-mono text-xs whitespace-pre text-ink">
+        <pre className="m-0 overflow-x-auto rounded-md border-2 border-outline bg-inset p-3 font-mono text-xs whitespace-pre text-ink">
           {curlExample(info.url)}
         </pre>
         <div className="flex flex-wrap items-center gap-2">

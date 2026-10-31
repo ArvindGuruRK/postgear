@@ -21,7 +21,7 @@ const PRESS_BASE = cn(
   'disabled:pointer-events-none disabled:shadow-none',
 );
 
-/** For controls on the small shadow (`shadow-brutalSm`): tiles, icon buttons. */
+/** For controls on the small shadow (`shadow-brutalSm`): Button, tiles, icon buttons. */
 export const pressSm = cn(
   PRESS_BASE,
   'shadow-brutalSm',
@@ -29,7 +29,11 @@ export const pressSm = cn(
   'active:translate-x-(--brutal-offset-sm) active:translate-y-(--brutal-offset-sm) active:shadow-brutalPressed',
 );
 
-/** For controls on the medium shadow (`shadow-brutalMd`): Button. */
+/**
+ * For controls on the medium shadow (`shadow-brutalMd`). No control uses it
+ * since Button moved to `pressSm` (2026-10-31, to match the calendar's
+ * tiles); kept for a control that genuinely needs the deeper shadow.
+ */
 export const pressMd = cn(
   PRESS_BASE,
   'shadow-brutalMd',

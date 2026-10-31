@@ -222,7 +222,7 @@ export function ConditionBuilder({
 
       <p
         className={cn(
-          'm-0 rounded-md border-2 border-dashed border-outline px-3 py-2 font-sans text-sm text-ink',
+          'm-0 rounded-md border-2 border-dashed border-outline bg-inset px-3 py-2 font-sans text-sm text-ink',
           group.rules.length === 0 && 'type-muted',
         )}
         aria-live="polite"

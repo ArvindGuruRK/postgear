@@ -10,6 +10,8 @@
 ## Progress Log
 
 - **2026-10-29**: this document, from the owner's brief.
+- **2026-10-31**: the owner's walkthrough brief (a first revamp pass, before the full sprint): the app rail scrolls without a bar (its tile size is unchanged: a compressed rail was tried and rejected the same day); Workflows and Studio open full-window with a back button and are desktop only; the Workflows list lost its search, got Tabs for the status filter, equal-size Connections and Create Workflow buttons and a Templates grid; Connections became a modal; Button moved to the calendar's small shadow, icon-only canvas controls lost their shadows (`variant="ghost"`), Add A Trigger hovers to the page ground; tables lost their Card and shadow. Rules in `design-system-rules.md` sections 11 and 16h. Before and after screenshots in `screenshots/10b-*`. The rest of this sprint (canvas kit, motion, contrast, robustness) is still planned.
+- **2026-10-31 (second pass, canvas)**: audit of a 6-step canvas at 1440 px (`screenshots/10b-10-*`, `10b-11-*`). Fixed: the dot grid was invisible in dark (now ink at 28%, aligned to the snap grid); steps 40px apart crammed line, arrowhead, port sticker and "+" together (gap now 80px, `STEP_GAP_X` and `TEMPLATE_COLUMN` 320); the arrowhead overlapped the port dot; a six-step flow opened at about 60% with unreadable cards (opens at 75%); the minimap showed for any flow (now from 8 steps). Focus Mode is dropped: Workflows now open full-window, which is what it was for. Still open: canvas kit playground, motion spec, contrast pass over 24 themes, the 50-step fixture and budgets, List View, reduced-motion checks, panel anatomy.
 
 ## Sprint Goal
 

@@ -88,7 +88,7 @@ export function CasesBuilder({ spec, value, onChange, errors, ids }: FieldContro
         </SortableContext>
       </DndContext>
 
-      <div className="flex flex-col gap-1 rounded-md border-2 border-dashed border-outline px-3 py-2">
+      <div className="flex flex-col gap-1 rounded-md border-2 border-dashed border-outline bg-inset px-3 py-2">
         <span className="type-ui text-sm text-ink">Otherwise</span>
         <Text size="xs" muted>
           Runs that match no path above go this way.
@@ -151,8 +151,8 @@ function SortableCase({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={
         isDragging
-          ? 'relative z-10 flex flex-col gap-3 rounded-lg border-2 border-outline bg-secondary p-3 shadow-brutalMd'
-          : 'flex flex-col gap-3 rounded-lg border-2 border-outline bg-secondary p-3'
+          ? 'relative z-10 flex flex-col gap-3 rounded-lg border-2 border-outline bg-inset p-3 shadow-surfaceMd'
+          : 'flex flex-col gap-3 rounded-lg border-2 border-outline bg-inset p-3'
       }
     >
       <div className="flex items-end gap-2">

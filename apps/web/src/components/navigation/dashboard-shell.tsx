@@ -12,7 +12,7 @@ import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import { WorkflowIcon } from '@animateicons/react/lucide/workflow-icon';
-import type { AnimatedIcon } from '@postgear/ui';
+import { type AnimatedIcon, cn } from '@postgear/ui';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { NotificationBell } from '../notifications/notification-bell';
@@ -73,18 +73,25 @@ const TITLES: Record<string, string> = {
 const FULL_BLEED = new Set(['calendar']);
 
 /**
- * Studio's editor (`studio/{designId}`, Sprint 9) fills the height too: its
- * slide rail and properties panel scroll on their own beside a canvas that
- * stays in view. The landing page and the wizard (`studio/new`) scroll as one.
- * The workflow builder (`workflows/{id}`, Sprint 10) is a canvas between two
- * panels, so it fills the height as well; the list and Connections scroll.
+ * Whether a page is its own module and so takes the whole window: no rail, no
+ * top bar (2026-10-31). Creating a workflow or a design moves into a separate
+ * place, the way Figma or n8n open a file, so the app frame steps out of the
+ * way and the page brings its own way back.
+ *
+ * - `'fixed'`: a workspace that fills the height and scrolls its own panels
+ *   (the workflow builder, `workflows/{id}`, and Studio's editor,
+ *   `studio/{designId}`).
+ * - `'scroll'`: a page that scrolls as one (Studio's Create Design wizard,
+ *   `studio/new`).
+ *
+ * The lists (`workflows`, `studio`) keep the frame.
  */
-function bleeds(page: string): boolean {
+function immersion(page: string): 'fixed' | 'scroll' | null {
   const [segment, child, ...deeper] = page.split('/');
-  if (FULL_BLEED.has(segment ?? '')) return true;
-  if (!child || deeper.length > 0) return false;
-  if (segment === 'studio') return child !== 'new';
-  return segment === 'workflows' && child !== 'connections';
+  if (segment !== 'studio' && segment !== 'workflows') return null;
+  if (!child || deeper.length > 0) return null;
+  if (segment === 'studio') return child === 'new' ? 'scroll' : 'fixed';
+  return 'fixed';
 }
 
 export function DashboardShell({ orgId, children }: { orgId: string; children: ReactNode }) {
@@ -103,6 +110,23 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
     setPage(urlPage);
   }
   const segment = page.split('/')[0] ?? '';
+  const immersive = immersion(page);
+
+  if (immersive) {
+    return (
+      <main
+        data-immersive={immersive}
+        className={cn(
+          'h-dvh w-full min-w-0 bg-primary p-3',
+          immersive === 'fixed'
+            ? 'flex overflow-hidden'
+            : 'overflow-y-auto pg-scrollbar pg-scrollbar-primary',
+        )}
+      >
+        {children}
+      </main>
+    );
+  }
 
   const navItems: SidebarItem[] = RAIL.map((item) => ({
     label: item.label,
@@ -127,7 +151,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
       navItems={navItems}
       sidebarBottomItems={bottomItems}
       pageTitle={TITLES[segment] ?? 'Dashboard'}
-      fullBleed={bleeds(page)}
+      fullBleed={FULL_BLEED.has(segment)}
       // Both of these read WorkspaceProvider, which [orgId]/layout.tsx sets up
       // above this component. They are passed here rather than imported by
       // AppShell so the shell stays renderable without a workspace.

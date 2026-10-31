@@ -139,7 +139,7 @@ export const StepEdge = memo(function StepEdge({
             <button
               type="button"
               aria-label="Add a step here"
-              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink shadow-brutalSm hover:bg-actionSecondary hover:text-onActionLight"
+              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-primary"
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 editor.pickOnEdge(id, { x: rect.right, y: rect.top + rect.height / 2 });
@@ -150,7 +150,7 @@ export const StepEdge = memo(function StepEdge({
             <button
               type="button"
               aria-label="Delete this line"
-              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-actionDanger text-onActionLight shadow-brutalSm"
+              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-actionDanger text-onActionLight"
               onClick={() => editor.dispatch({ type: 'disconnect', edgeIds: [id] })}
             >
               <MotionIcon icon={XIcon} className="h-3.5 w-3.5" />
@@ -167,7 +167,8 @@ function Arrow({ id, fill }: { id: string; fill: string }) {
     <marker
       id={id}
       viewBox="0 0 10 10"
-      refX="9"
+      // The tip stops short of the port dot it points at, so the two never overlap.
+      refX="15"
       refY="5"
       markerWidth="7"
       markerHeight="7"

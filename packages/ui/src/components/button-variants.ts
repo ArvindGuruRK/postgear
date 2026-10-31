@@ -1,32 +1,38 @@
 import { cva } from 'class-variance-authority';
 import { fillHoverNeutral } from '../lib/fill-hover-classes';
-import { pressMd } from '../lib/press';
+import { pressSm } from '../lib/press';
 import { cn } from '../lib/utils';
 
 const variants = cva(
   [
     'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap',
     'rounded-md border-2 border-outline type-ui',
-    // Sinks into its shadow on hover and press: see lib/press.ts.
-    pressMd,
     'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
     'disabled:opacity-50',
   ],
   {
     // One blue primary per area, the neutral secondary for everything else
     // (2026-10-21), red for deletes and violet (highlight) for a standout action.
+    // Every one of them stands on the small shadow, the same 2px one the
+    // calendar's Add Channel and Create Post tiles use (2026-10-31, it was the
+    // medium one), and sinks into it on hover and press: see lib/press.ts.
     variants: {
       variant: {
-        primary: 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover',
+        primary: cn(pressSm, 'bg-actionPrimary text-onActionPrimary active:bg-actionPrimaryHover'),
         // The card surface, told apart by its border and shadow, like the
         // calendar's Add Channel tile. On hover a yellow fill wipes in from
         // the pointer and the label turns black (lib/fill-hover.ts).
-        secondary: fillHoverNeutral,
-        danger: 'bg-actionDanger text-onActionLight active:brightness-90',
+        secondary: cn(pressSm, fillHoverNeutral),
+        danger: cn(pressSm, 'bg-actionDanger text-onActionLight active:brightness-90'),
         // The third button (2026-10-21): violet, for the one standout action that
         // is not the main one. Asking the AI is its first use; the sparkle icon
         // on the button says so, the colour does not have to.
-        highlight: 'bg-actionAi text-onActionAi active:brightness-90',
+        highlight: cn(pressSm, 'bg-actionAi text-onActionAi active:brightness-90'),
+        // An icon-only control on a surface that already has its own border
+        // and shadow (a toolbar, a panel header, a step card's hover bar): no
+        // border, no shadow, no press. Hover fills with the page ground, like
+        // the calendar's channel row menu.
+        ghost: 'border-transparent bg-transparent text-ink hover:bg-primary active:bg-primary',
       },
       size: {
         sm: 'h-9 px-4 text-xs',

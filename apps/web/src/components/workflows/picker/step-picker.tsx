@@ -190,7 +190,7 @@ export function StepPicker({
         {onCollapse ? (
           <TooltipHint label="Show Steps" side="right">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-9 w-9 px-0"
               aria-label="Show Steps"
@@ -203,7 +203,7 @@ export function StepPicker({
         {PICKER_CATEGORIES.filter((group) => itemsIn(items, group.id).length > 0).map((group) => (
           <TooltipHint key={group.id} label={group.title} side="right">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-9 w-9 px-0"
               aria-label={group.title}
@@ -238,7 +238,7 @@ export function StepPicker({
       <div className="flex items-center gap-2 px-3 pt-3">
         {category && !query ? (
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             className="h-8 w-8 px-0"
             aria-label="Back"
@@ -251,7 +251,7 @@ export function StepPicker({
         {onCollapse ? (
           <TooltipHint label="Hide Steps">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-8 w-8 px-0"
               aria-label="Hide Steps"
@@ -263,7 +263,7 @@ export function StepPicker({
         ) : null}
         {onClose ? (
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             className="h-8 w-8 px-0"
             aria-label="Close"

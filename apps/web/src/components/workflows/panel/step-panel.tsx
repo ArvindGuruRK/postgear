@@ -173,7 +173,7 @@ export function StepPanel({
         {onExpand ? (
           <TooltipHint label="Expand">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               className="h-9 w-9 px-0"
               aria-label="Expand step"
@@ -185,7 +185,7 @@ export function StepPanel({
           </TooltipHint>
         ) : null}
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
           className="h-9 w-9 px-0"
           aria-label="Close step panel"
