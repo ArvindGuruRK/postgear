@@ -23,7 +23,7 @@ import {
   type SummaryContext,
   type ValidationIssue,
 } from '@postgear/automation';
-import type { Edge, Node } from '@xyflow/react';
+import type { AriaLabelConfig, Edge, Node } from '@xyflow/react';
 import type { Position, Selection } from '../builder/builder-state';
 import { CARD_HEIGHT, CARD_WIDTH } from '../builder/graph-ops';
 import type { RunModel, StepPaint } from '../runs/run-model';
@@ -81,6 +81,34 @@ export const NOTE_COLOUR_NAMES: Record<NoteColour, string> = {
 export const STEP_DRAG_TYPE = 'application/x-postgear-step';
 
 export const NOTE_PREFIX = 'note:';
+
+/**
+ * What a screen reader hears from React Flow itself, in the builder's own
+ * words: its defaults say "node" and "edge" and describe keys the builder
+ * does not use (blueprint 13, no jargon).
+ */
+export const EDITOR_ARIA_LABELS: Partial<AriaLabelConfig> = {
+  'node.a11yDescription.default':
+    'Press Enter to open this step, and Enter again for the Expanded view. Arrow keys move to the next or previous step. Press Delete to remove it, and Escape to close its panel.',
+  'node.a11yDescription.keyboardDisabled':
+    'Press Enter to open this step, and Enter again for the Expanded view. Arrow keys move to the next or previous step. Press Delete to remove it, and Escape to close its panel.',
+  'node.a11yDescription.ariaLiveMessage': ({ direction }) => `Moved the step ${direction}.`,
+  'edge.a11yDescription.default': 'Press Enter to select this line, then Delete to remove it.',
+  'minimap.ariaLabel': 'Map of the workflow',
+  'handle.ariaLabel': 'Connection point',
+};
+
+/** The same for a run's read-only canvas. */
+export const RUN_ARIA_LABELS: Partial<AriaLabelConfig> = {
+  ...EDITOR_ARIA_LABELS,
+  'node.a11yDescription.default': 'Press Enter to see what this step did in the run.',
+  'node.a11yDescription.keyboardDisabled': 'Press Enter to see what this step did in the run.',
+};
+
+// React Flow calls every card a "node" and every line an "edge"; these win.
+const STEP_DOM = { 'aria-roledescription': 'step' } as const;
+const NOTE_DOM = { 'aria-roledescription': 'note' } as const;
+const LINE_DOM = { 'aria-roledescription': 'line' } as const;
 
 export interface StepNodeData extends Record<string, unknown> {
   node: GraphNode;
@@ -168,6 +196,7 @@ export function toFlowNodes(
       selected: selectedNotes.has(note.id),
       // Notes sit under the steps.
       zIndex: -1,
+      domAttributes: NOTE_DOM,
       dragHandle: '.pg-note-handle',
     };
   });
@@ -192,6 +221,7 @@ export function toFlowNodes(
       data,
       // On React Flow's own wrapper (a focusable group), so it is what a screen reader hears.
       ariaLabel: stepAriaLabel(data),
+      domAttributes: STEP_DOM,
       width: CARD_WIDTH,
       height: cardHeight(ports.length),
       selected: selectedNodes.has(node.key),
@@ -199,6 +229,49 @@ export function toFlowNodes(
   });
 
   return [...notes, ...steps];
+}
+
+/** Equal by value `depth` levels down (Object.is below that). */
+function sameShallow(a: unknown, b: unknown, depth: number): boolean {
+  if (Object.is(a, b)) return true;
+  if (depth === 0 || typeof a !== 'object' || typeof b !== 'object' || !a || !b) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  if (keys.length !== Object.keys(right).length) return false;
+  return keys.every(
+    (key) => Object.hasOwn(right, key) && sameShallow(left[key], right[key], depth - 1),
+  );
+}
+
+function sameCanvasNode(a: CanvasNode, b: CanvasNode): boolean {
+  return (
+    a.type === b.type &&
+    a.position.x === b.position.x &&
+    a.position.y === b.position.y &&
+    a.width === b.width &&
+    a.height === b.height &&
+    a.selected === b.selected &&
+    a.ariaLabel === b.ariaLabel &&
+    // data, then its fields, then one port, issue or paint field: three levels.
+    sameShallow(a.data, b.data, 3)
+  );
+}
+
+/**
+ * Hands back last render's node object for every card that looks the same,
+ * so React Flow and the memoised cards skip it. `toFlowNodes` builds fresh
+ * objects on every graph change; without this, typing in one step's field
+ * repainted every card on the canvas.
+ */
+export function reuseUnchanged(previous: readonly CanvasNode[], next: CanvasNode[]): CanvasNode[] {
+  if (previous.length === 0) return next;
+  const before = new Map(previous.map((node) => [node.id, node]));
+  return next.map((node) => {
+    const old = before.get(node.id);
+    return old && sameCanvasNode(old, node) ? old : node;
+  });
 }
 
 /**
@@ -222,6 +295,7 @@ export function toFlowEdges(
   run?: EdgeRunSets | null,
 ): FlowEdge[] {
   const selected = new Set(selection.edges);
+  const names = new Map(graph.nodes.map((node) => [node.key, node.name]));
   return graph.edges.map((edge) => {
     const state = edgeRunState(run, edge.id);
     const data: FlowEdgeData = { edge, isError: edge.sourcePort === 'error' };
@@ -237,6 +311,8 @@ export function toFlowEdges(
       // React Flow's own `animated` class: the dashes that flow into a running step.
       animated: state === 'active',
       data,
+      ariaLabel: `Line from ${names.get(edge.source) ?? 'a step'} to ${names.get(edge.target) ?? 'a step'}`,
+      domAttributes: LINE_DOM,
     };
   });
 }

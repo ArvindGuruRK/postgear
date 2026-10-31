@@ -31,4 +31,18 @@ export const CATALOG_REASONS = {
   connect: (app: string) => `Connect ${app} first.`,
   connectChannel: 'Connect a channel first.',
   notRunnable: (title: string) => `${title} cannot run yet in this version of PostGear.`,
+  /** Google Sheets when PostGear has no Google client and no simulated connection (Module 13). */
+  googleNotSetUp: 'Ask a workspace admin to set up Google.',
+} as const;
+
+/** The Webhook trigger (Module 13). */
+export const WEBHOOK_MESSAGES = {
+  /** 401 carries nothing else: a wrong secret and an unknown workflow look the same. */
+  UNAUTHORIZED: 'Unauthorized',
+  TOO_LARGE: 'This request is too large.',
+  JSON_ONLY: 'Send a JSON object.',
+  NOT_ON: 'This workflow is not turned on.',
+  IDEMPOTENCY_KEY_TOO_LONG: 'The Idempotency-Key header can be at most 128 characters.',
+  THROTTLED: 'Too many requests to this workflow. Slow down and try again.',
+  WORKFLOW_NOT_FOUND: 'Workflow not found.',
 } as const;

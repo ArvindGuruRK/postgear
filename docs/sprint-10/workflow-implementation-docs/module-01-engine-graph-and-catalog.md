@@ -227,7 +227,7 @@ Rules in this module (Module 02 adds token, condition and schedule rules through
 | `node.config_invalid` | error | one issue per Zod issue, with `field` set |
 | `node.connection_missing` | error | "Connect a {app} account to use this step." |
 | `node.connection_broken` | error | "{connection} needs to be reconnected." |
-| `node.channel_missing` | error | "This channel is disconnected." |
+| `node.channel_missing` | error | "{Channel} is disconnected. Reconnect it on the Channels page." (wording as built) |
 | `node.duplicate_name` | error | names must be unique (tokens show names) |
 | `node.disabled_output_used` | warning | see Disabled nodes |
 | `graph.dead_end_output` | warning | an If / Else output with nothing after it: "Nothing happens when this is False." |

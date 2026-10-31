@@ -66,6 +66,11 @@ import {
   toApplicationFailure,
 } from '../automation/failures';
 import { finalizeRun, OUTCOME_STATUS } from '../automation/finish';
+import {
+  createGatewayClient,
+  type GatewayClient,
+  UNAVAILABLE_GATEWAY,
+} from '../automation/gateway-client';
 import { PrismaRunStore } from '../automation/prisma-run-store';
 import type { RunStore, StepRecord } from '../automation/run-store';
 import {
@@ -85,6 +90,8 @@ const UNIT_MS = { minutes: 60_000, hours: 60 * 60_000, days: DAY_MS } as const;
 export interface AutomationActivityOptions {
   store?: RunStore;
   executors?: ExecutorRegistry;
+  /** The API's step gateway; built from `API_URL` and `AUTOMATION_INTERNAL_TOKEN` when left out. */
+  gateway?: GatewayClient;
   now?: () => Date;
   attempt?: () => number;
 }
@@ -212,7 +219,17 @@ export function createAutomationActivities(
   const env: EngineEnv = {
     store,
     executors: options.executors ?? EXECUTORS,
+    gateway:
+      options.gateway ??
+      (deps.env.API_URL
+        ? createGatewayClient({
+            apiUrl: deps.env.API_URL,
+            token: deps.env.AUTOMATION_INTERNAL_TOKEN,
+            log,
+          })
+        : UNAVAILABLE_GATEWAY),
     simulation: deps.env.AUTOMATION_SIMULATION === 'true',
+    allowPrivateUrls: deps.env.WEBHOOK_ALLOW_PRIVATE_URLS === 'true',
     now,
     attempt: options.attempt ?? (() => activityContext()?.info.attempt ?? 1),
     signal: () => activityContext()?.cancellationSignal ?? NEVER_ABORTED,

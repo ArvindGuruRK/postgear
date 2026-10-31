@@ -128,7 +128,7 @@ describe('connection providers', () => {
   describe('secret headers', () => {
     const judge = (headers: unknown) => httpProvider.judge({ headers }, PUBLIC);
 
-    it('accepts up to 10 headers and masks names only', async () => {
+    it('accepts up to 10 headers and masks them to the name and the last 4 characters', async () => {
       const verdict = await judge([
         { name: ' Authorization ', value: 'Bearer sk_live_123' },
         { name: 'X-Api-Key', value: 'k-999' },
@@ -144,11 +144,18 @@ describe('connection providers', () => {
       });
       if (!verdict.ok) return;
       const mask = httpProvider.mask(verdict.credentials, null);
-      expect(mask).toBe('2 secret headers: Authorization, X-Api-Key');
-      expect(mask).not.toMatch(/sk_live|k-999/);
-      expect(httpProvider.mask({ headers: [{ name: 'Authorization', value: 'x' }] }, null)).toBe(
-        '1 secret header: Authorization',
-      );
+      // Short values show no characters at all.
+      expect(mask).toBe('Authorization: Bearer ..., X-Api-Key: ...');
+      expect(mask).not.toMatch(/sk_live|k-999|123/);
+      expect(
+        httpProvider.mask(
+          { headers: [{ name: 'Authorization', value: 'Bearer sk_live_51Habcdefgh9f2c' }] },
+          null,
+        ),
+      ).toBe('Authorization: Bearer ...9f2c');
+      expect(
+        httpProvider.mask({ headers: [{ name: 'X-Api-Key', value: 'key-0123456789k999' }] }, null),
+      ).toBe('X-Api-Key: ...k999');
     });
 
     it('refuses none, too many, bad names, repeats, reserved names and bad values', async () => {

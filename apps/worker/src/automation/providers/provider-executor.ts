@@ -86,13 +86,30 @@ async function markerResult(
   }
 }
 
+/** `hooks.slack.com/...a9F2` for a webhook connection: the host and the last 4 characters only. */
+export function connectionHint(credentials: unknown): string | undefined {
+  const link =
+    typeof credentials === 'object' && credentials !== null
+      ? (credentials as { webhookUrl?: unknown }).webhookUrl
+      : undefined;
+  if (typeof link !== 'string' || link.length < 12) return undefined;
+  try {
+    return `${new URL(link).hostname}/...${link.slice(-4)}`;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildContext(ctx: ExecContext<unknown>): ProviderBuildContext {
+  const hint = connectionHint(ctx.connection?.credentials);
   return {
     run: { id: ctx.run.id, automationName: ctx.run.automationName, mode: ctx.run.mode },
     node: { key: ctx.node.key, name: ctx.node.name, type: ctx.node.type },
     scope: ctx.scope,
     timeZone: ctx.timeZone,
-    connection: ctx.connection ? { id: ctx.connection.id, name: ctx.connection.name } : null,
+    connection: ctx.connection
+      ? { id: ctx.connection.id, name: ctx.connection.name, ...(hint ? { hint } : {}) }
+      : null,
     idempotencyKey: ctx.idempotencyKey,
   };
 }
@@ -129,6 +146,7 @@ export function providerExecutor<Req, C = Record<string, unknown>>(
           idempotencyKey: ctx.idempotencyKey,
           signal: ctx.signal,
           heartbeat: ctx.heartbeat,
+          allowPrivate: ctx.allowPrivateUrls === true,
         });
       }
 
@@ -146,12 +164,16 @@ export function providerExecutor<Req, C = Record<string, unknown>>(
         }
         throw new StepFailure('notConnected', result.message, result.code, result.details);
       }
-      throw new StepFailure(
+      const failure = new StepFailure(
         result.retryable ? 'retryable' : 'permanent',
         result.message,
         result.code,
         result.details,
       );
+      if (result.retryable && result.retryAfterMs !== undefined) {
+        failure.retryAfterMs = result.retryAfterMs;
+      }
+      throw failure;
     },
   };
 }

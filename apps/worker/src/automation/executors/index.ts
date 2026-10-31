@@ -9,8 +9,12 @@
  * step the catalog calls not runnable. A module that ships an executor adds
  * it here and its type to `EXECUTABLE_TYPES` in the same change.
  */
+import { AI_EXECUTORS } from './ai';
+import { DATA_EXECUTORS } from './data';
 import { inAppExecutor } from './in-app';
 import { LOGIC_EXECUTORS } from './logic';
+import { NOTIFY_EXECUTORS } from './notify';
+import { POSTS_EXECUTORS } from './posts';
 import { TRIGGER_EXECUTORS } from './triggers';
 import type { Executor, ExecutorRegistry } from './types';
 
@@ -38,4 +42,8 @@ export const EXECUTORS: ExecutorRegistry = buildRegistry([
   ...TRIGGER_EXECUTORS,
   ...LOGIC_EXECUTORS,
   inAppExecutor,
+  ...POSTS_EXECUTORS,
+  ...AI_EXECUTORS,
+  ...NOTIFY_EXECUTORS,
+  ...DATA_EXECUTORS,
 ]);

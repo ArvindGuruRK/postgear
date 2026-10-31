@@ -21,6 +21,9 @@ const ENV_PATH = join(__dirname, '..', '.env');
  */
 const GENERATORS: Record<string, () => string> = {
   ENCRYPTION_KEY_AES256: () => randomBytes(32).toString('hex'),
+  // The worker's key to the API's step gateway (Sprint 10): both env schemas
+  // check 64 hex characters.
+  AUTOMATION_INTERNAL_TOKEN: () => randomBytes(32).toString('hex'),
   // base64 rather than hex for the JWT/NextAuth secrets: they are opaque
   // strings with no length contract, and base64 packs more entropy per char.
   JWT_SECRET: () => randomBytes(48).toString('base64'),

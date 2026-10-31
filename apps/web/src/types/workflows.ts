@@ -119,6 +119,73 @@ export interface ConnectionCheckResult {
   message: string;
 }
 
+/**
+ * `GET /automation-connections` (Module 13 adds the two flags). Callers that
+ * only read `connections` keep working.
+ */
+export interface ConnectionList {
+  connections: Connection[];
+  /** `AUTOMATION_SIMULATION` is on: a simulated Google connection may be added. */
+  simulation: boolean;
+  /** A real Google client id and secret are configured, so Connect With Google works. */
+  googleReady: boolean;
+}
+
+/* Google Sheets helpers (Module 13). */
+
+/** `GET /automation-connections/:id/picker-token`: a short-lived access token only. */
+export interface PickerToken {
+  accessToken: string;
+  expiresAt: string;
+  /** The browser key for the Picker. */
+  apiKey: string;
+  /** The Google Cloud project number. */
+  appId: string;
+}
+
+export interface SpreadsheetRef {
+  id: string;
+  name: string;
+  url: string;
+}
+
+/** A tab of a spreadsheet: Google's numeric sheet id and its title. */
+export interface SheetTabRef {
+  id: number;
+  title: string;
+}
+
+/** `GET /automation-connections/:id/google/spreadsheets/:spreadsheetId`. */
+export interface SpreadsheetDetail {
+  spreadsheet: SpreadsheetRef;
+  tabs: SheetTabRef[];
+}
+
+/** `POST /automation-connections/:id/google/spreadsheets` (201). */
+export interface CreatedSpreadsheet {
+  spreadsheet: SpreadsheetRef;
+  sheet: SheetTabRef;
+}
+
+/* Webhook trigger (Module 13). */
+
+/** `GET /automations/:id/webhook`. The secret itself is never listed. */
+export interface WebhookInfo {
+  /** `${API_URL}/v1/automations/<id>/hook`. */
+  url: string;
+  secret: { last4: string; createdAt: string } | null;
+  /** The last data received, redacted. */
+  sample: unknown | null;
+  sampleAt: string | null;
+}
+
+/** `POST /automations/:id/webhook/secret` (201): the only answer that holds the plain secret. */
+export interface WebhookSecretResult {
+  secret: string;
+  last4: string;
+  url: string;
+}
+
 /* Runs (Modules 07 and 08): mirrored from `runs/run-views.ts`. */
 
 export type AutomationRunMode = 'TEST' | 'LIVE';

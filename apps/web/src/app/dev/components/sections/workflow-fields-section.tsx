@@ -6,6 +6,13 @@
  * built-in sample data, and live checks from the package's own
  * validation. Each specimen prints the config it stores, so a round trip
  * can be checked by eye.
+ *
+ * Modules 10 to 13 add the post, sheet, webhook and message steps: media
+ * picks, channels for one platform, platform settings, time zones, the
+ * Google Sheets fields (on a simulated Google connection), the webhook link
+ * and the message previews. Controls that ask the API (sheets, the webhook
+ * link, media thumbnails) show their failure state here, since this page
+ * has no real workflow behind it.
  */
 import {
   type AutomationGraph,
@@ -24,6 +31,8 @@ import type { FieldContext } from '@/components/workflows/fields/contract';
 import { setAtPath } from '@/components/workflows/fields/form-model';
 import { InsertDataList } from '@/components/workflows/fields/insert-data';
 import { SchemaForm } from '@/components/workflows/fields/schema-form';
+import type { Channel } from '@/types/channel';
+import type { Connection } from '@/types/workflows';
 import { Row, Section, Spec } from '../shared';
 
 const EXTRA: { key: string; type: string; config?: Record<string, unknown> }[] = [
@@ -33,6 +42,76 @@ const EXTRA: { key: string; type: string; config?: Record<string, unknown> }[] =
   { key: 'kshowmanual', type: 'trigger.manual' },
   { key: 'kshowsched', type: 'trigger.schedule' },
   { key: 'kshowwrite', type: 'ai.generateText' },
+  {
+    key: 'kshowdraft',
+    type: 'postgear.createDraft',
+    config: { channels: [], text: 'New post: {{ trigger.post.url }}', media: '', mediaIds: [] },
+  },
+  {
+    key: 'kshowpublish',
+    type: 'postgear.publish',
+    config: { provider: 'youtube', channels: [], text: '', media: '', mediaIds: [] },
+  },
+  {
+    key: 'kshowlinkedin',
+    type: 'postgear.publish',
+    config: { provider: 'linkedin', channels: [], text: '', media: '', mediaIds: [] },
+  },
+  { key: 'kshowqueue', type: 'postgear.addToQueue' },
+  {
+    key: 'kshowsheet',
+    type: 'data.googleSheetsAppendRow',
+    config: { connectionId: 'demo-google', spreadsheet: null, sheet: null, columns: [] },
+  },
+  { key: 'kshowhook', type: 'trigger.webhook' },
+  { key: 'kshowteams', type: 'notify.teams' },
+  { key: 'kshowdiscord', type: 'notify.discord' },
+  { key: 'kshowemail', type: 'notify.email' },
+];
+
+const DEMO_TIME = '2026-10-01T09:00:00.000Z';
+
+/** A simulated Google connection, so the sheet fields have one to use. */
+const DEMO_CONNECTIONS: Connection[] = [
+  {
+    id: 'demo-google',
+    provider: 'google',
+    name: 'Simulated Google',
+    status: 'CONNECTED',
+    maskedHint: 'demo@example.com',
+    meta: { simulated: true },
+    lastCheckedAt: null,
+    lastError: null,
+    createdAt: DEMO_TIME,
+    updatedAt: DEMO_TIME,
+    usedBy: [],
+  },
+];
+
+function demoChannel(id: string, providerIdentifier: string, name: string): Channel {
+  return {
+    id,
+    providerIdentifier,
+    providerName: providerIdentifier,
+    name,
+    profile: null,
+    picture: null,
+    health: 'connected',
+    disabled: false,
+    refreshNeeded: false,
+    inBetweenSteps: false,
+    tokenExpiration: null,
+    postingTimes: [],
+    createdAt: DEMO_TIME,
+    color: 0,
+  };
+}
+
+/** A LinkedIn profile and Page (both count as LinkedIn) and an X account; no YouTube. */
+const DEMO_CHANNELS: Channel[] = [
+  demoChannel('demo-li', 'linkedin', 'Demo Profile'),
+  demoChannel('demo-lip', 'linkedin-page', 'Demo Page'),
+  demoChannel('demo-x', 'x', 'Demo X'),
 ];
 
 /** Publishing Report, then the extra steps chained after Slack. */
@@ -71,12 +150,13 @@ function useDemo() {
     () => ({
       orgId: 'seed-demo-org',
       automationId: 'demo',
-      connections: [],
-      channels: [],
+      connections: DEMO_CONNECTIONS,
+      channels: DEMO_CHANNELS,
       canManage: true,
       scope: sampleScope(graph),
       scopeSource: {},
       timeZone: 'Asia/Kolkata',
+      workflowName: 'Publishing Report',
     }),
     [graph],
   );
@@ -180,6 +260,43 @@ export function WorkflowFieldsSection() {
       </Row>
       <Row label="Generate Text, with its credits line">
         <StepDemo demo={demo} match={(node) => node.type === 'ai.generateText'} />
+      </Row>
+      <Row label="Create Draft: media from a step or the media library">
+        <StepDemo demo={demo} match={(node) => node.key === 'kshowdraft'} />
+      </Row>
+      <Row label="Publish To LinkedIn: only LinkedIn channels (profile and Page)">
+        <StepDemo demo={demo} match={(node) => node.key === 'kshowlinkedin'} tab="setup" />
+      </Row>
+      <Row label="Publish To YouTube: no channel yet, then its platform settings">
+        <div className="flex w-full max-w-xl flex-col gap-3">
+          <StepDemo demo={demo} match={(node) => node.key === 'kshowpublish'} tab="setup" />
+          <StepDemo demo={demo} match={(node) => node.key === 'kshowpublish'} />
+        </div>
+      </Row>
+      <Row label="Add To Queue: time zone">
+        <StepDemo demo={demo} match={(node) => node.type === 'postgear.addToQueue'} />
+      </Row>
+      <Row label="Google Sheets: spreadsheet and tab (simulated connection)">
+        <StepDemo
+          demo={demo}
+          match={(node) => node.type === 'data.googleSheetsAppendRow'}
+          tab="setup"
+        />
+      </Row>
+      <Row label="Google Sheets: columns">
+        <StepDemo demo={demo} match={(node) => node.type === 'data.googleSheetsAppendRow'} />
+      </Row>
+      <Row label="Webhook link (needs a saved workflow, so it fails here)">
+        <StepDemo demo={demo} match={(node) => node.type === 'trigger.webhook'} />
+      </Row>
+      <Row label="Teams message with its preview">
+        <StepDemo demo={demo} match={(node) => node.type === 'notify.teams'} />
+      </Row>
+      <Row label="Discord message with its preview and count">
+        <StepDemo demo={demo} match={(node) => node.type === 'notify.discord'} />
+      </Row>
+      <Row label="Email with its preview">
+        <StepDemo demo={demo} match={(node) => node.type === 'notify.email'} />
       </Row>
     </Section>
   );

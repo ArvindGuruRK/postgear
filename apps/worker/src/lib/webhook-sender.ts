@@ -13,6 +13,9 @@
  *
  * ## What an outcome means
  *
+ * The request itself is made by `safeHttpRequest` (safe-http.ts), shared
+ * with every workflow step that reaches an outside app.
+ *
  * - `delivered`: any 2xx. The receiver has it; the body is ignored.
  * - `retry`: 408, 429, 5xx, a timeout, or a network error. The receiver may
  *   be back later; the workflow's policy decides when to try again.
@@ -26,9 +29,6 @@
  * receiver's body is content a workspace member will see on the deliveries
  * screen, and an attacker-chosen one has no business there.
  */
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest, type RequestOptions } from 'node:https';
-import { isIP } from 'node:net';
 import {
   signWebhookPayload,
   WEBHOOK_DELIVERY_HEADER,
@@ -37,12 +37,10 @@ import {
   WEBHOOK_TIMESTAMP_HEADER,
 } from '@postgear/db';
 import { WEBHOOK_DELIVERY_TIMEOUT_MS } from '@postgear/scheduling';
-import { assertSafeUrl, bareHostname, type UrlGuardOptions } from '@postgear/seo-engine';
+import type { UrlGuardOptions } from '@postgear/seo-engine';
+import { safeHttpRequest } from './safe-http';
 
 export const WEBHOOK_USER_AGENT = 'PostGear-Webhooks/1.0';
-
-/** Largest response body read before the connection is dropped. The body is never kept. */
-const MAX_RESPONSE_BYTES = 64 * 1024;
 
 export interface SendWebhookInput {
   url: string;
@@ -86,10 +84,8 @@ export function webhookHeaders(input: {
 }
 
 export async function sendWebhook(input: SendWebhookInput): Promise<SendWebhookOutcome> {
-  const started = Date.now();
-  const timeoutMs = input.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS;
   const timestamp = input.timestamp ?? Math.floor(Date.now() / 1000);
-  const headers = webhookHeaders({
+  const { 'content-length': _length, ...headers } = webhookHeaders({
     secret: input.secret,
     deliveryId: input.deliveryId,
     event: input.event,
@@ -97,153 +93,45 @@ export async function sendWebhook(input: SendWebhookInput): Promise<SendWebhookO
     timestamp,
   });
 
-  let url: URL;
-  let address: string | null = null;
-
-  if (input.allowPrivate) {
-    // Local testing: the receiver is on this machine, which the guard exists
-    // to refuse. Only the scheme is checked; the OS resolves the host.
-    try {
-      url = new URL(input.url);
-    } catch {
-      return { outcome: 'unsafe', error: 'That is not a valid URL.', durationMs: 0 };
-    }
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return { outcome: 'unsafe', error: 'Only http and https URLs are delivered to.', durationMs: 0 };
-    }
-  } else {
-    const verdict = await assertSafeUrl(input.url, { resolve: input.resolve });
-    if (!verdict.ok) {
-      return { outcome: 'unsafe', error: verdict.message, durationMs: Date.now() - started };
-    }
-    url = verdict.url;
-    address = verdict.addresses[0] ?? null;
-  }
-
-  const https = url.protocol === 'https:';
-  const host = bareHostname(url);
-  const options: RequestOptions = {
+  // The guard, the pinned lookup, the timeout and the body cap live in
+  // safe-http.ts (Sprint 10, Module 12). The body is never kept.
+  const result = await safeHttpRequest({
     method: 'POST',
-    protocol: url.protocol,
-    hostname: host,
-    port: url.port === '' ? (https ? 443 : 80) : Number(url.port),
-    path: `${url.pathname}${url.search}`,
-    headers: { ...headers, host: url.host },
-    agent: false,
-    ...(address ? { lookup: pinnedLookup(address) } : {}),
-  };
-  if (https && isIP(host) === 0) {
-    options.servername = host;
-  }
-
-  return new Promise<SendWebhookOutcome>((resolve) => {
-    let settled = false;
-    const finish = (outcome: SendWebhookOutcome): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(outcome);
-    };
-    const durationMs = () => Date.now() - started;
-
-    const req = (https ? httpsRequest : httpRequest)(options);
-    const timer = setTimeout(() => {
-      req.destroy();
-      finish({
-        outcome: 'retry',
-        statusCode: null,
-        error: `No response within ${Math.round(timeoutMs / 1000)} s`,
-        durationMs: durationMs(),
-      });
-    }, timeoutMs);
-
-    req.on('error', (error: NodeJS.ErrnoException) => {
-      finish({
-        outcome: 'retry',
-        statusCode: null,
-        error: describeNetworkError(error),
-        durationMs: durationMs(),
-      });
-    });
-
-    req.on('response', (res) => {
-      const statusCode = res.statusCode ?? 0;
-      let read = 0;
-      // The body is drained (so the socket is reusable by the OS) but never
-      // kept, and a receiver that streams forever is cut off.
-      res.on('data', (chunk: Buffer) => {
-        read += chunk.length;
-        if (read > MAX_RESPONSE_BYTES) {
-          res.destroy();
-        }
-      });
-      res.on('error', () => undefined);
-      res.on('end', () => settle());
-      res.on('close', () => settle());
-
-      const settle = () => {
-        if (statusCode >= 200 && statusCode < 300) {
-          finish({ outcome: 'delivered', statusCode, durationMs: durationMs() });
-        } else if (statusCode === 408 || statusCode === 429 || statusCode >= 500) {
-          finish({
-            outcome: 'retry',
-            statusCode,
-            error: `Receiver answered ${statusCode}`,
-            durationMs: durationMs(),
-          });
-        } else {
-          finish({
-            outcome: 'rejected',
-            statusCode,
-            error: `Receiver answered ${statusCode}`,
-            durationMs: durationMs(),
-          });
-        }
-      };
-    });
-
-    req.end(input.body);
+    url: input.url,
+    headers,
+    body: input.body,
+    timeoutMs: input.timeoutMs ?? WEBHOOK_DELIVERY_TIMEOUT_MS,
+    keepBody: false,
+    allowPrivate: input.allowPrivate,
+    resolve: input.resolve,
   });
-}
 
-/** A `lookup` that answers with the validated address for every name. */
-function pinnedLookup(address: string): RequestOptions['lookup'] {
-  const family = isIP(address) === 6 ? 6 : 4;
-  return (_hostname, optionsOrCallback, maybeCallback) => {
-    const callback =
-      typeof optionsOrCallback === 'function' ? optionsOrCallback : (maybeCallback as never);
-    const wantsAll =
-      typeof optionsOrCallback === 'object' &&
-      optionsOrCallback !== null &&
-      (optionsOrCallback as { all?: boolean }).all === true;
-    if (wantsAll) {
-      (callback as (err: null, addresses: { address: string; family: number }[]) => void)(null, [
-        { address, family },
-      ]);
-    } else {
-      (callback as (err: null, address: string, family: number) => void)(null, address, family);
-    }
-  };
-}
-
-function describeNetworkError(error: NodeJS.ErrnoException): string {
-  switch (error.code) {
-    case 'ECONNREFUSED':
-      return 'Connection refused';
-    case 'ENOTFOUND':
-    case 'EAI_AGAIN':
-      return 'Host not found';
-    case 'ECONNRESET':
-      return 'Connection reset';
-    case 'ETIMEDOUT':
-      return 'Connection timed out';
-    case 'CERT_HAS_EXPIRED':
-    case 'ERR_TLS_CERT_ALTNAME_INVALID':
-    case 'DEPTH_ZERO_SELF_SIGNED_CERT':
-    case 'SELF_SIGNED_CERT_IN_CHAIN':
-    case 'UNABLE_TO_VERIFY_LEAF_SIGNATURE':
-      return 'TLS certificate not trusted';
-    default:
-      return error.code ? `Network error (${error.code})` : 'Network error';
+  switch (result.outcome) {
+    case 'ok':
+      // Redirects are not followed: a 3xx is the receiver refusing this URL.
+      return result.statusCode < 300
+        ? { outcome: 'delivered', statusCode: result.statusCode, durationMs: result.durationMs }
+        : {
+            outcome: 'rejected',
+            statusCode: result.statusCode,
+            error: `Receiver answered ${result.statusCode}`,
+            durationMs: result.durationMs,
+          };
+    case 'retry':
+      return {
+        outcome: 'retry',
+        statusCode: result.statusCode,
+        error: result.error,
+        durationMs: result.durationMs,
+      };
+    case 'rejected':
+      return {
+        outcome: 'rejected',
+        statusCode: result.statusCode,
+        error: result.error,
+        durationMs: result.durationMs,
+      };
+    case 'unsafe':
+      return { outcome: 'unsafe', error: result.error, durationMs: result.durationMs };
   }
 }

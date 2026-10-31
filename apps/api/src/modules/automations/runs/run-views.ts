@@ -105,9 +105,14 @@ export interface RunEvent {
 /**
  * A run summary. `facts` are the few trigger data fields its trigger phrase
  * needs (`AutomationRunsRepository.triggerFacts`); without them the phrase
- * is null.
+ * is null. `connectionValues` hides a connection value in the run's error sentence
+ * too; without them the sentence still goes through the secret patterns.
  */
-export function toRunSummary(row: RunSummaryRow, facts?: TriggerFacts | null): RunSummary {
+export function toRunSummary(
+  row: RunSummaryRow,
+  facts?: TriggerFacts | null,
+  connectionValues: readonly string[] = [],
+): RunSummary {
   return {
     id: row.id,
     automationId: row.automationId,
@@ -118,7 +123,7 @@ export function toRunSummary(row: RunSummaryRow, facts?: TriggerFacts | null): R
     startedById: row.startedById,
     stepCount: row.stepCount,
     creditsUsed: row.creditsUsed,
-    error: row.error,
+    error: hideText(row.error, connectionValues),
     startedAt: row.startedAt?.toISOString() ?? null,
     finishedAt: row.finishedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -133,7 +138,7 @@ export function toRunDetail(
   connectionValues: readonly string[],
 ): RunDetail {
   return {
-    ...toRunSummary(row, triggerFactsOf(row.triggerPayload)),
+    ...toRunSummary(row, triggerFactsOf(row.triggerPayload), connectionValues),
     triggerPayload: hide(row.triggerPayload, connectionValues),
     graph: row.graphSnapshot ?? row.version?.graph ?? null,
     steps: steps.map((entry) => toStepView(entry, connectionValues)),
@@ -213,11 +218,11 @@ export function toStepView(
   };
 }
 
-export function toRunEvent(row: RunSummaryRow): RunEvent {
+export function toRunEvent(row: RunSummaryRow, connectionValues: readonly string[] = []): RunEvent {
   return {
     id: row.id,
     status: row.status,
-    error: row.error,
+    error: hideText(row.error, connectionValues),
     stepCount: row.stepCount,
     startedAt: row.startedAt?.toISOString() ?? null,
     finishedAt: row.finishedAt?.toISOString() ?? null,
@@ -228,10 +233,20 @@ function hide(value: Prisma.JsonValue, connectionValues: readonly string[]): unk
   return value === null ? null : redact(value, { connectionValues }).value;
 }
 
+/** A run's one-sentence error, redacted like step data (Module 14). */
+export function hideText(
+  text: string | null,
+  connectionValues: readonly string[] = [],
+): string | null {
+  if (text === null) return null;
+  const value = redact(text, { connectionValues }).value;
+  return typeof value === 'string' ? value : null;
+}
+
 /**
  * Every secret text inside the workspace's connection credentials (each is
- * `encrypt(JSON.stringify(credentials))`): webhook links, header values,
- * tokens. A row that cannot be decrypted
+ * `encrypt(JSON.stringify(credentials))`): webhook links, header values
+ * (and the token of a "Bearer ..." value on its own), tokens. A row that cannot be decrypted
  * is counted, not thrown: its values cannot be in run data the worker wrote
  * either, since the worker could not have read them.
  */
@@ -257,10 +272,16 @@ export function connectionValuesOf(encrypted: readonly string[]): {
     }
     for (const text of textsIn(parsed)) {
       if (text.length > 0) values.add(text);
+      // "Bearer abc...": an app may echo the token alone (Module 14).
+      const token = AUTH_SCHEME_VALUE.exec(text.trim())?.[1];
+      if (token) values.add(token);
     }
   }
   return { values: [...values], unreadable };
 }
+
+/** A secret header value written with its scheme; the token after it is a secret on its own. */
+const AUTH_SCHEME_VALUE = /^(?:Bearer|Basic|Token|Bot|Digest|ApiKey)\s+(\S{8,})$/i;
 
 /**
  * Keys whose text is a label, not a secret: an HTTP header's `name` and

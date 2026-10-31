@@ -93,7 +93,11 @@ function setup(
     },
     {
       simulation: options.simulation,
-      executors: buildRegistry([...EXECUTORS.values(), providerExecutor('notify.slack', provider)]),
+      // The real Slack executor (Module 12) is swapped for one on the fake provider.
+      executors: buildRegistry([
+        ...[...EXECUTORS.values()].filter((executor) => executor.type !== 'notify.slack'),
+        providerExecutor('notify.slack', provider),
+      ]),
     },
   );
   if (options.conn !== null) h.store.addConnection(options.conn ?? connection());
@@ -256,13 +260,30 @@ describe('the simulation', () => {
     log.mockRestore();
   });
 
-  it('flags the connection for a reconnect on [simulate:401]', async () => {
+  it('flags the connection for a reconnect on [simulate:401], saying how to fix it', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
-    const { h } = setup({ mode: 'LIVE', simulation: true, message: 'Hi [simulate:401]' });
+    const { h, provider } = setup({ mode: 'LIVE', simulation: true, message: 'Hi [simulate:401]' });
+    const fix = 'Slack refused the connection. Reconnect it on the Connections page (simulated).';
 
-    await expect(h.activities.executeNodeActivity(h.stepRef('slack1'))).rejects.toBeDefined();
+    await expect(h.activities.executeNodeActivity(h.stepRef('slack1'))).rejects.toMatchObject({
+      type: AUTOMATION_FAILURE_TYPES.notConnected,
+      nonRetryable: true,
+      message: fix,
+    });
 
-    expect(h.store.connections[0].status).toBe('NEEDS_RECONNECT');
+    expect(h.store.connections[0]).toMatchObject({ status: 'NEEDS_RECONNECT', lastError: fix });
+    expect(h.store.latest('run_1', 'slack1')).toMatchObject({
+      status: 'FAILED',
+      error: { message: fix, code: 'connection_refused', retryable: false },
+    });
+
+    // The next run stops before the app is asked again, with the reconnect sentence.
+    h.attempt.value = 2;
+    await expect(h.activities.executeNodeActivity(h.stepRef('slack1'))).rejects.toMatchObject({
+      type: AUTOMATION_FAILURE_TYPES.notConnected,
+      message: 'Marketing Slack needs reconnecting. Reconnect it on the Connections page.',
+    });
+    expect(provider.simulate).not.toHaveBeenCalled();
     log.mockRestore();
   });
 

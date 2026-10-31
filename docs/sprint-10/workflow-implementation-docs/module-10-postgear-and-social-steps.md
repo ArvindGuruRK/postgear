@@ -1,6 +1,6 @@
 # Module 10: PostGear And Social Steps
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: M (one session)
+> **Sprint 10, Workflow Builder** | Status: Done (2026-10-31) | Size: M (one session)
 > **Depends on**: [Module 09](module-09-triggers-activation-versions.md) (live runs, activation, the `publishes` risk flag in the dialog)
 > **Stories**: WF-8.1 (P0), WF-8.2 (P1), Journey B step 5
 > **Next**: [Module 11](module-11-ai-steps-and-credits.md)
@@ -109,15 +109,15 @@ Define once in `packages/automation` (Module 02 output types): `MediaRef = { kin
 
 ## Tasks
 
-- [ ] Read the files in "Read First"; confirm or change the gateway decision in the README decision log.
-- [ ] `prisma-change`: `AutomationEffect`, `CreationMethod.AUTOMATION`; migrate and generate yourself; note both in `SCHEMA_NOTES.md`.
-- [ ] `AUTOMATION_INTERNAL_TOKEN` in API and worker env schemas and `.env.example`.
-- [ ] API: `InternalTokenGuard`, `automation-gateway.controller.ts` and service in `apps/api/src/modules/automations/gateway/`, run binding, effect claim helper.
-- [ ] `PostsService.create`: optional internal `group` and `creationMethod`; repository passes `creationMethod` through.
-- [ ] `nextFreeSlot` with tests.
-- [ ] Worker: `gateway-client.ts`, executors for the four types, outcome mapping, dry runs.
+- [x] Read the files in "Read First"; confirm or change the gateway decision in the README decision log.
+- [x] `prisma-change`: `AutomationEffect`, `CreationMethod.AUTOMATION`; migrate and generate yourself; note both in `SCHEMA_NOTES.md`.
+- [x] `AUTOMATION_INTERNAL_TOKEN` in API and worker env schemas and `.env.example`.
+- [x] API: `InternalTokenGuard`, `automation-gateway.controller.ts` and service in `apps/api/src/modules/automations/gateway/`, run binding, effect claim helper.
+- [x] `PostsService.create`: optional internal `group` and `creationMethod`; repository passes `creationMethod` through.
+- [x] `nextFreeSlot` with tests.
+- [x] Worker: `gateway-client.ts`, executors for the four types, outcome mapping, dry runs.
 - [ ] Catalog: mark the four types executable; Social Channels cards from the live channel list.
-- [ ] Web: channel picker field limited to one provider for `postgear.publish`; provider settings form via `settingsFieldsFor`; the "use Post Published for the link" hint.
+- [x] Web: channel picker field limited to one provider for `postgear.publish`; provider settings form via `settingsFieldsFor`; the "use Post Published for the link" hint. (Also the Media field with Pick From Media, and the time zone field defaulting to the browser's zone.)
 
 ## Tests
 

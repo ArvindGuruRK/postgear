@@ -9,6 +9,9 @@
  * - `needsConnection` when the step needs a connection kind and the
  *   workspace has no healthy one (or, for Publish, no active channel on a
  *   platform it can publish to). Still addable: the panel offers Connect.
+ *   Google Sheets with no Google client configured (and no simulated
+ *   account) says so instead: "Ask a workspace admin to set up Google."
+ *   (Module 13), since Connect could not work.
  * - otherwise `ready`.
  *
  * `runnable` is separate: false while the worker has no executor for the
@@ -26,6 +29,7 @@ import {
   type ValidationContext,
 } from '@postgear/automation';
 import { CATALOG_REASONS } from './automations.messages';
+import { googleReadyFrom } from './connections/google/google-config';
 
 export type CatalogState = 'ready' | 'needsConnection' | 'comingSoon';
 
@@ -67,10 +71,16 @@ export function connectedPlatforms(ctx: ValidationContext): PublishPlatformId[] 
   ).map((platform) => platform.id);
 }
 
+export interface CatalogOptions {
+  /** A real Google client is configured; read from the environment when left out. */
+  googleReady?: boolean;
+}
+
 function stateOf(
   def: NodeDefinition,
   ctx: ValidationContext,
   platforms: readonly PublishPlatformId[],
+  googleReady: boolean,
 ): { state: CatalogState; reason: string | null } {
   if (def.status === 'comingSoon') {
     return { state: 'comingSoon', reason: def.comingSoonReason ?? null };
@@ -86,17 +96,24 @@ function stateOf(
     if (!healthy) {
       return {
         state: 'needsConnection',
-        reason: CATALOG_REASONS.connect(connectionKindInfo(use.kind).title),
+        reason:
+          use.kind === 'google' && !googleReady
+            ? CATALOG_REASONS.googleNotSetUp
+            : CATALOG_REASONS.connect(connectionKindInfo(use.kind).title),
       };
     }
   }
   return { state: 'ready', reason: null };
 }
 
-export function buildCatalog(ctx: ValidationContext): WorkspaceCatalog {
+export function buildCatalog(
+  ctx: ValidationContext,
+  options: CatalogOptions = {},
+): WorkspaceCatalog {
+  const googleReady = options.googleReady ?? googleReadyFrom(process.env);
   const platforms = connectedPlatforms(ctx);
   const steps = NODE_CATALOG.map((def): CatalogEntry => {
-    const { state, reason } = stateOf(def, ctx, platforms);
+    const { state, reason } = stateOf(def, ctx, platforms, googleReady);
     const runnable = ctx.availableTypes?.has(def.type) ?? true;
     return {
       type: def.type,

@@ -71,6 +71,8 @@ export interface ReconcileReport {
 /** What `pruneAutomationRuns` deleted. */
 export interface PruneReport {
   runs: number;
+  /** Sprint 10, Module 10: step gateway effect rows past the retention. */
+  effects: number;
 }
 
 /** Finished runs are deleted this many at a time (their steps cascade). */
@@ -286,6 +288,9 @@ export type PruneClient = {
     findMany: Prisma.AutomationRunDelegate['findMany'];
     deleteMany: Prisma.AutomationRunDelegate['deleteMany'];
   };
+  automationEffect: {
+    deleteMany: Prisma.AutomationEffectDelegate['deleteMany'];
+  };
 };
 
 /**
@@ -293,6 +298,10 @@ export type PruneClient = {
  * is older than `AUTOMATION_RUN_RETENTION_DAYS`, 500 at a time. QUEUED,
  * RUNNING and WAITING runs are never touched, whatever their age; runs of
  * deleted workflows go the same way.
+ *
+ * Sprint 10, Module 10: the step gateway's `AutomationEffect` rows older
+ * than the same 30 days go too. An effect only guards the retries of one
+ * step, which end within minutes; after a month it protects nothing.
  */
 export async function pruneAutomationRuns(client: PruneClient, now: Date): Promise<PruneReport> {
   const cutoff = new Date(now.getTime() - AUTOMATION_RUN_RETENTION_DAYS * 24 * 60 * 60_000);
@@ -311,7 +320,10 @@ export async function pruneAutomationRuns(client: PruneClient, now: Date): Promi
     runs += count;
     if (batch.length < AUTOMATION_PRUNE_BATCH || count === 0) break;
   }
-  return { runs };
+  const { count: effects } = await client.automationEffect.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+  return { runs, effects };
 }
 
 /**

@@ -179,6 +179,44 @@ describe('ConnectionsService', () => {
     expectNoSecret(await service.check(ORG, USER, created.id));
   });
 
+  it('never answers with a Google refresh token or a secret header value (Module 13)', async () => {
+    const REFRESH = 'google-refresh-token-0123456789';
+    const BEARER = 'sk_live_header_secret_9f2c';
+    const google = await service.saveGrant(ORG, USER, 'google', {
+      credentials: {
+        accessToken: 'google-access-token-abc',
+        refreshToken: REFRESH,
+        expiresAt: Date.now() + 3_600_000,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        email: 'kim@gmail.com',
+      },
+      meta: { email: 'kim@gmail.com' },
+      name: 'kim@gmail.com',
+    });
+    const http = await service.create(ORG, USER, {
+      provider: 'http',
+      name: 'Zapier Secret',
+      credentials: { headers: [{ name: 'Authorization', value: `Bearer ${BEARER}` }] },
+    });
+    expect(google.maskedHint).toBe('k***@gmail.com');
+    expect(http.maskedHint).toBe('Authorization: Bearer ...9f2c');
+
+    const responses = [
+      google,
+      http,
+      await service.list(ORG),
+      await service.check(ORG, USER, google.id),
+      await service.check(ORG, USER, http.id),
+    ];
+    for (const response of responses) {
+      const json = JSON.stringify(response);
+      expect(json).not.toContain('credentials');
+      expect(json).not.toContain(REFRESH);
+      expect(json).not.toContain('google-access-token-abc');
+      expect(json).not.toContain(BEARER);
+    }
+  });
+
   it('refuses a name already used for that app, in any case', async () => {
     await addSlack();
     await expect(addSlack('marketing slack')).rejects.toMatchObject({
@@ -205,7 +243,35 @@ describe('ConnectionsService', () => {
         name: 'Sheets',
         credentials: { accessToken: 'a', refreshToken: 'r', expiresAt: 1, scope: '' },
       }),
-    ).rejects.toMatchObject({ status: 400, message: CONNECTION_MESSAGES.OAUTH_ONLY('Google') });
+    ).rejects.toMatchObject({
+      status: 422,
+      response: { message: CONNECTION_MESSAGES.OAUTH_ONLY('Google'), code: 'google_needs_oauth' },
+    });
+    expect(repository.rows).toHaveLength(0);
+  });
+
+  it('adds a simulated Google account under AUTOMATION_SIMULATION (Module 13)', async () => {
+    const created = await service.create(ORG, USER, {
+      provider: 'google',
+      name: 'Simulated Sheets',
+      credentials: { simulated: true },
+    });
+    expect(created).toMatchObject({ provider: 'google', maskedHint: 'Simulated' });
+    expect(repository.rows[0].meta).toEqual({ simulated: true, email: 'simulated@postgear.local' });
+    expect(JSON.parse(decrypt(repository.rows[0].credentials))).toEqual({ simulated: true });
+  });
+
+  it('refuses a simulated Google account when simulation is off', async () => {
+    const off = new ConnectionsService(repository as unknown as ConnectionsRepository, context, {
+      get: () => 'false',
+    } as never);
+    await expect(
+      off.create(ORG, USER, {
+        provider: 'google',
+        name: 'Simulated Sheets',
+        credentials: { simulated: true },
+      }),
+    ).rejects.toMatchObject({ status: 422, response: { code: 'google_needs_oauth' } });
   });
 
   it('reconnects with new details and a clean status', async () => {

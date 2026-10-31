@@ -1,7 +1,13 @@
-import { type AutomationGraph, getTemplate, instantiateTemplate } from '@postgear/automation';
+import {
+  type AutomationGraph,
+  availableData,
+  getTemplate,
+  instantiateTemplate,
+} from '@postgear/automation';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { buildScope, receivedWebhookData } from '../panel/panel-view-model';
 import { DATA_DRAG_MIME } from './contract';
-import { filterGroups, InsertDataList, NOTHING_UPSTREAM } from './insert-data';
+import { filterGroups, InsertDataList, NOTHING_UPSTREAM, withSampleFields } from './insert-data';
 import { stubBrowserLayout } from './test-dom';
 
 beforeAll(stubBrowserLayout);
@@ -97,5 +103,37 @@ describe('InsertDataList', () => {
     ];
     expect(filterGroups(groups as never, 'published')).toHaveLength(1);
     expect(filterGroups(groups as never, 'nope')).toHaveLength(0);
+  });
+
+  it('offers the fields of the data a Webhook trigger last received (Module 13)', () => {
+    const blog = instantiateTemplate(
+      getTemplate('blog-to-draft') as NonNullable<ReturnType<typeof getTemplate>>,
+      (key) => key,
+    );
+    const received = receivedWebhookData({
+      sample: { headline: 'Spring menu', author: { name: 'Mia' }, 'not a key': 1 },
+      sampleAt: '2026-11-03T09:00:00Z',
+    });
+    const { scope } = buildScope(blog, [], undefined, {}, received);
+    const onPick = jest.fn();
+    render(<InsertDataList graph={blog} nodeKey="write" scope={scope} onPick={onPick} />);
+    const group = screen.getByRole('region', { name: 'New Blog Article' });
+    fireEvent.click(within(group).getByRole('button', { name: /^Group of fields Received Data/ }));
+
+    fireEvent.click(within(group).getByRole('button', { name: /Headline Spring menu/ }));
+    expect(onPick).toHaveBeenLastCalledWith('trigger.body.headline');
+    fireEvent.click(within(group).getByRole('button', { name: /All Received Data/ }));
+    expect(onPick).toHaveBeenLastCalledWith('trigger.body');
+    // A key a token cannot hold is left out; the built-in sample's fields are gone.
+    expect(within(group).queryByRole('button', { name: /Not A Key/ })).toBeNull();
+    expect(within(group).queryByRole('button', { name: /^Text Title/ })).toBeNull();
+    fireEvent.click(within(group).getByRole('button', { name: /^Group of fields Author/ }));
+    fireEvent.click(within(group).getByRole('button', { name: /Name Mia/ }));
+    expect(onPick).toHaveBeenLastCalledWith('trigger.body.author.name');
+  });
+
+  it('leaves groups of fields with fields of their own, and other steps, alone', () => {
+    const groups = availableData(graph, slack.key);
+    expect(withSampleFields(groups)).toEqual(groups);
   });
 });

@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 import { count, isBlank, OUT, templateField } from './fields';
+import type { FieldSpec } from './form';
 import { PUBLISH_PLATFORM_IDS, platformById } from './platforms';
 import { defineNode, type OutputField } from './types';
 
@@ -34,6 +35,48 @@ const voiceField = z.enum(['personal', 'company']);
 function platformWords(platform: string): string {
   return platform === 'generic' ? 'any platform' : (platformById(platform)?.title ?? platform);
 }
+
+/** The Platform select every AI step shares. */
+const PLATFORM_FIELD: FieldSpec = {
+  path: 'platform',
+  kind: 'select',
+  label: 'Platform',
+  help: "Keeps the result within the platform's length limit.",
+  options: [
+    { value: 'generic', label: 'Any platform' },
+    ...PUBLISH_PLATFORM_IDS.map((id) => ({ value: id, label: platformById(id)?.title ?? id })),
+  ],
+};
+
+/** The Voice select: the same words as the AI page. */
+const VOICE_FIELD: FieldSpec = {
+  path: 'voice',
+  kind: 'select',
+  label: 'Voice',
+  help: 'Personal writes as you ("I"). Company writes as your workspace ("we").',
+  options: [
+    { value: 'personal', label: 'Personal' },
+    { value: 'company', label: 'Company' },
+  ],
+};
+
+/** Where Generate Hashtags and Rewrite In Brand Voice take their text from. */
+const SOURCE_TEXT_FIELD: FieldSpec = {
+  path: 'text',
+  kind: 'longText',
+  label: 'Text',
+  help: 'Usually the Text of a Generate Text step. Insert data to use earlier steps.',
+  placeholder: 'Enter your text',
+  acceptsData: true,
+  required: true,
+};
+
+const SHORTENED_FIELD: OutputField = {
+  path: 'shortened',
+  label: 'Shortened',
+  type: 'boolean',
+  sample: false,
+};
 
 const IMAGE_FIELDS: OutputField[] = [
   { path: 'image', label: 'Image', type: 'media' },
@@ -104,24 +147,8 @@ export const generateText = defineNode({
           acceptsData: true,
           required: true,
         },
-        {
-          path: 'platform',
-          kind: 'select',
-          label: 'Platform',
-          options: [
-            { value: 'generic', label: 'Any platform' },
-            ...PUBLISH_PLATFORM_IDS.map((id) => ({ value: id, label: platformById(id)?.title ?? id })),
-          ],
-        },
-        {
-          path: 'voice',
-          kind: 'select',
-          label: 'Voice',
-          options: [
-            { value: 'company', label: 'Company' },
-            { value: 'personal', label: 'Personal' },
-          ],
-        },
+        PLATFORM_FIELD,
+        VOICE_FIELD,
         {
           path: 'format',
           kind: 'select',
@@ -137,13 +164,13 @@ export const generateText = defineNode({
           path: 'research',
           kind: 'toggle',
           label: 'Web research',
-          help: 'Looks up recent facts on the web before writing.',
+          help: 'Searches the web first. Takes longer.',
         },
         {
           path: 'withImage',
           kind: 'toggle',
           label: 'Make an image too',
-          help: 'Also makes an image to go with the post.',
+          help: 'Also makes an image to go with the post and saves it to Media.',
         },
       ],
     },
@@ -179,6 +206,33 @@ export const generateImage = defineNode({
   credits: () => AI_STEP_CREDITS.image,
   summary: (config) =>
     config.style ? IMAGE_STYLE_WORDS[config.style] : 'An image from your prompt',
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'prompt',
+          kind: 'longText',
+          label: 'Prompt',
+          help: 'What the image should show. Insert data to use earlier steps.',
+          placeholder: 'Enter your prompt',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'style',
+          kind: 'select',
+          label: 'Style',
+          options: [
+            { value: 'photo', label: 'Photo' },
+            { value: 'illustration', label: 'Illustration' },
+            { value: 'flat', label: 'Flat graphic' },
+          ],
+        },
+      ],
+    },
+    notes: ['The image is saved to Media, so Create Draft can attach it.'],
+  },
 });
 
 const hashtagsConfig = z
@@ -210,9 +264,27 @@ export const generateHashtags = defineNode({
       sample: ['#bakery', '#bread'],
     },
     { path: 'line', label: 'Hashtag Line', type: 'text', sample: '#bakery #bread #sourdough' },
+    SHORTENED_FIELD,
   ],
   credits: () => AI_STEP_CREDITS.snippet,
   summary: (config) => `${count(config.count, 'hashtag')} for ${platformWords(config.platform)}`,
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        SOURCE_TEXT_FIELD,
+        PLATFORM_FIELD,
+        {
+          path: 'count',
+          kind: 'number',
+          label: 'How many',
+          help: 'From 3 to 15.',
+          min: 3,
+          max: 15,
+        },
+      ],
+    },
+  },
 });
 
 const rewriteConfig = z
@@ -233,10 +305,14 @@ export const rewriteInBrandVoice = defineNode({
   required: [{ path: 'text', message: 'Choose the text to rewrite.' }],
   outputShape: [
     { path: 'text', label: 'Text', type: 'text', sample: 'Our sourdough, your mornings.' },
+    SHORTENED_FIELD,
   ],
   credits: () => AI_STEP_CREDITS.snippet,
   summary: (config) =>
     isBlank(config.text) ? 'Choose the text to rewrite' : `For ${platformWords(config.platform)}`,
+  form: {
+    tabs: { setup: [], configure: [SOURCE_TEXT_FIELD, PLATFORM_FIELD, VOICE_FIELD] },
+  },
 });
 
 export const generateVideo = defineNode({

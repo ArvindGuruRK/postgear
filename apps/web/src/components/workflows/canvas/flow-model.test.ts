@@ -1,6 +1,14 @@
 import { EMPTY_SELECTION } from '../builder/builder-state';
 import { graphOf, line, runOf, step, stepRow } from './canvas-test-kit';
-import { edgeRunState, stepAriaLabel, toFlowEdges, toFlowNodes } from './flow-model';
+import {
+  type CanvasNode,
+  EDITOR_ARIA_LABELS,
+  edgeRunState,
+  reuseUnchanged,
+  stepAriaLabel,
+  toFlowEdges,
+  toFlowNodes,
+} from './flow-model';
 
 // A trigger, an If / Else with Yes on a, No on b, and c after a.
 const graph = graphOf(
@@ -87,5 +95,81 @@ describe('stepAriaLabel', () => {
         },
       }),
     ).toBe('Slack step, Failed: the link was not accepted');
+  });
+});
+
+describe('reuseUnchanged', () => {
+  const issue = (message: string) => ({
+    severity: 'error' as const,
+    code: 'node.required_missing' as const,
+    message,
+    nodeKey: 'a',
+  });
+
+  it('keeps the object of every card that did not change', () => {
+    const before = toFlowNodes(graph, {
+      ...options,
+      issues: new Map([['a', [issue('Add a message.')]]]),
+    });
+    // Fresh objects all round, as after a validation pass with the same result.
+    const after = toFlowNodes(graph, {
+      ...options,
+      issues: new Map([['a', [issue('Add a message.')]]]),
+    });
+    const kept = reuseUnchanged(before, after);
+    for (let i = 0; i < kept.length; i += 1) expect(kept[i]).toBe(before[i]);
+  });
+
+  it('hands over a new object only for the card that changed', () => {
+    const before = toFlowNodes(graph, options);
+    const edited = {
+      ...graph,
+      nodes: graph.nodes.map((node) =>
+        node.key === 'a' ? { ...node, config: { ...node.config, message: 'Hi' } } : node,
+      ),
+    };
+    const kept = reuseUnchanged(before, toFlowNodes(edited, options));
+    for (let i = 0; i < kept.length; i += 1) {
+      if (kept[i].id === 'a') expect(kept[i]).not.toBe(before[i]);
+      else expect(kept[i]).toBe(before[i]);
+    }
+  });
+
+  it('repaints a card whose issues, selection or position changed', () => {
+    const before = toFlowNodes(graph, options);
+    const byId = (nodes: CanvasNode[], id: string) => nodes.find((node) => node.id === id);
+    const withIssue = reuseUnchanged(
+      before,
+      toFlowNodes(graph, { ...options, issues: new Map([['a', [issue('Add a message.')]]]) }),
+    );
+    expect(byId(withIssue, 'a')).not.toBe(byId(before, 'a'));
+    const selected = reuseUnchanged(
+      before,
+      toFlowNodes(graph, { ...options, selection: { ...EMPTY_SELECTION, nodes: ['b'] } }),
+    );
+    expect(byId(selected, 'b')).not.toBe(byId(before, 'b'));
+    expect(byId(selected, 'a')).toBe(byId(before, 'a'));
+    const dragged = reuseUnchanged(
+      before,
+      toFlowNodes(graph, { ...options, drag: { c: { x: 500, y: 500 } } }),
+    );
+    expect(byId(dragged, 'c')).not.toBe(byId(before, 'c'));
+  });
+});
+
+describe('what a screen reader hears from React Flow', () => {
+  it('names cards steps and lines lines, with the step names, never "node" or "edge"', () => {
+    const steps = toFlowNodes(graph, options);
+    expect(steps.find((node) => node.id === 'a')?.domAttributes).toEqual({
+      'aria-roledescription': 'step',
+    });
+    const line = toFlowEdges(graph, EMPTY_SELECTION).find((edge) =>
+      edge.id.startsWith('check:true'),
+    );
+    expect(line?.ariaLabel).toBe('Line from Check to Slack');
+    expect(line?.domAttributes).toEqual({ 'aria-roledescription': 'line' });
+    for (const words of Object.values(EDITOR_ARIA_LABELS)) {
+      if (typeof words === 'string') expect(words).not.toMatch(/\b(node|edge)s?\b/i);
+    }
   });
 });

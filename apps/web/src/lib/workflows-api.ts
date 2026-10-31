@@ -9,17 +9,25 @@ import type {
   AutomationDetail,
   AutomationRunMode,
   AutomationRunStatus,
+  Connection,
+  ConnectionList,
+  CreatedSpreadsheet,
+  PickerToken,
   ReviewAnswer,
   RunDetail,
   RunPage,
   RunSummary,
+  SpreadsheetDetail,
   VersionDetail,
   VersionSummary,
+  WebhookInfo,
+  WebhookSecretResult,
 } from '@/types/workflows';
 import { api } from './api';
 
 const workflow = (id: string) => `/automations/${encodeURIComponent(id)}`;
 const runPath = (runId: string) => `/automation-runs/${encodeURIComponent(runId)}`;
+const connectionPath = (id: string) => `/automation-connections/${encodeURIComponent(id)}`;
 
 /* Runs */
 
@@ -189,4 +197,97 @@ export async function restoreVersion(
     { method: 'POST', body: { draftRevision } },
   );
   return automation;
+}
+
+/* Connections (Module 13 adds the flags and Google) */
+
+/**
+ * The workspace's connections plus `simulation` and `googleReady`. An older
+ * API without the flags reads as both off.
+ */
+export async function listConnections(): Promise<ConnectionList> {
+  const result = await api<Partial<ConnectionList>>('/automation-connections');
+  return {
+    connections: result.connections ?? [],
+    simulation: result.simulation === true,
+    googleReady: result.googleReady === true,
+  };
+}
+
+/**
+ * Admins only, and only when `simulation` is on: a Google connection that
+ * never calls Google. 422 `google_needs_oauth` otherwise.
+ */
+export async function addSimulatedGoogle(name: string): Promise<Connection> {
+  const { connection } = await api<{ connection: Connection }>('/automation-connections', {
+    method: 'POST',
+    body: { provider: 'google', name, credentials: { simulated: true } },
+  });
+  return connection;
+}
+
+/** Refusal codes of the Google helpers below. */
+export const GOOGLE_ERRORS = {
+  /** 422: the connection is simulated, so there is no Picker (offer a sample spreadsheet). */
+  simulated: 'simulated_connection',
+  /** 422: Google refused the token; the connection now needs a reconnect. */
+  disconnected: 'google_disconnected',
+  /** 422: the spreadsheet is no longer reachable with `drive.file`. */
+  unavailable: 'spreadsheet_unavailable',
+  /** 502: Google did not answer. */
+  down: 'google_unavailable',
+  /** 422 on adding a simulated Google connection without simulation on. */
+  needsOAuth: 'google_needs_oauth',
+} as const;
+
+/** Members: a short-lived access token for Google's Picker. 422 `simulated_connection`, `google_disconnected`. */
+export function getPickerToken(connectionId: string): Promise<PickerToken> {
+  return api(`${connectionPath(connectionId)}/picker-token`);
+}
+
+/** The picked spreadsheet's name, link and tabs. 422 `google_disconnected`, `spreadsheet_unavailable`; 502. */
+export function getSpreadsheet(
+  connectionId: string,
+  spreadsheetId: string,
+): Promise<SpreadsheetDetail> {
+  return api(
+    `${connectionPath(connectionId)}/google/spreadsheets/${encodeURIComponent(spreadsheetId)}`,
+  );
+}
+
+/** The first row of a tab; `[]` when it is empty. Same refusals as `getSpreadsheet`. */
+export async function getSheetHeader(
+  connectionId: string,
+  spreadsheetId: string,
+  sheet: string,
+): Promise<string[]> {
+  const { headers } = await api<{ headers: string[] }>(
+    `${connectionPath(connectionId)}/google/spreadsheets/${encodeURIComponent(
+      spreadsheetId,
+    )}/header?${new URLSearchParams({ sheet })}`,
+  );
+  return headers;
+}
+
+/** Creates a spreadsheet PostGear may use, with `headers` (0 to 50) as its first row. */
+export function createSpreadsheet(
+  connectionId: string,
+  body: { name: string; headers: string[] },
+): Promise<CreatedSpreadsheet> {
+  return api(`${connectionPath(connectionId)}/google/spreadsheets`, { method: 'POST', body });
+}
+
+/* Webhook trigger (Module 13) */
+
+/** The link, the secret's last 4 characters and the last data received. */
+export function getWebhook(automationId: string): Promise<WebhookInfo> {
+  return api(`${workflow(automationId)}/webhook`);
+}
+
+/**
+ * Admins only. Creates the first secret or regenerates it (the old one stops
+ * working). The plain secret is in this answer only: show it once.
+ */
+export function createWebhookSecret(automationId: string): Promise<WebhookSecretResult> {
+  return api(`${workflow(automationId)}/webhook/secret`, { method: 'POST' });
 }

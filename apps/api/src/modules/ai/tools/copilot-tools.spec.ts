@@ -43,7 +43,13 @@ const credits = (used: number) => ({
   resetsAt: RESETS_AT.toISOString(),
   tier: 'STANDARD' as const,
   low: false,
-  costs: { generate_post: 5, generate_image: 10, copilot_message: 1, seo_advice: 3 },
+  costs: {
+    generate_post: 5,
+    generate_image: 10,
+    copilot_message: 1,
+    seo_advice: 3,
+    generate_snippet: 2,
+  },
 });
 
 const result = {

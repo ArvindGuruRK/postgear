@@ -51,7 +51,13 @@ function credits(used: number): AiCredits {
     resetsAt: RESETS_AT.toISOString(),
     tier: 'STANDARD',
     low: false,
-    costs: { generate_post: 5, generate_image: 10, copilot_message: 1, seo_advice: 3 },
+    costs: {
+      generate_post: 5,
+      generate_image: 10,
+      copilot_message: 1,
+      seo_advice: 3,
+      generate_snippet: 2,
+    },
   };
 }
 
@@ -142,6 +148,7 @@ describe('AiService', () => {
       createPipeline: jest.fn().mockReturnValue(pipeline),
       createCopilot: jest.fn().mockReturnValue(agent),
       createSeoAdvisor: jest.fn().mockReturnValue(null),
+      createSnippetWriter: jest.fn().mockReturnValue(null),
       generateImage: jest.fn(),
     };
     ledger = {

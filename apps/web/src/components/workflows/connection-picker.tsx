@@ -17,6 +17,7 @@
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import type { ConnectionKind } from '@postgear/automation';
 import {
+  Badge,
   Button,
   MotionIcon,
   Select,
@@ -38,8 +39,10 @@ import {
   appInSentence,
   appTitle,
   isFormApp,
+  isSimulated,
   STATUS_WORDS,
 } from './connections/connections-view-model';
+import { GoogleConnectDialog } from './connections/google-connect-dialog';
 
 export interface ConnectionPickerProps {
   kind: ConnectionKind;
@@ -74,6 +77,7 @@ export function ConnectionPicker({
   const [loaded, setLoaded] = useState<Connection[] | null>(given ?? null);
   const [failed, setFailed] = useState(false);
   const [dialog, setDialog] = useState<ConnectDialogMode | null>(null);
+  const [google, setGoogle] = useState(false);
 
   useEffect(() => {
     if (given) {
@@ -100,6 +104,8 @@ export function ConnectionPicker({
 
   function connect() {
     if (isFormApp(kind)) setDialog({ kind: 'add', app: kind });
+    // Google: sign in, or a simulated stand-in, or "ask an admin", decided by the server's setup.
+    else if (kind === 'google') setGoogle(true);
     else window.location.assign(connectionOAuthUrl(kind, returnTo));
   }
 
@@ -136,6 +142,7 @@ export function ConnectionPicker({
                 <span className="flex items-center gap-2">
                   <AppIcon icon={appIcon(kind)} />
                   <span>{connection.name}</span>
+                  {isSimulated(connection) ? <Badge variant="secondary">Simulated</Badge> : null}
                   <StatusIndicator
                     status={DOT[connection.status]}
                     label={STATUS_WORDS[connection.status].label}
@@ -188,6 +195,14 @@ export function ConnectionPicker({
         }}
         onSaved={added}
       />
+      {kind === 'google' ? (
+        <GoogleConnectDialog
+          open={google}
+          onOpenChange={setGoogle}
+          onSaved={added}
+          returnTo={returnTo}
+        />
+      ) : null}
     </div>
   );
 }

@@ -158,8 +158,11 @@ export function SettingsBar({
   );
 }
 
-/** One field, drawn by its kind. An unset field shows its default. */
-function SettingControl({
+/**
+ * One field, drawn by its kind. An unset field shows its default. Exported
+ * for the workflow step form's Publish To {Platform} settings (Sprint 10).
+ */
+export function SettingControl({
   id,
   field,
   value,

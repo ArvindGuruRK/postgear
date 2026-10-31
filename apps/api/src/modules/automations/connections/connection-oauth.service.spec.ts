@@ -14,6 +14,8 @@ import {
 } from './connection-oauth.service';
 import type { ConnectionsRepository } from './connections.repository';
 import type { ConnectionsService } from './connections.service';
+import type { GoogleHttp } from './google/google-http';
+import { GOOGLE_DRIVE_FILE_SCOPE, GoogleOAuthPlugin } from './google/google-oauth.plugin';
 
 const ORG = 'org-1';
 const USER = 'user-1';
@@ -189,5 +191,37 @@ describe('ConnectionOAuthService', () => {
     expect(safeReturnTo(ORG, `/${ORG}/workflows/connections#x`)).toBe(
       `/${ORG}/workflows/connections`,
     );
+  });
+
+  it('runs the real Google plugin: single-use state, and a grant without a refresh token saves nothing', async () => {
+    const http = {
+      request: jest.fn(async () => ({
+        status: 200,
+        body: { access_token: 'access-1', scope: GOOGLE_DRIVE_FILE_SCOPE },
+      })),
+    };
+    const google = new GoogleOAuthPlugin(
+      { clientId: 'client-1', clientSecret: 'client-secret-1' },
+      http as unknown as GoogleHttp,
+    );
+    const real = new ConnectionOAuthService(
+      redis as unknown as RedisService,
+      repository as unknown as ConnectionsRepository,
+      connections as unknown as ConnectionsService,
+      { get: (key: string) => (key === 'WEB_URL' ? WEB : 'http://localhost:3001') } as never,
+      [google],
+    );
+
+    const url = await real.start(ORG, USER, 'google', { returnTo: RETURN_TO });
+    expect(new URL(url).searchParams.get('access_type')).toBe('offline');
+    const state = new URL(url).searchParams.get('state') ?? '';
+
+    const landing = await real.finish('google', 'code-1', state);
+    expect(landing).toContain('connectError=failed');
+    expect(landing).not.toContain('access-1');
+    expect(connections.saveGrant).not.toHaveBeenCalled();
+
+    await expect(real.finish('google', 'code-1', state)).resolves.toContain('connectError=expired');
+    expect(http.request).toHaveBeenCalledTimes(1);
   });
 });

@@ -275,12 +275,15 @@ export class AutomationRunsService {
     });
     const rows = page.slice(0, RUNS_PAGE_SIZE);
     const phrased = rows.filter((row) => PHRASED_TRIGGER_TYPES.has(row.triggerType));
-    const facts = await this.repository.triggerFacts(
-      orgId,
-      phrased.map((row) => row.id),
-    );
+    const [facts, connectionValues] = await Promise.all([
+      this.repository.triggerFacts(
+        orgId,
+        phrased.map((row) => row.id),
+      ),
+      this.connectionValues(orgId),
+    ]);
     return {
-      runs: rows.map((row) => toRunSummary(row, facts.get(row.id))),
+      runs: rows.map((row) => toRunSummary(row, facts.get(row.id), connectionValues)),
       nextCursor: page.length > RUNS_PAGE_SIZE ? rows[rows.length - 1].id : null,
     };
   }
@@ -596,7 +599,7 @@ export class AutomationRunsService {
       if (requested === 'last') throw unprocessable(RUN_MESSAGES.NO_LAST_RUN, 'no_last_run');
     }
 
-    return { payload: triggerSample(trigger), source: 'sample' };
+    return { payload: sampleTriggerOutput(automation, trigger), source: 'sample' };
   }
 
   /**
@@ -647,7 +650,8 @@ export class AutomationRunsService {
         output = last.get(key);
         source = 'last';
       } else {
-        output = key === trigger.key ? triggerSample(node) : stepSample(node, scope);
+        output =
+          key === trigger.key ? sampleTriggerOutput(automation, node) : stepSample(node, scope);
         source = 'sample';
       }
 
@@ -710,6 +714,25 @@ function blocks(issue: ValidationIssue, dry: ReadonlySet<string>): boolean {
 }
 
 /** `Automation.pinnedData` is `{ [nodeKey]: { output, pinnedAt, pinnedById } }`. */
+/**
+ * A trigger's sample data. For the Webhook trigger, the last body it
+ * received (Module 13: saved even while the workflow is off, so the first
+ * call from the other app becomes the test data); else the catalog sample.
+ */
+export function sampleTriggerOutput(
+  automation: Pick<TestableAutomation, 'webhookSample' | 'webhookSampleAt'>,
+  trigger: GraphNode,
+): unknown {
+  if (trigger.type === 'trigger.webhook' && isRecord(automation.webhookSample)) {
+    return {
+      body: automation.webhookSample,
+      receivedAt: (automation.webhookSampleAt ?? new Date()).toISOString(),
+      headers: { contentType: 'application/json' },
+    };
+  }
+  return triggerSample(trigger);
+}
+
 function pinnedOutputs(pinnedData: unknown): Map<string, unknown> {
   const pins = new Map<string, unknown>();
   if (!isRecord(pinnedData)) return pins;

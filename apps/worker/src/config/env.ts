@@ -82,6 +82,41 @@ const envSchema = z
     ),
 
     /**
+     * The key to the API's internal step gateway (Sprint 10, Module 10).
+     * Steps that need API services (Create Draft, Add To Queue, Publish, the
+     * AI steps, Email) call `${API_URL}/internal/automation/*` with it. The
+     * API checks the same variable. Generate it with `npm run generate:keys`.
+     */
+    AUTOMATION_INTERNAL_TOKEN: z
+      .string()
+      .regex(
+        /^[0-9a-fA-F]{64}$/,
+        'AUTOMATION_INTERNAL_TOKEN must be 64 hex characters (the same value as the API). Run `npm run generate:keys`',
+      ),
+
+    /**
+     * Google Sheets steps refresh their access token here (Module 13). The
+     * same client the API's Google connection uses: the automation client,
+     * else the sign-in client.
+     */
+    GOOGLE_AUTOMATION_CLIENT_ID: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional(),
+    ),
+    GOOGLE_AUTOMATION_CLIENT_SECRET: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional(),
+    ),
+    GOOGLE_CLIENT_ID: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional(),
+    ),
+    GOOGLE_CLIENT_SECRET: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().optional(),
+    ),
+
+    /**
      * Let outbound webhooks target localhost and private addresses (Sprint 8).
      * The delivery sender runs the same SSRF guard as the SEO crawler on every
      * send, which refuses exactly the receiver a developer runs on their own

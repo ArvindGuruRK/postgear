@@ -34,7 +34,9 @@ export const CONNECTION_MESSAGES = {
     teams:
       'This is not a Teams Workflows link. Copy the link the Workflows app shows when you finish its steps.',
   },
-  TEAMS_OLD_LINK: 'This is an old Teams connector link. Create a new one with the Workflows app.',
+  // Same words as the worker's TEAMS_OLD_LINK_MESSAGE.
+  TEAMS_OLD_LINK:
+    'That is an old Teams connector link, which Microsoft has switched off. Create a new link with the Teams Workflows app.',
 
   // Secret headers.
   HEADERS_INVALID: 'Add each secret header as a name and a value.',
@@ -48,6 +50,17 @@ export const CONNECTION_MESSAGES = {
     `The value for ${name} is too long or has a line break in it.`,
 
   GOOGLE_INVALID: 'Google did not send the details PostGear needs. Try connecting again.',
+  GOOGLE_NO_OFFLINE: 'Google did not grant offline access. Try again.',
+  GOOGLE_NO_FILES: 'Google did not give PostGear access to your files. Try again and allow it.',
+  GOOGLE_DISCONNECTED: 'Google Sheets is disconnected. Reconnect it in Connections.',
+  GOOGLE_UNAVAILABLE: 'Google is not answering right now. Try again in a minute.',
+  GOOGLE_NOT_SET_UP: 'Ask a workspace admin to set up Google.',
+  SPREADSHEET_UNAVAILABLE: (name: string) =>
+    `PostGear can no longer open ${name}. Pick it again in this step.`,
+  PICKER_SIMULATED:
+    'Google’s file picker needs a real Google account. Create a new spreadsheet instead.',
+  CHECK_GOOGLE_OK: 'Google answered. This connection works.',
+  CHECK_SIMULATED: 'This is a simulated connection: there is nothing to check.',
 
   // OAuth.
   RETURN_TO: 'The page to come back to must be a workflow page in this workspace.',

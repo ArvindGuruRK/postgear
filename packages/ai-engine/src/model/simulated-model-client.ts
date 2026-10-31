@@ -147,7 +147,9 @@ const FAMILY_OF: Record<AiCategory, Family> = {
 // ---------------------------------------------------------------------------
 
 const LEADING_REQUEST =
-  /^(please\s+)?(can you\s+|could you\s+|i want you to\s+|i need\s+)?(write|generate|create|compose|draft|make)\s+(me\s+)?(a|an|the)?\s*(short|long|quick|new)?\s*(linkedin|x|twitter|instagram|facebook|threads|tiktok|youtube)?\s*(post|thread|article|update|caption)?\s*(about|on|for|covering)?\s*/i;
+  // Each optional word must end at a word boundary, or "Write about bread"
+  // loses the "a" of "about" as if it were the article.
+  /^(please\s+)?(can you\s+|could you\s+|i want you to\s+|i need\s+)?(write|generate|create|compose|draft|make)\s+(me\s+)?(?:(a|an|the)\b\s*)?(?:(short|long|quick|new)\b\s*)?(?:(linkedin|x|twitter|instagram|facebook|threads|tiktok|youtube)\b\s*)?(?:(post|thread|article|update|caption)\b\s*)?(?:(about|on|for|covering)\b\s*)?/i;
 
 const SUBJECT_MAX_CHARS = 60;
 const TRAILING_STOPWORD =
@@ -636,6 +638,138 @@ function simulateSeoAdvice(user: string): SeoAdviceOutput {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Snippets: hashtags and a rewrite in a voice (Sprint 10)
+// ---------------------------------------------------------------------------
+
+const HASHTAG_STOPWORDS = new Set([
+  'this',
+  'that',
+  'with',
+  'from',
+  'your',
+  'have',
+  'will',
+  'just',
+  'what',
+  'when',
+  'about',
+  'they',
+  'them',
+  'their',
+  'there',
+  'were',
+  'been',
+  'into',
+  'more',
+  'most',
+  'some',
+  'than',
+  'then',
+  'very',
+  'also',
+  'here',
+  'every',
+  'each',
+  'only',
+  'over',
+  'such',
+  'because',
+  'which',
+  'while',
+  'would',
+  'could',
+  'should',
+  'after',
+  'before',
+  'again',
+  'still',
+  'ours',
+  'mine',
+]);
+
+/** Broad tags that pad a short post's list, in a fixed order. */
+const FALLBACK_HASHTAGS: readonly string[] = [
+  'socialmedia',
+  'marketing',
+  'community',
+  'smallbusiness',
+  'tips',
+  'growth',
+  'content',
+  'inspiration',
+  'behindthescenes',
+  'learning',
+  'creativity',
+  'teamwork',
+  'strategy',
+  'news',
+  'brand',
+];
+
+/** The post's most frequent longer words, then broad tags, as `#word`. */
+function simulateHashtags(user: string): { hashtags: string[] } {
+  const text = readBlock(user, 'Text') ?? '';
+  const count = readNumber(user, 'Count', 5);
+  const tally = new Map<string, { n: number; first: number }>();
+  (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).forEach((word, index) => {
+    if (word.length < 4 || HASHTAG_STOPWORDS.has(word) || /^\d+$/.test(word)) return;
+    const seen = tally.get(word);
+    if (seen) seen.n += 1;
+    else tally.set(word, { n: 1, first: index });
+  });
+  const words = [...tally.entries()]
+    .sort((a, b) => b[1].n - a[1].n || a[1].first - b[1].first)
+    .map(([word]) => word);
+  for (const fallback of FALLBACK_HASHTAGS) {
+    if (words.length >= count) break;
+    if (!words.includes(fallback)) words.push(fallback);
+  }
+  return { hashtags: words.slice(0, count).map((word) => `#${word}`) };
+}
+
+/** Pronoun swaps, longest first so "we are" is not read as "we". */
+const TO_COMPANY: ReadonlyArray<[RegExp, string]> = [
+  [/\bI am\b/g, 'we are'],
+  [/\bI'm\b/g, "we're"],
+  [/\bI've\b/g, "we've"],
+  [/\bI'll\b/g, "we'll"],
+  [/\bI was\b/g, 'we were'],
+  [/\bI\b/g, 'we'],
+  [/\b[Mm]yself\b/g, 'ourselves'],
+  [/\b[Mm]y\b/g, 'our'],
+  [/\b[Mm]e\b/g, 'us'],
+];
+
+const TO_PERSONAL: ReadonlyArray<[RegExp, string]> = [
+  [/\b[Ww]e are\b/g, 'I am'],
+  [/\b[Ww]e're\b/g, "I'm"],
+  [/\b[Ww]e've\b/g, "I've"],
+  [/\b[Ww]e'll\b/g, "I'll"],
+  [/\b[Ww]e were\b/g, 'I was'],
+  [/\b[Ww]e\b/g, 'I'],
+  [/\b[Oo]urselves\b/g, 'myself'],
+  [/\b[Oo]urs\b/g, 'mine'],
+  [/\b[Oo]ur\b/g, 'my'],
+  [/\b[Uu]s\b/g, 'me'],
+];
+
+/** The text with its pronouns turned to the voice, each sentence start capitalised. */
+function simulateRewrite(user: string): { rewrite: string } {
+  const text = readBlock(user, 'Text') ?? '';
+  const swaps = readTone(user) === 'company' ? TO_COMPANY : TO_PERSONAL;
+  let rewritten = text;
+  for (const [pattern, replacement] of swaps) rewritten = rewritten.replace(pattern, replacement);
+  rewritten = rewritten
+    .replace(
+      /(^|[.!?]\s+|\n)([a-z])/g,
+      (_match, lead: string, letter: string) => lead + letter.toUpperCase(),
+    )
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+  return { rewrite: rewritten.length > 0 ? rewritten : text };
+}
+
 function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   const keys = schemaKeys(schema);
   const brief = readBlock(user, 'Brief') ?? user;
@@ -644,6 +778,12 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
 
   if (keys.includes('summary') && keys.includes('recommendations')) {
     return simulateSeoAdvice(user);
+  }
+  if (keys.includes('hashtags')) {
+    return simulateHashtags(user);
+  }
+  if (keys.includes('rewrite')) {
+    return simulateRewrite(user);
   }
   if (keys.includes('category')) {
     return { category: classifyTopic(brief) };

@@ -58,6 +58,9 @@ describe('classifyTopic', () => {
 describe('subjectOf', () => {
   it('strips the request wrapper and dangling function words', () => {
     expect(subjectOf('Write a LinkedIn post about remote onboarding')).toBe('remote onboarding');
+    expect(subjectOf('Write about Spring sourdough')).toBe('spring sourdough');
+    expect(subjectOf('Write an article on onboarding')).toBe('onboarding');
+    expect(subjectOf('Draft threads about xylophones')).toBe('xylophones');
     expect(
       subjectOf('How small teams can keep a consistent posting schedule without burning out'),
     ).toBe('how small teams can keep a consistent posting schedule');

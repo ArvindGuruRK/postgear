@@ -74,9 +74,20 @@ export const httpProvider: ConnectionProvider<HttpCredentials> = {
   formEntry: true,
   helpLink: 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization',
   judge: async (input) => judgeHeaders(input),
-  /** Names only, never a value: "2 secret headers: Authorization, X-Api-Key". */
-  mask: ({ headers }) =>
-    `${headers.length} secret header${headers.length === 1 ? '' : 's'}: ${headers
-      .map((header) => header.name)
-      .join(', ')}`,
+  /**
+   * Each header's name, the value's scheme word when it has one, and at most
+   * its last 4 characters: "Authorization: Bearer ...9f2c, X-Api-Key: ...k999".
+   */
+  mask: ({ headers }) => headers.map(maskHeader).join(', '),
 };
+
+/** Values shorter than this show no characters at all: 4 would be too much of them. */
+const MIN_LENGTH_FOR_LAST4 = 12;
+
+export function maskHeader({ name, value }: { name: string; value: string }): string {
+  const [first, ...rest] = value.trim().split(/\s+/);
+  const scheme = rest.length > 0 && /^[A-Za-z][A-Za-z-]{1,15}$/.test(first) ? `${first} ` : '';
+  const secret = scheme ? rest.join(' ') : value.trim();
+  const tail = secret.length >= MIN_LENGTH_FOR_LAST4 ? secret.slice(-4) : '';
+  return `${name}: ${scheme}...${tail}`;
+}

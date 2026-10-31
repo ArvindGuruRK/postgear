@@ -29,6 +29,7 @@ import {
   AUTOMATION_AUTO_PAUSE_AFTER_FAILURES,
   AUTOMATION_FAILURE_ALERT_WINDOW_MS,
   AUTOMATION_NOTIFICATION_TYPES,
+  type AutomationStepError,
 } from '@postgear/scheduling';
 import { runLink } from './executors/in-app';
 import type { RunStore } from './run-store';
@@ -45,6 +46,12 @@ export interface LiveFailure {
   stepName: string | null;
   /** The run's one sentence. */
   reason: string | null;
+  /**
+   * The failed step's stored error, when one step's failure ended the run.
+   * Out of credits (Module 11) carries the cycle's reset date in
+   * `details.resetsAt`, from the API's credit ledger.
+   */
+  stepError?: AutomationStepError | null;
   finishedAt: Date;
 }
 
@@ -54,8 +61,33 @@ function sentence(text: string): string {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
+/** "1 December": the day a person can plan around, in UTC like the credit cycle. */
+const RESET_DAY = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+});
+
+/**
+ * "Credits reset on 1 December." when the run stopped because the
+ * workspace ran out of AI credits and the API said when the cycle resets.
+ * The API's credit cycle (`credits.policy.ts` `cycleFor`) is the only place
+ * that date is worked out; the gateway hands it over with the refusal.
+ */
+export function creditsResetSentence(error: AutomationStepError | null | undefined): string | null {
+  if (error?.code !== 'out_of_credits') return null;
+  const details = error.details;
+  if (typeof details !== 'object' || details === null) return null;
+  const resetsAt = (details as { resetsAt?: unknown }).resetsAt;
+  if (typeof resetsAt !== 'string') return null;
+  const date = new Date(resetsAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Credits reset on ${RESET_DAY.format(date)}.`;
+}
+
 function where(failure: LiveFailure): string {
-  const reason = sentence(failure.reason ?? NO_REASON);
+  const reset = creditsResetSentence(failure.stepError);
+  const reason = sentence(failure.reason ?? NO_REASON) + (reset ? ` ${reset}` : '');
   return failure.stepName ? `at ${failure.stepName}: ${reason}` : reason;
 }
 

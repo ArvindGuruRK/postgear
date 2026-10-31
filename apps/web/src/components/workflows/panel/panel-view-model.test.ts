@@ -16,6 +16,7 @@ import {
   locateDataError,
   neighbours,
   parsePinnedText,
+  receivedWebhookData,
   runsDryInTests,
   type StepRunResult,
   skippedSentence,
@@ -305,5 +306,49 @@ describe('the Test tab words', () => {
         'Error: The link was refused.',
       ].join('\n'),
     );
+  });
+});
+
+describe('buildScope with a Webhook sample (Module 13)', () => {
+  function blog(): AutomationGraph {
+    const template = getTemplate('blog-to-draft');
+    if (!template) throw new Error('missing template');
+    return instantiateTemplate(template, (key) => key);
+  }
+
+  it('uses the last data received over the built-in sample, as test runs do', () => {
+    const received = receivedWebhookData({
+      sample: { title: 'Real' },
+      sampleAt: '2026-11-03T09:00:00Z',
+    });
+    expect(received).toEqual({
+      body: { title: 'Real' },
+      receivedAt: '2026-11-03T09:00:00Z',
+      headers: { contentType: 'application/json' },
+    });
+    const { scope } = buildScope(blog(), [], undefined, {}, received);
+    expect(resolveValue('trigger.body.title', scope)).toBe('Real');
+    // Pinned data still wins.
+    const pinned = buildScope(
+      blog(),
+      [
+        {
+          nodeKey: 'blog',
+          pinnedAt: '2026-11-03T09:00:00Z',
+          output: { body: { title: 'Pinned' } },
+        },
+      ],
+      undefined,
+      {},
+      received,
+    );
+    expect(resolveValue('trigger.body.title', pinned.scope)).toBe('Pinned');
+  });
+
+  it('ignores nothing received, a list, and other triggers', () => {
+    expect(receivedWebhookData({ sample: null, sampleAt: null })).toBeUndefined();
+    expect(receivedWebhookData({ sample: [1, 2], sampleAt: null })).toBeUndefined();
+    const { scope } = buildScope(report(), [], undefined, {}, { body: { title: 'x' } });
+    expect(resolveValue('trigger.body', scope)).toBeUndefined();
   });
 });

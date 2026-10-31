@@ -48,6 +48,23 @@ export const FIELD_KINDS = [
   'toggle',
   /** The Manual trigger's input fields (label, type, required). */
   'manualInputs',
+  /**
+   * Media for a post (Module 10): a chip input that takes media from earlier
+   * steps (Generate Image's Image) plus Pick From Media for library items.
+   */
+  'media',
+  /** The publish platform's own settings form (`settingsFieldsFor`), for the provider at `providerPath`. */
+  'providerSettings',
+  /** Google Sheets (Module 13): Pick A Spreadsheet (Google Picker) or Create A New Spreadsheet. */
+  'spreadsheet',
+  /** Google Sheets: the tab, a select filled from the picked spreadsheet. */
+  'sheetTab',
+  /** Google Sheets: one chip input per header column, with Refresh Columns. */
+  'sheetColumns',
+  /** The Webhook trigger's link, secret and example (Module 13); edits no config. */
+  'webhookLink',
+  /** An IANA time zone, defaulted from the browser (Add To Queue). */
+  'timeZone',
 ] as const;
 
 export type FieldKind = (typeof FIELD_KINDS)[number];
@@ -110,12 +127,24 @@ export interface FieldSpec {
   lead?: string;
   /** `channels`, `tags`, `multiSelect`: what choosing nothing means ("Any channel"). */
   emptyLabel?: string;
+  /**
+   * `channels` and `providerSettings`: the config path holding the platform
+   * id; channels are limited to that platform (Publish To {Platform}).
+   */
+  providerPath?: string;
+  /** `media`: the sibling config path holding Media library ids picked with Pick From Media. */
+  libraryPath?: string;
 }
+
+/** The live message preview under a Notify step's Configure fields (Module 12). */
+export type MessagePreviewKind = 'slack' | 'teams' | 'discord' | 'email';
 
 export interface FormSpec {
   tabs: { setup: readonly FieldSpec[]; configure: readonly FieldSpec[] };
   /** Fixed sentences shown under the Configure fields ("A review waits up to 7 days."). */
   notes?: readonly string[];
+  /** Draws a live preview of the message under the Configure fields. */
+  preview?: MessagePreviewKind;
 }
 
 type FormOwner = Pick<NodeDefinition, 'form' | 'connection' | 'channels'>;
@@ -126,7 +155,14 @@ function within(base: string, path: string): boolean {
 
 /** True when `spec` edits the config at `path` or something inside it (a duration its unit too). */
 function covers(spec: FieldSpec, path: string): boolean {
-  return within(spec.path, path) || (spec.unitPath !== undefined && within(spec.unitPath, path));
+  return (
+    within(spec.path, path) ||
+    (spec.unitPath !== undefined && within(spec.unitPath, path)) ||
+    (spec.libraryPath !== undefined && within(spec.libraryPath, path)) ||
+    // The platform a Publish To card fixes has no control of its own; a
+    // problem with it lands on the channels (Setup) that depend on it.
+    (spec.providerPath !== undefined && within(spec.providerPath, path))
+  );
 }
 
 /**

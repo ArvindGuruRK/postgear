@@ -13,6 +13,7 @@ import {
   AutomationStatus,
   AutomationStepStatus,
   decrypt,
+  encrypt,
   NotificationEmailStatus,
   Prisma,
   type PrismaTransactionClient,
@@ -23,6 +24,7 @@ import type { RunRef } from './activity-contract';
 import type {
   AutomationRecord,
   AutomationRunSummary,
+  ChannelRecord,
   LiveRunRow,
   NewLiveRun,
   NotificationWrite,
@@ -256,6 +258,14 @@ export class PrismaRunStore implements RunStore {
     return result.count > 0;
   }
 
+  async addRunCredits(ref: RunRef, credits: number): Promise<void> {
+    if (credits <= 0) return;
+    await this.db.automationRun.updateMany({
+      where: { id: ref.runId, organizationId: ref.organizationId },
+      data: { creditsUsed: { increment: credits } },
+    });
+  }
+
   async cancelOpenSteps(ref: RunRef, finishedAt: Date): Promise<number> {
     const result = await this.db.automationRunStep.updateMany({
       where: {
@@ -285,6 +295,38 @@ export class PrismaRunStore implements RunStore {
         ],
       },
     });
+  }
+
+  async saveConnectionCredentials(
+    organizationId: string,
+    connectionId: string,
+    credentials: unknown,
+  ): Promise<void> {
+    await this.db.automationConnection.updateMany({
+      where: { id: connectionId, organizationId, deletedAt: null },
+      data: { credentials: encrypt(JSON.stringify(credentials)) },
+    });
+  }
+
+  async loadChannels(organizationId: string, ids: readonly string[]): Promise<ChannelRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db.integration.findMany({
+      where: { id: { in: [...ids] }, organizationId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        providerIdentifier: true,
+        postingTimes: true,
+        disabled: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      provider: row.providerIdentifier,
+      postingTimes: parsePostingTimes(row.postingTimes),
+      disabled: row.disabled,
+    }));
   }
 
   async loadConnection(
@@ -491,5 +533,26 @@ export class PrismaRunStore implements RunStore {
     }
     // Already inside one.
     return work(this);
+  }
+}
+
+/** `[{"time":120},...]` as minutes; anything unreadable is left out. */
+export function parsePostingTimes(raw: string | null): number[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) =>
+        typeof entry === 'object' && entry !== null
+          ? (entry as { time?: unknown }).time
+          : undefined,
+      )
+      .filter(
+        (time): time is number =>
+          typeof time === 'number' && Number.isInteger(time) && time >= 0 && time < 1440,
+      );
+  } catch {
+    return [];
   }
 }

@@ -16,11 +16,14 @@
  *   workspace. Reconnecting is a write: a member must never be able to
  *   overwrite a shared connection's tokens (n8n's CVE-2026-45732).
  *
- * Apps plug in through `CONNECTION_OAUTH_PLUGINS`. None ship in Module 04;
- * the specs use a fake.
+ * Apps plug in through `CONNECTION_OAUTH_PLUGINS`: Google (Module 13,
+ * `google/google-oauth.plugin.ts`) when a real Google client is configured.
+ * A grant the app gave but PostGear cannot use (no refresh token, file
+ * access unticked) lands back with `connectError=failed`; the reason goes to
+ * the log, never into the address bar.
  */
 import { randomBytes } from 'node:crypto';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { ConnectionKind } from '@postgear/automation';
 import { Role } from '@postgear/db';
@@ -82,6 +85,7 @@ export function withQuery(path: string, values: Record<string, string>): string 
 
 @Injectable()
 export class ConnectionOAuthService {
+  private readonly logger = new Logger(ConnectionOAuthService.name);
   private readonly apiUrl: string;
   private readonly webUrl: string;
 
@@ -164,9 +168,19 @@ export class ConnectionOAuthService {
         handshake.connectionId,
       );
       return this.back(handshake.returnTo, { connection: saved.id });
-    } catch {
+    } catch (error) {
       // The reason may hold the app's own error text; the person gets a
-      // plain retry message instead.
+      // plain retry message instead. Only our own refusals are logged by name.
+      if (error instanceof Error && error.name === 'OAuthGrantRefused') {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'automation.connection.oauth_refused',
+            provider: plugin.provider,
+            orgId: handshake.orgId,
+            reason: error.message,
+          }),
+        );
+      }
       return fail('failed');
     }
   }

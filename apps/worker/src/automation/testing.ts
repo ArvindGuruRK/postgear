@@ -18,6 +18,7 @@ import type { Client } from '@temporalio/client';
 import { createAutomationActivities } from '../activities/automation.activities';
 import type { ActivityDeps } from '../activities/deps';
 import type { ExecutorRegistry } from './executors/types';
+import type { GatewayClient } from './gateway-client';
 import { MemoryRunStore, type SeedRun } from './memory-run-store';
 
 export const ORG = 'org_test';
@@ -86,6 +87,8 @@ export function harness(
   options: {
     simulation?: boolean;
     executors?: ExecutorRegistry;
+    /** The step gateway the executors call (posts, AI, email). */
+    gateway?: GatewayClient;
     /** What `deps.temporalClient()` returns (the auto-pause deletes a schedule through it). */
     temporalClient?: () => Promise<Client>;
   } = {},
@@ -119,6 +122,7 @@ export function harness(
     now: () => clock.now,
     attempt: () => attempt.value,
     ...(options.executors ? { executors: options.executors } : {}),
+    ...(options.gateway ? { gateway: options.gateway } : {}),
   });
   const ref = { runId: run.id ?? RUN_ID, organizationId: run.organizationId ?? ORG };
   return { store, activities, attempt, clock, ref, stepRef: (nodeKey) => ({ ...ref, nodeKey }) };

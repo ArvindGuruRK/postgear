@@ -221,7 +221,8 @@ describe('executeNodeActivity failures', () => {
       [step('trig1', 'trigger.manual'), step('image1', 'ai.generateImage', { name: 'Picture' })],
       [line('trig1', 'image1')],
     );
-    const h = harness(graph);
+    // Generate Image has an executor since Module 11; a registry without it stands in.
+    const h = harness(graph, {}, { executors: new Map() });
 
     await expect(h.activities.executeNodeActivity(h.stepRef('image1'))).rejects.toMatchObject({
       type: AUTOMATION_FAILURE_TYPES.permanent,

@@ -150,7 +150,11 @@ describe('sendWebhook', () => {
 
   it('reports a connection refusal as retryable', async () => {
     const outcome = await send({ url: 'http://127.0.0.1:1/hook' });
-    expect(outcome).toMatchObject({ outcome: 'retry', statusCode: null, error: 'Connection refused' });
+    expect(outcome).toMatchObject({
+      outcome: 'retry',
+      statusCode: null,
+      error: 'Connection refused',
+    });
   });
 
   it('refuses a URL the SSRF guard rejects before sending anything', async () => {
@@ -165,6 +169,35 @@ describe('sendWebhook', () => {
     });
     expect(resolved.outcome).toBe('unsafe');
     expect(received).toHaveLength(0);
+  });
+
+  it.each([
+    'http://localhost/hook',
+    'http://127.0.0.1/hook',
+    'https://192.168.1.10/hook',
+    'http://169.254.169.254/latest/meta-data',
+  ])('refuses %s with private URLs not allowed, sending nothing', async (url) => {
+    const outcome = await send({ url, allowPrivate: false });
+    expect(outcome.outcome).toBe('unsafe');
+    expect(received).toHaveLength(0);
+  });
+
+  it('treats a redirect as a refusal and never follows it', async () => {
+    handler = (req, res) => {
+      if (req.url === '/hook') {
+        res.statusCode = 302;
+        res.setHeader('location', 'http://169.254.169.254/latest/meta-data');
+        res.end();
+        return;
+      }
+      res.statusCode = 200;
+      res.end('followed');
+    };
+
+    const outcome = await send();
+
+    expect(outcome).toMatchObject({ outcome: 'rejected', statusCode: 302 });
+    expect(received.map((r) => r.url)).toEqual(['/hook']);
   });
 
   it('with private URLs allowed, still refuses a non-http scheme', async () => {

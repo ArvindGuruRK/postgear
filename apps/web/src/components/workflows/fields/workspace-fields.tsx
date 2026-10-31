@@ -5,16 +5,19 @@
  * picker), the workspace's channels (the composer's chips) and its post
  * tags. Each reads the workspace from the form's `FieldContext`.
  */
+import { platformById } from '@postgear/automation';
 import { Alert, Button, MultiSelect, Text } from '@postgear/ui';
 import { TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ChannelPicker } from '@/components/composer/channel-picker';
+import { ActionLink } from '@/components/home/home-actions';
 import { api } from '@/lib/api';
 import type { Channel } from '@/types/channel';
 import type { Tag } from '@/types/tag';
 import { ConnectionPicker } from '../connection-picker';
 import { useFieldEnv } from './field-env';
 import { asList, asText, type FieldControlProps } from './field-types';
+import { getAtPath } from './form-model';
 
 /** "None picked: any channel." under a filter that is empty on purpose. */
 function emptyWords(emptyLabel: string | undefined): string | undefined {
@@ -70,15 +73,52 @@ export function pickableChannels(
   );
 }
 
-export function ChannelsField({ spec, value, onChange, ids }: FieldControlProps) {
+/**
+ * The workspace's channels limited to one publish platform (Publish To
+ * {Platform}): a LinkedIn card covers profiles and Pages. Channels already
+ * picked stay listed, so one of another platform can still be taken off.
+ */
+export function channelsForPlatform(
+  channels: readonly Channel[],
+  platformId: string | undefined,
+  selected: readonly string[] = [],
+): Channel[] {
+  if (!platformId) return [...channels];
+  const providers = platformById(platformId)?.providers ?? [platformId];
+  return channels.filter(
+    (channel) => selected.includes(channel.id) || providers.includes(channel.providerIdentifier),
+  );
+}
+
+export function ChannelsField({ spec, config, value, onChange, ids }: FieldControlProps) {
   const env = useFieldEnv();
   const selected = asList<string>(value).filter((id) => typeof id === 'string');
-  const channels = env?.context.channels ?? [];
-  const known = new Set(channels.map((channel) => channel.id));
+  const all = env?.context.channels ?? [];
+  const known = new Set(all.map((channel) => channel.id));
   const removed = selected.filter((id) => !known.has(id));
+  const platformId =
+    spec.providerPath !== undefined ? asText(getAtPath(config, spec.providerPath)) : undefined;
+  const platform = platformId ? platformById(platformId) : undefined;
+  const channels = channelsForPlatform(all, platformId, selected);
+  const pickable = pickableChannels(channels, selected);
+  const orgId = env?.context.orgId ?? '';
   const write = (next: string[]) => onChange(spec.path, next);
   const toggle = (id: string) =>
     write(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
+
+  if (platformId && pickable.length === 0) {
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: names the notice in place of the channel chips
+      <div role="group" aria-labelledby={ids.label} aria-describedby={ids.message}>
+        <Alert variant="info" className="flex-wrap items-center gap-2 p-3">
+          <span className="flex-1">
+            No {platform?.title ?? 'channel'} channel is connected to this workspace yet.
+          </span>
+          <ActionLink href={`/${orgId}/channels`}>Connect A Channel</ActionLink>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: names the composer's channel chips
@@ -88,12 +128,7 @@ export function ChannelsField({ spec, value, onChange, ids }: FieldControlProps)
       aria-describedby={ids.message}
       className="flex flex-col gap-2"
     >
-      <ChannelPicker
-        orgId={env?.context.orgId ?? ''}
-        channels={pickableChannels(channels, selected)}
-        selected={selected}
-        onToggle={toggle}
-      />
+      <ChannelPicker orgId={orgId} channels={pickable} selected={selected} onToggle={toggle} />
       {selected.length === 0 && emptyWords(spec.emptyLabel) ? (
         <Text size="xs" muted>
           {emptyWords(spec.emptyLabel)}

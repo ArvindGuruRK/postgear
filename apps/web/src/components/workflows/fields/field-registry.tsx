@@ -19,7 +19,12 @@ import { CasesBuilder } from './cases-builder';
 import { ConditionBuilder } from './condition-builder';
 import type { FieldControlProps } from './field-types';
 import { KeyValueList, ManualInputsEditor, RecipientsInput } from './list-fields';
+import { MediaField } from './media-field';
+import { ProviderSettingsField, settingsFieldsOf } from './provider-settings-field';
 import { ScheduleBuilder } from './schedule-builder';
+import { SheetColumnsField, SheetTabField, SpreadsheetField } from './sheets-fields';
+import { TimeZoneField } from './time-zone-field';
+import { WebhookLinkField } from './webhook-field';
 import { ChannelsField, ConnectionField, TagsField } from './workspace-fields';
 
 function ConditionField({ spec, value, onChange, errors, ids }: FieldControlProps) {
@@ -43,6 +48,11 @@ export interface FieldKindEntry {
    * toggle), `group` names a group of controls by the label's id.
    */
   label: (spec: FieldSpec) => 'for' | 'beside' | 'group';
+  /**
+   * Whether the field shows at all for this config, past its `showIf`: a
+   * platform without settings draws no Settings field. Shown when left out.
+   */
+  shown?: (spec: FieldSpec, config: Record<string, unknown>) => boolean;
 }
 
 export const FIELD_REGISTRY: Readonly<Record<FieldKind, FieldKindEntry>> = {
@@ -62,4 +72,15 @@ export const FIELD_REGISTRY: Readonly<Record<FieldKind, FieldKindEntry>> = {
   number: { Control: NumberField, label: () => 'for' },
   toggle: { Control: ToggleField, label: () => 'beside' },
   manualInputs: { Control: ManualInputsEditor, label: () => 'group' },
+  media: { Control: MediaField, label: () => 'group' },
+  providerSettings: {
+    Control: ProviderSettingsField,
+    label: () => 'group',
+    shown: (spec, config) => settingsFieldsOf(spec, config).length > 0,
+  },
+  spreadsheet: { Control: SpreadsheetField, label: () => 'group' },
+  sheetTab: { Control: SheetTabField, label: () => 'for' },
+  sheetColumns: { Control: SheetColumnsField, label: () => 'group' },
+  webhookLink: { Control: WebhookLinkField, label: () => 'group' },
+  timeZone: { Control: TimeZoneField, label: () => 'group' },
 };

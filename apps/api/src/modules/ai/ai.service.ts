@@ -302,18 +302,12 @@ export class AiService {
       chosen.push(channel);
     }
 
-    const limits = new Map(
-      this.channels
-        .listProviders()
-        .map((provider) => [provider.identifier, provider.rules.maxLength]),
-    );
     const platforms = [...new Set(chosen.map((channel) => channel.providerIdentifier))];
-    const known = platforms.flatMap((platform) => {
-      const limit = limits.get(platform);
-      return limit === undefined ? [] : [limit];
-    });
 
-    return { platforms, maxCharacters: known.length > 0 ? Math.min(...known) : null };
+    return {
+      platforms,
+      maxCharacters: strictestLimit(this.channels.listProviders(), platforms),
+    };
   }
 
   /**
@@ -344,6 +338,25 @@ export class AiService {
       this.logger.warn(line);
     }
   }
+}
+
+/**
+ * The strictest composer limit among `identifiers` (social-core provider
+ * identifiers), or null when none of them is known. Shared with the
+ * workflow AI steps (Sprint 10), which name a platform rather than channels.
+ */
+export function strictestLimit(
+  providers: ReadonlyArray<{ identifier: string; rules: { maxLength: number } }>,
+  identifiers: readonly string[],
+): number | null {
+  const limits = new Map(
+    providers.map((provider) => [provider.identifier, provider.rules.maxLength]),
+  );
+  const known = identifiers.flatMap((identifier) => {
+    const limit = limits.get(identifier);
+    return limit === undefined ? [] : [limit];
+  });
+  return known.length > 0 ? Math.min(...known) : null;
 }
 
 /** One line per channel, for the copilot's system prompt. */

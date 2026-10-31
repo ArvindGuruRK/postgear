@@ -617,27 +617,27 @@ describe('AutomationsService', () => {
   });
 
   describe('validate and catalog', () => {
-    it('reports node.not_runnable for the steps the worker cannot run yet', async () => {
+    it('reports no node.not_runnable once every step has an executor (Modules 10 to 13)', async () => {
       const result = await service.validate(ORG, ID);
       const notRunnable = result.issues.filter((issue) => issue.code === 'node.not_runnable');
-      // Module 07 runs the trigger and Set Fields; Slack and Sheets arrive later.
-      expect(notRunnable.length).toBe(2);
+      expect(notRunnable).toEqual([]);
+      // Slack and Sheets still have no connection picked.
       expect(result.blocking).toBe(true);
     });
 
-    it('marks steps ready but not runnable, Slack as needing a connection, Video as coming soon', async () => {
+    it('marks steps ready and runnable, Slack as needing a connection, Video as coming soon', async () => {
       const { steps, connectedPlatforms } = await service.catalog(ORG);
       const byType = new Map(steps.map((step) => [step.type, step]));
 
       expect(byType.get('logic.setFields')).toMatchObject({ state: 'ready', runnable: true });
       expect(byType.get('postgear.createDraft')).toMatchObject({
         state: 'ready',
-        runnable: false,
-        reason: 'Create Draft cannot run yet in this version of PostGear.',
+        runnable: true,
+        reason: null,
       });
       expect(byType.get('notify.slack')).toMatchObject({
         state: 'needsConnection',
-        runnable: false,
+        runnable: true,
         reason: 'Connect Slack first.',
       });
       expect(byType.get('data.googleSheetsAppendRow')).toMatchObject({ state: 'needsConnection' });
@@ -665,7 +665,8 @@ describe('AutomationsService', () => {
       const working = await service.catalog(ORG);
       expect(working.steps.find((step) => step.type === 'notify.slack')).toMatchObject({
         state: 'ready',
-        reason: 'Slack cannot run yet in this version of PostGear.',
+        runnable: true,
+        reason: null,
       });
     });
 
@@ -831,8 +832,8 @@ describe('AutomationsService', () => {
       expect(triggers.start).not.toHaveBeenCalled();
     });
 
-    it('is blocked by every error, steps this workspace cannot run yet included', async () => {
-      // Slack has no executor yet (Module 12), and no connection is chosen.
+    it('is blocked by every error, a missing connection included', async () => {
+      // No Slack connection is chosen.
       const graph = chain(
         node('trig01', 'trigger.manual'),
         node('slack1', 'notify.slack', { connectionId: '', message: 'Hi', footer: true }),
@@ -842,7 +843,8 @@ describe('AutomationsService', () => {
         list: connectionRows,
       } as unknown as ConnectionsRepository).forOrg(ORG);
       const errors = validateGraph(graph, context).filter((issue) => issue.severity === 'error');
-      expect(errors.map((issue) => issue.code)).toContain('node.not_runnable');
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors.map((issue) => issue.code)).not.toContain('node.not_runnable');
 
       await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
         status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -1111,6 +1113,133 @@ describe('AutomationsService', () => {
         'Version not found',
       );
       expect(restoreVersionSchema.safeParse({ draftRevision: 3, graph: {} }).success).toBe(false);
+    });
+  });
+
+  describe('edge cases (Module 14)', () => {
+    function draftOf(graph: AutomationGraph) {
+      repository.find.mockResolvedValue(
+        row({ draftGraph: graph as unknown as AutomationRow['draftGraph'] }),
+      );
+    }
+
+    async function expectActivationBlocked() {
+      await expect(service.activate(ORG, USER, ID, { draftRevision: 3 })).rejects.toMatchObject({
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        response: { code: 'activation_blocked' },
+      });
+      expect(repository.activate).not.toHaveBeenCalled();
+    }
+
+    it('marks a step whose channel is disconnected, and that blocks turning it on', async () => {
+      repository.channels.mockResolvedValue([
+        {
+          id: 'ch1',
+          name: 'Acme Page',
+          providerIdentifier: 'linkedin-page',
+          disabled: false,
+          refreshNeeded: true,
+          inBetweenSteps: false,
+        },
+      ]);
+      draftOf(
+        chain(
+          node('trig01', 'trigger.manual'),
+          node('drft01', 'postgear.createDraft', { channels: ['ch1'], text: 'Hello' }),
+        ),
+      );
+
+      const { issues, blocking } = await service.validate(ORG, ID);
+      expect(blocking).toBe(true);
+      expect(issues).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          code: 'node.channel_missing',
+          nodeKey: 'drft01',
+          field: 'channels',
+          message: 'Acme Page is disconnected. Reconnect it on the Channels page.',
+        }),
+      );
+      await expectActivationBlocked();
+    });
+
+    it('marks data from a deleted earlier step, and refuses to turn the workflow on', async () => {
+      draftOf(
+        chain(
+          node('trig01', 'trigger.manual'),
+          node('bell01', 'notify.inApp', {
+            title: 'Hello',
+            message: 'Text: {{ nodes.gone01.output.text }}',
+          }),
+        ),
+      );
+
+      const { issues } = await service.validate(ORG, ID);
+      expect(issues).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          code: 'token.unknown_node',
+          nodeKey: 'bell01',
+          message: 'This data is no longer available.',
+        }),
+      );
+      await expectActivationBlocked();
+    });
+
+    it('refuses to turn on a 51st step', async () => {
+      const bells = Array.from({ length: 50 }, (_, i) =>
+        node(`bell${String(i).padStart(2, '0')}`, 'notify.inApp', {
+          title: 'Hello',
+          message: 'World',
+        }),
+      );
+      const fifty = chain(node('trig01', 'trigger.manual'), ...bells.slice(1));
+      const fiftyOne = chain(node('trig01', 'trigger.manual'), ...bells);
+      expect(fifty.nodes).toHaveLength(50);
+      expect(fiftyOne.nodes).toHaveLength(51);
+
+      draftOf(fifty);
+      const fine = await service.validate(ORG, ID);
+      expect(fine.issues.map((issue) => issue.code)).not.toContain('graph.too_many_nodes');
+
+      draftOf(fiftyOne);
+      const { issues } = await service.validate(ORG, ID);
+      expect(issues).toContainEqual(
+        expect.objectContaining({
+          severity: 'error',
+          code: 'graph.too_many_nodes',
+          message: 'Workflows can have up to 50 steps.',
+        }),
+      );
+      await expectActivationBlocked();
+    });
+
+    it('refuses an unknown key in the body, and a secret under an unknown settings key', async () => {
+      expect(
+        updateAutomationSchema.safeParse({ draftRevision: 3, name: 'x', status: 'ACTIVE' }).success,
+      ).toBe(false);
+
+      const graph = cleanGraph();
+      graph.nodes[1].config = { ...graph.nodes[1].config, apiKey: 'abc123abc123abc123' };
+      await expect(
+        service.update(ORG, USER, ID, { draftRevision: 3, draftGraph: graph }),
+      ).rejects.toMatchObject({ response: { code: 'secret_in_step' } });
+      expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it('saves a harmless unknown settings key as a draft problem that blocks turning on', async () => {
+      const graph = cleanGraph();
+      graph.nodes[1].config = { ...graph.nodes[1].config, colour: 'blue' };
+      await expect(
+        service.update(ORG, USER, ID, { draftRevision: 3, draftGraph: graph }),
+      ).resolves.toMatchObject({ draftRevision: 4 });
+
+      draftOf(graph);
+      const { issues } = await service.validate(ORG, ID);
+      expect(issues).toContainEqual(
+        expect.objectContaining({ code: 'node.config_invalid', nodeKey: 'bell01' }),
+      );
+      await expectActivationBlocked();
     });
   });
 });

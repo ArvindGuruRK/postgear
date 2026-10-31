@@ -14,12 +14,20 @@
  *   in Module 12).
  * - **Delete is refused while a running workflow uses the connection**,
  *   naming them. Drafts that use it simply get a validation issue.
+ * - **Google** (Module 13) is connected by signing in only. Under
+ *   `AUTOMATION_SIMULATION=true` an admin may also add a simulated Google
+ *   account (`{ simulated: true }`), so the Sheets step can be tried without
+ *   real keys; otherwise that is 422 `google_needs_oauth`. Check Connection
+ *   on a real Google account refreshes its token: a real read.
  */
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   NotFoundException,
+  Optional,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type ConnectionKind, connectionKindInfo } from '@postgear/automation';
@@ -33,7 +41,10 @@ import {
   MAX_CONNECTIONS_PER_WORKSPACE,
   type UpdateConnectionInput,
 } from './dto/connections.schema';
+import { googleReadyFrom } from './google/google-config';
+import { GoogleSheetsService } from './google/google-sheets.service';
 import { type ConnectionProvider, type JudgeOptions, providerFor } from './providers';
+import { isSimulatedGoogle, SIMULATED_GOOGLE_EMAIL } from './providers/google.provider';
 
 export interface SafeConnection {
   id: string;
@@ -86,17 +97,38 @@ export function toSafeConnection(row: ConnectionRow, usage?: ConnectionUsage): S
   };
 }
 
+/** What the Connections page needs to know about this PostGear install. */
+export interface ConnectionSettings {
+  /** AUTOMATION_SIMULATION: a simulated Google account may be added. */
+  simulation: boolean;
+  /** A real Google client id and secret are configured. */
+  googleReady: boolean;
+}
+
 @Injectable()
 export class ConnectionsService {
   private readonly judgeOptions: JudgeOptions;
+  readonly settings: ConnectionSettings;
 
   constructor(
     private readonly repository: ConnectionsRepository,
     private readonly context: AutomationContextService,
     config: ConfigService<Env, true>,
+    @Optional() private readonly google?: GoogleSheetsService,
   ) {
     this.judgeOptions = {
       allowPrivate: config.get('WEBHOOK_ALLOW_PRIVATE_URLS', { infer: true }) === 'true',
+    };
+    this.settings = {
+      simulation: config.get('AUTOMATION_SIMULATION', { infer: true }) === 'true',
+      googleReady: googleReadyFrom({
+        GOOGLE_AUTOMATION_CLIENT_ID: config.get('GOOGLE_AUTOMATION_CLIENT_ID', { infer: true }),
+        GOOGLE_AUTOMATION_CLIENT_SECRET: config.get('GOOGLE_AUTOMATION_CLIENT_SECRET', {
+          infer: true,
+        }),
+        GOOGLE_CLIENT_ID: config.get('GOOGLE_CLIENT_ID', { infer: true }),
+        GOOGLE_CLIENT_SECRET: config.get('GOOGLE_CLIENT_SECRET', { infer: true }),
+      }),
     };
   }
 
@@ -114,6 +146,25 @@ export class ConnectionsService {
     input: CreateConnectionInput,
   ): Promise<SafeConnection> {
     const provider = this.provider(input.provider);
+    if (provider.kind === 'google') {
+      if (this.settings.simulation && isSimulatedGoogle(input.credentials)) {
+        return this.insert(
+          orgId,
+          userId,
+          provider,
+          input.name,
+          { simulated: true },
+          {
+            simulated: true,
+            email: SIMULATED_GOOGLE_EMAIL,
+          },
+        );
+      }
+      throw new UnprocessableEntityException({
+        message: CONNECTION_MESSAGES.OAUTH_ONLY(this.title(provider.kind)),
+        code: 'google_needs_oauth',
+      });
+    }
     if (!provider.formEntry) {
       throw new BadRequestException(CONNECTION_MESSAGES.OAUTH_ONLY(this.title(provider.kind)));
     }
@@ -213,14 +264,53 @@ export class ConnectionsService {
     const verdict = await provider.judge(stored, this.judgeOptions);
     if (!verdict.ok) return this.recordFailure(orgId, userId, id, verdict.message);
 
+    // The ciphertext never travels further than this line.
+    const { credentials: _secret, ...safe } = row;
+    if (provider.kind === 'google') return this.checkGoogle(orgId, userId, safe, stored);
+
     const message =
       provider.check === 'send'
         ? CONNECTION_MESSAGES.CHECK_SEND(app)
         : provider.check === 'none'
           ? CONNECTION_MESSAGES.CHECK_NONE
           : CONNECTION_MESSAGES.CHECK_LATER(app);
-    const { credentials: _secret, ...safe } = row;
     return { connection: await this.withUsage(orgId, safe), message };
+  }
+
+  /** A real Google account is checked by refreshing its token; a simulated one has nothing to check. */
+  private async checkGoogle(
+    orgId: string,
+    userId: string,
+    row: ConnectionRow,
+    stored: unknown,
+  ): Promise<CheckResult> {
+    if (isSimulatedGoogle(stored) || !this.google) {
+      return {
+        connection: await this.withUsage(orgId, row),
+        message: isSimulatedGoogle(stored)
+          ? CONNECTION_MESSAGES.CHECK_SIMULATED
+          : CONNECTION_MESSAGES.CHECK_LATER(this.title('google')),
+      };
+    }
+    try {
+      await this.google.accessToken(orgId, row.id, true);
+    } catch (error) {
+      const message =
+        error instanceof HttpException
+          ? String((error.getResponse() as { message?: unknown }).message ?? error.message)
+          : CONNECTION_MESSAGES.GOOGLE_UNAVAILABLE;
+      const current = await this.repository.find(orgId, row.id);
+      return { connection: await this.withUsage(orgId, this.ensure(current)), message };
+    }
+    const updated = await this.repository.update(orgId, row.id, userId, {
+      status: 'CONNECTED',
+      lastError: null,
+      lastCheckedAt: new Date(),
+    });
+    return {
+      connection: await this.withUsage(orgId, this.ensure(updated)),
+      message: CONNECTION_MESSAGES.CHECK_GOOGLE_OK,
+    };
   }
 
   private async recordFailure(orgId: string, userId: string, id: string, message: string) {

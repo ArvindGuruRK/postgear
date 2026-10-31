@@ -11,6 +11,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AutomationsModule } from './modules/automations/automations.module';
+import { AutomationGatewayModule } from './modules/automations/gateway/automation-gateway.module';
 import { AutomationRunsModule } from './modules/automations/runs/automation-runs.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
@@ -25,8 +26,8 @@ import { OrgModule } from './modules/org/org.module';
 import { PostsModule } from './modules/posts/posts.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { SchedulingModule } from './modules/scheduling/scheduling.module';
-import { SeoModule } from './modules/seo/seo.module';
 import { SearchModule } from './modules/search/search.module';
+import { SeoModule } from './modules/seo/seo.module';
 import { SignaturesModule } from './modules/signatures/signatures.module';
 import { StudioModule } from './modules/studio/studio.module';
 import { TagsModule } from './modules/tags/tags.module';
@@ -99,6 +100,7 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     AutomationsModule,
     // Sprint 10, Module 07: test runs, run history, live progress, cancel, review.
     AutomationRunsModule,
+    AutomationGatewayModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

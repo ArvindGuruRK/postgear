@@ -43,3 +43,34 @@ export const oauthStartQuerySchema = z
   .strict();
 
 export type OAuthStartQuery = z.infer<typeof oauthStartQuerySchema>;
+
+/** A Google spreadsheet id as Google makes them (and the simulated ones). */
+export const spreadsheetParamsSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    spreadsheetId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/),
+  })
+  .strict();
+
+export type SpreadsheetParams = z.infer<typeof spreadsheetParamsSchema>;
+
+export const sheetHeaderQuerySchema = z
+  .object({
+    /** The tab's title. */
+    sheet: z.string().min(1).max(200),
+  })
+  .strict();
+
+export type SheetHeaderQuery = z.infer<typeof sheetHeaderQuerySchema>;
+
+export const MAX_SHEET_HEADERS = 50;
+
+/** Create A New Spreadsheet: its name and the header row to start with. */
+export const createSpreadsheetSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    headers: z.array(z.string().trim().max(200)).max(MAX_SHEET_HEADERS),
+  })
+  .strict();
+
+export type CreateSpreadsheetInput = z.infer<typeof createSpreadsheetSchema>;

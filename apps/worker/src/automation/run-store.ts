@@ -56,6 +56,17 @@ export interface RunChange {
   stepCount?: number;
 }
 
+/** A channel as a posting step's dry run describes it. */
+export interface ChannelRecord {
+  id: string;
+  name: string;
+  /** `providerIdentifier`: 'instagram', 'linkedin-page', ... */
+  provider: string;
+  /** Minutes since local midnight (`Integration.postingTimes`), parsed; [] when unreadable. */
+  postingTimes: number[];
+  disabled: boolean;
+}
+
 /** One attempt of one step. */
 export interface StepRecord {
   runId: string;
@@ -198,6 +209,8 @@ export interface RunStore {
     from: readonly AutomationStepStatus[],
     change: StepChange,
   ): Promise<boolean>;
+  /** Adds AI credits a step used to the run's `creditsUsed` (Module 11). */
+  addRunCredits(ref: RunRef, credits: number): Promise<void>;
   /** Marks every QUEUED, RUNNING or WAITING row of the run CANCELLED. Returns how many. */
   cancelOpenSteps(ref: RunRef, finishedAt: Date): Promise<number>;
   /**
@@ -207,6 +220,20 @@ export interface RunStore {
   countLiveRunsAhead(run: { id: string; organizationId: string; startedAt: Date }): Promise<number>;
   /** The connection with its credentials decrypted; null when missing or deleted. */
   loadConnection(organizationId: string, connectionId: string): Promise<StoredConnection | null>;
+  /**
+   * Writes new credentials for a connection (encrypted), for a provider that
+   * refreshes its own token (Google Sheets, Module 13). Leaves the status.
+   */
+  saveConnectionCredentials(
+    organizationId: string,
+    connectionId: string,
+    credentials: unknown,
+  ): Promise<void>;
+  /**
+   * The workspace's channels among `ids` (not deleted), for the plain-words
+   * line a posting step's dry run shows (Module 10). Unknown ids are left out.
+   */
+  loadChannels(organizationId: string, ids: readonly string[]): Promise<ChannelRecord[]>;
   /** The app refused the credentials: the Connections page asks for a reconnect. */
   markConnectionBroken(
     organizationId: string,

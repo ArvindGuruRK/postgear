@@ -115,6 +115,32 @@ describe('automation schedules', () => {
     await expect(deleteAutomationSchedule(client, 'a')).resolves.toBe(false);
   });
 
+  it('pause then resume: the schedule is deleted, then made fresh, so missed times never run', async () => {
+    const temporal = fakeTemporal({ 'automation-schedule:daily': { versionId: 'daily_v1' } });
+    const daily: ActiveScheduledAutomation = {
+      automationId: 'daily',
+      organizationId: 'o',
+      versionId: 'daily_v1',
+      graph: scheduleGraph(),
+    };
+
+    // Paused: no longer ACTIVE, so its schedule goes (a paused Temporal
+    // schedule would keep its missed times and could catch up on resume).
+    await reconcileAutomationSchedules(temporal.client, async () => []);
+    expect(temporal.schedules.has('automation-schedule:daily')).toBe(false);
+
+    // Turned back on: a brand-new schedule with SKIP overlap and a one
+    // minute catch-up window, so nothing from the paused days is started.
+    await reconcileAutomationSchedules(temporal.client, async () => [daily]);
+    expect(temporal.created).toHaveLength(1);
+    expect(temporal.created[0]).toMatchObject({
+      scheduleId: 'automation-schedule:daily',
+      policies: { overlap: ScheduleOverlapPolicy.SKIP, catchupWindow: 60_000 },
+    });
+    expect(temporal.created[0]).not.toHaveProperty('state');
+    expect(temporal.created[0]).not.toHaveProperty('spec.startAt');
+  });
+
   it('reconciles: missing made, outdated replaced, stale deleted, current kept', async () => {
     const temporal = fakeTemporal({
       'automation-schedule:current': { versionId: 'current_v1' },

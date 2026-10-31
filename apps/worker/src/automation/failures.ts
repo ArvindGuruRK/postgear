@@ -30,6 +30,12 @@ export const TIMEOUT_MESSAGE = 'This step took too long.';
 
 export class StepFailure extends Error {
   readonly code: string;
+  /**
+   * Retryable failures only: when the app asked PostGear to come back
+   * (`Retry-After`, capped by the provider). Temporal's next retry waits this
+   * long instead of the policy's backoff; the attempt count is unchanged.
+   */
+  retryAfterMs?: number;
 
   constructor(
     readonly kind: FailureKind,
@@ -99,13 +105,24 @@ export function toStepFailure(error: unknown): StepFailure {
   return new StepFailure('retryable', UNEXPECTED_MESSAGE, 'unexpected', { name, message });
 }
 
-/** What the activity throws: Temporal retries only `retryable`. */
-export function toApplicationFailure(kind: FailureKind, stepError: AutomationStepError) {
+/**
+ * What the activity throws: Temporal retries only `retryable`, after
+ * `retryAfterMs` when the app named a wait.
+ */
+export function toApplicationFailure(
+  kind: FailureKind,
+  stepError: AutomationStepError,
+  retryAfterMs?: number,
+) {
   const type = AUTOMATION_FAILURE_TYPES[kind];
+  const nonRetryable = NON_RETRYABLE_AUTOMATION_FAILURES.includes(type);
   return ApplicationFailure.create({
     type,
     message: stepError.message,
-    nonRetryable: NON_RETRYABLE_AUTOMATION_FAILURES.includes(type),
+    nonRetryable,
     details: [{ code: stepError.code }],
+    ...(!nonRetryable && retryAfterMs !== undefined && retryAfterMs > 0
+      ? { nextRetryDelay: retryAfterMs }
+      : {}),
   });
 }

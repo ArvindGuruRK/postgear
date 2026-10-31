@@ -139,6 +139,8 @@ export interface AiCredits {
     copilot_message: number;
     /** Sprint 7: AI advice on an SEO audit. */
     seo_advice: number;
+    /** Sprint 10: a workflow's Generate Hashtags or Rewrite In Brand Voice step. */
+    generate_snippet: number;
   };
 }
 

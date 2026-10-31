@@ -22,7 +22,7 @@ import {
   topologicalOrder,
   triggerSample,
 } from '@postgear/automation';
-import type { AutomationStepStatus, PinnedStep, RunStep } from '@/types/workflows';
+import type { AutomationStepStatus, PinnedStep, RunStep, WebhookInfo } from '@/types/workflows';
 import type { DataSource } from '../fields/contract';
 
 // ---- Copy ----------------------------------------------------------------------------
@@ -69,21 +69,42 @@ export function handsDataOn(result: StepRunResult | undefined): result is StepRu
 }
 
 /**
+ * The Webhook trigger's saved sample (Module 13, `GET /automations/:id/webhook`)
+ * as the trigger's data, shaped the way the API's `sampleTriggerOutput`
+ * hands it to test runs. `undefined` when nothing usable has arrived yet.
+ */
+export function receivedWebhookData(
+  info: Pick<WebhookInfo, 'sample' | 'sampleAt'> | null | undefined,
+): Record<string, unknown> | undefined {
+  const sample = info?.sample;
+  if (!sample || typeof sample !== 'object' || Array.isArray(sample)) return undefined;
+  return {
+    body: sample,
+    ...(info?.sampleAt ? { receivedAt: info.sampleAt } : {}),
+    headers: { contentType: 'application/json' },
+  };
+}
+
+/**
  * Data for chips, Insert Data and the Input pane: each step's pinned data
  * when this browser knows it, else its output in the last test run (Module
- * 08), else the built-in sample (Module 02). `scopeSource` says where each
- * step's data came from, keyed by step key (and `trigger` for the trigger).
+ * 08), else the built-in sample (Module 02). A Webhook trigger's sample is
+ * the last data it received (`received`, Module 13) when there is one, as
+ * in test runs. `scopeSource` says where each step's data came from, keyed
+ * by step key (and `trigger` for the trigger).
  */
 export function buildScope(
   graph: AutomationGraph,
   pinned: readonly PinnedStep[],
   workspaceName?: string,
   lastTest: Readonly<Record<string, StepRunResult>> = {},
+  received?: Record<string, unknown>,
 ): { scope: RunScope; scopeSource: Record<string, DataSource> } {
   const base = sampleScope(graph, workspaceName);
   const trigger = graph.nodes.find((node) => isTriggerType(node.type));
   const nodes: Record<string, { output?: unknown } | undefined> = { ...(base.nodes ?? {}) };
-  let triggerData = base.trigger;
+  let triggerData =
+    trigger?.type === 'trigger.webhook' && received !== undefined ? received : base.trigger;
   const scopeSource: Record<string, DataSource> = {};
   for (const node of graph.nodes) {
     scopeSource[node.key] = { kind: 'sample' };

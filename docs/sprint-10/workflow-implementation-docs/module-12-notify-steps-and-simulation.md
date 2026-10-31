@@ -1,6 +1,6 @@
 # Module 12: Notify Steps And Simulation
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: M (one session)
+> **Sprint 10, Workflow Builder** | Status: Done with gaps (2026-10-31) | Size: M (one session)
 > **Depends on**: [Module 09](module-09-triggers-activation-versions.md); Module 04 (Slack, Teams and Discord connections); Module 07 (provider interface, `AUTOMATION_SIMULATION`, dry runs); Module 10 (the internal step gateway, for Email)
 > **Stories**: WF-11.1 (done in 07, checked here), WF-11.2 (Slack P0, Teams and Discord P1), WF-11.3 (P1), WF-12.1 (grouping, checked here), Journey C, Journey D (Slack retries)
 > **Next**: [Module 13](module-13-sheets-http-and-webhook.md)
@@ -131,14 +131,14 @@ Built from design-system parts in PostGear's look (a recognisable layout, not th
 
 ## Tasks
 
-- [ ] `safe-http.ts`; `sendWebhook` rewritten on top; existing webhook tests green.
-- [ ] Simulation stand-in base using `parseSimulationDirective` and `currentAttempt`.
-- [ ] Slack, Teams, Discord providers with escaping, caps, success checks and the retry table.
-- [ ] Connection URL shape checks and help links for the three apps (confirm Module 04).
-- [ ] Gateway `/email` route with the daily cap and effect-based recipient tracking.
-- [ ] Catalog: mark the four types executable.
-- [ ] Web: Configure fields, previews, Teams help text, the "posts as the Workflows bot" note.
-- [ ] Failed Post Alert: test and live run under simulation.
+- [x] `safe-http.ts`; `sendWebhook` rewritten on top; existing webhook tests green.
+- [x] Simulation stand-in base using `parseSimulationDirective` and `currentAttempt`.
+- [x] Slack, Teams, Discord providers with escaping, caps, success checks and the retry table.
+- [x] Connection URL shape checks and help links for the three apps (confirm Module 04).
+- [x] Gateway `/email` route with the daily cap and effect-based recipient tracking.
+- [x] Catalog: mark the four types executable.
+- [x] Web: Configure fields, previews, Teams help text, the "posts as the Workflows bot" note. (Catalog side done: forms, `preview` on all four, Teams notes; web side done: Slack, Teams, Discord and email previews with the Discord counter, Simulated sticker on connections.)
+- [ ] Failed Post Alert: test and live run under simulation. (Test done on Temporal's test server; the live run is the lead's hand check.)
 
 ## Tests
 
@@ -151,7 +151,7 @@ Built from design-system parts in PostGear's look (a recognisable layout, not th
 ## Done When
 
 - `npm run validate` passes; `webhook-sender.test.ts` unchanged and green.
-- Failed Post Alert runs end to end under simulation, and a `[simulate:429x2]` message shows "Succeeded after 2 attempts".
+- Failed Post Alert runs end to end under simulation, and a `[simulate:429x1]` message shows "Succeeded after 2 attempts" (`x2` succeeds on attempt 3).
 
 ## Hand Check
 
@@ -159,7 +159,7 @@ With `AUTOMATION_SIMULATION=true` and `PUBLISH_SIMULATION=true`:
 
 1. Create a Slack connection with a made-up `hooks.slack.com/services/...` link. Open Failed Post Alert, pick it, activate.
 2. Queue a post with `[simulate:400]` in its text and publish it: it fails, the worker console prints the simulated Slack line, the run shows Succeeded, and a bell notification appears.
-3. Put `[simulate:429x2]` in the Slack message, run again: "Succeeded after 2 attempts".
+3. Put `[simulate:429x1]` in the Slack message, run again: "Succeeded after 2 attempts".
 4. Put `[simulate:401]`: the step fails with the reconnect sentence and the connection shows **Needs Reconnect** on the Connections page.
 5. Optional, only with the user's OK: a real Slack or Discord webhook with simulation off.
 

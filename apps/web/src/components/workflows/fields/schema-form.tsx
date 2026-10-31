@@ -10,18 +10,22 @@
  * - Inline errors are the config's schema problems plus this step's
  *   validation issues by `field`; chips that an issue names turn red.
  * - A field shows only while its `showIf` holds.
- * - Configure ends with the AI credits a run uses and the form's notes.
+ * - Configure ends with the message preview (`form.preview`, Module 12),
+ *   the AI credits a run uses with the workspace's balance (Module 11),
+ *   and the form's notes.
  * - An error no shown field covers is still listed at the end, so nothing
  *   the tab's "!" counts is hidden.
  */
 import { type FieldSpec, isFieldShown, tabForField } from '@postgear/automation';
 import { FormErrorMessage, FormHelperText, FormLabel, Text } from '@postgear/ui';
 import { useId, useMemo } from 'react';
+import { AiCostLine } from './ai-cost';
 import { FIELD_PATH_ATTRIBUTE, type SchemaFormProps } from './contract';
 import { type FieldEnv, FieldEnvProvider } from './field-env';
 import { FIELD_REGISTRY } from './field-registry';
 import type { FieldControlProps } from './field-types';
 import { errorsUnder, formErrors, getAtPath } from './form-model';
+import { MessagePreviewBox } from './message-preview';
 
 export type { SchemaFormProps } from './contract';
 
@@ -33,6 +37,7 @@ const COMPOSITE = new Set<FieldSpec['kind']>([
   'keyValue',
   'recipients',
   'manualInputs',
+  'sheetColumns',
 ]);
 
 function within(base: string, path: string): boolean {
@@ -40,11 +45,11 @@ function within(base: string, path: string): boolean {
 }
 
 function covers(spec: FieldSpec, path: string): boolean {
-  return within(spec.path, path) || (spec.unitPath !== undefined && within(spec.unitPath, path));
-}
-
-function credits(n: number): string {
-  return `Uses about ${n} AI ${n === 1 ? 'credit' : 'credits'} per run.`;
+  return (
+    within(spec.path, path) ||
+    (spec.unitPath !== undefined && within(spec.unitPath, path)) ||
+    (spec.libraryPath !== undefined && within(spec.libraryPath, path))
+  );
 }
 
 export function SchemaForm({
@@ -67,7 +72,10 @@ export function SchemaForm({
     [graph, node.key, issues, context],
   );
 
-  const shown = (definition.form?.tabs[tab] ?? []).filter((spec) => isFieldShown(spec, config));
+  const shown = (definition.form?.tabs[tab] ?? []).filter(
+    (spec) =>
+      isFieldShown(spec, config) && (FIELD_REGISTRY[spec.kind]?.shown?.(spec, config) ?? true),
+  );
 
   const leftover = Object.entries(errors).filter(
     ([path]) =>
@@ -86,6 +94,7 @@ export function SchemaForm({
     }
   }
   const notes = tab === 'configure' ? (definition.form?.notes ?? []) : [];
+  const preview = tab === 'configure' ? definition.form?.preview : undefined;
 
   return (
     <FieldEnvProvider value={env}>
@@ -124,11 +133,8 @@ export function SchemaForm({
           </div>
         ) : null}
 
-        {perRun !== undefined && perRun > 0 ? (
-          <Text size="sm" muted>
-            {credits(perRun)}
-          </Text>
-        ) : null}
+        {preview ? <MessagePreviewBox kind={preview} config={config} /> : null}
+        {perRun !== undefined && perRun > 0 ? <AiCostLine perRun={perRun} /> : null}
         {notes.map((note) => (
           <Text key={note} size="sm" muted>
             {note}
@@ -151,8 +157,11 @@ function FieldFrame({
   const entry = FIELD_REGISTRY[spec.kind];
   const Control = entry.Control;
   const mode = entry.label(spec);
+  // A duration's unit and a media field's library picks report under the field's own line.
   const ownError =
-    props.errors[''] ?? (spec.unitPath !== undefined ? errors[spec.unitPath] : undefined);
+    props.errors[''] ??
+    (spec.unitPath !== undefined ? errors[spec.unitPath] : undefined) ??
+    (spec.libraryPath !== undefined ? errors[spec.libraryPath] : undefined);
   const message = COMPOSITE.has(spec.kind) ? undefined : ownError;
   const attr = { [FIELD_PATH_ATTRIBUTE]: spec.path };
 

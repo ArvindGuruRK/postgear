@@ -285,8 +285,26 @@ export const webhook = defineNode({
   outputShape: [
     { path: 'body', label: 'Received Data', type: 'object', sample: { title: 'New blog post' } },
     { path: 'receivedAt', label: 'Received At', type: 'date', sample: '2026-11-03T09:00:00Z' },
+    { path: 'headers', label: 'Request Details', type: 'object' },
+    {
+      path: 'headers.contentType',
+      label: 'Content Type',
+      type: 'text',
+      sample: 'application/json',
+    },
   ],
   summary: () => 'When data arrives at its private link',
+  form: {
+    tabs: {
+      setup: [],
+      // The link, the secret (shown once) and a ready-made example; edits no setting.
+      configure: [{ path: '', kind: 'webhookLink', label: 'Private link' }],
+    },
+    notes: [
+      'Send data as JSON with the secret in the X-PostGear-Secret header. Up to 60 requests a minute.',
+      'The last data received is kept as this workflow’s test data, even while it is off.',
+    ],
+  },
 });
 
 export const TRIGGER_NODES = [postPublished, postFailed, schedule, manual, webhook];

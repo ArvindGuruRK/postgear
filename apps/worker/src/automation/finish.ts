@@ -110,6 +110,7 @@ export async function finalizeRun(
         runId: run.id,
         stepName: failedStep?.nodeName ?? null,
         reason: error,
+        stepError: failedStep?.error ?? null,
         finishedAt: input.finishedAt,
       }));
     }

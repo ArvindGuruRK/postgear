@@ -87,6 +87,12 @@ export interface GroupWrite {
   intervalInDays: number | null;
   /** Live tag ids of this workspace, already checked, in display order. */
   tagIds: string[];
+  /**
+   * Who made the post, written on created rows only (an edit never changes
+   * it; rows an edit adds are the composer's). `WEB` when absent; a
+   * workflow step writes `AUTOMATION`.
+   */
+  creationMethod?: 'WEB' | 'AUTOMATION';
   channels: {
     integrationId: string;
     customized: boolean;
@@ -198,6 +204,9 @@ function queueWhere(query: QueueCountQuery & Pick<QueueQuery, 'states'>): Prisma
  * it and the second would silently erase the first. Postgres aborts one of two
  * conflicting serializable transactions, and that abort becomes a 409.
  */
+/** Queued times read for a free slot: far more than a year of three posts a day per channel. */
+const QUEUED_TIMES_LIMIT = 5_000;
+
 /** How many times a create is retried after a serialization failure. */
 const CREATE_ATTEMPTS = 3;
 const CREATE_RETRY_DELAY_MS = 50;
@@ -401,6 +410,60 @@ export class PostsRepository {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true, integrationId: true, state: true },
     });
+  }
+
+  /**
+   * The group a post belongs to, named by its group id or by any of its row
+   * ids, and the root row that stands for it (Sprint 10, Get Post): a
+   * workflow's trigger data carries the group as `post.id` and the root as
+   * `post.rootId`, and a person may paste either.
+   */
+  async findPostRef(
+    orgId: string,
+    value: string,
+  ): Promise<{ group: string; rootId: string } | null> {
+    const row = await prisma.post.findFirst({
+      where: { organizationId: orgId, deletedAt: null, OR: [{ id: value }, { group: value }] },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, group: true, parentPostId: true },
+    });
+    if (!row) {
+      return null;
+    }
+    if (row.id === value && row.parentPostId === null) {
+      return { group: row.group, rootId: row.id };
+    }
+    const [root] = await this.findRoots(orgId, row.group);
+    return { group: row.group, rootId: root?.id ?? row.id };
+  }
+
+  /**
+   * When posts are queued on these channels from `from` on: the roots only,
+   * since a thread's parts share their root's time (Sprint 10, Add To Queue's
+   * next free posting time).
+   */
+  async listQueuedTimes(params: {
+    orgId: string;
+    integrationIds: string[];
+    from: Date;
+  }): Promise<Date[]> {
+    if (params.integrationIds.length === 0) {
+      return [];
+    }
+    const rows = await prisma.post.findMany({
+      where: {
+        organizationId: params.orgId,
+        integrationId: { in: params.integrationIds },
+        deletedAt: null,
+        parentPostId: null,
+        state: State.QUEUE,
+        publishDate: { gte: params.from },
+      },
+      orderBy: { publishDate: 'asc' },
+      select: { publishDate: true },
+      take: QUEUED_TIMES_LIMIT,
+    });
+    return rows.map((row) => row.publishDate);
   }
 
   /**
@@ -714,7 +777,7 @@ export class PostsRepository {
             publishDate: data.publishDate,
             intervalInDays: data.intervalInDays,
             group: write.group,
-            creationMethod: 'WEB',
+            creationMethod: write.creationMethod ?? 'WEB',
             organization: { connect: { id: write.orgId } },
             // The workspace and liveness are part of the connect, not just a
             // check the service made earlier: a channel from another workspace,

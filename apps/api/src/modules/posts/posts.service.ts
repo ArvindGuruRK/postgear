@@ -87,6 +87,9 @@ const SEARCH_MAX_BATCHES = 5;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** A group id (UUID) or a row id (cuid). */
+const POST_REF_PATTERN = /^[0-9a-z-]{8,64}$/i;
+
 export interface PartView {
   content: PostDocument;
   media: MediaView[];
@@ -164,6 +167,14 @@ export interface PostSummary {
 /** A post found by search: its summary, and the words around the match (2026-10-21). */
 export interface PostSearchHit extends PostSummary {
   snippet: string;
+}
+
+/** What only internal callers may set on a new post (Sprint 10, Module 10). */
+export interface CreatePostOptions {
+  /** A group id the caller derived; when its rows already exist they are returned untouched. */
+  group?: string;
+  /** Who made the post; the composer's `WEB` when absent. */
+  creationMethod?: 'WEB' | 'AUTOMATION';
 }
 
 export interface QueuePage {
@@ -381,11 +392,40 @@ export class PostsService {
     return this.detail(orgId, group, rows);
   }
 
-  async create(orgId: string, input: CreatePostInput): Promise<PostDetail> {
-    const group = randomUUID();
+  /**
+   * Saves a new post. `options` is for internal callers only (the public
+   * DTO cannot reach it): a workflow step (Sprint 10, Module 10) passes a
+   * `group` derived from its run and step, so a retried step that already
+   * wrote its post gets that post back instead of a second one, and
+   * `creationMethod: 'AUTOMATION'` so the rows say who made them.
+   */
+  async create(
+    orgId: string,
+    input: CreatePostInput,
+    options: CreatePostOptions = {},
+  ): Promise<PostDetail> {
+    if (options.group !== undefined) {
+      if (!UUID_PATTERN.test(options.group)) {
+        // Only code passes a group, so a malformed one is a bug, not a request to refuse.
+        throw new Error('PostsService.create: the group must be a UUID');
+      }
+      // Idempotent: a group this workspace already holds is returned as it
+      // is, without writing, scheduling or publishing anything again.
+      const existing = await this.repository.findGroup(orgId, options.group);
+      if (existing.length > 0) {
+        return this.detail(orgId, options.group, existing);
+      }
+    }
+
+    const group = options.group ?? randomUUID();
     const { publishNow, ...write } = await this.prepare(orgId, input);
 
-    await this.repository.createGroup({ orgId, group, ...write });
+    await this.repository.createGroup({
+      orgId,
+      group,
+      ...write,
+      ...(options.creationMethod ? { creationMethod: options.creationMethod } : {}),
+    });
 
     // "Post now" on save (2026-10-19, Postiz's button): the post was written
     // to the queue at the current time, and is handed to the worker through
@@ -397,6 +437,27 @@ export class PostsService {
     await this.syncSchedules(orgId, await this.repository.findRoots(orgId, group));
 
     return this.get(orgId, group);
+  }
+
+  /**
+   * A post named by its group id or one of its row ids, with the root row
+   * that stands for it; null when this workspace has no such live post
+   * (Sprint 10, Get Post).
+   */
+  async findPostRef(
+    orgId: string,
+    value: string,
+  ): Promise<{ group: string; rootId: string } | null> {
+    // Groups are UUIDs and rows cuids; anything else names no post.
+    if (!POST_REF_PATTERN.test(value)) {
+      return null;
+    }
+    return this.repository.findPostRef(orgId, value);
+  }
+
+  /** When posts are queued on these channels from `from` on (Sprint 10, Add To Queue). */
+  async queuedTimes(orgId: string, channelIds: string[], from: Date): Promise<Date[]> {
+    return this.repository.listQueuedTimes({ orgId, integrationIds: channelIds, from });
   }
 
   async update(orgId: string, group: string, input: UpdatePostInput): Promise<PostDetail> {

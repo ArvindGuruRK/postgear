@@ -103,6 +103,9 @@ export interface TestableAutomation {
   name: string;
   draftGraph: Prisma.JsonValue;
   pinnedData: Prisma.JsonValue;
+  /** The Webhook trigger's last received body (Module 13), redacted. */
+  webhookSample: Prisma.JsonValue;
+  webhookSampleAt: Date | null;
   organization: { name: string };
 }
 
@@ -193,6 +196,8 @@ export class AutomationRunsRepository {
         name: true,
         draftGraph: true,
         pinnedData: true,
+        webhookSample: true,
+        webhookSampleAt: true,
         organization: { select: { name: true } },
       },
     });

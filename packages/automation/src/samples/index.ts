@@ -4,8 +4,10 @@
  * post that failed because its channel needs reconnecting, a schedule
  * tick, a manual run with its fields filled in.
  */
+
 import { getDefinition, outputFieldsOf } from '../catalog';
 import type { AutomationGraph, GraphNode } from '../graph/schema';
+import { SAMPLE_MEDIA_ID } from '../media/media-ref';
 import { buildIndex } from '../plan/build-index';
 import { resolveTemplate } from '../tokens/resolve';
 import type { RunScope } from '../tokens/values';
@@ -41,7 +43,11 @@ function fromFields(
   return output;
 }
 
+// Shaped like a `MediaRef`, so sample data flows into a Media field; the
+// sample id tells posting steps to leave it out (it is not a real row).
 const SAMPLE_IMAGE = {
+  kind: 'media',
+  id: SAMPLE_MEDIA_ID,
   url: 'https://media.postgear.local/samples/sourdough.png',
   type: 'image',
   alt: 'A loaf of sourdough bread',

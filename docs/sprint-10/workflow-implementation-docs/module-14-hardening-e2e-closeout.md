@@ -1,6 +1,6 @@
 # Module 14: Hardening, E2E And Sprint Close-Out
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: M (L if many gaps turn up)
+> **Sprint 10, Workflow Builder** | Status: Done (2026-10-31) | Size: M (L if many gaps turn up)
 > **Depends on**: Modules 01 to 13 Done (or Done with gaps that are written down)
 > **Stories**: the user stories' section 4 (UX rules), section 5 (edge cases), section 6 (completion checklist)
 > **Next**: the sprint PR, then [Module 15](module-15-p2-backlog.md) only if the user decides
@@ -42,7 +42,7 @@ Read every "Done with gaps" row and every Decision Log line that says "later" or
 | A connection stops working | provider spec: 401 from the stand-in marks the connection Needs Reconnect and the step message says how to fix it |
 | Outside app briefly down | `[simulate:429]` then success: "Succeeded after 2 attempts" (worker test) |
 | Out of AI credits | ledger at zero: the run stops at Generate Text with the exact message and a notification (worker test) |
-| Channel disconnected | validation marker; live run fails with "This channel is disconnected." |
+| Channel disconnected | validation marker "{Channel} is disconnected. Reconnect it on the Channels page."; a live run fails with the API's "One of the selected channels is no longer connected. Remove it and save again." |
 | Earlier step deleted | chips red, activation refused (package and API spec) |
 | Same post event twice | one run (worker test replaying the publish activity) |
 | Worker restart during a run | manual check: start a run with a Delay of 2 minutes and a review, stop and restart `dev:worker`, the run continues and the review still waits |
@@ -74,7 +74,7 @@ Prerequisites as in `CLAUDE.md` (docker services, seeded DB, `dev:api:e2e`, simu
 5. Activate as admin: the dialog sentence is shown; confirm; the badge reads Active v1.
 6. Edit the message: Unpublished Changes; Discard Changes restores it.
 7. As the member account: Activate is disabled with the reason.
-8. Publish a post with `[simulate:invalid]` (PUBLISH_SIMULATION) so it fails: a Live run appears in the Runs tab and succeeds.
+8. Publish a post with `[simulate:400]` (PUBLISH_SIMULATION; a permanent `rejected` failure the template's filter lets through) so it fails: a Live run appears in the Runs tab and succeeds.
 
 ### 5. Performance
 
@@ -108,15 +108,15 @@ Finally update the README: every module's status, and the Progress table's last 
 
 ## Tasks
 
-- [ ] Gap sweep from the Decision Log.
-- [ ] Edge case table: every row proven.
-- [ ] Security specs (secret sweep, refusal, tenancy, roles, webhook trigger, SSRF).
-- [ ] `e2e/workflows.spec.ts` passing.
-- [ ] Performance pass with numbers written down.
-- [ ] Accessibility, themes, reduced motion, phone width, jargon grep.
-- [ ] `.env.example`, local testing guide, sprint doc DoD and deviations, SCHEMA_NOTES.
-- [ ] `sprint-closeout` skill run; README final update.
-- [ ] `npm run validate` passes on a clean checkout.
+- [x] Gap sweep from the Decision Log.
+- [x] Edge case table: every row proven.
+- [x] Security specs (secret sweep, refusal, tenancy, roles, webhook trigger, SSRF).
+- [x] `e2e/workflows.spec.ts` passing.
+- [x] Performance pass with numbers written down.
+- [x] Accessibility, themes, phone width, jargon grep. (Reduced motion was not checked in the browser: see Known gaps in the completion checklist.)
+- [x] `.env.example`, local testing guide, sprint doc DoD and deviations, SCHEMA_NOTES.
+- [x] `sprint-closeout` skill run; README final update.
+- [x] `npm run validate` passes (43 of 43 tasks, on the working tree; Modules 10 to 14 are not committed yet).
 
 ## Done When
 

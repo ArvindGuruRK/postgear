@@ -21,7 +21,7 @@ import { copyDetailsText, failureNextStep, oneSentence } from './copy-details';
 import { retryFromHereState } from './retry-rules';
 import { ReviewCard } from './review-card';
 import { isReviewStep } from './review-words';
-import { CUT_NOTE, DRY_RUN_NOTE, STEP_BADGE } from './run-detail-model';
+import { CUT_NOTE, DRY_RUN_NOTE, STEP_BADGE, stepCreditsText } from './run-detail-model';
 import type { StepPaint } from './run-model';
 import { formatDuration, stepBadgeText } from './run-words';
 
@@ -67,6 +67,8 @@ export interface RunInfo {
   status: AutomationRunStatus;
   mode: AutomationRunMode;
   version: number | null;
+  /** The run's AI credits so far (Module 11), for the credits beside each AI step. */
+  creditsUsed?: number;
 }
 
 interface StepRowProps {
@@ -162,6 +164,7 @@ const StepRow = memo(function StepRow(props: StepRowProps) {
   const { step, paint, node, icon, open, selected, focusReview, onToggle, rowRef } = props;
   const state = paint?.state ?? 'queued';
   const duration = formatDuration(step.durationMs);
+  const credits = stepCreditsText(step, node, props.run.creditsUsed ?? 0);
   const review = isReviewStep(step);
   const failed = step.status === 'FAILED' || step.status === 'HANDLED_ERROR';
   const bodyId = `run-step-${step.id}`;
@@ -189,6 +192,11 @@ const StepRow = memo(function StepRow(props: StepRowProps) {
         <Badge variant={STEP_BADGE[state]} className="shrink-0">
           {paint ? stepBadgeText(paint) : 'Queued'}
         </Badge>
+        {credits ? (
+          <Text size="xs" as="span" muted className="shrink-0" data-testid="step-credits">
+            {credits}
+          </Text>
+        ) : null}
         {duration ? (
           <Text size="xs" as="span" muted className="hidden shrink-0 sm:inline">
             {duration}

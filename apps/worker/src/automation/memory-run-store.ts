@@ -15,6 +15,7 @@ import type { RunRef } from './activity-contract';
 import type {
   AutomationRecord,
   AutomationRunSummary,
+  ChannelRecord,
   LiveRunRow,
   NewLiveRun,
   NotificationWrite,
@@ -259,6 +260,47 @@ export class MemoryRunStore implements RunStore {
     if (!row || !from.includes(row.status)) return false;
     Object.assign(row, clone(change));
     return true;
+  }
+
+  /** Channels by workspace, for posting steps' dry runs (tests add them). */
+  readonly channels = new Map<string, ChannelRecord & { organizationId: string }>();
+
+  addChannel(channel: ChannelRecord & { organizationId: string }): void {
+    this.channels.set(channel.id, channel);
+  }
+
+  async loadChannels(organizationId: string, ids: readonly string[]): Promise<ChannelRecord[]> {
+    return ids
+      .map((id) => this.channels.get(id))
+      .filter(
+        (channel): channel is ChannelRecord & { organizationId: string } =>
+          channel !== undefined && channel.organizationId === organizationId,
+      )
+      .map(({ organizationId: _org, ...channel }) => channel);
+  }
+
+  /** Credentials written back by refreshing providers (tests read it). */
+  readonly savedCredentials = new Map<string, unknown>();
+
+  async saveConnectionCredentials(
+    organizationId: string,
+    connectionId: string,
+    credentials: unknown,
+  ): Promise<void> {
+    const connection = this.connections.find(
+      (row) => row.id === connectionId && row.organizationId === organizationId,
+    );
+    if (!connection) return;
+    connection.credentials = credentials;
+    this.savedCredentials.set(connectionId, credentials);
+  }
+
+  /** AI credits added per run (tests read it). */
+  readonly creditsUsed = new Map<string, number>();
+
+  async addRunCredits(ref: RunRef, credits: number): Promise<void> {
+    if (credits <= 0 || !this.owned(ref)) return;
+    this.creditsUsed.set(ref.runId, (this.creditsUsed.get(ref.runId) ?? 0) + credits);
   }
 
   async cancelOpenSteps(ref: RunRef, finishedAt: Date): Promise<number> {

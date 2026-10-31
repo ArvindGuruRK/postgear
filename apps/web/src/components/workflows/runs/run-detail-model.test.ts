@@ -1,5 +1,12 @@
+import { getDefinition } from '@postgear/automation';
 import type { RunStep } from '@/types/workflows';
-import { failedStepKey, orderedSteps, STEP_BADGE, waitingReviewKey } from './run-detail-model';
+import {
+  failedStepKey,
+  orderedSteps,
+  STEP_BADGE,
+  stepCreditsText,
+  waitingReviewKey,
+} from './run-detail-model';
 import { makeStep } from './run-test-fixtures';
 
 function stepsOf(list: RunStep[]): Record<string, RunStep> {
@@ -40,5 +47,33 @@ describe('STEP_BADGE', () => {
     expect(STEP_BADGE.handled).toBe('accent');
     expect(STEP_BADGE.failed).toBe('danger');
     expect(STEP_BADGE.skipped).toBe('outline');
+  });
+});
+
+describe('stepCreditsText', () => {
+  const write = { type: 'ai.generateText', typeVersion: 1, config: { withImage: false } };
+  const estimate = (getDefinition('ai.generateText')?.credits?.(write.config as never) ??
+    0) as number;
+
+  it('shows what the step says it was charged', () => {
+    const step = makeStep({ nodeType: 'ai.generateText', output: { text: 'Hi', credits: 7 } });
+    expect(stepCreditsText(step, write, 12)).toBe('7 Credits');
+    expect(stepCreditsText({ ...step, output: { creditsUsed: 1 } }, write, 12)).toBe('1 Credit');
+  });
+
+  it('falls back to the step estimate for a finished AI step, never above the run total', () => {
+    const step = makeStep({ nodeType: 'ai.generateText', output: { text: 'Hi' } });
+    expect(estimate).toBeGreaterThan(0);
+    expect(stepCreditsText(step, write, 100)).toBe(
+      estimate === 1 ? 'About 1 Credit' : `About ${estimate} Credits`,
+    );
+    expect(stepCreditsText(step, write, 1)).toBe('About 1 Credit');
+  });
+
+  it('shows nothing when the run used no credits, the step did not finish, or it is not AI', () => {
+    const step = makeStep({ nodeType: 'ai.generateText', output: { text: 'Hi' } });
+    expect(stepCreditsText(step, write, 0)).toBeNull();
+    expect(stepCreditsText({ ...step, status: 'FAILED' }, write, 10)).toBeNull();
+    expect(stepCreditsText(makeStep(), undefined, 10)).toBeNull();
   });
 });

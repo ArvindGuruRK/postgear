@@ -237,9 +237,10 @@ export function RunDetail({
             status: model.runStatus,
             mode: model.mode,
             version: head?.version ?? null,
+            creditsUsed: head?.creditsUsed ?? 0,
           }
         : null,
-    [model, runId, head?.version],
+    [model, runId, head?.version, head?.creditsUsed],
   );
 
   const iconOf = useCallback(
@@ -290,7 +291,12 @@ export function RunDetail({
   }
 
   const backButton = (
-    <Button variant="secondary" size="sm" onClick={onBack} className="self-start lg:hidden">
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={onBack}
+      className="shrink-0 self-start lg:hidden"
+    >
       <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
       Back To Runs
     </Button>

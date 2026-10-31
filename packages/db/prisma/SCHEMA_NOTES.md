@@ -58,6 +58,8 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `AutomationVersion` | An immutable snapshot of a workflow, made when it is turned on. Live runs read only these. | Sprint 10 (rows from Module 09) |
 | `AutomationRun` / `AutomationRunStep` | One run of a workflow and each step's attempt in it, inputs and outputs redacted and capped. | Sprint 10 (rows from Module 07) |
 | `AutomationConnection` | An outside app (Slack, Teams, Discord, secret HTTP headers, Google) linked to a workspace once and picked by any workflow. `credentials` is one encrypted blob, never returned; soft deleted. | Sprint 10 |
+| `AutomationEffect` | The step gateway's ledger: one row per side effect a workflow step asked the API for (a draft, a queued or published post, an AI call, an email), so a retried step never acts twice. See [Gateway and webhook](#gateway-and-webhook-modules-10-and-13). | Sprint 10 |
+| `AutomationWebhookSecret` | The secret a Webhook-triggered workflow's link checks, stored hashed with its last four characters. | Sprint 10 |
 
 ### Kept, though not yet used
 
@@ -467,6 +469,47 @@ Migration `20261029130000_sprint10_automation_connections`, additive: the
   workflows of under 50 steps each are cheap to scan.
 - **Names are unique per workspace and app among live rows**, checked by the
   API rather than an index, so a deleted connection's name can be reused.
+
+### Gateway and webhook (Modules 10 and 13)
+
+Migration `20261030193031_sprint10_gateway_and_webhook`, additive: the
+`AutomationEffect` and `AutomationWebhookSecret` tables, `AUTOMATION` on
+`CreationMethod`, and two columns on `Automation`.
+
+- **`AutomationEffect` is the step gateway's idempotency ledger.** The
+  worker runs every step, and the ones that need API services (Create Draft,
+  Add To Queue, Publish To, the AI steps, Email) call
+  `/internal/automation/*` on the API. Each call claims the row for
+  `idempotencyKey` = `${runId}:${nodeKey}` (unique): the first inserts
+  PENDING, acts, and stores DONE with the answer in `result`; a retry that
+  finds DONE gets `result` back without acting; a PENDING younger than two
+  minutes answers 409 (the worker retries), an older one or a FAILED one is
+  taken over by a compare-and-set on `status` and `updatedAt`. `result` also
+  holds progress an unfinished attempt saved (Email's recipients already
+  sent). `status` and `kind` are plain text, not enums: only the gateway
+  writes them and new step kinds should not need a migration.
+- **Posts get a second guard of their own.** A taken-over attempt may run
+  after a crash that already wrote its post, so the gateway passes a group id
+  derived from the key (UUID v5 over a fixed namespace) and `PostsService`
+  returns a group that already exists instead of writing another. The ledger
+  makes replays cheap; the group makes them safe.
+- **Effects are pruned after 30 days** (`createdAt` index), in the same
+  maintenance pass that prunes finished runs. No foreign key to the run: an
+  effect must outlive nothing and block no delete, and a run's retries end
+  within minutes.
+- **`CreationMethod.AUTOMATION`** marks posts a workflow step wrote. It is
+  set on created rows only (`PostsRepository.createGroup`); a later edit in
+  the composer keeps it, and rows an edit adds are `WEB`. The composer and
+  Queue can later show "Created by a workflow".
+- **`AutomationWebhookSecret`** holds the secret of a Webhook trigger's link
+  as a SHA-256 hash plus `last4` for "...a9F2"; the plain secret is shown
+  once, when it is made. Regenerating sets `revokedAt` on the old row rather
+  than deleting it, and the index on `(automationId, revokedAt)` finds the
+  live one.
+- **`Automation.webhookSample` and `webhookSampleAt`** keep the last data a
+  Webhook-triggered workflow received (also while it is off), so test runs
+  and Insert Data use real fields instead of the built-in sample. JSON on the
+  workflow row, not a table: only the latest one matters.
 
 ## A user may legitimately belong to zero organizations
 

@@ -10,6 +10,12 @@
  * - **Missing is explicit.** A path with no value reads as empty and is
  *   listed in `missing`, unless a `default` format filled it; the caller
  *   decides whether that fails the step.
+ * - **JSON mode** (`{ json: true }`, HTTP Request's JSON body, Module 13).
+ *   The template is JSON text, so a value is encoded, never spliced raw: a
+ *   chip inside a JSON string is escaped as string content (a quote in a
+ *   post's text cannot end the string), and a chip outside one is written
+ *   as a JSON value (`"text"`, `42`, `["a","b"]`, `{"k":1}`). The result is
+ *   always text.
  */
 import { applyFilter, type FilterOptions, isKnownFilter } from './filters';
 import { parseTemplate, singleToken, type TokenSegment } from './parse';
@@ -24,7 +30,44 @@ export interface Resolved {
   unknownFilters: string[];
 }
 
-export type ResolveOptions = FilterOptions;
+export interface ResolveOptions extends FilterOptions {
+  /** The template is JSON text: values are JSON-encoded where they land. */
+  json?: boolean;
+}
+
+/**
+ * Whether a JSON text ends inside a string, carried across text segments.
+ * Data chips never change it: their values are encoded, so they cannot
+ * open or close a string.
+ */
+interface JsonCursor {
+  inString: boolean;
+  escaped: boolean;
+}
+
+function advanceJson(cursor: JsonCursor, text: string): void {
+  for (const char of text) {
+    if (cursor.inString) {
+      if (cursor.escaped) cursor.escaped = false;
+      else if (char === '\\') cursor.escaped = true;
+      else if (char === '"') cursor.inString = false;
+    } else if (char === '"') {
+      cursor.inString = true;
+    }
+  }
+}
+
+/** A value as JSON: string content inside a string, a whole JSON value outside one. */
+function jsonEncode(value: unknown, inString: boolean): string {
+  if (inString) return JSON.stringify(toText(value)).slice(1, -1);
+  if (value instanceof Date) return JSON.stringify(toText(value));
+  if (typeof value === 'number' && !Number.isFinite(value)) return 'null';
+  try {
+    return JSON.stringify(value) ?? 'null';
+  } catch {
+    return 'null';
+  }
+}
 
 function evaluate(
   token: TokenSegment,
@@ -62,6 +105,19 @@ export function resolveTemplate(
   if (!text.includes('{{')) return done(text);
 
   const segments = parseTemplate(text);
+  if (options.json) {
+    const cursor: JsonCursor = { inString: false, escaped: false };
+    let out = '';
+    for (const segment of segments) {
+      if (segment.kind === 'text') {
+        advanceJson(cursor, segment.value);
+        out += segment.value;
+      } else {
+        out += jsonEncode(evaluate(segment, scope, options, report), cursor.inString);
+      }
+    }
+    return done(out);
+  }
   const single = singleToken(segments);
   if (single) return done(evaluate(single, scope, options, report));
 

@@ -1,7 +1,8 @@
 /**
  * Post events start workflow runs (Module 09): which workflows a Post
  * Published or Post Failed event starts, exactly once per event, and the
- * failed-publish activity replayed with the same and with a new publish run.
+ * failed-publish activity replayed with the same and with a new publish run,
+ * and the record-published activity replayed.
  */
 jest.mock('@postgear/db', () => {
   const actual = jest.requireActual('@postgear/db');
@@ -25,6 +26,7 @@ import {
   AUTOMATION_RUN_WORKFLOW,
   type PublishFailureReason,
   postFailedTriggerEventId,
+  postPublishedTriggerEventId,
   SCHEDULING_TASK_QUEUE,
 } from '@postgear/scheduling';
 import { type Client, WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
@@ -424,5 +426,97 @@ describe('markPublishFailed starts Post Failed workflows', () => {
       'post.failed:post_1:pub_run_1',
       'post.failed:post_1:pub_run_2',
     ]);
+  });
+});
+
+describe('recordPublished starts Post Published workflows', () => {
+  const mocked = prisma as unknown as {
+    post: { findFirst: jest.Mock; findMany: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  const root = {
+    id: 'post_1',
+    parentPostId: null,
+    content: '<p>Fresh rye today</p>',
+    image: null,
+    settings: null,
+    state: 'QUEUE',
+    releaseId: null,
+    releaseURL: null,
+    error: null,
+    group: 'grp_1',
+    publishDate: new Date('2026-11-03T09:00:00.000Z'),
+    integrationId: 'ch_1',
+    integration: {
+      id: 'ch_1',
+      internalId: 'x-1',
+      rootInternalId: 'x-1',
+      providerIdentifier: 'x',
+      name: 'Bloom On X',
+      profile: 'bloom',
+      token: 'secret',
+      additionalSettings: '[]',
+      deletedAt: null,
+      disabled: false,
+      inBetweenSteps: false,
+      refreshNeeded: false,
+    },
+  };
+
+  it('starts one run for the post, however often the activity is replayed', async () => {
+    const db = fakeDb([
+      on('cheer', published()),
+      on('other_channel', published({ channels: ['ch_9'] })),
+    ]);
+    const tx = {
+      post: { updateMany: jest.fn() },
+      notifications: { create: jest.fn() },
+      webhooks: { findMany: jest.fn(async () => []) },
+      tagsPosts: {
+        findMany: jest.fn(async () => [{ tag: { id: 't_launch', name: 'Launch' } }]),
+      },
+      ...db.raw,
+    };
+    mocked.post.findFirst.mockResolvedValue(root);
+    mocked.post.findMany.mockResolvedValue([root]);
+    mocked.$transaction.mockImplementation(async (work: (client: typeof tx) => unknown) =>
+      work(tx),
+    );
+    const start = jest.fn(async () => undefined);
+    const deps = {
+      env: { WEB_URL: 'http://localhost:3000' },
+      publicUrl: (key: string) => `http://media.test/${key}`,
+      temporalClient: async () => ({ workflow: { start } }) as unknown as Client,
+    } as unknown as ActivityDeps;
+    const activities = createPublishActivities(deps);
+    const record = () =>
+      new MockActivityEnvironment().run(activities.recordPublished, {
+        postId: 'post_1',
+        organizationId: ORG,
+        results: [{ id: 'post_1', postId: 'x_99', releaseURL: 'https://x.com/bloom/status/99' }],
+      });
+
+    await record();
+    await record();
+    await record();
+
+    expect(db.runs).toHaveLength(1);
+    expect(db.runs[0]).toMatchObject({
+      automationId: 'cheer',
+      triggerType: 'trigger.postPublished',
+      triggerEventId: postPublishedTriggerEventId('post_1'),
+      triggerPayload: {
+        post: { id: 'grp_1', rootId: 'post_1', state: 'PUBLISHED', channel: { id: 'ch_1' } },
+        tags: ['Launch'],
+      },
+    });
+    // Each replay may start the still-QUEUED run again; Temporal dedupes by its id.
+    expect(start).toHaveBeenCalledTimes(3);
+    for (const call of start.mock.calls) {
+      expect((call as unknown[])[1]).toMatchObject({
+        workflowId: `automation-run:${db.runs[0].id}`,
+        workflowIdReusePolicy: 'REJECT_DUPLICATE',
+      });
+    }
   });
 });

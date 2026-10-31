@@ -148,6 +148,8 @@ function automation(graph: AutomationGraph, pinnedData: unknown = {}): TestableA
     name: 'Publishing Report',
     draftGraph: graph as unknown as Prisma.JsonValue,
     pinnedData: pinnedData as Prisma.JsonValue,
+    webhookSample: null,
+    webhookSampleAt: null,
     organization: { name: 'Bloom Bakery' },
   };
 }
@@ -208,10 +210,14 @@ function fakeRedis() {
   };
 }
 
+/**
+ * Slack is left out so these tests keep one step that cannot run yet, now
+ * that Module 12 made the real one executable.
+ */
 const RUNNABLE_CONTEXT: ValidationContext = {
   connections: [],
   channels: [],
-  availableTypes: EXECUTABLE_TYPES,
+  availableTypes: new Set<string>([...EXECUTABLE_TYPES].filter((type) => type !== 'notify.slack')),
 };
 
 /** Slack counts as runnable here, so the only problem left is its missing connection. */
@@ -562,6 +568,16 @@ describe('AutomationRunsService', () => {
       await expect(
         service.startStepTest(ORG, USER, ID, 'slack', { sendForReal: true }),
       ).rejects.toMatchObject({ response: { code: 'test_blocked' } });
+    });
+
+    it('is a 404 for another workspace or a malformed workflow id (Module 14)', async () => {
+      await expect(service.startStepTest(ORG, USER, OTHER_ID, 'bell', {})).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(service.startStepTest(ORG, USER, 'nope', 'bell', {})).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(repository.createRun).not.toHaveBeenCalled();
     });
 
     it('is a 404 for a step that is not in the draft and a 422 for a turned-off one', async () => {

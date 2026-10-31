@@ -14,7 +14,8 @@
  *
  * then {@link createContentPipeline} and {@link createCopilotAgent} take
  * those seams and the API's tools, and {@link createSeoAdvisor} (Sprint 7)
- * takes the model alone. Everything the API programs against is re-exported
+ * takes the model alone, as do {@link generateHashtags} and
+ * {@link rewriteInVoice} (Sprint 10). Everything the API programs against is re-exported
  * from `./types`.
  */
 import {
@@ -64,6 +65,12 @@ export {
   type SeoAdvisorLogger,
 } from './agents/seo-advisor.agent';
 export {
+  createSnippetWriter,
+  generateHashtags,
+  hashtagCount,
+  rewriteInVoice,
+} from './agents/snippets';
+export {
   classifyError,
   isRetryableKind,
   normaliseRunError,
@@ -73,6 +80,7 @@ export {
   withTimeout,
 } from './model/resilience';
 export { type PartLimits, partLimits } from './prompts/content';
+export { HASHTAG_COUNT_MAX, HASHTAG_COUNT_MIN } from './prompts/hashtags';
 export {
   buildSeoAdvicePrompt,
   formatFindingLine,

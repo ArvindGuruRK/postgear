@@ -58,6 +58,8 @@ model Organization {
   automations         Automation[]
   automationRuns      AutomationRun[]
   automationConnections AutomationConnection[]
+  automationEffects     AutomationEffect[]
+  automationWebhookSecrets AutomationWebhookSecret[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -827,6 +829,8 @@ enum CreationMethod {
   API
   AUTOPOST
   CLI
+  /// Made by a workflow step (Sprint 10, Module 10).
+  AUTOMATION
 }
 
 enum ShortLinkPreference {
@@ -1231,12 +1235,17 @@ model Automation {
   /// The starter template it came from, if any. Templates are code, so this
   /// is plain text, not a foreign key.
   templateId            String?
+  /// The last body the Webhook trigger received (Module 13), redacted and
+  /// capped at 64 KB: the trigger's sample data for tests and Insert Data.
+  webhookSample         Json?
+  webhookSampleAt       DateTime?
   createdById           String?
   updatedById           String?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   deletedAt             DateTime?
   organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  webhookSecrets        AutomationWebhookSecret[]
   activeVersion         AutomationVersion?   @relation("ActiveVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
   createdBy             User?                @relation("AutomationAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy             User?                @relation("AutomationEditor", fields: [updatedById], references: [id], onDelete: SetNull)
@@ -1318,6 +1327,49 @@ model AutomationRun {
   @@index([status, createdAt])
   // Prune finished runs after 30 days (Module 09).
   @@index([finishedAt])
+}
+
+/// One side effect a workflow step asked the API for (Module 10's internal
+/// gateway): a post written, AI credits charged, emails sent. The key is
+/// `${runId}:${nodeKey}`, so an activity retried after the API acted gets
+/// the stored result back instead of acting twice. PENDING older than two
+/// minutes is a crashed attempt and may be run again (the work itself is
+/// idempotent: posts use a group derived from the key). Pruned with runs.
+model AutomationEffect {
+  id             String       @id @default(uuid())
+  organizationId String
+  idempotencyKey String       @unique
+  /// 'post.draft' | 'post.queue' | 'post.publish' | 'ai.text' | ... | 'email'.
+  kind           String
+  /// 'PENDING' | 'DONE' | 'FAILED'.
+  status         String       @default("PENDING")
+  /// What the step returns (DONE), or progress kept across attempts
+  /// (Email's recipients already sent).
+  result         Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+/// The Webhook trigger's secret (Module 13). Only a SHA-256 hash is kept;
+/// the secret is shown once. One active row per workflow: Regenerate sets
+/// `revokedAt` on the old one.
+model AutomationWebhookSecret {
+  id             String       @id @default(uuid())
+  automationId   String
+  organizationId String
+  /// Hex SHA-256 of the secret.
+  secretHash     String
+  /// The secret's last four characters, for "...a9F2".
+  last4          String
+  createdAt      DateTime     @default(now())
+  revokedAt      DateTime?
+  automation     Automation   @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId, revokedAt])
 }
 
 /// One step's attempt in one run. Name and type are copied in, so a step

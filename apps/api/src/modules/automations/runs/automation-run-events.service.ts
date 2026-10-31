@@ -114,7 +114,7 @@ export class AutomationRunEventsService {
           }
         }
 
-        const event = toRunEvent(run);
+        const event = toRunEvent(run, values);
         const fingerprint = JSON.stringify(event);
         if (fingerprint !== lastRunEvent) {
           stream.send('run', event);

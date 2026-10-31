@@ -651,6 +651,16 @@ function toJson(graph: AutomationGraph): Prisma.InputJsonValue {
   return graph as unknown as Prisma.InputJsonValue;
 }
 
+/**
+ * The last run's error sentence, through the secret patterns on the way out
+ * (Module 14): the worker redacts it already, this is the API's second look.
+ */
+function hideRunError(text: string | null): string | null {
+  if (text === null) return null;
+  const value = redact(text).value;
+  return typeof value === 'string' ? value : null;
+}
+
 function toListFields(row: AutomationListRow): Omit<AutomationListItem, 'runs30d'> {
   return {
     id: row.id,
@@ -660,7 +670,7 @@ function toListFields(row: AutomationListRow): Omit<AutomationListItem, 'runs30d
     hasUnpublishedChanges: row.hasUnpublishedChanges,
     lastRunAt: row.lastRunAt?.toISOString() ?? null,
     lastRunStatus: row.lastRunStatus,
-    lastRunError: row.lastRunError,
+    lastRunError: hideRunError(row.lastRunError),
     templateId: row.templateId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

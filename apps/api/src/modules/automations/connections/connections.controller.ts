@@ -9,6 +9,11 @@
  * The fixed `oauth/...` paths come before `:id`. The callback is public: the
  * app redirects the browser there, and the single-use state is what ties it
  * to a workspace and an admin.
+ *
+ * Google (Module 13): the list also says whether simulation is on and
+ * whether Google is set up; members may get a Picker token and use the three
+ * Sheets helpers (reading tabs and the header row, creating a spreadsheet),
+ * because picking or creating a file only grants PostGear access to it.
  */
 import {
   Body,
@@ -38,12 +43,19 @@ import { CONNECTION_MESSAGES } from './connections.messages';
 import { ConnectionsService } from './connections.service';
 import {
   type CreateConnectionInput,
+  type CreateSpreadsheetInput,
   createConnectionSchema,
+  createSpreadsheetSchema,
   type OAuthStartQuery,
   oauthStartQuerySchema,
+  type SheetHeaderQuery,
+  type SpreadsheetParams,
+  sheetHeaderQuerySchema,
+  spreadsheetParamsSchema,
   type UpdateConnectionInput,
   updateConnectionSchema,
 } from './dto/connections.schema';
+import { GoogleSheetsService } from './google/google-sheets.service';
 
 @Controller('automation-connections')
 @Roles(Role.ADMIN, Role.USER)
@@ -51,11 +63,16 @@ export class ConnectionsController {
   constructor(
     private readonly connections: ConnectionsService,
     private readonly oauth: ConnectionOAuthService,
+    private readonly google: GoogleSheetsService,
   ) {}
 
   @Get()
   async list(@CurrentOrg() org: ActiveOrg) {
-    return { connections: await this.connections.list(org.id) };
+    return {
+      connections: await this.connections.list(org.id),
+      simulation: this.connections.settings.simulation,
+      googleReady: this.connections.settings.googleReady,
+    };
   }
 
   @Get('oauth/:provider/start')
@@ -112,6 +129,46 @@ export class ConnectionsController {
   async remove(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
     await this.connections.remove(org.id, id);
     return { message: CONNECTION_MESSAGES.DELETED };
+  }
+
+  /** A short-lived Google access token for the file picker; never the refresh token. */
+  @Get(':id/picker-token')
+  pickerToken(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
+    return this.google.pickerToken(org.id, id);
+  }
+
+  /** The spreadsheet's name and link, and its tabs. */
+  @Get(':id/google/spreadsheets/:spreadsheetId')
+  spreadsheet(
+    @CurrentOrg() org: ActiveOrg,
+    @Param(new ZodQuery(spreadsheetParamsSchema, 'automation-connections/spreadsheet'))
+    params: SpreadsheetParams,
+  ) {
+    return this.google.spreadsheet(org.id, params.id, params.spreadsheetId);
+  }
+
+  /** The first row of a tab: the column headings the step maps data to. */
+  @Get(':id/google/spreadsheets/:spreadsheetId/header')
+  header(
+    @CurrentOrg() org: ActiveOrg,
+    @Param(new ZodQuery(spreadsheetParamsSchema, 'automation-connections/header'))
+    params: SpreadsheetParams,
+    @Query(new ZodQuery(sheetHeaderQuerySchema, 'automation-connections/header'))
+    query: SheetHeaderQuery,
+  ) {
+    return this.google.header(org.id, params.id, params.spreadsheetId, query.sheet);
+  }
+
+  /** Create A New Spreadsheet, with its header row filled in. */
+  @Post(':id/google/spreadsheets')
+  @HttpCode(HttpStatus.CREATED)
+  createSpreadsheet(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('id') id: string,
+    @Body(new ZodBody(createSpreadsheetSchema, 'automation-connections/create-spreadsheet'))
+    dto: CreateSpreadsheetInput,
+  ) {
+    return this.google.create(org.id, id, dto);
   }
 
   @Post(':id/check')

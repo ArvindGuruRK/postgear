@@ -1,6 +1,6 @@
 # Module 11: AI Steps And Credits
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: M (one session)
+> **Sprint 10, Workflow Builder** | Status: Done (2026-10-31) | Size: M (one session)
 > **Depends on**: [Module 09](module-09-triggers-activation-versions.md), and [Module 10](module-10-postgear-and-social-steps.md) for the internal step gateway and `MediaRef`
 > **Stories**: WF-9.1 (P0), WF-9.2 (P1), WF-9.3 (P0), Journey B, Journey D (out of credits)
 > **Next**: [Module 12](module-12-notify-steps-and-simulation.md)
@@ -107,15 +107,15 @@ Module 02 already refuses a Schedule faster than hourly in a graph with an `ai.*
 
 ## Tasks
 
-- [ ] Confirm the gateway or shared-ledger decision from the decision log.
-- [ ] `credits.policy.ts`: `generate_snippet`; specs updated; catalog-versus-policy cost test.
-- [ ] Engine factory: `research` option on `createPipeline`.
-- [ ] `packages/ai-engine`: `generateHashtags`, `rewriteInVoice`, prompts, tests with the simulated client.
-- [ ] API: `AutomationAiService` plus gateway routes `/ai/text`, `/ai/image`, `/ai/hashtags`, `/ai/rewrite`, each charge, run, refund-on-failure, effect row.
-- [ ] `prisma-change`: `AutomationRun.creditsUsed` if missing.
-- [ ] Worker: executors with heartbeats and the longer gateway timeout; credit failure marked `stopsRun`.
-- [ ] Web: Configure fields, cost and balance line, Test tab notice, Use Sample Text Instead.
-- [ ] Catalog: the four ready types in `EXECUTABLE_TYPES`; Generate Video stays Coming Soon.
+- [x] Confirm the gateway or shared-ledger decision from the decision log. (Option B, the gateway.)
+- [x] `credits.policy.ts`: `generate_snippet`; specs updated; catalog-versus-policy cost test.
+- [x] Engine factory: `research` option on `createPipeline`.
+- [x] `packages/ai-engine`: `generateHashtags`, `rewriteInVoice`, prompts, tests with the simulated client.
+- [x] API: `AutomationAiService` plus gateway routes `/ai/text`, `/ai/image`, `/ai/hashtags`, `/ai/rewrite`, each charge, run, refund-on-failure, effect row.
+- [x] `prisma-change`: `AutomationRun.creditsUsed` if missing. (It already existed; no change.)
+- [x] Worker: executors with heartbeats and the longer gateway timeout; credit failure marked `stopsRun`.
+- [x] Web: Configure fields, cost and balance line, Test tab notice, Use Sample Text Instead. (Run detail shows credits per AI step: the charged number when the step output carries `credits`, else "About N Credits" from the step's estimate.)
+- [x] Catalog: the four ready types in `EXECUTABLE_TYPES`; Generate Video stays Coming Soon.
 
 ## Tests
 

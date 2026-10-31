@@ -21,6 +21,7 @@ import {
   type DataField,
   type DataGroup,
   type FieldType,
+  humanise,
   type RunScope,
   toText,
 } from '@postgear/automation';
@@ -96,6 +97,72 @@ export function filterFields(fields: readonly DataField[], query: string): DataF
   });
 }
 
+// Insert Data shows 3 levels (as `availableData` does); keys a token path can hold.
+const SHOWN_LEVELS = 3;
+const TOKEN_KEY = /^[A-Za-z0-9_-]+$/;
+const MAX_SAMPLE_FIELDS = 30;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function typeOfSample(value: unknown): FieldType {
+  if (Array.isArray(value)) return 'list';
+  if (isPlainObject(value)) return 'object';
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'boolean') return 'boolean';
+  return 'text';
+}
+
+/**
+ * An open group of fields (declared with no fields of its own) listed from
+ * its sample: an "All ..." row that inserts the whole group, then one row
+ * per key of the sample.
+ */
+function openField(field: DataField, level: number): DataField {
+  if (field.children.length > 0 || field.type !== 'object' || !isPlainObject(field.sample)) {
+    return field;
+  }
+  if (level >= SHOWN_LEVELS) return field;
+  const children = Object.entries(field.sample)
+    .filter(([key]) => TOKEN_KEY.test(key))
+    .slice(0, MAX_SAMPLE_FIELDS)
+    .map(([key, value]) =>
+      openField(
+        {
+          path: `${field.path}.${key}`,
+          label: humanise(key),
+          type: typeOfSample(value),
+          sample: value,
+          children: [],
+        },
+        level + 1,
+      ),
+    );
+  if (children.length === 0) return field;
+  const whole: DataField = { ...field, label: `All ${field.label}`, children: [] };
+  return { ...field, children: [whole, ...children] };
+}
+
+function openFields(fields: readonly DataField[], level: number): DataField[] {
+  return fields.map((field) =>
+    field.children.length > 0
+      ? { ...field, children: openFields(field.children, level + 1) }
+      : openField(field, level),
+  );
+}
+
+/**
+ * The trigger's open groups of fields list the fields of their sample, so a
+ * Webhook's Received Data offers the fields of the last data it received
+ * (Module 13), or of the built-in sample until something arrives.
+ */
+export function withSampleFields(groups: readonly DataGroup[]): DataGroup[] {
+  return groups.map((group) =>
+    group.source === 'trigger' ? { ...group, fields: openFields(group.fields, 1) } : group,
+  );
+}
+
 /** The groups Insert Data shows for a search, without groups that have nothing left. */
 export function filterGroups(groups: readonly DataGroup[], query: string): DataGroup[] {
   const q = query.trim().toLowerCase();
@@ -128,7 +195,10 @@ export function InsertDataList({
 }: InsertDataListProps) {
   const [query, setQuery] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
-  const groups = useMemo(() => availableData(graph, nodeKey, { scope }), [graph, nodeKey, scope]);
+  const groups = useMemo(
+    () => withSampleFields(availableData(graph, nodeKey, { scope })),
+    [graph, nodeKey, scope],
+  );
   const shown = useMemo(() => filterGroups(groups, query), [groups, query]);
   const stepGroups = groups.filter(
     (group) => group.source !== 'run' && group.source !== 'workspace',

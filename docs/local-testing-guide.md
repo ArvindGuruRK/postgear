@@ -756,6 +756,181 @@ The whole library took 31 minutes with `PRESET_AT_ONCE=6` on 2026-10-28
 (overflow 12.5, contrast 18); two named templates take under a minute. The
 default of 2 pages at once leaves room for the app running beside it.
 
+### 5m. Workflows: Google Sheets, HTTP Request and Webhook (Sprint 10, Module 13)
+
+All three can be tried with no Google project and no outside service. Set
+`AUTOMATION_SIMULATION="true"` in the root `.env` (refused when
+`NODE_ENV=production`) and restart the API and the worker.
+
+**A simulated Google account (no Google project needed).** With simulation
+on, the Connections page (**Workflows > Connections**) can add a simulated
+Google account. It is labelled "Simulated", reads as a spreadsheet called
+"Social Report" with a tab "Posts" (Date, Channel, Text, Link), and a
+spreadsheet "created" from the step keeps its name and headers until the
+API restarts. In a run, the Sheets step writes nothing: it answers with the
+next row number (2, 3, 4 and so on per account) and `simulated: true`. The
+Google Picker needs a real account, so it is refused for a simulated one.
+
+**A real Google account (testing mode, free).**
+
+1. In Google Cloud Console, create a project (or reuse the sign-in one) and
+   enable the **Google Sheets API**, **Google Drive API** and **Google
+   Picker API**.
+2. **OAuth consent screen**: user type External, publishing status
+   **Testing**. Add the scopes `.../auth/drive.file`, `openid` and `email`
+   (no sensitive scope, so no Google review is needed). Under **Test users**
+   add every Google address you will connect with: in testing mode **only
+   listed test users can connect**; anyone else sees "Access blocked".
+3. **Credentials > OAuth client ID** (Web application). Add the redirect URI
+   `http://localhost:3001/automation-connections/oauth/google/callback`
+   (that is `${API_URL}/automation-connections/oauth/google/callback`; add
+   the staging and production API hosts the same way later).
+4. **Credentials > API key**, restricted to the Picker API, and note the
+   project **number** (Project settings), which the Picker calls the app id.
+5. In the root `.env`:
+
+   ```env
+   GOOGLE_AUTOMATION_CLIENT_ID="...apps.googleusercontent.com"
+   GOOGLE_AUTOMATION_CLIENT_SECRET="..."
+   GOOGLE_PICKER_API_KEY="..."
+   GOOGLE_CLOUD_APP_ID="123456789012"
+   ```
+
+   Left empty, the sign-in app's `GOOGLE_CLIENT_ID` and `_SECRET` are used
+   instead (then add the redirect URI above to that client). The
+   placeholders `google-client-id` and `google-client-secret` count as not
+   set: the Sheets step then says "Ask a workspace admin to set up Google."
+   until a simulated or real account is connected.
+6. Restart the API and the worker (both read these), then connect as an
+   admin.
+
+Things to know in testing mode:
+
+- **Refresh tokens expire after 7 days** for an app in Testing. After that
+  the next run fails with "Google Sheets is disconnected. Reconnect it in
+  Connections." and the connection shows **Needs Reconnect**: reconnect it
+  (admin only). Publishing the app (In Production) removes the 7-day limit.
+- PostGear asks for `drive.file` only, so it sees just the spreadsheets you
+  pick with the Picker or that PostGear created. Any other spreadsheet is
+  invisible until you pick it in the step.
+- Consent always asks again (`prompt=consent`) so Google returns a refresh
+  token; a grant without one is refused and lands back with a failed
+  connect.
+
+**HTTP Request.** To call a server on your own machine set
+`WEBHOOK_ALLOW_PRIVATE_URLS="true"` (local only; otherwise the address must
+be https and public). Put an `Authorization` or `X-Api-Key` header in a
+**Secret Headers** connection: typed into the step itself, validation
+refuses it with "Put this header in a connection so it stays secret." A
+test run that does not send for real shows "Would send POST to ... with 3
+fields." and the body with secrets hidden. POST and PATCH carry
+`Idempotency-Key: <runId>:<step>`.
+
+**Webhook trigger.** Add a workflow that starts with **Webhook**, then make
+its secret (admins only; it is shown once) from the trigger, or with
+`POST /automations/<id>/webhook/secret`. Call the private link from
+PowerShell:
+
+```powershell
+$id = "<workflow id from the URL>"; $secret = "<the secret>"
+Invoke-RestMethod -Method Post -Uri "http://localhost:3001/v1/automations/$id/hook" `
+  -Headers @{ "X-PostGear-Secret" = $secret; "Idempotency-Key" = "test-1" } `
+  -ContentType "application/json" -Body '{"title":"Hello","password":"x"}'
+```
+
+- While the workflow is off this answers 409 "This workflow is not turned
+  on." but still keeps the data (`GET /automations/<id>/webhook` shows it,
+  with `password` as `[hidden]`), and test runs now start from it.
+- Turned on, it answers 202 `{ runId }`; the same `Idempotency-Key` again
+  answers 200 with the same run id and starts nothing.
+- A missing or wrong secret is a bare 401; more than 256 KB is 413; anything
+  but a JSON object is 415; more than 60 calls a minute to one workflow is
+  429.
+
+Automated checks:
+
+```powershell
+npm test --workspace=@postgear/automation -- data form resolve
+npm test --workspace=@postgear/worker -- sheets http data
+npm test --workspace=@postgear/api -- google webhook connections automation-catalog webhook-sample
+```
+
+### 5n. Workflows: templates, schedules and sending for real (Sprint 10)
+
+**Set up once.** In the root `.env`:
+
+```env
+AUTOMATION_SIMULATION="true"   # Slack, Teams, Discord, Sheets, HTTP: stand-ins, nothing leaves the machine
+PUBLISH_SIMULATION="true"      # posting steps publish to the stand-in
+AI_SIMULATION="true"           # AI steps write template text, still charge credits
+AUTOMATION_INTERNAL_TOKEN="..." # npm run generate:keys; the API and the worker must share it
+```
+
+Restart the API and the worker. Without `AUTOMATION_INTERNAL_TOKEN` every
+posting, AI and Email step fails with "This step cannot run because the
+worker is not set up to reach PostGear. Ask your admin to set
+AUTOMATION_INTERNAL_TOKEN." Open **Workflows** in the sidebar
+(**<http://localhost:3000/seed-demo-org/workflows>**).
+
+**Connections under simulation.** On **Workflows > Connections**: Slack,
+Teams and Discord accept any well-formed link (for Slack
+`https://hooks.slack.com/services/T000/B000/anything`); Google adds a
+simulated account (see 5m). Nothing is sent, the run log line names the
+app and the link's last four characters.
+
+**Each template.** Pick it under **Create Workflow**, follow **Finish
+Setup**, then **Test Workflow** with the built-in sample. Steps that would
+reach outside show the Dry Run sticker; tick **Send For Real In Tests** on a
+step to run its stand-in (or the real app when simulation is off).
+
+| Template | Needs | How to see a live run |
+|---|---|---|
+| Publishing Report | simulated Google, Slack | Turn it on, publish any post from the composer: a Live run appears in the Runs tab |
+| AI Weekly Post | a channel | Test it: Generate Text (5 credits) and Generate Image (10) run for real even in tests, the review waits in the run bar (Approve), then a draft lands in **Drafts** |
+| Failed Post Alert | Slack | Turn it on, publish a post whose text contains `[simulate:400]`: the post fails, the Slack step runs |
+| Repurpose For X | a channel | Turn it on, publish a LinkedIn post: Rewrite In Brand Voice (2 credits), review, then a draft for X |
+| Blog To Draft | a channel | Turn it on, call its link (5m, Webhook trigger): a draft and a bell notification |
+
+**Forcing failures.** Put a marker in a Slack, Teams, Discord, Sheets or
+HTTP step's message (stand-ins read them under `AUTOMATION_SIMULATION`):
+`[simulate:429x1]` fails once then works ("Succeeded after 2 attempts");
+`[simulate:429x2]` works on attempt 3; `[simulate:401]` marks the connection
+**Needs Reconnect**; `[simulate:400]` fails at once; `[simulate:slow:20]`
+takes 20 seconds. To see out of credits, use up the month's AI credits
+(`/ai/credits` shows what is left) and run an AI step: the run stops at it
+with the reset date in the alert.
+
+**A schedule, quickly.** Add a Schedule trigger, Daily, at a time two or
+three minutes from now in your own time zone, then turn the workflow on.
+Temporal UI (**<http://localhost:8233>**, Schedules) lists
+`automation-schedule:<id>`; at the minute a Live run appears in the Runs tab.
+Pause deletes the schedule, and turning it back on never runs the missed
+times. More often than hourly is refused when the workflow has AI steps.
+
+**A review that waits.** Add Manual Review, test, and stop the worker while
+the run waits: start it again and the review is still there; Approve
+finishes the run. An unanswered review times out after 7 days.
+
+**Sending for real.** One flag per area, all local only:
+
+- `AUTOMATION_SIMULATION="false"`: Slack, Teams, Discord, Google Sheets and
+  HTTP Request call the real services (a real webhook link or Google
+  account, see 5m). Email goes out through SMTP when `SMTP_HOST` is set,
+  else it is printed in the API console either way.
+- `PUBLISH_SIMULATION="false"`: posting steps publish to the real channels.
+- `AI_SIMULATION="false"`: AI steps call OpenAI (costs money).
+
+Restart the API and the worker after changing any of them.
+
+Automated checks:
+
+```powershell
+npm test --workspace=@postgear/automation
+npm test --workspace=@postgear/worker -- automation
+npm test --workspace=@postgear/api -- automations
+npm run test:e2e -- e2e/workflows.spec.ts   # needs dev:api:e2e, see the top of playwright.config.ts
+```
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 

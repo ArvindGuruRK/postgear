@@ -5,6 +5,7 @@
  * only ever holds the connection id.
  */
 import { z } from 'zod';
+import { LIMITS } from '../limits';
 import { connectionIdField, connectionName, count, OUT, templateField } from './fields';
 import { defineNode, type SummaryContext } from './types';
 
@@ -146,8 +147,16 @@ export const slack = defineNode({
         },
       ],
     },
+    preview: 'slack',
   },
 });
+
+/** Teams' fixed sentences: how to make the link, and who the message comes from. */
+export const TEAMS_NOTES = [
+  'To make the link, open the Workflows app in Teams and pick the template "Send webhook alerts to a channel".',
+  'Choose the team and channel, finish the steps, then copy the link it shows into a Microsoft Teams connection.',
+  'Messages appear as sent by the Workflows bot, not by PostGear.',
+] as const;
 
 export const teams = defineNode({
   ...NOTIFY_BASICS,
@@ -171,9 +180,45 @@ export const teams = defineNode({
   outputShape: [
     { path: 'sent', label: 'Sent', type: 'boolean', sample: true },
     { path: 'preview', label: 'Message Preview', type: 'text', sample: 'New post on Instagram' },
+    { path: 'result', label: 'Result', type: 'text', sample: 'Teams accepted the message.' },
   ],
   connection: { kind: 'teams', field: 'connectionId' },
   summary: (config, ctx) => sendsTo('Teams', config.connectionId, ctx),
+  form: {
+    tabs: {
+      setup: [
+        { path: 'connectionId', kind: 'connection', label: 'Teams connection', required: true },
+      ],
+      configure: [
+        {
+          path: 'title',
+          kind: 'text',
+          label: 'Title',
+          help: 'Optional. Shown in bold above the message.',
+          placeholder: 'Enter your title',
+          acceptsData: true,
+        },
+        {
+          path: 'message',
+          kind: 'longText',
+          label: 'Message',
+          placeholder: 'Enter your message',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'includeLink',
+          kind: 'text',
+          label: 'Button link',
+          help: 'Optional. Adds a button that opens this link.',
+          placeholder: 'Enter your link',
+          acceptsData: true,
+        },
+      ],
+    },
+    notes: TEAMS_NOTES,
+    preview: 'teams',
+  },
 });
 
 export const discord = defineNode({
@@ -197,6 +242,26 @@ export const discord = defineNode({
   ],
   connection: { kind: 'discord', field: 'connectionId' },
   summary: (config, ctx) => sendsTo('Discord', config.connectionId, ctx),
+  form: {
+    tabs: {
+      setup: [
+        { path: 'connectionId', kind: 'connection', label: 'Discord connection', required: true },
+      ],
+      configure: [
+        {
+          path: 'message',
+          kind: 'longText',
+          label: 'Message',
+          help: 'Up to 2,000 characters. Longer messages are cut to fit.',
+          placeholder: 'Enter your message',
+          acceptsData: true,
+          required: true,
+        },
+      ],
+    },
+    notes: ['Mentions like @everyone in the message never ping anyone.'],
+    preview: 'discord',
+  },
 });
 
 export const email = defineNode({
@@ -211,7 +276,7 @@ export const email = defineNode({
   configSchema: z
     .object({
       /** Each a template that must resolve to an email address. */
-      to: z.array(templateField(320)).max(10),
+      to: z.array(templateField(320)).max(LIMITS.maxEmailRecipients),
       subject: templateField(200),
       message: templateField(),
     })
@@ -234,6 +299,44 @@ export const email = defineNode({
   ],
   summary: (config) =>
     config.to.length ? `Emails ${count(config.to.length, 'person', 'people')}` : 'Add who to email',
+  form: {
+    tabs: {
+      setup: [],
+      configure: [
+        {
+          path: 'to',
+          kind: 'recipients',
+          label: 'Send to',
+          help: `Up to ${LIMITS.maxEmailRecipients} email addresses, typed or from earlier steps.`,
+          placeholder: 'Enter your email address',
+          acceptsData: true,
+          required: true,
+          max: LIMITS.maxEmailRecipients,
+        },
+        {
+          path: 'subject',
+          kind: 'text',
+          label: 'Subject',
+          placeholder: 'Enter your subject',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'message',
+          kind: 'longText',
+          label: 'Message',
+          placeholder: 'Enter your message',
+          acceptsData: true,
+          required: true,
+        },
+      ],
+    },
+    notes: [
+      'Emails are plain text from PostGear, with a line saying which workflow sent them.',
+      `A workspace can send ${LIMITS.workflowEmailsPerDay} workflow emails a day.`,
+    ],
+    preview: 'email',
+  },
 });
 
 export const whatsapp = defineNode({

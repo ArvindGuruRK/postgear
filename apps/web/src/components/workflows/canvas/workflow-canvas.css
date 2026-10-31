@@ -159,3 +159,12 @@
     opacity: 1;
   }
 }
+
+/*
+ * On narrow screens the step panel opens in a Sheet. The panel has its own
+ * Close button, so the Sheet's own one (its last child) would sit on top of
+ * it and catch its clicks.
+ */
+[data-step-sheet] > button:last-child {
+  display: none;
+}

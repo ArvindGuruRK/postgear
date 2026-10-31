@@ -204,20 +204,45 @@ Ordered checklist; each phase ends with `verify-change`.
 
 ## Definition Of Done
 
-- [ ] Workflows is in the rail; workflows can be created, renamed, saved, reopened, duplicated and deleted.
-- [ ] Nodes are added from a searchable library and by the "+" on a port; incompatible ports cannot connect.
-- [ ] Node settings persist; tokens can be inserted from upstream outputs only; secrets never appear in graph JSON or any API response.
-- [ ] Validation lists every issue with a link to its node, and activation is impossible while any remain.
-- [ ] A test run shows per-node status on the canvas and in the inspector, and side-effect nodes do not reach the outside world in test mode unless explicitly switched on.
-- [ ] Post Published and Post Failed start runs for active workflows exactly once per event, even when the publish activity retries.
-- [ ] Schedule triggers fire on time in the workspace time zone and stop when paused.
-- [ ] Manual Review pauses a run until Approve or Reject, survives a worker restart, and expires after 7 days.
-- [ ] Editing an active workflow does not change running or future runs until it is activated again.
-- [ ] Slack and In-App Notification work end to end under simulation; Generate Text charges and refunds credits correctly.
-- [ ] Coming Soon nodes are visible and honest, and cannot be added.
-- [ ] The three starter templates open, validate and test-run.
-- [ ] `npm run validate` passes; an e2e spec covers build, connect, validate, test run and activate.
-- [ ] Every line of the user stories' completion checklist (section 6) is ticked.
+Evidence for each line is in the [completion checklist](../sprint-completion-checklists/sprint-10-completion-checklist.md#definition-of-done-evidence).
+
+- [x] Workflows is in the rail; workflows can be created, renamed, saved, reopened, duplicated and deleted. **Verified live**: the e2e spec creates, renames and deletes; duplicate is covered by the service spec.
+- [x] Nodes are added from a searchable library and by the "+" on a port; incompatible ports cannot connect. **Verified live** in Module 05's browser pass (add from "+", loop refused).
+- [x] Node settings persist; tokens can be inserted from upstream outputs only; secrets never appear in graph JSON or any API response. **Verified live**: the security sweep found no secret in 18 answers, the stored rows or the logs (84 of 84 checks, 2026-10-31).
+- [x] Validation lists every issue with a link to its node, and activation is impossible while any remain. **Verified live**: a deleted earlier step, a disconnected channel and a 51st step each answered 422 `activation_blocked`.
+- [x] A test run shows per-node status on the canvas and in the inspector, and side-effect nodes do not reach the outside world in test mode unless explicitly switched on. **Verified live**: e2e test 4 (Slack Dry Run) and the 2026-10-31 run with Send For Real on three steps.
+- [x] Post Published and Post Failed start runs for active workflows exactly once per event, even when the publish activity retries. **In simulation** (`PUBLISH_SIMULATION`): replay tests for both triggers, and e2e test 8 (one live run per failed post).
+- [x] Schedule triggers fire on time in the workspace time zone and stop when paused. **Verified live** in Module 09 (a Daily schedule fired once, pause deleted it); each step keeps its own IANA zone (see Deviations).
+- [x] Manual Review pauses a run until Approve or Reject, survives a worker restart, and expires after 7 days. **Verified live** through a worker restart (Module 07); expiry by a time-skipping workflow test.
+- [x] Editing an active workflow does not change running or future runs until it is activated again. **Verified** by the run store test (live runs read their version) and live in Module 09 and e2e test 6.
+- [x] Slack and In-App Notification work end to end under simulation; Generate Text charges and refunds credits correctly. **In simulation**: Slack retried once and succeeded, 7 credits charged on the run and the ledger (2026-10-31); refunds and out of credits by specs.
+- [x] Coming Soon nodes are visible and honest, and cannot be added. Generate Video, Render Design, Excel and WhatsApp, each with its reason.
+- [x] The three starter templates open, validate and test-run. **Verified live**: all five templates opened, validated with 0 errors once filled, and test-ran to Succeeded (2026-10-31).
+- [x] `npm run validate` passes; an e2e spec covers build, connect, validate, test run and activate. 43 of 43 tasks; `e2e/workflows.spec.ts` 8 passed.
+- [ ] Every line of the user stories' completion checklist (section 6) is ticked. **Partly**: every product line is met; Journeys A to D by hand and the 10-minute first activation need the owner.
+
+## Deviations
+
+What changed from this document while building, with the reason. The full list of decisions is the Decision Log in [`workflow-implementation-docs/README.md`](../sprint-10/workflow-implementation-docs/README.md#decision-log).
+
+| Planned | Built | Why |
+|---|---|---|
+| Creating posts from the worker: a shared post writer, or a narrow shared function | **An internal step gateway in the API** (`POST /internal/automation/*`, token `AUTOMATION_INTERNAL_TOKEN`, every call bound to a live run and its step). Create Draft, Add To Queue, Schedule Post, Publish, Get Post, every AI step and Email call it; the worker never writes posts itself | `PostsService` needs channels, media, tags, Temporal and the provider manager; one copy of the validation, no extraction |
+| Generate Text charges "through the existing ledger" | The ledger **stays in the API** (`CreditsService`); AI steps reach it through the gateway. New ledger type `generate_snippet` (2 credits) for Hashtags and Rewrite; the run stores `creditsUsed` | No ledger code copied into the worker |
+| Exactly-once by step rows and idempotency keys | Plus an effect ledger (`AutomationEffect`) on the API side, keyed by run and step, so a retried gateway call returns the first result | A step can retry after the API acted but before the worker heard back |
+| Three starter templates | **Five**: also Repurpose For X and Blog To Draft | Research additions, listed in the README |
+| Failed Post Alert filters out "rate limited" | Filters out `retries_exhausted` ("Gave up after several tries (often a rate limit)") | `PublishFailureReason` has no rate-limited reason |
+| Schedule fires "in the workspace time zone" | Each Schedule (and Add To Queue) step stores its own IANA time zone, defaulted from the browser | PostGear has no workspace time zone; `User.timezone` is an offset and cannot follow daylight saving |
+| Teams incoming webhook | Teams Workflows app link with an Adaptive Card; old `webhook.office.com` links are refused | Office 365 Connectors were switched off in May 2026 |
+| Google Sheets OAuth (sensitive scope) | `drive.file` scope with the Google Picker; a simulated Google account for local testing | No sensitive-scope verification needed |
+| One 120 s step timeout | Timeout classes: fast 30 s, slow 5 minutes with a 30 s heartbeat (AI) | Model calls can take over a minute |
+| A 51st step is refused | It saves, and validation reports `graph.too_many_nodes` (activation refused); the request schema refuses past 100 | A paste never loses work |
+| Live run view | The SSE endpoint polls the database every 750 ms; the web falls back to polling every 1.5 s | No Redis pub/sub in `RedisService` |
+| Test mode: side effects dry | In-App Notification and Create Draft act for real, marked "(Test)"; AI steps run and charge credits (Use Sample Text Instead avoids it) | They stay inside PostGear; the user needs to see real output |
+| A second review answer returns the first decision | 409 `review_answered`; the card says someone answered first | Module 07's code; the UI covers it |
+| Activation warning "within a minute" | "PostGear will set it up within 15 minutes." | The maintenance reconcile runs every 15 minutes |
+| P2: Retry From Here, Webhook trigger hardening | **Built** (Modules 08 and 13) | Fitted in the modules that owned them |
+| P2: Render Design, WhatsApp, Excel, plan quotas, Generate Video | Visible as Coming Soon steps (or not started); parked in [Module 15](../sprint-10/workflow-implementation-docs/module-15-p2-backlog.md) | Only when the user decides |
 
 ## Risks
 

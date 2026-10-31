@@ -35,7 +35,13 @@ import { BuilderProvider } from '../builder/builder-context';
 import type { Selection } from '../builder/builder-state';
 import type { RunModel } from '../runs/run-model';
 import { type CanvasMode, CanvasModeProvider, useMarkerId } from './canvas-mode';
-import { type CanvasNode, type FlowEdge, toFlowEdges, toFlowNodes } from './flow-model';
+import {
+  type CanvasNode,
+  type FlowEdge,
+  RUN_ARIA_LABELS,
+  toFlowEdges,
+  toFlowNodes,
+} from './flow-model';
 import { StepCard } from './step-card';
 import { EdgeMarkers, StepEdge } from './step-edge';
 import { StickyNoteCard } from './sticky-note';
@@ -153,6 +159,7 @@ function ReadOnlyFlow({ graph, run, selectedKey, onSelectStep, className }: RunC
           elementsSelectable={false}
           edgesFocusable={false}
           deleteKeyCode={null}
+          ariaLabelConfig={RUN_ARIA_LABELS}
           selectionKeyCode={null}
           multiSelectionKeyCode={null}
           panOnDrag

@@ -4,7 +4,7 @@
  * steps the view jumps to (the waiting review, the failed step). Pure, so
  * it is unit tested.
  */
-import { topologicalOrder } from '@postgear/automation';
+import { type GraphNode, getDefinition, topologicalOrder } from '@postgear/automation';
 import type { RunStep } from '@/types/workflows';
 import { isReviewStep } from './review-words';
 import type { BadgeVariant } from './run-list-model';
@@ -50,6 +50,47 @@ export function orderedSteps(model: Pick<RunModel, 'steps' | 'graph'>): RunStep[
     if (aStart === null && bStart !== null) return 1;
     return rank(a) - rank(b);
   });
+}
+
+/** A positive whole number of credits a step's output reports, if any. */
+function reportedCredits(output: unknown): number | null {
+  if (typeof output !== 'object' || output === null) return null;
+  const record = output as Record<string, unknown>;
+  for (const key of ['credits', 'creditsUsed']) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.floor(value);
+  }
+  return null;
+}
+
+/**
+ * The AI credits beside a step in a run (Module 11): "5 Credits" when the
+ * step's output says what it was charged, else "About 5 Credits" from the
+ * step's own estimate, for an AI step that finished in a run that used
+ * credits at all. Step rows carry no credit column (the run's total is
+ * `creditsUsed`), so a step that was pinned or refunded never claims more
+ * than the run says. Nothing for steps that cost nothing.
+ */
+export function stepCreditsText(
+  step: Pick<RunStep, 'status' | 'output' | 'nodeType'>,
+  node: Pick<GraphNode, 'type' | 'typeVersion' | 'config'> | undefined,
+  runCredits: number,
+): string | null {
+  if (!(runCredits > 0)) return null;
+  if (step.status !== 'SUCCEEDED' && step.status !== 'HANDLED_ERROR') return null;
+  const reported = reportedCredits(step.output);
+  if (reported !== null) return reported === 1 ? '1 Credit' : `${reported} Credits`;
+  const def = getDefinition(node?.type ?? step.nodeType, node?.typeVersion);
+  if (step.status !== 'SUCCEEDED' || !def?.credits) return null;
+  let estimate = 0;
+  try {
+    estimate = def.credits((node?.config ?? def.defaultConfig) as never);
+  } catch {
+    return null;
+  }
+  if (!(estimate > 0)) return null;
+  const amount = Math.min(estimate, runCredits);
+  return amount === 1 ? 'About 1 Credit' : `About ${amount} Credits`;
 }
 
 /** The Manual Review waiting for an answer, if any. */

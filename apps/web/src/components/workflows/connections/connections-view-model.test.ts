@@ -5,6 +5,7 @@ import {
   credentialsFrom,
   deleteWarning,
   emptyConnectionForm,
+  isSimulated,
   searchConnections,
   usedByText,
   validateConnectionForm,
@@ -114,5 +115,13 @@ describe('connections view model', () => {
     expect(connectErrorMessage(null)).toBeNull();
     expect(connectErrorMessage('not_admin')).toBe('Only workspace admins can connect apps.');
     expect(connectErrorMessage('anything')).toBe('The app did not finish connecting. Try again.');
+  });
+});
+
+describe('isSimulated', () => {
+  it('reads the simulated flag a stand-in connection carries', () => {
+    expect(isSimulated({ meta: { simulated: true } })).toBe(true);
+    expect(isSimulated({ meta: { simulated: 'yes' } })).toBe(false);
+    expect(isSimulated({ meta: null })).toBe(false);
   });
 });

@@ -28,7 +28,13 @@ const credits: AiCredits = {
   resetsAt: '2026-11-01T00:00:00.000Z',
   tier: 'STANDARD',
   low: false,
-  costs: { generate_post: 5, generate_image: 10, copilot_message: 1, seo_advice: 3 },
+  costs: {
+    generate_post: 5,
+    generate_image: 10,
+    copilot_message: 1,
+    seo_advice: 3,
+    generate_snippet: 2,
+  },
 };
 
 function sent(content = 'What channels do I have?'): ChatState {

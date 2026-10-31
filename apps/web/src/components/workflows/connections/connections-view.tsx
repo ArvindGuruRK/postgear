@@ -56,18 +56,21 @@ import type { Connection, ConnectionCheckResult } from '@/types/workflows';
 import { AppIcon } from '../app-icon';
 import { ConnectDialog, type ConnectDialogMode } from './connect-dialog';
 import {
+  ADD_MENU_APPS,
   appIcon,
   appTitle,
   checkNote,
   connectErrorMessage,
   deleteWarning,
-  FORM_APPS,
+  type GoogleSetup,
   isFormApp,
+  isSimulated,
   lastCheckedText,
   STATUS_WORDS,
   searchConnections,
   usedByText,
 } from './connections-view-model';
+import { GoogleConnectDialog } from './google-connect-dialog';
 
 export interface ConnectionsViewProps {
   orgId: string;
@@ -75,6 +78,13 @@ export interface ConnectionsViewProps {
   canManage: boolean;
   /** `?connectError=` from an OAuth sign-in that did not finish. */
   connectErrorCode: string | null;
+  /** `?connection=` from an OAuth sign-in that finished. */
+  connectedId?: string | null;
+  /**
+   * What connecting Google offers (`GET /automation-connections`'s flags);
+   * null when the list did not load, so the Google dialog asks itself.
+   */
+  googleSetup?: GoogleSetup | null;
 }
 
 export function ConnectionsView({
@@ -82,17 +92,25 @@ export function ConnectionsView({
   initialConnections,
   canManage,
   connectErrorCode,
+  connectedId = null,
+  googleSetup = null,
 }: ConnectionsViewProps) {
   const [connections, setConnections] = useState<Connection[] | null>(initialConnections);
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<ConnectDialogMode | null>(null);
   const [deleting, setDeleting] = useState<Connection | null>(null);
   const [busy, setBusy] = useState(false);
+  const [google, setGoogle] = useState<{ reconnect: Connection | null } | null>(null);
   const connectError = connectErrorMessage(connectErrorCode);
+  const returnTo = `/${orgId}/workflows/connections`;
 
   useEffect(() => {
     if (connectError) toast({ title: connectError, variant: 'danger' });
   }, [connectError]);
+
+  useEffect(() => {
+    if (connectedId) toast({ title: 'Connection saved' });
+  }, [connectedId]);
 
   const shown = useMemo(() => searchConnections(connections ?? [], search), [connections, search]);
 
@@ -160,8 +178,13 @@ export function ConnectionsView({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {FORM_APPS.map((app) => (
-          <DropdownMenuItem key={app} onSelect={() => setDialog({ kind: 'add', app })}>
+        {ADD_MENU_APPS.map((app) => (
+          <DropdownMenuItem
+            key={app}
+            onSelect={() =>
+              isFormApp(app) ? setDialog({ kind: 'add', app }) : setGoogle({ reconnect: null })
+            }
+          >
             <AppIcon icon={appIcon(app)} />
             {appTitle(app)}
           </DropdownMenuItem>
@@ -200,7 +223,7 @@ export function ConnectionsView({
           title="No connections yet"
           description={
             canManage
-              ? 'Connect Slack, Microsoft Teams, Discord or secret headers once, then use them in any workflow.'
+              ? 'Connect Slack, Microsoft Teams, Discord, Google or secret headers once, then use them in any workflow.'
               : 'Ask a workspace admin to connect the apps your workflows need.'
           }
         />
@@ -237,7 +260,14 @@ export function ConnectionsView({
                             <AppIcon icon={appIcon(connection.provider)} className="h-5 w-5" />
                           </span>
                           <div className="flex min-w-0 flex-col">
-                            <span className="type-ui truncate text-ink">{connection.name}</span>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="type-ui truncate text-ink">{connection.name}</span>
+                              {isSimulated(connection) ? (
+                                <Badge variant="secondary" className="shrink-0">
+                                  Simulated
+                                </Badge>
+                              ) : null}
+                            </span>
                             <Text size="xs" muted as="span" className="font-mono">
                               {connection.maskedHint}
                             </Text>
@@ -324,6 +354,12 @@ export function ConnectionsView({
                                 >
                                   Reconnect
                                 </DropdownMenuItem>
+                              ) : connection.provider === 'google' && !isSimulated(connection) ? (
+                                <DropdownMenuItem
+                                  onSelect={() => setGoogle({ reconnect: connection })}
+                                >
+                                  Reconnect
+                                </DropdownMenuItem>
                               ) : null}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -360,6 +396,20 @@ export function ConnectionsView({
           upsert(connection);
           toast({ title: dialog?.kind === 'add' ? 'Connection saved' : 'Connection updated' });
         }}
+      />
+
+      <GoogleConnectDialog
+        open={google !== null}
+        onOpenChange={(open) => {
+          if (!open) setGoogle(null);
+        }}
+        onSaved={(connection) => {
+          upsert(connection);
+          toast({ title: 'Connection saved' });
+        }}
+        returnTo={returnTo}
+        setup={googleSetup}
+        reconnect={google?.reconnect ?? null}
       />
 
       <AlertDialog

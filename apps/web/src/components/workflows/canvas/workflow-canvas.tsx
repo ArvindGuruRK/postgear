@@ -32,16 +32,18 @@ import {
   type ReactFlowInstance,
   useReactFlow,
 } from '@xyflow/react';
-import { type DragEvent, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type DragEvent, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useBuilder } from '../builder/builder-context';
 import type { Position, Selection } from '../builder/builder-state';
 import type { RunModel } from '../runs/run-model';
 import { type CanvasMode, CanvasModeProvider, useMarkerId } from './canvas-mode';
 import {
   type CanvasNode,
+  EDITOR_ARIA_LABELS,
   FAMILY_FILL,
   type FlowEdge,
   NOTE_PREFIX,
+  reuseUnchanged,
   STEP_DRAG_TYPE,
   toFlowEdges,
   toFlowNodes,
@@ -120,15 +122,19 @@ export function WorkflowCanvas({
     () => toFlowNodes(graph, { selection, issues, summary, drag, paint }),
     [graph, selection, issues, summary, drag, paint],
   );
-  const nodes = useMemo(
-    () =>
-      sizes
-        ? derived.map((node) =>
-            sizes[node.id] ? { ...node, width: sizes[node.id].w, height: sizes[node.id].h } : node,
-          )
-        : derived,
-    [derived, sizes],
-  );
+  // Cards that did not change keep last render's object (reuseUnchanged), so
+  // typing in one step's field does not repaint the whole canvas.
+  const lastNodes = useRef<CanvasNode[]>([]);
+  const nodes = useMemo(() => {
+    const sized = sizes
+      ? derived.map((node) =>
+          sizes[node.id] ? { ...node, width: sizes[node.id].w, height: sizes[node.id].h } : node,
+        )
+      : derived;
+    const kept = reuseUnchanged(lastNodes.current, sized);
+    lastNodes.current = kept;
+    return kept;
+  }, [derived, sizes]);
   const edges = useMemo(() => toFlowEdges(graph, selection, run), [graph, selection, run]);
 
   const onNodesChange = useCallback(
@@ -324,6 +330,7 @@ export function WorkflowCanvas({
           fitView
           fitViewOptions={FIT}
           deleteKeyCode={null}
+          ariaLabelConfig={EDITOR_ARIA_LABELS}
           multiSelectionKeyCode={MULTI_SELECT}
           nodesDraggable={!builder.locked}
           nodesConnectable={!builder.locked}

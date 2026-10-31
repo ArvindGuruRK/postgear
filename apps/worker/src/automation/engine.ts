@@ -34,6 +34,7 @@ import type { NodeRunResult, RunRef, StepRef } from './activity-contract';
 import { connectionIdOf, connectionProblem, connectionValues } from './connection';
 import type { ExecLog, ExecutorRegistry } from './executors/types';
 import { permanent, TIMEOUT_MESSAGE, toApplicationFailure, toStepFailure } from './failures';
+import { type GatewayClient, UNAVAILABLE_GATEWAY } from './gateway-client';
 import type { RunRecord, RunStore, StepRecord, StoredConnection } from './run-store';
 import {
   buildScope,
@@ -48,6 +49,10 @@ import {
 export interface EngineEnv {
   store: RunStore;
   executors: ExecutorRegistry;
+  /** The API's internal step gateway; left out, gateway steps fail with "not set up". */
+  gateway?: GatewayClient;
+  /** WEBHOOK_ALLOW_PRIVATE_URLS: outside calls may reach local receivers (never in production). */
+  allowPrivateUrls?: boolean;
   /** AUTOMATION_SIMULATION. */
   simulation: boolean;
   now(): Date;
@@ -253,7 +258,7 @@ export async function recordFailure(input: {
       }),
     );
   }
-  return toApplicationFailure(failure.kind, stepError);
+  return toApplicationFailure(failure.kind, stepError, failure.retryAfterMs);
 }
 
 export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRunResult> {
@@ -384,12 +389,13 @@ export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRun
       timeZone,
       dryRun,
       simulation: env.simulation,
+      allowPrivateUrls: env.allowPrivateUrls === true,
       idempotencyKey: `${ref.runId}:${ref.nodeKey}`,
       connection,
       attempt,
       signal: env.signal(),
       heartbeat: env.heartbeat,
-      deps: { store, now: env.now },
+      deps: { store, gateway: env.gateway ?? UNAVAILABLE_GATEWAY, now: env.now },
       log: env.log,
     });
 
@@ -400,7 +406,8 @@ export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRun
       capBytes: LIMITS.stepIoCapBytes,
     });
     const finishedAt = env.now();
-    await store.moveStep(ref, key, ['RUNNING'], {
+    const credits = Math.max(0, Math.floor(result.credits ?? 0));
+    const finish = {
       status: FINAL_STATUS[status],
       output: safeOutput.value,
       truncated: stepInput.truncated || safeOutput.truncated,
@@ -408,7 +415,18 @@ export async function executeNode(env: EngineEnv, ref: StepRef): Promise<NodeRun
       durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
       // The same ports the workflow feeds to planNext (Module 08's lines).
       ports: [...ports],
-    });
+    };
+    if (credits > 0) {
+      // AI credits join the run's total in the same write as the step's
+      // row, and only when this attempt is the one that finished it.
+      await store.transaction(async (tx) => {
+        if (await tx.moveStep(ref, key, ['RUNNING'], finish)) {
+          await tx.addRunCredits(ref, credits);
+        }
+      });
+    } else {
+      await store.moveStep(ref, key, ['RUNNING'], finish);
+    }
 
     return { status, ports, attempt };
   } catch (error) {

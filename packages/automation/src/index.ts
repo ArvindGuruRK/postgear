@@ -74,6 +74,7 @@ export {
   fieldSpecFor,
   isFieldShown,
   type KeyValueRow,
+  type MessagePreviewKind,
   tabComplete,
   tabForField,
 } from './catalog/form';
@@ -145,6 +146,15 @@ export {
 } from './graph/schema';
 // Limits
 export { GRAPH_HARD_CAPS, LIMITS } from './limits';
+// Media passed between steps (Module 10)
+export {
+  isMediaRef,
+  MEDIA_FIELD_MESSAGE,
+  type MediaRef,
+  mediaRefSchema,
+  mediaRefsFrom,
+  SAMPLE_MEDIA_ID,
+} from './media/media-ref';
 // Order and branch planning
 export { buildIndex, edgesFrom, type GraphIndex, type GraphInput } from './plan/build-index';
 export {
@@ -168,6 +178,15 @@ export {
 } from './plan/plan-next';
 // Connecting steps
 export { CONNECT_REASONS, type ConnectCheck, canConnect, type ProposedEdge } from './ports';
+// Add To Queue's next free posting time (Module 10)
+export {
+  DEFAULT_POSTING_TIMES,
+  type NextFreeSlotInput,
+  nextFreeSlot,
+  SLOT_CLASH_MS,
+  SLOT_LEAD_MS,
+  SLOT_SEARCH_DAYS,
+} from './queue/next-free-slot';
 // Secrets: hiding them in run data, refusing them in a saved graph
 export {
   isSecretKey,

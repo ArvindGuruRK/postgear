@@ -91,6 +91,24 @@ export function setConfigPath(
   return write(config, 0) as Record<string, unknown>;
 }
 
+/**
+ * The config a step starts with when it is added from the picker: steps
+ * whose settings hold an IANA `timeZone` (the Schedule trigger, Add To
+ * Queue) take the browser's zone instead of the catalog's UTC, as templates
+ * do (`instantiateTemplate`). A zone the picker item already set wins.
+ */
+export function startingConfig(
+  type: string,
+  config: Record<string, unknown> | undefined,
+  browserZone: string,
+): Record<string, unknown> | undefined {
+  const def = getDefinition(type);
+  const defaults = def?.defaultConfig as Record<string, unknown> | undefined;
+  if (!defaults || !Object.hasOwn(defaults, 'timeZone') || !browserZone) return config;
+  if (config && Object.hasOwn(config, 'timeZone')) return config;
+  return { ...(config ?? {}), timeZone: browserZone };
+}
+
 /** A fresh step of `type`, with its default settings and a name not taken yet. */
 export function createStep(
   graph: AutomationGraph,

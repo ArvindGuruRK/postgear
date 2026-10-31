@@ -30,6 +30,13 @@ export const LIMITS = {
   webhookBodyCapBytes: 262_144,
   /** A schedule in a workflow with AI steps may not run more often than this. */
   minScheduleMinutesWithAi: 60,
+  /** People one Email step writes to. The Email step's schema refuses more. */
+  maxEmailRecipients: 10,
+  /**
+   * Emails Email steps may send per workspace per UTC day, recipients
+   * counted one by one. The API's email gateway refuses past it.
+   */
+  workflowEmailsPerDay: 200,
 } as const;
 
 /**

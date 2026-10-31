@@ -39,6 +39,26 @@ export function isSendChecked(kind: ConnectionKind): boolean {
   return SEND_CHECKED.has(kind);
 }
 
+/** A stand-in connection for local testing (`AUTOMATION_SIMULATION`): it never calls the app. */
+export function isSimulated(connection: Pick<Connection, 'meta'>): boolean {
+  return connection.meta?.simulated === true;
+}
+
+/** What Google connecting offers: signing in when PostGear has Google keys, a stand-in when simulating. */
+export interface GoogleSetup {
+  simulation: boolean;
+  googleReady: boolean;
+}
+
+/** The name a simulated Google connection gets. */
+export const SIMULATED_GOOGLE_NAME = 'Simulated Google';
+
+/** The sentence for a workspace where Google cannot be connected at all. */
+export const GOOGLE_NOT_SET_UP = 'Ask a workspace admin to set up Google.';
+
+/** Every app the Add Connection menu offers: the form apps, then Google. */
+export const ADD_MENU_APPS: readonly ConnectionKind[] = [...FORM_APPS, 'google'];
+
 export const STATUS_WORDS: Record<
   ConnectionStatus,
   { label: string; variant: 'success' | 'accent' | 'danger' }
@@ -129,7 +149,7 @@ export const HELP: Record<
       'Finish its steps, choosing the team and channel.',
       'Copy the link it shows at the end and paste it here.',
     ],
-    note: 'Messages appear as posted by Flow bot, and the flow belongs to the person who made it: if they leave, make a new one.',
+    note: 'Messages appear as posted by the Workflows bot, not by PostGear. The flow belongs to the person who made it: if they leave, make a new one.',
     docs: 'https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook',
   },
 };

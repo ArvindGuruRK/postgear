@@ -1,11 +1,21 @@
 /**
  * Data steps: write to spreadsheets or call another app. Both leave
  * PostGear, so they run dry in tests unless switched on. Secret headers of
- * HTTP Request live in an `http` connection, never in the graph.
+ * HTTP Request live in an `http` connection, never in the graph: a plain
+ * header whose name looks secret (`Authorization`, `X-Api-Key`, `Token`)
+ * is a config problem with the sentence the panel shows.
+ *
+ * Google Sheets uses the `drive.file` scope (Module 13): PostGear sees only
+ * the spreadsheets someone picked with Google's file picker or that
+ * PostGear created, so the form never offers a pasted link.
  */
 import { z } from 'zod';
+import { isSecretKey } from '../redact/patterns';
 import { connectionIdField, count, OUT, templateField } from './fields';
 import { defineNode } from './types';
+
+/** Validation's words for a secret-looking plain header (Module 13). */
+export const SECRET_HEADER_MESSAGE = 'Put this header in a connection so it stays secret.';
 
 const DATA_BASICS = {
   typeVersion: 1,
@@ -72,6 +82,42 @@ export const googleSheetsAppendRow = defineNode({
   connection: { kind: 'google', field: 'connectionId' },
   summary: (config) =>
     config.spreadsheet ? `Adds a row to ${config.spreadsheet.name}` : 'Pick a spreadsheet',
+  form: {
+    tabs: {
+      setup: [
+        { path: 'connectionId', kind: 'connection', label: 'Google account', required: true },
+        {
+          path: 'spreadsheet',
+          kind: 'spreadsheet',
+          label: 'Spreadsheet',
+          help: 'Pick one with Google’s file picker, or create a new one.',
+          required: true,
+        },
+        {
+          path: 'sheet',
+          kind: 'sheetTab',
+          label: 'Tab',
+          help: 'The tab in the spreadsheet that gets the new rows.',
+          required: true,
+        },
+      ],
+      configure: [
+        {
+          path: 'columns',
+          kind: 'sheetColumns',
+          label: 'Columns',
+          help: 'One per heading in the first row of the tab. A column you leave empty gets an empty cell.',
+          acceptsData: true,
+          max: 50,
+          required: true,
+        },
+      ],
+    },
+    notes: [
+      'PostGear can only open spreadsheets you pick with Google’s file picker or that PostGear created. Pasting a link to a spreadsheet will not work.',
+      'Each run adds one row at the bottom of the tab. Text is written exactly as it is, so nothing in it turns into a formula.',
+    ],
+  },
 });
 
 export const excelAppendRow = defineNode({
@@ -92,7 +138,7 @@ export const excelAppendRow = defineNode({
 
 const HEADER_NAME = /^[A-Za-z0-9-]{1,64}$/;
 
-const httpConfig = z
+const httpConfigShape = z
   .object({
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
     /** A template that must resolve to an https address. */
@@ -114,6 +160,38 @@ const httpConfig = z
     responseType: z.enum(['auto', 'json', 'text']),
   })
   .strict();
+
+/** A plain header whose name looks secret belongs in a connection. */
+const httpConfig = httpConfigShape.superRefine((config, issue) => {
+  config.headers.forEach((header, i) => {
+    if (isSecretKey(header.name)) {
+      issue.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['headers', i, 'name'],
+        message: SECRET_HEADER_MESSAGE,
+      });
+    }
+  });
+});
+
+const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+
+/** The body field, once per body type, so each gets its own help (one shows at a time). */
+const BODY_FIELDS = (
+  [
+    ['json', 'Data you insert is written safely inside the JSON, quotes and all.'],
+    ['form', 'One field per line, like name=value.'],
+    ['text', 'Sent exactly as written.'],
+  ] as const
+).map(([type, help]) => ({
+  path: 'body',
+  kind: 'longText' as const,
+  label: 'Body',
+  help,
+  placeholder: 'Enter your request body',
+  acceptsData: true,
+  showIf: { path: 'bodyType', equals: type },
+}));
 
 /** "api.example.com" from a typed address; nothing when the host is data from a step. */
 function hostOf(url: string): string | undefined {
@@ -151,6 +229,71 @@ export const httpRequest = defineNode({
     const host = hostOf(config.url);
     const headers = config.headers.length ? `, ${count(config.headers.length, 'header')}` : '';
     return host ? `${config.method} to ${host}${headers}` : `${config.method} request${headers}`;
+  },
+  form: {
+    tabs: {
+      setup: [
+        {
+          path: 'method',
+          kind: 'select',
+          label: 'Method',
+          options: HTTP_METHODS.map((method) => ({ value: method, label: method })),
+          required: true,
+        },
+        {
+          path: 'url',
+          kind: 'text',
+          label: 'Address',
+          help: 'Must start with https://.',
+          placeholder: 'Enter your address',
+          acceptsData: true,
+          required: true,
+        },
+        {
+          path: 'secretHeadersConnectionId',
+          kind: 'connection',
+          label: 'Secret headers',
+          help: 'Optional. Keys and passwords the other app needs, kept in a connection so they are never saved in the workflow.',
+        },
+      ],
+      configure: [
+        {
+          path: 'headers',
+          kind: 'keyValue',
+          label: 'Headers',
+          help: 'Never put a password or key here: use Secret headers.',
+          acceptsData: true,
+          max: 20,
+          row: { key: 'name', value: 'value', keyLabel: 'Name', valueLabel: 'Value' },
+        },
+        {
+          path: 'bodyType',
+          kind: 'select',
+          label: 'Body type',
+          options: [
+            { value: 'none', label: 'No body' },
+            { value: 'json', label: 'JSON' },
+            { value: 'form', label: 'Form fields' },
+            { value: 'text', label: 'Plain text' },
+          ],
+        },
+        ...BODY_FIELDS,
+        {
+          path: 'responseType',
+          kind: 'select',
+          label: 'Read the answer as',
+          options: [
+            { value: 'auto', label: 'Work it out from the answer' },
+            { value: 'json', label: 'JSON' },
+            { value: 'text', label: 'Text' },
+          ],
+        },
+      ],
+    },
+    notes: [
+      'PostGear never follows a redirect: the other app’s answer is what the next steps get.',
+      'POST and PATCH requests carry an Idempotency-Key header, so an app that supports it never acts twice on a retry.',
+    ],
   },
 });
 

@@ -1,6 +1,6 @@
 # Module 13: Google Sheets, HTTP Request And Webhook Trigger
 
-> **Sprint 10, Workflow Builder** | Status: Not started | Size: L (one session)
+> **Sprint 10, Workflow Builder** | Status: Done with gaps (2026-10-31) | Size: L (one session)
 > **Depends on**: [Module 12](module-12-notify-steps-and-simulation.md) (`safe-http.ts`, stand-ins), Module 04 (connections, OAuth start and callback framework with single-use state), Module 09 (live runs, activation)
 > **Stories**: WF-11.4 (P1), WF-11.5 (P1), WF-7.5 (P1), Journey A (Sheets), Journey D (Sheets disconnected)
 > **Next**: [Module 14](module-14-hardening-e2e-closeout.md)
@@ -109,15 +109,15 @@ Config:
 
 ## Tasks
 
-- [ ] Env vars in API and worker schemas and `.env.example`; local testing guide section for Google testing mode.
-- [ ] Google OAuth provider in Module 04's framework (`drive.file`, offline, consent), picker-token route, worker refresh helper.
-- [ ] API Google helpers: list tabs, read header row, create spreadsheet.
-- [ ] Sheets executor, stand-in, dry run; web Setup (Picker, Create A New Spreadsheet) and Configure (columns) fields.
-- [ ] `http` connection kind (if Module 04 lacks it); HTTP Request executor, JSON-safe resolution, redirects not followed; web fields.
-- [ ] `prisma-change`: `AutomationWebhookSecret`, `Automation.webhookSample`, `webhookSampleAt`; migrate and generate yourself.
-- [ ] Hook controller with secret check, caps, throttle, idempotency, sample storage; trigger panel.
-- [ ] Catalog: the three types executable.
-- [ ] Publishing Report and Blog To Draft run under simulation.
+- [x] Env vars in API and worker schemas and `.env.example`; local testing guide section for Google testing mode.
+- [x] Google OAuth provider in Module 04's framework (`drive.file`, offline, consent), picker-token route, worker refresh helper.
+- [x] API Google helpers: list tabs, read header row, create spreadsheet.
+- [x] Sheets executor, stand-in, dry run; web Setup (Picker, Create A New Spreadsheet) and Configure (columns) fields. (Web part done: Spreadsheet, Tab and Columns fields, Use A Sample Spreadsheet on a simulated connection, Google connect dialog.)
+- [x] `http` connection kind (if Module 04 lacks it); HTTP Request executor, JSON-safe resolution, redirects not followed; web fields.
+- [x] `prisma-change`: `AutomationWebhookSecret`, `Automation.webhookSample`, `webhookSampleAt`; migrate and generate yourself. (Done by the lead before the build.)
+- [x] Hook controller with secret check, caps, throttle, idempotency, sample storage; trigger panel. (Web part done: the trigger panel's link, shown-once secret, example and last received line.)
+- [x] Catalog: the three types executable.
+- [x] Publishing Report and Blog To Draft run under simulation.
 
 ## Tests
 

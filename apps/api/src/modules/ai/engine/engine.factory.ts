@@ -23,6 +23,7 @@ import type { ConfigService } from '@nestjs/config';
 import {
   AiProviderError,
   createSeoAdvisor as buildSeoAdvisor,
+  createSnippetWriter as buildSnippetWriter,
   type ContentPipeline,
   type CopilotAgent,
   type CopilotContext,
@@ -37,6 +38,7 @@ import {
   type ModelClient,
   type ResearchProvider,
   type SeoAdvisor,
+  type SnippetWriter,
   withResearchCache,
 } from '@postgear/ai-engine';
 import { redact } from '../../../common/logging/security-logger';
@@ -52,6 +54,7 @@ import {
   type EngineScope,
   type GeneratedImageOutput,
   imageNameFor,
+  type PipelineOptions,
 } from './engine.types';
 import { imageSinkFor } from './image-sink';
 import { createSimulatedImageGenerator } from './simulated-image.generator';
@@ -157,14 +160,16 @@ export function buildAiEngine(
     researchEnabled: research !== null,
     imagesEnabled: images !== null,
 
-    createPipeline(scope: EngineScope): ContentPipeline | null {
+    createPipeline(scope: EngineScope, options: PipelineOptions = {}): ContentPipeline | null {
       if (!model) {
         return null;
       }
 
       return createContentPipeline({
         model,
-        research,
+        // Research only when asked and a provider exists; in simulation the
+        // provider is the canned one, never Tavily (see `createAiEngine`).
+        research: options.research === false ? null : research,
         images,
         imageSink: images ? imageSinkFor(media, scope.orgId) : null,
         logger: engineLogger,
@@ -181,6 +186,10 @@ export function buildAiEngine(
       }
 
       return createCopilotAgent({ model, tools, context });
+    },
+
+    createSnippetWriter(_scope: EngineScope): SnippetWriter | null {
+      return model ? buildSnippetWriter(model) : null;
     },
 
     createSeoAdvisor(_scope: EngineScope): SeoAdvisor | null {

@@ -39,7 +39,8 @@ export const STRIPE_PLACEHOLDERS: readonly string[] = [
 function placeholderAsUnset<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess(
     (value) =>
-      typeof value === 'string' && (value.trim() === '' || STRIPE_PLACEHOLDERS.includes(value.trim()))
+      typeof value === 'string' &&
+      (value.trim() === '' || STRIPE_PLACEHOLDERS.includes(value.trim()))
         ? undefined
         : value,
     schema,
@@ -188,7 +189,10 @@ const envSchema = z
     // Chromium); `on` fails the crawl rather than silently degrading.
     SEO_BROWSER: blankAsUnset(z.enum(['auto', 'on', 'off']).default('auto')),
     SEO_USER_AGENT: blankAsUnset(
-      z.string().min(1).default('Mozilla/5.0 (compatible; PostGearBot/1.0; +https://postgear.rkay.in/bot)'),
+      z
+        .string()
+        .min(1)
+        .default('Mozilla/5.0 (compatible; PostGearBot/1.0; +https://postgear.rkay.in/bot)'),
     ),
     // Optional. With a key, the authority score comes from Open PageRank's
     // backlink index; without one it is estimated from on-page signals and
@@ -246,6 +250,31 @@ const envSchema = z
     // dies at boot on both sides. Refused in production below.
     AUTOMATION_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
 
+    // The worker's key to the internal step gateway (`/internal/automation/*`,
+    // Module 10): steps that need API services (posts, AI, email) call it with
+    // this value in `X-PostGear-Internal`. Unset locally means the gateway
+    // refuses every call; required in production below. Generate it with
+    // `npm run generate:keys`; the worker reads the same variable.
+    AUTOMATION_INTERNAL_TOKEN: blankAsUnset(
+      z
+        .string()
+        .regex(
+          /^[0-9a-fA-F]{64}$/,
+          'AUTOMATION_INTERNAL_TOKEN must be 64 hex characters. Run `npm run generate:keys`',
+        )
+        .optional(),
+    ),
+
+    // Google Sheets connections (Module 13). The client falls back to the
+    // sign-in app's GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET when these are
+    // unset; add `${API_URL}/automation-connections/oauth/google/callback` to
+    // that client's redirect URIs. The Picker needs a browser key restricted
+    // to the Picker API and the project number.
+    GOOGLE_AUTOMATION_CLIENT_ID: blankAsUnset(z.string().optional()),
+    GOOGLE_AUTOMATION_CLIENT_SECRET: blankAsUnset(z.string().optional()),
+    GOOGLE_PICKER_API_KEY: blankAsUnset(z.string().optional()),
+    GOOGLE_CLOUD_APP_ID: blankAsUnset(z.string().optional()),
+
     // Error tracking (Sprint 8). Absent DSN = no Sentry at all, which is the
     // local default; traces stay off unless asked for.
     SENTRY_DSN: blankAsUnset(z.string().url().optional()),
@@ -302,6 +331,14 @@ const envSchema = z
     }
     // A workflow whose Slack message "succeeded" against a stand-in would
     // hide, on a real deployment, that nobody was ever told (Sprint 10).
+    if (env.NODE_ENV === 'production' && !env.AUTOMATION_INTERNAL_TOKEN) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AUTOMATION_INTERNAL_TOKEN'],
+        message: 'AUTOMATION_INTERNAL_TOKEN is required when NODE_ENV=production',
+      });
+    }
+
     if (env.NODE_ENV === 'production' && env.AUTOMATION_SIMULATION === 'true') {
       context.addIssue({
         code: z.ZodIssueCode.custom,

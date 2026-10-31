@@ -24,6 +24,7 @@ import type {
   CopilotTool,
   SavedImage,
   SeoAdvisor,
+  SnippetWriter,
 } from '@postgear/ai-engine';
 
 export type AiMode = 'openai' | 'simulation' | 'unconfigured';
@@ -46,6 +47,16 @@ export interface EngineScope {
   orgId: string;
 }
 
+export interface PipelineOptions {
+  /**
+   * Run web research first (Sprint 10's Generate Text step has a switch for
+   * it). Research still needs a provider: a Tavily key, or the simulated one
+   * under `AI_SIMULATION`. Defaults to true, which is how the AI page and the
+   * copilot have always run.
+   */
+  research?: boolean;
+}
+
 /** A tool as the engine's agent accepts it, whatever its input type. */
 export type AnyCopilotTool = CopilotTool<never, unknown>;
 
@@ -60,7 +71,10 @@ export interface AiEngine {
   readonly imagesEnabled: boolean;
 
   /** Null when unconfigured. */
-  createPipeline(scope: EngineScope): ContentPipeline | null;
+  createPipeline(scope: EngineScope, options?: PipelineOptions): ContentPipeline | null;
+
+  /** Hashtags and rewrites in a voice (Sprint 10's workflow steps). Null when unconfigured. */
+  createSnippetWriter(scope: EngineScope): SnippetWriter | null;
 
   /** Null when unconfigured. */
   createCopilot(

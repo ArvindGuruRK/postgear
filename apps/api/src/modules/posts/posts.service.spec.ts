@@ -95,6 +95,8 @@ describe('PostsService', () => {
       | 'countQueueStates'
       | 'reschedule'
       | 'publishNow'
+      | 'findPostRef'
+      | 'listQueuedTimes'
     >
   >;
   let channels: { list: jest.Mock; colors: jest.Mock };
@@ -118,6 +120,8 @@ describe('PostsService', () => {
         .mockResolvedValue({ all: 0, QUEUE: 0, PUBLISHED: 0, ERROR: 0, DRAFT: 0 }),
       reschedule: jest.fn(),
       publishNow: jest.fn(),
+      findPostRef: jest.fn(),
+      listQueuedTimes: jest.fn().mockResolvedValue([]),
     };
     scheduling = {
       schedulePublish: jest.fn().mockResolvedValue(true),
@@ -816,6 +820,88 @@ describe('PostsService', () => {
         intervalInDays: 7,
         tags: [{ id: 'tag_b' }, { id: 'tag_a' }],
       });
+    });
+  });
+
+  describe('internal callers: a known group and the origin (Sprint 10)', () => {
+    const KNOWN = '5a8b6f1e-3c2d-5e4f-8a9b-0c1d2e3f4a5b';
+
+    it('writes nothing for the composer beyond what it always did', async () => {
+      await service.create('org_1', input());
+
+      const write = repository.createGroup.mock.calls[0][0];
+      expect(write).not.toHaveProperty('creationMethod');
+      expect(write.group).not.toBe(KNOWN);
+    });
+
+    it('uses the caller’s group and origin when the group is new', async () => {
+      repository.findGroup.mockResolvedValueOnce([]);
+
+      const detail = await service.create('org_1', input(), {
+        group: KNOWN,
+        creationMethod: 'AUTOMATION',
+      });
+
+      expect(repository.findGroup).toHaveBeenNthCalledWith(1, 'org_1', KNOWN);
+      expect(repository.createGroup.mock.calls[0][0]).toMatchObject({
+        group: KNOWN,
+        creationMethod: 'AUTOMATION',
+      });
+      expect(detail.group).toBe(KNOWN);
+    });
+
+    it('returns a known group as it is: no second row, no schedule, no publish', async () => {
+      repository.findGroup.mockResolvedValue([row({ group: KNOWN, state: State.QUEUE })]);
+
+      const detail = await service.create(
+        'org_1',
+        input({ state: 'QUEUE', publishNow: true, publishDate: '2020-01-01T00:00:00.000Z' }),
+        { group: KNOWN, creationMethod: 'AUTOMATION' },
+      );
+
+      expect(detail).toMatchObject({ group: KNOWN, state: State.QUEUE });
+      expect(repository.createGroup).not.toHaveBeenCalled();
+      expect(repository.publishNow).not.toHaveBeenCalled();
+      expect(scheduling.publishNow).not.toHaveBeenCalled();
+      expect(scheduling.schedulePublish).not.toHaveBeenCalled();
+      // Not even the channels and media are looked up again.
+      expect(channels.list).not.toHaveBeenCalled();
+    });
+
+    it('publishes a new group now under the caller’s id', async () => {
+      repository.findGroup.mockResolvedValueOnce([]);
+      repository.publishNow.mockResolvedValue({
+        outcome: 'saved',
+        roots: [{ id: 'root_x', integrationId: 'ch_x', state: State.QUEUE }],
+      });
+
+      await service.create('org_1', input({ state: 'QUEUE', publishNow: true }), {
+        group: KNOWN,
+        creationMethod: 'AUTOMATION',
+      });
+
+      expect(repository.publishNow).toHaveBeenCalledWith({ orgId: 'org_1', group: KNOWN });
+      expect(scheduling.publishNow).toHaveBeenCalledWith([
+        { postId: 'root_x', organizationId: 'org_1' },
+      ]);
+    });
+
+    it('refuses a malformed group as a bug, before reading anything', async () => {
+      await expect(service.create('org_1', input(), { group: 'not-a-uuid' })).rejects.toThrow(
+        'the group must be a UUID',
+      );
+      expect(repository.findGroup).not.toHaveBeenCalled();
+    });
+
+    it('finds a post by group or row id, and nothing for junk', async () => {
+      repository.findPostRef.mockResolvedValue({ group: GROUP, rootId: 'p1' });
+
+      await expect(service.findPostRef('org_1', GROUP)).resolves.toEqual({
+        group: GROUP,
+        rootId: 'p1',
+      });
+      await expect(service.findPostRef('org_1', '{{ oops }}')).resolves.toBeNull();
+      expect(repository.findPostRef).toHaveBeenCalledTimes(1);
     });
   });
 });

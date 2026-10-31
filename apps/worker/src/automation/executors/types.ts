@@ -15,6 +15,7 @@ import type {
   PortId,
   RunScope,
 } from '@postgear/automation';
+import type { GatewayClient } from '../gateway-client';
 import type { PriorOutput, RunStore, StoredConnection } from '../run-store';
 
 export interface ExecLog {
@@ -35,6 +36,8 @@ export interface ExecRun {
 export interface ExecDeps {
   /** Writes PostGear data (In-App Notification); tests pass the memory store. */
   store: RunStore;
+  /** The API's internal step gateway (posts, AI, email; Module 10). Call it through `callGateway`. */
+  gateway: GatewayClient;
   now(): Date;
 }
 
@@ -55,6 +58,8 @@ export interface ExecContext<C = Record<string, unknown>> {
   dryRun: boolean;
   /** True under AUTOMATION_SIMULATION: providers use `simulate()`, not `send()`. */
   simulation: boolean;
+  /** WEBHOOK_ALLOW_PRIVATE_URLS: pass to `safeHttpRequest` as `allowPrivate`. Absent means false. */
+  allowPrivateUrls?: boolean;
   /** `${runId}:${nodeKey}`, for every provider that accepts one. */
   idempotencyKey: string;
   /** The step's connection, decrypted; null when it has none or it is not usable. */
@@ -75,6 +80,8 @@ export interface ExecResult {
   ports?: PortId[];
   /** `dryRun` stores DRY_RUN; `handledError` when the executor itself chose to carry on. */
   status?: 'succeeded' | 'dryRun' | 'handledError';
+  /** AI credits the step used (net of refunds); added to the run's total with the step's row. */
+  credits?: number;
 }
 
 export interface Executor<C = Record<string, unknown>> {

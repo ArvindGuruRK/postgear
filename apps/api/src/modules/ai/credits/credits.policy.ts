@@ -24,10 +24,10 @@
  */
 import type { SubscriptionTier } from '@postgear/db';
 import {
-  allowanceFor as planAllowanceFor,
   PLAN_ORDER,
-  resolveEntitlement,
   type SubscriptionLike as PlanSubscriptionLike,
+  allowanceFor as planAllowanceFor,
+  resolveEntitlement,
 } from '../../billing/plans';
 
 export const AI_CREDIT_COSTS = {
@@ -36,6 +36,11 @@ export const AI_CREDIT_COSTS = {
   copilot_message: 1,
   /** Sprint 7: the SEO analyzer's AI advice; one structured call over the audit. */
   seo_advice: 3,
+  /**
+   * Sprint 10: the small workflow AI steps (Generate Hashtags, Rewrite In
+   * Brand Voice); one short structured call each.
+   */
+  generate_snippet: 2,
 } as const;
 
 export type AiCreditType = keyof typeof AI_CREDIT_COSTS;

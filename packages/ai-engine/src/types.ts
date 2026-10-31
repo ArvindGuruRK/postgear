@@ -185,6 +185,53 @@ export interface ContentPipeline {
 }
 
 // ---------------------------------------------------------------------------
+// Snippets (Sprint 10): the small writing jobs a workflow step asks for
+// ---------------------------------------------------------------------------
+
+export interface HashtagRequest {
+  /** The post the hashtags are for. */
+  text: string;
+  /** A provider identifier (`instagram`, `x` ...) or `generic`. */
+  platform: string;
+  /** How many to suggest; held to 3 to 15. */
+  count: number;
+  /** The platform's limit for one post: the hashtag line must fit it. Null for none. */
+  maxCharacters?: number | null;
+}
+
+export interface HashtagResult {
+  /** Each starts with `#`, most relevant first, no repeats. */
+  hashtags: string[];
+  /** The hashtags on one line, separated by spaces: "#a #b #c". */
+  line: string;
+  /** True when hashtags were dropped so the line fits the platform's limit. */
+  shortened: boolean;
+}
+
+export interface RewriteRequest {
+  text: string;
+  /** A provider identifier (`instagram`, `x` ...) or `generic`. */
+  platform: string;
+  voice: Tone;
+  /** The platform's limit for one post. Null for none. */
+  maxCharacters?: number | null;
+  /** The workspace's name, used as the brand name in company voice. */
+  workspaceName?: string;
+}
+
+export interface RewriteResult {
+  text: string;
+  /** True when the rewrite was cut to fit the platform's limit. */
+  shortened: boolean;
+}
+
+/** The snippet jobs bound to one model client. Rejects with an {@link AiProviderError}. */
+export interface SnippetWriter {
+  hashtags(request: HashtagRequest, options?: { signal?: AbortSignal }): Promise<HashtagResult>;
+  rewrite(request: RewriteRequest, options?: { signal?: AbortSignal }): Promise<RewriteResult>;
+}
+
+// ---------------------------------------------------------------------------
 // The copilot
 // ---------------------------------------------------------------------------
 

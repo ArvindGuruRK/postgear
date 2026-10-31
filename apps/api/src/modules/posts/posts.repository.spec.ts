@@ -100,6 +100,24 @@ describe('PostsRepository', () => {
       });
     });
 
+    it('writes AUTOMATION as the origin of a workflow’s post (Sprint 10)', async () => {
+      await repository.createGroup({
+        orgId: 'org_1',
+        group: 'g_1',
+        state: 'DRAFT',
+        publishDate: new Date(),
+        intervalInDays: null,
+        tagIds: [],
+        creationMethod: 'AUTOMATION',
+        channels: [
+          { integrationId: 'ch_x', customized: false, settings: {}, parts: [part('a'), part('b')] },
+        ],
+      });
+
+      const writes = db.post.create.mock.calls.map(([args]) => args.data);
+      expect(writes.map((data) => data.creationMethod)).toEqual(['AUTOMATION', 'AUTOMATION']);
+    });
+
     it('runs in a serializable transaction', async () => {
       await repository.createGroup({
         orgId: 'o',
@@ -194,6 +212,28 @@ describe('PostsRepository', () => {
         select: { tag: { select: { id: true, name: true, color: true } } },
       });
       expect(db.post.findMany.mock.calls[0][0].select.intervalInDays).toBe(true);
+    });
+
+    it('reads queued roots of the chosen channels only, from a time on (Sprint 10)', async () => {
+      const at = new Date('2026-11-03T09:00:00Z');
+      db.post.findMany.mockResolvedValueOnce([{ publishDate: at }]);
+      const from = new Date('2026-11-03T08:00:00Z');
+
+      await expect(
+        repository.listQueuedTimes({ orgId: 'org_1', integrationIds: ['ch_x'], from }),
+      ).resolves.toEqual([at]);
+      expect(db.post.findMany.mock.calls[0][0].where).toEqual({
+        organizationId: 'org_1',
+        integrationId: { in: ['ch_x'] },
+        deletedAt: null,
+        parentPostId: null,
+        state: State.QUEUE,
+        publishDate: { gte: from },
+      });
+      await expect(
+        repository.listQueuedTimes({ orgId: 'org_1', integrationIds: [], from }),
+      ).resolves.toEqual([]);
+      expect(db.post.findMany).toHaveBeenCalledTimes(1);
     });
   });
 

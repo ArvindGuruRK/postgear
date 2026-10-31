@@ -76,6 +76,7 @@ import {
 } from 'react';
 import { ApiError, api, pinStepData, unpinStepData } from '@/lib/api';
 import { registerLeaveGuard } from '@/lib/leave-guard';
+import { getWebhook } from '@/lib/workflows-api';
 import type { Channel } from '@/types/channel';
 import type {
   AutomationDetail,
@@ -101,7 +102,7 @@ import type { FieldContext } from '../fields/contract';
 import { TemplateGallery } from '../list/template-gallery';
 import { ExpandedView } from '../panel/expanded-view';
 import type { PinControls } from '../panel/output-pane';
-import { buildScope, inputSourceLine } from '../panel/panel-view-model';
+import { buildScope, inputSourceLine, receivedWebhookData } from '../panel/panel-view-model';
 import { pinErrorMessage } from '../panel/pinned-data-editor';
 import { ResizeHandle } from '../panel/resize-handle';
 import { StepPanel } from '../panel/step-panel';
@@ -139,7 +140,7 @@ import {
 } from './builder-view-model';
 import { CommandPalette, type PaletteCommand } from './command-palette';
 import { FinishSetup } from './finish-setup';
-import { firstOutput, leaves } from './graph-ops';
+import { firstOutput, leaves, startingConfig } from './graph-ops';
 import { type IssuePlace, issuePlace, stepPlace } from './issue-focus';
 import { ShortcutsSheet } from './shortcuts-sheet';
 import { keyMaker, newStepKey } from './step-keys';
@@ -487,10 +488,27 @@ function Builder({
   const workspaceName = workspace?.organizations.find((org) => org.id === orgId)?.name;
   const canManage = canManageProp ?? (workspace ? workspace.role !== 'USER' : false);
   const timeZone = useMemo(browserZone, []);
+  // A Webhook trigger's sample is the last data it received (Module 13), as
+  // in test runs. Asked again each time a step panel opens, so data that
+  // arrived while the builder was open shows up in Insert Data.
+  const webhookTrigger = checkedGraph.nodes.some((node) => node.type === 'trigger.webhook');
+  const [received, setReceived] = useState<Record<string, unknown> | undefined>(undefined);
+  useEffect(() => {
+    if (!webhookTrigger || panelKey === null) return;
+    let live = true;
+    getWebhook(automation.id)
+      .then((info) => {
+        if (live) setReceived(receivedWebhookData(info));
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [webhookTrigger, panelKey, automation.id]);
   // Pinned data first, then each step's last test, then samples.
   const { scope, scopeSource } = useMemo(
-    () => buildScope(checkedGraph, pinned, workspaceName, testRun.lastTest),
-    [checkedGraph, pinned, workspaceName, testRun.lastTest],
+    () => buildScope(checkedGraph, pinned, workspaceName, testRun.lastTest, received),
+    [checkedGraph, pinned, workspaceName, testRun.lastTest, received],
   );
   const fieldContext = useMemo(
     (): FieldContext => ({
@@ -502,8 +520,19 @@ function Builder({
       scope,
       scopeSource,
       timeZone,
+      workflowName: state.name,
     }),
-    [orgId, automation.id, connections, channels, canManage, scope, scopeSource, timeZone],
+    [
+      orgId,
+      automation.id,
+      connections,
+      channels,
+      canManage,
+      scope,
+      scopeSource,
+      timeZone,
+      state.name,
+    ],
   );
   const pinnedKeys = useMemo(() => new Set(pinned.map((pin) => pin.nodeKey)), [pinned]);
 
@@ -706,6 +735,7 @@ function Builder({
       } = {},
     ) => {
       if (item.blocked) return;
+      const config = startingConfig(item.type, item.config, browserZone());
       const key = newStepKey(
         new Set([
           ...graphRef.current.nodes.map((node) => node.key),
@@ -718,14 +748,14 @@ function Builder({
           edgeId: where.edgeId,
           stepType: item.type,
           key,
-          config: item.config,
+          config,
         });
       } else if (where.from || where.position) {
         dispatch({
           type: 'addStep',
           stepType: item.type,
           key,
-          config: item.config,
+          config,
           from: where.from,
           position: where.position,
         });
@@ -740,7 +770,7 @@ function Builder({
           type: 'addStep',
           stepType: item.type,
           key,
-          config: item.config,
+          config,
           from: anchor && port ? { source: anchor.key, sourcePort: port } : undefined,
         });
       }
@@ -1013,8 +1043,16 @@ function Builder({
           }
           case 'escape':
             if (picker) setPicker(null);
-            else if (panelKey) setPanelKey(null);
-            else dispatch({ type: 'select', selection: { nodes: [], edges: [], notes: [] } });
+            else if (panelKey) {
+              const key = panelKey;
+              setPanelKey(null);
+              // React Flow blurs a card on Escape: hand the keyboard back to the step's card.
+              requestAnimationFrame(() => {
+                document
+                  .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(key)}"]`)
+                  ?.focus();
+              });
+            } else dispatch({ type: 'select', selection: { nodes: [], edges: [], notes: [] } });
             return true;
         }
       })();
@@ -1574,7 +1612,12 @@ function Builder({
             </SheetContent>
           </Sheet>
           <Sheet open={panel !== null} onOpenChange={(value) => !value && setPanelKey(null)}>
-            <SheetContent side="right" className="flex w-full max-w-md flex-col p-0">
+            {/* The panel has its own Close; workflow-canvas.css hides the sheet's, which sat on top of it. */}
+            <SheetContent
+              side="right"
+              className="flex w-full max-w-md flex-col p-0"
+              data-step-sheet=""
+            >
               <SheetTitle className="sr-only">{panelNode?.name ?? 'Step'}</SheetTitle>
               <SheetDescription className="sr-only">Set up this step.</SheetDescription>
               {panel}

@@ -198,17 +198,25 @@ describe('pruneAutomationRuns', () => {
       left -= args.where.id.in.length;
       return { count: args.where.id.in.length };
     });
+    const deleteEffects = jest.fn(async () => ({ count: 7 }));
     return {
-      client: { automationRun: { findMany: findRuns, deleteMany } } as unknown as PruneClient,
+      client: {
+        automationRun: { findMany: findRuns, deleteMany },
+        automationEffect: { deleteMany: deleteEffects },
+      } as unknown as PruneClient,
       findRuns,
       deleteMany,
+      deleteEffects,
     };
   }
 
   it('deletes finished runs older than the retention, 500 at a time', async () => {
     const { client, findRuns, deleteMany } = pruneClient(1_200);
 
-    await expect(pruneAutomationRuns(client, new Date(NOW))).resolves.toEqual({ runs: 1_200 });
+    await expect(pruneAutomationRuns(client, new Date(NOW))).resolves.toEqual({
+      runs: 1_200,
+      effects: 7,
+    });
 
     expect(deleteMany).toHaveBeenCalledTimes(3);
     expect(deleteMany.mock.calls.map(([args]) => args.where.id.in.length)).toEqual([
@@ -239,7 +247,20 @@ describe('pruneAutomationRuns', () => {
 
   it('does nothing when nothing is old enough', async () => {
     const { client, deleteMany } = pruneClient(0);
-    await expect(pruneAutomationRuns(client, new Date(NOW))).resolves.toEqual({ runs: 0 });
+    await expect(pruneAutomationRuns(client, new Date(NOW))).resolves.toMatchObject({ runs: 0 });
     expect(deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('deletes step gateway effects older than the retention (Module 10)', async () => {
+    const { client, deleteEffects } = pruneClient(0);
+    await expect(pruneAutomationRuns(client, new Date(NOW))).resolves.toEqual({
+      runs: 0,
+      effects: 7,
+    });
+    expect(deleteEffects).toHaveBeenCalledWith({
+      where: {
+        createdAt: { lt: new Date(NOW - AUTOMATION_RUN_RETENTION_DAYS * 24 * 60 * 60_000) },
+      },
+    });
   });
 });

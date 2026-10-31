@@ -38,6 +38,8 @@ export interface FieldContext {
   scopeSource: Readonly<Record<string, DataSource>>;
   /** The browser's IANA zone, the default for the schedule builder. */
   timeZone: string;
+  /** The workflow's name, for message previews ("Sent by the workflow ..."). */
+  workflowName?: string;
 }
 
 export type DataSource =

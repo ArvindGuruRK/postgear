@@ -33,6 +33,9 @@ const PANEL_TYPES: NodeType[] = [
   'trigger.postFailed',
   'trigger.schedule',
   'trigger.manual',
+  'trigger.webhook',
+  'data.googleSheetsAppendRow',
+  'data.httpRequest',
   'logic.ifElse',
   'logic.switch',
   'logic.filter',
@@ -41,8 +44,17 @@ const PANEL_TYPES: NodeType[] = [
   'logic.setFields',
   'notify.inApp',
   'notify.slack',
+  'notify.teams',
+  'notify.discord',
+  'notify.email',
   'ai.generateText',
+  'ai.generateImage',
+  'ai.generateHashtags',
+  'ai.rewriteInBrandVoice',
   'postgear.createDraft',
+  'postgear.addToQueue',
+  'postgear.publish',
+  'postgear.getPost',
 ];
 
 function unwrap(schema: ZodTypeAny): ZodTypeAny {
@@ -223,11 +235,14 @@ describe('tabForField', () => {
   it('falls back sensibly for steps without a form', () => {
     const teams = getDefinition('notify.teams') as NodeDefinition;
     const publish = getDefinition('postgear.publish') as NodeDefinition;
-    expect(teams.form).toBeUndefined();
+    // Teams has its own form since Module 12; its fields land where the fallback would put them.
+    expect(teams.form?.preview).toBe('teams');
     expect(tabForField(teams, 'connectionId')).toBe('setup');
     expect(tabForField(teams, 'message')).toBe('configure');
+    // Publish To has its own form since Module 10: channels on Setup, settings on Configure.
     expect(tabForField(publish, 'channels')).toBe('setup');
-    expect(tabForField(publish, undefined)).toBe('configure');
+    expect(tabForField(publish, 'settings.title')).toBe('configure');
+    expect(tabForField(publish, 'mediaIds')).toBe('configure');
     expect(tabForField(slack, undefined)).toBe('setup');
   });
 });
@@ -329,29 +344,35 @@ function graphWith(node: GraphNode) {
 describe('focus-the-field', () => {
   const context = { connections: [], channels: [] };
 
-  it.each(PANEL_TYPES)('resolves every issue field %s can have', (type) => {
-    const def = getDefinition(type) as NodeDefinition;
-    const seen = new Set<string>();
-    for (const config of brokenConfigs(type)) {
-      const node = step('target', type, { config });
-      const issues = validateGraph(graphWith(node), context).filter(
-        (issue) => issue.nodeKey === 'target' && issue.field !== undefined,
-      );
-      for (const issue of issues) {
-        const field = issue.field as string;
-        seen.add(`${issue.code} ${field}`);
-        const place = tabForField(def, field);
-        if (place === 'settings' || place === 'name') continue;
-        expect({ code: issue.code, field, spec: fieldSpecFor(def, field) !== undefined }).toEqual({
-          code: issue.code,
-          field,
-          spec: true,
-        });
+  // The Webhook trigger has no settings, so no issue can name a field of it.
+  it.each(PANEL_TYPES.filter((type) => type !== 'trigger.webhook'))(
+    'resolves every issue field %s can have',
+    (type) => {
+      const def = getDefinition(type) as NodeDefinition;
+      const seen = new Set<string>();
+      for (const config of brokenConfigs(type)) {
+        const node = step('target', type, { config });
+        const issues = validateGraph(graphWith(node), context).filter(
+          (issue) => issue.nodeKey === 'target' && issue.field !== undefined,
+        );
+        for (const issue of issues) {
+          const field = issue.field as string;
+          seen.add(`${issue.code} ${field}`);
+          const place = tabForField(def, field);
+          if (place === 'settings' || place === 'name') continue;
+          expect({ code: issue.code, field, spec: fieldSpecFor(def, field) !== undefined }).toEqual(
+            {
+              code: issue.code,
+              field,
+              spec: true,
+            },
+          );
+        }
       }
-    }
-    // The broken configs really did reach the validators.
-    expect(seen.size).toBeGreaterThan(0);
-  });
+      // The broken configs really did reach the validators.
+      expect(seen.size).toBeGreaterThan(0);
+    },
+  );
 
   it('covers the AI schedule rule and duplicate names', () => {
     const schedule = getDefinition('trigger.schedule') as NodeDefinition;

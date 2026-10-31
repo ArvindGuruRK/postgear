@@ -26,6 +26,11 @@ export type ProviderResult =
       message: string;
       /** The app refused the credentials: the connection needs a reconnect. */
       connectionBroken?: boolean;
+      /**
+       * A retryable failure where the app said when to come back (`Retry-After`,
+       * Discord's `retry_after`), already capped; becomes Temporal's next retry delay.
+       */
+      retryAfterMs?: number;
       /** For support; redacted before it is stored. */
       details?: unknown;
     };
@@ -36,7 +41,12 @@ export interface ProviderBuildContext {
   scope: RunScope;
   timeZone: string;
   /** Name only: what a summary may say about the connection. */
-  connection: { id: string; name: string } | null;
+  connection: {
+    id: string;
+    name: string;
+    /** Safe to log: a webhook link's host and last 4 characters (`hooks.slack.com/...a9F2`). */
+    hint?: string;
+  } | null;
   idempotencyKey: string;
 }
 
@@ -47,6 +57,8 @@ export interface ProviderSendOptions {
   signal: AbortSignal;
   /** Call while waiting on a slow app. */
   heartbeat(): void;
+  /** `WEBHOOK_ALLOW_PRIVATE_URLS`: pass to `safeHttpRequest` (local receivers only; refused in production). */
+  allowPrivate?: boolean;
 }
 
 export interface AutomationProvider<Req, C = Record<string, unknown>> {
