@@ -19,6 +19,7 @@ const workflow = (status: AutomationListItem['status']): AutomationListItem => (
   lastRunStatus: null,
   lastRunError: null,
   runs30d: 0,
+  preview: { nodes: [], edges: [], stepCount: 0 },
   templateId: null,
   createdAt: '2026-10-29T10:00:00.000Z',
   updatedAt: '2026-10-29T10:00:00.000Z',

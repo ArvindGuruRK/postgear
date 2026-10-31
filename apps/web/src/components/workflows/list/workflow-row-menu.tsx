@@ -23,6 +23,7 @@ export function WorkflowRowMenu({
   workflow,
   canManage,
   busy = false,
+  variant = 'ghost',
   onOpen,
   onDuplicate,
   onActivate,
@@ -34,6 +35,8 @@ export function WorkflowRowMenu({
   canManage: boolean;
   /** Activate is loading the workflow: the menu waits. */
   busy?: boolean;
+  /** Ghost in a row of its own; secondary when it floats over a card's picture. */
+  variant?: 'ghost' | 'secondary';
   onOpen: () => void;
   onDuplicate: () => void;
   onActivate: () => void;
@@ -52,7 +55,7 @@ export function WorkflowRowMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
+          variant={variant}
           size="sm"
           className="w-9 px-0"
           aria-label={`Actions for ${workflow.name}`}

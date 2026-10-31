@@ -25,6 +25,29 @@ export type AutomationRunStatus =
   | 'REJECTED'
   | 'EXPIRED';
 
+/** The list's tab counts: every workflow of the workspace, by status. */
+export interface AutomationStatusCounts {
+  ALL: number;
+  ACTIVE: number;
+  PAUSED: number;
+  DRAFT: number;
+}
+
+/** `GET /automations` */
+export interface AutomationListResponse {
+  automations: AutomationListItem[];
+  nextCursor: string | null;
+  counts: AutomationStatusCounts;
+}
+
+/** The shape of a workflow's draft, enough to draw a small picture of it on a card. */
+export interface AutomationPreview {
+  nodes: { key: string; type: string; name: string; x: number; y: number; disabled?: boolean }[];
+  edges: { source: string; target: string }[];
+  /** Steps in the whole flow, which can be more than `nodes` holds. */
+  stepCount: number;
+}
+
 export interface AutomationListItem {
   id: string;
   name: string;
@@ -35,6 +58,7 @@ export interface AutomationListItem {
   lastRunStatus: AutomationRunStatus | null;
   lastRunError: string | null;
   runs30d: number;
+  preview: AutomationPreview;
   templateId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -50,7 +74,7 @@ export interface PinnedStep {
   output?: unknown;
 }
 
-export interface AutomationDetail extends Omit<AutomationListItem, 'runs30d'> {
+export interface AutomationDetail extends Omit<AutomationListItem, 'runs30d' | 'preview'> {
   draftGraph: AutomationGraph;
   draftRevision: number;
   pinned: PinnedStep[];
@@ -95,6 +119,11 @@ export interface WorkspaceCatalog {
 }
 
 export type { TemplateSummary };
+
+/** A template with its steps, for the side preview on the list page. */
+export interface TemplateWithPicture extends TemplateSummary {
+  preview: AutomationPreview;
+}
 
 export type ConnectionStatus = 'CONNECTED' | 'NEEDS_RECONNECT' | 'ERROR';
 

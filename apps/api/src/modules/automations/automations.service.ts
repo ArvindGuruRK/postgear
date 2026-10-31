@@ -77,6 +77,29 @@ import {
   type UpdateAutomationInput,
 } from './dto/automations.schema';
 
+/** Steps a card's picture draws; a longer flow is cut here, the card says how many there are. */
+const PREVIEW_MAX_NODES = 40;
+
+/**
+ * The shape of a workflow, enough to draw a small picture of it on the list's
+ * card: where each step sits, what kind it is, what it is called, and which
+ * step feeds which. Never the settings a step was configured with.
+ */
+export interface AutomationPreview {
+  nodes: { key: string; type: string; name: string; x: number; y: number; disabled?: boolean }[];
+  edges: { source: string; target: string }[];
+  /** Steps in the whole flow, which can be more than `nodes` holds. */
+  stepCount: number;
+}
+
+/** The list's tab counts: every workflow of the workspace, by status. */
+export interface AutomationStatusCounts {
+  ALL: number;
+  ACTIVE: number;
+  PAUSED: number;
+  DRAFT: number;
+}
+
 /** One row of the list. */
 export interface AutomationListItem {
   id: string;
@@ -89,6 +112,8 @@ export interface AutomationListItem {
   lastRunError: string | null;
   /** Live runs in the last 30 days. */
   runs30d: number;
+  /** The draft's shape, for the card's picture. */
+  preview: AutomationPreview;
   templateId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -104,7 +129,7 @@ export interface PinnedSummary {
   output: unknown;
 }
 
-export interface AutomationDetail extends Omit<AutomationListItem, 'runs30d'> {
+export interface AutomationDetail extends Omit<AutomationListItem, 'runs30d' | 'preview'> {
   draftGraph: AutomationGraph;
   draftRevision: number;
   pinned: PinnedSummary[];
@@ -171,7 +196,11 @@ export class AutomationsService {
   async list(
     orgId: string,
     query: ListAutomationsQuery,
-  ): Promise<{ automations: AutomationListItem[]; nextCursor: string | null }> {
+  ): Promise<{
+    automations: AutomationListItem[];
+    nextCursor: string | null;
+    counts: AutomationStatusCounts;
+  }> {
     const search = query.search ?? '';
     const terms = search.length >= MIN_SEARCH_LENGTH ? searchTerms(search) : [];
     let rows: AutomationListRow[];
@@ -197,15 +226,28 @@ export class AutomationsService {
       if (page.length > AUTOMATIONS_PAGE_SIZE) nextCursor = rows[rows.length - 1].id;
     }
 
-    const counts = await this.repository.liveRunCounts(
-      orgId,
-      rows.map((row) => row.id),
-      new Date(Date.now() - RUN_STATS_DAYS * DAY_MS),
-    );
+    const [runs, statuses] = await Promise.all([
+      this.repository.liveRunCounts(
+        orgId,
+        rows.map((row) => row.id),
+        new Date(Date.now() - RUN_STATS_DAYS * DAY_MS),
+      ),
+      this.repository.statusCounts(orgId),
+    ]);
+
+    const active = statuses.get(AutomationStatus.ACTIVE) ?? 0;
+    const paused = statuses.get(AutomationStatus.PAUSED) ?? 0;
+    const draft = statuses.get(AutomationStatus.DRAFT) ?? 0;
 
     return {
-      automations: rows.map((row) => ({ ...toListFields(row), runs30d: counts.get(row.id) ?? 0 })),
+      automations: rows.map((row) => ({
+        ...toListFields(row),
+        runs30d: runs.get(row.id) ?? 0,
+        preview: toPreview(row.draftGraph),
+      })),
       nextCursor,
+      // Of the whole workspace, whatever the filter: the tabs show them all at once.
+      counts: { ALL: active + paused + draft, ACTIVE: active, PAUSED: paused, DRAFT: draft },
     };
   }
 
@@ -661,7 +703,70 @@ function hideRunError(text: string | null): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-function toListFields(row: AutomationListRow): Omit<AutomationListItem, 'runs30d'> {
+/** A step's name for the list: what the canvas shows, through the secret patterns on the way out. */
+function stepName(name: unknown): string {
+  if (typeof name !== 'string') return '';
+  const value = redact(name).value;
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * A draft's shape for the list. Read loosely on purpose: the list must not
+ * fail because one stored draft is odd, so anything unreadable is skipped and
+ * a draft that is not a graph at all draws as an empty picture.
+ */
+export function toPreview(graph: unknown): AutomationPreview {
+  const empty: AutomationPreview = { nodes: [], edges: [], stepCount: 0 };
+  if (typeof graph !== 'object' || graph === null) return empty;
+  const { nodes, edges } = graph as { nodes?: unknown; edges?: unknown };
+  if (!Array.isArray(nodes)) return empty;
+
+  const kept: AutomationPreview['nodes'] = [];
+  for (const node of nodes) {
+    const item = node as {
+      key?: unknown;
+      type?: unknown;
+      name?: unknown;
+      position?: { x?: unknown; y?: unknown };
+      disabled?: unknown;
+    } | null;
+    if (
+      typeof item?.key !== 'string' ||
+      typeof item.type !== 'string' ||
+      typeof item.position?.x !== 'number' ||
+      typeof item.position.y !== 'number'
+    ) {
+      continue;
+    }
+    if (kept.length < PREVIEW_MAX_NODES) {
+      kept.push({
+        key: item.key,
+        type: item.type,
+        name: stepName(item.name),
+        x: item.position.x,
+        y: item.position.y,
+        ...(item.disabled === true ? { disabled: true } : {}),
+      });
+    }
+  }
+
+  const shown = new Set(kept.map((node) => node.key));
+  const links: AutomationPreview['edges'] = [];
+  for (const edge of Array.isArray(edges) ? edges : []) {
+    const link = edge as { source?: unknown; target?: unknown } | null;
+    if (
+      typeof link?.source === 'string' &&
+      typeof link.target === 'string' &&
+      shown.has(link.source) &&
+      shown.has(link.target)
+    ) {
+      links.push({ source: link.source, target: link.target });
+    }
+  }
+  return { nodes: kept, edges: links, stepCount: nodes.length };
+}
+
+function toListFields(row: AutomationListRow): Omit<AutomationListItem, 'runs30d' | 'preview'> {
   return {
     id: row.id,
     name: row.name,

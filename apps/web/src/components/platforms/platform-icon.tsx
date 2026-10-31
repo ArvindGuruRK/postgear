@@ -35,6 +35,16 @@ interface Brand {
 
 const BRANDS: Record<string, Brand> = {
   google: { label: 'Google', src: '/icon/google.svg' },
+  // The apps workflows connect to (2026-10-31). Google Sheets has its own mark,
+  // which the workflows' Google connection wears too (its icon key is
+  // `google-sheets`); `google` above stays the round "G" for sign-in. Slack and
+  // Teams are full-colour marks, Discord a tile; none vanishes on a dark page,
+  // so none needs a `darkSrc`.
+  'google-sheets': { label: 'Google Sheets', src: '/icon/google-sheets.svg' },
+  slack: { label: 'Slack', src: '/icon/slack.svg' },
+  teams: { label: 'Microsoft Teams', src: '/icon/microsoft-teams.svg' },
+  discord: { label: 'Discord', src: '/icon/discord.svg' },
+  excel: { label: 'Microsoft Excel', src: '/icon/microsoft-excel.svg' },
   'facebook-signin': { label: 'Facebook', src: '/icon/facebook.svg' },
   facebook: { label: 'Facebook', src: '/icon/facebookplatform.svg' },
   // twitter.svg draws its tile 4 units in from each edge of a 64-unit canvas;

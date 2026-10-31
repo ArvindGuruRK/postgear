@@ -19,6 +19,7 @@ jest.mock('@postgear/db', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
+      groupBy: jest.fn(),
     },
     automationVersion: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
     automationRun: { groupBy: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
@@ -42,7 +43,7 @@ import {
 import { AutomationsRepository } from './automations.repository';
 
 type PrismaMock = {
-  automation: Record<'findMany' | 'findFirst' | 'create' | 'updateMany', jest.Mock>;
+  automation: Record<'findMany' | 'findFirst' | 'create' | 'updateMany' | 'groupBy', jest.Mock>;
   automationVersion: Record<'findMany' | 'findFirst' | 'create', jest.Mock>;
   automationRun: Record<'groupBy' | 'findMany' | 'updateMany', jest.Mock>;
   automationRunStep: { updateMany: jest.Mock };
@@ -89,8 +90,13 @@ describe('AutomationsRepository', () => {
       cursor: { id: ID },
       skip: 1,
     });
-    // The list never reads the graph.
-    expect(db.automation.findMany.mock.calls[0][0].select).not.toHaveProperty('draftGraph');
+    // The list reads the draft only to draw each card's picture; the service
+    // keeps its shape and nothing it was configured with. It never reads the
+    // pins, the revision or the active version.
+    const { select } = db.automation.findMany.mock.calls[0][0];
+    expect(select).toHaveProperty('draftGraph', true);
+    expect(select).not.toHaveProperty('pinnedData');
+    expect(select).not.toHaveProperty('draftRevision');
   });
 
   it('searches names in the workspace only', async () => {
@@ -128,6 +134,23 @@ describe('AutomationsRepository', () => {
 
     await expect(repository.liveRunCounts(ORG, [], since)).resolves.toEqual(new Map());
     expect(db.automationRun.groupBy).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a workspace by status, leaving out deleted workflows', async () => {
+    db.automation.groupBy.mockResolvedValue([
+      { status: 'ACTIVE', _count: { _all: 2 } },
+      { status: 'DRAFT', _count: { _all: 5 } },
+    ]);
+
+    const counts = await repository.statusCounts(ORG);
+
+    expect(counts.get('ACTIVE' as never)).toBe(2);
+    expect(counts.get('DRAFT' as never)).toBe(5);
+    expect(counts.get('PAUSED' as never)).toBeUndefined();
+    expect(db.automation.groupBy.mock.calls[0][0]).toMatchObject({
+      by: ['status'],
+      where: { organizationId: ORG, deletedAt: null },
+    });
   });
 
   it('reads one workflow only within the workspace and only while live', async () => {

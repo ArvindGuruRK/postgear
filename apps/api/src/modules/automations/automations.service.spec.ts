@@ -40,7 +40,7 @@ import type {
   AutomationsRepository,
   VersionDetailRow,
 } from './automations.repository';
-import { AutomationsService, copyName, sameJson } from './automations.service';
+import { AutomationsService, copyName, sameJson, toPreview } from './automations.service';
 import type { ConnectionsRepository } from './connections/connections.repository';
 import {
   activateAutomationSchema,
@@ -187,6 +187,7 @@ describe('AutomationsService', () => {
       list: jest.fn().mockResolvedValue([]),
       search: jest.fn().mockResolvedValue([]),
       liveRunCounts: jest.fn().mockResolvedValue(new Map()),
+      statusCounts: jest.fn().mockResolvedValue(new Map()),
       find: jest
         .fn()
         .mockImplementation(async (_org: string, id: string) => (id === ID ? row() : null)),
@@ -597,6 +598,79 @@ describe('AutomationsService', () => {
       expect(page.nextCursor).toBe(rows[49].id);
       expect(repository.liveRunCounts).toHaveBeenCalledTimes(1);
       expect(repository.liveRunCounts.mock.lastCall?.[1]).toHaveLength(50);
+    });
+
+    it('counts the whole workspace by status for the tabs, whatever the filter', async () => {
+      repository.statusCounts.mockResolvedValueOnce(
+        new Map([
+          [AutomationStatus.ACTIVE, 2],
+          [AutomationStatus.DRAFT, 5],
+        ]),
+      );
+
+      const page = await service.list(ORG, { status: AutomationStatus.ACTIVE });
+
+      expect(page.counts).toEqual({ ALL: 7, ACTIVE: 2, PAUSED: 0, DRAFT: 5 });
+      expect(repository.statusCounts).toHaveBeenCalledWith(ORG);
+    });
+
+    it('gives each row a preview of its draft: the shape only, never a setting', async () => {
+      repository.list.mockResolvedValueOnce([listRow(ID, 'Report')]);
+      repository.liveRunCounts.mockResolvedValueOnce(new Map());
+
+      const [item] = (await service.list(ORG, {})).automations;
+
+      expect(item.preview.stepCount).toBe(reportGraph().nodes.length);
+      expect(item.preview.nodes).toHaveLength(reportGraph().nodes.length);
+      expect(item.preview.edges.length).toBeGreaterThan(0);
+      expect(Object.keys(item.preview.nodes[0]).sort()).toEqual(['key', 'name', 'type', 'x', 'y']);
+      expect(JSON.stringify(item.preview)).not.toContain('config');
+    });
+
+    describe('toPreview', () => {
+      it('draws a draft that is not a graph as an empty picture', () => {
+        const empty = { nodes: [], edges: [], stepCount: 0 };
+        expect(toPreview(null)).toEqual(empty);
+        expect(toPreview('nope')).toEqual(empty);
+        expect(toPreview({ nodes: 'nope' })).toEqual(empty);
+      });
+
+      it('skips steps it cannot place and links to steps it does not hold', () => {
+        const preview = toPreview({
+          nodes: [
+            { key: 'a', type: 'trigger.manual', name: 'Start', position: { x: 1, y: 2 } },
+            { key: 'b', type: 'notify.slack' },
+            null,
+          ],
+          edges: [{ source: 'a', target: 'b' }, 'bad'],
+        });
+        expect(preview.nodes).toEqual([
+          { key: 'a', type: 'trigger.manual', name: 'Start', x: 1, y: 2 },
+        ]);
+        expect(preview.edges).toEqual([]);
+      });
+
+      it('keeps a step name for the card, and an empty one when it has none', () => {
+        const preview = toPreview({
+          nodes: [
+            { key: 'a', type: 'trigger.manual', name: 'Start', position: { x: 0, y: 0 } },
+            { key: 'b', type: 'notify.slack', position: { x: 1, y: 0 } },
+          ],
+        });
+        expect(preview.nodes.map((node) => node.name)).toEqual(['Start', '']);
+      });
+
+      it('holds a long flow to 40 steps and still counts them all', () => {
+        const nodes = Array.from({ length: 55 }, (_, index) => ({
+          key: `n${index}`,
+          type: 'logic.setFields',
+          position: { x: index, y: 0 },
+        }));
+        const preview = toPreview({ nodes, edges: [{ source: 'n0', target: 'n54' }] });
+        expect(preview.nodes).toHaveLength(40);
+        expect(preview.stepCount).toBe(55);
+        expect(preview.edges).toEqual([]);
+      });
     });
 
     it('searches by every word, case-insensitively, with no cursor', async () => {

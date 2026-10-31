@@ -308,6 +308,7 @@ describe('No secret anywhere (Module 14)', () => {
       list: jest.fn(async () => [workflow()]),
       search: jest.fn(async () => [workflow()]),
       liveRunCounts: jest.fn(async () => new Map([[AUTOMATION_ID, 1]])),
+      statusCounts: jest.fn(async () => new Map()),
       find: jest.fn(async (_org: string, id: string) => (id === AUTOMATION_ID ? workflow() : null)),
       listVersions: jest.fn(async () => [version()]),
       findVersion: jest.fn(async () => version()),

@@ -39,11 +39,12 @@ const LIST_SELECT = {
   templateId: true,
   createdAt: true,
   updatedAt: true,
+  // Only to draw each card's picture of the flow; the service keeps keys, types, positions and edges.
+  draftGraph: true,
 } as const;
 
 const DETAIL_SELECT = {
   ...LIST_SELECT,
-  draftGraph: true,
   draftRevision: true,
   pinnedData: true,
   activeVersion: { select: { id: true, version: true } },
@@ -121,10 +122,10 @@ export interface AutomationListRow {
   templateId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  draftGraph: Prisma.JsonValue;
 }
 
 export interface AutomationRow extends AutomationListRow {
-  draftGraph: Prisma.JsonValue;
   draftRevision: number;
   pinnedData: Prisma.JsonValue;
   activeVersion: { id: string; version: number } | null;
@@ -230,6 +231,17 @@ export class AutomationsRepository {
     });
 
     return new Map(groups.map((group) => [group.automationId, group._count._all]));
+  }
+
+  /** How many live workflows the workspace has in each status, for the list's tab counts. */
+  async statusCounts(orgId: string): Promise<Map<AutomationStatus, number>> {
+    const groups = await prisma.automation.groupBy({
+      by: ['status'],
+      where: { organizationId: orgId, deletedAt: null },
+      _count: { _all: true },
+    });
+
+    return new Map(groups.map((group) => [group.status, group._count._all]));
   }
 
   async find(orgId: string, id: string): Promise<AutomationRow | null> {

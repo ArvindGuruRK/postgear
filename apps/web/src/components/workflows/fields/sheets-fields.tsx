@@ -43,7 +43,7 @@ import {
   SelectValue,
   Text,
 } from '@postgear/ui';
-import { FileSpreadsheet, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import {
@@ -54,6 +54,7 @@ import {
   getSpreadsheet,
 } from '@/lib/workflows-api';
 import type { Connection, SheetTabRef, SpreadsheetDetail } from '@/types/workflows';
+import { AppIcon } from '../app-icon';
 import { ChipInput } from './chip-input';
 import { FIELD_PATH_ATTRIBUTE } from './contract';
 import { useFieldEnv } from './field-env';
@@ -291,11 +292,7 @@ export function SpreadsheetField(props: FieldControlProps) {
     >
       {step.spreadsheet ? (
         <div className="flex items-center gap-3 rounded-md border-2 border-outline bg-inset p-3">
-          <FileSpreadsheet
-            aria-hidden="true"
-            className="h-5 w-5 shrink-0 text-ink"
-            strokeWidth={2.5}
-          />
+          <AppIcon icon="google-sheets" className="h-5 w-5" />
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="type-ui truncate text-sm text-ink" data-testid="spreadsheet-name">
               {name || 'Spreadsheet'}

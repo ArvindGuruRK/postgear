@@ -59,13 +59,24 @@ export function runsText(count: number): string {
   return count === 1 ? '1 run' : `${count} runs`;
 }
 
-/** "Uses: Google Sheets, Slack" from what a template needs. */
-export function usesText(template: Pick<TemplateSummary, 'needs'>): string | null {
-  const names = template.needs.map((need) => {
+/** "No steps", "1 step", "5 steps": the card's size line. */
+export function stepCountText(count: number): string {
+  if (count === 0) return 'No steps';
+  return count === 1 ? '1 step' : `${count} steps`;
+}
+
+/** What a template needs, by name: "Channel", "Google Sheets", "Slack". */
+export function needNames(template: Pick<TemplateSummary, 'needs'>): string[] {
+  return template.needs.map((need) => {
     if (need === 'channel') return 'Channel';
     if (need === 'google') return 'Google Sheets';
     return CONNECTION_KINDS.find((kind) => kind.kind === need)?.title ?? need;
   });
+}
+
+/** "Uses: Google Sheets, Slack" from what a template needs. */
+export function usesText(template: Pick<TemplateSummary, 'needs'>): string | null {
+  const names = needNames(template);
   return names.length ? `Uses: ${names.join(', ')}` : null;
 }
 

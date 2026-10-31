@@ -1,11 +1,13 @@
 /**
  * `IconKey` (from `@postgear/automation`) to what draws it: the platform
- * logos from `components/platforms` for social steps, lucide for built-ins.
+ * logos from `components/platforms` for the social platforms and the apps
+ * workflows connect to (Slack, Microsoft Teams, Discord, Microsoft Excel and
+ * Google Sheets), lucide for built-ins.
  *
- * Slack, Microsoft Teams, Discord, Google Sheets, Excel and WhatsApp have no
- * artwork in `public/icon/` yet (the owner chose every platform logo there),
- * so they use a lucide glyph until real artwork is added; then they become
- * `{ platform }` entries like Instagram's, read by `PlatformIcon`.
+ * WhatsApp and email have no artwork in `public/icon/` yet (the owner
+ * chose every platform logo there), so they use a lucide glyph until real
+ * artwork is added; then they become `{ platform }` entries like Slack's, read
+ * by `PlatformIcon`.
  */
 import type { IconKey } from '@postgear/automation';
 import {
@@ -15,7 +17,6 @@ import {
   CircleAlert,
   Clapperboard,
   FilePen,
-  FileSpreadsheet,
   Filter,
   GitBranch,
   GitMerge,
@@ -26,19 +27,15 @@ import {
   type LucideIcon,
   Mail,
   MessageCircle,
-  MessagesSquare,
   MousePointerClick,
   Palette,
   PencilLine,
   Send,
-  Sheet,
-  Slack,
   Sparkles,
   Split,
   SquareCheckBig,
   StickyNote,
   UserCheck,
-  Users,
   WandSparkles,
   Webhook,
   Workflow,
@@ -71,19 +68,26 @@ const GLYPHS: Record<Exclude<IconKey, PlatformKey>, LucideIcon> = {
   'set-fields': PencilLine,
   merge: GitMerge,
   bell: Bell,
-  slack: Slack,
-  teams: Users,
-  discord: MessagesSquare,
   email: Mail,
   whatsapp: MessageCircle,
-  'google-sheets': Sheet,
-  excel: FileSpreadsheet,
   http: Globe,
   run: Workflow,
   workspace: SquareCheckBig,
 };
 
-type PlatformKey = 'instagram' | 'facebook' | 'x' | 'linkedin' | 'youtube' | 'tiktok' | 'pinterest';
+type PlatformKey =
+  | 'instagram'
+  | 'facebook'
+  | 'x'
+  | 'linkedin'
+  | 'youtube'
+  | 'tiktok'
+  | 'pinterest'
+  | 'slack'
+  | 'teams'
+  | 'discord'
+  | 'google-sheets'
+  | 'excel';
 
 const PLATFORM_KEYS = new Set<string>([
   'instagram',
@@ -93,6 +97,11 @@ const PLATFORM_KEYS = new Set<string>([
   'youtube',
   'tiktok',
   'pinterest',
+  'slack',
+  'teams',
+  'discord',
+  'google-sheets',
+  'excel',
 ]);
 
 export function iconSource(key: string): IconSource {
