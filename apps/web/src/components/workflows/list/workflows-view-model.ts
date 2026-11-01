@@ -20,7 +20,7 @@ export const STATUS_FILTERS: readonly { id: AutomationStatus | 'ALL'; label: str
 ];
 
 export const WORKFLOW_STATUS: Record<AutomationStatus, { label: string; variant: BadgeVariant }> = {
-  DRAFT: { label: 'Draft', variant: 'outline' },
+  DRAFT: { label: 'Draft', variant: 'primary' },
   ACTIVE: { label: 'Active', variant: 'success' },
   PAUSED: { label: 'Paused', variant: 'secondary' },
 };

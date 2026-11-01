@@ -70,7 +70,7 @@ function describe(
 ): PostPresentation {
   switch (state) {
     case 'DRAFT':
-      return { tone: 'draft', label: 'Draft', variant: 'outline', detail: null, live: false };
+      return { tone: 'draft', label: 'Draft', variant: 'primary', detail: null, live: false };
 
     case 'PUBLISHED':
       return {

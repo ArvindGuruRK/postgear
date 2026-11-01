@@ -77,7 +77,7 @@ describe('describePost', () => {
   it('describes drafts, published posts and single channels', () => {
     expect(describePost({ state: 'DRAFT', publishDate: later, channels: [] }, now)).toMatchObject({
       tone: 'draft',
-      variant: 'outline',
+      variant: 'primary',
     });
     expect(describeChannel(channel('PUBLISHED'), earlier, now)).toMatchObject({
       tone: 'published',

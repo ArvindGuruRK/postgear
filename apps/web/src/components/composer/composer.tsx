@@ -661,7 +661,7 @@ export function Composer({
           <div className="flex h-16 shrink-0 items-center gap-3 border-b-2 border-outline px-5">
             <DialogTitle className="truncate text-xl">{title}</DialogTitle>
             {state.group ? (
-              <Badge variant={locked ? 'success' : queued ? 'primary' : 'outline'}>
+              <Badge variant={locked ? 'success' : 'primary'}>
                 {locked ? 'Published' : queued ? 'Queued' : 'Draft'}
               </Badge>
             ) : null}
