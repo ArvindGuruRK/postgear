@@ -89,7 +89,7 @@ describe('WorkflowLiveControls', () => {
   it('opens the activation dialog from the switch for admins', () => {
     renderControls();
     expect(switchControl().disabled).toBe(false);
-    expect(screen.getByTestId('status-badge').textContent).toBe('Draft');
+    expect(screen.queryByTestId('status-badge')).toBeNull();
     fireEvent.click(switchControl());
     expect(screen.getByRole('heading', { name: 'Turn On Workflow' })).toBeTruthy();
   });

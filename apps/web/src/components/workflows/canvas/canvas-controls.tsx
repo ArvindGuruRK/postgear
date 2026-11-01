@@ -94,7 +94,6 @@ export function CanvasControls({
           icon={ScanIcon}
           onClick={() => void flow.fitView({ duration: 200, padding: 0.2 })}
         />
-        <span aria-hidden="true" className="mx-0.5 h-6 w-0.5 bg-outline" />
         <Control
           label="Undo"
           shortcut="Ctrl+Z"

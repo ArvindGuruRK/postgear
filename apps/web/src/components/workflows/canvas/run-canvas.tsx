@@ -170,7 +170,7 @@ function ReadOnlyFlow({ graph, run, selectedKey, onSelectStep, className }: RunC
           maxZoom={1.5}
           fitView
           fitViewOptions={FIT}
-          attributionPosition="top-right"
+          proOptions={{ hideAttribution: true }}
           aria-label={run ? 'Run canvas' : 'Version canvas'}
         >
           <Background

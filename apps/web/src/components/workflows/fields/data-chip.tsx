@@ -19,7 +19,7 @@ import { Button, cn, MotionIcon, Popover, PopoverAnchor, PopoverContent, Text } 
 import { NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react';
 import { SlidersHorizontal } from 'lucide-react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { chipInfo, chipName, chipValue, previewText } from './chip-model';
 import type { FieldContext } from './contract';
 import { sourceOfPath, sourceWords } from './field-env';
@@ -161,7 +161,7 @@ export function DataChipView({
               aria-hidden="true"
               className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-outline bg-secondary"
             >
-              <AppIcon icon={info.icon} className="h-3 w-3" />
+              <StepGlyph icon={info.icon} className="h-3 w-3" />
             </span>
             <span className="truncate">
               {info.source}: {info.field}
@@ -185,7 +185,7 @@ export function DataChipView({
         >
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-              <AppIcon icon={info.icon} className="h-4 w-4" />
+              <StepGlyph icon={info.icon} className="h-4 w-4" />
             </span>
             <div className="flex min-w-0 flex-col">
               <span className="truncate type-ui text-sm text-ink">{info.field}</span>

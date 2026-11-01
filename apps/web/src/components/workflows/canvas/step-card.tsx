@@ -2,7 +2,7 @@
 
 /**
  * The step card (blueprint 4.1 and 4.2): PostGear's card language on n8n's
- * compact layout. 240 px wide, the family stripe on the left, a 44 px icon
+ * compact layout. 264 px wide and 96 px tall, no edge stripe, a 44 px icon
  * tile, the name and a one-line summary from the catalog.
  *
  * - Triggers carry a "When" tab and a rounder left edge, and no input.
@@ -31,7 +31,7 @@
  *   double-click.
  */
 import { CopyPlusIcon } from '@animateicons/react/lucide/copy-plus-icon';
-import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { PlayIcon } from '@animateicons/react/lucide/play-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { PowerIcon } from '@animateicons/react/lucide/power-icon';
@@ -71,11 +71,12 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { memo, useEffect, useRef, useState } from 'react';
-import { AppIcon } from '../app-icon';
+import { memo, type ReactNode, useEffect, useRef, useState } from 'react';
+import { StepGlyph } from '../list/step-glyph';
 import { useOptionalBuilder } from '../builder/builder-context';
 import { useCanvasMode } from './canvas-mode';
-import { cardHeight, FAMILY_STRIPE, type StepFlowNode } from './flow-model';
+import { CARD_WIDTH } from '../builder/graph-ops';
+import { cardHeight, type StepFlowNode } from './flow-model';
 import { type BadgeIcon, type BadgeTone, badgeLabel, paintLook } from './step-paint';
 
 export type ZoomDetail = 'full' | 'compact' | 'icon';
@@ -117,6 +118,37 @@ const BADGE_VARIANT: Record<BadgeTone, 'success' | 'danger' | 'accent' | 'primar
   neutral: 'outline',
 };
 
+/**
+ * React Flow's NodeToolbar keeps its size whatever the zoom, so zoomed out it
+ * grew against its shrinking card and floated away from it. This one scales with
+ * the canvas from its bottom edge, and its gap to the card scales too, so it
+ * stays where it was, in proportion. Only the toolbar on show listens to the
+ * zoom, so the other cards do not render on every wheel tick.
+ */
+function ToolbarAtZoom({
+  visible,
+  offset,
+  children,
+}: {
+  visible: boolean;
+  offset: number;
+  children: ReactNode;
+}) {
+  if (!visible) return null;
+  return <ZoomedToolbar offset={offset}>{children}</ZoomedToolbar>;
+}
+
+function ZoomedToolbar({ offset, children }: { offset: number; children: ReactNode }) {
+  const zoom = useStore((state) => state.transform[2]);
+  return (
+    <NodeToolbar isVisible position={Position.Top} offset={offset * zoom}>
+      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'bottom center' }}>
+        {children}
+      </div>
+    </NodeToolbar>
+  );
+}
+
 export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps<StepFlowNode>) {
   const builder = useOptionalBuilder();
   const mode = useCanvasMode();
@@ -127,7 +159,6 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
   const [hover, setHover] = useState(false);
   const leave = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { node, def, issues, ports, usedPorts, isTrigger, paint } = data;
-  const family = def?.family ?? 'ink';
   const height = cardHeight(ports.length);
   const firstIssue = issues[0];
   const canDisable = def?.canDisable ?? true;
@@ -168,9 +199,8 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
   }
 
   const toolbar = editor ? (
-    <NodeToolbar
-      isVisible={hover && !connection.inProgress && detail !== 'icon'}
-      position={Position.Top}
+    <ToolbarAtZoom
+      visible={hover && !connection.inProgress && detail !== 'icon'}
       offset={isTrigger ? 30 : 8}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: hover keeps the toolbar open, keyboard users use the menu */}
@@ -237,7 +267,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
               className="h-8 px-2"
               aria-label={`More actions for ${node.name}`}
             >
-              <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -247,7 +277,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </NodeToolbar>
+    </ToolbarAtZoom>
   ) : null;
 
   const pinSticker =
@@ -298,7 +328,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
     // biome-ignore lint/a11y/noStaticElementInteractions: hover shows the toolbar; React Flow makes the node focusable
     <div
       className={cn('relative', fits === false && !isSource ? 'opacity-30' : '')}
-      style={{ width: 240, height }}
+      style={{ width: CARD_WIDTH, height }}
       data-run-state={look?.state}
       onMouseEnter={enter}
       onMouseLeave={exit}
@@ -330,7 +360,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
 
       <div
         className={cn(
-          'pg-step-card relative flex h-full w-full items-center gap-3 overflow-hidden border-2 border-outline bg-secondary pe-3 shadow-surfaceSm transition-shadow',
+          'pg-step-card relative flex h-full w-full items-center gap-4 overflow-hidden border-2 border-outline bg-secondary px-5 shadow-surfaceSm transition-shadow',
           isTrigger ? 'rounded-l-3xl rounded-r-card' : 'rounded-card',
           selected
             ? 'shadow-surfaceMd outline-solid outline-[3px] outline-offset-2 outline-focusRing'
@@ -340,15 +370,12 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         )}
       >
         <span
-          aria-hidden="true"
           className={cn(
-            'h-full w-1.5 shrink-0',
-            FAMILY_STRIPE[family],
+            'relative flex h-12 w-12 shrink-0 items-center justify-center',
             look?.running ? 'pg-run-pulse' : '',
           )}
-        />
-        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-          <AppIcon icon={def?.icon ?? 'manual'} className="h-5 w-5" />
+        >
+          <StepGlyph icon={def?.icon ?? 'manual'} className="h-9 w-9" />
           {look?.running ? (
             <span
               aria-hidden="true"
@@ -368,9 +395,12 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
             </span>
           ) : null}
         </span>
-        <span className="flex min-w-0 flex-col">
+        <span className="flex min-w-0 flex-col gap-0.5">
           <span
-            className={cn('type-ui truncate text-sm text-ink', node.disabled ? 'line-through' : '')}
+            className={cn(
+              'type-ui truncate text-base text-ink',
+              node.disabled ? 'line-through' : '',
+            )}
           >
             {node.name}
           </span>

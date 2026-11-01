@@ -32,7 +32,7 @@ import {
   toast,
 } from '@postgear/ui';
 import { useEffect, useMemo, useState } from 'react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import type { DataSource } from '../fields/contract';
 import { insertDataAtLastField } from '../fields/insert-target';
 import { DataTable, DataTree, type DataViewKind, DataViews, RawView } from './data-view';
@@ -126,7 +126,7 @@ export function InputPane({
                 <SelectItem key={option.source} value={option.source}>
                   {/* One line in the trigger: a long step name is cut, not wrapped. */}
                   <span className="flex min-w-0 items-center gap-2 text-left">
-                    <AppIcon icon={option.icon} className="h-3.5 w-3.5 shrink-0" />
+                    <StepGlyph icon={option.icon} className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">From: {option.title}</span>
                   </span>
                 </SelectItem>

@@ -147,7 +147,7 @@ export type FlowEdge = Edge<FlowEdgeData, 'flow'>;
 
 /** A card grows when it has more outputs than fit its height (Paths). */
 export function cardHeight(ports: number): number {
-  return Math.max(CARD_HEIGHT, ports * 24 + 28);
+  return Math.max(CARD_HEIGHT, ports * 32 + 32);
 }
 
 export function issuesByStep(issues: readonly ValidationIssue[]): Map<string, ValidationIssue[]> {
@@ -203,6 +203,7 @@ export function toFlowNodes(
 
   const steps: StepFlowNode[] = graph.nodes.map((node) => {
     const ports = outputPortsOf(node);
+    const height = cardHeight(ports.length);
     const data: StepNodeData = {
       node,
       def: getDefinition(node.type, node.typeVersion),
@@ -223,7 +224,11 @@ export function toFlowNodes(
       ariaLabel: stepAriaLabel(data),
       domAttributes: STEP_DOM,
       width: CARD_WIDTH,
-      height: cardHeight(ports.length),
+      height,
+      // A card's size is fixed, so say it is measured. Without `measured`, React Flow
+      // drops a node's handle positions each time it gets a new node object (every
+      // frame of a drag), and the lines on that card vanish until it is measured again.
+      measured: { width: CARD_WIDTH, height },
       selected: selectedNodes.has(node.key),
     };
   });

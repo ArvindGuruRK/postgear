@@ -282,7 +282,7 @@ test('tests the workflow on the built-in sample: every step settles and Slack is
 
 test('turns the workflow on as an admin: the dialog says what it will do, the badge reads Active v1', async () => {
   const live = page.getByTestId('live-controls');
-  await expect(live.getByTestId('status-badge')).toHaveText('Draft');
+  await expect(live.getByTestId('status-badge')).toHaveCount(0);
   const toggle = live.getByRole('switch', { name: 'Activate' });
   await expect(toggle).toBeEnabled();
   await expect(toggle).not.toBeChecked();

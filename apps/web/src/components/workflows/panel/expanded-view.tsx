@@ -31,7 +31,7 @@ import {
   TooltipHint,
 } from '@postgear/ui';
 import { type CSSProperties, type Dispatch, useEffect, useRef, useState } from 'react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import type { BuilderAction } from '../builder/builder-state';
 import type { FieldContext } from '../fields/contract';
 import { InputPane } from './input-pane';
@@ -150,7 +150,7 @@ function ExpandedBody({
     >
       <div className="flex items-center gap-3 border-b-2 border-outline p-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-          <AppIcon icon={def?.icon ?? 'manual'} className="h-5 w-5" />
+          <StepGlyph icon={def?.icon ?? 'manual'} className="h-5 w-5" />
         </span>
         <DialogTitle className="sr-only">{node.name}</DialogTitle>
         <DialogDescription className="sr-only">

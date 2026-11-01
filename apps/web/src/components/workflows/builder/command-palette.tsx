@@ -19,7 +19,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@postgear/ui';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import type { PickerItem } from '../picker/picker-search';
 
 export type PaletteCommand = 'tidy' | 'addNote' | 'toggleSteps' | 'fit' | 'shortcuts';
@@ -97,7 +97,7 @@ export function CommandPalette({
                   value={`add ${item.title} ${item.keywords.join(' ')}`}
                   onSelect={() => run(() => onAddStep(item))}
                 >
-                  <AppIcon icon={item.icon} />
+                  <StepGlyph icon={item.icon} className="h-4 w-4" />
                   {item.title}
                 </CommandItem>
               ))}

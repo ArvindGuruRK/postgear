@@ -30,7 +30,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import type { BuilderAction } from '../builder/builder-state';
 import { FIELD_PATH_ATTRIBUTE, type FieldContext } from '../fields/contract';
 import type { PinControls } from './output-pane';
@@ -152,9 +152,9 @@ export function StepPanel({
       data-testid="step-panel"
       onKeyDown={keepKeysInPanel}
     >
-      <div className="flex items-start gap-3 border-b-2 border-outline p-4">
-        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-          <AppIcon icon={def?.icon ?? 'manual'} className="h-5 w-5" />
+      <div className="flex items-start gap-3 p-4 pb-2">
+        <span className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+          <StepGlyph icon={def?.icon ?? 'manual'} className="h-8 w-8" />
           {pin.pinned ? (
             <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-md border-2 border-outline bg-actionPrimary text-onActionPrimary">
               <Pin aria-hidden="true" className="h-3 w-3" strokeWidth={2.75} />

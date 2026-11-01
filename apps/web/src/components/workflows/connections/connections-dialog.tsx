@@ -16,7 +16,7 @@
  * The list is fetched when the dialog opens, so the Workflows page does not
  * ask for it unless someone looks.
  */
-import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import {
   Alert,
   AlertDialog,
@@ -316,7 +316,7 @@ export function ConnectionsDialog({
                                 className="w-9 shrink-0 px-0"
                                 aria-label={`Actions for ${connection.name}`}
                               >
-                                <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+                                <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">

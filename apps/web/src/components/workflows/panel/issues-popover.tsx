@@ -10,10 +10,10 @@
  * refused for its issues opens the list (`openSignal`, Module 08).
  */
 import { type AutomationGraph, getDefinition, type ValidationIssue } from '@postgear/automation';
-import { Button, cn, Popover, PopoverContent, PopoverTrigger } from '@postgear/ui';
+import { Button, cn, liftSm, Popover, PopoverContent, PopoverTrigger } from '@postgear/ui';
 import { CircleCheck, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { issuesChip } from '../builder/builder-view-model';
 
 export function issueKey(issue: ValidationIssue): string {
@@ -52,42 +52,19 @@ export function IssuesPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="secondary"
+          variant={chip.errorLabel ? 'danger' : 'secondary'}
           size="sm"
           disabled={issues.length === 0}
           data-testid="issues-chip"
           aria-label={issues.length === 0 ? chip.label : `${chip.label}. Show the list.`}
-          className="gap-1.5"
+          className={cn('gap-1.5', liftSm)}
         >
           {issues.length === 0 ? (
-            <>
-              <CircleCheck aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
-              {chip.label}
-            </>
+            <CircleCheck aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
           ) : (
-            <>
-              {chip.errorLabel ? (
-                <span
-                  data-testid="issues-chip-errors"
-                  className="flex items-center gap-1 rounded-md border-2 border-outline bg-actionDanger px-1.5 py-0.5 text-onActionLight"
-                >
-                  <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                  {chip.errorLabel}
-                </span>
-              ) : null}
-              {chip.warningLabel ? (
-                <span
-                  data-testid="issues-chip-warnings"
-                  className="flex items-center gap-1 rounded-md border-2 border-outline bg-actionAccent px-1.5 py-0.5 text-onActionLight"
-                >
-                  {chip.errorLabel ? null : (
-                    <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                  )}
-                  {chip.warningLabel}
-                </span>
-              ) : null}
-            </>
+            <TriangleAlert aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
           )}
+          {chip.label}
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -151,7 +128,7 @@ function IssueRow({
       >
         <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink">
           {icon ? (
-            <AppIcon icon={icon} className="h-3.5 w-3.5" />
+            <StepGlyph icon={icon} className="h-3.5 w-3.5" />
           ) : (
             <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
           )}

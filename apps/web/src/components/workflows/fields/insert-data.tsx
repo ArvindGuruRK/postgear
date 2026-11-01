@@ -55,7 +55,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { fieldSample } from './chip-model';
 import { DATA_DRAG_MIME } from './contract';
 
@@ -275,7 +275,7 @@ function GroupBlock({
     >
       <div className="flex items-center gap-2">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-          <AppIcon icon={group.icon} className="h-3.5 w-3.5" />
+          <StepGlyph icon={group.icon} className="h-3.5 w-3.5" />
         </span>
         <span className="min-w-0 flex-1 truncate type-ui text-sm text-ink">{group.title}</span>
         {group.maybeEmpty ? <Badge variant="accent">May Be Empty</Badge> : null}

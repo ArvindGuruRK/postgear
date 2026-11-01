@@ -4,11 +4,12 @@
  * The workflow builder (Sprint 10, Module 05; blueprint sections 3 and 4).
  *
  * Layout: the PageActions row (name, save state, status, issues, menu),
- * then the work area: the Steps panel on the left (collapsible to an icon
- * strip), the canvas, and the step panel on the right when a step is open.
- * Below `lg` both panels are drawers (a narrow window, not a phone layout:
- * the builder is desktop only, see design-system-rules.md section 11).
- * It takes the whole window, without the app rail (DashboardShell).
+ * then the work area: the canvas at full width. A step's settings and the
+ * step picker (n8n's node creator, Zapier's side panel) open in the design
+ * system's Sheet on the right, one at a time: the picker is also what Add
+ * Step, a "+" on a card or a line dropped on the canvas opens. The builder
+ * is desktop only (design-system-rules.md section 11). It takes the whole
+ * window, without the app rail (DashboardShell).
  *
  * State lives in one reducer (`builder-state.ts`); the canvas draws it,
  * autosave sends it (`use-builder-autosave.ts`), and the browser checks it
@@ -42,6 +43,7 @@ import {
   type ValidationIssue,
   validateGraph,
 } from '@postgear/automation';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
   Alert,
   AlertDialog,
@@ -57,6 +59,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  MotionIcon,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -105,11 +108,9 @@ import { ExpandedView } from '../panel/expanded-view';
 import type { PinControls } from '../panel/output-pane';
 import { buildScope, inputSourceLine, receivedWebhookData } from '../panel/panel-view-model';
 import { pinErrorMessage } from '../panel/pinned-data-editor';
-import { ResizeHandle } from '../panel/resize-handle';
 import { StepPanel } from '../panel/step-panel';
 import type { FocusRequest } from '../panel/step-tabs';
 import type { StepTestControls } from '../panel/test-tab';
-import { PANEL_MAX, PANEL_MIN, PANEL_STEP, usePanelWidth } from '../panel/use-panel-width';
 import { type PickerItem, pickerItems, pushRecent, RECENT_LIMIT } from '../picker/picker-search';
 import { StepPicker } from '../picker/step-picker';
 import { ReviewCard } from '../runs/review-card';
@@ -140,16 +141,13 @@ import {
 } from './builder-view-model';
 import { CommandPalette, type PaletteCommand } from './command-palette';
 import { FinishSetup } from './finish-setup';
-import { firstOutput, leaves, startingConfig } from './graph-ops';
+import { CARD_HEIGHT, CARD_WIDTH, firstOutput, leaves, startingConfig } from './graph-ops';
 import { type IssuePlace, issuePlace, stepPlace } from './issue-focus';
 import { ShortcutsSheet } from './shortcuts-sheet';
 import { keyMaker, newStepKey } from './step-keys';
 import { useBuilderAutosave } from './use-builder-autosave';
 
 const VALIDATE_DELAY_MS = 300;
-const WIDE = '(min-width: 1024px)';
-const PICKER_WIDTH = 340;
-const PICKER_HEIGHT = 440;
 
 export interface BuilderPageProps {
   orgId: string;
@@ -176,9 +174,9 @@ export interface BuilderPageProps {
   initialReview?: boolean;
 }
 
+/** The picker was opened for a place: after a step, on a line, or as the first trigger. */
 type PickerState = {
   placement: 'next' | 'trigger';
-  at: ScreenPoint;
   from?: { source: string; sourcePort: PortId };
   edgeId?: string;
   flowAt?: Position;
@@ -206,18 +204,6 @@ function writeRecent(orgId: string, recent: string[]) {
   } catch {
     // Recent is a convenience; private windows may refuse storage.
   }
-}
-
-function useWide(): boolean {
-  const [wide, setWide] = useState(true);
-  useEffect(() => {
-    const query = window.matchMedia(WIDE);
-    const update = () => setWide(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-  return wide;
 }
 
 function connectionIdsOf(graph: AutomationGraph): string[] {
@@ -266,7 +252,6 @@ function Builder({
 }: BuilderPageProps) {
   const router = useRouter();
   const flow = useReactFlow<CanvasNode, FlowEdge>();
-  const wide = useWide();
   const [state, dispatch] = useReducer(builderReducer, undefined, () =>
     initialState(automation.draftGraph, automation.name),
   );
@@ -292,13 +277,11 @@ function Builder({
     null,
   );
   const focusSeq = useRef(0);
-  const [panelWidth, setPanelWidth] = usePanelWidth();
   const [pinned, setPinned] = useState<PinnedStep[]>(automation.pinned ?? []);
   // The graph as last checked: samples follow it, so typing does not rebuild them on each key.
   const [checkedGraph, setCheckedGraph] = useState<AutomationGraph>(automation.draftGraph);
   const [renameSignal, setRenameSignal] = useState(0);
   const [picker, setPicker] = useState<PickerState | null>(null);
-  const [stepsOpen, setStepsOpen] = useState(true);
   const [stepsSheet, setStepsSheet] = useState(false);
   const [locked, setLocked] = useState(false);
   const [tidying, setTidying] = useState(false);
@@ -574,10 +557,10 @@ function Builder({
         const inside =
           node.position.x >= topLeft.x &&
           node.position.y >= topLeft.y &&
-          node.position.x + 240 <= bottomRight.x &&
-          node.position.y + 76 <= bottomRight.y;
+          node.position.x + CARD_WIDTH <= bottomRight.x &&
+          node.position.y + CARD_HEIGHT <= bottomRight.y;
         if (!inside) {
-          void flow.setCenter(node.position.x + 120, node.position.y + 38, {
+          void flow.setCenter(node.position.x + CARD_WIDTH / 2, node.position.y + CARD_HEIGHT / 2, {
             zoom: flow.getZoom(),
             duration: 200,
           });
@@ -626,12 +609,14 @@ function Builder({
   );
 
   const showSteps = useCallback(() => {
-    if (wide) setStepsOpen(true);
-    else setStepsSheet(true);
+    // The sheet holds one thing at a time: leaving the open step brings the picker back.
+    setPanelKey(null);
+    setPicker(null);
+    setStepsSheet(true);
     requestAnimationFrame(() =>
       document.querySelector<HTMLInputElement>('[data-steps-panel] input[type="search"]')?.focus(),
     );
-  }, [wide]);
+  }, []);
 
   /** Focus-the-field: lands on where an issue lives (`issue-focus.ts`). */
   const goTo = useCallback(
@@ -860,7 +845,7 @@ function Builder({
     dispatch({ type: 'tidy', positions: tidyPositions(graphRef.current) });
     setTimeout(() => {
       setTidying(false);
-      void flow.fitView({ duration: 200, padding: 0.25, maxZoom: 1 });
+      void flow.fitView({ duration: 200, padding: 0.12, minZoom: 0.6, maxZoom: 1 });
     }, 320);
   }, [flow]);
 
@@ -882,7 +867,9 @@ function Builder({
       if (stateRef.current.name === 'Untitled Workflow')
         dispatch({ type: 'rename', name: template.title });
       setShowSetup(true);
-      requestAnimationFrame(() => void flow.fitView({ duration: 200, padding: 0.25, maxZoom: 1 }));
+      requestAnimationFrame(
+        () => void flow.fitView({ duration: 200, padding: 0.12, minZoom: 0.6, maxZoom: 1 }),
+      );
     },
     [flow, keys],
   );
@@ -911,8 +898,14 @@ function Builder({
         open(key);
         setRenameSignal((count) => count + 1);
       },
-      pickFrom: (from, at, flowAt) => setPicker({ placement: 'next', at, from, flowAt }),
-      pickOnEdge: (edgeId, at) => setPicker({ placement: 'next', at, edgeId }),
+      pickFrom: (from, _at, flowAt) => {
+        setPanelKey(null);
+        setPicker({ placement: 'next', from, flowAt });
+      },
+      pickOnEdge: (edgeId) => {
+        setPanelKey(null);
+        setPicker({ placement: 'next', edgeId });
+      },
       remove: removeItems,
       duplicate,
       copy,
@@ -1191,7 +1184,7 @@ function Builder({
       return [
         {
           label: 'Add A Step Here',
-          onSelect: () => menu && setPicker({ placement: 'next', at: menu.at, edgeId: target.id }),
+          onSelect: () => builderApi.pickOnEdge(target.id, { x: 0, y: 0 }),
         },
         {
           label: 'Delete',
@@ -1204,10 +1197,7 @@ function Builder({
       {
         label: 'Add Step',
         shortcut: 'N',
-        onSelect: () => {
-          if (wide) setStepsOpen(true);
-          else setStepsSheet(true);
-        },
+        onSelect: showSteps,
       },
       { label: 'Add Note', shortcut: 'Shift+S', onSelect: () => addNote(target.flowAt) },
       { label: 'Paste', shortcut: 'Ctrl+V', onSelect: () => void paste() },
@@ -1228,8 +1218,10 @@ function Builder({
     if (command === 'tidy') tidy();
     else if (command === 'addNote') addNote();
     else if (command === 'toggleSteps') {
-      if (wide) setStepsOpen((value) => !value);
-      else setStepsSheet((value) => !value);
+      if (stepsSheet || picker) {
+        setPicker(null);
+        setStepsSheet(false);
+      } else showSteps();
     } else if (command === 'fit') void flow.fitView({ duration: 200, padding: 0.25, maxZoom: 1 });
     else setShortcuts(true);
   }
@@ -1246,17 +1238,31 @@ function Builder({
     [catalog, hasTrigger],
   );
 
+  /** The picker in its sheet: for a place on the canvas when `picker` is set, else free. */
   const stepsPicker = (
     <StepPicker
-      placement="panel"
+      key={picker ? `${picker.placement}-${picker.edgeId ?? picker.from?.source ?? ''}` : 'free'}
+      placement={picker?.placement ?? (hasTrigger ? 'panel' : 'trigger')}
       catalog={catalog}
       hasTrigger={hasTrigger}
       recent={recent}
       orgId={orgId}
-      onPick={(item) => addItem(item)}
-      onCollapse={wide ? () => setStepsOpen(false) : undefined}
-      onClose={wide ? undefined : () => setStepsSheet(false)}
-      autoFocus={false}
+      onPick={(item) =>
+        picker
+          ? addItem(item, {
+              from: picker.from,
+              edgeId: picker.edgeId,
+              position: picker.flowAt
+                ? { x: picker.flowAt.x, y: picker.flowAt.y - CARD_HEIGHT / 2 }
+                : undefined,
+            })
+          : addItem(item)
+      }
+      onClose={() => {
+        setPicker(null);
+        setStepsSheet(false);
+      }}
+      autoFocus
       className="h-full"
     />
   );
@@ -1315,25 +1321,23 @@ function Builder({
 
   const empty =
     state.graph.nodes.length === 0 ? (
-      <div className="flex max-w-3xl flex-col items-center gap-6">
+      <div className="flex w-full max-w-3xl flex-col gap-6">
         <button
           type="button"
           data-testid="add-trigger"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            // Over the tile it opened from (the popover sits 8 px right of and 40 px above `at`).
-            setPicker({
-              placement: 'trigger',
-              at: { x: rect.left + rect.width / 2 - PICKER_WIDTH / 2 - 8, y: rect.top + 40 },
-            });
+          onClick={() => {
+            setPanelKey(null);
+            setPicker({ placement: 'trigger' });
           }}
-          className="flex w-72 flex-col items-center gap-2 rounded-card border-2 border-dashed border-outline bg-secondary p-6 text-center outline-none hover:bg-primary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+          className="flex w-full items-center gap-4 rounded-card border-2 border-dashed border-outline bg-secondary p-5 text-left outline-none hover:bg-chrome focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-actionPrimary text-onActionPrimary">
             <Plus aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
           </span>
-          <span className="type-heading text-lg">Add A Trigger</span>
-          <span className="font-sans text-sm">Choose what starts this workflow.</span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="type-heading text-lg">Add A Trigger</span>
+            <span className="font-sans text-sm type-muted">Choose what starts this workflow.</span>
+          </span>
         </button>
         <TemplateGallery
           templates={templates}
@@ -1345,24 +1349,8 @@ function Builder({
       </div>
     ) : null;
 
-  const pickerLeft = picker
-    ? Math.max(
-        8,
-        Math.min(
-          picker.at.x + 8,
-          (typeof window === 'undefined' ? 1200 : window.innerWidth) - PICKER_WIDTH - 8,
-        ),
-      )
-    : 0;
-  const pickerTop = picker
-    ? Math.max(
-        8,
-        Math.min(
-          picker.at.y - 40,
-          (typeof window === 'undefined' ? 800 : window.innerHeight) - PICKER_HEIGHT - 8,
-        ),
-      )
-    : 0;
+  // One sheet at a time: the open step's settings, else the step picker.
+  const pickerOpen = (stepsSheet || picker !== null) && panel === null;
 
   return (
     <BuilderProvider value={builderApi}>
@@ -1419,8 +1407,6 @@ function Builder({
           onVersions={() => setVersionsOpen(true)}
           onDuplicate={() => void duplicateWorkflow()}
           onDelete={() => setDeleting(true)}
-          stepsHidden={!wide && preview === null}
-          onShowSteps={() => setStepsSheet(true)}
         />
 
         {autosave.status === 'conflict' ? (
@@ -1484,30 +1470,8 @@ function Builder({
             </div>
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
-            {wide ? (
-              stepsOpen ? (
-                <div
-                  data-steps-panel
-                  className="flex w-70 shrink-0 flex-col border-r-2 border-outline bg-chrome"
-                >
-                  {stepsPicker}
-                </div>
-              ) : (
-                <StepPicker
-                  placement="panel"
-                  catalog={catalog}
-                  hasTrigger={hasTrigger}
-                  recent={recent}
-                  orgId={orgId}
-                  onPick={(item) => addItem(item)}
-                  onCollapse={() => setStepsOpen(true)}
-                  collapsed
-                />
-              )
-            ) : null}
-
-            <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
               <div ref={canvasBox} className="relative min-h-0 min-w-0 flex-1">
                 <WorkflowCanvas
                   graph={state.graph}
@@ -1553,6 +1517,12 @@ function Builder({
                       />
                     </Panel>
                   ) : null}
+                  <Panel position="top-right" className="m-3!">
+                    <Button variant="secondary" size="sm" onClick={showSteps}>
+                      <MotionIcon icon={PlusIcon} className="h-4 w-4" />
+                      Add Step
+                    </Button>
+                  </Panel>
                 </WorkflowCanvas>
               </div>
               {barRun ? (
@@ -1566,35 +1536,26 @@ function Builder({
                 />
               ) : null}
             </div>
-
-            {wide && panel ? (
-              <div
-                className="relative flex shrink-0 flex-col border-l-2 border-outline"
-                style={{ width: panelWidth }}
-                data-testid="step-panel-dock"
-              >
-                <ResizeHandle
-                  label="Resize Step Panel"
-                  value={panelWidth}
-                  min={PANEL_MIN}
-                  max={PANEL_MAX}
-                  step={PANEL_STEP}
-                  grows="left"
-                  valueText={`${panelWidth} pixels wide`}
-                  onChange={setPanelWidth}
-                  className="absolute inset-y-0 -left-1.5 w-3"
-                />
-                {panel}
-              </div>
-            ) : null}
           </div>
         )}
       </div>
 
-      {!wide && editing ? (
+      {editing ? (
         <>
-          <Sheet open={stepsSheet} onOpenChange={setStepsSheet}>
-            <SheetContent side="left" className="flex w-80 flex-col p-0" data-steps-panel>
+          <Sheet
+            open={pickerOpen}
+            onOpenChange={(value) => {
+              if (value) return;
+              setStepsSheet(false);
+              setPicker(null);
+            }}
+          >
+            <SheetContent
+              side="right"
+              className="flex w-full max-w-md flex-col p-0"
+              data-steps-panel
+              data-step-sheet=""
+            >
               <SheetTitle className="sr-only">Steps</SheetTitle>
               <SheetDescription className="sr-only">
                 Choose a step to add to the workflow.
@@ -1606,8 +1567,11 @@ function Builder({
             {/* The panel has its own Close; workflow-canvas.css hides the sheet's, which sat on top of it. */}
             <SheetContent
               side="right"
-              className="flex w-full max-w-md flex-col p-0"
+              className="flex w-full max-w-lg flex-col p-0"
               data-step-sheet=""
+              // The sheet would put the cursor in the name field and select it; a field
+              // that needs the focus (an issue, a deep link) asks for it itself.
+              onOpenAutoFocus={(event) => event.preventDefault()}
             >
               <SheetTitle className="sr-only">{panelNode?.name ?? 'Step'}</SheetTitle>
               <SheetDescription className="sr-only">Set up this step.</SheetDescription>
@@ -1615,29 +1579,6 @@ function Builder({
             </SheetContent>
           </Sheet>
         </>
-      ) : null}
-
-      {picker && editing ? (
-        <PickerPopover left={pickerLeft} top={pickerTop} onClose={() => setPicker(null)}>
-          <StepPicker
-            placement={picker.placement}
-            catalog={catalog}
-            hasTrigger={hasTrigger}
-            recent={recent}
-            orgId={orgId}
-            onClose={() => setPicker(null)}
-            onPick={(item) =>
-              addItem(item, {
-                from: picker.from,
-                edgeId: picker.edgeId,
-                position: picker.flowAt
-                  ? { x: picker.flowAt.x, y: picker.flowAt.y - 38 }
-                  : undefined,
-              })
-            }
-            className="h-full"
-          />
-        </PickerPopover>
       ) : null}
 
       <CanvasContextMenu
@@ -1756,41 +1697,5 @@ function Builder({
         </AlertDialogContent>
       </AlertDialog>
     </BuilderProvider>
-  );
-}
-
-/** The picker as a floating panel at a point: closes on Esc (the picker) or a click outside. */
-function PickerPopover({
-  left,
-  top,
-  onClose,
-  children,
-}: {
-  left: number;
-  top: number;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function onPointerDown(event: PointerEvent) {
-      if (box.current && !box.current.contains(event.target as Node)) onClose();
-    }
-    // Next tick, so the click that opened it does not close it.
-    const timer = setTimeout(() => window.addEventListener('pointerdown', onPointerDown), 0);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('pointerdown', onPointerDown);
-    };
-  }, [onClose]);
-  return (
-    <div
-      ref={box}
-      className="fixed z-50 flex flex-col overflow-hidden rounded-card border-2 border-outline bg-secondary shadow-brutalLg"
-      style={{ left, top, width: PICKER_WIDTH, height: PICKER_HEIGHT }}
-      data-testid="step-picker-popover"
-    >
-      {children}
-    </div>
   );
 }

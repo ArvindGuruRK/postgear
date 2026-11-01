@@ -30,6 +30,7 @@ import {
   Badge,
   Button,
   Label,
+  liftSm,
   MotionIcon,
   Toggle,
   TooltipHint,
@@ -188,6 +189,7 @@ export function WorkflowLiveControls({
       disabled={!canManage}
       aria-describedby={canManage ? undefined : reasonId}
       data-testid="activate-switch"
+      className="shadow-none"
       onCheckedChange={(next) => {
         if (next) setActivation('turnOn');
         else setPausing(true);
@@ -197,9 +199,11 @@ export function WorkflowLiveControls({
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="live-controls">
-      <Badge variant={badge.variant} data-testid="status-badge">
-        {badge.label}
-      </Badge>
+      {automation.status === 'DRAFT' ? null : (
+        <Badge variant={badge.variant} data-testid="status-badge">
+          {badge.label}
+        </Badge>
+      )}
 
       {unpublished ? (
         <>
@@ -207,12 +211,22 @@ export function WorkflowLiveControls({
             Unpublished Changes
           </Badge>
           {canManage && active ? (
-            <Button variant="secondary" size="sm" onClick={() => setActivation('changes')}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className={liftSm}
+              onClick={() => setActivation('changes')}
+            >
               <MotionIcon icon={UploadIcon} className="h-4 w-4" />
               Activate Changes
             </Button>
           ) : null}
-          <Button variant="secondary" size="sm" onClick={() => setDiscarding(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className={liftSm}
+            onClick={() => setDiscarding(true)}
+          >
             <MotionIcon icon={UndoIcon} className="h-4 w-4" />
             Discard Changes
           </Button>
@@ -223,6 +237,7 @@ export function WorkflowLiveControls({
         <Button
           variant="secondary"
           size="sm"
+          className={liftSm}
           onClick={() => void clickRunNow()}
           disabled={running}
           data-testid="run-now"

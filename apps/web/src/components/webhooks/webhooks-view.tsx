@@ -9,7 +9,7 @@
  * treatment. Secrets appear in exactly two places, the create dialog and
  * the rotate result, and nowhere else.
  */
-import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { HistoryIcon } from '@animateicons/react/lucide/history-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
@@ -286,7 +286,7 @@ export function WebhooksView({
                         className="w-9 px-0"
                         aria-label={`Actions for ${webhook.name}`}
                       >
-                        <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+                        <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

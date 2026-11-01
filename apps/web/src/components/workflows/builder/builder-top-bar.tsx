@@ -12,9 +12,8 @@
  * The page hands Test Workflow and the live controls in as slots, so this
  * row only lays them out.
  */
-import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
-import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import type { AutomationGraph, ValidationIssue } from '@postgear/automation';
 import {
   Button,
@@ -93,8 +92,6 @@ export function BuilderTopBar({
   onVersions,
   onDuplicate,
   onDelete,
-  stepsHidden,
-  onShowSteps,
 }: {
   orgId: string;
   name: string;
@@ -116,9 +113,6 @@ export function BuilderTopBar({
   onVersions: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  /** Below `lg` the Steps panel is a drawer, opened from here. */
-  stepsHidden: boolean;
-  onShowSteps: () => void;
 }) {
   const [draft, setDraft] = useState(name);
 
@@ -136,30 +130,18 @@ export function BuilderTopBar({
   }
 
   return (
-    <PageActions className="justify-start">
+    <PageActions className="justify-start gap-2 rounded-card border-2 border-outline bg-secondary px-3 py-2 shadow-surfaceSm">
       <TooltipHint label="Back To Workflows" side="bottom">
         <Link
           href={`/${orgId}/workflows`}
           aria-label="Back To Workflows"
           data-testid="builder-back"
-          className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'w-9 shrink-0 px-0')}
+          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-9 shrink-0 px-0')}
         >
           <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
         </Link>
       </TooltipHint>
-      {stepsHidden && tab === 'editor' ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onShowSteps}
-          aria-label="Show Steps"
-          className="lg:hidden"
-        >
-          <MotionIcon icon={PanelLeftOpenIcon} className="h-4 w-4" />
-          Steps
-        </Button>
-      ) : null}
-      {/* On a phone the name takes the first line; Steps and the rest wrap below it. */}
+      {/* On a phone the name takes the first line; the rest wraps below it. */}
       <div className="order-first flex min-w-0 flex-1 basis-full flex-wrap items-center gap-3 sm:order-none sm:basis-auto">
         <Input
           value={draft}
@@ -177,18 +159,22 @@ export function BuilderTopBar({
               event.currentTarget.blur();
             }
           }}
-          className="h-9 w-full max-w-xs type-ui sm:w-72"
+          className="h-9 w-full max-w-xs type-ui shadow-none sm:w-64"
           data-testid="workflow-name"
         />
         <SaveState status={status} message={message} />
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3 [&_button:not([role=switch]):not([role=tab])]:h-9">
         <Tabs value={tab} onValueChange={(value) => onTabChange(value as BuilderTab)}>
-          <TabsList aria-label="Builder view" data-testid="builder-tabs">
-            <TabsTrigger value="editor" className="px-3 py-1.5">
+          <TabsList
+            aria-label="Builder view"
+            data-testid="builder-tabs"
+            className="h-9 p-0.5 shadow-none"
+          >
+            <TabsTrigger value="editor" className="h-full px-3 py-0">
               Editor
             </TabsTrigger>
-            <TabsTrigger value="runs" className="px-3 py-1.5">
+            <TabsTrigger value="runs" className="h-full px-3 py-0">
               Runs
             </TabsTrigger>
           </TabsList>
@@ -203,8 +189,8 @@ export function BuilderTopBar({
         {liveControls}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="secondary" size="sm" aria-label="Workflow actions">
-              <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+            <Button variant="ghost" size="sm" aria-label="Workflow actions">
+              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

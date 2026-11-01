@@ -21,6 +21,30 @@
     }
   }
 
+  /*
+   * Stacking, from TriForms' workflow canvas: neither pane sets a z-index, so
+   * it falls to DOM order. A line that skips ahead (a branch past several
+   * steps) must tuck behind every card it passes under, never be drawn over one.
+   */
+  .pg-canvas .react-flow__edges {
+    position: absolute;
+    z-index: 0;
+  }
+
+  .pg-canvas .react-flow__nodes {
+    position: absolute;
+    z-index: 1;
+  }
+
+  /*
+   * A note's resize frame, from TriForms' annotations: a dashed line and small
+   * square handles, quiet until the note is selected.
+   */
+  .pg-canvas .react-flow__resize-control.line {
+    border-style: dashed;
+    border-width: 1.5px;
+  }
+
   .pg-canvas .react-flow__node {
     cursor: default;
   }

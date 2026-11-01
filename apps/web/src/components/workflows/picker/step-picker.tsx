@@ -4,10 +4,10 @@
  * The step picker (Module 05, blueprint 4.4): n8n's node creator and
  * Zapier's app picker in one component, used three ways:
  *
- * - `panel`: the docked Steps panel on the left, collapsible to an icon
- *   strip; items can also be dragged onto the canvas;
- * - `next`: the popover from a "+" or a dropped line, "What happens next?",
- *   with triggers hidden;
+ * - `panel`: the dock on the right while no step is open (n8n's node
+ *   creator, Zapier's side panel); items can also be dragged onto the canvas;
+ * - `next`: the same dock, opened from a "+" or a dropped line, "What
+ *   happens next?", with triggers hidden;
  * - `trigger`: the empty canvas's Add A Trigger, triggers only.
  *
  * Search first (ranked in `picker-search.ts`); without one, Recent and then
@@ -21,8 +21,6 @@ import { BellIcon } from '@animateicons/react/lucide/bell-icon';
 import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
 import { DatabaseIcon } from '@animateicons/react/lucide/database-icon';
 import { GitBranchIcon } from '@animateicons/react/lucide/git-branch-icon';
-import { PanelLeftCloseIcon } from '@animateicons/react/lucide/panel-left-close-icon';
-import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { ShareIcon } from '@animateicons/react/lucide/share-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
@@ -41,7 +39,7 @@ import {
   useState,
 } from 'react';
 import type { WorkspaceCatalog } from '@/types/workflows';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { STEP_DRAG_TYPE } from '../canvas/flow-model';
 import {
   itemsIn,
@@ -66,7 +64,7 @@ const CATEGORY_ICONS: Record<NodeCategory, AnimatedIcon> = {
 };
 
 const TITLES: Record<PickerPlacement, string> = {
-  panel: 'Steps',
+  panel: 'Add A Step',
   next: 'What Happens Next?',
   trigger: 'Add A Trigger',
 };
@@ -83,9 +81,8 @@ export interface StepPickerProps {
   orgId: string;
   onPick: (item: PickerItem) => void;
   onClose?: () => void;
-  /** The docked panel's collapse button. */
+  /** The dock's hide button. */
   onCollapse?: () => void;
-  collapsed?: boolean;
   autoFocus?: boolean;
   className?: string;
 }
@@ -99,7 +96,6 @@ export function StepPicker({
   onPick,
   onClose,
   onCollapse,
-  collapsed = false,
   autoFocus = true,
   className,
 }: StepPickerProps) {
@@ -140,8 +136,8 @@ export function StepPicker({
     setHighlight({ view, index: typeof next === 'number' ? next : next(active) });
 
   useEffect(() => {
-    if (autoFocus && !collapsed) search.current?.focus();
-  }, [autoFocus, collapsed]);
+    if (autoFocus) search.current?.focus();
+  }, [autoFocus]);
 
   function choose(row: Row | undefined) {
     if (!row) return;
@@ -178,48 +174,6 @@ export function StepPicker({
     }
   }
 
-  if (collapsed) {
-    return (
-      <nav
-        aria-label="Steps"
-        className={cn(
-          'flex w-14 flex-col items-center gap-1 border-r-2 border-outline bg-chrome py-2',
-          className,
-        )}
-      >
-        {onCollapse ? (
-          <TooltipHint label="Show Steps" side="right">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 w-9 px-0"
-              aria-label="Show Steps"
-              onClick={onCollapse}
-            >
-              <MotionIcon icon={PanelLeftOpenIcon} className="h-4 w-4" />
-            </Button>
-          </TooltipHint>
-        ) : null}
-        {PICKER_CATEGORIES.filter((group) => itemsIn(items, group.id).length > 0).map((group) => (
-          <TooltipHint key={group.id} label={group.title} side="right">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 w-9 px-0"
-              aria-label={group.title}
-              onClick={() => {
-                setCategory(group.id);
-                onCollapse?.();
-              }}
-            >
-              <MotionIcon icon={CATEGORY_ICONS[group.id]} className="h-4 w-4" />
-            </Button>
-          </TooltipHint>
-        ))}
-      </nav>
-    );
-  }
-
   const activeId = rows[active] ? `${listId}-${active}` : undefined;
   const heading = category
     ? PICKER_CATEGORIES.find((group) => group.id === category)?.title
@@ -235,7 +189,7 @@ export function StepPicker({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
       }}
     >
-      <div className="flex items-center gap-2 px-3 pt-3">
+      <div className="flex items-center gap-2 px-4 pt-4">
         {category && !query ? (
           <Button
             variant="ghost"
@@ -247,7 +201,7 @@ export function StepPicker({
             <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
           </Button>
         ) : null}
-        <h2 className="type-heading min-w-0 flex-1 truncate text-lg text-ink">{heading}</h2>
+        <h2 className="type-heading min-w-0 flex-1 truncate text-2xl text-ink">{heading}</h2>
         {onCollapse ? (
           <TooltipHint label="Hide Steps">
             <Button
@@ -257,7 +211,7 @@ export function StepPicker({
               aria-label="Hide Steps"
               onClick={onCollapse}
             >
-              <MotionIcon icon={PanelLeftCloseIcon} className="h-4 w-4" />
+              <MotionIcon icon={XIcon} className="h-4 w-4" />
             </Button>
           </TooltipHint>
         ) : null}
@@ -273,7 +227,7 @@ export function StepPicker({
           </Button>
         ) : null}
       </div>
-      <div className="px-3 pt-2 pb-2">
+      <div className="px-4 pt-3 pb-3">
         <SearchInput
           ref={search}
           value={query}
@@ -298,7 +252,7 @@ export function StepPicker({
           id={listId}
           role="listbox"
           aria-label={heading}
-          className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+          className="min-h-0 flex-1 overflow-y-auto px-3 pb-4"
           onMouseEnter={() => setHovering(true)}
           onMouseLeave={() => setHovering(false)}
         >
@@ -336,10 +290,11 @@ export function StepPicker({
                         : 'border-transparent text-ink',
                     )}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center text-ink">
                       <MotionIcon icon={CATEGORY_ICONS[row.id]} className="h-4 w-4" />
                     </span>
                     <span className="type-ui flex-1 text-sm">{row.title}</span>
+                    <span className="font-sans text-xs type-muted">{row.count}</span>
                     <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" />
                   </button>
                 </div>
@@ -376,11 +331,11 @@ export function StepPicker({
                 >
                   <span
                     className={cn(
-                      'flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary',
+                      'flex h-9 w-9 shrink-0 items-center justify-center',
                       addable ? '' : 'opacity-50',
                     )}
                   >
-                    <AppIcon icon={item.icon} className="h-4 w-4" />
+                    <StepGlyph icon={item.icon} className="h-7 w-7" />
                   </span>
                   <span
                     className={cn(

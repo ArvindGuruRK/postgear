@@ -35,6 +35,7 @@ import {
 } from '@xyflow/react';
 import { type DragEvent, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useBuilder } from '../builder/builder-context';
+import { CARD_HEIGHT, CARD_WIDTH } from '../builder/graph-ops';
 import type { Position, Selection } from '../builder/builder-state';
 import type { RunModel } from '../runs/run-model';
 import { type CanvasMode, CanvasModeProvider, useMarkerId } from './canvas-mode';
@@ -58,16 +59,17 @@ import './workflow-canvas.css';
 const NODE_TYPES = { step: StepCard, note: StickyNoteCard };
 const EDGE_TYPES = { flow: StepEdge };
 const SNAP: [number, number] = [12, 12];
+const PRO_OPTIONS = { hideAttribution: true };
 const PAN_BUTTONS = [1, 2];
 const MULTI_SELECT = ['Shift', 'Meta', 'Control'];
-const FIT = { padding: 0.25, maxZoom: 1 };
+const FIT = { padding: 0.15, maxZoom: 1 };
 
 /**
  * A flow too wide to fit at a readable size opens at this zoom with its first
  * step in view, not shrunk until every card is a name-sized speck (a six-step
  * flow opened at about 60%). Fit To Screen still fits everything.
  */
-const OPEN_ZOOM = 0.75;
+const OPEN_ZOOM = 0.65;
 const OPEN_MARGIN = 48;
 
 /** Steps from which the minimap earns its corner; fewer fit the screen anyway. */
@@ -310,7 +312,7 @@ export function WorkflowCanvas({
     if (!itemId) return;
     event.preventDefault();
     const at = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    onDropStep(itemId, { x: at.x - 120, y: at.y - 38 });
+    onDropStep(itemId, { x: at.x - CARD_WIDTH / 2, y: at.y - CARD_HEIGHT / 2 });
   }
 
   return (
@@ -335,6 +337,11 @@ export function WorkflowCanvas({
           onConnectEnd={onConnectEnd}
           isValidConnection={isValidConnection}
           onPaneClick={onPaneClick}
+          onNodeClick={(event, node) => {
+            // A plain click opens the step's settings in the dock; a modified one is multi-select.
+            if (node.type !== 'step' || event.shiftKey || event.metaKey || event.ctrlKey) return;
+            builder.open(node.id);
+          }}
           onPaneContextMenu={(event) => {
             event.preventDefault();
             builder.contextMenu(
@@ -364,7 +371,7 @@ export function WorkflowCanvas({
           multiSelectionKeyCode={MULTI_SELECT}
           nodesDraggable={!builder.locked}
           nodesConnectable={!builder.locked}
-          attributionPosition="top-right"
+          proOptions={PRO_OPTIONS}
           aria-label="Workflow canvas"
         >
           <Background
@@ -397,7 +404,7 @@ export function WorkflowCanvas({
         </ReactFlow>
         {empty ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-            <div className="pointer-events-auto">{empty}</div>
+            <div className="pointer-events-auto flex w-full justify-center">{empty}</div>
           </div>
         ) : null}
       </div>

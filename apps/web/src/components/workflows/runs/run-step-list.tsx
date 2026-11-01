@@ -14,7 +14,7 @@ import { Alert, Badge, Button, cn, MotionIcon, Text, TooltipHint, toast } from '
 import { ChevronDown } from 'lucide-react';
 import { memo, useState } from 'react';
 import type { AutomationRunMode, AutomationRunStatus, RunStep } from '@/types/workflows';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { DataTable, DataTree, type DataViewKind, DataViews, RawView } from '../panel/data-view';
 import { rawText, valueTree, valueWords } from '../panel/panel-view-model';
 import { copyDetailsText, failureNextStep, oneSentence } from './copy-details';
@@ -186,7 +186,7 @@ const StepRow = memo(function StepRow(props: StepRowProps) {
         className="flex w-full min-w-0 items-center gap-3 rounded-card px-3 py-2.5 text-left outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-          {icon ? <AppIcon icon={icon} /> : null}
+          {icon ? <StepGlyph icon={icon} className="h-4 w-4" /> : null}
         </span>
         <span className="type-ui min-w-0 flex-1 truncate text-sm text-ink">{step.nodeName}</span>
         <Badge variant={STEP_BADGE[state]} className="shrink-0">

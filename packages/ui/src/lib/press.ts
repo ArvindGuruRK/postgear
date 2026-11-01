@@ -40,3 +40,17 @@ export const pressMd = cn(
   'hover:translate-x-(--brutal-offset-md) hover:translate-y-(--brutal-offset-md) hover:shadow-brutalPressed',
   'active:translate-x-(--brutal-offset-md) active:translate-y-(--brutal-offset-md) active:shadow-brutalPressed',
 );
+
+/**
+ * The press the other way round (2026-11-01), for a toolbar that wants flat
+ * buttons: no shadow at rest and none on hover; while pressed the control
+ * rises up and left by the shadow's depth and its shadow shows beneath it,
+ * then settles back down when let go. Put it after a Button's own classes,
+ * which it overrides.
+ */
+export const liftSm = cn(
+  'transition-[translate,box-shadow] duration-150 ease-out',
+  'motion-reduce:transition-none',
+  'shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none',
+  'active:-translate-x-(--brutal-offset-sm) active:-translate-y-(--brutal-offset-sm) active:shadow-brutalSm',
+);

@@ -42,8 +42,8 @@ export interface AutomationTemplate {
 /** A template without its graph, for the list. */
 export type TemplateSummary = Omit<AutomationTemplate, 'graph'> & { steps: number };
 
-export const TEMPLATE_COLUMN = 320;
-export const TEMPLATE_ROW = 160;
+export const TEMPLATE_COLUMN = 432;
+export const TEMPLATE_ROW = 192;
 
 function step(
   key: string,

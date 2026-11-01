@@ -10,7 +10,7 @@
 import { XIcon } from '@animateicons/react/lucide/x-icon';
 import { Button, MotionIcon } from '@postgear/ui';
 import { CircleCheck } from 'lucide-react';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { SETUP_DONE, type SetupItem } from './builder-view-model';
 
 export function FinishSetup({
@@ -26,7 +26,7 @@ export function FinishSetup({
     <section
       aria-label="Finish Setup"
       data-testid="finish-setup"
-      className="w-72 rounded-card border-2 border-outline bg-secondary p-3 shadow-surfaceMd"
+      className="w-72 rounded-card border-2 border-outline bg-secondary p-3 shadow-surfaceSm"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="type-heading text-base text-ink">Finish Setup</h2>
@@ -59,8 +59,8 @@ export function FinishSetup({
                 onClick={() => item.nodeKey && onOpen(item)}
                 className="flex w-full items-start gap-2 rounded-md border-2 border-transparent p-1.5 text-left hover:border-outline disabled:cursor-default disabled:hover:border-transparent"
               >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-                  {item.icon ? <AppIcon icon={item.icon} className="h-3.5 w-3.5" /> : null}
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+                  {item.icon ? <StepGlyph icon={item.icon} className="h-6 w-6" /> : null}
                 </span>
                 <span className="flex min-w-0 flex-col">
                   <span className="type-ui truncate text-xs text-ink">{item.stepName}</span>

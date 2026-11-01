@@ -17,15 +17,15 @@ import {
 } from '@postgear/automation';
 
 /** The step card's size on the canvas. */
-export const CARD_WIDTH = 240;
-export const CARD_HEIGHT = 76;
+export const CARD_WIDTH = 264;
+export const CARD_HEIGHT = 96;
 /**
  * How far right a step is placed after the one it follows: the card plus an
  * 80px run for the line, its arrowhead, a port sticker and the "+" stem
  * (2026-10-31, it was 280, a 40px gap that crammed all four together).
  */
-export const STEP_GAP_X = 320;
-export const STEP_GAP_Y = 160;
+export const STEP_GAP_X = 432;
+export const STEP_GAP_Y = 192;
 /** The canvas grid; positions snap to it. */
 export const GRID = 12;
 

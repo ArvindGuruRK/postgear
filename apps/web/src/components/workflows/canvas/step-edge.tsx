@@ -19,7 +19,7 @@
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
 import { cn, MotionIcon } from '@postgear/ui';
-import { EdgeLabelRenderer, type EdgeProps, getBezierPath } from '@xyflow/react';
+import { EdgeLabelRenderer, type EdgeProps, getBezierPath, Position } from '@xyflow/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useOptionalBuilder } from '../builder/builder-context';
 import { useCanvasMode } from './canvas-mode';
@@ -74,7 +74,9 @@ export const StepEdge = memo(function StepEdge({
     sourceX,
     sourceY,
     sourcePosition,
-    targetX,
+    // React Flow ends a line on the outer edge of the port dot. The arrow tip sits on that
+    // end (see the marker), 1px under the dot so anti-aliasing leaves no hairline gap.
+    targetX: targetPosition === Position.Left ? targetX + 1 : targetX,
     targetY,
     targetPosition,
   });
@@ -167,8 +169,8 @@ function Arrow({ id, fill }: { id: string; fill: string }) {
     <marker
       id={id}
       viewBox="0 0 10 10"
-      // The tip stops short of the port dot it points at, so the two never overlap.
-      refX="15"
+      // The tip (x = 10 of the 10 wide box) is the end of the line, on the port dot's edge.
+      refX="10"
       refY="5"
       markerWidth="7"
       markerHeight="7"

@@ -60,7 +60,7 @@ export const StickyNoteCard = memo(function StickyNoteCard({
     // biome-ignore lint/a11y/noStaticElementInteractions: double-click opens the editor; the note is focusable through React Flow
     <div
       className={cn(
-        'flex h-full w-full flex-col overflow-hidden rounded-card border-2 border-outline shadow-brutalSm',
+        'flex h-full w-full flex-col overflow-hidden rounded-card border-2 border-outline shadow-surfaceSm',
         NOTE_FILL[note.colour],
         NOTE_TEXT[note.colour],
         selected ? 'outline-solid outline-[3px] outline-offset-2 outline-focusRing' : '',
@@ -81,7 +81,7 @@ export const StickyNoteCard = memo(function StickyNoteCard({
         maxWidth={2_000}
         maxHeight={2_000}
         lineClassName="border-focusRing!"
-        handleClassName="h-2.5! w-2.5! rounded-sm! border-2! border-outline! bg-secondary!"
+        handleClassName="h-2! w-2! rounded-xs! border-2! border-focusRing! bg-focusRing!"
         onResizeEnd={(_event, params) =>
           editor?.dispatch({
             type: 'updateNote',
@@ -96,7 +96,7 @@ export const StickyNoteCard = memo(function StickyNoteCard({
       />
       <div
         className={cn(
-          'pg-note-handle flex h-6 shrink-0 items-center justify-end gap-1 border-b-2 border-outline px-1.5',
+          'pg-note-handle flex h-6 shrink-0 items-center justify-end gap-1 px-2',
           editor ? 'cursor-grab' : '',
         )}
       >

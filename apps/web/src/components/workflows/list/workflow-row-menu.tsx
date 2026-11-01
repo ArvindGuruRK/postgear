@@ -5,7 +5,7 @@
  * Pause for workspace admins (Module 09), and Delete (red, confirmed by the
  * list). Members see no Activate or Pause: the API refuses them.
  */
-import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import {
   Button,
   DropdownMenu,
@@ -61,7 +61,7 @@ export function WorkflowRowMenu({
           aria-label={`Actions for ${workflow.name}`}
           disabled={busy}
         >
-          <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+          <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

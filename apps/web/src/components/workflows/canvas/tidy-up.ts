@@ -19,8 +19,8 @@ import { type AutomationGraph, isTriggerType, outputPortsOf } from '@postgear/au
 import type { Position } from '../builder/builder-state';
 import { CARD_HEIGHT, CARD_WIDTH, snap } from '../builder/graph-ops';
 
-export const TIDY_NODESEP = 40;
-export const TIDY_RANKSEP = 80;
+export const TIDY_NODESEP = 72;
+export const TIDY_RANKSEP = 168;
 
 /** New top-left positions for every step, keyed by step key. */
 export function tidyPositions(graph: AutomationGraph): Record<string, Position> {

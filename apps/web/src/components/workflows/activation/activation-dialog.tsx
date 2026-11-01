@@ -33,7 +33,7 @@ import { CalendarClock, Sparkles, TriangleAlert } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { activateWorkflow } from '@/lib/workflows-api';
 import type { ActivationResult } from '@/types/workflows';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from '../list/step-glyph';
 import { issueKey } from '../panel/issues-popover';
 import {
   type ActivationContent,
@@ -294,7 +294,7 @@ function IssueRow({
       >
         <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink">
           {icon ? (
-            <AppIcon icon={icon} className="h-3.5 w-3.5" />
+            <StepGlyph icon={icon} className="h-3.5 w-3.5" />
           ) : (
             <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
           )}

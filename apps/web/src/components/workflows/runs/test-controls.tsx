@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  liftSm,
   MotionIcon,
 } from '@postgear/ui';
 import { LoaderCircle } from 'lucide-react';
@@ -104,6 +105,7 @@ export function TestControls({
         size="sm"
         onClick={onStop}
         disabled={stopping}
+        className={liftSm}
         data-testid="stop-test"
         aria-keyshortcuts="Control+Enter Meta+Enter"
       >
@@ -128,7 +130,7 @@ export function TestControls({
           size="sm"
           onClick={() => request()}
           disabled={busy}
-          className="rounded-r-none"
+          className={cn('rounded-r-none', liftSm)}
           aria-keyshortcuts="Control+Enter Meta+Enter"
           data-testid="test-workflow"
         >
@@ -149,7 +151,7 @@ export function TestControls({
               size="sm"
               disabled={busy}
               aria-label="Choose the test data"
-              className={cn('rounded-l-none border-l-0 px-2')}
+              className={cn('rounded-l-none border-l-0 px-2', liftSm)}
               data-testid="test-data-menu"
             >
               <MotionIcon icon={ChevronDownIcon} className="h-4 w-4" />

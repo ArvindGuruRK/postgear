@@ -16,7 +16,7 @@
  */
 import { cn, pressSm, Spinner } from '@postgear/ui';
 import type { TemplateSummary } from '@/types/workflows';
-import { AppIcon } from '../app-icon';
+import { StepGlyph } from './step-glyph';
 import { usesText } from './workflows-view-model';
 
 export const FOCUS =
@@ -59,7 +59,7 @@ export function TemplateCard({
         'disabled:cursor-not-allowed disabled:opacity-60',
       )}
     >
-      <span className="flex items-center" aria-hidden="true">
+      <span className="flex max-w-full items-center overflow-hidden" aria-hidden="true">
         <span className="flex -space-x-1">
           {shown.map((icon, index) => (
             <span
@@ -68,7 +68,7 @@ export function TemplateCard({
               key={`${icon}-${index}`}
               className={STICKER}
             >
-              <AppIcon icon={icon} className="h-4 w-4" />
+              <StepGlyph icon={icon} className="h-5 w-5" />
             </span>
           ))}
           {rest > 0 ? (
@@ -109,7 +109,7 @@ export function TemplateGallery({
       <h2 id="workflow-templates" className="type-heading text-lg text-ink">
         Templates
       </h2>
-      <div className="grid grid-cols-3 gap-4 pb-1 2xl:grid-cols-5">
+      <div className={cn('grid grid-cols-3 gap-4 pb-1', compact ? '' : '2xl:grid-cols-5')}>
         {shown.map((template) => (
           <TemplateCard
             key={template.id}

@@ -12,6 +12,7 @@ import {
   HISTORY_LIMIT,
   initialState,
 } from './builder-state';
+import { STEP_GAP_X } from './graph-ops';
 
 function report(): AutomationGraph {
   const template = getTemplate('publishing-report');
@@ -52,7 +53,7 @@ describe('builderReducer', () => {
         targetPort: 'in',
       },
     ]);
-    expect(state.graph.nodes[1].position).toEqual({ x: 324, y: 0 });
+    expect(state.graph.nodes[1].position).toEqual({ x: STEP_GAP_X, y: 0 });
     expect(state.selection.nodes).toEqual(['slackstep1']);
     expect(state.past).toHaveLength(2);
   });
