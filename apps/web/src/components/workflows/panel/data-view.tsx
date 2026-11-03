@@ -63,7 +63,7 @@ function TreeRow({
             aria-label={open ? `Hide ${field.label}` : `Show ${field.label}`}
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink outline-none hover:bg-actionSecondary hover:text-onActionLight focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink outline-none hover:bg-primary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing"
           >
             <ChevronRight
               aria-hidden="true"

@@ -132,10 +132,10 @@ export const StickyNoteCard = memo(function StickyNoteCard({
           }}
           aria-label="Note text"
           placeholder="Enter your note"
-          className="nodrag nowheel h-full w-full resize-none bg-transparent p-2 font-sans text-sm outline-none placeholder:opacity-70"
+          className="nodrag nowheel h-full w-full resize-none bg-transparent p-3 font-sans text-base outline-none placeholder:opacity-70"
         />
       ) : (
-        <div className="nowheel h-full overflow-auto p-2 font-sans text-sm">
+        <div className="nowheel h-full overflow-auto p-3 font-sans text-base">
           {note.text ? (
             <NoteText text={note.text} />
           ) : editor ? (

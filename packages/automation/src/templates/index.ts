@@ -42,7 +42,8 @@ export interface AutomationTemplate {
 /** A template without its graph, for the list. */
 export type TemplateSummary = Omit<AutomationTemplate, 'graph'> & { steps: number };
 
-export const TEMPLATE_COLUMN = 432;
+/** A 320px card plus the 160px run the builder leaves between steps (`STEP_GAP_X` in the web app). */
+export const TEMPLATE_COLUMN = 480;
 export const TEMPLATE_ROW = 192;
 
 function step(

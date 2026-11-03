@@ -54,6 +54,7 @@ import { StepCard } from './step-card';
 import { EdgeMarkers, StepEdge } from './step-edge';
 import { StickyNoteCard } from './sticky-note';
 import { useBodyAppearance } from './use-body-appearance';
+import { ZoomVar } from './zoom-var';
 import './workflow-canvas.css';
 
 const NODE_TYPES = { step: StepCard, note: StickyNoteCard };
@@ -63,6 +64,8 @@ const PRO_OPTIONS = { hideAttribution: true };
 const PAN_BUTTONS = [1, 2];
 const MULTI_SELECT = ['Shift', 'Meta', 'Control'];
 const FIT = { padding: 0.15, maxZoom: 1 };
+/** Until the page's scheme is known (use-body-appearance.ts): hidden, not removed, so the layout holds. */
+const HIDDEN = { visibility: 'hidden' } as const;
 
 /**
  * A flow too wide to fit at a readable size opens at this zoom with its first
@@ -72,8 +75,8 @@ const FIT = { padding: 0.15, maxZoom: 1 };
 const OPEN_ZOOM = 0.65;
 const OPEN_MARGIN = 48;
 
-/** Steps from which the minimap earns its corner; fewer fit the screen anyway. */
-const MINIMAP_FROM = 8;
+/** The minimap is on from the first step: it also shows where the view is when zoomed out (TriForms keeps one always). */
+const MINIMAP_FROM = 1;
 
 /** Opens a flow that fit too small at a readable zoom, trigger end in view. */
 function openReadable(instance: ReactFlowInstance<CanvasNode, FlowEdge>) {
@@ -321,6 +324,7 @@ export function WorkflowCanvas({
         <EdgeMarkers id={markerId} />
         <ReactFlow<CanvasNode, FlowEdge>
           colorMode={appearance.scheme}
+          style={appearance.ready ? undefined : HIDDEN}
           data-light-theme={appearance.lightTheme}
           data-dark-theme={appearance.darkTheme}
           onDragOver={onDragOver}
@@ -374,6 +378,7 @@ export function WorkflowCanvas({
           proOptions={PRO_OPTIONS}
           aria-label="Workflow canvas"
         >
+          <ZoomVar />
           <Background
             variant={BackgroundVariant.Dots}
             gap={24}

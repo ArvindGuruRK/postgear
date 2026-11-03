@@ -75,6 +75,29 @@ describe('tidyPositions', () => {
     expect(positions.yes000001.y).toBeLessThan(positions.nope00001.y);
   });
 
+  it('keeps Approved up when Rejected has nothing after it', () => {
+    let graph = emptyGraph();
+    const add = (type: string, key: string) => {
+      const step = createStep(graph, type, key, { x: 0, y: 0 });
+      if (!step) throw new Error(type);
+      graph = { ...graph, nodes: [...graph.nodes, step] };
+    };
+    add('trigger.manual', 'start0001');
+    add('logic.manualReview', 'review001');
+    add('notify.inApp', 'approved01');
+    graph = {
+      ...graph,
+      edges: [
+        makeEdge('start0001', 'out', 'review001'),
+        makeEdge('review001', 'approved', 'approved01'),
+      ],
+    };
+    const positions = tidyPositions(graph);
+    expect(positions.approved01.y).toBeLessThan(positions.review001.y);
+    // Only the real steps come back, never the stand-in for the empty Rejected row.
+    expect(Object.keys(positions).sort()).toEqual(['approved01', 'review001', 'start0001']);
+  });
+
   it('does nothing to an empty canvas', () => {
     expect(tidyPositions(emptyGraph())).toEqual({});
   });

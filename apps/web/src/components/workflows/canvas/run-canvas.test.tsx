@@ -77,10 +77,10 @@ describe('RunCanvas', () => {
 
   it('rings the selected step', () => {
     render(<RunCanvas graph={graph} run={run} catalog={null} selectedKey="a" />);
-    const card = screen.getByText('Slack').closest('.pg-step-card');
-    expect(classOf(card)).toEqual(expect.arrayContaining(['outline-focusRing']));
-    expect(classOf(screen.getByText('Set Fields').closest('.pg-step-card'))).not.toEqual(
-      expect.arrayContaining(['outline-focusRing']),
-    );
+    // The ring is drawn by workflow-canvas.css on the selected node (a width that holds at every
+    // zoom), so what the card carries is React Flow's `selected` class on its node.
+    const node = (text: string) => screen.getByText(text).closest('.react-flow__node');
+    expect(classOf(node('Slack'))).toEqual(expect.arrayContaining(['selected']));
+    expect(classOf(node('Set Fields'))).not.toEqual(expect.arrayContaining(['selected']));
   });
 });

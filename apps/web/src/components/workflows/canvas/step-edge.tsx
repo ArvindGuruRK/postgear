@@ -17,7 +17,7 @@
  * no menu.
  */
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
-import { XIcon } from '@animateicons/react/lucide/x-icon';
+import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { cn, MotionIcon } from '@postgear/ui';
 import { EdgeLabelRenderer, type EdgeProps, getBezierPath, Position } from '@xyflow/react';
 import { memo, useEffect, useRef, useState } from 'react';
@@ -27,24 +27,41 @@ import type { EdgeRunState, FlowEdge } from './flow-model';
 
 const GRACE_MS = 150;
 
+/** A button of the line's control: a centred 36px square, muted until the pointer is on it. */
+const EDGE_BUTTON =
+  'flex h-8 w-8 items-center justify-center rounded-md text-ink/60 transition-colors outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing';
+
+/**
+ * The arrowhead's length in px, whatever the line's width (the marker uses user units), and the
+ * bigger one a hovered or selected line swells to along with its line (2.5px to 3.5px), as in
+ * TriForms.
+ */
+const ARROW = 16;
+const ARROW_BIG = 20;
+
 /** The visible path's classes and its arrowhead, from what the run did with the line. */
 export function edgeLook(options: {
   run: EdgeRunState | undefined;
   isError: boolean;
   selected: boolean;
+  /** The pointer is on the line: it swells like a selected one. */
+  hover?: boolean;
   markerId: string;
 }): { path: string; group: string; marker: string } {
-  const { run, isError, selected, markerId } = options;
-  const width = selected ? 'stroke-[3px]' : 'stroke-2';
+  const { run, isError, selected, hover = false, markerId } = options;
+  const active = selected || hover;
+  const width = active ? 'stroke-[3.5px]' : 'stroke-[2.5px]';
+  // The bigger head is a marker of its own: CSS cannot resize a marker from its line.
+  const big = active ? '-big' : '';
   if (run === 'taken') {
     return {
       path: cn('pg-edge-path pg-edge-taken stroke-successInk', width),
       group: '',
-      marker: `url(#${markerId}-taken)`,
+      marker: `url(#${markerId}-taken${big})`,
     };
   }
   const colour = isError ? 'stroke-actionDanger' : 'stroke-ink';
-  const marker = isError ? `url(#${markerId}-error)` : `url(#${markerId})`;
+  const marker = isError ? `url(#${markerId}-error${big})` : `url(#${markerId}${big})`;
   if (run === 'skipped') {
     return { path: cn('pg-edge-path pg-edge-skipped', colour, width), group: 'opacity-35', marker };
   }
@@ -70,13 +87,16 @@ export const StepEdge = memo(function StepEdge({
   const editor = mode.readOnly ? null : builder;
   const [hover, setHover] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const arrow = hover || selected ? ARROW_BIG : ARROW;
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
-    // React Flow ends a line on the outer edge of the port dot. The arrow tip sits on that
-    // end (see the marker), 1px under the dot so anti-aliasing leaves no hairline gap.
-    targetX: targetPosition === Position.Left ? targetX + 1 : targetX,
+    // React Flow ends a line on the outer edge of the port dot. The arrowhead's tip belongs
+    // there (1px under the dot so anti-aliasing leaves no hairline gap), so the line itself
+    // stops one arrowhead short, at the head's base. A line run on to the tip would poke
+    // out of it as a small stub, the tip being narrower than the stroke.
+    targetX: targetPosition === Position.Left ? targetX + 1 - arrow : targetX,
     targetY,
     targetPosition,
   });
@@ -84,6 +104,7 @@ export const StepEdge = memo(function StepEdge({
     run: data?.run,
     isError: data?.isError ?? false,
     selected: selected ?? false,
+    hover,
     markerId: mode.markerId,
   });
 
@@ -95,7 +116,7 @@ export const StepEdge = memo(function StepEdge({
   );
 
   function enter() {
-    if (!editor) return;
+    // The line swells under the pointer on a read-only canvas too; only the buttons need an editor.
     if (timer.current) clearTimeout(timer.current);
     setHover(true);
   }
@@ -133,29 +154,31 @@ export const StepEdge = memo(function StepEdge({
         <EdgeLabelRenderer>
           {/* biome-ignore lint/a11y/noStaticElementInteractions: keeps the buttons open while the pointer moves onto them */}
           <div
-            className="nodrag nopan pointer-events-auto absolute flex items-center gap-1"
+            className="nodrag nopan pointer-events-auto absolute flex items-center gap-1 rounded-lg border-2 border-outline bg-secondary p-1"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
             onMouseEnter={enter}
             onMouseLeave={exit}
           >
+            {/* One quiet pair: the icons rest in muted ink and take their colour on hover, blue to
+                add and red to delete (after TriForms' line control). */}
             <button
               type="button"
               aria-label="Add a step here"
-              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-primary"
+              className={cn(EDGE_BUTTON, 'hover:bg-actionPrimary/15 hover:text-actionPrimary')}
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 editor.pickOnEdge(id, { x: rect.right, y: rect.top + rect.height / 2 });
               }}
             >
-              <MotionIcon icon={PlusIcon} className="h-3.5 w-3.5" />
+              <MotionIcon icon={PlusIcon} className="h-4 w-4" />
             </button>
             <button
               type="button"
               aria-label="Delete this line"
-              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline bg-actionDanger text-onActionLight"
+              className={cn(EDGE_BUTTON, 'hover:bg-actionDanger/15 hover:text-dangerInk')}
               onClick={() => editor.dispatch({ type: 'disconnect', edgeIds: [id] })}
             >
-              <MotionIcon icon={XIcon} className="h-3.5 w-3.5" />
+              <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
             </button>
           </div>
         </EdgeLabelRenderer>
@@ -164,16 +187,18 @@ export const StepEdge = memo(function StepEdge({
   );
 });
 
-function Arrow({ id, fill }: { id: string; fill: string }) {
+function Arrow({ id, fill, size = ARROW }: { id: string; fill: string; size?: number }) {
   return (
     <marker
       id={id}
       viewBox="0 0 10 10"
-      // The tip (x = 10 of the 10 wide box) is the end of the line, on the port dot's edge.
-      refX="10"
+      // The head's base (x = 0) sits on the end of the line and its tip reaches ARROW px on,
+      // to the port dot. Fixed user units, so a selected (thicker) line keeps the same head.
+      refX="0"
       refY="5"
-      markerWidth="7"
-      markerHeight="7"
+      markerUnits="userSpaceOnUse"
+      markerWidth={size}
+      markerHeight={size}
       orient="auto-start-reverse"
     >
       <path d="M 0 0 L 10 5 L 0 10 z" className={fill} />
@@ -189,6 +214,9 @@ export function EdgeMarkers({ id = 'pg-arrow' }: { id?: string }) {
         <Arrow id={id} fill="fill-ink" />
         <Arrow id={`${id}-error`} fill="fill-actionDanger" />
         <Arrow id={`${id}-taken`} fill="fill-successInk" />
+        <Arrow id={`${id}-big`} fill="fill-ink" size={ARROW_BIG} />
+        <Arrow id={`${id}-error-big`} fill="fill-actionDanger" size={ARROW_BIG} />
+        <Arrow id={`${id}-taken-big`} fill="fill-successInk" size={ARROW_BIG} />
       </defs>
     </svg>
   );

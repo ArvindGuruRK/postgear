@@ -103,6 +103,8 @@ export interface TooltipHintProps {
    * wrong name, so it closes the moment the pointer leaves the trigger.
    */
   hoverable?: boolean;
+  /** A smaller label (11px, tighter padding), for dense chrome such as a canvas toolbar. */
+  compact?: boolean;
   /** One element, typically an icon button that carries its own aria-label. */
   children: ReactElement;
 }
@@ -125,6 +127,7 @@ export function TooltipHint({
   triggerClassName,
   sideOffset,
   hoverable = true,
+  compact = false,
   children,
 }: TooltipHintProps) {
   if (hidden) {
@@ -154,7 +157,12 @@ export function TooltipHint({
   return (
     <Tooltip disableHoverableContent={!hoverable}>
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-      <TooltipContent side={side} align={align} sideOffset={sideOffset}>
+      <TooltipContent
+        side={side}
+        align={align}
+        sideOffset={sideOffset}
+        className={compact ? 'gap-1.5 px-2 py-1 text-[11px]' : undefined}
+      >
         <span>{label}</span>
         {shortcut}
       </TooltipContent>

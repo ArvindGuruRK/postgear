@@ -27,6 +27,7 @@ import type { AriaLabelConfig, Edge, Node } from '@xyflow/react';
 import type { Position, Selection } from '../builder/builder-state';
 import { CARD_HEIGHT, CARD_WIDTH } from '../builder/graph-ops';
 import type { RunModel, StepPaint } from '../runs/run-model';
+import { PICKER_CATEGORIES } from '../picker/picker-search';
 import { stepBadgeText } from '../runs/run-words';
 
 /** Stripe colours by family. Social steps show the platform's logo on an ink stripe. */
@@ -119,6 +120,8 @@ export interface StepNodeData extends Record<string, unknown> {
   /** Output ports with at least one line, so the others show their "+". */
   usedPorts: string[];
   isTrigger: boolean;
+  /** The tab above the card: "When" for the trigger, else the kind of step ("AI"). */
+  label: string;
   /** Module 08: the step's state in the painted run (absent: not started, or no run). */
   paint?: StepPaint;
 }
@@ -145,9 +148,28 @@ export type NoteFlowNode = Node<NoteNodeData, 'note'>;
 export type CanvasNode = StepFlowNode | NoteFlowNode;
 export type FlowEdge = Edge<FlowEdgeData, 'flow'>;
 
+/**
+ * The tab above every card, text only: the kind of step it is ("AI",
+ * "Social Channels"), and "When" on the trigger. No numbers: a number goes
+ * stale the moment a card is moved.
+ */
+export function stepLabels(graph: AutomationGraph): Map<string, string> {
+  const titles = new Map(PICKER_CATEGORIES.map((group) => [group.id, group.title]));
+  const labels = new Map<string, string>();
+  for (const node of graph.nodes) {
+    if (isTriggerType(node.type)) {
+      labels.set(node.key, 'When');
+      continue;
+    }
+    const category = getDefinition(node.type, node.typeVersion)?.category;
+    labels.set(node.key, (category && titles.get(category)) || '');
+  }
+  return labels;
+}
+
 /** A card grows when it has more outputs than fit its height (Paths). */
 export function cardHeight(ports: number): number {
-  return Math.max(CARD_HEIGHT, ports * 32 + 32);
+  return Math.max(CARD_HEIGHT, ports * 40 + 40);
 }
 
 export function issuesByStep(issues: readonly ValidationIssue[]): Map<string, ValidationIssue[]> {
@@ -183,6 +205,7 @@ export function toFlowNodes(
   }
   const selectedNodes = new Set(options.selection.nodes);
   const selectedNotes = new Set(options.selection.notes);
+  const labels = stepLabels(graph);
 
   const notes: NoteFlowNode[] = graph.notes.map((note) => {
     const id = `${NOTE_PREFIX}${note.id}`;
@@ -212,6 +235,7 @@ export function toFlowNodes(
       ports,
       usedPorts: [...(used.get(node.key) ?? [])],
       isTrigger: isTriggerType(node.type),
+      label: labels.get(node.key) ?? '',
     };
     const paint = options.paint?.[node.key];
     if (paint) data.paint = paint;

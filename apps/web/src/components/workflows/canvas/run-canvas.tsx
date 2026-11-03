@@ -46,9 +46,12 @@ import { StepCard } from './step-card';
 import { EdgeMarkers, StepEdge } from './step-edge';
 import { StickyNoteCard } from './sticky-note';
 import { useBodyAppearance } from './use-body-appearance';
+import { ZoomVar } from './zoom-var';
 import './workflow-canvas.css';
 
 const NODE_TYPES = { step: StepCard, note: StickyNoteCard };
+/** Until the page's scheme is known (use-body-appearance.ts): hidden, not removed, so the layout holds. */
+const HIDDEN = { visibility: 'hidden' } as const;
 const EDGE_TYPES = { flow: StepEdge };
 const FIT = { padding: 0.2, maxZoom: 1 };
 const NO_ISSUES = new Map<string, ValidationIssue[]>();
@@ -145,6 +148,7 @@ function ReadOnlyFlow({ graph, run, selectedKey, onSelectStep, className }: RunC
         <EdgeMarkers id={markerId} />
         <ReactFlow<CanvasNode, FlowEdge>
           colorMode={appearance.scheme}
+          style={appearance.ready ? undefined : HIDDEN}
           data-light-theme={appearance.lightTheme}
           data-dark-theme={appearance.darkTheme}
           nodes={nodes}
@@ -173,6 +177,7 @@ function ReadOnlyFlow({ graph, run, selectedKey, onSelectStep, className }: RunC
           proOptions={{ hideAttribution: true }}
           aria-label={run ? 'Run canvas' : 'Version canvas'}
         >
+          <ZoomVar />
           <Background
             variant={BackgroundVariant.Dots}
             gap={24}

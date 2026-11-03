@@ -57,10 +57,15 @@ export interface MotionIconProps {
  */
 export function MotionIcon({
   icon: Icon,
-  size = 16,
+  size: sizeProp,
   strokeWidth = 2.5,
   className,
 }: MotionIconProps) {
+  // The svg is drawn at `size` inside a box the classes size. When they disagree (an `h-3.5`
+  // box around a 16px svg) the svg overflows its box and sits off-centre in its button, so
+  // without a `size` the svg takes the box's own `h-*` step (4px a step).
+  const step = /(?:^|\s)h-(\d+(?:\.5)?)(?=\s|$)/.exec(className ?? '');
+  const size = sizeProp ?? (step ? Number(step[1]) * 4 : 16);
   const anchor = useRef<HTMLSpanElement>(null);
   const handle = useRef<IconAnimationHandle>(null);
 

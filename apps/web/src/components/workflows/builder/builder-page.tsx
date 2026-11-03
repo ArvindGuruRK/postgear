@@ -829,8 +829,9 @@ function Builder({
         type: 'addNote',
         note: {
           id: keys()(),
-          position: { x: Math.round(centre.x - 120), y: Math.round(centre.y - 60) },
-          size: { w: 240, h: 120 },
+          // 360 by 180: a note sits beside 320 by 120 cards and has to read like one of them.
+          position: { x: Math.round(centre.x - 180), y: Math.round(centre.y - 90) },
+          size: { w: 360, h: 180 },
           text: '',
           colour: 'yellow',
         },
@@ -843,11 +844,9 @@ function Builder({
     if (graphRef.current.nodes.length === 0) return;
     setTidying(true);
     dispatch({ type: 'tidy', positions: tidyPositions(graphRef.current) });
-    setTimeout(() => {
-      setTidying(false);
-      void flow.fitView({ duration: 200, padding: 0.12, minZoom: 0.6, maxZoom: 1 });
-    }, 320);
-  }, [flow]);
+    // Tidy Up only arranges: the view stays where it is (Fit To Screen is the zoom's button).
+    setTimeout(() => setTidying(false), 320);
+  }, []);
 
   const fromTemplate = useCallback(
     (templateId: string) => {

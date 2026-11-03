@@ -5,7 +5,7 @@ const base = { isError: false, selected: false, markerId: 'm' };
 describe('edgeLook', () => {
   it('draws a plain line in ink with the ink arrow', () => {
     expect(edgeLook({ ...base, run: undefined })).toEqual({
-      path: 'pg-edge-path stroke-ink stroke-2',
+      path: 'pg-edge-path stroke-ink stroke-[2.5px]',
       group: '',
       marker: 'url(#m)',
     });
@@ -34,6 +34,6 @@ describe('edgeLook', () => {
 
   it('marks a flowing line and thickens a selected one', () => {
     expect(edgeLook({ ...base, run: 'active' }).path).toContain('pg-edge-active');
-    expect(edgeLook({ ...base, selected: true, run: 'taken' }).path).toContain('stroke-[3px]');
+    expect(edgeLook({ ...base, selected: true, run: 'taken' }).path).toContain('stroke-[3.5px]');
   });
 });

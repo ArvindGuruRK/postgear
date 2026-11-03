@@ -203,7 +203,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
     case 'addStep': {
       const isTrigger = isTriggerType(action.stepType);
       if (isTrigger && state.graph.nodes.some((node) => isTriggerType(node.type))) return state;
-      const position = action.position ?? placeAfter(state.graph, action.from?.source);
+      const position = action.position ?? placeAfter(state.graph, action.from?.source, action.from?.sourcePort);
       const step = createStep(state.graph, action.stepType, action.key, position, action.config);
       if (!step) return state;
       let graph: AutomationGraph = { ...state.graph, nodes: [...state.graph.nodes, step] };

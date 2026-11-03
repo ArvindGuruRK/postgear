@@ -16,16 +16,17 @@ import {
   uniqueNodeName,
 } from '@postgear/automation';
 
-/** The step card's size on the canvas. */
-export const CARD_WIDTH = 264;
-export const CARD_HEIGHT = 96;
+/** The step card's size on the canvas: one size for every step, the trigger included. */
+export const CARD_WIDTH = 320;
+export const CARD_HEIGHT = 120;
 /**
- * How far right a step is placed after the one it follows: the card plus an
- * 80px run for the line, its arrowhead, a port sticker and the "+" stem
- * (2026-10-31, it was 280, a 40px gap that crammed all four together).
+ * How far right a step is placed after the one it follows: the card plus a
+ * 160px run for the line, its arrowhead, a port sticker and the "+" stem
+ * (the same gap Tidy Up leaves, `TIDY_RANKSEP`; 480 sits on the 12px grid).
  */
-export const STEP_GAP_X = 432;
-export const STEP_GAP_Y = 192;
+export const STEP_GAP_X = CARD_WIDTH + 160;
+/** One row down: a card's height plus Tidy Up's 72px between rows (`TIDY_NODESEP`; 192 is on the grid). */
+export const STEP_GAP_Y = CARD_HEIGHT + 72;
 /** The canvas grid; positions snap to it. */
 export const GRID = 12;
 
@@ -157,15 +158,30 @@ function overlaps(graph: AutomationGraph, x: number, y: number, except?: string)
  * Where a step added after `afterKey` goes: one column to the right, moved
  * down a row at a time until it overlaps nothing. With no `afterKey`, after
  * the last leaf, or the middle of an empty canvas.
+ *
+ * A step with several outputs (Approved and Rejected, True and False, a
+ * Paths case list, On Error) fans its branches out around its own row in the
+ * order of its ports: the first output lands highest, the last lowest, so the
+ * line from each port runs to its own row and never crosses another's.
  */
-export function placeAfter(graph: AutomationGraph, afterKey?: string): { x: number; y: number } {
+export function placeAfter(
+  graph: AutomationGraph,
+  afterKey?: string,
+  afterPort?: string,
+): { x: number; y: number } {
   const anchor =
     (afterKey && graph.nodes.find((node) => node.key === afterKey)) ||
     leaves(graph).at(-1) ||
     graph.nodes.at(-1);
   if (!anchor) return { x: 0, y: 0 };
   const x = snap(anchor.position.x + STEP_GAP_X);
-  let y = snap(anchor.position.y);
+  let branch = 0;
+  if (afterKey && afterPort && anchor.key === afterKey) {
+    const ports = outputPortsOf(anchor);
+    const index = ports.findIndex((port) => port.id === afterPort);
+    if (ports.length > 1 && index !== -1) branch = (index - (ports.length - 1) / 2) * STEP_GAP_Y;
+  }
+  let y = snap(anchor.position.y + branch);
   for (let tries = 0; tries < 50 && overlaps(graph, x, y); tries += 1) y = snap(y + STEP_GAP_Y);
   return { x, y };
 }

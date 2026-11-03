@@ -2,10 +2,12 @@
 
 /**
  * The step card (blueprint 4.1 and 4.2): PostGear's card language on n8n's
- * compact layout. 264 px wide and 96 px tall, no edge stripe, a 44 px icon
- * tile, the name and a one-line summary from the catalog.
+ * compact layout. 320 px wide and 120 px tall for every step (the trigger
+ * too), one 12px corner, no edge stripe and no shadow, a 56 px icon tile, the
+ * name and a one-line summary from the catalog.
  *
- * - Triggers carry a "When" tab and a rounder left edge, and no input.
+ * - Every card carries a tab behind its top edge: a yellow "When" on the trigger
+ *   (which has no input), a quiet kind ("AI", "Logic") on the rest.
  * - Turned off: faded, the name struck through, an Off sticker.
  * - Issues: a corner triangle with a "!" (never colour alone) and the
  *   first issue as its tooltip.
@@ -51,7 +53,6 @@ import {
 import {
   Handle,
   type NodeProps,
-  NodeToolbar,
   Position,
   type ReactFlowState,
   useConnection,
@@ -69,7 +70,6 @@ import {
   SkipForward,
   TriangleAlert,
   X,
-  Zap,
 } from 'lucide-react';
 import { memo, type ReactNode, useEffect, useRef, useState } from 'react';
 import { StepGlyph } from '../list/step-glyph';
@@ -86,18 +86,27 @@ export const zoomDetail = (state: ReactFlowState): ZoomDetail => {
   return zoom < 0.4 ? 'icon' : zoom < 0.6 ? 'compact' : 'full';
 };
 
-const HOVER_GRACE_MS = 150;
+const HOVER_GRACE_MS = 250;
 
 function portTop(index: number, count: number): string {
   return `${((index + 1) / (count + 1)) * 100}%`;
 }
 
-const HANDLE =
-  'pg-handle h-3! w-3! rounded-full! border-2! border-outline! bg-secondary! transition-transform';
+/**
+ * A port dot: 16px, ink (white in the dark themes) on both sides of a card, centred on its
+ * border line and a touch bigger under the pointer (workflow-canvas.css).
+ */
+const HANDLE = 'pg-handle h-4! w-4! rounded-full! border-2! border-outline! bg-ink!';
+
+/** A button of the hover toolbar: a centred 28px square, muted until the pointer is on it. */
+const TOOL = 'h-7 w-7 rounded-md px-0 text-ink/60 transition-colors';
+
+/** Hover for every toolbar button but Delete: the dark page shade and full ink, no colour. */
+const TOOL_NEUTRAL = 'hover:bg-primary hover:text-ink';
 
 /** The small stickers on a card's edges. */
 const STICKER =
-  'rounded-md border-2 border-outline px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none';
+  'rounded-md border-2 border-outline px-2 py-1 font-sans text-xs font-bold leading-none';
 
 const BADGE_ICONS: Record<BadgeIcon, LucideIcon> = {
   check: Check,
@@ -119,35 +128,13 @@ const BADGE_VARIANT: Record<BadgeTone, 'success' | 'danger' | 'accent' | 'primar
 };
 
 /**
- * React Flow's NodeToolbar keeps its size whatever the zoom, so zoomed out it
- * grew against its shrinking card and floated away from it. This one scales with
- * the canvas from its bottom edge, and its gap to the card scales too, so it
- * stays where it was, in proportion. Only the toolbar on show listens to the
- * zoom, so the other cards do not render on every wheel tick.
+ * Where the hover toolbar sits above a card, in flow px: the tab's 30px above the border plus
+ * an 8px margin. The toolbar is a child of the card, not React Flow's NodeToolbar (TriForms
+ * does the same): a NodeToolbar lives in screen pixels, so at 25% zoom it was a 208px bar over
+ * an 80px card, and every attempt to scale it by the zoom left it the wrong size somewhere. Inside
+ * the card it is part of the canvas, so it is in proportion to its card at every zoom, by construction.
  */
-function ToolbarAtZoom({
-  visible,
-  offset,
-  children,
-}: {
-  visible: boolean;
-  offset: number;
-  children: ReactNode;
-}) {
-  if (!visible) return null;
-  return <ZoomedToolbar offset={offset}>{children}</ZoomedToolbar>;
-}
-
-function ZoomedToolbar({ offset, children }: { offset: number; children: ReactNode }) {
-  const zoom = useStore((state) => state.transform[2]);
-  return (
-    <NodeToolbar isVisible position={Position.Top} offset={offset * zoom}>
-      <div style={{ transform: `scale(${zoom})`, transformOrigin: 'bottom center' }}>
-        {children}
-      </div>
-    </NodeToolbar>
-  );
-}
+const TOOLBAR_RISE = 38;
 
 export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps<StepFlowNode>) {
   const builder = useOptionalBuilder();
@@ -199,75 +186,77 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
   }
 
   const toolbar = editor ? (
-    <ToolbarAtZoom
-      visible={hover && !connection.inProgress && detail !== 'icon'}
-      offset={isTrigger ? 30 : 8}
+    hover && !connection.inProgress ? (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover keeps the toolbar open, keyboard users use the menu
+    <div
+      data-testid="step-toolbar"
+      style={{ marginBottom: TOOLBAR_RISE }}
+      onMouseEnter={enter}
+      onMouseLeave={exit}
+      // The pseudo-element is a bridge down to the card, so the pointer never crosses a gap.
+      className="nodrag nopan absolute bottom-full left-1/2 z-40 -translate-x-1/2 before:absolute before:inset-x-0 before:top-full before:h-[38px] before:content-['']"
     >
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover keeps the toolbar open, keyboard users use the menu */}
-      <div
-        className="flex items-center gap-1 rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalSm"
-        onMouseEnter={enter}
-        onMouseLeave={exit}
-      >
+      <div className="flex items-center gap-0.5 rounded-lg border-2 border-outline bg-secondary p-1">
+        {/* Compact, like TriForms': muted icons, full ink on hover, and red for Delete alone. */}
         {editor.testStep ? (
-          <TooltipHint label="Test Step">
+          <TooltipHint label="Test Step" compact hidden={detail !== 'full'}>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-8 px-2"
+              className={cn(TOOL, TOOL_NEUTRAL)}
               aria-label={`Test ${node.name}`}
               onClick={() => editor.testStep?.(id)}
             >
-              <MotionIcon icon={PlayIcon} className="h-4 w-4" />
+              <MotionIcon icon={PlayIcon} className="h-3.5 w-3.5" />
             </Button>
           </TooltipHint>
         ) : null}
         {canDisable ? (
-          <TooltipHint label={node.disabled ? 'Turn On' : 'Turn Off'} shortcut="D">
+          <TooltipHint
+            label={node.disabled ? 'Turn On' : 'Turn Off'}
+            shortcut="D"
+            compact
+            hidden={detail !== 'full'}
+          >
             <Button
               variant="ghost"
-              size="sm"
-              className="h-8 px-2"
+              className={cn(TOOL, TOOL_NEUTRAL)}
               aria-label={node.disabled ? `Turn on ${node.name}` : `Turn off ${node.name}`}
               onClick={() => editor.dispatch({ type: 'toggleDisabled', keys: [id] })}
             >
-              <MotionIcon icon={PowerIcon} className="h-4 w-4" />
+              <MotionIcon icon={PowerIcon} className="h-3.5 w-3.5" />
             </Button>
           </TooltipHint>
         ) : null}
         {isTrigger ? null : (
-          <TooltipHint label="Duplicate">
+          <TooltipHint label="Duplicate" compact hidden={detail !== 'full'}>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-8 px-2"
+              className={cn(TOOL, TOOL_NEUTRAL)}
               aria-label={`Duplicate ${node.name}`}
               onClick={() => editor.duplicate([id])}
             >
-              <MotionIcon icon={CopyPlusIcon} className="h-4 w-4" />
+              <MotionIcon icon={CopyPlusIcon} className="h-3.5 w-3.5" />
             </Button>
           </TooltipHint>
         )}
-        <TooltipHint label="Delete">
+        <TooltipHint label="Delete" compact hidden={detail !== 'full'}>
           <Button
-            variant="danger"
-            size="sm"
-            className="h-8 px-2"
+            variant="ghost"
+            className={cn(TOOL, 'hover:bg-actionDanger/15 hover:text-dangerInk')}
             aria-label={`Delete ${node.name}`}
             onClick={() => editor.remove({ nodes: [id] })}
           >
-            <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
+            <MotionIcon icon={Trash2Icon} className="h-3.5 w-3.5" />
           </Button>
         </TooltipHint>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-8 px-2"
+              className={cn(TOOL, TOOL_NEUTRAL)}
               aria-label={`More actions for ${node.name}`}
             >
-              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
+              <MotionIcon icon={EllipsisVerticalIcon} className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -277,8 +266,8 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </ToolbarAtZoom>
-  ) : null;
+    </div>
+  ) : null) : null;
 
   const pinSticker =
     pinned && detail !== 'icon' ? (
@@ -287,9 +276,9 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
           // biome-ignore lint/a11y/noNoninteractiveTabindex: the sticker's meaning is reachable by keyboard
           tabIndex={0}
           data-testid="pin-sticker"
-          className="nodrag flex h-6 items-center gap-1 rounded-md border-2 border-outline bg-actionPrimary px-1.5 text-onActionPrimary"
+          className="nodrag flex h-7 items-center gap-1 rounded-md border-2 border-outline bg-actionPrimary px-2 text-onActionPrimary"
         >
-          <Pin aria-hidden="true" className="h-3 w-3" strokeWidth={2.75} />
+          <Pin aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.75} />
           <span className="sr-only">This step has pinned test data.</span>
         </span>
       </TooltipHint>
@@ -303,14 +292,14 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         data-testid="run-badge"
         data-state={look.state}
         className={cn(
-          'gap-1 whitespace-nowrap px-1.5 text-[10px] leading-none',
+          'gap-1 whitespace-nowrap px-2 text-xs leading-none',
           look.tone === 'neutral' ? 'bg-secondary' : '',
         )}
       >
         <BadgeGlyph
           aria-hidden="true"
           className={cn(
-            'h-3 w-3 shrink-0',
+            'h-3.5 w-3.5 shrink-0',
             look.icon === 'spinner' ? 'animate-spin motion-reduce:animate-none' : '',
           )}
           strokeWidth={3}
@@ -341,41 +330,44 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
     >
       {toolbar}
 
-      {isTrigger ? (
-        <span className="absolute -top-6 left-3 flex items-center gap-1 rounded-t-md border-2 border-b-0 border-outline bg-actionSecondary px-2 py-0.5 font-sans text-[11px] font-bold text-onActionLight">
-          <Zap aria-hidden="true" className="h-3 w-3" strokeWidth={2.5} />
-          When
+      {data.label && detail === 'full' ? (
+        // A tab behind the card's top edge (it runs 2px under the border), left-aligned and as
+        // wide as its words need. "When" for the trigger, in yellow; every other step names its
+        // kind, quietly ("AI"), after TriForms' "1. Question" tab.
+        <span
+          data-testid="step-tab"
+          className={cn(
+            'absolute bottom-full left-5 -mb-0.5 flex h-8 items-center whitespace-nowrap rounded-t-md border-2 border-b-0 border-outline px-3.5 pb-0.5 text-sm',
+            isTrigger
+              ? 'type-ui bg-actionSecondary text-onActionLight'
+              : 'type-label bg-secondary text-ink muted-tone',
+          )}
+        >
+          {data.label}
         </span>
       ) : null}
 
       {look?.waiting && !selected ? (
         <span
           aria-hidden="true"
-          className={cn(
-            'pg-run-waiting pointer-events-none absolute -inset-1.5',
-            isTrigger ? 'rounded-l-3xl rounded-r-card' : 'rounded-card',
-          )}
+          className="pg-run-waiting pointer-events-none absolute -inset-1.5 rounded-card"
         />
       ) : null}
 
       <div
         className={cn(
-          'pg-step-card relative flex h-full w-full items-center gap-4 overflow-hidden border-2 border-outline bg-secondary px-5 shadow-surfaceSm transition-shadow',
-          isTrigger ? 'rounded-l-3xl rounded-r-card' : 'rounded-card',
-          selected
-            ? 'shadow-surfaceMd outline-solid outline-[3px] outline-offset-2 outline-focusRing'
-            : '',
+          'pg-step-card relative flex h-full w-full items-center gap-4 overflow-hidden rounded-card border-2 border-outline bg-secondary px-6',
           node.disabled ? 'opacity-50' : '',
           look?.card,
         )}
       >
         <span
           className={cn(
-            'relative flex h-12 w-12 shrink-0 items-center justify-center',
+            'relative flex h-14 w-14 shrink-0 items-center justify-center',
             look?.running ? 'pg-run-pulse' : '',
           )}
         >
-          <StepGlyph icon={def?.icon ?? 'manual'} className="h-9 w-9" />
+          <StepGlyph icon={def?.icon ?? 'manual'} className="h-10 w-10" />
           {look?.running ? (
             <span
               aria-hidden="true"
@@ -398,7 +390,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         <span className="flex min-w-0 flex-col gap-0.5">
           <span
             className={cn(
-              'type-ui truncate text-base text-ink',
+              'type-ui truncate text-lg text-ink',
               node.disabled ? 'line-through' : '',
             )}
           >
@@ -406,11 +398,11 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
           </span>
           {detail === 'full' ? (
             paint?.state === 'failed' && paint.error ? (
-              <span className="type-label truncate text-xs text-dangerInk" title={paint.error}>
+              <span className="type-label truncate text-sm text-dangerInk" title={paint.error}>
                 {paint.error}
               </span>
             ) : (
-              <span className="type-label truncate text-xs text-ink type-muted">
+              <span className="type-label truncate text-sm text-ink type-muted">
                 {data.summary}
               </span>
             )
@@ -423,24 +415,20 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
       ) : null}
 
       {liveInTests && detail !== 'icon' ? (
-        // The pin joins the row so the two never overlap.
-        <span
-          className={cn(
-            'absolute -top-3 flex items-center gap-1',
-            isTrigger ? 'left-20' : 'left-3',
-          )}
-        >
+        // The pin joins the row so the two never overlap. On the bottom edge, left: the top
+        // edge's left is the tab's, and its right is for Off and the issue sticker.
+        <span className="absolute -bottom-3 left-5 flex items-center gap-1">
           <Badge
             variant="danger"
             data-testid="live-in-tests"
-            className="h-6 px-1.5 text-[10px] leading-none"
+            className="h-7 px-2 text-xs leading-none"
           >
             Live In Tests
           </Badge>
           {pinSticker}
         </span>
       ) : pinSticker ? (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2">{pinSticker}</span>
+        <span className="absolute -bottom-3 left-5">{pinSticker}</span>
       ) : null}
 
       {firstIssue ? (
@@ -449,13 +437,13 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
             // biome-ignore lint/a11y/noNoninteractiveTabindex: the issue's sentence is reachable by keyboard
             tabIndex={0}
             className={cn(
-              'nodrag absolute -top-2.5 -right-2.5 flex h-6 w-6 items-center justify-center rounded-md border-2 border-outline',
+              'nodrag absolute -top-3 -right-3 flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline',
               firstIssue.severity === 'error'
                 ? 'bg-actionDanger text-onActionLight'
-                : 'bg-actionSecondary text-onActionLight',
+                : 'bg-actionAccent text-onActionLight',
             )}
           >
-            <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.75} />
+            <TriangleAlert aria-hidden="true" className="h-4 w-4" strokeWidth={2.75} />
             <span className="sr-only">{firstIssue.message}</span>
           </span>
         </TooltipHint>
@@ -485,7 +473,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
           type="target"
           position={Position.Left}
           id="in"
-          className={cn(HANDLE, 'bg-ink!', fits ? 'pg-handle-fits' : '')}
+          className={cn(HANDLE, fits ? 'pg-handle-fits' : '')}
         />
       )}
 
@@ -519,12 +507,21 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
             {editor && open && !connection.inProgress && detail !== 'icon' && !editor.locked ? (
               <span
                 className="absolute left-full flex -translate-y-1/2 items-center"
-                style={{ top, marginLeft: labelled ? 8 + port.label.length * 6 + 16 : 6 }}
+                style={{ top, marginLeft: labelled ? 8 + port.label.length * 7.5 + 20 : 0 }}
               >
-                <span aria-hidden="true" className="h-0.5 w-5 bg-outline" />
+                {/* The stem is a line like any other: 2px ink, from the port dot to the "+". */}
+                <span aria-hidden="true" className="h-[2.5px] w-7 bg-ink" />
                 <button
                   type="button"
-                  className="nodrag nopan flex h-6 w-6 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink hover:bg-primary"
+                  // A white tile (ink, with a page-coloured plus) like the line it ends, swelling
+                  // under the pointer after TriForms' add button. It grows from its left edge on
+                  // the line's own centre, so nothing around it moves.
+                  className={cn(
+                    'nodrag nopan flex h-8 w-8 items-center justify-center rounded-md border-2 border-ink bg-ink text-primary',
+                    'transition-[width,height] duration-150 ease-out motion-reduce:transition-none',
+                    'hover:h-12 hover:w-12 focus-visible:h-12 focus-visible:w-12',
+                    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                  )}
                   aria-label={`Add a step after ${node.name}${labelled ? `, ${port.label}` : ''}`}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -535,7 +532,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
                     );
                   }}
                 >
-                  <MotionIcon icon={PlusIcon} className="h-3.5 w-3.5" />
+                  <MotionIcon icon={PlusIcon} className="h-5 w-5" />
                 </button>
               </span>
             ) : null}

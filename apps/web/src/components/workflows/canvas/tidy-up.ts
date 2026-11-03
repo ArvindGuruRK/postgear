@@ -8,7 +8,8 @@
  * - **Branches keep their order**: the children of a step are added in the
  *   order of its outputs (True before False, Paths cases in their order,
  *   On Error last) and told to dagre as order constraints, so True sits
- *   above False.
+ *   above False. An output with nothing after it keeps its row (a stand-in
+ *   node, never returned), so Approved stays above Rejected's empty row.
  * - Sticky notes are not moved. Positions snap to the grid.
  *
  * Pure and deterministic: the same graph always gives the same positions.
@@ -20,7 +21,7 @@ import type { Position } from '../builder/builder-state';
 import { CARD_HEIGHT, CARD_WIDTH, snap } from '../builder/graph-ops';
 
 export const TIDY_NODESEP = 72;
-export const TIDY_RANKSEP = 168;
+export const TIDY_RANKSEP = 160;
 
 /** New top-left positions for every step, keyed by step key. */
 export function tidyPositions(graph: AutomationGraph): Record<string, Position> {
@@ -58,10 +59,26 @@ export function tidyPositions(graph: AutomationGraph): Record<string, Position> 
   // Children of one step, in output order, stacked top to bottom.
   const constraints: OrderConstraint[] = [];
   const children = new Map<string, string[]>();
-  for (const edge of edges) {
-    const list = children.get(edge.source) ?? [];
-    if (!list.includes(edge.target)) list.push(edge.target);
-    children.set(edge.source, list);
+  for (const node of ordered) {
+    const ports = outputPortsOf(node);
+    const list: string[] = [];
+    for (const port of ports) {
+      const targets = edges
+        .filter((edge) => edge.source === node.key && edge.sourcePort === port.id)
+        .map((edge) => edge.target);
+      for (const target of targets) if (!list.includes(target)) list.push(target);
+      // An empty branch (Rejected with nothing after it) still holds its row, through a
+      // stand-in that dagre lays out and we never return. So Approved stays up where it was
+      // placed instead of sliding down beside its parent. On Error is not held: most steps
+      // have it off the path, and it should not push the main flow up.
+      if (targets.length === 0 && ports.length > 1 && port.id !== 'error') {
+        const slot = `slot:${node.key}:${port.id}`;
+        g.setNode(slot, { width: CARD_WIDTH, height: CARD_HEIGHT });
+        g.setEdge(node.key, slot, {}, slot);
+        list.push(slot);
+      }
+    }
+    if (list.length > 0) children.set(node.key, list);
   }
   const placed = new Set<string>();
   for (const list of children.values()) {

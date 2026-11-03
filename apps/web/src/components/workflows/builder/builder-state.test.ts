@@ -58,6 +58,39 @@ describe('builderReducer', () => {
     expect(state.past).toHaveLength(2);
   });
 
+  it('fans a step with two outputs out by port: Approved above Rejected', () => {
+    const base = run(
+      initialState(emptyGraph(), 'Untitled Workflow'),
+      { type: 'addStep', stepType: 'trigger.manual', key: 'trigger001' },
+      {
+        type: 'addStep',
+        stepType: 'logic.manualReview',
+        key: 'review001',
+        from: { source: 'trigger001', sourcePort: 'out' },
+      },
+    );
+    const state = run(
+      base,
+      {
+        type: 'addStep',
+        stepType: 'notify.slack',
+        key: 'approved01',
+        from: { source: 'review001', sourcePort: 'approved' },
+      },
+      {
+        type: 'addStep',
+        stepType: 'notify.slack',
+        key: 'rejected01',
+        from: { source: 'review001', sourcePort: 'rejected' },
+      },
+    );
+    const at = (key: string) => state.graph.nodes.find((node) => node.key === key)?.position;
+    expect(at('approved01')?.x).toBe(STEP_GAP_X * 2);
+    expect(at('rejected01')?.x).toBe(STEP_GAP_X * 2);
+    expect((at('approved01')?.y ?? 0) < (at('review001')?.y ?? 0)).toBe(true);
+    expect((at('rejected01')?.y ?? 0) > (at('review001')?.y ?? 0)).toBe(true);
+  });
+
   it('refuses a second trigger and a loop', () => {
     const graph = report();
     const state = initialState(graph, 'Report');

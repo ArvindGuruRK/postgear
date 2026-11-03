@@ -285,9 +285,8 @@ export function StepPicker({
                     onClick={() => choose(row)}
                     className={cn(
                       'flex w-full items-center gap-3 rounded-md border-2 px-2 py-2 text-left',
-                      isActive
-                        ? 'border-outline bg-actionSecondary text-onActionLight'
-                        : 'border-transparent text-ink',
+                      'border-transparent text-ink',
+                      isActive ? 'bg-primary' : '',
                     )}
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center text-ink">
@@ -323,10 +322,8 @@ export function StepPicker({
                   className={cn(
                     'flex w-full items-start gap-3 rounded-md border-2 px-2 py-2 text-left',
                     addable ? 'cursor-pointer' : 'cursor-not-allowed',
-                    isActive && addable
-                      ? 'border-outline bg-actionSecondary text-onActionLight'
-                      : 'border-transparent text-ink',
-                    isActive && !addable ? 'border-outline' : '',
+                    'border-transparent text-ink',
+                    isActive ? 'bg-primary' : '',
                   )}
                 >
                   <span
