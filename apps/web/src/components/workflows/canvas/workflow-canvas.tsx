@@ -26,11 +26,12 @@ import {
   type Connection,
   type EdgeChange,
   type FinalConnectionState,
-  getNodesBounds,
+  getViewportForBounds,
   MiniMap,
   type NodeChange,
   ReactFlow,
   type ReactFlowInstance,
+  type Viewport,
   useReactFlow,
 } from '@xyflow/react';
 import { type DragEvent, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
@@ -63,33 +64,55 @@ const SNAP: [number, number] = [12, 12];
 const PRO_OPTIONS = { hideAttribution: true };
 const PAN_BUTTONS = [1, 2];
 const MULTI_SELECT = ['Shift', 'Meta', 'Control'];
-const FIT = { padding: 0.15, maxZoom: 1 };
+/** Room for what floats on the canvas: the toolbars below, the tool rail on the right. */
+export const CANVAS_FIT = {
+  padding: { top: '72px', right: '96px', bottom: '112px', left: '64px' },
+  maxZoom: 1,
+} as const;
 /** Until the page's scheme is known (use-body-appearance.ts): hidden, not removed, so the layout holds. */
 const HIDDEN = { visibility: 'hidden' } as const;
 
 /**
  * A flow too wide to fit at a readable size opens at this zoom with its first
- * step in view, not shrunk until every card is a name-sized speck (a six-step
- * flow opened at about 60%). Fit To Screen still fits everything.
+ * step in view, not shrunk until every card is a speck with an unreadable name.
+ * Fit To Screen still fits everything.
  */
-const OPEN_ZOOM = 0.65;
+const OPEN_ZOOM = 0.8;
 const OPEN_MARGIN = 48;
 
 /** The minimap is on from the first step: it also shows where the view is when zoomed out (TriForms keeps one always). */
 const MINIMAP_FROM = 1;
 
-/** Opens a flow that fit too small at a readable zoom, trigger end in view. */
+/**
+ * The view for a flow that would only fit too small to read: the opening zoom with
+ * its trigger end in view. Null when it fits at a readable size, so a plain fit will do.
+ */
+export function readableViewport(flow: ReactFlowInstance<CanvasNode, FlowEdge>): Viewport | null {
+  const canvas = document.querySelector('.pg-canvas');
+  const nodes = flow.getNodes();
+  if (nodes.length === 0 || !canvas?.clientWidth) return null;
+  const bounds = flow.getNodesBounds(nodes);
+  const { zoom } = getViewportForBounds(
+    bounds,
+    canvas.clientWidth,
+    canvas.clientHeight,
+    0.2,
+    CANVAS_FIT.maxZoom,
+    CANVAS_FIT.padding,
+  );
+  if (zoom >= OPEN_ZOOM) return null;
+  return {
+    x: OPEN_MARGIN - bounds.x * OPEN_ZOOM,
+    y: canvas.clientHeight / 2 - (bounds.y + bounds.height / 2) * OPEN_ZOOM,
+    zoom: OPEN_ZOOM,
+  };
+}
+
+/** Opens a flow that fit too small at a readable zoom. */
 function openReadable(instance: ReactFlowInstance<CanvasNode, FlowEdge>) {
   requestAnimationFrame(() => {
-    const nodes = instance.getNodes();
-    if (nodes.length === 0 || instance.getZoom() >= OPEN_ZOOM) return;
-    const bounds = getNodesBounds(nodes);
-    const height = document.querySelector('.pg-canvas')?.clientHeight ?? 600;
-    void instance.setViewport({
-      x: OPEN_MARGIN - bounds.x * OPEN_ZOOM,
-      y: height / 2 - (bounds.y + bounds.height / 2) * OPEN_ZOOM,
-      zoom: OPEN_ZOOM,
-    });
+    const view = readableViewport(instance);
+    if (view) void instance.setViewport(view);
   });
 }
 
@@ -341,11 +364,6 @@ export function WorkflowCanvas({
           onConnectEnd={onConnectEnd}
           isValidConnection={isValidConnection}
           onPaneClick={onPaneClick}
-          onNodeClick={(event, node) => {
-            // A plain click opens the step's settings in the dock; a modified one is multi-select.
-            if (node.type !== 'step' || event.shiftKey || event.metaKey || event.ctrlKey) return;
-            builder.open(node.id);
-          }}
           onPaneContextMenu={(event) => {
             event.preventDefault();
             builder.contextMenu(
@@ -369,7 +387,7 @@ export function WorkflowCanvas({
           minZoom={0.2}
           maxZoom={1.5}
           fitView
-          fitViewOptions={FIT}
+          fitViewOptions={CANVAS_FIT}
           deleteKeyCode={null}
           ariaLabelConfig={EDITOR_ARIA_LABELS}
           multiSelectionKeyCode={MULTI_SELECT}

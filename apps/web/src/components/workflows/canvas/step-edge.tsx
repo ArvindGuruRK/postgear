@@ -1,11 +1,13 @@
 'use client';
 
 /**
- * A line between two steps (blueprint 4.2): a 2 px ink bezier with an
- * arrowhead, 3 px when selected, red from an On Error output. Hovering or
- * selecting it shows a midpoint "+" (a new step goes in between and the
- * line splits) and a delete button. A 24 px invisible path makes it easy to
- * hit. Branch lines carry no label of their own: the port sticker names it.
+ * A line between two steps (blueprint 4.2): a 2.5 px ink bezier with an
+ * arrowhead, 3.5 px when selected, red from an On Error output. A line
+ * that has to run backwards goes round with square corners instead of curling
+ * over the cards (n8n's). Hovering or selecting it shows a midpoint "+" (a new
+ * step goes in between and the line splits) and a delete button. A 24 px
+ * invisible path makes it easy to hit. Branch lines carry no label of their
+ * own: the name at the port says which it is.
  *
  * A painted run (Module 08, blueprint 7.2) restyles it: the line into a
  * running step flows (React Flow's `animated` class, our 1 s dash keyframe in
@@ -19,7 +21,13 @@
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { cn, MotionIcon } from '@postgear/ui';
-import { EdgeLabelRenderer, type EdgeProps, getBezierPath, Position } from '@xyflow/react';
+import {
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getBezierPath,
+  getSmoothStepPath,
+  Position,
+} from '@xyflow/react';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useOptionalBuilder } from '../builder/builder-context';
 import { useCanvasMode } from './canvas-mode';
@@ -33,11 +41,13 @@ const EDGE_BUTTON =
 
 /**
  * The arrowhead's length in px, whatever the line's width (the marker uses user units), and the
- * bigger one a hovered or selected line swells to along with its line (2.5px to 3.5px), as in
- * TriForms.
+ * bigger one a hovered or selected line swells to along with its line.
  */
 const ARROW = 16;
 const ARROW_BIG = 20;
+
+/** A line whose target is not this far right of its source would curl: it goes round instead. */
+const BACKWARDS_BELOW = 48;
 
 /** The visible path's classes and its arrowhead, from what the run did with the line. */
 export function edgeLook(options: {
@@ -88,7 +98,7 @@ export const StepEdge = memo(function StepEdge({
   const [hover, setHover] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const arrow = hover || selected ? ARROW_BIG : ARROW;
-  const [path, labelX, labelY] = getBezierPath({
+  const ends = {
     sourceX,
     sourceY,
     sourcePosition,
@@ -99,7 +109,27 @@ export const StepEdge = memo(function StepEdge({
     targetX: targetPosition === Position.Left ? targetX + 1 - arrow : targetX,
     targetY,
     targetPosition,
-  });
+  };
+  const backwards = targetX < sourceX + BACKWARDS_BELOW;
+  // A named port's line runs level past its sticker before it bends, as far as there is room.
+  const lead = Math.max(0, Math.min(data?.lead ?? 0, targetX - sourceX - 24));
+  const from = sourceX + lead;
+  // What room the sticker leaves can be too little to curve in: a bezier there falls almost straight
+  // down and meets the arrowhead sideways, so that line turns square corners instead.
+  const tight = lead > 0 && ends.targetX - from < Math.abs(targetY - sourceY) * 0.6;
+  const [curve, labelX, labelY] =
+    backwards || tight
+      ? getSmoothStepPath({
+          ...ends,
+          sourceX: backwards ? sourceX : from,
+          borderRadius: 12,
+          offset: backwards ? Math.max(24, data?.lead ?? 0) : 0,
+        })
+      : getBezierPath({ ...ends, sourceX: from });
+  const path =
+    !backwards && lead > 0
+      ? `M${sourceX},${sourceY} L${from},${sourceY} ${curve.replace(/^M[^A-Z]*/, '')}`
+      : curve;
   const look = edgeLook({
     run: data?.run,
     isError: data?.isError ?? false,

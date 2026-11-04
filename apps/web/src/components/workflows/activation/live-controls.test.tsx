@@ -23,7 +23,11 @@ jest.mock('@postgear/ui', () => ({ ...jest.requireActual('@postgear/ui'), toast:
 const api = jest.requireMock('@/lib/workflows-api') as Record<string, jest.Mock>;
 const { toast } = jest.requireMock('@postgear/ui') as { toast: jest.Mock };
 
-beforeAll(stubBrowserLayout);
+beforeAll(() => {
+  stubBrowserLayout();
+  // A focused button plays its animated icon; the icon stub is a bare <svg> without the handle.
+  Object.assign(SVGElement.prototype, { startAnimation() {}, stopAnimation() {} });
+});
 beforeEach(() => {
   for (const mock of Object.values(api)) mock.mockReset();
   toast.mockReset();
@@ -66,6 +70,7 @@ function renderControls(props: Partial<LiveControlsProps> = {}) {
     onChanged: jest.fn(),
     onOpenIssue: jest.fn(),
     onRunStarted: jest.fn(),
+    onVersions: jest.fn(),
     ...props,
   };
   render(
@@ -76,25 +81,31 @@ function renderControls(props: Partial<LiveControlsProps> = {}) {
   return all;
 }
 
-const switchControl = () => screen.getByRole('switch', { name: 'Activate' }) as HTMLButtonElement;
+const activateButton = () => screen.getByTestId('activate-button') as HTMLButtonElement;
+
+/** Radix opens a menu on a pointer press or the keyboard, not on a plain click. */
+function openMenu() {
+  fireEvent.keyDown(screen.getByTestId('activate-menu'), { key: 'Enter' });
+}
 
 describe('WorkflowLiveControls', () => {
-  it('disables the switch for members and says why', () => {
+  it('disables Activate for members and says why', () => {
     renderControls({ canManage: false });
-    expect(switchControl().disabled).toBe(true);
-    const described = switchControl().getAttribute('aria-describedby');
+    expect(activateButton().disabled).toBe(true);
+    const described = activateButton().getAttribute('aria-describedby');
     expect(described && document.getElementById(described)?.textContent).toBe(ADMINS_ONLY);
   });
 
-  it('opens the activation dialog from the switch for admins', () => {
+  it('opens the activation dialog from Activate for admins', () => {
     renderControls();
-    expect(switchControl().disabled).toBe(false);
+    expect(activateButton().disabled).toBe(false);
+    expect(activateButton().textContent).toBe('Activate');
     expect(screen.queryByTestId('status-badge')).toBeNull();
-    fireEvent.click(switchControl());
+    fireEvent.click(activateButton());
     expect(screen.getByRole('heading', { name: 'Turn On Workflow' })).toBeTruthy();
   });
 
-  it('opens the pause dialog when an active workflow is switched off', () => {
+  it('opens the pause dialog from the menu of an active workflow', () => {
     renderControls({
       automation: {
         id: 'wf-1',
@@ -105,12 +116,14 @@ describe('WorkflowLiveControls', () => {
       },
     });
     expect(screen.getByTestId('status-badge').textContent).toBe('Active v3');
-    expect(switchControl().getAttribute('aria-checked')).toBe('true');
-    fireEvent.click(switchControl());
+    expect(activateButton().textContent).toBe('Activate Changes');
+    expect(activateButton().disabled).toBe(true);
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Pause' }));
     expect(screen.getByRole('heading', { name: 'Pause Workflow' })).toBeTruthy();
   });
 
-  it('shows Unpublished Changes with Activate Changes for admins only', () => {
+  it('offers Activate Changes and Discard Changes with unpublished edits', () => {
     const automation = {
       id: 'wf-1',
       name: 'Report',
@@ -119,12 +132,19 @@ describe('WorkflowLiveControls', () => {
       hasUnpublishedChanges: true,
     };
     renderControls({ automation });
-    expect(screen.getByTestId('unpublished-badge').textContent).toBe('Unpublished Changes');
-    expect(screen.getByRole('button', { name: 'Activate Changes' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Discard Changes' })).toBeTruthy();
+    expect(activateButton().disabled).toBe(false);
+    openMenu();
+    expect(screen.getByRole('menuitem', { name: 'Discard Changes' })).toBeTruthy();
   });
 
-  it('hides Activate Changes from members but lets them discard after a confirm', async () => {
+  it('opens Versions from the menu', () => {
+    const props = renderControls();
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Versions' }));
+    expect(props.onVersions).toHaveBeenCalled();
+  });
+
+  it('keeps Activate Changes from members but lets them discard after a confirm', async () => {
     const detail = { id: 'wf-1', status: 'ACTIVE' } as AutomationDetail;
     api.discardChanges.mockResolvedValue(detail);
     const props = renderControls({
@@ -137,8 +157,10 @@ describe('WorkflowLiveControls', () => {
         hasUnpublishedChanges: true,
       },
     });
-    expect(screen.queryByRole('button', { name: 'Activate Changes' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Discard Changes' }));
+    expect(activateButton().disabled).toBe(true);
+    openMenu();
+    expect(screen.queryByRole('menuitem', { name: 'Pause' })).toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Discard Changes' }));
     expect(screen.getByText(/back to version 3/)).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getByTestId('discard-confirm'));
@@ -167,6 +189,7 @@ describe('WorkflowLiveControls', () => {
         hasUnpublishedChanges: false,
       },
     });
+    openMenu();
     await act(async () => {
       fireEvent.click(screen.getByTestId('run-now'));
     });
@@ -195,6 +218,7 @@ describe('WorkflowLiveControls', () => {
       automation: active,
       graph: chain(node('trigger', 'trigger.manual', { fields: [] })),
     });
+    openMenu();
     await act(async () => {
       fireEvent.click(screen.getByTestId('run-now'));
     });
@@ -205,6 +229,7 @@ describe('WorkflowLiveControls', () => {
 
   it('offers no Run Now for other triggers', () => {
     renderControls({ automation: active });
+    openMenu();
     expect(screen.queryByTestId('run-now')).toBeNull();
   });
 });

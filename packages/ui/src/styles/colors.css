@@ -72,6 +72,19 @@
        own, halfway from its page to its frame. Never for something you
        press or type in: those stay on the card and field layers. */
     --color-inset: #1e1e1e;
+    /* Syntax colours for code you read (the workflow Raw view): VS Code's Dark+
+       theme, with its bracket pair colours. They read on every dark theme's
+       inset box, so the themes further down do not set their own. */
+    --color-code-key: #9cdcfe;
+    --color-code-string: #ce9178;
+    --color-code-number: #b5cea8;
+    --color-code-keyword: #569cd6;
+    --color-code-punctuation: #d4d4d4;
+    --color-code-line-number: #858585;
+    --color-code-guide: #404040;
+    --color-code-bracket-1: #ffd700;
+    --color-code-bracket-2: #da70d6;
+    --color-code-bracket-3: #179fff;
     --color-forth: #1d4ed8;
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
@@ -88,6 +101,17 @@
     /* Light keeps an inset box on its card colour (the look before the token
        existed), so this follows each light theme's --color-secondary. */
     --color-inset: var(--color-secondary);
+    /* VS Code's Light+ theme, as in the .dark block above. */
+    --color-code-key: #0451a5;
+    --color-code-string: #a31515;
+    --color-code-number: #098658;
+    --color-code-keyword: #0000ff;
+    --color-code-punctuation: #3b3b3b;
+    --color-code-line-number: #237893;
+    --color-code-guide: #d3d3d3;
+    --color-code-bracket-1: #0431fa;
+    --color-code-bracket-2: #319331;
+    --color-code-bracket-3: #7b3814;
     --color-forth: #1d4ed8;
     --color-seventh: #3d5fe0;
     --color-gray: #8c8c8c;
@@ -620,6 +644,28 @@
      2026-08-31 addendum above. Every other comic accent (secondary/danger/
      accent/success) still pairs with black and is unaffected. */
   --color-on-action-ai: #ffffff;
+}
+
+/* ── Logo colours (2026-11-04) ──────────────────────────────────────────
+   A workflow step's ring takes the colour of its icon when selected. A step
+   with a logo goes by the logo's main colour, read from its
+   artwork in apps/web/public/icon. Two needed a choice: Slack's logo has four
+   colours, and cyan is the one that reads as neither an error nor a trigger;
+   X's logo is black and white, which would leave a black border unchanged, so
+   it wears the blue of X's own badge. Flat across themes, like the logos. */
+:root {
+  --color-logo-instagram: #d82d7e;
+  --color-logo-facebook: #1877f2;
+  --color-logo-x: #1d9bf0;
+  --color-logo-linkedin: #0077b5;
+  --color-logo-youtube: #fd3832;
+  --color-logo-tiktok: #ff1753;
+  --color-logo-pinterest: #cc2126;
+  --color-logo-slack: #00bcd4;
+  --color-logo-teams: #9fa2ff;
+  --color-logo-discord: #7289da;
+  --color-logo-google-sheets: #14ba61;
+  --color-logo-excel: #4aa647;
 }
 
 /* ── Avatar initials palette (2026-10-19) ───────────────────────────────

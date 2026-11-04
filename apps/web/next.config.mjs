@@ -15,6 +15,9 @@ const nextConfig = {
     '@postgear/design-engine',
     '@postgear/automation',
   ],
+  // The "N" badge sat on top of the workflow canvas's controls. Build and
+  // runtime errors still show without it.
+  devIndicators: false,
   // TODO: Configure remaining Next.js settings
   // - Image optimization domains
   // - Environment variable exposure

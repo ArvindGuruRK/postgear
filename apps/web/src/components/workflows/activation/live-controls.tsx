@@ -1,18 +1,17 @@
 'use client';
 
 /**
- * The builder's live state (Module 09, blueprint 8): the status badge
- * (Draft, Active v3, Paused), Unpublished Changes with Activate Changes and
- * Discard Changes, Run Now for an active Manual workflow, and the Activate
- * switch with its turn on and pause dialogs.
+ * The builder's live state (Module 09, blueprint 8), in one control after
+ * n8n's Publish (2026-11-03): the status badge (Active v3, Paused) and the
+ * Activate split. It reads Activate while the workflow is off and Activate
+ * Changes while it is on, greyed when there is nothing new to send live. Its
+ * menu holds the rest: Run Now for an active Manual workflow, Versions,
+ * Discard Changes and Pause.
  *
- * Turning on and off is for workspace admins: members see the switch
- * disabled with the reason, and no Activate Changes. Discard Changes and
- * Run Now are open to every member, as the API allows.
+ * Turning on and off is for workspace admins: members see the main button
+ * disabled with the reason, and no Pause. Discard Changes and Run Now are open
+ * to every member, as the API allows, so the menu stays open to them.
  */
-import { PlayIcon } from '@animateicons/react/lucide/play-icon';
-import { UndoIcon } from '@animateicons/react/lucide/undo-icon';
-import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
 import type {
   AutomationGraph,
   GraphNode,
@@ -29,14 +28,12 @@ import {
   AlertDialogTitle,
   Badge,
   Button,
-  Label,
-  liftSm,
-  MotionIcon,
-  Toggle,
-  TooltipHint,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  SplitButton,
   toast,
 } from '@postgear/ui';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { discardChanges, getVersion, runNow } from '@/lib/workflows-api';
 import type {
   AutomationDetail,
@@ -83,6 +80,10 @@ export interface LiveControlsProps {
   onOpenIssue: (issue: ValidationIssue) => void;
   /** Run Now started a live run: the page opens it in the Runs tab. */
   onRunStarted: (run: RunSummary) => void;
+  /** The menu's Versions: the page opens its dock. */
+  onVersions: () => void;
+  /** Bumped by the command palette's Activate. */
+  activateSignal?: number;
   /**
    * Optional: channel and connection names for the activation sentence
    * ("publish to Acme on LinkedIn"); without it the sentence counts them.
@@ -100,9 +101,10 @@ export function WorkflowLiveControls({
   onChanged,
   onOpenIssue,
   onRunStarted,
+  onVersions,
+  activateSignal = 0,
   summary,
 }: LiveControlsProps) {
-  const switchId = useId();
   const reasonId = useId();
   const [activation, setActivation] = useState<ActivationMode | null>(null);
   const [pausing, setPausing] = useState(false);
@@ -182,20 +184,15 @@ export function WorkflowLiveControls({
     }
   }
 
-  const toggle = (
-    <Toggle
-      id={switchId}
-      checked={active}
-      disabled={!canManage}
-      aria-describedby={canManage ? undefined : reasonId}
-      data-testid="activate-switch"
-      className="shadow-none"
-      onCheckedChange={(next) => {
-        if (next) setActivation('turnOn');
-        else setPausing(true);
-      }}
-    />
-  );
+  // Nothing new to send live: greyed, as n8n greys Publish, so the button never jumps away.
+  const canActivate = canManage && (!active || unpublished);
+
+  const seenActivate = useRef(activateSignal);
+  useEffect(() => {
+    if (activateSignal === seenActivate.current) return;
+    seenActivate.current = activateSignal;
+    if (canActivate) setActivation(active ? 'changes' : 'turnOn');
+  }, [activateSignal, canActivate, active]);
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="live-controls">
@@ -205,65 +202,47 @@ export function WorkflowLiveControls({
         </Badge>
       )}
 
-      {unpublished ? (
-        <>
-          <Badge variant="accent" data-testid="unpublished-badge">
-            Unpublished Changes
-          </Badge>
-          {canManage && active ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              className={liftSm}
-              onClick={() => setActivation('changes')}
-            >
-              <MotionIcon icon={UploadIcon} className="h-4 w-4" />
-              Activate Changes
-            </Button>
-          ) : null}
-          <Button
-            variant="secondary"
-            size="sm"
-            className={liftSm}
-            onClick={() => setDiscarding(true)}
-          >
-            <MotionIcon icon={UndoIcon} className="h-4 w-4" />
-            Discard Changes
-          </Button>
-        </>
-      ) : null}
-
-      {runnable ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          className={liftSm}
-          onClick={() => void clickRunNow()}
-          disabled={running}
-          data-testid="run-now"
-        >
-          <MotionIcon icon={PlayIcon} className="h-4 w-4" />
-          {running && asking === null ? 'Starting...' : 'Run Now'}
-        </Button>
-      ) : null}
-
-      <div className="flex items-center gap-2">
-        <Label htmlFor={switchId} className={canManage ? undefined : 'type-muted'}>
-          Activate
-        </Label>
-        {canManage ? (
-          toggle
-        ) : (
-          <TooltipHint label={ADMINS_ONLY} disabled>
-            {toggle}
-          </TooltipHint>
-        )}
-        {canManage ? null : (
-          <span id={reasonId} className="sr-only">
-            {ADMINS_ONLY}
-          </span>
-        )}
-      </div>
+      <SplitButton
+        disabled={!canActivate}
+        hint={canManage ? undefined : ADMINS_ONLY}
+        aria-describedby={canManage ? undefined : reasonId}
+        data-testid="activate-button"
+        onClick={() => setActivation(active ? 'changes' : 'turnOn')}
+        menuLabel="More actions"
+        menuTriggerProps={{ 'data-testid': 'activate-menu' }}
+        menu={
+          <>
+            {runnable ? (
+              <DropdownMenuItem
+                disabled={running}
+                onSelect={() => void clickRunNow()}
+                data-testid="run-now"
+              >
+                {running && asking === null ? 'Starting...' : 'Run Now'}
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem onSelect={onVersions}>Versions</DropdownMenuItem>
+            {unpublished ? (
+              <DropdownMenuItem onSelect={() => setDiscarding(true)}>
+                Discard Changes
+              </DropdownMenuItem>
+            ) : null}
+            {canManage && active ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setPausing(true)}>Pause</DropdownMenuItem>
+              </>
+            ) : null}
+          </>
+        }
+      >
+        {active ? 'Activate Changes' : 'Activate'}
+      </SplitButton>
+      {canManage ? null : (
+        <span id={reasonId} className="sr-only">
+          {ADMINS_ONLY}
+        </span>
+      )}
 
       {activation !== null ? (
         <ActivationDialog

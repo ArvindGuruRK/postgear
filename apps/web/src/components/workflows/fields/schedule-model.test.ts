@@ -10,10 +10,8 @@ import {
   asSchedule,
   dayOfMonthChoices,
   FREQUENCY_CHOICES,
-  joinTime,
-  minuteChoices,
+  runRows,
   scheduleFor,
-  splitTime,
   timeZoneChoices,
   toggleDay,
   upcomingRuns,
@@ -91,12 +89,7 @@ describe('schedule builder output', () => {
     expect(toggleDay(scheduleFor('weekly', { days: ['wed'] }, 'UTC'), 'wed').days).toEqual(['wed']);
   });
 
-  it('writes 24 hour times', () => {
-    expect(joinTime(7, 5)).toBe('07:05');
-    expect(splitTime('23:59')).toEqual([23, 59]);
-    expect(splitTime('9am')).toEqual([9, 0]);
-    expect(minuteChoices(7)).toContain(7);
-    expect(minuteChoices(10)).toHaveLength(12);
+  it('names the days of the month', () => {
     expect(dayOfMonthChoices().at(-1)).toEqual({ value: 'last', label: 'Last day' });
     expect(dayOfMonthChoices()[1].label).toBe('2nd');
     expect(dayOfMonthChoices()[10].label).toBe('11th');
@@ -119,7 +112,14 @@ describe('schedule builder output', () => {
     const config: ScheduleConfig = { frequency: 'daily', time: '09:00', timeZone: 'Asia/Kolkata' };
     const runs = upcomingRuns(config, '2026-11-02T00:00:00Z', 'en-GB');
     expect(runs).toHaveLength(3);
-    expect(runs[0]).toContain('09:00');
-    expect(runs[0]).toContain('2 November');
+    expect(runs[0]).toEqual(
+      expect.objectContaining({ weekday: 'Monday', date: '2 November', time: '09:00' }),
+    );
+    expect(runRows(runs, (time) => `at ${time}`)[0]).toEqual({
+      id: runs[0].iso,
+      lead: 'Monday',
+      main: '2 November',
+      end: 'at 09:00',
+    });
   });
 });

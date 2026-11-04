@@ -22,6 +22,7 @@ import {
   MotionIcon,
   StatCard,
   StatusIndicator,
+  SummaryBox,
   Table,
   TableBody,
   TableCaption,
@@ -184,6 +185,19 @@ export function DataDisplaySection() {
       </Row>
       <Row label="Data Table (sortable + paginated)">
         <DataTable columns={POST_COLUMNS} data={DEMO_POSTS} pageSize={3} className="w-full" />
+      </Row>
+      <Row label="Summary Box">
+        <SummaryBox
+          className="w-full max-w-lg"
+          title="On the 1st of every month at 9:00 AM"
+          notes={['Asia/Kolkata']}
+          rowsLabel="Next Runs"
+          rows={[
+            { id: 'dec', lead: 'Tuesday', main: 'December 1', end: '9:00 AM' },
+            { id: 'jan', lead: 'Friday', main: 'January 1', end: '9:00 AM' },
+            { id: 'feb', lead: 'Monday', main: 'February 1', end: '9:00 AM' },
+          ]}
+        />
       </Row>
       <Row label="Timeline">
         <Timeline className="w-80">

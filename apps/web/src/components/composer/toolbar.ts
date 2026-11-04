@@ -1,4 +1,4 @@
-import { cn } from '@postgear/ui';
+import { cn, FIELD_FOCUS } from '@postgear/ui';
 
 /**
  * The editor toolbar's icon buttons and their pressed (format on) state,
@@ -17,14 +17,6 @@ export const TOOL = cn(
 
 export const TOOL_PRESSED =
   'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary';
-
-/**
- * The focus treatment of a field (`FIELD_FOCUS` in packages/ui lib/field.ts,
- * which the package does not export): the footer's Tags and Repeat open
- * pickers, like the date beside them, so they focus like it does.
- */
-export const FIELD_FOCUS =
-  'outline-none transition-[border-color,box-shadow] duration-150 focus-visible:border-actionPrimary focus-visible:ring-3 focus-visible:ring-actionPrimary/20';
 
 /**
  * A picker trigger in the footer row: the date picker's own look

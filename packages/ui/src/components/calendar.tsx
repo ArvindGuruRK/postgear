@@ -11,6 +11,7 @@ import {
   type DayPickerProps,
 } from 'react-day-picker';
 import { FIELD_FOCUS, FIELD_FOCUS_ERROR } from '../lib/field';
+import type { AnimatedIcon } from '../lib/icon-animation';
 import { cn } from '../lib/utils';
 import { MotionIcon } from './motion-icon';
 
@@ -117,16 +118,30 @@ export interface CalendarTriggerProps
   /** The exact value (`2026-10-24`, `2026-10-24T14:00`), for forms and tests. */
   dataValue: string;
   invalid?: boolean;
+  /** The calendar by default; a time picker shows a clock. */
+  icon?: AnimatedIcon;
 }
 
 /**
- * The field-style button that opens every calendar picker: a calendar icon
+ * The field-style button that opens every calendar and time picker: an icon
  * and the value. The text and the exact value appear after mount: both are
  * local to the viewer's time zone and locale, which the server rendering this
  * does not share, and a server-made label would mismatch on hydration.
  */
 export const CalendarTrigger = forwardRef<HTMLButtonElement, CalendarTriggerProps>(
-  ({ label, text, placeholder, dataValue, invalid = false, className, ...props }, ref) => {
+  (
+    {
+      label,
+      text,
+      placeholder,
+      dataValue,
+      invalid = false,
+      icon = CalendarIcon,
+      className,
+      ...props
+    },
+    ref,
+  ) => {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -152,7 +167,7 @@ export const CalendarTrigger = forwardRef<HTMLButtonElement, CalendarTriggerProp
         )}
         {...props}
       >
-        <MotionIcon icon={CalendarIcon} className="h-4 w-4 shrink-0" />
+        <MotionIcon icon={icon} className="h-4 w-4 shrink-0" />
         <span className={cn('truncate', !shown && 'opacity-50')}>{shown ?? placeholder}</span>
       </button>
     );

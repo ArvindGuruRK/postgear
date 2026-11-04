@@ -6,16 +6,16 @@
  * step list, Copy Details, Cancel Run, Retry From Here, Debug In Editor and
  * a waiting Manual Review's card).
  *
- * Below `lg` (like the builder's own small-screen layout) the two stack:
- * the list, then the chosen run with a Back control in its place.
+ * With no runs at all the right side says so and offers Test Workflow. It runs
+ * edge to edge under the header, as the Editor does.
  */
 import { cn, EmptyState } from '@postgear/ui';
-import { History } from 'lucide-react';
+import { History, Play } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import type { PinnedStep, RunSummary, WorkspaceCatalog } from '@/types/workflows';
 import { RunDetail } from './run-detail';
 import { RunList } from './run-list';
-import type { RunPatch } from './run-list-model';
+import { type RunPatch, RUNS_EMPTY_NOTE } from './run-list-model';
 
 export interface RunsTabProps {
   orgId: string;
@@ -35,6 +35,8 @@ export interface RunsTabProps {
    * swaps them in, switches to the Editor and selects `focusKey`.
    */
   onDebugInEditor: (result: { pinned: PinnedStep[]; focusKey: string | null }) => void;
+  /** Back to the Editor, and a test starts. */
+  onTestWorkflow: () => void;
 }
 
 export function RunsTab({
@@ -46,7 +48,9 @@ export function RunsTab({
   openReview,
   onSelectRun,
   onDebugInEditor,
+  onTestWorkflow,
 }: RunsTabProps) {
+  const [noRuns, setNoRuns] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [patch, setPatch] = useState<RunPatch | null>(null);
 
@@ -61,14 +65,11 @@ export function RunsTab({
   );
 
   return (
-    <div
-      className="flex min-h-0 flex-1 overflow-hidden rounded-card border-2 border-outline shadow-brutalSm"
-      data-testid="runs-tab"
-    >
+    <div className="flex min-h-0 flex-1 overflow-hidden" data-testid="runs-tab">
       <aside
         aria-label="Run history"
         className={cn(
-          'min-h-0 w-full flex-col bg-chrome lg:flex lg:w-80 lg:shrink-0 lg:border-r-2 lg:border-outline',
+          'min-h-0 w-full flex-col bg-secondary lg:flex lg:w-80 lg:shrink-0 lg:border-r-2 lg:border-outline',
           runId ? 'hidden' : 'flex',
         )}
       >
@@ -79,13 +80,14 @@ export function RunsTab({
           onSelect={onSelect}
           reloadKey={reloadKey}
           patch={patch}
+          onEmptyChange={setNoRuns}
         />
       </aside>
 
       <section
         aria-label="Chosen run"
         className={cn(
-          'min-h-0 min-w-0 flex-1 flex-col bg-chrome lg:flex',
+          'min-h-0 min-w-0 flex-1 flex-col bg-primary lg:flex',
           runId ? 'flex' : 'hidden',
         )}
       >
@@ -102,6 +104,15 @@ export function RunsTab({
             onRetried={onRetried}
             onRunPatch={setPatch}
             onDebugInEditor={onDebugInEditor}
+          />
+        ) : noRuns ? (
+          <EmptyState
+            icon={Play}
+            title="Nothing here yet"
+            description={RUNS_EMPTY_NOTE}
+            action={{ label: 'Test Workflow', onClick: onTestWorkflow }}
+            className="flex-1"
+            data-testid="runs-nothing-yet"
           />
         ) : (
           <EmptyState

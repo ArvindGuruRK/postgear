@@ -186,6 +186,12 @@ describe('the schedule sentence', () => {
     expect(
       describeSchedule({ frequency: 'monthly', dayOfMonth: 22, time: '07:15', timeZone: 'UTC' }),
     ).toBe('On the 22nd of every month at 07:15 (UTC)');
+    expect(
+      describeSchedule(
+        { frequency: 'daily', time: '09:00', timeZone: 'UTC' },
+        { timeZone: false, formatTime: () => '9:00 AM' },
+      ),
+    ).toBe('Every day at 9:00 AM');
   });
 
   it('names picked days, and calls Monday to Friday "every weekday"', () => {

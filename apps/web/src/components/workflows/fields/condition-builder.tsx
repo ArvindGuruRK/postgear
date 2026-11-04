@@ -27,6 +27,7 @@ import {
   FormErrorMessage,
   Label,
   MotionIcon,
+  Segmented,
   Select,
   SelectContent,
   SelectItem,
@@ -53,7 +54,6 @@ import {
 import { FIELD_PATH_ATTRIBUTE } from './contract';
 import { useFieldEnv } from './field-env';
 import { joinPath } from './field-types';
-import { Segmented } from './segmented';
 
 const MATCH_CHOICES = [
   { value: 'all', label: 'All Of' },

@@ -1,6 +1,6 @@
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import { PlayIcon } from '@animateicons/react/lucide/play-icon';
-import { Badge, Button, MotionIcon } from '@postgear/ui';
+import { Badge, Button, DropdownMenuItem, MotionIcon, SplitButton } from '@postgear/ui';
 import { Row, Section } from '../shared';
 
 export function ButtonsSection() {
@@ -15,6 +15,35 @@ export function ButtonsSection() {
           <Button size="md">Create Post</Button>
           <Button size="lg">Create Post</Button>
           <Button disabled>Disabled</Button>
+        </Row>
+        <Row label="Split (one main action, the rest in its menu)">
+          <SplitButton
+            menuLabel="More actions"
+            menu={
+              <>
+                <DropdownMenuItem>Run Now</DropdownMenuItem>
+                <DropdownMenuItem>Versions</DropdownMenuItem>
+              </>
+            }
+          >
+            Activate
+          </SplitButton>
+          <SplitButton
+            size="md"
+            menuLabel="Choose the test data"
+            menu={<DropdownMenuItem>Use The Built-In Sample</DropdownMenuItem>}
+          >
+            <MotionIcon icon={PlayIcon} className="h-4 w-4" />
+            Test Workflow
+          </SplitButton>
+          <SplitButton
+            disabled
+            hint="Only workspace admins can do this."
+            menuLabel="More actions"
+            menu={<DropdownMenuItem>Run Now</DropdownMenuItem>}
+          >
+            Disabled
+          </SplitButton>
         </Row>
         <Row label="Secondary (everything else)">
           <Button variant="secondary">Add Channel</Button>

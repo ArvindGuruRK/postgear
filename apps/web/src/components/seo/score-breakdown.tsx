@@ -35,14 +35,7 @@ import {
 import { AlertTriangle, Check, Info, X } from 'lucide-react';
 import type { SeoCategoryScore, SeoCheck, SeoCrawlSummary } from '@/types/seo';
 import { SEO_CATEGORIES, SEO_CATEGORY_LABELS } from '@/types/seo';
-import {
-  CATEGORY_META,
-  INSET,
-  PanelHeader,
-  SEGMENTED_LIST,
-  SEGMENTED_TRIGGER,
-  SeoPanel,
-} from './seo-ui';
+import { CATEGORY_META, INSET, PanelHeader, SeoPanel } from './seo-ui';
 
 const AUTHORITY_SOURCE: Record<NonNullable<SeoCrawlSummary['authority']>['source'], string> = {
   openpagerank: 'Open PageRank',
@@ -107,10 +100,7 @@ export function ScoreBreakdown({
       <Tabs defaultValue="onPage">
         <TabsList
           aria-label="Category"
-          className={cn(
-            SEGMENTED_LIST,
-            'flex w-full max-w-full overflow-x-auto pg-scrollbar pg-scrollbar-primary sm:inline-flex sm:w-auto',
-          )}
+          className="flex w-full overflow-x-auto pg-scrollbar pg-scrollbar-primary sm:inline-flex sm:w-auto"
         >
           {SEO_CATEGORIES.map((id) => {
             const category = byCategory.get(id);
@@ -119,7 +109,7 @@ export function ScoreBreakdown({
               <TabsTrigger
                 key={id}
                 value={id}
-                className={cn(SEGMENTED_TRIGGER, 'flex-1 gap-2 whitespace-nowrap sm:flex-none')}
+                className="flex-1 sm:flex-none"
               >
                 <Icon className="hidden h-4 w-4 sm:block" strokeWidth={2.5} aria-hidden="true" />
                 {SEO_CATEGORY_LABELS[id]}

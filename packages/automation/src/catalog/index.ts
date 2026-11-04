@@ -138,7 +138,7 @@ export function describeNode(node: NodeLike, ctx: SummaryContext = {}): string {
   if (!def) return 'This step type is not available any more.';
   if (def.status === 'comingSoon') return def.comingSoonReason ?? 'Coming soon';
   const parsed = def.configSchema.safeParse(node.config);
-  if (!parsed.success) return 'Finish setting up this step';
+  if (!parsed.success) return 'Finish setting up';
   try {
     return def.summary(parsed.data, ctx);
   } catch {

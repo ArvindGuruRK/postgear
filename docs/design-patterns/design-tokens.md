@@ -108,6 +108,23 @@ Locked 2026-08-30 as Palette A ("Classic Comic Primary"). These fills are **flat
 
 **Text-on-fill is paired to the variant name, not derived from the hue.** Repointing a variant at a different color means also repointing which `on*` token its text uses. Every pair above is contrast-checked, not eyeballed: the lowest is 4.75:1, comfortably over WCAG AA's 4.5:1.
 
+## 4a. Code colours
+
+For code shown as code, which today is the Raw view in the workflow step editor (2026-11-03). They are VS Code's own: Dark+ in `.dark`, Light+ in `.light`. The dark and light blocks set them once, so every theme reads the same and the theme blocks further down do not repeat them.
+
+| Token | Utility | Dark+ | Light+ | Used for |
+|---|---|---|---|---|
+| `--color-code-key` | `text-codeKey` | `#9cdcfe` | `#0451a5` | JSON keys |
+| `--color-code-string` | `text-codeString` | `#ce9178` | `#a31515` | Strings |
+| `--color-code-number` | `text-codeNumber` | `#b5cea8` | `#098658` | Numbers |
+| `--color-code-keyword` | `text-codeKeyword` | `#569cd6` | `#0000ff` | `true`, `false`, `null` |
+| `--color-code-punctuation` | `text-codePunctuation` | `#d4d4d4` | `#3b3b3b` | Commas and colons |
+| `--color-code-line-number` | `text-codeLineNumber` | `#858585` | `#237893` | The line number gutter |
+| `--color-code-guide` | `border-codeGuide` | `#404040` | `#d3d3d3` | Indent guides |
+| `--color-code-bracket-1` | `text-codeBracket1` | `#ffd700` | `#0431fa` | Brackets, outermost pair |
+| `--color-code-bracket-2` | `text-codeBracket2` | `#da70d6` | `#319331` | Brackets, next pair |
+| `--color-code-bracket-3` | `text-codeBracket3` | `#179fff` | `#7b3814` | Brackets, next pair |
+
 ## 5. Focus ring
 
 | Token | Utility | Value |
@@ -123,6 +140,8 @@ The treatment itself is decided once and reused verbatim: `focus-visible:outline
 `bgLinkedin`, `bgFacebook`, `bgInstagram`, `bgTiktokItem`, `bgTiktokItemIcon`, `bgYoutube`, `bgCommentFacebook`, `textLinkedin`, `borderLinkedin`, `youtubeButton`, `youtubeBgAction`, `youtubeSvg`.
 
 These represent each target platform's own identity in post previews, not PostGear's style, so **never rebrand them**. They have no uses yet and were deliberately kept through the prune: Sprint 3's channel-connection UI is what consumes them.
+
+**Logo colours** (2026-11-04), `--color-logo-*`: a workflow step's selected ring takes the colour of its icon, so a step with a logo goes by the logo's main colour, read from its artwork in `apps/web/public/icon`. One token per platform key (`instagram`, `facebook`, `x`, `linkedin`, `youtube`, `tiktok`, `pinterest`, `slack`, `teams`, `discord`, `google-sheets`, `excel`), flat across themes and used through `stepColour` rather than as utilities. Two were a choice: Slack's logo has four colours, and cyan reads as neither an error nor a trigger; X's logo is black and white, which would leave a black border unchanged, so it wears the blue of X's own badge.
 
 ## 7. Typography
 

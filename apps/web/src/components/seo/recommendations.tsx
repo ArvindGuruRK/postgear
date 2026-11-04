@@ -34,7 +34,7 @@ import {
 import { AlertTriangle, Info, X } from 'lucide-react';
 import type { SeoAdvice, SeoImpact, SeoRecommendation, SeoSeverity } from '@/types/seo';
 import { SEO_CATEGORY_LABELS, SEO_SEVERITIES } from '@/types/seo';
-import { INSET, PanelHeader, SEGMENTED_LIST, SEGMENTED_TRIGGER, SeoPanel } from './seo-ui';
+import { INSET, PanelHeader, SeoPanel } from './seo-ui';
 import { SEVERITY_LABELS, severityVariant } from './seo-view-model';
 
 const IMPACT_LABELS: Record<SeoImpact, string> = {
@@ -126,13 +126,13 @@ export function Recommendations({
       <Tabs key={advice.recommendations[0]?.id ?? 'none'} defaultValue={opening}>
         <TabsList
           aria-label="Severity"
-          className={cn(SEGMENTED_LIST, 'flex w-full sm:inline-flex sm:w-auto')}
+          className="flex w-full sm:inline-flex sm:w-auto"
         >
           {groups.map(({ severity, items }) => (
             <TabsTrigger
               key={severity}
               value={severity}
-              className={cn(SEGMENTED_TRIGGER, 'flex-1 gap-2 sm:flex-none')}
+              className="flex-1 sm:flex-none"
             >
               {SEVERITY_LABELS[severity]}
               <SeverityCount severity={severity} count={items.length} />

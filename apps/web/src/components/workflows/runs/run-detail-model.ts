@@ -14,7 +14,7 @@ import type { RunModel, StepPaintState } from './run-model';
 export const STEP_BADGE: Record<StepPaintState, BadgeVariant> = {
   queued: 'outline',
   running: 'primary',
-  waiting: 'secondary',
+  waiting: 'accent',
   succeeded: 'success',
   dryRun: 'success',
   handled: 'accent',

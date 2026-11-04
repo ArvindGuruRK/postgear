@@ -154,15 +154,3 @@ export function InfoButton({ label, info }: { label: string; info: string }) {
   );
 }
 
-/**
- * The calendar toolbar's segmented control, for the design system's `Tabs`
- * (so the arrow keys and roles stay Radix's): a chrome frame, and the chosen
- * option as a filled tile with no shadow of its own.
- */
-export const SEGMENTED_LIST =
-  'h-10 gap-1 rounded-lg border-2 border-outline bg-chrome p-0.5 shadow-none';
-
-export const SEGMENTED_TRIGGER = cn(
-  'h-8 rounded border-2 border-transparent px-3 type-ui text-sm',
-  'data-[state=active]:border-outline data-[state=inactive]:hover:bg-primary',
-);

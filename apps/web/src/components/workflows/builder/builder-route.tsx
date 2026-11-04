@@ -55,7 +55,7 @@ export function BuilderRoute({
   if (load.kind === 'missing') return <WorkflowMissing orgId={rest.orgId} />;
   if (load.kind === 'failed') {
     return (
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-3 p-3">
         <Alert variant="danger" className="flex-wrap items-center">
           <TriangleAlert aria-hidden="true" className="h-5 w-5 shrink-0" strokeWidth={2.5} />
           <span className="min-w-0 grow basis-56">{WORKFLOW_LOAD_FAILED}</span>
@@ -66,5 +66,9 @@ export function BuilderRoute({
       </div>
     );
   }
-  return <Skeleton className="min-h-96 flex-1" aria-label="Loading the workflow" />;
+  return (
+    <div className="flex min-w-0 flex-1 p-3">
+      <Skeleton className="min-h-96 flex-1" aria-label="Loading the workflow" />
+    </div>
+  );
 }

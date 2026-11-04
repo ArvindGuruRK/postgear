@@ -9,12 +9,14 @@ import {
 } from '@postgear/automation';
 import { TooltipProvider } from '@postgear/ui';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useRef } from 'react';
 import { issuePlace } from '../builder/issue-focus';
 import type { FieldContext } from '../fields/contract';
 import type { PinControls } from './output-pane';
 import { buildScope } from './panel-view-model';
-import { StepPanel, type StepPanelProps } from './step-panel';
-import type { FocusRequest } from './step-tabs';
+import { keepKeysInPanel } from './panel-keys';
+import { StepNameField } from './step-name-field';
+import { type FocusRequest, StepTabs, type StepTabsProps } from './step-tabs';
 
 // The field kit draws the real form; here each field is a plain input with its path.
 jest.mock('../fields/schema-form', () => {
@@ -91,34 +93,44 @@ const missingConnection: ValidationIssue = {
   field: 'connectionId',
 };
 
-function renderPanel(overrides: Partial<StepPanelProps> = {}) {
+/** As in the step editor: the name in its header, the tabs under it, the keys kept in. */
+function Editor(props: StepTabsProps) {
+  const nameRef = useRef<HTMLInputElement>(null);
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: as in the editor, keys inside stay inside
+    <div onKeyDown={keepKeysInPanel}>
+      <StepNameField node={props.node} dispatch={props.dispatch} inputRef={nameRef} />
+      <StepTabs {...props} onFocusName={() => nameRef.current?.focus()} />
+    </div>
+  );
+}
+
+function renderPanel(overrides: Partial<StepTabsProps> = {}) {
   const dispatch = jest.fn();
-  const props: StepPanelProps = {
+  const props: StepTabsProps = {
     node: slack as NonNullable<typeof slack>,
     graph,
     issues: [missingConnection],
     context,
     dispatch,
     pin,
-    onClose: () => undefined,
-    renameSignal: 0,
     ...overrides,
   };
   const view = render(
     <TooltipProvider>
-      <StepPanel {...props} />
+      <Editor {...props} />
     </TooltipProvider>,
   );
-  const again = (next: Partial<StepPanelProps>) =>
+  const again = (next: Partial<StepTabsProps>) =>
     view.rerender(
       <TooltipProvider>
-        <StepPanel {...props} {...next} />
+        <Editor {...props} {...next} />
       </TooltipProvider>,
     );
   return { ...view, dispatch, again };
 }
 
-describe('StepPanel', () => {
+describe('StepTabs', () => {
   it('keeps keys pressed in its fields away from the canvas, so Backspace never deletes the step', () => {
     const canvas = jest.fn();
     window.addEventListener('keydown', canvas);
@@ -128,13 +140,13 @@ describe('StepPanel', () => {
       fireEvent.keyDown(name, { key: 'Backspace' });
       fireEvent.keyDown(name, { key: 'Delete' });
       fireEvent.keyDown(screen.getByLabelText('Slack connection'), { key: 'Backspace' });
-      // A focused tab is not a field, but arrows and Delete still stay in the panel.
+      // A focused tab is not a field, but arrows and Delete still stay in the editor.
       const setup = screen.getByRole('tab', { name: /Setup/ });
       fireEvent.keyDown(setup, { key: 'Delete' });
       fireEvent.keyDown(setup, { key: 'ArrowRight' });
       expect(canvas).not.toHaveBeenCalled();
 
-      // Esc still reaches the builder, which closes the panel.
+      // Esc still reaches whoever closes the editor.
       fireEvent.keyDown(setup, { key: 'Escape' });
       expect(canvas).toHaveBeenCalledTimes(1);
     } finally {
@@ -205,14 +217,12 @@ describe('StepPanel', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Step name')));
   });
 
-  it('shows the pin sticker and an Expand button', () => {
-    const onExpand = jest.fn();
-    renderPanel({
-      onExpand,
-      pin: { ...pin, pinned: { nodeKey: 'slack', pinnedAt: '2026-11-03T09:00:00Z' } },
-    });
-    expect(screen.getByText('Pinned data')).not.toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Expand step' }));
-    expect(onExpand).toHaveBeenCalled();
+  it('has Settings as a tab of its own, beside Setup and Configure', () => {
+    renderPanel();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      expect.stringContaining('Setup'),
+      expect.stringContaining('Configure'),
+      expect.stringContaining('Settings'),
+    ]);
   });
 });

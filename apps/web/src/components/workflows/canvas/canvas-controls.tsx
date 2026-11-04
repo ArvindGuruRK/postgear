@@ -16,6 +16,8 @@ import { ZoomOutIcon } from '@animateicons/react/lucide/zoom-out-icon';
 import { Button, MotionIcon, TooltipHint } from '@postgear/ui';
 import { Panel, useReactFlow } from '@xyflow/react';
 import type { ComponentProps } from 'react';
+import { ShortcutKeys } from '../builder/shortcut-keys';
+import { CANVAS_FIT } from './workflow-canvas';
 
 type AnimatedIcon = ComponentProps<typeof MotionIcon>['icon'];
 
@@ -28,14 +30,18 @@ function Control({
   pressed,
 }: {
   label: string;
-  shortcut?: string;
+  shortcut?: readonly string[];
   icon: AnimatedIcon;
   onClick: () => void;
   disabled?: boolean;
   pressed?: boolean;
 }) {
   return (
-    <TooltipHint label={label} shortcut={shortcut} disabled={disabled}>
+    <TooltipHint
+      label={label}
+      shortcut={shortcut ? <ShortcutKeys keys={shortcut} /> : undefined}
+      disabled={disabled}
+    >
       <Button
         variant="ghost"
         size="sm"
@@ -90,20 +96,20 @@ export function CanvasControls({
         />
         <Control
           label="Fit To Screen"
-          shortcut="1"
+          shortcut={['1']}
           icon={ScanIcon}
-          onClick={() => void flow.fitView({ duration: 200, padding: 0.2 })}
+          onClick={() => void flow.fitView({ ...CANVAS_FIT, duration: 200 })}
         />
         <Control
           label="Undo"
-          shortcut="Ctrl+Z"
+          shortcut={['Ctrl', 'Z']}
           icon={UndoIcon}
           onClick={onUndo}
           disabled={!canUndo}
         />
         <Control
           label="Redo"
-          shortcut="Ctrl+Shift+Z"
+          shortcut={['Ctrl', 'Shift', 'Z']}
           icon={RedoIcon}
           onClick={onRedo}
           disabled={!canRedo}

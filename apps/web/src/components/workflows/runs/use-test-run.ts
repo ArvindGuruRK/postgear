@@ -164,8 +164,11 @@ export function useTestRun({
   flush: () => Promise<boolean>;
   /** The graph now: send-for-real keys of steps deleted since are left out. */
   graph: () => AutomationGraph;
-  /** 422 `test_blocked`: its message was shown; the page opens the issues list. */
-  onBlocked: (message: string) => void;
+  /**
+   * 422 `test_blocked`: the API only counts the issues, so the page says which
+   * and shows where. `stepKey` is the step a refused Test Step was for.
+   */
+  onBlocked: (message: string, stepKey: string | null) => void;
 }): TestRun {
   const [runId, setRunId] = useState<string | null>(null);
   const [stepKey, setStepKey] = useState<string | null>(null);
@@ -223,10 +226,17 @@ export function useTestRun({
     };
   }, [automationId]);
 
-  const report = useCallback((cause: unknown) => {
+  const report = useCallback((cause: unknown, stepKey: string | null) => {
     const refusal = testRefusal(cause);
-    toast({ title: refusal.message, variant: 'danger' });
-    if (refusal.blocked) blocked.current(refusal.message);
+    if (refusal.blocked) {
+      blocked.current(refusal.message, stepKey);
+      return;
+    }
+    // Too many tests is a wait, not a failure.
+    toast({
+      title: refusal.message,
+      variant: refusal.message === TOO_MANY_TESTS ? 'warning' : 'danger',
+    });
   }, []);
 
   const begin = useCallback(
@@ -237,7 +247,7 @@ export function useTestRun({
       setStartingKey(key);
       try {
         if (!(await flush())) {
-          toast({ title: TEST_NOT_SAVED, variant: 'danger' });
+          toast({ title: TEST_NOT_SAVED, variant: 'warning' });
           return;
         }
         const run = await send();
@@ -245,7 +255,7 @@ export function useTestRun({
         setStepKey(key);
         setPainted(true);
       } catch (cause) {
-        report(cause);
+        report(cause, key);
       } finally {
         setStarting(false);
       }

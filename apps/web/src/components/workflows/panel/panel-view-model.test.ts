@@ -7,20 +7,24 @@ import {
 import type { RunStep } from '@/types/workflows';
 import {
   buildScope,
+  childrenOf,
+  connectedSteps,
   checkPinnedShape,
   copyDetailsText,
   dryRunContent,
-  flattenFields,
+  humanValue,
+  isEmptyValue,
+  recordTable,
   inputSourceLine,
   liveEffectSentence,
   locateDataError,
-  neighbours,
   parsePinnedText,
   receivedWebhookData,
   runsDryInTests,
   type StepRunResult,
   skippedSentence,
   sourceLabel,
+  valueTree,
   valueWords,
   walkOrder,
 } from './panel-view-model';
@@ -104,10 +108,13 @@ describe('the Expanded view walk', () => {
   it('steps through the workflow in run order', () => {
     const graph = report();
     expect(walkOrder(graph)).toEqual(['published', 'fields', 'sheet', 'slack']);
-    expect(neighbours(graph, 'published')).toEqual({ previous: null, next: 'fields' });
-    expect(neighbours(graph, 'sheet')).toEqual({ previous: 'fields', next: 'slack' });
-    expect(neighbours(graph, 'slack')).toEqual({ previous: 'sheet', next: null });
-    expect(neighbours(graph, 'gone')).toEqual({ previous: null, next: null });
+    const names = (nodes: { key: string }[]) => nodes.map((node) => node.key);
+    const sheet = connectedSteps(graph, 'sheet');
+    expect(names(sheet.previous)).toEqual(['fields']);
+    expect(names(sheet.next)).toEqual(['slack']);
+    expect(connectedSteps(graph, 'published').previous).toEqual([]);
+    expect(connectedSteps(graph, 'slack').next).toEqual([]);
+    expect(connectedSteps(graph, 'gone')).toEqual({ previous: [], next: [] });
   });
 
   it('follows run order, not where the cards sit', () => {
@@ -160,23 +167,6 @@ describe('words', () => {
     expect(valueWords([1, 2, 3])).toBe('3 items');
     expect(valueWords({ a: 1 })).toBe('1 field');
     expect(valueWords('x'.repeat(100), 10)).toHaveLength(10);
-  });
-
-  it('flattens a field tree parents first', () => {
-    const rows = flattenFields([
-      {
-        path: 'trigger.post',
-        label: 'Post',
-        type: 'object',
-        children: [
-          { path: 'trigger.post.url', label: 'Post Link', type: 'text', sample: 'x', children: [] },
-        ],
-      },
-    ]);
-    expect(rows.map((row) => [row.label, row.depth])).toEqual([
-      ['Post', 0],
-      ['Post Link', 1],
-    ]);
   });
 });
 
@@ -350,5 +340,110 @@ describe('buildScope with a Webhook sample (Module 13)', () => {
     expect(receivedWebhookData({ sample: [1, 2], sampleAt: null })).toBeUndefined();
     const { scope } = buildScope(report(), [], undefined, {}, { body: { title: 'x' } });
     expect(resolveValue('trigger.body', scope)).toBeUndefined();
+  });
+});
+
+describe('humanValue', () => {
+  it('writes a date the way a person would, not as a timestamp', () => {
+    const words = humanValue('2026-11-03T12:30:00.000Z');
+    expect(words).toMatch(/Nov/);
+    expect(words).not.toContain('T12');
+    expect(words).not.toContain('Z');
+  });
+
+  it('leaves a string that only starts like a date, or is not one, alone', () => {
+    expect(humanValue('2026-13-45T99:99:00')).toBe('2026-13-45T99:99:00');
+    expect(humanValue('Fresh sourdough')).toBe('Fresh sourdough');
+  });
+
+  it('separates big numbers but not years or small counts', () => {
+    expect(humanValue(2026)).toBe('2026');
+    expect(humanValue(7)).toBe('7');
+    expect(humanValue(1250000)).toBe((1250000).toLocaleString());
+  });
+
+  it('spells out a short list of plain values and counts anything longer', () => {
+    expect(humanValue(['a', 'b', 'c'])).toBe('a, b, c');
+    expect(humanValue(['a', 'b', 'c', 'd'])).toBe('4 items');
+    expect(humanValue([{ a: 1 }])).toBe('1 item');
+    expect(humanValue([])).toBe('0 items');
+  });
+
+  it('keeps the words valueWords uses for the rest', () => {
+    expect(humanValue(true)).toBe('Yes');
+    expect(humanValue(null)).toBe('Empty');
+    expect(humanValue({ a: 1, b: 2 })).toBe('2 fields');
+  });
+
+  it('knows what counts as empty', () => {
+    expect(isEmptyValue('')).toBe(true);
+    expect(isEmptyValue(null)).toBe(true);
+    expect(isEmptyValue(0)).toBe(false);
+    expect(isEmptyValue(false)).toBe(false);
+  });
+});
+
+describe('childrenOf', () => {
+  const field = (type: 'object' | 'media' | 'list' | 'text', sample: unknown) => ({
+    path: 'trigger.image',
+    label: 'Image',
+    type,
+    sample,
+    children: [],
+  });
+
+  it('opens a group that declares no children from what its value holds', () => {
+    const children = childrenOf(field('media', { url: 'https://a.test', alt: 'Bread' }));
+    expect(children.map((child) => [child.path, child.label])).toEqual([
+      ['trigger.image.url', 'URL'],
+      ['trigger.image.alt', 'Alt'],
+    ]);
+  });
+
+  it('prefers the children a step declares', () => {
+    const declared = { ...field('text', 'x'), path: 'trigger.image.url', label: 'Link' };
+    expect(childrenOf({ ...field('object', { url: 'x' }), children: [declared] })).toEqual([
+      declared,
+    ]);
+  });
+
+  it('leaves a plain value and an empty group closed', () => {
+    expect(childrenOf(field('text', 'Bread'))).toEqual([]);
+    expect(childrenOf(field('object', {}))).toEqual([]);
+    expect(childrenOf(field('list', []))).toEqual([]);
+  });
+});
+
+describe('recordTable', () => {
+  it('turns a list of records into columns, in first-seen order', () => {
+    const table = recordTable(
+      valueTree(
+        [
+          { title: 'One', post_url: 'https://a.test' },
+          { title: 'Two', extra: 3 },
+        ],
+        [],
+      ),
+    );
+    expect(table?.columns).toEqual([
+      { key: 'title', label: 'Title' },
+      { key: 'post_url', label: 'Post URL' },
+      { key: 'extra', label: 'Extra' },
+    ]);
+    expect(table?.rows.map((row) => row.cells.title)).toEqual(['One', 'Two']);
+    expect(table?.rows[1].cells.post_url).toBeUndefined();
+  });
+
+  it('finds a list nested inside a record', () => {
+    const [rows] = valueTree({ rows: [{ a: 1 }, { a: 2 }] }, []);
+    expect(recordTable(rows.children)?.rows).toHaveLength(2);
+  });
+
+  it('leaves a single record, a list of plain values and mixed lists as rows', () => {
+    expect(recordTable(valueTree({ a: 1, b: 2 }, []))).toBeNull();
+    expect(recordTable(valueTree(['a', 'b'], []))).toBeNull();
+    expect(recordTable(valueTree([{ a: 1 }, 'b'], []))).toBeNull();
+    expect(recordTable(valueTree([{}], []))).toBeNull();
+    expect(recordTable([])).toBeNull();
   });
 });

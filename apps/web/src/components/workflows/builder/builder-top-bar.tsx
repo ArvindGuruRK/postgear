@@ -1,21 +1,24 @@
 'use client';
 
 /**
- * The builder's PageActions row (blueprint 3): the workflow's name (click
- * to rename), the save state in words, the Editor and Runs switch, the
- * issues chip (its list lands on the step's field,
- * `panel/issues-popover.tsx`), Test Workflow (Module 08), the live state
- * and the Activate switch (Module 09's `WorkflowLiveControls`), and a menu
- * with Versions, Duplicate and Delete. The top bar above already says
- * Workflows, so there is no page title.
+ * The builder's header (after n8n, 2026-11-03): a full-width strip above the
+ * edge-to-edge canvas. On the left the way back, the workflow's name (click to
+ * rename), its menu and the save state in words; in the middle the Editor and
+ * Runs switch; on the right the status and the Activate split
+ * (`WorkflowLiveControls`).
  *
- * The page hands Test Workflow and the live controls in as slots, so this
- * row only lays them out.
+ * The page hands the live controls in as a slot, so this row only lays them
+ * out. Everything else lives on the canvas: Test Workflow bottom centre, Add
+ * Step and Setup on the tool rail.
  */
-import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
-import type { AutomationGraph, ValidationIssue } from '@postgear/automation';
+import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
   Button,
   buttonVariants,
   cn,
@@ -26,7 +29,6 @@ import {
   DropdownMenuTrigger,
   Input,
   MotionIcon,
-  PageActions,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -35,13 +37,12 @@ import {
 import { CircleCheck, CloudOff, LoaderCircle, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useState } from 'react';
-import { IssuesPopover } from '../panel/issues-popover';
 import type { SaveStatus } from './builder-autosave';
 import { type BuilderTab, SAVE_STATE_WORDS } from './builder-view-model';
 
 const MAX_NAME = 80;
 
-function SaveState({ status, message }: { status: SaveStatus; message: string | null }) {
+export function SaveState({ status, message }: { status: SaveStatus; message: string | null }) {
   const Icon =
     status === 'saved'
       ? CircleCheck
@@ -58,7 +59,7 @@ function SaveState({ status, message }: { status: SaveStatus; message: string | 
       data-status={status}
       title={message ?? undefined}
       className={cn(
-        'flex items-center gap-1.5 font-sans text-xs',
+        'flex shrink-0 items-center gap-1.5 font-sans text-xs',
         status === 'conflict' || status === 'failed' ? 'text-dangerInk' : 'text-ink type-muted',
       )}
     >
@@ -83,13 +84,7 @@ export function BuilderTopBar({
   message,
   tab,
   onTabChange,
-  issues,
-  graph,
-  onOpenIssue,
-  issuesSignal = 0,
-  testControls,
   liveControls,
-  onVersions,
   onDuplicate,
   onDelete,
 }: {
@@ -101,16 +96,8 @@ export function BuilderTopBar({
   /** The Editor and Runs switch (`?tab=runs`). */
   tab: BuilderTab;
   onTabChange: (tab: BuilderTab) => void;
-  issues: ValidationIssue[];
-  graph: AutomationGraph;
-  onOpenIssue: (issue: ValidationIssue) => void;
-  /** Bumped to open the issues list (a test refused for them). */
-  issuesSignal?: number;
-  /** Test Workflow, or Stop while a test runs. */
-  testControls: ReactNode;
-  /** The status badge, Unpublished Changes, Run Now and the Activate switch. */
+  /** The status badge and the Activate split. */
   liveControls: ReactNode;
-  onVersions: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
@@ -130,71 +117,71 @@ export function BuilderTopBar({
   }
 
   return (
-    <PageActions className="justify-start gap-2 rounded-card border-2 border-outline bg-secondary px-3 py-2 shadow-surfaceSm">
-      <TooltipHint label="Back To Workflows" side="bottom">
-        <Link
-          href={`/${orgId}/workflows`}
-          aria-label="Back To Workflows"
-          data-testid="builder-back"
-          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-9 shrink-0 px-0')}
-        >
-          <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
-        </Link>
-      </TooltipHint>
-      {/* On a phone the name takes the first line; the rest wraps below it. */}
-      <div className="order-first flex min-w-0 flex-1 basis-full flex-wrap items-center gap-3 sm:order-none sm:basis-auto">
-        <Input
-          value={draft}
-          maxLength={MAX_NAME}
-          aria-label="Workflow name"
-          placeholder="Enter your workflow name"
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              event.currentTarget.blur();
-            } else if (event.key === 'Escape') {
-              setDraft(name);
-              event.currentTarget.blur();
-            }
-          }}
-          className="h-9 w-full max-w-xs type-ui shadow-none sm:w-64"
-          data-testid="workflow-name"
-        />
-        <SaveState status={status} message={message} />
-      </div>
-      <div className="flex flex-wrap items-center gap-3 [&_button:not([role=switch]):not([role=tab])]:h-9">
-        <Tabs value={tab} onValueChange={(value) => onTabChange(value as BuilderTab)}>
-          <TabsList
-            aria-label="Builder view"
-            data-testid="builder-tabs"
-            className="h-9 p-0.5 shadow-none"
+    <header
+      data-testid="builder-top-bar"
+      className="grid h-14 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 border-b-2 border-outline bg-secondary px-3"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <TooltipHint label="Back To Workflows" side="bottom">
+          <Link
+            href={`/${orgId}/workflows`}
+            aria-label="Back To Workflows"
+            data-testid="builder-back"
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-9 shrink-0 px-0')}
           >
-            <TabsTrigger value="editor" className="h-full px-3 py-0">
-              Editor
-            </TabsTrigger>
-            <TabsTrigger value="runs" className="h-full px-3 py-0">
-              Runs
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <IssuesPopover
-          issues={issues}
-          graph={graph}
-          onOpenIssue={onOpenIssue}
-          openSignal={issuesSignal}
-        />
-        {testControls}
-        {liveControls}
+            <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
+          </Link>
+        </TooltipHint>
+        <Breadcrumb className="min-w-0">
+          <BreadcrumbList className="flex-nowrap">
+            <BreadcrumbItem className="shrink-0">
+              <Link
+                href={`/${orgId}/workflows`}
+                className="font-medium muted-tone outline-none hover:underline focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+              >
+                Workflows
+              </Link>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="min-w-0">
+                {/* Quiet until touched: it reads as the page's name and edits in place. */}
+                <Input
+                  value={draft}
+                  maxLength={MAX_NAME}
+                  aria-label="Workflow name"
+                  placeholder="Enter your workflow name"
+                  onChange={(event) => setDraft(event.target.value)}
+                  onBlur={commit}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    } else if (event.key === 'Escape') {
+                      setDraft(name);
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  size="sm"
+                  className="type-ui field-sizing-content max-w-sm min-w-24 truncate border-transparent bg-transparent px-2 text-sm shadow-none hover:border-outline focus:bg-field"
+                  data-testid="workflow-name"
+                />
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" aria-label="Workflow actions">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-9 shrink-0 px-0"
+              aria-label="Workflow actions"
+            >
               <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onVersions}>Versions</DropdownMenuItem>
+          <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={onDuplicate}>Duplicate</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-dangerInk" onSelect={onDelete}>
@@ -202,7 +189,17 @@ export function BuilderTopBar({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <SaveState status={status} message={message} />
       </div>
-    </PageActions>
+
+      <Tabs value={tab} onValueChange={(value) => onTabChange(value as BuilderTab)}>
+        <TabsList aria-label="Builder view" data-testid="builder-tabs">
+          <TabsTrigger value="editor">Editor</TabsTrigger>
+          <TabsTrigger value="runs">Runs</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <div className="flex min-w-0 items-center justify-end gap-3">{liveControls}</div>
+    </header>
   );
 }

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@postgear/ui';
 import type { ScreenPoint } from '../builder/builder-context';
+import { ShortcutKeys } from '../builder/shortcut-keys';
 
 export interface MenuItem {
   label: string;
@@ -59,8 +60,8 @@ export function CanvasContextMenu({
             >
               {item.label}
               {item.shortcut ? (
-                <span className="ms-auto ps-4 font-sans text-xs text-ink type-muted">
-                  {item.shortcut}
+                <span className="ms-auto ps-4">
+                  <ShortcutKeys keys={item.shortcut.split('+')} />
                 </span>
               ) : null}
             </DropdownMenuItem>

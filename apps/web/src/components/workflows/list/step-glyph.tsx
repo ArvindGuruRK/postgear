@@ -48,15 +48,19 @@ import { cn } from '@postgear/ui';
 import { AppIcon } from '../app-icon';
 import { iconSource } from '../icons';
 
-/** An icon's colour. The icon sits on the card as it is: no square or wash behind it. */
+/**
+ * An icon's colour, as a class for the icon and a value for what else wears it. The icon sits on
+ * the card as it is: no square or wash behind it.
+ */
 interface Tone {
   text: string;
+  colour: string;
 }
 
-const TRIGGER: Tone = { text: 'text-actionAccent' };
-const AI: Tone = { text: 'text-actionAi' };
-const LOGIC: Tone = { text: 'text-actionPrimary' };
-const APP: Tone = { text: 'text-actionSuccess' };
+const TRIGGER: Tone = { text: 'text-actionAccent', colour: 'var(--color-brutal-accent)' };
+const AI: Tone = { text: 'text-actionAi', colour: 'var(--color-brutal-ai)' };
+const LOGIC: Tone = { text: 'text-actionPrimary', colour: 'var(--color-forth)' };
+const APP: Tone = { text: 'text-actionSuccess', colour: 'var(--color-brutal-success)' };
 
 const GLYPHS: Partial<Record<IconKey, { icon: Icon; tone: Tone }>> = {
   'post-published': { icon: Lightning, tone: TRIGGER },
@@ -89,10 +93,20 @@ const GLYPHS: Partial<Record<IconKey, { icon: Icon; tone: Tone }>> = {
   http: { icon: Globe, tone: APP },
 };
 
+/** An icon with no entry of its own, so an unknown step still draws. */
+const FALLBACK = { icon: FlowArrow, tone: LOGIC };
+
+/** The colour a step goes by: its icon's, or for a logo the logo's own (`--color-logo-*`). */
+export function stepColour(icon: string): string {
+  const source = iconSource(icon);
+  if ('platform' in source) return `var(--color-logo-${source.platform})`;
+  return (GLYPHS[icon as IconKey] ?? FALLBACK).tone.colour;
+}
+
 /** A step's icon by its `IconKey`. A platform's logo stays its logo. */
 export function StepGlyph({ icon, className }: { icon: string; className?: string }) {
   if ('platform' in iconSource(icon)) return <AppIcon icon={icon} className={className} />;
-  const glyph = GLYPHS[icon as IconKey] ?? { icon: FlowArrow, tone: LOGIC };
+  const glyph = GLYPHS[icon as IconKey] ?? FALLBACK;
   const Glyph = glyph.icon;
   return <Glyph aria-hidden="true" weight="duotone" className={cn(glyph.tone.text, className)} />;
 }

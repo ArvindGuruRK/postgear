@@ -115,7 +115,6 @@ export function MediaLibrary({
           options={FILTERS}
           value={list.type}
           onValueChange={(value) => list.setType(value as MediaFilter)}
-          className="shadow-none"
         />
         {list.data ? (
           <Text size="sm" muted className="sm:ms-auto" aria-live="polite">

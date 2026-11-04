@@ -12,6 +12,7 @@ import type { CatalogEntry } from '@/types/workflows';
 import {
   ADMINS_ONLY,
   activatedToast,
+  issueRows,
   activateFailure,
   activationContent,
   activationIssues,
@@ -107,8 +108,8 @@ describe('activation dialog content', () => {
     const content = activationContent(graph, [], { nowIso: NOW, locale: 'en-GB' });
     if (content.kind !== 'confirm') throw new Error('expected the confirm');
     expect(content.scheduleRuns).toHaveLength(3);
-    expect(content.scheduleRuns[0]).toContain('30 October');
-    expect(content.scheduleRuns.every((run) => run.includes('09:00'))).toBe(true);
+    expect(content.scheduleRuns[0].date).toBe('30 October');
+    expect(content.scheduleRuns.every((run) => run.time === '09:00')).toBe(true);
   });
 
   it('asks for the tick when a post goes out without a review', () => {
@@ -278,5 +279,32 @@ describe('manual trigger fields', () => {
       ok: true,
       inputs: { topic: 'Launch', tone: 'Warm' },
     });
+  });
+});
+
+describe('issueRows', () => {
+  const issue = (nodeKey: string | undefined, message: string): ValidationIssue => ({
+    severity: 'error',
+    code: 'node.required_missing',
+    message,
+    nodeKey,
+  });
+
+  it('gives a step one row, however many issues it has', () => {
+    const rows = issueRows([
+      issue('a', 'Fill in this field.'),
+      issue('b', 'This value is not valid here.'),
+      issue('a', 'Fill in this field.'),
+      issue('a', 'Choose one of the options.'),
+    ]);
+    expect(rows.map((row) => [row.issue.nodeKey, row.message])).toEqual([
+      ['a', '3 things to fix.'],
+      ['b', 'This value is not valid here.'],
+    ]);
+  });
+
+  it('keeps every issue that belongs to no step', () => {
+    const rows = issueRows([issue(undefined, 'Add a trigger.'), issue(undefined, 'Add a step.')]);
+    expect(rows.map((row) => row.message)).toEqual(['Add a trigger.', 'Add a step.']);
   });
 });

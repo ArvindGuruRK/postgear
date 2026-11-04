@@ -182,8 +182,9 @@ const SAFE_AREA_PADDING =
  * replaces the tab's "active" / "inactive".
  */
 const SCOPE_TILE = cn(
-  'h-11 w-11 rounded-lg border-2 border-ink/15 bg-chrome p-0 text-ink hover:border-outline',
+  'h-11 w-11 rounded-lg border-2 border-ink/15 bg-chrome p-0 text-ink hover:border-outline sm:min-w-0',
   'aria-selected:border-outline aria-selected:bg-actionPrimary aria-selected:text-onActionPrimary',
+  'data-[state=inactive]:hover:bg-actionPrimary/10',
 );
 
 export function Composer({
@@ -745,7 +746,7 @@ export function Composer({
                 {/* The reference's scope tiles: the globe edits the post every
                     channel shares; each selected channel's tile edits that
                     channel's own version, marked with a dot once it has one. */}
-                <TabsList className="max-w-full flex-wrap justify-start gap-2 border-0 bg-transparent p-0 shadow-none">
+                <TabsList className="max-w-full flex-wrap justify-start gap-2 border-0 bg-transparent p-0">
                   <TooltipHint label="All Channels: One Post For Every Channel" side="bottom">
                     <TabsTrigger value={SHARED} aria-label="All channels" className={SCOPE_TILE}>
                       <MotionIcon

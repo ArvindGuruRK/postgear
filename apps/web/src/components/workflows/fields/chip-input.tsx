@@ -26,7 +26,7 @@ import {
   type RunScope,
   type ValidationIssue,
 } from '@postgear/automation';
-import { cn } from '@postgear/ui';
+import { cn, FIELD_FOCUS_WITHIN, FIELD_FOCUS_WITHIN_ERROR } from '@postgear/ui';
 import type { JSONContent } from '@tiptap/core';
 import { Placeholder } from '@tiptap/extensions';
 import { EditorContent, useEditor } from '@tiptap/react';
@@ -360,10 +360,8 @@ export const ChipInput = forwardRef<ChipInputHandle, ChipInputProps>(function Ch
         <div
           className={cn(
             'pg-editor relative rounded-md border-2 bg-field px-3 py-2 shadow-surfaceSm',
-            'transition-[border-color,box-shadow] duration-150 focus-within:ring-3',
-            invalid
-              ? 'border-actionDanger focus-within:border-actionDanger focus-within:ring-actionDanger/20'
-              : 'border-outline focus-within:border-actionPrimary focus-within:ring-actionPrimary/20',
+            FIELD_FOCUS_WITHIN,
+            invalid ? `border-actionDanger ${FIELD_FOCUS_WITHIN_ERROR}` : 'border-outline',
             insertButton === 'icon' && acceptsData && 'pe-10',
             disabled && 'cursor-not-allowed opacity-50 shadow-none',
             '[&_.ProseMirror]:text-sm',

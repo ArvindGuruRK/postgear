@@ -7,6 +7,7 @@ import {
   pushRecent,
   recentItems,
   searchPicker,
+  splitPopular,
 } from './picker-search';
 
 function catalog(
@@ -113,5 +114,17 @@ describe('searchPicker', () => {
 
   it('returns everything for an empty search', () => {
     expect(searchPicker(items, '   ')).toHaveLength(items.length);
+  });
+});
+
+describe('splitPopular', () => {
+  it('leads with where most workflows reach first and keeps every item', () => {
+    const items = pickerItems(catalog(), { placement: 'next', hasTrigger: true }).filter((item) => item.category === 'logic');
+    const { popular, other } = splitPopular(items);
+    expect(popular.map((item) => item.id)).toEqual(
+      expect.arrayContaining(['logic.ifElse', 'logic.manualReview']),
+    );
+    expect(popular.length + other.length).toBe(items.length);
+    expect(other.some((item) => popular.includes(item))).toBe(false);
   });
 });

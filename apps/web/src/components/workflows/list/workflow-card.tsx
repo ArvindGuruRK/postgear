@@ -6,8 +6,9 @@
  * stage, then its name, its status badges and two muted lines. The steps are
  * the preview the list API returns (`workflow-flow.tsx`).
  *
- * The card opens the builder. The corner menu is a sibling of the link, so it
- * is its own tab stop and a click on it never follows the link.
+ * The card opens the builder. The menu is a sibling of the link, so it is its
+ * own tab stop and a click on it never follows the link. It sits on the name's
+ * row, not the stage's corner, where it would lie on the first step's row.
  */
 import { Badge, cn } from '@postgear/ui';
 import Link from 'next/link';
@@ -78,7 +79,10 @@ export function WorkflowCard({
         </div>
 
         <span className="flex min-w-0 flex-1 flex-col gap-2 p-3">
-          <span className="line-clamp-2 break-words type-ui text-sm text-ink" title={workflow.name}>
+          <span
+            className="line-clamp-2 break-words pe-10 type-ui text-sm text-ink"
+            title={workflow.name}
+          >
             {workflow.name}
           </span>
           <span className="flex flex-wrap items-center gap-1.5">
@@ -104,7 +108,7 @@ export function WorkflowCard({
         </span>
       </Link>
 
-      <span className="absolute end-2 top-2">
+      <span className="absolute end-2 top-58">
         <WorkflowRowMenu
           workflow={workflow}
           variant="secondary"

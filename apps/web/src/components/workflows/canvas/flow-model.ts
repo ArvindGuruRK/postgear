@@ -25,9 +25,9 @@ import {
 } from '@postgear/automation';
 import type { AriaLabelConfig, Edge, Node } from '@xyflow/react';
 import type { Position, Selection } from '../builder/builder-state';
-import { CARD_HEIGHT, CARD_WIDTH } from '../builder/graph-ops';
-import type { RunModel, StepPaint } from '../runs/run-model';
+import { CARD_WIDTH, cardHeight, portLead } from '../builder/graph-ops';
 import { PICKER_CATEGORIES } from '../picker/picker-search';
+import type { RunModel, StepPaint } from '../runs/run-model';
 import { stepBadgeText } from '../runs/run-words';
 
 /** Stripe colours by family. Social steps show the platform's logo on an ink stripe. */
@@ -90,9 +90,9 @@ export const NOTE_PREFIX = 'note:';
  */
 export const EDITOR_ARIA_LABELS: Partial<AriaLabelConfig> = {
   'node.a11yDescription.default':
-    'Press Enter to open this step, and Enter again for the Expanded view. Arrow keys move to the next or previous step. Press Delete to remove it, and Escape to close its panel.',
+    'Press Enter to open this step. Arrow keys move to the next or previous step. Press Delete to remove it.',
   'node.a11yDescription.keyboardDisabled':
-    'Press Enter to open this step, and Enter again for the Expanded view. Arrow keys move to the next or previous step. Press Delete to remove it, and Escape to close its panel.',
+    'Press Enter to open this step. Arrow keys move to the next or previous step. Press Delete to remove it.',
   'node.a11yDescription.ariaLiveMessage': ({ direction }) => `Moved the step ${direction}.`,
   'edge.a11yDescription.default': 'Press Enter to select this line, then Delete to remove it.',
   'minimap.ariaLabel': 'Map of the workflow',
@@ -116,12 +116,12 @@ export interface StepNodeData extends Record<string, unknown> {
   def: NodeDefinition | undefined;
   summary: string;
   issues: ValidationIssue[];
+  /** The tab above the card: "When" for the trigger, else the kind of step ("AI"). */
+  label: string;
   ports: PortSpec[];
   /** Output ports with at least one line, so the others show their "+". */
   usedPorts: string[];
   isTrigger: boolean;
-  /** The tab above the card: "When" for the trigger, else the kind of step ("AI"). */
-  label: string;
   /** Module 08: the step's state in the painted run (absent: not started, or no run). */
   paint?: StepPaint;
 }
@@ -138,6 +138,8 @@ export interface FlowEdgeData extends Record<string, unknown> {
   isError: boolean;
   /** Module 08: absent when no run is painted, or the run has not reached the line. */
   run?: EdgeRunState;
+  /** The straight run past the sticker of a named port (`portLead`). */
+  lead?: number;
 }
 
 /** The line sets of a run model, all a canvas needs to draw its lines. */
@@ -147,30 +149,6 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
 export type NoteFlowNode = Node<NoteNodeData, 'note'>;
 export type CanvasNode = StepFlowNode | NoteFlowNode;
 export type FlowEdge = Edge<FlowEdgeData, 'flow'>;
-
-/**
- * The tab above every card, text only: the kind of step it is ("AI",
- * "Social Channels"), and "When" on the trigger. No numbers: a number goes
- * stale the moment a card is moved.
- */
-export function stepLabels(graph: AutomationGraph): Map<string, string> {
-  const titles = new Map(PICKER_CATEGORIES.map((group) => [group.id, group.title]));
-  const labels = new Map<string, string>();
-  for (const node of graph.nodes) {
-    if (isTriggerType(node.type)) {
-      labels.set(node.key, 'When');
-      continue;
-    }
-    const category = getDefinition(node.type, node.typeVersion)?.category;
-    labels.set(node.key, (category && titles.get(category)) || '');
-  }
-  return labels;
-}
-
-/** A card grows when it has more outputs than fit its height (Paths). */
-export function cardHeight(ports: number): number {
-  return Math.max(CARD_HEIGHT, ports * 40 + 40);
-}
 
 export function issuesByStep(issues: readonly ValidationIssue[]): Map<string, ValidationIssue[]> {
   const map = new Map<string, ValidationIssue[]>();
@@ -205,7 +183,6 @@ export function toFlowNodes(
   }
   const selectedNodes = new Set(options.selection.nodes);
   const selectedNotes = new Set(options.selection.notes);
-  const labels = stepLabels(graph);
 
   const notes: NoteFlowNode[] = graph.notes.map((note) => {
     const id = `${NOTE_PREFIX}${note.id}`;
@@ -224,6 +201,7 @@ export function toFlowNodes(
     };
   });
 
+  const labels = stepLabels(graph);
   const steps: StepFlowNode[] = graph.nodes.map((node) => {
     const ports = outputPortsOf(node);
     const height = cardHeight(ports.length);
@@ -232,10 +210,10 @@ export function toFlowNodes(
       def: getDefinition(node.type, node.typeVersion),
       summary: describeNode(node, options.summary),
       issues: options.issues.get(node.key) ?? [],
+      label: labels.get(node.key) ?? '',
       ports,
       usedPorts: [...(used.get(node.key) ?? [])],
       isTrigger: isTriggerType(node.type),
-      label: labels.get(node.key) ?? '',
     };
     const paint = options.paint?.[node.key];
     if (paint) data.paint = paint;
@@ -318,6 +296,25 @@ export function edgeRunState(
   return undefined;
 }
 
+/**
+ * The tab above every card, text only: the kind of step it is ("AI",
+ * "Social Channels"), and "When" on the trigger. No numbers: a number goes
+ * stale the moment a card is moved.
+ */
+export function stepLabels(graph: AutomationGraph): Map<string, string> {
+  const titles = new Map(PICKER_CATEGORIES.map((group) => [group.id, group.title]));
+  const labels = new Map<string, string>();
+  for (const node of graph.nodes) {
+    if (isTriggerType(node.type)) {
+      labels.set(node.key, 'When');
+      continue;
+    }
+    const category = getDefinition(node.type, node.typeVersion)?.category;
+    labels.set(node.key, (category && titles.get(category)) || '');
+  }
+  return labels;
+}
+
 export function toFlowEdges(
   graph: AutomationGraph,
   selection: Selection,
@@ -325,10 +322,16 @@ export function toFlowEdges(
 ): FlowEdge[] {
   const selected = new Set(selection.edges);
   const names = new Map(graph.nodes.map((node) => [node.key, node.name]));
+  const byKey = new Map(graph.nodes.map((node) => [node.key, node]));
   return graph.edges.map((edge) => {
     const state = edgeRunState(run, edge.id);
     const data: FlowEdgeData = { edge, isError: edge.sourcePort === 'error' };
     if (state) data.run = state;
+    if (edge.sourcePort !== 'out') {
+      const source = byKey.get(edge.source);
+      const port = source && outputPortsOf(source).find((one) => one.id === edge.sourcePort);
+      if (port) data.lead = portLead(port.label);
+    }
     return {
       id: edge.id,
       type: 'flow',

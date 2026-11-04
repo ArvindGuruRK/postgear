@@ -36,6 +36,7 @@ import {
   sameJson,
   setConfigPath,
   snap,
+  STEP_GAP_Y,
   updateNode,
 } from './graph-ops';
 
@@ -220,7 +221,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       if (!source || !target || isTriggerType(action.stepType)) return state;
       const position = {
         x: (source.position.x + target.position.x) / 2,
-        y: (source.position.y + target.position.y) / 2 + 96,
+        y: (source.position.y + target.position.y) / 2 + STEP_GAP_Y,
       };
       const step = createStep(state.graph, action.stepType, action.key, position, action.config);
       if (!step) return state;

@@ -51,8 +51,11 @@ import {
   DialogHeader,
   DialogTitle,
   MotionIcon,
+  SEGMENT_FRAME,
+  SEGMENT_WORDS,
   Skeleton,
   Stack,
+  segment,
   toast,
 } from '@postgear/ui';
 import Link from 'next/link';
@@ -305,7 +308,7 @@ export function AppearanceSettings({
             <div
               role="group"
               aria-label="Colour mode"
-              className="inline-flex items-center gap-1 rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalSm"
+              className={cn('inline-flex max-w-full flex-wrap items-center', SEGMENT_FRAME)}
             >
               {MODES.map((option) => {
                 const active = option.value === mode;
@@ -322,14 +325,7 @@ export function AppearanceSettings({
                         void save({ mode: option.value });
                       }
                     }}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-md px-4 py-2 type-ui text-xs outline-none transition-colors',
-                      'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-                      'disabled:pointer-events-none',
-                      active
-                        ? 'bg-actionPrimary text-onActionPrimary'
-                        : 'text-ink hover:bg-actionPrimary/10',
-                    )}
+                    className={cn(segment(active), SEGMENT_WORDS)}
                   >
                     <MotionIcon icon={option.icon} className="h-4 w-4" />
                     {option.label}
@@ -338,7 +334,7 @@ export function AppearanceSettings({
               })}
             </div>
           ) : (
-            <Skeleton className="h-11 w-72" />
+            <Skeleton className="h-10 w-72" />
           )}
         </CardContent>
       </Card>

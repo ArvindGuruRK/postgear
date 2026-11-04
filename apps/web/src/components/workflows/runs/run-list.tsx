@@ -5,15 +5,30 @@
  * newest first, 25 a page, the next page loading as the end scrolls into
  * view. Each row: the status sticker in words, Test or Live, the trigger
  * phrase, when it started (exact on hover), how long it took, the version
- * of a live run and the credits it used. Filters: All, Succeeded, Failed,
- * Waiting, Test.
+ * of a live run and the credits it used. The header (after n8n's executions
+ * list, 2026-11-03): Auto Refresh, Refresh, and a filter menu: All, Succeeded,
+ * Failed, Waiting, Test.
  */
+import { ListFilterIcon } from '@animateicons/react/lucide/list-filter-icon';
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
-import { Badge, Button, cn, MotionIcon, Skeleton, Text, TooltipHint } from '@postgear/ui';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  MotionIcon,
+  Skeleton,
+  Text,
+  TooltipHint,
+} from '@postgear/ui';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { listRuns } from '@/lib/workflows-api';
 import type { RunSummary, WorkspaceCatalog } from '@/types/workflows';
-import { Segmented } from '../fields/segmented';
 import {
   appendPage,
   filterQuery,
@@ -36,7 +51,11 @@ export interface RunListProps {
   reloadKey: number;
   /** The open run's live state, so its row keeps up. */
   patch: RunPatch | null;
+  /** Whether this workflow has no runs at all, for the empty state beside the list. */
+  onEmptyChange?: (empty: boolean) => void;
 }
+
+const AUTO_REFRESH_MS = 5_000;
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -98,7 +117,10 @@ export function RunList({
   onSelect,
   reloadKey,
   patch,
+  onEmptyChange,
 }: RunListProps) {
+  const autoId = useId();
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [filter, setFilter] = useState<RunFilter>('all');
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -106,10 +128,21 @@ export function RunList({
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreFailed, setMoreFailed] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pages, setPages] = useState(1);
   const request = useRef(0);
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const lastFilter = useRef<RunFilter>(filter);
+  const opened = useRef(false);
+
+  // Beside the list, the newest run opens by itself rather than leaving an empty pane.
+  useEffect(() => {
+    if (opened.current || state !== 'ready') return;
+    opened.current = true;
+    if (!selectedId && runs[0] && window.matchMedia?.('(min-width: 1024px)').matches) {
+      onSelect(runs[0].id);
+    }
+  }, [state, runs, selectedId, onSelect]);
 
   // The first page: again on a filter change (cleared at once), a reload
   // or a refresh (the old rows stay until the new ones arrive).
@@ -129,6 +162,7 @@ export function RunList({
         if (token !== request.current) return;
         setRuns(page.runs);
         setNextCursor(page.nextCursor);
+        setPages(1);
         setState('ready');
       })
       .catch(() => {
@@ -147,6 +181,7 @@ export function RunList({
         if (token !== request.current) return;
         setRuns((current) => appendPage(current, page.runs));
         setNextCursor(page.nextCursor);
+        setPages((count) => count + 1);
       })
       .catch(() => {
         if (token === request.current) setMoreFailed(true);
@@ -172,29 +207,82 @@ export function RunList({
     return () => observer.disconnect();
   }, [nextCursor, moreFailed, loadMore]);
 
+  // A refresh replaces what is loaded with the first page, so it waits while more are open:
+  // the list must not jump under someone who has scrolled down.
+  useEffect(() => {
+    if (!autoRefresh || pages > 1) return;
+    const timer = setInterval(() => {
+      if (!document.hidden) setRefreshKey((value) => value + 1);
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [autoRefresh, pages]);
+
   const shown = useMemo(() => patchRuns(runs, patch), [runs, patch]);
+
+  const hasNoRuns = state === 'ready' && filter === 'all' && shown.length === 0;
+  useEffect(() => {
+    onEmptyChange?.(hasNoRuns);
+  }, [hasNoRuns, onEmptyChange]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b-2 border-outline p-3">
-        <Segmented
-          label="Show runs"
-          options={RUN_FILTERS}
-          value={filter}
-          onValueChange={setFilter}
-          className="min-w-0"
+      <div className="flex h-14 shrink-0 items-center gap-1 border-b-2 border-outline px-3">
+        <Checkbox
+          id={autoId}
+          checked={autoRefresh}
+          onCheckedChange={(value) => setAutoRefresh(value === true)}
         />
+        <label htmlFor={autoId} className="me-auto ms-2 font-sans text-sm font-medium text-ink">
+          Auto refresh
+        </label>
         <TooltipHint label="Refresh Runs">
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             aria-label="Refresh Runs"
-            className="ms-auto h-9 w-9 shrink-0 px-0"
+            className="h-9 w-9 shrink-0 px-0"
             onClick={() => setRefreshKey((value) => value + 1)}
           >
             <MotionIcon icon={RefreshCwIcon} className="h-4 w-4" />
           </Button>
         </TooltipHint>
+        <DropdownMenu>
+          <TooltipHint label="Filter Runs">
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={
+                  filter === 'all'
+                    ? 'Filter runs'
+                    : `Filter runs: ${RUN_FILTERS.find((one) => one.value === filter)?.label}`
+                }
+                data-testid="run-filter"
+                className="relative h-9 w-9 shrink-0 px-0"
+              >
+                <MotionIcon icon={ListFilterIcon} className="h-4 w-4" />
+                {filter === 'all' ? null : (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-actionPrimary"
+                  />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipHint>
+          <DropdownMenuContent align="end">
+            <DropdownMenuRadioGroup
+              value={filter}
+              onValueChange={(value) => setFilter(value as RunFilter)}
+            >
+              {RUN_FILTERS.map((option) => (
+                <DropdownMenuRadioItem key={option.value} value={option.value}>
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="run-list">

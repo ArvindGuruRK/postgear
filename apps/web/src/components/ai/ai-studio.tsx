@@ -22,7 +22,6 @@
 import { MessageSquareIcon } from '@animateicons/react/lucide/message-square-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
-  cn,
   ErrorState,
   MotionIcon,
   PageActions,
@@ -37,7 +36,6 @@ import { useEffect, useState } from 'react';
 import type { AiCredits, AiStatus } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import { useWorkspace } from '../navigation/workspace-provider';
-import { SEGMENTED_LIST, SEGMENTED_TRIGGER } from './ai-ui';
 import { AiUnavailable } from './ai-unavailable';
 import { CopilotChat } from './copilot-chat';
 import { CreditsMeter } from './credits-meter';
@@ -130,17 +128,17 @@ export function AiStudio({
     >
       {/* The page's actions row: the mode on the left, the balance both modes spend on the right. */}
       <PageActions className="items-end justify-between gap-4">
-        <TabsList aria-label="Mode" className={cn(SEGMENTED_LIST, 'h-12 w-full sm:w-auto')}>
+        <TabsList aria-label="Mode" className="w-full sm:w-auto">
           <TabsTrigger
             value="generate"
-            className={cn(SEGMENTED_TRIGGER, 'h-10 flex-1 gap-2 px-5 sm:flex-none')}
+            className="flex-1 sm:flex-none"
           >
             <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
             Generate
           </TabsTrigger>
           <TabsTrigger
             value="copilot"
-            className={cn(SEGMENTED_TRIGGER, 'h-10 flex-1 gap-2 px-5 sm:flex-none')}
+            className="flex-1 sm:flex-none"
           >
             <MotionIcon icon={MessageSquareIcon} className="h-4 w-4" />
             Copilot

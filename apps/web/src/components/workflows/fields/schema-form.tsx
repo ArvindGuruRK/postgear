@@ -174,11 +174,11 @@ function FieldFrame({
   if (mode === 'beside') {
     return (
       <div {...attr} className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-3">
-          <Control {...props} />
+        <div className="flex items-center justify-between gap-3">
           <FormLabel htmlFor={ids.control} id={ids.label} required={spec.required}>
             {spec.label}
           </FormLabel>
+          <Control {...props} />
         </div>
         {line}
       </div>

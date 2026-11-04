@@ -168,7 +168,7 @@ export function ReviewCard({ runId, step, onAnswered, autoFocus, className }: Re
   return (
     <section aria-label={`${step.nodeName} review`} className={frame} data-testid="review-card">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">Waiting For Review</Badge>
+        <Badge variant="accent">Waiting For Review</Badge>
         <Text size="sm" as="span" muted>
           {reviewExpiryText(step.startedAt)}
         </Text>

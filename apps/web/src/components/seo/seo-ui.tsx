@@ -17,8 +17,6 @@ import type { SeoCategory } from '@/types/seo';
 export {
   AnalyticsPanel as SeoPanel,
   PanelHeader,
-  SEGMENTED_LIST,
-  SEGMENTED_TRIGGER,
 } from '../analytics/analytics-ui';
 
 /** What each score covers, in the words of its checks (`packages/seo-engine`). */

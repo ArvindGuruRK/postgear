@@ -84,16 +84,15 @@ describe('ExpandedView', () => {
 
   it('has no previous step on the trigger and no next step on the last step', () => {
     const first = renderView('published');
-    expect(previousButton().disabled).toBe(true);
-    expect(nextButton().disabled).toBe(false);
+    expect(screen.queryByTestId('expanded-previous')).toBeNull();
     fireEvent.click(nextButton());
     expect(first.onNavigate).toHaveBeenCalledWith('fields');
   });
 
   it('stops at the last step', () => {
     renderView('slack');
-    expect(nextButton().disabled).toBe(true);
-    expect(previousButton().disabled).toBe(false);
+    expect(screen.queryByTestId('expanded-next')).toBeNull();
+    expect(previousButton()).toBeTruthy();
   });
 
   it('shows the Input, Settings and Output columns, with nothing open when no step is', () => {

@@ -17,7 +17,7 @@ import {
 } from '@postgear/automation';
 import { ApiError } from '@/lib/api';
 import type { AutomationStatus, VersionSummary, WorkspaceCatalog } from '@/types/workflows';
-import { upcomingRuns } from '../fields/schedule-model';
+import { type UpcomingRun, upcomingRuns } from '../fields/schedule-model';
 import { ago, WORKFLOW_STATUS } from '../list/workflows-view-model';
 
 type BadgeVariant = (typeof WORKFLOW_STATUS)[AutomationStatus]['variant'];
@@ -107,6 +107,25 @@ export function activationIssues(
   return [...issues, ...extra];
 }
 
+/**
+ * The dialog's rows: one per step, the first issue being where a click lands. Issues that belong
+ * to no step each keep their own row.
+ */
+export function issueRows(
+  issues: readonly ValidationIssue[],
+): { issue: ValidationIssue; message: string }[] {
+  const rows: { issue: ValidationIssue; count: number }[] = [];
+  for (const issue of issues) {
+    const row = issue.nodeKey ? rows.find((r) => r.issue.nodeKey === issue.nodeKey) : undefined;
+    if (row) row.count += 1;
+    else rows.push({ issue, count: 1 });
+  }
+  return rows.map(({ issue, count }) => ({
+    issue,
+    message: count === 1 ? issue.message : `${count} things to fix.`,
+  }));
+}
+
 export type ActivationContent =
   | { kind: 'issues'; issues: ValidationIssue[] }
   | {
@@ -116,7 +135,7 @@ export type ActivationContent =
       /** "Uses about 12 AI credits per run.", or null without AI steps. */
       credits: string | null;
       /** A Schedule's next three runs in its own zone; empty otherwise. */
-      scheduleRuns: string[];
+      scheduleRuns: UpcomingRun[];
       /** Posts can go out without a review: the extra tick. */
       needsTick: boolean;
     };
@@ -129,7 +148,11 @@ export function creditsText(credits: number): string | null {
 }
 
 /** The next three runs of a Schedule trigger, or nothing for any other trigger. */
-export function scheduleRunsOf(graph: AutomationGraph, nowIso: string, locale?: string): string[] {
+export function scheduleRunsOf(
+  graph: AutomationGraph,
+  nowIso: string,
+  locale?: string,
+): UpcomingRun[] {
   const trigger = triggerOf(graph);
   if (trigger?.type !== 'trigger.schedule') return [];
   const parsed = scheduleConfigSchema.safeParse(trigger.config);

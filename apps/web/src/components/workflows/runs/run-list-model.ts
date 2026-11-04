@@ -16,7 +16,7 @@ export type BadgeVariant = 'primary' | 'secondary' | 'danger' | 'accent' | 'succ
 export const TONE_BADGE: Record<RunTone, BadgeVariant> = {
   neutral: 'outline',
   running: 'primary',
-  waiting: 'secondary',
+  waiting: 'accent',
   success: 'success',
   danger: 'danger',
 };
@@ -47,7 +47,10 @@ export function filterQuery(filter: RunFilter): Omit<RunListQuery, 'cursor'> {
   }
 }
 
-export const NO_RUNS = 'No runs yet. Test the workflow and its runs show up here.';
+/** `AUTOMATION_RUN_RETENTION_DAYS` in `@postgear/scheduling`, which the web app does not import. */
+export const RUN_RETENTION_DAYS = 30;
+export const RUNS_EMPTY_NOTE = `Test the workflow and its runs show up here. Runs are kept for ${RUN_RETENTION_DAYS} days.`;
+export const NO_RUNS = 'No runs yet.';
 export const NO_MATCHING_RUNS = 'No runs match this filter.';
 export const RUNS_NOT_LOADED = 'The runs could not be loaded.';
 

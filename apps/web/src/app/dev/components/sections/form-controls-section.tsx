@@ -1,8 +1,13 @@
 'use client';
 
+import { CalendarCheckIcon } from '@animateicons/react/lucide/calendar-check-icon';
+import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
+import { SunIcon } from '@animateicons/react/lucide/sun-icon';
 import {
   Calendar,
   Checkbox,
+  ChoiceTiles,
+  ChoiceTilesMany,
   Combobox,
   type ComboboxOption,
   DatePicker,
@@ -29,6 +34,7 @@ import {
   SelectValue,
   Slider,
   Textarea,
+  TimePicker,
   Toggle,
 } from '@postgear/ui';
 import { useState } from 'react';
@@ -64,6 +70,9 @@ export function FormControlsSection() {
   const [laterDate, setLaterDate] = useState<Date | undefined>();
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [dateTime, setDateTime] = useState<Date | null>(null);
+  const [time, setTime] = useState<string | null>('09:00');
+  const [often, setOften] = useState('weekly');
+  const [days, setDays] = useState<string[]>(['mon', 'wed']);
 
   const multiOptions: MultiSelectOption[] = PLATFORM_OPTIONS;
 
@@ -196,6 +205,37 @@ export function FormControlsSection() {
           onValueChange={setDateTime}
           className="w-72"
         />
+      </Row>
+      <Row label="Time Picker">
+        <TimePicker label="Time" value={time} onValueChange={setTime} className="w-44" />
+      </Row>
+      <Row label="Choice Tiles">
+        <div className="flex w-full max-w-lg flex-col gap-3">
+          <ChoiceTiles
+            label="How often"
+            options={[
+              { value: 'daily', label: 'Daily', icon: SunIcon },
+              { value: 'weekly', label: 'Weekly', icon: CalendarDaysIcon },
+              { value: 'monthly', label: 'Monthly', icon: CalendarCheckIcon },
+            ]}
+            value={often}
+            onValueChange={setOften}
+          />
+          <ChoiceTilesMany
+            label="Days"
+            options={[
+              { value: 'mon', label: 'Monday', short: 'Mon' },
+              { value: 'tue', label: 'Tuesday', short: 'Tue' },
+              { value: 'wed', label: 'Wednesday', short: 'Wed' },
+              { value: 'thu', label: 'Thursday', short: 'Thu' },
+              { value: 'fri', label: 'Friday', short: 'Fri' },
+            ]}
+            values={days}
+            onToggle={(day) =>
+              setDays((on) => (on.includes(day) ? on.filter((d) => d !== day) : [...on, day]))
+            }
+          />
+        </div>
       </Row>
       <Row label="Date Range Picker">
         <DateRangePicker

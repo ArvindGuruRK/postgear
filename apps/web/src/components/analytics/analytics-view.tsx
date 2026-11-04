@@ -67,7 +67,7 @@ import { useWorkspace } from '../navigation/workspace-provider';
 import { useMounted } from '../posts/use-mounted';
 import { AnalyticsStats, AnalyticsStatsSkeleton } from './analytics-stats';
 import { AnalyticsSyncPill } from './analytics-sync-pill';
-import { AnalyticsPanel, PanelHeader, SEGMENTED_LIST, SEGMENTED_TRIGGER } from './analytics-ui';
+import { AnalyticsPanel, PanelHeader } from './analytics-ui';
 import { type AnalyticsFilters, hasMetrics, lacksMetrics } from './analytics-view-model';
 import { ChannelsTable } from './channels-table';
 import { PostAnalyticsDialog } from './post-analytics-dialog';
@@ -180,13 +180,13 @@ export function AnalyticsView({
             <TabsList
               aria-label="Range"
               data-testid="analytics-range"
-              className={cn(SEGMENTED_LIST, 'flex w-full sm:inline-flex sm:w-auto')}
+              className="flex w-full sm:inline-flex sm:w-auto"
             >
               {ANALYTICS_RANGES.map((range) => (
                 <TabsTrigger
                   key={range}
                   value={String(range)}
-                  className={cn(SEGMENTED_TRIGGER, 'flex-1 sm:flex-none')}
+                  className="flex-1 sm:flex-none"
                 >
                   {range} Days
                 </TabsTrigger>

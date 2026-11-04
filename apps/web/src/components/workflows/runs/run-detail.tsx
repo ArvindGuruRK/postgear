@@ -45,6 +45,7 @@ import type {
   WorkspaceCatalog,
 } from '@/types/workflows';
 import { RunCanvas } from '../canvas/run-canvas';
+import { ResizeHandle } from '../panel/resize-handle';
 import {
   DEBUG_PINNED,
   debugErrorMessage,
@@ -124,6 +125,7 @@ export function RunDetail({
   const rows = useRef(new Map<string, HTMLLIElement>());
   const reviewOpened = useRef(false);
   const alsoId = useId();
+  const [listHeight, setListHeight] = useState(264);
 
   const terminal = model ? isTerminalRun(model.runStatus) : false;
 
@@ -338,10 +340,8 @@ export function RunDetail({
     model.runStatus === 'RUNNING' || model.runStatus === 'WAITING' || model.runStatus === 'QUEUED';
 
   return (
-    <div
-      className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
-      data-testid="run-detail"
-    >
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="run-detail">
+      <div className="flex shrink-0 flex-col gap-3 border-b-2 border-outline bg-secondary p-3">
       {backButton}
 
       <div className="flex flex-wrap items-start gap-3">
@@ -403,23 +403,41 @@ export function RunDetail({
       {model.error ? (
         <Alert variant={words.tone === 'danger' ? 'danger' : 'default'}>{model.error}</Alert>
       ) : null}
+      </div>
 
-      {model.graph ? (
-        <RunCanvas
-          graph={model.graph}
-          run={model}
-          catalog={catalog}
-          selectedKey={selectedKey}
-          onSelectStep={onSelectStep}
-          className="h-72 w-full shrink-0 overflow-hidden rounded-card border-2 border-outline lg:h-96"
-        />
-      ) : (
-        <Text size="sm" muted>
-          This run has no saved steps to draw.
-        </Text>
-      )}
+      <div className="flex min-h-0 flex-1">
+        {model.graph ? (
+          <RunCanvas
+            graph={model.graph}
+            run={model}
+            catalog={catalog}
+            selectedKey={selectedKey}
+            onSelectStep={onSelectStep}
+            className="min-h-0 flex-1 bg-hatch"
+          />
+        ) : (
+          <Text size="sm" muted className="p-4">
+            This run has no saved steps to draw.
+          </Text>
+        )}
+      </div>
 
-      <section aria-labelledby={`${alsoId}-steps`} className="flex flex-col gap-3">
+      <ResizeHandle
+        label="Resize Steps"
+        value={listHeight}
+        min={120}
+        max={560}
+        step={24}
+        grows="up"
+        valueText={`Steps ${listHeight} pixels tall`}
+        onChange={setListHeight}
+        className="-mb-1 w-full"
+      />
+      <section
+        aria-labelledby={`${alsoId}-steps`}
+        style={{ height: listHeight }}
+        className="flex shrink-0 flex-col gap-3 overflow-y-auto border-t-2 border-outline bg-secondary p-3"
+      >
         <h3 id={`${alsoId}-steps`} className="type-heading text-lg text-ink">
           Steps
         </h3>

@@ -73,6 +73,17 @@
   --color-field: var(--color-field);
   /* A box you read inside a card, panel or dialog: see colors.css. */
   --color-inset: var(--color-inset);
+  /* The Raw data view's syntax colours: see colors.css. */
+  --color-codeKey: var(--color-code-key);
+  --color-codeString: var(--color-code-string);
+  --color-codeNumber: var(--color-code-number);
+  --color-codeKeyword: var(--color-code-keyword);
+  --color-codePunctuation: var(--color-code-punctuation);
+  --color-codeLineNumber: var(--color-code-line-number);
+  --color-codeGuide: var(--color-code-guide);
+  --color-codeBracket1: var(--color-code-bracket-1);
+  --color-codeBracket2: var(--color-code-bracket-2);
+  --color-codeBracket3: var(--color-code-bracket-3);
 
   /* Neubrutalism structural tokens (Sprint 0): see
      docs/sprint-documents/sprint-00-design-system.md and the header comment

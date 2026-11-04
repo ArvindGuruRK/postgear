@@ -1,33 +1,33 @@
 'use client';
 
 /**
- * The step card (blueprint 4.1 and 4.2): PostGear's card language on n8n's
- * compact layout. 320 px wide and 120 px tall for every step (the trigger
- * too), one 12px corner, no edge stripe and no shadow, a 56 px icon tile, the
- * name and a one-line summary from the catalog.
+ * The step card (blueprint 4.1 and 4.2): 320 by 120 for every step, one 12px
+ * corner, no edge stripe and no shadow, the step's coloured icon, its name and
+ * a one-line summary from the catalog. A tab behind the top edge names its kind
+ * ("When" in yellow on the trigger). A step with three or more outputs grows
+ * taller.
  *
- * - Every card carries a tab behind its top edge: a yellow "When" on the trigger
- *   (which has no input), a quiet kind ("AI", "Logic") on the rest.
- * - Turned off: faded, the name struck through, an Off sticker.
- * - Issues: a corner triangle with a "!" (never colour alone) and the
- *   first issue as its tooltip.
- * - Pinned test data: a pin sticker on the top edge (n8n); a double-click
- *   opens the Expanded view.
- * - Outputs: labelled ports carry a sticker (On Error in red); an output
- *   with no line shows a short stem with a "+" that opens the picker.
+ * - A ring touching the card's border, with no gap (the owner's call of 2026-11-04,
+ *   workflow-canvas.css): grey under the pointer, the icon's colour when selected.
+ * - Status marks are bare icons in the bottom-right corner, inside the card
+ *   (the owner's call of 2026-11-03, after n8n): the run's result, Live In
+ *   Tests, the pin, turned off, and last, in the very corner, the issue sign.
+ *   Each says itself in a tooltip. The issue sign lists what is wrong and lands
+ *   on the first problem when clicked.
+ * - Turned off: faded, the name struck through.
+ * - Outputs: labelled ports carry a sticker (On Error and Rejected in red,
+ *   Approved in green); an output with no line shows a short stem with a "+"
+ *   that opens the picker.
  * - While a line is being drawn, inputs that fit glow and the rest fade.
- * - Zoomed out, detail drops: no summary below 60%, name and icon only
- *   below 40% (read from React Flow's store, not a timer).
+ * - Zoomed out, detail drops: no summary below 60%, name and icon only below
+ *   40% (read from React Flow's store, not a timer).
  *
  * Module 08 (blueprint 7.1 and 7.2):
- * - A painted run dresses the card by state (`step-paint.ts`) and hangs a
- *   result badge on its bottom-right edge: an icon, the state in words and
- *   the duration. Clicking it opens the step on that run.
- * - Running steps get marching dashes round the icon tile and a pulsing
- *   stripe; a step waiting for review pulses amber. Reduced motion keeps
- *   the looks and drops the motion (workflow-canvas.css).
- * - Steps this builder's tests send for real wear a red Live In Tests
- *   sticker, and the hover toolbar offers Test Step.
+ * - A painted run dresses the card by state (`step-paint.ts`). Its result mark
+ *   opens the step on that run.
+ * - Running steps get marching dashes round the icon, which pulses; the border
+ *   of a step waiting for review pulses amber. Reduced motion keeps the looks
+ *   and drops the motion (workflow-canvas.css).
  * - Outside the builder (a run or a version preview) or on a read-only
  *   canvas, the card edits nothing: no toolbar, no menu, no "+", no
  *   double-click.
@@ -40,7 +40,6 @@ import { PowerIcon } from '@animateicons/react/lucide/power-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { canConnect, type PortId } from '@postgear/automation';
 import {
-  Badge,
   Button,
   cn,
   DropdownMenu,
@@ -58,26 +57,17 @@ import {
   useConnection,
   useStore,
 } from '@xyflow/react';
-import {
-  Check,
-  CircleAlert,
-  CircleStop,
-  Clock,
-  LoaderCircle,
-  type LucideIcon,
-  Pause,
-  Pin,
-  SkipForward,
-  TriangleAlert,
-  X,
-} from 'lucide-react';
-import { memo, type ReactNode, useEffect, useRef, useState } from 'react';
-import { StepGlyph } from '../list/step-glyph';
+import { Pin, PowerOff, Radio, TriangleAlert } from 'lucide-react';
+import { type CSSProperties, memo, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useOptionalBuilder } from '../builder/builder-context';
+import { issueLines } from '../builder/builder-view-model';
+import { CARD_WIDTH, cardHeight, PORT_PITCH } from '../builder/graph-ops';
+import { ShortcutKeys } from '../builder/shortcut-keys';
+import { StepGlyph, stepColour } from '../list/step-glyph';
 import { useCanvasMode } from './canvas-mode';
-import { CARD_WIDTH } from '../builder/graph-ops';
-import { cardHeight, type StepFlowNode } from './flow-model';
-import { type BadgeIcon, type BadgeTone, badgeLabel, paintLook } from './step-paint';
+import type { StepFlowNode } from './flow-model';
+import { RunGlyph } from './run-glyph';
+import { badgeLabel, paintLook } from './step-paint';
 
 export type ZoomDetail = 'full' | 'compact' | 'icon';
 
@@ -88,8 +78,9 @@ export const zoomDetail = (state: ReactFlowState): ZoomDetail => {
 
 const HOVER_GRACE_MS = 250;
 
-function portTop(index: number, count: number): string {
-  return `${((index + 1) / (count + 1)) * 100}%`;
+/** Outputs sit a fixed pitch apart, centred on the card, so two fit the one card size. */
+function portTop(index: number, count: number, height: number): string {
+  return `${height / 2 + (index - (count - 1) / 2) * PORT_PITCH}px`;
 }
 
 /**
@@ -98,45 +89,71 @@ function portTop(index: number, count: number): string {
  */
 const HANDLE = 'pg-handle h-4! w-4! rounded-full! border-2! border-outline! bg-ink!';
 
-/** A button of the hover toolbar: a centred 28px square, muted until the pointer is on it. */
-const TOOL = 'h-7 w-7 rounded-md px-0 text-ink/60 transition-colors';
+/** A button of the hover toolbar: a centred 32px square, muted until the pointer is on it. */
+const TOOL = 'h-8 w-8 rounded-md px-0 text-ink/80 transition-colors';
 
 /** Hover for every toolbar button but Delete: the dark page shade and full ink, no colour. */
 const TOOL_NEUTRAL = 'hover:bg-primary hover:text-ink';
 
 /** The small stickers on a card's edges. */
 const STICKER =
-  'rounded-md border-2 border-outline px-2 py-1 font-sans text-xs font-bold leading-none';
+  'flex items-center whitespace-nowrap rounded-md border-2 border-outline px-2 py-1 font-sans text-xs font-bold leading-none';
 
-const BADGE_ICONS: Record<BadgeIcon, LucideIcon> = {
-  check: Check,
-  cross: X,
-  pause: Pause,
-  alert: CircleAlert,
-  clock: Clock,
-  spinner: LoaderCircle,
-  skip: SkipForward,
-  stop: CircleStop,
+/** A branch's sticker, coloured where its name is an outcome. */
+const PORT_STICKER: Partial<Record<PortId, string>> = {
+  error: 'bg-actionDanger text-onActionLight',
+  rejected: 'bg-actionDanger text-onActionLight',
+  approved: 'bg-actionSuccess text-onActionLight',
 };
 
-const BADGE_VARIANT: Record<BadgeTone, 'success' | 'danger' | 'accent' | 'primary' | 'outline'> = {
-  success: 'success',
-  danger: 'danger',
-  accent: 'accent',
-  primary: 'primary',
-  neutral: 'outline',
-};
+/** The most issue lines a sign's tooltip lists. */
+const ISSUE_LINES = 4;
+
+/**
+ * A status mark: a bare icon that says itself in a tooltip, to hover or tab to. Zoomed out it
+ * grows in flow px, so it can still be seen.
+ */
+function Mark({
+  label,
+  testId,
+  state,
+  className,
+  children,
+}: {
+  label: string;
+  testId?: string;
+  state?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <TooltipHint label={label}>
+      <span
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the mark's meaning is reachable by keyboard
+        tabIndex={0}
+        data-testid={testId}
+        data-state={state}
+        className={cn(
+          'nodrag flex shrink-0 items-center rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing',
+          className,
+        )}
+      >
+        {children}
+        <span className="sr-only">{label}</span>
+      </span>
+    </TooltipHint>
+  );
+}
 
 /**
  * Where the hover toolbar sits above a card, in flow px: the tab's 30px above the border plus
  * an 8px margin. The toolbar is a child of the card, not React Flow's NodeToolbar (TriForms
  * does the same): a NodeToolbar lives in screen pixels, so at 25% zoom it was a 208px bar over
- * an 80px card, and every attempt to scale it by the zoom left it the wrong size somewhere. Inside
- * the card it is part of the canvas, so it is in proportion to its card at every zoom, by construction.
+ * an 80px card. Inside the card it is part of the canvas, so it keeps its proportion at every zoom.
  */
 const TOOLBAR_RISE = 38;
 
-export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps<StepFlowNode>) {
+export const StepCard = memo(function StepCard({ id, data }: NodeProps<StepFlowNode>) {
   const builder = useOptionalBuilder();
   const mode = useCanvasMode();
   // The builder's editing hands: none on a read-only canvas.
@@ -148,6 +165,7 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
   const { node, def, issues, ports, usedPorts, isTrigger, paint } = data;
   const height = cardHeight(ports.length);
   const firstIssue = issues[0];
+  const issueNotes = issueLines(def, issues);
   const canDisable = def?.canDisable ?? true;
   const pinned = editor?.pinned.has(id) ?? false;
   const liveInTests = editor?.liveInTests?.has(id) ?? false;
@@ -187,137 +205,141 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
 
   const toolbar = editor ? (
     hover && !connection.inProgress ? (
-    // biome-ignore lint/a11y/noStaticElementInteractions: hover keeps the toolbar open, keyboard users use the menu
-    <div
-      data-testid="step-toolbar"
-      style={{ marginBottom: TOOLBAR_RISE }}
-      onMouseEnter={enter}
-      onMouseLeave={exit}
-      // The pseudo-element is a bridge down to the card, so the pointer never crosses a gap.
-      className="nodrag nopan absolute bottom-full left-1/2 z-40 -translate-x-1/2 before:absolute before:inset-x-0 before:top-full before:h-[38px] before:content-['']"
-    >
-      <div className="flex items-center gap-0.5 rounded-lg border-2 border-outline bg-secondary p-1">
-        {/* Compact, like TriForms': muted icons, full ink on hover, and red for Delete alone. */}
-        {editor.testStep ? (
-          <TooltipHint label="Test Step" compact hidden={detail !== 'full'}>
-            <Button
-              variant="ghost"
-              className={cn(TOOL, TOOL_NEUTRAL)}
-              aria-label={`Test ${node.name}`}
-              onClick={() => editor.testStep?.(id)}
+      // biome-ignore lint/a11y/noStaticElementInteractions: hover keeps the toolbar open, keyboard users use the menu
+      <div
+        data-testid="step-toolbar"
+        style={{ marginBottom: TOOLBAR_RISE }}
+        onMouseEnter={enter}
+        onMouseLeave={exit}
+        // The pseudo-element is a bridge down to the card, so the pointer never crosses a gap.
+        className="nodrag nopan absolute bottom-full left-1/2 z-40 -translate-x-1/2 before:absolute before:inset-x-0 before:top-full before:h-[38px] before:content-['']"
+      >
+        <div className="flex items-center gap-0.5 rounded-lg border-2 border-outline bg-secondary p-1">
+          {/* Compact, like TriForms': muted icons, full ink on hover, and red for Delete alone. */}
+          {editor.testStep ? (
+            <TooltipHint label="Test Step" compact hidden={detail !== 'full'}>
+              <Button
+                variant="ghost"
+                className={cn(TOOL, TOOL_NEUTRAL)}
+                aria-label={`Test ${node.name}`}
+                onClick={() => editor.testStep?.(id)}
+              >
+                <MotionIcon icon={PlayIcon} className="h-4 w-4" />
+              </Button>
+            </TooltipHint>
+          ) : null}
+          {canDisable ? (
+            <TooltipHint
+              label={node.disabled ? 'Turn On' : 'Turn Off'}
+              shortcut={<ShortcutKeys keys={['D']} />}
+              compact
+              hidden={detail !== 'full'}
             >
-              <MotionIcon icon={PlayIcon} className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipHint>
-        ) : null}
-        {canDisable ? (
+              <Button
+                variant="ghost"
+                className={cn(TOOL, TOOL_NEUTRAL)}
+                aria-label={node.disabled ? `Turn on ${node.name}` : `Turn off ${node.name}`}
+                onClick={() => editor.dispatch({ type: 'toggleDisabled', keys: [id] })}
+              >
+                <MotionIcon icon={PowerIcon} className="h-4 w-4" />
+              </Button>
+            </TooltipHint>
+          ) : null}
+          {isTrigger ? null : (
+            <TooltipHint
+              label="Duplicate"
+              shortcut={<ShortcutKeys keys={['Ctrl', 'D']} />}
+              compact
+              hidden={detail !== 'full'}
+            >
+              <Button
+                variant="ghost"
+                className={cn(TOOL, TOOL_NEUTRAL)}
+                aria-label={`Duplicate ${node.name}`}
+                onClick={() => editor.duplicate([id])}
+              >
+                <MotionIcon icon={CopyPlusIcon} className="h-4 w-4" />
+              </Button>
+            </TooltipHint>
+          )}
           <TooltipHint
-            label={node.disabled ? 'Turn On' : 'Turn Off'}
-            shortcut="D"
+            label="Delete"
+            shortcut={<ShortcutKeys keys={['Del']} />}
             compact
             hidden={detail !== 'full'}
           >
             <Button
               variant="ghost"
-              className={cn(TOOL, TOOL_NEUTRAL)}
-              aria-label={node.disabled ? `Turn on ${node.name}` : `Turn off ${node.name}`}
-              onClick={() => editor.dispatch({ type: 'toggleDisabled', keys: [id] })}
+              className={cn(TOOL, 'hover:bg-actionDanger/15 hover:text-dangerInk')}
+              aria-label={`Delete ${node.name}`}
+              onClick={() => editor.remove({ nodes: [id] })}
             >
-              <MotionIcon icon={PowerIcon} className="h-3.5 w-3.5" />
+              <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
             </Button>
           </TooltipHint>
-        ) : null}
-        {isTrigger ? null : (
-          <TooltipHint label="Duplicate" compact hidden={detail !== 'full'}>
-            <Button
-              variant="ghost"
-              className={cn(TOOL, TOOL_NEUTRAL)}
-              aria-label={`Duplicate ${node.name}`}
-              onClick={() => editor.duplicate([id])}
-            >
-              <MotionIcon icon={CopyPlusIcon} className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipHint>
-        )}
-        <TooltipHint label="Delete" compact hidden={detail !== 'full'}>
-          <Button
-            variant="ghost"
-            className={cn(TOOL, 'hover:bg-actionDanger/15 hover:text-dangerInk')}
-            aria-label={`Delete ${node.name}`}
-            onClick={() => editor.remove({ nodes: [id] })}
-          >
-            <MotionIcon icon={Trash2Icon} className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipHint>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cn(TOOL, TOOL_NEUTRAL)}
-              aria-label={`More actions for ${node.name}`}
-            >
-              <MotionIcon icon={EllipsisVerticalIcon} className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => editor.open(id)}>Open</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => editor.rename(id)}>Rename</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => editor.copy([id])}>Copy</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className={cn(TOOL, TOOL_NEUTRAL)}
+                aria-label={`More actions for ${node.name}`}
+              >
+                <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => editor.open(id)}>Open</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => editor.rename(id)}>Rename</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => editor.copy([id])}>Copy</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-    </div>
-  ) : null) : null;
+    ) : null
+  ) : null;
 
-  const pinSticker =
-    pinned && detail !== 'icon' ? (
-      <TooltipHint label="Pinned Data">
-        <span
-          // biome-ignore lint/a11y/noNoninteractiveTabindex: the sticker's meaning is reachable by keyboard
-          tabIndex={0}
-          data-testid="pin-sticker"
-          className="nodrag flex h-7 items-center gap-1 rounded-md border-2 border-outline bg-actionPrimary px-2 text-onActionPrimary"
-        >
-          <Pin aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.75} />
-          <span className="sr-only">This step has pinned test data.</span>
-        </span>
-      </TooltipHint>
-    ) : null;
+  const markSize = detail === 'full' ? 'h-6 w-6 shrink-0' : 'h-9 w-9 shrink-0';
 
-  const BadgeGlyph = look ? BADGE_ICONS[look.icon] : null;
-  const badge =
-    look && BadgeGlyph ? (
-      <Badge
-        variant={BADGE_VARIANT[look.tone]}
-        data-testid="run-badge"
-        data-state={look.state}
-        className={cn(
-          'gap-1 whitespace-nowrap px-2 text-xs leading-none',
-          look.tone === 'neutral' ? 'bg-secondary' : '',
-        )}
-      >
-        <BadgeGlyph
-          aria-hidden="true"
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            look.icon === 'spinner' ? 'animate-spin motion-reduce:animate-none' : '',
-          )}
-          strokeWidth={3}
-        />
-        {detail === 'icon' ? null : (
-          <span>
-            {look.words}
-            {look.duration ? `, ${look.duration}` : ''}
-          </span>
-        )}
-      </Badge>
-    ) : null;
+  const runWords = look ? `${look.words}${look.duration ? `, ${look.duration}` : ''}` : '';
+  const runGlyph = look ? <RunGlyph look={look} className={markSize} /> : null;
+
+  // A solid triangle with its "!" cut out in the dark ink, so it reads at any zoom.
+  const issueGlyph = firstIssue ? (
+    <TriangleAlert
+      aria-hidden="true"
+      className={cn(
+        markSize,
+        '[&>path:not(:first-child)]:stroke-onActionLight',
+        firstIssue.severity === 'error'
+          ? 'fill-actionDanger stroke-actionDanger'
+          : 'fill-actionAccent stroke-actionAccent',
+      )}
+      strokeWidth={2.25}
+    />
+  ) : null;
+  const issueTip = (
+    <span className="flex max-w-64 flex-col gap-0.5 whitespace-normal text-left">
+      <span className="type-ui">Issues</span>
+      {issueNotes.slice(0, ISSUE_LINES).map((line) => (
+        <span key={line}>{line}</span>
+      ))}
+      {issueNotes.length > ISSUE_LINES ? (
+        <span>And {issueNotes.length - ISSUE_LINES} more.</span>
+      ) : null}
+    </span>
+  );
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hover shows the toolbar; React Flow makes the node focusable
     <div
       className={cn('relative', fits === false && !isSource ? 'opacity-30' : '')}
-      style={{ width: CARD_WIDTH, height }}
+      style={
+        {
+          width: CARD_WIDTH,
+          height,
+          '--pg-step-colour': stepColour(def?.icon ?? 'manual'),
+        } as CSSProperties
+      }
       data-run-state={look?.state}
       onMouseEnter={enter}
       onMouseLeave={exit}
@@ -326,37 +348,31 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         event.preventDefault();
         editor.contextMenu({ kind: 'step', key: id }, { x: event.clientX, y: event.clientY });
       }}
-      onDoubleClick={() => editor?.expand(id)}
+      onDoubleClick={() => editor?.open(id)}
     >
       {toolbar}
 
       {data.label && detail === 'full' ? (
-        // A tab behind the card's top edge (it runs 2px under the border), left-aligned and as
-        // wide as its words need. "When" for the trigger, in yellow; every other step names its
+        // A tab on the card's top edge (its last 2px run into the card and are clipped), left-aligned
+        // and as wide as its words need. "When" for the trigger, in yellow; every other step names its
         // kind, quietly ("AI"), after TriForms' "1. Question" tab.
         <span
           data-testid="step-tab"
           className={cn(
-            'absolute bottom-full left-5 -mb-0.5 flex h-8 items-center whitespace-nowrap rounded-t-md border-2 border-b-0 border-outline px-3.5 pb-0.5 text-sm',
+            'pg-step-tab absolute bottom-full left-5 -mb-0.5 flex h-8 items-center whitespace-nowrap rounded-t-md px-3.5 pb-0.5 text-sm',
             isTrigger
               ? 'type-ui bg-actionSecondary text-onActionLight'
-              : 'type-label bg-secondary text-ink muted-tone',
+              : 'type-label bg-secondary text-ink',
           )}
         >
-          {data.label}
+          {/* On the words, not the tab: it would fade the tab's border along with them. */}
+          <span className={isTrigger ? undefined : 'muted-tone'}>{data.label}</span>
         </span>
-      ) : null}
-
-      {look?.waiting && !selected ? (
-        <span
-          aria-hidden="true"
-          className="pg-run-waiting pointer-events-none absolute -inset-1.5 rounded-card"
-        />
       ) : null}
 
       <div
         className={cn(
-          'pg-step-card relative flex h-full w-full items-center gap-4 overflow-hidden rounded-card border-2 border-outline bg-secondary px-6',
+          'pg-step-card relative flex h-full w-full items-center gap-4 overflow-hidden rounded-card bg-secondary px-6',
           node.disabled ? 'opacity-50' : '',
           look?.card,
         )}
@@ -367,7 +383,8 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
             look?.running ? 'pg-run-pulse' : '',
           )}
         >
-          <StepGlyph icon={def?.icon ?? 'manual'} className="h-10 w-10" />
+          {/* 48 here is the 40 px on screen the owner likes, at the opening zoom of 0.8. */}
+          <StepGlyph icon={def?.icon ?? 'manual'} className="h-12 w-12" />
           {look?.running ? (
             <span
               aria-hidden="true"
@@ -389,10 +406,8 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span
-            className={cn(
-              'type-ui truncate text-lg text-ink',
-              node.disabled ? 'line-through' : '',
-            )}
+            title={node.name}
+            className={cn('type-ui truncate text-lg text-ink', node.disabled ? 'line-through' : '')}
           >
             {node.name}
           </span>
@@ -401,72 +416,93 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
               <span className="type-label truncate text-sm text-dangerInk" title={paint.error}>
                 {paint.error}
               </span>
-            ) : (
-              <span className="type-label truncate text-sm text-ink type-muted">
+            ) : data.summary ? (
+              <span
+                className="type-label truncate text-sm text-ink type-muted"
+                title={data.summary}
+              >
                 {data.summary}
               </span>
-            )
+            ) : null
           ) : null}
         </span>
       </div>
 
-      {node.disabled && detail !== 'icon' ? (
-        <span className={cn(STICKER, 'absolute -top-3 right-3 bg-secondary text-ink')}>Off</span>
-      ) : null}
-
-      {liveInTests && detail !== 'icon' ? (
-        // The pin joins the row so the two never overlap. On the bottom edge, left: the top
-        // edge's left is the tab's, and its right is for Off and the issue sticker.
-        <span className="absolute -bottom-3 left-5 flex items-center gap-1">
-          <Badge
-            variant="danger"
-            data-testid="live-in-tests"
-            className="h-7 px-2 text-xs leading-none"
-          >
-            Live In Tests
-          </Badge>
-          {pinSticker}
-        </span>
-      ) : pinSticker ? (
-        <span className="absolute -bottom-3 left-5">{pinSticker}</span>
-      ) : null}
-
-      {firstIssue ? (
-        <TooltipHint label={firstIssue.message}>
-          <span
-            // biome-ignore lint/a11y/noNoninteractiveTabindex: the issue's sentence is reachable by keyboard
-            tabIndex={0}
-            className={cn(
-              'nodrag absolute -top-3 -right-3 flex h-7 w-7 items-center justify-center rounded-md border-2 border-outline',
-              firstIssue.severity === 'error'
-                ? 'bg-actionDanger text-onActionLight'
-                : 'bg-actionAccent text-onActionLight',
+      <span
+        data-testid="step-marks"
+        className="absolute right-2.5 bottom-2 flex items-center gap-2"
+      >
+        {look && runGlyph ? (
+          mode.onRunBadgeClick ? (
+            <TooltipHint label={runWords}>
+              <button
+                type="button"
+                data-testid="run-badge"
+                data-state={look.state}
+                className="nodrag nopan flex shrink-0 items-center rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing"
+                aria-label={badgeLabel(look, node.name)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  mode.onRunBadgeClick?.(id);
+                }}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                {runGlyph}
+                <span className="sr-only">{runWords}</span>
+              </button>
+            </TooltipHint>
+          ) : (
+            <Mark label={runWords} testId="run-badge" state={look.state}>
+              {runGlyph}
+            </Mark>
+          )
+        ) : null}
+        {liveInTests && detail !== 'icon' ? (
+          <Mark label="Live In Tests" testId="live-in-tests" className="text-dangerInk">
+            <Radio aria-hidden="true" className={markSize} strokeWidth={2.75} />
+          </Mark>
+        ) : null}
+        {pinned && detail !== 'icon' ? (
+          <Mark label="Pinned Data" testId="pin-sticker" className="text-ink">
+            <Pin aria-hidden="true" className={markSize} strokeWidth={2.75} />
+          </Mark>
+        ) : null}
+        {node.disabled && detail !== 'icon' ? (
+          <Mark label="Turned Off" testId="off-mark" className="text-ink">
+            <PowerOff aria-hidden="true" className={markSize} strokeWidth={2.75} />
+          </Mark>
+        ) : null}
+        {firstIssue ? (
+          <TooltipHint label={issueTip} side="bottom">
+            {editor ? (
+              <button
+                type="button"
+                data-testid="step-issue"
+                aria-label={`Fix ${node.name}: ${issueNotes.join(' ')}`}
+                className="nodrag nopan flex shrink-0 items-center rounded-sm outline-none transition-transform duration-150 hover:scale-110 focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing motion-reduce:transition-none"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (editor.openIssue) editor.openIssue(firstIssue);
+                  else editor.open(id);
+                }}
+                onDoubleClick={(event) => event.stopPropagation()}
+              >
+                {issueGlyph}
+              </button>
+            ) : (
+              <span
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: the issue's sentence is reachable by keyboard
+                tabIndex={0}
+                data-testid="step-issue"
+                className="nodrag flex shrink-0 items-center rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing"
+              >
+                {issueGlyph}
+                <span className="sr-only">{issueNotes.join(' ')}</span>
+              </span>
             )}
-          >
-            <TriangleAlert aria-hidden="true" className="h-4 w-4" strokeWidth={2.75} />
-            <span className="sr-only">{firstIssue.message}</span>
-          </span>
-        </TooltipHint>
-      ) : null}
-
-      {look && badge ? (
-        mode.onRunBadgeClick ? (
-          <button
-            type="button"
-            className="nodrag nopan absolute -bottom-2.5 right-3 rounded-md outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
-            aria-label={badgeLabel(look, node.name)}
-            onClick={(event) => {
-              event.stopPropagation();
-              mode.onRunBadgeClick?.(id);
-            }}
-            onDoubleClick={(event) => event.stopPropagation()}
-          >
-            {badge}
-          </button>
-        ) : (
-          <span className="absolute -bottom-2.5 right-3">{badge}</span>
-        )
-      ) : null}
+          </TooltipHint>
+        ) : null}
+      </span>
 
       {isTrigger ? null : (
         <Handle
@@ -478,9 +514,14 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
       )}
 
       {ports.map((port, index) => {
-        const top = portTop(index, ports.length);
+        const top = portTop(index, ports.length, height);
         const labelled = port.id !== 'out';
-        const open = !usedPorts.includes(port.id);
+        const named = labelled && detail !== 'icon';
+        const open =
+          editor && !usedPorts.includes(port.id) && !connection.inProgress && detail !== 'icon'
+            ? !editor.locked
+            : false;
+        const stem = port.id === 'error' ? 'bg-actionDanger' : 'bg-ink';
         return (
           <div key={port.id}>
             <Handle
@@ -490,50 +531,59 @@ export const StepCard = memo(function StepCard({ id, data, selected }: NodeProps
               style={{ top }}
               className={cn(HANDLE, port.id === 'error' ? 'bg-actionDanger!' : '')}
             />
-            {labelled && detail !== 'icon' ? (
+            {named || open ? (
+              // One row from the dot outwards, so the stem, the name and the "+" always join,
+              // however long the name is.
               <span
-                className={cn(
-                  STICKER,
-                  'pointer-events-none absolute left-full ms-2 -translate-y-1/2',
-                  port.id === 'error'
-                    ? 'bg-actionDanger text-onActionLight'
-                    : 'bg-secondary text-ink',
-                )}
+                className="pointer-events-none absolute left-full ms-2 flex -translate-y-1/2 items-center"
                 style={{ top }}
               >
-                {port.label}
-              </span>
-            ) : null}
-            {editor && open && !connection.inProgress && detail !== 'icon' && !editor.locked ? (
-              <span
-                className="absolute left-full flex -translate-y-1/2 items-center"
-                style={{ top, marginLeft: labelled ? 8 + port.label.length * 7.5 + 20 : 0 }}
-              >
-                {/* The stem is a line like any other: 2px ink, from the port dot to the "+". */}
-                <span aria-hidden="true" className="h-[2.5px] w-7 bg-ink" />
-                <button
-                  type="button"
-                  // A white tile (ink, with a page-coloured plus) like the line it ends, swelling
-                  // under the pointer after TriForms' add button. It grows from its left edge on
-                  // the line's own centre, so nothing around it moves.
-                  className={cn(
-                    'nodrag nopan flex h-8 w-8 items-center justify-center rounded-md border-2 border-ink bg-ink text-primary',
-                    'transition-[width,height] duration-150 ease-out motion-reduce:transition-none',
-                    'hover:h-12 hover:w-12 focus-visible:h-12 focus-visible:w-12',
-                    'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-                  )}
-                  aria-label={`Add a step after ${node.name}${labelled ? `, ${port.label}` : ''}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    editor.pickFrom(
-                      { source: id, sourcePort: port.id },
-                      { x: rect.right, y: rect.top + rect.height / 2 },
-                    );
-                  }}
-                >
-                  <MotionIcon icon={PlusIcon} className="h-5 w-5" />
-                </button>
+                {named ? (
+                  <>
+                    <span aria-hidden="true" className={cn('h-[2.5px] w-3', stem)} />
+                    <span
+                      title={port.label}
+                      className={cn(
+                        STICKER,
+                        'pointer-events-auto max-w-24',
+                        PORT_STICKER[port.id] ?? 'bg-secondary text-ink',
+                      )}
+                    >
+                      <span className="truncate">{port.label}</span>
+                    </span>
+                  </>
+                ) : null}
+                {open ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className={cn('h-[2.5px]', named ? 'w-3' : 'w-5', stem)}
+                    />
+                    <button
+                      type="button"
+                      // A white tile (ink, with a page-coloured plus) like the line it ends, swelling
+                      // under the pointer. It grows from its left edge on the line's own centre, so
+                      // nothing around it moves.
+                      className={cn(
+                        'nodrag nopan pointer-events-auto flex h-8 w-8 items-center justify-center rounded-md border-2 border-ink bg-ink text-primary',
+                        'transition-[width,height] duration-150 ease-out motion-reduce:transition-none',
+                        'hover:h-12 hover:w-12 focus-visible:h-12 focus-visible:w-12',
+                        'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+                      )}
+                      aria-label={`Add a step after ${node.name}${labelled ? `, ${port.label}` : ''}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        editor?.pickFrom(
+                          { source: id, sourcePort: port.id },
+                          { x: rect.right, y: rect.top + rect.height / 2 },
+                        );
+                      }}
+                    >
+                      <MotionIcon icon={PlusIcon} className="h-5 w-5" />
+                    </button>
+                  </>
+                ) : null}
               </span>
             ) : null}
           </div>

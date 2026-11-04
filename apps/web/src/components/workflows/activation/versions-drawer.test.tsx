@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { AutomationDetail, VersionDetail, VersionSummary } from '@/types/workflows';
 import { stubBrowserLayout } from '../fields/test-dom';
 import { NO_VERSIONS } from './activation-model';
-import { VersionPreviewBanner, VersionsDrawer } from './versions-drawer';
+import { VersionPreviewActions, VersionsDock } from './versions-drawer';
 
 jest.mock('@/lib/workflows-api', () => ({
   listVersions: jest.fn(),
@@ -17,8 +17,7 @@ const { toast } = jest.requireMock('@postgear/ui') as { toast: jest.Mock };
 
 beforeAll(() => {
   stubBrowserLayout();
-  // The sheet focuses its close button on open, which plays its animated icon;
-  // the icon stub is a bare <svg> without the animation handle.
+  // A focused button plays its animated icon; the icon stub is a bare <svg> without the handle.
   Object.assign(SVGElement.prototype, { startAnimation() {}, stopAnimation() {} });
 });
 beforeEach(() => {
@@ -52,19 +51,21 @@ const detail: VersionDetail = {
   graph: { schemaVersion: GRAPH_SCHEMA_VERSION, nodes: [], edges: [], notes: [] },
 };
 
-describe('VersionsDrawer', () => {
+describe('VersionsDock', () => {
+  const dock = (onPreview = jest.fn()) =>
+    render(
+      <VersionsDock
+        automationId="wf-1"
+        previewing={null}
+        onPreview={onPreview}
+        onClose={jest.fn()}
+      />,
+    );
+
   it('lists each version with its number, author, time, note and the Active marker', async () => {
     api.listVersions.mockResolvedValue(versions);
     await act(async () => {
-      render(
-        <VersionsDrawer
-          open
-          onOpenChange={jest.fn()}
-          automationId="wf-1"
-          previewing={null}
-          onPreview={jest.fn()}
-        />,
-      );
+      dock();
     });
     expect(api.listVersions).toHaveBeenCalledWith('wf-1');
     const rows = screen.getAllByTestId('version-row');
@@ -78,55 +79,50 @@ describe('VersionsDrawer', () => {
     expect(within(rows[1]).getByText('Turned on 3 days ago')).toBeTruthy();
   });
 
-  it('previews a version on the canvas and closes', async () => {
+  it('previews a version on the canvas and stays open to compare', async () => {
     api.listVersions.mockResolvedValue(versions);
     api.getVersion.mockResolvedValue(detail);
     const onPreview = jest.fn();
-    const onOpenChange = jest.fn();
     await act(async () => {
-      render(
-        <VersionsDrawer
-          open
-          onOpenChange={onOpenChange}
-          automationId="wf-1"
-          previewing={null}
-          onPreview={onPreview}
-        />,
-      );
+      dock(onPreview);
     });
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('version-row')[1]);
     });
     expect(api.getVersion).toHaveBeenCalledWith('wf-1', 1);
     expect(onPreview).toHaveBeenCalledWith(detail);
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId('versions-drawer')).toBeTruthy();
+  });
+
+  it('goes back to the draft from Current Changes', async () => {
+    api.listVersions.mockResolvedValue(versions);
+    const onPreview = jest.fn();
+    await act(async () => {
+      dock(onPreview);
+    });
+    fireEvent.click(screen.getByTestId('version-current'));
+    expect(onPreview).toHaveBeenCalledWith(null);
   });
 
   it('says when there are no versions yet', async () => {
     api.listVersions.mockResolvedValue([]);
     await act(async () => {
-      render(
-        <VersionsDrawer
-          open
-          onOpenChange={jest.fn()}
-          automationId="wf-1"
-          previewing={null}
-          onPreview={jest.fn()}
-        />,
-      );
+      dock();
     });
     expect(screen.getByText(NO_VERSIONS)).toBeTruthy();
   });
 });
 
-describe('VersionPreviewBanner', () => {
+describe('VersionPreviewActions', () => {
+  const openMenu = () => fireEvent.keyDown(screen.getByTestId('version-actions'), { key: 'Enter' });
+
   it('restores the version as the draft after saving the latest edits', async () => {
     const restored = { id: 'wf-1', draftRevision: 9 } as AutomationDetail;
     api.restoreVersion.mockResolvedValue(restored);
     const flush = jest.fn(async () => 8);
     const onRestored = jest.fn();
     render(
-      <VersionPreviewBanner
+      <VersionPreviewActions
         automationId="wf-1"
         version={detail}
         flush={flush}
@@ -134,9 +130,10 @@ describe('VersionPreviewBanner', () => {
         onClose={jest.fn()}
       />,
     );
-    expect(screen.getByText('Viewing version 1.')).toBeTruthy();
+    expect(screen.getByTestId('version-preview-chip').textContent).toContain('Version 1');
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Restore As Draft' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Restore As Draft' }));
     });
     expect(flush).toHaveBeenCalled();
     expect(api.restoreVersion).toHaveBeenCalledWith('wf-1', 1, 8);
@@ -144,10 +141,10 @@ describe('VersionPreviewBanner', () => {
     expect(toast).toHaveBeenCalledWith({ title: 'Version 1 copied into the draft.' });
   });
 
-  it('closes the preview', () => {
+  it('goes back to the current changes', () => {
     const onClose = jest.fn();
     render(
-      <VersionPreviewBanner
+      <VersionPreviewActions
         automationId="wf-1"
         version={detail}
         flush={jest.fn(async () => 1)}
@@ -155,7 +152,8 @@ describe('VersionPreviewBanner', () => {
         onClose={onClose}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    openMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Back To Current Changes' }));
     expect(onClose).toHaveBeenCalled();
   });
 });

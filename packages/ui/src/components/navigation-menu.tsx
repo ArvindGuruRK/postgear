@@ -2,6 +2,7 @@
 
 import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import * as NavigationMenuPrimitive from '@radix-ui/react-navigation-menu';
+import type { LucideIcon } from 'lucide-react';
 import { forwardRef } from 'react';
 import { cn } from '../lib/utils';
 import { MotionIcon } from './motion-icon';
@@ -83,16 +84,20 @@ NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
 /**
  * Styled as a selectable row (same shape as DropdownMenuItem: full-width,
  * padded, solid hover/active fill) instead of bare inline text; a mega-menu
- * link list should read as a menu, not a stack of underlined hyperlinks.
+ * link list should read as a menu, not a stack of underlined hyperlinks. Every
+ * value carries a plain lucide icon beside its name, not an animated one (the
+ * owner's call, 2026-11-04), so the icon is a required prop.
  */
 export const NavigationMenuLink = forwardRef<
   React.ElementRef<typeof NavigationMenuPrimitive.Link>,
-  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Link>
->(({ className, ...props }, ref) => (
+  Omit<React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Link>, 'asChild'> & {
+    icon: LucideIcon;
+  }
+>(({ className, icon: Icon, children, ...props }, ref) => (
   <NavigationMenuPrimitive.Link
     ref={ref}
     className={cn(
-      'flex cursor-pointer select-none items-center rounded-md px-3 py-2 outline-none transition-colors',
+      'flex cursor-pointer select-none items-center gap-2 rounded-md px-3 py-2 outline-none transition-colors',
       'font-sans text-sm text-ink',
       'hover:bg-actionPrimary hover:text-onActionPrimary',
       'focus-visible:bg-actionPrimary focus-visible:text-onActionPrimary',
@@ -100,7 +105,10 @@ export const NavigationMenuLink = forwardRef<
       className,
     )}
     {...props}
-  />
+  >
+    <Icon aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+    {children}
+  </NavigationMenuPrimitive.Link>
 ));
 NavigationMenuLink.displayName = NavigationMenuPrimitive.Link.displayName;
 

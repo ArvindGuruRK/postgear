@@ -117,6 +117,7 @@ describe('ActivationDialog', () => {
     expect(toast).toHaveBeenCalledWith({
       title: 'Workflow turned on.',
       description: 'The schedule is not set up yet.',
+      variant: 'warning',
     });
     expect(props.onActivated).toHaveBeenCalledWith(
       expect.objectContaining({ version: result.version }),

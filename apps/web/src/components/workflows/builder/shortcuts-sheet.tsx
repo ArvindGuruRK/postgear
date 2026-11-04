@@ -7,9 +7,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  Kbd,
 } from '@postgear/ui';
 import { SHORTCUTS } from './builder-shortcuts';
+import { ShortcutKeys } from './shortcut-keys';
 
 export function ShortcutsSheet({
   open,
@@ -25,12 +25,12 @@ export function ShortcutsSheet({
           <DialogTitle>Keyboard Shortcuts</DialogTitle>
           <DialogDescription>Shortcuts never fire while you type in a field.</DialogDescription>
         </DialogHeader>
-        <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2">
+        <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-6 gap-y-2.5">
           {SHORTCUTS.map((shortcut) => (
             <div key={shortcut.keys} className="contents">
-              <dt className="flex flex-wrap gap-1">
+              <dt className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {shortcut.keys.split(', ').map((keys) => (
-                  <Kbd key={keys}>{keys}</Kbd>
+                  <ShortcutKeys key={keys} keys={keys.split('+')} />
                 ))}
               </dt>
               <dd className="font-sans text-sm text-ink">{shortcut.label}</dd>

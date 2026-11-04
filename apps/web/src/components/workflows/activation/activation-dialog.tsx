@@ -26,21 +26,26 @@ import {
   FormField,
   FormHelperText,
   FormLabel,
+  SummaryBox,
   Textarea,
+  timeText,
   toast,
+  useTwelveHourClock,
 } from '@postgear/ui';
-import { CalendarClock, Sparkles, TriangleAlert } from 'lucide-react';
+import { Sparkles, TriangleAlert } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { activateWorkflow } from '@/lib/workflows-api';
 import type { ActivationResult } from '@/types/workflows';
+import { runRows } from '../fields/schedule-model';
 import { StepGlyph } from '../list/step-glyph';
-import { issueKey } from '../panel/issues-popover';
+import { issueKey } from '../builder/builder-view-model';
 import {
   type ActivationContent,
   AUTOMATIC_POSTING_TICK,
   activatedToast,
   activateFailure,
   activationContent,
+  issueRows,
   canTurnOn,
   NOTE_MAX,
   saveFirstFailure,
@@ -87,6 +92,7 @@ export function ActivationDialog({
   // The API asked for the tick although the draft here did not seem to need it.
   const [serverTick, setServerTick] = useState(false);
   const [openedAt, setOpenedAt] = useState(() => new Date().toISOString());
+  const twelveHour = useTwelveHourClock();
 
   useEffect(() => {
     if (!open) return;
@@ -125,7 +131,9 @@ export function ActivationDialog({
       });
       toast({
         title: activatedToast(mode === 'changes', result.version.version),
-        ...(result.warnings.length > 0 ? { description: result.warnings.join(' ') } : {}),
+        ...(result.warnings.length > 0
+          ? { description: result.warnings.join(' '), variant: 'warning' as const }
+          : {}),
       });
       onActivated(result);
       onOpenChange(false);
@@ -151,10 +159,11 @@ export function ActivationDialog({
               </DialogDescription>
             </DialogHeader>
             <ul className="mt-4 flex max-h-80 flex-col gap-1 overflow-y-auto" aria-label="Issues">
-              {content.issues.map((issue) => (
+              {issueRows(content.issues).map(({ issue, message }) => (
                 <IssueRow
                   key={issueKey(issue)}
                   issue={issue}
+                  message={message}
                   graph={graph}
                   onOpen={() => {
                     onOpenChange(false);
@@ -192,24 +201,10 @@ export function ActivationDialog({
               ) : null}
 
               {content.scheduleRuns.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  <p className="flex items-center gap-2 font-sans text-sm font-bold text-ink">
-                    <CalendarClock
-                      aria-hidden="true"
-                      className="h-4 w-4 shrink-0"
-                      strokeWidth={2.5}
-                    />
-                    Next runs
-                  </p>
-                  <ul
-                    className="flex flex-col gap-1 rounded-md border-2 border-outline bg-inset p-3 font-sans text-sm text-ink"
-                    aria-label="Next runs"
-                  >
-                    {content.scheduleRuns.map((run) => (
-                      <li key={run}>{run}</li>
-                    ))}
-                  </ul>
-                </div>
+                <SummaryBox
+                  rowsLabel="Next Runs"
+                  rows={runRows(content.scheduleRuns, (time) => timeText(time, twelveHour))}
+                />
               ) : null}
 
               <FormField>
@@ -276,10 +271,12 @@ export function ActivationDialog({
 
 function IssueRow({
   issue,
+  message,
   graph,
   onOpen,
 }: {
   issue: ValidationIssue;
+  message: string;
   graph: AutomationGraph;
   onOpen: () => void;
 }) {
@@ -292,22 +289,20 @@ function IssueRow({
         onClick={onOpen}
         className="flex w-full items-start gap-2 rounded-md border-2 border-transparent p-1.5 text-left outline-none hover:border-outline focus-visible:border-outline focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing"
       >
-        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary text-ink">
-          {icon ? (
-            <StepGlyph icon={icon} className="h-3.5 w-3.5" />
-          ) : (
-            <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2.5} />
-          )}
-          <span
+        {icon ? (
+          <StepGlyph icon={icon} className="h-6 w-6 shrink-0" />
+        ) : (
+          <TriangleAlert
             aria-hidden="true"
-            className="absolute -right-1.5 -bottom-1.5 h-3 w-3 rounded-sm border-2 border-outline bg-actionDanger"
+            className="h-6 w-6 shrink-0 text-dangerInk"
+            strokeWidth={2.5}
           />
-        </span>
+        )}
         <span className="flex min-w-0 flex-col">
-          <span className="type-ui truncate text-xs text-ink">{step?.name ?? 'Workflow'}</span>
-          <span className="font-sans text-xs text-ink">
+          <span className="type-ui truncate text-sm text-ink">{step?.name ?? 'Workflow'}</span>
+          <span className="font-sans text-sm text-ink">
             <span className="sr-only">Error: </span>
-            {issue.message}
+            {message}
           </span>
         </span>
       </button>

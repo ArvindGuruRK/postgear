@@ -24,8 +24,6 @@ import type { AnalyticsOverview, ChannelMetric } from '@/types/analytics';
 import {
   AnalyticsPanel,
   PanelHeader,
-  SEGMENTED_LIST,
-  SEGMENTED_TRIGGER,
   TrendLine,
 } from './analytics-ui';
 import {
@@ -104,9 +102,9 @@ function Performance({
               value={metric ?? undefined}
               onValueChange={(value) => onMetric(value as ChannelMetric)}
             >
-              <TabsList className={`${SEGMENTED_LIST} max-w-full flex-wrap`} aria-label="Metric">
+              <TabsList className="flex-wrap" aria-label="Metric">
                 {available.map((entry) => (
-                  <TabsTrigger key={entry} value={entry} className={SEGMENTED_TRIGGER}>
+                  <TabsTrigger key={entry} value={entry}>
                     {metricLabel(entry)}
                   </TabsTrigger>
                 ))}

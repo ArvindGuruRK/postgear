@@ -18,13 +18,14 @@ import {
   type Weekday,
   zoneWords,
 } from '@postgear/automation';
+import type { SummaryBoxRow } from '@postgear/ui';
 
 export const FREQUENCY_CHOICES: readonly { value: ScheduleFrequency; label: string }[] = [
-  { value: 'hourly', label: 'Every Hour' },
-  { value: 'daily', label: 'Every Day' },
-  { value: 'weekdays', label: 'Every Weekday' },
-  { value: 'weekly', label: 'Every Week' },
-  { value: 'monthly', label: 'Every Month' },
+  { value: 'hourly', label: 'Hourly' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekdays', label: 'Weekdays' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
 ];
 
 export const DEFAULT_TIME = '09:00';
@@ -48,7 +49,7 @@ function isFrequency(value: unknown): value is ScheduleFrequency {
 
 /**
  * The config for one frequency, with only the fields that frequency uses:
- * switching from Every Week to Every Day drops the days, and anything the
+ * switching from Weekly to Daily drops the days, and anything the
  * new frequency needs gets a default (09:00, Monday, the 1st, every hour).
  */
 export function scheduleFor(
@@ -101,26 +102,7 @@ export function toggleDay(config: ScheduleConfig, day: Weekday): ScheduleConfig 
   return { ...config, days: sortDays(next) };
 }
 
-/** "09:05" from an hour and a minute. */
-export function joinTime(hour: number, minute: number): string {
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-/** [9, 5] from "09:05"; the default time for anything else. */
-export function splitTime(time: string | undefined): [number, number] {
-  const text = time && TIME_OF_DAY_PATTERN.test(time) ? time : DEFAULT_TIME;
-  const [hour, minute] = text.split(':').map(Number);
-  return [hour, minute];
-}
-
-/** The minutes the minute menu offers: every 5, plus a stored odd one. */
-export function minuteChoices(current: number): number[] {
-  const steps = Array.from({ length: 12 }, (_, i) => i * 5);
-  if (!steps.includes(current)) steps.push(current);
-  return steps.sort((a, b) => a - b);
-}
-
-/** "1st", "2nd", ... "31st" and "Last day" for Every Month. */
+/** "1st", "2nd", ... "31st" and "Last day" for Monthly. */
 export function dayOfMonthChoices(): { value: string; label: string }[] {
   const choices = Array.from({ length: 31 }, (_, i) => ({
     value: String(i + 1),
@@ -187,25 +169,58 @@ export function timeZoneChoices(
     });
 }
 
+export interface UpcomingRun {
+  iso: string;
+  /** "Monday". */
+  weekday: string;
+  /** "3 November", or "November 3", as the locale writes it. */
+  date: string;
+  /** "09:00": always this shape, for `runRows` to write the viewer's way. */
+  time: string;
+}
+
 /**
- * The next three runs as the schedule's own zone tells them: "Monday 3
- * November, 09:00". Empty when the config cannot run yet.
+ * The next three runs as the schedule's own zone tells them, in parts so a list
+ * can line them up. Empty when the config cannot run yet.
  */
-export function upcomingRuns(config: ScheduleConfig, fromIso: string, locale?: string): string[] {
-  const runs = nextRuns(config, fromIso, 3);
-  let format: Intl.DateTimeFormat;
+export function upcomingRuns(
+  config: ScheduleConfig,
+  fromIso: string,
+  locale?: string,
+): UpcomingRun[] {
+  const timeZone = config.timeZone;
   try {
-    format = new Intl.DateTimeFormat(locale, {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone });
+    const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone });
+    const time = new Intl.DateTimeFormat('en-GB', {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
-      timeZone: config.timeZone,
+      timeZone,
+    });
+    return nextRuns(config, fromIso, 3).map((iso) => {
+      const at = Date.parse(iso);
+      return {
+        iso,
+        weekday: weekday.format(at),
+        date: date.format(at),
+        time: time.format(at),
+      };
     });
   } catch {
     return [];
   }
-  return runs.map((iso) => format.format(Date.parse(iso)));
+}
+
+/** The runs as the rows of a `SummaryBox`. */
+export function runRows(
+  runs: readonly UpcomingRun[],
+  formatTime: (time: string) => string,
+): SummaryBoxRow[] {
+  return runs.map((run) => ({
+    id: run.iso,
+    lead: run.weekday,
+    main: run.date,
+    end: formatTime(run.time),
+  }));
 }

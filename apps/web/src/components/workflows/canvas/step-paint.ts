@@ -1,8 +1,8 @@
 /**
  * How a painted run dresses a step card (Module 08, blueprint 7.1): the
- * card's own style per state, and the result badge (Make's bubble) with its
- * icon, colour, words and duration. Words always show with the colour, so a
- * state never rests on colour alone, and a handled error is amber, never
+ * card's own style per state, and the result mark with its icon, colour, words
+ * and duration. Each state has its own icon and says its words in a tooltip, so
+ * a state never rests on colour alone, and a handled error is amber, never
  * green.
  */
 import type { StepPaint, StepPaintState } from '../runs/run-model';
@@ -31,20 +31,20 @@ export interface PaintLook {
   words: string;
   /** "1.2 s", or empty while the step has no duration yet. */
   duration: string;
-  /** Marching dashes round the icon tile and a pulsing stripe. */
+  /** Marching dashes round the icon, which pulses. */
   running: boolean;
-  /** The amber pulse round a step waiting for review. */
+  /** The card's border pulses amber while a step waits for review. */
   waiting: boolean;
 }
 
 const LOOKS: Record<StepPaintState, { card: string; icon: BadgeIcon; tone: BadgeTone }> = {
   queued: { card: 'border-dashed', icon: 'clock', tone: 'neutral' },
   running: { card: '', icon: 'spinner', tone: 'primary' },
-  waiting: { card: '', icon: 'pause', tone: 'accent' },
+  waiting: { card: 'pg-run-waiting', icon: 'pause', tone: 'accent' },
   succeeded: { card: '', icon: 'check', tone: 'success' },
   dryRun: { card: '', icon: 'check', tone: 'success' },
   handled: { card: '', icon: 'alert', tone: 'accent' },
-  failed: { card: 'border-actionDanger', icon: 'cross', tone: 'danger' },
+  failed: { card: 'pg-run-failed', icon: 'cross', tone: 'danger' },
   skipped: { card: 'opacity-40', icon: 'skip', tone: 'neutral' },
   cancelled: { card: 'opacity-60', icon: 'stop', tone: 'neutral' },
 };

@@ -3,14 +3,14 @@
 /**
  * What the canvas's cards, lines and notes need from the builder, without
  * prop drilling through React Flow: the reducer's `dispatch`, the handful
- * of actions that open something (the picker, the step panel), and a ref to
+ * of actions that open something (the picker, the step editor), and a ref to
  * the graph as it is right now.
  *
  * The ref is updated in the same render that produces the graph, so a
  * handler reading it during a drag or a connect always sees the latest
  * graph (the stale-closure lesson in builder-state.ts).
  */
-import type { AutomationGraph, PortId } from '@postgear/automation';
+import type { AutomationGraph, PortId, ValidationIssue } from '@postgear/automation';
 import { createContext, type Dispatch, type RefObject, useContext } from 'react';
 import type { BuilderAction, Selection } from './builder-state';
 
@@ -24,13 +24,13 @@ export interface BuilderApi {
   graphRef: RefObject<AutomationGraph>;
   /** Moving steps is off (the lock in the controls). */
   locked: boolean;
-  /** Selects a step and opens its panel. */
+  /** Selects a step and opens the step editor on it (double-click, Enter). */
   open: (key: string) => void;
-  /** Opens the Expanded view on a step (double-click on a card). */
-  expand: (key: string) => void;
+  /** Lands on where a card's issue lives: the step editor, on the field to fix. */
+  openIssue?: (issue: ValidationIssue) => void;
   /** Steps with pinned test data: their cards wear the pin sticker. */
   pinned: ReadonlySet<string>;
-  /** Opens the panel on the step's name. */
+  /** Opens the step editor on the step's name. */
   rename: (key: string) => void;
   /** The picker from an output's "+", or a line dropped on empty canvas. */
   pickFrom: (

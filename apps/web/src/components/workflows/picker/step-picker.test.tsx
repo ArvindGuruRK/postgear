@@ -64,9 +64,9 @@ describe('StepPicker', () => {
     expect(search.getAttribute('aria-activedescendant')).toBe(options()[1].id);
     const category = options()[1].textContent ?? '';
     fireEvent.keyDown(search, { key: 'Enter' });
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(
-      category.replace(/\d+$/, '').trim(),
-    );
+    const heading = screen.getByRole('heading', { level: 2 }).textContent ?? '';
+    expect(heading).not.toBe('');
+    expect(category.startsWith(heading)).toBe(true);
   });
 
   it('adds the highlighted step with Enter', () => {

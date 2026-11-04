@@ -3,9 +3,8 @@
 /**
  * Small controls the properties panel's tabs share (Sprint 9, Screen 4).
  *
- * - `Segmented`: one choice from a few (S, M, L; left, centre, right; where
- *   a logo sits), as pressed buttons in a group, built like the design
- *   system's view switcher.
+ * - `Segmented`: the design system's, re-exported for the panel's tabs: one
+ *   choice from a few (S, M, L; left, centre, right; where a logo sits).
  * - `SwatchPicker`: one colour from a grid of swatches, each named under its
  *   colour. The chosen one is ringed and ticked, so the choice is never told
  *   by colour alone.
@@ -30,7 +29,6 @@ import {
   MotionIcon,
   pressSm,
   Slider,
-  TooltipHint,
 } from '@postgear/ui';
 import { Check, ImageOff } from 'lucide-react';
 import { createContext, type ReactNode, useContext, useId, useState } from 'react';
@@ -150,97 +148,7 @@ export function GroupLabel({
 // One choice from a few
 // ---------------------------------------------------------------------------
 
-export interface SegmentOption<T extends string> {
-  value: T;
-  /** The option's name: its text, or, with a short form or an icon, its tooltip and spoken name. */
-  label: string;
-  /** Shown in place of the label, such as S for Small. */
-  short?: string;
-  /** Shown in place of any text. */
-  icon?: AnimatedIcon;
-}
-
-const SEGMENT = cn(
-  'flex h-8 min-w-8 items-center justify-center rounded-md px-2.5 type-ui text-xs',
-  'outline-none transition-colors motion-reduce:transition-none',
-  'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-);
-
-/**
- * One choice from a few, as pressed buttons: the design system's view
- * switcher, with text as well as icons. A choice shown as a letter or an icon
- * names itself on hover and keyboard focus, and to a screen reader always.
- */
-export function Segmented<T extends string>({
-  labelledBy,
-  options,
-  value,
-  onValueChange,
-  className,
-}: {
-  /** The id of the text that names the group. */
-  labelledBy: string;
-  options: readonly SegmentOption<T>[];
-  value: T;
-  onValueChange: (value: T) => void;
-  className?: string;
-}) {
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: a div[role=group] of pressed buttons is the ARIA pattern for one choice of a few, as in the design system's view switcher
-    <div
-      role="group"
-      aria-labelledby={labelledBy}
-      className={cn(
-        'inline-flex max-w-full flex-wrap items-center gap-1 self-start rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalSm',
-        className,
-      )}
-    >
-      {options.map((option) => {
-        const active = option.value === value;
-        const compact = option.icon !== undefined || option.short !== undefined;
-        const button = (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={active}
-            aria-label={compact ? option.label : undefined}
-            onClick={() => {
-              if (!active) onValueChange(option.value);
-            }}
-            className={cn(
-              SEGMENT,
-              active
-                ? 'bg-actionPrimary text-onActionPrimary'
-                : 'text-ink hover:bg-actionPrimary/10',
-            )}
-          >
-            {option.icon ? (
-              <MotionIcon icon={option.icon} className="h-4 w-4" />
-            ) : (
-              (option.short ?? option.label)
-            )}
-          </button>
-        );
-
-        // Flush buttons: the tooltip closes as the pointer leaves, so it never
-        // covers the next one (see ViewSwitcher).
-        return compact ? (
-          <TooltipHint
-            key={option.value}
-            label={option.label}
-            side="top"
-            sideOffset={10}
-            hoverable={false}
-          >
-            {button}
-          </TooltipHint>
-        ) : (
-          button
-        );
-      })}
-    </div>
-  );
-}
+export { Segmented, type SegmentedOption as SegmentOption } from '@postgear/ui';
 
 // ---------------------------------------------------------------------------
 // Swatches

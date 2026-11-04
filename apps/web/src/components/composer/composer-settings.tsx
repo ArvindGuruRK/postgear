@@ -25,6 +25,8 @@ import {
   Checkbox,
   cn,
   FormErrorMessage,
+  FIELD_FOCUS_WITHIN,
+  FIELD_FOCUS_WITHIN_ERROR,
   FormField,
   FormHelperText,
   FormLabel,
@@ -39,7 +41,6 @@ import {
 import { type KeyboardEvent, useId, useState } from 'react';
 import { ChannelMark } from '@/components/channels/channel-mark';
 import type { Channel } from '@/types/channel';
-import { FIELD_FOCUS } from './toolbar';
 
 const FOCUS =
   'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
@@ -351,8 +352,8 @@ function KeywordsField({
       <div
         className={cn(
           'flex min-h-11 flex-wrap items-center gap-1.5 rounded-md border-2 border-outline bg-field px-2 py-1.5 shadow-surfaceSm',
-          'focus-within:border-actionPrimary focus-within:ring-3 focus-within:ring-actionPrimary/20',
-          error && 'border-actionDanger focus-within:border-actionDanger',
+          FIELD_FOCUS_WITHIN,
+          error && `border-actionDanger ${FIELD_FOCUS_WITHIN_ERROR}`,
           disabled && 'cursor-not-allowed opacity-50 shadow-none',
         )}
       >
@@ -388,11 +389,7 @@ function KeywordsField({
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
           onBlur={() => add(draft)}
-          className={cn(
-            'h-7 min-w-28 flex-1 bg-transparent px-1 font-sans text-sm text-ink placeholder:text-ink/50',
-            FIELD_FOCUS,
-            'focus-visible:ring-0',
-          )}
+          className="h-7 min-w-28 flex-1 bg-transparent px-1 font-sans text-sm text-ink outline-none placeholder:text-ink/50"
         />
       </div>
       <Note

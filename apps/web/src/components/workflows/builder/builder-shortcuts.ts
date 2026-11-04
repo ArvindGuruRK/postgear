@@ -102,7 +102,7 @@ export function shortcutFor(event: ShortcutKeys): ShortcutCommand | null {
 export const SHORTCUTS: readonly { keys: string; label: string }[] = [
   { keys: 'N', label: 'Open the step picker' },
   { keys: 'Shift+S', label: 'Add a sticky note' },
-  { keys: 'Enter', label: 'Open the selected step (again for the Expanded view)' },
+  { keys: 'Enter', label: 'Open the selected step' },
   { keys: 'F2', label: 'Rename the selected step' },
   { keys: 'D', label: 'Turn the selected step off or on' },
   { keys: 'Ctrl+C, Ctrl+V, Ctrl+D', label: 'Copy, paste, duplicate' },
@@ -112,8 +112,8 @@ export const SHORTCUTS: readonly { keys: string; label: string }[] = [
   { keys: 'Ctrl+K', label: 'Open the command palette' },
   { keys: 'Ctrl+Enter', label: 'Test the workflow (Stop while it runs)' },
   { keys: '1, 0', label: 'Fit to screen, reset zoom' },
-  { keys: 'Arrow keys', label: 'Move to the next or previous step along the lines' },
-  { keys: 'Space+drag', label: 'Pan the canvas' },
+  { keys: 'Arrow Keys', label: 'Move to the next or previous step along the lines' },
+  { keys: 'Space+Drag', label: 'Pan the canvas' },
   { keys: '?', label: 'Show these shortcuts' },
-  { keys: 'Esc', label: 'Close the picker or panel, then clear the selection' },
+  { keys: 'Esc', label: 'Close the open panel, then clear the selection' },
 ];

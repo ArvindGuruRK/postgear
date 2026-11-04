@@ -10,6 +10,7 @@ import {
   scheduleConfigSchema,
   type ValidationIssue,
 } from '@postgear/automation';
+import { TooltipProvider } from '@postgear/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 import type { FieldContext } from './contract';
@@ -93,7 +94,7 @@ function renderForm(
       />
     );
   }
-  const view = render(<Host />);
+  const view = render(<Host />, { wrapper: TooltipProvider });
   return { ...view, onChange, step };
 }
 
@@ -145,13 +146,13 @@ describe('SchemaForm', () => {
 
   it('writes a whole schedule at the empty path, in a shape the package accepts', () => {
     const { onChange } = renderForm('trigger.schedule');
-    fireEvent.click(screen.getByRole('button', { name: 'Every Day' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Daily' }));
     const [path, value] = onChange.mock.lastCall ?? [];
     expect(path).toBe('');
     expect(value).toEqual({ frequency: 'daily', time: '09:00', timeZone: 'UTC' });
     expect(scheduleConfigSchema.safeParse(value).success).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Every Week' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Weekly' }));
     fireEvent.click(screen.getByRole('button', { name: 'Friday' }));
     expect(onChange.mock.lastCall?.[1]).toEqual({
       frequency: 'weekly',

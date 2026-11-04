@@ -17,14 +17,21 @@ export const WORKSPACE_FIELDS: readonly OutputField[] = [
   { path: 'name', label: 'Workspace Name', type: 'text', sample: 'Bloom Bakery' },
 ];
 
-/** `publishedAt` is "Published At", `post_url` is "Post Url". */
+/** Words people only ever write in capitals. */
+const CAPITALS = new Set(['ai', 'api', 'html', 'id', 'url']);
+
+/** `publishedAt` is "Published At", `post_url` is "Post URL". */
 export function humanise(part: string): string {
   return part
     .replace(/[_-]+/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .trim()
     .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) =>
+      CAPITALS.has(word.toLowerCase())
+        ? word.toUpperCase()
+        : word.charAt(0).toUpperCase() + word.slice(1),
+    )
     .join(' ');
 }
 

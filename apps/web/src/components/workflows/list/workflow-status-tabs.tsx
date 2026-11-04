@@ -2,14 +2,12 @@
 
 /**
  * The list's status filter (All, Active, Paused, Draft), set as Queue's state
- * tabs are: the shared segmented control (`SEGMENTED_LIST`, `SEGMENTED_TRIGGER`
- * from the Analytics page) with a count badge in each tab. Counts are the whole
+ * tabs are: the design system's Tabs with a count badge in each tab. Counts are the whole
  * workspace's, whichever tab is chosen, so "3 paused" shows before anyone
  * clicks it. On the chosen tab, which is itself blue, the badge turns to the
  * card surface so it never disappears into the fill.
  */
 import { Badge, cn, Tabs, TabsList, TabsTrigger } from '@postgear/ui';
-import { SEGMENTED_LIST, SEGMENTED_TRIGGER } from '@/components/analytics/analytics-ui';
 import type { AutomationStatus, AutomationStatusCounts } from '@/types/workflows';
 import { STATUS_FILTERS } from './workflows-view-model';
 
@@ -31,19 +29,11 @@ export function WorkflowStatusTabs({
       value={value}
       onValueChange={(next) => onChange(next as StatusFilter)}
     >
-      <TabsList
-        aria-label="Filter by status"
-        data-testid="workflow-status-filter"
-        className={cn(SEGMENTED_LIST, 'inline-flex max-w-full')}
-      >
+      <TabsList aria-label="Filter by status" data-testid="workflow-status-filter">
         {STATUS_FILTERS.map((filter) => {
           const count = counts?.[filter.id];
           return (
-            <TabsTrigger
-              key={filter.id}
-              value={filter.id}
-              className={cn(SEGMENTED_TRIGGER, 'group gap-2')}
-            >
+            <TabsTrigger key={filter.id} value={filter.id} className="group">
               {filter.label}
               {count === undefined ? null : <CountBadge status={filter.id} count={count} />}
             </TabsTrigger>

@@ -20,8 +20,6 @@ export {
   AnalyticsPanel as AiPanel,
   FOCUS,
   PanelHeader,
-  SEGMENTED_LIST,
-  SEGMENTED_TRIGGER,
 } from '../analytics/analytics-ui';
 
 /** A box set into its panel (the inset layer), for what you read or pick. */

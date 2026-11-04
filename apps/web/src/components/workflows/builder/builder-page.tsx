@@ -3,30 +3,29 @@
 /**
  * The workflow builder (Sprint 10, Module 05; blueprint sections 3 and 4).
  *
- * Layout: the PageActions row (name, save state, status, issues, menu),
- * then the work area: the canvas at full width. A step's settings and the
- * step picker (n8n's node creator, Zapier's side panel) open in the design
- * system's Sheet on the right, one at a time: the picker is also what Add
- * Step, a "+" on a card or a line dropped on the canvas opens. The builder
- * is desktop only (design-system-rules.md section 11). It takes the whole
- * window, without the app rail (DashboardShell).
+ * Layout, after n8n (2026-11-03): a full-width header (way back, name, Editor
+ * and Runs, Activate), then the canvas edge to edge with its tools floating on
+ * it and the Logs strip under it. The step picker, Setup and Versions open in
+ * one dock on the right that pushes the canvas (`builder-dock.tsx`); a step
+ * opens in the step editor, a near full-window dialog. The builder is desktop
+ * only (design-system-rules.md section 11). It takes the whole window, without
+ * the app rail (DashboardShell).
  *
  * State lives in one reducer (`builder-state.ts`); the canvas draws it,
  * autosave sends it (`use-builder-autosave.ts`), and the browser checks it
- * with `validateGraph` a moment after each change, for the issue markers,
- * the issues chip and Finish Setup. Handlers read the graph through a ref
+ * with `validateGraph` a moment after each change, for the issue markers
+ * and the Setup dock. Handlers read the graph through a ref
  * set right after each render, never through a stale closure.
  *
- * Module 06 adds the step panel's fields (`FieldContext`: the workspace,
- * and sample or pinned data for chips and Insert Data), a resizable panel,
- * the Expanded view, pinned test data, and focus-the-field: an issue, a
- * Finish Setup line or a `?step=<key>&field=<path>` link selects the step,
- * centres it, opens the panel on the right tab and focuses the field.
+ * Module 06 adds the step's fields (`FieldContext`: the workspace, and sample
+ * or pinned data for chips and Insert Data), pinned test data, and
+ * focus-the-field: an issue or a `?step=<key>&field=<path>` link selects the
+ * step, centres it, opens the editor on the right tab and focuses the field.
  *
  * Module 08 adds testing: Test Workflow (or Ctrl/Cmd+Enter) and Test Step
  * run the saved draft (`runs/use-test-run.ts`), the canvas paints the test
- * with the run bar under it until Close or a change to the steps or lines,
- * and the panels show each step's last result. The Editor and Runs switch
+ * until Close or a change to the steps or lines, the Logs dock under it follows
+ * the test, and the step editor shows each step's last result. The Editor and Runs switch
  * keeps `?tab=runs&run=<id>` in the address bar without a navigation.
  *
  * Module 09 adds the live controls (status, Activate, Run Now), Versions
@@ -43,7 +42,6 @@ import {
   type ValidationIssue,
   validateGraph,
 } from '@postgear/automation';
-import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import {
   Alert,
   AlertDialog,
@@ -54,19 +52,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Badge,
   Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
   MotionIcon,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
   toast,
 } from '@postgear/ui';
 import { Panel, ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import { ListChecksIcon } from '@animateicons/react/lucide/list-checks-icon';
 import { Plus, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -94,28 +90,26 @@ import type {
 } from '@/types/workflows';
 import { useOptionalWorkspace } from '../../navigation/workspace-provider';
 import { WorkflowLiveControls } from '../activation/live-controls';
-import { VersionPreviewBanner, VersionsDrawer } from '../activation/versions-drawer';
+import { VersionPreviewActions, VersionsDock } from '../activation/versions-drawer';
 import { CanvasControls } from '../canvas/canvas-controls';
 import { copySteps, pasteSteps, readClipboard } from '../canvas/clipboard';
 import { CanvasContextMenu, type MenuItem } from '../canvas/context-menu';
 import { type CanvasNode, type FlowEdge, issuesByStep } from '../canvas/flow-model';
 import { RunCanvas } from '../canvas/run-canvas';
 import { tidyPositions } from '../canvas/tidy-up';
-import { WorkflowCanvas } from '../canvas/workflow-canvas';
+import { CANVAS_FIT, readableViewport, WorkflowCanvas } from '../canvas/workflow-canvas';
 import type { FieldContext } from '../fields/contract';
 import { TemplateGallery } from '../list/template-gallery';
 import { ExpandedView } from '../panel/expanded-view';
 import type { PinControls } from '../panel/output-pane';
 import { buildScope, inputSourceLine, receivedWebhookData } from '../panel/panel-view-model';
 import { pinErrorMessage } from '../panel/pinned-data-editor';
-import { StepPanel } from '../panel/step-panel';
 import type { FocusRequest } from '../panel/step-tabs';
-import type { StepTestControls } from '../panel/test-tab';
+import type { StepTestControls } from '../panel/step-test';
 import { type PickerItem, pickerItems, pushRecent, RECENT_LIMIT } from '../picker/picker-search';
 import { StepPicker } from '../picker/step-picker';
 import { ReviewCard } from '../runs/review-card';
-import { RunBar } from '../runs/run-bar';
-import { isTerminalRun } from '../runs/run-model';
+import { LogsDock } from '../runs/logs-dock';
 import { RunsTab } from '../runs/runs-tab';
 import { TestControls } from '../runs/test-controls';
 import { stepResult, useTestRun } from '../runs/use-test-run';
@@ -127,24 +121,36 @@ import {
 } from './builder-context';
 import { isTyping, shortcutFor } from './builder-shortcuts';
 import { builderReducer, initialState, type Position, type Selection } from './builder-state';
-import { BuilderTopBar } from './builder-top-bar';
+import { BuilderDock, type Dock } from './builder-dock';
+import { BuilderTopBar, SaveState } from './builder-top-bar';
 import {
   type BuilderTab,
   builderSearch,
   CONFLICT_MESSAGE,
   LOOP_REFUSED,
   NOT_SAVED_YET,
+  refusedTestText,
+  STEP_TEST_REFUSED_TITLE,
   setupItems,
   structureKey,
   summaryContext,
+  TEST_REFUSED_TITLE,
   validationContext,
 } from './builder-view-model';
 import { CommandPalette, type PaletteCommand } from './command-palette';
-import { FinishSetup } from './finish-setup';
-import { CARD_HEIGHT, CARD_WIDTH, firstOutput, leaves, startingConfig } from './graph-ops';
+import {
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  firstOutput,
+  leaves,
+  placeNote,
+  startingConfig,
+} from './graph-ops';
 import { type IssuePlace, issuePlace, stepPlace } from './issue-focus';
+import { SetupDock } from './setup-dock';
 import { ShortcutsSheet } from './shortcuts-sheet';
 import { keyMaker, newStepKey } from './step-keys';
+import { ToolRail } from './tool-rail';
 import { useBuilderAutosave } from './use-builder-autosave';
 
 const VALIDATE_DELAY_MS = 300;
@@ -173,14 +179,6 @@ export interface BuilderPageProps {
   /** `?review=1`: open that run's waiting review card at once. */
   initialReview?: boolean;
 }
-
-/** The picker was opened for a place: after a step, on a line, or as the first trigger. */
-type PickerState = {
-  placement: 'next' | 'trigger';
-  from?: { source: string; sourcePort: PortId };
-  edgeId?: string;
-  flowAt?: Position;
-};
 
 function recentKey(orgId: string): string {
   return `postgear.workflows.recent.${orgId}`;
@@ -271,7 +269,6 @@ function Builder({
       validationContext(initialConnections ?? [], initialChannels ?? []),
     ),
   );
-  const [panelKey, setPanelKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ key: string; request: FocusRequest } | null>(
     null,
@@ -280,19 +277,15 @@ function Builder({
   const [pinned, setPinned] = useState<PinnedStep[]>(automation.pinned ?? []);
   // The graph as last checked: samples follow it, so typing does not rebuild them on each key.
   const [checkedGraph, setCheckedGraph] = useState<AutomationGraph>(automation.draftGraph);
-  const [renameSignal, setRenameSignal] = useState(0);
-  const [picker, setPicker] = useState<PickerState | null>(null);
-  const [stepsSheet, setStepsSheet] = useState(false);
+  // Setup opens by itself only for a workflow just made from a template.
+  const [dock, setDock] = useState<Dock | null>(setup ? { kind: 'setup' } : null);
+  const dockReturn = useRef<HTMLElement | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
   const [locked, setLocked] = useState(false);
   const [tidying, setTidying] = useState(false);
   const [menu, setMenu] = useState<{ target: ContextTarget; at: ScreenPoint } | null>(null);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
-  const [showSetup, setShowSetup] = useState(
-    () =>
-      setup ||
-      (automation.templateId !== null && issues.some((issue) => issue.severity === 'error')),
-  );
   const [recent, setRecent] = useState<string[]>([]);
   const [unpublished, setUnpublished] = useState(automation.hasUnpublishedChanges);
   // Activate, Pause, Discard and Restore change these; the page swaps them in.
@@ -303,12 +296,11 @@ function Builder({
   const [tab, setTab] = useState<BuilderTab>(initialTab);
   const [runId, setRunId] = useState<string | null>(initialRunId);
   const [review, setReview] = useState(initialReview && initialRunId !== null);
-  const [versionsOpen, setVersionsOpen] = useState(false);
   const [preview, setPreview] = useState<VersionDetail | null>(null);
-  const [issuesSignal, setIssuesSignal] = useState(0);
   const [startSignal, setStartSignal] = useState(0);
-  // Test Step from a card: that step's panel opens on its Test tab.
-  const [showTest, setShowTest] = useState<{ key: string; seq: number } | null>(null);
+  // Held here: Test Workflow is not on screen during the Runs tab, whose own button starts a test.
+  const startSeen = useRef(0);
+  const [activateSignal, setActivateSignal] = useState(0);
   // The Expanded view was opened from a result badge: it shows that run.
   const [fromBadge, setFromBadge] = useState(false);
   const [reviewKey, setReviewKey] = useState<string | null>(null);
@@ -335,12 +327,17 @@ function Builder({
   // ---- Tests (Module 08) -------------------------------------------------------------
 
   const currentGraph = useCallback(() => graphRef.current, []);
-  const openIssues = useCallback(() => setIssuesSignal((count) => count + 1), []);
+  // Set further down, where the issues and the editor's handlers are known.
+  const whenBlocked = useRef<(message: string, stepKey: string | null) => void>(() => undefined);
+  const onBlocked = useCallback(
+    (message: string, stepKey: string | null) => whenBlocked.current(message, stepKey),
+    [],
+  );
   const testRun = useTestRun({
     automationId: automation.id,
     flush: autosave.flush,
     graph: currentGraph,
-    onBlocked: openIssues,
+    onBlocked,
   });
   const testRef = useRef(testRun);
   useLayoutEffect(() => {
@@ -471,12 +468,13 @@ function Builder({
   const canManage = canManageProp ?? (workspace ? workspace.role !== 'USER' : false);
   const timeZone = useMemo(browserZone, []);
   // A Webhook trigger's sample is the last data it received (Module 13), as
-  // in test runs. Asked again each time a step panel opens, so data that
+  // in test runs. Asked again each time a step's fields open, so data that
   // arrived while the builder was open shows up in Insert Data.
   const webhookTrigger = checkedGraph.nodes.some((node) => node.type === 'trigger.webhook');
   const [received, setReceived] = useState<Record<string, unknown> | undefined>(undefined);
+  const fieldsOpen = expandedKey ?? (dock?.kind === 'setup' ? 'setup' : null);
   useEffect(() => {
-    if (!webhookTrigger || panelKey === null) return;
+    if (!webhookTrigger || fieldsOpen === null) return;
     let live = true;
     getWebhook(automation.id)
       .then((info) => {
@@ -486,7 +484,7 @@ function Builder({
     return () => {
       live = false;
     };
-  }, [webhookTrigger, panelKey, automation.id]);
+  }, [webhookTrigger, fieldsOpen, automation.id]);
   // Pinned data first, then each step's last test, then samples.
   const { scope, scopeSource } = useMemo(
     () => buildScope(checkedGraph, pinned, workspaceName, testRun.lastTest, received),
@@ -570,32 +568,38 @@ function Builder({
     [flow],
   );
 
-  const open = useCallback((key: string) => {
-    dispatch({ type: 'select', selection: { nodes: [key], edges: [], notes: [] } });
-    setPanelKey(key);
-    setPicker(null);
+  /** The dock remembers what had the keyboard, so closing it hands the keyboard back. */
+  const openDock = useCallback((next: Dock) => {
+    setDock((current) => {
+      if (!current) dockReturn.current = document.activeElement as HTMLElement | null;
+      return next;
+    });
   }, []);
 
-  const expand = useCallback(
-    (key: string) => {
-      open(key);
-      setExpandedKey(key);
-      setFromBadge(false);
-    },
-    [open],
-  );
+  const closeDock = useCallback(() => {
+    setDock(null);
+    setPreview(null);
+    requestAnimationFrame(() => dockReturn.current?.focus?.());
+  }, []);
 
-  /** A result badge on the painted canvas: the Expanded view on that run's input and output. */
-  const expandRun = useCallback(
+  /** Opens the step editor; the step's own place stays selected on the canvas behind it. */
+  const open = useCallback((key: string) => {
+    dispatch({ type: 'select', selection: { nodes: [key], edges: [], notes: [] } });
+    setExpandedKey(key);
+    setFromBadge(false);
+    setDock((current) => (current?.kind === 'picker' ? null : current));
+  }, []);
+
+  /** A result badge on the painted canvas: the editor on that run's input and output. */
+  const openRun = useCallback(
     (key: string) => {
       open(key);
-      setExpandedKey(key);
       setFromBadge(true);
     },
     [open],
   );
 
-  /** Centres a step, once the panel has opened and the canvas has narrowed. */
+  /** Centres a step, once a dock has opened and the canvas has narrowed. */
   const centre = useCallback(
     (key: string) => {
       requestAnimationFrame(() =>
@@ -608,15 +612,7 @@ function Builder({
     [flow],
   );
 
-  const showSteps = useCallback(() => {
-    // The sheet holds one thing at a time: leaving the open step brings the picker back.
-    setPanelKey(null);
-    setPicker(null);
-    setStepsSheet(true);
-    requestAnimationFrame(() =>
-      document.querySelector<HTMLInputElement>('[data-steps-panel] input[type="search"]')?.focus(),
-    );
-  }, []);
+  const showSteps = useCallback(() => openDock({ kind: 'picker', place: null }), [openDock]);
 
   /** Focus-the-field: lands on where an issue lives (`issue-focus.ts`). */
   const goTo = useCallback(
@@ -636,7 +632,7 @@ function Builder({
         centre(place.nodeKey);
       } else if (place.kind === 'line') {
         dispatch({ type: 'select', selection: { nodes: [], edges: [place.edgeId], notes: [] } });
-        setPanelKey(null);
+        setExpandedKey(null);
         if (place.nodeKey) centre(place.nodeKey);
       } else if (place.action === 'addTrigger') {
         showSteps();
@@ -650,10 +646,68 @@ function Builder({
     [goTo],
   );
 
-  // A focus request is for one opening of one step's panel.
+  // Setup, Versions and Logs take room from the canvas for a while: the whole workflow stays
+  // in view. Not the picker: what it adds gets revealed, and a fit here would fight that.
+  const roomy = dock !== null && dock.kind !== 'picker';
+  // Starts from "no room taken", so a page that opens on Setup fits its narrower canvas too.
+  const roomSeen = useRef({ roomy: false, logsOpen: false });
   useEffect(() => {
-    if (focusRequest && focusRequest.key !== panelKey) setFocusRequest(null);
-  }, [focusRequest, panelKey]);
+    if (roomSeen.current.roomy === roomy && roomSeen.current.logsOpen === logsOpen) return;
+    roomSeen.current = { roomy, logsOpen };
+    // Two frames: the first lays out the new size, the second measures it.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        const wide = readableViewport(flow);
+        if (!wide) {
+          void flow.fitView({ ...CANVAS_FIT, duration: 200 });
+          return;
+        }
+        // A flow that would shrink to specks keeps its size and sideways position. It only
+        // recentres up and down, so a shorter canvas does not push it under the floating tools.
+        const view = flow.getViewport();
+        const bounds = flow.getNodesBounds(flow.getNodes());
+        const y = wide.y + (bounds.y + bounds.height / 2) * (wide.zoom - view.zoom);
+        void flow.setViewport({ ...view, y }, { duration: 200 });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [roomy, logsOpen, flow]);
+
+  // A focus request is for one opening of one step's editor.
+  useEffect(() => {
+    if (focusRequest && focusRequest.key !== expandedKey) setFocusRequest(null);
+  }, [focusRequest, expandedKey]);
+
+  // A refused test says which steps, as the API only counts them, and shows where.
+  useLayoutEffect(() => {
+    whenBlocked.current = (message, stepKey) => {
+      const own = stepKey
+        ? issues.find(
+            (issue) =>
+              issue.nodeKey === stepKey &&
+              issue.severity === 'error' &&
+              issue.code !== 'node.not_runnable',
+          )
+        : undefined;
+      if (own) {
+        toast({ variant: 'warning', title: STEP_TEST_REFUSED_TITLE, description: own.message });
+        goToIssue(own);
+        return;
+      }
+      toast({
+        variant: 'warning',
+        title: stepKey ? STEP_TEST_REFUSED_TITLE : TEST_REFUSED_TITLE,
+        description: refusedTestText(setupList, message),
+      });
+      // The editor is over the canvas; the dock beside it would be out of reach.
+      setExpandedKey(null);
+      openDock({ kind: 'setup' });
+    };
+  });
 
   // The Expanded view closes with its step (deleted, or undone away).
   useEffect(() => {
@@ -661,7 +715,7 @@ function Builder({
       setExpandedKey(null);
   }, [expandedKey, state.graph]);
 
-  // Debug In Editor: once the canvas is back, select the step and open its panel.
+  // Debug In Editor: once the canvas is back, select the step and open its editor.
   useEffect(() => {
     if (tab !== 'editor' || preview || !pendingFocus) return;
     setPendingFocus(null);
@@ -759,9 +813,8 @@ function Builder({
         });
       }
       remember(item.id);
-      setPanelKey(key);
-      setPicker(null);
-      setStepsSheet(false);
+      // Adding only selects it (the reducer does): a dialog on each add would stop the flow.
+      setDock((current) => (current?.kind === 'picker' ? null : current));
       reveal(key);
     },
     [remember, reveal],
@@ -806,7 +859,6 @@ function Builder({
     };
     dispatch({ type: 'select', selection });
     dispatch({ type: 'deleteSelection' });
-    setPanelKey((current) => (current && selection.nodes.includes(current) ? null : current));
   }, []);
 
   const duplicate = useCallback(
@@ -819,19 +871,21 @@ function Builder({
 
   const addNote = useCallback(
     (at?: Position) => {
+      // Roomy enough for a few lines, and two rows of cards tall (`STEP_GAP_Y`).
+      const size = { w: 360, h: 180 };
       const box = canvasBox.current?.getBoundingClientRect();
-      const centre =
-        at ??
-        (box
-          ? flow.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 })
-          : { x: 0, y: 0 });
+      const centre = box
+        ? flow.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 })
+        : { x: 0, y: 0 };
       dispatch({
         type: 'addNote',
         note: {
           id: keys()(),
-          // 360 by 180: a note sits beside 320 by 120 cards and has to read like one of them.
-          position: { x: Math.round(centre.x - 180), y: Math.round(centre.y - 90) },
-          size: { w: 360, h: 180 },
+          // Where someone pointed, exactly; from a button, somewhere clear.
+          position: at
+            ? { x: Math.round(at.x - size.w / 2), y: Math.round(at.y - size.h / 2) }
+            : placeNote(graphRef.current, centre, size),
+          size,
           text: '',
           colour: 'yellow',
         },
@@ -865,25 +919,24 @@ function Builder({
       dispatch({ type: 'select', selection: { nodes: [], edges: [], notes: [] } });
       if (stateRef.current.name === 'Untitled Workflow')
         dispatch({ type: 'rename', name: template.title });
-      setShowSetup(true);
-      requestAnimationFrame(
-        () => void flow.fitView({ duration: 200, padding: 0.12, minZoom: 0.6, maxZoom: 1 }),
-      );
+      openDock({ kind: 'setup' });
+      // A blank canvas still has its opening fit queued, and it only lands once these cards are
+      // measured. The promise settles after that, so the readable zoom has the last word.
+      void flow.fitView(CANVAS_FIT).then(() => {
+        const view = readableViewport(flow);
+        if (view) void flow.setViewport(view);
+      });
     },
-    [flow, keys],
+    [flow, keys, openDock],
   );
 
   // ---- The API the cards, lines and notes use ---------------------------------------
 
-  /** Test Step from a card: its panel opens on the Test tab, where the result lands. */
-  const testStepFromCard = useCallback(
-    (key: string) => {
-      open(key);
-      setShowTest((current) => ({ key, seq: (current?.seq ?? 0) + 1 }));
-      void testRef.current.testStep(key);
-    },
-    [open],
-  );
+  /** Test Step from a card: it runs in place, the badge and Logs show how it went. */
+  const testStepFromCard = useCallback((key: string) => {
+    dispatch({ type: 'select', selection: { nodes: [key], edges: [], notes: [] } });
+    void testRef.current.testStep(key);
+  }, []);
 
   const builderApi = useMemo(
     (): BuilderApi => ({
@@ -891,20 +944,16 @@ function Builder({
       graphRef,
       locked,
       open,
-      expand,
+      openIssue: goToIssue,
       pinned: pinnedKeys,
       rename: (key) => {
         open(key);
-        setRenameSignal((count) => count + 1);
+        focusSeq.current += 1;
+        setFocusRequest({ key, request: { place: 'name', seq: focusSeq.current } });
       },
-      pickFrom: (from, _at, flowAt) => {
-        setPanelKey(null);
-        setPicker({ placement: 'next', from, flowAt });
-      },
-      pickOnEdge: (edgeId) => {
-        setPanelKey(null);
-        setPicker({ placement: 'next', edgeId });
-      },
+      pickFrom: (from, _at, flowAt) =>
+        openDock({ kind: 'picker', place: { placement: 'next', from, flowAt } }),
+      pickOnEdge: (edgeId) => openDock({ kind: 'picker', place: { placement: 'next', edgeId } }),
       remove: removeItems,
       duplicate,
       copy,
@@ -915,7 +964,8 @@ function Builder({
     [
       locked,
       open,
-      expand,
+      goToIssue,
+      openDock,
       pinnedKeys,
       removeItems,
       duplicate,
@@ -933,6 +983,18 @@ function Builder({
   useEffect(() => {
     if (!editing) return;
     function onKeyDown(event: KeyboardEvent) {
+      // Ctrl/Cmd+K works from any field and from the step editor, or the browser takes it.
+      // Over any other dialog (the palette itself) it only keeps the browser away.
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        const dialog = (event.target as Element | null)?.closest?.(
+          '[role="dialog"], [role="alertdialog"]',
+        );
+        if (dialog && dialog.getAttribute('data-testid') !== 'expanded-view') return;
+        setExpandedKey(null);
+        setPalette(true);
+        return;
+      }
       if (event.defaultPrevented || isTyping(event.target)) return;
       const command = shortcutFor(event);
       if (!command) return;
@@ -949,10 +1011,8 @@ function Builder({
             addNote();
             return true;
           case 'openStep':
-            // Enter opens the step's panel; Enter again opens the Expanded view.
             if (!single) return false;
-            if (panelKey === single) expand(single);
-            else open(single);
+            open(single);
             return true;
           case 'rename':
             if (!single) return false;
@@ -991,10 +1051,9 @@ function Builder({
             dispatch({ type: 'redo' });
             return true;
           case 'palette':
-            setPalette(true);
             return true;
           case 'fit':
-            void flow.fitView({ duration: 200, padding: 0.25, maxZoom: 1 });
+            void flow.fitView({ ...CANVAS_FIT, duration: 200 });
             return true;
           case 'resetZoom':
             void flow.zoomTo(1, { duration: 200 });
@@ -1033,17 +1092,8 @@ function Builder({
             return true;
           }
           case 'escape':
-            if (picker) setPicker(null);
-            else if (panelKey) {
-              const key = panelKey;
-              setPanelKey(null);
-              // React Flow blurs a card on Escape: hand the keyboard back to the step's card.
-              requestAnimationFrame(() => {
-                document
-                  .querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(key)}"]`)
-                  ?.focus();
-              });
-            } else dispatch({ type: 'select', selection: { nodes: [], edges: [], notes: [] } });
+            if (dock) closeDock();
+            else dispatch({ type: 'select', selection: { nodes: [], edges: [], notes: [] } });
             return true;
         }
       })();
@@ -1056,7 +1106,6 @@ function Builder({
     showSteps,
     addNote,
     open,
-    expand,
     builderApi,
     copy,
     paste,
@@ -1064,8 +1113,8 @@ function Builder({
     removeItems,
     flow,
     reveal,
-    picker,
-    panelKey,
+    dock,
+    closeDock,
   ]);
 
   // ---- Deep link ------------------------------------------------------------------------
@@ -1147,7 +1196,6 @@ function Builder({
       const def = getDefinition(node.type, node.typeVersion);
       const items: MenuItem[] = [
         { label: 'Open', shortcut: 'Enter', onSelect: () => open(node.key) },
-        { label: 'Expand', onSelect: () => expand(node.key) },
         { label: 'Rename', shortcut: 'F2', onSelect: () => builderApi.rename(node.key) },
       ];
       if (def?.canDisable) {
@@ -1216,19 +1264,19 @@ function Builder({
   function onPalette(command: PaletteCommand) {
     if (command === 'tidy') tidy();
     else if (command === 'addNote') addNote();
+    else if (command === 'test') setStartSignal((count) => count + 1);
+    else if (command === 'activate') setActivateSignal((count) => count + 1);
+    else if (command === 'setup') openDock({ kind: 'setup' });
     else if (command === 'toggleSteps') {
-      if (stepsSheet || picker) {
-        setPicker(null);
-        setStepsSheet(false);
-      } else showSteps();
-    } else if (command === 'fit') void flow.fitView({ duration: 200, padding: 0.25, maxZoom: 1 });
+      if (dock?.kind === 'picker') closeDock();
+      else showSteps();
+    } else if (command === 'fit') void flow.fitView({ ...CANVAS_FIT, duration: 200 });
     else setShortcuts(true);
   }
 
   // ---- Render ------------------------------------------------------------------------------
 
   const hasTrigger = state.graph.nodes.some((node) => isTriggerType(node.type));
-  const panelNode = panelKey ? state.graph.nodes.find((node) => node.key === panelKey) : undefined;
   const paletteItems = useMemo(
     () =>
       catalog
@@ -1237,7 +1285,8 @@ function Builder({
     [catalog, hasTrigger],
   );
 
-  /** The picker in its sheet: for a place on the canvas when `picker` is set, else free. */
+  /** The picker in its dock: for a place on the canvas when it has one, else free. */
+  const picker = dock?.kind === 'picker' ? dock.place : null;
   const stepsPicker = (
     <StepPicker
       key={picker ? `${picker.placement}-${picker.edgeId ?? picker.from?.source ?? ''}` : 'free'}
@@ -1257,16 +1306,13 @@ function Builder({
             })
           : addItem(item)
       }
-      onClose={() => {
-        setPicker(null);
-        setStepsSheet(false);
-      }}
+      onClose={closeDock}
       autoFocus
       className="h-full"
     />
   );
 
-  /** Test Step, its result and Send For Real In Tests, for a step's Test tab and Output pane. */
+  /** Test Step, its result and Send For Real In Tests, for the step editor and the Setup dock. */
   const stepTest = (node: GraphNode): StepTestControls => ({
     result: stepResult(node.key, testRun.model, testRun.lastTest),
     busy: testRun.busy,
@@ -1278,40 +1324,19 @@ function Builder({
     workflowName: state.name,
   });
 
-  const panel = panelNode ? (
-    <StepPanel
-      key={panelNode.key}
-      node={panelNode}
-      graph={state.graph}
-      issues={issuesMap.get(panelNode.key) ?? []}
-      context={fieldContext}
-      dispatch={dispatch}
-      pin={pinControls(panelNode.key)}
-      onClose={() => setPanelKey(null)}
-      onExpand={() => expand(panelNode.key)}
-      renameSignal={renameSignal}
-      focus={focusRequest?.key === panelNode.key ? focusRequest.request : null}
-      test={stepTest(panelNode)}
-      showTest={showTest?.key === panelNode.key ? showTest.seq : 0}
-    />
-  ) : null;
   const expandedNode = expandedKey
     ? state.graph.nodes.find((node) => node.key === expandedKey)
     : undefined;
 
   const trigger = state.graph.nodes.find((node) => isTriggerType(node.type));
-  // The run bar: the painted test, or one still going after an edit cleared the paint.
-  const barRun =
-    testRun.painted ??
-    (testRun.model && !isTerminalRun(testRun.model.runStatus) ? testRun.model : null);
-  const barSteps = barRun
+  const logsSteps = testRun.model
     ? testRun.stepTestKey
       ? 1
-      : (barRun.graph ?? state.graph).nodes.length
+      : (testRun.model.graph ?? state.graph).nodes.length
     : 0;
   const reviewStep = reviewKey && testRun.model ? testRun.model.steps[reviewKey] : undefined;
 
-  /** An issue from the top bar or the live controls: back to the Editor, then to its field. */
+  /** An issue from the live controls or the Setup dock: back to the Editor, then to its field. */
   function openIssue(issue: ValidationIssue) {
     setPreview(null);
     setTab('editor');
@@ -1324,10 +1349,7 @@ function Builder({
         <button
           type="button"
           data-testid="add-trigger"
-          onClick={() => {
-            setPanelKey(null);
-            setPicker({ placement: 'trigger' });
-          }}
+          onClick={() => openDock({ kind: 'picker', place: { placement: 'trigger' } })}
           className="flex w-full items-center gap-4 rounded-card border-2 border-dashed border-outline bg-secondary p-5 text-left outline-none hover:bg-chrome focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
         >
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-actionPrimary text-onActionPrimary">
@@ -1348,12 +1370,9 @@ function Builder({
       </div>
     ) : null;
 
-  // One sheet at a time: the open step's settings, else the step picker.
-  const pickerOpen = (stepsSheet || picker !== null) && panel === null;
-
   return (
     <BuilderProvider value={builderApi}>
-      <div className="flex min-w-0 flex-1 flex-col gap-3" data-testid="workflow-builder">
+      <div className="flex min-w-0 flex-1 flex-col" data-testid="workflow-builder">
         <BuilderTopBar
           orgId={orgId}
           name={state.name}
@@ -1363,26 +1382,9 @@ function Builder({
           tab={tab}
           onTabChange={(next) => {
             setPreview(null);
+            setDock(null);
             setTab(next);
           }}
-          issues={issues}
-          graph={state.graph}
-          onOpenIssue={openIssue}
-          issuesSignal={issuesSignal}
-          testControls={
-            editing ? (
-              <TestControls
-                trigger={trigger}
-                hasPinnedTrigger={trigger ? pinnedKeys.has(trigger.key) : false}
-                busy={testRun.busy}
-                running={testRun.running}
-                stopping={testRun.stopping}
-                onStart={(options) => void testRun.start(options)}
-                onStop={() => void testRun.stop()}
-                startSignal={startSignal}
-              />
-            ) : null
-          }
           liveControls={
             <WorkflowLiveControls
               automation={{
@@ -1400,16 +1402,24 @@ function Builder({
               onChanged={adopt}
               onOpenIssue={openIssue}
               onRunStarted={showRun}
+              onVersions={() => {
+                setTab('editor');
+                openDock({ kind: 'versions' });
+              }}
+              activateSignal={activateSignal}
               summary={summary}
             />
           }
-          onVersions={() => setVersionsOpen(true)}
           onDuplicate={() => void duplicateWorkflow()}
           onDelete={() => setDeleting(true)}
         />
 
         {autosave.status === 'conflict' ? (
-          <Alert variant="danger" className="flex-wrap items-center" data-testid="save-conflict">
+          <Alert
+            variant="danger"
+            className="m-3 mb-0 flex-wrap items-center"
+            data-testid="save-conflict"
+          >
             <TriangleAlert aria-hidden="true" className="h-5 w-5 shrink-0" strokeWidth={2.5} />
             <span className="min-w-0 grow basis-56">{CONFLICT_MESSAGE}</span>
             <Button variant="secondary" size="sm" onClick={copyChanges}>
@@ -1427,7 +1437,7 @@ function Builder({
           </Alert>
         ) : null}
         {autosave.status === 'failed' ? (
-          <Alert variant="danger" className="flex-wrap items-center">
+          <Alert variant="danger" className="m-3 mb-0 flex-wrap items-center">
             <TriangleAlert aria-hidden="true" className="h-5 w-5 shrink-0" strokeWidth={2.5} />
             <span className="min-w-0 grow basis-56">
               {autosave.message ?? 'Your changes were not saved.'}
@@ -1448,29 +1458,35 @@ function Builder({
             openReview={review}
             onSelectRun={selectRun}
             onDebugInEditor={debugInEditor}
+            onTestWorkflow={() => {
+              setTab('editor');
+              setStartSignal((count) => count + 1);
+            }}
           />
-        ) : preview ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="version-preview">
-            <VersionPreviewBanner
-              automationId={automation.id}
-              version={preview}
-              flush={flushRevision}
-              onRestored={adopt}
-              onClose={() => setPreview(null)}
-            />
-            <div className="flex min-h-0 flex-1 overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
-              <RunCanvas
-                key={preview.version}
-                graph={preview.graph}
-                run={null}
-                catalog={catalog}
-                className="min-h-0 flex-1"
-              />
-            </div>
-          </div>
         ) : (
           <div className="flex min-h-0 flex-1">
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-card border-2 border-outline shadow-brutalSm">
+            {preview ? (
+              <div className="relative flex min-w-0 flex-1" data-testid="version-preview">
+                <VersionPreviewActions
+                  automationId={automation.id}
+                  version={preview}
+                  flush={flushRevision}
+                  onRestored={(detail) => {
+                    adopt(detail);
+                    closeDock();
+                  }}
+                  onClose={() => setPreview(null)}
+                />
+                <RunCanvas
+                  key={preview.version}
+                  graph={preview.graph}
+                  run={null}
+                  catalog={catalog}
+                  className="min-h-0 flex-1 bg-hatch"
+                />
+              </div>
+            ) : (
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <div ref={canvasBox} className="relative min-h-0 min-w-0 flex-1">
                 <WorkflowCanvas
                   graph={state.graph}
@@ -1479,9 +1495,9 @@ function Builder({
                   summary={summary}
                   tidying={tidying}
                   run={testRun.painted}
-                  onRunBadgeClick={expandRun}
+                  onRunBadgeClick={openRun}
                   onConnectRefused={(reason) =>
-                    toast({ title: reason || LOOP_REFUSED, variant: 'danger' })
+                    toast({ title: reason || LOOP_REFUSED, variant: 'warning' })
                   }
                   onDropStep={(itemId, at) => {
                     const item = catalog
@@ -1491,10 +1507,10 @@ function Builder({
                       : undefined;
                     if (item) addItem(item, { position: at });
                   }}
-                  onPaneClick={() => {
-                    setPanelKey(null);
-                    setPicker(null);
-                  }}
+                  // The picker is for the place just pressed; Setup and Versions stay open.
+                  onPaneClick={() =>
+                    setDock((current) => (current?.kind === 'picker' ? null : current))
+                  }
                   empty={empty}
                 >
                   <CanvasControls
@@ -1507,78 +1523,93 @@ function Builder({
                     onLock={() => setLocked((value) => !value)}
                     hasSteps={state.graph.nodes.length > 0}
                   />
-                  {showSetup && state.graph.nodes.length > 0 ? (
+                  {setupList.length > 0 && state.graph.nodes.length > 0 ? (
                     <Panel position="top-left" className="m-3!">
-                      <FinishSetup
-                        items={setupList}
-                        onOpen={(item) => goToIssue(item.issue)}
-                        onDismiss={() => setShowSetup(false)}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        aria-pressed={dock?.kind === 'setup'}
+                        data-testid="finish-setup"
+                        onClick={() =>
+                          dock?.kind === 'setup' ? closeDock() : openDock({ kind: 'setup' })
+                        }
+                      >
+                        <MotionIcon icon={ListChecksIcon} className="h-4 w-4" />
+                        Finish Setup
+                        <Badge variant="danger" className="ms-1 px-1.5">
+                          {setupList.length}
+                        </Badge>
+                      </Button>
+                    </Panel>
+                  ) : null}
+                  <ToolRail
+                    pickerOpen={dock?.kind === 'picker'}
+                    setupOpen={dock?.kind === 'setup'}
+                    onAddStep={() => (dock?.kind === 'picker' ? closeDock() : showSteps())}
+                    onSearch={() => setPalette(true)}
+                    onAddNote={() => addNote()}
+                    onSetup={() =>
+                      dock?.kind === 'setup' ? closeDock() : openDock({ kind: 'setup' })
+                    }
+                  />
+                  {state.graph.nodes.length > 0 ? (
+                    <Panel position="bottom-center" className="m-3!">
+                      <TestControls
+                        trigger={trigger}
+                        hasPinnedTrigger={trigger ? pinnedKeys.has(trigger.key) : false}
+                        busy={testRun.busy}
+                        running={testRun.running}
+                        stopping={testRun.stopping}
+                        onStart={(options) => void testRun.start(options)}
+                        onStop={() => void testRun.stop()}
+                        startSignal={startSignal}
+                        startSeen={startSeen}
                       />
                     </Panel>
                   ) : null}
-                  <Panel position="top-right" className="m-3!">
-                    <Button variant="secondary" size="sm" onClick={showSteps}>
-                      <MotionIcon icon={PlusIcon} className="h-4 w-4" />
-                      Add Step
-                    </Button>
-                  </Panel>
                 </WorkflowCanvas>
               </div>
-              {barRun ? (
-                <RunBar
-                  run={barRun}
-                  totalSteps={barSteps}
-                  stopping={testRun.stopping}
-                  onStop={() => void testRun.stop()}
-                  onClose={testRun.unpaint}
-                  onOpenReview={setReviewKey}
-                />
-              ) : null}
+              <LogsDock
+                run={testRun.model}
+                painted={testRun.painted !== null}
+                totalSteps={logsSteps}
+                onClose={testRun.unpaint}
+                onOpenChange={setLogsOpen}
+                onOpenReview={setReviewKey}
+                onReviewAnswered={testRun.refresh}
+                workflowName={state.name}
+                activeVersion={live.activeVersion}
+              />
             </div>
+            )}
+            {dock ? (
+              <BuilderDock kind={dock.kind} onClose={closeDock}>
+                {dock.kind === 'picker' ? stepsPicker : null}
+                {dock.kind === 'setup' ? (
+                  <SetupDock
+                    graph={state.graph}
+                    issues={issues}
+                    context={fieldContext}
+                    dispatch={dispatch}
+                    test={stepTest}
+                    onClose={closeDock}
+                    onOpenStep={open}
+                    onOpenIssue={goToIssue}
+                  />
+                ) : null}
+                {dock.kind === 'versions' ? (
+                  <VersionsDock
+                    automationId={automation.id}
+                    previewing={preview?.version ?? null}
+                    onPreview={setPreview}
+                    onClose={closeDock}
+                  />
+                ) : null}
+              </BuilderDock>
+            ) : null}
           </div>
         )}
       </div>
-
-      {editing ? (
-        <>
-          <Sheet
-            open={pickerOpen}
-            onOpenChange={(value) => {
-              if (value) return;
-              setStepsSheet(false);
-              setPicker(null);
-            }}
-          >
-            <SheetContent
-              side="right"
-              className="flex w-full max-w-md flex-col p-0"
-              data-steps-panel
-              data-step-sheet=""
-            >
-              <SheetTitle className="sr-only">Steps</SheetTitle>
-              <SheetDescription className="sr-only">
-                Choose a step to add to the workflow.
-              </SheetDescription>
-              {stepsPicker}
-            </SheetContent>
-          </Sheet>
-          <Sheet open={panel !== null} onOpenChange={(value) => !value && setPanelKey(null)}>
-            {/* The panel has its own Close; workflow-canvas.css hides the sheet's, which sat on top of it. */}
-            <SheetContent
-              side="right"
-              className="flex w-full max-w-lg flex-col p-0"
-              data-step-sheet=""
-              // The sheet would put the cursor in the name field and select it; a field
-              // that needs the focus (an issue, a deep link) asks for it itself.
-              onOpenAutoFocus={(event) => event.preventDefault()}
-            >
-              <SheetTitle className="sr-only">{panelNode?.name ?? 'Step'}</SheetTitle>
-              <SheetDescription className="sr-only">Set up this step.</SheetDescription>
-              {panel}
-            </SheetContent>
-          </Sheet>
-        </>
-      ) : null}
 
       <CanvasContextMenu
         at={menu?.at ?? null}
@@ -1599,16 +1630,6 @@ function Builder({
         onCommand={onPalette}
       />
       <ShortcutsSheet open={shortcuts} onOpenChange={setShortcuts} />
-      <VersionsDrawer
-        open={versionsOpen}
-        onOpenChange={setVersionsOpen}
-        automationId={automation.id}
-        previewing={preview?.version ?? null}
-        onPreview={(version) => {
-          setPreview(version);
-          if (version) setTab('editor');
-        }}
-      />
 
       <ExpandedView
         node={expandedNode}
@@ -1623,9 +1644,10 @@ function Builder({
         }}
         onNavigate={(key) => {
           open(key);
-          setExpandedKey(key);
           reveal(key);
         }}
+        focus={expandedKey && focusRequest?.key === expandedKey ? focusRequest.request : null}
+        saveState={<SaveState status={autosave.status} message={autosave.message} />}
         test={expandedNode ? stepTest(expandedNode) : undefined}
         runResult={
           fromBadge && expandedNode ? stepResult(expandedNode.key, testRun.model, {}) : null
@@ -1650,7 +1672,7 @@ function Builder({
                 testRun.refresh();
                 setReviewKey(null);
               }}
-              className="border-0 p-0 shadow-none"
+              className="border-0 bg-transparent p-0 shadow-none"
             />
           </DialogContent>
         ) : null}

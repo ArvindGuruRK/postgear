@@ -2,6 +2,7 @@
 
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { forwardRef } from 'react';
+import { SEGMENT, SEGMENT_FRAME, SEGMENT_WORDS } from '../lib/segmented';
 import { cn } from '../lib/utils';
 
 export const Tabs = TabsPrimitive.Root;
@@ -12,10 +13,7 @@ export const TabsList = forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn(
-      'inline-flex items-center gap-1 rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalSm',
-      className,
-    )}
+    className={cn('inline-flex max-w-full items-center', SEGMENT_FRAME, className)}
     {...props}
   />
 ));
@@ -28,12 +26,11 @@ export const TabsTrigger = forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2',
-      'type-ui text-xs text-ink transition-colors',
-      'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-      'disabled:pointer-events-none disabled:opacity-50',
-      'data-[state=active]:bg-actionPrimary data-[state=active]:text-onActionPrimary',
-      'data-[state=inactive]:hover:bg-actionPrimary/10',
+      SEGMENT,
+      SEGMENT_WORDS,
+      'border-transparent text-ink',
+      'data-[state=active]:border-outline data-[state=active]:bg-actionPrimary data-[state=active]:text-onActionPrimary',
+      'data-[state=inactive]:hover:bg-primary',
       className,
     )}
     {...props}

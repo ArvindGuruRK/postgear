@@ -35,15 +35,47 @@ export interface PickerItem {
   fixHref: 'channels' | null;
 }
 
-export const PICKER_CATEGORIES: readonly { id: NodeCategory; title: string }[] = [
-  { id: 'trigger', title: 'Triggers' },
-  { id: 'postgear', title: 'PostGear' },
-  { id: 'social', title: 'Social Channels' },
-  { id: 'ai', title: 'AI' },
-  { id: 'logic', title: 'Logic' },
-  { id: 'notify', title: 'Notify' },
-  { id: 'data', title: 'Data' },
+export const PICKER_CATEGORIES: readonly {
+  id: NodeCategory;
+  title: string;
+  description: string;
+}[] = [
+  { id: 'trigger', title: 'Triggers', description: 'Choose what starts this workflow.' },
+  { id: 'postgear', title: 'PostGear', description: 'Draft, queue and read your posts.' },
+  { id: 'social', title: 'Social Channels', description: 'Publish to a connected channel.' },
+  { id: 'ai', title: 'AI', description: 'Write text and make images and videos.' },
+  { id: 'logic', title: 'Logic', description: 'Branch, wait, filter and ask for a review.' },
+  { id: 'notify', title: 'Notify', description: 'Tell your team in Slack, Teams or by email.' },
+  { id: 'data', title: 'Data', description: 'Send data to sheets and other apps.' },
 ];
+
+/** Where most workflows reach first: these lead their category, the rest follow under Other. */
+const POPULAR: ReadonlySet<string> = new Set([
+  'trigger.schedule',
+  'trigger.manual',
+  'trigger.webhook',
+  'postgear.createDraft',
+  'postgear.addToQueue',
+  'ai.generateText',
+  'ai.rewriteInBrandVoice',
+  'logic.ifElse',
+  'logic.manualReview',
+  'notify.slack',
+  'notify.email',
+  'data.httpRequest',
+  'data.googleSheetsAppendRow',
+]);
+
+/** A category's items as Popular and Other. Either can be empty: then it needs no headings. */
+export function splitPopular(items: readonly PickerItem[]): {
+  popular: PickerItem[];
+  other: PickerItem[];
+} {
+  return {
+    popular: items.filter((item) => POPULAR.has(item.id)),
+    other: items.filter((item) => !POPULAR.has(item.id)),
+  };
+}
 
 export const ONE_TRIGGER = 'A workflow can have only one trigger.';
 export const RECENT_LIMIT = 5;

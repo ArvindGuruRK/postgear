@@ -1,9 +1,10 @@
 'use client';
 
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { cn } from '../lib/utils';
 import { Calendar, CalendarFooter, CalendarTrigger, calendarPopoverClasses } from './calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { TimeColumns, useTwelveHourClock } from './time-picker';
 
 /**
  * A date and a time in one field (UI revamp, 2026-10-19): the design
@@ -13,10 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './popover';
  * theme.
  *
  * - Choosing a day keeps the time; choosing a time keeps the day.
- * - The clock follows the viewer's locale: hours 1 to 12 with AM / PM where
- *   that is the convention, 00 to 23 otherwise.
- * - Minutes step by 5, the way people schedule; a time already on another
- *   minute (a channel's 9:20 posting slot) is kept and shown in the list.
+ * - The time columns are `TimePicker`'s.
  * - Everything is local time. Callers convert at their own edges.
  * - Below the `sm` breakpoint the time columns sit under the calendar, so the
  *   popover fits a phone.
@@ -42,8 +40,6 @@ export interface DateTimePickerProps {
   invalid?: boolean;
 }
 
-const MINUTE_STEP = 5;
-
 function startOfDay(date: Date): Date {
   const next = new Date(date);
   next.setHours(0, 0, 0, 0);
@@ -56,11 +52,6 @@ function nextHour(): Date {
   next.setMinutes(0, 0, 0);
   next.setHours(next.getHours() + 1);
   return next;
-}
-
-function uses12HourClock(): boolean {
-  const cycle = new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hourCycle;
-  return cycle === 'h11' || cycle === 'h12';
 }
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -84,13 +75,8 @@ export function DateTimePicker({
   invalid = false,
 }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
-  const [twelveHour, setTwelveHour] = useState(true);
+  const twelveHour = useTwelveHourClock();
   const [month, setMonth] = useState<Date>(() => value ?? new Date());
-
-  // After mount: the server does not know the viewer's clock convention.
-  useEffect(() => {
-    setTwelveHour(uses12HourClock());
-  }, []);
 
   // Opening shows the month of the chosen date, not wherever it was left.
   // Here rather than in an effect on `value`: callers pass a fresh Date on
@@ -118,17 +104,6 @@ export function DateTimePicker({
     next.setHours(hours, minutes, 0, 0);
     onValueChange(next);
   }
-
-  const hours24 = current.getHours();
-  const minutes = current.getMinutes();
-  const pm = hours24 >= 12;
-  const hourOptions = twelveHour
-    ? Array.from({ length: 12 }, (_, index) => index + 1)
-    : Array.from({ length: 24 }, (_, index) => index);
-  const shownHour = twelveHour ? hours24 % 12 || 12 : hours24;
-  const minuteOptions = Array.from(
-    new Set([...Array.from({ length: 60 / MINUTE_STEP }, (_, i) => i * MINUTE_STEP), minutes]),
-  ).sort((a, b) => a - b);
 
   const minDay = minDate ? startOfDay(minDate) : undefined;
   const text = value
@@ -189,40 +164,13 @@ export function DateTimePicker({
               twelveHour ? 'sm:w-56' : 'sm:w-40',
             )}
           >
-            <div className="absolute inset-0 flex gap-1.5 p-3">
-              <TimeColumn
-                label="Hour"
-                options={hourOptions.map((hour) => ({
-                  value: hour,
-                  text: twelveHour ? String(hour) : pad(hour),
-                }))}
-                selected={shownHour}
-                onSelect={(hour) =>
-                  setTime(twelveHour ? (hour % 12) + (pm ? 12 : 0) : hour, minutes)
-                }
-                open={open}
-              />
-              <TimeColumn
-                label="Minute"
-                options={minuteOptions.map((minute) => ({ value: minute, text: pad(minute) }))}
-                selected={minutes}
-                onSelect={(minute) => setTime(hours24, minute)}
-                open={open}
-              />
-              {twelveHour ? (
-                <TimeColumn
-                  label="AM or PM"
-                  shortLabel="AM/PM"
-                  options={[
-                    { value: 0, text: 'AM' },
-                    { value: 1, text: 'PM' },
-                  ]}
-                  selected={pm ? 1 : 0}
-                  onSelect={(period) => setTime((hours24 % 12) + (period === 1 ? 12 : 0), minutes)}
-                  open={open}
-                />
-              ) : null}
-            </div>
+            <TimeColumns
+              hours={current.getHours()}
+              minutes={current.getMinutes()}
+              twelveHour={twelveHour}
+              onChange={setTime}
+              open={open}
+            />
           </div>
         </div>
         <CalendarFooter
@@ -237,78 +185,5 @@ export function DateTimePicker({
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-/**
- * One scrolling column of time keys: the chosen one is the primary fill, as
- * on the calendar's grid, and is scrolled into view each time the popover
- * opens.
- */
-function TimeColumn({
-  label,
-  shortLabel,
-  options,
-  selected,
-  onSelect,
-  open,
-}: {
-  label: string;
-  shortLabel?: string;
-  options: Array<{ value: number; text: string }>;
-  selected: number;
-  onSelect: (value: number) => void;
-  open: boolean;
-}) {
-  const list = useRef<HTMLFieldSetElement>(null);
-  const chosen = useRef<HTMLButtonElement>(null);
-
-  // Centres the chosen key in its own column only; scrollIntoView would also
-  // scroll the page or the dialog behind the popover.
-  useLayoutEffect(() => {
-    if (open && list.current && chosen.current) {
-      list.current.scrollTop =
-        chosen.current.offsetTop - list.current.clientHeight / 2 + chosen.current.clientHeight / 2;
-    }
-  }, [open]);
-
-  return (
-    <div className="flex min-h-0 flex-col gap-1.5">
-      <span
-        aria-hidden="true"
-        className="text-center font-sans text-[11px] font-bold text-ink opacity-60"
-      >
-        {shortLabel ?? label}
-      </span>
-      <fieldset
-        ref={list}
-        className="relative m-0 flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-y-auto border-0 p-0 pe-1 pg-scrollbar pg-scrollbar-secondary"
-      >
-        <legend className="sr-only">{label}</legend>
-        {options.map((option) => {
-          const isSelected = option.value === selected;
-          return (
-            <button
-              key={option.value}
-              ref={isSelected ? chosen : undefined}
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => onSelect(option.value)}
-              className={cn(
-                'h-9 w-12 shrink-0 rounded-md border-2 border-outline font-sans text-sm tabular-nums',
-                'outline-none transition-[transform,background-color] duration-100',
-                'active:translate-x-[1px] active:translate-y-[1px]',
-                'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-[-3px] focus-visible:outline-focusRing',
-                isSelected
-                  ? 'bg-actionPrimary text-onActionPrimary shadow-surfaceSm'
-                  : 'bg-primary text-ink hover:bg-actionPrimary/20',
-              )}
-            >
-              {option.text}
-            </button>
-          );
-        })}
-      </fieldset>
-    </div>
   );
 }

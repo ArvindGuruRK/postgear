@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * Test Workflow (Module 08, blueprint 3 and 7): the primary button in the
- * builder's PageActions row, and Ctrl/Cmd+Enter (`startSignal`).
+ * Test Workflow (Module 08, blueprint 3 and 7): the one big button at the
+ * bottom of the canvas (n8n's Execute), and Ctrl/Cmd+Enter (`startSignal`).
  *
  * - The button tests with the data the API picks (pinned trigger data,
  *   else the last real event, else the built-in sample); its menu picks
@@ -11,23 +11,18 @@
  * - A Manual trigger with fields asks for them first (`ManualInputsDialog`).
  * - While a test runs the button becomes **Stop** (one test at a time).
  */
-import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { CircleStopIcon } from '@animateicons/react/lucide/circle-stop-icon';
 import { PlayIcon } from '@animateicons/react/lucide/play-icon';
 import type { GraphNode } from '@postgear/automation';
 import {
   Button,
-  cn,
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuTrigger,
-  liftSm,
   MotionIcon,
+  SplitButton,
 } from '@postgear/ui';
 import { LoaderCircle } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ManualInputsDialog } from './manual-inputs-dialog';
 import type { StartTestOptions, TriggerDataChoice } from './use-test-run';
 
@@ -62,8 +57,13 @@ export interface TestControlsProps {
   stopping: boolean;
   onStart: (options: StartTestOptions) => void;
   onStop: () => void;
-  /** Bumped by Ctrl/Cmd+Enter. */
+  /** Bumped by Ctrl/Cmd+Enter and by Test Workflow on the Runs tab. */
   startSignal: number;
+  /**
+   * The last signal answered, held by the page: this button is not on screen
+   * during the Runs tab, and a press there has to start the test on the way back.
+   */
+  startSeen: RefObject<number>;
 }
 
 export function TestControls({
@@ -75,9 +75,9 @@ export function TestControls({
   onStart,
   onStop,
   startSignal,
+  startSeen,
 }: TestControlsProps) {
   const [asking, setAsking] = useState<{ triggerData?: TriggerDataChoice } | null>(null);
-  const seen = useRef(startSignal);
 
   function request(triggerData?: TriggerDataChoice) {
     if (busy) return;
@@ -94,18 +94,16 @@ export function TestControls({
 
   // Ctrl/Cmd+Enter: the same as pressing the button, once per press.
   useEffect(() => {
-    if (startSignal === seen.current) return;
-    seen.current = startSignal;
+    if (startSignal === startSeen.current) return;
+    startSeen.current = startSignal;
     requestRef.current();
-  }, [startSignal]);
+  }, [startSignal, startSeen]);
 
   if (running) {
     return (
       <Button
-        size="sm"
         onClick={onStop}
         disabled={stopping}
-        className={liftSm}
         data-testid="stop-test"
         aria-keyshortcuts="Control+Enter Meta+Enter"
       >
@@ -125,39 +123,17 @@ export function TestControls({
 
   return (
     <>
-      <div className="flex items-stretch" data-testid="test-controls">
-        <Button
-          size="sm"
-          onClick={() => request()}
-          disabled={busy}
-          className={cn('rounded-r-none', liftSm)}
-          aria-keyshortcuts="Control+Enter Meta+Enter"
-          data-testid="test-workflow"
-        >
-          {busy ? (
-            <LoaderCircle
-              aria-hidden="true"
-              className="h-4 w-4 motion-safe:animate-spin"
-              strokeWidth={2.5}
-            />
-          ) : (
-            <MotionIcon icon={PlayIcon} className="h-4 w-4" />
-          )}
-          Test Workflow
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="sm"
-              disabled={busy}
-              aria-label="Choose the test data"
-              className={cn('rounded-l-none border-l-0 px-2', liftSm)}
-              data-testid="test-data-menu"
-            >
-              <MotionIcon icon={ChevronDownIcon} className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+      <SplitButton
+        size="md"
+        onClick={() => request()}
+        disabled={busy}
+        aria-keyshortcuts="Control+Enter Meta+Enter"
+        data-testid="test-workflow"
+        menuDisabled={busy}
+        menuLabel="Choose the test data"
+        menuTriggerProps={{ 'data-testid': 'test-data-menu' }}
+        menu={
+          <>
             <DropdownMenuLabel>Test Data</DropdownMenuLabel>
             <DropdownMenuItem onSelect={() => request('last')}>
               {lastRealLabel(trigger?.type)}
@@ -170,9 +146,20 @@ export function TestControls({
                 Use Pinned Data
               </DropdownMenuItem>
             ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          </>
+        }
+      >
+        {busy ? (
+          <LoaderCircle
+            aria-hidden="true"
+            className="h-4 w-4 motion-safe:animate-spin"
+            strokeWidth={2.5}
+          />
+        ) : (
+          <MotionIcon icon={PlayIcon} className="h-4 w-4" />
+        )}
+        Test Workflow
+      </SplitButton>
 
       {trigger && asksForInputs(trigger) ? (
         <ManualInputsDialog

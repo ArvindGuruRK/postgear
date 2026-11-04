@@ -17,11 +17,11 @@ describe('paintLook', () => {
   it.each([
     ['queued', 'clock', 'neutral', 'Queued', 'border-dashed'],
     ['running', 'spinner', 'primary', 'Running', ''],
-    ['waiting', 'pause', 'accent', 'Waiting For Review', ''],
+    ['waiting', 'pause', 'accent', 'Waiting For Review', 'pg-run-waiting'],
     ['succeeded', 'check', 'success', 'Succeeded', ''],
     ['dryRun', 'check', 'success', 'Dry Run', ''],
     ['handled', 'alert', 'accent', 'Error Handled', ''],
-    ['failed', 'cross', 'danger', 'Failed', 'border-actionDanger'],
+    ['failed', 'cross', 'danger', 'Failed', 'pg-run-failed'],
     ['skipped', 'skip', 'neutral', 'Skipped', 'opacity-40'],
     ['cancelled', 'stop', 'neutral', 'Cancelled', 'opacity-60'],
   ] as const)('%s: %s icon, %s fill, "%s"', (state, icon, tone, words, card) => {

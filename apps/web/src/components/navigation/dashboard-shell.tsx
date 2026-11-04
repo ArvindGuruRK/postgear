@@ -79,19 +79,20 @@ const FULL_BLEED = new Set(['calendar']);
  * way and the page brings its own way back.
  *
  * - `'fixed'`: a workspace that fills the height and scrolls its own panels
- *   (the workflow builder, `workflows/{id}`, and Studio's editor,
- *   `studio/{designId}`).
+ *   (Studio's editor, `studio/{designId}`).
+ * - `'edge'`: the same, right up to the window's edge (the workflow builder,
+ *   `workflows/{id}`, whose canvas has no frame).
  * - `'scroll'`: a page that scrolls as one (Studio's Create Design wizard,
  *   `studio/new`).
  *
  * The lists (`workflows`, `studio`) keep the frame.
  */
-function immersion(page: string): 'fixed' | 'scroll' | null {
+function immersion(page: string): 'fixed' | 'edge' | 'scroll' | null {
   const [segment, child, ...deeper] = page.split('/');
   if (segment !== 'studio' && segment !== 'workflows') return null;
   if (!child || deeper.length > 0) return null;
   if (segment === 'studio') return child === 'new' ? 'scroll' : 'fixed';
-  return 'fixed';
+  return 'edge';
 }
 
 export function DashboardShell({ orgId, children }: { orgId: string; children: ReactNode }) {
@@ -117,10 +118,11 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
       <main
         data-immersive={immersive}
         className={cn(
-          'h-dvh w-full min-w-0 bg-primary p-3',
-          immersive === 'fixed'
-            ? 'flex overflow-hidden'
-            : 'overflow-y-auto pg-scrollbar pg-scrollbar-primary',
+          'h-dvh w-full min-w-0 bg-primary',
+          immersive === 'edge' ? '' : 'p-3',
+          immersive === 'scroll'
+            ? 'overflow-y-auto pg-scrollbar pg-scrollbar-primary'
+            : 'flex overflow-hidden',
         )}
       >
         {children}

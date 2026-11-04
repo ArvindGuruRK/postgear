@@ -1,11 +1,38 @@
 import { TooltipProvider } from '@postgear/ui';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { listRuns } from '@/lib/workflows-api';
 import { RunList } from './run-list';
 import { NO_MATCHING_RUNS, NO_RUNS } from './run-list-model';
 import { makeRun } from './run-test-fixtures';
 
 jest.mock('@/lib/workflows-api', () => ({ listRuns: jest.fn() }));
+// jsdom spends minutes matching selectors while a real menu closes; plain buttons test the same.
+jest.mock('@postgear/ui', () => {
+  const { Children, cloneElement, createElement } =
+    jest.requireActual<typeof import('react')>('react');
+  type Props = { children?: React.ReactNode; onValueChange?: (value: string) => void };
+  const pass = ({ children }: Props) => children;
+  return {
+    ...jest.requireActual('@postgear/ui'),
+    DropdownMenu: pass,
+    DropdownMenuTrigger: pass,
+    DropdownMenuContent: pass,
+    DropdownMenuRadioGroup: ({ children, onValueChange }: Props) =>
+      Children.map(children as React.ReactElement<Props>[], (child) =>
+        cloneElement(child, { onValueChange }),
+      ),
+    DropdownMenuRadioItem: ({
+      children,
+      value,
+      onValueChange,
+    }: Props & { value: string }) =>
+      createElement(
+        'button',
+        { type: 'button', role: 'menuitemradio', onClick: () => onValueChange?.(value) },
+        children,
+      ),
+  };
+});
 
 const list = listRuns as jest.MockedFunction<typeof listRuns>;
 
@@ -17,6 +44,8 @@ beforeAll(() => {
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
     }) as unknown as MediaQueryList;
+  // A focused button plays its animated icon; the icon stub is a bare <svg> without the handle.
+  Object.assign(SVGElement.prototype, { startAnimation() {}, stopAnimation() {} });
 });
 
 beforeEach(() => list.mockReset());
@@ -85,15 +114,41 @@ describe('RunList', () => {
     expect(list).toHaveBeenLastCalledWith('wf-1', {});
 
     list.mockResolvedValue({ runs: [], nextCursor: null });
-    fireEvent.click(screen.getByRole('button', { name: 'Failed' }));
+    const choose = (name: string) =>
+      fireEvent.click(screen.getByRole('menuitemradio', { name }));
+    choose('Failed');
     await waitFor(() => expect(list).toHaveBeenLastCalledWith('wf-1', { status: 'FAILED' }));
     expect(await screen.findByText(NO_MATCHING_RUNS)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Failed' }).getAttribute('aria-pressed')).toBe(
-      'true',
+    expect(screen.getByTestId('run-filter').getAttribute('aria-label')).toBe(
+      'Filter runs: Failed',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Test' }));
+    choose('Test');
     await waitFor(() => expect(list).toHaveBeenLastCalledWith('wf-1', { mode: 'TEST' }));
+  });
+
+  it('refreshes by itself while one page is loaded, until Auto refresh is off', async () => {
+    jest.useFakeTimers();
+    try {
+      list.mockResolvedValue({ runs: [makeRun()], nextCursor: null });
+      renderList();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(0);
+      });
+      const before = list.mock.calls.length;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(5_000);
+      });
+      expect(list.mock.calls.length).toBe(before + 1);
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Auto refresh' }));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(20_000);
+      });
+      expect(list.mock.calls.length).toBe(before + 1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('says there are no runs yet, in a sentence', async () => {

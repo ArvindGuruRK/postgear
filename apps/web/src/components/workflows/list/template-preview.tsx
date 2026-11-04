@@ -24,7 +24,6 @@
  * never gets between the pointer and the page. It is for the eye: the row's
  * button carries the description for a screen reader.
  */
-import { ArrowRight } from '@phosphor-icons/react';
 import { Badge, cn, gsap, useGSAP } from '@postgear/ui';
 import { useRef } from 'react';
 import type { TemplateWithPicture } from '@/types/workflows';
@@ -125,9 +124,7 @@ export function TemplatePreview({
       </div>
 
       <div className="flex items-center gap-2 border-t-2 border-outline bg-inset px-4 py-3">
-        <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full border-2 border-outline', accent)} />
         <span className="font-sans text-sm text-ink">Click to start from this template</span>
-        <ArrowRight aria-hidden="true" weight="bold" className="ms-auto h-4 w-4 text-ink" />
       </div>
     </div>
   );

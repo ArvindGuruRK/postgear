@@ -1,12 +1,15 @@
 /**
- * Words and small rules for the builder page (Module 05): the issues chip,
- * the Finish Setup checklist (blueprint section 9) and the validation
- * context the browser checks the draft against. Pure and unit tested.
+ * Words and small rules for the builder page (Module 05): the Setup dock's
+ * groups, the Finish Setup list (blueprint section 9), what a refused test says
+ * and the validation context the browser checks the draft against. Pure and
+ * unit tested.
  */
 import {
+  fieldSpecFor,
   type AutomationGraph,
   type ChannelState,
   type ConnectionState,
+  type GraphNode,
   getDefinition,
   type SummaryContext,
   type ValidationContext,
@@ -67,32 +70,6 @@ export function summaryContext(
   };
 }
 
-export const NO_ISSUES = 'No issues found';
-
-/**
- * The issues chip (blueprint 3 and 6): "No issues found", else the errors
- * ("2 Issues", red, they block a test and turning on) and the warnings
- * ("1 Warning", amber, they do not) side by side.
- */
-export function issuesChip(issues: readonly ValidationIssue[]): {
-  label: string;
-  errors: number;
-  warnings: number;
-  errorLabel: string | null;
-  warningLabel: string | null;
-} {
-  const errors = issues.filter((issue) => issue.severity === 'error').length;
-  const warnings = issues.length - errors;
-  const errorLabel = errors === 0 ? null : errors === 1 ? '1 Issue' : `${errors} Issues`;
-  const warningLabel =
-    warnings === 0 ? null : warnings === 1 ? '1 Warning' : `${warnings} Warnings`;
-  const label =
-    issues.length === 0
-      ? NO_ISSUES
-      : [errorLabel, warningLabel].filter((part): part is string => part !== null).join(', ');
-  return { label, errors, warnings, errorLabel, warningLabel };
-}
-
 export interface SetupItem {
   /** The step to open, or null for a workflow-wide item (no trigger yet). */
   nodeKey: string | null;
@@ -129,6 +106,74 @@ export function setupItems(
 }
 
 export const SETUP_DONE = 'Ready to test.';
+
+/** A step's issues for its warning sign's tooltip: each once, naming the field when it has one. */
+export function issueLines(
+  definition: Parameters<typeof fieldSpecFor>[0] | undefined,
+  issues: readonly ValidationIssue[],
+): string[] {
+  const lines = issues.map((issue) => {
+    const spec =
+      definition && issue.field ? fieldSpecFor(definition, issue.field)?.spec : undefined;
+    return spec ? `${spec.label}: ${issue.message}` : issue.message;
+  });
+  return [...new Set(lines)];
+}
+
+export function issueKey(issue: ValidationIssue): string {
+  return [issue.code, issue.nodeKey, issue.field, issue.token, issue.edgeId, issue.message]
+    .map((part) => part ?? '')
+    .join('|');
+}
+
+export interface SetupRow {
+  node: GraphNode;
+  /** Every error on this step, unlike `setupItems`' first one. */
+  errors: ValidationIssue[];
+  done: boolean;
+}
+
+/**
+ * What the Setup dock lists: a row for each step with an error or with setup
+ * of its own (those that need something first), the warnings, and the errors
+ * that belong to no step. A step that merely cannot run yet is not setup.
+ */
+export function setupGroups(
+  graph: AutomationGraph,
+  issues: readonly ValidationIssue[],
+): { steps: SetupRow[]; warnings: ValidationIssue[]; workflow: ValidationIssue[] } {
+  const known = new Set(graph.nodes.map((node) => node.key));
+  const relevant = issues.filter((issue) => issue.code !== 'node.not_runnable');
+  const errors = relevant.filter((issue) => issue.severity === 'error');
+  const rows = graph.nodes.flatMap((node): SetupRow[] => {
+    const own = errors.filter((issue) => issue.nodeKey === node.key);
+    const def = getDefinition(node.type, node.typeVersion);
+    const hasSetup = (def?.form?.tabs.setup.length ?? 0) > 0 || def?.connection !== undefined;
+    return own.length > 0 || hasSetup ? [{ node, errors: own, done: own.length === 0 }] : [];
+  });
+  return {
+    steps: [...rows.filter((row) => !row.done), ...rows.filter((row) => row.done)],
+    warnings: relevant.filter((issue) => issue.severity !== 'error'),
+    workflow: errors.filter((issue) => !issue.nodeKey || !known.has(issue.nodeKey)),
+  };
+}
+
+export const TEST_REFUSED_TITLE = "This workflow can't be tested yet";
+export const STEP_TEST_REFUSED_TITLE = "This step can't be tested yet";
+
+/**
+ * Which steps stopped a test, for the toast: the API sends only a count. One
+ * step says what to do; several name the first three. Falls back to the API's
+ * own sentence if the browser's check found nothing.
+ */
+export function refusedTestText(items: readonly SetupItem[], fallback: string): string {
+  const [first] = items;
+  if (!first) return fallback;
+  if (items.length === 1) return `${first.stepName}: ${first.message}`;
+  const names = items.slice(0, 3).map((item) => item.stepName);
+  const more = items.length > 3 ? ` and ${items.length - 3} more` : '';
+  return `${items.length} steps need attention: ${names.join(', ')}${more}.`;
+}
 
 /** The save state's words beside the name. Never a toast: the words say it. */
 export const SAVE_STATE_WORDS: Record<SaveStatus, string> = {

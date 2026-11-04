@@ -164,15 +164,22 @@ export function walkOrder(graph: AutomationGraph): string[] {
   return [...order, ...graph.nodes.map((node) => node.key).filter((key) => !seen.has(key))];
 }
 
-/** The steps before and after `key` in run order, for the Expanded view's arrows. */
-export function neighbours(
+/**
+ * The steps joined to `key` by a line, for the buttons in the step editor's panes:
+ * what feeds it and what it feeds, each once, in the order of their lines.
+ */
+export function connectedSteps(
   graph: AutomationGraph,
   key: string,
-): { previous: string | null; next: string | null } {
-  const order = walkOrder(graph);
-  const at = order.indexOf(key);
-  if (at === -1) return { previous: null, next: null };
-  return { previous: order[at - 1] ?? null, next: order[at + 1] ?? null };
+): { previous: GraphNode[]; next: GraphNode[] } {
+  const steps = (keys: string[]) =>
+    [...new Set(keys)]
+      .map((one) => graph.nodes.find((node) => node.key === one))
+      .filter((node): node is GraphNode => node !== undefined);
+  return {
+    previous: steps(graph.edges.filter((edge) => edge.target === key).map((edge) => edge.source)),
+    next: steps(graph.edges.filter((edge) => edge.source === key).map((edge) => edge.target)),
+  };
 }
 
 // ---- How values read ---------------------------------------------------------------------
@@ -191,29 +198,75 @@ export function valueWords(value: unknown, max = 80): string {
   return String(value);
 }
 
-export interface DataRow {
-  /** The full token path (what a drag or a click inserts). */
-  path: string;
-  label: string;
-  depth: number;
-  value: unknown;
-  type: FieldType;
+export function isEmptyValue(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
 }
 
-/** A field tree as one row per field path, parents first: the Table view. */
-export function flattenFields(fields: readonly DataField[], depth = 0): DataRow[] {
-  const rows: DataRow[] = [];
-  for (const field of fields) {
-    rows.push({
-      path: field.path,
-      label: field.label,
-      depth,
-      value: field.sample,
-      type: field.type,
-    });
-    rows.push(...flattenFields(field.children, depth + 1));
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+/** Below this a number is as likely a year or a count as a quantity, so it gets no separators. */
+const SEPARATE_FROM = 10_000;
+
+function isPlainValue(value: unknown): boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+}
+
+/**
+ * A value in the words a person would use, for the Data and Table views (Raw
+ * keeps it exact): dates as "Nov 3, 10:32 PM", big numbers with separators, a
+ * short list spelled out.
+ */
+export function humanValue(value: unknown, max = 240): string {
+  if (typeof value === 'number' && Math.abs(value) >= SEPARATE_FROM) return value.toLocaleString();
+  if (typeof value === 'string' && ISO_DATE.test(value)) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    }
   }
-  return rows;
+  if (Array.isArray(value) && value.length > 0 && value.length <= 3 && value.every(isPlainValue)) {
+    return value.map((item) => humanValue(item, max)).join(', ');
+  }
+  return valueWords(value, max);
+}
+
+export interface RecordTable {
+  columns: { key: string; label: string }[];
+  rows: { path: string; cells: Record<string, unknown> }[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * A list of records as columns for the Table view: the fields a list's items
+ * turn into (`valueTree` names them Item 1, Item 2), when every one of them is a
+ * record. Anything else stays one row per field.
+ */
+export function recordTable(items: readonly DataField[]): RecordTable | null {
+  const isList = items.length > 0 && items.every((item) => /(^|\.)\d+$/.test(item.path));
+  if (!isList || !items.every((item) => isRecord(item.sample))) return null;
+  const columns: RecordTable['columns'] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    for (const child of item.children) {
+      const key = child.path.slice(child.path.lastIndexOf('.') + 1);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      columns.push({ key, label: child.label });
+    }
+  }
+  if (columns.length === 0) return null;
+  return {
+    columns,
+    rows: items.map((item) => ({ path: item.path, cells: item.sample as Record<string, unknown> })),
+  };
 }
 
 function kindOf(value: unknown): FieldType {
@@ -251,6 +304,17 @@ export function valueTree(
       children: valueTree(child, declared, path, depth + 1),
     };
   });
+}
+
+/**
+ * What opens under a field: the children its step declares, or, for a group or
+ * list that declares none (an image, say), what its value holds. Validation
+ * takes those paths too (`lookupField`), so they can be mapped like any other.
+ */
+export function childrenOf(field: DataField): readonly DataField[] {
+  if (field.children.length > 0) return field.children;
+  if (field.type !== 'object' && field.type !== 'media' && field.type !== 'list') return [];
+  return valueTree(field.sample, [], field.path, 1);
 }
 
 /** Formatted data for a Raw view, the only place it appears as written. */

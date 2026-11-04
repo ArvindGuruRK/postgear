@@ -2,7 +2,7 @@
  * One run as the builder paints it (Module 08). A pure reducer: the run
  * detail from `GET /automation-runs/:runId`, then every `step` and `run`
  * event from the live stream, in any order and any number of times (a
- * reconnect replays the latest rows). The canvas, the run bar, the Runs tab
+ * reconnect replays the latest rows). The canvas, the Logs dock, the Runs tab
  * and the Output pane only read this model.
  *
  * Lines are derived, never streamed: a line is taken when its source fired

@@ -45,7 +45,8 @@ ToastViewport.displayName = ToastPrimitive.Viewport.displayName;
 
 const toastVariants = cva(
   [
-    'relative col-start-1 row-start-1 flex w-full items-center justify-between gap-3 self-end',
+    // Clickable over an open dialog, which turns pointer events off for the rest of the page.
+    'pointer-events-auto relative col-start-1 row-start-1 flex w-full items-start gap-3 self-end',
     'rounded-md border-2 border-outline p-4 shadow-surfaceMd',
     'font-sans text-sm will-change-transform',
     'transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
@@ -58,6 +59,9 @@ const toastVariants = cva(
       variant: {
         default: 'bg-secondary text-ink',
         danger: 'bg-actionDanger text-onActionLight',
+        // The Alert's orange (alert.tsx): something is in the way and the
+        // person can fix it. Danger is for what actually failed.
+        warning: 'bg-actionAccent text-onActionLight',
         ai: 'bg-actionAi text-onActionAi',
       },
     },
@@ -86,7 +90,7 @@ export const ToastTitle = forwardRef<
   React.ElementRef<typeof ToastPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <ToastPrimitive.Title ref={ref} className={cn('type-heading text-base', className)} {...props} />
+  <ToastPrimitive.Title ref={ref} className={cn('type-ui text-sm', className)} {...props} />
 ));
 ToastTitle.displayName = ToastPrimitive.Title.displayName;
 
@@ -122,7 +126,11 @@ export const ToastClose = forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitive.Close
     ref={ref}
-    className={cn('shrink-0 outline-none', className)}
+    aria-label="Close"
+    className={cn(
+      'shrink-0 rounded-md outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+      className,
+    )}
     toast-close=""
     {...props}
   >

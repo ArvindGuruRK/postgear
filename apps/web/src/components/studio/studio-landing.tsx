@@ -189,7 +189,7 @@ export function StudioLanding({
               value={designs.format}
               onValueChange={(value) => designs.setFormat(value as FormatFilter)}
             >
-              <SelectTrigger aria-label="Filter by format" className="shadow-none sm:w-56">
+              <SelectTrigger aria-label="Filter by format" className="sm:w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

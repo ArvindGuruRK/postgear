@@ -15,7 +15,7 @@ import { WORKFLOW_MISSING_MESSAGE } from './builder-view-model';
 
 export function WorkflowMissing({ orgId }: { orgId: string }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-3">
+    <div className="flex min-w-0 flex-1 flex-col gap-3 p-3">
       <Alert variant="warning" role="status" className="flex-wrap items-center">
         <TriangleAlert aria-hidden="true" className="h-5 w-5 shrink-0" strokeWidth={2.5} />
         <span className="min-w-0 grow basis-56 break-words">{WORKFLOW_MISSING_MESSAGE}</span>

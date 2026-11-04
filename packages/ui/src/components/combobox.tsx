@@ -62,9 +62,9 @@ export function Combobox({
           disabled={disabled}
           className={cn(
             'flex h-11 w-full items-center justify-between gap-2 rounded-md border-2 border-outline bg-field px-4',
-            'font-sans text-sm text-ink shadow-surfaceSm',
+            'font-sans text-sm text-ink',
             FIELD_FOCUS,
-            'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
+            'disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}
         >
@@ -74,7 +74,7 @@ export function Combobox({
           <MotionIcon icon={ChevronDownIcon} className="h-4 w-4 shrink-0" strokeWidth={3} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2">
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2 shadow-none">
         <input
           // biome-ignore lint/a11y/noAutofocus: opening the combobox is itself the user's focus action
           autoFocus

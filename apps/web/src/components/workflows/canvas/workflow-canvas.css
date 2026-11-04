@@ -10,7 +10,7 @@
 @import "@xyflow/react/dist/base.css" layer(base);
 
 @layer components {
-  /* A new card scales in. First, so the focus ring below outranks it. */
+  /* A new card scales in. First, so a run's animation further down outranks it. */
   .pg-canvas .pg-step-card {
     animation: pg-card-in 200ms ease-out;
   }
@@ -54,9 +54,9 @@
   }
 
   /*
-   * The hovered card comes to the front: its toolbar is a child of the card and rises 38px
-   * above it, which can reach over the card in the row above. React Flow sets each node's
-   * z-index inline, so this has to be important.
+   * The hovered card comes to the front: its toolbar is a child of the card and rises above
+   * it, which can reach over the card in the row above. React Flow sets each node's z-index
+   * inline, so this has to be important.
    */
   .pg-canvas .react-flow__node:hover {
     z-index: 1000 !important;
@@ -74,21 +74,61 @@
   }
 
   /*
-   * A card's rings stay 3px (hover 2px) on screen at every zoom: they are
-   * divided by the canvas zoom (`--pg-zoom`, zoom-var.tsx), because a ring that
-   * scales with the canvas is under a pixel at 20% and the card looks neither
-   * hovered nor selected. Hover is quieter than selection, and selection wins.
+   * A card keeps its own border, in the outline colour. A state shows as a ring
+   * touching that border, with no gap (the owner's call, 2026-11-04, after trying
+   * the border itself changing colour): grey under the pointer, and the colour of
+   * the step's icon (`--pg-step-colour`, step-card.tsx) when selected or with the
+   * keyboard on it. Border and ring scale with the card, so neither grows zoomed
+   * out; each only holds at about 1.5px on screen when zoomed far out (`--pg-zoom`,
+   * zoom-var.tsx), where it would otherwise thin to nothing. They are set here
+   * rather than with utilities, which would outrank these states. The order
+   * matters: selection comes last, so it wins.
+   *
+   * The tab wears the ring as a shadow, which follows its corners, and sits above
+   * the card to cover the card's ring along its width. Its clip cuts off the 2px
+   * it runs into the card, so the card's border carries on unbroken beneath it and
+   * the ring only follows the outer edge of the two together (the owner chose this
+   * over a ring on the card alone, same day).
    */
-  .pg-canvas .react-flow__node:hover .pg-step-card {
-    outline: calc(2px / var(--pg-zoom, 1)) solid
-      color-mix(in srgb, var(--color-ink) 45%, transparent);
-    outline-offset: calc(2px / var(--pg-zoom, 1));
+  .pg-canvas .react-flow__node {
+    --pg-step-border: max(2px, calc(1.5px / var(--pg-zoom, 1)));
+  }
+
+  .pg-canvas .pg-step-card {
+    border: var(--pg-step-border) solid var(--color-outline);
+    outline: var(--pg-ring-width, 0) solid var(--pg-ring, transparent);
+    transition: outline-color 120ms ease-out;
+  }
+
+  .pg-canvas .pg-step-tab {
+    z-index: 1;
+    border: var(--pg-step-border) solid var(--color-outline);
+    border-bottom: 0;
+    box-shadow: 0 0 0 var(--pg-ring-width, 0) var(--pg-ring, transparent);
+    clip-path: inset(-16px -16px 2px);
+    transition: box-shadow 120ms ease-out;
+  }
+
+  /* Mixed with the page and not left see-through, so it stays the same grey over anything. */
+  .pg-canvas .react-flow__node:hover .pg-step-card,
+  .pg-canvas .react-flow__node:hover .pg-step-tab {
+    --pg-ring: color-mix(in srgb, var(--color-ink) 45%, var(--color-primary));
+    --pg-ring-width: max(2px, calc(1.5px / var(--pg-zoom, 1)));
   }
 
   .pg-canvas .react-flow__node.selected .pg-step-card,
-  .pg-canvas .react-flow__node:focus-visible .pg-step-card {
-    outline: calc(3px / var(--pg-zoom, 1)) solid var(--color-focus-ring);
-    outline-offset: calc(2px / var(--pg-zoom, 1));
+  .pg-canvas .react-flow__node.selected .pg-step-tab,
+  .pg-canvas .react-flow__node:focus-visible .pg-step-card,
+  .pg-canvas .react-flow__node:focus-visible .pg-step-tab {
+    --pg-ring: var(--pg-step-colour);
+    --pg-ring-width: max(3px, calc(1.5px / var(--pg-zoom, 1)));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pg-canvas .pg-step-card,
+    .pg-canvas .pg-step-tab {
+      transition: none;
+    }
   }
 
   /*
@@ -102,8 +142,6 @@
    */
   .pg-canvas .react-flow__handle {
     --pg-port-scale: 1;
-    width: 16px;
-    height: 16px;
     transition: transform 140ms ease-out;
   }
 
@@ -167,6 +205,12 @@
     color: color-mix(in srgb, var(--color-ink) 28%, transparent);
   }
 
+  /* A previewed version's canvas: read-only, so the hatch shows through. */
+  .pg-canvas.bg-hatch .react-flow,
+  .pg-canvas.bg-hatch .react-flow__background {
+    background: transparent;
+  }
+
   .pg-canvas .react-flow__attribution {
     background: transparent;
     font-size: 10px;
@@ -192,10 +236,11 @@
    * A painted run (Module 08, blueprint 7.1 and 7.2). The line into a
    * running step carries React Flow's `animated` class: its dashes flow
    * from source to target on a 1 s loop. A line on the branch not taken is
-   * dashed (and faded by its group). A running step's icon tile has
-   * marching dashes and its stripe pulses; a step waiting for review pulses
-   * amber. Reduced motion keeps every look and stops every movement: the
-   * badge's words carry the state.
+   * dashed (and faded by its group). A running step's icon has marching
+   * dashes and pulses; a failed step's border is red; a step waiting for review
+   * has an amber border that pulses. Hover and selection still show on both, as
+   * the ring outside the border. Reduced motion keeps every look and stops every
+   * movement: the mark's words carry the state.
    */
   .pg-canvas .react-flow__edge.animated .pg-edge-path {
     stroke-dasharray: 6 4;
@@ -215,9 +260,13 @@
     animation: pg-run-pulse 1s ease-in-out infinite;
   }
 
+  .pg-canvas .pg-run-failed {
+    border-color: var(--color-brutal-danger);
+  }
+
   .pg-canvas .pg-run-waiting {
-    border: 3px solid var(--color-brutal-accent);
-    animation: pg-run-pulse 1.4s ease-in-out infinite;
+    border-color: var(--color-brutal-accent);
+    animation: pg-run-waiting 1.4s ease-in-out infinite;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -251,6 +300,17 @@
   }
 }
 
+@keyframes pg-run-waiting {
+  0%,
+  100% {
+    border-color: var(--color-brutal-accent);
+  }
+
+  50% {
+    border-color: var(--color-outline);
+  }
+}
+
 @keyframes pg-card-in {
   from {
     transform: scale(0.96);
@@ -261,13 +321,4 @@
     transform: scale(1);
     opacity: 1;
   }
-}
-
-/*
- * On narrow screens the step panel opens in a Sheet. The panel has its own
- * Close button, so the Sheet's own one (its last child) would sit on top of
- * it and catch its clicks.
- */
-[data-step-sheet] > button:last-child {
-  display: none;
 }

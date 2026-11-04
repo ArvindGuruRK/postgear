@@ -18,7 +18,7 @@
 import { CircleStopIcon } from '@animateicons/react/lucide/circle-stop-icon';
 import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
-import { Alert, Button, cn, MotionIcon, Text, Textarea } from '@postgear/ui';
+import { Alert, Button, cn, FIELD_FOCUS_WITHIN, MotionIcon, Text, Textarea } from '@postgear/ui';
 import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
@@ -210,8 +210,7 @@ export function CopilotChat({
       // The focus ring moves from the borderless textarea to the whole box.
       className={cn(
         'flex flex-col gap-1 rounded-xl border-2 border-outline bg-field p-2 shadow-brutalSm',
-        'transition-[border-color,box-shadow] duration-150',
-        'focus-within:border-actionPrimary focus-within:ring-3 focus-within:ring-actionPrimary/20',
+        FIELD_FOCUS_WITHIN,
       )}
       onSubmit={(event) => {
         event.preventDefault();
@@ -238,7 +237,7 @@ export function CopilotChat({
         disabled={cannotAfford}
         aria-describedby="copilot-help"
         // Grows with what is typed, up to a few lines, then scrolls inside.
-        className="field-sizing-content max-h-48 min-h-[3.5rem] resize-none border-0 bg-transparent p-2 text-base shadow-none focus-visible:ring-0"
+        className="field-sizing-content max-h-48 min-h-[3.5rem] resize-none border-0 bg-transparent p-2 text-base shadow-none"
       />
       <div className="flex items-center justify-between gap-3 px-1">
         <div className="flex min-w-0 items-center gap-2">

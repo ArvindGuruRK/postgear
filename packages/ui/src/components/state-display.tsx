@@ -13,6 +13,8 @@ export interface StateDisplayProps extends React.HTMLAttributes<HTMLDivElement> 
   description?: string;
   tone?: StateDisplayTone;
   action?: { label: string; onClick: () => void; variant?: ButtonProps['variant'] };
+  /** Instead of `action`, when the state offers more than one thing to do. */
+  actions?: React.ReactNode;
 }
 
 const toneIconClasses: Record<StateDisplayTone, string> = {
@@ -23,7 +25,7 @@ const toneIconClasses: Record<StateDisplayTone, string> = {
 
 /** Shared layout behind EmptyState/ErrorState/SuccessState: icon + heading + description + optional action. */
 export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
-  ({ className, icon: Icon, title, description, tone = 'neutral', action, ...props }, ref) => (
+  ({ className, icon: Icon, title, description, tone = 'neutral', action, actions, ...props }, ref) => (
     <div
       ref={ref}
       className={cn('flex flex-col items-center justify-center gap-3 p-10 text-center', className)}
@@ -53,6 +55,7 @@ export const StateDisplay = forwardRef<HTMLDivElement, StateDisplayProps>(
           {action.label}
         </Button>
       )}
+      {actions ? <div className="mt-2 flex flex-wrap justify-center gap-2">{actions}</div> : null}
     </div>
   ),
 );

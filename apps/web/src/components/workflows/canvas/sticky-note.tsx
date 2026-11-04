@@ -63,7 +63,6 @@ export const StickyNoteCard = memo(function StickyNoteCard({
         'flex h-full w-full flex-col overflow-hidden rounded-card border-2 border-outline shadow-surfaceSm',
         NOTE_FILL[note.colour],
         NOTE_TEXT[note.colour],
-        selected ? 'outline-solid outline-[3px] outline-offset-2 outline-focusRing' : '',
       )}
       onDoubleClick={() => {
         if (editor) setEditing(true);
@@ -80,8 +79,8 @@ export const StickyNoteCard = memo(function StickyNoteCard({
         minHeight={40}
         maxWidth={2_000}
         maxHeight={2_000}
-        lineClassName="border-focusRing!"
-        handleClassName="h-2! w-2! rounded-xs! border-2! border-focusRing! bg-focusRing!"
+        lineClassName="border-ink!"
+        handleClassName="h-2! w-2! rounded-xs! border-2! border-ink! bg-ink!"
         onResizeEnd={(_event, params) =>
           editor?.dispatch({
             type: 'updateNote',
@@ -132,10 +131,10 @@ export const StickyNoteCard = memo(function StickyNoteCard({
           }}
           aria-label="Note text"
           placeholder="Enter your note"
-          className="nodrag nowheel h-full w-full resize-none bg-transparent p-3 font-sans text-base outline-none placeholder:opacity-70"
+          className="nodrag nowheel h-full w-full resize-none bg-transparent px-3 pb-3 font-sans text-base outline-none placeholder:opacity-70"
         />
       ) : (
-        <div className="nowheel h-full overflow-auto p-3 font-sans text-base">
+        <div className="nowheel h-full overflow-auto px-3 pb-3 font-sans text-base">
           {note.text ? (
             <NoteText text={note.text} />
           ) : editor ? (

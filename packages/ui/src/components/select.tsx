@@ -20,9 +20,9 @@ export const SelectTrigger = forwardRef<
     ref={ref}
     className={cn(
       'flex h-11 w-full items-center justify-between gap-2 rounded-md border-2 border-outline bg-field px-4',
-      'font-sans text-sm text-ink shadow-surfaceSm',
+      'font-sans text-sm text-ink',
       FIELD_FOCUS,
-      'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
+      'disabled:cursor-not-allowed disabled:opacity-50',
       className,
     )}
     {...props}
@@ -44,7 +44,7 @@ export const SelectContent = forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'z-50 overflow-hidden rounded-md border-2 border-outline bg-secondary shadow-surfaceMd',
+        'z-50 overflow-hidden rounded-md border-2 border-outline bg-secondary',
         'font-sans text-sm text-ink',
         // A menu never narrower than its field (2026-10-23): it opened at its
         // content's width, so a wide channel picker dropped a stub of a menu.

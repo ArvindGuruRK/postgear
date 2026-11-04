@@ -73,9 +73,9 @@ export function MultiSelect({
           }}
           className={cn(
             'flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-md border-2 border-outline bg-field px-3 py-2',
-            'font-sans text-sm text-ink shadow-surfaceSm',
+            'font-sans text-sm text-ink',
             FIELD_FOCUS,
-            disabled ? 'cursor-not-allowed opacity-50 shadow-none' : 'cursor-pointer',
+            disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
             className,
           )}
         >
@@ -102,7 +102,7 @@ export function MultiSelect({
           <MotionIcon icon={ChevronDownIcon} className="ml-auto h-4 w-4" strokeWidth={3} />
         </div>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2">
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2 shadow-none">
         <input
           // biome-ignore lint/a11y/noAutofocus: opening the multi-select is itself the user's focus action
           autoFocus

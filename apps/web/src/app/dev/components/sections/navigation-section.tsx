@@ -31,17 +31,20 @@ import {
   NavigationMenuList,
   NavigationMenuTrigger,
   Pagination,
+  Segmented,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from '@postgear/ui';
+import { CalendarDays, ChartColumn, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Row, Section } from '../shared';
 
 export function NavigationSection() {
   const [page, setPage] = useState(4);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
 
   return (
     <Section
@@ -59,6 +62,18 @@ export function NavigationSection() {
           <TabsContent value="drafts">Drafts waiting for review.</TabsContent>
           <TabsContent value="archived">Archived and cancelled posts.</TabsContent>
         </Tabs>
+      </Row>
+      <Row label="Segmented">
+        <Segmented
+          label="Period"
+          options={[
+            { value: 'day', label: 'Day' },
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+          ]}
+          value={period}
+          onValueChange={setPeriod}
+        />
       </Row>
       <Row label="Breadcrumb">
         <Breadcrumb>
@@ -87,9 +102,15 @@ export function NavigationSection() {
               <NavigationMenuTrigger>Product</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <div className="flex flex-col">
-                  <NavigationMenuLink href="#">Calendar</NavigationMenuLink>
-                  <NavigationMenuLink href="#">Analytics</NavigationMenuLink>
-                  <NavigationMenuLink href="#">SEO Analyzer</NavigationMenuLink>
+                  <NavigationMenuLink href="#" icon={CalendarDays}>
+                    Calendar
+                  </NavigationMenuLink>
+                  <NavigationMenuLink href="#" icon={ChartColumn}>
+                    Analytics
+                  </NavigationMenuLink>
+                  <NavigationMenuLink href="#" icon={Search}>
+                    SEO Analyzer
+                  </NavigationMenuLink>
                 </div>
               </NavigationMenuContent>
             </NavigationMenuItem>

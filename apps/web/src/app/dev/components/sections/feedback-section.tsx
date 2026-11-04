@@ -71,6 +71,19 @@ export function FeedbackSection() {
         </Button>
         <Button
           size="sm"
+          variant="secondary"
+          onClick={() =>
+            toast({
+              variant: 'warning',
+              title: "This workflow can't be tested yet",
+              description: 'Create Draft: choose at least one channel.',
+            })
+          }
+        >
+          Warning
+        </Button>
+        <Button
+          size="sm"
           variant="highlight"
           onClick={() =>
             toast({

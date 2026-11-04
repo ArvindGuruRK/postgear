@@ -256,9 +256,7 @@ export function ConnectionsDialog({
                         data-connection-id={connection.id}
                         className="flex items-center gap-3 rounded-card border-2 border-outline bg-inset p-3 shadow-surfaceSm"
                       >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-inset">
-                          <AppIcon icon={appIcon(connection.provider)} className="h-5 w-5" />
-                        </span>
+                        <AppIcon icon={appIcon(connection.provider)} className="h-8 w-8 shrink-0" />
                         <div className="flex min-w-0 flex-1 flex-col">
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="truncate type-ui text-ink">{connection.name}</span>

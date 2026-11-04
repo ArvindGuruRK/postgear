@@ -11,13 +11,15 @@
  * - `trigger`: the empty canvas's Add A Trigger, triggers only.
  *
  * Search first (ranked in `picker-search.ts`); without one, Recent and then
- * the categories, which drill down. Fully keyboard driven: Up and Down
+ * the categories, each with a line on what it holds, which drill down to
+ * Popular and Other. Fully keyboard driven: Up and Down
  * move, Enter adds or opens, Right opens a category, Left goes back, Esc
  * goes back and then closes. Coming Soon steps and steps that need
  * something first show why and cannot be added.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { BellIcon } from '@animateicons/react/lucide/bell-icon';
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { ChevronRightIcon } from '@animateicons/react/lucide/chevron-right-icon';
 import { DatabaseIcon } from '@animateicons/react/lucide/database-icon';
 import { GitBranchIcon } from '@animateicons/react/lucide/git-branch-icon';
@@ -49,6 +51,7 @@ import {
   pickerItems,
   recentItems,
   searchPicker,
+  splitPopular,
 } from './picker-search';
 
 type AnimatedIcon = ComponentProps<typeof MotionIcon>['icon'];
@@ -65,12 +68,12 @@ const CATEGORY_ICONS: Record<NodeCategory, AnimatedIcon> = {
 
 const TITLES: Record<PickerPlacement, string> = {
   panel: 'Add A Step',
-  next: 'What Happens Next?',
+  next: 'What happens next?',
   trigger: 'Add A Trigger',
 };
 
 type Row =
-  | { kind: 'category'; id: NodeCategory; title: string; count: number }
+  | { kind: 'category'; id: NodeCategory; title: string; description: string }
   | { kind: 'item'; item: PickerItem };
 
 export interface StepPickerProps {
@@ -101,6 +104,7 @@ export function StepPicker({
 }: StepPickerProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<NodeCategory | null>(null);
+  const [closed, setClosed] = useState({ popular: false, other: false });
   // The highlighted row, which starts again at the top whenever the search or the category changes.
   const [highlight, setHighlight] = useState({ view: '', index: 0 });
   // Shown only while someone is using the picker, so a row never looks chosen at rest.
@@ -114,18 +118,38 @@ export function StepPicker({
     [catalog, placement, hasTrigger],
   );
 
+  // Inside a category: Popular, then Other, when it has both.
+  const groups = useMemo(() => {
+    if (!category || query.trim()) return null;
+    const split = splitPopular(itemsIn(items, category));
+    return split.popular.length > 0 && split.other.length > 0 ? split : null;
+  }, [items, category, query]);
+  const popularShown = groups && !closed.popular ? groups.popular.length : 0;
+
   const rows = useMemo((): Row[] => {
     if (query.trim())
       return searchPicker(items, query, recent).map((item) => ({ kind: 'item', item }));
     if (placement === 'trigger') return items.map((item) => ({ kind: 'item', item }));
+    if (groups) {
+      return [
+        ...(closed.popular ? [] : groups.popular),
+        ...(closed.other ? [] : groups.other),
+      ].map((item) => ({ kind: 'item', item }));
+    }
     if (category) return itemsIn(items, category).map((item) => ({ kind: 'item', item }));
     const list: Row[] = recentItems(items, recent).map((item) => ({ kind: 'item', item }));
     for (const group of PICKER_CATEGORIES) {
-      const count = itemsIn(items, group.id).length;
-      if (count > 0) list.push({ kind: 'category', id: group.id, title: group.title, count });
+      if (itemsIn(items, group.id).length > 0) {
+        list.push({
+          kind: 'category',
+          id: group.id,
+          title: group.title,
+          description: group.description,
+        });
+      }
     }
     return list;
-  }, [items, query, recent, category, placement]);
+  }, [items, query, recent, category, placement, groups, closed]);
 
   const recentCount =
     !query.trim() && !category && placement !== 'trigger' ? recentItems(items, recent).length : 0;
@@ -175,9 +199,28 @@ export function StepPicker({
   }
 
   const activeId = rows[active] ? `${listId}-${active}` : undefined;
-  const heading = category
-    ? PICKER_CATEGORIES.find((group) => group.id === category)?.title
-    : TITLES[placement];
+  const openCategory = category
+    ? PICKER_CATEGORIES.find((group) => group.id === category)
+    : undefined;
+  const heading = openCategory?.title ?? TITLES[placement];
+
+  /** Popular or Other: a heading that folds its rows away. */
+  function groupHead(id: 'popular' | 'other', label: string) {
+    return (
+      <button
+        type="button"
+        aria-expanded={!closed[id]}
+        onClick={() => setClosed((current) => ({ ...current, [id]: !current[id] }))}
+        className="type-label flex w-full items-center justify-between rounded-md px-2 pt-3 pb-1 text-left text-xs text-ink outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-focusRing"
+      >
+        <span className="type-muted">{label}</span>
+        <MotionIcon
+          icon={ChevronDownIcon}
+          className={cn('h-4 w-4 transition-transform', closed[id] ? '-rotate-90' : '')}
+        />
+      </button>
+    );
+  }
 
   return (
     <section
@@ -189,19 +232,19 @@ export function StepPicker({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
       }}
     >
-      <div className="flex items-center gap-2 px-4 pt-4">
+      <div className="flex h-14 shrink-0 items-center gap-2 px-4">
         {category && !query ? (
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 px-0"
+            className="h-9 w-9 px-0"
             aria-label="Back"
             onClick={() => setCategory(null)}
           >
             <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
           </Button>
         ) : null}
-        <h2 className="type-heading min-w-0 flex-1 truncate text-2xl text-ink">{heading}</h2>
+        <h2 className="type-heading min-w-0 flex-1 truncate text-lg text-ink">{heading}</h2>
         {onCollapse ? (
           <TooltipHint label="Hide Steps">
             <Button
@@ -219,7 +262,7 @@ export function StepPicker({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 px-0"
+            className="h-9 w-9 px-0"
             aria-label="Close"
             onClick={onClose}
           >
@@ -227,7 +270,10 @@ export function StepPicker({
           </Button>
         ) : null}
       </div>
-      <div className="px-4 pt-3 pb-3">
+      <div className="flex flex-col gap-2 px-4 pb-3">
+        {openCategory && !query ? (
+          <p className="font-sans text-sm text-ink type-muted">{openCategory.description}</p>
+        ) : null}
         <SearchInput
           ref={search}
           value={query}
@@ -264,6 +310,7 @@ export function StepPicker({
               Recent
             </div>
           ) : null}
+          {groups ? groupHead('popular', 'Popular') : null}
           {rows.map((row, index) => {
             const isActive = (focused || hovering) && index === active;
             const id = `${listId}-${index}`;
@@ -290,10 +337,12 @@ export function StepPicker({
                     )}
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center text-ink">
-                      <MotionIcon icon={CATEGORY_ICONS[row.id]} className="h-4 w-4" />
+                      <MotionIcon icon={CATEGORY_ICONS[row.id]} className="h-5 w-5" />
                     </span>
-                    <span className="type-ui flex-1 text-sm">{row.title}</span>
-                    <span className="font-sans text-xs type-muted">{row.count}</span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="type-ui text-sm">{row.title}</span>
+                      <span className="font-sans text-xs type-muted">{row.description}</span>
+                    </span>
                     <MotionIcon icon={ChevronRightIcon} className="h-4 w-4" />
                   </button>
                 </div>
@@ -303,6 +352,7 @@ export function StepPicker({
             const addable = item.blocked === null;
             return (
               <div key={item.id} role="presentation">
+                {groups && index === popularShown ? groupHead('other', 'Other') : null}
                 <div
                   id={id}
                   role="option"
@@ -366,7 +416,8 @@ export function StepPicker({
               </div>
             );
           })}
-          {rows.length === 0 ? (
+          {groups && popularShown === rows.length ? groupHead('other', 'Other') : null}
+          {rows.length === 0 && !groups ? (
             <div role="presentation" className="px-2 py-4 font-sans text-sm text-ink type-muted">
               No steps match that search.
             </div>

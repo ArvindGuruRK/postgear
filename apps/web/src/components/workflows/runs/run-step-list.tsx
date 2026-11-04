@@ -27,20 +27,27 @@ import { formatDuration, stepBadgeText } from './run-words';
 
 function RunData({
   label,
+  title,
   value,
   node,
 }: {
   label: string;
+  /** Shares a row with the view switch, so the data starts one row sooner. */
+  title: string;
   value: unknown;
   /** The step, for its own field labels (outputs only). */
   node?: GraphNode;
 }) {
   const [view, setView] = useState<DataViewKind>('data');
+  const heading = <h4 className="min-w-0 flex-1 type-heading text-base text-ink">{title}</h4>;
   if (value === undefined || value === null) {
     return (
-      <Text size="sm" muted>
-        No data.
-      </Text>
+      <>
+        {heading}
+        <Text size="sm" muted>
+          No data.
+        </Text>
+      </>
     );
   }
   const fields = valueTree(value, node ? outputFieldsOf(node) : []);
@@ -54,6 +61,7 @@ function RunData({
       <DataViews
         view={view}
         onViewChange={setView}
+        meta={heading}
         data={fields.length ? <DataTree fields={fields} label={label} /> : plain}
         table={fields.length ? <DataTable fields={fields} label={label} /> : plain}
         raw={<RawView text={rawText(value)} label={label} />}
@@ -71,21 +79,25 @@ export interface RunInfo {
   creditsUsed?: number;
 }
 
-interface StepRowProps {
+export interface StepRunBodyProps {
   step: RunStep;
-  paint: StepPaint | undefined;
   node: GraphNode | undefined;
-  icon: string | null;
   run: RunInfo;
   workflowName: string;
   activeVersion: number | null;
-  open: boolean;
-  selected: boolean;
   retrying: boolean;
   focusReview: boolean;
-  onToggle: (nodeKey: string) => void;
-  onRetry: (nodeKey: string) => void;
+  /** Left out where a new run could not be followed (the Logs dock). */
+  onRetry?: (nodeKey: string) => void;
   onReviewAnswered: () => void;
+}
+
+interface StepRowProps extends StepRunBodyProps {
+  paint: StepPaint | undefined;
+  icon: string | null;
+  open: boolean;
+  selected: boolean;
+  onToggle: (nodeKey: string) => void;
   rowRef: (nodeKey: string, element: HTMLLIElement | null) => void;
 }
 
@@ -105,17 +117,22 @@ function FailureBox({
   activeVersion,
   retrying,
   onRetry,
-}: Pick<StepRowProps, 'step' | 'run' | 'workflowName' | 'activeVersion' | 'retrying' | 'onRetry'>) {
+}: Pick<
+  StepRunBodyProps,
+  'step' | 'run' | 'workflowName' | 'activeVersion' | 'retrying' | 'onRetry'
+>) {
   const handled = step.status === 'HANDLED_ERROR';
   const retry = retryFromHereState({ step, run, activeVersion });
+  // Without somewhere to follow the new run (the Logs dock), there is no retry to offer.
+  const offered = onRetry !== undefined && retry.show;
   const message = step.error?.message ? oneSentence(step.error.message) : 'This step failed.';
 
   const retryButton = (
     <Button
       variant="secondary"
       size="sm"
-      disabled={!retry.show || !retry.enabled || retrying}
-      onClick={() => onRetry(step.nodeKey)}
+      disabled={!offered || !retry.enabled || retrying}
+      onClick={() => onRetry?.(step.nodeKey)}
     >
       <MotionIcon icon={RotateCcwIcon} className="h-4 w-4" />
       {retrying ? 'Retrying...' : 'Retry From Here'}
@@ -141,7 +158,7 @@ function FailureBox({
           <MotionIcon icon={CopyIcon} className="h-4 w-4" />
           Copy Details
         </Button>
-        {retry.show && !handled ? (
+        {offered && !handled ? (
           retry.enabled ? (
             retryButton
           ) : (
@@ -151,7 +168,7 @@ function FailureBox({
           )
         ) : null}
       </div>
-      {retry.show && !retry.enabled && !handled ? (
+      {offered && !retry.enabled && !handled ? (
         <p className="font-sans text-xs font-medium" data-testid="retry-reason">
           {retry.reason}
         </p>
@@ -160,13 +177,50 @@ function FailureBox({
   );
 }
 
+/** What one step did in a run: what went wrong, its review card, its input and output. */
+export function StepRunBody(props: StepRunBodyProps) {
+  const { step, node, focusReview } = props;
+  const review = isReviewStep(step);
+  const failed = step.status === 'FAILED' || step.status === 'HANDLED_ERROR';
+  return (
+    <>
+      {failed ? <FailureBox {...props} /> : null}
+      {review ? (
+        <ReviewCard
+          runId={props.run.runId}
+          step={step}
+          autoFocus={focusReview}
+          onAnswered={props.onReviewAnswered}
+        />
+      ) : null}
+      {step.status === 'DRY_RUN' ? <Text size="sm">{DRY_RUN_NOTE}</Text> : null}
+      {step.truncated ? (
+        <Text size="sm" muted>
+          {CUT_NOTE}
+        </Text>
+      ) : null}
+      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+        <section aria-label={`${step.nodeName} input`} className="flex min-w-0 flex-col gap-2">
+          <RunData label={`${step.nodeName} input`} title="Input" value={step.input} />
+        </section>
+        <section aria-label={`${step.nodeName} output`} className="flex min-w-0 flex-col gap-2">
+          <RunData
+            label={`${step.nodeName} output`}
+            title="Output"
+            value={step.output}
+            node={node}
+          />
+        </section>
+      </div>
+    </>
+  );
+}
+
 const StepRow = memo(function StepRow(props: StepRowProps) {
-  const { step, paint, node, icon, open, selected, focusReview, onToggle, rowRef } = props;
+  const { step, paint, node, icon, open, selected, onToggle, rowRef } = props;
   const state = paint?.state ?? 'queued';
   const duration = formatDuration(step.durationMs);
   const credits = stepCreditsText(step, node, props.run.creditsUsed ?? 0);
-  const review = isReviewStep(step);
-  const failed = step.status === 'FAILED' || step.status === 'HANDLED_ERROR';
   const bodyId = `run-step-${step.id}`;
 
   return (
@@ -185,9 +239,7 @@ const StepRow = memo(function StepRow(props: StepRowProps) {
         onClick={() => onToggle(step.nodeKey)}
         className="flex w-full min-w-0 items-center gap-3 rounded-card px-3 py-2.5 text-left outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-outline bg-secondary">
-          {icon ? <StepGlyph icon={icon} className="h-4 w-4" /> : null}
-        </span>
+        {icon ? <StepGlyph icon={icon} className="h-6 w-6 shrink-0" /> : null}
         <span className="type-ui min-w-0 flex-1 truncate text-sm text-ink">{step.nodeName}</span>
         <Badge variant={STEP_BADGE[state]} className="shrink-0">
           {paint ? stepBadgeText(paint) : 'Queued'}
@@ -219,31 +271,7 @@ const StepRow = memo(function StepRow(props: StepRowProps) {
               Took {duration}
             </Text>
           ) : null}
-          {failed ? <FailureBox {...props} /> : null}
-          {review ? (
-            <ReviewCard
-              runId={props.run.runId}
-              step={step}
-              autoFocus={focusReview}
-              onAnswered={props.onReviewAnswered}
-            />
-          ) : null}
-          {step.status === 'DRY_RUN' ? <Text size="sm">{DRY_RUN_NOTE}</Text> : null}
-          {step.truncated ? (
-            <Text size="sm" muted>
-              {CUT_NOTE}
-            </Text>
-          ) : null}
-          <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-            <section aria-label={`${step.nodeName} input`} className="flex min-w-0 flex-col gap-2">
-              <h4 className="type-heading text-base text-ink">Input</h4>
-              <RunData label={`${step.nodeName} input`} value={step.input} />
-            </section>
-            <section aria-label={`${step.nodeName} output`} className="flex min-w-0 flex-col gap-2">
-              <h4 className="type-heading text-base text-ink">Output</h4>
-              <RunData label={`${step.nodeName} output`} value={step.output} node={node} />
-            </section>
-          </div>
+          <StepRunBody {...props} />
         </div>
       ) : null}
     </li>

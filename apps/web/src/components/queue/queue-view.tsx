@@ -36,7 +36,6 @@ import { CircleCheck, FilePen, ListOrdered, type LucideIcon, Send } from 'lucide
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { SEGMENTED_LIST, SEGMENTED_TRIGGER } from '@/components/analytics/analytics-ui';
 import { toSummary } from '@/components/calendar/calendar-view';
 import { ChannelSelect } from '@/components/channels/channel-select';
 import type { Channel } from '@/types/channel';
@@ -143,19 +142,13 @@ export function QueueView({
           >
             <TabsList
               aria-label="Filter by state"
-              className={cn(
-                SEGMENTED_LIST,
-                'flex w-full max-w-full overflow-x-auto pg-scrollbar pg-scrollbar-primary md:inline-flex md:w-auto',
-              )}
+              className="flex w-full overflow-x-auto pg-scrollbar pg-scrollbar-primary md:inline-flex md:w-auto"
             >
               {STATE_TABS.map((tab) => (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className={cn(
-                    SEGMENTED_TRIGGER,
-                    'group flex-1 gap-2 px-2.5 sm:px-3 md:flex-none',
-                  )}
+                  className="group flex-1 px-2.5 sm:px-3 md:flex-none"
                 >
                   {tab.label}
                   {counts ? <CountBadge state={tab.value} count={counts[tab.value]} /> : null}

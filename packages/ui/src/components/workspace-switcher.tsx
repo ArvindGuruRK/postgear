@@ -45,7 +45,7 @@ export function WorkspaceSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          'flex items-center gap-2 rounded-md border-2 border-outline bg-secondary px-3 py-1.5 shadow-brutalSm outline-none',
+          'flex items-center gap-2 rounded-md border-2 border-outline bg-secondary px-3 py-1.5 outline-none',
           'font-sans text-sm font-semibold text-ink',
           'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
           className,

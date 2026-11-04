@@ -12,7 +12,7 @@ import {
   HISTORY_LIMIT,
   initialState,
 } from './builder-state';
-import { STEP_GAP_X } from './graph-ops';
+import { CARD_HEIGHT, cardHeight, placeNote, STEP_GAP_X } from './graph-ops';
 
 function report(): AutomationGraph {
   const template = getTemplate('publishing-report');
@@ -359,5 +359,43 @@ describe('builderReducer', () => {
     expect(state.future).toEqual([]);
     expect(state.selection).toEqual({ nodes: [], edges: [], notes: [] });
     expect(builderReducer(state, { type: 'undo' })).toBe(state);
+  });
+});
+
+describe('placeNote', () => {
+  const size = { w: 288, h: 144 };
+  const empty = emptyGraph();
+
+  it('centres on the view when the place is free', () => {
+    expect(placeNote(empty, { x: 100, y: 100 }, size)).toEqual({ x: -44, y: 28 });
+  });
+
+  it('moves up clear of a step', () => {
+    const graph = {
+      ...empty,
+      nodes: [{ key: 'a', position: { x: 0, y: 0 } }],
+    } as unknown as AutomationGraph;
+    const place = placeNote(graph, { x: 48, y: 48 }, size);
+    expect(place.x).toBe(-96);
+    expect(place.y + size.h).toBeLessThanOrEqual(0);
+  });
+
+  it('moves up clear of another note too', () => {
+    const graph = {
+      ...empty,
+      notes: [{ id: 'n', position: { x: 0, y: 0 }, size, text: '', colour: 'yellow' }],
+    } as unknown as AutomationGraph;
+    const place = placeNote(graph, { x: 144, y: 84 }, size);
+    expect(place.y + size.h).toBeLessThanOrEqual(0);
+  });
+});
+
+describe('cardHeight', () => {
+  it('keeps one card size for one or two outputs, and grows for three or more', () => {
+    expect(cardHeight(0)).toBe(CARD_HEIGHT);
+    expect(cardHeight(1)).toBe(CARD_HEIGHT);
+    expect(cardHeight(2)).toBe(CARD_HEIGHT);
+    expect(cardHeight(3)).toBeGreaterThan(CARD_HEIGHT);
+    expect(cardHeight(4)).toBeGreaterThan(cardHeight(3));
   });
 });

@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@postgear/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { graphOf, installMatchMedia, runOf, step, stepRow } from '../canvas/canvas-test-kit';
-import { RunBar, type RunBarProps, runBarSummary, settledSteps, waitingStep } from './run-bar';
+import { LogsDock, type LogsDockProps, runBarSummary, settledSteps, waitingStep } from './logs-dock';
 import type { RunModel } from './run-model';
 
 installMatchMedia();
@@ -30,11 +30,11 @@ function defaultSteps() {
   return [stepRow('t', 'SUCCEEDED'), stepRow('a', 'SKIPPED'), stepRow('review', 'RUNNING')];
 }
 
-function renderBar(props: Partial<RunBarProps> & { run: RunModel }) {
-  const handlers = { onStop: jest.fn(), onClose: jest.fn(), onOpenReview: jest.fn() };
+function renderBar(props: Partial<LogsDockProps> & { run: RunModel | null }) {
+  const handlers = { onClose: jest.fn(), onOpenReview: jest.fn() };
   render(
     <TooltipProvider>
-      <RunBar totalSteps={4} stopping={false} {...handlers} {...props} />
+      <LogsDock totalSteps={4} {...handlers} {...props} />
     </TooltipProvider>,
   );
   return handlers;
@@ -62,26 +62,18 @@ describe('runBarSummary', () => {
   });
 });
 
-describe('RunBar', () => {
-  it('shows the summary, the status in words and Stop while it runs', () => {
-    const { onStop } = renderBar({ run: model() });
+describe('LogsDock', () => {
+  it('shows the summary and the status in words, and leaves Stop to the canvas', () => {
+    renderBar({ run: model() });
     expect(screen.getByTestId('run-bar-summary').textContent).toMatch(
       /^Test run 14:02, 2 of 4 steps, /,
     );
     expect(screen.getByRole('status').textContent).toContain('Running');
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
-    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Stop/ })).toBeNull();
   });
 
-  it('is busy while stopping', () => {
-    renderBar({ run: model(), stopping: true });
-    const stop = screen.getByRole('button', { name: 'Stopping' });
-    expect((stop as HTMLButtonElement).disabled).toBe(true);
-    expect(stop.getAttribute('aria-busy')).toBe('true');
-  });
-
-  it('offers Close once the run ended, and no Stop', () => {
+  it('offers Close once the run ended', () => {
     const { onClose } = renderBar({
       run: model({ status: 'SUCCEEDED', finishedAt: at(3100) }),
     });
@@ -126,3 +118,33 @@ describe('RunBar', () => {
     expect(screen.getByText('Slack did not answer.')).toBeTruthy();
   });
 });
+
+describe('LogsDock body', () => {
+  const failing = () =>
+    model({ status: 'FAILED' }, [
+      stepRow('t', 'SUCCEEDED'),
+      stepRow('a', 'FAILED', { error: { message: 'It broke.' } as never }),
+    ]);
+
+  it('is a closed strip until opened, and says what it holds with no run yet', () => {
+    renderBar({ run: null });
+    expect(screen.queryByTestId('logs-body')).toBeNull();
+    fireEvent.click(screen.getByTestId('logs-toggle'));
+    expect(screen.getByText(/Test the workflow to see what each step/)).toBeTruthy();
+  });
+
+  it('opens by itself on a failed test, on the step that failed', () => {
+    renderBar({ run: failing() });
+    expect(screen.getByTestId('logs-body')).toBeTruthy();
+    const current = document.querySelector('[aria-current="true"]');
+    expect(current?.textContent).toContain('Failed');
+  });
+
+  it('shows the step chosen from the list, without a retry it could not follow', () => {
+    renderBar({ run: failing() });
+    expect(screen.queryByRole('button', { name: /Retry From Here/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^tSucceeded|^t/ }));
+    expect(screen.getByRole('region', { name: 't input' })).toBeTruthy();
+  });
+});
+

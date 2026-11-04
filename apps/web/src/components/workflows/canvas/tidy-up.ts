@@ -2,7 +2,7 @@
  * Tidy Up (Module 05): lays the steps out left to right with dagre, the
  * way n8n's Tidy Up does.
  *
- * - `rankdir LR`, `nodesep 40`, `ranksep 80`, every card its real size.
+ * - `rankdir LR`, every card its real size.
  * - **The trigger stays put**: the whole layout is shifted so the trigger
  *   lands where it was, so the view does not jump.
  * - **Branches keep their order**: the children of a step are added in the
@@ -18,7 +18,7 @@
 import { graphlib, layout, type OrderConstraint } from '@dagrejs/dagre';
 import { type AutomationGraph, isTriggerType, outputPortsOf } from '@postgear/automation';
 import type { Position } from '../builder/builder-state';
-import { CARD_HEIGHT, CARD_WIDTH, snap } from '../builder/graph-ops';
+import { CARD_HEIGHT, CARD_WIDTH, cardHeight, snap } from '../builder/graph-ops';
 
 export const TIDY_NODESEP = 72;
 export const TIDY_RANKSEP = 160;
@@ -53,7 +53,11 @@ export function tidyPositions(graph: AutomationGraph): Record<string, Position> 
     ...graph.nodes.filter((node) => isTriggerType(node.type)),
     ...graph.nodes.filter((node) => !isTriggerType(node.type)),
   ];
-  for (const node of ordered) g.setNode(node.key, { width: CARD_WIDTH, height: CARD_HEIGHT });
+  const heightOf = (key: string): number => {
+    const node = byKey.get(key);
+    return node ? cardHeight(outputPortsOf(node).length) : CARD_HEIGHT;
+  };
+  for (const node of ordered) g.setNode(node.key, { width: CARD_WIDTH, height: heightOf(node.key) });
   for (const edge of edges) g.setEdge(edge.source, edge.target, {}, edge.id);
 
   // Children of one step, in output order, stacked top to bottom.
@@ -97,7 +101,7 @@ export function tidyPositions(graph: AutomationGraph): Record<string, Position> 
     const label = g.node(node.key);
     raw.set(node.key, {
       x: (label?.x ?? 0) - CARD_WIDTH / 2,
-      y: (label?.y ?? 0) - CARD_HEIGHT / 2,
+      y: (label?.y ?? 0) - heightOf(node.key) / 2,
     });
   }
 

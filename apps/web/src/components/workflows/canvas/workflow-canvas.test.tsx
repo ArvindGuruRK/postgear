@@ -25,7 +25,6 @@ function fakeBuilder(graph: AutomationGraph, extra: Partial<BuilderApi> = {}): B
     graphRef: { current: graph },
     locked: false,
     open: jest.fn(),
-    expand: jest.fn(),
     pinned: new Set(),
     rename: jest.fn(),
     pickFrom: jest.fn(),
@@ -130,7 +129,7 @@ describe('WorkflowCanvas painting', () => {
     renderCanvas(wide, { run: paintedWide });
     const box = (key: string) => card(`Step ${key}`).querySelector('.pg-step-card');
     expect(classOf(box('q'))).toEqual(expect.arrayContaining(['border-dashed']));
-    expect(classOf(box('f'))).toEqual(expect.arrayContaining(['border-actionDanger']));
+    expect(classOf(box('f'))).toEqual(expect.arrayContaining(['pg-run-failed']));
     expect(classOf(box('k'))).toEqual(expect.arrayContaining(['opacity-40']));
     expect(within(card('Step r')).getByTestId('run-ring')).toBeTruthy();
     expect(card('Step r').querySelector('.pg-run-pulse')).not.toBeNull();
@@ -179,6 +178,22 @@ describe('Live In Tests and Test Step', () => {
     fireEvent.mouseEnter(card('Slack'));
     expect(screen.getByRole('button', { name: 'Delete Slack' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Test Slack' })).toBeNull();
+  });
+});
+
+describe("a step card's colours", () => {
+  const graph = graphOf([step('r', 'logic.manualReview', { name: 'Review' })]);
+
+  it('hands the card its icon colour for its border', () => {
+    renderCanvas(graph);
+    expect(card('Review').style.getPropertyValue('--pg-step-colour')).toBe('var(--color-forth)');
+  });
+
+  it("colours a review's outcomes: Approved green, Rejected red", () => {
+    renderCanvas(graph);
+    const sticker = (name: string) => classOf(within(card('Review')).getByTitle(name));
+    expect(sticker('Approved')).toEqual(expect.arrayContaining(['bg-actionSuccess']));
+    expect(sticker('Rejected')).toEqual(expect.arrayContaining(['bg-actionDanger']));
   });
 });
 

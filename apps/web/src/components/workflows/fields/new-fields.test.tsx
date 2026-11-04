@@ -18,7 +18,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react';
 import { createWebhookSecret, getWebhook } from '@/lib/workflows-api';
 import type { Channel } from '@/types/channel';
-import { usesAiCredits } from '../panel/test-tab';
+import { usesAiCredits } from '../panel/step-test';
 import type { FieldContext } from './contract';
 import { SchemaForm } from './schema-form';
 import { stubBrowserLayout } from './test-dom';

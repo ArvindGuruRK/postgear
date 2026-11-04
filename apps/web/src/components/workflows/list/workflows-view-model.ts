@@ -28,7 +28,7 @@ export const WORKFLOW_STATUS: Record<AutomationStatus, { label: string; variant:
 export const RUN_WORDS: Record<AutomationRunStatus, { label: string; variant: BadgeVariant }> = {
   QUEUED: { label: 'Waiting', variant: 'outline' },
   RUNNING: { label: 'Running', variant: 'primary' },
-  WAITING: { label: 'Waiting For Review', variant: 'secondary' },
+  WAITING: { label: 'Waiting For Review', variant: 'accent' },
   SUCCEEDED: { label: 'Succeeded', variant: 'success' },
   FAILED: { label: 'Failed', variant: 'danger' },
   CANCELLED: { label: 'Cancelled', variant: 'outline' },
@@ -54,8 +54,9 @@ export function lastRunText(item: Pick<AutomationListItem, 'lastRunStatus'>): {
   return item.lastRunStatus ? RUN_WORDS[item.lastRunStatus] : null;
 }
 
+/** Live runs only: a test run sets the last run's badge, so a plain "No runs" beside it would be untrue. */
 export function runsText(count: number): string {
-  if (count === 0) return 'No runs';
+  if (count === 0) return 'No live runs';
   return count === 1 ? '1 run' : `${count} runs`;
 }
 

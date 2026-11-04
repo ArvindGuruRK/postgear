@@ -15,6 +15,7 @@ import {
   type PortId,
   uniqueNodeName,
 } from '@postgear/automation';
+import type { Position } from './builder-state';
 
 /** The step card's size on the canvas: one size for every step, the trigger included. */
 export const CARD_WIDTH = 320;
@@ -27,8 +28,24 @@ export const CARD_HEIGHT = 120;
 export const STEP_GAP_X = CARD_WIDTH + 160;
 /** One row down: a card's height plus Tidy Up's 72px between rows (`TIDY_NODESEP`; 192 is on the grid). */
 export const STEP_GAP_Y = CARD_HEIGHT + 72;
+/** How far apart a card's outputs sit, so their stickers never touch. */
+export const PORT_PITCH = 40;
 /** The canvas grid; positions snap to it. */
 export const GRID = 12;
+
+/** Two outputs fit the one card size; a card grows only for three or more (Paths). */
+/**
+ * How far a named port's line runs straight before it may bend, so it leaves from behind its
+ * sticker level and never slants out of it. Stem 12 + dot 8, the sticker (at most 96, and
+ * never measured short: bold text-xs is under 7 px a letter) and 8 clear of it.
+ */
+export function portLead(label: string): number {
+  return 20 + Math.min(96, 20 + label.length * 7) + 8;
+}
+
+export function cardHeight(ports: number): number {
+  return Math.max(CARD_HEIGHT, ports * PORT_PITCH + PORT_PITCH);
+}
 
 export function snap(value: number): number {
   return Math.round(value / GRID) * GRID;
@@ -152,6 +169,38 @@ function overlaps(graph: AutomationGraph, x: number, y: number, except?: string)
       Math.abs(node.position.x - x) < CARD_WIDTH &&
       Math.abs(node.position.y - y) < CARD_HEIGHT + 24,
   );
+}
+
+/**
+ * Where a new note goes: centred on the view, or if steps or notes are there,
+ * moved up in its own height until it is clear. A note behind a card is hard to
+ * read and hard to grab.
+ */
+export function placeNote(
+  graph: AutomationGraph,
+  centre: Position,
+  size: { w: number; h: number },
+): Position {
+  const x = Math.round(centre.x - size.w / 2);
+  let y = Math.round(centre.y - size.h / 2);
+  const hits = (top: number) =>
+    graph.nodes.some(
+      (node) =>
+        node.position.x < x + size.w &&
+        node.position.x + CARD_WIDTH > x &&
+        // 32 for the tab above the card.
+        node.position.y - 32 < top + size.h &&
+        node.position.y + CARD_HEIGHT > top,
+    ) ||
+    graph.notes.some(
+      (note) =>
+        note.position.x < x + size.w &&
+        note.position.x + note.size.w > x &&
+        note.position.y < top + size.h &&
+        note.position.y + note.size.h > top,
+    );
+  for (let tries = 0; tries < 50 && hits(y); tries += 1) y -= size.h + 24;
+  return { x, y };
 }
 
 /**

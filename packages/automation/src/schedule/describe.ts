@@ -48,6 +48,8 @@ export function zoneWords(timeZone: string): string {
 export interface DescribeScheduleOptions {
   /** Add the zone after the time. Default true; card summaries leave it out. */
   timeZone?: boolean;
+  /** Writes the stored "HH:MM" the viewer's way. Default: as stored. */
+  formatTime?: (time: string) => string;
 }
 
 export function describeSchedule(
@@ -78,7 +80,7 @@ export function describeSchedule(
       break;
     }
   }
-  return `${when} at ${time}${zone}`;
+  return `${when} at ${options.formatTime ? options.formatTime(time) : time}${zone}`;
 }
 
 /** Extra lines the Schedule panel shows under the sentence. */

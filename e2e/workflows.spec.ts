@@ -51,7 +51,7 @@ const ADMINS_ONLY = 'Only workspace admins can turn workflows on.';
 /** The Slack message field; its label carries the required mark ("Message*"). */
 const MESSAGE_LABEL = /^Message\*?$/;
 
-/** A step's run badge settles on one of these (`runs/run-bar.tsx`). */
+/** A step's run badge settles on one of these (`runs/logs-dock.tsx`). */
 const FINAL_STATES = ['succeeded', 'dryRun', 'handled', 'failed', 'skipped'];
 
 const created = newCreated();
@@ -87,8 +87,21 @@ function builder(): Locator {
   return page.getByTestId('workflow-builder');
 }
 
+/** The step editor, open on the Slack step. */
 function slackPanel(): Locator {
-  return page.getByRole('complementary', { name: 'Slack step' });
+  return page.getByTestId('expanded-view');
+}
+
+function setupDock(): Locator {
+  return page.getByRole('complementary', { name: 'Setup' });
+}
+
+/** The editor covers the page: its Close hands the header back. */
+async function closeStep(): Promise<void> {
+  if (await slackPanel().isVisible()) {
+    await slackPanel().getByRole('button', { name: 'Close step' }).click();
+  }
+  await expect(slackPanel()).toBeHidden();
 }
 
 function messageBox(): Locator {
@@ -105,10 +118,10 @@ async function expectSaved(): Promise<void> {
   });
 }
 
-/** Opens the Slack step's panel on its Configure tab: select the card, then Enter. */
+/** Opens the Slack step in the editor on its Configure tab: select the tile, then Enter. */
 async function openSlackConfigure(): Promise<void> {
   if (!(await slackPanel().isVisible())) {
-    await stepCard(slackKey).click();
+    await stepCard(slackKey).locator('.pg-step-card').click();
     await page.keyboard.press('Enter');
   }
   await expect(slackPanel()).toBeVisible();
@@ -124,7 +137,7 @@ async function caretAtEnd(): Promise<void> {
   await page.keyboard.press('ControlOrMeta+End');
 }
 
-test('creates a workflow from the Failed Post Alert template and Finish Setup lists Slack', async () => {
+test('creates a workflow from the Failed Post Alert template and Setup lists Slack', async () => {
   await page.goto(`/${DEMO_ORG}/workflows`);
   const gallery = page.getByRole('region', { name: 'Templates' });
   const template = gallery.getByRole('button', { name: /Failed Post Alert/ });
@@ -149,14 +162,13 @@ test('creates a workflow from the Failed Post Alert template and Finish Setup li
   });
   await expect(builder()).toBeVisible({ timeout: 30_000 });
 
-  // Finish Setup names the one thing left: the Slack step has no connection.
-  const setup = page.getByRole('region', { name: 'Finish Setup' });
-  await expect(setup).toBeVisible();
-  const slackLine = setup
-    .getByRole('button')
+  // A new workflow from a template opens on Setup, with the one thing left: Slack's connection.
+  await expect(setupDock()).toBeVisible();
+  const slackRow = setupDock()
+    .getByTestId('setup-row')
     .filter({ hasText: /Choose a Slack connection|Connect a Slack account/ });
-  await expect(slackLine).toHaveCount(1);
-  await expect(slackLine).toContainText('Slack');
+  await expect(slackRow).toHaveCount(1);
+  await expect(slackRow).toContainText('Slack');
 
   // Renamed to this run's own name, so the run's cleanup can find it.
   const name = page.getByRole('textbox', { name: 'Workflow name' });
@@ -168,16 +180,9 @@ test('creates a workflow from the Failed Post Alert template and Finish Setup li
   await expectSaved();
 });
 
-test('connects Slack with a pasted webhook link and the issues chip reads "No issues found"', async () => {
-  const setup = page.getByRole('region', { name: 'Finish Setup' });
-  await setup
-    .getByRole('button')
-    .filter({ hasText: /Choose a Slack connection|Connect a Slack account/ })
-    .click();
-  await expect(slackPanel()).toBeVisible();
-
+test('connects Slack with a pasted webhook link, right in the Setup dock', async () => {
   // "Connect Slack" in an empty workspace; "Add Another" next to someone else's Slack.
-  await slackPanel()
+  await setupDock()
     .getByRole('button', { name: /^(Connect Slack|Add Another)$/ })
     .click();
   const dialog = page.getByRole('dialog', { name: 'Connect Slack' });
@@ -198,11 +203,8 @@ test('connects Slack with a pasted webhook link and the issues chip reads "No is
   await expect(dialog).toBeHidden();
 
   // The new connection is chosen for the step at once.
-  await expect(slackPanel().getByRole('combobox', { name: 'Slack connection' })).toContainText(
-    CONNECTION_NAME,
-  );
-  await expect(page.getByTestId('issues-chip')).toHaveText('No issues found', { timeout: 15_000 });
-  await expect(page.getByRole('region', { name: 'Finish Setup' })).toContainText('Ready to test.');
+  await expect(page.getByTestId('setup-done')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('finish-setup')).toHaveCount(0);
   await expectSaved();
 
   const slack = (await getWorkflow(page.request, workflowId)).draftGraph.nodes.find(
@@ -244,6 +246,7 @@ test('inserts data into the Slack message through Insert Data', async () => {
     );
   await expectSaved();
   liveMessage = await savedSlackMessage(page.request, workflowId);
+  await closeStep();
 });
 
 test('tests the workflow on the built-in sample: every step settles and Slack is a dry run', async () => {
@@ -283,10 +286,10 @@ test('tests the workflow on the built-in sample: every step settles and Slack is
 test('turns the workflow on as an admin: the dialog says what it will do, the badge reads Active v1', async () => {
   const live = page.getByTestId('live-controls');
   await expect(live.getByTestId('status-badge')).toHaveCount(0);
-  const toggle = live.getByRole('switch', { name: 'Activate' });
-  await expect(toggle).toBeEnabled();
-  await expect(toggle).not.toBeChecked();
-  await toggle.click();
+  const activate = live.getByTestId('activate-button');
+  await expect(activate).toBeEnabled();
+  await expect(activate).toHaveText('Activate');
+  await activate.click();
 
   const dialog = page.getByRole('dialog', { name: 'Turn On Workflow' });
   await expect(dialog).toBeVisible();
@@ -305,41 +308,45 @@ test('turns the workflow on as an admin: the dialog says what it will do, the ba
   await expect(dialog).toBeHidden();
 
   await expect(live.getByTestId('status-badge')).toHaveText('Active v1');
-  await expect(toggle).toBeChecked();
-  await expect(live.getByTestId('unpublished-badge')).toHaveCount(0);
+  // Nothing new to send live: the button stays where it is, greyed.
+  await expect(activate).toHaveText('Activate Changes');
+  await expect(activate).toBeDisabled();
 
   const workflow = await getWorkflow(page.request, workflowId);
   expect(workflow.status).toBe('ACTIVE');
   expect(workflow.activeVersion).toBe(1);
 });
 
-test('an edit shows Unpublished Changes and Discard Changes puts the live message back', async () => {
+test('an edit wakes Activate Changes and Discard Changes puts the live message back', async () => {
   const live = page.getByTestId('live-controls');
   await openSlackConfigure();
   await caretAtEnd();
   await page.keyboard.type(DISCARDED_WORDS);
   await expect(messageBox()).toContainText(DISCARDED_WORDS.trim());
 
-  await expect(live.getByTestId('unpublished-badge')).toHaveText('Unpublished Changes', {
-    timeout: 30_000,
-  });
   await expectSaved();
   expect(await savedSlackMessage(page.request, workflowId)).toContain(DISCARDED_WORDS.trim());
+  await closeStep();
+  const activate = live.getByTestId('activate-button');
+  await expect(activate).toBeEnabled({ timeout: 30_000 });
 
-  await live.getByRole('button', { name: 'Discard Changes', exact: true }).click();
+  await live.getByTestId('activate-menu').click();
+  await page.getByRole('menuitem', { name: 'Discard Changes', exact: true }).click();
   const confirm = page.getByRole('alertdialog', { name: 'Discard Changes?' });
   await expect(confirm).toContainText('The draft goes back to version 1, the live one.');
   await confirm.getByRole('button', { name: 'Discard Changes', exact: true }).click();
   await expect(confirm).toBeHidden();
 
-  await expect(live.getByTestId('unpublished-badge')).toHaveCount(0);
+  await expect(activate).toBeDisabled();
   await expect(live.getByTestId('status-badge')).toHaveText('Active v1');
+  await openSlackConfigure();
   await expect(messageBox()).not.toContainText(DISCARDED_WORDS.trim());
   await expect(messageBox().locator(`[data-chip-path="${ATTEMPTS_TOKEN}"]`)).toHaveCount(1);
 
   const workflow = await getWorkflow(page.request, workflowId);
   expect(workflow.hasUnpublishedChanges).toBe(false);
   expect(await savedSlackMessage(page.request, workflowId)).toBe(liveMessage);
+  await closeStep();
 });
 
 test('a member sees Activate turned off, with the reason', async ({ browser }) => {
@@ -354,10 +361,9 @@ test('a member sees Activate turned off, with the reason', async ({ browser }) =
     const live = member.getByTestId('live-controls');
     await expect(live).toBeVisible({ timeout: 30_000 });
     await expect(live.getByTestId('status-badge')).toHaveText('Active v1');
-    const toggle = live.getByRole('switch', { name: 'Activate' });
-    await expect(toggle).toBeDisabled();
-    await expect(toggle).toBeChecked();
-    await expect(toggle).toHaveAccessibleDescription(ADMINS_ONLY);
+    const activate = live.getByTestId('activate-button');
+    await expect(activate).toBeDisabled();
+    await expect(activate).toHaveAccessibleDescription(ADMINS_ONLY);
   } finally {
     await memberContext.close();
   }

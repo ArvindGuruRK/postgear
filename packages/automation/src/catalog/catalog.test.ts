@@ -423,7 +423,7 @@ describe('step summaries', () => {
     );
     expect(say('notify.whatsapp')).toBe('WhatsApp is coming soon.');
     expect(describeNode({ ...step('n1', 'notify.slack'), config: { footer: 'yes' } })).toBe(
-      'Finish setting up this step',
+      'Finish setting up',
     );
   });
 });

@@ -5,7 +5,7 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 ## Look
 
 - Neobrutalist: 2px `border-outline` borders, hard unblurred diagonal shadows, chunky icons, stickers. Not the faded flat look of the reference apps.
-- Shadows by role (rules doc section 6): things you press use `shadow-brutalSm/Md/Lg`; boxes that hold content or take input use `shadow-surfaceSm/Md/Lg`. Tables and file drop zones get none.
+- Shadows by role (rules doc section 6): things you press use `shadow-brutalSm/Md/Lg`; boxes that hold content or take input use `shadow-surfaceSm/Md/Lg`. Tables and file drop zones get none. Nor do dropdowns (the button and the open list) or toggle-style controls (tab lists, view switchers, segmented controls, choice tiles), anywhere in the app (2026-11-03).
 - **No shadow on a selected segment** (the active option inside a segmented control or tab strip). The container may have one; the chosen segment does not.
 - Corners: Tailwind's default scale everywhere (buttons, menus, toggles, sidebar, calendar), except `Card` and the panels on it, which use `rounded-card` (12px, 2026-10-27). Badges are squared 6px tags (`rounded-md`), not pills. Never a bracketed `rounded-[...]`; the owner rejected rounder corners on every component.
 - Never inline a hex or pixel value. New needs extend `packages/ui/src/styles/colors.css` and `packages/config/tailwind.css` (rules doc section 17).
@@ -32,6 +32,7 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 
 ## Icons
 
+- **A navigation menu's values use a plain `lucide-react` icon** beside the name (the owner's call, 2026-11-04). Every other clickable icon follows the next line.
 - **Clickable icons are animated**: `MotionIcon` from `@postgear/ui` wrapping an icon imported from its own file, for example `import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon'` then `<MotionIcon icon={Trash2Icon} className="h-4 w-4" />`. Import per-icon subpaths, never the barrel. See `components/ai/copilot-chat.tsx`.
 - Decorative icons, state ticks and preview bars stay plain `lucide-react`.
 - Size explicitly (`h-4 w-4` next to text), `strokeWidth={2.5}` (3 for small indicators). Rules doc section 13.
@@ -47,7 +48,7 @@ The short form of `docs/design-patterns/design-system-rules.md` plus the user's 
 
 ## Do not
 
-- Repeat the page title, add a tagline, add a divider, or add a rule under the top bar.
+- Repeat the page title, add a tagline, add a divider, or add a rule under the top bar. (The workflow builder's own full-window header is the one exception: it has `border-b-2`.)
 - Add decorative status pills or badges that say nothing new.
 - Widen the sidebar rail.
 - Paste Postiz code (AGPL). Rebuild layouts from `docs/screenshots/`.

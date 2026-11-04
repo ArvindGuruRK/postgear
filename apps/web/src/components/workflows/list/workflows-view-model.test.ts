@@ -26,7 +26,7 @@ describe('workflows view model', () => {
       label: 'Failed',
       variant: 'danger',
     });
-    expect(runsText(0)).toBe('No runs');
+    expect(runsText(0)).toBe('No live runs');
     expect(runsText(1)).toBe('1 run');
     expect(runsText(14)).toBe('14 runs');
   });

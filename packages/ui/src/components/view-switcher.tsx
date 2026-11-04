@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import type { AnimatedIcon } from '../lib/icon-animation';
+import { SEGMENT_FRAME, SEGMENT_ICON, segment } from '../lib/segmented';
 import { cn } from '../lib/utils';
 import { MotionIcon } from './motion-icon';
 import { TooltipHint } from './tooltip';
@@ -25,10 +26,7 @@ export function ViewSwitcher({ options, value, onValueChange, className }: ViewS
     <div
       role="group"
       aria-label="View"
-      className={cn(
-        'inline-flex items-center gap-1 rounded-md border-2 border-outline bg-secondary p-1 shadow-brutalSm',
-        className,
-      )}
+      className={cn('inline-flex items-center', SEGMENT_FRAME, className)}
     >
       {options.map((option) => {
         const Icon = option.icon;
@@ -36,7 +34,7 @@ export function ViewSwitcher({ options, value, onValueChange, className }: ViewS
         return (
           // The icons alone do not say which is which: each names itself on
           // hover and keyboard focus. Above the switch, clear of its border
-          // and shadow; not hoverable, because the buttons sit flush and an
+          // ; not hoverable, because the buttons sit flush and an
           // open tooltip would otherwise linger over the next one.
           <TooltipHint
             key={option.value}
@@ -50,13 +48,7 @@ export function ViewSwitcher({ options, value, onValueChange, className }: ViewS
               aria-pressed={isActive}
               aria-label={option.label}
               onClick={() => onValueChange(option.value)}
-              className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
-                'focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
-                isActive
-                  ? 'bg-actionPrimary text-onActionPrimary'
-                  : 'text-ink hover:bg-actionPrimary/10',
-              )}
+              className={cn(segment(isActive), SEGMENT_ICON)}
             >
               {option.animatedIcon ? (
                 <MotionIcon icon={option.animatedIcon} className="h-4 w-4" />

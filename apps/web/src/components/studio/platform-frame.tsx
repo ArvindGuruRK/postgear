@@ -74,7 +74,6 @@ import {
 } from 'react';
 import { initialsOf } from '@/lib/avatars';
 import type { PreviewPlatform, PreviewPlatformId, StudioMediaRef } from '@/types/studio';
-import { SEGMENTED_LIST, SEGMENTED_TRIGGER } from '../analytics/analytics-ui';
 import { PlatformIcon } from '../platforms/platform-icon';
 import { PreviewText } from '../previews/preview-parts';
 import { FOCUS } from './design-card';
@@ -174,13 +173,12 @@ export function PlatformPreview({
       onValueChange={(value) => setChosen(value as PreviewPlatformId)}
       className={cn('flex flex-col gap-4', className)}
     >
-      <TabsList aria-label="Platform" className={cn(SEGMENTED_LIST, 'max-w-full self-center')}>
+      <TabsList aria-label="Platform" className="self-center">
         {platforms.map((platform) => (
           <TabsTrigger
             key={platform.id}
             value={platform.id}
             data-testid={`preview-platform-${platform.id}`}
-            className={cn(SEGMENTED_TRIGGER, 'gap-2')}
           >
             <PlatformIcon platform={platform.id} />
             {/* Logos alone on a phone, so four platforms fit on one row. */}

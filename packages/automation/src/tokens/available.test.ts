@@ -153,6 +153,8 @@ describe('labels', () => {
     expect(fallbackLabel('trigger.post.channel.name')).toBe('Post Channel Name');
     expect(fallbackLabel('nodes.k1.output.publishedAt')).toBe('Published At');
     expect(fallbackLabel('nodes.k1.output')).toBe('Step Data');
-    expect(humanise('post_url')).toBe('Post Url');
+    expect(humanise('post_url')).toBe('Post URL');
+    expect(humanise('id')).toBe('ID');
+    expect(humanise('video')).toBe('Video');
   });
 });

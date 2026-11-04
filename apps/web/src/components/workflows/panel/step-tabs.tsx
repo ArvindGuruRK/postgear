@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * The body of a step's panel (blueprint 5.1), shared by the docked panel
- * and the Expanded view's middle column: the Setup, Configure and Test
- * tabs, then the collapsed Settings (On Error, Retries, Notes, Turn Off).
+ * The Settings column of the step editor (blueprint 5.1): the Setup, Configure
+ * and Settings tabs (On Error, Retries, Notes, Turn Off), with Test Step on the
+ * tab row as n8n has Execute Step.
  *
  * - **Setup and Configure** are the step's `form` drawn by the field kit's
  *   `SchemaForm`. Each edit is one `updateConfig` at its path (folded for
@@ -13,9 +13,9 @@
  * - **Ticks and "!"**: a tab shows a tick once its required fields are
  *   filled (`tabComplete`) and a "!" while one of its fields has an error
  *   (`tabForField` on each issue's field).
- * - **Focus-the-field**: a `focus` request switches to the tab (or opens
- *   Settings) that holds the field, then scrolls to and focuses the element
- *   carrying its `data-field-path`, waiting a few frames for it to draw.
+ * - **Focus-the-field**: a `focus` request switches to the tab that holds the
+ *   field, then scrolls to and focuses the element carrying its
+ *   `data-field-path`, waiting a few frames for it to draw.
  */
 import {
   type AutomationGraph,
@@ -24,6 +24,7 @@ import {
   type GraphNode,
   getDefinition,
   isTriggerType,
+  type NodeDefinition,
   type OnErrorPolicy,
   tabComplete,
   tabForField,
@@ -31,9 +32,6 @@ import {
 } from '@postgear/automation';
 import {
   Alert,
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
   cn,
   Label,
   Select,
@@ -49,7 +47,7 @@ import {
   Textarea,
   Toggle,
 } from '@postgear/ui';
-import { Check, ChevronDown, TriangleAlert } from 'lucide-react';
+import { Check, TriangleAlert } from 'lucide-react';
 import { type Dispatch, useEffect, useId, useRef, useState } from 'react';
 import type { BuilderAction } from '../builder/builder-state';
 import { focusField } from '../builder/issue-focus';
@@ -58,7 +56,7 @@ import { FIELD_PATH_ATTRIBUTE, type FieldContext } from '../fields/contract';
 import { SchemaForm } from '../fields/schema-form';
 import type { PinControls } from './output-pane';
 import { sourceLabel } from './panel-view-model';
-import { type StepTestControls, TestTab } from './test-tab';
+import { StepTestButton, type StepTestControls, StepTestNotices } from './step-test';
 
 export const ON_ERROR_OPTIONS: readonly { id: OnErrorPolicy['mode']; label: string }[] = [
   { id: 'stop', label: 'Stop The Workflow' },
@@ -83,7 +81,7 @@ export interface FocusRequest {
   seq: number;
 }
 
-type PanelTab = FormTab | 'test';
+type PanelTab = FormTab | 'settings';
 
 /** How long focus-the-field waits for a field to draw (fields may mount an editor first). */
 const FOCUS_FRAMES = 30;
@@ -116,11 +114,83 @@ export interface StepTabsProps {
   focus?: FocusRequest | null;
   /** A focus request for the step's name: the header that holds it focuses it. */
   onFocusName?: () => void;
-  /** Module 08: Test Step, the result and Send For Real In Tests. */
+  /** Module 08: Test Step and Send For Real In Tests. */
   test?: StepTestControls;
-  /** Bumped to show the Test tab (Test Step from a card's hover toolbar). */
-  showTest?: number;
   className?: string;
+}
+
+/** The form's own connection field wins; otherwise the shared picker stands in. */
+function sharedPicker(def: NodeDefinition | undefined) {
+  const connection = def?.connection;
+  const setupFields = def?.form?.tabs.setup ?? [];
+  return connection && !setupFields.some((field) => field.kind === 'connection')
+    ? connection
+    : null;
+}
+
+/**
+ * A step's Setup fields, in the editor's Setup tab and the Setup dock.
+ * `withConfigure` adds the Configure fields too, for a dock row whose error
+ * lives there, so it can be fixed on the spot.
+ */
+export function StepSetupFields({
+  node,
+  graph,
+  issues,
+  context,
+  dispatch,
+  withConfigure = false,
+}: Pick<StepTabsProps, 'node' | 'graph' | 'issues' | 'context' | 'dispatch'> & {
+  withConfigure?: boolean;
+}) {
+  const ids = useId();
+  const def = getDefinition(node.type, node.typeVersion);
+  const ownPicker = sharedPicker(def);
+  const update = (path: string, value: unknown) =>
+    dispatch({ type: 'updateConfig', key: node.key, path, value, now: Date.now() });
+  const value =
+    ownPicker && typeof node.config[ownPicker.field] === 'string'
+      ? (node.config[ownPicker.field] as string)
+      : '';
+  const connectionIssue = ownPicker
+    ? issues.find((issue) => issue.field === ownPicker.field)
+    : undefined;
+  const returnTo = `/${context.orgId}/workflows/${context.automationId}?step=${encodeURIComponent(node.key)}`;
+  const formProps = def
+    ? { definition: def, node, graph, onChange: update, issues, context }
+    : null;
+  const needsConfigure =
+    withConfigure &&
+    def !== undefined &&
+    (def.form?.tabs.configure.length ?? 0) > 0 &&
+    issues.some(
+      (issue) => issue.field !== undefined && tabForField(def, issue.field) === 'configure',
+    );
+  return (
+    <>
+      {ownPicker ? (
+        <div {...{ [FIELD_PATH_ATTRIBUTE]: ownPicker.field }} className="flex flex-col gap-1.5">
+          <Label htmlFor={`${ids}-connection`}>Connection</Label>
+          <ConnectionPicker
+            kind={ownPicker.kind}
+            value={value}
+            returnTo={returnTo}
+            canManage={context.canManage}
+            onChange={(connectionId) => update(ownPicker.field, connectionId)}
+          />
+          {connectionIssue ? (
+            <Text size="sm" className="text-dangerInk">
+              {connectionIssue.message}
+            </Text>
+          ) : null}
+        </div>
+      ) : null}
+      {formProps && (def?.form?.tabs.setup.length ?? 0) > 0 ? (
+        <SchemaForm {...formProps} tab="setup" />
+      ) : null}
+      {formProps && needsConfigure ? <SchemaForm {...formProps} tab="configure" /> : null}
+    </>
+  );
 }
 
 export function StepTabs({
@@ -133,7 +203,6 @@ export function StepTabs({
   focus = null,
   onFocusName,
   test,
-  showTest = 0,
   className,
 }: StepTabsProps) {
   const ids = useId();
@@ -141,11 +210,7 @@ export function StepTabs({
   const form = def?.form;
   const setupFields = form?.tabs.setup ?? [];
   const configureFields = form?.tabs.configure ?? [];
-  const connection = def?.connection;
-  // The form's own connection field wins; otherwise the shared picker stands in.
-  const ownPicker =
-    connection && !setupFields.some((field) => field.kind === 'connection') ? connection : null;
-  const hasSetup = setupFields.length > 0 || ownPicker !== null;
+  const hasSetup = setupFields.length > 0 || sharedPicker(def) !== null;
   const config = node.config;
 
   const errorPlaces = new Set<FieldPlace>();
@@ -163,9 +228,8 @@ export function StepTabs({
   );
 
   const [tab, setTab] = useState<PanelTab>(() =>
-    showTest > 0 ? 'test' : hasSetup && !setupDone ? 'setup' : 'configure',
+    hasSetup && !setupDone ? 'setup' : 'configure',
   );
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const pending = useRef<FocusRequest | null>(null);
   // The tab can disappear when a step's form changes; fall back to Configure.
@@ -178,15 +242,10 @@ export function StepTabs({
       return;
     }
     pending.current = focus;
-    if (focus.place === 'settings') setSettingsOpen(true);
-    else setTab(focus.place === 'setup' && !hasSetup ? 'configure' : focus.place);
+    setTab(focus.place === 'setup' && !hasSetup ? 'configure' : focus.place);
   }, [focus, onFocusName, hasSetup]);
 
-  useEffect(() => {
-    if (showTest > 0) setTab('test');
-  }, [showTest]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs again once the tab or Settings has opened, when the field is drawn
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs again once the tab has opened, when the field is drawn
   useEffect(() => {
     const request = pending.current;
     if (!request) return;
@@ -204,7 +263,7 @@ export function StepTabs({
     };
     frame = requestAnimationFrame(attempt);
     return () => cancelAnimationFrame(frame);
-  }, [focus, shownTab, settingsOpen]);
+  }, [focus, shownTab]);
 
   function update(path: string, value: unknown) {
     dispatch({ type: 'updateConfig', key: node.key, path, value, now: Date.now() });
@@ -216,14 +275,6 @@ export function StepTabs({
 
   const policy: OnErrorPolicy = node.onError ?? { mode: 'stop' };
   const retries = policy.retries ?? { max: 0, waitSeconds: 30 };
-  const connectionValue =
-    ownPicker && typeof config[ownPicker.field] === 'string'
-      ? (config[ownPicker.field] as string)
-      : '';
-  const connectionIssue = ownPicker
-    ? issues.find((issue) => issue.field === ownPicker.field)
-    : undefined;
-  const returnTo = `/${context.orgId}/workflows/${context.automationId}?step=${encodeURIComponent(node.key)}`;
   const fieldAttr = (path: string) => ({ [FIELD_PATH_ATTRIBUTE]: path });
 
   const formProps = def
@@ -232,8 +283,45 @@ export function StepTabs({
 
   return (
     <div ref={root} className={cn('flex flex-col', className)}>
+      <Tabs
+        value={shownTab}
+        onValueChange={(value) => setTab(value as PanelTab)}
+        className="flex flex-col gap-4"
+      >
+        {/* The line Input and Output share (`pane-header.tsx`); stays in view while the column scrolls. */}
+        <div
+          data-testid="pane-header"
+          className="sticky top-0 z-10 -mx-4 flex h-14 items-center justify-between gap-2 border-b-2 border-outline bg-secondary px-4"
+        >
+          <TabsList>
+            {hasSetup ? (
+              <TabsTrigger value="setup">
+                Setup
+                {errorPlaces.has('setup') ? (
+                  <TabMark kind="error" />
+                ) : setupDone ? (
+                  <TabMark kind="done" />
+                ) : null}
+              </TabsTrigger>
+            ) : null}
+            <TabsTrigger value="configure">
+              Configure
+              {errorPlaces.has('configure') ? (
+                <TabMark kind="error" />
+              ) : configureDone ? (
+                <TabMark kind="done" />
+              ) : null}
+            </TabsTrigger>
+            <TabsTrigger value="settings">
+              Settings
+              {errorPlaces.has('settings') ? <TabMark kind="error" /> : null}
+            </TabsTrigger>
+          </TabsList>
+          {test ? <StepTestButton node={node} test={test} /> : null}
+        </div>
+
       {stepIssues.length > 0 ? (
-        <div className="mb-4 flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           {stepIssues.map((issue) => (
             <Alert
               key={`${issue.code}-${issue.edgeId ?? ''}-${issue.message}`}
@@ -247,53 +335,17 @@ export function StepTabs({
         </div>
       ) : null}
 
-      <Tabs
-        value={shownTab}
-        onValueChange={(value) => setTab(value as PanelTab)}
-        className="flex flex-col gap-4"
-      >
-        <TabsList className="self-start">
-          {hasSetup ? (
-            <TabsTrigger value="setup">
-              Setup
-              {errorPlaces.has('setup') ? (
-                <TabMark kind="error" />
-              ) : setupDone ? (
-                <TabMark kind="done" />
-              ) : null}
-            </TabsTrigger>
-          ) : null}
-          <TabsTrigger value="configure">
-            Configure
-            {errorPlaces.has('configure') ? (
-              <TabMark kind="error" />
-            ) : configureDone ? (
-              <TabMark kind="done" />
-            ) : null}
-          </TabsTrigger>
-          <TabsTrigger value="test">Test</TabsTrigger>
-        </TabsList>
+        <StepTestNotices node={node} pin={pin} test={test} />
 
         {hasSetup ? (
           <TabsContent value="setup" className="mt-0 flex flex-col gap-4">
-            {ownPicker ? (
-              <div {...fieldAttr(ownPicker.field)} className="flex flex-col gap-1.5">
-                <Label htmlFor={`${ids}-connection`}>Connection</Label>
-                <ConnectionPicker
-                  kind={ownPicker.kind}
-                  value={connectionValue}
-                  returnTo={returnTo}
-                  canManage={context.canManage}
-                  onChange={(connectionId) => update(ownPicker.field, connectionId)}
-                />
-                {connectionIssue ? (
-                  <Text size="sm" className="text-dangerInk">
-                    {connectionIssue.message}
-                  </Text>
-                ) : null}
-              </div>
-            ) : null}
-            {formProps && setupFields.length > 0 ? <SchemaForm {...formProps} tab="setup" /> : null}
+            <StepSetupFields
+              node={node}
+              graph={graph}
+              issues={issues}
+              context={context}
+              dispatch={dispatch}
+            />
           </TabsContent>
         ) : null}
 
@@ -320,28 +372,7 @@ export function StepTabs({
           )}
         </TabsContent>
 
-        <TabsContent value="test" className="mt-0 flex flex-col gap-4">
-          <TestTab node={node} scope={context.scope} pin={pin} test={test} />
-        </TabsContent>
-      </Tabs>
-
-      <Collapsible
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        className="mt-6 rounded-md border-2 border-outline bg-inset"
-      >
-        <CollapsibleTrigger className="group flex w-full items-center justify-between px-3 py-2 type-ui text-sm text-ink">
-          <span className="flex items-center">
-            Settings
-            {errorPlaces.has('settings') ? <TabMark kind="error" /> : null}
-          </span>
-          <ChevronDown
-            aria-hidden="true"
-            className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180"
-            strokeWidth={2.5}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="flex flex-col gap-4 border-t-2 border-outline p-3">
+        <TabsContent value="settings" className="mt-0 flex flex-col gap-4">
           {def?.canHandleErrors || node.onError ? (
             <>
               <div {...fieldAttr('onError')} className="flex flex-col gap-1.5">
@@ -472,8 +503,8 @@ export function StepTabs({
                 ))}
             </div>
           ) : null}
-        </CollapsibleContent>
-      </Collapsible>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
