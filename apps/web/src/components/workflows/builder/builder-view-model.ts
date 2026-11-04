@@ -55,8 +55,10 @@ export function validationContext(
 export function summaryContext(
   connections: readonly Connection[],
   channels: readonly Channel[],
+  formatTime?: (time: string) => string,
 ): SummaryContext {
   return {
+    formatTime,
     connections: connections.map((connection) => ({
       id: connection.id,
       name: connection.name,

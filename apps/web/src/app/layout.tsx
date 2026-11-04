@@ -7,8 +7,8 @@ import { brandFont } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
-  // `template` lets each route set a short `title` ("Sign in") and get
-  // "Sign in - PostGear" in the tab; `default` covers routes that set none.
+  // `template` lets each route set a short `title` ("Login") and get
+  // "Login - PostGear" in the tab; `default` covers routes that set none.
   title: {
     default: 'PostGear',
     template: '%s - PostGear',

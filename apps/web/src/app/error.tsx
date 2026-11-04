@@ -32,7 +32,7 @@ export default function AppError({
           <div className="flex justify-center gap-3 pb-8">
             <Button onClick={reset}>Try Again</Button>
             <Button variant="secondary" onClick={() => window.location.assign('/login')}>
-              Back To Sign In
+              Back To Login
             </Button>
           </div>
           {error.digest ? (

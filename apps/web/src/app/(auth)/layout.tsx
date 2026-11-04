@@ -63,9 +63,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <aside className="hidden bg-primary bg-halftone lg:sticky lg:top-0 lg:order-first lg:flex lg:h-screen lg:flex-col lg:items-center lg:justify-center lg:gap-8 lg:self-start lg:px-12">
         <AuthIllustration className="w-full max-w-sm" />
         <div className="max-w-sm text-center">
-          <Heading level="h3">Every channel. One queue.</Heading>
+          <Heading level="h3">Every channel. One workspace.</Heading>
           <Text muted className="mt-2">
-            Schedule, publish and analyze, everywhere your audience is.
+            Create, publish, automate and analyze, everywhere your audience is.
           </Text>
         </div>
       </aside>

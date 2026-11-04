@@ -82,6 +82,8 @@ const ACTION_TAGS = new Set(['EmptyState', 'ErrorState', 'SuccessState']);
  * reason; the list is meant to stay short.
  */
 const ALLOWED: Record<string, string> = {
+  'apps/web/src/app/(auth)/register/page.tsx :: Create your Account':
+    "The owner's call, 2026-11-04: Sora's capital Y looks bad at this big heading size.",
   'apps/web/src/components/onboarding/welcome-screen.tsx :: Hey there, X Welcome To PostGear':
     'A greeting is a sentence, like Home\'s "Good evening, Demo"; the second line is Title Case.',
   'apps/web/src/components/onboarding/welcome-screen.tsx :: Hey there X Welcome To PostGear':

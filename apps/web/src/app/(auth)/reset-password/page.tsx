@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
           Remembered it?
         </Text>
         <Link href="/login" className="text-sm">
-          Sign in
+          Login
         </Link>
       </Stack>
     </Stack>

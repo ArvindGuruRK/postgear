@@ -112,6 +112,20 @@ describe('activation dialog content', () => {
     expect(content.scheduleRuns.every((run) => run.time === '09:00')).toBe(true);
   });
 
+  it('writes the sentence on the viewer clock when it is given one', () => {
+    const graph = graphOf(
+      [
+        node('trigger', 'trigger.schedule', { frequency: 'daily', time: '09:00', timeZone: 'UTC' }),
+        node('notify', 'notify.inApp', { message: 'Hi' }),
+      ],
+      [edge('trigger', 'notify')],
+    );
+    const summary = { formatTime: () => '9:00 AM' };
+    const content = activationContent(graph, [], { summary, nowIso: NOW, locale: 'en-GB' });
+    if (content.kind !== 'confirm') throw new Error('expected the confirm');
+    expect(content.sentence).toContain('Every day at 9:00 AM');
+  });
+
   it('asks for the tick when a post goes out without a review', () => {
     const unreviewed = graphOf(
       [node('trigger', 'trigger.manual', { fields: [] }), node('publish', 'postgear.publish')],

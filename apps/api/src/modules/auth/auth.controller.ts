@@ -97,7 +97,7 @@ export class AuthController {
       throw new BadRequestException(AUTH_MESSAGES.ACTIVATION_LINK_INVALID);
     }
 
-    return { message: 'Your account is confirmed. You can sign in now.' };
+    return { message: 'Your account is confirmed. You can login now.' };
   }
 
   @Public()
@@ -122,7 +122,7 @@ export class AuthController {
     // or `sameSite` leaves the original cookie in place in most browsers.
     response.clearCookie(this.authCookie, this.cookieOptions());
     response.clearCookie(this.orgCookie, this.cookieOptions(false));
-    return { message: 'Signed out' };
+    return { message: 'Logged out' };
   }
 
   /**
@@ -170,7 +170,7 @@ export class AuthController {
       throw new BadRequestException(AUTH_MESSAGES.RESET_LINK_INVALID);
     }
 
-    return { message: 'Your password has been changed. Sign in with it now.' };
+    return { message: 'Your password has been changed. Login with it now.' };
   }
 
   @Post('password/change')

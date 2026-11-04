@@ -72,7 +72,7 @@ describe('MailService.sendWorkspaceInvitation', () => {
     await service.sendWorkspaceInvitation('ada@example.com', invitation);
 
     const { text } = sent.mock.calls[0][0] as { text: string };
-    expect(text).toContain('sign in or create an account');
+    expect(text).toContain('login or create an account');
     expect(text).not.toMatch(/already have an account|your account/i);
   });
 });

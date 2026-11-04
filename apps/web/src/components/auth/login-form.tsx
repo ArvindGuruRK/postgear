@@ -39,7 +39,7 @@ export function LoginForm({ next = null }: { next?: string | null }) {
   const [error, setError] = useState<string | null>(
     // The OAuth callback redirects here with ?error=oauth when a handshake
     // fails, since it cannot render a message into a page it is redirecting to.
-    searchParams.get('error') === 'oauth' ? 'We could not complete that sign-in' : null,
+    searchParams.get('error') === 'oauth' ? 'We could not complete that login' : null,
   );
   const [pending, setPending] = useState(false);
 
@@ -111,7 +111,7 @@ export function LoginForm({ next = null }: { next?: string | null }) {
         </FormField>
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
-          {pending ? 'Signing in…' : 'Sign In'}
+          {pending ? 'Logging in…' : 'Login'}
         </Button>
       </Stack>
     </form>

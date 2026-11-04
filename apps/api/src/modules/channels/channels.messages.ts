@@ -3,8 +3,8 @@
  *
  * Separate from `auth.messages.ts` on purpose. That catalogue exists to stop
  * authentication leaking whether an account exists, and every string in it is
- * worded for sign-in: `OAUTH_FAILED` reads "We could not complete that
- * sign-in", which is simply wrong when a user was connecting an Instagram
+ * worded for login: `OAUTH_FAILED` reads "We could not complete that
+ * login", which is simply wrong when a user was connecting an Instagram
  * account. Reusing it would have meant either a misleading message or loosening
  * a string whose exact wording is asserted by a test.
  *
@@ -21,7 +21,7 @@ export const CHANNEL_MESSAGES = {
    * swapped between accounts.
    */
   WRONG_ACCOUNT:
-    'That is a different account from the one this channel uses. Sign in to the original account and try again.',
+    'That is a different account from the one this channel uses. Login to the original account and try again.',
   PROVIDER_UNKNOWN: 'PostGear does not support that platform.',
   PROVIDER_NOT_CONFIGURED: 'That platform is not set up on this PostGear instance yet.',
   NOT_FOUND: 'Channel not found',

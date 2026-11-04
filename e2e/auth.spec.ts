@@ -14,7 +14,7 @@ import { expect, test } from '@playwright/test';
 test('/ redirects to sign in instead of 404ing', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
 });
 
 test('sign in renders its fields and routes on to the other auth screens', async ({ page }) => {
@@ -32,7 +32,7 @@ test('sign in renders its fields and routes on to the other auth screens', async
   // post-signup onboarding flow (sprint-02, Task 6).
   await expect(page.getByLabel('Organization')).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Sign in' }).click();
+  await page.getByRole('link', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/login$/);
 
   await page.getByRole('link', { name: 'Forgot password?' }).click();
@@ -145,7 +145,7 @@ test('an unknown route renders the styled 404, not a bare Next.js page', async (
   await page.goto('/this-route-does-not-exist');
 
   await expect(page.getByRole('heading', { name: 'Nothing scheduled here' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Back to sign in' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to login' })).toBeVisible();
 });
 
 test('an org route redirects an anonymous visitor to sign in', async ({ page }) => {
@@ -157,7 +157,7 @@ test('an org route redirects an anonymous visitor to sign in', async ({ page }) 
   await page.goto('/acme/calendar');
 
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible();
 });
 
 test('the sign-in form reports a failure without saying which field was wrong', async ({
@@ -170,7 +170,7 @@ test('the sign-in form reports a failure without saying which field was wrong', 
 
   await page.getByLabel('Email').fill('definitely-not-a-user@example.com');
   await page.locator('#password').fill('whatever-9-password');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Login' }).click();
 
   // Scoped to the form: Next renders its own always-present route announcer
   // with role="alert", so an unscoped getByRole('alert') matches two elements.

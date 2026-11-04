@@ -86,11 +86,11 @@ export function InviteActions({
       <Stack gap="md">
         {/* The address it was sent to is in the paragraph above. */}
         <Text>
-          You&apos;re signed in as <span className="break-words">{signedInAs}</span>, not as the
+          You&apos;re logged in as <span className="break-words">{signedInAs}</span>, not as the
           address this invitation was sent to.
         </Text>
         <Button size="lg" className="w-full" onClick={switchAccount} disabled={working}>
-          {working ? 'Signing out…' : 'Sign In With Another Account'}
+          {working ? 'Logging out…' : 'Login With Another Account'}
         </Button>
       </Stack>
     );
@@ -111,7 +111,7 @@ export function InviteActions({
         </span>
       </Button>
       <Text size="sm" muted className="text-center">
-        Signed in as <span className="break-words">{signedInAs}</span>
+        Logged in as <span className="break-words">{signedInAs}</span>
       </Text>
     </Stack>
   );

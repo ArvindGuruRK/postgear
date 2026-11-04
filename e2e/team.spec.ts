@@ -41,7 +41,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.locator('#password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Login' }).click();
 }
 
 async function openTeam(page: Page) {
@@ -241,15 +241,15 @@ test('a new account joins through the link, which then cannot be used again, and
       `/register?next=${encodeURIComponent(path)}`,
     );
 
-    await page.getByRole('link', { name: 'Sign in to join' }).click();
+    await page.getByRole('link', { name: 'Login to join' }).click();
     await expect(page).toHaveURL(`/login?next=${encodeURIComponent(path)}`);
     await page.getByLabel('Email').fill(invitee.email);
     await page.locator('#password').fill(invitee.password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('button', { name: 'Login' }).click();
 
     // Back on the invitation, signed in.
     await expect(page).toHaveURL(path, { timeout: 20_000 });
-    await expect(page.getByText(`Signed in as ${invitee.email}`)).toBeVisible();
+    await expect(page.getByText(`Logged in as ${invitee.email}`)).toBeVisible();
     await page.getByTestId('invite-join').click();
 
     // Not onboarded yet, so the dashboard's gate takes over, past step 1.

@@ -26,7 +26,7 @@ export const metadata: Metadata = {
  * invitation, so joining is a click (unlike /verify, where a prefetch
  * confirming the account is the benign direction to fail in).
  *
- * - **Signed out**: "Sign in to join" and "Create an account", both carrying
+ * - **Signed out**: "Login to join" and "Create an account", both carrying
  *   `?next=` back to this page.
  * - **Signed in**: one button, "Join <workspace>", or a way to switch
  *   accounts when the link was sent to another address.
@@ -49,7 +49,7 @@ export default async function InvitePage({ params }: PageProps<'/invite/[token]'
           href={session ? '/' : '/login'}
           className={cn(buttonVariants({ variant: 'secondary', size: 'lg' }), 'w-full')}
         >
-          {session ? 'Go to PostGear' : 'Sign in'}
+          {session ? 'Go to PostGear' : 'Login'}
         </NextLink>
       </Stack>
     );
@@ -100,7 +100,7 @@ export default async function InvitePage({ params }: PageProps<'/invite/[token]'
             href={withNext('/login', here)}
             className={cn(buttonVariants({ size: 'lg' }), 'w-full')}
           >
-            Sign in to join
+            Login to join
           </NextLink>
           <NextLink
             href={withNext('/register', here)}

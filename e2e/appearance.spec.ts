@@ -32,7 +32,7 @@ async function signIn(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(user.email);
   await page.locator('#password').fill(user.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(new RegExp(`/${orgId}/`), { timeout: 20_000 });
 }
 

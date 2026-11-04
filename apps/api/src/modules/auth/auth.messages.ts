@@ -54,7 +54,7 @@ export const AUTH_MESSAGES = {
   ACTIVATION_LINK_INVALID: 'That confirmation link is no longer valid',
 
   /** A missing or expired session on a protected route. */
-  SESSION_EXPIRED: 'Your session has expired. Please sign in again.',
+  SESSION_EXPIRED: 'Your session has expired. Please login again.',
 
   /** Authenticated, but the role on the active workspace is insufficient. */
   FORBIDDEN: 'You do not have permission to do that',
@@ -69,7 +69,7 @@ export const AUTH_MESSAGES = {
   UNEXPECTED: 'Something went wrong. Please try again.',
 
   /** OAuth handshake failed for any reason: bad state, provider error, denial. */
-  OAUTH_FAILED: 'We could not complete that sign-in',
+  OAUTH_FAILED: 'We could not complete that login',
 } as const;
 
 export type AuthMessage = (typeof AUTH_MESSAGES)[keyof typeof AUTH_MESSAGES];

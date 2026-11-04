@@ -101,7 +101,7 @@ export class MailService {
       text: [
         'Someone just tried to create a PostGear account with this email address.',
         '',
-        'You already have an account, so nothing has changed. If it was you, sign in',
+        'You already have an account, so nothing has changed. If it was you, login',
         `instead: ${this.webUrl}/login`,
         '',
         `If you've forgotten your password, reset it: ${this.webUrl}/reset-password`,
@@ -145,7 +145,7 @@ export class MailService {
       to,
       subject: 'Your PostGear account is temporarily locked',
       text: [
-        `There have been several failed sign-in attempts on this account, so it is`,
+        `There have been several failed login attempts on this account, so it is`,
         `locked for ${minutes} minutes.`,
         '',
         'If that was you, wait and try again, or reset your password now to sign',
@@ -202,7 +202,7 @@ export class MailService {
       text: [
         `${inviter} invited you to join ${workspace} on PostGear as ${role}.`,
         '',
-        'Open this link to accept. You can sign in or create an account from there:',
+        'Open this link to accept. You can login or create an account from there:',
         invitation.link,
         '',
         `The link works once and expires on ${expires} (UTC).`,

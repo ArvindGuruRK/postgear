@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Share (DS-9.1, sprint Task 7): a link anyone can open without signing in,
+ * Share (DS-9.1, sprint Task 7): a link anyone can open without logging in,
  * so a manager can look at a design before it goes out.
  *
  * The share page draws the design as the server has it, so Create Link saves
@@ -116,7 +116,7 @@ export function ShareDialog({
         <DialogHeader className="px-6 pt-6 pb-4 pe-14">
           <DialogTitle className="break-words">Share {title}</DialogTitle>
           <DialogDescription>
-            Anyone with the link can view this design without signing in, and search engines do not
+            Anyone with the link can view this design without logging in, and search engines do not
             index it.
           </DialogDescription>
         </DialogHeader>

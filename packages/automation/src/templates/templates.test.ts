@@ -222,6 +222,12 @@ describe('the activation sentence', () => {
     );
   });
 
+  it('writes a schedule on the viewer clock when it is given one', () => {
+    const graph = graphOf([step('trig', 'trigger.schedule')]);
+    expect(describeWorkflow(graph)).toContain('at 09:00');
+    expect(describeWorkflow(graph, { formatTime: () => '9:00 AM' })).toContain('at 9:00 AM');
+  });
+
   it('says plainly when a workflow has no trigger or does nothing outside itself', () => {
     expect(describeWorkflow(graphOf([]))).toBe('This workflow has no trigger yet.');
     expect(describeWorkflow(graphOf([step('trig', 'trigger.manual')]))).toBe(

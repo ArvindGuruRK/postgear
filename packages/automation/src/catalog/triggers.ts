@@ -130,7 +130,7 @@ export const postFailed = defineNode({
       path: 'error.message',
       label: 'Error Message',
       type: 'text',
-      sample: 'Instagram asked PostGear to sign in again.',
+      sample: 'Instagram asked PostGear to login again.',
     },
     { path: 'error.attempts', label: 'Attempts', type: 'number', sample: 3 },
   ],
@@ -175,7 +175,7 @@ export const schedule = defineNode({
   ...TRIGGER_BASICS,
   type: 'trigger.schedule',
   title: 'Schedule',
-  description: 'Starts at the times you choose, like every Monday at 09:00.',
+  description: 'Starts at the times you choose, like every Monday morning.',
   keywords: ['time', 'every', 'daily', 'weekly', 'recurring', 'timer'],
   icon: 'schedule',
   status: 'ready',
@@ -186,7 +186,8 @@ export const schedule = defineNode({
     { path: 'scheduledFor', label: 'Scheduled Time', type: 'date', sample: '2026-11-03T09:00:00Z' },
     { path: 'timeZone', label: 'Time Zone', type: 'text', sample: 'Asia/Kolkata' },
   ],
-  summary: (config) => describeSchedule(config, { timeZone: false }),
+  summary: (config, ctx) =>
+    describeSchedule(config, { timeZone: false, formatTime: ctx.formatTime }),
   form: {
     tabs: {
       setup: [],

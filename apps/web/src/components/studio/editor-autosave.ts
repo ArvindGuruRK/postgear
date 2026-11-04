@@ -129,7 +129,7 @@ export function refusalOf(error: ApiError): SaveRefusal {
       return {
         kind: 'signIn',
         message:
-          'Your session has ended, so your changes cannot be saved. Sign in again to keep editing this design.',
+          'Your session has ended, so your changes cannot be saved. Login again to keep editing this design.',
       };
     case 404:
       return { kind: 'gone', message: 'This design was deleted, so your changes cannot be saved.' };

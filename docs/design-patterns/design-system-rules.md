@@ -176,6 +176,8 @@ Every part of a form control is `font-sans`; see the form-control typography rul
 
 **A choice that is the point of a form is `ChoiceTiles` (2026-11-04, the owner asked: "why are we using the tabs UI?").** A full-width row of equal keys in the time picker's look (`keyTile`), with an icon above the word, or a short word with its full name in a tooltip for a day. `ChoiceTilesMany` for several at once. Keep the options few: it is always one row. A smaller setting stays a `Segmented`.
 
+**A saved time reads the same everywhere (2026-11-04, the owner agreed).** Anything that shows a saved `HH:MM` writes it through `useTimeText()`, so a 12 hour viewer sees 9:00 AM on step cards, in the Activate sentence, in the form and in the next runs alike.
+
 **A time of day on its own is `TimePicker` (2026-11-04).** The date and time picker's columns (`TimeColumns`, shared) under a field-style trigger, in the viewer's clock. It stores `HH:MM` on a 24 hour clock whichever clock the viewer sees; `timeText` writes that the viewer's way anywhere else on the page.
 
 **What a form's choices come to, read back, is `SummaryBox` (2026-11-04).** A sentence with quiet notes, then rows with three columns that line up down the box, the last flush right. Inset shade, a solid border, no shadow. Everything starts on one left edge, the same one as the text in a dropdown above it.

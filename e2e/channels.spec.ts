@@ -29,7 +29,7 @@ async function signIn(page: import('@playwright/test').Page, email: string) {
   // By id, not getByLabel: the field's reveal toggle is labelled
   // "Show password", which the accessible-name lookup also matches.
   await page.locator('#password').fill(SEED_PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
 }
 

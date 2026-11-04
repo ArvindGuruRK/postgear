@@ -38,7 +38,7 @@ interface ChannelsViewProps {
 const ERROR_MESSAGES: Record<string, string> = {
   channel_oauth: 'We could not connect that account. Please try again.',
   wrong_account:
-    'That is a different account from the one this channel uses. Sign in to the original account and try again.',
+    'That is a different account from the one this channel uses. Login to the original account and try again.',
   unknown_provider: 'PostGear does not support that platform.',
   no_workspace: 'Select a workspace before connecting a channel.',
   channel_limit:

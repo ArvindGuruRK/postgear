@@ -144,7 +144,7 @@ export function GoogleConnectDialog({
                 Connect With Google
               </Button>
               <Text size="xs" muted>
-                You sign in on Google&apos;s own page, then come back here.
+                You login on Google&apos;s own page, then come back here.
               </Text>
             </div>
           ) : null}

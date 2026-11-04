@@ -600,7 +600,7 @@ describe('loading and saving problems', () => {
     expect(latestProblem(new ApiError('That design could not be found.', 404))).toBe(
       DESIGN_MISSING_MESSAGE,
     );
-    expect(latestProblem(new ApiError('Please sign in again.', 401))).toBe('Please sign in again.');
+    expect(latestProblem(new ApiError('Please login again.', 401))).toBe('Please login again.');
     expect(latestProblem(new TypeError('Failed to fetch'))).toBe(LATEST_FAILED_MESSAGE);
   });
 

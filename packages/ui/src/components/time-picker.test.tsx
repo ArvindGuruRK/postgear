@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { useState } from 'react';
-import { parseTime, TimePicker, timeText } from './time-picker';
+import { parseTime, TimePicker, timeText, useTimeText } from './time-picker';
 
 describe('parseTime', () => {
   it('reads a 24 hour time', () => {
@@ -29,6 +29,38 @@ describe('timeText', () => {
 
   it('leaves anything else alone', () => {
     expect(timeText('soon', true)).toBe('soon');
+  });
+});
+
+describe('useTimeText', () => {
+  const useClock = (hourCycle: 'h12' | 'h23') =>
+    jest
+      .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+      .mockReturnValue({ hourCycle } as Intl.ResolvedDateTimeFormatOptions);
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('writes a saved time on a 12 hour clock', () => {
+    useClock('h12');
+    const { result } = renderHook(() => useTimeText());
+    expect(result.current('09:00')).toBe('9:00 AM');
+    expect(result.current('14:05')).toBe('2:05 PM');
+  });
+
+  it('leaves a saved time as it is on a 24 hour clock', () => {
+    useClock('h23');
+    const { result } = renderHook(() => useTimeText());
+    expect(result.current('09:00')).toBe('09:00');
+  });
+
+  it('stays the same function while the clock stays the same', () => {
+    useClock('h12');
+    const { result, rerender } = renderHook(() => useTimeText());
+    const first = result.current;
+    rerender();
+    expect(result.current).toBe(first);
   });
 });
 

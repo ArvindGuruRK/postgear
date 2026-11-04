@@ -230,9 +230,9 @@ export function connectErrorMessage(code: string | null): string | null {
     case 'not_admin':
       return 'Only workspace admins can connect apps.';
     case 'unavailable':
-      return 'This app cannot be connected by signing in yet.';
+      return 'This app cannot be connected by logging in yet.';
     case 'expired':
-      return 'That sign-in took too long or was already used. Try connecting again.';
+      return 'That login took too long or was already used. Try connecting again.';
     default:
       return 'The app did not finish connecting. Try again.';
   }

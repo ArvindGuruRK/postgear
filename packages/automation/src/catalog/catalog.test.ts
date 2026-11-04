@@ -365,6 +365,13 @@ describe('step summaries', () => {
     );
   });
 
+  it('writes a schedule on the viewer clock when it is given one', () => {
+    const formatTime = () => '9:00 AM';
+    expect(describeNode(step('n1', 'trigger.schedule'), { formatTime })).toBe(
+      'Every Monday at 9:00 AM',
+    );
+  });
+
   it('describes schedules in plain words', () => {
     expect(say('trigger.schedule')).toBe('Every Monday at 09:00');
     expect(say('trigger.schedule', { days: ['mon', 'wed', 'fri'] })).toBe(

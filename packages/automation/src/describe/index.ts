@@ -34,7 +34,9 @@ function triggerPhrase(node: GraphNode, ctx: SummaryContext): string {
     case 'trigger.postFailed':
       return 'When a post fails to publish';
     case 'trigger.schedule':
-      return parsed?.success ? describeSchedule(parsed.data as ScheduleConfig) : 'On a schedule';
+      return parsed?.success
+        ? describeSchedule(parsed.data as ScheduleConfig, { formatTime: ctx.formatTime })
+        : 'On a schedule';
     case 'trigger.manual':
       return 'When you click Run Now';
     case 'trigger.webhook':

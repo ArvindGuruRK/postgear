@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 //
 // `?next=` (2026-10-19) comes from the invitation page. Registering does not
 // sign anyone in (the account has to be confirmed by email first), so it is
-// not a redirect here: it rides along on the "Sign in" links, so the person
+// not a redirect here: it rides along on the "Login" links, so the person
 // who confirms and then signs in from this tab lands back on the invitation.
 export default async function RegisterPage({ searchParams }: PageProps<'/register'>) {
   const next = safeNextPath((await searchParams).next);
@@ -29,8 +29,8 @@ export default async function RegisterPage({ searchParams }: PageProps<'/registe
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">Create Your Account</Heading>
-        <Text muted>Start scheduling across every channel in a few minutes.</Text>
+        <Heading level="h2">Create your Account</Heading>
+        <Text muted>Create, publish and grow across every social media platform.</Text>
       </Stack>
 
       <RegisterForm next={next} />
@@ -42,7 +42,7 @@ export default async function RegisterPage({ searchParams }: PageProps<'/registe
           Already have an account?
         </Text>
         <Link href={withNext('/login', next)} className="text-sm">
-          Sign in
+          Login
         </Link>
       </Stack>
     </Stack>

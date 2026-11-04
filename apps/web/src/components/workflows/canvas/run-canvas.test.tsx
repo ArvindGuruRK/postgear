@@ -56,6 +56,20 @@ describe('RunCanvas', () => {
     expect(screen.queryByRole('button', { name: 'Test Slack' })).toBeNull();
   });
 
+  it('writes a schedule on the viewer clock, as the editor does', () => {
+    const clock = jest
+      .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+      .mockReturnValue({ hourCycle: 'h12' } as Intl.ResolvedDateTimeFormatOptions);
+    const schedule = graphOf([
+      step('when', 'trigger.schedule', {
+        config: { frequency: 'daily', time: '14:30', timeZone: 'UTC' },
+      }),
+    ]);
+    render(<RunCanvas graph={schedule} run={null} catalog={null} />);
+    expect(screen.getByText('Every day at 2:30 PM')).toBeTruthy();
+    clock.mockRestore();
+  });
+
   it('paints the run on its cards', () => {
     render(<RunCanvas graph={graph} run={run} catalog={null} />);
     expect(badgeStates()).toEqual(['succeeded', 'dryRun', 'failed']);

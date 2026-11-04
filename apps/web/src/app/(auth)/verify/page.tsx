@@ -28,7 +28,7 @@ export default async function VerifyPage({ searchParams }: PageProps<'/verify'>)
         <Heading level="h2">{activated ? 'Account Confirmed' : 'That link did not work'}</Heading>
         <Text muted>
           {activated
-            ? 'Your email address is verified. Sign in to finish setting up your workspace.'
+            ? 'Your email address is verified. Login to finish setting up your workspace.'
             : 'Confirmation links expire after 24 hours and can only be used once.'}
         </Text>
       </Stack>
@@ -36,19 +36,19 @@ export default async function VerifyPage({ searchParams }: PageProps<'/verify'>)
       {activated ? (
         <Link href="/login">
           <Button size="lg" className="w-full">
-            Sign In
+            Login
           </Button>
         </Link>
       ) : (
         <Stack gap="sm">
           <Text size="sm" muted>
-            Try signing in. If your account is already confirmed, it will just work. Otherwise
+            Try logging in. If your account is already confirmed, it will just work. Otherwise
             register again to get a fresh link.
           </Text>
           <Stack direction="row" gap="sm">
             <Link href="/login" className="flex-1">
               <Button variant="secondary" className="w-full">
-                Sign In
+                Login
               </Button>
             </Link>
             <Link href="/register" className="flex-1">

@@ -101,7 +101,7 @@ export function RegisterForm({ next = null }: { next?: string | null }) {
         {next ? (
           <Text size="sm">
             Once it is confirmed,{' '}
-            <Link href={`/login?next=${encodeURIComponent(next)}`}>sign in to continue</Link>.
+            <Link href={`/login?next=${encodeURIComponent(next)}`}>login to continue</Link>.
           </Text>
         ) : null}
       </Stack>

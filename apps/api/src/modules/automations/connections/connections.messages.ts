@@ -10,7 +10,7 @@ export const CONNECTION_MESSAGES = {
   NAME_TAKEN: (app: string, name: string) => `You already have a ${app} connection called ${name}.`,
   LIMIT: (max: number) => `A workspace can have at most ${max} connections.`,
   NOTHING_TO_CHANGE: 'Change the name or the details, then save.',
-  OAUTH_ONLY: (app: string) => `${app} is connected by signing in, not with a form.`,
+  OAUTH_ONLY: (app: string) => `${app} is connected by logging in, not with a form.`,
   IN_USE: (names: string) => `Pause these workflows first: ${names}.`,
   UNREADABLE: 'The saved details could not be read. Reconnect this connection.',
 

@@ -152,7 +152,7 @@ describe('findSecretLikeValues', () => {
       }),
     );
     expect(findings.map((finding) => [finding.field, finding.reason])).toEqual([
-      ['headers.0.value', 'a sign-in token'],
+      ['headers.0.value', 'a login token'],
       ['body', "a field named 'password'"],
     ]);
   });

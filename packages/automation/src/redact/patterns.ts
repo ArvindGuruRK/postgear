@@ -35,8 +35,8 @@ export function isSecretQueryKey(key: string, generous = true): boolean {
  * in. Each has a plain name for the error message.
  */
 export const SECRET_VALUE_PATTERNS: readonly { name: string; pattern: RegExp }[] = [
-  { name: 'a sign-in token', pattern: /\bBearer\s+[A-Za-z0-9\-._~+/]{16,}=*/i },
-  { name: 'a sign-in token', pattern: /\bBasic\s+[A-Za-z0-9+/]{16,}={0,2}/ },
+  { name: 'a login token', pattern: /\bBearer\s+[A-Za-z0-9\-._~+/]{16,}=*/i },
+  { name: 'a login token', pattern: /\bBasic\s+[A-Za-z0-9+/]{16,}={0,2}/ },
   {
     name: 'a Slack webhook link',
     pattern:
@@ -62,7 +62,7 @@ export const SECRET_VALUE_PATTERNS: readonly { name: string; pattern: RegExp }[]
   { name: 'a Google API key', pattern: /\bAIza[0-9A-Za-z_-]{35}\b/ },
   { name: 'an AWS key', pattern: /\bAKIA[0-9A-Z]{16}\b/ },
   {
-    name: 'a sign-in token',
+    name: 'a login token',
     pattern: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
   },
 ];

@@ -8,7 +8,7 @@ import { getSession } from '@/lib/session';
 import { safeNextPath, withNext } from './safe-next';
 
 export const metadata: Metadata = {
-  title: 'Sign In',
+  title: 'Login',
 };
 
 // The page stays a server component so it can export `metadata`: a client
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 // whole route opts out of static rendering with a build-time error.
 //
 // `?next=` (2026-10-19) is where to go once signed in, used by the
-// invitation page so "Sign in to join" lands back on the invitation. It is
+// invitation page so "Login to join" lands back on the invitation. It is
 // checked here, once, by `safeNextPath`, and only the checked value is
 // handed on to the form and the register link.
 export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
@@ -40,8 +40,8 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Heading level="h2">Sign In</Heading>
-        <Text muted>Welcome back. Pick up where your queue left off.</Text>
+        <Heading level="h2">Login</Heading>
+        <Text muted>Welcome back. Pick up right where you left off.</Text>
       </Stack>
 
       <Suspense fallback={null}>

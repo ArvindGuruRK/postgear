@@ -162,6 +162,8 @@ export interface SummaryContext {
    * summaries read well. `tokenLabeler(graph)` makes one.
    */
   tokenLabel?(path: string): string | undefined;
+  /** Writes a saved "HH:MM" the viewer's way. Default: as saved. */
+  formatTime?: (time: string) => string;
 }
 
 export interface NodeDefinition<C extends object = Record<string, unknown>> {

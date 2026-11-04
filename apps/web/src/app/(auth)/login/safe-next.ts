@@ -1,6 +1,6 @@
 /**
  * Where to go after signing in, from a `?next=` parameter (2026-10-19, for
- * the invitation page: "Sign in to join" comes back to the invitation).
+ * the invitation page: "Login to join" comes back to the invitation).
  *
  * Only a path on this site is honoured: one leading `/`, then anything but a
  * second `/` or a `\`. That refuses every way an attacker could turn the

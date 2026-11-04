@@ -60,6 +60,7 @@ import {
   DialogTitle,
   MotionIcon,
   toast,
+  useTimeText,
 } from '@postgear/ui';
 import { Panel, ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import { ListChecksIcon } from '@animateicons/react/lucide/list-checks-icon';
@@ -458,7 +459,11 @@ function Builder({
     return () => clearTimeout(timer);
   }, [state.graph, context]);
   const issuesMap = useMemo(() => issuesByStep(issues), [issues]);
-  const summary = useMemo(() => summaryContext(connections, channels), [connections, channels]);
+  const formatTime = useTimeText();
+  const summary = useMemo(
+    () => summaryContext(connections, channels, formatTime),
+    [connections, channels, formatTime],
+  );
   const setupList = useMemo(() => setupItems(state.graph, issues), [state.graph, issues]);
 
   // ---- What the step panel's fields see -------------------------------------------

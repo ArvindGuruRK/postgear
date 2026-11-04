@@ -28,9 +28,8 @@ import {
   FormLabel,
   SummaryBox,
   Textarea,
-  timeText,
   toast,
-  useTwelveHourClock,
+  useTimeText,
 } from '@postgear/ui';
 import { Sparkles, TriangleAlert } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -92,7 +91,7 @@ export function ActivationDialog({
   // The API asked for the tick although the draft here did not seem to need it.
   const [serverTick, setServerTick] = useState(false);
   const [openedAt, setOpenedAt] = useState(() => new Date().toISOString());
-  const twelveHour = useTwelveHourClock();
+  const formatTime = useTimeText();
 
   useEffect(() => {
     if (!open) return;
@@ -105,8 +104,9 @@ export function ActivationDialog({
   }, [open]);
 
   const content = useMemo<ActivationContent>(
-    () => activationContent(graph, issues, { summary, nowIso: openedAt }),
-    [graph, issues, summary, openedAt],
+    () =>
+      activationContent(graph, issues, { summary: { ...summary, formatTime }, nowIso: openedAt }),
+    [graph, issues, summary, formatTime, openedAt],
   );
   const needsTick = content.kind === 'confirm' && (content.needsTick || serverTick);
   const title = mode === 'changes' ? 'Activate Changes' : 'Turn On Workflow';
@@ -203,7 +203,7 @@ export function ActivationDialog({
               {content.scheduleRuns.length > 0 ? (
                 <SummaryBox
                   rowsLabel="Next Runs"
-                  rows={runRows(content.scheduleRuns, (time) => timeText(time, twelveHour))}
+                  rows={runRows(content.scheduleRuns, formatTime)}
                 />
               ) : null}
 

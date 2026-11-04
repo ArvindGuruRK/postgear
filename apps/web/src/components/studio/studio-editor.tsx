@@ -11,7 +11,7 @@
  * - Autosave sends what is on screen (`use-autosave.ts`), and closing the
  *   editor sends whatever is still unsaved. A save that met a newer version
  *   stops and asks (DS-6.2); one that was refused says why, with what is left
- *   to do: Try Again, Sign In for a session that ended, or Back To Studio for
+ *   to do: Try Again, Login for a session that ended, or Back To Studio for
  *   a design that was deleted. A save refused for a premium look the plan
  *   does not include (Sprint 9b) opens the dialog that says why and locks
  *   premium looks from then on; the edits stay on screen, undoable, and the
@@ -1042,7 +1042,7 @@ function RefusalAlert({
       ) : kind === 'signIn' ? (
         <ActionLink href={withNext('/login', `/${orgId}/studio/${designId}`)}>
           <MotionIcon icon={LogInIcon} className="h-4 w-4" />
-          Sign In
+          Login
         </ActionLink>
       ) : kind === 'premium' ? (
         <div className="flex flex-wrap gap-2">

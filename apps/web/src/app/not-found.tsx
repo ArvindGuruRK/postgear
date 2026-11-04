@@ -22,7 +22,7 @@ export default function NotFound() {
               This page doesn&apos;t exist. It may have been moved, or the link that brought
               you here is out of date.
             </Text>
-            <Link href="/login">Back to sign in</Link>
+            <Link href="/login">Back to login</Link>
           </Stack>
         </CardContent>
       </Card>

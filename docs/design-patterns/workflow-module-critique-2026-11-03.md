@@ -82,7 +82,7 @@ Step editor:
 - [x] **The schedule form's edges were ragged.** A label stacked on a label, short selects stopping at `max-w-56`, and a preview of another width. Every row reaches both edges now, and Time sits level with Time Zone (owner's request).
 - [x] **Time was two small selects with a colon.** It is the app's own time picker now, as a design system `TimePicker` that `DateTimePicker` shares its columns with (owner's request).
 - [x] **The schedule's read-back was a dashed box with ragged lines.** Dashes say "drop something here", and dates and times did not line up. It is a `SummaryBox` now, a solid inset box with real columns, and the Activate dialog's next runs use it too (owner's request).
-- [x] **The field said 9:00 AM and the box under it said 09:00.** Found once the picker was in. The sentence and the next runs follow the viewer's clock now. Cards and the Activate sentence do not: see the questions.
+- [x] **The field said 9:00 AM and the box under it said 09:00.** Found once the picker was in. The sentence and the next runs follow the viewer's clock now, and so do step cards and the Activate sentence, on the owner's go-ahead.
 - [x] **Weekly and Monthly had nearly the same icon** at 20 px. Monthly has its own now. Found on review.
 - [x] **The time panel crossed the dialog's bottom edge** by 8 px on a 768 high window. It is 16 px shorter now and stops 2 px inside. Found on review.
 - [x] **The clock icon sat 4 px left of the dropdown text above it.** They share one left edge now. Found on review.
@@ -183,6 +183,7 @@ Answered by the owner, 2026-11-04:
 - **Branch labels:** keep their background, as labels. Approved and Rejected go green and red. Built, see Canvas above.
 - **Field focus:** stays as built. The dark edge goes on focus only, and resting text boxes keep their shadow.
 - **A navigation menu's values:** an icon and the name, with plain lucide icons. Built.
+- **A saved time:** step cards, the read-only canvas and the Activate sentence follow the viewer's clock, as the form does, so a 12 hour viewer sees 9:00 AM everywhere. The Schedule step's blurb in the picker no longer names a time. Built.
 - **The toggle bar:** the owner loves it. Data, Table, Raw stays blue and Copilot's tabs stay 40 px.
 
 Still open:
@@ -194,4 +195,3 @@ Still open:
 5. **The run mark no longer shows the duration on the card.** The tooltip and Logs have it.
 6. **True and False stay neutral.** Approved and Rejected are outcomes; a condition being false is not bad news. It is one line each to colour them too.
 7. **Close branches are tight.** With labels on both of a review's outputs, the "+" on Rejected sits right by the arrow into the next step in the AI Weekly Post template (shot 156). More room between columns would fix it, but it moves every template.
-8. **Cards and the Activate sentence still say 09:00**, while the schedule form says 9:00 AM. A schedule saves its time as 24 hour text, and `describeSchedule` prints that text as is unless the caller passes the viewer's clock. Only the form passes it so far. Nothing stops the other two: only the browser calls them, so it is a small pass. The owner has the reason and has not decided yet.

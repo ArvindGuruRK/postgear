@@ -33,7 +33,7 @@ test.beforeAll(async ({ browser }) => {
   await page.goto('/login');
   await page.getByLabel('Email').fill('demo@postgear.local');
   await page.locator('#password').fill('DemoPassword123!');
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 30_000 });
 });
 

@@ -38,7 +38,7 @@ export async function signInAs(page: Page, email: string): Promise<void> {
         response.request().method() === 'POST' &&
         new URL(response.url()).pathname === '/auth/login',
     );
-    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await page.getByRole('button', { name: 'Login', exact: true }).click();
     const response = await answered;
 
     if (response.status() === 429 && attempt === 1) {

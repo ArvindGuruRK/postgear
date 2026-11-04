@@ -21,8 +21,8 @@
 import { ScanIcon } from '@animateicons/react/lucide/scan-icon';
 import { ZoomInIcon } from '@animateicons/react/lucide/zoom-in-icon';
 import { ZoomOutIcon } from '@animateicons/react/lucide/zoom-out-icon';
-import type { AutomationGraph, SummaryContext, ValidationIssue } from '@postgear/automation';
-import { Button, cn, MotionIcon, TooltipHint } from '@postgear/ui';
+import type { AutomationGraph, ValidationIssue } from '@postgear/automation';
+import { Button, cn, MotionIcon, TooltipHint, useTimeText } from '@postgear/ui';
 import {
   Background,
   BackgroundVariant,
@@ -65,8 +65,6 @@ const READABLE_FIT = 0.6;
 const FOCUS_ZOOM = 0.7;
 const FOCUS_MARGIN = 48;
 const NO_ISSUES = new Map<string, ValidationIssue[]>();
-// No connection or channel names here: summaries fall back to their plain words.
-const NO_SUMMARY: SummaryContext = {};
 
 export interface RunCanvasProps {
   graph: AutomationGraph;
@@ -168,16 +166,18 @@ function ReadOnlyFlow({ graph, run, selectedKey, onSelectStep, className }: RunC
     [selectedKey],
   );
   const paint = run?.paint ?? null;
+  const formatTime = useTimeText();
   const nodes = useMemo(
     () =>
       toFlowNodes(graph, {
         selection,
         issues: NO_ISSUES,
-        summary: NO_SUMMARY,
+        // No connection or channel names here: summaries fall back to their plain words.
+        summary: { formatTime },
         drag: null,
         paint,
       }),
-    [graph, selection, paint],
+    [graph, selection, paint, formatTime],
   );
   const edges = useMemo(() => toFlowEdges(graph, selection, run), [graph, selection, run]);
 

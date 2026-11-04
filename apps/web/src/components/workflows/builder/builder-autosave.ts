@@ -64,7 +64,7 @@ function retryable(error: unknown): boolean {
 }
 
 function refusal(error: ApiError): string {
-  if (error.status === 401) return 'Your session has ended. Sign in again to keep editing.';
+  if (error.status === 401) return 'Your session has ended. Login again to keep editing.';
   if (error.status === 404) return 'This workflow was deleted, so your changes cannot be saved.';
   return error.message;
 }

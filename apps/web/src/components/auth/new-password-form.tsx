@@ -70,7 +70,7 @@ export function NewPasswordForm({ token }: { token: string }) {
       <Stack gap="sm">
         <Text>Your password has been changed.</Text>
         <Button size="lg" className="w-full" onClick={() => router.push('/login')}>
-          Sign In
+          Login
         </Button>
       </Stack>
     );

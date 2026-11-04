@@ -1,7 +1,7 @@
 'use client';
 
 import { ClockIcon } from '@animateicons/react/lucide/clock-icon';
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { keyTile } from '../lib/key-tile';
 import { cn } from '../lib/utils';
 import { CalendarFooter, CalendarTrigger, calendarPopoverClasses } from './calendar';
@@ -40,6 +40,12 @@ export function useTwelveHourClock(): boolean {
     setTwelveHour(uses12HourClock());
   }, []);
   return twelveHour;
+}
+
+/** Writes a stored "HH:MM" on the viewer's clock. The same function until that clock changes. */
+export function useTimeText(): (time: string) => string {
+  const twelveHour = useTwelveHourClock();
+  return useCallback((time: string) => timeText(time, twelveHour), [twelveHour]);
 }
 
 /**

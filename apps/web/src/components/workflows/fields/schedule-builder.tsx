@@ -40,8 +40,7 @@ import {
   SelectValue,
   SummaryBox,
   TimePicker,
-  timeText,
-  useTwelveHourClock,
+  useTimeText,
 } from '@postgear/ui';
 import { Info } from 'lucide-react';
 import { type ReactNode, useId, useMemo } from 'react';
@@ -96,8 +95,7 @@ export function ScheduleBuilder({ spec, value, onChange, errors, ids }: FieldCon
   const own = useId();
   const write = (next: ScheduleConfig) => onChange(spec.path, next);
   const zones = useMemo(() => timeZoneChoices(config.timeZone, zone), [config.timeZone, zone]);
-  const twelveHour = useTwelveHourClock();
-  const formatTime = (time: string) => timeText(time, twelveHour);
+  const formatTime = useTimeText();
   const hasAi = (env?.graph.nodes ?? []).some(
     (node) => !node.disabled && node.type.startsWith('ai.'),
   );

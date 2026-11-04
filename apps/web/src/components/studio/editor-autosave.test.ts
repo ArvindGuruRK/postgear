@@ -647,7 +647,7 @@ describe('refusalOf', () => {
     expect(refusalOf(new ApiError('Unauthorized', 401))).toEqual({
       kind: 'signIn',
       message:
-        'Your session has ended, so your changes cannot be saved. Sign in again to keep editing this design.',
+        'Your session has ended, so your changes cannot be saved. Login again to keep editing this design.',
     });
     expect(refusalOf(new ApiError('That design could not be found.', 404)).kind).toBe('gone');
     // Anything else keeps the API's own sentence.

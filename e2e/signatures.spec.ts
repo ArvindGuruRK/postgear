@@ -31,7 +31,7 @@ async function signIn(
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.locator('#password').fill(SEED_PASSWORD);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/[^/]+\/(home|calendar|channels)/, { timeout: 20_000 });
   return { context, page };
 }
