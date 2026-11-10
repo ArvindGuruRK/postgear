@@ -1,6 +1,6 @@
 # Module 03: The Discover Page And The Place Flow
 
-> **Sprint 11, Discover** | Status: Not started | Size: XL (may need a second session)
+> **Sprint 11, Discover** | Status: Done (2026-11-10, committed and pushed on `sprint-11-discover`, awaiting the hand check) | Size: XL (one session)
 > **Depends on**: [Module 02](module-02-api-locality-feed-and-cache.md)
 > **Stories**: DC-1.1, 1.2, 1.3, 1.4, 1.5, 1.7, DC-2.1, DC-2.4, DC-3.1
 > **Next**: [Module 04](module-04-create-post.md) (Create Post), [Module 05](module-05-more-sources.md), [Module 06](module-06-settings-and-data-model.md)
@@ -68,14 +68,14 @@ A `Select` styled as a chip: the place's languages that have a News edition (the
 
 ## Tasks
 
-- [ ] Rail entry and title; the route and server page.
-- [ ] `types/discover.ts` and `lib/discover-api.ts` with the rounding test.
-- [ ] `use-place.ts` (guess, remember, browser flow, search, worldwide, language) with tests.
-- [ ] `PlaceChip`, `PlacePopover`, `LanguageChip`.
-- [ ] `useFeed`, `DiscoverView`, `DiscoverGroup`, `TrendCard`, `StoryCard`, `DiscoverSkeleton`, states.
-- [ ] Playground section; title-case test green.
-- [ ] Playwright once, under `DISCOVER_SIMULATION=true`: grant geolocation (13.08, 80.27), open Discover, Use My Location, see Chennai and Tamil trends and stories; deny and see the alert; search "paris" and pick it; reload and see Paris kept. Screenshots `s11-01` to `s11-06` in `screenshots/` (light, dark, Lilac, phone).
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Rail entry and title; the route and server page.
+- [x] `types/discover.ts` and `lib/discover-api.ts` with the rounding test.
+- [x] `use-place.ts` (guess, remember, browser flow, search, worldwide, language) with tests.
+- [x] `PlaceChip`, `PlacePopover`, `LanguageChip`.
+- [x] `useFeed`, `DiscoverView`, `DiscoverGroup`, `TrendCard`, `StoryCard`, `DiscoverSkeleton`, states.
+- [x] Playground section; title-case test green.
+- [x] Playwright once, under `DISCOVER_SIMULATION=true`: grant geolocation (13.08, 80.27), open Discover, Use My Location, see Chennai and Tamil trends and stories; deny and see the alert; search "paris" and pick it; reload and see Paris kept. Screenshots `s11-01` to `s11-06` in `screenshots/` (light, dark, Lilac, phone).
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

@@ -1,9 +1,10 @@
 'use client';
 
-// Per-icon subpaths rather than the `lucide` barrel, so dev compiles eight
-// icons and not all of them.
+// Per-icon subpaths rather than the `lucide` barrel, so dev compiles the
+// rail's icons and not all of them.
 import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
 import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
+import { CompassIcon } from '@animateicons/react/lucide/compass-icon';
 import { HouseIcon } from '@animateicons/react/lucide/house-icon';
 import { ImageIcon } from '@animateicons/react/lucide/image-icon';
 import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
@@ -36,6 +37,9 @@ import type { SidebarItem } from './sidebar';
  *
  * Studio (Sprint 9) sits right after Media: it makes the images Media keeps.
  * Workflows (Sprint 10) follows Studio: it puts the other pages to work.
+ * Discover (Sprint 11) follows Workflows: what to post about, where the
+ * audience is. On a phone the first four stay in the tab bar and the rest,
+ * Discover among them, open from More (`TabBar` in sidebar.tsx).
  *
  * Composer and Channels are not here, as in the reference: both are reached
  * from the calendar's channel card (Create Post, Add Channel, the channels
@@ -51,6 +55,7 @@ const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
   { segment: 'media', label: 'Media', icon: ImageIcon },
   { segment: 'studio', label: 'Studio', icon: PaletteIcon },
   { segment: 'workflows', label: 'Workflows', icon: WorkflowIcon },
+  { segment: 'discover', label: 'Discover', icon: CompassIcon },
   { segment: 'seo-analyzer', label: 'SEO', icon: SearchIcon },
 ];
 
@@ -64,6 +69,7 @@ const TITLES: Record<string, string> = {
   media: 'Media',
   studio: 'Design Studio',
   workflows: 'Workflows',
+  discover: 'Discover',
   'seo-analyzer': 'SEO Analyzer',
   channels: 'Channels',
   settings: 'Settings',

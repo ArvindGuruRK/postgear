@@ -18,6 +18,7 @@ import { AiSection } from './sections/ai-section';
 import { AnalyticsSection } from './sections/analytics-section';
 import { ButtonsSection } from './sections/buttons-section';
 import { DataDisplaySection } from './sections/data-display-section';
+import { DiscoverSection } from './sections/discover-section';
 import { FeedbackSection } from './sections/feedback-section';
 import { FormControlsSection } from './sections/form-controls-section';
 import { FoundationsSection } from './sections/foundations-section';
@@ -100,6 +101,7 @@ export function ComponentsShowcase() {
         <AiSection />
         <WorkflowsSection />
         <WorkflowFieldsSection />
+        <DiscoverSection />
       </div>
     </AppShell>
   );
