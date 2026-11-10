@@ -12,6 +12,7 @@
 import { z } from 'zod';
 import type { ResearchSource, Tone } from '../types';
 import { block, field } from './fields';
+import { languageField, languageName, languageRule } from './language';
 import { toneRules } from './tone';
 
 export const hookSchema = z.object({
@@ -31,6 +32,8 @@ export interface HookPromptInput {
   sources: ResearchSource[];
   platforms: string[];
   workspaceName?: string;
+  /** A BCP 47 tag; absent means English and leaves the prompt as it always was. */
+  language?: string;
 }
 
 export function buildHookPrompt(input: HookPromptInput): { system: string; user: string } {
@@ -43,20 +46,26 @@ export function buildHookPrompt(input: HookPromptInput): { system: string; user:
     '- Do not copy or lightly rephrase the brief; say something the brief implies.',
     '- No hashtags, no emoji, no markdown, no quotation marks around the hook.',
     '- Avoid tired openers: "Discover the secret", "The best", "Are you ready", "In today\'s world".',
-    '- Plain, concrete English. Specifics beat adjectives.',
-  ].join('\n');
+    `- Plain, concrete ${input.language ? languageName(input.language) : 'English'}. Specifics beat adjectives.`,
+    input.language ? languageRule(input.language) : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 
   const user = [
     field('Voice', input.tone),
     field('Category', input.category),
     field('Platforms', input.platforms.length > 0 ? input.platforms.join(', ') : 'generic'),
     field('Workspace', input.workspaceName),
+    input.language ? field('Language', languageField(input.language)) : null,
     block('Brief', input.topic),
     block(
       'Research',
       input.sources.map((source) => `- ${source.title} | ${source.snippet}`).join('\n'),
     ),
-  ].join('\n');
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
 
   return { system, user };
 }

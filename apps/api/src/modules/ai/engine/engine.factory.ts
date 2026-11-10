@@ -168,8 +168,9 @@ export function buildAiEngine(
       return createContentPipeline({
         model,
         // Research only when asked and a provider exists; in simulation the
-        // provider is the canned one, never Tavily (see `createAiEngine`).
-        research: options.research === false ? null : research,
+        // provider is the canned one, never Tavily (see `createAiEngine`). A
+        // caller's own provider (Discover's headlines) wins over both.
+        research: options.research === false ? null : (options.researchProvider ?? research),
         images,
         imageSink: images ? imageSinkFor(media, scope.orgId) : null,
         logger: engineLogger,

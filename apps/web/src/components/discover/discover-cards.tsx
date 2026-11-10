@@ -15,16 +15,15 @@
  *
  * **Create Post** is the neutral secondary, not blue: the same action on every
  * card is not the one call to action, and Draft With AI is (Arvind's pick on
- * 2026-11-10). Until the sheet exists it is disabled with a reason.
+ * 2026-11-10). It opens the Create Post sheet (`create-post-sheet.tsx`); the
+ * overflow menu after Open holds Draft In Copilot (`card-menu.tsx`).
  */
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
-import { AspectRatio, Button, cn, Link, MotionIcon, TooltipHint } from '@postgear/ui';
+import { AspectRatio, Button, cn, Link, MotionIcon } from '@postgear/ui';
 import { type ReactNode, useId, useState } from 'react';
 import type { DiscoverItem } from '@/types/discover';
 import { ActionLink } from '../home/home-actions';
 import { itemMeta, openHref, safeHref } from './discover-model';
-
-export const CREATE_POST_LATER = 'Arrives in the next step of this sprint.';
 
 /** Up to three related headlines on a card; one on a phone. */
 const RELATED_SHOWN = 3;
@@ -32,7 +31,7 @@ const RELATED_SHOWN = 3;
 export interface ItemCardProps {
   item: DiscoverItem;
   now: Date;
-  /** Opens the Create Post sheet. Without it the button explains why it waits. */
+  /** Opens the Create Post sheet. Without it there is no Create Post (the playground). */
   onCreatePost?: (item: DiscoverItem) => void;
   /** Extra controls after Open (Module 04's overflow menu). */
   extra?: ReactNode;
@@ -126,13 +125,7 @@ function ItemCard({ item, now, onCreatePost, extra }: ItemCardProps) {
             <Button variant="secondary" size="sm" onClick={() => onCreatePost(item)}>
               Create Post
             </Button>
-          ) : (
-            <TooltipHint label={CREATE_POST_LATER} disabled>
-              <Button variant="secondary" size="sm" disabled>
-                Create Post
-              </Button>
-            </TooltipHint>
-          )}
+          ) : null}
           {href ? (
             <ActionLink
               href={href}

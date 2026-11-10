@@ -5,6 +5,12 @@
  */
 import type { DiscoverGroup, DiscoverItem, Locality } from '@/types/discover';
 import {
+  copilotHref,
+  DRAFT_SOURCES_MAX,
+  DRAFT_TOPIC_MAX,
+  draftLanguages,
+  draftSources,
+  draftTopic,
   firstLanguage,
   isWorldwide,
   itemMeta,
@@ -267,5 +273,77 @@ describe('language names', () => {
 
   it('falls back to the code when nothing knows it', () => {
     expect(languageName('zzz').english).toBe('zzz');
+  });
+});
+
+describe('drafts (Module 04)', () => {
+  const related = [
+    { title: 'Heavy rain alert', url: 'https://www.thehindu.com/rain', source: 'The Hindu' },
+    { title: 'Bad link', url: 'javascript:alert(1)', source: 'Nobody' },
+    { title: 'Same story again', url: 'https://www.thehindu.com/rain', source: 'The Hindu' },
+    { title: '  Schools\nshut  ', url: 'https://www.dinamalar.com/schools', source: '' },
+  ];
+
+  it('writes from the API brief, on one line and within the limit', () => {
+    expect(draftTopic(item({ brief: ' Rising search\nin Tamil Nadu ' }))).toBe(
+      'Rising search in Tamil Nadu',
+    );
+    expect(draftTopic(item({ brief: 'a'.repeat(DRAFT_TOPIC_MAX + 50) }))).toHaveLength(
+      DRAFT_TOPIC_MAX,
+    );
+    // A brief too short for the route falls back to the title.
+    expect(draftTopic(item({ brief: ' ' }))).toBe('weather coimbatore');
+  });
+
+  it('backs a trend with its related headlines: web addresses only, each once', () => {
+    expect(draftSources(item({ url: 'https://www.thehindu.com/rain', related }))).toEqual([
+      { title: 'Heavy rain alert', url: 'https://www.thehindu.com/rain', snippet: 'The Hindu' },
+      { title: 'Schools shut', url: 'https://www.dinamalar.com/schools', snippet: '' },
+    ]);
+  });
+
+  it('backs a story with itself first', () => {
+    const story = item({
+      kind: 'news',
+      title: 'சென்னையில் கனமழை',
+      source: { id: 'google-news', name: 'Nakkheeran' },
+      opaqueUrl: 'https://news.google.com/rss/articles/abc',
+      related: related.slice(0, 1),
+    });
+    expect(draftSources(story)).toEqual([
+      {
+        title: 'சென்னையில் கனமழை',
+        url: 'https://news.google.com/rss/articles/abc',
+        snippet: 'Nakkheeran',
+      },
+      { title: 'Heavy rain alert', url: 'https://www.thehindu.com/rain', snippet: 'The Hindu' },
+    ]);
+  });
+
+  it('keeps at most six sources, and none when there is nothing safe', () => {
+    const many = Array.from({ length: 9 }, (_, index) => ({
+      title: `Story ${index}`,
+      url: `https://example.com/${index}`,
+      source: 'Example',
+    }));
+    expect(draftSources(item({ related: many }))).toHaveLength(DRAFT_SOURCES_MAX);
+    expect(draftSources(item({ related: [related[1]] }))).toEqual([]);
+    expect(draftSources(item())).toEqual([]);
+  });
+
+  it("offers the place's languages and English, with the chip's language when the place lacks it", () => {
+    expect(draftLanguages(CHENNAI, 'ta')).toEqual(['ta', 'en']);
+    expect(draftLanguages(INDIA, 'en')).toEqual(['hi', 'en', 'bn', 'ta']);
+    expect(draftLanguages({ ...CHENNAI, languages: ['es'] }, 'es-419')).toEqual([
+      'es-419',
+      'es',
+      'en',
+    ]);
+  });
+
+  it('sends Draft In Copilot to the AI page with the brief as its topic', () => {
+    expect(copilotHref('org-a', item({ brief: 'Rising search: "rain & schools"' }))).toBe(
+      '/org-a/ai-copilot?topic=Rising%20search%3A%20%22rain%20%26%20schools%22',
+    );
   });
 });

@@ -7,6 +7,7 @@
  * built from the design system (blueprint section 11), so this section is
  * where a change to one of those is checked against Discover too.
  */
+import { CardMenu } from '@/components/discover/card-menu';
 import { DiscoverGroup, DiscoverSkeleton } from '@/components/discover/discover-group';
 import { LanguageChip } from '@/components/discover/language-chip';
 import { PlaceChip } from '@/components/discover/place-chip';
@@ -186,9 +187,17 @@ export function DiscoverSection() {
 
       <Row label="Trend And Story Cards In A Group">
         <div className="w-full">
-          <DiscoverGroup group={DEMO_GROUP} now={NOW} />
+          <DiscoverGroup
+            group={DEMO_GROUP}
+            now={NOW}
+            onCreatePost={nothing}
+            renderExtra={(item) => <CardMenu orgId="dev" item={item} />}
+          />
         </div>
-        <Spec>AnalyticsPanel + PanelHeader; cards bg-inset, dir=&quot;auto&quot; on feed text</Spec>
+        <Spec>
+          AnalyticsPanel + PanelHeader; cards bg-inset, dir=&quot;auto&quot; on feed text; Create
+          Post secondary; overflow is a ghost icon button with Draft In Copilot
+        </Spec>
       </Row>
 
       <Row label="Loading">

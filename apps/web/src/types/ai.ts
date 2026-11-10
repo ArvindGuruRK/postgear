@@ -58,6 +58,12 @@ export interface GenerateRequestBody {
   format: PostFormat;
   withImage: boolean;
   channelIds: string[];
+  /** Sprint 11: a BCP 47 tag to write in; absent is English. */
+  language?: string;
+  /** Sprint 11: research to use instead of a web search (Discover's headlines), at most 6. */
+  sources?: ResearchSource[];
+  /** Sprint 11: when the post should go out; echoed on `done`, never scheduled by the API. */
+  publishAt?: string;
 }
 
 export type AiErrorKind =
@@ -80,7 +86,7 @@ export type GenerateStreamEvent =
   | { type: 'hook'; hook: string }
   | { type: 'content'; parts: GeneratedPart[] }
   | { type: 'image'; index: number; image: SavedImage }
-  | { type: 'done'; result: GenerateResult; credits: AiCredits }
+  | { type: 'done'; result: GenerateResult; credits: AiCredits; publishAt?: string }
   | { type: 'error'; kind: AiErrorKind; message: string; retryable: boolean; credits: AiCredits };
 
 export interface CopilotMessage {

@@ -6,6 +6,7 @@
  *
  * The words are the page's (place, trend, story, Worldwide), never the API's.
  */
+import type { ResearchSource } from '@/types/ai';
 import type { DiscoverGroup, DiscoverItem, DiscoverTab, Locality } from '@/types/discover';
 import { DISCOVER_TABS } from '@/types/discover';
 import { formatRelative } from '../seo/seo-view-model';
@@ -248,4 +249,65 @@ export function safeHref(url: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/** What `POST /ai/generate` accepts for a topic and for its sources (`ai.schema.ts`). */
+export const DRAFT_TOPIC_MAX = 2_000;
+export const DRAFT_SOURCES_MAX = 6;
+const SOURCE_TITLE_MAX = 300;
+const SOURCE_SNIPPET_MAX = 500;
+const SOURCE_URL_MAX = 2_048;
+
+/** The brief a draft is written from: the API's own, bounded to what the route takes. */
+export function draftTopic(item: DiscoverItem): string {
+  const brief = item.brief.replace(/\s+/g, ' ').trim();
+  const topic = brief.length >= 3 ? brief : item.title.trim();
+  return topic.slice(0, DRAFT_TOPIC_MAX);
+}
+
+function oneLine(text: string, max: number): string {
+  return text.replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+/**
+ * The research a draft is backed by: what the card showed. A story is its
+ * own first source; then its related coverage, publisher as the snippet.
+ * Only web addresses, each once, at most six. A trend's title is a search
+ * term, not an article, so a trend starts at its related headlines.
+ */
+export function draftSources(item: DiscoverItem): ResearchSource[] {
+  const candidates: { title: string; url: string | null | undefined; snippet: string }[] = [];
+  if (item.kind === 'news') {
+    candidates.push({ title: item.title, url: openHref(item), snippet: item.source.name });
+  }
+  for (const headline of item.related ?? []) {
+    candidates.push({ title: headline.title, url: headline.url, snippet: headline.source ?? '' });
+  }
+
+  const seen = new Set<string>();
+  const sources: ResearchSource[] = [];
+  for (const candidate of candidates) {
+    const url = safeHref(candidate.url);
+    const title = oneLine(candidate.title, SOURCE_TITLE_MAX);
+    if (!url || url.length > SOURCE_URL_MAX || title.length === 0 || seen.has(url)) continue;
+    seen.add(url);
+    sources.push({ title, url, snippet: oneLine(candidate.snippet, SOURCE_SNIPPET_MAX) });
+    if (sources.length === DRAFT_SOURCES_MAX) break;
+  }
+  return sources;
+}
+
+/**
+ * The languages a draft can be written in: the place's own, then English,
+ * each once. The chip's language leads when the place does not list it (a
+ * news edition such as `es-419` where the place lists `es`).
+ */
+export function draftLanguages(place: Locality, chosen: string): string[] {
+  const lead = place.languages.includes(chosen) ? [] : [chosen];
+  return [...new Set([...lead, ...place.languages, 'en'])];
+}
+
+/** The AI page with the brief already in its topic (DC-4.5). */
+export function copilotHref(orgId: string, item: DiscoverItem): string {
+  return `/${orgId}/ai-copilot?topic=${encodeURIComponent(draftTopic(item))}`;
 }

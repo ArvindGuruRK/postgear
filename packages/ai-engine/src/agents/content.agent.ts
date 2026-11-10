@@ -235,6 +235,7 @@ export function createContentPipeline(deps: ContentPipelineDeps): ContentPipelin
       sources: state.sources,
       platforms: state.request.platforms,
       workspaceName: state.request.workspaceName,
+      language: state.request.language,
     });
     const output = await deps.model.structured({ schema: hookSchema, ...prompt, signal });
     const text = cleanPartText(output.hook)
@@ -263,6 +264,7 @@ export function createContentPipeline(deps: ContentPipelineDeps): ContentPipelin
       platforms: request.platforms,
       sources: state.sources,
       workspaceName: request.workspaceName,
+      language: request.language,
     };
 
     const first = await deps.model.structured({ schema, ...buildContentPrompt(base), signal });

@@ -1,6 +1,6 @@
 # Module 04: Create Post
 
-> **Sprint 11, Discover** | Status: Not started | Size: M (one session)
+> **Sprint 11, Discover** | Status: Done (2026-11-10, committed and pushed on `sprint-11-discover`, awaiting the hand check) | Size: M (one session)
 > **Depends on**: [Module 03](module-03-discover-page-and-location.md)
 > **Stories**: DC-4.1, 4.2, 4.3, 4.4, 4.5
 > **Next**: [Module 05](module-05-more-sources.md), [Module 08](module-08-website-reader.md)
@@ -47,15 +47,15 @@
 
 ## Tasks
 
-- [ ] `generateSchema` and `GenerateRequest` changes with spec updates (`ai.schema.spec`, `ai.service.spec`: `language` passes through; `sources` becomes the research result; absent fields change nothing).
-- [ ] Prompt field and language-name table in `ai-engine`, with prompt tests.
-- [ ] Simulated client echo.
-- [ ] `createPipeline` `researchProvider` option and the `AiService` wiring, with a spec that proves Tavily is not called when `sources` is present.
-- [ ] `CreatePostSheet` and wiring on `TrendCard` and `StoryCard`; `GenerateResult.publishAt`.
-- [ ] Draft In Copilot menu item.
-- [ ] Web tests: the sheet submits the right body (brief as topic, language, sources, channels), disabled when out of credits, Open In Composer navigates with `group`, `publishAt` reaches the draft's `publishDate`.
-- [ ] Playwright once under both simulations: Create Post from a Chennai trend in Tamil for one channel, see "(written in ta)" in the result, Open In Composer, see the draft in the composer. Screenshots `s11-07` to `s11-09`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `generateSchema` and `GenerateRequest` changes with spec updates (`ai.schema.spec`, `ai.service.spec`: `language` passes through; `sources` becomes the research result; absent fields change nothing).
+- [x] Prompt field and language-name table in `ai-engine`, with prompt tests.
+- [x] Simulated client echo.
+- [x] `createPipeline` `researchProvider` option and the `AiService` wiring, with a spec that proves Tavily is not called when `sources` is present.
+- [x] `CreatePostSheet` and wiring on `TrendCard` and `StoryCard`; `GenerateResult.publishAt`.
+- [x] Draft In Copilot menu item.
+- [x] Web tests: the sheet submits the right body (brief as topic, language, sources, channels), disabled when out of credits, Open In Composer navigates with `group`, `publishAt` reaches the draft's `publishDate`.
+- [x] Playwright once under both simulations: Create Post from a Chennai trend in Tamil for one channel, see "(written in ta)" in the result, Open In Composer, see the draft in the composer. Screenshots `s11-07` to `s11-09` (taken as `s11-11` to `s11-19`, since `s11-07` to `s11-10` were already used).
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

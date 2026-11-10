@@ -3,11 +3,9 @@
 /**
  * Generate mode: the form, the run, and the result, wired together.
  *
- * The run is one `streamEvents` call feeding the reducer; an
- * `AbortController` is the Stop button, and also what unmounting pulls. A
- * stream that closes without a terminal event is reported as a failure
- * rather than left spinning: the API always ends with `done` or `error`, so
- * silence means the connection dropped.
+ * The run is `useGenerateRun`: one `streamEvents` call feeding the reducer,
+ * with Stop, and a dropped connection reported as a failure. Discover's
+ * Create Post sheet (Sprint 11) runs the same hook.
  *
  * The form's values live here, not in the form, so "Regenerate" on the
  * result sends the request that produced it even if the form has since been
@@ -15,22 +13,16 @@
  */
 import { Alert } from '@postgear/ui';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ApiError } from '@/lib/api';
-import { streamEvents } from '@/lib/sse';
-import type { AiCredits, AiStatus, GenerateRequestBody, GenerateStreamEvent } from '@/types/ai';
+import { useCallback, useMemo, useState } from 'react';
+import type { AiCredits, AiStatus, GenerateRequestBody } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import { AiPanel } from './ai-ui';
 import { GenerateForm, TOPIC_MAX } from './generate-form';
 import { GeneratePreview } from './generate-preview';
 import { GenerateProgress } from './generate-progress';
 import { GenerateResult } from './generate-result';
-import {
-  generateReducer,
-  hasPartialResult,
-  initialGenerateState,
-  strictestLimit,
-} from './generate-state';
+import { hasPartialResult, strictestLimit } from './generate-state';
+import { useGenerateRun } from './use-generate-run';
 
 const EMPTY_VALUES: GenerateRequestBody = {
   topic: '',
@@ -69,8 +61,7 @@ export function GeneratePanel({
         ? channels.filter((channel) => channel.health === 'connected').map((channel) => channel.id)
         : [],
   }));
-  const [state, dispatch] = useReducer(generateReducer, credits, initialGenerateState);
-  const controller = useRef<AbortController | null>(null);
+  const { state, generate, stop } = useGenerateRun(credits, onCredits);
 
   const limit = useMemo(
     () => strictestLimit(state.request?.channelIds ?? values.channelIds, channels, providers),
@@ -81,59 +72,6 @@ export function GeneratePanel({
     [values.channelIds, channels, providers],
   );
 
-  const generate = useCallback(
-    async (request: GenerateRequestBody) => {
-      controller.current?.abort();
-      const current = new AbortController();
-      controller.current = current;
-      let settled = false;
-
-      dispatch({ type: 'start', request });
-
-      try {
-        await streamEvents<GenerateStreamEvent>('/ai/generate', request, {
-          signal: current.signal,
-          onEvent: (event) => {
-            dispatch({ type: 'event', event });
-            if (event.type === 'done' || event.type === 'error') {
-              settled = true;
-              onCredits(event.credits);
-            }
-          },
-        });
-
-        if (!settled) {
-          dispatch({
-            type: 'fail',
-            message: 'The connection closed before the generation finished. Please try again.',
-          });
-        }
-      } catch (cause) {
-        if (current.signal.aborted) {
-          dispatch({ type: 'abort' });
-        } else {
-          dispatch({
-            type: 'fail',
-            message:
-              cause instanceof ApiError
-                ? cause.message
-                : 'The AI service could not be reached. Check your connection and try again.',
-            status: cause instanceof ApiError ? cause.status : undefined,
-          });
-        }
-      } finally {
-        if (controller.current === current) {
-          controller.current = null;
-        }
-      }
-    },
-    [onCredits],
-  );
-
-  // Leaving the page stops the run; the API aborts the engine on disconnect.
-  useEffect(() => () => controller.current?.abort(), []);
-
-  const stop = useCallback(() => controller.current?.abort(), []);
   const regenerate = useCallback(() => {
     void generate(state.request ?? values);
   }, [generate, state.request, values]);

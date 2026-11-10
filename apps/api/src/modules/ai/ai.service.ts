@@ -47,7 +47,9 @@ import { AI_CREDIT_COSTS, type AiCredits, generateCost } from './credits/credits
 import { type CreditContext, CreditsService } from './credits/credits.service';
 import type { CopilotChatInput, GenerateInput } from './dto/ai.schema';
 import { AI_ENGINE, type AiEngine, type AiStatus } from './engine/engine.types';
+import { createHeadlinesResearch } from './engine/headlines-research';
 import { createCopilotTools } from './tools/copilot-tools';
+import { writtenHeavyOnX } from './x-heavy-scripts';
 
 /** What a run writes to. `sse.ts` provides it; a test hands in a recorder. */
 export interface StreamSink {
@@ -100,14 +102,21 @@ export class AiService {
    * costs anything.
    */
   async prepareGenerate(orgId: string, input: GenerateInput): Promise<PreparedRun> {
-    const pipeline = this.engine.createPipeline({ orgId });
+    // Sources sent with the request (Discover's headlines) are the research
+    // for this run: no web search of its own.
+    const pipeline = input.sources
+      ? this.engine.createPipeline(
+          { orgId },
+          { researchProvider: createHeadlinesResearch(input.sources) },
+        )
+      : this.engine.createPipeline({ orgId });
 
     if (!pipeline) {
       throw new ServiceUnavailableException(AI_MESSAGES.NOT_CONFIGURED);
     }
 
     const context = await this.credits.context(orgId);
-    const targets = await this.resolveTargets(orgId, input.channelIds);
+    const targets = await this.resolveTargets(orgId, input.channelIds, input.language);
     const cost = generateCost(input.withImage);
     const charged = await this.credits.charge(orgId, 'generate_post', cost, context);
 
@@ -170,6 +179,7 @@ export class AiService {
           maxCharacters: targets.maxCharacters,
           platforms: targets.platforms,
           workspaceName: context.workspaceName,
+          ...(input.language ? { language: input.language } : {}),
         },
         { signal: stream.signal, onEvent },
       );
@@ -179,6 +189,8 @@ export class AiService {
         type: 'done',
         result,
         credits: await this.freshCredits(orgId, context, params.charged),
+        // Echoed for the web to hand to the composer; nothing is scheduled here.
+        ...(input.publishAt ? { publishAt: input.publishAt } : {}),
       });
     } catch (error) {
       refund('generate_post', cost - refunded);
@@ -285,7 +297,11 @@ export class AiService {
    * A channel id that is not this workspace's, or was disconnected since
    * the page loaded, is refused before anything is charged.
    */
-  private async resolveTargets(orgId: string, channelIds: string[]): Promise<GenerateTargets> {
+  private async resolveTargets(
+    orgId: string,
+    channelIds: string[],
+    language?: string,
+  ): Promise<GenerateTargets> {
     const available = new Map(
       (await this.channels.list(orgId)).map((channel) => [channel.id, channel]),
     );
@@ -306,7 +322,7 @@ export class AiService {
 
     return {
       platforms,
-      maxCharacters: strictestLimit(this.channels.listProviders(), platforms),
+      maxCharacters: strictestLimit(this.channels.listProviders(), platforms, language),
     };
   }
 
@@ -344,13 +360,28 @@ export class AiService {
  * The strictest composer limit among `identifiers` (social-core provider
  * identifiers), or null when none of them is known. Shared with the
  * workflow AI steps (Sprint 10), which name a platform rather than channels.
+ *
+ * The engine counts characters with `text.length`. X counts some scripts
+ * double, so for a `language` written in one of them (Japanese, Korean,
+ * Chinese, Amharic, Khmer, ...) X's limit is halved here; see
+ * `x-heavy-scripts.ts`. Without a language nothing changes.
  */
 export function strictestLimit(
-  providers: ReadonlyArray<{ identifier: string; rules: { maxLength: number } }>,
+  providers: ReadonlyArray<{
+    identifier: string;
+    rules: { maxLength: number; lengthMethod?: string };
+  }>,
   identifiers: readonly string[],
+  language?: string,
 ): number | null {
+  const heavy = writtenHeavyOnX(language);
   const limits = new Map(
-    providers.map((provider) => [provider.identifier, provider.rules.maxLength]),
+    providers.map((provider) => [
+      provider.identifier,
+      heavy && provider.rules.lengthMethod === 'x-weighted'
+        ? Math.floor(provider.rules.maxLength / 2)
+        : provider.rules.maxLength,
+    ]),
   );
   const known = identifiers.flatMap((identifier) => {
     const limit = limits.get(identifier);

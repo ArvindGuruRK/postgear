@@ -13,7 +13,7 @@
  */
 import type { PostFormat, Tone } from '@postgear/ai-engine';
 import { z } from 'zod';
-import { stripControlChars } from '../../../common/sanitize';
+import { collapseWhitespace, stripControlChars } from '../../../common/sanitize';
 import { MAX_CHANNELS_PER_POST } from '../../posts/dto/posts.schema';
 
 export const TONE_VALUES = ['personal', 'company'] as const satisfies readonly Tone[];
@@ -44,6 +44,45 @@ export function cleanText(min: number, max: number) {
     .pipe(z.string().min(min).max(max));
 }
 
+/**
+ * A BCP 47 tag as Discover sends it: a two or three letter language, then
+ * optional subtags (`ta`, `es-419`, `zh-Hans`). The engine only names the
+ * language in the prompt; it never looks the tag up anywhere.
+ */
+export const LANGUAGE_PATTERN = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
+export const MAX_LANGUAGE_LENGTH = 16;
+
+/** Headlines a caller already has (Discover's related coverage), used in place of web research. */
+export const MAX_SOURCES = 6;
+export const MAX_SOURCE_TITLE_LENGTH = 300;
+export const MAX_SOURCE_SNIPPET_LENGTH = 500;
+export const MAX_SOURCE_URL_LENGTH = 2_048;
+
+/**
+ * One line of text: cleaned, whitespace runs collapsed (a source is one line
+ * of the prompt's research block, so a line break must not start another),
+ * then bounded.
+ */
+function oneLine(min: number, max: number) {
+  return z
+    .string()
+    .max(max * 2)
+    .transform((text) => collapseWhitespace(stripControlChars(text)))
+    .pipe(z.string().min(min).max(max));
+}
+
+const sourceSchema = z
+  .object({
+    title: oneLine(1, MAX_SOURCE_TITLE_LENGTH),
+    url: z
+      .string()
+      .max(MAX_SOURCE_URL_LENGTH)
+      .url()
+      .refine((url) => /^https?:\/\//i.test(url), 'Only web addresses'),
+    snippet: oneLine(0, MAX_SOURCE_SNIPPET_LENGTH),
+  })
+  .strict();
+
 export const generateSchema = z
   .object({
     topic: cleanText(MIN_TOPIC_LENGTH, MAX_TOPIC_LENGTH),
@@ -55,6 +94,16 @@ export const generateSchema = z
       .min(1, 'Choose at least one channel')
       .max(MAX_CHANNELS_PER_POST)
       .refine((ids) => new Set(ids).size === ids.length, 'A channel is listed twice'),
+    /** Sprint 11: write in this language rather than English. */
+    language: z.string().max(MAX_LANGUAGE_LENGTH).regex(LANGUAGE_PATTERN).optional(),
+    /** Sprint 11: the research to use, so the run makes no search of its own. */
+    sources: z.array(sourceSchema).min(1).max(MAX_SOURCES).optional(),
+    /**
+     * Sprint 11: when the post is meant to go out (a festival's date). Only
+     * echoed back on `done` for the web to hand to the composer: this route
+     * schedules nothing.
+     */
+    publishAt: z.string().datetime({ offset: true }).optional(),
   })
   .strict();
 

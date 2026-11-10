@@ -168,6 +168,34 @@ describe('structured: classify / hook / content', () => {
     expect(parts[0].text.length).toBeLessThanOrEqual(150);
   });
 
+  it('owns up to the language it was asked for, on the line after the hook', async () => {
+    const { parts } = await model.structured({
+      schema: contentSchema(false),
+      ...buildContentPrompt({
+        topic,
+        tone: 'personal',
+        format: 'thread_short',
+        category: 'Tips',
+        hook,
+        withImage: false,
+        maxCharacters: 280,
+        platforms: ['x'],
+        sources,
+        workspaceName: 'Acme',
+        language: 'ta',
+      }),
+    });
+
+    expect(parts[0].text.split('\n').slice(0, 2)).toEqual([hook, '(written in ta)']);
+    for (const part of parts.slice(1)) expect(part.text).not.toContain('(written in');
+    for (const part of parts) expect(part.text.length).toBeLessThanOrEqual(280);
+  });
+
+  it('writes no language line without a language', async () => {
+    const { parts } = await content('personal', 'one_short', 280);
+    expect(parts[0].text).not.toContain('(written in');
+  });
+
   it('one_long lands between the floor and the cap, in company voice', async () => {
     const limits = partLimits('one_long', null);
     const { parts } = await content('company', 'one_long', null);

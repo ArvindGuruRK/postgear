@@ -67,6 +67,12 @@ export interface GenerateRequest {
   platforms: string[];
   /** The workspace's name, used as the brand name in company voice. */
   workspaceName?: string;
+  /**
+   * The language to write in, as a BCP 47 tag (`ta`, `es-419`). Absent means
+   * English, and the prompts are exactly what they were before the field
+   * existed (Sprint 11, Discover).
+   */
+  language?: string;
 }
 
 // ---------------------------------------------------------------------------

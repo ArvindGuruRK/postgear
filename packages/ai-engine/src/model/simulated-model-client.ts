@@ -402,6 +402,19 @@ interface ComposeSpec {
   withImage: boolean;
   workspaceName: string | null;
   sources: Array<{ title: string; snippet: string }>;
+  /**
+   * The tag from the prompt's `Language` field. The simulation writes
+   * English whatever it says, so it owns up on the line after the hook,
+   * "(written in ta)", which is what a hand check looks for.
+   */
+  language: string | null;
+}
+
+/** The tag at the start of the `Language` field ("ta (Tamil)"), or null. */
+function readLanguage(user: string): string | null {
+  const value = readField(user, 'Language');
+  const tag = value?.split(/\s+/)[0] ?? '';
+  return /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(tag) ? tag : null;
 }
 
 class SentenceWell {
@@ -455,8 +468,10 @@ function composeParts(
   const parts: Array<{ text: string; imagePrompt: string | null }> = [];
   for (let index = 0; index < partCount; index += 1) {
     const lines: string[] = [];
-    if (index === 0) lines.push(spec.hook.trim());
-    else if (index < partCount - 1) lines.push(fill(transitions.next(), slots));
+    if (index === 0) {
+      lines.push(spec.hook.trim());
+      if (spec.language) lines.push(`(written in ${spec.language})`);
+    } else if (index < partCount - 1) lines.push(fill(transitions.next(), slots));
 
     const closer =
       index === partCount - 1
@@ -817,6 +832,7 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
           withImage: readField(user, 'Image prompts') === 'yes',
           workspaceName,
           sources: readSources(user),
+          language: readLanguage(user),
         },
         picker,
       ),

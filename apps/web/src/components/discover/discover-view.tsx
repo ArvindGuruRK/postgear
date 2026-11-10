@@ -15,6 +15,9 @@
  * source: a resting group keeps its last copy with a note, a group with
  * nothing is hidden, and only a tab with nothing at all says so, with Try
  * Again (blueprint section 7, story DC-2.4).
+ *
+ * What a card opens (the Create Post sheet, the overflow menu) is handed in
+ * by `discover-page.tsx`; without it a card shows Open only.
  */
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import {
@@ -38,6 +41,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import type { DiscoverItem, DiscoverStatus, DiscoverTab, FeedKind } from '@/types/discover';
 import { DISCOVER_TABS } from '@/types/discover';
 import { useMounted } from '../posts/use-mounted';
+import type { CreatePostTarget } from './create-post-sheet';
 import { DiscoverGroup, DiscoverSkeleton } from './discover-group';
 import { placeInSentence, TAB_NAMES, updatedText } from './discover-model';
 import { PlacesCredit } from './discover-ui';
@@ -66,8 +70,8 @@ export interface DiscoverViewProps {
   /** Null when the server could not ask; the page still works without it. */
   status: DiscoverStatus | null;
   initialTab: DiscoverTab;
-  /** Opens the Create Post sheet for an item (Module 04). */
-  onCreatePost?: (item: DiscoverItem) => void;
+  /** Opens the Create Post sheet for an item, read in this place and language (Module 04). */
+  onCreatePost?: (target: CreatePostTarget) => void;
   /** Per-card controls after Open (Module 04's overflow menu). */
   renderCardExtra?: (item: DiscoverItem) => ReactNode;
 }
@@ -107,6 +111,14 @@ export function DiscoverView({
   const groups = feed.data?.groups.filter((group) => group.items.length > 0) ?? [];
   const updated = kind && feed.data && mounted ? updatedText(groups, now) : null;
   const ready = mounted && place.place !== null && place.language !== null;
+
+  // A card's Create Post carries the place and language it was read in.
+  const current = place.place;
+  const language = place.language;
+  const createPost =
+    onCreatePost && current && language
+      ? (item: DiscoverItem) => onCreatePost({ item, place: current, language })
+      : undefined;
 
   function tryAgain() {
     if (place.failed) place.retry();
@@ -162,7 +174,7 @@ export function DiscoverView({
               key={group.id}
               group={group}
               now={now}
-              onCreatePost={onCreatePost}
+              onCreatePost={createPost}
               renderExtra={renderCardExtra}
             />
           ))

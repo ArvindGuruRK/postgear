@@ -9,6 +9,7 @@
 import type { AiCredits, GenerateRequestBody, GenerateStreamEvent } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import {
+  draftDate,
   type GenerateState,
   generateCost,
   generateReducer,
@@ -254,5 +255,23 @@ describe('helpers', () => {
     expect(sourceHost('https://www.example.com/a/b?c=1')).toBe('example.com');
     expect(sourceHost('https://blog.example.org')).toBe('blog.example.org');
     expect(sourceHost('not a url')).toBe('not a url');
+  });
+});
+
+describe('draftDate', () => {
+  const now = new Date('2026-11-10T09:20:00.000Z');
+
+  it('dates the draft when it was made for, if that is still ahead', () => {
+    expect(draftDate('2026-11-12T03:30:00.000Z', now).toISOString()).toBe(
+      '2026-11-12T03:30:00.000Z',
+    );
+  });
+
+  it('falls back to the next full hour without one, or when it has passed or does not parse', () => {
+    const next = nextFullHour(now).toISOString();
+    expect(draftDate(undefined, now).toISOString()).toBe(next);
+    expect(draftDate(null, now).toISOString()).toBe(next);
+    expect(draftDate('2026-11-09T09:00:00.000Z', now).toISOString()).toBe(next);
+    expect(draftDate('not a date', now).toISOString()).toBe(next);
   });
 });

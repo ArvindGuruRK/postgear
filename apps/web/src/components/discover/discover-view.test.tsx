@@ -201,13 +201,40 @@ describe('DiscoverView', () => {
     expect(card.querySelector('img')).toBeNull();
   });
 
-  it('keeps Create Post waiting with a reason until the sheet arrives', async () => {
+  it('shows Create Post only with a sheet to open', async () => {
     remember();
     mockedApi.mockResolvedValue(feed('trending', [TRENDS]));
     renderView();
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
-    expect(within(card).getByRole('button', { name: 'Create Post' })).toBeDisabled();
+    expect(within(card).queryByRole('button', { name: 'Create Post' })).not.toBeInTheDocument();
+  });
+
+  it('hands Create Post the item with the place and language it was read in', async () => {
+    remember();
+    mockedApi.mockResolvedValue(feed('trending', [TRENDS]));
+    const onCreatePost = jest.fn();
+    render(
+      <TooltipProvider>
+        <DiscoverView
+          orgId="org-a"
+          status={STATUS}
+          initialTab="trending"
+          onCreatePost={onCreatePost}
+          renderCardExtra={(item) => <span data-testid="card-extra">{item.id}</span>}
+        />
+      </TooltipProvider>,
+    );
+
+    const card = await screen.findByRole('article', { name: 'weather coimbatore' });
+    expect(within(card).getByTestId('card-extra')).toHaveTextContent('t1');
+    fireEvent.click(within(card).getByRole('button', { name: 'Create Post' }));
+
+    expect(onCreatePost).toHaveBeenCalledWith({
+      item: TRENDS.items[0],
+      place: CHENNAI,
+      language: 'ta',
+    });
   });
 
   it('shows News with its stories, Open going to the redirect when that is all there is', async () => {

@@ -22,6 +22,7 @@ import type {
   CopilotAgent,
   CopilotContext,
   CopilotTool,
+  ResearchProvider,
   SavedImage,
   SeoAdvisor,
   SnippetWriter,
@@ -55,6 +56,13 @@ export interface PipelineOptions {
    * copilot have always run.
    */
   research?: boolean;
+  /**
+   * Research to use for this one run in place of the configured provider
+   * (Sprint 11: Discover's related headlines, so a drafted trend cites what
+   * the card showed and no web search is paid for). Ignored when `research`
+   * is false.
+   */
+  researchProvider?: ResearchProvider;
 }
 
 /** A tool as the engine's agent accepts it, whatever its input type. */

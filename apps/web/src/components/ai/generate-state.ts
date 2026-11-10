@@ -347,6 +347,21 @@ export function nextFullHour(now: Date): Date {
   return next;
 }
 
+/**
+ * When a generated draft is dated: the time it was made for (Sprint 11's
+ * festival rows send one), unless that has passed or does not parse; then
+ * the next full hour, as it always was.
+ */
+export function draftDate(publishAt: string | null | undefined, now: Date): Date {
+  if (publishAt) {
+    const at = new Date(publishAt);
+    if (!Number.isNaN(at.getTime()) && at.getTime() > now.getTime()) {
+      return at;
+    }
+  }
+  return nextFullHour(now);
+}
+
 /** The generated text as one block, for the clipboard. */
 export function partsAsText(parts: readonly GeneratedPart[]): string {
   return parts.map((part) => part.text).join('\n\n');

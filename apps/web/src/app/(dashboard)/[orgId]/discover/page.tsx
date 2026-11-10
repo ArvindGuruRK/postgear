@@ -8,18 +8,19 @@
  * the viewer's own and lives in their browser, not in the request.
  *
  * The island is keyed by the workspace, so switching workspaces starts from
- * that workspace's remembered place instead of carrying the last one over.
+ * that workspace's remembered place instead of carrying the last one over
+ * (and drops an open Create Post sheet with it).
  */
 import type { Metadata } from 'next';
 import { tabFrom } from '@/components/discover/discover-model';
-import { DiscoverView } from '@/components/discover/discover-view';
+import { DiscoverPage } from '@/components/discover/discover-page';
 import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
 import type { DiscoverStatus } from '@/types/discover';
 
 export const metadata: Metadata = { title: 'Discover' };
 
-export default async function DiscoverPage({
+export default async function DiscoverRoute({
   params,
   searchParams,
 }: PageProps<'/[orgId]/discover'>) {
@@ -30,5 +31,5 @@ export default async function DiscoverPage({
     .then((result) => result.status)
     .catch(() => null);
 
-  return <DiscoverView key={orgId} orgId={orgId} status={status} initialTab={tabFrom(query.tab)} />;
+  return <DiscoverPage key={orgId} orgId={orgId} status={status} initialTab={tabFrom(query.tab)} />;
 }

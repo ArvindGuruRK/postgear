@@ -171,8 +171,8 @@ describe('AiService', () => {
         }),
       ]),
       listProviders: jest.fn().mockReturnValue([
-        { identifier: 'x', rules: { maxLength: 280 } },
-        { identifier: 'linkedin', rules: { maxLength: 3000 } },
+        { identifier: 'x', rules: { maxLength: 280, lengthMethod: 'x-weighted' } },
+        { identifier: 'linkedin', rules: { maxLength: 3000, lengthMethod: 'utf16' } },
       ]),
     };
     posts = { create: jest.fn() };
@@ -257,6 +257,64 @@ describe('AiService', () => {
       });
       expect(stream.events[4].data).toEqual({ type: 'done', result, credits: credits(38) });
       expect(ledger.refund).not.toHaveBeenCalled();
+    });
+
+    it('builds the pipeline as before when no Sprint 11 field is sent', async () => {
+      await (await service.prepareGenerate('org_1', input))(recorder());
+
+      expect(engine.createPipeline).toHaveBeenCalledTimes(1);
+      expect((engine.createPipeline as jest.Mock).mock.calls[0]).toEqual([{ orgId: 'org_1' }]);
+      expect('language' in pipeline.generate.mock.calls[0][0]).toBe(false);
+    });
+
+    it('passes the language through to the engine', async () => {
+      await (await service.prepareGenerate('org_1', { ...input, language: 'ta' }))(recorder());
+
+      expect(pipeline.generate.mock.calls[0][0]).toMatchObject({
+        topic: 'Our new calendar',
+        language: 'ta',
+        maxCharacters: 280,
+      });
+    });
+
+    it("asks for half of X's limit in a language X counts double", async () => {
+      await (await service.prepareGenerate('org_1', { ...input, language: 'ja' }))(recorder());
+
+      expect(pipeline.generate.mock.calls[0][0]).toMatchObject({
+        language: 'ja',
+        maxCharacters: 140,
+      });
+    });
+
+    it('uses the sent sources as the research, through a provider of their own', async () => {
+      const sources = [
+        {
+          title: 'Heavy rain alert for Coimbatore',
+          url: 'https://www.thehindu.com/rain',
+          snippet: 'The Hindu',
+        },
+      ];
+
+      await (await service.prepareGenerate('org_1', { ...input, sources }))(recorder());
+
+      const [scope, options] = (engine.createPipeline as jest.Mock).mock.calls[0];
+      expect(scope).toEqual({ orgId: 'org_1' });
+      expect(options.researchProvider.name).toBe('discover-headlines');
+      await expect(options.researchProvider.search('anything at all')).resolves.toEqual(sources);
+      expect(options.research).toBeUndefined();
+    });
+
+    it('echoes publishAt on done, and only when it was sent', async () => {
+      const publishAt = '2026-11-12T03:30:00.000Z';
+      const stream = recorder();
+      await (await service.prepareGenerate('org_1', { ...input, publishAt }))(stream);
+
+      expect(stream.events[stream.events.length - 1]?.data).toEqual({
+        type: 'done',
+        result,
+        credits: credits(38),
+        publishAt,
+      });
     });
 
     it('leaves the limit null when no selected platform declares one', async () => {

@@ -43,9 +43,9 @@ import type { SavePayload } from '../composer/composer-state';
 import { FOCUS, INSET, PanelHeader } from './ai-ui';
 import {
   type CharacterLimit,
+  draftDate,
   FORMAT_OPTIONS,
   type GenerateState,
-  nextFullHour,
   partsAsText,
   sourceHost,
 } from './generate-state';
@@ -55,11 +55,22 @@ export function GenerateResult({
   state,
   limit,
   onRegenerate,
+  publishAt,
+  onOpened,
 }: {
   orgId: string;
   state: GenerateState;
   limit: CharacterLimit | null;
   onRegenerate: () => void;
+  /** When the draft should be dated (Sprint 11's festival rows); the next full hour without it. */
+  publishAt?: string | null;
+  /**
+   * Called once the draft exists and the composer is on its way. The
+   * composer opens as a modal over the current page, so a caller that is
+   * itself an overlay (Discover's Create Post sheet) closes here rather than
+   * waiting under the composer with a spent result.
+   */
+  onOpened?: () => void;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -82,7 +93,7 @@ export function GenerateResult({
 
     const payload: SavePayload = {
       state: 'DRAFT',
-      publishDate: nextFullHour(new Date()).toISOString(),
+      publishDate: draftDate(publishAt, new Date()).toISOString(),
       shared: parts.map((part, index) => ({
         content: documentFromText(part.text),
         // Platforms attach media to the root post; comment parts cannot carry it.
@@ -94,6 +105,7 @@ export function GenerateResult({
     try {
       const { post } = await api<{ post: PostDetail }>('/posts', { method: 'POST', body: payload });
       router.push(`/${orgId}/composer?group=${encodeURIComponent(post.group)}`);
+      onOpened?.();
     } catch (cause) {
       setOpenError(
         cause instanceof ApiError

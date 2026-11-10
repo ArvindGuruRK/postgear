@@ -18,6 +18,7 @@
 import { z } from 'zod';
 import type { PostFormat, ResearchSource, Tone } from '../types';
 import { block, field } from './fields';
+import { languageField, languageRule } from './language';
 import { toneRules } from './tone';
 
 export interface PartLimits {
@@ -108,6 +109,8 @@ export interface ContentPromptInput {
   platforms: string[];
   sources: ResearchSource[];
   workspaceName?: string;
+  /** A BCP 47 tag; absent means English and leaves the prompt as it always was. */
+  language?: string;
   /** Set on the repair pass: what was wrong with the previous answer. */
   repairNote?: string;
 }
@@ -132,6 +135,10 @@ export function buildContentPrompt(input: ContentPromptInput): { system: string;
     input.withImage
       ? '- Also write "imagePrompt" for part 1: a vivid description for an illustration, with no brand names and no text in the image. Leave it null on other parts.'
       : null,
+    input.language ? languageRule(input.language) : null,
+    input.language && input.withImage
+      ? '- Write "imagePrompt" in English whatever the post\'s language.'
+      : null,
   ]
     .filter((line): line is string => line !== null)
     .join('\n');
@@ -146,6 +153,7 @@ export function buildContentPrompt(input: ContentPromptInput): { system: string;
     field('Image prompts', input.withImage ? 'yes' : 'no'),
     field('Platforms', input.platforms.length > 0 ? input.platforms.join(', ') : 'generic'),
     field('Workspace', input.workspaceName),
+    input.language ? field('Language', languageField(input.language)) : null,
     block('Hook', input.hook),
     block('Brief', input.topic),
     block(
