@@ -61,6 +61,7 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `AutomationEffect` | The step gateway's ledger: one row per side effect a workflow step asked the API for (a draft, a queued or published post, an AI call, an email), so a retried step never acts twice. See [Gateway and webhook](#gateway-and-webhook-modules-10-and-13). | Sprint 10 |
 | `AutomationWebhookSecret` | The secret a Webhook-triggered workflow's link checks, stored hashed with its last four characters. | Sprint 10 |
 | `DiscoverSettings` | A workspace's Discover default: a place (city, region, country, time zone), ordered languages, news topics and which groups show. One row per workspace at most, keyed by the workspace id. See [Sprint 11 additions](#sprint-11-additions). | Sprint 11 |
+| `Competitor` | A competitor a workspace follows in Discover: a name, a website, up to 5 feed addresses, a YouTube channel id, a Bluesky handle, a Mastodon account and a news search. At most 20 live rows per workspace; soft deleted. See [Sprint 11 additions](#sprint-11-additions). | Sprint 11 |
 
 ### Kept, though not yet used
 
@@ -514,10 +515,10 @@ Migration `20261030193031_sprint10_gateway_and_webhook`, additive: the
 
 ## Sprint 11 additions
 
-Migration `20261110120000_sprint11_discover_settings`. Additive only: one
-table and one enum, nothing changed on an existing model. The design is in
-[`docs/sprint-11/discover-implementation-docs/`](../../../docs/sprint-11/discover-implementation-docs/README.md)
-(Module 06). `Competitor` arrives with Module 07, in a migration of its own.
+Migrations `20261110120000_sprint11_discover_settings` (Module 06) and
+`20261110130000_sprint11_competitors` (Module 07). Additive only: two tables
+and one enum, nothing changed on an existing model. The design is in
+[`docs/sprint-11/discover-implementation-docs/`](../../../docs/sprint-11/discover-implementation-docs/README.md).
 
 - **`DiscoverSettings` is one row per workspace, and the workspace id is its
   key.** There is never a second row to choose between, so there is no id of
@@ -545,6 +546,25 @@ table and one enum, nothing changed on an existing model. The design is in
   `TrendingLog` and their GitHub-star neighbours were dropped on purpose (see
   [Deliberately removed](#deliberately-removed)). They tracked trending GitHub
   repositories; Discover reads public feeds and keeps none of them.
+- **`Competitor` is capped at 20 live rows per workspace, in the API.** The
+  count and the insert run in one serializable transaction
+  (`competitors.repository.ts`), so two people adding the twentieth at once
+  cannot both get in. There is no database constraint: a soft-deleted row
+  must not count, and a partial unique index cannot express "at most 20".
+- **`Competitor.feedUrls` holds at most 5 addresses, also in the API.** Every
+  address in the row (the website, each feed, the Mastodon instance) was
+  checked against the private-network guard before it was saved, and is
+  checked again on every fetch.
+- **`Competitor.lastError` is one sentence of ours, never a response body.**
+  "YouTube could not be reached." is what it looks like. Nothing a stranger's
+  server said is ever written to this table.
+- **`Competitor.newsQuery` null means the name.** Renaming a competitor moves
+  its news search with it; a phrase someone typed stays as typed.
+- **`Competitor.createdById` has no relation on purpose.** It is a note of who
+  added the row. Removing that person must not touch the competitor.
+- **Removing a competitor is a soft delete** (`deletedAt`), like webhooks and
+  brand kits: every read filters on it, and the API answers 404 for the id
+  afterwards. Its items were never stored, so there is nothing else to clean.
 
 ## A user may legitimately belong to zero organizations
 

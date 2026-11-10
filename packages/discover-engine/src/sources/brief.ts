@@ -103,7 +103,41 @@ function capped(text: string): string {
     : points.slice(0, BRIEF_MAX_CHARS).join('').trimEnd();
 }
 
-export function buildBrief(item: ComposedItem, locality: Locality, language: string): string {
+/** What a brief needs that the item and the place do not carry. */
+export interface BriefContext {
+  /** Whose item this is, for a competitor's row: the name the workspace gave them. */
+  competitor?: string;
+}
+
+const OUR_OWN_TAKE = 'Write our own take on this topic for our audience, not a summary of theirs.';
+
+/**
+ * A competitor's row: what they did, in their own title, and the one instruction
+ * that matters, which is that the draft is ours. A story about them names its
+ * publisher instead of claiming they wrote it.
+ */
+function competitorLine(item: ComposedItem, title: string, context: BriefContext): string {
+  const name = stripHtml(context.competitor ?? '') || 'A competitor';
+
+  switch (item.source.id) {
+    case 'google-news':
+      return `News about ${name}: '${title}' (${stripHtml(item.source.name)}). ${OUR_OWN_TAKE}`;
+    case 'youtube':
+      return `${name} published a video: '${title}'. ${OUR_OWN_TAKE}`;
+    case 'bluesky':
+    case 'mastodon':
+      return `${name} posted on ${stripHtml(item.source.name)}: '${title}'. ${OUR_OWN_TAKE}`;
+    default:
+      return `${name} published: '${title}'. ${OUR_OWN_TAKE}`;
+  }
+}
+
+export function buildBrief(
+  item: ComposedItem,
+  locality: Locality,
+  language: string,
+  context: BriefContext = {},
+): string {
   const title = stripHtml(item.title);
   const place = placeLabel(locality, language);
   const lines: string[] = [];
@@ -147,7 +181,9 @@ export function buildBrief(item: ComposedItem, locality: Locality, language: str
       lines.push(`Festival in ${place}: "${title}"${on}${badge}.`);
       break;
     }
-    // A competitor's post keeps this line until its own module writes one.
+    case 'competitor':
+      lines.push(competitorLine(item, title, context));
+      break;
     default:
       lines.push(`Trending in ${place}: "${title}" (${stripHtml(item.source.name)}).`);
   }

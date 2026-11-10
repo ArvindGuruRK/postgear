@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sample: written by hand for tests and simulation, in the shape of a YouTube channel feed. Not a recording. -->
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+  <link rel="self" href="https://www.youtube.com/feeds/videos.xml?channel_id=UCacmeSampleChannel00000" />
+  <id>yt:channel:acmeSampleChannel00000</id>
+  <yt:channelId>acmeSampleChannel00000</yt:channelId>
+  <title>Acme Analytics (Sample Channel)</title>
+  <link rel="alternate" href="https://www.youtube.com/channel/UCacmeSampleChannel00000" />
+  <author>
+    <name>Acme Analytics (Sample Channel)</name>
+    <uri>https://www.youtube.com/channel/UCacmeSampleChannel00000</uri>
+  </author>
+  <published>2024-01-15T10:00:00+00:00</published>
+  <entry>
+    <id>yt:video:SAMPLEacme1</id>
+    <yt:videoId>SAMPLEacme1</yt:videoId>
+    <yt:channelId>UCacmeSampleChannel00000</yt:channelId>
+    <title>Reading a retention chart in four minutes</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=SAMPLEacme1" />
+    <author>
+      <name>Acme Analytics (Sample Channel)</name>
+      <uri>https://www.youtube.com/channel/UCacmeSampleChannel00000</uri>
+    </author>
+    <published>2026-11-07T15:00:00+00:00</published>
+    <updated>2026-11-07T18:20:00+00:00</updated>
+    <media:group>
+      <media:title>Reading a retention chart in four minutes</media:title>
+      <media:content url="https://www.youtube.com/v/SAMPLEacme1?version=3" type="application/x-shockwave-flash" width="640" height="390" />
+      <media:thumbnail url="https://i.ytimg.com/vi/SAMPLEacme1/hqdefault.jpg" width="480" height="360" />
+      <media:description>An invented video for tests and simulation.</media:description>
+    </media:group>
+  </entry>
+  <entry>
+    <id>yt:video:SAMPLEacme2</id>
+    <yt:videoId>SAMPLEacme2</yt:videoId>
+    <yt:channelId>UCacmeSampleChannel00000</yt:channelId>
+    <title>Customer story: a bakery that stopped guessing</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=SAMPLEacme2" />
+    <author>
+      <name>Acme Analytics (Sample Channel)</name>
+      <uri>https://www.youtube.com/channel/UCacmeSampleChannel00000</uri>
+    </author>
+    <published>2026-10-29T12:00:00+00:00</published>
+    <updated>2026-10-29T12:40:00+00:00</updated>
+    <media:group>
+      <media:title>Customer story: a bakery that stopped guessing</media:title>
+      <media:content url="https://www.youtube.com/v/SAMPLEacme2?version=3" type="application/x-shockwave-flash" width="640" height="390" />
+      <media:thumbnail url="https://i.ytimg.com/vi/SAMPLEacme2/hqdefault.jpg" width="480" height="360" />
+      <media:description>An invented video for tests and simulation.</media:description>
+    </media:group>
+  </entry>
+</feed>

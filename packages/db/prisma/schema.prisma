@@ -62,6 +62,8 @@ model Organization {
   automationWebhookSecrets AutomationWebhookSecret[]
   // Sprint 11: the workspace's default place, languages and groups in Discover.
   discoverSettings    DiscoverSettings?
+  // Sprint 11: the competitors the workspace follows in Discover.
+  competitors         Competitor[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -1499,4 +1501,34 @@ model DiscoverSettings {
   updatedAt      DateTime               @updatedAt
   organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   updatedBy      User?                  @relation("DiscoverSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/// A competitor a workspace follows in Discover (Module 07): a name, and the
+/// public places it publishes. At most 20 live rows per workspace, enforced in
+/// the API. Nothing it publishes is stored here: its items live in Redis.
+model Competitor {
+  id               String       @id @default(uuid())
+  organizationId   String
+  name             String
+  websiteUrl       String?
+  /// RSS or Atom addresses, found on the website or typed. At most 5.
+  feedUrls         String[]     @default([])
+  /// "UC" and 22 more characters.
+  youtubeChannelId String?
+  /// A domain-like handle, "acme.bsky.social".
+  blueskyHandle    String?
+  /// user@instance.
+  mastodonAcct     String?
+  /// What Google News is searched for. Null means the name.
+  newsQuery        String?
+  lastCheckedAt    DateTime?
+  /// One sentence of ours, never a response body.
+  lastError        String?
+  createdById      String?
+  deletedAt        DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, deletedAt])
 }

@@ -9,21 +9,42 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { COMMON_FEED_PATHS, discoverFeeds } from './discover-feeds';
 import { editionFor } from './geo/editions';
 import { CHENNAI, PARIS, SAN_FRANCISCO } from './geo/geocoder/simulated';
 import { resolveLanguages } from './geo/languages';
 import { buildLocality, WORLDWIDE } from './geo/locality';
-import { createFixtureFetch, FIXTURE_FEEDS, recordingsOf } from './simulation';
+import {
+  COMPETITOR_FIXTURES,
+  COMPETITOR_SAMPLE,
+  createFixtureFetch,
+  FIXTURE_FEEDS,
+  fixtureFileName,
+  recordingsOf,
+} from './simulation';
 import { BLUESKY_TRENDS_URL, createBlueskySource } from './sources/bluesky';
+import { blueskyAuthorFeedUrl, createBlueskyAuthorSource } from './sources/bluesky-author';
 import { buildBrief } from './sources/brief';
 import { composeFeed, itemId } from './sources/compose';
-import { createGoogleNewsSource, newsTopicUrl, newsTopUrl } from './sources/google-news';
+import {
+  createGoogleNewsSource,
+  newsSearchUrl,
+  newsTopicUrl,
+  newsTopUrl,
+} from './sources/google-news';
 import { createGoogleTrendsSource, trendsFeedUrl } from './sources/google-trends';
 import { createHolidaysSource, festivalsInWindow, todayIn } from './sources/holidays';
 import { HOLIDAY_CALENDAR_IDS, holidayCalendarUrl } from './sources/holidays/google-calendar';
 import { createMastodonSource, mastodonTrendsUrl } from './sources/mastodon';
+import {
+  createMastodonAccountSource,
+  mastodonLookupUrl,
+  mastodonStatusesUrl,
+} from './sources/mastodon-account';
+import { createRssSource } from './sources/rss';
 import { createWikipediaSource, isWikipediaArticle, wikipediaTopUrl } from './sources/wikipedia';
 import { createYoutubeSource, youtubePopularPrefix, youtubePopularUrl } from './sources/youtube';
+import { createYoutubeChannelSource, youtubeChannelFeedUrl } from './sources/youtube-channel';
 import type { DiscoverFetchInit, Locality, SourceItem } from './types';
 
 const INIT: DiscoverFetchInit = {
@@ -579,11 +600,26 @@ describe('createFixtureFetch', () => {
   });
 });
 
+/** Every file under a folder, however deep: the competitor samples sit one level further down. */
+function filesUnder(directory: string): string[] {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = join(directory, entry);
+    return statSync(path).isDirectory() ? filesUnder(path) : [path];
+  });
+}
+
+/** A hand-written JSON answer says so inside: on the object, or on every row of a list. */
+function saysItIsASample(body: unknown): boolean {
+  const marked = (value: unknown) =>
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { _sample?: unknown })._sample === 'string';
+  return Array.isArray(body) ? body.length > 0 && body.every(marked) : marked(body);
+}
+
 describe('the fixtures themselves', () => {
   const root = join(__dirname, '..', 'fixtures');
-  const files = readdirSync(root).flatMap((place) =>
-    readdirSync(join(root, place)).map((file) => join(root, place, file)),
-  );
+  const files = filesUnder(root);
 
   it('are all there: twenty-three feeds, three places and Worldwide', async () => {
     expect(FIXTURE_FEEDS).toHaveLength(23);
@@ -612,11 +648,7 @@ describe('the fixtures themselves', () => {
     // A recording must never carry the mark, and a sample must never lack it.
     for (const file of files.filter((path) => path.endsWith('.json'))) {
       const body: unknown = JSON.parse(readFileSync(file, 'utf8'));
-      const marked =
-        typeof body === 'object' &&
-        body !== null &&
-        typeof (body as { _sample?: unknown })._sample === 'string';
-      expect([file, marked]).toEqual([file, file.endsWith('.sample.json')]);
+      expect([file, saysItIsASample(body)]).toEqual([file, file.endsWith('.sample.json')]);
     }
   });
 
@@ -643,5 +675,269 @@ describe('the fixtures themselves', () => {
   it('stay small enough to live in the repository', () => {
     const total = files.reduce((sum, file) => sum + statSync(file).size, 0);
     expect(total).toBeLessThan(5 * 1024 * 1024);
+  });
+});
+
+describe('the competitor samples (Module 07)', () => {
+  const root = join(__dirname, '..', 'fixtures');
+  const folder = join(root, 'competitors', 'acme');
+  const S = COMPETITOR_SAMPLE;
+  const options = { fetch: fixtureFetch, maxAgeMs: null };
+  const page = { ...INIT, accept: 'text/html' };
+
+  it('are eight hand-written answers, every one with its file', async () => {
+    expect(COMPETITOR_FIXTURES.map((feed) => feed.name).sort()).toEqual([
+      'blog-rss',
+      'bluesky-author',
+      'changelog-atom',
+      'mastodon-lookup',
+      'mastodon-statuses',
+      'news-search',
+      'site',
+      'youtube-channel',
+    ]);
+
+    for (const feed of COMPETITOR_FIXTURES) {
+      expect([feed.name, feed.place, feed.sample]).toEqual([feed.name, 'competitors/acme', true]);
+      // Asked the way the fixture fetch asks, so a file it would not serve does not count.
+      expect([feed.name, await recordingsOf(root, feed)]).toEqual([
+        feed.name,
+        [fixtureFileName(feed, 'sample')],
+      ]);
+    }
+  });
+
+  it('leave no file in the folder that the list does not name', () => {
+    const listed = COMPETITOR_FIXTURES.map((feed) => fixtureFileName(feed, 'sample')).sort();
+    expect(readdirSync(folder).sort()).toEqual(listed);
+  });
+
+  it('never name a sample twice, by name or by address', () => {
+    const names = COMPETITOR_FIXTURES.map((feed) => feed.name);
+    const addresses = COMPETITOR_FIXTURES.map((feed) => feed.url);
+
+    expect(new Set(names).size).toBe(names.length);
+    expect(new Set(addresses).size).toBe(addresses.length);
+  });
+
+  it('are kept out of the list the recorder fetches from', () => {
+    const recorded = FIXTURE_FEEDS.map((feed) => feed.url);
+
+    expect(FIXTURE_FEEDS.filter((feed) => feed.place.startsWith('competitors'))).toEqual([]);
+    for (const feed of COMPETITOR_FIXTURES) {
+      expect([feed.name, recorded.includes(feed.url)]).toEqual([feed.name, false]);
+    }
+    for (const address of recorded) {
+      expect([address, address.includes('acme.example')]).toEqual([address, false]);
+      expect([address, address.includes('mastodon.example')]).toEqual([address, false]);
+    }
+  });
+
+  it('live on a name reserved for examples, apart from the three real services they stand in for', () => {
+    const hosts = [...new Set(COMPETITOR_FIXTURES.map((feed) => new URL(feed.url).hostname))];
+
+    expect(hosts.sort()).toEqual([
+      'acme.example',
+      'mastodon.example',
+      'news.google.com',
+      'public.api.bsky.app',
+      'www.youtube.com',
+    ]);
+    expect(S.website).toBe('https://acme.example/');
+    expect(S.blueskyHandle.endsWith('.example')).toBe(true);
+    expect(S.mastodonAcct.endsWith('.example')).toBe(true);
+  });
+
+  it('all say inside that they are samples', () => {
+    for (const feed of COMPETITOR_FIXTURES) {
+      const file = fixtureFileName(feed, 'sample');
+      const text = readFileSync(join(folder, file), 'utf8');
+
+      if (file.endsWith('.json')) {
+        expect([file, saysItIsASample(JSON.parse(text))]).toEqual([file, true]);
+      } else {
+        // A feed or a page: a comment that starts "Sample:", before the content.
+        const comment = /<!--\s*Sample:[^>]*-->/.exec(text);
+        expect([file, comment !== null]).toEqual([file, true]);
+        expect([file, (comment?.index ?? Number.MAX_SAFE_INTEGER) < 100]).toEqual([file, true]);
+      }
+    }
+  });
+
+  it('keep out the two characters this project bans, and hold no key', () => {
+    const banned = [0x2014, 0xb7].map((code) => String.fromCodePoint(code));
+
+    for (const file of readdirSync(folder)) {
+      const text = readFileSync(join(folder, file), 'utf8');
+      for (const character of banned)
+        expect([file, text.includes(character)]).toEqual([file, false]);
+      expect([file, /[?&]key=[^&"\s]/.test(text)]).toEqual([file, false]);
+    }
+  });
+
+  it('serve each sample at exactly the address its source asks for', async () => {
+    const addresses = [
+      S.website,
+      S.blogFeed,
+      S.changelogFeed,
+      youtubeChannelFeedUrl(S.youtubeChannelId),
+      blueskyAuthorFeedUrl(S.blueskyHandle),
+      mastodonLookupUrl({ user: 'acme', instance: 'mastodon.example' }),
+      mastodonStatusesUrl('mastodon.example', S.mastodonAccountId),
+      newsSearchUrl(S.name, editionFor(null, 'en')),
+    ];
+
+    for (const address of addresses) {
+      const answer = await fixtureFetch(address, INIT);
+      expect([address, answer.status, answer.finalUrl]).toEqual([address, 200, address]);
+      expect(answer.body.length).toBeGreaterThan(100);
+    }
+  });
+
+  it('answer the news search for any phrase that starts with the name, in any edition', async () => {
+    const editions = [editionFor(null, 'en'), editionFor('IN', 'ta'), editionFor('FR', 'fr')];
+
+    for (const edition of editions) {
+      for (const phrase of ['Acme', 'Acme Analytics']) {
+        const answer = await fixtureFetch(newsSearchUrl(phrase, edition), INIT);
+        expect([phrase, edition.ceid, answer.status]).toEqual([phrase, edition.ceid, 200]);
+        expect(answer.body).toContain('<!-- Sample:');
+      }
+    }
+  });
+
+  it('never answer the news search for another name', async () => {
+    for (const phrase of ['Globex', 'The Acme Company', 'acme', 'Initech Acme']) {
+      const answer = await fixtureFetch(newsSearchUrl(phrase, editionFor(null, 'en')), INIT);
+      expect([phrase, answer.status, answer.body]).toEqual([phrase, 404, '']);
+    }
+  });
+
+  it.each([
+    ['a page of the site that was not written', 'https://acme.example/pricing'],
+    ['a feed that was not written', 'https://acme.example/missing.xml'],
+    ['a common feed path', 'https://acme.example/feed'],
+    ['the site with no slash', 'https://acme.example'],
+    ['the site over plain http', 'http://acme.example/'],
+    ['the site with a query', 'https://acme.example/?page=2'],
+    ['another host under the same name', 'https://www.acme.example/'],
+    ['a name that only begins like it', 'https://acme.example.attacker.test/'],
+    ['another channel', youtubeChannelFeedUrl('UCsomeOtherChannel000000')],
+    ['another Bluesky handle', blueskyAuthorFeedUrl('globex.example')],
+    [
+      'another Mastodon account',
+      mastodonLookupUrl({ user: 'globex', instance: 'mastodon.example' }),
+    ],
+    [
+      'the same account on another instance',
+      mastodonLookupUrl({ user: 'acme', instance: 'other.example' }),
+    ],
+    [
+      'the statuses of another account',
+      mastodonStatusesUrl('mastodon.example', '110000000000000002'),
+    ],
+  ])('answer 404 for %s', async (_what, address) => {
+    expect(await fixtureFetch(address, INIT)).toEqual({ status: 404, body: '', finalUrl: address });
+  });
+
+  it('finds the two feeds of the sample site, without a probe', async () => {
+    const asked: string[] = [];
+    const counting: typeof fixtureFetch = (url, init) => {
+      asked.push(url);
+      return fixtureFetch(url, init);
+    };
+    const site = await counting(S.website, page);
+
+    expect(await discoverFeeds(site.body, site.finalUrl, { fetch: counting })).toEqual([
+      { url: S.blogFeed, title: 'Blog', kind: 'rss' },
+      { url: S.changelogFeed, title: 'Changelog', kind: 'atom' },
+    ]);
+    expect(asked).toEqual([S.website]);
+  });
+
+  it('finds no feed on a site that was not written, after trying the common paths', async () => {
+    const asked: string[] = [];
+    const counting: typeof fixtureFetch = (url, init) => {
+      asked.push(url);
+      return fixtureFetch(url, init);
+    };
+
+    expect(
+      await discoverFeeds('<html></html>', 'https://globex.example/', { fetch: counting }),
+    ).toEqual([]);
+    expect(asked).toEqual(COMMON_FEED_PATHS.map((path) => `https://globex.example${path}`));
+  });
+
+  it('gives the hand check its rows: blog, changelog, a video, two networks and the news', async () => {
+    const rss = createRssSource(options);
+    const answers = {
+      blog: await rss.read(S.blogFeed),
+      changelog: await rss.read(S.changelogFeed),
+      youtube: await createYoutubeChannelSource(options).read(S.youtubeChannelId),
+      bluesky: await createBlueskyAuthorSource(options).read(S.blueskyHandle),
+      mastodon: await createMastodonAccountSource(options).read(S.mastodonAcct),
+      news: await news.search(S.name, { locality: CHENNAI, language: 'ta' }),
+    };
+
+    for (const [name, answer] of Object.entries(answers)) {
+      expect([name, answer.failed, answer.unreadable]).toEqual([name, undefined, undefined]);
+      expect([name, answer.items.every((item) => item.kind === 'competitor')]).toEqual([
+        name,
+        true,
+      ]);
+    }
+    expect(
+      Object.fromEntries(
+        Object.entries(answers).map(([name, answer]) => [
+          name,
+          [answer.items.length, answer.items[0]?.source.id],
+        ]),
+      ),
+    ).toEqual({
+      blog: [5, 'rss'],
+      changelog: [3, 'rss'],
+      youtube: [2, 'youtube'],
+      bluesky: [2, 'bluesky'],
+      mastodon: [2, 'mastodon'],
+      news: [2, 'google-news'],
+    });
+  });
+
+  it('writes the brief the story asks for from the first blog post', async () => {
+    const [post] = (await createRssSource(options).read(S.blogFeed)).items;
+    const composed = { ...post, id: itemId(post.source.id, post.url ?? post.title) };
+
+    expect(buildBrief(composed, CHENNAI, 'en', { competitor: 'Acme Analytics' })).toBe(
+      "Acme Analytics published: 'Five ways to cut churn'. Write our own take on this topic for our audience, not a summary of theirs.",
+    );
+  });
+
+  it('reads a feed that was not written as "nothing there", and the site as "not a feed"', async () => {
+    const rss = createRssSource(options);
+
+    expect(await rss.read('https://acme.example/missing.xml')).toMatchObject({
+      items: [],
+      failed: 'not_found',
+    });
+    expect(await rss.read(S.website)).toMatchObject({
+      items: [],
+      failed: 'not_found',
+      unreadable: true,
+    });
+  });
+
+  it('keeps every sample row inside the last 30 days of the day they were written, bar the one that is old on purpose', async () => {
+    const written = { fetch: fixtureFetch, now: RECORDED };
+    const blog = await createRssSource(written).read(S.blogFeed);
+    const youtube = await createYoutubeChannelSource(written).read(S.youtubeChannelId);
+    const bluesky = await createBlueskyAuthorSource(written).read(S.blueskyHandle);
+    const mastodon = await createMastodonAccountSource(written).read(S.mastodonAcct);
+
+    expect([blog, youtube, bluesky, mastodon].map((answer) => answer.items.length)).toEqual([
+      4, 2, 2, 2,
+    ]);
+    expect(blog.items.map((item) => item.title)).not.toContain(
+      'How we started (an old sample post)',
+    );
   });
 });

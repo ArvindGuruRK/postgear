@@ -13,23 +13,31 @@
  * YouTube has no recording: there is no key to record with. Its files are written
  * by hand, named `.sample.` and marked inside as samples, and a real recording,
  * if one is ever made, is served in their place.
+ *
+ * Competitors (Module 07) have one invented company, {@link COMPETITOR_SAMPLE},
+ * whose website, feeds, channel and accounts are all hand-written samples in
+ * `fixtures/competitors/acme/`. Anything else a person types under simulation is
+ * a 404, so no stranger's site is ever fetched.
  */
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { editionFor, type NewsLocale } from './geo/editions';
 import { BLUESKY_TRENDS_URL } from './sources/bluesky';
+import { blueskyAuthorFeedUrl } from './sources/bluesky-author';
 import { newsPlaceUrl, newsTopUrl } from './sources/google-news';
 import { trendsFeedUrl } from './sources/google-trends';
 import { HOLIDAY_CALENDAR_IDS, holidayCalendarUrl } from './sources/holidays/google-calendar';
 import { mastodonTrendsUrl } from './sources/mastodon';
+import { mastodonLookupUrl, mastodonStatusesUrl } from './sources/mastodon-account';
 import { wikipediaTopPrefix } from './sources/wikipedia';
 import { youtubePopularPrefix } from './sources/youtube';
+import { youtubeChannelFeedUrl } from './sources/youtube-channel';
 import type { DiscoverFetch } from './types';
 
 export { createSimulatedGeocoder } from './geo/geocoder/simulated';
 
-export type FixtureType = 'xml' | 'json' | 'ics';
+export type FixtureType = 'xml' | 'json' | 'ics' | 'html';
 
 export interface FixtureFeed {
   /** The folder under `fixtures/`. */
@@ -113,6 +121,65 @@ export const FIXTURE_FEEDS: readonly FixtureFeed[] = [
   youtubeSample('paris', 'FR'),
 ];
 
+/**
+ * The competitor every simulated screen follows (Module 07). All of it is
+ * invented and lives on `.example`, a name reserved for exactly this, so it can
+ * never be mistaken for a real company or reach a real site.
+ */
+export const COMPETITOR_SAMPLE = {
+  name: 'Acme',
+  website: 'https://acme.example/',
+  blogFeed: 'https://acme.example/blog/rss.xml',
+  changelogFeed: 'https://acme.example/changelog/atom.xml',
+  youtubeChannelId: 'UCacmeSampleChannel00000',
+  blueskyHandle: 'acme.example',
+  mastodonAcct: 'acme@mastodon.example',
+  mastodonAccountId: '110000000000000001',
+} as const;
+
+const COMPETITOR_FOLDER = 'competitors/acme';
+
+function competitorSample(
+  name: string,
+  url: string,
+  extra: Pick<FixtureFeed, 'type' | 'match'> = {},
+): FixtureFeed {
+  return { place: COMPETITOR_FOLDER, name, url, sample: true, ...extra };
+}
+
+/**
+ * What simulation answers for that competitor. Written by hand, never recorded,
+ * and kept out of {@link FIXTURE_FEEDS}, which is the recorder's list: no real
+ * site stands behind any of these addresses.
+ *
+ * The news search is matched on how its address starts, so it answers for any
+ * phrase that opens with the sample's name, in whichever edition is asked.
+ */
+export const COMPETITOR_FIXTURES: readonly FixtureFeed[] = [
+  competitorSample('site', COMPETITOR_SAMPLE.website, { type: 'html' }),
+  competitorSample('blog-rss', COMPETITOR_SAMPLE.blogFeed),
+  competitorSample('changelog-atom', COMPETITOR_SAMPLE.changelogFeed),
+  competitorSample('youtube-channel', youtubeChannelFeedUrl(COMPETITOR_SAMPLE.youtubeChannelId)),
+  competitorSample('bluesky-author', blueskyAuthorFeedUrl(COMPETITOR_SAMPLE.blueskyHandle), {
+    type: 'json',
+  }),
+  competitorSample(
+    'mastodon-lookup',
+    mastodonLookupUrl({ user: 'acme', instance: 'mastodon.example' }),
+    { type: 'json' },
+  ),
+  competitorSample(
+    'mastodon-statuses',
+    mastodonStatusesUrl('mastodon.example', COMPETITOR_SAMPLE.mastodonAccountId),
+    { type: 'json' },
+  ),
+  competitorSample(
+    'news-search',
+    `https://news.google.com/rss/search?q=${encodeURIComponent(`"${COMPETITOR_SAMPLE.name}`)}`,
+    { match: 'prefix' },
+  ),
+];
+
 /** `trends-IN.2026-11-04.xml`, and for a hand-written one `youtube-IN.sample.json`. */
 export function fixtureFileName(feed: FixtureFeed, stamp: string): string {
   return `${feed.name}.${stamp}.${feed.type ?? 'xml'}`;
@@ -145,7 +212,7 @@ function asRecordedUrl(url: string): string {
 
 function feedFor(url: string): FixtureFeed | undefined {
   const asked = asRecordedUrl(url);
-  return FIXTURE_FEEDS.find((entry) =>
+  return [...FIXTURE_FEEDS, ...COMPETITOR_FIXTURES].find((entry) =>
     entry.match === 'prefix' ? asked.startsWith(entry.url) : entry.url === asked,
   );
 }

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sample: written by hand for tests and simulation, in the shape of a Google News search feed. Not a recording: every publisher and story is invented. -->
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <generator>Sample</generator>
+    <title>"Acme" when:7d - Google News (Sample)</title>
+    <link>https://news.google.com/search?q=%22Acme%22+when:7d</link>
+    <language>en-US</language>
+    <description>An invented search answer for tests and simulation.</description>
+    <item>
+      <title>Acme Analytics raises a sample round to build reporting tools - Sample Business Daily</title>
+      <link>https://news.google.com/rss/articles/CBMiSAMPLEacme0001?oc=5</link>
+      <guid isPermaLink="false">CBMiSAMPLEacme0001</guid>
+      <pubDate>Sun, 08 Nov 2026 06:45:00 GMT</pubDate>
+      <description>&lt;a href="https://news.google.com/rss/articles/CBMiSAMPLEacme0001?oc=5" target="_blank"&gt;Acme Analytics raises a sample round to build reporting tools&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Sample Business Daily&lt;/font&gt;</description>
+      <source url="https://business-daily.example">Sample Business Daily</source>
+    </item>
+    <item>
+      <title>Why small shops are turning to tools like Acme - The Sample Ledger</title>
+      <link>https://news.google.com/rss/articles/CBMiSAMPLEacme0002?oc=5</link>
+      <guid isPermaLink="false">CBMiSAMPLEacme0002</guid>
+      <pubDate>Thu, 05 Nov 2026 12:20:00 GMT</pubDate>
+      <description>&lt;a href="https://news.google.com/rss/articles/CBMiSAMPLEacme0002?oc=5" target="_blank"&gt;Why small shops are turning to tools like Acme&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;The Sample Ledger&lt;/font&gt;</description>
+      <source url="https://ledger.example">The Sample Ledger</source>
+    </item>
+  </channel>
+</rss>

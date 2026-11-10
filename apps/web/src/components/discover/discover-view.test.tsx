@@ -2,7 +2,8 @@
  * The Discover page: groups and cards from the API's answer, the stale note,
  * groups with nothing hidden, the empty tab with Try Again, the error state,
  * Open as a real outside link, `dir="auto"` on what came from a feed, and the
- * tab that arrives later.
+ * Competitors tab (Module 07), which loads its own list, never the feed, and
+ * answers the page's Refresh.
  *
  * Module 05: Trending's Wikipedia rows and social chips (and an updated line
  * that leaves Wikipedia out), the Videos tab with and without a YouTube key
@@ -30,7 +31,6 @@ import {
   type DiscoverViewProps,
   FESTIVALS_NEED_PLACE,
   FESTIVALS_NEED_PLACE_HINT,
-  LATER_STEP,
   LOAD_FAILED_TITLE,
   VIDEOS_ASK_ADMIN,
   VIDEOS_NEED_PLACE,
@@ -350,17 +350,99 @@ describe('DiscoverView', () => {
     ).toBeInTheDocument();
   });
 
-  it('says the Competitors tab is coming, and asks for nothing', async () => {
+  it('opens the Competitors tab on its own list, and asks the feed for nothing', async () => {
     remember();
-    mockedApi.mockResolvedValue(feed('trending', [TRENDS]));
+    mockedApi.mockResolvedValue({ competitors: [], limit: 20 });
     renderView(STATUS, 'competitors');
 
-    expect(await screen.findByText(LATER_STEP)).toBeInTheDocument();
+    expect(await screen.findByText('No competitors yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Competitor' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Competitors' })).toHaveAttribute(
       'data-state',
       'active',
     );
-    expect(mockedApi).not.toHaveBeenCalled();
+    expect(mockedApi).toHaveBeenCalledWith('/discover/competitors');
+    expect(feedCalls()).toEqual([]);
+    expect(screen.queryByTestId('discover-updated')).not.toBeInTheDocument();
+  });
+
+  it('reloads the competitors and their items on Refresh', async () => {
+    remember();
+    const competitor = {
+      id: 'c1',
+      name: 'Acme',
+      websiteUrl: null,
+      feedUrls: [],
+      youtubeChannelId: null,
+      blueskyHandle: null,
+      mastodonAcct: null,
+      newsQuery: null,
+      lastCheckedAt: null,
+      lastError: null,
+      createdAt: '2026-11-10T08:00:00.000Z',
+      updatedAt: '2026-11-10T08:00:00.000Z',
+    };
+    mockedApi.mockImplementation(async (path: string) =>
+      path === '/discover/competitors'
+        ? { competitors: [competitor], limit: 20 }
+        : { items: [], unavailable: [], notes: [], fetchedAt: FETCHED, stale: false, pending: false },
+    );
+    renderView(STATUS, 'competitors');
+
+    expect(await screen.findByRole('heading', { name: 'Latest From Acme' })).toBeInTheDocument();
+    const asked = (path: string) =>
+      mockedApi.mock.calls.filter(([called]) => called === path).length;
+    await waitFor(() => expect(asked('/discover/competitors/c1/items')).toBe(1));
+    expect(asked('/discover/competitors')).toBe(1);
+
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    expect(refresh).toBeEnabled();
+    fireEvent.click(refresh);
+
+    await waitFor(() => expect(asked('/discover/competitors/c1/items')).toBe(2));
+    expect(asked('/discover/competitors')).toBe(2);
+    expect(feedCalls()).toEqual([]);
+  });
+
+  it("hands a competitor's row to Create Post with the place and language being read", async () => {
+    remember();
+    const onCreatePost = jest.fn();
+    const post = {
+      id: 'p1',
+      kind: 'competitor',
+      source: { id: 'rss', name: 'Acme Blog' },
+      title: 'Five ways to cut churn',
+      url: 'https://acme.example/blog/churn',
+      brief: "Acme published: 'Five ways to cut churn'. Write our own take.",
+    };
+    mockedApi.mockImplementation(async (path: string) =>
+      path === '/discover/competitors'
+        ? {
+            competitors: [
+              {
+                id: 'c1',
+                name: 'Acme',
+                websiteUrl: null,
+                feedUrls: ['https://acme.example/feed'],
+                youtubeChannelId: null,
+                blueskyHandle: null,
+                mastodonAcct: null,
+                newsQuery: null,
+                lastCheckedAt: null,
+                lastError: null,
+                createdAt: '2026-11-10T08:00:00.000Z',
+                updatedAt: '2026-11-10T08:00:00.000Z',
+              },
+            ],
+            limit: 20,
+          }
+        : { items: [post], unavailable: [], notes: [], fetchedAt: FETCHED, stale: false, pending: false },
+    );
+    renderView(STATUS, 'competitors', { onCreatePost });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create Post' }));
+
+    expect(onCreatePost).toHaveBeenCalledWith({ item: post, place: CHENNAI, language: 'ta' });
   });
 });
 

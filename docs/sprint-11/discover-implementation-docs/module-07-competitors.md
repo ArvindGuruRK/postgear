@@ -1,6 +1,6 @@
 # Module 07: Competitors
 
-> **Sprint 11, Discover** | Status: Not started | Size: L (one full session)
+> **Sprint 11, Discover** | Status: Done (2026-11-10) | Size: L (one full session)
 > **Depends on**: [Module 02](module-02-api-locality-feed-and-cache.md), [Module 06](module-06-settings-and-data-model.md)
 > **Stories**: DC-7.1, 7.2, 7.3
 > **Next**: [Module 08](module-08-website-reader.md)
@@ -55,13 +55,13 @@ The `Competitor` model from the sprint doc, in its own migration `2026MMDDHHMMSS
 
 ## Tasks
 
-- [ ] Schema, migration, `db:generate`, SCHEMA_NOTES (use `prisma-change`).
-- [ ] Engine sources and `discoverFeeds` with tests on recorded bodies (RSS and Atom mapping, 30 day cut, YouTube channel feed, Bluesky author feed, Mastodon lookup then statuses, autodiscovery from `<link>` and from common paths, relative hrefs resolved).
-- [ ] Repository, service, schemas, routes with specs (cap at 20, private URL 422 without a fetch, foreign id 404, member delete 403, items fan-out with one feed failing, `lastError` is a sentence).
-- [ ] Web: tab, rows, dialog, remove confirm, Create Post wiring; tests (feeds listed after Find Feeds, private sentence, remove confirm text, stale note per kind).
-- [ ] Playground: `CompetitorRow`.
-- [ ] Playwright once under simulation: add a competitor from a fixture website, see feeds found, save, see items; remove. Screenshots `s11-10` to `s11-12`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Schema, migration, `db:generate`, SCHEMA_NOTES (use `prisma-change`).
+- [x] Engine sources and `discoverFeeds` with tests on recorded bodies (RSS and Atom mapping, 30 day cut, YouTube channel feed, Bluesky author feed, Mastodon lookup then statuses, autodiscovery from `<link>` and from common paths, relative hrefs resolved).
+- [x] Repository, service, schemas, routes with specs (cap at 20, private URL 422 without a fetch, foreign id 404, member delete 403, items fan-out with one feed failing, `lastError` is a sentence).
+- [x] Web: tab, rows, dialog, remove confirm, Create Post wiring; tests (feeds listed after Find Feeds, private sentence, remove confirm text, stale note per kind).
+- [x] Playground: `CompetitorRow`.
+- [x] Playwright once under simulation: add a competitor from a fixture website, see feeds found, save, see items; remove. Screenshots `s11-36` to `s11-42` (the numbers `s11-10` to `s11-12` were taken; see the Decision Log).
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

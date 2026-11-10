@@ -48,6 +48,8 @@ const ACCEPT: Record<FixtureType, string> = {
   xml: 'application/rss+xml, application/xml;q=0.9, text/xml;q=0.8',
   json: 'application/json',
   ics: 'text/calendar, text/plain;q=0.9',
+  // Never recorded: the only pages are the hand-written competitor samples.
+  html: 'text/html',
 };
 
 const EM_DASH = new RegExp(String.fromCodePoint(0x2014), 'g');

@@ -65,6 +65,27 @@ export const DISCOVER_MESSAGES = {
   festivalsSubtitle: 'Dates from public holiday calendars and date-holidays (CC BY-SA).',
 
   staleNote: (minutes: number) => `Showing what we had from ${ageInWords(minutes)} ago.`,
+
+  // Competitors (Module 07).
+  competitorNotFound: 'Competitor not found.',
+  competitorRemoved: 'Competitor removed.',
+  competitorPrivate: 'This address is private or on your own network.',
+  competitorLimit: (limit: number) => `You can follow up to ${limit} competitors.`,
+  competitorUnreachable: 'We could not find that website. Check the address and try again.',
+  competitorAddressInvalid: 'That does not look like a web address. Check it and try again.',
+  competitorThrottled: 'Try again in a moment.',
+  /** "YouTube could not be reached.", or "could not be read" when it answered with something else. */
+  competitorTrouble: (kind: string, unreadable: boolean) =>
+    `${kind} could not be ${unreadable ? 'read' : 'reached'}.`,
+} as const;
+
+/** A competitor's kinds of row, by the name each badge and each note shows. */
+export const COMPETITOR_KIND_NAMES = {
+  blog: 'Blog',
+  youtube: 'YouTube',
+  bluesky: 'Bluesky',
+  mastodon: 'Mastodon',
+  news: 'News',
 } as const;
 
 /** The networks of the Worldwide group, by the name each is shown under. */

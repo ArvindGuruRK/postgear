@@ -220,6 +220,84 @@ export interface LocalitySearchResponse {
   message?: string;
 }
 
+/**
+ * What a competitor's row is, which is also its badge: Blog (their own feeds),
+ * YouTube, Bluesky, Mastodon, or News (stories that name them).
+ */
+export type CompetitorKind = 'blog' | 'youtube' | 'bluesky' | 'mastodon' | 'news';
+
+/** A competitor the workspace follows (Module 07). `GET /discover/competitors` lists them. */
+export interface Competitor {
+  id: string;
+  name: string;
+  websiteUrl: string | null;
+  /** RSS or Atom addresses, found on the website or typed. At most 5. */
+  feedUrls: string[];
+  youtubeChannelId: string | null;
+  blueskyHandle: string | null;
+  /** `user@instance`. */
+  mastodonAcct: string | null;
+  /** What Google News is searched for. Null means the name. */
+  newsQuery: string | null;
+  /** ISO 8601, null until its items were first read. */
+  lastCheckedAt: string | null;
+  /** One sentence ("YouTube could not be reached."), null when the last read went well. */
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CompetitorsResponse {
+  competitors: Competitor[];
+  /** How many a workspace may follow (20). */
+  limit: number;
+}
+
+/**
+ * What `POST /discover/competitors` takes, and any part of it for `PATCH`.
+ * Null clears an optional field. The website may be typed without `https://`.
+ */
+export interface CompetitorInput {
+  name: string;
+  websiteUrl?: string | null;
+  feedUrls?: string[];
+  youtubeChannelId?: string | null;
+  blueskyHandle?: string | null;
+  mastodonAcct?: string | null;
+  newsQuery?: string | null;
+}
+
+/** A feed found on a website: `POST /discover/competitors/discover-feeds` answers these. */
+export interface DiscoveredFeed {
+  url: string;
+  /** The feed's name as the site gives it ("Blog"). Empty when it gives none. */
+  title: string;
+  kind: 'rss' | 'atom';
+}
+
+/** `GET /discover/competitors/:id/items`: the newest of everything one competitor published. */
+export interface CompetitorItemsResponse {
+  /**
+   * Newest first, every one `kind: 'competitor'` with its `brief`. Its
+   * `source.id` says which row it is: `rss` Blog, `youtube`, `bluesky`,
+   * `mastodon`, `google-news` News.
+   */
+  items: DiscoverItem[];
+  /** The kinds that could not be read this time. Their last copy, if any, is still in `items`. */
+  unavailable: CompetitorKind[];
+  /** One sentence for each of those: "YouTube could not be reached. Showing what we had from 2 hours ago." */
+  notes: string[];
+  /** ISO 8601. */
+  fetchedAt: string;
+  stale: boolean;
+  /**
+   * Nothing is known yet for at least one of its places: someone else is
+   * reading them right now, or the API had no free slot. Ask again in a few
+   * seconds, and never read an empty `items` as "nothing new" while this is true.
+   */
+  pending: boolean;
+}
+
 /** The page's tabs, in order. The open one lives in `?tab=`. */
 export const DISCOVER_TABS = ['trending', 'news', 'videos', 'festivals', 'competitors'] as const;
 

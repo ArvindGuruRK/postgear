@@ -46,6 +46,25 @@ describe('tokenize', () => {
     expect(text).toEqual([{ type: 'text', text: 'yes' }]);
   });
 
+  it('reads a megabyte of script tags in a moment, not in its size times their number', () => {
+    // A stranger's page can be nothing but these. Lower-casing the page once per
+    // tag took 26 seconds here, with nothing able to interrupt it.
+    const page = '<script></script>'.repeat(Math.ceil((1024 * 1024) / 17));
+    const started = Date.now();
+
+    const tokens = tokenize(page);
+
+    expect(tokens.length).toBeGreaterThan(100_000);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it('skips a script body whatever the case of its closing tag', () => {
+    const text = tokenize('<SCRIPT>one</Script><style>two</STYLE>three').filter(
+      (token) => token.type === 'text',
+    );
+    expect(text).toEqual([{ type: 'text', text: 'three' }]);
+  });
+
   it('survives a bare bracket and an unclosed tag', () => {
     expect(tokenize('a < b')).toEqual([
       { type: 'text', text: 'a ' },

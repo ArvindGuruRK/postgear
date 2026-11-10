@@ -59,6 +59,26 @@ export function newsTopicUrl(topic: NewsTopic, locale: NewsLocale): string {
   return `${FEED_BASE}/headlines/section/topic/${topic}?${localeQuery(locale)}`;
 }
 
+const SEARCH_PHRASE_CHARS = 80;
+const MAX_MENTIONS = 10;
+
+/**
+ * What a competitor's name becomes inside a search: plain text, one line, and no
+ * double quote of its own, since the phrase is wrapped in a pair so the words are
+ * looked for together. Empty when nothing is left to search for.
+ */
+export function searchPhrase(query: string): string {
+  return Array.from(cleanText(query).replace(/"/g, ' ').replace(/\s+/g, ' ').trim())
+    .slice(0, SEARCH_PHRASE_CHARS)
+    .join('')
+    .trim();
+}
+
+/** The last seven days of stories that name the phrase (Module 07). */
+export function newsSearchUrl(phrase: string, locale: NewsLocale): string {
+  return `${FEED_BASE}/search?q=${encodeURIComponent(`"${phrase}" when:7d`)}&${localeQuery(locale)}`;
+}
+
 /** "Headline - Publisher" to "Headline", only when the tail really is this publisher. */
 export function stripPublisher(title: string, publisher: string): string {
   const tail = ` - ${publisher}`;
@@ -141,6 +161,12 @@ export interface GoogleNewsSource extends DiscoverSource {
   readonly top: (input: SourceInput) => Promise<SourceResult>;
   /** One topic in the locality's edition. */
   readonly topic: (input: SourceInput, topic: NewsTopic) => Promise<SourceResult>;
+  /**
+   * The week's stories that name a phrase, in the locality's edition, as
+   * competitor rows (Module 07): the newest ten, each with its publisher and
+   * Google's redirect, and no related list.
+   */
+  readonly search: (query: string, input: SourceInput) => Promise<SourceResult>;
 }
 
 export function createGoogleNewsSource(options: { fetch: DiscoverFetch }): GoogleNewsSource {
@@ -193,12 +219,33 @@ export function createGoogleNewsSource(options: { fetch: DiscoverFetch }): Googl
     return read(input, locale, newsTopicUrl(id, locale));
   };
 
+  const search: GoogleNewsSource['search'] = async (query, input) => {
+    const phrase = searchPhrase(query);
+    if (!phrase) {
+      return {
+        items: [],
+        attribution: ATTRIBUTION,
+        warnings: ['Google News has nothing to search for without a phrase.'],
+      };
+    }
+
+    const locale = localeOf(input);
+    const answer = await read(input, locale, newsSearchUrl(phrase, locale));
+    const mentions = answer.items
+      .map(({ related: _related, ...story }): SourceItem => ({ ...story, kind: 'competitor' }))
+      .sort((a, b) => Date.parse(b.publishedAt ?? '') - Date.parse(a.publishedAt ?? '') || 0)
+      .slice(0, MAX_MENTIONS);
+
+    return { ...answer, items: mentions };
+  };
+
   return {
     id: 'google-news',
     name: ATTRIBUTION.name,
     place,
     top,
     topic,
+    search,
 
     // The one call the shared interface knows: the narrowest feed the input can name.
     fetch: (input) => {

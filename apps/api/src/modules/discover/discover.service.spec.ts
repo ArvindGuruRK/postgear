@@ -182,6 +182,8 @@ function fakeEngine(simulation: boolean, hasVideos: boolean): FakeEngine {
       place: jest.fn().mockResolvedValue(answer([story('A local story')])),
       top: jest.fn().mockResolvedValue(answer([story('A national story')])),
       topic: jest.fn().mockResolvedValue(answer([story('A topic story')])),
+      // Module 07's, for competitors. The feed never calls it.
+      search: jest.fn(),
     },
   };
 }

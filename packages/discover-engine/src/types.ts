@@ -133,6 +133,13 @@ export interface SourceResult {
    * towards a breaker; the API shows the items and asks again sooner.
    */
   partial?: boolean;
+  /**
+   * Competitors: the address answered, but not with what was asked for (a page
+   * where a feed should be, a body over the size cap, another shape). Set only
+   * with `failed: 'not_found'`, because the host itself is fine. The page says
+   * "could not be read" for it, and "could not be reached" for any other failure.
+   */
+  unreadable?: boolean;
 }
 
 export interface SourceInput {

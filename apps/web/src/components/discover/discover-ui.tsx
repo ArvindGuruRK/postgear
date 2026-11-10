@@ -29,6 +29,13 @@ export const ROW_LIST =
 /** One row of it: wraps on a phone, so the actions drop under the words. */
 export const ROW = 'flex flex-wrap items-center gap-x-4 gap-y-2 p-3';
 
+/**
+ * A sentence in a group that has no rows to show ("Nothing new from Acme in
+ * the last 30 days."): the same inset box the rows would have sat in.
+ */
+export const INSET_NOTE =
+  'm-0 rounded-lg border-2 border-outline bg-inset p-4 font-sans text-sm text-ink type-muted';
+
 export const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
 
 export function PlacesCredit({ className }: { className?: string }) {

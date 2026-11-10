@@ -38,10 +38,14 @@ export interface FeedKeyParts {
   topic: string | null;
 }
 
-/** The two per-workspace counters. They hold no answer, so simulation has no reason to differ. */
+/** The per-workspace counters. They hold no answer, so simulation has no reason to differ. */
 export const workspaceKeys = {
   localityThrottle: (orgId: string) => `discover:locality:${orgId}`,
   feedMisses: (orgId: string) => `discover:feedmiss:${orgId}`,
+  /** How often a workspace asks a stranger's website for its feeds (Module 07). */
+  feedDiscovery: (orgId: string) => `discover:feedfind:${orgId}`,
+  /** How often a workspace makes the server read a competitor it has no copy of (Module 07). */
+  competitorReads: (orgId: string) => `discover:competitorread:${orgId}`,
 };
 
 export function discoverKeys(simulation: boolean) {
@@ -67,6 +71,20 @@ export function discoverKeys(simulation: boolean) {
     festivals: (country: string, region: string | null) =>
       `${root}:feed:v1:festivals:${country}:${region ?? '-'}`,
     breaker: (source: SourceId) => `${root}:breaker:${source}`,
+    /**
+     * One competitor's items (Module 07). The id is a row's, so the copy is one
+     * workspace's. `sources` is a hash of everything the items are read from:
+     * edit a feed and the key moves, so an old copy can never answer for the new
+     * list, and the new one has a lock of its own.
+     */
+    competitor: (id: string, sources: string) =>
+      `${root}:competitor:${id}:${hashed(sources).slice(0, 16)}`,
+    /**
+     * A competitor's host that keeps failing rests like any source. Hashed: a
+     * host is something a person typed, and a key list should not read as a
+     * list of who follows whom.
+     */
+    hostBreaker: (host: string) => `${root}:breaker:host:${hashed(host).slice(0, 32)}`,
     geoReverse: (lat: number, lng: number) => `${root}:geo:rev:${hashed(`${lat}:${lng}`)}`,
     geoSearch: (normalisedQuery: string) => `${root}:geo:q:${hashed(normalisedQuery)}`,
     nominatimBudget: `${root}:budget:nominatim`,

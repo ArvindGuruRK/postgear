@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sample: written by hand for tests and simulation. Not a recording of any real feed. -->
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Acme Analytics Blog (Sample)</title>
+    <link>https://acme.example/blog</link>
+    <description>An invented blog for tests and simulation.</description>
+    <language>en</language>
+    <lastBuildDate>Mon, 09 Nov 2026 09:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Five ways to cut churn</title>
+      <link>https://acme.example/blog/five-ways-to-cut-churn</link>
+      <guid isPermaLink="true">https://acme.example/blog/five-ways-to-cut-churn</guid>
+      <pubDate>Mon, 09 Nov 2026 09:00:00 GMT</pubDate>
+      <description><![CDATA[<p>Churn is rarely one big reason. It is five small ones, and <strong>each can be measured</strong>. Here is how our sample customers found theirs.</p>]]></description>
+      <media:thumbnail url="https://acme.example/images/churn.png" width="640" height="360" />
+    </item>
+    <item>
+      <title>What a good onboarding email looks like</title>
+      <link>/blog/good-onboarding-email</link>
+      <guid isPermaLink="false">acme-sample-2</guid>
+      <pubDate>Fri, 06 Nov 2026 14:30:00 GMT</pubDate>
+      <description>Three sentences, one link, and nothing about the company. A sample post.</description>
+      <enclosure url="https://acme.example/images/onboarding.jpg" type="image/jpeg" length="48213" />
+    </item>
+    <item>
+      <title>Dashboards people open twice &amp; why</title>
+      <link>https://acme.example/blog/dashboards-people-open-twice</link>
+      <guid isPermaLink="true">https://acme.example/blog/dashboards-people-open-twice</guid>
+      <pubDate>Tue, 03 Nov 2026 08:15:00 GMT</pubDate>
+      <description>A dashboard is opened a second time when it answered a question the first time. A sample post.</description>
+    </item>
+    <item>
+      <title>Our 2026 pricing, explained</title>
+      <link>https://acme.example/blog/pricing-2026</link>
+      <guid isPermaLink="true">https://acme.example/blog/pricing-2026</guid>
+      <pubDate>Wed, 28 Oct 2026 10:00:00 GMT</pubDate>
+      <description>What changed, what did not, and who it is for. A sample post.</description>
+    </item>
+    <item>
+      <title>How we started (an old sample post)</title>
+      <link>https://acme.example/blog/how-we-started</link>
+      <guid isPermaLink="true">https://acme.example/blog/how-we-started</guid>
+      <pubDate>Mon, 02 Mar 2026 10:00:00 GMT</pubDate>
+      <description>Older than thirty days on purpose, so the age limit has something to drop.</description>
+    </item>
+  </channel>
+</rss>

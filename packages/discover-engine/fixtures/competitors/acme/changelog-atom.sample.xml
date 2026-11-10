@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sample: written by hand for tests and simulation. Not a recording of any real feed. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Acme Analytics Changelog (Sample)</title>
+  <link rel="alternate" type="text/html" href="https://acme.example/changelog" />
+  <link rel="self" type="application/atom+xml" href="https://acme.example/changelog/atom.xml" />
+  <id>https://acme.example/changelog</id>
+  <updated>2026-11-08T16:00:00Z</updated>
+  <entry>
+    <title>Version 2.4: scheduled reports</title>
+    <link rel="alternate" type="text/html" href="/changelog/2-4" />
+    <id>https://acme.example/changelog/2-4</id>
+    <published>2026-11-08T16:00:00Z</published>
+    <updated>2026-11-08T16:00:00Z</updated>
+    <summary>Reports can now be sent every Monday morning. A sample entry.</summary>
+  </entry>
+  <entry>
+    <title>Version 2.3: faster filters</title>
+    <link rel="alternate" type="text/html" href="https://acme.example/changelog/2-3" />
+    <id>https://acme.example/changelog/2-3</id>
+    <published>2026-10-30T11:00:00Z</published>
+    <updated>2026-10-30T11:00:00Z</updated>
+    <content type="html">&lt;p&gt;Filters on large tables answer in &lt;em&gt;under a second&lt;/em&gt;. A sample entry.&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <title>Version 2.2: single sign-on</title>
+    <link rel="alternate" type="text/html" href="https://acme.example/changelog/2-2" />
+    <id>https://acme.example/changelog/2-2</id>
+    <published>2026-10-19T09:30:00Z</published>
+    <updated>2026-10-19T09:30:00Z</updated>
+    <summary>Teams can sign in with their company account. A sample entry.</summary>
+  </entry>
+</feed>

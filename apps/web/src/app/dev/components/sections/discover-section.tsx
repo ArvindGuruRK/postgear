@@ -4,9 +4,10 @@
  * Sprint 11's Discover pieces, as the page uses them: the place chip in each
  * of its states, the language chip, the popover's body (with the blocked
  * warning), a trend card and a story card, Module 05's Wikipedia rows, social
- * chips, video cards and festival rows, and the loading footprint. They are
- * built from the design system (blueprint section 11), so this section is
- * where a change to one of those is checked against Discover too.
+ * chips, video cards and festival rows, Module 07's competitor rows, and the
+ * loading footprint. They are built from the design system (blueprint section
+ * 11), so this section is where a change to one of those is checked against
+ * Discover too.
  *
  * Module 06 adds the chip's Workspace badge, the popover's last part (the
  * workspace's saved place and Save For This Workspace, as an admin and as a
@@ -17,7 +18,9 @@
  */
 import { useState } from 'react';
 import { CardMenu } from '@/components/discover/card-menu';
+import { CompetitorRows } from '@/components/discover/competitor-row';
 import { DiscoverGroup, DiscoverSkeleton } from '@/components/discover/discover-group';
+import { INSET_NOTE } from '@/components/discover/discover-ui';
 import { LanguageChip } from '@/components/discover/language-chip';
 import { PlaceChip } from '@/components/discover/place-chip';
 import {
@@ -245,6 +248,62 @@ const FESTIVAL_GROUP: Group = {
     festival('2026-12-03', 'கார்த்திகை தீபம்', true),
   ],
 };
+
+function competitorItem(
+  id: string,
+  source: DiscoverItem['source'],
+  title: string,
+  publishedAt: string,
+  url?: string,
+): DiscoverItem {
+  return {
+    id: `demo-competitor-${id}`,
+    kind: 'competitor',
+    source,
+    title,
+    publishedAt,
+    ...(url ? { url } : {}),
+    brief: `Acme Analytics published: '${title}'. Write our own take on this topic.`,
+  };
+}
+
+/** One of each kind, newest first. The last has no address, so it has no Open. */
+const COMPETITOR_ITEMS: DiscoverItem[] = [
+  competitorItem(
+    'blog',
+    { id: 'rss', name: 'Acme Analytics Blog' },
+    'Five ways to cut churn',
+    '2026-11-10T09:00:00Z',
+    'https://example.com/blog/five-ways-to-cut-churn',
+  ),
+  competitorItem(
+    'youtube',
+    { id: 'youtube', name: 'Acme Analytics' },
+    'Reading a retention chart in four minutes',
+    '2026-11-09T15:00:00Z',
+    'https://example.com/watch',
+  ),
+  competitorItem(
+    'bluesky',
+    { id: 'bluesky', name: 'Bluesky' },
+    'Scheduled reports are live. Pick a day, pick a time, and stop exporting by hand.',
+    '2026-11-08T16:40:00Z',
+    'https://example.com/profile/acme/post/1',
+  ),
+  competitorItem(
+    'mastodon',
+    { id: 'mastodon', name: 'Mastodon' },
+    'نبحث عن مهندس دعم',
+    '2026-11-06T09:00:00Z',
+    'https://example.com/@acme/2',
+  ),
+  competitorItem(
+    'news',
+    { id: 'google-news', name: 'Sample Business Daily' },
+    'Acme Analytics raises a round to build reporting tools',
+    '2026-11-04T06:45:00Z',
+  ),
+];
 
 const nothing = () => undefined;
 const notFound = () => Promise.resolve(false);
@@ -517,6 +576,24 @@ export function DiscoverSection() {
           Sections h3 type-label; ROW_LIST; date type-heading; Badge success (Public Holiday) or
           secondary (Observance); when type-muted; Plan A Post secondary sm
         </Spec>
+      </Row>
+
+      <Row label="Competitor Rows (one of each kind; the last has no address)">
+        <div className="w-full">
+          <CompetitorRows items={COMPETITOR_ITEMS} now={NOW} onCreatePost={nothing} />
+        </div>
+        <Spec>
+          ul, ROW_LIST; Badge outline names the kind; title is a Link with dir=&quot;auto&quot;; a
+          News row names its publisher in type-muted; Create Post secondary sm; Open is an
+          ActionLink
+        </Spec>
+      </Row>
+
+      <Row label="A Competitor With Nothing New">
+        <div className="w-full">
+          <p className={INSET_NOTE}>Nothing new from Acme Analytics in the last 30 days.</p>
+        </div>
+        <Spec>INSET_NOTE: rounded-lg border-2 bg-inset, type-muted, no shadow</Spec>
       </Row>
 
       <Row label="Loading">

@@ -1,0 +1,79 @@
+{
+  "_sample": "Written by hand for tests and simulation, in the shape of app.bsky.feed.getAuthorFeed. Not a recording.",
+  "feed": [
+    {
+      "post": {
+        "uri": "at://did:plc:sampleacme000000000000000/app.bsky.feed.post/3lsampleacme1",
+        "cid": "bafyreisampleacme1",
+        "author": {
+          "did": "did:plc:sampleacme000000000000000",
+          "handle": "acme.example",
+          "displayName": "Acme Analytics (Sample)"
+        },
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "createdAt": "2026-11-09T11:05:00.000Z",
+          "langs": ["en"],
+          "text": "New on the blog: five ways to cut churn, each with a number you can check on Monday. (A sample post.)"
+        },
+        "replyCount": 2,
+        "repostCount": 5,
+        "likeCount": 31,
+        "indexedAt": "2026-11-09T11:05:02.000Z"
+      }
+    },
+    {
+      "post": {
+        "uri": "at://did:plc:samplesomeoneelse000000000/app.bsky.feed.post/3lsampleother1",
+        "cid": "bafyreisampleother1",
+        "author": {
+          "did": "did:plc:samplesomeoneelse000000000",
+          "handle": "someone-else.example",
+          "displayName": "Someone Else (Sample)"
+        },
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "createdAt": "2026-11-08T08:00:00.000Z",
+          "text": "A post by someone else that Acme reposted. It is not theirs, so it is left out."
+        },
+        "indexedAt": "2026-11-08T08:00:01.000Z"
+      },
+      "reason": {
+        "$type": "app.bsky.feed.defs#reasonRepost",
+        "by": { "did": "did:plc:sampleacme000000000000000", "handle": "acme.example" },
+        "indexedAt": "2026-11-08T09:00:00.000Z"
+      }
+    },
+    {
+      "post": {
+        "uri": "at://did:plc:sampleacme000000000000000/app.bsky.feed.post/3lsampleacme2",
+        "cid": "bafyreisampleacme2",
+        "author": {
+          "did": "did:plc:sampleacme000000000000000",
+          "handle": "acme.example",
+          "displayName": "Acme Analytics (Sample)"
+        },
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "createdAt": "2026-11-05T16:40:00.000Z",
+          "langs": ["en"],
+          "text": "Scheduled reports are live. Pick a day, pick a time, and stop exporting by hand. (A sample post.)"
+        },
+        "embed": {
+          "$type": "app.bsky.embed.images#view",
+          "images": [
+            {
+              "thumb": "https://cdn.bsky.app/img/feed_thumbnail/plain/sample/acme2@jpeg",
+              "fullsize": "https://cdn.bsky.app/img/feed_fullsize/plain/sample/acme2@jpeg",
+              "alt": "A sample picture."
+            }
+          ]
+        },
+        "replyCount": 0,
+        "repostCount": 3,
+        "likeCount": 18,
+        "indexedAt": "2026-11-05T16:40:03.000Z"
+      }
+    }
+  ]
+}

@@ -46,6 +46,8 @@ interface CustomItemFields {
   sourceNodes?: (XmlTextNode | string)[];
   mediaContent?: XmlTextNode;
   mediaThumbnail?: XmlTextNode;
+  /** A YouTube channel feed keeps an entry's thumbnail inside `<media:group>`. */
+  mediaGroup?: { 'media:thumbnail'?: XmlTextNode[]; 'media:content'?: XmlTextNode[] };
 }
 
 export type FeedItem = Parser.Item & CustomItemFields;
@@ -62,6 +64,7 @@ const parser = new Parser<Record<string, never>, CustomItemFields>({
       ['source', 'sourceNodes', { keepArray: true }],
       ['media:content', 'mediaContent'],
       ['media:thumbnail', 'mediaThumbnail'],
+      ['media:group', 'mediaGroup'],
     ],
   },
 });

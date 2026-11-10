@@ -39,9 +39,38 @@ export {
   defaultTimeZone,
   isKnownCountry,
 } from './geo/timezone';
-export { createFixtureFetch, FIXTURE_FEEDS, type FixtureFeed } from './simulation';
+export {
+  COMMON_FEED_PATHS,
+  type DiscoveredFeed,
+  type DiscoverFeedsOptions,
+  discoverFeeds,
+  type FeedFormat,
+  feedFormatOf,
+  findFeedLinks,
+  MAX_DISCOVERED_FEEDS,
+} from './discover-feeds';
+export {
+  COMPETITOR_FIXTURES,
+  COMPETITOR_SAMPLE,
+  createFixtureFetch,
+  FIXTURE_FEEDS,
+  type FixtureFeed,
+} from './simulation';
 export { BLUESKY_TRENDS_URL, createBlueskySource } from './sources/bluesky';
-export { BRIEF_MAX_CHARS, buildBrief, placeLabel } from './sources/brief';
+export {
+  blueskyAuthorFeedUrl,
+  blueskyHandle,
+  createBlueskyAuthorSource,
+} from './sources/bluesky-author';
+export { BRIEF_MAX_CHARS, type BriefContext, buildBrief, placeLabel } from './sources/brief';
+export {
+  COMPETITOR_MAX_AGE_MS,
+  COMPETITOR_MAX_ITEMS,
+  COMPETITOR_TEXT_CHARS,
+  type CompetitorSource,
+  type CompetitorSourceOptions,
+  isHostName,
+} from './sources/competitor';
 export {
   type ComposedGroup,
   type ComposeOptions,
@@ -67,9 +96,11 @@ export {
   NEWS_TOPICS,
   type NewsTopic,
   newsPlaceUrl,
+  newsSearchUrl,
   newsTopicUrl,
   newsTopUrl,
   parseRelated,
+  searchPhrase,
   stripPublisher,
 } from './sources/google-news';
 export { createGoogleTrendsSource, parseTraffic, trendsFeedUrl } from './sources/google-trends';
@@ -92,6 +123,14 @@ export { calendarName, type IcsEvent, parseIcs } from './sources/holidays/ics';
 export { cleanText, decodeEntities, safeHttpUrl, stripControlChars } from './sources/html-text';
 export { createMastodonSource, MASTODON_INSTANCE, mastodonTrendsUrl } from './sources/mastodon';
 export {
+  createMastodonAccountSource,
+  type MastodonAccount,
+  mastodonAccount,
+  mastodonLookupUrl,
+  mastodonStatusesUrl,
+} from './sources/mastodon-account';
+export { createRssSource, FEED_ACCEPT } from './sources/rss';
+export {
   createWikipediaSource,
   isWikipediaArticle,
   wikipediaProject,
@@ -99,6 +138,11 @@ export {
   wikipediaTopUrl,
 } from './sources/wikipedia';
 export { createYoutubeSource, youtubePopularPrefix, youtubePopularUrl } from './sources/youtube';
+export {
+  createYoutubeChannelSource,
+  isYoutubeChannelId,
+  youtubeChannelFeedUrl,
+} from './sources/youtube-channel';
 export type {
   ComposedItem,
   DiscoverFetch,

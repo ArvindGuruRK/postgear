@@ -1,0 +1,46 @@
+[
+  {
+    "_sample": "Written by hand for tests and simulation, in the shape of /api/v1/accounts/:id/statuses. Not a recording.",
+    "id": "113000000000000003",
+    "created_at": "2026-11-08T17:10:00.000Z",
+    "in_reply_to_id": null,
+    "sensitive": false,
+    "spoiler_text": "",
+    "visibility": "public",
+    "language": "en",
+    "uri": "https://mastodon.example/users/acme/statuses/113000000000000003",
+    "url": "https://mastodon.example/@acme/113000000000000003",
+    "replies_count": 1,
+    "reblogs_count": 4,
+    "favourites_count": 12,
+    "content": "<p>Version 2.4 is out: reports that send themselves every Monday. <a href=\"https://acme.example/changelog/2-4\" rel=\"nofollow noopener\" target=\"_blank\">acme.example/changelog/2-4</a> (A sample post.)</p>",
+    "reblog": null,
+    "media_attachments": []
+  },
+  {
+    "_sample": "Written by hand for tests and simulation. Not a recording.",
+    "id": "113000000000000002",
+    "created_at": "2026-11-04T09:00:00.000Z",
+    "in_reply_to_id": null,
+    "sensitive": false,
+    "spoiler_text": "",
+    "visibility": "public",
+    "language": "en",
+    "uri": "https://mastodon.example/users/acme/statuses/113000000000000002",
+    "url": "https://mastodon.example/@acme/113000000000000002",
+    "replies_count": 0,
+    "reblogs_count": 2,
+    "favourites_count": 9,
+    "content": "<p>We are hiring a support engineer.<br />Remote, four days a week. (A sample post.)</p>",
+    "reblog": null,
+    "media_attachments": [
+      {
+        "id": "114000000000000001",
+        "type": "image",
+        "url": "https://files.mastodon.example/media/sample-hiring.png",
+        "preview_url": "https://files.mastodon.example/media/sample-hiring-small.png",
+        "description": "A sample picture."
+      }
+    ]
+  }
+]

@@ -54,6 +54,10 @@ const SKIPPED_BODIES = new Set(['script', 'style']);
 export function tokenize(html: string): HtmlToken[] {
   const tokens: HtmlToken[] = [];
   const length = html.length;
+  // Made once, and only if a script or style tag turns up. Made per tag, a page
+  // of nothing but script tags would cost its size times their number, and this
+  // runs on a stranger's page with nothing to interrupt it.
+  let lower: string | undefined;
   let i = 0;
 
   while (i < length) {
@@ -100,7 +104,8 @@ export function tokenize(html: string): HtmlToken[] {
     i = end;
 
     if (SKIPPED_BODIES.has(name)) {
-      const close = html.toLowerCase().indexOf(`</${name}`, i);
+      lower ??= html.toLowerCase();
+      const close = lower.indexOf(`</${name}`, i);
       i = close === -1 ? length : close;
     }
   }

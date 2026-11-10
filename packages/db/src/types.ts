@@ -21,6 +21,7 @@ export type {
   BrandKit,
   ChannelMetricSnapshot,
   Comments,
+  Competitor,
   Credits,
   Customer,
   Design,

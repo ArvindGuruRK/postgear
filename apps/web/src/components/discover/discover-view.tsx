@@ -19,8 +19,12 @@
  * Four tabs are the feed's (Module 05 added Videos and Festivals). Two of
  * them can know their answer without asking: Videos when this PostGear has no
  * YouTube key (the status says so), and Videos or Festivals for Worldwide,
- * since both are a country's. Neither makes a request then. Competitors
- * arrives with Module 07.
+ * since both are a country's. Neither makes a request then.
+ *
+ * The fifth tab, Competitors (Module 07), is not the feed's: it has routes of
+ * its own and no place in it, so `competitors-tab.tsx` loads it. This view
+ * hands it Create Post, and counts the presses of Refresh for it, since the
+ * page has one Refresh button and it must work on every tab.
  *
  * What a card opens (the Create Post sheet, the overflow menu) is handed in
  * by `discover-page.tsx`; without it a card shows Open only. A festival's
@@ -64,6 +68,7 @@ import type {
 } from '@/types/discover';
 import { DISCOVER_TABS } from '@/types/discover';
 import { useMounted } from '../posts/use-mounted';
+import { CompetitorsTab } from './competitors-tab';
 import type { CreatePostTarget } from './create-post-sheet';
 import { DiscoverGroup, DiscoverSkeleton } from './discover-group';
 import {
@@ -85,7 +90,6 @@ import { TopicSelect } from './topic-select';
 import { useFeed } from './use-feed';
 import { usePlace } from './use-place';
 
-export const LATER_STEP = 'Arrives in a later step of this sprint.';
 export const VIDEOS_TURNED_OFF = 'Videos are turned off for this workspace.';
 export const FESTIVALS_TURNED_OFF = 'Festivals are turned off for this workspace.';
 export const TURN_BACK_ON = 'Turn them back on in Settings, Discover.';
@@ -213,6 +217,9 @@ export function DiscoverView({
   const turnedOff = (tab === 'videos' || tab === 'festivals') && switchedOff(settings, tab);
   const kind = feedKindFor(tab, videosOff, worldwide, turnedOff);
   const feed = useFeed(kind, place.place, place.language, place.topic);
+  // Competitors loads itself; each press of Refresh on that tab moves this on.
+  const [competitorsRefresh, setCompetitorsRefresh] = useState(0);
+  const onCompetitors = tab === 'competitors';
 
   // The open tab lives in the URL without a navigation, which would re-run
   // the server page for nothing.
@@ -460,8 +467,10 @@ export function DiscoverView({
             variant="secondary"
             size="sm"
             className="h-10"
-            onClick={feed.refresh}
-            disabled={!kind || !ready || feed.loading}
+            onClick={
+              onCompetitors ? () => setCompetitorsRefresh((count) => count + 1) : feed.refresh
+            }
+            disabled={onCompetitors ? !mounted : !kind || !ready || feed.loading}
           >
             <MotionIcon
               icon={RefreshCwIcon}
@@ -502,7 +511,15 @@ export function DiscoverView({
           </TabsContent>
         ))}
         <TabsContent value="competitors">
-          <EmptyState icon={Compass} title={LATER_STEP} />
+          {onCompetitors && mounted ? (
+            <CompetitorsTab
+              orgId={orgId}
+              isAdmin={isAdmin}
+              now={now}
+              refreshKey={competitorsRefresh}
+              onCreatePost={createPost}
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
     </Stack>

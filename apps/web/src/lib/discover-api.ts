@@ -12,6 +12,11 @@
  * anything finer, so a caller that skipped this would fail rather than leak.
  */
 import type {
+  Competitor,
+  CompetitorInput,
+  CompetitorItemsResponse,
+  CompetitorsResponse,
+  DiscoveredFeed,
   DiscoverSettings,
   DiscoverSettingsPatch,
   DiscoverStatus,
@@ -105,6 +110,56 @@ export function getFeed(
   topic?: NewsTopic,
 ): Promise<FeedResponse> {
   return api<FeedResponse>(`/discover/feed?${feedQuery(kind, place, language, topic)}`);
+}
+
+/** The competitors this workspace follows, oldest first, and how many it may follow. */
+export function getCompetitors(): Promise<CompetitorsResponse> {
+  return api<CompetitorsResponse>('/discover/competitors');
+}
+
+/**
+ * Follows a competitor. Refusals arrive as `ApiError` with the API's sentence
+ * and a `code`: `competitor_private` (an address on a private network),
+ * `competitor_limit` (the workspace already follows 20), `competitor_unreachable`
+ * (the website's name does not exist).
+ */
+export function createCompetitor(input: CompetitorInput): Promise<Competitor> {
+  return api<{ competitor: Competitor }>('/discover/competitors', {
+    method: 'POST',
+    body: input,
+  }).then((result) => result.competitor);
+}
+
+/** Changes what was sent and nothing else. Null clears an optional field. */
+export function updateCompetitor(id: string, patch: Partial<CompetitorInput>): Promise<Competitor> {
+  return api<{ competitor: Competitor }>(`/discover/competitors/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: patch,
+  }).then((result) => result.competitor);
+}
+
+/** Admins only. The id answers 404 afterwards. */
+export function removeCompetitor(id: string): Promise<void> {
+  return api<{ message: string }>(`/discover/competitors/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }).then(() => undefined);
+}
+
+/**
+ * The feeds a website offers. Called on Find Feeds or when the website field
+ * loses focus, never per keystroke: the API allows five a minute per workspace
+ * (`competitor_throttled`). A site with no feed answers an empty list.
+ */
+export function findCompetitorFeeds(url: string): Promise<DiscoveredFeed[]> {
+  return api<{ feeds: DiscoveredFeed[] }>('/discover/competitors/discover-feeds', {
+    method: 'POST',
+    body: { url },
+  }).then((result) => result.feeds);
+}
+
+/** The newest of what one competitor published, across its feeds, channel, accounts and the news. */
+export function getCompetitorItems(id: string): Promise<CompetitorItemsResponse> {
+  return api<CompetitorItemsResponse>(`/discover/competitors/${encodeURIComponent(id)}/items`);
 }
 
 /** What the workspace saved for Discover, or the defaults when it saved nothing. Any member may read it. */

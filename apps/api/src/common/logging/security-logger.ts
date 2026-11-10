@@ -127,6 +127,11 @@ export type SecurityEvent =
   // the workspace only, never the position or what was typed.
   | 'discover.locality_throttled'
   | 'discover.feed_throttled'
+  // A competitor's website or feed is a user-supplied URL fetched server-side,
+  // the same SSRF surface as the analyzer: every address the private-network
+  // guard refuses is recorded, by reason and never by address.
+  | 'discover.competitor_unsafe_url'
+  | 'discover.competitor_throttled'
   // Analytics (Sprint 7): a request naming a channel or post outside the
   // workspace, and a sync the worker could not complete.
   | 'analytics.foreign_reference'

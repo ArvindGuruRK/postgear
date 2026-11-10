@@ -5,13 +5,16 @@
  * old the page's copy is, and (Module 05) which week a festival falls in, how
  * far off it is, and when a post about it should go out. Module 06 adds what
  * a workspace saved: where a visit starts, what Save For This Workspace
- * sends, and the News topic.
+ * sends, and the News topic. Module 07 adds a competitor's rows: which of the
+ * five kinds one is, and where its group says it reads from.
  *
  * The words are the page's (place, trend, story, festival, Worldwide), never
  * the API's.
  */
 import type { ResearchSource } from '@/types/ai';
 import type {
+  Competitor,
+  CompetitorKind,
   DiscoverGroup,
   DiscoverGroupId,
   DiscoverItem,
@@ -763,4 +766,61 @@ export function festivalPublishAt(
     return `${date}T${twoDigits(hour)}:00:00${sign}${twoDigits(Math.floor(ahead / 60))}:${twoDigits(ahead % 60)}`;
   }
   return null;
+}
+
+/** A competitor's row by where it was read: its own feeds are its blog, and a story that names it is news. */
+const COMPETITOR_KINDS: Partial<Record<DiscoverItem['source']['id'], CompetitorKind>> = {
+  rss: 'blog',
+  youtube: 'youtube',
+  bluesky: 'bluesky',
+  mastodon: 'mastodon',
+  'google-news': 'news',
+};
+
+export const COMPETITOR_KIND_NAMES: Record<CompetitorKind, string> = {
+  blog: 'Blog',
+  youtube: 'YouTube',
+  bluesky: 'Bluesky',
+  mastodon: 'Mastodon',
+  news: 'News',
+};
+
+/** Which of the five rows a competitor's item is. A source nobody expected reads as its blog. */
+export function competitorKind(item: Pick<DiscoverItem, 'source'>): CompetitorKind {
+  return COMPETITOR_KINDS[item.source.id] ?? 'blog';
+}
+
+/** The row's badge: Blog, YouTube, Bluesky, Mastodon or News. */
+export function competitorKindLabel(item: Pick<DiscoverItem, 'source'>): string {
+  return COMPETITOR_KIND_NAMES[competitorKind(item)];
+}
+
+/** "2 hours ago" for a competitor's row, or nothing when the item has no date. */
+export function competitorWhen(item: Pick<DiscoverItem, 'publishedAt'>, now: Date): string {
+  return item.publishedAt ? formatRelative(item.publishedAt, now) : '';
+}
+
+/** A group's name: "Latest From Acme Analytics", the name as the workspace typed it. */
+export function competitorGroupTitle(name: string): string {
+  return `Latest From ${name}`;
+}
+
+/**
+ * The line under a competitor's name, saying where its rows come from: "From
+ * their feeds, YouTube, Bluesky and Google News." The news search always runs
+ * (it falls back to the name), so Google News is always in it.
+ */
+export function competitorSources(
+  competitor: Pick<Competitor, 'feedUrls' | 'youtubeChannelId' | 'blueskyHandle' | 'mastodonAcct'>,
+): string {
+  const places = [
+    competitor.feedUrls.length > 0 ? 'their feeds' : null,
+    competitor.youtubeChannelId ? 'YouTube' : null,
+    competitor.blueskyHandle ? 'Bluesky' : null,
+    competitor.mastodonAcct ? 'Mastodon' : null,
+    'Google News',
+  ].filter((place): place is string => place !== null);
+
+  const last = places.pop();
+  return places.length > 0 ? `From ${places.join(', ')} and ${last}.` : `From ${last}.`;
 }

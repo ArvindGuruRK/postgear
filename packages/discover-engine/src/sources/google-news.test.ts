@@ -1,14 +1,17 @@
 import { editionFor } from '../geo/editions';
 import { buildLocality, WORLDWIDE } from '../geo/locality';
+import { createFixtureFetch } from '../simulation';
 import type { DiscoverFetch, DiscoverFetchResponse, SourceInput } from '../types';
 import {
   createGoogleNewsSource,
   isNewsTopic,
   NEWS_TOPICS,
   newsPlaceUrl,
+  newsSearchUrl,
   newsTopicUrl,
   newsTopUrl,
   parseRelated,
+  searchPhrase,
   stripPublisher,
 } from './google-news';
 
@@ -274,6 +277,197 @@ describe('failures', () => {
 
   it('reports not found for a place Google does not know', async () => {
     const result = await sourceAnswering({ status: 404 }).source.place(inTamil);
+    expect(result).toMatchObject({ items: [], failed: 'not_found' });
+  });
+});
+
+describe('searchPhrase', () => {
+  it('leaves a plain name alone', () => {
+    expect(searchPhrase('Acme Analytics')).toBe('Acme Analytics');
+    expect(searchPhrase('அக்மே')).toBe('அக்மே');
+  });
+
+  it('takes out every double quote, since the phrase gets a pair of its own', () => {
+    expect(searchPhrase('"Acme" Analytics')).toBe('Acme Analytics');
+    expect(searchPhrase('Acme" OR "Globex')).toBe('Acme OR Globex');
+    expect(searchPhrase('""')).toBe('');
+  });
+
+  it('puts it on one line, with single spaces and no control characters', () => {
+    expect(searchPhrase('  Acme\n\tAnalytics \r\n Inc  ')).toBe('Acme Analytics Inc');
+    const hidden = String.fromCodePoint(0x00) + String.fromCodePoint(0x202e);
+    expect(searchPhrase(`Ac${hidden}me Analytics`)).toBe('Acme Analytics');
+  });
+
+  it('stops at 80 characters, counted the way a reader counts', () => {
+    expect(searchPhrase('a'.repeat(100))).toHaveLength(80);
+    expect(searchPhrase(`${'a'.repeat(79)} bcd`)).toBe('a'.repeat(79));
+
+    const rocket = String.fromCodePoint(0x1f680);
+    expect(Array.from(searchPhrase(rocket.repeat(100)))).toHaveLength(80);
+  });
+
+  it('is empty when there is nothing to search for', () => {
+    for (const nothing of ['', '   ', '\n\t', '" "', '\u0000']) {
+      expect(searchPhrase(nothing)).toBe('');
+    }
+  });
+});
+
+describe('the search feed', () => {
+  const inEnglish = editionFor('IN', 'en');
+
+  /** A story in a search answer: "Headline - Publisher", its redirect, its day. */
+  function mention(headline: string, id: string, pubDate: string, publisher = 'Sample Daily') {
+    return `<item><title>${headline} - ${publisher}</title><link>https://news.google.com/rss/articles/${id}?oc=5</link><pubDate>${pubDate}</pubDate><description>${xmlEscape(li(`https://news.google.com/rss/articles/${id}?oc=5`, headline, publisher) + li(OTHER_LINK, 'The same story elsewhere', 'BBC'))}</description><source url="https://daily.example">${publisher}</source></item>`;
+  }
+
+  it('asks for the phrase in quotes, within the last seven days, in the edition', () => {
+    expect(newsSearchUrl('Acme Analytics', inEnglish)).toBe(
+      'https://news.google.com/rss/search?q=%22Acme%20Analytics%22%20when%3A7d&hl=en-IN&gl=IN&ceid=IN:en',
+    );
+    expect(newsSearchUrl('Acme', editionFor('IN', 'ta'))).toBe(
+      'https://news.google.com/rss/search?q=%22Acme%22%20when%3A7d&hl=ta&gl=IN&ceid=IN:ta',
+    );
+  });
+
+  it('encodes the phrase, so a name cannot steer the address', () => {
+    const url = newsSearchUrl('Acme&hl=xx#top?q=other', inEnglish);
+
+    expect(url).toContain('q=%22Acme%26hl%3Dxx%23top%3Fq%3Dother%22%20when%3A7d&hl=en-IN');
+    expect(new URL(url).searchParams.get('q')).toBe('"Acme&hl=xx#top?q=other" when:7d');
+    expect(new URL(url).searchParams.get('hl')).toBe('en-IN');
+    expect(new URL(url).hash).toBe('');
+  });
+
+  it("asks the place's own edition, with the phrase cleaned first", async () => {
+    const { fetchMock, source } = sourceAnswering({ body: feed() });
+
+    await source.search('  "Acme"\n Analytics ', inTamil);
+    await source.search('Acme', { locality: { ...WORLDWIDE }, language: 'en' });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      newsSearchUrl('Acme Analytics', editionFor('IN', 'ta')),
+      newsSearchUrl('Acme', editionFor(null, 'en')),
+    ]);
+    expect(fetchMock.mock.calls[1][0]).toContain('ceid=US:en');
+  });
+
+  it('gives the sample mentions as competitor rows, through the fixture fetch', async () => {
+    const source = createGoogleNewsSource({ fetch: createFixtureFetch() });
+    const result = await source.search('Acme Analytics', {
+      locality: { ...WORLDWIDE },
+      language: 'en',
+    });
+
+    expect(result.failed).toBeUndefined();
+    expect(result.warnings).toEqual([]);
+    expect(result.attribution).toEqual({ name: 'Google News', url: 'https://news.google.com' });
+    expect(result.items).toEqual([
+      {
+        kind: 'competitor',
+        // The publisher, not Google and not the competitor.
+        source: {
+          id: 'google-news',
+          name: 'Sample Business Daily',
+          url: 'https://business-daily.example/',
+        },
+        title: 'Acme Analytics raises a sample round to build reporting tools',
+        opaqueUrl: 'https://news.google.com/rss/articles/CBMiSAMPLEacme0001?oc=5',
+        publishedAt: '2026-11-08T06:45:00.000Z',
+        language: 'en',
+      },
+      {
+        kind: 'competitor',
+        source: { id: 'google-news', name: 'The Sample Ledger', url: 'https://ledger.example/' },
+        title: 'Why small shops are turning to tools like Acme',
+        opaqueUrl: 'https://news.google.com/rss/articles/CBMiSAMPLEacme0002?oc=5',
+        publishedAt: '2026-11-05T12:20:00.000Z',
+        language: 'en',
+      },
+    ]);
+  });
+
+  it('keeps the redirect as the only address, and no related list', async () => {
+    const { source } = sourceAnswering({
+      body: feed(mention('Acme opens an office', 'CBMiOne', 'Wed, 04 Nov 2026 10:00:00 GMT')),
+    });
+    const [item] = (await source.search('Acme', inTamil)).items;
+
+    expect(item.kind).toBe('competitor');
+    expect(item.opaqueUrl).toBe('https://news.google.com/rss/articles/CBMiOne?oc=5');
+    expect(item.url).toBeUndefined();
+    expect('related' in item).toBe(false);
+    // The same feed read as a place's stories does carry them.
+    const [story] = (await source.top(inTamil)).items;
+    expect(story.kind).toBe('news');
+    expect(story.related).toHaveLength(1);
+  });
+
+  it('puts the newest first, whatever order Google sent them in', async () => {
+    const { source } = sourceAnswering({
+      body: feed(
+        mention('Oldest', 'CBMiOld', 'Mon, 02 Nov 2026 10:00:00 GMT'),
+        mention('Newest', 'CBMiNew', 'Sun, 08 Nov 2026 10:00:00 GMT'),
+        mention('Middle', 'CBMiMid', 'Thu, 05 Nov 2026 10:00:00 GMT'),
+      ),
+    });
+    const { items } = await source.search('Acme', inTamil);
+
+    expect(items.map((item) => item.title)).toEqual(['Newest', 'Middle', 'Oldest']);
+  });
+
+  it('stops at ten mentions', async () => {
+    const stories = Array.from({ length: 15 }, (_, index) =>
+      mention(
+        `Story ${index + 1}`,
+        `CBMi${index + 1}`,
+        `2026-11-${String(index + 1).padStart(2, '0')}T08:00:00Z`,
+      ),
+    );
+    const { items } = await sourceAnswering({ body: feed(...stories) }).source.search(
+      'Acme',
+      inTamil,
+    );
+
+    expect(items).toHaveLength(10);
+    expect(items[0].title).toBe('Story 15');
+    expect(items.at(-1)?.title).toBe('Story 6');
+  });
+
+  it.each([
+    ['nothing', ''],
+    ['spaces', '   '],
+    ['only quotes', '""'],
+    ['only control characters', '\u0000\u0001'],
+  ])('asks nobody when the phrase is %s', async (_what, query) => {
+    const { fetchMock, source } = sourceAnswering({ body: feed() });
+    const result = await source.search(query, inTamil);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      items: [],
+      attribution: { name: 'Google News', url: 'https://news.google.com' },
+      warnings: ['Google News has nothing to search for without a phrase.'],
+    });
+  });
+
+  it('is empty with no failure when nobody wrote about them this week', async () => {
+    const result = await sourceAnswering({ body: feed() }).source.search('Acme', inTamil);
+
+    expect(result.items).toEqual([]);
+    expect(result.failed).toBeUndefined();
+  });
+
+  it('reports trouble for a 429, a 5xx and a dropped connection, and never throws', async () => {
+    for (const response of [{ status: 429 }, { status: 500 }, new Error('socket hang up')]) {
+      const result = await sourceAnswering(response).source.search('Acme', inTamil);
+      expect(result).toMatchObject({ items: [], failed: 'upstream' });
+    }
+  });
+
+  it('reports not found for a 404', async () => {
+    const result = await sourceAnswering({ status: 404 }).source.search('Acme', inTamil);
     expect(result).toMatchObject({ items: [], failed: 'not_found' });
   });
 });
