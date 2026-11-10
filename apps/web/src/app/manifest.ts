@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 // The web app manifest: the name and icons a browser uses when PostGear is
-// installed or pinned to a home screen. The icons are the logo's Cog Badge on
+// installed or pinned to a home screen. The icons are the logo's gear badge on
 // white, written by apps/web/scripts/generate-brand.mjs; the tab icon itself
 // is app/favicon.ico and app/icon.svg. The launch screen is white to match
 // the icons; theme_color is the Classic light page (--color-primary). Both

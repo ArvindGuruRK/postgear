@@ -1,36 +1,42 @@
 /**
  * Generates the PostGear logo: the shapes the app draws and every icon file.
  *
- *     node apps/web/scripts/generate-brand.mjs --mark-font <LuckiestGuy.ttf> --word-font <Jumping Chick.ttf>
+ *     node apps/web/scripts/generate-brand.mjs [--word-font <Jumping Chick.ttf>]
  *
  * Run once by hand; everything it writes is committed. Nothing loads a logo
- * font at runtime: the letters are outlined to SVG paths here, so the logo
+ * font at runtime: the wordmark is outlined to SVG paths here, so the logo
  * renders the same in the app, the PDF and the browser tab with no font file.
+ * Without --word-font the wordmark already in brand-paths.ts is kept as it is.
  *
- * ## The logo (locked 2026-10-26)
+ * ## The logo (mark locked 2026-11-05)
  *
- * - The mark, the "Cog Badge": a ten-tooth blue gear with an ink outline and
- *   no hard shadow, holding "PG" in Luckiest Guy, white with a thin ink
- *   border on each letter.
+ * - The mark: a blue gear with 6 tall spokes, deep cuts and a solid white
+ *   centre (white on every background), in the app's sticker: an ink outline,
+ *   a white band, an ink rim and a hard ink shadow. It has no letters. It is
+ *   Version 5 of the Logo Lab, which replaced the ten-tooth PG Cog Badge.
  * - The wordmark: "POSTGEAR" in Jumping Chick capitals, one colour (the
  *   component fills it with the surrounding text colour). It replaced Baby
  *   Barbie on 2026-10-27, whose licence is personal use only.
+ * - The sidebar's tile (2026-11-05): "PG" in Luckiest Guy, outlined here like
+ *   the wordmark. It is the one place the rail differs from the gear; only its
+ *   letters come from this script, and no icon file uses them.
  *
  * ## The fonts and their licences
  *
- * Neither font file is committed: only the outlined shapes are.
- * - Luckiest Guy (Astigmatic): Apache License 2.0, commercial use fine.
- *   From Google Fonts (github.com/google/fonts, apache/luckiestguy).
  * - Jumping Chick (Khurasan Studio, khurasanstudio.com): its notes say "100%
- *   free for personal use & commercial use".
+ *   free for personal use & commercial use". The font file is not committed:
+ *   only the outlined shapes are.
+ * - Luckiest Guy (Astigmatic): Apache License 2.0, commercial use fine. Read
+ *   from packages/design-engine/fonts, where Design Studio already ships it.
  *
  * ## What it writes
  *
- * - src/components/brand/brand-paths.ts: the path data `BrandMark` and
- *   `BrandWordmark` (src/components/brand/brand-mark.tsx) and the PDF draw.
- * - src/app/icon.svg and src/app/favicon.ico (the tab icon: the Monogram
- *   Tile, TAB_TILE below) and src/app/apple-icon.png (180, on a white
- *   ground): Next's app icon file conventions.
+ * - src/components/brand/brand-paths.ts: the path data `BrandMark`,
+ *   `BrandWordmark` and `BrandTile` (src/components/brand/brand-mark.tsx) and
+ *   the PDF draw.
+ * - src/app/icon.svg and src/app/favicon.ico (the tab icon: the same mark,
+ *   filling the square, see TAB_SHADOW below) and src/app/apple-icon.png
+ *   (180, on a white ground): Next's app icon file conventions.
  * - public/brand/icon-192.png, icon-512.png, icon-maskable-512.png: the web
  *   manifest's icons (src/app/manifest.ts).
  * - public/logo.svg: the mark on its own, for anything outside the app.
@@ -46,7 +52,7 @@
  * packages/ui/src/styles/colors.css (blue, white, ink), which never change
  * with the theme.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as fontkit from 'fontkit';
@@ -66,44 +72,56 @@ const GROUND = WHITE;
 // The mark on a 64 x 64 grid.
 const GRID = 64;
 const OUTLINE = 3; // the gear's outline, the app's border-2 scaled to the grid
-const LETTER_OUTLINE = 2.4; // painted under each letter, so 1.2 shows outside it
 // The badge wears a sticker (the owner's pick, 2026-10-27): a white band and
-// an ink rim round the gear's own outline, so 2 of band and then 1.2 of rim
-// show outside it, over a hard ink shadow 2 down and right (the app's 2px
-// drop shadow at the 64px sidebar size). The app icons and logo.svg wear it
-// too, the browser-tab icon does not (see `tab` below); the wordmark stays
-// plain.
+// an ink rim round the gear's own outer edge, so 2 of band and then 1.2 of rim
+// show outside it, over a hard ink shadow 2 down and right (2px when the mark
+// is drawn at 64px). The app icons, logo.svg and the tab icon wear it too; the
+// wordmark stays plain.
 const MARK_BAND = 7;
 const MARK_RIM = 9.4;
 const MARK_SHADOW = 2;
-const GEAR = { cx: 32, cy: 32, rOut: 27.5, rRoot: 22.5, teeth: 10, halfRoot: 10, halfTip: 6.5 };
-const LETTERS = { text: 'PG', cx: 32, cy: 32, w: 29, h: 22 };
-// The browser-tab icon is not the gear but a Monogram Tile (the owner's pick,
-// 2026-10-27): a blue rounded square to the edge of the square, white PG
-// filling it. At 16 px the round gear filled only 69% of the square and its
-// teeth and small letters read as clutter beside other sites' square icons;
-// a white tile behind the gear was tried and still looked small. The border
-// is 4 units, one crisp ink pixel at 16 px.
-const TAB_TILE = { border: 4, radius: 12 };
-const TAB_LETTERS = { ...LETTERS, w: 46, h: 34 };
-// Luckiest Guy is very heavy, so the tab's PG is thinned (the owner asked,
-// 2026-10-27): this much is shaved off each letter, half from each side of
-// every stroke, and the thin ink edge follows the new edge.
-const TAB_THIN = 3;
+// Version 5 of the Logo Lab (locked by the owner, 2026-11-05).
+const GEAR = {
+  cx: 32,
+  cy: 32,
+  rOut: 27.5,
+  rRoot: 19.5,
+  teeth: 6,
+  halfRoot: 19,
+  halfTip: 14,
+  tipRound: 1.6,
+  rootRound: 1.2,
+};
+// The gear's hole, and the white disc under it, slightly wider so no ground
+// shows at the seam. The hard shadow still falls on the disc inside the hole.
+const HOLE = 10;
+const CENTRE = 11;
+// The tab icon is the same mark filling the square. The owner wants to see it
+// with the shadow first and may remove it later: set this to false and re-run.
+const TAB_SHADOW = true;
 // The tab icon's frames in favicon.ico (see the note at the top on sizes).
 const ICO_SIZES = [16, 32, 48];
 // All capitals (the owner's pick, 2026-10-27); screen readers still get "PostGear" from `label`.
 const WORD = 'POSTGEAR';
+// The sidebar tile's letters, the same as the old badge's and the Logo Lab's:
+// 29 wide on the 64 grid, with an ink border painted under each letter, so only
+// its outer half shows and the border parts the P from the G.
+const TILE_FONT = join(
+  WEB,
+  '..',
+  '..',
+  'packages',
+  'design-engine',
+  'fonts',
+  'luckiest-guy-400.woff2',
+);
+const TILE_TEXT = 'PG';
+const TILE_WIDTH = 29;
+const TILE_OUTLINE = 2.4;
 
 function arg(name) {
   const i = process.argv.indexOf(name);
-  if (i === -1 || !process.argv[i + 1]) {
-    console.error(
-      `Missing ${name} <path to the font file>. See the comment at the top of this script.`,
-    );
-    process.exit(1);
-  }
-  return process.argv[i + 1];
+  return i === -1 ? null : process.argv[i + 1];
 }
 
 const round = (n, places) => Math.round(n * 10 ** places) / 10 ** places;
@@ -130,37 +148,52 @@ function bounds(paths) {
   };
 }
 
-/** The gear outline as one path: trapezoid teeth joined by arcs on the root circle. */
-function gearPath({ cx, cy, rOut, rRoot, teeth, halfRoot, halfTip }) {
-  const pt = (rad, deg) => {
+/**
+ * The gear's outer edge as one path: trapezoid teeth with softly rounded
+ * corners, joined by arcs on the root circle.
+ */
+function gearPath({ cx, cy, rOut, rRoot, teeth, halfRoot, halfTip, tipRound, rootRound }) {
+  const at = (rad, deg) => {
     const a = ((deg - 90) * Math.PI) / 180;
-    return `${round(cx + rad * Math.cos(a), 2)} ${round(cy + rad * Math.sin(a), 2)}`;
+    return [cx + rad * Math.cos(a), cy + rad * Math.sin(a)];
   };
+  const str = (p) => `${round(p[0], 2)} ${round(p[1], 2)}`;
+  const toward = (from, to, dist) => {
+    const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    return [from[0] + ((to[0] - from[0]) * dist) / len, from[1] + ((to[1] - from[1]) * dist) / len];
+  };
+  // A distance along a circle, as degrees.
+  const deg = (dist, rad) => (dist / rad) * (180 / Math.PI);
   const step = 360 / teeth;
-  let d = `M${pt(rRoot, -halfRoot)}`;
+  let d = '';
   for (let i = 0; i < teeth; i++) {
     const t = i * step;
-    d += `L${pt(rOut, t - halfTip)}`;
-    d += `A${rOut} ${rOut} 0 0 1 ${pt(rOut, t + halfTip)}`;
-    d += `L${pt(rRoot, t + halfRoot)}`;
-    d += `A${rRoot} ${rRoot} 0 0 1 ${pt(rRoot, t + step - halfRoot)}`;
+    const rootA = at(rRoot, t - halfRoot);
+    const tipA = at(rOut, t - halfTip);
+    const tipB = at(rOut, t + halfTip);
+    const rootB = at(rRoot, t + halfRoot);
+    const start = at(rRoot, t - halfRoot - deg(rootRound, rRoot));
+    d += i === 0 ? `M${str(start)}` : `A${rRoot} ${rRoot} 0 0 1 ${str(start)}`;
+    d += `Q${str(rootA)} ${str(toward(rootA, tipA, rootRound))}`;
+    d += `L${str(toward(tipA, rootA, tipRound))}`;
+    d += `Q${str(tipA)} ${str(at(rOut, t - halfTip + deg(tipRound, rOut)))}`;
+    d += `A${rOut} ${rOut} 0 0 1 ${str(at(rOut, t + halfTip - deg(tipRound, rOut)))}`;
+    d += `Q${str(tipB)} ${str(toward(tipB, rootB, tipRound))}`;
+    d += `L${str(toward(rootB, tipB, rootRound))}`;
+    d += `Q${str(rootB)} ${str(at(rRoot, t + halfRoot + deg(rootRound, rRoot)))}`;
   }
-  return `${d}Z`;
+  return `${d}A${rRoot} ${rRoot} 0 0 1 ${str(at(rRoot, -halfRoot - deg(rootRound, rRoot)))}Z`;
 }
 
-/** "PG" fitted inside the w x h box centred on (cx, cy), one path per letter. */
-function letterPaths(face, box) {
-  const raw = glyphPaths(face, box.text);
-  const b = bounds(raw);
-  const s = Math.min(box.w / (b.maxX - b.minX), box.h / (b.maxY - b.minY));
-  const tx = box.cx - ((b.minX + b.maxX) / 2) * s;
-  const ty = box.cy - ((b.minY + b.maxY) / 2) * s;
-  return raw.map((p) => trim(p.transform(s, 0, 0, s, tx, ty).toSVG(), 2));
-}
+/** The gear's hole, added to the outer edge and filled with the even-odd rule. */
+const holePath = ({ cx, cy }, r) =>
+  `M${cx} ${cy - r}A${r} ${r} 0 1 0 ${cx} ${cy + r}A${r} ${r} 0 1 0 ${cx} ${cy - r}Z`;
 
-/** The wordmark in font units, with a 2% pad so no curve touches the edge. */
-function wordmark(face) {
-  const paths = glyphPaths(face, WORD);
+/**
+ * Letters in font units, with a 2% pad so no curve touches the edge. The box
+ * hugs the ink, so centring the box centres the letters themselves.
+ */
+function outlined(face, paths) {
   const b = bounds(paths);
   const pad = face.unitsPerEm * 0.02;
   const box = [
@@ -177,24 +210,43 @@ function wordmark(face) {
   };
 }
 
-/** One white letter with its thin ink border (literal colours, for image files). */
-const letterSvg = (d) =>
-  `<path fill="${WHITE}" stroke="${INK}" stroke-width="${LETTER_OUTLINE}" stroke-linejoin="round" paint-order="stroke" d="${d}"/>`;
+const wordmark = (face) => outlined(face, glyphPaths(face, WORD));
+
+/** The sidebar tile's "PG", one path per letter, in a box that hugs the border. */
+function tileLetters(face) {
+  const raw = glyphPaths(face, TILE_TEXT);
+  const b = bounds(raw);
+  const s = TILE_WIDTH / (b.maxX - b.minX);
+  const edge = TILE_OUTLINE / 2;
+  const width = round(TILE_WIDTH + 2 * edge, 2);
+  const height = round((b.maxY - b.minY) * s + 2 * edge, 2);
+  return {
+    viewBox: `0 0 ${width} ${height}`,
+    width,
+    height,
+    paths: raw.map((p) =>
+      trim(p.transform(s, 0, 0, s, edge - b.minX * s, edge - b.minY * s).toSVG(), 2),
+    ),
+  };
+}
 
 /**
  * The mark as a standalone SVG body (literal colours, for image files), in
- * its sticker: the shadow, the rim and the band under the gear, as the app
- * draws it (src/components/brand/brand-mark.tsx).
+ * its sticker, as the app draws it (src/components/brand/brand-mark.tsx): the
+ * white centre, the shadow, the rim and the band under the gear. The sticker
+ * follows the outer edge only, so it never rings the hole.
  */
-function markBody(gear, letters) {
-  const layer = (fill, width, extra = '') =>
-    `<path fill="${fill}" stroke="${fill}" stroke-width="${width}" stroke-linejoin="round"${extra} d="${gear}"/>`;
+function markBody(edge, body, shadow = true) {
+  const ring = (colour, width) =>
+    `<path fill="none" stroke="${colour}" stroke-width="${width}" stroke-linejoin="round" d="${edge}"/>`;
   return [
-    layer(INK, MARK_RIM, ` transform="translate(${MARK_SHADOW} ${MARK_SHADOW})"`),
-    layer(INK, MARK_RIM),
-    layer(WHITE, MARK_BAND),
-    `<path fill="${BLUE}" stroke="${INK}" stroke-width="${OUTLINE}" stroke-linejoin="round" d="${gear}"/>`,
-    ...letters.map(letterSvg),
+    `<circle cx="${GEAR.cx}" cy="${GEAR.cy}" r="${CENTRE}" fill="${WHITE}"/>`,
+    shadow
+      ? `<g transform="translate(${MARK_SHADOW} ${MARK_SHADOW})"><path fill="${INK}" fill-rule="evenodd" d="${body}"/>${ring(INK, MARK_RIM)}</g>`
+      : '',
+    ring(INK, MARK_RIM),
+    ring(WHITE, MARK_BAND),
+    `<path fill="${BLUE}" fill-rule="evenodd" stroke="${INK}" stroke-width="${OUTLINE}" stroke-linejoin="round" d="${body}"/>`,
   ].join('');
 }
 
@@ -202,9 +254,9 @@ function markBody(gear, letters) {
  * The square the sticker fills, as [x, y, size]: the rim reaches half its
  * width past the gear's teeth, and the shadow a little further down and right.
  */
-const stickerBox = ({ cx, cy, rOut }) => {
+const stickerBox = ({ cx, cy, rOut }, shadow = MARK_SHADOW) => {
   const r = rOut + MARK_RIM / 2;
-  return [round(cx - r, 2), round(cy - r, 2), round(2 * r + MARK_SHADOW, 2)];
+  return [round(cx - r, 2), round(cy - r, 2), round(2 * r + shadow, 2)];
 };
 
 const svg = (body, ground, [x, y, size] = [0, 0, GRID]) =>
@@ -219,22 +271,6 @@ function padded(body, box, scale) {
   const tx = round((GRID - box[2] * s) / 2 - box[0] * s, 2);
   const ty = round((GRID - box[2] * s) / 2 - box[1] * s, 2);
   return svg(`<g transform="translate(${tx} ${ty}) scale(${s})">${body}</g>`, GROUND);
-}
-
-/** The Monogram Tile, for the browser tab (icon.svg and favicon.ico). */
-function monogram(letters) {
-  const { border, radius } = TAB_TILE;
-  const edge = GRID - border;
-  const d = letters.join('');
-  // A mask keeps the inside of the letters less a band along their edge, so
-  // a layer drawn through it is the letters shaved by half the band's width.
-  const shaved = (id, band) =>
-    `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${GRID}" height="${GRID}"><path fill="${WHITE}" stroke="#000" stroke-width="${band}" stroke-linejoin="round" d="${d}"/></mask>`;
-  return svg(
-    `<defs>${shaved('ink', TAB_THIN - LETTER_OUTLINE)}${shaved('white', TAB_THIN)}</defs>` +
-      `<rect x="${border / 2}" y="${border / 2}" width="${edge}" height="${edge}" rx="${radius}" fill="${BLUE}" stroke="${INK}" stroke-width="${border}"/>` +
-      `<path fill="${INK}" mask="url(#ink)" d="${d}"/><path fill="${WHITE}" mask="url(#white)" d="${d}"/>`,
-  );
 }
 
 /** An .ico holding one PNG frame per size (PNG frames work in every current browser). */
@@ -262,26 +298,45 @@ const png = (text, size) =>
     .png()
     .toBuffer();
 
-const markFace = fontkit.openSync(arg('--mark-font'));
-const wordFace = fontkit.openSync(arg('--word-font'));
+const out = (...p) => join(WEB, ...p);
+const PATHS_FILE = out('src', 'components', 'brand', 'brand-paths.ts');
 
-const gear = gearPath(GEAR);
-const letters = letterPaths(markFace, LETTERS);
-const word = wordmark(wordFace);
+/** The wordmark already in brand-paths.ts, used when no font file is given. */
+async function keptWordmark() {
+  const text = await readFile(PATHS_FILE, 'utf8');
+  const part = text.slice(text.indexOf('BRAND_WORDMARK'));
+  return {
+    viewBox: part.match(/viewBox: '([^']+)'/)[1],
+    width: Number(part.match(/width: (\d+)/)[1]),
+    height: Number(part.match(/height: (\d+)/)[1]),
+    d: part.match(/ d: '([^']+)'/)[1],
+  };
+}
+
+const wordFont = arg('--word-font');
+const edge = gearPath(GEAR);
+const gear = edge + holePath(GEAR, HOLE);
+const word = wordFont ? wordmark(fontkit.openSync(wordFont)) : await keptWordmark();
+const tile = tileLetters(fontkit.openSync(TILE_FONT));
 
 const ts = `// Generated by apps/web/scripts/generate-brand.mjs: do not edit by hand.
-// The PostGear logo as path data. The mark's letters are Luckiest Guy (Apache 2.0),
-// the wordmark is Jumping Chick; both outlined, so no font is ever loaded.
+// The PostGear logo as path data. The wordmark is Jumping Chick, outlined, so no
+// font is ever loaded.
 
-/** The Cog Badge on a ${GRID} x ${GRID} grid: the gear, then one path per letter of "PG". */
+/**
+ * The mark on a ${GRID} x ${GRID} grid: \`edge\` is the gear's outer edge (the sticker
+ * follows it), \`gear\` adds the hole (fill it with the even-odd rule), and
+ * \`centre\` is the white disc under the hole.
+ */
 export const BRAND_MARK = {
   viewBox: '0 0 ${GRID} ${GRID}',
   outline: ${OUTLINE},
-  letterOutline: ${LETTER_OUTLINE},
   band: ${MARK_BAND},
   rim: ${MARK_RIM},
+  shadow: ${MARK_SHADOW},
+  centre: { cx: ${GEAR.cx}, cy: ${GEAR.cy}, r: ${CENTRE} },
+  edge: '${edge}',
   gear: '${gear}',
-  letters: [${letters.map((d) => `\n    '${d}'`).join(',')},\n  ],
 } as const;
 
 /** "${WORD}" in font units; width and height give its aspect ratio. */
@@ -291,17 +346,29 @@ export const BRAND_WORDMARK = {
   height: ${word.height},
   d: '${word.d}',
 } as const;
+
+/** "${TILE_TEXT}" in Luckiest Guy for the sidebar's tile, one path per letter. */
+export const BRAND_TILE_LETTERS = {
+  viewBox: '${tile.viewBox}',
+  width: ${tile.width},
+  height: ${tile.height},
+  outline: ${TILE_OUTLINE},
+  paths: [${tile.paths.map((d) => `\n    '${d}'`).join(',')},\n  ],
+} as const;
 `;
 
-const body = markBody(gear, letters);
+const body = markBody(edge, gear);
 const box = stickerBox(GEAR);
 const flat = svg(body, null, box);
-const tab = monogram(letterPaths(markFace, TAB_LETTERS));
+const tab = svg(
+  markBody(edge, gear, TAB_SHADOW),
+  null,
+  stickerBox(GEAR, TAB_SHADOW ? MARK_SHADOW : 0),
+);
 
-const out = (...p) => join(WEB, ...p);
 await mkdir(out('src', 'components', 'brand'), { recursive: true });
 await mkdir(out('public', 'brand'), { recursive: true });
-await writeFile(out('src', 'components', 'brand', 'brand-paths.ts'), ts);
+await writeFile(PATHS_FILE, ts);
 await writeFile(out('src', 'app', 'icon.svg'), tab);
 await writeFile(
   out('src', 'app', 'favicon.ico'),
