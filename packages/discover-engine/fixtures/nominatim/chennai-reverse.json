@@ -1,0 +1,14 @@
+{
+  "name": "Chennai",
+  "display_name": "Chennai, Chennai Metropolitan Area, Chennai District, Tamil Nadu, India",
+  "addresstype": "city",
+  "address": {
+    "city": "Chennai",
+    "state_district": "Chennai District",
+    "state": "Tamil Nadu",
+    "ISO3166-2-lvl4": "IN-TN",
+    "country": "India",
+    "country_code": "in"
+  },
+  "licence": "Data (c) OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright"
+}

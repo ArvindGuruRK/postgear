@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist"
+  },
+  // `rootDir` is left out so the person-run scripts are type-checked with the
+  // source. `main` points at src/index.ts, so nothing ever reads `dist`.
+  "include": ["src/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist"],
+  // The root config targets a bundler (ESNext). The scripts run directly under
+  // Node through ts-node, which needs real CommonJS.
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": { "module": "commonjs", "moduleResolution": "node" }
+  }
+}

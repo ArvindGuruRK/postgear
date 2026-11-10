@@ -28,6 +28,7 @@
     "@postgear/automation": "*",
     "@postgear/db": "*",
     "@postgear/design-engine": "*",
+    "@postgear/discover-engine": "*",
     "@postgear/seo-engine": "*",
     "@postgear/social-core": "*",
     "@sentry/nestjs": "^11.8.0",
