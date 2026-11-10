@@ -60,6 +60,8 @@ model Organization {
   automationConnections AutomationConnection[]
   automationEffects     AutomationEffect[]
   automationWebhookSecrets AutomationWebhookSecret[]
+  // Sprint 11: the workspace's default place, languages and groups in Discover.
+  discoverSettings    DiscoverSettings?
 
   @@index([apiKey])
   @@index([streakSince])
@@ -137,6 +139,8 @@ model User {
   automationRuns        AutomationRun[]      @relation("AutomationRunStarter")
   automationConnectionsCreated AutomationConnection[] @relation("AutomationConnectionAuthor")
   automationConnectionsUpdated AutomationConnection[] @relation("AutomationConnectionEditor")
+  // Sprint 11: the Discover settings this user saved last.
+  discoverSettingsUpdated DiscoverSettings[]   @relation("DiscoverSettingsEditor")
 
   // --- Sprint 2: auth lifecycle -------------------------------------------
   // Tokens are stored as SHA-256 hashes, never as the value mailed to the
@@ -1452,4 +1456,47 @@ model AutomationConnection {
   updatedBy      User?                      @relation("AutomationConnectionEditor", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@index([organizationId, provider, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 11: Discover (Module 06). What a workspace starts Discover from: a
+// place, the languages to read and write in, the news topics it follows and
+// which groups it shows. Nothing from a feed is ever stored: Discover's items
+// live in Redis for a limited time (prisma/SCHEMA_NOTES.md, Sprint 11).
+// ---------------------------------------------------------------------------
+
+/// How the saved place was found. NONE means no place was ever saved.
+enum DiscoverLocationSource {
+  NONE
+  BROWSER
+  SEARCH
+  TIMEZONE
+}
+
+/// One row per workspace at most, keyed by the workspace's own id. A place is
+/// a city, a region, a country and a time zone, never a position: coordinates
+/// are used once to find the city and are not kept anywhere.
+model DiscoverSettings {
+  organizationId String                 @id
+  /// ISO 3166-1 alpha-2. Null with a source other than NONE means Worldwide.
+  countryCode    String?
+  /// ISO 3166-2, "IN-TN".
+  regionCode     String?
+  regionName     String?
+  city           String?
+  /// IANA, "Asia/Kolkata".
+  timeZone       String?
+  /// BCP-47, in the workspace's order. The first is the default.
+  languages      String[]               @default([])
+  /// Google News topic ids ("BUSINESS"). The first is the News tab's default.
+  topics         String[]               @default([])
+  /// { trends, wikipedia, social, videos, festivals } to booleans. Null, or a
+  /// missing key, means the group is on.
+  sources        Json?
+  locationSource DiscoverLocationSource @default(NONE)
+  updatedById    String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  updatedBy      User?                  @relation("DiscoverSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
 }

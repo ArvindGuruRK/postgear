@@ -28,7 +28,7 @@ function coordinate(limit: number) {
 }
 
 /** An IANA name is letters, digits and these. Enough to stop anything else reaching the lookup. */
-const timeZone = z
+export const timeZone = z
   .string()
   .max(64)
   .regex(/^[A-Za-z0-9_+\-/]+$/);
@@ -54,15 +54,21 @@ export const localitySearchQuerySchema = z.object({ q: searchText }).strict();
 
 export type LocalitySearchQuery = z.infer<typeof localitySearchQuerySchema>;
 
+/** A real ISO country, not merely two capital letters. */
+export const countryCode = z.string().refine((code) => isCountryCode(code) && isKnownCountry(code));
+
+/** `IN-TN`. The shape only: which country it is in is for the object around it to say. */
+export const regionCode = z.string().refine(isRegionCode);
+
 /** Text that ends up in a heading and in what is handed to the AI: no markup, no tricks. */
-const placeName = z
+export const placeName = z
   .string()
   .max(LOCALITY_SEARCH_MAX * 4)
   .transform(sanitizeText)
   .pipe(z.string().min(1).max(LOCALITY_SEARCH_MAX));
 
 /** `ta`, `en-IN`, `es-419`, `zh-Hant`. */
-const languageTag = z
+export const languageTag = z
   .string()
   .max(16)
   .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/);
@@ -73,17 +79,17 @@ export const feedQuerySchema = z
   .object({
     kind: z.enum(FEED_KINDS),
     // Absent means Worldwide.
-    country: z
-      .string()
-      .refine((code) => isCountryCode(code) && isKnownCountry(code))
-      .optional(),
-    region: z.string().refine(isRegionCode).optional(),
+    country: countryCode.optional(),
+    region: regionCode.optional(),
     // Display only, and never part of the cache key: only a heading changes with it.
     regionName: placeName.optional(),
     city: placeName.optional(),
     lang: languageTag.optional(),
     tz: timeZone.optional(),
     topic: z.enum(NEWS_TOPICS).optional(),
+    // The page sends it, so the groups its workspace switched off are not asked for.
+    // Without it the answer is the whole tab, whatever the workspace has set.
+    useWorkspaceSources: z.literal('1').optional(),
   })
   .strict()
   .refine((query) => query.country || (!query.region && !query.regionName && !query.city), {

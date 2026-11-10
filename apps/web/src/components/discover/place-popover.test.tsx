@@ -2,20 +2,28 @@
  * The place popover: the city search asks only on Enter or the Search button,
  * never while typing; a refusal from the browser shows its sentence and puts
  * the focus in the field; results are picked by click or by keyboard.
+ *
+ * Module 06: the workspace's saved place under Worldwide, Save For This
+ * Workspace for an admin, the same button disabled with its reason for a
+ * member, and the finder on its own as Settings draws it.
  */
 import '@testing-library/jest-dom';
 import { TooltipProvider } from '@postgear/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ApiError } from '@/lib/api';
 import { searchPlaces } from '@/lib/discover-api';
-import type { Locality } from '@/types/discover';
+import type { DiscoverSettings, Locality } from '@/types/discover';
 import { stubBrowserLayout } from '../workflows/fields/test-dom';
 import {
   CONSENT_SENTENCE,
   GEOCODER_OFF,
+  PlaceFinder,
+  type PlaceFinderProps,
   PlacePopover,
   type PlacePopoverProps,
   SEARCH_TOO_SHORT,
+  WorkspaceDefault,
+  type WorkspaceDefaultProps,
 } from './place-popover';
 import { LOCATION_MESSAGES } from './use-place';
 
@@ -221,5 +229,221 @@ describe('PlacePopover', () => {
     expect(screen.queryByRole('button', { name: 'Use My Location' })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Enter your city')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Worldwide' })).toBeInTheDocument();
+  });
+
+  it('draws nothing about the workspace unless it is handed in', () => {
+    renderPopover();
+    expect(screen.queryByTestId('discover-workspace-default')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Save For This Workspace' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+const CHENNAI: Locality = {
+  countryCode: 'IN',
+  countryName: 'India',
+  regionCode: 'IN-TN',
+  regionName: 'Tamil Nadu',
+  city: 'Chennai',
+  timeZone: 'Asia/Kolkata',
+  languages: ['ta', 'en'],
+  newsLanguages: ['ta', 'en'],
+};
+
+const SAVED: DiscoverSettings = {
+  countryCode: 'IN',
+  regionCode: 'IN-TN',
+  regionName: 'Tamil Nadu',
+  city: 'Chennai',
+  timeZone: 'Asia/Kolkata',
+  languages: ['ta', 'en'],
+  topics: ['BUSINESS'],
+  sources: null,
+  locationSource: 'SEARCH',
+  place: CHENNAI,
+  updatedAt: '2026-11-10T08:00:00.000Z',
+};
+
+const NOTHING_SAVED: DiscoverSettings = {
+  ...SAVED,
+  countryCode: null,
+  regionCode: null,
+  regionName: null,
+  city: null,
+  timeZone: null,
+  languages: [],
+  topics: [],
+  locationSource: 'NONE',
+  place: null,
+  updatedAt: null,
+};
+
+function workspace(patch: Partial<WorkspaceDefaultProps> = {}): WorkspaceDefaultProps {
+  return {
+    settings: SAVED,
+    isAdmin: true,
+    saving: false,
+    error: null,
+    onSave: jest.fn(),
+    ...patch,
+  };
+}
+
+describe('the workspace place in the popover (Module 06)', () => {
+  it('says what the workspace starts from, under Worldwide', () => {
+    renderPopover({ workspace: workspace() });
+
+    const line = screen.getByTestId('discover-workspace-default');
+    expect(line).toHaveTextContent('Workspace default: Chennai, Tamil Nadu');
+    const worldwide = screen.getByRole('button', { name: 'Worldwide' });
+    expect(worldwide.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('says when there is no workspace place yet, and names a saved Worldwide', () => {
+    const { unmount } = render(
+      <TooltipProvider>
+        <WorkspaceDefault {...workspace({ settings: NOTHING_SAVED })} />
+      </TooltipProvider>,
+    );
+    expect(screen.getByTestId('discover-workspace-default')).toHaveTextContent(
+      'No workspace default yet.',
+    );
+    unmount();
+
+    const world = { ...PARIS, countryCode: null, countryName: null, regionCode: null };
+    render(
+      <TooltipProvider>
+        <WorkspaceDefault
+          {...workspace({ settings: { ...NOTHING_SAVED, locationSource: 'SEARCH', place: world } })}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.getByTestId('discover-workspace-default')).toHaveTextContent(
+      'Workspace default: Worldwide',
+    );
+  });
+
+  it('lets an admin save, with no tooltip in the way', () => {
+    const props = workspace();
+    renderPopover({ workspace: props });
+
+    const save = screen.getByRole('button', { name: 'Save For This Workspace' });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    expect(props.onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a member the button disabled, with the reason in a tooltip', async () => {
+    const props = workspace({ isAdmin: false });
+    renderPopover({ workspace: props });
+
+    const save = screen.getByRole('button', { name: 'Save For This Workspace' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(props.onSave).not.toHaveBeenCalled();
+
+    // A disabled button takes no focus, so the wrapper around it does.
+    const reach = save.parentElement as HTMLElement;
+    expect(reach).toHaveAttribute('tabindex', '0');
+    await act(async () => {
+      fireEvent.focus(reach);
+    });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Only workspace admins can change the workspace place.',
+    );
+    // The member still reads what the workspace starts from.
+    expect(screen.getByTestId('discover-workspace-default')).toHaveTextContent(
+      'Workspace default: Chennai, Tamil Nadu',
+    );
+  });
+
+  it('is busy while the save is on its way', () => {
+    renderPopover({ workspace: workspace({ saving: true }) });
+
+    const save = screen.getByRole('button', { name: 'Saving…' });
+    expect(save).toBeDisabled();
+    expect(save).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it("shows the API's sentence when a save is refused, with Try Again", () => {
+    const props = workspace({ error: 'Choose a real country for the workspace place.' });
+    renderPopover({ workspace: props });
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Choose a real country for the workspace place.');
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    expect(props.onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the button but drops the line when the settings could not be read', () => {
+    renderPopover({ workspace: workspace({ settings: null }) });
+
+    expect(screen.queryByTestId('discover-workspace-default')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save For This Workspace' })).toBeEnabled();
+  });
+
+  it('still shows the line and the button with the place finder off', () => {
+    renderPopover({ geocoder: 'off', workspace: workspace() });
+
+    expect(screen.getByText(GEOCODER_OFF)).toBeInTheDocument();
+    expect(screen.getByTestId('discover-workspace-default')).toHaveTextContent(
+      'Workspace default: Chennai, Tamil Nadu',
+    );
+    expect(screen.getByRole('button', { name: 'Save For This Workspace' })).toBeEnabled();
+  });
+});
+
+describe('PlaceFinder on its own (the Settings card draws it)', () => {
+  function renderFinder(props: Partial<PlaceFinderProps> = {}) {
+    const handlers = { onLocate: jest.fn(), onPick: jest.fn(), onWorldwide: jest.fn() };
+    render(
+      <TooltipProvider>
+        <PlaceFinder status="idle" message={null} geocoder="nominatim" {...handlers} {...props} />
+      </TooltipProvider>,
+    );
+    return handlers;
+  }
+
+  it('has no workspace line, no save button and no credit of its own', () => {
+    renderFinder();
+
+    expect(screen.getByRole('button', { name: 'Use My Location' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Worldwide' })).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Save For This Workspace' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'OpenStreetMap contributors' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears the search once a place is picked', async () => {
+    const handlers = renderFinder();
+    fireEvent.change(field(), { target: { value: 'paris' } });
+    await act(async () => {
+      fireEvent.submit(field().closest('form') as HTMLFormElement);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Paris, Ile-de-France, France' }));
+
+    expect(handlers.onPick).toHaveBeenCalledWith(PARIS);
+    expect(screen.queryByRole('list', { name: 'Places found' })).not.toBeInTheDocument();
+    expect(field()).toHaveValue('');
+  });
+
+  it('turns every control off when disabled, and never searches', async () => {
+    const handlers = renderFinder({ disabled: true });
+
+    expect(screen.getByRole('button', { name: 'Use My Location' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Worldwide' })).toBeDisabled();
+    expect(field()).toBeDisabled();
+
+    await act(async () => {
+      fireEvent.submit(field().closest('form') as HTMLFormElement);
+    });
+    expect(mockedSearch).not.toHaveBeenCalled();
+    expect(handlers.onLocate).not.toHaveBeenCalled();
   });
 });

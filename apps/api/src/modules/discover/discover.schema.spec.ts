@@ -144,4 +144,45 @@ describe('feedQuerySchema', () => {
       false,
     );
   });
+
+  it("takes the page's word that its workspace's switches apply, for every kind", () => {
+    for (const kind of ['trending', 'news', 'videos', 'festivals']) {
+      const query = { kind, country: 'IN', useWorkspaceSources: '1' };
+      expect(feedQuerySchema.parse(query)).toEqual(query);
+    }
+    expect(feedQuerySchema.parse({ kind: 'videos', useWorkspaceSources: '1' })).toEqual({
+      kind: 'videos',
+      useWorkspaceSources: '1',
+    });
+  });
+
+  it('adds no such word when the query has none', () => {
+    expect(feedQuerySchema.parse({ kind: 'trending', country: 'IN' })).not.toHaveProperty(
+      'useWorkspaceSources',
+    );
+  });
+
+  it.each([
+    ['0', '0'],
+    ['true', 'true'],
+    ['nothing after the equals sign', ''],
+    ['a repeated parameter', ['1', '1']],
+    ["a list of switches, which is not the query's to choose", 'social,videos'],
+  ])('refuses the switches asked for with %s', (_name, useWorkspaceSources) => {
+    expect(
+      feedQuerySchema.safeParse({ kind: 'trending', country: 'IN', useWorkspaceSources }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a workspace or a switch named in the query: both come from the session', () => {
+    for (const extra of [
+      { hidden: 'social' },
+      { sources: 'videos' },
+      { organizationId: 'org-2' },
+    ]) {
+      expect(feedQuerySchema.safeParse({ kind: 'trending', country: 'IN', ...extra }).success).toBe(
+        false,
+      );
+    }
+  });
 });

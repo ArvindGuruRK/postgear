@@ -4,7 +4,17 @@
  *
  * The answer depends on the place and the language, never on the workspace, so it
  * is cached for everyone: nothing here can tell one tenant's Chennai from another's.
- * The workspace only appears in the limit on asking for new places.
+ * The workspace appears in two things only, and neither is shared: the limit on
+ * asking for new places, and the groups it has switched off.
+ *
+ * ## A workspace's switches
+ *
+ * A request that asks for them (`workspaceSources`) has its workspace's switches
+ * read first, and the loads of a group that is off are never planned: no fetch,
+ * no lock, no count. The answer names them in `hidden`, and they are never in
+ * `unavailable`, because nothing is wrong with them. The switches decide which
+ * loads this one request asks for and nothing else. They are in no key, no copy
+ * and no log line, so the next workspace reads the same copies as ever.
  *
  * ## One path for every load
  *
@@ -68,17 +78,25 @@ import { DISCOVER_MESSAGES, SOCIAL_NETWORKS, TOPIC_TITLES } from './discover.mes
 import {
   answerLanguage,
   type Budget,
+  type DiscoverSourceSwitch,
   type FeedGroupId,
   type FeedKind,
   type FeedRequest,
   type GroupPlan,
   type LoadPlan,
   planLoads,
+  switchesOf,
   wikipediaEdition,
 } from './discover.plan';
 import { type LocalityAnswer, withNewsLanguages } from './locality.service';
+import { DiscoverSettingsService } from './settings.service';
 
-export type { FeedGroupId, FeedKind, FeedRequest } from './discover.plan';
+export type {
+  DiscoverSourceSwitch,
+  FeedGroupId,
+  FeedKind,
+  FeedRequest,
+} from './discover.plan';
 export { YOUTUBE_DAILY_UNITS } from './discover.plan';
 
 const MINUTE_MS = 60_000;
@@ -134,6 +152,12 @@ export interface FeedAnswer {
   today?: string;
   /** Videos only, and only when there are no groups. */
   reason?: FeedEmptyReason;
+  /**
+   * Only when the request asked for its workspace's switches: the groups of this
+   * tab the workspace has switched off, in the order the tab shows them. Empty
+   * when none is.
+   */
+  hidden?: DiscoverSourceSwitch[];
 }
 
 export interface DiscoverStatus {
@@ -266,6 +290,7 @@ export class DiscoverService {
     private readonly cache: DiscoverCache,
     private readonly gate: DiscoverGate,
     private readonly redis: RedisService,
+    private readonly settings: DiscoverSettingsService,
   ) {
     this.keys = discoverKeys(engine.simulation);
   }
@@ -288,8 +313,10 @@ export class DiscoverService {
 
   async feed(orgId: string, request: FeedRequest): Promise<FeedAnswer> {
     const language = answerLanguage(request);
+    // Read before anything is planned, so a group that is off is never asked for.
+    const hidden = request.workspaceSources ? await this.hiddenFor(orgId, request.kind) : undefined;
     // No loads means nothing to fetch, so nothing to cache either.
-    const loads = planLoads(this.engine, this.keys, request);
+    const loads = planLoads(this.engine, this.keys, request, hidden);
 
     // Side by side: each has its own copy, its own lock and its own age. All of
     // them are waited for, so a refusal leaves no fetch running behind the answer.
@@ -300,7 +327,19 @@ export class DiscoverService {
       return { load: loads[index], entry: result.value };
     });
 
-    return this.present(request, language, loaded);
+    return this.present(request, language, loaded, hidden);
+  }
+
+  /**
+   * Of the groups this tab shows, the ones the workspace has switched off, in the
+   * tab's own order. A tab with no switch (News) has nothing to read.
+   */
+  private async hiddenFor(orgId: string, kind: FeedKind): Promise<DiscoverSourceSwitch[]> {
+    const switches = switchesOf(kind);
+    if (switches.length === 0) return [];
+
+    const off = await this.settings.switchedOff(orgId);
+    return switches.filter((id) => off.includes(id));
   }
 
   private async load(orgId: string, load: LoadPlan): Promise<CachedFeed | null> {
@@ -503,7 +542,12 @@ export class DiscoverService {
     }
   }
 
-  private present(request: FeedRequest, language: string, loaded: Loaded[]): FeedAnswer {
+  private present(
+    request: FeedRequest,
+    language: string,
+    loaded: Loaded[],
+    hidden: DiscoverSourceSwitch[] | undefined,
+  ): FeedAnswer {
     const { kind, locality } = request;
     const now = Date.now();
     const today = kind === 'festivals' ? this.todayAt(locality) : undefined;
@@ -534,7 +578,8 @@ export class DiscoverService {
       .map((part) => this.groupOf(part, request));
     if (networks.length > 0) groups.push(this.socialGroup(networks, request));
 
-    const reason = this.emptyReason(kind, groups, loaded);
+    // Switched off is the whole explanation: whether there is a key is beside the point.
+    const reason = hidden?.includes('videos') ? undefined : this.emptyReason(kind, groups, loaded);
 
     return {
       kind,
@@ -551,6 +596,7 @@ export class DiscoverService {
       ],
       ...(today === undefined ? {} : { today }),
       ...(reason ? { reason } : {}),
+      ...(hidden ? { hidden } : {}),
     };
   }
 

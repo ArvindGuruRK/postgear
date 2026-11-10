@@ -8,17 +8,33 @@
  * built from the design system (blueprint section 11), so this section is
  * where a change to one of those is checked against Discover too.
  *
+ * Module 06 adds the chip's Workspace badge, the popover's last part (the
+ * workspace's saved place and Save For This Workspace, as an admin and as a
+ * member see it) and the News tab's Topic select.
+ *
  * The samples are made up, with Tamil and Arabic among them: outside text
  * arrives in any script, and a right-to-left title must still sit right.
  */
+import { useState } from 'react';
 import { CardMenu } from '@/components/discover/card-menu';
 import { DiscoverGroup, DiscoverSkeleton } from '@/components/discover/discover-group';
 import { LanguageChip } from '@/components/discover/language-chip';
 import { PlaceChip } from '@/components/discover/place-chip';
-import { PlacePopover } from '@/components/discover/place-popover';
+import {
+  PlacePopover,
+  WorkspaceDefault,
+  type WorkspaceDefaultProps,
+} from '@/components/discover/place-popover';
+import { TopicSelect } from '@/components/discover/topic-select';
 import { LOCATION_MESSAGES } from '@/components/discover/use-place';
 import { useMounted } from '@/components/posts/use-mounted';
-import type { DiscoverItem, DiscoverGroup as Group, Locality } from '@/types/discover';
+import type {
+  DiscoverItem,
+  DiscoverSettings,
+  DiscoverGroup as Group,
+  Locality,
+  NewsTopic,
+} from '@/types/discover';
 import { Row, Section, Spec } from '../shared';
 
 const INDIA: Locality = {
@@ -233,10 +249,48 @@ const FESTIVAL_GROUP: Group = {
 const nothing = () => undefined;
 const notFound = () => Promise.resolve(false);
 
+/** What a workspace saved (Module 06): Chennai, Tamil then English, Business first. */
+const SAVED: DiscoverSettings = {
+  countryCode: 'IN',
+  regionCode: 'IN-TN',
+  regionName: 'Tamil Nadu',
+  city: 'Chennai',
+  timeZone: 'Asia/Kolkata',
+  languages: ['ta', 'en'],
+  topics: ['BUSINESS'],
+  sources: null,
+  locationSource: 'SEARCH',
+  place: CHENNAI,
+  updatedAt: '2026-11-10T08:00:00.000Z',
+};
+
+const NOTHING_SAVED: DiscoverSettings = {
+  ...SAVED,
+  countryCode: null,
+  regionCode: null,
+  regionName: null,
+  city: null,
+  timeZone: null,
+  languages: [],
+  topics: [],
+  locationSource: 'NONE',
+  place: null,
+  updatedAt: null,
+};
+
+/** The popover's last part for an admin with nothing going on; each specimen changes one thing. */
+const WORKSPACE_ADMIN: Omit<WorkspaceDefaultProps, 'settings'> = {
+  isAdmin: true,
+  saving: false,
+  error: null,
+  onSave: nothing,
+};
+
 export function DiscoverSection() {
   // The sample thumbnail is the app's own icon, so the playground asks nothing
   // of the outside; a thumbnail needs a full address, known only in the browser.
   const mounted = useMounted();
+  const [topic, setTopic] = useState<NewsTopic | null>('BUSINESS');
   const videoGroup: Group = {
     id: 'videos',
     title: 'Trending On YouTube In India',
@@ -254,9 +308,9 @@ export function DiscoverSection() {
   return (
     <Section
       title="Discover"
-      description="The place and language chips, the place popover, trend, story and video cards, Wikipedia rows, social chips, festival rows and the loading footprint from Sprint 11. Everything is a design-system piece; nothing here is drawn by hand."
+      description="The place and language chips, the place popover with the workspace's saved place, the Topic select, trend, story and video cards, Wikipedia rows, social chips, festival rows and the loading footprint from Sprint 11. Everything is a design-system piece; nothing here is drawn by hand."
     >
-      <Row label="Place Chip (guess, found, Worldwide, finding)">
+      <Row label="Place Chip (guess, found, the workspace's, Worldwide, finding)">
         <PlaceChip
           place={INDIA}
           source="guess"
@@ -278,6 +332,17 @@ export function DiscoverSection() {
           onWorldwide={nothing}
         />
         <PlaceChip
+          place={CHENNAI}
+          source="workspace"
+          status="idle"
+          message={null}
+          geocoder="nominatim"
+          onLocate={notFound}
+          onPick={nothing}
+          onWorldwide={nothing}
+          workspace={{ ...WORKSPACE_ADMIN, settings: SAVED }}
+        />
+        <PlaceChip
           place={WORLD}
           source="worldwide"
           status="idle"
@@ -297,7 +362,10 @@ export function DiscoverSection() {
           onPick={nothing}
           onWorldwide={nothing}
         />
-        <Spec>Popover trigger; h-10 rounded-lg border-2 bg-chrome; no shadow; FIELD_FOCUS</Spec>
+        <Spec>
+          Popover trigger; h-10 rounded-lg border-2 bg-chrome; no shadow; FIELD_FOCUS; Guess and
+          Workspace are Badge outline
+        </Spec>
       </Row>
 
       <Row label="Language Chip">
@@ -327,6 +395,68 @@ export function DiscoverSection() {
             onWorldwide={nothing}
           />
         </div>
+      </Row>
+
+      <Row label="Place Popover With The Workspace Place (an admin, and a member: hover the button)">
+        <div className="w-96 max-w-full rounded-lg border-2 border-outline bg-secondary p-4">
+          <PlacePopover
+            status="idle"
+            message={null}
+            geocoder="nominatim"
+            onLocate={nothing}
+            onPick={nothing}
+            onWorldwide={nothing}
+            workspace={{ ...WORKSPACE_ADMIN, settings: SAVED }}
+          />
+        </div>
+        <div className="w-96 max-w-full rounded-lg border-2 border-outline bg-secondary p-4">
+          <PlacePopover
+            status="idle"
+            message={null}
+            geocoder="nominatim"
+            onLocate={nothing}
+            onPick={nothing}
+            onWorldwide={nothing}
+            workspace={{ ...WORKSPACE_ADMIN, settings: SAVED, isAdmin: false }}
+          />
+        </div>
+        <Spec>
+          Under Worldwide, a border-t-2 line apart; Save For This Workspace is Button secondary; a
+          member gets it disabled inside TooltipHint
+        </Spec>
+      </Row>
+
+      <Row label="Workspace Place Footer (nothing saved yet, a refused save, saving, place finder off)">
+        <div className="w-96 max-w-full rounded-lg border-2 border-outline bg-secondary p-4">
+          <WorkspaceDefault {...WORKSPACE_ADMIN} settings={NOTHING_SAVED} />
+        </div>
+        <div className="w-96 max-w-full rounded-lg border-2 border-outline bg-secondary p-4">
+          <WorkspaceDefault
+            {...WORKSPACE_ADMIN}
+            settings={SAVED}
+            error="We could not save the workspace place. Try again in a moment."
+          />
+        </div>
+        <div className="w-96 max-w-full rounded-lg border-2 border-outline bg-secondary p-4">
+          <WorkspaceDefault {...WORKSPACE_ADMIN} settings={SAVED} saving />
+        </div>
+        <div className="w-96 max-w-full rounded-lg border-2 border-outline bg-secondary p-4">
+          <PlacePopover
+            status="idle"
+            message={null}
+            geocoder="off"
+            onLocate={nothing}
+            onPick={nothing}
+            onWorldwide={nothing}
+            workspace={{ ...WORKSPACE_ADMIN, settings: SAVED }}
+          />
+        </div>
+        <Spec>A refused save is Alert danger with Try Again, never a hand-made tint</Spec>
+      </Row>
+
+      <Row label="Topic Select (the News tab)">
+        <TopicSelect value={topic} onChange={setTopic} />
+        <Spec>Select, trigger dressed as the language chip; All, then Google&apos;s order</Spec>
       </Row>
 
       <Row label="Trend And Story Cards In A Group">

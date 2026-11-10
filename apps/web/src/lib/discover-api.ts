@@ -12,6 +12,8 @@
  * anything finer, so a caller that skipped this would fail rather than leak.
  */
 import type {
+  DiscoverSettings,
+  DiscoverSettingsPatch,
   DiscoverStatus,
   FeedKind,
   FeedResponse,
@@ -69,6 +71,10 @@ export function searchPlaces(text: string): Promise<LocalitySearchResponse> {
  * and the city only change headings, never what is fetched. The time zone is
  * what the Festivals answer counts its `today` in. The language is sent for
  * every tab, though only Trending and News read differently in another one.
+ *
+ * Every call asks with `useWorkspaceSources=1` (Module 06): the API then
+ * leaves out the groups this workspace switched off and names them in
+ * `hidden`.
  */
 export function feedQuery(
   kind: FeedKind,
@@ -85,6 +91,7 @@ export function feedQuery(
     if (place.city) query.set('city', place.city);
   }
   query.set('lang', language);
+  query.set('useWorkspaceSources', '1');
   if (place.timeZone) query.set('tz', place.timeZone);
   if (topic) query.set('topic', topic);
 
@@ -98,4 +105,23 @@ export function getFeed(
   topic?: NewsTopic,
 ): Promise<FeedResponse> {
   return api<FeedResponse>(`/discover/feed?${feedQuery(kind, place, language, topic)}`);
+}
+
+/** What the workspace saved for Discover, or the defaults when it saved nothing. Any member may read it. */
+export function getDiscoverSettings(): Promise<DiscoverSettings> {
+  return api<{ settings: DiscoverSettings }>('/discover/settings').then(
+    (result) => result.settings,
+  );
+}
+
+/**
+ * Saves part of the workspace's Discover settings and answers all of them.
+ * Admins only: a member is refused with the API's own sentence (403), so the
+ * page never offers a member anything that calls this.
+ */
+export function saveDiscoverSettings(patch: DiscoverSettingsPatch): Promise<DiscoverSettings> {
+  return api<{ settings: DiscoverSettings }>('/discover/settings', {
+    method: 'PATCH',
+    body: patch,
+  }).then((result) => result.settings);
 }

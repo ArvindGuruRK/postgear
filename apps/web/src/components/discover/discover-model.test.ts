@@ -2,10 +2,13 @@
  * Discover's words and choices: what the chips say, which language a place
  * starts in, what is remembered (and what is refused when read back), how old
  * the page says its copy is, and (Module 05) which week a festival is listed
- * under, how far off it reads, and when a post about it is dated.
+ * under, how far off it reads, and when a post about it is dated. Module 06:
+ * where a visit starts once a workspace saved a place, what saving one sends,
+ * and the News topic remembered beside the place.
  */
-import type { DiscoverGroup, DiscoverItem, Locality } from '@/types/discover';
+import type { DiscoverGroup, DiscoverItem, DiscoverSettings, Locality } from '@/types/discover';
 import {
+  ADMINS_ONLY_PLACE,
   copilotHref,
   DRAFT_SOURCES_MAX,
   DRAFT_TOPIC_MAX,
@@ -19,22 +22,34 @@ import {
   festivalSections,
   festivalWhen,
   firstLanguage,
+  isNewsTopic,
   isWorldwide,
   itemMeta,
   languageFor,
+  locationSourceFor,
+  MAX_WORKSPACE_LANGUAGES,
+  NO_WORKSPACE_DEFAULT,
   openHref,
   placeChipText,
   placeInSentence,
+  placePatch,
   placeResultText,
   placeShortText,
+  placeStart,
   placeStorageKey,
   readRememberedPlace,
   safeHref,
   serializeRememberedPlace,
   socialChipLabel,
+  switchedOff,
+  TOPIC_CHOICES,
+  TOPIC_NAMES,
   tabFrom,
   updatedText,
   WORLDWIDE_PLACE,
+  workspaceDefaultText,
+  workspaceLanguages,
+  workspaceTopic,
 } from './discover-model';
 import { languageLabel, languageName } from './language-names';
 
@@ -729,5 +744,278 @@ describe('festivalPublishAt', () => {
     expect(festivalPublishAt({ observance: false }, 'Asia/Kolkata')).toBeNull();
     expect(festivalPublishAt(holiday('2026-02-30'), 'Asia/Kolkata')).toBeNull();
     expect(festivalPublishAt(holiday('8 November'), 'Asia/Kolkata')).toBeNull();
+  });
+});
+
+/*
+ * Module 06: what the workspace saved. Where a visit starts, what Save For
+ * This Workspace sends, the popover's line, and the News topic.
+ */
+
+const PARIS: Locality = {
+  countryCode: 'FR',
+  countryName: 'France',
+  regionCode: 'FR-IDF',
+  regionName: 'Ile-de-France',
+  city: 'Paris',
+  timeZone: 'Europe/Paris',
+  languages: ['fr', 'en'],
+  newsLanguages: ['fr'],
+};
+
+function settings(patch: Partial<DiscoverSettings> = {}): DiscoverSettings {
+  return {
+    countryCode: 'IN',
+    regionCode: 'IN-TN',
+    regionName: 'Tamil Nadu',
+    city: 'Chennai',
+    timeZone: 'Asia/Kolkata',
+    languages: ['ta', 'en'],
+    topics: ['BUSINESS'],
+    sources: null,
+    locationSource: 'SEARCH',
+    place: CHENNAI,
+    updatedAt: '2026-11-10T08:00:00.000Z',
+    ...patch,
+  };
+}
+
+const NOTHING_SAVED = settings({
+  countryCode: null,
+  regionCode: null,
+  regionName: null,
+  city: null,
+  timeZone: null,
+  languages: [],
+  topics: [],
+  locationSource: 'NONE',
+  place: null,
+  updatedAt: null,
+});
+
+describe('where a visit starts', () => {
+  it('starts from the workspace place, in its first language, when nothing is remembered', () => {
+    expect(placeStart(null, settings())).toEqual({
+      from: 'workspace',
+      place: CHENNAI,
+      language: 'ta',
+    });
+    expect(placeStart(null, settings({ languages: ['en', 'ta'] }))).toMatchObject({
+      language: 'en',
+    });
+  });
+
+  it("falls back to the place's first language when the workspace's is not offered", () => {
+    expect(placeStart(null, settings({ place: PARIS, languages: ['ta', 'en'] }))).toEqual({
+      from: 'workspace',
+      place: PARIS,
+      language: 'fr',
+    });
+    expect(placeStart(null, settings({ languages: [] }))).toMatchObject({ language: 'ta' });
+  });
+
+  it('starts from a saved Worldwide too', () => {
+    expect(placeStart(null, settings({ place: WORLDWIDE_PLACE, languages: ['en'] }))).toEqual({
+      from: 'workspace',
+      place: WORLDWIDE_PLACE,
+      language: 'en',
+    });
+  });
+
+  it('guesses when nothing is remembered and nothing is saved', () => {
+    expect(placeStart(null, NOTHING_SAVED)).toEqual({ from: 'guess' });
+    expect(placeStart(null, null)).toEqual({ from: 'guess' });
+  });
+
+  it("lets the person's own place win on this device", () => {
+    for (const source of ['browser', 'search'] as const) {
+      expect(placeStart({ place: PARIS, source, language: 'fr' }, settings())).toEqual({
+        from: 'remembered',
+        place: PARIS,
+        source,
+        language: 'fr',
+      });
+    }
+    expect(
+      placeStart({ place: WORLDWIDE_PLACE, source: 'worldwide', language: 'en' }, settings()),
+    ).toMatchObject({ from: 'remembered', source: 'worldwide' });
+  });
+
+  it('reads a remembered place as before when the workspace saved none', () => {
+    const guess = { place: INDIA, source: 'guess', language: 'en' } as const;
+    expect(placeStart(guess, NOTHING_SAVED)).toMatchObject({ from: 'remembered', source: 'guess' });
+    expect(placeStart(guess, null)).toMatchObject({ from: 'remembered', place: INDIA });
+  });
+
+  it('gives a remembered guess up for the workspace place, keeping the switched language', () => {
+    expect(placeStart({ place: INDIA, source: 'guess', language: 'en' }, settings())).toEqual({
+      from: 'workspace',
+      place: CHENNAI,
+      language: 'en',
+    });
+    // Hindi is not a language of the workspace's place.
+    expect(placeStart({ place: INDIA, source: 'guess', language: 'hi' }, settings())).toMatchObject(
+      { from: 'workspace', language: 'ta' },
+    );
+  });
+
+  it('follows the workspace place as it is saved now, not as it was remembered', () => {
+    const followed = { place: CHENNAI, source: 'workspace', language: 'en' } as const;
+    expect(placeStart(followed, settings({ place: PARIS, languages: ['fr'] }))).toEqual({
+      from: 'workspace',
+      place: PARIS,
+      language: 'fr',
+    });
+    expect(placeStart(followed, settings())).toMatchObject({ place: CHENNAI, language: 'en' });
+  });
+
+  it('guesses again once a followed default was cleared, but trusts the record offline', () => {
+    const followed = { place: CHENNAI, source: 'workspace', language: 'ta' } as const;
+    expect(placeStart(followed, NOTHING_SAVED)).toEqual({ from: 'guess' });
+    // The settings could not be read: the last known workspace place is better than a guess.
+    expect(placeStart(followed, null)).toMatchObject({ from: 'remembered', source: 'workspace' });
+  });
+});
+
+describe('saving a place for the workspace', () => {
+  it('says how the place was found', () => {
+    expect(locationSourceFor('browser')).toBe('BROWSER');
+    expect(locationSourceFor('guess')).toBe('TIMEZONE');
+    expect(locationSourceFor('search')).toBe('SEARCH');
+    expect(locationSourceFor('workspace')).toBe('SEARCH');
+    expect(locationSourceFor('worldwide')).toBe('SEARCH');
+  });
+
+  it('sends a place whole, and nothing that is not stored', () => {
+    expect(placePatch(CHENNAI, 'BROWSER')).toEqual({
+      countryCode: 'IN',
+      regionCode: 'IN-TN',
+      regionName: 'Tamil Nadu',
+      city: 'Chennai',
+      timeZone: 'Asia/Kolkata',
+      locationSource: 'BROWSER',
+    });
+  });
+
+  it('sends the fields a country has not got as null, so an old region never stays', () => {
+    expect(placePatch(INDIA, 'TIMEZONE')).toEqual({
+      countryCode: 'IN',
+      regionCode: null,
+      regionName: null,
+      city: null,
+      timeZone: 'Asia/Kolkata',
+      locationSource: 'TIMEZONE',
+    });
+  });
+
+  it('sends Worldwide and a cleared place as nulls, told apart by the source', () => {
+    const empty = {
+      countryCode: null,
+      regionCode: null,
+      regionName: null,
+      city: null,
+      timeZone: null,
+    };
+    expect(placePatch(WORLDWIDE_PLACE, 'SEARCH')).toEqual({ ...empty, locationSource: 'SEARCH' });
+    expect(placePatch(null, 'NONE')).toEqual({ ...empty, locationSource: 'NONE' });
+  });
+
+  it("puts the chip's language first, each language once, six at most", () => {
+    expect(workspaceLanguages(CHENNAI, 'en')).toEqual(['en', 'ta']);
+    expect(workspaceLanguages(CHENNAI, 'ta')).toEqual(['ta', 'en']);
+    expect(workspaceLanguages(CHENNAI)).toEqual(['ta', 'en']);
+
+    const many = { ...INDIA, newsLanguages: ['hi', 'en', 'bn', 'ta', 'te', 'mr', 'gu', 'kn'] };
+    const saved = workspaceLanguages(many, 'kn');
+    expect(saved).toEqual(['kn', 'hi', 'en', 'bn', 'ta', 'te']);
+    expect(saved).toHaveLength(MAX_WORKSPACE_LANGUAGES);
+  });
+
+  it('writes the line the popover shows', () => {
+    expect(workspaceDefaultText(settings())).toBe('Workspace default: Chennai, Tamil Nadu');
+    expect(workspaceDefaultText(settings({ place: INDIA }))).toBe('Workspace default: India');
+    expect(workspaceDefaultText(settings({ place: WORLDWIDE_PLACE }))).toBe(
+      'Workspace default: Worldwide',
+    );
+    expect(workspaceDefaultText(NOTHING_SAVED)).toBe(NO_WORKSPACE_DEFAULT);
+    expect(NO_WORKSPACE_DEFAULT).toBe('No workspace default yet.');
+    expect(ADMINS_ONLY_PLACE).toBe('Only workspace admins can change the workspace place.');
+  });
+
+  it('reads a switch as on unless it was turned off', () => {
+    expect(switchedOff(settings({ sources: { videos: false } }), 'videos')).toBe(true);
+    expect(switchedOff(settings({ sources: { videos: false } }), 'festivals')).toBe(false);
+    expect(switchedOff(settings({ sources: { videos: true } }), 'videos')).toBe(false);
+    expect(switchedOff(settings(), 'videos')).toBe(false);
+    expect(switchedOff(null, 'videos')).toBe(false);
+  });
+});
+
+describe('the News topic', () => {
+  it('offers All, then the eight topics in the order Google lists them', () => {
+    expect(TOPIC_CHOICES.map((choice) => TOPIC_NAMES[choice])).toEqual([
+      'All',
+      'World',
+      'Nation',
+      'Business',
+      'Technology',
+      'Entertainment',
+      'Sports',
+      'Science',
+      'Health',
+    ]);
+  });
+
+  it("defaults to the workspace's first topic, or All", () => {
+    expect(workspaceTopic(settings({ topics: ['SPORTS', 'BUSINESS'] }))).toBe('SPORTS');
+    expect(workspaceTopic(settings({ topics: [] }))).toBeNull();
+    expect(workspaceTopic(null)).toBeNull();
+    // Whatever the API sent, only a real topic is ever asked for.
+    expect(workspaceTopic(settings({ topics: ['GOSSIP'] as never }))).toBeNull();
+  });
+
+  it('remembers a topic with the place, and All as a choice of its own', () => {
+    const raw = serializeRememberedPlace({
+      place: CHENNAI,
+      source: 'search',
+      language: 'ta',
+      topic: 'BUSINESS',
+    });
+    expect(JSON.parse(raw)).toMatchObject({ v: 1, topic: 'BUSINESS' });
+    expect(readRememberedPlace(raw)?.topic).toBe('BUSINESS');
+
+    const all = serializeRememberedPlace({
+      place: CHENNAI,
+      source: 'search',
+      language: 'ta',
+      topic: 'ALL',
+    });
+    expect(readRememberedPlace(all)?.topic).toBe('ALL');
+  });
+
+  it('still reads a record stored before topics existed', () => {
+    const old = JSON.stringify({ v: 1, place: CHENNAI, source: 'browser', language: 'ta' });
+
+    const read = readRememberedPlace(old);
+    expect(read).toEqual({ place: CHENNAI, source: 'browser', language: 'ta' });
+    expect(read).not.toHaveProperty('topic');
+    // And writes none until one is picked.
+    expect(
+      JSON.parse(serializeRememberedPlace({ place: CHENNAI, source: 'browser', language: 'ta' })),
+    ).not.toHaveProperty('topic');
+  });
+
+  it('drops a topic it does not know, and keeps the rest of the record', () => {
+    const odd = JSON.stringify({
+      v: 1,
+      place: CHENNAI,
+      source: 'browser',
+      language: 'ta',
+      topic: '<script>',
+    });
+    expect(readRememberedPlace(odd)).toEqual({ place: CHENNAI, source: 'browser', language: 'ta' });
+    expect(isNewsTopic('BUSINESS')).toBe(true);
+    expect(isNewsTopic('ALL')).toBe(false);
+    expect(isNewsTopic(7)).toBe(false);
   });
 });

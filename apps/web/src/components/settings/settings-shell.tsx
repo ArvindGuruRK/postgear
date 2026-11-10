@@ -1,6 +1,7 @@
 'use client';
 
 import { BellIcon } from '@animateicons/react/lucide/bell-icon';
+import { CompassIcon } from '@animateicons/react/lucide/compass-icon';
 import { CreditCardIcon } from '@animateicons/react/lucide/credit-card-icon';
 import { KeyRoundIcon } from '@animateicons/react/lucide/key-round-icon';
 import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
@@ -32,6 +33,9 @@ const SECTIONS = [
   // The workspace's saved sign-offs (2026-10-19), which the composer inserts.
   { segment: 'signatures', label: 'Signatures', icon: SignatureIcon },
   { segment: 'notifications', label: 'Notifications', icon: BellIcon },
+  // The workspace's Discover defaults (Sprint 11): its place, languages, news
+  // topics and which groups are on. Everyone reads them, admins change them.
+  { segment: 'discover', label: 'Discover', icon: CompassIcon },
   // Per user, like Notifications: the mode and light theme follow the person
   // into every workspace.
   { segment: 'appearance', label: 'Appearance', icon: PaletteIcon },

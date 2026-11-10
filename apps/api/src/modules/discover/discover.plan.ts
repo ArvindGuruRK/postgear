@@ -20,6 +20,13 @@
  * keyed by an edition the place has a use for: the language asked for when the
  * place speaks it (or it is English), the place's own first language otherwise. So
  * `lang=xx` reads the copy everyone else in that place reads, and costs no call.
+ *
+ * ## A group a workspace switched off is never planned
+ *
+ * A workspace can turn five groups off (`TAB_PARTS` says which loads each switch
+ * stands in front of). A load that is switched off is left out here, before the
+ * service sees it: no fetch, no lock, no count of new places. The switches never
+ * reach a key or a copy, which stay everyone's.
  */
 import {
   type DiscoverSource,
@@ -51,6 +58,12 @@ export interface FeedRequest {
   locality: Locality;
   language: string;
   topic?: NewsTopic;
+  /**
+   * Set when the asker wants the groups its workspace switched off left out.
+   * Says only that the switches apply: what they are is read per request, and
+   * neither this nor they are ever part of a key.
+   */
+  workspaceSources?: boolean;
 }
 
 export type FeedGroupId =
@@ -63,6 +76,20 @@ export type FeedGroupId =
   | 'topic'
   | 'videos'
   | 'festivals';
+
+/**
+ * The groups a workspace can switch off, each by the id of the group it hides.
+ * News has no switch.
+ */
+export const SOURCE_SWITCHES = [
+  'trends',
+  'wikipedia',
+  'social',
+  'videos',
+  'festivals',
+] as const satisfies readonly FeedGroupId[];
+
+export type DiscoverSourceSwitch = (typeof SOURCE_SWITCHES)[number];
 
 /**
  * Two windows per load. Inside `freshMs` the copy is simply the answer. Past it
@@ -327,35 +354,84 @@ function festivalsLoad({ engine, keys, request }: PlanContext, country: string):
   };
 }
 
+/** One thing a tab asks for: its loads, and the switch that stands in front of them. */
+interface TabPart {
+  /** The switch a workspace turns these loads off with. A part without one is always asked. */
+  offSwitch?: DiscoverSourceSwitch;
+  loads: (context: PlanContext) => LoadPlan[];
+}
+
+/**
+ * What each tab is made of, in the order its groups are shown, and which switch
+ * hides which loads. This table is the whole mapping: the loads a switch leaves
+ * out and the switches a tab answers to are both read from it.
+ */
+const TAB_PARTS: Record<FeedKind, readonly TabPart[]> = {
+  trending: [
+    {
+      offSwitch: 'trends',
+      // Worldwide has no rising searches: Google Trends needs a country.
+      loads: (context) => (context.request.locality.countryCode ? [trendsLoad(context)] : []),
+    },
+    { offSwitch: 'wikipedia', loads: (context) => [wikipediaLoad(context)] },
+    {
+      // One switch for both networks: the page shows them as one group.
+      offSwitch: 'social',
+      loads: (context) => [
+        socialLoad(context, context.engine.bluesky, BLUESKY_ATTRIBUTION),
+        socialLoad(context, context.engine.mastodon, MASTODON_ATTRIBUTION),
+      ],
+    },
+  ],
+  news: [{ loads: (context) => [newsLoad(context)] }],
+  videos: [
+    {
+      offSwitch: 'videos',
+      loads: (context) => {
+        const { videos } = context.engine;
+        const country = context.request.locality.countryCode;
+        return videos && country ? [videosLoad(context, videos, country)] : [];
+      },
+    },
+  ],
+  festivals: [
+    {
+      offSwitch: 'festivals',
+      loads: (context) => {
+        const country = context.request.locality.countryCode;
+        return country ? [festivalsLoad(context, country)] : [];
+      },
+    },
+  ],
+};
+
+/** A kind nobody knows is made of nothing. */
+function partsOf(kind: FeedKind): readonly TabPart[] {
+  return TAB_PARTS[kind] ?? [];
+}
+
+/** The switches a tab answers to, in the order its groups are shown. News has none. */
+export function switchesOf(kind: FeedKind): DiscoverSourceSwitch[] {
+  return partsOf(kind).flatMap((part) => part.offSwitch ?? []);
+}
+
 /**
  * The loads behind a request, in the order their groups are shown. None at all
  * means there is nothing to ask: videos with no key or no country, festivals with
  * no country, and a kind nobody knows.
+ *
+ * `hidden` names the switches that are off for whoever is asking. Their loads
+ * are not planned at all, so nothing downstream can fetch, lock or count them.
  */
 export function planLoads(
   engine: DiscoverEngine,
   keys: DiscoverKeys,
   request: FeedRequest,
+  hidden: readonly DiscoverSourceSwitch[] = [],
 ): LoadPlan[] {
   const context: PlanContext = { engine, keys, request };
-  const country = request.locality.countryCode;
 
-  switch (request.kind) {
-    case 'trending':
-      return [
-        // Worldwide has no rising searches: Google Trends needs a country.
-        ...(country ? [trendsLoad(context)] : []),
-        wikipediaLoad(context),
-        socialLoad(context, engine.bluesky, BLUESKY_ATTRIBUTION),
-        socialLoad(context, engine.mastodon, MASTODON_ATTRIBUTION),
-      ];
-    case 'news':
-      return [newsLoad(context)];
-    case 'videos':
-      return engine.videos && country ? [videosLoad(context, engine.videos, country)] : [];
-    case 'festivals':
-      return country ? [festivalsLoad(context, country)] : [];
-    default:
-      return [];
-  }
+  return partsOf(request.kind)
+    .filter((part) => !part.offSwitch || !hidden.includes(part.offSwitch))
+    .flatMap((part) => part.loads(context));
 }

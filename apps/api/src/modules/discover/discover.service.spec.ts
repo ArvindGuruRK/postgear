@@ -38,6 +38,8 @@ import {
   NEW_PLACES_PER_MINUTE,
   YOUTUBE_DAILY_UNITS,
 } from './discover.service';
+import type { DiscoverSettingsRepository, SettingsRow } from './settings.repository';
+import { DiscoverSettingsService } from './settings.service';
 import { FakeRedis } from './testing/fake-redis';
 
 /** Ten at night on the 4th in San Francisco, and half past eleven in the morning of the 5th in Chennai. */
@@ -184,19 +186,55 @@ function fakeEngine(simulation: boolean, hasVideos: boolean): FakeEngine {
   };
 }
 
+/**
+ * The settings table, as far as the feed reads it: what each workspace's row has
+ * in `sources`, exactly as stored. A workspace that is not named has no row, so
+ * every group is on, which is what every test that says nothing about switches gets.
+ */
+function fakeSettingsRepository(stored: Record<string, unknown>) {
+  return {
+    find: jest.fn(async (orgId: string): Promise<SettingsRow | null> => {
+      if (!(orgId in stored)) return null;
+      return {
+        countryCode: null,
+        regionCode: null,
+        regionName: null,
+        city: null,
+        timeZone: null,
+        languages: [],
+        topics: [],
+        sources: stored[orgId],
+        locationSource: 'NONE',
+        updatedAt: NOW,
+      };
+    }),
+    upsert: jest.fn(),
+  };
+}
+
 function build(
-  options: { simulation?: boolean; gate?: DiscoverGate; videos?: boolean; redis?: FakeRedis } = {},
+  options: {
+    simulation?: boolean;
+    gate?: DiscoverGate;
+    videos?: boolean;
+    redis?: FakeRedis;
+    /** The `sources` column of each workspace that has a row, by workspace id. */
+    sources?: Record<string, unknown>;
+  } = {},
 ) {
   const redis = options.redis ?? new FakeRedis();
   const engine = fakeEngine(options.simulation ?? false, options.videos ?? true);
   const gate = options.gate ?? new DiscoverGate(4, 4_000);
+  const settings = fakeSettingsRepository(options.sources ?? {});
   const service = new DiscoverService(
     engine as unknown as DiscoverEngine,
     new DiscoverCache(redis.asService()),
     gate,
     redis.asService(),
+    // The real service over the fake table, so the feed reads a row the way it really does.
+    new DiscoverSettingsService(settings as unknown as DiscoverSettingsRepository),
   );
-  return { service, engine, redis, gate };
+  return { service, engine, redis, gate, settings };
 }
 
 function trending(locality: Locality = TAMIL_NADU, language = 'ta'): FeedRequest {
@@ -2682,5 +2720,332 @@ describe('simulated and real, on one Redis', () => {
 
     expect(breakers(redis)).toEqual(['discover:sim:breaker:bluesky']);
     expect(real.engine.bluesky.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a workspace's switches", () => {
+  const OTHER_ORG = 'org-2';
+  const EVERYTHING_OFF = {
+    trends: false,
+    wikipedia: false,
+    social: false,
+    videos: false,
+    festivals: false,
+  };
+
+  /** A request as the page sends it: the one asker that wants its workspace's switches. */
+  function fromThePage(request: FeedRequest): FeedRequest {
+    return { ...request, workspaceSources: true };
+  }
+
+  function ids(result: FeedAnswer): string[] {
+    return result.groups.map((group) => group.id);
+  }
+
+  /** The fake sources each of Trending's switches stands in front of. */
+  function behind(engine: FakeEngine) {
+    return {
+      trends: [engine.trends],
+      wikipedia: [engine.wikipedia],
+      social: [engine.bluesky, engine.mastodon],
+    };
+  }
+
+  it.each([
+    ['trends', ['wikipedia', 'social'], ':trending:'],
+    ['wikipedia', ['trends', 'social'], ':wiki:'],
+    ['social', ['trends', 'wikipedia'], ':social:'],
+  ] as const)(
+    'leaves %s out of Trending: no outside call, no copy, no lock',
+    async (off, shown, keyPart) => {
+      const { service, engine, redis } = build({ sources: { [ORG]: { [off]: false } } });
+      fillTrending(engine);
+
+      const result = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+
+      expect(ids(result)).toEqual(shown);
+      expect(result.hidden).toEqual([off]);
+      expect(result.unavailable).toEqual([]);
+      for (const [id, sources] of Object.entries(behind(engine))) {
+        for (const source of sources) {
+          expect(source.fetch).toHaveBeenCalledTimes(id === off ? 0 : 1);
+        }
+      }
+      // Locks too: the group was never planned, so nothing was even started for it.
+      expect(redis.keys.filter((key) => key.includes(keyPart))).toEqual([]);
+    },
+  );
+
+  it.each([
+    ['with a key', true],
+    ['with no key', false],
+  ])(
+    'answers a switched-off Videos as switched off and gives no other reason, %s',
+    async (_name, hasKey) => {
+      const { service, engine, redis } = build({
+        videos: hasKey,
+        sources: { [ORG]: { videos: false } },
+      });
+
+      const result = await service.feed(ORG, fromThePage(videos()));
+
+      expect(result).toEqual({
+        kind: 'videos',
+        locality: { ...TAMIL_NADU, newsLanguages: ['ta', 'en'] },
+        language: 'ta',
+        groups: [],
+        unavailable: [],
+        hidden: ['videos'],
+      });
+      expect(result).not.toHaveProperty('reason');
+      // No copy, no lock, no count of a new place and no unit of the day's budget.
+      expect(redis.keys).toEqual([]);
+      expect(engine.videos?.fetch.mock.calls ?? []).toEqual([]);
+      expect(logLine).not.toHaveBeenCalled();
+    },
+  );
+
+  it('gives no reason for a switched-off Videos even when the budget is gone', async () => {
+    const { service, redis } = build({ sources: { [ORG]: { videos: false } } });
+    spend(redis, YOUTUBE_DAILY_UNITS);
+
+    const result = await service.feed(ORG, fromThePage(videos()));
+
+    expect(result.hidden).toEqual(['videos']);
+    expect(result).not.toHaveProperty('reason');
+    expect(redis.keys).toEqual([BUDGET]);
+  });
+
+  it('answers a switched-off Festivals with no festival, and asks no calendar', async () => {
+    const { service, engine, redis } = build({ sources: { [ORG]: { festivals: false } } });
+
+    await expect(service.feed(ORG, fromThePage(festivals()))).resolves.toEqual({
+      kind: 'festivals',
+      locality: { ...CHENNAI, newsLanguages: ['ta', 'en'] },
+      language: 'ta',
+      groups: [],
+      unavailable: [],
+      today: '2026-11-05',
+      hidden: ['festivals'],
+    });
+    expect(engine.holidays.fetch).not.toHaveBeenCalled();
+    expect(redis.keys).toEqual([]);
+  });
+
+  it.each([
+    ['trending', ['trends', 'wikipedia', 'social']],
+    ['news', []],
+    ['videos', ['videos']],
+    ['festivals', ['festivals']],
+  ] as const)(
+    'names in %s only the switches that tab has, in its own order',
+    async (kind, hidden) => {
+      // Stored in an order no tab shows them in.
+      const stored = {
+        festivals: false,
+        videos: false,
+        social: false,
+        wikipedia: false,
+        trends: false,
+      };
+      const { service } = build({ sources: { [ORG]: stored } });
+
+      const result = await service.feed(
+        ORG,
+        fromThePage({ kind, locality: CHENNAI, language: 'ta' }),
+      );
+
+      expect(result.hidden).toEqual(hidden);
+    },
+  );
+
+  it('names rising searches as hidden for Worldwide too, where there were none to ask for', async () => {
+    const { service, engine } = build({ sources: { [ORG]: { trends: false } } });
+    fillTrending(engine);
+
+    const result = await service.feed(ORG, fromThePage(trending({ ...WORLDWIDE }, 'en')));
+
+    expect(ids(result)).toEqual(['wikipedia', 'social']);
+    expect(result.hidden).toEqual(['trends']);
+  });
+
+  it('never switches News, and reads nothing to know that', async () => {
+    const { service, engine, settings } = build({ sources: { [ORG]: EVERYTHING_OFF } });
+
+    const result = await service.feed(ORG, fromThePage(news()));
+
+    expect(ids(result)).toEqual(['place', 'top']);
+    expect(result.hidden).toEqual([]);
+    expect(result.unavailable).toEqual([]);
+    expect(engine.news.top).toHaveBeenCalledTimes(1);
+    expect(settings.find).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['trending', ['trends', 'wikipedia', 'social']],
+    ['videos', ['videos']],
+    ['festivals', ['festivals']],
+  ] as const)(
+    'answers the whole of %s without the parameter: no hidden, and nothing read',
+    async (kind, shown) => {
+      const { service, engine, settings } = build({ sources: { [ORG]: EVERYTHING_OFF } });
+      fillTrending(engine);
+
+      const result = await service.feed(ORG, { kind, locality: CHENNAI, language: 'ta' });
+
+      expect(ids(result)).toEqual(shown);
+      expect(result).not.toHaveProperty('hidden');
+      expect(settings.find).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['never saved anything', {}],
+    ['saved no switches', { [ORG]: null }],
+    ['saved an empty set', { [ORG]: {} }],
+    ['has them all on', { [ORG]: { trends: true, wikipedia: true, social: true } }],
+  ])(
+    'answers an empty list for a workspace that %s, after one read of its own row',
+    async (_name, sources) => {
+      const { service, engine, settings } = build({ sources });
+      fillTrending(engine);
+
+      const result = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+
+      expect(ids(result)).toEqual(['trends', 'wikipedia', 'social']);
+      expect(result.hidden).toEqual([]);
+      expect(settings.find).toHaveBeenCalledTimes(1);
+      expect(settings.find).toHaveBeenCalledWith(ORG);
+    },
+  );
+
+  it.each([
+    ['text', 'videos'],
+    ['a list', ['trends', 'social']],
+    ['a number', 0],
+    [
+      'values that are not booleans',
+      { trends: 'false', wikipedia: 0, social: null, videos: 'off', festivals: [] },
+    ],
+    ['keys nobody knows', JSON.parse('{"news":false,"all":false,"__proto__":{"trends":false}}')],
+  ])('switches nothing off for a row someone edited into %s', async (_name, stored) => {
+    const { service, engine } = build({ sources: { [ORG]: stored } });
+    fillTrending(engine);
+
+    const result = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+
+    expect(ids(result)).toEqual(['trends', 'wikipedia', 'social']);
+    expect(result.hidden).toEqual([]);
+  });
+
+  it('reads from an edited row only what is a switch and a boolean', async () => {
+    const stored = { trends: false, wikipedia: 'false', social: 1, top: false, place: false };
+    const { service, engine } = build({ sources: { [ORG]: stored } });
+    fillTrending(engine);
+
+    const result = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+
+    expect(ids(result)).toEqual(['wikipedia', 'social']);
+    expect(result.hidden).toEqual(['trends']);
+  });
+
+  it('does not call a switched-off group unavailable, even when its source is down', async () => {
+    const { service, engine, redis } = build({ sources: { [ORG]: { social: false } } });
+    engine.bluesky.fetch.mockResolvedValue(failure('upstream'));
+    engine.mastodon.fetch.mockResolvedValue(failure('upstream'));
+
+    const result = await service.feed(ORG, fromThePage(trending()));
+
+    expect(result.unavailable).toEqual([]);
+    expect(result.hidden).toEqual(['social']);
+    expect(breakers(redis)).toEqual([]);
+  });
+
+  it('does not count a switched-off group against the limit on new places', async () => {
+    const { service, redis } = build({ sources: { [ORG]: { trends: false } } });
+
+    for (let index = 0; index < NEW_PLACES_PER_MINUTE + 5; index += 1) {
+      await service.feed(ORG, fromThePage(trending(placeIn(index))));
+    }
+
+    expect(redis.read(workspaceKeys.feedMisses(ORG))).toBeNull();
+  });
+
+  it("does not let one workspace's switches reach another", async () => {
+    const { service, engine } = build({ sources: { [ORG]: { social: false } } });
+    fillTrending(engine);
+
+    const mine = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+    const theirs = await service.feed(OTHER_ORG, fromThePage(trending(CHENNAI)));
+
+    expect(ids(mine)).toEqual(['trends', 'wikipedia']);
+    expect(mine.hidden).toEqual(['social']);
+    expect(ids(theirs)).toEqual(['trends', 'wikipedia', 'social']);
+    expect(theirs.hidden).toEqual([]);
+    // What both show was fetched once and shared. The networks were asked once, for the one that shows them.
+    expect(engine.trends.fetch).toHaveBeenCalledTimes(1);
+    expect(engine.bluesky.fetch).toHaveBeenCalledTimes(1);
+    expect(engine.mastodon.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides a group whose copy is already there, and leaves that copy to everyone else', async () => {
+    const { service, engine, redis } = build({ sources: { [ORG]: { social: false } } });
+    fillTrending(engine);
+    await service.feed(OTHER_ORG, fromThePage(trending(CHENNAI)));
+    const kept = feedKeys(redis).sort();
+
+    const mine = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+    const theirs = await service.feed(OTHER_ORG, fromThePage(trending(CHENNAI)));
+
+    expect(ids(mine)).toEqual(['trends', 'wikipedia']);
+    expect(titles(mine).flat()).not.toContain('A Bluesky trend');
+    expect(ids(theirs)).toEqual(['trends', 'wikipedia', 'social']);
+    expect(feedKeys(redis).sort()).toEqual(kept);
+    expect(engine.bluesky.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the switches out of every key, every copy and every log line', async () => {
+    const { service, engine, redis } = build({
+      sources: { [ORG]: { social: false, videos: false } },
+    });
+    fillTrending(engine);
+
+    await service.feed(ORG, fromThePage(trending(CHENNAI)));
+    await service.feed(ORG, fromThePage(videos()));
+
+    const everythingKept = JSON.stringify(redis.keys.map((key) => [key, redis.read(key)]));
+    for (const trace of ['hidden', 'workspaceSources', '"social":false', '"videos":false']) {
+      expect(everythingKept).not.toContain(trace);
+      expect(everythingLogged()).not.toContain(trace);
+    }
+    // The workspace is in its own count of new places, and nowhere else.
+    expect(redis.keys.filter((key) => key.includes(ORG))).toEqual([workspaceKeys.feedMisses(ORG)]);
+    expect(everythingKept.split(ORG)).toHaveLength(2);
+    expect(everythingLogged()).not.toContain(ORG);
+  });
+
+  it('holds on the very next request after an admin flips a switch', async () => {
+    const sources: Record<string, unknown> = { [ORG]: { social: false } };
+    const { service, engine } = build({ sources });
+    fillTrending(engine);
+
+    expect(ids(await service.feed(ORG, fromThePage(trending(CHENNAI))))).not.toContain('social');
+    sources[ORG] = { social: true, wikipedia: false };
+    const next = await service.feed(ORG, fromThePage(trending(CHENNAI)));
+
+    expect(ids(next)).toEqual(['trends', 'social']);
+    expect(next.hidden).toEqual(['wikipedia']);
+  });
+
+  it('does not guess when the switches cannot be read: no answer, and nobody is asked', async () => {
+    const { service, engine, redis, settings } = build();
+    const away = new Error('the database is away');
+    settings.find.mockRejectedValue(away);
+
+    await expect(service.feed(ORG, fromThePage(trending()))).rejects.toBe(away);
+
+    expect(engine.trends.fetch).not.toHaveBeenCalled();
+    expect(engine.bluesky.fetch).not.toHaveBeenCalled();
+    expect(redis.keys).toEqual([]);
   });
 });

@@ -7,7 +7,8 @@
  * Draft In Copilot. The view stays free of both, and a festival's Plan A Post
  * (Module 05) opens the same sheet with a date of its own.
  *
- * `isAdmin` comes from the server page and goes straight through to the view.
+ * `isAdmin` and the workspace's saved `settings` (Module 06) come from the
+ * server page and go straight through to the view.
  */
 import { useState } from 'react';
 import { CardMenu } from './card-menu';

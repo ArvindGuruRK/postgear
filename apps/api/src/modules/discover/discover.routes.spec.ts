@@ -3,9 +3,13 @@
  * the shape of `automations.routes.spec.ts`: any member may read everything, nothing
  * is public, and a new route can only be added by adding it to this table. Then what
  * the controller itself decides, which is little on purpose.
+ *
+ * One route writes: saving the workspace's settings. The guard lets a member reach
+ * it on purpose, and the settings service refuses them in a sentence of its own,
+ * which is followed here from the guard to the table.
  */
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { PATH_METADATA } from '@nestjs/common/constants';
+import { ForbiddenException, RequestMethod, UnauthorizedException } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { JwtService } from '@nestjs/jwt';
@@ -23,14 +27,21 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { DiscoverController } from './discover.controller';
 import type { DiscoverService } from './discover.service';
 import { FEED_KINDS, type FeedQuery } from './dto/discover.schema';
+import type { UpdateSettingsInput } from './dto/settings.schema';
 import type { LocalityService } from './locality.service';
+import type { DiscoverSettingsRepository } from './settings.repository';
+import { DiscoverSettingsService } from './settings.service';
 
 const { prisma } = jest.requireMock('@postgear/db') as {
   prisma: { userOrganization: { findFirst: jest.Mock } };
 };
 
-const ROUTES = ['status', 'locality', 'search', 'feed'];
+const READS = ['status', 'locality', 'search', 'feed', 'settings'];
+/** The one route that changes anything. */
+const SAVE = 'saveSettings';
+const ROUTES = [...READS, SAVE];
 const ORG_ID = 'org-1';
+const SENTENCE = 'Only workspace admins can change the workspace place.';
 const user = { id: 'u1', email: 'a@x.com', isSuperAdmin: false, onboardingCompletedAt: null };
 const config = { get: (_key: string, fallback: string) => fallback } as unknown as ConfigService;
 
@@ -68,7 +79,7 @@ describe('Discover routes', () => {
     expect(routesOf().sort()).toEqual([...ROUTES].sort());
   });
 
-  it.each(ROUTES)('lets a member read %s', async (name) => {
+  it.each(READS)('lets a member read %s', async (name) => {
     prisma.userOrganization.findFirst.mockResolvedValue({
       organizationId: ORG_ID,
       role: Role.USER,
@@ -78,6 +89,32 @@ describe('Discover routes', () => {
     await expect(
       guard.canActivate(contextFor(name, { user, cookies: { pg_org: ORG_ID } })),
     ).resolves.toBe(true);
+  });
+
+  it('reads and saves the settings at one address, and saving is the only route that is not a read', () => {
+    const proto = DiscoverController.prototype as unknown as Record<string, object>;
+    const verbOf = (name: string) => Reflect.getMetadata(METHOD_METADATA, proto[name]);
+
+    expect(Reflect.getMetadata(PATH_METADATA, proto.settings)).toBe('settings');
+    expect(Reflect.getMetadata(PATH_METADATA, proto[SAVE])).toBe('settings');
+    expect(verbOf(SAVE)).toBe(RequestMethod.PATCH);
+    for (const name of READS) expect(verbOf(name)).toBe(RequestMethod.GET);
+  });
+
+  it.each([
+    ["a member, so that the refusal can be the sentence and not the guard's own", Role.USER],
+    ['an admin', Role.ADMIN],
+  ])('lets %s through the guard to save the settings', async (_name, role) => {
+    prisma.userOrganization.findFirst.mockResolvedValue({ organizationId: ORG_ID, role });
+    const guard = new RolesGuard(new Reflector(), config);
+    const request: { user: typeof user; cookies: object; activeOrg?: unknown } = {
+      user,
+      cookies: { pg_org: ORG_ID },
+    };
+
+    await expect(guard.canActivate(contextFor(SAVE, request))).resolves.toBe(true);
+    // The role the route then judges is the one the guard read from the membership.
+    expect(request.activeOrg).toEqual({ id: ORG_ID, role });
   });
 
   it.each(ROUTES)('refuses %s to someone outside the workspace', async (name) => {
@@ -102,6 +139,16 @@ describe('Discover routes', () => {
 
 describe('DiscoverController', () => {
   const org = { id: ORG_ID, role: Role.USER };
+  /** Stands in for whatever the settings service answers. */
+  const SAVED = { city: 'Chennai', languages: ['ta', 'en'] };
+  const CHENNAI_BODY: UpdateSettingsInput = {
+    countryCode: 'IN',
+    regionCode: 'IN-TN',
+    regionName: 'Tamil Nadu',
+    city: 'Chennai',
+    timeZone: 'Asia/Kolkata',
+    locationSource: 'SEARCH',
+  };
 
   function build() {
     const discover = {
@@ -113,11 +160,16 @@ describe('DiscoverController', () => {
       reverse: jest.fn(async () => CHENNAI),
       search: jest.fn(async () => [PARIS]),
     };
+    const settings = {
+      get: jest.fn(async (): Promise<unknown> => SAVED),
+      update: jest.fn(async (): Promise<unknown> => SAVED),
+    };
     const controller = new DiscoverController(
       discover as unknown as DiscoverService,
       localities as unknown as LocalityService,
+      settings as unknown as DiscoverSettingsService,
     );
-    return { controller, discover, localities };
+    return { controller, discover, localities, settings };
   }
 
   it('wraps the status in a named key', () => {
@@ -305,5 +357,171 @@ describe('DiscoverController', () => {
         locality: expect.objectContaining({ countryCode: null, city: null }),
       }),
     );
+  });
+
+  it.each(FEED_KINDS)(
+    "asks for the workspace's switches on %s when the page says so",
+    async (kind) => {
+      const { controller, discover } = build();
+
+      await controller.feed(org, { kind, country: 'IN', useWorkspaceSources: '1' });
+
+      expect(discover.feed).toHaveBeenCalledWith(
+        ORG_ID,
+        expect.objectContaining({ kind, workspaceSources: true }),
+      );
+    },
+  );
+
+  it('says nothing about switches for a request that did not ask, so its answer is unchanged', async () => {
+    const { controller, discover } = build();
+
+    await controller.feed(org, { kind: 'trending', country: 'IN' });
+
+    const handed = discover.feed.mock.calls[0] as unknown[];
+    expect(handed).toHaveLength(2);
+    expect(handed[1]).not.toHaveProperty('workspaceSources');
+  });
+
+  it('answers the hidden groups the feed answered, and takes the workspace only from the session', async () => {
+    const { controller, discover } = build();
+    const answered = { kind: 'videos', groups: [], unavailable: [], hidden: ['videos'] };
+    discover.feed.mockResolvedValue(answered);
+
+    await expect(
+      controller.feed(org, { kind: 'videos', country: 'IN', useWorkspaceSources: '1' }),
+    ).resolves.toBe(answered);
+    expect((discover.feed.mock.calls[0] as unknown[])[0]).toBe(ORG_ID);
+  });
+
+  it('wraps the settings of the active workspace in a named key', async () => {
+    const { controller, settings } = build();
+
+    await expect(controller.settings(org)).resolves.toEqual({ settings: SAVED });
+
+    expect(settings.get).toHaveBeenCalledTimes(1);
+    expect(settings.get).toHaveBeenCalledWith(ORG_ID);
+    expect(settings.update).not.toHaveBeenCalled();
+  });
+
+  it('hands a save on with the workspace, the person and the body, and wraps what was saved', async () => {
+    const { controller, settings } = build();
+    const admin = { id: ORG_ID, role: Role.ADMIN };
+
+    await expect(controller.saveSettings(admin, user, CHENNAI_BODY)).resolves.toEqual({
+      settings: SAVED,
+    });
+
+    expect(settings.update).toHaveBeenCalledTimes(1);
+    expect(settings.update).toHaveBeenCalledWith(admin, user, CHENNAI_BODY);
+  });
+
+  it('lets a refusal to save through as it is', async () => {
+    const { controller, settings } = build();
+    const refusal = new ForbiddenException(SENTENCE);
+    settings.update.mockRejectedValue(refusal);
+
+    await expect(controller.saveSettings(org, user, CHENNAI_BODY)).rejects.toBe(refusal);
+  });
+});
+
+describe('saving the settings, from the guard to the table', () => {
+  const proto = DiscoverController.prototype as unknown as Record<string, object>;
+  const body: UpdateSettingsInput = {
+    countryCode: 'IN',
+    city: 'Chennai',
+    locationSource: 'SEARCH',
+  };
+
+  /** The real guard, the real controller and the real settings service, over a table that only counts. */
+  function build() {
+    const table = {
+      find: jest.fn(async () => null),
+      upsert: jest.fn(async () => ({
+        countryCode: 'IN',
+        regionCode: null,
+        regionName: null,
+        city: 'Chennai',
+        timeZone: null,
+        languages: [],
+        topics: [],
+        sources: null,
+        locationSource: 'SEARCH',
+        updatedAt: new Date('2026-11-10T10:00:00.000Z'),
+      })),
+    };
+    const controller = new DiscoverController(
+      {} as DiscoverService,
+      {} as LocalityService,
+      new DiscoverSettingsService(table as unknown as DiscoverSettingsRepository),
+    );
+    return { controller, table, guard: new RolesGuard(new Reflector(), config) };
+  }
+
+  /** Goes through the guard as the request would, and hands back who it says is asking. */
+  async function admitted(guard: RolesGuard, asking: typeof user) {
+    const request: { user: typeof user; cookies: object; activeOrg?: { id: string; role: Role } } =
+      { user: asking, cookies: { pg_org: ORG_ID } };
+    const context = {
+      switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => proto[SAVE],
+      getClass: () => DiscoverController,
+    } as never;
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    if (!request.activeOrg) throw new Error('The guard resolved no workspace.');
+    return request.activeOrg;
+  }
+
+  it('refuses a member with the sentence and status 403, and writes nothing', async () => {
+    prisma.userOrganization.findFirst.mockResolvedValue({
+      organizationId: ORG_ID,
+      role: Role.USER,
+    });
+    const { controller, table, guard } = build();
+    const org = await admitted(guard, user);
+
+    const error = await controller.saveSettings(org, user, body).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect((error as ForbiddenException).getStatus()).toBe(403);
+    expect((error as ForbiddenException).message).toBe(SENTENCE);
+    expect(table.upsert).not.toHaveBeenCalled();
+    expect(table.find).not.toHaveBeenCalled();
+  });
+
+  it('saves for an admin, under the workspace the guard resolved and as the person asking', async () => {
+    prisma.userOrganization.findFirst.mockResolvedValue({
+      organizationId: ORG_ID,
+      role: Role.ADMIN,
+    });
+    const { controller, table, guard } = build();
+    const org = await admitted(guard, user);
+
+    const { settings } = await controller.saveSettings(org, user, body);
+
+    expect(settings).toMatchObject({
+      countryCode: 'IN',
+      city: 'Chennai',
+      locationSource: 'SEARCH',
+    });
+    expect(settings.place).toMatchObject({ countryName: 'India', city: 'Chennai' });
+    expect(table.upsert).toHaveBeenCalledWith(
+      ORG_ID,
+      'u1',
+      expect.objectContaining({ city: 'Chennai' }),
+    );
+  });
+
+  it('saves for a super admin who holds no membership in the workspace', async () => {
+    prisma.userOrganization.findFirst.mockResolvedValue(null);
+    const { controller, table, guard } = build();
+    const root = { ...user, id: 'root', isSuperAdmin: true };
+    const org = await admitted(guard, root);
+
+    await controller.saveSettings(org, root, body);
+
+    expect(org).toEqual({ id: ORG_ID, role: 'SUPERADMIN' });
+    expect(table.upsert).toHaveBeenCalledWith(ORG_ID, 'root', expect.any(Object));
   });
 });

@@ -25,6 +25,13 @@
  * What a card opens (the Create Post sheet, the overflow menu) is handed in
  * by `discover-page.tsx`; without it a card shows Open only. A festival's
  * Plan A Post opens the same sheet with a date for the draft.
+ *
+ * Module 06 brings in what the workspace saved (`settings`, read by the
+ * server page): the place a first visit starts from, the News tab's default
+ * topic, and the groups an admin switched off. Videos and Festivals say so
+ * without asking when the settings already do. Save For This Workspace in the
+ * place popover is the one thing here that writes them, and only for an
+ * admin.
  */
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import {
@@ -42,10 +49,19 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  toast,
 } from '@postgear/ui';
 import { CalendarDays, Clapperboard, Compass, MapPin } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import type { DiscoverItem, DiscoverStatus, DiscoverTab, FeedKind } from '@/types/discover';
+import { ApiError } from '@/lib/api';
+import { saveDiscoverSettings } from '@/lib/discover-api';
+import type {
+  DiscoverItem,
+  DiscoverSettings,
+  DiscoverStatus,
+  DiscoverTab,
+  FeedKind,
+} from '@/types/discover';
 import { DISCOVER_TABS } from '@/types/discover';
 import { useMounted } from '../posts/use-mounted';
 import type { CreatePostTarget } from './create-post-sheet';
@@ -53,17 +69,28 @@ import { DiscoverGroup, DiscoverSkeleton } from './discover-group';
 import {
   festivalPublishAt,
   isWorldwide,
+  locationSourceFor,
+  placeChipText,
   placeInSentence,
+  placePatch,
+  switchedOff,
   TAB_NAMES,
   updatedText,
+  workspaceLanguages,
 } from './discover-model';
 import { PlacesCredit } from './discover-ui';
 import { LanguageChip } from './language-chip';
 import { PlaceChip } from './place-chip';
+import { TopicSelect } from './topic-select';
 import { useFeed } from './use-feed';
 import { usePlace } from './use-place';
 
 export const LATER_STEP = 'Arrives in a later step of this sprint.';
+export const VIDEOS_TURNED_OFF = 'Videos are turned off for this workspace.';
+export const FESTIVALS_TURNED_OFF = 'Festivals are turned off for this workspace.';
+export const TURN_BACK_ON = 'Turn them back on in Settings, Discover.';
+export const WORKSPACE_SAVE_FAILED =
+  'We could not save the workspace place. Try again in a moment.';
 export const LOAD_FAILED_TITLE = 'Discover could not load';
 export const VIDEOS_NOT_SET_UP = 'Trending videos are not set up for this PostGear.';
 export const VIDEOS_ASK_ADMIN = 'Ask your PostGear admin to add a YouTube key.';
@@ -90,14 +117,36 @@ function useNow(): Date {
 
 /**
  * What the open tab asks the feed for, or null when there is nothing to ask:
- * Competitors has routes of its own, videos need a key and a country, and
- * festivals need a country.
+ * Competitors has routes of its own, videos need a key and a country,
+ * festivals need a country, and neither is asked for once the workspace has
+ * turned it off.
  */
-function feedKindFor(tab: DiscoverTab, videosOff: boolean, worldwide: boolean): FeedKind | null {
-  if (tab === 'competitors') return null;
+function feedKindFor(
+  tab: DiscoverTab,
+  videosOff: boolean,
+  worldwide: boolean,
+  turnedOff: boolean,
+): FeedKind | null {
+  if (tab === 'competitors' || turnedOff) return null;
   if (tab === 'videos' && (videosOff || worldwide)) return null;
   if (tab === 'festivals' && worldwide) return null;
   return tab;
+}
+
+/**
+ * A tab the workspace switched off in Settings. An admin is told where to
+ * turn it back on; a member cannot, so they get the one sentence. No button:
+ * the top bar's Settings is one click away and this is not an error.
+ */
+function TurnedOff({ tab, isAdmin }: { tab: 'videos' | 'festivals'; isAdmin: boolean }) {
+  const videos = tab === 'videos';
+  return (
+    <EmptyState
+      icon={videos ? Clapperboard : CalendarDays}
+      title={videos ? VIDEOS_TURNED_OFF : FESTIVALS_TURNED_OFF}
+      description={isAdmin ? TURN_BACK_ON : undefined}
+    />
+  );
 }
 
 /**
@@ -121,9 +170,15 @@ export interface DiscoverViewProps {
   status: DiscoverStatus | null;
   initialTab: DiscoverTab;
   /**
+   * What the workspace saved for Discover (Module 06): its place, languages,
+   * topics and switched-off groups. Null when the server could not ask; the
+   * page then starts from the time zone guess and hides nothing itself.
+   */
+  settings: DiscoverSettings | null;
+  /**
    * Whether the viewer is an admin of this workspace. Presentation only: it
-   * decides who is told how a missing piece gets set up (Module 06 reuses it
-   * for the workspace place). The API's guard is the real check.
+   * decides who is told how a missing piece gets set up, and who may press
+   * Save For This Workspace. The API's guard is the real check.
    */
   isAdmin: boolean;
   /** Opens the Create Post sheet for an item, read in this place and language (Module 04). */
@@ -136,19 +191,28 @@ export function DiscoverView({
   orgId,
   status,
   initialTab,
+  settings: initialSettings,
   isAdmin,
   onCreatePost,
   renderCardExtra,
 }: DiscoverViewProps) {
   const mounted = useMounted();
   const now = useNow();
-  const place = usePlace(orgId);
+  // Saving from the popover answers the new settings, so they live here.
+  const [settings, setSettings] = useState(initialSettings);
+  const [savingDefault, setSavingDefault] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const place = usePlace(orgId, settings);
+  // The place as it is now, for the moment a save comes back.
+  const reading = useRef(place);
+  reading.current = place;
   const [tab, setTab] = useState<DiscoverTab>(initialTab);
   const tabsRef = useRef<HTMLDivElement>(null);
   const worldwide = place.place !== null && isWorldwide(place.place);
   const videosOff = status?.sources.videos === false;
-  const kind = feedKindFor(tab, videosOff, worldwide);
-  const feed = useFeed(kind, place.place, place.language);
+  const turnedOff = (tab === 'videos' || tab === 'festivals') && switchedOff(settings, tab);
+  const kind = feedKindFor(tab, videosOff, worldwide, turnedOff);
+  const feed = useFeed(kind, place.place, place.language, place.topic);
 
   // The open tab lives in the URL without a navigation, which would re-run
   // the server page for nothing.
@@ -193,6 +257,44 @@ export function DiscoverView({
     feed.refresh();
   }
 
+  // A failed save was about the place it tried to save; a new place starts clean.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `current` is the trigger
+  useEffect(() => {
+    setSaveError(null);
+  }, [current]);
+
+  /**
+   * Save For This Workspace: the place being read, whole, with the chip's
+   * language first. One request. The person stays where they are, and the
+   * place now reads as the workspace's.
+   */
+  async function saveForWorkspace() {
+    if (!isAdmin || !current || !language || savingDefault) return;
+    setSavingDefault(true);
+    setSaveError(null);
+
+    try {
+      const saved = await saveDiscoverSettings({
+        ...placePatch(current, locationSourceFor(place.source)),
+        languages: workspaceLanguages(current, language),
+      });
+      setSettings(saved);
+      // Only if they are still reading the place that was saved: someone who
+      // moved on while the save was out keeps the place they moved to.
+      if (reading.current.place === current) reading.current.followWorkspace();
+      toast({
+        title: 'Saved',
+        description: `${placeChipText(current, 'workspace')} is now the workspace default.`,
+      });
+    } catch (cause) {
+      setSaveError(
+        cause instanceof ApiError && cause.status !== 0 ? cause.message : WORKSPACE_SAVE_FAILED,
+      );
+    } finally {
+      setSavingDefault(false);
+    }
+  }
+
   /** A tab whose every group is empty: the sentence that fits why. */
   function nothingToShow(): ReactNode {
     const where = current ? placeInSentence(current) : 'this place';
@@ -228,6 +330,13 @@ export function DiscoverView({
   }
 
   function feedTab(): ReactNode {
+    if (tab === 'videos' || tab === 'festivals') {
+      // The settings said so before asking, or (when they could not be read)
+      // the answer did. Either beats "not set up": off is the workspace's own call.
+      if (turnedOff || feed.data?.hidden?.includes(tab)) {
+        return <TurnedOff tab={tab} isAdmin={isAdmin} />;
+      }
+    }
     if (tab === 'videos' && videosOff) {
       return <VideosNotSetUp isAdmin={isAdmin} />;
     }
@@ -316,6 +425,13 @@ export function DiscoverView({
                   onLocate={place.locate}
                   onPick={place.pickPlace}
                   onWorldwide={place.pickWorldwide}
+                  workspace={{
+                    settings,
+                    isAdmin,
+                    saving: savingDefault,
+                    error: saveError,
+                    onSave: () => void saveForWorkspace(),
+                  }}
                 />
                 <LanguageChip
                   languages={place.place.newsLanguages}
@@ -375,6 +491,13 @@ export function DiscoverView({
 
         {FEED_TABS.map((value) => (
           <TabsContent key={value} value={value}>
+            {tab === value && value === 'news' && ready ? (
+              // Above the groups, and still there when a topic has nothing,
+              // so the way back to All is never lost.
+              <div className="mb-4">
+                <TopicSelect value={place.topic} onChange={place.setTopic} />
+              </div>
+            ) : null}
             {tab === value ? feedTab() : null}
           </TabsContent>
         ))}

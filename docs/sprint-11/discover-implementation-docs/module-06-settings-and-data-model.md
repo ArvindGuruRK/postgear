@@ -1,6 +1,6 @@
 # Module 06: Settings And Data Model
 
-> **Sprint 11, Discover** | Status: Not started | Size: M (one session)
+> **Sprint 11, Discover** | Status: Done, committed (2026-11-10). See the README Progress row and Decision Log for what differs from this page | Size: M (one session)
 > **Depends on**: [Module 03](module-03-discover-page-and-location.md)
 > **Stories**: DC-1.6, DC-3.2
 > **Next**: [Module 07](module-07-competitors.md)
@@ -42,14 +42,14 @@ Exactly the `DiscoverSettings` model and `DiscoverLocationSource` enum from the 
 
 ## Tasks
 
-- [ ] Schema, migration, `db:generate`, SCHEMA_NOTES (use `prisma-change`).
-- [ ] Repository and service with specs (upsert, member 403, validation refusals, unknown source id refused, feed leaves a switched-off group out without an upstream call).
-- [ ] Controller routes; `discover.routes.spec.ts` updated.
-- [ ] `use-place` workspace default; popover Save For This Workspace; tests (member disabled, admin saves and the badge appears, remembered choice wins on this device).
-- [ ] Topic select on News with tests.
-- [ ] Settings section and page with tests (read-only for members).
-- [ ] Seed: `seed-demo-org` gets Chennai, `['ta', 'en']`, topics `['BUSINESS']` so the demo starts in the right place; PostGear Second Org gets nothing.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Schema, migration, `db:generate`, SCHEMA_NOTES (use `prisma-change`).
+- [x] Repository and service with specs (upsert, member 403, validation refusals, unknown source id refused, feed leaves a switched-off group out without an upstream call).
+- [x] Controller routes; `discover.routes.spec.ts` updated.
+- [x] `use-place` workspace default; popover Save For This Workspace; tests (member disabled, admin saves and the badge appears, remembered choice wins on this device).
+- [x] Topic select on News with tests.
+- [x] Settings section and page with tests (read-only for members).
+- [x] Seed: `seed-demo-org` gets Chennai, `['ta', 'en']`, topics `['BUSINESS']` so the demo starts in the right place; PostGear Second Org gets nothing.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

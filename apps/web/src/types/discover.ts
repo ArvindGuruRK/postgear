@@ -135,7 +135,67 @@ export interface FeedResponse {
   today?: string;
   /** Videos only, and only with no groups. */
   reason?: FeedEmptyReason;
+  /**
+   * Only when the page asks with `useWorkspaceSources=1`: the groups of this
+   * tab the workspace has switched off. Never fetched, never in `unavailable`.
+   */
+  hidden?: DiscoverSourceSwitch[];
 }
+
+/** The five groups a workspace can switch off (Module 06). News has no switch. */
+export const DISCOVER_SOURCE_SWITCHES = [
+  'trends',
+  'wikipedia',
+  'social',
+  'videos',
+  'festivals',
+] as const;
+
+export type DiscoverSourceSwitch = (typeof DISCOVER_SOURCE_SWITCHES)[number];
+
+/** How the saved workspace place was found. `NONE` means no place was ever saved. */
+export type DiscoverLocationSource = 'NONE' | 'BROWSER' | 'SEARCH' | 'TIMEZONE';
+
+/** What a workspace saved for Discover: `GET` and `PATCH /discover/settings` answer it. */
+export interface DiscoverSettings {
+  /** Null with `locationSource: 'NONE'` means never saved; null with any other source means Worldwide was saved. */
+  countryCode: string | null;
+  regionCode: string | null;
+  regionName: string | null;
+  city: string | null;
+  timeZone: string | null;
+  /** BCP-47, the workspace's order, first is the default. At most 6. */
+  languages: string[];
+  /** Google News topic ids, the first is the News tab's default. */
+  topics: NewsTopic[];
+  /** A missing key means on; null means every group is on. */
+  sources: Partial<Record<DiscoverSourceSwitch, boolean>> | null;
+  locationSource: DiscoverLocationSource;
+  /** The saved place as every Discover answer carries one. Null when no place was ever saved. */
+  place: Locality | null;
+  /** ISO 8601, null when never saved. */
+  updatedAt: string | null;
+}
+
+/**
+ * What `PATCH /discover/settings` takes: any of these, never none. A place is
+ * sent whole (all five place fields with `locationSource`), so a new city
+ * never keeps the old region, and `sources` replaces the saved switches.
+ */
+export type DiscoverSettingsPatch = Partial<
+  Pick<
+    DiscoverSettings,
+    | 'countryCode'
+    | 'regionCode'
+    | 'regionName'
+    | 'city'
+    | 'timeZone'
+    | 'languages'
+    | 'topics'
+    | 'sources'
+    | 'locationSource'
+  >
+>;
 
 export interface DiscoverStatus {
   simulation: boolean;

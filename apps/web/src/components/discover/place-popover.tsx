@@ -2,8 +2,13 @@
 
 /**
  * What the place chip opens (blueprint section 3): Use My Location with the
- * sentence that says what happens to the position, a city search, Worldwide
- * and the OpenStreetMap credit.
+ * sentence that says what happens to the position, a city search, Worldwide,
+ * the workspace's saved place with Save For This Workspace (Module 06), and
+ * the OpenStreetMap credit.
+ *
+ * It is three parts, so Settings can use the first without copying it:
+ * `PlaceFinder` (the three ways to choose a place), `WorkspaceDefault` (the
+ * saved place and the button) and `PlacePopover`, which stacks them.
  *
  * The search asks only on Enter or the Search button, never as someone types:
  * OpenStreetMap's place service forbids lookups per keystroke, and the API
@@ -13,16 +18,20 @@
  *
  * When the browser says no, or cannot find a position, the sentence becomes a
  * warning and the field takes the focus, since typing the city is the way on.
+ *
+ * Only a workspace admin can save the place for everyone. A member sees the
+ * same button disabled, with the reason in a tooltip, so the page never sends
+ * a save the API would refuse.
  */
 import { GlobeIcon } from '@animateicons/react/lucide/globe-icon';
 import { MapPinIcon } from '@animateicons/react/lucide/map-pin-icon';
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
-import { Alert, Button, cn, Input, List, ListItem, MotionIcon } from '@postgear/ui';
+import { Alert, Button, cn, Input, List, ListItem, MotionIcon, TooltipHint } from '@postgear/ui';
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { searchPlaces } from '@/lib/discover-api';
-import type { Locality } from '@/types/discover';
-import { placeResultText } from './discover-model';
+import type { DiscoverSettings, Locality } from '@/types/discover';
+import { ADMINS_ONLY_PLACE, placeResultText, workspaceDefaultText } from './discover-model';
 import { PlacesCredit } from './discover-ui';
 import type { PlaceStatus } from './use-place';
 
@@ -35,7 +44,7 @@ export const GEOCODER_OFF = 'Finding places is turned off on this PostGear.';
 /** The API returns up to eight; the story says no more are shown. */
 const MAX_RESULTS = 8;
 
-export interface PlacePopoverProps {
+export interface PlaceFinderProps {
   status: PlaceStatus;
   /** The sentence for `denied` or `unavailable`. */
   message: string | null;
@@ -44,16 +53,24 @@ export interface PlacePopoverProps {
   onLocate: () => void;
   onPick: (place: Locality) => void;
   onWorldwide: () => void;
+  /** Every control off: a member reading Settings, or a save on its way. */
+  disabled?: boolean;
 }
 
-export function PlacePopover({
+/**
+ * The three ways to choose a place: Use My Location, the city search and
+ * Worldwide. The popover and the Workspace Place card in Settings both draw
+ * this; what a chosen place does is the caller's.
+ */
+export function PlaceFinder({
   status,
   message,
   geocoder,
   onLocate,
   onPick,
   onWorldwide,
-}: PlacePopoverProps) {
+  disabled = false,
+}: PlaceFinderProps) {
   const fieldId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -72,6 +89,7 @@ export function PlacePopover({
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (disabled) return;
     const query = text.replace(/\s+/g, ' ').trim();
     setNote(null);
     setProblem(null);
@@ -94,6 +112,15 @@ export function PlacePopover({
     } finally {
       setSearching(false);
     }
+  }
+
+  function pick(place: Locality) {
+    // In the popover a pick closes it; inline in Settings the search is done
+    // with, so the list and the typed city go.
+    setResults(null);
+    setNote(null);
+    setText('');
+    onPick(place);
   }
 
   function resultButtons(): HTMLButtonElement[] {
@@ -129,7 +156,12 @@ export function PlacePopover({
     return (
       <div className="flex flex-col gap-4">
         <p className="m-0 font-sans text-sm text-ink">{GEOCODER_OFF}</p>
-        <Button variant="secondary" onClick={onWorldwide} className="self-start">
+        <Button
+          variant="secondary"
+          onClick={onWorldwide}
+          disabled={disabled}
+          className="self-start"
+        >
           <MotionIcon icon={GlobeIcon} className="h-4 w-4" />
           Worldwide
         </Button>
@@ -143,7 +175,7 @@ export function PlacePopover({
         <Button
           variant="secondary"
           onClick={onLocate}
-          disabled={resolving}
+          disabled={resolving || disabled}
           aria-busy={resolving}
           className="self-start"
         >
@@ -174,13 +206,14 @@ export function PlacePopover({
             placeholder="Enter your city"
             autoComplete="address-level2"
             maxLength={80}
+            disabled={disabled}
             className="h-10 min-w-0 flex-1"
           />
           <Button
             type="submit"
             variant="secondary"
             className="h-10 shrink-0"
-            disabled={searching}
+            disabled={searching || disabled}
             aria-busy={searching}
           >
             <MotionIcon icon={SearchIcon} className="h-4 w-4" />
@@ -211,10 +244,12 @@ export function PlacePopover({
                   >
                     <button
                       type="button"
-                      onClick={() => onPick(result)}
+                      onClick={() => pick(result)}
+                      disabled={disabled}
                       className={cn(
                         'w-full px-3 py-2.5 text-start font-sans text-sm text-ink',
                         'outline-none hover:bg-primary focus-visible:bg-actionPrimary focus-visible:text-onActionPrimary',
+                        'disabled:cursor-not-allowed disabled:opacity-60',
                       )}
                     >
                       {label}
@@ -227,12 +262,83 @@ export function PlacePopover({
         </div>
       </form>
 
-      <Button variant="secondary" onClick={onWorldwide} className="self-start">
+      <Button variant="secondary" onClick={onWorldwide} disabled={disabled} className="self-start">
         <MotionIcon icon={GlobeIcon} className="h-4 w-4" />
         Worldwide
       </Button>
+    </div>
+  );
+}
 
-      <PlacesCredit />
+export interface WorkspaceDefaultProps {
+  /** What the workspace saved. Null when it could not be read: the line is left out, the button stays. */
+  settings: DiscoverSettings | null;
+  /** Presentation only: a member gets the button disabled with the reason. The API's guard is the real check. */
+  isAdmin: boolean;
+  saving: boolean;
+  /** The API's sentence when the last save failed. */
+  error: string | null;
+  /** Saves the place and language being read as the workspace's. Try Again calls it too. */
+  onSave: () => void;
+}
+
+/**
+ * The popover's last part: what the workspace starts from, and the button
+ * that makes the place being read the start for everyone.
+ */
+export function WorkspaceDefault({
+  settings,
+  isAdmin,
+  saving,
+  error,
+  onSave,
+}: WorkspaceDefaultProps) {
+  return (
+    <div className="flex flex-col gap-2 border-t-2 border-outline pt-4">
+      {settings ? (
+        <p className="m-0 font-sans text-sm text-ink" data-testid="discover-workspace-default">
+          {workspaceDefaultText(settings)}
+        </p>
+      ) : null}
+      {error ? (
+        <Alert variant="danger" className="items-center px-3 py-2 text-xs">
+          <span className="flex-1">{error}</span>
+          <Button variant="secondary" size="sm" onClick={onSave} disabled={saving}>
+            Try Again
+          </Button>
+        </Alert>
+      ) : null}
+      <TooltipHint
+        label={ADMINS_ONLY_PLACE}
+        disabled={!isAdmin}
+        hidden={isAdmin}
+        triggerClassName="self-start"
+      >
+        <Button
+          variant="secondary"
+          onClick={onSave}
+          disabled={!isAdmin || saving}
+          aria-busy={saving}
+          className="self-start"
+        >
+          {saving ? 'Saving…' : 'Save For This Workspace'}
+        </Button>
+      </TooltipHint>
+    </div>
+  );
+}
+
+export interface PlacePopoverProps extends Omit<PlaceFinderProps, 'disabled'> {
+  /** The workspace's saved place and its button. Left out, that part is not drawn. */
+  workspace?: WorkspaceDefaultProps;
+}
+
+export function PlacePopover({ workspace, ...finder }: PlacePopoverProps) {
+  return (
+    <div className="flex flex-col gap-4">
+      <PlaceFinder {...finder} />
+      {workspace ? <WorkspaceDefault {...workspace} /> : null}
+      {finder.geocoder === 'off' ? null : <PlacesCredit />}
     </div>
   );
 }

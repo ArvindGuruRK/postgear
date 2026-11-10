@@ -2,8 +2,12 @@
  * Discover (Sprint 11): what is rising, what is news, what is being watched and
  * what is coming up in a place.
  *
- * Owns no table: nothing from a feed is written to Postgres. Everything it keeps is
- * in Redis, for a limited time, and shared by everyone in that place.
+ * Nothing from a feed is written to Postgres. Everything a feed keeps is in Redis,
+ * for a limited time, and shared by everyone in that place.
+ *
+ * It owns one table, `DiscoverSettings` (Module 06): a workspace's own place,
+ * languages, news topics and switched-off groups, a row per workspace at most.
+ * `DiscoverSettingsRepository` is the only thing that touches it.
  *
  * The engine sits behind a token, built once from the environment, so a service
  * never knows whether it is reading recorded feeds and a test hands it a fake. The
@@ -22,6 +26,8 @@ import { createDiscoverEngine, DISCOVER_ENGINE, describeEngine } from './discove
 import { DiscoverGate } from './discover.gate';
 import { DiscoverService } from './discover.service';
 import { LocalityService } from './locality.service';
+import { DiscoverSettingsRepository } from './settings.repository';
+import { DiscoverSettingsService } from './settings.service';
 
 const MAX_UPSTREAM_FETCHES = 4;
 const GATE_WAIT_MS = 4_000;
@@ -49,6 +55,8 @@ const GATE_WAIT_MS = 4_000;
     },
     DiscoverCache,
     DiscoverService,
+    DiscoverSettingsRepository,
+    DiscoverSettingsService,
     LocalityService,
   ],
   exports: [DiscoverService],

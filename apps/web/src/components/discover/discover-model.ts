@@ -3,7 +3,9 @@
  * what the place chip says in each state, the line a search result reads as,
  * which language a new place starts in, what is remembered per workspace, how
  * old the page's copy is, and (Module 05) which week a festival falls in, how
- * far off it is, and when a post about it should go out.
+ * far off it is, and when a post about it should go out. Module 06 adds what
+ * a workspace saved: where a visit starts, what Save For This Workspace
+ * sends, and the News topic.
  *
  * The words are the page's (place, trend, story, festival, Worldwide), never
  * the API's.
@@ -13,14 +15,19 @@ import type {
   DiscoverGroup,
   DiscoverGroupId,
   DiscoverItem,
+  DiscoverLocationSource,
+  DiscoverSettings,
+  DiscoverSettingsPatch,
+  DiscoverSourceSwitch,
   DiscoverTab,
   Locality,
+  NewsTopic,
 } from '@/types/discover';
-import { DISCOVER_TABS } from '@/types/discover';
+import { DISCOVER_TABS, NEWS_TOPICS } from '@/types/discover';
 import { viewerTimeZone } from '../home/home-model';
 import { formatRelative } from '../seo/seo-view-model';
 
-/** How the current place was chosen. `workspace` arrives with Module 06. */
+/** How the current place was chosen. `workspace` is the workspace's saved place (Module 06). */
 export type PlaceSource = 'guess' | 'browser' | 'search' | 'worldwide' | 'workspace';
 
 export const PLACE_SOURCES: readonly PlaceSource[] = [
@@ -114,10 +121,34 @@ export function placeStorageKey(orgId: string): string {
   return `pg:discover:${orgId}`;
 }
 
+/** What the News tab's Topic select holds: one of Google's topics, or All (no topic group). */
+export type TopicChoice = NewsTopic | 'ALL';
+
+/** The select's options: All, then Google's order. */
+export const TOPIC_CHOICES: readonly TopicChoice[] = ['ALL', ...NEWS_TOPICS];
+
+export const TOPIC_NAMES: Record<TopicChoice, string> = {
+  ALL: 'All',
+  WORLD: 'World',
+  NATION: 'Nation',
+  BUSINESS: 'Business',
+  TECHNOLOGY: 'Technology',
+  ENTERTAINMENT: 'Entertainment',
+  SPORTS: 'Sports',
+  SCIENCE: 'Science',
+  HEALTH: 'Health',
+};
+
+export function isNewsTopic(value: unknown): value is NewsTopic {
+  return typeof value === 'string' && (NEWS_TOPICS as readonly string[]).includes(value);
+}
+
 export interface RememberedPlace {
   place: Locality;
   source: PlaceSource;
   language: string;
+  /** The News topic, once the person picked one (Module 06). Left out until then. */
+  topic?: TopicChoice;
 }
 
 const LANGUAGE_TAG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
@@ -182,10 +213,15 @@ export function readRememberedPlace(raw: string | null): RememberedPlace | null 
     newsLanguages: record.place.newsLanguages,
   };
 
+  // Added in Module 06 without a new version: a record from before it has no
+  // topic and is still a choice. Anything that is not a topic is dropped.
+  const topic = record.topic === 'ALL' || isNewsTopic(record.topic) ? record.topic : undefined;
+
   return {
     place,
     source: record.source as PlaceSource,
     language: languageFor(place, record.language),
+    ...(topic ? { topic } : {}),
   };
 }
 
@@ -205,7 +241,139 @@ export function serializeRememberedPlace(remembered: RememberedPlace): string {
     },
     source: remembered.source,
     language: remembered.language,
+    ...(remembered.topic ? { topic: remembered.topic } : {}),
   });
+}
+
+/*
+ * The workspace's saved place (Module 06). An admin saves a place, languages
+ * and topics for everyone; a person's own choice still wins on their device.
+ */
+
+export const NO_WORKSPACE_DEFAULT = 'No workspace default yet.';
+
+/** The API's own refusal, word for word, so the tooltip and a 403 read the same. */
+export const ADMINS_ONLY_PLACE = 'Only workspace admins can change the workspace place.';
+
+/** How many languages a workspace keeps. */
+export const MAX_WORKSPACE_LANGUAGES = 6;
+
+/** The popover's line: "Workspace default: Chennai, Tamil Nadu", or that there is none yet. */
+export function workspaceDefaultText(settings: DiscoverSettings): string {
+  if (!settings.place) return NO_WORKSPACE_DEFAULT;
+  return `Workspace default: ${placeChipText(settings.place, 'workspace')}`;
+}
+
+/** Where a visit to Discover starts. */
+export type PlaceStart =
+  | { from: 'remembered'; place: Locality; source: PlaceSource; language: string }
+  | { from: 'workspace'; place: Locality; language: string }
+  | { from: 'guess' };
+
+/** Places the person picked themselves: found by the browser, searched, or Worldwide. */
+const OWN_CHOICES: ReadonlySet<PlaceSource> = new Set(['browser', 'search', 'worldwide']);
+
+/**
+ * Where a visit starts, from what this browser remembers and what the
+ * workspace saved (null when the settings could not be read).
+ *
+ * A place the person chose wins on this device. Without one, the workspace's
+ * saved place is the start, in the workspace's first language when the place
+ * offers it; without that either, the time zone guess.
+ *
+ * A remembered guess or workspace place is not a choice of place: it is only
+ * stored because the person switched the language or the topic on it. So it
+ * gives way to the workspace's place as it is saved now (a changed default
+ * reaches everyone who never chose a place), and the language they switched
+ * to is kept when the place still offers it. A remembered workspace place
+ * whose default was cleared since is nobody's any more, and the guess is made
+ * again.
+ */
+export function placeStart(
+  remembered: RememberedPlace | null,
+  settings: DiscoverSettings | null,
+): PlaceStart {
+  const saved = settings?.place ?? null;
+
+  if (remembered && (OWN_CHOICES.has(remembered.source) || !saved)) {
+    const cleared = remembered.source === 'workspace' && settings !== null;
+    if (!cleared) {
+      return {
+        from: 'remembered',
+        place: remembered.place,
+        source: remembered.source,
+        language: remembered.language,
+      };
+    }
+  }
+  if (!saved) return { from: 'guess' };
+
+  const switched = remembered?.language;
+  const wanted =
+    switched && saved.newsLanguages.includes(switched) ? switched : settings?.languages[0];
+  return { from: 'workspace', place: saved, language: languageFor(saved, wanted) };
+}
+
+/** The News tab's default topic: the workspace's first, or null for All. */
+export function workspaceTopic(settings: DiscoverSettings | null): NewsTopic | null {
+  const first = settings?.topics[0];
+  return isNewsTopic(first) ? first : null;
+}
+
+/** Whether the workspace switched a group off. A missing key, or no settings, means on. */
+export function switchedOff(
+  settings: DiscoverSettings | null,
+  group: DiscoverSourceSwitch,
+): boolean {
+  return settings?.sources?.[group] === false;
+}
+
+/**
+ * How a saved place says it was found: the browser's position, the time zone
+ * guess, or picked (a search, Worldwide, or the workspace's own place saved
+ * again).
+ */
+export function locationSourceFor(source: PlaceSource): DiscoverLocationSource {
+  if (source === 'browser') return 'BROWSER';
+  if (source === 'guess') return 'TIMEZONE';
+  return 'SEARCH';
+}
+
+/**
+ * The languages saved with a place: the one being read first, then the
+ * place's others that News has an edition in, each once, six at most.
+ */
+export function workspaceLanguages(place: Locality, language?: string | null): string[] {
+  const lead = language ? [language] : [];
+  return [...new Set([...lead, ...place.newsLanguages])].slice(0, MAX_WORKSPACE_LANGUAGES);
+}
+
+/** The five place fields and how the place was found, as one save carries them. */
+export type PlacePatch = Required<
+  Pick<
+    DiscoverSettingsPatch,
+    'countryCode' | 'regionCode' | 'regionName' | 'city' | 'timeZone' | 'locationSource'
+  >
+>;
+
+/**
+ * A place as `PATCH /discover/settings` takes it: whole, so a new city never
+ * keeps the old region. Worldwide is every field null with a source that is
+ * not `NONE`; `NONE` with every field null clears the saved place.
+ */
+export function placePatch(
+  place: Locality | null,
+  locationSource: DiscoverLocationSource,
+): PlacePatch {
+  const named = place && !isWorldwide(place) ? place : null;
+  return {
+    countryCode: named?.countryCode ?? null,
+    regionCode: named?.regionCode ?? null,
+    regionName: named?.regionName ?? null,
+    city: named?.city ?? null,
+    timeZone: named?.timeZone ?? null,
+    locationSource,
+  };
 }
 
 /** The tab in `?tab=`, or Trending. */

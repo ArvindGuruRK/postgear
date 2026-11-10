@@ -1,15 +1,19 @@
 /**
  * The Discover client: the position is rounded to two decimals here and
- * nowhere else, and the feed query sends only what the API accepts.
+ * nowhere else, and the feed query sends only what the API accepts. Module
+ * 06: every feed call asks for the workspace's switches, and the settings are
+ * read and saved through one route.
  */
-import type { Locality } from '@/types/discover';
+import type { DiscoverSettings, Locality } from '@/types/discover';
 import { api } from './api';
 import {
   feedQuery,
+  getDiscoverSettings,
   getFeed,
   localityFromPosition,
   localityFromTimeZone,
   roundCoordinate,
+  saveDiscoverSettings,
   searchPlaces,
 } from './discover-api';
 
@@ -93,6 +97,7 @@ describe('feedQuery', () => {
       regionName: 'Tamil Nadu',
       city: 'Chennai',
       lang: 'ta',
+      useWorkspaceSources: '1',
       tz: 'Asia/Kolkata',
     });
   });
@@ -101,6 +106,7 @@ describe('feedQuery', () => {
     expect(Object.fromEntries(feedQuery('news', WORLD, 'en'))).toEqual({
       kind: 'news',
       lang: 'en',
+      useWorkspaceSources: '1',
     });
   });
 
@@ -110,8 +116,16 @@ describe('feedQuery', () => {
       kind: 'news',
       country: 'IN',
       lang: 'hi',
+      useWorkspaceSources: '1',
       tz: 'Asia/Kolkata',
     });
+  });
+
+  it('asks every tab to leave out what the workspace switched off', () => {
+    for (const kind of ['trending', 'news', 'videos', 'festivals'] as const) {
+      expect(feedQuery(kind, CHENNAI, 'ta').get('useWorkspaceSources')).toBe('1');
+    }
+    expect(feedQuery('videos', WORLD, 'en').toString()).toContain('useWorkspaceSources=1');
   });
 
   it('adds a topic only when one is asked for', () => {
@@ -124,5 +138,46 @@ describe('feedQuery', () => {
     expect(mockedApi).toHaveBeenCalledWith(
       `/discover/feed?${feedQuery('news', CHENNAI, 'ta').toString()}`,
     );
+  });
+
+  it('carries the News topic through getFeed', async () => {
+    await getFeed('news', CHENNAI, 'ta', 'BUSINESS');
+    expect(mockedApi.mock.calls[0]?.[0]).toContain('&topic=BUSINESS');
+  });
+});
+
+describe('the workspace settings routes (Module 06)', () => {
+  const SETTINGS: DiscoverSettings = {
+    countryCode: 'IN',
+    regionCode: 'IN-TN',
+    regionName: 'Tamil Nadu',
+    city: 'Chennai',
+    timeZone: 'Asia/Kolkata',
+    languages: ['ta', 'en'],
+    topics: ['BUSINESS'],
+    sources: null,
+    locationSource: 'SEARCH',
+    place: CHENNAI,
+    updatedAt: '2026-11-10T08:00:00.000Z',
+  };
+
+  it('reads the settings and hands back what is inside the answer', async () => {
+    mockedApi.mockResolvedValueOnce({ settings: SETTINGS });
+
+    await expect(getDiscoverSettings()).resolves.toEqual(SETTINGS);
+    expect(mockedApi).toHaveBeenCalledWith('/discover/settings');
+  });
+
+  it('saves a patch as one PATCH and hands back all the settings', async () => {
+    mockedApi.mockResolvedValueOnce({ settings: { ...SETTINGS, languages: ['en', 'ta'] } });
+
+    const saved = await saveDiscoverSettings({ languages: ['en', 'ta'] });
+
+    expect(saved.languages).toEqual(['en', 'ta']);
+    expect(mockedApi).toHaveBeenCalledTimes(1);
+    expect(mockedApi).toHaveBeenCalledWith('/discover/settings', {
+      method: 'PATCH',
+      body: { languages: ['en', 'ta'] },
+    });
   });
 });

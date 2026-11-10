@@ -31,6 +31,9 @@ export const DISCOVER_MESSAGES = {
 
   feedThrottled: 'That is a lot of new places at once. Try again in a moment.',
 
+  /** What a member is told on trying to save any of the workspace's Discover settings. */
+  settingsAdminOnly: 'Only workspace admins can change the workspace place.',
+
   risingTitle: (place: string) => `Rising Searches In ${place}`,
   risingSubtitle: 'Via Google Trends.',
   placeTitle: (city: string) => `${city} Stories`,

@@ -19,6 +19,7 @@ import {
   OnboardingTeamSize,
   Period,
   PostingFrequency,
+  Prisma,
   PrismaClient,
   Provider,
   ReferralSource,
@@ -345,6 +346,11 @@ async function main() {
   // steps left unconnected so the canvas shows Finish Setup.
   const seededAutomations = await seedAutomations(prisma, organization.id, user.id);
 
+  // Sprint 11: the demo workspace starts Discover in Chennai, in Tamil then
+  // English, following Business. The second workspace gets no row, so "no
+  // workspace default yet" has somewhere to be seen.
+  const seededDiscover = await seedDiscoverSettings(organization.id, user.id);
+
   console.log('Seed complete:', {
     organizationId: organization.id,
     secondOrganizationId: secondOrganization.id,
@@ -361,7 +367,37 @@ async function main() {
     seoAudits: seededSeo,
     studio: seededStudio,
     automations: seededAutomations,
+    discover: seededDiscover,
   });
+}
+
+/**
+ * The demo workspace's Discover default (Sprint 11, Module 06). Upserted on the
+ * workspace id, which is the row's key, and reset on re-seed so a hand check
+ * that cleared or changed it starts from Chennai again. A place only: the row
+ * has no position to hold.
+ */
+async function seedDiscoverSettings(organizationId: string, updatedById: string) {
+  const settings = {
+    countryCode: 'IN',
+    regionCode: 'IN-TN',
+    regionName: 'Tamil Nadu',
+    city: 'Chennai',
+    timeZone: 'Asia/Kolkata',
+    languages: ['ta', 'en'],
+    topics: ['BUSINESS'],
+    sources: Prisma.DbNull,
+    locationSource: 'SEARCH' as const,
+    updatedById,
+  };
+
+  await prisma.discoverSettings.upsert({
+    where: { organizationId },
+    update: settings,
+    create: { organizationId, ...settings },
+  });
+
+  return { place: `${settings.city}, ${settings.regionName}`, languages: settings.languages };
 }
 
 /**

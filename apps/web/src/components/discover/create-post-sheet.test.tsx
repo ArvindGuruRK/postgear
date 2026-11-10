@@ -35,6 +35,10 @@ const mockedStream = streamEvents as jest.MockedFunction<typeof streamEvents>;
 
 beforeAll(stubBrowserLayout);
 
+// These suites render whole pages, and the Discover set runs side by side: on a
+// busy machine the first render of a suite can take longer than Jest's 5 s.
+jest.setTimeout(20_000);
+
 const CHENNAI: Locality = {
   countryCode: 'IN',
   countryName: 'India',

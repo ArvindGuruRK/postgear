@@ -49,6 +49,10 @@ const mockedApi = api as jest.MockedFunction<typeof api>;
 
 beforeAll(stubBrowserLayout);
 
+// These suites render whole pages, and the Discover set runs side by side: on a
+// busy machine the first render of a suite can take longer than Jest's 5 s.
+jest.setTimeout(20_000);
+
 const CHENNAI: Locality = {
   countryCode: 'IN',
   countryName: 'India',
@@ -154,6 +158,9 @@ function renderView(
         orgId="org-a"
         status={status}
         initialTab={initialTab}
+        // As before Module 06: the workspace's settings could not be read.
+        // `discover-workspace.test.tsx` covers the page with them.
+        settings={null}
         isAdmin={false}
         {...props}
       />

@@ -3,9 +3,11 @@
 /**
  * The place and language Discover shows, and how they were chosen.
  *
- * - **First visit**: a guess from the browser's time zone (`guess`), which
- *   needs no permission and no outside call, so the page is never empty and
- *   never opens on a prompt.
+ * - **First visit**: the workspace's saved place when an admin saved one
+ *   (`workspace`, Module 06), in the workspace's first language. Otherwise a
+ *   guess from the browser's time zone (`guess`), which needs no permission
+ *   and no outside call. Either way the page is never empty and never opens
+ *   on a prompt.
  * - **Use My Location**: only from a click. The permission is checked first
  *   where the browser can say, so a blocked one is explained instead of asked
  *   again; the position goes straight to `localityFromPosition`, which rounds
@@ -15,22 +17,31 @@
  * Every choice is remembered in this browser per workspace
  * (`pg:discover:<orgId>`), and a new place starts in its first language. The
  * storage is wrapped: a private window or blocked site data still gets a
- * working page, just one that forgets. Module 06 adds the workspace default
- * as the starting point before the guess.
+ * working page, just one that forgets.
+ *
+ * A workspace start, like a guess, is not written to storage: a default the
+ * admin changes later reaches everyone who never chose a place for
+ * themselves. `placeStart` in `discover-model.ts` holds the whole rule.
+ *
+ * The News topic is remembered in the same record. Until the person picks
+ * one it follows the workspace's first topic.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { localityFromPosition, localityFromTimeZone } from '@/lib/discover-api';
-import type { Locality } from '@/types/discover';
+import type { DiscoverSettings, Locality, NewsTopic } from '@/types/discover';
 import { viewerTimeZone } from '../home/home-model';
 import {
   firstLanguage,
   languageFor,
   type PlaceSource,
+  placeStart,
   placeStorageKey,
   readRememberedPlace,
   serializeRememberedPlace,
+  type TopicChoice,
   WORLDWIDE_PLACE,
+  workspaceTopic,
 } from './discover-model';
 
 export type PlaceStatus = 'idle' | 'resolving' | 'denied' | 'unavailable';
@@ -57,10 +68,19 @@ export interface PlaceHandle {
   message: string | null;
   /** The guess could not be made (the API did not answer). */
   failed: boolean;
+  /** The News topic: the person's own once they picked, else the workspace's first. Null is All. */
+  topic: NewsTopic | null;
   locate: () => Promise<boolean>;
   pickPlace: (place: Locality) => void;
   pickWorldwide: () => void;
   setLanguage: (language: string) => void;
+  /** Null picks All. Remembered with the place. */
+  setTopic: (topic: NewsTopic | null) => void;
+  /**
+   * The current place was just saved as the workspace's: it reads as the
+   * workspace place from now on (the chip's badge) and follows the default.
+   */
+  followWorkspace: () => void;
   /** Try the guess again after `failed`. */
   retry: () => void;
 }
@@ -109,7 +129,52 @@ function isPositionError(cause: unknown): cause is GeolocationPositionError {
   return typeof cause === 'object' && cause !== null && 'code' in cause && !('status' in cause);
 }
 
-export function usePlace(orgId: string): PlaceHandle {
+/** What asking the browser for its place came to. */
+export type BrowserPlace =
+  | { found: true; place: Locality }
+  | { found: false; status: 'denied' | 'unavailable'; message: string };
+
+/**
+ * The browser's place, for Use My Location on the page and in Settings. Only
+ * ever called from a click. A permission the browser already refused is
+ * explained without asking again; `onAsking` runs when the browser is really
+ * asked, so the caller can show it is busy. The position is rounded by
+ * `localityFromPosition` and kept nowhere.
+ */
+export async function findBrowserPlace(onAsking?: () => void): Promise<BrowserPlace> {
+  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+    // Plain HTTP on a LAN address has no geolocation at all.
+    return { found: false, status: 'unavailable', message: LOCATION_MESSAGES.unavailable };
+  }
+
+  if (await permissionDenied()) {
+    return { found: false, status: 'denied', message: LOCATION_MESSAGES.denied };
+  }
+
+  onAsking?.();
+  try {
+    const position = await currentPosition();
+    const place = await localityFromPosition(position.coords.latitude, position.coords.longitude);
+    return { found: true, place };
+  } catch (cause) {
+    if (isPositionError(cause) && cause.code === 1) {
+      return { found: false, status: 'denied', message: LOCATION_MESSAGES.denied };
+    }
+    return {
+      found: false,
+      status: 'unavailable',
+      // The API's sentence when it is the one that failed ("Try again in a
+      // moment." for the throttle); the browser's otherwise.
+      message: cause instanceof ApiError ? cause.message : LOCATION_MESSAGES.unavailable,
+    };
+  }
+}
+
+/**
+ * @param workspace What the workspace saved, as the server page read it. Null
+ *   when it could not be read; the page then behaves as it did before Module 06.
+ */
+export function usePlace(orgId: string, workspace: DiscoverSettings | null = null): PlaceHandle {
   const [place, setPlaceState] = useState<Locality | null>(null);
   const [language, setLanguageState] = useState<string | null>(null);
   const [source, setSource] = useState<PlaceSource>('guess');
@@ -117,21 +182,37 @@ export function usePlace(orgId: string): PlaceHandle {
   const [message, setMessage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // The person's own topic; null until they pick one.
+  const [chosenTopic, setChosenTopic] = useState<TopicChoice | null>(null);
   // Which workspace the current answers belong to: a guess or a position
   // that lands after a workspace switch must not be shown in the other one.
   const owner = useRef(orgId);
+  // Where a visit starts is decided once per workspace. Saving a new default
+  // from this page must not move the place the person is already reading.
+  const saved = useRef(workspace);
+  saved.current = workspace;
 
   const remember = useCallback(
-    (next: Locality, nextSource: PlaceSource, nextLanguage: string) => {
+    (
+      next: Locality,
+      nextSource: PlaceSource,
+      nextLanguage: string,
+      nextTopic: TopicChoice | null = chosenTopic,
+    ) => {
       setPlaceState(next);
       setSource(nextSource);
       setLanguageState(nextLanguage);
       writeStorage(
         placeStorageKey(orgId),
-        serializeRememberedPlace({ place: next, source: nextSource, language: nextLanguage }),
+        serializeRememberedPlace({
+          place: next,
+          source: nextSource,
+          language: nextLanguage,
+          ...(nextTopic ? { topic: nextTopic } : {}),
+        }),
       );
     },
-    [orgId],
+    [orgId, chosenTopic],
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the explicit retry trigger
@@ -142,10 +223,15 @@ export function usePlace(orgId: string): PlaceHandle {
     setFailed(false);
 
     const remembered = readRememberedPlace(readStorage(placeStorageKey(orgId)));
-    if (remembered) {
-      setPlaceState(remembered.place);
-      setSource(remembered.source);
-      setLanguageState(remembered.language);
+    setChosenTopic(remembered?.topic ?? null);
+
+    const start = placeStart(remembered, saved.current);
+    if (start.from !== 'guess') {
+      // Neither is written to storage here: a remembered choice is already
+      // there, and a workspace start is read from the workspace every visit.
+      setPlaceState(start.place);
+      setSource(start.from === 'workspace' ? 'workspace' : start.source);
+      setLanguageState(start.language);
       return;
     }
 
@@ -176,40 +262,17 @@ export function usePlace(orgId: string): PlaceHandle {
     const asking = orgId;
     setMessage(null);
 
-    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      // Plain HTTP on a LAN address has no geolocation at all.
-      setStatus('unavailable');
-      setMessage(LOCATION_MESSAGES.unavailable);
-      return false;
-    }
+    const answer = await findBrowserPlace(() => setStatus('resolving'));
+    if (owner.current !== asking) return false;
 
-    if (await permissionDenied()) {
-      setStatus('denied');
-      setMessage(LOCATION_MESSAGES.denied);
+    if (!answer.found) {
+      setStatus(answer.status);
+      setMessage(answer.message);
       return false;
     }
-
-    setStatus('resolving');
-    try {
-      const position = await currentPosition();
-      const found = await localityFromPosition(position.coords.latitude, position.coords.longitude);
-      if (owner.current !== asking) return false;
-      remember(found, 'browser', firstLanguage(found));
-      setStatus('idle');
-      return true;
-    } catch (cause) {
-      if (owner.current !== asking) return false;
-      if (isPositionError(cause) && cause.code === 1) {
-        setStatus('denied');
-        setMessage(LOCATION_MESSAGES.denied);
-      } else {
-        setStatus('unavailable');
-        // The API's sentence when it is the one that failed ("Try again in a
-        // moment." for the throttle); the browser's otherwise.
-        setMessage(cause instanceof ApiError ? cause.message : LOCATION_MESSAGES.unavailable);
-      }
-      return false;
-    }
+    remember(answer.place, 'browser', firstLanguage(answer.place));
+    setStatus('idle');
+    return true;
   }, [orgId, remember]);
 
   const pickPlace = useCallback(
@@ -237,7 +300,24 @@ export function usePlace(orgId: string): PlaceHandle {
     [place, source, remember],
   );
 
+  const setTopic = useCallback(
+    (next: NewsTopic | null) => {
+      const choice: TopicChoice = next ?? 'ALL';
+      setChosenTopic(choice);
+      if (place && language) remember(place, source, language, choice);
+    },
+    [place, source, language, remember],
+  );
+
+  const followWorkspace = useCallback(() => {
+    if (place && language) remember(place, 'workspace', language);
+  }, [place, language, remember]);
+
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
+
+  // All is a choice too: it beats the workspace's topic once it is picked.
+  const ownTopic = chosenTopic === 'ALL' ? null : chosenTopic;
+  const topic = chosenTopic === null ? workspaceTopic(workspace) : ownTopic;
 
   return {
     place,
@@ -246,10 +326,13 @@ export function usePlace(orgId: string): PlaceHandle {
     status,
     message,
     failed,
+    topic,
     locate,
     pickPlace,
     pickWorldwide,
     setLanguage,
+    setTopic,
+    followWorkspace,
     retry,
   };
 }

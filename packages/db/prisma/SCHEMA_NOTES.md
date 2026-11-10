@@ -60,6 +60,7 @@ Sprint numbers below refer to [`docs/sprint-documents/`](../../../docs/sprint-do
 | `AutomationConnection` | An outside app (Slack, Teams, Discord, secret HTTP headers, Google) linked to a workspace once and picked by any workflow. `credentials` is one encrypted blob, never returned; soft deleted. | Sprint 10 |
 | `AutomationEffect` | The step gateway's ledger: one row per side effect a workflow step asked the API for (a draft, a queued or published post, an AI call, an email), so a retried step never acts twice. See [Gateway and webhook](#gateway-and-webhook-modules-10-and-13). | Sprint 10 |
 | `AutomationWebhookSecret` | The secret a Webhook-triggered workflow's link checks, stored hashed with its last four characters. | Sprint 10 |
+| `DiscoverSettings` | A workspace's Discover default: a place (city, region, country, time zone), ordered languages, news topics and which groups show. One row per workspace at most, keyed by the workspace id. See [Sprint 11 additions](#sprint-11-additions). | Sprint 11 |
 
 ### Kept, though not yet used
 
@@ -510,6 +511,40 @@ Migration `20261030193031_sprint10_gateway_and_webhook`, additive: the
   Webhook-triggered workflow received (also while it is off), so test runs
   and Insert Data use real fields instead of the built-in sample. JSON on the
   workflow row, not a table: only the latest one matters.
+
+## Sprint 11 additions
+
+Migration `20261110120000_sprint11_discover_settings`. Additive only: one
+table and one enum, nothing changed on an existing model. The design is in
+[`docs/sprint-11/discover-implementation-docs/`](../../../docs/sprint-11/discover-implementation-docs/README.md)
+(Module 06). `Competitor` arrives with Module 07, in a migration of its own.
+
+- **`DiscoverSettings` is one row per workspace, and the workspace id is its
+  key.** There is never a second row to choose between, so there is no id of
+  its own and no lookup: `organizationId` is `@id`. A workspace with no row
+  has no default yet, and the API answers the defaults.
+- **It holds a place, never a position.** The browser's coordinates are
+  rounded, used once to find the city, and dropped. The row keeps `city`,
+  `regionCode` (ISO 3166-2, `IN-TN`), `regionName`, `countryCode` and
+  `timeZone`. There is no latitude or longitude column, on purpose: do not
+  add one.
+- **`locationSource: NONE` means "never saved".** A null `countryCode` alone
+  cannot tell that from a saved Worldwide, which is a null country with
+  `SEARCH`, `BROWSER` or `TIMEZONE`.
+- **`languages` and `topics` are ordered lists.** The first language is the
+  default the page reads and drafts in; the first topic is the News tab's
+  default. Topics are Google News topic ids (`BUSINESS`), checked by the API.
+- **`sources` is JSON, `{ trends, wikipedia, social, videos, festivals }` to
+  booleans.** Null, or a missing key, means on, so a new group needs no
+  migration and no backfill. News has no switch.
+- **`updatedBy` is `SetNull`.** Removing the admin who saved the default must
+  not remove the default.
+- **Nothing from a feed is stored.** There is no items table: trends, stories,
+  videos and festivals live in Redis for a limited time, shared by place.
+- **This is not the inherited `Trending` coming back.** The Postiz `Trending`,
+  `TrendingLog` and their GitHub-star neighbours were dropped on purpose (see
+  [Deliberately removed](#deliberately-removed)). They tracked trending GitHub
+  repositories; Discover reads public feeds and keeps none of them.
 
 ## A user may legitimately belong to zero organizations
 
