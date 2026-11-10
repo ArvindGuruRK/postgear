@@ -85,7 +85,20 @@ export interface DiscoverItem {
   brief: string;
 }
 
-export type DiscoverGroupId = 'trends' | 'place' | 'top' | 'world' | 'topic';
+/**
+ * Trending: `trends`, `wikipedia`, `social`. News: `topic`, `place`, `top`,
+ * `world`. Videos: `videos`. Festivals: `festivals`.
+ */
+export type DiscoverGroupId =
+  | 'trends'
+  | 'wikipedia'
+  | 'social'
+  | 'place'
+  | 'top'
+  | 'world'
+  | 'topic'
+  | 'videos'
+  | 'festivals';
 
 export interface DiscoverGroup {
   id: DiscoverGroupId;
@@ -101,8 +114,14 @@ export interface DiscoverGroup {
   fetchedAt: string;
 }
 
-/** The kinds the feed answers today. Videos and festivals answer 501 until Module 05. */
-export type FeedKind = 'trending' | 'news';
+/** The kinds the feed answers. Competitors has routes of its own (Module 07). */
+export type FeedKind = 'trending' | 'news' | 'videos' | 'festivals';
+
+/**
+ * Why a tab has no groups, when that is worth a sentence of its own: the
+ * source needs a key this PostGear does not have, or it has used up its day.
+ */
+export type FeedEmptyReason = 'not_set_up' | 'resting';
 
 export interface FeedResponse {
   kind: FeedKind;
@@ -112,6 +131,10 @@ export interface FeedResponse {
   groups: DiscoverGroup[];
   /** Sources that had nothing to give (hidden groups), resting or not. */
   unavailable: DiscoverSourceId[];
+  /** Festivals only: today (`YYYY-MM-DD`) in the place's own time zone, for "in 3 days". */
+  today?: string;
+  /** Videos only, and only with no groups. */
+  reason?: FeedEmptyReason;
 }
 
 export interface DiscoverStatus {

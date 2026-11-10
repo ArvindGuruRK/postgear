@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "countries-and-timezones": "^3.11.0",
+    "date-holidays": "^3.39.1",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {

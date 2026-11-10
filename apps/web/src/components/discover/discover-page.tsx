@@ -2,10 +2,12 @@
 
 /**
  * The Discover page's island: the view, plus what its cards open (Module
- * 04). Create Post on any card opens the sheet with that card, the place and
- * the language it was read in; each card's overflow menu offers Draft In
- * Copilot. The view stays free of both, so a later tab (Module 05's
- * festivals) can open the same sheet with a date of its own.
+ * 04). Create Post on any card or row opens the sheet with that item, the
+ * place and the language it was read in; each card's overflow menu offers
+ * Draft In Copilot. The view stays free of both, and a festival's Plan A Post
+ * (Module 05) opens the same sheet with a date of its own.
+ *
+ * `isAdmin` comes from the server page and goes straight through to the view.
  */
 import { useState } from 'react';
 import { CardMenu } from './card-menu';

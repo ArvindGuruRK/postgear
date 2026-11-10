@@ -1,0 +1,201 @@
+{
+  "_sample": "Written by hand for tests and simulation. Not a recording: there is no YouTube key.",
+  "kind": "youtube#videoListResponse",
+  "etag": "sample-etag-FR",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-FR-1",
+      "id": "SAMPLE_FR_1",
+      "snippet": {
+        "publishedAt": "2026-11-08T09:00:00Z",
+        "channelId": "UCsampleChannelFR0000001",
+        "title": "Vidéo d'exemple : une tarte aux pommes en dix minutes",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_1/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_1/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_1/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: La Cuisine De Démo",
+        "categoryId": "26",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "fr"
+      },
+      "statistics": {
+        "viewCount": "1502880",
+        "likeCount": "61230",
+        "favoriteCount": "0",
+        "commentCount": "2044"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-FR-2",
+      "id": "SAMPLE_FR_2",
+      "snippet": {
+        "publishedAt": "2026-11-09T07:40:00Z",
+        "channelId": "UCsampleChannelFR0000002",
+        "title": "Sample video: Paris metro line 14 from end to end",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_2/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_2/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_2/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Rails And Tiles",
+        "categoryId": "19",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "402115",
+        "likeCount": "15008",
+        "favoriteCount": "0",
+        "commentCount": "690"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-FR-3",
+      "id": "SAMPLE_FR_3",
+      "snippet": {
+        "publishedAt": "2026-11-07T18:05:00Z",
+        "channelId": "UCsampleChannelFR0000003",
+        "title": "Sample video: Armistice Day, the ceremony explained",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_3/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_3/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_3/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: History In Five",
+        "categoryId": "27",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "97340",
+        "likeCount": "3877",
+        "favoriteCount": "0",
+        "commentCount": "214"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-FR-4",
+      "id": "SAMPLE_FR_4",
+      "snippet": {
+        "publishedAt": "2026-11-09T12:30:00Z",
+        "channelId": "UCsampleChannelFR0000004",
+        "title": "Sample video: A week of boulangerie breakfasts",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Crumbs Before Nine",
+        "categoryId": "26",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "23650",
+        "likeCount": "1102",
+        "favoriteCount": "0",
+        "commentCount": "73"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-FR-5",
+      "id": "SAMPLE_FR_5",
+      "snippet": {
+        "publishedAt": "2026-11-08T20:15:00Z",
+        "channelId": "UCsampleChannelFR0000005",
+        "title": "Sample video: Evening walk along the Seine, no talking",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_5/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_5/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_FR_5/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Slow Quays",
+        "categoryId": "19",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "fr"
+      },
+      "statistics": {
+        "viewCount": "5204",
+        "likeCount": "290",
+        "favoriteCount": "0",
+        "commentCount": "18"
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 5,
+    "resultsPerPage": 25
+  }
+}

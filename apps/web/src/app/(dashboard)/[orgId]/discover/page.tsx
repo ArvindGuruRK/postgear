@@ -2,10 +2,17 @@
  * Discover (Sprint 11): what is rising and what is being reported where the
  * audience is.
  *
- * The server asks only for the status (whether the place service is on, and
- * whether the API reads recorded feeds), with a `null` fallback the island
- * copes with. The feed itself is fetched by the island, because the place is
- * the viewer's own and lives in their browser, not in the request.
+ * The server asks for the status (whether the place service is on, whether
+ * the API reads recorded feeds, and which sources are set up), with a `null`
+ * fallback the island copes with. The feed itself is fetched by the island,
+ * because the place is the viewer's own and lives in their browser, not in
+ * the request.
+ *
+ * The viewer's role comes along (Module 05), the way the Channels and
+ * Workflows pages learn it: only a workspace admin is told who can add a
+ * missing YouTube key, and Module 06 uses the same flag for the workspace
+ * place. It is presentation only (the API's guard is the real check), so a
+ * failed lookup reads as a member.
  *
  * The island is keyed by the workspace, so switching workspaces starts from
  * that workspace's remembered place instead of carrying the last one over
@@ -17,6 +24,7 @@ import { DiscoverPage } from '@/components/discover/discover-page';
 import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
 import type { DiscoverStatus } from '@/types/discover';
+import type { Organization } from '@/types/workspace';
 
 export const metadata: Metadata = { title: 'Discover' };
 
@@ -27,9 +35,25 @@ export default async function DiscoverRoute({
   const [{ orgId }, query] = await Promise.all([params, searchParams]);
   const cookie = await getSessionCookieHeader();
 
-  const status = await serverApi<{ status: DiscoverStatus }>('/discover/status', { cookie })
-    .then((result) => result.status)
-    .catch(() => null);
+  const [status, isAdmin] = await Promise.all([
+    serverApi<{ status: DiscoverStatus }>('/discover/status', { cookie })
+      .then((result) => result.status)
+      .catch(() => null),
+    serverApi<{ organizations: Organization[] }>('/orgs', { cookie })
+      .then((result) => {
+        const role = result.organizations.find((organization) => organization.id === orgId)?.role;
+        return role === 'ADMIN' || role === 'SUPERADMIN';
+      })
+      .catch(() => false),
+  ]);
 
-  return <DiscoverPage key={orgId} orgId={orgId} status={status} initialTab={tabFrom(query.tab)} />;
+  return (
+    <DiscoverPage
+      key={orgId}
+      orgId={orgId}
+      status={status}
+      initialTab={tabFrom(query.tab)}
+      isAdmin={isAdmin}
+    />
+  );
 }

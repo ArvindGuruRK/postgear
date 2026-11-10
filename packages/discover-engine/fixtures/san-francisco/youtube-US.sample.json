@@ -1,0 +1,199 @@
+{
+  "_sample": "Written by hand for tests and simulation. Not a recording: there is no YouTube key.",
+  "kind": "youtube#videoListResponse",
+  "etag": "sample-etag-US",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-US-1",
+      "id": "SAMPLE_US_1",
+      "snippet": {
+        "publishedAt": "2026-11-09T15:00:00Z",
+        "channelId": "UCsampleChannelUS0000001",
+        "title": "Sample video: Golden Gate sunrise timelapse",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_1/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_1/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_1/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Fog City Films",
+        "categoryId": "19",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "2410336",
+        "likeCount": "98211",
+        "favoriteCount": "0",
+        "commentCount": "3120"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-US-2",
+      "id": "SAMPLE_US_2",
+      "snippet": {
+        "publishedAt": "2026-11-08T19:30:00Z",
+        "channelId": "UCsampleChannelUS0000002",
+        "title": "Sample video: Thanksgiving sides you can make ahead",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_2/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_2/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_2/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Sunset Pantry",
+        "categoryId": "26",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "731900",
+        "likeCount": "30455",
+        "favoriteCount": "0",
+        "commentCount": "1208"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-US-3",
+      "id": "SAMPLE_US_3",
+      "snippet": {
+        "publishedAt": "2026-11-07T22:10:00Z",
+        "channelId": "UCsampleChannelUS0000003",
+        "title": "Sample video: Mission District burrito taste test",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_3/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_3/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_3/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Two Forks",
+        "categoryId": "24",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "118452",
+        "likeCount": "4090",
+        "favoriteCount": "0",
+        "commentCount": "265"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-US-4",
+      "id": "SAMPLE_US_4",
+      "snippet": {
+        "publishedAt": "2026-11-09T04:00:00Z",
+        "channelId": "UCsampleChannelUS0000004",
+        "title": "Sample video: A beginner's guide to riding the cable cars",
+        "description": "An invented video for tests and simulation. Its view count is hidden, as an uploader may choose.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Hill And Bell",
+        "categoryId": "19",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "favoriteCount": "0",
+        "commentCount": "58"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-US-5",
+      "id": "SAMPLE_US_5",
+      "snippet": {
+        "publishedAt": "2026-11-08T08:25:00Z",
+        "channelId": "UCsampleChannelUS0000005",
+        "title": "Sample video: Veterans Day parade walk-through",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_5/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_5/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_US_5/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Market Street Notes",
+        "categoryId": "25",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en"
+      },
+      "statistics": {
+        "viewCount": "8730",
+        "likeCount": "412",
+        "favoriteCount": "0",
+        "commentCount": "37"
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 5,
+    "resultsPerPage": 25
+  }
+}

@@ -1,14 +1,23 @@
 /**
  * Discover's display logic, kept pure so the words are tested on their own:
  * what the place chip says in each state, the line a search result reads as,
- * which language a new place starts in, what is remembered per workspace, and
- * how old the page's copy is.
+ * which language a new place starts in, what is remembered per workspace, how
+ * old the page's copy is, and (Module 05) which week a festival falls in, how
+ * far off it is, and when a post about it should go out.
  *
- * The words are the page's (place, trend, story, Worldwide), never the API's.
+ * The words are the page's (place, trend, story, festival, Worldwide), never
+ * the API's.
  */
 import type { ResearchSource } from '@/types/ai';
-import type { DiscoverGroup, DiscoverItem, DiscoverTab, Locality } from '@/types/discover';
+import type {
+  DiscoverGroup,
+  DiscoverGroupId,
+  DiscoverItem,
+  DiscoverTab,
+  Locality,
+} from '@/types/discover';
 import { DISCOVER_TABS } from '@/types/discover';
+import { viewerTimeZone } from '../home/home-model';
 import { formatRelative } from '../seo/seo-view-model';
 
 /** How the current place was chosen. `workspace` arrives with Module 06. */
@@ -214,9 +223,20 @@ export const TAB_NAMES: Record<DiscoverTab, string> = {
   competitors: 'Competitors',
 };
 
-/** The age of the oldest copy shown: one line, so a stale group is never hidden by a fresh one. */
+/**
+ * Groups dated by something other than when they were fetched, so they stay
+ * out of "Updated 5 min ago": Wikipedia's is a whole day's reading (its own
+ * line says which day), and a festival's date does not age.
+ */
+const DATED_GROUPS: ReadonlySet<DiscoverGroupId> = new Set(['wikipedia', 'festivals']);
+
+/**
+ * The age of the oldest live copy shown: one line, so a stale group is never
+ * hidden by a fresh one. Null when nothing shown is live (the Festivals tab).
+ */
 export function updatedText(groups: readonly DiscoverGroup[], now: Date): string | null {
   const times = groups
+    .filter((group) => !DATED_GROUPS.has(group.id))
     .map((group) => Date.parse(group.fetchedAt))
     .filter((time) => Number.isFinite(time));
   if (times.length === 0) return null;
@@ -232,12 +252,24 @@ export function openHref(item: DiscoverItem): string | null {
 
 /**
  * The quiet line under a card's title: "500+ searches, 2 hours ago" for a
- * trend, "The Hindu, 2 hours ago" for a story.
+ * trend, "The Hindu, 2 hours ago" for a story, "1.2M views, 3 days ago" for a
+ * video.
  */
 export function itemMeta(item: DiscoverItem, now: Date): string {
   const lead = item.kind === 'news' ? item.source.name : item.signal?.label;
   const when = item.publishedAt ? formatRelative(item.publishedAt, now) : '';
   return [lead, when].filter(Boolean).join(', ');
+}
+
+/**
+ * What a screen reader says for a social chip. The two networks look alike on
+ * the page, so the name tells them apart and says the link leaves:
+ * "House speaker on Bluesky, 4,625 posts, opens in a new tab".
+ */
+export function socialChipLabel(item: DiscoverItem): string {
+  return [`${item.title} on ${item.source.name}`, item.signal?.label, 'opens in a new tab']
+    .filter(Boolean)
+    .join(', ');
 }
 
 /** Only addresses a link can safely carry; a feed is outside data. */
@@ -269,15 +301,20 @@ function oneLine(text: string, max: number): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/** Kinds whose title is a page of its own: a story, a Wikipedia article, a video. */
+const OWN_SOURCE_KINDS: ReadonlySet<DiscoverItem['kind']> = new Set(['news', 'wiki', 'video']);
+
 /**
- * The research a draft is backed by: what the card showed. A story is its
- * own first source; then its related coverage, publisher as the snippet.
- * Only web addresses, each once, at most six. A trend's title is a search
- * term, not an article, so a trend starts at its related headlines.
+ * The research a draft is backed by: what the card showed. A story, a
+ * Wikipedia article and a video are each their own first source (the title,
+ * its address, the source's name as the snippet); then the related coverage,
+ * publisher as the snippet. Only web addresses, each once, at most six. A
+ * trend's title is a search term, not an article, so a trend starts at its
+ * related headlines; a festival and a social topic have no page of their own.
  */
 export function draftSources(item: DiscoverItem): ResearchSource[] {
   const candidates: { title: string; url: string | null | undefined; snippet: string }[] = [];
-  if (item.kind === 'news') {
+  if (OWN_SOURCE_KINDS.has(item.kind)) {
     candidates.push({ title: item.title, url: openHref(item), snippet: item.source.name });
   }
   for (const headline of item.related ?? []) {
@@ -310,4 +347,252 @@ export function draftLanguages(place: Locality, chosen: string): string[] {
 /** The AI page with the brief already in its topic (DC-4.5). */
 export function copilotHref(orgId: string, item: DiscoverItem): string {
   return `/${orgId}/ai-copilot?topic=${encodeURIComponent(draftTopic(item))}`;
+}
+
+/*
+ * Festivals (Module 05). Everything below reads a date as a plain calendar
+ * date (`YYYY-MM-DD`) and counts from the answer's own `today`, which the API
+ * works out in the place's time zone. The browser's clock and zone are never
+ * asked, so Chennai's "tomorrow" reads the same to a colleague in Paris.
+ */
+
+const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** A calendar date as a count of days, or null for anything that is not one. No clock, no zone. */
+function dayNumber(date: string | null | undefined): number | null {
+  const match = date ? CALENDAR_DATE.exec(date) : null;
+  if (!match) return null;
+
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const time = Date.UTC(year, month - 1, day);
+  const back = new Date(time);
+  // The 30th of February is not a date; `Date.UTC` would roll it into March.
+  const real =
+    back.getUTCFullYear() === year && back.getUTCMonth() === month - 1 && back.getUTCDate() === day;
+  return real ? time / DAY_MS : null;
+}
+
+/** Whole days from `today` to `date`: negative for the past, null when either is not a date. */
+export function daysUntil(
+  date: string | null | undefined,
+  today: string | null | undefined,
+): number | null {
+  const [day, from] = [dayNumber(date), dayNumber(today)];
+  return day === null || from === null ? null : day - from;
+}
+
+/** "today", "tomorrow", "in 5 days", "yesterday", "2 days ago". Empty when it cannot be said. */
+export function festivalWhen(
+  date: string | null | undefined,
+  today: string | null | undefined,
+): string {
+  const days = daysUntil(date, today);
+  if (days === null) return '';
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days === -1) return 'yesterday';
+  return days > 0 ? `in ${days} days` : `${-days} days ago`;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * A festival's date as the row writes it: "8 Nov" and "Sunday". From tables,
+ * not `Intl`, so the server and every browser write the same words.
+ */
+export function festivalDay(
+  date: string | null | undefined,
+): { day: string; weekday: string } | null {
+  const number = dayNumber(date);
+  if (number === null) return null;
+
+  const at = new Date(number * DAY_MS);
+  return {
+    day: `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`,
+    weekday: WEEKDAYS[at.getUTCDay()] ?? '',
+  };
+}
+
+export type FestivalSectionId =
+  | 'this-week'
+  | 'next-week'
+  | 'later-this-month'
+  | 'next-month'
+  | 'just-happened';
+
+/** The list's sections in the order they are shown: what is coming first, what passed last. */
+export const FESTIVAL_SECTIONS: readonly { id: FestivalSectionId; title: string }[] = [
+  { id: 'this-week', title: 'This Week' },
+  { id: 'next-week', title: 'Next Week' },
+  { id: 'later-this-month', title: 'Later This Month' },
+  { id: 'next-month', title: 'Next Month' },
+  { id: 'just-happened', title: 'Just Happened' },
+];
+
+export interface FestivalSection {
+  /** `all` only when the answer had no usable `today`: one list in date order, with no name. */
+  id: FestivalSectionId | 'all';
+  title: string | null;
+  items: DiscoverItem[];
+}
+
+/**
+ * Which section a day falls in. Weeks run Monday to Sunday for every place:
+ * one rule everywhere beats a per-country one, which would put the same
+ * festival under two headings for two colleagues reading the same list.
+ * This Week is today to the coming Sunday (a Sunday is the last day of its
+ * own week), Next Week the seven days after, and what is left is Later This
+ * Month while it is still today's calendar month, Next Month after that.
+ */
+function sectionOf(day: number, date: string, today: number, todayDate: string): FestivalSectionId {
+  if (day < today) return 'just-happened';
+
+  // Day 0 (1 January 1970) was a Thursday, so 0 here is a Sunday.
+  const weekday = (((today + 4) % 7) + 7) % 7;
+  const sunday = today + ((7 - weekday) % 7);
+  if (day <= sunday) return 'this-week';
+  if (day <= sunday + 7) return 'next-week';
+  return date.slice(0, 7) === todayDate.slice(0, 7) ? 'later-this-month' : 'next-month';
+}
+
+/**
+ * The festivals in their sections, empty sections left out. Coming dates read
+ * soonest first, what just happened most recent first, and festivals that
+ * share a date keep the order the API gave them. A festival without a real
+ * date is dropped; without a real `today` nothing can be placed, so the list
+ * is one unnamed section in date order.
+ */
+export function festivalSections(
+  items: readonly DiscoverItem[],
+  today: string | null | undefined,
+): FestivalSection[] {
+  const dated = items
+    .map((item) => ({ item, date: item.date ?? '', day: dayNumber(item.date) }))
+    .filter((entry): entry is { item: DiscoverItem; date: string; day: number } => {
+      return entry.day !== null;
+    })
+    // `sort` is stable, so one date's festivals stay in the API's order.
+    .sort((a, b) => a.day - b.day);
+  if (dated.length === 0) return [];
+
+  const todayNumber = dayNumber(today);
+  if (todayNumber === null || !today) {
+    return [{ id: 'all', title: null, items: dated.map((entry) => entry.item) }];
+  }
+
+  return FESTIVAL_SECTIONS.flatMap(({ id, title }) => {
+    const found = dated.filter(
+      (entry) => sectionOf(entry.day, entry.date, todayNumber, today) === id,
+    );
+    if (found.length === 0) return [];
+    if (id === 'just-happened') found.sort((a, b) => b.day - a.day);
+    return [{ id, title, items: found.map((entry) => entry.item) }];
+  });
+}
+
+export interface FestivalBadge {
+  label: 'Public Holiday' | 'Observance';
+  variant: 'success' | 'secondary';
+}
+
+/** A day off is the green tag. Only a festival the API marks as not an observance is one. */
+export function festivalBadge(item: Pick<DiscoverItem, 'observance'>): FestivalBadge {
+  return item.observance === false
+    ? { label: 'Public Holiday', variant: 'success' }
+    : { label: 'Observance', variant: 'secondary' };
+}
+
+/** A post about a public holiday goes out the evening before: people post ahead of a day off. */
+export const HOLIDAY_POST_HOUR = 18;
+/** A post about an observance goes out that morning. */
+export const OBSERVANCE_POST_HOUR = 10;
+
+/**
+ * How far a zone's clock is ahead of UTC at an instant, in minutes (India is
+ * 330, Los Angeles -480 in winter), or null for a zone the browser does not
+ * know. Read from `Intl`, which knows every clock change.
+ */
+function zoneOffsetMinutes(timeZone: string, instant: number): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(new Date(instant));
+    const read = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value);
+    const local = Date.UTC(
+      read('year'),
+      read('month') - 1,
+      read('day'),
+      read('hour'),
+      read('minute'),
+      read('second'),
+    );
+    return Number.isFinite(local) ? Math.round((local - instant) / MINUTE_MS) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The zone's offset at a wall-clock hour of a calendar day. The first guess
+ * reads the offset as if the wall time were UTC, which is the wrong side of a
+ * clock change for a few hours a year; asking again at the instant that guess
+ * gives settles it. (10:00 and 18:00 are never inside the hour a change skips
+ * or repeats, so there is one right answer.)
+ */
+function wallClockOffset(day: number, hour: number, timeZone: string): number | null {
+  const wall = day * DAY_MS + hour * HOUR_MS;
+  const guess = zoneOffsetMinutes(timeZone, wall);
+  if (guess === null) return null;
+  return zoneOffsetMinutes(timeZone, wall - guess * MINUTE_MS) ?? guess;
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/**
+ * When Plan A Post dates the draft: the evening before a public holiday
+ * (18:00), the morning of an observance (10:00), on the place's own clock.
+ * An ISO 8601 instant with its offset (`2026-11-07T18:00:00+05:30`), as
+ * `POST /ai/generate` takes it, right on either side of a clock change.
+ *
+ * A place without a time zone (or with one this browser does not know) is
+ * read on the viewer's clock, then on UTC. Null only when the festival has no
+ * real date. A moment already past is still returned: the sheet falls back to
+ * the next full hour for it (`draftDate`).
+ */
+export function festivalPublishAt(
+  item: Pick<DiscoverItem, 'date' | 'observance'>,
+  timeZone: string | null | undefined,
+  viewerZone: string = viewerTimeZone(),
+): string | null {
+  const festival = dayNumber(item.date);
+  if (festival === null) return null;
+
+  const holiday = item.observance === false;
+  const day = holiday ? festival - 1 : festival;
+  const hour = holiday ? HOLIDAY_POST_HOUR : OBSERVANCE_POST_HOUR;
+
+  for (const zone of [timeZone, viewerZone, 'UTC']) {
+    const offset = zone ? wallClockOffset(day, hour, zone) : null;
+    if (offset === null) continue;
+
+    const date = new Date(day * DAY_MS).toISOString().slice(0, 10);
+    const ahead = Math.abs(offset);
+    const sign = offset < 0 ? '-' : '+';
+    return `${date}T${twoDigits(hour)}:00:00${sign}${twoDigits(Math.floor(ahead / 60))}:${twoDigits(ahead % 60)}`;
+  }
+  return null;
 }

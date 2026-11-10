@@ -1,5 +1,6 @@
 /**
- * Discover (Sprint 11): what is rising and what is news in a place.
+ * Discover (Sprint 11): what is rising, what is news, what is being watched and
+ * what is coming up in a place.
  *
  * Owns no table: nothing from a feed is written to Postgres. Everything it keeps is
  * in Redis, for a limited time, and shared by everyone in that place.
@@ -7,7 +8,8 @@
  * The engine sits behind a token, built once from the environment, so a service
  * never knows whether it is reading recorded feeds and a test hands it a fake. The
  * boot log says which world this process is in and who it says it is, because that
- * is the first thing to check when an outside service has a complaint.
+ * is the first thing to check when an outside service has a complaint. It also says
+ * whether videos are set up, and never the key that sets them up.
  *
  * Exports `DiscoverService` for Create Post (Module 04).
  */
@@ -16,7 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env';
 import { DiscoverCache } from './discover.cache';
 import { DiscoverController } from './discover.controller';
-import { createDiscoverEngine, DISCOVER_ENGINE } from './discover.engine';
+import { createDiscoverEngine, DISCOVER_ENGINE, describeEngine } from './discover.engine';
 import { DiscoverGate } from './discover.gate';
 import { DiscoverService } from './discover.service';
 import { LocalityService } from './locality.service';
@@ -35,15 +37,9 @@ const GATE_WAIT_MS = 4_000;
           DISCOVER_SIMULATION: config.get('DISCOVER_SIMULATION', { infer: true }),
           DISCOVER_GEOCODER: config.get('DISCOVER_GEOCODER', { infer: true }),
           DISCOVER_GEOCODER_USER_AGENT: config.get('DISCOVER_GEOCODER_USER_AGENT', { infer: true }),
+          YOUTUBE_API_KEY: config.get('YOUTUBE_API_KEY', { infer: true }),
         });
-        new Logger('Discover').log(
-          JSON.stringify({
-            event: 'discover.boot',
-            simulation: engine.simulation,
-            geocoder: engine.geocoder ? 'nominatim' : 'off',
-            userAgent: engine.userAgent,
-          }),
-        );
+        new Logger('Discover').log(JSON.stringify(describeEngine(engine)));
         return engine;
       },
     },

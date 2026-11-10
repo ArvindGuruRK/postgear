@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * A trend or a story as a card (blueprint section 4): the picture when there
- * is one, the title, a quiet line (how many searched, or who published it, and
- * when), up to three related headlines with their publishers, then the
- * actions.
+ * A trend, a story or a video as a card (blueprint section 4): the picture
+ * when there is one, the title, a quiet line (how many searched, who
+ * published it or how many watched, and when), up to three related headlines
+ * with their publishers, then the actions. A video names its channel under
+ * the title, and its Open goes to YouTube.
  *
  * The card is a box you read, so it sits on `bg-inset` inside its group and
  * does not move; its buttons do. Everything that came from a feed carries
@@ -92,7 +93,19 @@ function RelatedHeadlines({ item }: { item: DiscoverItem }) {
   );
 }
 
-function ItemCard({ item, now, onCreatePost, extra }: ItemCardProps) {
+function ItemCard({
+  item,
+  now,
+  onCreatePost,
+  extra,
+  byline,
+  openLabel,
+}: ItemCardProps & {
+  /** A name under the title: a video's channel. */
+  byline?: string;
+  /** What a screen reader says for Open, when "in a new tab" is not the whole story. */
+  openLabel?: string;
+}) {
   const titleId = useId();
   const href = safeHref(openHref(item));
   const image = safeHref(item.image);
@@ -111,6 +124,11 @@ function ItemCard({ item, now, onCreatePost, extra }: ItemCardProps) {
           <h3 id={titleId} dir="auto" className="m-0 break-words type-heading text-base text-ink">
             {item.title}
           </h3>
+          {byline ? (
+            <p dir="auto" className="m-0 break-words type-ui text-xs text-ink">
+              {byline}
+            </p>
+          ) : null}
           {meta ? (
             <p dir="auto" className="m-0 font-sans text-xs text-ink type-muted">
               {meta}
@@ -133,7 +151,7 @@ function ItemCard({ item, now, onCreatePost, extra }: ItemCardProps) {
               rel="noopener noreferrer"
               prefetch={false}
               // Every card has an Open; the name says which story, and that it leaves.
-              aria-label={`Open ${item.title} in a new tab`}
+              aria-label={openLabel ?? `Open ${item.title} in a new tab`}
             >
               <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
               Open
@@ -154,4 +172,19 @@ export function TrendCard(props: ItemCardProps) {
 /** A story: the headline, "The Hindu, 2 hours ago", and related coverage when Google gives it. */
 export function StoryCard(props: ItemCardProps) {
   return <ItemCard {...props} />;
+}
+
+/**
+ * A trending video (Module 05): the thumbnail, the title as the uploader
+ * wrote it, the channel, "1.2M views, 3 days ago", and Open to YouTube.
+ */
+export function VideoCard(props: ItemCardProps) {
+  const { item } = props;
+  return (
+    <ItemCard
+      {...props}
+      byline={item.summary}
+      openLabel={`Open ${item.title} on ${item.source.name} in a new tab`}
+    />
+  );
 }

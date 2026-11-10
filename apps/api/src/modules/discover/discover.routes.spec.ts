@@ -4,7 +4,7 @@
  * is public, and a new route can only be added by adding it to this table. Then what
  * the controller itself decides, which is little on purpose.
  */
-import { ForbiddenException, type HttpException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { PATH_METADATA } from '@nestjs/common/constants';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { DiscoverController } from './discover.controller';
 import type { DiscoverService } from './discover.service';
-import type { FeedQuery } from './dto/discover.schema';
+import { FEED_KINDS, type FeedQuery } from './dto/discover.schema';
 import type { LocalityService } from './locality.service';
 
 const { prisma } = jest.requireMock('@postgear/db') as {
@@ -106,7 +106,7 @@ describe('DiscoverController', () => {
   function build() {
     const discover = {
       status: jest.fn(() => ({ simulation: true })),
-      feed: jest.fn(async () => ({ kind: 'trending', groups: [] })),
+      feed: jest.fn(async (): Promise<unknown> => ({ kind: 'trending', groups: [] })),
     };
     const localities = {
       fromTimeZone: jest.fn(() => CHENNAI),
@@ -171,19 +171,76 @@ describe('DiscoverController', () => {
     });
   });
 
-  it.each(['videos', 'festivals'] as const)('says %s are not here yet', (kind) => {
+  it.each(FEED_KINDS)('passes %s through, and answers what the feed answered', async (kind) => {
+    const { controller, discover } = build();
+    const answered = { kind, groups: [], unavailable: [] };
+    discover.feed.mockResolvedValue(answered);
+
+    await expect(controller.feed(org, { kind, country: 'IN', region: 'IN-TN' })).resolves.toBe(
+      answered,
+    );
+
+    expect(discover.feed).toHaveBeenCalledTimes(1);
+    expect(discover.feed).toHaveBeenCalledWith(ORG_ID, {
+      kind,
+      language: 'ta',
+      topic: undefined,
+      locality: expect.objectContaining({ countryCode: 'IN', countryName: 'India' }),
+    });
+  });
+
+  it('answers videos that are not set up as an answer, not as an error of its own', async () => {
+    const { controller, discover } = build();
+    const notSetUp = { kind: 'videos', groups: [], unavailable: [], reason: 'not_set_up' };
+    discover.feed.mockResolvedValue(notSetUp);
+
+    await expect(controller.feed(org, { kind: 'videos', country: 'IN' })).resolves.toEqual({
+      kind: 'videos',
+      groups: [],
+      unavailable: [],
+      reason: 'not_set_up',
+    });
+  });
+
+  it.each(['videos', 'festivals'] as const)(
+    'asks for %s Worldwide without making up a place',
+    async (kind) => {
+      const { controller, discover } = build();
+
+      await controller.feed(org, { kind });
+
+      expect(discover.feed).toHaveBeenCalledWith(
+        ORG_ID,
+        expect.objectContaining({
+          kind,
+          language: 'en',
+          locality: expect.objectContaining({ countryCode: null, timeZone: null }),
+        }),
+      );
+    },
+  );
+
+  it('hands the zone on as it came, since the feed is where it is read', async () => {
     const { controller, discover } = build();
 
-    let error: HttpException | undefined;
-    try {
-      controller.feed(org, { kind });
-    } catch (caught) {
-      error = caught as HttpException;
-    }
+    // The query checks a zone for shape only, so this is one it lets through.
+    await controller.feed(org, { kind: 'festivals', country: 'IN', tz: 'Not/AZone' });
 
-    expect(error?.getStatus()).toBe(501);
-    expect(error?.message).toBe('Arrives in a later step of this sprint.');
-    expect(discover.feed).not.toHaveBeenCalled();
+    expect(discover.feed).toHaveBeenCalledWith(
+      ORG_ID,
+      expect.objectContaining({
+        kind: 'festivals',
+        locality: expect.objectContaining({ countryCode: 'IN', timeZone: 'Not/AZone' }),
+      }),
+    );
+  });
+
+  it('lets a refusal from the feed through as it is', async () => {
+    const { controller, discover } = build();
+    const refusal = new Error('That is a lot of new places at once. Try again in a moment.');
+    discover.feed.mockRejectedValue(refusal);
+
+    await expect(controller.feed(org, { kind: 'festivals', country: 'IN' })).rejects.toBe(refusal);
   });
 
   it('builds the place from the query, with its languages', () => {

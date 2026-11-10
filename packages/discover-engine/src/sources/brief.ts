@@ -45,6 +45,57 @@ function relatedLine(item: ComposedItem): string | null {
   return headlines.length > 0 ? `Related: ${headlines.join('; ')}.` : null;
 }
 
+/** "Tamil" for `ta`. A tag Intl cannot read, or has no name for, stays as it is. */
+function languageName(tag: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(tag) ?? tag;
+  } catch {
+    return tag;
+  }
+}
+
+/** The item's count in brackets, " (1,627 reads)", or nothing when it has none. */
+function signalNote(item: ComposedItem): string {
+  const label = stripHtml(item.signal?.label ?? '');
+  return label ? ` (${label})` : '';
+}
+
+/** A summary often ends its own sentence, and must not end it twice. */
+function asSentence(text: string): string {
+  return /[.!?…]$/.test(text) ? text : `${text}.`;
+}
+
+const LONG_DATE = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/**
+ * "Sunday 8 November 2026" from `2026-11-08`. A festival's date is a square on
+ * the calendar, not a moment, so it is built and read in UTC from end to end and
+ * never meets the machine's own zone, which could move it a day. The words are
+ * joined from parts because the commas between them change with the ICU version.
+ * Null for anything that is not a real date.
+ */
+function longDate(date: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return null;
+
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const at = new Date(Date.UTC(year, month - 1, day));
+  // 31 February rolls over into March, which is not a date anyone meant.
+  const isReal =
+    at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
+  if (!isReal) return null;
+
+  const parts = new Map(LONG_DATE.formatToParts(at).map((part) => [part.type, part.value]));
+  const words = (['weekday', 'day', 'month', 'year'] as const).map((type) => parts.get(type));
+  return words.every(Boolean) ? words.join(' ') : null;
+}
+
 function capped(text: string): string {
   const points = Array.from(text);
   return points.length <= BRIEF_MAX_CHARS
@@ -66,6 +117,37 @@ export function buildBrief(item: ComposedItem, locality: Locality, language: str
     case 'news':
       lines.push(`News story in ${place}: "${title}" (${stripHtml(item.source.name)}).`);
       break;
+    case 'wiki': {
+      // An edition is a language's readers everywhere, so the line names it and not the place.
+      const edition = item.language ? `${stripHtml(languageName(item.language))} ` : '';
+      lines.push(`Widely read on ${edition}Wikipedia: "${title}"${signalNote(item)}.`);
+      break;
+    }
+    case 'social': {
+      const network = stripHtml(item.source.name);
+      lines.push(`Trending worldwide on ${network}: "${title}"${signalNote(item)}.`);
+      const about = stripHtml(item.summary ?? '');
+      if (about) lines.push(`About: ${asSentence(about)}`);
+      break;
+    }
+    case 'video': {
+      // On a video the summary is the channel, which YouTube's terms ask us to name.
+      const channel = stripHtml(item.summary ?? '');
+      const by = channel ? ` by ${channel}` : '';
+      lines.push(`Trending video in ${place}: "${title}"${by}${signalNote(item)}.`);
+      break;
+    }
+    case 'festival': {
+      const day = item.date ? longDate(item.date) : null;
+      const on = day ? ` on ${day}` : '';
+      const badge =
+        item.observance === undefined
+          ? ''
+          : ` (${item.observance ? 'observance' : 'public holiday'})`;
+      lines.push(`Festival in ${place}: "${title}"${on}${badge}.`);
+      break;
+    }
+    // A competitor's post keeps this line until its own module writes one.
     default:
       lines.push(`Trending in ${place}: "${title}" (${stripHtml(item.source.name)}).`);
   }

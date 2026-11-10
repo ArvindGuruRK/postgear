@@ -3,7 +3,7 @@
  * workspace. The workspace comes from `@CurrentOrg()` and is used only to count
  * how fast it is asking; the answers are the same for everyone in a place.
  */
-import { Controller, Get, NotImplementedException, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { buildLocality, type Locality, WORLDWIDE } from '@postgear/discover-engine';
 import { type ActiveOrg, CurrentOrg } from '../../common/decorators/current-org.decorator';
@@ -76,10 +76,6 @@ export class DiscoverController {
     @CurrentOrg() org: ActiveOrg,
     @Query(new ZodQuery(feedQuerySchema, 'discover/feed')) query: FeedQuery,
   ) {
-    if (query.kind !== 'trending' && query.kind !== 'news') {
-      throw new NotImplementedException(DISCOVER_MESSAGES.kindNotReady);
-    }
-
     const locality = localityOf(query);
     return this.discover.feed(org.id, {
       kind: query.kind,

@@ -1,20 +1,31 @@
 /**
- * What is rising and what is news in a place.
+ * What is rising, what is news, what is being watched and what is coming up in a
+ * place.
  *
  * The answer depends on the place and the language, never on the workspace, so it
  * is cached for everyone: nothing here can tell one tenant's Chennai from another's.
  * The workspace only appears in the limit on asking for new places.
  *
+ * ## One path for every load
+ *
+ * A tab is made of loads (`discover.plan.ts`): the sources that share a key and a
+ * window. Trending is up to four of them side by side, the other tabs one each.
+ * Every load goes through the same code here, whatever it reads: the shared cache
+ * and its lock, the gate, the breaker, and the copy a failed group keeps. A new
+ * source is a new plan, never a new path.
+ *
  * ## What goes in the cache, and what never does
  *
  * Only what changes the upstream answer goes in the key. Google Trends has no
- * language, so Trending ignores it. News is keyed by the edition really asked for,
+ * language, so its load ignores it. News is keyed by the edition really asked for,
  * not the language requested, so `en` and `en-GB` in India share one copy, and a
- * made-up language cannot be used to force a fetch.
+ * made-up language cannot be used to force a fetch. Wikipedia follows the same
+ * rule with its editions.
  *
  * Headings and briefs are built per request and never stored, because they name the
  * viewer's own place. Everyone in Chennai shares the items; only the person who
- * typed "Madras" sees that word.
+ * typed "Madras" sees that word. Festivals are cut to the window around the
+ * place's own today per request too, so one copy serves a whole month.
  *
  * ## When a source is struggling
  *
@@ -24,7 +35,9 @@
  *   ten minutes. Only real trouble counts. A place Google has nothing for is
  *   `not_found`, so asking about one cannot switch the source off for everyone.
  * - An entry with a failure in it is retried after a minute rather than after the
- *   kind's full window, and not before: one attempt a minute per place at most.
+ *   load's full window, and not before: one attempt a minute per place at most.
+ * - YouTube has a daily budget. Past it the source is not asked at all, which is
+ *   not a failure: the copy stays, and the page says the source is resting.
  */
 import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import {
@@ -32,15 +45,18 @@ import {
   type ComposedItem,
   composeFeed,
   type DiscoverItem,
-  editionFor,
+  defaultTimeZone,
+  type FeedGroupInput,
+  festivalsInWindow,
+  itemId,
   type Locality,
-  languagesWithEdition,
   NEWS_MAX_AGE_MS,
   type NewsTopic,
   type SourceAttribution,
   type SourceId,
-  type SourceInput,
+  type SourceItem,
   type SourceResult,
+  todayIn,
 } from '@postgear/discover-engine';
 import { securityLogger } from '../../common/logging/security-logger';
 import { RedisService } from '../redis/redis.service';
@@ -48,18 +64,36 @@ import { type CacheEntry, DiscoverCache, LOCK_SECONDS } from './discover.cache';
 import { DISCOVER_ENGINE, type DiscoverEngine } from './discover.engine';
 import { DiscoverGate } from './discover.gate';
 import { type DiscoverKeys, discoverKeys, workspaceKeys } from './discover.keys';
-import { DISCOVER_MESSAGES, TOPIC_TITLES } from './discover.messages';
+import { DISCOVER_MESSAGES, SOCIAL_NETWORKS, TOPIC_TITLES } from './discover.messages';
+import {
+  answerLanguage,
+  type Budget,
+  type FeedGroupId,
+  type FeedKind,
+  type FeedRequest,
+  type GroupPlan,
+  type LoadPlan,
+  planLoads,
+  wikipediaEdition,
+} from './discover.plan';
 import { type LocalityAnswer, withNewsLanguages } from './locality.service';
 
-const MINUTE_MS = 60_000;
+export type { FeedGroupId, FeedKind, FeedRequest } from './discover.plan';
+export { YOUTUBE_DAILY_UNITS } from './discover.plan';
 
-const FRESH_MS: Record<FeedKind, number> = { trending: 20 * MINUTE_MS, news: 15 * MINUTE_MS };
-const KEEP_SECONDS = 6 * 60 * 60;
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
 
 /** Long enough that a struggling source is not hammered, per place. */
 const RETRY_AFTER_TROUBLE_MS = MINUTE_MS;
 /** A full gate says nothing about the source and clears in moments: as soon as the lock allows. */
 const RETRY_AFTER_BUSY_MS = LOCK_SECONDS * 1000;
+/** Half an answer, because one of two readers was down: worth asking for the rest soon. */
+const RETRY_AFTER_PARTIAL_MS = 10 * MINUTE_MS;
+/** Wikipedia had not published yesterday yet. It will within hours, and a day is too long to wait. */
+const RETRY_AFTER_EARLY_MS = 60 * MINUTE_MS;
+/** A spent budget comes back at midnight in its own zone. Looking costs nothing, so look often. */
+const RETRY_AFTER_SPENT_MS = 10 * MINUTE_MS;
 
 export const BREAKER_THRESHOLD = 3;
 export const BREAKER_SECONDS = 10 * 60;
@@ -70,16 +104,8 @@ const GROUP_DEADLINE_MS = 12_000;
 export const NEW_PLACES_PER_MINUTE = 30;
 const NEW_PLACES_WINDOW_SECONDS = 60;
 
-export type FeedKind = 'trending' | 'news';
-
-export interface FeedRequest {
-  kind: FeedKind;
-  locality: Locality;
-  language: string;
-  topic?: NewsTopic;
-}
-
-export type FeedGroupId = 'trends' | 'place' | 'top' | 'world' | 'topic';
+/** A budget's key names its day, so it only has to outlive that day. */
+const BUDGET_SECONDS = 2 * 24 * 60 * 60;
 
 export interface FeedGroup {
   id: FeedGroupId;
@@ -91,6 +117,12 @@ export interface FeedGroup {
   fetchedAt: string;
 }
 
+/**
+ * Why a tab has no groups, when that deserves a sentence of its own: the source
+ * needs a key this PostGear does not have, or it has used up its day.
+ */
+export type FeedEmptyReason = 'not_set_up' | 'resting';
+
 export interface FeedAnswer {
   kind: FeedKind;
   locality: LocalityAnswer;
@@ -98,6 +130,10 @@ export interface FeedAnswer {
   language: string;
   groups: FeedGroup[];
   unavailable: SourceId[];
+  /** Festivals only: today (`YYYY-MM-DD`) in the place's own zone, so "in 3 days" is counted from there. */
+  today?: string;
+  /** Videos only, and only when there are no groups. */
+  reason?: FeedEmptyReason;
 }
 
 export interface DiscoverStatus {
@@ -113,17 +149,12 @@ export interface DiscoverStatus {
   };
 }
 
-interface GroupPlan {
-  id: FeedGroupId;
-  source: SourceId;
-  attribution: SourceAttribution;
-  fetch: (signal: AbortSignal) => Promise<SourceResult>;
-}
-
 interface GroupOutcome {
   /** Absent when the source was not asked at all. */
   result?: SourceResult;
   retryAfterMs: number | null;
+  /** Not asked because its budget for the day is gone. */
+  spent?: boolean;
 }
 
 interface CachedGroup {
@@ -134,22 +165,95 @@ interface CachedGroup {
   /** When these items were really fetched, which a kept copy does not change. */
   fetchedAt: string;
   answeredGeo?: string;
+  /** Wikipedia: the day the list is for, so the heading never calls an older one "yesterday". */
+  answeredDay?: string;
+  /** Festivals: one of the two readers was down, so a complete copy is worth more than this. */
+  partial?: boolean;
+  /** The budget ran out, which is why this copy is still the answer. */
+  spent?: boolean;
 }
 
 interface CachedFeed extends CacheEntry {
   groups: CachedGroup[];
   unavailable: SourceId[];
-  /** Set when something went wrong: how soon this entry is worth trying again. */
+  /** Set when this entry is worth asking for again sooner than its window says. */
   retryAfterMs: number | null;
+}
+
+/** A load and the copy it came back with. No copy means nobody finished fetching in time. */
+interface Loaded {
+  load: LoadPlan;
+  entry: CachedFeed | null;
+}
+
+/** A cached group on its way out: what of it this request shows, and how old that is. */
+interface ShownGroup {
+  group: CachedGroup;
+  items: DiscoverItem[];
+  ageMs: number;
+  stale: boolean;
 }
 
 const TROUBLE: GroupOutcome = { retryAfterMs: RETRY_AFTER_TROUBLE_MS };
 
-const TRENDS_ATTRIBUTION = { name: 'Google Trends', url: 'https://trends.google.com/trending' };
-const NEWS_ATTRIBUTION = { name: 'Google News', url: 'https://news.google.com' };
+/** The answer of a source that had one. A failure, or a source nobody asked, has none. */
+function answerOf(outcome: GroupOutcome): SourceResult | undefined {
+  return outcome.result?.failed === undefined ? outcome.result : undefined;
+}
 
-function answered(outcome: GroupOutcome): boolean {
-  return outcome.result !== undefined && outcome.result.failed === undefined;
+/** How soon an answer is worth asking for again, when that is sooner than its window. */
+function askAgainAfter(result: SourceResult): number | null {
+  if (result.failed === 'upstream') return RETRY_AFTER_TROUBLE_MS;
+  if (result.partial) return RETRY_AFTER_PARTIAL_MS;
+  if (result.answeredDay && result.answeredDay !== utcYesterday()) return RETRY_AFTER_EARLY_MS;
+  return null;
+}
+
+function utcYesterday(): string {
+  return new Date(Date.now() - DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * A festival's id. Not the composer's, which is made from the title alone: the
+ * list holds the same festival in two different years, and both are rows.
+ */
+function withFestivalId(item: SourceItem): ComposedItem {
+  return { ...item, id: itemId(item.source.id, `${item.date ?? ''}|${item.title}`) };
+}
+
+/** "Tamil" for `ta`. Null when `Intl` has no name for the tag, or cannot read it. */
+function languageName(tag: string): string | null {
+  try {
+    const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(tag);
+    return name && name !== tag ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+const DAY_AND_MONTH = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+});
+
+/** "8 November" from `2026-11-08`, joined from parts so the wording cannot move with the ICU version. */
+function dayAndMonth(day: string): string | null {
+  const time = /^\d{4}-\d{2}-\d{2}$/.test(day) ? Date.parse(`${day}T00:00:00Z`) : Number.NaN;
+  if (Number.isNaN(time)) return null;
+
+  const parts = new Map(
+    DAY_AND_MONTH.formatToParts(new Date(time)).map((part) => [part.type, part.value]),
+  );
+  const words = [parts.get('day'), parts.get('month')];
+  return words.every(Boolean) ? words.join(' ') : null;
+}
+
+/** Yesterday's list is called that only while it still is yesterday's. */
+function wikipediaSubtitle(answeredDay: string | undefined): string {
+  if (answeredDay === utcYesterday()) return DISCOVER_MESSAGES.wikipediaYesterday;
+  const day = answeredDay ? dayAndMonth(answeredDay) : null;
+  return day ? DISCOVER_MESSAGES.wikipediaOlder(day) : DISCOVER_MESSAGES.wikipediaUndated;
 }
 
 @Injectable()
@@ -173,95 +277,53 @@ export class DiscoverService {
       sources: {
         trends: true,
         news: true,
-        wikipedia: false,
-        videos: false,
-        holidays: false,
-        social: false,
+        wikipedia: true,
+        // The one source that needs a key. Whether there is one, never the key.
+        videos: this.engine.videos !== null,
+        holidays: true,
+        social: true,
       },
     };
   }
 
   async feed(orgId: string, request: FeedRequest): Promise<FeedAnswer> {
-    const plans = this.planGroups(request);
-    const language = this.answerLanguage(request);
+    const language = answerLanguage(request);
+    // No loads means nothing to fetch, so nothing to cache either.
+    const loads = planLoads(this.engine, this.keys, request);
 
-    // Worldwide has no Trending yet: nothing to fetch, so nothing to cache.
-    if (plans.length === 0) return this.present(request, language, null, plans);
-
-    const key = this.keys.feed(this.keyParts(request, language));
-    const { entry } = await this.cache.load<CachedFeed>(key, {
-      keepSeconds: KEEP_SECONDS,
-      freshMs: (cached) => cached.retryAfterMs ?? FRESH_MS[request.kind],
-      beforeMiss: () => this.countNewPlace(orgId),
-      refresh: (previous) => this.fetchGroups(key, plans, previous),
+    // Side by side: each has its own copy, its own lock and its own age. All of
+    // them are waited for, so a refusal leaves no fetch running behind the answer.
+    const settled = await Promise.allSettled(loads.map((load) => this.load(orgId, load)));
+    const loaded = settled.map((result, index): Loaded => {
+      // Only the limit on new places refuses, and it refuses the whole request.
+      if (result.status === 'rejected') throw result.reason;
+      return { load: loads[index], entry: result.value };
     });
 
-    return this.present(request, language, entry, plans);
+    return this.present(request, language, loaded);
   }
 
-  /** News answers in an edition that exists. Trends has no language of its own. */
-  private answerLanguage({ kind, locality, language }: FeedRequest): string {
-    return kind === 'news' ? editionFor(locality.countryCode, language).language : language;
-  }
-
-  private keyParts({ kind, locality, topic }: FeedRequest, language: string) {
-    return kind === 'trending'
-      ? {
-          kind,
-          country: locality.countryCode,
-          region: locality.regionCode,
-          city: null,
-          language: null,
-          topic: null,
-        }
-      : {
-          kind,
-          country: locality.countryCode,
-          region: null,
-          city: locality.city,
-          language,
-          topic: topic ?? null,
-        };
-  }
-
-  private planGroups({ kind, locality, language, topic }: FeedRequest): GroupPlan[] {
-    const input = (signal: AbortSignal): SourceInput => ({ locality, language, signal });
-
-    if (kind === 'trending') {
-      if (!locality.countryCode) return [];
-      return [
-        {
-          id: 'trends',
-          source: 'google-trends',
-          attribution: TRENDS_ATTRIBUTION,
-          fetch: (signal) => this.engine.trends.fetch(input(signal)),
-        },
-      ];
-    }
-
-    const plan = (id: FeedGroupId, fetch: GroupPlan['fetch']): GroupPlan => ({
-      id,
-      source: 'google-news',
-      attribution: NEWS_ATTRIBUTION,
-      fetch,
+  private async load(orgId: string, load: LoadPlan): Promise<CachedFeed | null> {
+    const { entry } = await this.cache.load<CachedFeed>(load.key, {
+      keepSeconds: load.windows.keepSeconds,
+      freshMs: (cached) => cached.retryAfterMs ?? this.freshFor(load, cached),
+      beforeMiss: load.placeBound ? () => this.countNewPlace(orgId) : undefined,
+      refresh: (previous) => this.fetchGroups(load, previous),
     });
-    const { news } = this.engine;
+    return entry;
+  }
 
-    // A chosen topic comes first: de-duplicating favours the earlier group, and a
-    // story that is both top news and about the topic belongs under what was asked for.
-    const groups: GroupPlan[] = [];
-    if (topic) groups.push(plan('topic', (signal) => news.topic(input(signal), topic)));
-    if (locality.city) groups.push(plan('place', (signal) => news.place(input(signal))));
-
-    // Reading a country with no edition from `US:en`'s top stories would be American
-    // news with that country's name on it. World news says what it is.
-    if (languagesWithEdition(locality.countryCode).length > 0) {
-      groups.push(plan('top', (signal) => news.top(input(signal))));
-    } else {
-      groups.push(plan('world', (signal) => news.topic(input(signal), 'WORLD')));
-    }
-
-    return groups;
+  /**
+   * How long a good copy is the answer. Its load's window, except for a Wikipedia
+   * list that has since stopped being yesterday's: one fetched late in the evening
+   * would otherwise hide the next day's list for most of that day.
+   */
+  private freshFor(load: LoadPlan, cached: CachedFeed): number {
+    const yesterday = utcYesterday();
+    const isOlder = cached.groups.some(
+      (group) => group.answeredDay !== undefined && group.answeredDay !== yesterday,
+    );
+    return isOlder ? Math.min(load.windows.freshMs, RETRY_AFTER_EARLY_MS) : load.windows.freshMs;
   }
 
   /** Limits fetches, not reads: a place that is already cached costs Google nothing. */
@@ -279,11 +341,8 @@ export class DiscoverService {
     );
   }
 
-  private async fetchGroups(
-    key: string,
-    plans: GroupPlan[],
-    previous: CachedFeed | null,
-  ): Promise<CachedFeed> {
+  private async fetchGroups(load: LoadPlan, previous: CachedFeed | null): Promise<CachedFeed> {
+    const { key, groups: plans, windows } = load;
     const started = Date.now();
     const settled = await Promise.allSettled(plans.map((plan) => this.runGroup(plan)));
     const outcomes = settled.map((result, index) => {
@@ -305,37 +364,53 @@ export class DiscoverService {
     const keptCopy = (plan: GroupPlan): CachedGroup | null => {
       const copy = previous?.groups.find((group) => group.id === plan.id);
       if (!copy) return null;
-      return now.getTime() - Date.parse(copy.fetchedAt) <= KEEP_SECONDS * 1000 ? copy : null;
+      return now.getTime() - Date.parse(copy.fetchedAt) <= windows.keepSeconds * 1000 ? copy : null;
     };
 
-    // A kept copy goes through the composer too, so it cannot repeat a fresh story.
-    const composed = composeFeed(
-      plans.map((plan, index) => ({
-        id: plan.id,
-        items: answered(outcomes[index])
-          ? (outcomes[index].result as SourceResult).items
-          : (keptCopy(plan)?.items ?? []),
-      })),
-      // Recordings all pass 48 hours two days after they were made.
-      { now, maxNewsAgeMs: this.engine.simulation ? null : NEWS_MAX_AGE_MS },
-    );
-
-    const groups = plans.map((plan, index): CachedGroup => {
+    // What each group goes on with: the new answer, or failing that what it had.
+    const taken = plans.map((plan, index) => {
       const outcome = outcomes[index];
       const copy = keptCopy(plan);
-      const isFresh = answered(outcome);
+      const answer = answerOf(outcome);
+      // Half an answer never replaces a whole one.
+      const isWhole = copy !== null && !copy.partial && copy.items.length > 0;
+      const isWorse = answer?.partial === true && isWhole;
+      return { plan, outcome, copy, fresh: isWorse ? undefined : answer };
+    });
+
+    const lists = taken.map(
+      ({ plan, copy, fresh }): FeedGroupInput => ({
+        id: plan.id,
+        items: fresh ? fresh.items : (copy?.items ?? []),
+      }),
+    );
+    // A kept copy goes through the composer too, so it cannot repeat a fresh story.
+    const composed = load.compose
+      ? composeFeed(lists, {
+          now,
+          // Recordings all pass 48 hours two days after they were made.
+          maxNewsAgeMs: this.engine.simulation ? null : NEWS_MAX_AGE_MS,
+        })
+      : lists.map((list) => ({ id: list.id, items: list.items.map(withFestivalId) }));
+
+    const groups = taken.map(({ plan, outcome, copy, fresh }, index): CachedGroup => {
+      // What the source said about its own answer travels with the items it is about.
+      const said = fresh ?? copy;
       return {
         id: plan.id,
         source: plan.source,
-        attribution: plan.attribution,
+        attribution: (plan.ownAttribution ? said?.attribution : undefined) ?? plan.attribution,
         items: composed[index].items,
-        fetchedAt: isFresh || !copy ? now.toISOString() : copy.fetchedAt,
-        answeredGeo: isFresh ? outcome.result?.answeredGeo : copy?.answeredGeo,
+        fetchedAt: fresh || !copy ? now.toISOString() : copy.fetchedAt,
+        answeredGeo: said?.answeredGeo,
+        answeredDay: said?.answeredDay,
+        partial: said?.partial,
+        spent: outcome.spent,
       };
     });
 
     const unavailable = [
-      ...new Set(plans.filter((_, index) => !answered(outcomes[index])).map((plan) => plan.source)),
+      ...new Set(plans.filter((_, index) => !answerOf(outcomes[index])).map((plan) => plan.source)),
     ];
     const retries = outcomes.flatMap((outcome) => outcome.retryAfterMs ?? []);
 
@@ -364,11 +439,43 @@ export class DiscoverService {
     if (!release) return { retryAfterMs: RETRY_AFTER_BUSY_MS };
 
     try {
+      // Inside the gate, so a unit is only ever taken for a call that is about to be made.
+      if (plan.budget && !(await this.reserve(plan.budget))) {
+        return { spent: true, retryAfterMs: RETRY_AFTER_SPENT_MS };
+      }
+
       const result = await plan.fetch(AbortSignal.timeout(GROUP_DEADLINE_MS));
+      if (plan.budget) await this.settle(plan.budget, result);
       await this.recordHealth(plan.source, result);
-      return { result, retryAfterMs: result.failed === 'upstream' ? RETRY_AFTER_TROUBLE_MS : null };
+      return { result, retryAfterMs: askAgainAfter(result) };
     } finally {
       release();
+    }
+  }
+
+  /**
+   * Takes one call's worth from a budget before the call is made, and says whether
+   * there was any left. Before, not after, so a call that fails or never comes
+   * back is counted too.
+   *
+   * The increment decides. It is one atomic step, so however many requests race,
+   * only as many as the limit ever see a count within it. The read in front of it
+   * only stops a spent budget's counter from climbing all day.
+   */
+  private async reserve(budget: Budget): Promise<boolean> {
+    if (Number((await this.redis.get(budget.key)) ?? 0) >= budget.limit) return false;
+    return (await this.redis.incrementWithTtl(budget.key, BUDGET_SECONDS)) <= budget.limit;
+  }
+
+  /**
+   * A source says what its answer really cost. Whatever is beyond the unit already
+   * taken is added, up to the whole day: past the limit one more changes nothing,
+   * so a source that says nonsense cannot keep this counting for ever.
+   */
+  private async settle(budget: Budget, result: SourceResult): Promise<void> {
+    const beyond = Math.min((result.unitsUsed ?? 1) - 1, budget.limit);
+    for (let extra = beyond; extra > 0; extra -= 1) {
+      await this.redis.incrementWithTtl(budget.key, BUDGET_SECONDS);
     }
   }
 
@@ -377,6 +484,9 @@ export class DiscoverService {
   }
 
   private async recordHealth(source: SourceId, result: SourceResult): Promise<void> {
+    // Half an answer says one reader is down and one is fine: no verdict either way.
+    if (result.partial) return;
+
     const key = this.keys.breaker(source);
 
     if (result.failed !== 'upstream') {
@@ -393,53 +503,146 @@ export class DiscoverService {
     }
   }
 
-  private present(
-    request: FeedRequest,
-    language: string,
-    entry: CachedFeed | null,
-    plans: GroupPlan[],
-  ): FeedAnswer {
+  private present(request: FeedRequest, language: string, loaded: Loaded[]): FeedAnswer {
     const { kind, locality } = request;
     const now = Date.now();
+    const today = kind === 'festivals' ? this.todayAt(locality) : undefined;
 
-    const groups = (entry?.groups ?? [])
+    const shown = loaded
+      .flatMap(({ load, entry }) =>
+        (entry?.groups ?? []).map((group): ShownGroup => {
+          const ageMs = now - Date.parse(group.fetchedAt);
+          // The copy holds more than a year of festivals. The tab shows the weeks around today.
+          const items = today === undefined ? group.items : festivalsInWindow(group.items, today);
+          return {
+            group,
+            items: items.map((item) => ({ ...item, brief: buildBrief(item, locality, language) })),
+            ageMs,
+            // Each group against its own load's window. A spent budget is why a copy
+            // is still the answer, however young it is.
+            stale: ageMs >= load.windows.freshMs || group.spent === true,
+          };
+        }),
+      )
       // An empty group has nothing to say: the page just does not show it.
-      .filter((group) => group.items.length > 0)
-      .map((group): FeedGroup => {
-        const ageMs = now - Date.parse(group.fetchedAt);
-        const stale = ageMs >= FRESH_MS[kind];
-        const via =
-          group.source === 'google-trends'
-            ? DISCOVER_MESSAGES.risingSubtitle
-            : DISCOVER_MESSAGES.newsSubtitle;
+      .filter((part) => part.items.length > 0);
 
-        return {
-          id: group.id,
-          title: this.titleOf(group, request),
-          subtitle: stale
-            ? `${via} ${DISCOVER_MESSAGES.staleNote(Math.floor(ageMs / MINUTE_MS))}`
-            : via,
-          attribution: group.attribution,
-          items: group.items.map((item) => ({
-            ...item,
-            brief: buildBrief(item, locality, language),
-          })),
-          stale,
-          fetchedAt: group.fetchedAt,
-        };
-      });
+    // The two networks are fetched and kept apart, and shown as one group.
+    const networks = shown.filter((part) => part.group.id === 'social');
+    const groups = shown
+      .filter((part) => part.group.id !== 'social')
+      .map((part) => this.groupOf(part, request));
+    if (networks.length > 0) groups.push(this.socialGroup(networks, request));
+
+    const reason = this.emptyReason(kind, groups, loaded);
 
     return {
       kind,
       locality: withNewsLanguages(locality),
       language,
       groups,
-      // No entry means nobody finished fetching in time, so nothing is known.
-      unavailable: entry ? entry.unavailable : [...new Set(plans.map((plan) => plan.source))],
+      unavailable: [
+        ...new Set(
+          loaded.flatMap(({ load, entry }) =>
+            // No entry means nobody finished fetching in time, so nothing is known.
+            entry ? entry.unavailable : load.groups.map((plan) => plan.source),
+          ),
+        ),
+      ],
+      ...(today === undefined ? {} : { today }),
+      ...(reason ? { reason } : {}),
     };
   }
 
-  private titleOf(group: CachedGroup, { locality, topic }: FeedRequest): string {
+  /**
+   * Today where the place is, which is what a festival is "in 3 days" from. The
+   * zone arrives from a query string checked for shape only, and `todayIn` is
+   * where a zone `Intl` does not know reads UTC instead of throwing.
+   */
+  private todayAt({ timeZone, countryCode }: Locality): string {
+    return todayIn(timeZone ?? (countryCode ? defaultTimeZone(countryCode) : null));
+  }
+
+  private emptyReason(
+    kind: FeedKind,
+    groups: FeedGroup[],
+    loaded: Loaded[],
+  ): FeedEmptyReason | undefined {
+    if (kind !== 'videos') return undefined;
+    if (!this.engine.videos) return 'not_set_up';
+
+    const isSpent = loaded.some(({ entry }) => entry?.groups.some((group) => group.spent));
+    return groups.length === 0 && isSpent ? 'resting' : undefined;
+  }
+
+  private groupOf(part: ShownGroup, request: FeedRequest): FeedGroup {
+    const { group, items, stale } = part;
+    return {
+      id: group.id,
+      title: this.titleOf(group, request),
+      subtitle: this.subtitleOf(part),
+      attribution: group.attribution,
+      items,
+      stale,
+      fetchedAt: group.fetchedAt,
+    };
+  }
+
+  /**
+   * Bluesky's trends and then Mastodon's, as one group. It is as old as its older
+   * half and stale when either half is. A network with nothing to show is simply
+   * not named: its chips are missing, and `unavailable` says why.
+   */
+  private socialGroup(networks: ShownGroup[], request: FeedRequest): FeedGroup {
+    const oldest = networks.reduce((a, b) => (b.ageMs > a.ageMs ? b : a));
+    if (networks.length === 1) return this.groupOf(oldest, request);
+
+    const names = networks.map(({ group }) => this.networkName(group));
+    const stale = networks.some((part) => part.stale);
+    return {
+      id: 'social',
+      title: DISCOVER_MESSAGES.socialTitle(names),
+      subtitle: this.subtitleOf({ ...oldest, stale }),
+      attribution: { name: DISCOVER_MESSAGES.socialAttribution(names) },
+      items: networks.flatMap((part) => part.items),
+      stale,
+      fetchedAt: oldest.group.fetchedAt,
+    };
+  }
+
+  private networkName(group: CachedGroup): string {
+    return group.source in SOCIAL_NETWORKS
+      ? SOCIAL_NETWORKS[group.source as keyof typeof SOCIAL_NETWORKS]
+      : group.attribution.name;
+  }
+
+  private subtitleOf({ group, ageMs, stale }: ShownGroup): string {
+    if (group.spent) return DISCOVER_MESSAGES.videosResting;
+
+    const via = this.viaOf(group);
+    return stale ? `${via} ${DISCOVER_MESSAGES.staleNote(Math.floor(ageMs / MINUTE_MS))}` : via;
+  }
+
+  /** The sentence that names where a group comes from. */
+  private viaOf(group: CachedGroup): string {
+    switch (group.id) {
+      case 'trends':
+        return DISCOVER_MESSAGES.risingSubtitle;
+      case 'wikipedia':
+        return wikipediaSubtitle(group.answeredDay);
+      case 'social':
+        return DISCOVER_MESSAGES.socialSubtitle;
+      case 'videos':
+        return DISCOVER_MESSAGES.videosSubtitle;
+      case 'festivals':
+        return DISCOVER_MESSAGES.festivalsSubtitle;
+      default:
+        return DISCOVER_MESSAGES.newsSubtitle;
+    }
+  }
+
+  private titleOf(group: CachedGroup, request: FeedRequest): string {
+    const { locality, topic } = request;
     const country = locality.countryName ?? locality.countryCode ?? '';
 
     switch (group.id) {
@@ -448,6 +651,11 @@ export class DiscoverService {
         const isRegion = group.answeredGeo === locality.regionCode && locality.regionName;
         return DISCOVER_MESSAGES.risingTitle(isRegion ? (locality.regionName as string) : country);
       }
+      case 'wikipedia':
+        // An edition is a language's readers everywhere, so the heading names it and not the place.
+        return DISCOVER_MESSAGES.wikipediaTitle(languageName(wikipediaEdition(request)));
+      case 'social':
+        return DISCOVER_MESSAGES.socialTitle([this.networkName(group)]);
       case 'place':
         return DISCOVER_MESSAGES.placeTitle(locality.city as string);
       case 'top':
@@ -456,6 +664,10 @@ export class DiscoverService {
         return DISCOVER_MESSAGES.worldTitle;
       case 'topic':
         return TOPIC_TITLES[topic as NewsTopic];
+      case 'videos':
+        return DISCOVER_MESSAGES.videosTitle(country);
+      case 'festivals':
+        return DISCOVER_MESSAGES.festivalsTitle(country);
     }
   }
 }

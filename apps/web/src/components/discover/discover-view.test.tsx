@@ -2,7 +2,12 @@
  * The Discover page: groups and cards from the API's answer, the stale note,
  * groups with nothing hidden, the empty tab with Try Again, the error state,
  * Open as a real outside link, `dir="auto"` on what came from a feed, and the
- * tabs that arrive later.
+ * tab that arrives later.
+ *
+ * Module 05: Trending's Wikipedia rows and social chips (and an updated line
+ * that leaves Wikipedia out), the Videos tab with and without a YouTube key
+ * (no request without one, and who is told to ask), and the Festivals tab,
+ * whose Plan A Post hands the sheet a date.
  */
 import '@testing-library/jest-dom';
 import { TooltipProvider } from '@postgear/ui';
@@ -10,15 +15,28 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { api } from '@/lib/api';
 import type {
   DiscoverGroup,
+  DiscoverItem,
   DiscoverSourceId,
   DiscoverStatus,
   DiscoverTab,
+  FeedKind,
   FeedResponse,
   Locality,
 } from '@/types/discover';
 import { stubBrowserLayout } from '../workflows/fields/test-dom';
-import { placeStorageKey, serializeRememberedPlace } from './discover-model';
-import { DiscoverView, LATER_STEP, LOAD_FAILED_TITLE } from './discover-view';
+import { placeStorageKey, serializeRememberedPlace, WORLDWIDE_PLACE } from './discover-model';
+import {
+  DiscoverView,
+  type DiscoverViewProps,
+  FESTIVALS_NEED_PLACE,
+  FESTIVALS_NEED_PLACE_HINT,
+  LATER_STEP,
+  LOAD_FAILED_TITLE,
+  VIDEOS_ASK_ADMIN,
+  VIDEOS_NEED_PLACE,
+  VIDEOS_NOT_SET_UP,
+  VIDEOS_RESTING,
+} from './discover-view';
 
 jest.mock('@/lib/api', () => {
   const actual = jest.requireActual('@/lib/api');
@@ -107,26 +125,47 @@ const STORIES: DiscoverGroup = {
 };
 
 function feed(
-  kind: 'trending' | 'news',
+  kind: FeedKind,
   groups: DiscoverGroup[],
   unavailable: DiscoverSourceId[] = [],
 ): FeedResponse {
   return { kind, language: 'ta', locality: CHENNAI, groups, unavailable };
 }
 
-function remember() {
+function remember(place: Locality = CHENNAI) {
   window.localStorage.setItem(
     placeStorageKey('org-a'),
-    serializeRememberedPlace({ place: CHENNAI, source: 'browser', language: 'ta' }),
+    serializeRememberedPlace({
+      place,
+      source: place.countryCode ? 'browser' : 'worldwide',
+      language: place.newsLanguages[0] ?? 'en',
+    }),
   );
 }
 
-function renderView(status: DiscoverStatus | null = STATUS, initialTab: DiscoverTab = 'trending') {
+function renderView(
+  status: DiscoverStatus | null = STATUS,
+  initialTab: DiscoverTab = 'trending',
+  props: Partial<DiscoverViewProps> = {},
+) {
   return render(
     <TooltipProvider>
-      <DiscoverView orgId="org-a" status={status} initialTab={initialTab} />
+      <DiscoverView
+        orgId="org-a"
+        status={status}
+        initialTab={initialTab}
+        isAdmin={false}
+        {...props}
+      />
     </TooltipProvider>,
   );
+}
+
+/** The feed requests made so far, as their query strings. */
+function feedCalls(): string[] {
+  return mockedApi.mock.calls
+    .map(([path]) => path)
+    .filter((path) => path.startsWith('/discover/feed'));
 }
 
 beforeEach(() => {
@@ -214,17 +253,10 @@ describe('DiscoverView', () => {
     remember();
     mockedApi.mockResolvedValue(feed('trending', [TRENDS]));
     const onCreatePost = jest.fn();
-    render(
-      <TooltipProvider>
-        <DiscoverView
-          orgId="org-a"
-          status={STATUS}
-          initialTab="trending"
-          onCreatePost={onCreatePost}
-          renderCardExtra={(item) => <span data-testid="card-extra">{item.id}</span>}
-        />
-      </TooltipProvider>,
-    );
+    renderView(STATUS, 'trending', {
+      onCreatePost,
+      renderCardExtra: (item) => <span data-testid="card-extra">{item.id}</span>,
+    });
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
     expect(within(card).getByTestId('card-extra')).toHaveTextContent('t1');
@@ -311,13 +343,419 @@ describe('DiscoverView', () => {
     ).toBeInTheDocument();
   });
 
-  it('says the later tabs are coming', async () => {
+  it('says the Competitors tab is coming, and asks for nothing', async () => {
     remember();
     mockedApi.mockResolvedValue(feed('trending', [TRENDS]));
-    renderView(STATUS, 'festivals');
+    renderView(STATUS, 'competitors');
 
     expect(await screen.findByText(LATER_STEP)).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Festivals' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('tab', { name: 'Competitors' })).toHaveAttribute(
+      'data-state',
+      'active',
+    );
     expect(mockedApi).not.toHaveBeenCalled();
+  });
+});
+
+const WIKIPEDIA: DiscoverGroup = {
+  id: 'wikipedia',
+  title: 'What People Are Reading On Tamil Wikipedia',
+  subtitle: "Yesterday's most-read articles. Wikipedia, text CC BY-SA.",
+  attribution: { name: 'Wikipedia', url: 'https://ta.wikipedia.org' },
+  stale: false,
+  // A whole day's reading, fetched hours ago: older than anything live on the page.
+  fetchedAt: new Date(Date.now() - 20 * 3_600_000).toISOString(),
+  items: [
+    {
+      id: 'w1',
+      kind: 'wiki',
+      source: { id: 'wikipedia', name: 'Wikipedia', url: 'https://ta.wikipedia.org' },
+      title: 'திருக்குறள்',
+      url: 'https://ta.wikipedia.org/wiki/Thirukkural',
+      language: 'ta',
+      signal: { label: '1,627 reads', rank: 1, views: 1627 },
+      brief: 'Widely read on Tamil Wikipedia: "திருக்குறள்" (1,627 reads).',
+    },
+  ],
+};
+
+const SOCIAL: DiscoverGroup = {
+  id: 'social',
+  title: 'Worldwide On Bluesky And Mastodon',
+  subtitle: 'Not local: what the whole network is talking about.',
+  attribution: { name: 'Bluesky and Mastodon' },
+  stale: false,
+  fetchedAt: new Date(Date.now() - 4 * 60_000).toISOString(),
+  items: [
+    {
+      id: 's1',
+      kind: 'social',
+      source: { id: 'bluesky', name: 'Bluesky', url: 'https://bsky.app' },
+      title: 'House speaker picks',
+      url: 'https://bsky.app/profile/did:plc:abc/feed/xyz',
+      signal: { label: '4,625 posts', posts: 4625 },
+      brief: 'Trending worldwide on Bluesky.',
+    },
+    {
+      id: 's2',
+      kind: 'social',
+      source: { id: 'mastodon', name: 'Mastodon', url: 'https://mastodon.social' },
+      title: '#MeerMittwoch',
+      url: 'https://mastodon.social/tags/MeerMittwoch',
+      signal: { label: '273 uses this week', posts: 273 },
+      brief: 'Trending worldwide on Mastodon.',
+    },
+  ],
+};
+
+describe('Trending with more sources (Module 05)', () => {
+  it('draws Wikipedia as rows and the social topics as chips, each under its own name', async () => {
+    remember();
+    mockedApi.mockResolvedValue(feed('trending', [TRENDS, WIKIPEDIA, SOCIAL]));
+    renderView();
+
+    const wikipedia = await screen.findByRole('region', {
+      name: 'What People Are Reading On Tamil Wikipedia',
+    });
+    expect(
+      within(wikipedia).getByText("Yesterday's most-read articles. Wikipedia, text CC BY-SA."),
+    ).toBeInTheDocument();
+    const row = within(wikipedia).getByTestId('discover-wiki-row');
+    expect(within(row).getByRole('link', { name: 'திருக்குறள்' })).toHaveAttribute(
+      'href',
+      'https://ta.wikipedia.org/wiki/Thirukkural',
+    );
+    expect(within(row).getByText('1,627 reads')).toBeInTheDocument();
+    expect(within(wikipedia).queryByRole('article')).not.toBeInTheDocument();
+
+    const social = screen.getByRole('region', { name: 'Worldwide On Bluesky And Mastodon' });
+    expect(
+      within(social).getByText('Not local: what the whole network is talking about.'),
+    ).toBeInTheDocument();
+    expect(
+      within(social).getByRole('link', {
+        name: 'House speaker picks on Bluesky, 4,625 posts, opens in a new tab',
+      }),
+    ).toHaveAttribute('href', 'https://bsky.app/profile/did:plc:abc/feed/xyz');
+    expect(
+      within(social).getByRole('link', {
+        name: '#MeerMittwoch on Mastodon, 273 uses this week, opens in a new tab',
+      }),
+    ).toHaveAttribute('rel', 'noopener noreferrer');
+    // A chip is a link and nothing else.
+    expect(within(social).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('leaves Wikipedia out of the updated line', async () => {
+    remember();
+    mockedApi.mockResolvedValue(feed('trending', [TRENDS, WIKIPEDIA, SOCIAL]));
+    renderView();
+
+    // Trends were fetched 25 minutes ago, Wikipedia 20 hours ago.
+    expect(await screen.findByTestId('discover-updated')).toHaveTextContent('Updated 25 min ago');
+  });
+
+  it('shows no updated line when Wikipedia is all there is', async () => {
+    remember();
+    mockedApi.mockResolvedValue(feed('trending', [WIKIPEDIA]));
+    renderView();
+
+    await screen.findByTestId('discover-wiki-row');
+    expect(screen.queryByTestId('discover-updated')).not.toBeInTheDocument();
+  });
+
+  it('hands Create Post a Wikipedia article with the place and language', async () => {
+    remember();
+    mockedApi.mockResolvedValue(feed('trending', [WIKIPEDIA]));
+    const onCreatePost = jest.fn();
+    renderView(STATUS, 'trending', { onCreatePost });
+
+    const row = await screen.findByTestId('discover-wiki-row');
+    fireEvent.click(within(row).getByRole('button', { name: 'Create Post' }));
+
+    expect(onCreatePost).toHaveBeenCalledWith({
+      item: WIKIPEDIA.items[0],
+      place: CHENNAI,
+      language: 'ta',
+    });
+  });
+});
+
+const WITH_VIDEOS: DiscoverStatus = { ...STATUS, sources: { ...STATUS.sources, videos: true } };
+
+const VIDEO: DiscoverItem = {
+  id: 'v1',
+  kind: 'video',
+  source: { id: 'youtube', name: 'YouTube', url: 'https://www.youtube.com' },
+  title: 'சென்னை மழை: இன்றைய நிலவரம்',
+  summary: 'Chennai Live',
+  url: 'https://www.youtube.com/watch?v=abc123DEF_-',
+  image: 'https://i.ytimg.com/vi/abc123DEF_-/mqdefault.jpg',
+  publishedAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+  signal: { label: '1.2M views', views: 1_200_000 },
+  brief: 'Trending video in India.',
+};
+
+const VIDEOS: DiscoverGroup = {
+  id: 'videos',
+  title: 'Trending On YouTube In India',
+  subtitle: 'Via YouTube.',
+  attribution: { name: 'YouTube', url: 'https://www.youtube.com' },
+  stale: false,
+  fetchedAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+  items: [VIDEO],
+};
+
+describe('Videos (Module 05)', () => {
+  it('says videos are not set up without a key, and makes no request', async () => {
+    remember();
+    renderView(STATUS, 'videos');
+
+    expect(await screen.findByText(VIDEOS_NOT_SET_UP)).toBeInTheDocument();
+    // A member can do nothing about it: one sentence, nothing to press.
+    expect(screen.queryByText(VIDEOS_ASK_ADMIN)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try Again' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('discover-place-chip')).toHaveTextContent('Chennai, Tamil Nadu'),
+    );
+    expect(mockedApi).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+  });
+
+  it('tells a workspace admin who to ask, and nobody else', async () => {
+    remember();
+    renderView(STATUS, 'videos', { isAdmin: true });
+
+    expect(await screen.findByText(VIDEOS_NOT_SET_UP)).toBeInTheDocument();
+    expect(screen.getByText(VIDEOS_ASK_ADMIN)).toBeInTheDocument();
+    expect(feedCalls()).toEqual([]);
+  });
+
+  it('believes the answer when the status could not be asked', async () => {
+    remember();
+    mockedApi.mockResolvedValue({ ...feed('videos', []), reason: 'not_set_up' });
+    renderView(null, 'videos', { isAdmin: true });
+
+    expect(await screen.findByText(VIDEOS_NOT_SET_UP)).toBeInTheDocument();
+    expect(screen.getByText(VIDEOS_ASK_ADMIN)).toBeInTheDocument();
+    expect(feedCalls()).toHaveLength(1);
+  });
+
+  it('draws a video card: thumbnail, channel, views and time, Open to YouTube', async () => {
+    remember();
+    mockedApi.mockResolvedValue(feed('videos', [VIDEOS]));
+    const onCreatePost = jest.fn();
+    renderView(WITH_VIDEOS, 'videos', { onCreatePost });
+
+    const card = await screen.findByRole('article', { name: VIDEO.title });
+    expect(card).toHaveAttribute('data-kind', 'video');
+    expect(within(card).getByRole('heading', { name: VIDEO.title })).toHaveAttribute('dir', 'auto');
+    expect(within(card).getByText('Chennai Live')).toBeInTheDocument();
+    expect(within(card).getByText('1.2M views, 3 hours ago')).toBeInTheDocument();
+
+    const image = card.querySelector('img');
+    expect(image).toHaveAttribute('src', 'https://i.ytimg.com/vi/abc123DEF_-/mqdefault.jpg');
+    expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
+    expect(image).toHaveAttribute('loading', 'lazy');
+    fireEvent.error(image as HTMLImageElement);
+    expect(card.querySelector('img')).toBeNull();
+
+    const open = within(card).getByRole('link', {
+      name: `Open ${VIDEO.title} on YouTube in a new tab`,
+    });
+    expect(open).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abc123DEF_-');
+    expect(open).toHaveAttribute('target', '_blank');
+    expect(open).toHaveAttribute('rel', 'noopener noreferrer');
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Create Post' }));
+    expect(onCreatePost).toHaveBeenCalledWith({ item: VIDEO, place: CHENNAI, language: 'ta' });
+
+    expect(feedCalls()).toEqual([
+      expect.stringMatching(/^\/discover\/feed\?kind=videos&country=IN/),
+    ]);
+    expect(window.location.search).toBe('?tab=videos');
+    expect(screen.getByTestId('discover-updated')).toHaveTextContent('Updated 12 min ago');
+  });
+
+  it('says YouTube is resting when the day is spent and nothing was kept', async () => {
+    remember();
+    mockedApi.mockResolvedValue({ ...feed('videos', [], ['youtube']), reason: 'resting' });
+    renderView(WITH_VIDEOS, 'videos');
+
+    expect(await screen.findByText(VIDEOS_RESTING)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try Again' })).not.toBeInTheDocument();
+  });
+
+  it('shows the kept copy with the note the API wrote when YouTube rests', async () => {
+    remember();
+    const resting = 'YouTube is resting until tomorrow. Showing what we had.';
+    mockedApi.mockResolvedValue(
+      feed('videos', [{ ...VIDEOS, stale: true, subtitle: resting }], ['youtube']),
+    );
+    renderView(WITH_VIDEOS, 'videos');
+
+    expect(await screen.findByText(resting)).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: VIDEO.title })).toBeInTheDocument();
+  });
+
+  it('asks for a place before asking for Worldwide videos', async () => {
+    remember(WORLDWIDE_PLACE);
+    renderView(WITH_VIDEOS, 'videos');
+
+    expect(await screen.findByText(VIDEOS_NEED_PLACE)).toBeInTheDocument();
+    expect(feedCalls()).toEqual([]);
+  });
+});
+
+function festival(date: string, title: string, observance: boolean): DiscoverItem {
+  return {
+    id: `${date}|${title}`,
+    kind: 'festival',
+    source: { id: 'holidays', name: 'Google Calendar' },
+    title,
+    date,
+    observance,
+    brief: `Festival in India: "${title}".`,
+  };
+}
+
+const DIWALI = festival('2026-11-08', 'Diwali/Deepavali', false);
+const BHAI_DUJ = festival('2026-11-11', 'Bhai Duj', true);
+const GURU_NANAK = festival('2026-11-24', 'Guru Nanak Jayanti', false);
+
+const FESTIVALS: DiscoverGroup = {
+  id: 'festivals',
+  title: 'Festivals And Holidays In India',
+  subtitle: 'Dates from public holiday calendars and date-holidays (CC BY-SA).',
+  attribution: { name: 'Public holiday calendars and date-holidays' },
+  stale: false,
+  fetchedAt: new Date(Date.now() - 3 * 24 * 3_600_000).toISOString(),
+  items: [DIWALI, BHAI_DUJ, GURU_NANAK],
+};
+
+/** The answer for India on 10 November 2026, whatever day the tests run on. */
+function festivals(groups: DiscoverGroup[], unavailable: DiscoverSourceId[] = []): FeedResponse {
+  return { ...feed('festivals', groups, unavailable), today: '2026-11-10' };
+}
+
+describe('Festivals (Module 05)', () => {
+  it('lists the festivals by week under the line the API wrote, with no updated line', async () => {
+    remember();
+    mockedApi.mockResolvedValue(festivals([FESTIVALS]));
+    renderView(STATUS, 'festivals');
+
+    const group = await screen.findByRole('region', { name: 'Festivals And Holidays In India' });
+    expect(
+      within(group).getByText('Dates from public holiday calendars and date-holidays (CC BY-SA).'),
+    ).toBeInTheDocument();
+    expect(
+      within(group)
+        .getAllByRole('heading', { level: 3 })
+        .map((node) => node.textContent),
+    ).toEqual(['This Week', 'Later This Month', 'Just Happened']);
+
+    const thisWeek = within(group).getByRole('region', { name: 'This Week' });
+    expect(within(thisWeek).getByText('Bhai Duj')).toBeInTheDocument();
+    expect(within(thisWeek).getByText('Observance')).toBeInTheDocument();
+    expect(within(thisWeek).getByText('tomorrow')).toBeInTheDocument();
+
+    const past = within(group).getByRole('region', { name: 'Just Happened' });
+    expect(within(past).getByText('Public Holiday')).toBeInTheDocument();
+    expect(within(past).getByText('2 days ago')).toBeInTheDocument();
+
+    expect(feedCalls()).toEqual([
+      expect.stringMatching(/^\/discover\/feed\?kind=festivals&country=IN.*&tz=Asia%2FKolkata$/),
+    ]);
+    expect(screen.queryByTestId('discover-updated')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+  });
+
+  it('hands Plan A Post the festival with its date: the evening before a public holiday', async () => {
+    remember();
+    mockedApi.mockResolvedValue(festivals([FESTIVALS]));
+    const onCreatePost = jest.fn();
+    renderView(STATUS, 'festivals', { onCreatePost });
+
+    const upcoming = await screen.findByRole('region', { name: 'Later This Month' });
+    fireEvent.click(within(upcoming).getByRole('button', { name: 'Plan A Post' }));
+
+    expect(onCreatePost).toHaveBeenLastCalledWith({
+      item: GURU_NANAK,
+      place: CHENNAI,
+      language: 'ta',
+      publishAt: '2026-11-23T18:00:00+05:30',
+    });
+  });
+
+  it('dates an observance for its own morning, and a past festival all the same', async () => {
+    remember();
+    mockedApi.mockResolvedValue(festivals([FESTIVALS]));
+    const onCreatePost = jest.fn();
+    renderView(STATUS, 'festivals', { onCreatePost });
+
+    const thisWeek = await screen.findByRole('region', { name: 'This Week' });
+    fireEvent.click(within(thisWeek).getByRole('button', { name: 'Plan A Post' }));
+    expect(onCreatePost).toHaveBeenLastCalledWith({
+      item: BHAI_DUJ,
+      place: CHENNAI,
+      language: 'ta',
+      publishAt: '2026-11-11T10:00:00+05:30',
+    });
+
+    const past = screen.getByRole('region', { name: 'Just Happened' });
+    fireEvent.click(within(past).getByRole('button', { name: 'Plan A Post' }));
+    expect(onCreatePost).toHaveBeenLastCalledWith({
+      item: DIWALI,
+      place: CHENNAI,
+      language: 'ta',
+      publishAt: '2026-11-07T18:00:00+05:30',
+    });
+  });
+
+  it('shows no Plan A Post without a sheet to open', async () => {
+    remember();
+    mockedApi.mockResolvedValue(festivals([FESTIVALS]));
+    renderView(STATUS, 'festivals');
+
+    await screen.findByRole('region', { name: 'This Week' });
+    expect(screen.queryByRole('button', { name: 'Plan A Post' })).not.toBeInTheDocument();
+  });
+
+  it('says a quiet month plainly', async () => {
+    remember();
+    mockedApi.mockResolvedValue(festivals([{ ...FESTIVALS, items: [] }]));
+    renderView(STATUS, 'festivals');
+
+    expect(
+      await screen.findByText('No festivals found for Chennai in the next 30 days.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try Again' })).not.toBeInTheDocument();
+  });
+
+  it('offers Try Again when the calendars had nothing to give', async () => {
+    remember();
+    mockedApi.mockResolvedValue(festivals([], ['holidays']));
+    renderView(STATUS, 'festivals');
+
+    expect(
+      await screen.findByText('No festivals found for Chennai in the next 30 days.'),
+    ).toBeInTheDocument();
+
+    mockedApi.mockResolvedValue(festivals([FESTIVALS]));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    });
+    expect(await screen.findByRole('region', { name: 'This Week' })).toBeInTheDocument();
+    expect(feedCalls()).toHaveLength(2);
+  });
+
+  it('asks for a place for Worldwide, without a request', async () => {
+    remember(WORLDWIDE_PLACE);
+    renderView(STATUS, 'festivals');
+
+    expect(await screen.findByText(FESTIVALS_NEED_PLACE)).toBeInTheDocument();
+    expect(screen.getByText(FESTIVALS_NEED_PLACE_HINT)).toBeInTheDocument();
+    expect(mockedApi).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
   });
 });

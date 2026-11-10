@@ -6,29 +6,74 @@
  * sentence the API wrote under it, which names the source and, for a copy kept
  * while the source rests, how old it is. A group with nothing in it is never
  * drawn: the tab decides what to say instead.
+ *
+ * What sits inside depends on the group (Module 05): trends, stories and
+ * videos are cards in a grid, Wikipedia's most-read articles are rows, the
+ * social topics are chips, and festivals are a list in sections by week.
  */
 import { Skeleton } from '@postgear/ui';
 import { type ReactNode, useId } from 'react';
 import type { DiscoverItem, DiscoverGroup as Group } from '@/types/discover';
 import { AnalyticsPanel, PanelHeader } from '../analytics/analytics-ui';
-import { StoryCard, TrendCard } from './discover-cards';
+import { StoryCard, TrendCard, VideoCard } from './discover-cards';
+import { SocialChips, WikipediaRows } from './discover-rows';
+import { ROW_LIST } from './discover-ui';
+import { FestivalList } from './festival-list';
 
 export const CARD_GRID = 'grid gap-4 sm:grid-cols-2 xl:grid-cols-4';
+
+export interface DiscoverGroupProps {
+  group: Group;
+  now: Date;
+  /** Festivals only: today in the place's own calendar (`YYYY-MM-DD`), from the answer. */
+  today?: string | null;
+  onCreatePost?: (item: DiscoverItem) => void;
+  /** Festivals only: opens the Create Post sheet with the festival's date. */
+  onPlanPost?: (item: DiscoverItem) => void;
+  /** Per-card controls after Open (Module 04's overflow menu). */
+  renderExtra?: (item: DiscoverItem) => ReactNode;
+}
 
 export function DiscoverGroup({
   group,
   now,
+  today,
   onCreatePost,
+  onPlanPost,
   renderExtra,
-}: {
-  group: Group;
-  now: Date;
-  onCreatePost?: (item: DiscoverItem) => void;
-  /** Per-card controls after Open (Module 04's overflow menu). */
-  renderExtra?: (item: DiscoverItem) => ReactNode;
-}) {
+}: DiscoverGroupProps) {
   const headingId = useId();
   if (group.items.length === 0) return null;
+
+  function body(): ReactNode {
+    if (group.id === 'wikipedia') {
+      return <WikipediaRows items={group.items} onCreatePost={onCreatePost} />;
+    }
+    if (group.id === 'social') {
+      return <SocialChips items={group.items} />;
+    }
+    if (group.id === 'festivals') {
+      return <FestivalList items={group.items} today={today} onPlanPost={onPlanPost} />;
+    }
+
+    return (
+      <div className={CARD_GRID}>
+        {group.items.map((item) => {
+          const ItemCard =
+            item.kind === 'news' ? StoryCard : item.kind === 'video' ? VideoCard : TrendCard;
+          return (
+            <ItemCard
+              key={item.id}
+              item={item}
+              now={now}
+              onCreatePost={onCreatePost}
+              extra={renderExtra?.(item)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <section aria-labelledby={headingId} data-testid="discover-group" data-group={group.id}>
@@ -45,27 +90,7 @@ export function DiscoverGroup({
             </p>
           }
         />
-        <div className={CARD_GRID}>
-          {group.items.map((item) =>
-            item.kind === 'news' ? (
-              <StoryCard
-                key={item.id}
-                item={item}
-                now={now}
-                onCreatePost={onCreatePost}
-                extra={renderExtra?.(item)}
-              />
-            ) : (
-              <TrendCard
-                key={item.id}
-                item={item}
-                now={now}
-                onCreatePost={onCreatePost}
-                extra={renderExtra?.(item)}
-              />
-            ),
-          )}
-        </div>
+        {body()}
       </AnalyticsPanel>
     </section>
   );
@@ -106,7 +131,7 @@ export function DiscoverSkeleton({ label = 'Loading Discover' }: { label?: strin
           <Skeleton className="h-6 w-56 max-w-full" />
           <Skeleton className="h-4 w-36" />
         </div>
-        <div className="flex flex-col divide-y-2 divide-outline overflow-hidden rounded-lg border-2 border-outline bg-inset">
+        <div className={ROW_LIST}>
           {[0, 1, 2, 3, 4].map((index) => (
             <div key={index} className="flex items-center gap-3 p-3">
               <Skeleton className="h-4 flex-1" />

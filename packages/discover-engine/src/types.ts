@@ -115,6 +115,24 @@ export interface SourceResult {
   failed?: SourceFailure;
   /** Google Trends: which geo really answered, so a header can say so after a fallback. */
   answeredGeo?: string;
+  /**
+   * Wikipedia: the UTC day (`YYYY-MM-DD`) the numbers are for. Yesterday's are
+   * published some hours into today, so the day before can be what answered, and
+   * a header must not call that "yesterday".
+   */
+  answeredDay?: string;
+  /**
+   * YouTube: quota units the outside calls behind this answer cost, whether or
+   * not they succeeded. The API keeps the day's budget from it.
+   */
+  unitsUsed?: number;
+  /**
+   * Festivals: the items are real but not the whole picture, because one of the
+   * two things this source reads (the country's calendar) did not answer and the
+   * other (the offline holiday rules) did. Not a failure, so it never counts
+   * towards a breaker; the API shows the items and asks again sooner.
+   */
+  partial?: boolean;
 }
 
 export interface SourceInput {

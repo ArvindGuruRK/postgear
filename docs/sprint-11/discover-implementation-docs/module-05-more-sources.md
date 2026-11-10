@@ -1,6 +1,6 @@
 # Module 05: More Sources, Wikipedia, Social, Videos And Festivals
 
-> **Sprint 11, Discover** | Status: Not started | Size: L (one full session)
+> **Sprint 11, Discover** | Status: Done, committed (2026-11-10). See the README Progress row and Decision Log for what differs from this page | Size: L (one full session)
 > **Depends on**: [Module 03](module-03-discover-page-and-location.md) (and [Module 04](module-04-create-post.md) for Plan A Post; without it the row's button stays disabled)
 > **Stories**: DC-2.2, DC-2.3, DC-5.1, DC-5.2, DC-6.1
 > **Next**: [Module 06](module-06-settings-and-data-model.md)
@@ -48,13 +48,13 @@ Trending gains the Wikipedia and Worldwide groups; the Videos and Festivals tabs
 
 ## Tasks
 
-- [ ] Engine: wikipedia, bluesky, mastodon, youtube sources with tests on recorded bodies (filtering, mapping, day fallback, budget metadata).
-- [ ] Engine: ICS parser with tests (folded lines, VALUE=DATE, multi-day, odd line endings); calendar id table with a test for the demo countries; date-holidays adapter (lazy init, India TN placeholder ignored); merge and de-dup tests (Diwali/Deepavali, Pongal observance, a date with two names).
-- [ ] Record fixtures for the three places (Wikipedia `ta`, `en`, `fr`; Bluesky; Mastodon; the three calendars; YouTube `IN`, `US`, `FR` only if Arvind provides a key, else a hand-written sample marked as such).
-- [ ] API: status flags, the kinds, YouTube budget, cache windows, specs (budget stops at 8,000; Bluesky down hides only its chips; festivals window and de-dup through the service).
-- [ ] Web: `WikipediaGroup`, `SocialGroup`, `VideoCard`, `FestivalRow`, the two tabs, Plan A Post with `publishAt`; tests (grouping by week, badge choice, "in N days" in the place's zone, Plan A Post passes the date).
-- [ ] Playground rows for the new card and row types.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Engine: wikipedia, bluesky, mastodon, youtube sources with tests on recorded bodies (filtering, mapping, day fallback, budget metadata).
+- [x] Engine: ICS parser with tests (folded lines, VALUE=DATE, multi-day, odd line endings); calendar id table with a test for the demo countries; date-holidays adapter (lazy init, India TN placeholder ignored); merge and de-dup tests (Diwali/Deepavali, Pongal observance, a date with two names).
+- [x] Record fixtures for the three places (Wikipedia `ta`, `en`, `fr`; Bluesky; Mastodon; the three calendars; YouTube `IN`, `US`, `FR` only if Arvind provides a key, else a hand-written sample marked as such).
+- [x] API: status flags, the kinds, YouTube budget, cache windows, specs (budget stops at 8,000; Bluesky down hides only its chips; festivals window and de-dup through the service).
+- [x] Web: `WikipediaGroup`, `SocialGroup`, `VideoCard`, `FestivalRow`, the two tabs, Plan A Post with `publishAt`; tests (grouping by week, badge choice, "in N days" in the place's zone, Plan A Post passes the date).
+- [x] Playground rows for the new card and row types.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

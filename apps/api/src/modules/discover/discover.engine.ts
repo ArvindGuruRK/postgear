@@ -9,13 +9,26 @@
  *
  * `DISCOVER_GEOCODER=off` wins over both: the routes that find places answer 503 in
  * simulation too, so that state can be seen locally.
+ *
+ * ## The one key
+ *
+ * YouTube is the only source that needs a key, so it is the only one that can be
+ * missing: without `YOUTUBE_API_KEY` there is no videos source at all, and the
+ * Videos tab says it is not set up. The key lives inside that source and nowhere
+ * else. Nothing here hands it on, the boot line says only whether there is one, and
+ * simulation does not use the real one even when it is set.
  */
 import {
+  createBlueskySource,
   createFixtureFetch,
   createGoogleNewsSource,
   createGoogleTrendsSource,
+  createHolidaysSource,
+  createMastodonSource,
   createNominatimGeocoder,
   createSimulatedGeocoder,
+  createWikipediaSource,
+  createYoutubeSource,
   type DiscoverFetch,
   type DiscoverSource,
   type Geocoder,
@@ -28,6 +41,9 @@ export const DISCOVER_ENGINE = Symbol('DISCOVER_ENGINE');
 
 const REQUEST_TIMEOUT_MS = 8_000;
 
+/** What simulation asks its recordings with. They answer whatever the key, so the real one stays at home. */
+const SIMULATED_YOUTUBE_KEY = 'simulation';
+
 export interface DiscoverEngine {
   simulation: boolean;
   userAgent: string;
@@ -35,11 +51,17 @@ export interface DiscoverEngine {
   geocoder: Geocoder | null;
   trends: DiscoverSource;
   news: GoogleNewsSource;
+  wikipedia: DiscoverSource;
+  bluesky: DiscoverSource;
+  mastodon: DiscoverSource;
+  /** Null without `YOUTUBE_API_KEY`: the one source that needs a key. */
+  videos: DiscoverSource | null;
+  holidays: DiscoverSource;
 }
 
 export type DiscoverEnv = Pick<
   Env,
-  'DISCOVER_SIMULATION' | 'DISCOVER_GEOCODER' | 'DISCOVER_GEOCODER_USER_AGENT'
+  'DISCOVER_SIMULATION' | 'DISCOVER_GEOCODER' | 'DISCOVER_GEOCODER_USER_AGENT' | 'YOUTUBE_API_KEY'
 >;
 
 /**
@@ -87,5 +109,29 @@ export function createDiscoverEngine(env: DiscoverEnv): DiscoverEngine {
     geocoder,
     trends: createGoogleTrendsSource({ fetch: feedFetch }),
     news: createGoogleNewsSource({ fetch: feedFetch }),
+    wikipedia: createWikipediaSource({ fetch: feedFetch }),
+    bluesky: createBlueskySource({ fetch: feedFetch }),
+    mastodon: createMastodonSource({ fetch: feedFetch }),
+    videos: env.YOUTUBE_API_KEY
+      ? createYoutubeSource({
+          fetch: feedFetch,
+          apiKey: simulation ? SIMULATED_YOUTUBE_KEY : env.YOUTUBE_API_KEY,
+        })
+      : null,
+    holidays: createHolidaysSource({ fetch: feedFetch }),
+  };
+}
+
+/**
+ * What the boot log says about this process: which world it is in and who it says
+ * it is. Videos is a yes or a no. The key itself is never in a log line.
+ */
+export function describeEngine(engine: DiscoverEngine) {
+  return {
+    event: 'discover.boot',
+    simulation: engine.simulation,
+    geocoder: engine.geocoder ? 'nominatim' : 'off',
+    userAgent: engine.userAgent,
+    videos: engine.videos !== null,
   };
 }

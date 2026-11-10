@@ -1,16 +1,23 @@
 /**
  * Discover's words and choices: what the chips say, which language a place
- * starts in, what is remembered (and what is refused when read back), and how
- * old the page says its copy is.
+ * starts in, what is remembered (and what is refused when read back), how old
+ * the page says its copy is, and (Module 05) which week a festival is listed
+ * under, how far off it reads, and when a post about it is dated.
  */
 import type { DiscoverGroup, DiscoverItem, Locality } from '@/types/discover';
 import {
   copilotHref,
   DRAFT_SOURCES_MAX,
   DRAFT_TOPIC_MAX,
+  daysUntil,
   draftLanguages,
   draftSources,
   draftTopic,
+  festivalBadge,
+  festivalDay,
+  festivalPublishAt,
+  festivalSections,
+  festivalWhen,
   firstLanguage,
   isWorldwide,
   itemMeta,
@@ -24,6 +31,7 @@ import {
   readRememberedPlace,
   safeHref,
   serializeRememberedPlace,
+  socialChipLabel,
   tabFrom,
   updatedText,
   WORLDWIDE_PLACE,
@@ -220,6 +228,21 @@ describe('the page', () => {
     expect(updatedText([group('2026-11-10T11:59:50Z')], NOW)).toBe('Updated just now');
     expect(updatedText([], NOW)).toBeNull();
   });
+
+  it('leaves Wikipedia out of the age: its copy is a whole day by design', () => {
+    const wikipedia: DiscoverGroup = { ...group('2026-11-09T14:00:00Z'), id: 'wikipedia' };
+    const social: DiscoverGroup = { ...group('2026-11-10T11:55:00Z'), id: 'social' };
+
+    expect(updatedText([group('2026-11-10T11:35:00Z'), wikipedia, social], NOW)).toBe(
+      'Updated 25 min ago',
+    );
+    expect(updatedText([wikipedia], NOW)).toBeNull();
+  });
+
+  it('gives the Festivals tab no age at all', () => {
+    const festivals: DiscoverGroup = { ...group('2026-11-04T02:00:00Z'), id: 'festivals' };
+    expect(updatedText([festivals], NOW)).toBeNull();
+  });
 });
 
 describe('a card', () => {
@@ -345,5 +368,366 @@ describe('drafts (Module 04)', () => {
     expect(copilotHref('org-a', item({ brief: 'Rising search: "rain & schools"' }))).toBe(
       '/org-a/ai-copilot?topic=Rising%20search%3A%20%22rain%20%26%20schools%22',
     );
+  });
+});
+
+describe('more sources (Module 05)', () => {
+  it('backs a Wikipedia article and a video with themselves', () => {
+    const article = item({
+      kind: 'wiki',
+      title: 'திருக்குறள்',
+      source: { id: 'wikipedia', name: 'Wikipedia', url: 'https://ta.wikipedia.org' },
+      url: 'https://ta.wikipedia.org/wiki/Thirukkural',
+    });
+    expect(draftSources(article)).toEqual([
+      {
+        title: 'திருக்குறள்',
+        url: 'https://ta.wikipedia.org/wiki/Thirukkural',
+        snippet: 'Wikipedia',
+      },
+    ]);
+
+    const video = item({
+      kind: 'video',
+      title: 'Chennai rain, live',
+      summary: 'Chennai Live',
+      source: { id: 'youtube', name: 'YouTube', url: 'https://www.youtube.com' },
+      url: 'https://www.youtube.com/watch?v=abc123DEF_-',
+    });
+    expect(draftSources(video)).toEqual([
+      {
+        title: 'Chennai rain, live',
+        url: 'https://www.youtube.com/watch?v=abc123DEF_-',
+        snippet: 'YouTube',
+      },
+    ]);
+  });
+
+  it('gives a festival and a social topic no source of their own', () => {
+    const festival = item({ kind: 'festival', title: 'Diwali/Deepavali', date: '2026-11-08' });
+    expect(draftSources(festival)).toEqual([]);
+
+    const topic = item({
+      kind: 'social',
+      title: '#MeerMittwoch',
+      source: { id: 'mastodon', name: 'Mastodon' },
+      url: 'https://mastodon.social/tags/MeerMittwoch',
+    });
+    expect(draftSources(topic)).toEqual([]);
+  });
+
+  it('never cites an article whose address is not the web', () => {
+    const article = item({ kind: 'wiki', url: 'javascript:alert(1)' });
+    expect(draftSources(article)).toEqual([]);
+  });
+
+  it('tells the two networks apart in a chip name, and says the link leaves', () => {
+    const bluesky = item({
+      kind: 'social',
+      title: 'House speaker picks',
+      source: { id: 'bluesky', name: 'Bluesky' },
+      signal: { label: '4,625 posts', posts: 4625 },
+    });
+    expect(socialChipLabel(bluesky)).toBe(
+      'House speaker picks on Bluesky, 4,625 posts, opens in a new tab',
+    );
+
+    const mastodon = item({
+      kind: 'social',
+      title: '#MeerMittwoch',
+      source: { id: 'mastodon', name: 'Mastodon' },
+    });
+    expect(socialChipLabel(mastodon)).toBe('#MeerMittwoch on Mastodon, opens in a new tab');
+  });
+
+  it('says how many watched a video, and when it went up', () => {
+    const video = item({
+      kind: 'video',
+      signal: { label: '1.2M views', views: 1_200_000 },
+      publishedAt: '2026-11-07T12:00:00Z',
+    });
+    expect(itemMeta(video, NOW)).toBe('1.2M views, 3 days ago');
+  });
+});
+
+function festival(date: string | undefined, title?: string, observance = true): DiscoverItem {
+  const name = title ?? `Festival ${date}`;
+  return item({
+    id: `${date}|${name}`,
+    kind: 'festival',
+    source: { id: 'holidays', name: 'Google Calendar' },
+    title: name,
+    date,
+    observance,
+  });
+}
+
+/** The sections as they are shown: each name with its dates, in order. */
+function layout(dates: string[], today: string): [string | null, (string | undefined)[]][] {
+  return festivalSections(
+    dates.map((date) => festival(date)),
+    today,
+  ).map((section) => [section.title, section.items.map((entry) => entry.date)]);
+}
+
+describe('festivals by week', () => {
+  it('sorts a Tuesday into its sections, Monday to Sunday', () => {
+    // 10 November 2026 is a Tuesday; its week ends on Sunday the 15th.
+    const dates = [
+      '2026-11-22',
+      '2026-11-03',
+      '2026-11-10',
+      '2026-12-10',
+      '2026-11-15',
+      '2026-11-16',
+      '2026-11-09',
+      '2026-11-23',
+      '2026-11-30',
+      '2026-12-01',
+      '2026-11-08',
+    ];
+
+    expect(layout(dates, '2026-11-10')).toEqual([
+      ['This Week', ['2026-11-10', '2026-11-15']],
+      ['Next Week', ['2026-11-16', '2026-11-22']],
+      ['Later This Month', ['2026-11-23', '2026-11-30']],
+      ['Next Month', ['2026-12-01', '2026-12-10']],
+      ['Just Happened', ['2026-11-09', '2026-11-08', '2026-11-03']],
+    ]);
+  });
+
+  it('ends This Week on the day itself when today is a Sunday', () => {
+    const dates = ['2026-11-14', '2026-11-15', '2026-11-16', '2026-11-22', '2026-11-23'];
+
+    expect(layout(dates, '2026-11-15')).toEqual([
+      ['This Week', ['2026-11-15']],
+      ['Next Week', ['2026-11-16', '2026-11-22']],
+      ['Later This Month', ['2026-11-23']],
+      ['Just Happened', ['2026-11-14']],
+    ]);
+  });
+
+  it('has no Later This Month on the last days of one', () => {
+    // Saturday 28 November: the week ends on the 29th, the next on 6 December.
+    const dates = [
+      '2026-11-28',
+      '2026-11-29',
+      '2026-11-30',
+      '2026-12-06',
+      '2026-12-07',
+      '2026-12-25',
+    ];
+    expect(layout(dates, '2026-11-28')).toEqual([
+      ['This Week', ['2026-11-28', '2026-11-29']],
+      ['Next Week', ['2026-11-30', '2026-12-06']],
+      ['Next Month', ['2026-12-07', '2026-12-25']],
+    ]);
+
+    // Monday 30 November: a whole week that is mostly December is still This Week.
+    expect(layout(['2026-11-30', '2026-12-06', '2026-12-13', '2026-12-14'], '2026-11-30')).toEqual([
+      ['This Week', ['2026-11-30', '2026-12-06']],
+      ['Next Week', ['2026-12-13']],
+      ['Next Month', ['2026-12-14']],
+    ]);
+  });
+
+  it('carries a week across a year end', () => {
+    // Tuesday 29 December 2026: the week ends on Sunday 3 January 2027.
+    const dates = [
+      '2026-12-25',
+      '2026-12-31',
+      '2027-01-01',
+      '2027-01-03',
+      '2027-01-04',
+      '2027-01-10',
+      '2027-01-15',
+    ];
+
+    expect(layout(dates, '2026-12-29')).toEqual([
+      ['This Week', ['2026-12-31', '2027-01-01', '2027-01-03']],
+      ['Next Week', ['2027-01-04', '2027-01-10']],
+      ['Next Month', ['2027-01-15']],
+      ['Just Happened', ['2026-12-25']],
+    ]);
+  });
+
+  it('keeps the festivals of one date in the order the API gave them', () => {
+    const items = [
+      festival('2026-11-08', 'Diwali/Deepavali', false),
+      festival('2026-11-08', 'Naraka Chaturdasi'),
+      festival('2026-11-09', 'Govardhan Puja'),
+      festival('2026-11-24', 'Guru Nanak Jayanti', false),
+      festival('2026-11-24', "Guru Tegh Bahadur's Martyrdom Day"),
+    ];
+    const sections = festivalSections(items, '2026-11-10');
+
+    expect(sections.map((section) => section.id)).toEqual(['later-this-month', 'just-happened']);
+    expect(sections[0]?.items.map((entry) => entry.title)).toEqual([
+      'Guru Nanak Jayanti',
+      "Guru Tegh Bahadur's Martyrdom Day",
+    ]);
+    // Most recent date first; the two of the 8th stay as they came.
+    expect(sections[1]?.items.map((entry) => entry.title)).toEqual([
+      'Govardhan Puja',
+      'Diwali/Deepavali',
+      'Naraka Chaturdasi',
+    ]);
+  });
+
+  it('drops a festival without a real date, and draws no empty section', () => {
+    const items = [festival(undefined), festival('soon'), festival('2026-02-30')];
+    expect(festivalSections(items, '2026-11-10')).toEqual([]);
+    expect(festivalSections([], '2026-11-10')).toEqual([]);
+  });
+
+  it('is one unnamed list in date order when the answer has no usable today', () => {
+    const items = [festival('2026-11-24'), festival('2026-11-08')];
+
+    for (const today of [undefined, null, 'tomorrow', '2026-13-01']) {
+      const sections = festivalSections(items, today);
+      expect(sections).toHaveLength(1);
+      expect(sections[0]?.id).toBe('all');
+      expect(sections[0]?.title).toBeNull();
+      expect(sections[0]?.items.map((entry) => entry.date)).toEqual(['2026-11-08', '2026-11-24']);
+    }
+  });
+});
+
+describe('a festival row', () => {
+  it('marks a day off as a Public Holiday and anything else as an Observance', () => {
+    expect(festivalBadge({ observance: false })).toEqual({
+      label: 'Public Holiday',
+      variant: 'success',
+    });
+    expect(festivalBadge({ observance: true })).toEqual({
+      label: 'Observance',
+      variant: 'secondary',
+    });
+    // Unsaid is not a claim of a day off.
+    expect(festivalBadge({})).toEqual({ label: 'Observance', variant: 'secondary' });
+  });
+
+  it("says how far off it is from the answer's today, never from a clock", () => {
+    const today = '2026-11-10';
+    expect(festivalWhen('2026-11-10', today)).toBe('today');
+    expect(festivalWhen('2026-11-11', today)).toBe('tomorrow');
+    expect(festivalWhen('2026-11-15', today)).toBe('in 5 days');
+    expect(festivalWhen('2026-12-10', today)).toBe('in 30 days');
+    expect(festivalWhen('2026-11-09', today)).toBe('yesterday');
+    expect(festivalWhen('2026-11-08', today)).toBe('2 days ago');
+    expect(festivalWhen('2026-11-03', today)).toBe('7 days ago');
+  });
+
+  it('counts plain calendar days across a month, a year and a leap day', () => {
+    expect(daysUntil('2026-12-01', '2026-11-30')).toBe(1);
+    expect(festivalWhen('2027-01-01', '2026-12-31')).toBe('tomorrow');
+    expect(daysUntil('2028-03-01', '2028-02-28')).toBe(2);
+    expect(daysUntil('2027-03-01', '2027-02-28')).toBe(1);
+    expect(daysUntil('2026-11-03', '2026-11-10')).toBe(-7);
+  });
+
+  it('says nothing when either date is not one', () => {
+    expect(daysUntil('soon', '2026-11-10')).toBeNull();
+    expect(daysUntil('2026-11-10', undefined)).toBeNull();
+    expect(festivalWhen('2026-02-30', '2026-11-10')).toBe('');
+    expect(festivalWhen(undefined, '2026-11-10')).toBe('');
+  });
+
+  it('writes the date and its weekday', () => {
+    expect(festivalDay('2026-11-08')).toEqual({ day: '8 Nov', weekday: 'Sunday' });
+    expect(festivalDay('2026-09-01')).toEqual({ day: '1 Sep', weekday: 'Tuesday' });
+    expect(festivalDay('2027-01-15')).toEqual({ day: '15 Jan', weekday: 'Friday' });
+    expect(festivalDay('15 January')).toBeNull();
+    expect(festivalDay(undefined)).toBeNull();
+  });
+});
+
+describe('festivalPublishAt', () => {
+  const holiday = (date: string) => ({ date, observance: false });
+  const observance = (date: string) => ({ date, observance: true });
+  const instant = (iso: string | null) => (iso ? new Date(iso).toISOString() : null);
+
+  it('dates a public holiday for the evening before, on the place clock', () => {
+    const diwali = festivalPublishAt(holiday('2026-11-08'), 'Asia/Kolkata');
+    expect(diwali).toBe('2026-11-07T18:00:00+05:30');
+    expect(instant(diwali)).toBe('2026-11-07T12:30:00.000Z');
+  });
+
+  it('dates an observance for that morning', () => {
+    const bhaiDuj = festivalPublishAt(observance('2026-11-11'), 'Asia/Kolkata');
+    expect(bhaiDuj).toBe('2026-11-11T10:00:00+05:30');
+    expect(instant(bhaiDuj)).toBe('2026-11-11T04:30:00.000Z');
+    // Unsaid reads as an observance: the day itself.
+    expect(festivalPublishAt({ date: '2026-11-11' }, 'Asia/Kolkata')).toBe(
+      '2026-11-11T10:00:00+05:30',
+    );
+  });
+
+  it('is right on both sides of the November clock change in Los Angeles', () => {
+    const zone = 'America/Los_Angeles';
+    // Clocks go back at 02:00 on Sunday 1 November 2026.
+    const before = festivalPublishAt(holiday('2026-11-01'), zone);
+    expect(before).toBe('2026-10-31T18:00:00-07:00');
+    expect(instant(before)).toBe('2026-11-01T01:00:00.000Z');
+
+    const morningAfter = festivalPublishAt(observance('2026-11-01'), zone);
+    expect(morningAfter).toBe('2026-11-01T10:00:00-08:00');
+    expect(instant(morningAfter)).toBe('2026-11-01T18:00:00.000Z');
+
+    expect(festivalPublishAt(holiday('2026-11-02'), zone)).toBe('2026-11-01T18:00:00-08:00');
+    expect(festivalPublishAt(holiday('2026-11-11'), zone)).toBe('2026-11-10T18:00:00-08:00');
+  });
+
+  it('is right on both sides of the March clock change too', () => {
+    const zone = 'America/Los_Angeles';
+    // Clocks go forward at 02:00 on Sunday 8 March 2026.
+    expect(festivalPublishAt(holiday('2026-03-08'), zone)).toBe('2026-03-07T18:00:00-08:00');
+    expect(festivalPublishAt(observance('2026-03-08'), zone)).toBe('2026-03-08T10:00:00-07:00');
+  });
+
+  it('follows Paris through winter and summer', () => {
+    const zone = 'Europe/Paris';
+    expect(festivalPublishAt(holiday('2026-11-11'), zone)).toBe('2026-11-10T18:00:00+01:00');
+    expect(festivalPublishAt(holiday('2026-07-14'), zone)).toBe('2026-07-13T18:00:00+02:00');
+    // The mornings of the two change days, 29 March and 25 October 2026.
+    expect(festivalPublishAt(observance('2026-03-29'), zone)).toBe('2026-03-29T10:00:00+02:00');
+    expect(festivalPublishAt(observance('2026-10-25'), zone)).toBe('2026-10-25T10:00:00+01:00');
+  });
+
+  it('steps the day before back over a month, a year and a leap day', () => {
+    const zone = 'Asia/Kolkata';
+    expect(festivalPublishAt(holiday('2026-12-01'), zone)).toBe('2026-11-30T18:00:00+05:30');
+    expect(festivalPublishAt(holiday('2027-01-01'), zone)).toBe('2026-12-31T18:00:00+05:30');
+    expect(festivalPublishAt(holiday('2028-03-01'), zone)).toBe('2028-02-29T18:00:00+05:30');
+  });
+
+  it('writes a zone behind UTC by a half hour with its sign and minutes', () => {
+    expect(festivalPublishAt(observance('2026-12-01'), 'America/St_Johns')).toBe(
+      '2026-12-01T10:00:00-03:30',
+    );
+  });
+
+  it("reads a place without a time zone on the viewer's clock, then on UTC", () => {
+    const diwali = holiday('2026-11-08');
+    expect(festivalPublishAt(diwali, null, 'Europe/Paris')).toBe('2026-11-07T18:00:00+01:00');
+    expect(festivalPublishAt(diwali, undefined, 'Asia/Kolkata')).toBe('2026-11-07T18:00:00+05:30');
+    // A zone this browser does not know is skipped, never thrown on.
+    expect(festivalPublishAt(diwali, 'Mars/Olympus_Mons', 'Asia/Kolkata')).toBe(
+      '2026-11-07T18:00:00+05:30',
+    );
+    expect(festivalPublishAt(diwali, null, 'Nowhere/At_All')).toBe('2026-11-07T18:00:00+00:00');
+  });
+
+  it('gives a festival that already happened its date all the same', () => {
+    // The sheet decides what a past moment means (the next full hour).
+    expect(festivalPublishAt(holiday('2021-01-26'), 'Asia/Kolkata')).toBe(
+      '2021-01-25T18:00:00+05:30',
+    );
+  });
+
+  it('has no date for a festival without a real one', () => {
+    expect(festivalPublishAt({ observance: false }, 'Asia/Kolkata')).toBeNull();
+    expect(festivalPublishAt(holiday('2026-02-30'), 'Asia/Kolkata')).toBeNull();
+    expect(festivalPublishAt(holiday('8 November'), 'Asia/Kolkata')).toBeNull();
   });
 });

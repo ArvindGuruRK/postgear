@@ -2,7 +2,8 @@
 
 /**
  * Create Post (Sprint 11, blueprint section 5): a right-hand sheet that turns
- * a trend or a story into a draft with the AI page's own pipeline.
+ * a trend, a story, a Wikipedia article, a video or a festival into a draft
+ * with the AI page's own pipeline.
  *
  * The brief is the API's (`item.brief`), shown as it will be sent. The
  * person picks the language (the place's, plus English), the channels, the
@@ -53,7 +54,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { api } from '@/lib/api';
 import type { AiStatus, GenerateRequestBody, PostFormat, Tone } from '@/types/ai';
 import type { Channel, ProviderSummary } from '@/types/channel';
-import type { DiscoverItem, Locality } from '@/types/discover';
+import type { DiscoverItem, DiscoverItemKind, Locality } from '@/types/discover';
 import { AiUnavailable } from '../ai/ai-unavailable';
 import { CreditsChip, formatResetDate } from '../ai/credits-meter';
 import { GenerateProgress } from '../ai/generate-progress';
@@ -84,6 +85,18 @@ export const SETUP_FAILED_TITLE = 'Your channels could not load';
 export const CHANNEL_REQUIRED = 'Choose at least one channel to write for.';
 /** A brief longer than this starts folded to five lines. */
 const BRIEF_FOLD_AT = 280;
+
+/** What the sheet calls the thing a draft is about, in the page's own words. */
+const ITEM_WORDS: Record<DiscoverItemKind, string> = {
+  trend: 'trend',
+  news: 'story',
+  wiki: 'article',
+  social: 'topic',
+  video: 'video',
+  festival: 'festival',
+  // Module 07 names its own; until then a competitor's item reads as a story.
+  competitor: 'story',
+};
 
 const TONE_OPTIONS: readonly { value: Tone; label: string }[] = [
   { value: 'personal', label: 'Personal' },
@@ -138,7 +151,7 @@ export function CreatePostSheet({
   onClose: () => void;
 }) {
   const { setup, failed, retry } = useDraftSetup(target !== null);
-  const kind = target?.item.kind === 'trend' ? 'trend' : 'story';
+  const kind = target ? ITEM_WORDS[target.item.kind] : 'story';
 
   return (
     <Sheet open={target !== null} onOpenChange={(open) => (open ? undefined : onClose())}>

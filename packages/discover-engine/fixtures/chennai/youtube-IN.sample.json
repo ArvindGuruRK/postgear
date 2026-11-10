@@ -1,0 +1,201 @@
+{
+  "_sample": "Written by hand for tests and simulation. Not a recording: there is no YouTube key.",
+  "kind": "youtube#videoListResponse",
+  "etag": "sample-etag-IN",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-IN-1",
+      "id": "SAMPLE_IN_1",
+      "snippet": {
+        "publishedAt": "2026-11-08T04:30:00Z",
+        "channelId": "UCsampleChannelIN0000001",
+        "title": "மாதிரி காணொளி: தீபாவளி இனிப்புகள் பத்து நிமிடங்களில்",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_1/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_1/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_1/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Chennai Kitchen",
+        "categoryId": "26",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "ta"
+      },
+      "statistics": {
+        "viewCount": "1234567",
+        "likeCount": "45678",
+        "favoriteCount": "0",
+        "commentCount": "1234"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-IN-2",
+      "id": "SAMPLE_IN_2",
+      "snippet": {
+        "publishedAt": "2026-11-09T11:00:00Z",
+        "channelId": "UCsampleChannelIN0000002",
+        "title": "Sample video: Chennai monsoon street food tour",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_2/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_2/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_2/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Marina Eats",
+        "categoryId": "19",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en-IN"
+      },
+      "statistics": {
+        "viewCount": "845210",
+        "likeCount": "21004",
+        "favoriteCount": "0",
+        "commentCount": "802"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-IN-3",
+      "id": "SAMPLE_IN_3",
+      "snippet": {
+        "publishedAt": "2026-11-07T14:15:00Z",
+        "channelId": "UCsampleChannelIN0000003",
+        "title": "Sample video: Diwali rangoli ideas for beginners",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_3/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_3/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_3/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Colour And Chalk",
+        "categoryId": "26",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "hi"
+      },
+      "statistics": {
+        "viewCount": "312004",
+        "likeCount": "9120",
+        "favoriteCount": "0",
+        "commentCount": "377"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-IN-4",
+      "id": "SAMPLE_IN_4",
+      "snippet": {
+        "publishedAt": "2026-11-09T02:45:00Z",
+        "channelId": "UCsampleChannelIN0000004",
+        "title": "Sample video: Local train vlog, Tambaram to Beach",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Platform Nine",
+        "categoryId": "19",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en-IN"
+      },
+      "statistics": {
+        "viewCount": "56018",
+        "likeCount": "1830",
+        "favoriteCount": "0",
+        "commentCount": "96"
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sample-etag-IN-5",
+      "id": "SAMPLE_IN_5",
+      "snippet": {
+        "publishedAt": "2026-11-08T17:20:00Z",
+        "channelId": "UCsampleChannelIN0000005",
+        "title": "Sample video: Weekend cricket highlights from a match that never happened",
+        "description": "An invented video for tests and simulation.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_5/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_5/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SAMPLE_IN_5/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Sample Channel: Gully Sixes",
+        "categoryId": "17",
+        "liveBroadcastContent": "none",
+        "defaultAudioLanguage": "en-IN"
+      },
+      "statistics": {
+        "viewCount": "9421",
+        "likeCount": "310",
+        "favoriteCount": "0",
+        "commentCount": "41"
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 5,
+    "resultsPerPage": 25
+  }
+}

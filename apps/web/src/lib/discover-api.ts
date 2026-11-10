@@ -63,9 +63,12 @@ export function searchPlaces(text: string): Promise<LocalitySearchResponse> {
 }
 
 /**
- * The feed query for a place. Worldwide sends no country; a region or a city
- * is only sent with its country, as the API requires. `regionName` and the
- * city only change headings, never what is fetched.
+ * The feed query for a place, for any of the four tabs the feed answers
+ * (Trending, News, Videos, Festivals). Worldwide sends no country; a region
+ * or a city is only sent with its country, as the API requires. `regionName`
+ * and the city only change headings, never what is fetched. The time zone is
+ * what the Festivals answer counts its `today` in. The language is sent for
+ * every tab, though only Trending and News read differently in another one.
  */
 export function feedQuery(
   kind: FeedKind,

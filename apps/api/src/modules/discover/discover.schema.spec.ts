@@ -100,7 +100,7 @@ describe('feedQuerySchema', () => {
     expect(feedQuerySchema.parse({ kind: 'news' })).toEqual({ kind: 'news' });
   });
 
-  it('knows all four kinds, so the later two can answer 501, and refuses a fifth', () => {
+  it('knows all four kinds, and refuses a fifth', () => {
     for (const kind of ['trending', 'news', 'videos', 'festivals']) {
       expect(feedQuerySchema.safeParse({ kind }).success).toBe(true);
     }

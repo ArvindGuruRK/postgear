@@ -1,22 +1,35 @@
 /**
- * The Module 01 hand check: runs the real sources over the recorded feeds and
- * prints what a tab would show. No network.
+ * The engine's hand check: runs the real sources over the recorded answers and
+ * prints what each tab would show for a place. No network.
  *
  *   npx ts-node packages/discover-engine/scripts/print-feed.ts IN-TN ta
  *
  * The first argument is a region or a country that has a recording (`IN-TN`, `IN`,
  * `US-CA`, `US`, `FR-IDF`, `FR`). On a Windows console, run `chcp 65001` first or
  * Tamil text prints as boxes.
+ *
+ * Trending and News are Module 01's groups. Module 05 added Wikipedia, the two
+ * social networks, videos and festivals. The videos are hand-written samples
+ * (there is no YouTube key to record with), and the festivals are cut around the
+ * real today in the place's own zone, the way the API cuts them.
  */
 import {
   CHENNAI,
   composeFeed,
+  createBlueskySource,
   createFixtureFetch,
   createGoogleNewsSource,
   createGoogleTrendsSource,
+  createHolidaysSource,
+  createMastodonSource,
+  createWikipediaSource,
+  createYoutubeSource,
+  daysUntil,
+  festivalsInWindow,
   type Locality,
   PARIS,
   SAN_FRANCISCO,
+  todayIn,
 } from '../src';
 
 const PLACES = [CHENNAI, SAN_FRANCISCO, PARIS];
@@ -29,6 +42,13 @@ function printGroup(heading: string, lines: string[], warnings: string[]): void 
   console.log(`\n${heading} (${lines.length})`);
   for (const warning of warnings) console.log(`  [${warning}]`);
   for (const [index, line] of lines.entries()) console.log(`  ${index + 1}. ${line}`);
+}
+
+/** "today", "in 5 days", "2 days ago". */
+function whenFrom(days: number): string {
+  if (days === 0) return 'today';
+  const count = `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
+  return days > 0 ? `in ${count}` : `${count} ago`;
 }
 
 async function main(): Promise<void> {
@@ -44,10 +64,16 @@ async function main(): Promise<void> {
   const input = { locality, language };
   const fetchFixture = createFixtureFetch();
 
-  const [trends, place, top] = await Promise.all([
+  const [trends, place, top, wiki, bluesky, mastodon, videos, festivals] = await Promise.all([
     createGoogleTrendsSource({ fetch: fetchFixture }).fetch(input),
     createGoogleNewsSource({ fetch: fetchFixture }).place(input),
     createGoogleNewsSource({ fetch: fetchFixture }).top(input),
+    createWikipediaSource({ fetch: fetchFixture }).fetch(input),
+    createBlueskySource({ fetch: fetchFixture }).fetch(input),
+    createMastodonSource({ fetch: fetchFixture }).fetch(input),
+    // Any key reads the sample: simulation matches the address before the key.
+    createYoutubeSource({ fetch: fetchFixture, apiKey: 'no-key-in-simulation' }).fetch(input),
+    createHolidaysSource({ fetch: fetchFixture }).fetch(input),
   ]);
 
   // Recordings age, so the 48 hour limit stays off here as it does in simulation.
@@ -78,6 +104,38 @@ async function main(): Promise<void> {
     'Top stories',
     topStories.items.map((item) => `${item.title} (${item.source.name})`),
     top.warnings,
+  );
+
+  // Each of these is one load of its own in the API, so none is composed with another.
+  printGroup(
+    `Most read on ${wiki.attribution.url ?? 'Wikipedia'}, numbers of ${wiki.answeredDay ?? 'no day'}`,
+    wiki.items.map((item) => `${item.title} (${item.signal?.label})`),
+    wiki.warnings,
+  );
+  printGroup(
+    'Worldwide on Bluesky and Mastodon',
+    [...bluesky.items, ...mastodon.items].map(
+      (item) => `${item.title} (${item.signal?.label ?? 'no count'}, ${item.source.name})`,
+    ),
+    [...bluesky.warnings, ...mastodon.warnings],
+  );
+  printGroup(
+    `Trending videos in ${locality.countryCode} (hand-written samples, ${videos.unitsUsed ?? 0} unit)`,
+    videos.items.map(
+      (item) =>
+        `${item.title}, by ${item.summary ?? 'no channel'} (${item.signal?.label ?? 'views hidden'})`,
+    ),
+    videos.warnings,
+  );
+
+  const today = todayIn(locality.timeZone);
+  printGroup(
+    `Festivals around ${today}, out of ${festivals.items.length} handed over${festivals.partial ? ', calendar missing' : ''}`,
+    festivalsInWindow(festivals.items, today).map((item) => {
+      const badge = item.observance ? 'observance' : 'public holiday';
+      return `${item.date} ${item.title} (${badge}, ${whenFrom(daysUntil(item.date ?? '', today))})`;
+    }),
+    festivals.warnings,
   );
 }
 

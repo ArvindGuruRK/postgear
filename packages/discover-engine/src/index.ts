@@ -40,6 +40,7 @@ export {
   isKnownCountry,
 } from './geo/timezone';
 export { createFixtureFetch, FIXTURE_FEEDS, type FixtureFeed } from './simulation';
+export { BLUESKY_TRENDS_URL, createBlueskySource } from './sources/bluesky';
 export { BRIEF_MAX_CHARS, buildBrief, placeLabel } from './sources/brief';
 export {
   type ComposedGroup,
@@ -72,7 +73,32 @@ export {
   stripPublisher,
 } from './sources/google-news';
 export { createGoogleTrendsSource, parseTraffic, trendsFeedUrl } from './sources/google-trends';
+// Only what the API cuts and labels festivals with. How the two readers are
+// merged stays inside `sources/holidays`, and `date-holidays` itself is not
+// loaded by importing this file: the source requires it on its first fetch.
+export {
+  createHolidaysSource,
+  daysUntil,
+  FESTIVAL_DAYS_AHEAD,
+  FESTIVAL_DAYS_BACK,
+  FESTIVAL_SPAN_DAYS_AHEAD,
+  FESTIVAL_SPAN_DAYS_BACK,
+  festivalsInWindow,
+  todayIn,
+} from './sources/holidays';
+export { holidayRegion } from './sources/holidays/date-holidays';
+export { HOLIDAY_CALENDAR_IDS, holidayCalendarUrl } from './sources/holidays/google-calendar';
+export { calendarName, type IcsEvent, parseIcs } from './sources/holidays/ics';
 export { cleanText, decodeEntities, safeHttpUrl, stripControlChars } from './sources/html-text';
+export { createMastodonSource, MASTODON_INSTANCE, mastodonTrendsUrl } from './sources/mastodon';
+export {
+  createWikipediaSource,
+  isWikipediaArticle,
+  wikipediaProject,
+  wikipediaTopPrefix,
+  wikipediaTopUrl,
+} from './sources/wikipedia';
+export { createYoutubeSource, youtubePopularPrefix, youtubePopularUrl } from './sources/youtube';
 export type {
   ComposedItem,
   DiscoverFetch,

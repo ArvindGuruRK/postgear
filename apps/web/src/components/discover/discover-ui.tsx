@@ -1,8 +1,8 @@
 /**
  * Small pieces the Discover page's parts share: the chip frame both chips
- * wear, and the OpenStreetMap credit that sits under the place chip and in
- * its popover (the map data's licence asks for it wherever a place we found
- * through it is shown).
+ * wear, the box a group's rows sit in, and the OpenStreetMap credit that sits
+ * under the place chip and in its popover (the map data's licence asks for it
+ * wherever a place we found through it is shown).
  */
 import { cn, FIELD_FOCUS } from '@postgear/ui';
 
@@ -17,6 +17,17 @@ export const CHIP = cn(
   FIELD_FOCUS,
   'disabled:cursor-not-allowed disabled:opacity-60',
 );
+
+/**
+ * A group's rows (Wikipedia articles, festivals): one box you read, so the
+ * inset layer and no shadow, with a line between rows (blueprint section 2).
+ * The same frame as the AI page's `INSET`, on a list.
+ */
+export const ROW_LIST =
+  'm-0 flex list-none flex-col divide-y-2 divide-outline overflow-hidden rounded-lg border-2 border-outline bg-inset p-0';
+
+/** One row of it: wraps on a phone, so the actions drop under the words. */
+export const ROW = 'flex flex-wrap items-center gap-x-4 gap-y-2 p-3';
 
 export const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
 

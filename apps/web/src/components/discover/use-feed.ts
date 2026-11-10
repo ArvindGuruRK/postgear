@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * One tab's answer for the current place and language.
+ * One tab's answer (Trending, News, Videos or Festivals) for the current
+ * place and language.
  *
  * Sequenced like `use-analytics.ts`: an answer for Paris that lands after the
  * reader has moved on to Chennai is dropped, never shown under the Chennai
@@ -27,9 +28,17 @@ export interface FeedHandle {
 
 export const FEED_FAILED = 'Try again in a moment.';
 
-/** The key of what was asked, so an answer can be matched to its question. */
-function feedKey(kind: FeedKind, place: Locality, language: string): string {
-  return [kind, place.countryCode, place.regionCode, place.city, language].join('|');
+/** The tabs whose answer is in the chip's language. Videos and festivals read the same in every one. */
+const SPOKEN_KINDS: ReadonlySet<FeedKind> = new Set(['trending', 'news']);
+
+/**
+ * The key of what was asked, so an answer can be matched to its question.
+ * The language is part of it only where it changes the answer, so switching
+ * it on Videos or Festivals asks for nothing.
+ */
+export function feedKey(kind: FeedKind, place: Locality, language: string): string {
+  const spoken = SPOKEN_KINDS.has(kind) ? language : '';
+  return [kind, place.countryCode, place.regionCode, place.city, spoken].join('|');
 }
 
 export function useFeed(

@@ -14,6 +14,13 @@
  * off a key list. The key has no link to the person or the workspace either, which
  * is the part that matters most: the space of two-decimal positions is small enough
  * to walk, so the hash alone is pseudonymity, not secrecy.
+ *
+ * ## A feed key holds only what changes the outside answer
+ *
+ * Rising searches belong to a region, a Wikipedia list to an edition, the social
+ * lists to nobody, videos to a country and festivals to a country and its region.
+ * Nothing a person can make up (a language no place speaks, a city for a list that
+ * has none) reaches a key, so it cannot be used to force a fetch.
  */
 import { createHash } from 'node:crypto';
 import type { SourceId } from '@postgear/discover-engine';
@@ -51,10 +58,20 @@ export function discoverKeys(simulation: boolean) {
         language ?? '-',
         topic ?? '-',
       ].join(':'),
+    /** By edition and nothing else: not the place, and not the day, which the copy holds. */
+    wikipedia: (project: string) => `${root}:feed:v1:wiki:${project}`,
+    /** One copy for the whole world, per network. */
+    social: (source: SourceId) => `${root}:feed:v1:social:${source}`,
+    videos: (country: string) => `${root}:feed:v1:videos:${country}`,
+    /** The region too: a state can have days off of its own. */
+    festivals: (country: string, region: string | null) =>
+      `${root}:feed:v1:festivals:${country}:${region ?? '-'}`,
     breaker: (source: SourceId) => `${root}:breaker:${source}`,
     geoReverse: (lat: number, lng: number) => `${root}:geo:rev:${hashed(`${lat}:${lng}`)}`,
     geoSearch: (normalisedQuery: string) => `${root}:geo:q:${hashed(normalisedQuery)}`,
     nominatimBudget: `${root}:budget:nominatim`,
+    /** `day` is the date in the zone the quota resets in. The key that pays for the calls is never part of it. */
+    youtubeBudget: (day: string) => `${root}:budget:youtube:${day}`,
   };
 }
 
