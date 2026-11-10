@@ -29,6 +29,7 @@ Untracked files count: a new test or component must be checked too.
 | `packages/scheduling/` | `@postgear/scheduling` |
 | `packages/ai-engine/` | `@postgear/ai-engine` |
 | `packages/seo-engine/` | `@postgear/seo-engine` |
+| `packages/discover-engine/` | `@postgear/discover-engine` |
 | `packages/ui/` | `@postgear/ui` |
 | `packages/sdk/` | `@postgear/sdk` |
 | `packages/config/` | `@postgear/config` (no scripts of its own) |
@@ -39,6 +40,7 @@ A changed shared package must also check everything that consumes it. Turbo's `.
 - `...@postgear/social-core` -> social-core, api, web, worker
 - `...@postgear/ui` -> ui, web
 - `...@postgear/ai-engine`, `...@postgear/seo-engine` -> the package, api, worker
+- `...@postgear/discover-engine` -> the package, api
 
 Two gaps in the declared dependencies, so add these by hand:
 

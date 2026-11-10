@@ -57,13 +57,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // goes to the log, which is the only place it belongs, and to Sentry
       // when a DSN is configured (Sprint 8), which is where a bug in
       // production is actually seen.
+      //
+      // The path only: a query string can carry what a person typed, or a position
+      // (Discover), and neither belongs in a log or on a dashboard.
+      const path = request.url.split('?')[0];
       this.logger.error(
-        `Unhandled ${request.method} ${request.url}`,
+        `Unhandled ${request.method} ${path}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
       reportUnexpectedError(exception, {
         method: request.method,
-        url: request.url,
+        url: path,
         userId: request.user?.id,
         orgId: request.activeOrg?.id,
       });

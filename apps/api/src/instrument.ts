@@ -34,6 +34,10 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment: process.env.NODE_ENV ?? 'development',
+    // No query strings, on incoming requests or on the calls we make, in events,
+    // breadcrumbs or spans. Discover's carry a rounded position or a typed city,
+    // on the way in and on the way to OpenStreetMap, and those are never kept.
+    dataCollection: { urlQueryParams: false },
     tracesSampleRate: Number.isFinite(tracesSampleRate) ? Math.min(1, Math.max(0, tracesSampleRate)) : 0,
   });
 }

@@ -250,6 +250,22 @@ const envSchema = z
     // dies at boot on both sides. Refused in production below.
     AUTOMATION_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
 
+    // Discover (Sprint 11). With this on, the page reads recorded feeds and a
+    // stand-in place finder instead of the network. Refused in production below.
+    DISCOVER_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // `off` turns finding places off: the time zone guess keeps working, and the
+    // routes that would call OpenStreetMap answer 503.
+    DISCOVER_GEOCODER: blankAsUnset(z.enum(['nominatim', 'off']).default('nominatim')),
+    // Who Discover says it is on every outside call. OpenStreetMap's policy asks
+    // for one that identifies the application; production should add a contact.
+    DISCOVER_GEOCODER_USER_AGENT: blankAsUnset(
+      z.string().min(1).default('PostGear/1.0 (+https://postgear.rkay.in)'),
+    ),
+    // Module 08: resolving a Google News link so Read can open the article.
+    DISCOVER_LINK_DECODE: blankAsUnset(z.enum(['true', 'false']).default('true')),
+    // Module 05: optional. Without it the Videos tab says it is not set up.
+    YOUTUBE_API_KEY: blankAsUnset(z.string().min(1).optional()),
+
     // The worker's key to the internal step gateway (`/internal/automation/*`,
     // Module 10): steps that need API services (posts, AI, email) call it with
     // this value in `X-PostGear-Internal`. Unset locally means the gateway
@@ -344,6 +360,15 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['AUTOMATION_SIMULATION'],
         message: 'AUTOMATION_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+
+    // Recorded headlines presented as today's news would be a quiet lie.
+    if (env.NODE_ENV === 'production' && env.DISCOVER_SIMULATION === 'true') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DISCOVER_SIMULATION'],
+        message: 'DISCOVER_SIMULATION cannot be "true" when NODE_ENV=production',
       });
     }
     // Stripe needs both halves: a secret key to call it and a signing secret

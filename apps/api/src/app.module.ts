@@ -16,6 +16,7 @@ import { AutomationRunsModule } from './modules/automations/runs/automation-runs
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DiscoverModule } from './modules/discover/discover.module';
 import { DevelopersModule } from './modules/developers/developers.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -101,6 +102,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     // Sprint 10, Module 07: test runs, run history, live progress, cancel, review.
     AutomationRunsModule,
     AutomationGatewayModule,
+    // Sprint 11: Discover, what is rising and what is news in a place.
+    DiscoverModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

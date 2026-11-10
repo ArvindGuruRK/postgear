@@ -52,6 +52,19 @@ describe('HttpExceptionFilter', () => {
     expect(JSON.stringify(response.json.mock.calls[0][0])).not.toContain('not a function');
   });
 
+  it('never logs or reports a query string', () => {
+    const { host: h } = host({ method: 'GET', url: '/discover/locality?lat=13.08&lng=80.27' });
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+    filter.catch(new TypeError('boom'), h);
+
+    expect(log.mock.calls[0][0]).toBe('Unhandled GET /discover/locality');
+    expect(reportUnexpectedError).toHaveBeenCalledWith(
+      expect.any(TypeError),
+      expect.objectContaining({ url: '/discover/locality' }),
+    );
+  });
+
   it('passes a snake_case code through, and drops anything else in that field', () => {
     const coded = host({ method: 'PATCH', url: '/users/me/appearance' });
     filter.catch(

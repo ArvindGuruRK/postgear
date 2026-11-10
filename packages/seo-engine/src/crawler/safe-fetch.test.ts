@@ -33,6 +33,22 @@ async function failure(promise: Promise<unknown>): Promise<SeoCrawlError> {
 }
 
 describe('fetchUrlSafely', () => {
+  it('reaches past a bad certificate unless the caller asks it not to', async () => {
+    const https = jest.requireActual<typeof import('node:https')>('node:https');
+    const request = jest.spyOn(https, 'request');
+    // TLS against the plain HTTP test server: every attempt fails at the handshake.
+    const url = `${server.origin.replace('http:', 'https:')}/`;
+
+    await failure(fetchUrlSafely(url, { guard: server.guard }));
+    await failure(fetchUrlSafely(url, { guard: server.guard, verifyCertificate: true }));
+
+    const checked = request.mock.calls.map(
+      ([options]) => (options as { rejectUnauthorized?: boolean }).rejectUnauthorized,
+    );
+    expect(checked).toEqual([false, true]);
+    request.mockRestore();
+  });
+
   it('fetches a page through the injected resolver and reports timing', async () => {
     server.routes.set('/', serveHtml(html('<h1>Hello</h1>')));
     const response = await fetchUrlSafely(`${server.origin}/`, { guard: server.guard });

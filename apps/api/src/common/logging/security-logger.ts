@@ -123,6 +123,10 @@ export type SecurityEvent =
   // network behind the API.
   | 'seo.unsafe_url'
   | 'seo.audit_failed'
+  // Discover (Sprint 11). Who is asking for places faster than a person would:
+  // the workspace only, never the position or what was typed.
+  | 'discover.locality_throttled'
+  | 'discover.feed_throttled'
   // Analytics (Sprint 7): a request naming a channel or post outside the
   // workspace, and a sync the worker could not complete.
   | 'analytics.foreign_reference'

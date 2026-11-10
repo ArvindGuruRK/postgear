@@ -66,9 +66,10 @@ MCP servers (`.mcp.json`): the Postgres MCP was removed because every session le
 - `social-core`: provider implementations (X, LinkedIn, Facebook, Instagram, YouTube, TikTok, Pinterest) on `abstract/social.abstract.ts`. The web app may import only `@postgear/social-core/composer` (browser-safe); the root pulls in `node:crypto`.
 - `ai-engine`: LangGraph agents, prompts, tools, model wiring (OpenAI + Tavily).
 - `seo-engine`: Playwright crawler (falls back to plain fetch) + scoring.
+- `discover-engine`: Discover's sources (Google Trends, Google News), places and languages. Never imports another workspace and never reaches the network on its own: its fetch is injected (the API binds `fetchUrlSafely`, simulation binds recorded files).
 - `ui`: design-system components; `config`: shared Jest preset, Tailwind config, tsconfig base; `sdk`: public API client.
 
-**Simulation modes** (how everything is tested locally without paid keys; each is refused when `NODE_ENV=production`): `PUBLISH_SIMULATION` (worker publishes to a stand-in; `[simulate:429]` etc. in post text forces failures), `ANALYTICS_SIMULATION` (defaults to following PUBLISH_SIMULATION), `AI_SIMULATION`, `BILLING_SIMULATION` (synthesises Stripe events through the real webhook handler), `WEBHOOK_ALLOW_PRIVATE_URLS`. Without `SMTP_HOST`, mail (activation/reset links) is printed to the API console. `.env.example` documents every variable.
+**Simulation modes** (how everything is tested locally without paid keys; each is refused when `NODE_ENV=production`): `PUBLISH_SIMULATION` (worker publishes to a stand-in; `[simulate:429]` etc. in post text forces failures), `ANALYTICS_SIMULATION` (defaults to following PUBLISH_SIMULATION), `AI_SIMULATION`, `BILLING_SIMULATION` (synthesises Stripe events through the real webhook handler), `DISCOVER_SIMULATION` (Discover reads the feeds recorded in `packages/discover-engine/fixtures` and finds places with a stand-in that knows Chennai, San Francisco and Paris), `WEBHOOK_ALLOW_PRIVATE_URLS`. Without `SMTP_HOST`, mail (activation/reset links) is printed to the API console. `.env.example` documents every variable.
 
 ## UI conventions
 

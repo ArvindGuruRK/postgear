@@ -20,8 +20,9 @@
  * that a certificate is bad, which it cannot do if the TLS layer refuses to
  * talk; `rejectUnauthorized: false` lets the handshake complete and
  * `socket.authorized` becomes the technical evaluator's `certificate` check.
- * Nothing we send is sensitive, so there is nothing for a bad certificate to
- * expose.
+ * Nothing the analyzer sends is sensitive, so there is nothing for a bad
+ * certificate to expose. A caller whose request does say something about a person
+ * (Discover asking where a position is) sets `verifyCertificate`.
  */
 
 import type { IncomingMessage } from 'node:http';
@@ -59,6 +60,8 @@ export interface SafeFetchOptions {
   /** Fail with `bad_status` on a 4xx/5xx. Default true; probes set it false. */
   rejectBadStatus?: boolean;
   accept?: string;
+  /** Refuse a bad certificate instead of reporting it. Default false. */
+  verifyCertificate?: boolean;
 }
 
 export interface SafeFetchResponse {
@@ -200,6 +203,7 @@ interface RawRequest {
   maxBytes: number;
   /** Resolve as soon as the headers arrive and drop the body (probes). */
   discardBody: boolean;
+  verifyCertificate: boolean;
 }
 
 interface RawResponse {
@@ -234,7 +238,7 @@ function requestOnce(url: URL, address: string, init: RawRequest): Promise<RawRe
     agent: false,
   };
   if (https) {
-    options.rejectUnauthorized = false;
+    options.rejectUnauthorized = init.verifyCertificate;
     if (isIP(host) === 0) options.servername = host;
   }
 
@@ -403,6 +407,7 @@ async function follow(input: string, options: FollowOptions): Promise<Followed> 
       timeoutMs: options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
       maxBytes: options.maxBytes ?? DEFAULT_MAX_HTML_BYTES,
       discardBody: options.discardBody,
+      verifyCertificate: options.verifyCertificate ?? false,
     });
 
     const location = response.headers.location;

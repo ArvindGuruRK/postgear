@@ -6,7 +6,7 @@ import Redis from 'ioredis';
  * A tiny counter/KV store over Redis, with an in-process fallback.
  *
  * Only the operations rate limiting and OAuth state actually need are exposed
- * (`incrementWithTtl`, `get`, `set`, `delete`), rather than the whole ioredis
+ * (`incrementWithTtl`, `get`, `set`, `setIfAbsent`, `delete`), rather than the whole ioredis
  * surface. Keeping it narrow is what makes the in-memory fallback tractable.
  *
  * ## What the fallback is and is not
@@ -27,6 +27,7 @@ interface CounterStore {
   incrementWithTtl(key: string, ttlSeconds: number): Promise<number>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string, ttlSeconds: number): Promise<void>;
+  setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
   delete(key: string): Promise<void>;
 }
 
@@ -108,6 +109,22 @@ export class RedisService implements CounterStore, OnModuleDestroy {
       },
       () => {
         this.memory.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+      },
+    );
+  }
+
+  /**
+   * Sets the key only when nothing holds it, and says whether it did: a lock, or
+   * a budget of one per window. A single atomic command, because a read followed
+   * by a write would let two callers both believe they had it.
+   */
+  async setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    return this.callWithFallback(
+      async (client) => (await client.set(key, value, 'EX', ttlSeconds, 'NX')) === 'OK',
+      () => {
+        if (this.readMemory(key) !== null) return false;
+        this.memory.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+        return true;
       },
     );
   }
