@@ -146,34 +146,28 @@ function Frame({
 }
 
 /**
- * The logo's Cog Badge (components/brand/brand-mark.tsx) in the PDF's
- * colours. The renderer has no `paint-order`, so each letter is drawn twice:
- * stroked first, then filled on top, which leaves only the outer half of its
- * outline showing, as on screen.
+ * The logo's gear (components/brand/brand-mark.tsx) in the PDF's colours,
+ * without the sticker, as the PDF has always drawn it: the outer edge, then the
+ * white centre with the gear's outline round it.
  */
 function BrandMarkPdf({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox={BRAND_MARK.viewBox}>
       <Path
-        d={BRAND_MARK.gear}
+        d={BRAND_MARK.edge}
         fill={C.primary}
         stroke={C.outline}
         strokeWidth={BRAND_MARK.outline}
         strokeLinejoin="round"
       />
-      {BRAND_MARK.letters.map((d) => (
-        <Path
-          key={`outline-${d}`}
-          d={d}
-          fill={C.onPrimary}
-          stroke={C.outline}
-          strokeWidth={BRAND_MARK.letterOutline}
-          strokeLinejoin="round"
-        />
-      ))}
-      {BRAND_MARK.letters.map((d) => (
-        <Path key={`fill-${d}`} d={d} fill={C.onPrimary} />
-      ))}
+      <Circle
+        cx={BRAND_MARK.centre.cx}
+        cy={BRAND_MARK.centre.cy}
+        r={BRAND_MARK.centre.r - 1}
+        fill={C.onPrimary}
+        stroke={C.outline}
+        strokeWidth={BRAND_MARK.outline}
+      />
     </Svg>
   );
 }

@@ -13,7 +13,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { BrandMark } from '@/components/brand/brand-mark';
+import { BrandTile } from '@/components/brand/brand-mark';
 
 interface SidebarItemBase {
   label: string;
@@ -83,7 +83,7 @@ const TILE_LABEL = 'line-clamp-2 w-full break-words text-center type-ui text-[10
 
 /**
  * The app rail (UI revamp, 2026-10-18), after the reference's left menu: a
- * fixed 80px column with the brand mark on top, the product sections under
+ * fixed 80px column with the brand tile on top, the product sections under
  * it, and account-level destinations pinned to the bottom.
  *
  * Fixed width on purpose. The expanding sidebar it replaces spent 150px on
@@ -99,7 +99,7 @@ export function Sidebar({
   items: SidebarItem[];
   /** Pinned to the bottom of the rail (e.g. Billing, Settings). */
   bottomItems?: SidebarItem[];
-  /** Accessible name of the brand mark. */
+  /** Accessible name of the brand tile. */
   brandLabel?: string;
   className?: string;
 }) {
@@ -107,18 +107,15 @@ export function Sidebar({
     <aside
       aria-label="Main"
       className={cn(
-        'flex w-20 shrink-0 flex-col items-center gap-4 rounded-2xl border-2 border-outline bg-chrome pt-1 pb-3 shadow-surfaceMd',
+        'flex w-20 shrink-0 flex-col items-center gap-4 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd',
         className,
       )}
     >
-      {/* The logo's Cog Badge in place of the old "P" tile. It carries its own
-          outline, so no tile border or shadow around it. 64px, as wide as the
-          nav tiles (w-16), the owner's pick (2026-10-27, down from 68px).
-          The gear's teeth stop about as far from the top edge (pt-1 plus the
-          mark's own margin) as from the sides. */}
-      <span title={brandLabel} className="flex h-16 w-16 shrink-0 items-center justify-center">
-        <BrandMark label={brandLabel} className="h-16 w-16" />
-      </span>
+      {/* The sidebar wears the PG tile, not the gear (the owner's call,
+          2026-11-05): the old "P" tile, grown to 56px (the owner's pick), holding "PG"
+          in Luckiest Guy. The gear stays the logo everywhere else. The rail is
+          always this one narrow column, so no wordmark sits beside the tile. */}
+      <BrandTile label={brandLabel} />
 
       <nav
         aria-label="Sections"
