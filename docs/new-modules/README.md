@@ -1,9 +1,10 @@
-# New Modules: Design Studio and Workflow Builder
+# New Modules: Design Studio, Workflow Builder and Discover
 
-Two modules that set PostGear apart from other schedulers:
+Three modules that set PostGear apart from other schedulers:
 
 1. **Design Studio**: branded posts and carousels from templates, with brand colours taken from the user's website or picked by hand, edited inside fixed regions, previewed in a platform frame, and sent to the composer.
 2. **Workflow Builder**: n8n-style automations for posting. Triggers (post published, post failed, schedule), AI, logic, PostGear actions, and notifications (Slack, Teams, Sheets, WhatsApp later) connected on a canvas.
+3. **Discover** (Sprint 11, documents only so far): what is trending where the audience is (search trends, local news in the local language, festivals, competitors, worldwide social topics), each item one click from an AI draft. Research in [`../sprint-11/`](../sprint-11/README.md).
 
 ## Which file is what
 
@@ -11,8 +12,10 @@ Two modules that set PostGear apart from other schedulers:
 |---|---|
 | [`../sprint-documents/sprint-09-design-studio.md`](../sprint-documents/sprint-09-design-studio.md) | **Build spec** for Design Studio, written against this codebase |
 | [`../sprint-documents/sprint-10-workflow-builder.md`](../sprint-documents/sprint-10-workflow-builder.md) | **Build spec** for Workflow Builder, written against this codebase |
+| [`../sprint-documents/sprint-11-discover.md`](../sprint-documents/sprint-11-discover.md) | **Build spec** for Discover, written against this codebase |
 | [`user-stories-design-studio.md`](user-stories-design-studio.md) | **User stories** for Design Studio: personas, real journeys, acceptance criteria, UX rules, edge cases, completion checklist |
 | [`user-stories-workflow-builder.md`](user-stories-workflow-builder.md) | **User stories** for Workflow Builder, same structure |
+| [`user-stories-discover.md`](user-stories-discover.md) | **User stories** for Discover, same structure |
 | [`CLAUDE_CODE_PROMPTS.md`](CLAUDE_CODE_PROMPTS.md) | One copy-paste prompt per build phase |
 | `POSTGEAR_PRODUCT_PRD.md`, `POSTGEAR_USER_STORIES_AND_WALKTHROUGH.md`, `CAROUSEL_STUDIO_REQUIREMENTS.md`, `WORKFLOW_BUILDER_REQUIREMENTS.md`, `IMPLEMENTATION_PROMPT_FOR_CODING_AGENT.md` | First brainstorm drafts, generated outside this codebase. **Not a reference**: do not build from them. Kept only as a record of the original idea. |
 

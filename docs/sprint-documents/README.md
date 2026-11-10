@@ -27,6 +27,7 @@
 | 9 | [Design Studio (Template-Based Posts and Carousels)](sprint-09-design-studio.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 4, 7 |
 | 10 | [Workflow Builder (Visual Automations)](sprint-10-workflow-builder.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 5, 6, 8 (9 for the Render Design node) |
 | 10b | [Workflow Builder UI Revamp (Immersive Canvas)](sprint-10b-workflow-builder-ui-revamp.md) | None (look and feel of Sprint 10's builder; behaviour unchanged) | Sprint 10 (best after its Module 14) |
+| 11 | [Discover (Location-Aware Trending Content For AI Posts)](sprint-11-discover.md) | New module (research and build plan in [`../sprint-11/`](../sprint-11/README.md)); touches 5.5 AI content | Sprint 4, 6, 7 |
 
 ## Cross-Cutting Notes
 
