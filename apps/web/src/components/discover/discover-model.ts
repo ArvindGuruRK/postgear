@@ -320,6 +320,19 @@ export function placeStart(
   return { from: 'workspace', place: saved, language: languageFor(saved, wanted) };
 }
 
+/**
+ * Whether the server may read this workspace's settings yet. The API answers
+ * for the workspace the active-workspace cookie names, not the one in the
+ * address: on a bookmark or a typed address the two can disagree until
+ * `SyncActiveWorkspace` has switched the cookie, and settings read before
+ * then are another workspace's (its saved place would open here under a
+ * Workspace badge). The page starts from the guess instead and takes the real
+ * settings when it renders again.
+ */
+export function settingsInScope(urlOrgId: string, cookieOrgId: string | null): boolean {
+  return cookieOrgId === urlOrgId;
+}
+
 /** The News tab's default topic: the workspace's first, or null for All. */
 export function workspaceTopic(settings: DiscoverSettings | null): NewsTopic | null {
   const first = settings?.topics[0];

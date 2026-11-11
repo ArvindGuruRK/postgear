@@ -93,11 +93,11 @@ describe('WikipediaRows', () => {
     const { rerender } = render(<WikipediaRows items={ARTICLES} onCreatePost={onCreatePost} />);
 
     const rows = screen.getAllByTestId('discover-wiki-row');
-    fireEvent.click(within(rows[1]).getByRole('button', { name: 'Create Post' }));
+    fireEvent.click(within(rows[1]).getByRole('button', { name: /^Create Post( for |$)/ }));
     expect(onCreatePost).toHaveBeenCalledWith(ARTICLES[1]);
 
     rerender(<WikipediaRows items={ARTICLES} />);
-    expect(screen.queryByRole('button', { name: 'Create Post' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Create Post( for |$)/ })).not.toBeInTheDocument();
   });
 
   it('never makes a link of an address that is not the web', () => {

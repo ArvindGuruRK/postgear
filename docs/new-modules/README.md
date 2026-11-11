@@ -4,7 +4,7 @@ Three modules that set PostGear apart from other schedulers:
 
 1. **Design Studio**: branded posts and carousels from templates, with brand colours taken from the user's website or picked by hand, edited inside fixed regions, previewed in a platform frame, and sent to the composer.
 2. **Workflow Builder**: n8n-style automations for posting. Triggers (post published, post failed, schedule), AI, logic, PostGear actions, and notifications (Slack, Teams, Sheets, WhatsApp later) connected on a canvas.
-3. **Discover** (Sprint 11, documents only so far): what is trending where the audience is (search trends, local news in the local language, festivals, competitors, worldwide social topics), each item one click from an AI draft. Research in [`../sprint-11/`](../sprint-11/README.md).
+3. **Discover** (Sprint 11, built in ten modules; see its completion checklist): what is trending where the audience is (search trends, local news in the local language, festivals, competitors, worldwide social topics), each item one click from an AI draft. Research in [`../sprint-11/`](../sprint-11/README.md).
 
 ## Which file is what
 

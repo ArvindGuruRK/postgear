@@ -190,6 +190,22 @@ describe('PlacePopover', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Try again in a moment.');
   });
 
+  it('says places are not available when the search never reached the API, and lists nothing', async () => {
+    mockedSearch.mockRejectedValue(new TypeError('Failed to fetch'));
+    renderPopover();
+    fireEvent.change(field(), { target: { value: 'paris' } });
+    await act(async () => {
+      fireEvent.submit(field().closest('form') as HTMLFormElement);
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Places are not available right now. Try again in a few minutes.',
+    );
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    // Worldwide still works with the place finder down.
+    expect(screen.getByRole('button', { name: 'Worldwide' })).toBeEnabled();
+  });
+
   it('replaces the consent sentence with the warning and focuses the field when blocked', () => {
     renderPopover({ status: 'denied', message: LOCATION_MESSAGES.denied });
 

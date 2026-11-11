@@ -237,18 +237,20 @@ Ordered checklist; each phase ends with `verify-change`. The phases are the modu
 
 Evidence for each line goes in the completion checklist when the sprint closes.
 
-- [ ] Discover opens from the rail; the first visit shows country-level Trending and News from the browser's time zone with no prompt.
-- [ ] Use My Location turns a rounded position into a city, region and country through Nominatim within its policy (one request a second globally, identifying User-Agent, 30 day cache, attribution shown); denied and unavailable states each show their sentence; coordinates are never stored or logged.
-- [ ] A typed city (on Enter) becomes a place; Worldwide works; the viewer's choice survives a reload.
-- [ ] Trending shows rising searches for the region (country fallback), Wikipedia reads for the language, and Worldwide social topics; each group names its source and place.
-- [ ] News shows the city's stories in the place's first language and switches language from the chip; every card links out and shows the publisher.
-- [ ] Create Post on any card drafts through `POST /ai/generate` in the chosen language, charges 5 credits (refunded on failure), and Open In Composer opens the draft; a festival draft lands on the festival date.
-- [ ] Festivals lists the next 30 days with Public Holiday and Observance badges from the holiday calendar and `date-holidays`, merged and de-duplicated.
-- [ ] Videos shows YouTube's most popular for the country when `YOUTUBE_API_KEY` is set and says "not set up" otherwise; the daily budget stops at 8,000 units.
-- [ ] A workspace admin saves a default place, languages, topics and sources; members see it on a new device.
-- [ ] Competitors: add by website with feeds found automatically, add channel handles, see the latest items per competitor and name mentions from Google News; 20 per workspace; unsafe URLs refused with a sentence.
-- [ ] Read opens an article in a sheet from a safe fetch with Readability; private, unreadable and non-article pages each get their sentence; the reader never stores page text; Google News links resolve when they can and fall back to Open.
-- [ ] Every upstream call goes through the SSRF-guarded fetch; the cache is shared by place; a resting source shows stale items or `unavailable`, never an error page; no paid call exists in the code.
+Closed 2026-11-11: see [the completion checklist](../sprint-completion-checklists/sprint-11-completion-checklist.md). Every ticked line is met in simulation only. The last two are partly met and stay open: `validate` fails on four image tests older than this sprint, and the look pass left four small things.
+
+- [x] Discover opens from the rail; the first visit shows country-level Trending and News from the browser's time zone with no prompt.
+- [x] Use My Location turns a rounded position into a city, region and country through Nominatim within its policy (one request a second globally, identifying User-Agent, 30 day cache, attribution shown); denied and unavailable states each show their sentence; coordinates are never stored or logged.
+- [x] A typed city (on Enter) becomes a place; Worldwide works; the viewer's choice survives a reload.
+- [x] Trending shows rising searches for the region (country fallback), Wikipedia reads for the language, and Worldwide social topics; each group names its source and place.
+- [x] News shows the city's stories in the place's first language and switches language from the chip; every card links out and shows the publisher.
+- [x] Create Post on any card drafts through `POST /ai/generate` in the chosen language, charges 5 credits (refunded on failure), and Open In Composer opens the draft; a festival draft lands on the festival date.
+- [x] Festivals lists the next 30 days with Public Holiday and Observance badges from the holiday calendar and `date-holidays`, merged and de-duplicated.
+- [x] Videos shows YouTube's most popular for the country when `YOUTUBE_API_KEY` is set and says "not set up" otherwise; the daily budget stops at 8,000 units.
+- [x] A workspace admin saves a default place, languages, topics and sources; members see it on a new device.
+- [x] Competitors: add by website with feeds found automatically, add channel handles, see the latest items per competitor and name mentions from Google News; 20 per workspace; unsafe URLs refused with a sentence.
+- [x] Read opens an article in a sheet from a safe fetch with Readability; private, unreadable and non-article pages each get their sentence; the reader never stores page text; Google News links resolve when they can and fall back to Open.
+- [x] Every upstream call goes through the SSRF-guarded fetch; the cache is shared by place; a resting source shows stale items or `unavailable`, never an error page; no paid call exists in the code.
 - [ ] `DISCOVER_SIMULATION=true` runs every screen offline; `e2e/discover.spec.ts` passes under it; unit tests cover every source with injected fetch; `npm run validate` is green.
 - [ ] Light, dark and Lilac checked; phone width checked; Tamil, Arabic and Japanese sample items render with `dir="auto"`.
 

@@ -1100,3 +1100,59 @@ describe('CompetitorsService.items', () => {
     expect(readsMade()).toBe(0);
   });
 });
+
+describe('CompetitorsService: refused addresses are counted (Module 09)', () => {
+  const PRIVATE_SITE = 'http://10.0.0.1/';
+
+  it('answers 429 after thirty refusals in a minute, before the guard runs again', async () => {
+    const { service, engine, repository, readsMade } = build();
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await expect(
+        refusalOf(service.create(ORG, USER, { name: 'Acme', websiteUrl: PRIVATE_SITE })),
+      ).resolves.toMatchObject({ status: 422, code: 'competitor_private' });
+    }
+    expect(engine.guard).toHaveBeenCalledTimes(30);
+
+    await expect(refusalOf(service.discoverFeeds(ORG, PRIVATE_SITE))).resolves.toEqual({
+      status: 429,
+      code: 'competitor_throttled',
+      message: 'Try again in a moment.',
+    });
+    await expect(
+      refusalOf(service.create(ORG, USER, { name: 'Acme', websiteUrl: 'https://acme.example' })),
+    ).resolves.toMatchObject({ status: 429, code: 'competitor_throttled' });
+
+    expect(engine.guard).toHaveBeenCalledTimes(30);
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(readsMade()).toBe(0);
+  });
+
+  it('counts each workspace on its own, and starts again after a minute', async () => {
+    const { service, redis } = build();
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await refusalOf(service.create(ORG, USER, { name: 'Acme', websiteUrl: PRIVATE_SITE }));
+    }
+    expect(redis.read(`discover:addrrefused:${ORG}`)).toBe('30');
+
+    await expect(
+      service.create(OTHER_ORG, USER, { name: 'Acme', websiteUrl: 'https://acme.example' }),
+    ).resolves.toBeDefined();
+
+    jest.advanceTimersByTime(61_000);
+    await expect(
+      refusalOf(service.create(ORG, USER, { name: 'Acme', websiteUrl: PRIVATE_SITE })),
+    ).resolves.toMatchObject({ status: 422, code: 'competitor_private' });
+    await expect(
+      service.create(ORG, USER, { name: 'Acme', websiteUrl: 'https://acme.example' }),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not count an address that was fine', async () => {
+    const { service, redis } = build();
+
+    await service.create(ORG, USER, { name: 'Acme', websiteUrl: 'https://acme.example' });
+
+    expect(redis.keys).not.toContain(`discover:addrrefused:${ORG}`);
+  });
+});

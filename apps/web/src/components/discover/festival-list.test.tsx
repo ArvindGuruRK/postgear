@@ -116,17 +116,17 @@ describe('FestivalList', () => {
     const onPlanPost = jest.fn();
     render(<FestivalList items={INDIA} today={TODAY} onPlanPost={onPlanPost} />);
 
-    fireEvent.click(within(row('Diwali/Deepavali')).getByRole('button', { name: 'Plan A Post' }));
+    fireEvent.click(within(row('Diwali/Deepavali')).getByRole('button', { name: /^Plan A Post( for |$)/ }));
     expect(onPlanPost).toHaveBeenCalledTimes(1);
     expect(onPlanPost).toHaveBeenCalledWith(DIWALI);
 
     // A festival that just happened can still be planned for: every row has the button.
-    expect(screen.getAllByRole('button', { name: 'Plan A Post' })).toHaveLength(INDIA.length);
+    expect(screen.getAllByRole('button', { name: /^Plan A Post( for |$)/ })).toHaveLength(INDIA.length);
   });
 
   it('shows no Plan A Post without a sheet to open', () => {
     render(<FestivalList items={INDIA} today={TODAY} />);
-    expect(screen.queryByRole('button', { name: 'Plan A Post' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Plan A Post( for |$)/ })).not.toBeInTheDocument();
   });
 
   it('is one unnamed list, with no "in N days", when the answer has no today', () => {

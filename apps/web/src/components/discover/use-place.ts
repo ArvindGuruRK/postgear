@@ -191,6 +191,9 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
   // from this page must not move the place the person is already reading.
   const saved = useRef(workspace);
   saved.current = workspace;
+  // True while the place on screen is only a guess nobody chose. The
+  // workspace's saved place may still replace it if it arrives late (below).
+  const adoptable = useRef(false);
 
   const remember = useCallback(
     (
@@ -199,6 +202,8 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
       nextLanguage: string,
       nextTopic: TopicChoice | null = chosenTopic,
     ) => {
+      // A choice, or a save: from here on the place is the person's.
+      adoptable.current = false;
       setPlaceState(next);
       setSource(nextSource);
       setLanguageState(nextLanguage);
@@ -226,6 +231,7 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
     setChosenTopic(remembered?.topic ?? null);
 
     const start = placeStart(remembered, saved.current);
+    adoptable.current = start.from === 'guess';
     if (start.from !== 'guess') {
       // Neither is written to storage here: a remembered choice is already
       // there, and a workspace start is read from the workspace every visit.
@@ -242,7 +248,8 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
 
     localityFromTimeZone(viewerTimeZone())
       .then((guess) => {
-        if (cancelled || owner.current !== orgId) return;
+        // The workspace's place got here first, or the person chose one: no guess needed.
+        if (cancelled || owner.current !== orgId || !adoptable.current) return;
         // Not written to storage: a guess is made again on the next visit,
         // so a laptop that travelled guesses its new country.
         setPlaceState(guess);
@@ -257,6 +264,29 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
       cancelled = true;
     };
   }, [orgId, attempt]);
+
+  /**
+   * The workspace's saved place can arrive after the first render: on the
+   * first page after signing in the active-workspace cookie is not set yet, so
+   * the server cannot read the settings until it has been (the layout's
+   * `SyncActiveWorkspace` then re-runs the page). A visit that started on the
+   * time zone guess moves to the workspace's place when that happens. A place
+   * the person chose, on this visit or an earlier one, is never moved.
+   */
+  const savedPlaceKey = workspace?.place ? JSON.stringify(workspace.place) : null;
+  useEffect(() => {
+    if (!adoptable.current || savedPlaceKey === null || owner.current !== orgId) return;
+
+    const remembered = readRememberedPlace(readStorage(placeStorageKey(orgId)));
+    const start = placeStart(remembered, saved.current);
+    if (start.from !== 'workspace') return;
+
+    adoptable.current = false;
+    setFailed(false);
+    setPlaceState(start.place);
+    setSource('workspace');
+    setLanguageState(start.language);
+  }, [savedPlaceKey, orgId]);
 
   const locate = useCallback(async (): Promise<boolean> => {
     const asking = orgId;

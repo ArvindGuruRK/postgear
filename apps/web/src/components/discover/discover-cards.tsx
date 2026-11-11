@@ -59,7 +59,13 @@ export function ReadButton({
   if (readHref(item) === null) return null;
 
   return (
-    <Button variant="secondary" size="sm" onClick={() => onRead(item)}>
+    <Button
+      variant="secondary"
+      size="sm"
+      // Every card has a Read; the name says which story.
+      aria-label={`Read ${item.title}`}
+      onClick={() => onRead(item)}
+    >
       Read
     </Button>
   );
@@ -168,7 +174,13 @@ function ItemCard({
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
           {onCreatePost ? (
-            <Button variant="secondary" size="sm" onClick={() => onCreatePost(item)}>
+            <Button
+              variant="secondary"
+              size="sm"
+              // Every card has a Create Post; the name says which item it is for.
+              aria-label={`Create Post for ${item.title}`}
+              onClick={() => onCreatePost(item)}
+            >
               Create Post
             </Button>
           ) : null}

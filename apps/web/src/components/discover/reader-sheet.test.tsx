@@ -28,7 +28,6 @@ jest.mock('../home/home-model', () => ({ viewerTimeZone: () => 'UTC' }));
 const mockedRead = readPage as jest.MockedFunction<typeof readPage>;
 
 beforeAll(stubBrowserLayout);
-jest.setTimeout(20_000);
 
 const MIDDLE_DOT = String.fromCodePoint(0xb7);
 

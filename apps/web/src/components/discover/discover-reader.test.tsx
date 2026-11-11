@@ -32,6 +32,7 @@ import { DiscoverPage } from './discover-page';
 import { DiscoverView, type DiscoverViewProps } from './discover-view';
 
 jest.mock('next/navigation', () => ({
+  usePathname: () => '/org-a/discover',
   useRouter: () => ({
     push: jest.fn(),
     replace: jest.fn(),
@@ -53,7 +54,6 @@ const mockedApi = api as jest.MockedFunction<typeof api>;
 const mockedStream = streamEvents as jest.MockedFunction<typeof streamEvents>;
 
 beforeAll(stubBrowserLayout);
-jest.setTimeout(20_000);
 
 const NOW = new Date('2026-11-10T12:00:00Z');
 
@@ -179,20 +179,20 @@ describe('Read on a card', () => {
     const card = screen.getByRole('article', { name: 'weather coimbatore' });
     expect(actionsOf(card)).toEqual(['Create Post', 'Read', 'Open']);
 
-    fireEvent.click(within(card).getByRole('button', { name: 'Read' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Read(?! A Page)( |$)/ }));
     expect(onRead).toHaveBeenCalledWith(TREND);
   });
 
   it("is on a story that only has Google's link, which the API opens", () => {
     render(<StoryCard item={STORY} now={NOW} onRead={jest.fn()} />);
 
-    expect(screen.getByRole('button', { name: 'Read' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Read(?! A Page)( |$)/ })).toBeInTheDocument();
   });
 
   it('is not there without a reader to open', () => {
     render(<TrendCard item={TREND} now={NOW} onCreatePost={jest.fn()} />);
 
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 
   it('is not there for an item with no page of its own, though Open may still go somewhere', () => {
@@ -200,7 +200,7 @@ describe('Read on a card', () => {
 
     // Open falls back to the first related story; Read does not read a different page.
     expect(screen.getByRole('link', { name: /^Open/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 
   it('is never there for an address that is not the web', () => {
@@ -212,14 +212,14 @@ describe('Read on a card', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 
   it('is never on a video, whose page is not an article', () => {
     render(<VideoCard item={VIDEO} now={NOW} onRead={jest.fn()} onCreatePost={jest.fn()} />);
 
-    expect(screen.getByRole('button', { name: 'Create Post' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Create Post( for |$)/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 
   it('is on the cards of a group, and never on its Wikipedia rows or social chips', () => {
@@ -227,18 +227,18 @@ describe('Read on a card', () => {
     const { rerender } = render(
       <DiscoverGroup group={group('trends', [TREND])} now={NOW} onRead={onRead} />,
     );
-    expect(screen.getByRole('button', { name: 'Read' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Read(?! A Page)( |$)/ })).toBeInTheDocument();
 
     rerender(<DiscoverGroup group={group('wikipedia', [WIKI])} now={NOW} onRead={onRead} />);
     expect(screen.getByTestId('discover-wiki-row')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
 
     rerender(<DiscoverGroup group={group('social', [CHIP])} now={NOW} onRead={onRead} />);
     expect(screen.getByTestId('discover-social-chip')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
 
     rerender(<DiscoverGroup group={group('videos', [VIDEO])} now={NOW} onRead={onRead} />);
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 });
 
@@ -322,7 +322,7 @@ describe('Read on the page', () => {
     renderView('trending', { onRead });
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
-    fireEvent.click(within(card).getByRole('button', { name: 'Read' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Read(?! A Page)( |$)/ }));
 
     expect(onRead).toHaveBeenCalledWith({
       target: { mode: 'item', item: TREND },
@@ -336,7 +336,7 @@ describe('Read on the page', () => {
     renderView('news', { onCreatePost: jest.fn() });
 
     await screen.findByRole('article', { name: 'A story behind a Google link' });
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Read A Page' })).not.toBeInTheDocument();
   });
 
@@ -390,7 +390,7 @@ describe('Read on the page', () => {
 
     await screen.findByText('A blog post');
     const rows = screen.getAllByTestId('discover-competitor-row');
-    const reads = rows.map((row) => within(row).queryByRole('button', { name: 'Read' }) !== null);
+    const reads = rows.map((row) => within(row).queryByRole('button', { name: /^Read(?! A Page)( |$)/ }) !== null);
     expect(rows.map((row) => row.getAttribute('data-kind'))).toEqual([
       'blog',
       'youtube',
@@ -400,7 +400,7 @@ describe('Read on the page', () => {
     ]);
     expect(reads).toEqual([true, false, false, false, true]);
 
-    fireEvent.click(within(rows[4]).getByRole('button', { name: 'Read' }));
+    fireEvent.click(within(rows[4]).getByRole('button', { name: /^Read(?! A Page)( |$)/ }));
     expect(onRead).toHaveBeenCalledWith({
       target: { mode: 'item', item: ROWS[4] },
       place: CHENNAI,
@@ -424,7 +424,7 @@ describe('Read on the page', () => {
     renderView('competitors', { onCreatePost: jest.fn() });
 
     await screen.findByText('A blog post');
-    expect(screen.queryByRole('button', { name: 'Read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 });
 
@@ -511,7 +511,7 @@ describe('DiscoverPage, from Read to a draft', () => {
     renderPage('trending');
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
-    fireEvent.click(within(card).getByRole('button', { name: 'Read' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Read(?! A Page)( |$)/ }));
 
     const reader = await screen.findByTestId('reader-sheet');
     expect(await within(reader).findByTestId('reader-text')).toHaveTextContent(
@@ -596,7 +596,7 @@ describe('DiscoverPage, from Read to a draft', () => {
     renderPage('trending');
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
-    fireEvent.click(within(card).getByRole('button', { name: 'Read' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Read(?! A Page)( |$)/ }));
     const reader = await screen.findByTestId('reader-sheet');
     await within(reader).findByTestId('reader-text');
 

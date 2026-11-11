@@ -6,7 +6,7 @@
  */
 import '@testing-library/jest-dom';
 import { TooltipProvider } from '@postgear/ui';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { api } from '@/lib/api';
 import { streamEvents } from '@/lib/sse';
 import type { AiCredits, AiStatus } from '@/types/ai';
@@ -17,6 +17,7 @@ import { placeStorageKey, serializeRememberedPlace } from './discover-model';
 import { DiscoverPage } from './discover-page';
 
 jest.mock('next/navigation', () => ({
+  usePathname: () => '/org-a/discover',
   useRouter: () => ({
     push: jest.fn(),
     replace: jest.fn(),
@@ -39,9 +40,6 @@ const mockedStream = streamEvents as jest.MockedFunction<typeof streamEvents>;
 
 beforeAll(stubBrowserLayout);
 
-// These suites render whole pages, and the Discover set runs side by side: on a
-// busy machine the first render of a suite can take longer than Jest's 5 s.
-jest.setTimeout(20_000);
 
 const CHENNAI: Locality = {
   countryCode: 'IN',
@@ -195,10 +193,10 @@ describe('DiscoverPage', () => {
     });
     renderPage('festivals');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Plan A Post' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Plan A Post( for |$)/ }));
 
     const sheet = await screen.findByTestId('create-post-sheet');
-    expect(within(sheet).getByRole('heading', { name: 'Create Post' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('heading', { name: /^Create Post( for |$)/ })).toBeInTheDocument();
     expect(within(sheet).getByText(/Draft a post about this festival with AI\./)).toBeVisible();
     expect(await within(sheet).findByTestId('create-post-brief')).toHaveTextContent(DIWALI_BRIEF);
 
@@ -233,7 +231,7 @@ describe('DiscoverPage', () => {
     renderPage('trending');
 
     const row = await screen.findByTestId('discover-wiki-row');
-    fireEvent.click(within(row).getByRole('button', { name: 'Create Post' }));
+    fireEvent.click(within(row).getByRole('button', { name: /^Create Post( for |$)/ }));
 
     const sheet = await screen.findByTestId('create-post-sheet');
     expect(within(sheet).getByText(/Draft a post about this article with AI\./)).toBeVisible();
@@ -258,5 +256,79 @@ describe('DiscoverPage', () => {
         },
       ],
     });
+  });
+});
+
+describe('DiscoverPage by keyboard (Module 09)', () => {
+  function trending() {
+    answer({
+      kind: 'trending',
+      language: 'ta',
+      locality: CHENNAI,
+      groups: [WIKIPEDIA],
+      unavailable: [],
+    });
+    renderPage('trending');
+  }
+
+  it('names the tab list "Discover tabs", and walks its tabs with the arrow keys', async () => {
+    trending();
+    await screen.findByTestId('discover-wiki-row');
+
+    const tabs = within(screen.getByRole('tablist', { name: 'Discover tabs' })).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Trending',
+      'News',
+      'Videos',
+      'Festivals',
+      'Competitors',
+    ]);
+    const open = tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true');
+    expect(open).toHaveLength(1);
+    expect(open[0]).toHaveTextContent('Trending');
+
+    // One stop in the tab order, then the arrow keys walk the tabs.
+    const [trendingTab, newsTab] = tabs as [HTMLElement, HTMLElement];
+    act(() => trendingTab.focus());
+    expect(trendingTab).toHaveFocus();
+    fireEvent.keyDown(trendingTab, { key: 'ArrowRight' });
+    await waitFor(() => expect(newsTab).toHaveFocus());
+  });
+
+  it('closes the place popover on Escape and leaves the page as it was', async () => {
+    trending();
+    await screen.findByTestId('discover-wiki-row');
+
+    fireEvent.click(screen.getByTestId('discover-place-chip'));
+    const worldwide = await screen.findByRole('button', { name: 'Worldwide' });
+    fireEvent.keyDown(worldwide, { key: 'Escape' });
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Worldwide' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('discover-wiki-row')).toBeInTheDocument();
+    expect(screen.queryByTestId('create-post-sheet')).not.toBeInTheDocument();
+  });
+
+  it('closes the popover first and the sheet second, one Escape each', async () => {
+    trending();
+    const row = await screen.findByTestId('discover-wiki-row');
+
+    // First Escape: the popover.
+    fireEvent.click(screen.getByTestId('discover-place-chip'));
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Worldwide' }), { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Worldwide' })).not.toBeInTheDocument(),
+    );
+
+    // Second Escape: the sheet that was opened after it.
+    fireEvent.click(
+      within(row).getByRole('button', { name: `Create Post for ${WIKIPEDIA.items[0].title}` }),
+    );
+    const sheet = await screen.findByTestId('create-post-sheet');
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByTestId('create-post-sheet')).not.toBeInTheDocument());
+    expect(screen.getByTestId('discover-wiki-row')).toBeInTheDocument();
   });
 });

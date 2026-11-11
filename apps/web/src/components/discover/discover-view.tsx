@@ -220,6 +220,13 @@ export function DiscoverView({
   const now = useNow();
   // Saving from the popover answers the new settings, so they live here.
   const [settings, setSettings] = useState(initialSettings);
+  // The server page can read the settings later than the first render: on the
+  // first page after signing in the workspace cookie is not set yet, and the
+  // page is run again once it is. What arrives then is adopted. A null (the
+  // server could not ask) never wipes what is already known.
+  useEffect(() => {
+    if (initialSettings) setSettings(initialSettings);
+  }, [initialSettings]);
   const [savingDefault, setSavingDefault] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const place = usePlace(orgId, settings);
@@ -416,7 +423,8 @@ export function DiscoverView({
     return (
       <div
         aria-busy={feed.loading}
-        className={cn('flex flex-col gap-6 transition-opacity', feed.loading && 'opacity-70')}
+        className={cn('flex flex-col gap-6 transition-opacity motion-reduce:transition-none',
+          feed.loading && 'opacity-70')}
       >
         {feed.error ? (
           <Alert variant="warning" className="items-center py-3">
@@ -516,7 +524,7 @@ export function DiscoverView({
       <Tabs value={tab} onValueChange={(value) => setTab(value as DiscoverTab)}>
         <TabsList
           ref={tabsRef}
-          aria-label="Discover"
+          aria-label="Discover tabs"
           className="flex w-full justify-start overflow-x-auto sm:inline-flex sm:w-auto"
         >
           {DISCOVER_TABS.map((value) => (

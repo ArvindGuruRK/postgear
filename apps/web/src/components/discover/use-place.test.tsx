@@ -502,3 +502,119 @@ describe('the News topic (Module 06)', () => {
     expect(result.current.topic).toBe('BUSINESS');
   });
 });
+
+/**
+ * The first page after signing in: the active-workspace cookie is not set
+ * yet, so the server page cannot read the settings and hands down null. The
+ * layout sets the cookie and the page runs again, this time with the settings.
+ */
+describe('usePlace when the workspace place arrives late (Module 09)', () => {
+  function renderLate(first: DiscoverSettings | null = null) {
+    return renderHook(({ workspace }) => usePlace('org-a', workspace), {
+      initialProps: { workspace: first },
+    });
+  }
+
+  it('moves a time zone guess to the workspace place, in its language', async () => {
+    const { result, rerender } = renderLate();
+    await waitFor(() => expect(result.current.place).toEqual(INDIA));
+    expect(result.current.source).toBe('guess');
+
+    rerender({ workspace: saved() });
+
+    expect(result.current.place).toEqual(PARIS);
+    expect(result.current.source).toBe('workspace');
+    expect(result.current.language).toBe('fr');
+    expect(result.current.topic).toBe('BUSINESS');
+    // Read from the workspace every visit, so nothing is written.
+    expect(stored()).toBeNull();
+  });
+
+  it('keeps the workspace place when the guess answers after it', async () => {
+    let answerGuess: (value: { locality: Locality }) => void = () => undefined;
+    mockedApi.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answerGuess = resolve as typeof answerGuess;
+        }),
+    );
+    const { result, rerender } = renderLate();
+    expect(result.current.place).toBeNull();
+
+    rerender({ workspace: saved() });
+    expect(result.current.place).toEqual(PARIS);
+
+    await act(async () => {
+      answerGuess({ locality: INDIA });
+    });
+    expect(result.current.place).toEqual(PARIS);
+    expect(result.current.source).toBe('workspace');
+  });
+
+  it('clears a failed guess once the workspace place is there', async () => {
+    mockedApi.mockRejectedValue(new Error('offline'));
+    const { result, rerender } = renderLate();
+    await waitFor(() => expect(result.current.failed).toBe(true));
+
+    rerender({ workspace: saved() });
+
+    expect(result.current.failed).toBe(false);
+    expect(result.current.place).toEqual(PARIS);
+  });
+
+  it('never moves a place remembered from an earlier visit', () => {
+    window.localStorage.setItem(
+      placeStorageKey('org-a'),
+      serializeRememberedPlace({ place: CHENNAI, source: 'search', language: 'ta' }),
+    );
+    const { result, rerender } = renderLate();
+    expect(result.current.place).toEqual(CHENNAI);
+
+    rerender({ workspace: saved() });
+
+    expect(result.current.place).toEqual(CHENNAI);
+    expect(result.current.source).toBe('search');
+    expect(result.current.language).toBe('ta');
+  });
+
+  it('never moves a place the person picked while the settings were on their way', async () => {
+    const { result, rerender } = renderLate();
+    await waitFor(() => expect(result.current.place).toEqual(INDIA));
+    act(() => result.current.pickPlace(CHENNAI));
+
+    rerender({ workspace: saved() });
+
+    expect(result.current.place).toEqual(CHENNAI);
+    expect(result.current.source).toBe('search');
+  });
+
+  it('never moves Worldwide once it was chosen', async () => {
+    const { result, rerender } = renderLate();
+    await waitFor(() => expect(result.current.place).toEqual(INDIA));
+    act(() => result.current.pickWorldwide());
+
+    rerender({ workspace: saved() });
+
+    expect(result.current.place).toEqual(WORLDWIDE_PLACE);
+    expect(result.current.source).toBe('worldwide');
+  });
+
+  it('stays on the guess when the settings arrive with no place saved', async () => {
+    const { result, rerender } = renderLate();
+    await waitFor(() => expect(result.current.place).toEqual(INDIA));
+
+    rerender({ workspace: NOTHING_SAVED });
+
+    expect(result.current.place).toEqual(INDIA);
+    expect(result.current.source).toBe('guess');
+  });
+
+  it('does not follow a default that changes after the visit started on it', () => {
+    const { result, rerender } = renderLate(saved());
+    expect(result.current.place).toEqual(PARIS);
+
+    rerender({ workspace: saved({ place: CHENNAI, languages: ['ta', 'en'] }) });
+
+    expect(result.current.place).toEqual(PARIS);
+  });
+});

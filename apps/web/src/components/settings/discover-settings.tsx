@@ -110,7 +110,21 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
   const [settings, setSettings] = useState<DiscoverSettings | null>(initial);
   const [saving, setSaving] = useState<CardId | null>(null);
   const [loading, setLoading] = useState(initial === null);
+  // The server page can read the settings later than the first render (the
+  // workspace cookie is set by the layout after the first page loads, and the
+  // page is run again). What arrives then replaces what this island had.
   const [error, setError] = useState<string | null>(null);
+  // Once the server has answered, an answer of this island's own first load
+  // that lands later (it left before the cookie was set) is dropped.
+  const serverAnswered = useRef(initial !== null);
+  useEffect(() => {
+    if (!initial) return;
+    serverAnswered.current = true;
+    setSettings(initial);
+    setLoading(false);
+    // Its own read may have failed meanwhile: what the server read stands.
+    setError(null);
+  }, [initial]);
   const retry = useRef<(() => Promise<void>) | null>(null);
   // What is on screen now, for a save that starts after a wait (the browser
   // finding a position, or Try Again): it must put back this, not an old copy.
@@ -120,15 +134,18 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
   const [locating, setLocating] = useState<PlaceStatus>('idle');
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (first = false) => {
     setLoading(true);
     try {
-      setSettings(await getDiscoverSettings());
+      const loaded = await getDiscoverSettings();
+      if (first && serverAnswered.current) return;
+      setSettings(loaded);
       setError(null);
       retry.current = null;
     } catch (cause) {
+      if (first && serverAnswered.current) return;
       setError(describe(cause, LOAD_FAILED));
-      retry.current = load;
+      retry.current = () => load();
     } finally {
       setLoading(false);
     }
@@ -136,7 +153,7 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
 
   useEffect(() => {
     if (initial === null) {
-      void load();
+      void load(true);
     }
   }, [initial, load]);
 

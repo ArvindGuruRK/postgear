@@ -34,8 +34,8 @@ import {
   useToast,
 } from '@postgear/ui';
 import { Globe } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import type { GeneratedPart } from '@/types/ai';
 import type { PostDetail } from '@/types/post';
@@ -76,6 +76,24 @@ export function GenerateResult({
   const { toast } = useToast();
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
+  // The composer opens as a modal over this page, so this component is still
+  // here when it closes. The button stays "Opening" from the click until the
+  // composer has come and gone (so a second click cannot make a second
+  // draft), and is offered again once the page is back from it. A click then
+  // reopens the draft these parts already made, if it is still there, rather
+  // than saving the same words a second time.
+  const made = useRef<{ parts: GenerateState['parts']; group: string } | null>(null);
+  const pathname = usePathname();
+  const wentToComposer = useRef(false);
+  useEffect(() => {
+    const atComposer = pathname?.endsWith('/composer') ?? false;
+    if (atComposer) {
+      wentToComposer.current = true;
+    } else if (wentToComposer.current) {
+      wentToComposer.current = false;
+      setOpening(false);
+    }
+  }, [pathname]);
 
   const running = state.phase === 'running';
   const parts = state.parts ?? [];
@@ -91,6 +109,19 @@ export function GenerateResult({
     setOpening(true);
     setOpenError(null);
 
+    const earlier = made.current;
+    if (earlier && earlier.parts === state.parts) {
+      try {
+        await api(`/posts/${encodeURIComponent(earlier.group)}`);
+        router.push(`/${orgId}/composer?group=${encodeURIComponent(earlier.group)}`);
+        onOpened?.();
+        return;
+      } catch {
+        // Deleted in the composer, or out of reach just now: make a new one.
+        made.current = null;
+      }
+    }
+
     const payload: SavePayload = {
       state: 'DRAFT',
       publishDate: draftDate(publishAt, new Date()).toISOString(),
@@ -104,6 +135,7 @@ export function GenerateResult({
 
     try {
       const { post } = await api<{ post: PostDetail }>('/posts', { method: 'POST', body: payload });
+      made.current = { parts: state.parts, group: post.group };
       router.push(`/${orgId}/composer?group=${encodeURIComponent(post.group)}`);
       onOpened?.();
     } catch (cause) {

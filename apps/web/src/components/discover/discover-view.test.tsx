@@ -49,10 +49,6 @@ const mockedApi = api as jest.MockedFunction<typeof api>;
 
 beforeAll(stubBrowserLayout);
 
-// These suites render whole pages, and the Discover set runs side by side: on a
-// busy machine the first render of a suite can take longer than Jest's 5 s.
-jest.setTimeout(20_000);
-
 const CHENNAI: Locality = {
   countryCode: 'IN',
   countryName: 'India',
@@ -76,6 +72,33 @@ const STATUS: DiscoverStatus = {
     social: false,
   },
 };
+
+/**
+ * The clock stands still for this whole file, and only the clock: timers,
+ * promises and animation frames stay real, so every `findBy` and `waitFor`
+ * works as usual. The answers below are dated against it ("25 minutes ago"),
+ * and the page reads the same clock, so "Updated 25 min ago" cannot turn into
+ * 26 when the suite runs slowly beside the others, which it did.
+ */
+jest.useFakeTimers({
+  now: new Date('2026-11-10T12:00:00Z'),
+  doNotFake: [
+    'hrtime',
+    'nextTick',
+    'performance',
+    'queueMicrotask',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
+    'requestIdleCallback',
+    'cancelIdleCallback',
+    'setImmediate',
+    'clearImmediate',
+    'setInterval',
+    'clearInterval',
+    'setTimeout',
+    'clearTimeout',
+  ],
+});
 
 const FETCHED = new Date(Date.now() - 25 * 60_000).toISOString();
 
@@ -253,7 +276,7 @@ describe('DiscoverView', () => {
     renderView();
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
-    expect(within(card).queryByRole('button', { name: 'Create Post' })).not.toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: /^Create Post( for |$)/ })).not.toBeInTheDocument();
   });
 
   it('hands Create Post the item with the place and language it was read in', async () => {
@@ -267,7 +290,7 @@ describe('DiscoverView', () => {
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
     expect(within(card).getByTestId('card-extra')).toHaveTextContent('t1');
-    fireEvent.click(within(card).getByRole('button', { name: 'Create Post' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Create Post( for |$)/ }));
 
     expect(onCreatePost).toHaveBeenCalledWith({
       item: TRENDS.items[0],
@@ -440,7 +463,7 @@ describe('DiscoverView', () => {
     );
     renderView(STATUS, 'competitors', { onCreatePost });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Create Post' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Create Post( for |$)/ }));
 
     expect(onCreatePost).toHaveBeenCalledWith({ item: post, place: CHENNAI, language: 'ta' });
   });
@@ -560,7 +583,7 @@ describe('Trending with more sources (Module 05)', () => {
     renderView(STATUS, 'trending', { onCreatePost });
 
     const row = await screen.findByTestId('discover-wiki-row');
-    fireEvent.click(within(row).getByRole('button', { name: 'Create Post' }));
+    fireEvent.click(within(row).getByRole('button', { name: /^Create Post( for |$)/ }));
 
     expect(onCreatePost).toHaveBeenCalledWith({
       item: WIKIPEDIA.items[0],
@@ -656,7 +679,7 @@ describe('Videos (Module 05)', () => {
     expect(open).toHaveAttribute('target', '_blank');
     expect(open).toHaveAttribute('rel', 'noopener noreferrer');
 
-    fireEvent.click(within(card).getByRole('button', { name: 'Create Post' }));
+    fireEvent.click(within(card).getByRole('button', { name: /^Create Post( for |$)/ }));
     expect(onCreatePost).toHaveBeenCalledWith({ item: VIDEO, place: CHENNAI, language: 'ta' });
 
     expect(feedCalls()).toEqual([
@@ -766,7 +789,7 @@ describe('Festivals (Module 05)', () => {
     renderView(STATUS, 'festivals', { onCreatePost });
 
     const upcoming = await screen.findByRole('region', { name: 'Later This Month' });
-    fireEvent.click(within(upcoming).getByRole('button', { name: 'Plan A Post' }));
+    fireEvent.click(within(upcoming).getByRole('button', { name: /^Plan A Post( for |$)/ }));
 
     expect(onCreatePost).toHaveBeenLastCalledWith({
       item: GURU_NANAK,
@@ -783,7 +806,7 @@ describe('Festivals (Module 05)', () => {
     renderView(STATUS, 'festivals', { onCreatePost });
 
     const thisWeek = await screen.findByRole('region', { name: 'This Week' });
-    fireEvent.click(within(thisWeek).getByRole('button', { name: 'Plan A Post' }));
+    fireEvent.click(within(thisWeek).getByRole('button', { name: /^Plan A Post( for |$)/ }));
     expect(onCreatePost).toHaveBeenLastCalledWith({
       item: BHAI_DUJ,
       place: CHENNAI,
@@ -792,7 +815,7 @@ describe('Festivals (Module 05)', () => {
     });
 
     const past = screen.getByRole('region', { name: 'Just Happened' });
-    fireEvent.click(within(past).getByRole('button', { name: 'Plan A Post' }));
+    fireEvent.click(within(past).getByRole('button', { name: /^Plan A Post( for |$)/ }));
     expect(onCreatePost).toHaveBeenLastCalledWith({
       item: DIWALI,
       place: CHENNAI,
@@ -807,7 +830,7 @@ describe('Festivals (Module 05)', () => {
     renderView(STATUS, 'festivals');
 
     await screen.findByRole('region', { name: 'This Week' });
-    expect(screen.queryByRole('button', { name: 'Plan A Post' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Plan A Post( for |$)/ })).not.toBeInTheDocument();
   });
 
   it('says a quiet month plainly', async () => {

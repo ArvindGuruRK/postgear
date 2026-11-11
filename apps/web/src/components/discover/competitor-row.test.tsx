@@ -139,7 +139,7 @@ describe('CompetitorRows', () => {
     render(<CompetitorRows items={FIVE} now={NOW} onCreatePost={onCreatePost} />);
 
     const rows = screen.getAllByTestId('discover-competitor-row');
-    fireEvent.click(within(rows[2]).getByRole('button', { name: 'Create Post' }));
+    fireEvent.click(within(rows[2]).getByRole('button', { name: /^Create Post( for |$)/ }));
 
     expect(onCreatePost).toHaveBeenCalledTimes(1);
     expect(onCreatePost).toHaveBeenCalledWith(FIVE[2]);
@@ -148,7 +148,7 @@ describe('CompetitorRows', () => {
   it('has no Create Post without somewhere to send it', () => {
     render(<CompetitorRows items={[item()]} now={NOW} />);
 
-    expect(screen.queryByRole('button', { name: 'Create Post' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Create Post( for |$)/ })).not.toBeInTheDocument();
   });
 
   it('puts what it is handed after Open', () => {

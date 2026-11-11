@@ -15,6 +15,8 @@
  *
  * The samples are made up, with Tamil and Arabic among them: outside text
  * arrives in any script, and a right-to-left title must still sit right.
+ * Module 09 adds one story card and one row each in Tamil, Arabic and Japanese
+ * (`discover-script-samples.ts`), all invented.
  */
 import { useState } from 'react';
 import { CardMenu } from '@/components/discover/card-menu';
@@ -41,6 +43,7 @@ import type {
   NewsTopic,
 } from '@/types/discover';
 import { Row, Section, Spec } from '../shared';
+import { SCRIPT_ROW_GROUP, SCRIPT_STORY_GROUP } from './discover-script-samples';
 
 const INDIA: Locality = {
   countryCode: 'IN',
@@ -557,6 +560,23 @@ export function DiscoverSection() {
         <Spec>
           ol, ROW_LIST (bg-inset, divide-y-2, no shadow); rank type-heading; title is a Link; reads
           type-muted; Create Post secondary sm; Open is an ActionLink
+        </Spec>
+      </Row>
+
+      <Row label="Tamil, Arabic And Japanese (invented samples: one story card and one row each)">
+        <div className="flex w-full flex-col gap-6">
+          <DiscoverGroup
+            group={SCRIPT_STORY_GROUP}
+            now={NOW}
+            onCreatePost={nothing}
+            onRead={nothing}
+          />
+          <DiscoverGroup group={SCRIPT_ROW_GROUP} now={NOW} onCreatePost={nothing} />
+        </div>
+        <Spec>
+          Titles carry dir=&quot;auto&quot;: Arabic reads right to left and sits on the right, Tamil
+          and Japanese on the left; break-words wraps a headline with no spaces; buttons and
+          badges stay left to right
         </Spec>
       </Row>
 

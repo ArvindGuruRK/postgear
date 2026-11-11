@@ -88,7 +88,12 @@ export function CompetitorRow({ item, now, onCreatePost, extra }: CompetitorRowP
       ) : null}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {onCreatePost ? (
-          <Button variant="secondary" size="sm" onClick={() => onCreatePost(item)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label={`Create Post for ${item.title}`}
+            onClick={() => onCreatePost(item)}
+          >
             Create Post
           </Button>
         ) : null}

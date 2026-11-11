@@ -195,7 +195,7 @@ describe('ReaderService.read', () => {
     ['the cloud metadata address', 'http://169.254.169.254/latest/meta-data'],
     ['an IPv6 loopback', 'http://[::1]/'],
     ['a name on the local network', 'https://nas.local/'],
-  ])('refuses %s with the sentence, with no request and no count', async (_name, url) => {
+  ])('refuses %s with the sentence, with no request and no read counted', async (_name, url) => {
     const { service, fetch, redis } = build();
 
     await expect(refusalOf(service.read(ORG, url))).resolves.toEqual({
@@ -205,8 +205,10 @@ describe('ReaderService.read', () => {
     });
 
     expect(fetch).not.toHaveBeenCalled();
-    // Not even the throttle moved: a private address costs nothing at all.
-    expect(redis.keys).toEqual([]);
+    // The read limit did not move. The one thing kept is the count of refusals,
+    // by workspace, with nothing of the address in it (Module 09).
+    expect(redis.keys).toEqual([`discover:addrrefused:${ORG}`]);
+    expect(redis.read(`discover:addrrefused:${ORG}`)).toBe('1');
   });
 
   it('refuses a public name that resolves to a private address', async () => {
@@ -862,5 +864,60 @@ describe('a page in another encoding', () => {
     await expect(service.read(ORG, 'https://news.example/a')).resolves.toBeDefined();
     fetch.mockResolvedValue({ ...sample, contentType: null });
     await expect(service.read(ORG, 'https://news.example/b')).resolves.toBeDefined();
+  });
+});
+
+describe('ReaderService: refused addresses are counted (Module 09)', () => {
+  const PRIVATE_PAGE = 'http://10.0.0.1/';
+
+  it('answers 429 after thirty refusals in a minute, before the guard runs again', async () => {
+    const { service, engine, fetch } = build();
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await expect(refusalOf(service.read(ORG, PRIVATE_PAGE))).resolves.toMatchObject({
+        status: 422,
+        code: 'read_private',
+      });
+    }
+    expect(engine.guard).toHaveBeenCalledTimes(30);
+
+    await expect(refusalOf(service.read(ORG, PRIVATE_PAGE))).resolves.toEqual({
+      status: 429,
+      code: 'read_throttled',
+      message: 'Try again in a moment.',
+    });
+    // A good address waits too: the workspace is resting, whatever it asks for.
+    await expect(refusalOf(service.read(ORG, READER_SAMPLE.article))).resolves.toMatchObject({
+      status: 429,
+    });
+
+    expect(engine.guard).toHaveBeenCalledTimes(30);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('counts each workspace on its own, and starts again after a minute', async () => {
+    const { service, fetch } = build();
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await refusalOf(service.read(ORG, PRIVATE_PAGE));
+    }
+
+    await expect(service.read('org-2', READER_SAMPLE.article)).resolves.toBeDefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(61_000);
+    await expect(refusalOf(service.read(ORG, PRIVATE_PAGE))).resolves.toMatchObject({
+      status: 422,
+      code: 'read_private',
+    });
+    await expect(service.read(ORG, READER_SAMPLE.article)).resolves.toBeDefined();
+  });
+
+  it('does not count an address that was fine, or text that is not an address', async () => {
+    const { service, redis } = build();
+
+    await service.read(ORG, READER_SAMPLE.article);
+    await refusalOf(service.read(ORG, 'javascript:alert(1)'));
+
+    expect(redis.keys).not.toContain(`discover:addrrefused:${ORG}`);
   });
 });

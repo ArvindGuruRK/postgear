@@ -34,7 +34,6 @@ const mockedUpdate = updateCompetitor as jest.MockedFunction<typeof updateCompet
 const mockedFind = findCompetitorFeeds as jest.MockedFunction<typeof findCompetitorFeeds>;
 
 beforeAll(stubBrowserLayout);
-jest.setTimeout(20_000);
 
 const PRIVATE = 'This address is private or on your own network.';
 

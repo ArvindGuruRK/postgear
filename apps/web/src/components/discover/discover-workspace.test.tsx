@@ -45,9 +45,6 @@ const mockedToast = toast as jest.MockedFunction<typeof toast>;
 
 beforeAll(stubBrowserLayout);
 
-// These suites render whole pages, and the Discover set runs side by side: on a
-// busy machine the first render of a suite can take longer than Jest's 5 s.
-jest.setTimeout(20_000);
 
 const CHENNAI: Locality = {
   countryCode: 'IN',
@@ -598,5 +595,70 @@ describe('a tab the workspace switched off', () => {
 
     expect(await screen.findByRole('article', { name: 'Metro line opens' })).toBeInTheDocument();
     expect(screen.queryByText(VIDEOS_TURNED_OFF)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The first page after signing in (Module 09): the server could not read the
+ * settings yet, so the page starts without them and is handed them a moment
+ * later, when the layout has set the workspace cookie and the page ran again.
+ */
+describe('settings that arrive after the first paint', () => {
+  function page(settings: DiscoverSettings | null, isAdmin = false) {
+    return (
+      <TooltipProvider>
+        <DiscoverView
+          orgId="org-a"
+          status={STATUS}
+          initialTab="trending"
+          settings={settings}
+          isAdmin={isAdmin}
+        />
+      </TooltipProvider>
+    );
+  }
+
+  it('moves from the guess to the workspace place, with its badge, and asks the feed for it', async () => {
+    const { rerender } = render(page(null));
+    const chip = await screen.findByTestId('discover-place-chip');
+    await waitFor(() => expect(chip).toHaveTextContent('India, from your time zone'));
+
+    rerender(page(saved()));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('discover-place-chip')).toHaveTextContent('Chennai, Tamil Nadu'),
+    );
+    const moved = screen.getByTestId('discover-place-chip');
+    expect(within(moved).getByText('Workspace')).toBeInTheDocument();
+    expect(within(moved).queryByText('Guess')).not.toBeInTheDocument();
+    expect(screen.getByTestId('discover-language-chip')).toHaveTextContent('தமிழ் Tamil');
+    await waitFor(() =>
+      expect(calls('/discover/feed').some((path) => path.includes('region=IN-TN'))).toBe(true),
+    );
+  });
+
+  it("keeps the person's own place when the settings arrive", async () => {
+    remember(KOCHI, 'search', 'ml');
+    const { rerender } = render(page(null));
+    expect(await screen.findByTestId('discover-place-chip')).toHaveTextContent('Kochi, Kerala');
+
+    rerender(page(saved()));
+
+    await waitFor(() => expect(calls('/discover/feed').length).toBeGreaterThan(0));
+    const chip = screen.getByTestId('discover-place-chip');
+    expect(chip).toHaveTextContent('Kochi, Kerala');
+    expect(within(chip).queryByText('Workspace')).not.toBeInTheDocument();
+  });
+
+  it('lets an admin save from the popover once the settings are there', async () => {
+    remember(KOCHI, 'search', 'ml');
+    const { rerender } = render(page(null, true));
+    await screen.findByTestId('discover-place-chip');
+
+    rerender(page(saved(), true));
+
+    await openPopover();
+    // The line under Worldwide names what the workspace starts from: it is drawn only with settings.
+    expect(screen.getByText(/Chennai, Tamil Nadu/)).toBeInTheDocument();
   });
 });

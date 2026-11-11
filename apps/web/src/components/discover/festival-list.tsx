@@ -65,7 +65,13 @@ export function FestivalRow({ item, today, onPlanPost }: FestivalRowProps) {
         ) : null}
       </div>
       {onPlanPost ? (
-        <Button variant="secondary" size="sm" className="shrink-0" onClick={() => onPlanPost(item)}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="shrink-0"
+          aria-label={`Plan A Post for ${item.title}`}
+          onClick={() => onPlanPost(item)}
+        >
           Plan A Post
         </Button>
       ) : null}

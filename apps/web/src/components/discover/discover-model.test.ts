@@ -40,6 +40,7 @@ import {
   readRememberedPlace,
   safeHref,
   serializeRememberedPlace,
+  settingsInScope,
   socialChipLabel,
   switchedOff,
   TOPIC_CHOICES,
@@ -964,6 +965,14 @@ describe('the News topic', () => {
       'Science',
       'Health',
     ]);
+  });
+
+  it("reads the settings only once the cookie names the address's workspace", () => {
+    expect(settingsInScope('org_b', 'org_b')).toBe(true);
+    // A bookmark into another workspace: the API would still answer for org_a.
+    expect(settingsInScope('org_b', 'org_a')).toBe(false);
+    // Right after signing in to an account with two workspaces: no cookie yet.
+    expect(settingsInScope('org_b', null)).toBe(false);
   });
 
   it("defaults to the workspace's first topic, or All", () => {

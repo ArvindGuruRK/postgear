@@ -50,7 +50,6 @@ const mockedUpdate = updateCompetitor as jest.MockedFunction<typeof updateCompet
 const mockedRemove = removeCompetitor as jest.MockedFunction<typeof removeCompetitor>;
 
 beforeAll(stubBrowserLayout);
-jest.setTimeout(20_000);
 
 const NOW = new Date('2026-11-10T12:00:00Z');
 
@@ -321,7 +320,7 @@ describe('CompetitorsTab', () => {
     mockedItems.mockResolvedValue(items({ items: [churn] }));
     renderTab({ onCreatePost });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Create Post' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Create Post( for |$)/ }));
 
     expect(onCreatePost).toHaveBeenCalledWith(churn);
   });

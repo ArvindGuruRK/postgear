@@ -32,6 +32,7 @@ placeholders.
 | **API keys and the public API** (Sprint 8): create / rotate / revoke keys, `/v1` with Swagger docs at `/api/docs`, per-key rate limiting, the Node SDK | OAuth apps, Zapier/Make connectors |
 | **Outbound webhooks** (Sprint 8): signed deliveries on post published / failed, retries, a test send, delivery history | |
 | **Design Studio** (Sprints 9 and 9b): brand kits by hand or read from a website, 167 templates in four formats (Classic, Signature and a premium Luxury set, with background art), 52 fonts, an editor with autosave and undo, preview in platform frames, export to Media at 1x or 2x, PDF download, Send To Composer as a draft, share links | AI-written slides, LinkedIn PDF carousels, approvals on share links |
+| **Discover** (Sprint 11): what is trending where the audience is (rising searches, local news in the local language, Wikipedia reads, worldwide social topics, videos, festivals), competitors by website, a reader for any story, and Create Post on every item. Runs fully offline with `DISCOVER_SIMULATION="true"` (section 5o) | A country and region picker when the place finder is off, saved items, a Home card |
 | Connect a real social account (OAuth) | |
 | Channel card, reconnect, "wrong account" guard, disconnect | |
 
@@ -931,6 +932,143 @@ npm test --workspace=@postgear/api -- automations
 npm run test:e2e -- e2e/workflows.spec.ts   # needs dev:api:e2e, see the top of playwright.config.ts
 ```
 
+### 5o. Discover (Sprint 11)
+
+**Set up once.** In the root `.env`:
+
+```env
+DISCOVER_SIMULATION="true"   # recorded feeds, a stand-in place finder, sample competitor and sample articles: nothing leaves the machine
+AI_SIMULATION="true"         # Create Post drafts with the stand-in model, and still charges credits
+DISCOVER_GEOCODER="nominatim"  # "off" turns finding places off, to see that state
+DISCOVER_LINK_DECODE="true"    # "false" takes Read off Google News stories, to see that sentence
+# YOUTUBE_API_KEY=""           # leave empty: the Videos tab then says it is not set up
+```
+
+Apply the two Sprint 11 migrations (`npm run migrate:deploy --workspace=packages/db`)
+and restart the API. Its boot log prints one line, `discover.boot`, that says
+which world it is in (`"simulation":true`) and who it says it is. Open
+**<http://localhost:3000/seed-demo-org/discover>** as `demo@postgear.local`.
+The page wears a **Simulated** sticker at the top right while the flag is on.
+
+**What simulation knows.** Three places: Chennai (Tamil and English), San
+Francisco (English) and Paris (French). Any other position or city answers
+Worldwide. One competitor: an invented company at `acme.example`. Four sample
+pages for the reader, and any other address answers the English sample
+article, so no real site is ever fetched.
+
+**The place.**
+
+- The seeded demo workspace starts on **Chennai, Tamil Nadu** with a
+  Workspace badge, in Tamil. A workspace with no saved place (switch to
+  **PostGear Second Org**) starts on a guess from the browser's time zone,
+  with a Guess badge.
+- Click the place chip. **Use My Location** asks the browser once; under
+  simulation any position near Chennai, San Francisco or Paris finds that
+  city. The sentence under the button says what is kept (the city, not the
+  position).
+- Block location in the browser and press it again: "Location is blocked in
+  your browser. Search for your city instead." with the search field focused.
+- Type `paris` and press Enter (search only runs on Enter): pick Paris,
+  France. Reload: the page remembers it.
+- **Worldwide** shows the world group; Videos and Festivals then say they
+  need a place.
+- As the admin, **Save For This Workspace** makes the place the default for
+  everyone. As `member@postgear.local` the button is disabled with "Only
+  workspace admins can change the workspace place."
+- Switch the language chip between Tamil and English: News follows it.
+
+**The tabs.**
+
+- **Trending**: Rising Searches In Tamil Nadu (cards with related
+  headlines), What People Are Reading On Tamil Wikipedia (ranked rows), and
+  Worldwide On Bluesky And Mastodon (chips that link out).
+- **News**: Chennai Stories and Top Stories In India, in the chip's
+  language. Pick a topic from the select; **Read A Page** opens the reader
+  on any address you paste.
+- **Videos**: "Trending videos are not set up for this PostGear." with no
+  key. With `YOUTUBE_API_KEY` set to anything, simulation shows five sample
+  videos.
+- **Festivals**: the next 30 days in sections by week, with Public Holiday
+  and Observance badges and **Plan A Post**.
+- **Competitors**: empty at first. Press **Add Competitor**, name it `Acme`,
+  enter `acme.example` and press **Find Feeds**: Blog (RSS) and Changelog
+  (Atom) appear ticked. Add the YouTube channel id
+  `UCacmeSampleChannel00000`, the Bluesky handle `acme.example` and the
+  Mastodon account `acme@mastodon.example`, and save. The group shows rows
+  with Blog, YouTube, Bluesky, Mastodon and News badges. Try
+  `http://127.0.0.1:3000` as a website: "This address is private or on your
+  own network." Edit from the group menu; Remove is an admin's (red, asked
+  first).
+
+**Create Post.**
+
+- **Create Post** on any card opens a sheet with the brief, the language
+  (the chip's), your channels, Tone and Format. **Draft With AI** costs 5
+  credits; **Open In Composer** saves a draft and opens it.
+- **Plan A Post** on a festival dates the draft: the evening before a public
+  holiday, the morning of an observance.
+- A competitor's brief ends with "Write our own take on this topic for our
+  audience, not a summary of theirs."
+- The demo workspace's monthly allowance is 100 credits. At 0 the sheet shows
+  the out-of-credits message with the reset date; `npm run db:seed` resets
+  the ledger (it also resets notifications and billing events).
+
+**The reader.**
+
+- **Read** on a Trending card opens the sample article in a side sheet: site,
+  byline, date, reading time, the text. **Create Post From This** opens the
+  Create Post sheet with the article as the brief.
+- **Read** on a News story shows "Opening the story..." and then the Tamil
+  sample (the link is resolved through the sample pages).
+- **Read A Page** with `http://10.0.0.1/`: "This page is private or on your
+  own network." With `https://reader.example/`: "This page is not an
+  article." With `https://reader.example/missing`: "We could not read this
+  page. Open it in a new tab instead." Open stays on every failure.
+- Set `DISCOVER_LINK_DECODE="false"`, restart the API, press Read on a News
+  story: "We could not open this story here. Open it in a new tab instead."
+- More than ten reads in a minute: "Try again in a moment."
+
+**Settings.** Open **Settings**, then **Discover**: Workspace Place,
+Languages (the first is the default), News Topics and Sources. Turn Videos
+off and the Videos tab says "Videos are turned off for this workspace." for
+everyone in it. A member sees the page read-only.
+
+**What is kept, and where.** Nothing from a feed, a competitor or a page is
+written to Postgres: it lives in Redis for a limited time
+(`docker exec postgear_redis redis-cli --scan --pattern 'discover:*'`;
+simulated copies sit under `discover:sim:`). Postgres holds two tables only:
+`DiscoverSettings` (a place, never a position) and `Competitor`. To start
+clean, delete the Redis keys:
+
+```powershell
+docker exec postgear_redis sh -c "redis-cli --scan --pattern 'discover:*' | xargs -r redis-cli del"
+```
+
+**The real feeds (only with the owner's yes).** Everything above is free to
+run for real, and belongs to someone else: Google's feeds are unofficial, and
+OpenStreetMap's place finder allows one request a second and asks to be
+identified. So this is a one-time check, never a loop:
+
+1. Set `DISCOVER_SIMULATION="false"` and restart the API. The boot line now
+   says `"simulation":false` and the sticker is gone.
+2. Open Discover on Chennai: Trending, News and Festivals come from the live
+   feeds. Press **Use My Location** once (one request to OpenStreetMap).
+3. Press **Read** on one Trending card. Many publishers refuse automated
+   readers, so "We could not read this page." with Open is a normal answer.
+4. Set the flag back to `"true"` and restart.
+
+No step here costs money, and no key is needed except the optional YouTube
+one (a free Data API key from the Google Cloud project you already have).
+
+Automated checks:
+
+```powershell
+npm test --workspace=@postgear/discover-engine
+npm test --workspace=@postgear/api -- discover
+npm test --workspace=@postgear/web -- discover
+npm run test:e2e -- e2e/discover.spec.ts   # needs dev:api:e2e and both simulations, section 3a
+```
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 
@@ -1120,6 +1258,13 @@ A real upload needs a video and is not worth testing from the UI yet.
 | Extract From Website says "That is a lot of websites at once." | Five extractions a minute per workspace. Wait a minute. |
 | Studio text still looks like the old Sora or Playfair | The browser kept Sprint 9's font files (cached for a week). Hard-refresh the page (Ctrl+Shift+R). |
 | No premium lock anywhere in the Studio | The demo workspace is on a paid plan. Switch to **PostGear Second Org**, which has none. |
+| Use My Location does nothing, or says location is blocked | Browsers only offer a position on HTTPS or on `localhost`. On a LAN address use the city search instead. If it says blocked, allow location for the site in the browser's address bar. |
+| Discover says "Try again in a moment." when finding a place | Five place lookups a minute per workspace, and OpenStreetMap allows one request a second for the whole deployment (it answers 429 past that). Wait a minute. |
+| Discover says "Finding places is turned off on this PostGear." | `DISCOVER_GEOCODER="off"`. Set it to `"nominatim"` and restart the API. |
+| The Videos tab says "Trending videos are not set up for this PostGear." | `YOUTUBE_API_KEY` is empty. It is optional and free (a Data API key, not the OAuth client used for publishing). |
+| Discover shows no Simulated sticker, or shows real headlines | `DISCOVER_SIMULATION` is not `"true"` in the root `.env`, or the API was not restarted. The `discover.boot` log line says which. |
+| Read says "We could not open this story here." on every News story | `DISCOVER_LINK_DECODE="false"`, or (for real) Google changed the page the link decoder reads. Open still works. |
+| Read says "Try again in a moment." | Ten reads a minute per workspace, two pages at a time, and a page that took the article finder too long uses up that workspace's minute. Wait a minute. |
 | Download PDF says "Export this design first, then download it." | PDF and Download All use the last export. Export, then download. |
 
 ---

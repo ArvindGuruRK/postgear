@@ -59,7 +59,15 @@ import {
   toast,
 } from '@postgear/ui';
 import { Compass } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { ApiError } from '@/lib/api';
 import { getCompetitorItems, getCompetitors, removeCompetitor } from '@/lib/discover-api';
 import type {
@@ -69,6 +77,7 @@ import type {
   DiscoverItem,
 } from '@/types/discover';
 import { AnalyticsPanel, PanelHeader } from '../analytics/analytics-ui';
+import { useOptionalWorkspace } from '../navigation/workspace-provider';
 import { CompetitorDialog } from './competitor-dialog';
 import { COMPETITORS_FAILED, ITEMS_FAILED, REMOVE_FAILED, STILL_READING } from './competitor-model';
 import { CompetitorRows } from './competitor-row';
@@ -223,7 +232,10 @@ export function CompetitorGroup({
     if (items.length === 0) return null;
 
     return (
-      <div aria-busy={loading} className={cn('transition-opacity', loading && 'opacity-70')}>
+      <div
+        aria-busy={loading}
+        className={cn('transition-opacity motion-reduce:transition-none', loading && 'opacity-70')}
+      >
         <CompetitorRows
           items={items}
           now={now}
@@ -361,6 +373,11 @@ function RemoveCompetitorDialog({
   );
 }
 
+/** For a tab shown outside the dashboard: nothing to listen to. */
+function subscribeToNothing(): () => void {
+  return () => {};
+}
+
 export interface CompetitorsTabProps {
   orgId: string;
   /** Presentation only: whether Remove is offered. The API's guard is the real check. */
@@ -396,8 +413,32 @@ export function CompetitorsTab({
   const [removeBusy, setRemoveBusy] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
+  // The list is scoped by the workspace cookie, not by the address. Reached by
+  // a bookmark while the cookie still names another workspace, the tab waits
+  // for the switch to settle, or it would list that workspace's competitors
+  // here until Refresh. Outside the dashboard (the playground, a test) there is
+  // no switch to wait for.
+  const workspace = useOptionalWorkspace();
+  const scope = workspace?.scope ?? null;
+  const scopeStatus = useSyncExternalStore(
+    scope ? scope.subscribe : subscribeToNothing,
+    () => (scope ? scope.status(orgId) : 'ready'),
+    () => (scope ? scope.status(orgId) : 'ready'),
+  );
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: the workspace, `refreshKey` and `attempt` are triggers, not inputs
   useEffect(() => {
+    const settled = scope ? scope.status(orgId) : 'ready';
+    if (scopeStatus === 'failed' || settled === 'failed') {
+      setError(COMPETITORS_FAILED);
+      setLoading(false);
+      return;
+    }
+    if (scopeStatus !== 'ready' || settled !== 'ready') {
+      setLoading(true);
+      return;
+    }
+
     asked.current += 1;
     const mine = asked.current;
     setLoading(true);
@@ -419,7 +460,7 @@ export function CompetitorsTab({
     return () => {
       asked.current += 1;
     };
-  }, [orgId, refreshKey, attempt]);
+  }, [orgId, refreshKey, attempt, scope, scopeStatus]);
 
   const openAdd = useCallback(() => {
     setEditing(null);

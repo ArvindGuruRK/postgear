@@ -1,6 +1,6 @@
 # Module 09: Hardening, E2E And Sprint Close-Out
 
-> **Sprint 11, Discover** | Status: Not started | Size: M (one session)
+> **Sprint 11, Discover** | Status: Done with gaps (the full `validate` has timing failures in older tests; see the checklist) | Size: M (one session)
 > **Depends on**: Modules 01 to 08
 > **Stories**: the section 6 checklist of the user stories
 > **Next**: [Module 10](module-10-p2-backlog.md) (parked)
@@ -60,15 +60,15 @@ One test per row of the stories' section 5, placed where the behaviour lives (en
 
 ## Tasks
 
-- [ ] `discover.security.spec.ts` and the no-direct-fetch test.
-- [ ] Edge-case tests for every section 5 row; list them.
-- [ ] `e2e/discover.spec.ts`; run it; fix what it finds.
-- [ ] Performance numbers logged in the Progress notes.
-- [ ] Accessibility pass and the script samples; screenshots.
-- [ ] Local testing guide 5o, section 0 and section 9 rows.
-- [ ] Completion checklist with the `sprint-closeout` skill.
-- [ ] `npm run validate` green across the repo.
-- [ ] Update the Progress table and the Decision Log; suggest the final commit message.
+- [x] `discover.security.spec.ts` and the no-direct-fetch test.
+- [x] Edge-case tests for every section 5 row; list them. (Checklist section 5. One row is short: no country and region picker with the place finder off.)
+- [x] `e2e/discover.spec.ts`; run it; fix what it finds. (10 of 10, three runs; it found the stale workspace place.)
+- [x] Performance numbers logged in the Progress notes. (Not measured: layout shift over 40 cards.)
+- [x] Accessibility pass and the script samples; screenshots. (`s11-50` to `s11-59`; the keyboard walk and Escape order are unit tested, not walked by hand.)
+- [x] Local testing guide 5o, section 0 and section 9 rows.
+- [x] Completion checklist with the `sprint-closeout` skill.
+- [ ] `npm run validate` green across the repo. (Not green: lint, typecheck and every Discover test pass; 4 tests in `media/image-processor.spec` and `media/media.service.spec` time out, Sprint 9 code. Reported, not fixed.)
+- [x] Update the Progress table and the Decision Log; suggest the final commit message.
 
 ## Tests
 

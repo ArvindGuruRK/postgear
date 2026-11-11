@@ -68,7 +68,14 @@ import {
   CompetitorsRepository,
   type CompetitorWrite,
 } from './competitors.repository';
-import { addressOf, hopRefusal, isPrivate, judgeAddress } from './discover.addresses';
+import {
+  addressOf,
+  countRefusal,
+  hopRefusal,
+  isPrivate,
+  judgeAddress,
+  refusalsSpent,
+} from './discover.addresses';
 import { type CacheEntry, DiscoverCache, LOCK_SECONDS } from './discover.cache';
 import { DiscoverGate } from './discover.gate';
 import { type DiscoverKeys, discoverKeys, workspaceKeys } from './discover.keys';
@@ -715,8 +722,15 @@ export class CompetitorsService {
     const url = addressOf(input);
     if (!url) throw this.invalidAddress();
 
+    // The guard looks names up, and that is the one thing a refusal costs. A
+    // workspace with a run of refusals behind it is not judged again just now.
+    if (await refusalsSpent(this.redis, orgId)) throw this.throttled(orgId);
+
     const verdict = await this.judge(url);
-    if (!verdict.ok) throw this.refusal(orgId, verdict.reason);
+    if (!verdict.ok) {
+      await countRefusal(this.redis, orgId);
+      throw this.refusal(orgId, verdict.reason);
+    }
 
     return verdict.url.toString();
   }

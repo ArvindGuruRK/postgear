@@ -68,7 +68,12 @@ export function WikipediaRow({ item, rank, onCreatePost }: WikipediaRowProps) {
       ) : null}
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {onCreatePost ? (
-          <Button variant="secondary" size="sm" onClick={() => onCreatePost(item)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            aria-label={`Create Post for ${item.title}`}
+            onClick={() => onCreatePost(item)}
+          >
             Create Post
           </Button>
         ) : null}
@@ -113,7 +118,7 @@ const SOCIAL_CHIP =
 
 /** The secondary button's fill, without its moving circle: a chip is small and there are twenty. */
 const SOCIAL_CHIP_LINK =
-  'transition-colors duration-100 hover:bg-actionSecondary hover:text-onActionLight active:bg-actionSecondary active:text-onActionLight';
+  'transition-colors duration-100 motion-reduce:transition-none hover:bg-actionSecondary hover:text-onActionLight active:bg-actionSecondary active:text-onActionLight';
 
 /** One topic: the display name or `#tag`, then "4,625 posts" or "273 uses this week". */
 export function SocialChip({ item }: { item: DiscoverItem }) {

@@ -5,8 +5,9 @@
  * ## The order of things, and why
  *
  * 1. **The guard.** The address is made real and judged before anything else, so
- *    a private one is answered with its sentence and costs nothing: no count, no
- *    lookup of a link, no request.
+ *    a private one is answered with its sentence and costs no read and no
+ *    request. Refusals are counted on their own (thirty a minute a workspace),
+ *    because judging an address can mean looking its name up.
  * 2. **The throttle.** Ten reads a minute per workspace. It counts a person
  *    asking, so it comes before the cache: a script walking addresses stops the
  *    same way whether or not they happen to be cached.
@@ -65,7 +66,14 @@ import {
 } from '@postgear/discover-engine';
 import { securityLogger } from '../../common/logging/security-logger';
 import { RedisService } from '../redis/redis.service';
-import { addressOf, hopRefusal, isPrivate, judgeAddress } from './discover.addresses';
+import {
+  addressOf,
+  countRefusal,
+  hopRefusal,
+  isPrivate,
+  judgeAddress,
+  refusalsSpent,
+} from './discover.addresses';
 import { DiscoverGate } from './discover.gate';
 import { type DiscoverKeys, discoverKeys, workspaceKeys } from './discover.keys';
 import { DISCOVER_MESSAGES } from './discover.messages';
@@ -452,9 +460,14 @@ export class ReaderService {
     const url = addressOf(input);
     if (!url) throw otherwise();
 
+    // The guard looks names up, and that is the one thing a refusal costs. A
+    // workspace with a run of refusals behind it is not judged again just now.
+    if (await refusalsSpent(this.redis, orgId)) throw this.throttled(orgId);
+
     const verdict = await judgeAddress(this.engine.guard, url);
     if (verdict.ok) return verdict.url.toString();
 
+    await countRefusal(this.redis, orgId);
     throw isPrivate(verdict.reason) ? this.privateAddress(orgId, verdict.reason) : otherwise();
   }
 

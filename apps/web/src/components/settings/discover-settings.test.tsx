@@ -24,9 +24,6 @@ const mockedToast = toast as jest.MockedFunction<typeof toast>;
 
 beforeAll(stubBrowserLayout);
 
-// These suites render whole pages, and the Discover set runs side by side: on a
-// busy machine the first render of a suite can take longer than Jest's 5 s.
-jest.setTimeout(20_000);
 
 const CHENNAI: Locality = {
   countryCode: 'IN',
@@ -231,6 +228,26 @@ describe('what the page shows', () => {
       '/discover/settings',
       '/discover/settings',
     ]);
+    expect(saves()).toEqual([]);
+  });
+
+  it('takes the settings the server reads a moment later, over a read of its own that failed', async () => {
+    // The first page after signing in: no workspace cookie yet, so the server hands down null.
+    mockedApi.mockRejectedValueOnce(new ApiError('Try again in a moment.', 503));
+    const { rerender } = renderForm({ initial: null });
+    expect(await screen.findByTestId('discover-settings-error')).toBeInTheDocument();
+
+    rerender(
+      <TooltipProvider>
+        <DiscoverSettingsForm initial={saved()} isAdmin geocoder="nominatim" />
+      </TooltipProvider>,
+    );
+
+    expect(await screen.findByTestId('discover-settings-place-text')).toHaveTextContent(
+      'Chennai, Tamil Nadu, India',
+    );
+    expect(screen.queryByTestId('discover-settings-error')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('switch').length).toBeGreaterThan(0);
     expect(saves()).toEqual([]);
   });
 });

@@ -50,6 +50,8 @@ export const workspaceKeys = {
   readThrottle: (orgId: string) => `discover:readthrottle:${orgId}`,
   /** One workspace's share of the Google News links resolved through Google in a minute (Module 08). */
   decodeShare: (orgId: string) => `discover:decodeshare:${orgId}`,
+  /** Addresses of this workspace the private-network guard refused in the last minute (Module 09). */
+  addressRefusals: (orgId: string) => `discover:addrrefused:${orgId}`,
 };
 
 export function discoverKeys(simulation: boolean) {

@@ -20,6 +20,7 @@ import { CHANNEL_REQUIRED, CreatePostSheet, type CreatePostTarget } from './crea
 const push = jest.fn();
 
 jest.mock('next/navigation', () => ({
+  usePathname: () => '/org-a/discover',
   useRouter: () => ({ push, replace: jest.fn(), refresh: jest.fn(), prefetch: jest.fn() }),
 }));
 
@@ -35,9 +36,6 @@ const mockedStream = streamEvents as jest.MockedFunction<typeof streamEvents>;
 
 beforeAll(stubBrowserLayout);
 
-// These suites render whole pages, and the Discover set runs side by side: on a
-// busy machine the first render of a suite can take longer than Jest's 5 s.
-jest.setTimeout(20_000);
 
 const CHENNAI: Locality = {
   countryCode: 'IN',
@@ -193,7 +191,7 @@ describe('CreatePostSheet', () => {
     renderSheet(TARGET);
 
     const sheet = await screen.findByTestId('create-post-sheet');
-    expect(within(sheet).getByRole('heading', { name: 'Create Post' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('heading', { name: /^Create Post( for |$)/ })).toBeInTheDocument();
     expect(await within(sheet).findByTestId('create-post-brief')).toHaveTextContent(STORY.brief);
     expect(within(sheet).getByTestId('create-post-brief')).toHaveAttribute('dir', 'auto');
     expect(within(sheet).getByTestId('create-post-language')).toHaveTextContent('தமிழ் Tamil');
@@ -340,6 +338,37 @@ describe('CreatePostSheet', () => {
     expect(screen.getByText('Half a draft.')).toBeInTheDocument();
     expect(screen.queryByTestId('create-post-brief')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit Settings' })).toBeInTheDocument();
+  });
+
+  it('shows the sentence and the refunded balance when a draft fails after it was charged', async () => {
+    const sentence = 'Something went wrong while drafting. Your credits were not used.';
+    mockedStream.mockImplementation(async (_path, _body, options) => {
+      const emit = (event: GenerateStreamEvent) => options?.onEvent?.(event as never);
+      emit({ type: 'hook', hook: 'Chennai is watching the sky today.' });
+      // The API refunds before it says so: the balance on the event is the one from before the run.
+      emit({
+        type: 'error',
+        kind: 'unexpected',
+        message: sentence,
+        retryable: true,
+        credits: credits(44),
+      });
+    });
+    renderSheet(TARGET);
+
+    const button = await screen.findByRole('button', { name: 'Draft With AI (5 Credits)' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(await screen.findByText(sentence)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+
+    // Back at the settings the refunded balance still covers a draft.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Settings' }));
+    expect(await screen.findByTestId('create-post-credits')).toHaveTextContent('44');
+    expect(screen.getByRole('button', { name: 'Draft With AI (5 Credits)' })).toBeEnabled();
   });
 
   it('stops the run when the sheet closes', async () => {
