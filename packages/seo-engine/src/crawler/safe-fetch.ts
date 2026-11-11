@@ -62,6 +62,13 @@ export interface SafeFetchOptions {
   accept?: string;
   /** Refuse a bad certificate instead of reporting it. Default false. */
   verifyCertificate?: boolean;
+  /**
+   * Send this form with a POST instead of asking with a GET. For the one caller
+   * that has to (Discover resolving a Google News link). The same guard, pinned
+   * address, size cap and timeout apply. A redirect in answer to it is refused
+   * rather than followed: a form is never re-sent to wherever a server points.
+   */
+  post?: { body: string; contentType: string };
 }
 
 export interface SafeFetchResponse {
@@ -82,7 +89,11 @@ export interface SafeFetchResponse {
   addresses: string[];
 }
 
-export type SafeProbeOptions = Omit<SafeFetchOptions, 'maxBytes' | 'requireHtml' | 'accept'>;
+/** A probe only asks whether something is there: it never sends a form. */
+export type SafeProbeOptions = Omit<
+  SafeFetchOptions,
+  'maxBytes' | 'requireHtml' | 'accept' | 'post'
+>;
 
 export type SafeProbeResponse = Omit<SafeFetchResponse, 'body' | 'bytes' | 'contentType'>;
 
@@ -196,8 +207,10 @@ function certificateValidity(message: IncomingMessage, https: boolean): boolean 
 }
 
 interface RawRequest {
-  method: 'GET' | 'HEAD';
+  method: 'GET' | 'HEAD' | 'POST';
   headers: Record<string, string>;
+  /** The form a POST sends. */
+  body?: string;
   signal?: AbortSignal;
   timeoutMs: number;
   maxBytes: number;
@@ -356,7 +369,7 @@ function requestOnce(url: URL, address: string, init: RawRequest): Promise<RawRe
       });
     });
 
-    req.end();
+    req.end(init.body);
   });
 }
 
@@ -365,7 +378,7 @@ function requestOnce(url: URL, address: string, init: RawRequest): Promise<RawRe
 // ---------------------------------------------------------------------------
 
 interface FollowOptions extends SafeFetchOptions {
-  method: 'GET' | 'HEAD';
+  method: 'GET' | 'HEAD' | 'POST';
   discardBody: boolean;
 }
 
@@ -392,6 +405,10 @@ async function follow(input: string, options: FollowOptions): Promise<Followed> 
     connection: 'close',
   };
   if (options.discardBody && options.method === 'GET') headers.range = 'bytes=0-1023';
+  if (options.method === 'POST' && options.post) {
+    headers['content-type'] = options.post.contentType;
+    headers['content-length'] = String(Buffer.byteLength(options.post.body));
+  }
 
   const redirects: string[] = [];
   let current = input;
@@ -403,6 +420,7 @@ async function follow(input: string, options: FollowOptions): Promise<Followed> 
     const response = await requestOnce(safety.url, pickAddress(safety.addresses), {
       method: options.method,
       headers,
+      body: options.method === 'POST' ? options.post?.body : undefined,
       signal: options.signal,
       timeoutMs: options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
       maxBytes: options.maxBytes ?? DEFAULT_MAX_HTML_BYTES,
@@ -412,6 +430,14 @@ async function follow(input: string, options: FollowOptions): Promise<Followed> 
 
     const location = response.headers.location;
     if (response.statusCode >= 300 && response.statusCode < 400 && location !== undefined) {
+      if (options.method === 'POST') {
+        throw new SeoCrawlError(
+          'unreachable',
+          `${bareHostname(safety.url)} redirected a form, which is never followed.`,
+          false,
+          { statusCode: response.statusCode },
+        );
+      }
       redirects.push(safety.url.toString());
       let next: URL;
       try {
@@ -442,7 +468,11 @@ export async function fetchUrlSafely(
   url: string,
   options: SafeFetchOptions = {},
 ): Promise<SafeFetchResponse> {
-  const result = await follow(url, { ...options, method: 'GET', discardBody: false });
+  const result = await follow(url, {
+    ...options,
+    method: options.post ? 'POST' : 'GET',
+    discardBody: false,
+  });
   const host = bareHostname(result.finalUrl);
   const contentType = result.headers['content-type'] ?? null;
 
@@ -488,7 +518,7 @@ export async function fetchUrlSafely(
  */
 export async function fetchBinarySafely(
   url: string,
-  options: Omit<SafeFetchOptions, 'requireHtml'> = {},
+  options: Omit<SafeFetchOptions, 'requireHtml' | 'post'> = {},
 ): Promise<Omit<SafeFetchResponse, 'body'> & { body: Buffer }> {
   const result = await follow(url, {
     ...options,

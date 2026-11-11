@@ -292,6 +292,65 @@ describe('classifyFetchError', () => {
   });
 });
 
+describe('fetchUrlSafely with a form', () => {
+  const form = { body: 'f.req=%5B1%5D&at=x', contentType: 'application/x-www-form-urlencoded' };
+
+  it('sends the form with a POST, its type and its length, through the same guard', async () => {
+    let received = { method: '', type: '', length: '', body: '' };
+    server.routes.set('/rpc', (req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        received = {
+          method: req.method ?? '',
+          type: req.headers['content-type'] ?? '',
+          length: req.headers['content-length'] ?? '',
+          body: Buffer.concat(chunks).toString('utf8'),
+        };
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('[["ok"]]');
+      });
+    });
+
+    const response = await fetchUrlSafely(`${server.origin}/rpc`, {
+      guard: server.guard,
+      requireHtml: false,
+      post: form,
+    });
+
+    expect(received).toEqual({
+      method: 'POST',
+      type: form.contentType,
+      length: String(form.body.length),
+      body: form.body,
+    });
+    expect(response).toMatchObject({ statusCode: 200, body: '[["ok"]]' });
+  });
+
+  it('never follows a redirect that answers a form', async () => {
+    server.routes.set('/rpc', (_req, res) => {
+      res.writeHead(307, { location: '/elsewhere' });
+      res.end();
+    });
+    server.routes.set('/elsewhere', serveHtml(html('')));
+
+    const error = await failure(
+      fetchUrlSafely(`${server.origin}/rpc`, { guard: server.guard, post: form }),
+    );
+
+    expect(error.kind).toBe('unreachable');
+    expect(server.requests.map((request) => request.url)).toEqual(['/rpc']);
+  });
+
+  it('still asks with a GET, and no body, when there is no form', async () => {
+    server.routes.set('/', serveHtml(html('')));
+
+    await fetchUrlSafely(`${server.origin}/`, { guard: server.guard });
+
+    expect(server.requests).toEqual([{ method: 'GET', url: '/' }]);
+  });
+});
+
 describe('isHtmlContentType', () => {
   it('accepts html and xhtml with parameters only', () => {
     expect(isHtmlContentType('text/html; charset=utf-8')).toBe(true);

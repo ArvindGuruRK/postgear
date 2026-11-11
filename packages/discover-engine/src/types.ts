@@ -163,12 +163,25 @@ export interface DiscoverFetchInit {
   maxBytes: number;
   /** Overrides the binding's default. Nominatim's policy asks for an identifying one. */
   userAgent?: string;
+  /**
+   * A form to send with a POST instead of asking with a GET. One caller needs
+   * it: resolving a Google News link (Module 08). Everything else only reads.
+   */
+  post?: { body: string; contentType: string };
+  /** Refuse an answer that is not an HTML page. The reader sets it; feeds and JSON never do. */
+  requireHtml?: boolean;
 }
 
 export interface DiscoverFetchResponse {
   status: number;
   body: string;
   finalUrl: string;
+  /**
+   * The answer's `Content-Type`, when the binding knows it. The reader looks at
+   * its charset: the body was decoded as UTF-8, and a page in another encoding
+   * would otherwise be shown, and kept, as garbage.
+   */
+  contentType?: string | null;
 }
 
 /** A non-200 is an answer, not a throw. A throw means the request never completed. */

@@ -26,6 +26,7 @@ import type {
   LocalityResponse,
   LocalitySearchResponse,
   NewsTopic,
+  ReaderArticle,
 } from '@/types/discover';
 import { api } from './api';
 
@@ -160,6 +161,24 @@ export function findCompetitorFeeds(url: string): Promise<DiscoveredFeed[]> {
 /** The newest of what one competitor published, across its feeds, channel, accounts and the news. */
 export function getCompetitorItems(id: string): Promise<CompetitorItemsResponse> {
   return api<CompetitorItemsResponse>(`/discover/competitors/${encodeURIComponent(id)}/items`);
+}
+
+/**
+ * Reads a page for the reader sheet (Module 08): a story's own address, or a
+ * Google News link, which the API turns into the publisher's address first.
+ * Only when a person presses Read, never ahead of time.
+ *
+ * Refusals arrive as `ApiError` with the API's sentence and a `code`:
+ * `read_private` (an address on a private network), `read_failed` (the page
+ * could not be read), `read_not_article` (it has no article), `link_unresolved`
+ * (a Google News link that would not open here) and `read_throttled` (429,
+ * more than ten reads a minute). Open still works for every one of them.
+ */
+export function readPage(url: string): Promise<ReaderArticle> {
+  return api<{ article: ReaderArticle }>('/discover/read', {
+    method: 'POST',
+    body: { url },
+  }).then((result) => result.article);
 }
 
 /** What the workspace saved for Discover, or the defaults when it saved nothing. Any member may read it. */

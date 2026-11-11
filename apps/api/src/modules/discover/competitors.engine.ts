@@ -35,7 +35,8 @@ import {
   type DiscoverFetch,
   type GoogleNewsSource,
 } from '@postgear/discover-engine';
-import { assertSafeUrl, type UrlSafetyResult } from '@postgear/seo-engine';
+import { assertSafeUrl } from '@postgear/seo-engine';
+import type { UrlGuard } from './discover.addresses';
 import { createSafeDiscoverFetch, type DiscoverEnv } from './discover.engine';
 
 export const COMPETITOR_ENGINE = Symbol('COMPETITOR_ENGINE');
@@ -50,8 +51,6 @@ export const COMPETITOR_GATE = Symbol('COMPETITOR_GATE');
 
 /** A public address that stands in for every name under simulation. Never connected to. */
 const SIMULATED_ADDRESS = '93.184.216.34';
-
-export type UrlGuard = (url: string) => Promise<UrlSafetyResult>;
 
 export interface CompetitorEngine {
   simulation: boolean;
@@ -75,6 +74,15 @@ const realGuard: UrlGuard = (url) => assertSafeUrl(url);
 const simulatedGuard: UrlGuard = (url) =>
   assertSafeUrl(url, { resolve: async () => [SIMULATED_ADDRESS] });
 
+/**
+ * The private-network check for an address a person typed: the real one, or
+ * under simulation the one that judges everything but looks no name up. The
+ * reader (Module 08) asks through the same one.
+ */
+export function createUrlGuard(simulation: boolean): UrlGuard {
+  return simulation ? simulatedGuard : realGuard;
+}
+
 export function createCompetitorEngine(env: CompetitorEnv): CompetitorEngine {
   const simulation = env.DISCOVER_SIMULATION === 'true';
   const fetch = simulation
@@ -85,7 +93,7 @@ export function createCompetitorEngine(env: CompetitorEnv): CompetitorEngine {
 
   return {
     simulation,
-    guard: simulation ? simulatedGuard : realGuard,
+    guard: createUrlGuard(simulation),
     fetch,
     feeds: createRssSource(options),
     youtube: createYoutubeChannelSource(options),

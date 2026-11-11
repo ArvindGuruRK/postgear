@@ -14,12 +14,23 @@ import { editionFor } from './geo/editions';
 import { CHENNAI, PARIS, SAN_FRANCISCO } from './geo/geocoder/simulated';
 import { resolveLanguages } from './geo/languages';
 import { buildLocality, WORLDWIDE } from './geo/locality';
+import { extractArticle } from './reader/extract-article';
+import {
+  decodeGoogleNewsLink,
+  GOOGLE_NEWS_BATCH_URL,
+  googleNewsArticleUrl,
+  readBatchAnswer,
+  readDecodingParams,
+} from './reader/google-news-link';
 import {
   COMPETITOR_FIXTURES,
   COMPETITOR_SAMPLE,
   createFixtureFetch,
+  createReaderFixtureFetch,
   FIXTURE_FEEDS,
   fixtureFileName,
+  READER_FIXTURES,
+  READER_SAMPLE,
   recordingsOf,
 } from './simulation';
 import { BLUESKY_TRENDS_URL, createBlueskySource } from './sources/bluesky';
@@ -939,5 +950,248 @@ describe('the competitor samples (Module 07)', () => {
     expect(blog.items.map((item) => item.title)).not.toContain(
       'How we started (an old sample post)',
     );
+  });
+});
+
+describe('the reader samples (Module 08)', () => {
+  const folder = join(__dirname, '..', 'fixtures', 'reader');
+  const R = READER_SAMPLE;
+  const F = READER_FIXTURES;
+  const readerFetch = createReaderFixtureFetch();
+  const page = { ...INIT, accept: 'text/html' };
+  const form = {
+    ...INIT,
+    accept: '*/*',
+    post: { body: 'f.req=%5B%5D', contentType: 'application/x-www-form-urlencoded;charset=UTF-8' },
+  };
+  const fileOf = (name: string) => readFileSync(join(folder, name), 'utf8');
+  const STORY = 'CBMiSAMPLEstoryTamil0001';
+
+  it('are five hand-written files, and the folder holds exactly those', () => {
+    expect(Object.keys(F).sort()).toEqual([
+      'article',
+      'frontPage',
+      'googleNewsArticle',
+      'googleNewsBatch',
+      'tamilArticle',
+    ]);
+    expect(readdirSync(folder).sort()).toEqual(Object.values(F).sort());
+    for (const file of Object.values(F)) {
+      expect([file, file.includes('.sample.')]).toEqual([file, true]);
+      expect([file, statSync(join(folder, file)).size > 200]).toEqual([file, true]);
+    }
+  });
+
+  it('all say inside that they are samples', () => {
+    for (const file of Object.values(F)) {
+      const text = fileOf(file);
+
+      if (file.endsWith('.html')) {
+        // A page: a comment that starts "Sample:", before the content.
+        const comment = /<!--\s*Sample:[^>]*-->/.exec(text);
+        expect([file, comment !== null]).toEqual([file, true]);
+        expect([file, (comment?.index ?? Number.MAX_SAFE_INTEGER) < 100]).toEqual([file, true]);
+      } else {
+        // The batch answer cannot hold a comment: one of its rows says so instead.
+        const rows: unknown = JSON.parse(text.split(/\r?\n\r?\n/)[1] ?? 'null');
+        const marks = (Array.isArray(rows) ? rows : []).filter(
+          (row) => Array.isArray(row) && row[0] === '_sample' && typeof row[1] === 'string',
+        );
+        expect([file, marks.length]).toEqual([file, 1]);
+        expect((marks[0] as string[])[1]).toMatch(/^Written by hand/);
+      }
+    }
+  });
+
+  it('say in the two articles themselves that nothing in them happened', () => {
+    // The stand-in is shown to a person, so the story has to say it too, not only a comment.
+    expect(fileOf(F.article)).toContain('This is a sample article');
+    expect(fileOf(F.article)).toContain('The Sample Courier');
+    expect(fileOf(F.tamilArticle)).toMatch(TAMIL);
+  });
+
+  it('keep out the two characters this project bans, and hold no key', () => {
+    const banned = [0x2014, 0xb7].map((code) => String.fromCodePoint(code));
+
+    for (const file of readdirSync(folder)) {
+      const text = fileOf(file);
+      for (const character of banned)
+        expect([file, text.includes(character)]).toEqual([file, false]);
+      expect([file, /[?&]key=[^&"\s]/.test(text)]).toEqual([file, false]);
+    }
+  });
+
+  it('live on a name reserved for examples, and are kept out of the lists the feeds read', () => {
+    for (const address of Object.values(R)) {
+      expect([address, new URL(address).hostname]).toEqual([address, 'reader.example']);
+    }
+    expect(new Set(Object.values(R)).size).toBe(Object.values(R).length);
+
+    const listed = [...FIXTURE_FEEDS, ...COMPETITOR_FIXTURES];
+    expect(listed.filter((feed) => feed.place.startsWith('reader'))).toEqual([]);
+    expect(listed.filter((feed) => feed.url.includes('reader.example'))).toEqual([]);
+  });
+
+  it('serve each sample page at its own address', async () => {
+    const served: [string, string][] = [
+      [R.article, F.article],
+      [R.tamilArticle, F.tamilArticle],
+      [R.frontPage, F.frontPage],
+    ];
+
+    for (const [address, file] of served) {
+      expect(await readerFetch(address, page)).toEqual({
+        status: 200,
+        body: fileOf(file),
+        finalUrl: address,
+      });
+    }
+  });
+
+  it('answer 404 for the one address that is always missing', async () => {
+    expect(await readerFetch(R.missing, page)).toEqual({
+      status: 404,
+      body: '',
+      finalUrl: R.missing,
+    });
+  });
+
+  it.each([
+    [
+      'an RSS link, as a News card carries it',
+      `https://news.google.com/rss/articles/${STORY}?oc=5`,
+    ],
+    ['the address the decoder asks for', googleNewsArticleUrl(STORY)],
+    ['an article link', `https://news.google.com/articles/${STORY}`],
+    ['a read link', `https://news.google.com/read/${STORY}`],
+    ['any other story', 'https://news.google.com/rss/articles/CBMiANOTHERstory00000002?oc=5'],
+  ])('answer the sample Google News page for %s', async (_what, address) => {
+    const answer = await readerFetch(address, page);
+
+    expect([answer.status, answer.finalUrl]).toEqual([200, address]);
+    expect(answer.body).toBe(fileOf(F.googleNewsArticle));
+    expect(readDecodingParams(answer.body)).not.toBeNull();
+  });
+
+  it('answer the batch sample for the one POST, and for nothing else', async () => {
+    const posted = await readerFetch(GOOGLE_NEWS_BATCH_URL, form);
+    expect(posted).toEqual({
+      status: 200,
+      body: fileOf(F.googleNewsBatch),
+      finalUrl: GOOGLE_NEWS_BATCH_URL,
+    });
+    expect(readBatchAnswer(posted.body)).toBe(R.tamilArticle);
+
+    // A form sent anywhere else is refused, whatever the address would answer to a read.
+    for (const address of [
+      R.article,
+      R.frontPage,
+      googleNewsArticleUrl(STORY),
+      'https://news.google.com/_/DotsSplashUi/data/other',
+      'https://publisher.example/login',
+    ]) {
+      expect(await readerFetch(address, form)).toEqual({
+        status: 404,
+        body: '',
+        finalUrl: address,
+      });
+    }
+
+    // And reading the endpoint without a form never gives the answer away.
+    const read = await readerFetch(GOOGLE_NEWS_BATCH_URL, page);
+    expect(read.body).not.toBe(fileOf(F.googleNewsBatch));
+  });
+
+  it.each([
+    [
+      'a publisher a Trends card points at',
+      'https://www.publisher.example/news/cities/chennai/a-story/article123.ece',
+    ],
+    ['another page of the sample site', 'https://reader.example/articles/another-one'],
+    ['the sample site with a query', 'https://reader.example/?page=2'],
+    ['plain http', 'http://publisher.example/story'],
+    ["a competitor's blog post", 'https://acme.example/blog/five-ways-to-cut-churn'],
+  ])('answer the English sample, as a stand-in, for %s', async (_what, address) => {
+    expect(await readerFetch(address, page)).toEqual({
+      status: 200,
+      body: fileOf(F.article),
+      finalUrl: address,
+    });
+  });
+
+  it('never reach for the network, whatever they are asked', async () => {
+    const real = jest.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      throw new Error('The simulated reader reached for the real fetch.');
+    });
+
+    try {
+      for (const address of [
+        ...Object.values(R),
+        googleNewsArticleUrl(STORY),
+        'https://www.publisher.example/news/a-story',
+        'https://example.org/',
+      ]) {
+        await readerFetch(address, page);
+        await readerFetch(address, form);
+      }
+      await readerFetch(GOOGLE_NEWS_BATCH_URL, form);
+      expect(real).not.toHaveBeenCalled();
+    } finally {
+      real.mockRestore();
+    }
+  });
+
+  it('read a folder they are pointed at, so a test can hand them its own pages', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'discover-reader-'));
+    try {
+      mkdirSync(join(directory, 'reader'));
+      writeFileSync(join(directory, 'reader', F.article), 'a page of its own');
+      const own = createReaderFixtureFetch({ directory });
+
+      expect((await own(R.article, page)).body).toBe('a page of its own');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('walk a News card from its Google link to the Tamil story, offline', async () => {
+    const asked: string[] = [];
+    const counting: typeof readerFetch = (url, init) => {
+      asked.push(`${init.post ? 'POST' : 'GET'} ${url}`);
+      return readerFetch(url, init);
+    };
+
+    const publisher = await decodeGoogleNewsLink(STORY, { fetch: counting });
+    const story = await counting(publisher, page);
+    const article = extractArticle(story.body, story.finalUrl);
+
+    expect(asked).toEqual([
+      `GET ${googleNewsArticleUrl(STORY)}`,
+      `POST ${GOOGLE_NEWS_BATCH_URL}`,
+      `GET ${R.tamilArticle}`,
+    ]);
+    expect(article).toMatchObject({ language: 'ta', readMinutes: 1 });
+    expect(article?.title).toMatch(TAMIL);
+    expect(article?.text).toMatch(TAMIL);
+  });
+
+  it('read the three pages the way the reader will: two articles, and a front page that is not one', async () => {
+    const articleOf = async (address: string) => {
+      const answer = await readerFetch(address, page);
+      return extractArticle(answer.body, answer.finalUrl);
+    };
+
+    expect(await articleOf(R.article)).toMatchObject({
+      title: 'Harbour market reopens after two years of repairs',
+      siteName: 'The Sample Courier',
+      byline: 'A. Reporter',
+      language: 'en-GB',
+      readMinutes: 2,
+    });
+    expect(await articleOf(R.tamilArticle)).toMatchObject({ language: 'ta' });
+    expect(await articleOf(R.frontPage)).toBeNull();
+    // The stand-in reads as the same sample, which says in its first paragraph what it is.
+    const standIn = await articleOf('https://www.publisher.example/a-story');
+    expect(standIn?.excerpt).toContain('This is a sample article');
   });
 });

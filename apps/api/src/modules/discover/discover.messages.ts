@@ -77,6 +77,13 @@ export const DISCOVER_MESSAGES = {
   /** "YouTube could not be reached.", or "could not be read" when it answered with something else. */
   competitorTrouble: (kind: string, unreadable: boolean) =>
     `${kind} could not be ${unreadable ? 'read' : 'reached'}.`,
+
+  // The reader (Module 08). Each failure is one sentence, and Open always works.
+  readPrivate: 'This page is private or on your own network.',
+  readFailed: 'We could not read this page. Open it in a new tab instead.',
+  readNotArticle: 'This page is not an article.',
+  readThrottled: 'Try again in a moment.',
+  linkUnresolved: 'We could not open this story here. Open it in a new tab instead.',
 } as const;
 
 /** A competitor's kinds of row, by the name each badge and each note shows. */

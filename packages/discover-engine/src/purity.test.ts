@@ -37,6 +37,10 @@ const FORBIDDEN: [RegExp, string][] = [
 ];
 
 const ALLOWED_PACKAGES = new Set([
+  // The reader (Module 08): a DOM built in memory and the article finder that
+  // walks it. Neither opens a connection: the page is fetched by the caller.
+  '@mozilla/readability',
+  'linkedom',
   'countries-and-timezones',
   'date-holidays',
   'node:crypto',

@@ -23,6 +23,7 @@ import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { editionFor, type NewsLocale } from './geo/editions';
+import { GOOGLE_NEWS_BATCH_URL, isGoogleNewsLink } from './reader/google-news-link';
 import { BLUESKY_TRENDS_URL } from './sources/bluesky';
 import { blueskyAuthorFeedUrl } from './sources/bluesky-author';
 import { newsPlaceUrl, newsTopUrl } from './sources/google-news';
@@ -250,5 +251,75 @@ export function createFixtureFetch(options: { directory?: string } = {}): Discov
       body: await readFile(join(directory, feed.place, newest), 'utf8'),
       finalUrl: url,
     };
+  };
+}
+
+/**
+ * The pages the simulated reader knows by address (Module 08). All invented,
+ * all on `.example`, all hand-written and marked as samples inside.
+ */
+export const READER_SAMPLE = {
+  /** An English article with an `article` tag, a byline, a date and a picture. */
+  article: 'https://reader.example/articles/harbour-market',
+  /** A Tamil article with no `article` tag. What the sample Google News link resolves to. */
+  tamilArticle: 'https://reader.example/articles/coimbatore-rain',
+  /** A front page: links and headings, and no story. */
+  frontPage: 'https://reader.example/',
+  /** Always a 404. */
+  missing: 'https://reader.example/missing',
+} as const;
+
+const READER_FOLDER = 'reader';
+
+/** The reader's sample files, by what they are. `fixtures/reader/` holds exactly these. */
+export const READER_FIXTURES = {
+  article: 'article-en.sample.html',
+  tamilArticle: 'article-ta.sample.html',
+  frontPage: 'not-article.sample.html',
+  googleNewsArticle: 'google-news-article.sample.html',
+  googleNewsBatch: 'google-news-batch.sample.txt',
+} as const;
+
+/**
+ * What the reader fetches under simulation.
+ *
+ * - The sample pages answer at their own addresses, and `missing` is a 404.
+ * - Any Google News article link answers the sample article page, and the one
+ *   POST to `batchexecute` answers the sample batch answer, so a News card's
+ *   Read walks the whole decoder and ends at the Tamil sample.
+ * - **Any other web address answers the English sample article.** A Trends card
+ *   under simulation still points at a real publisher, and simulation must never
+ *   fetch one. The stand-in says it is a sample in its first paragraph, the page
+ *   wears its Simulated sticker, and the Read flow can be seen end to end offline.
+ *
+ * Nothing here reaches the network, whatever it is asked.
+ */
+export function createReaderFixtureFetch(options: { directory?: string } = {}): DiscoverFetch {
+  const folder = join(options.directory ?? findFixturesDir(), READER_FOLDER);
+
+  const page = async (file: string, url: string) => ({
+    status: 200,
+    body: await readFile(join(folder, file), 'utf8'),
+    finalUrl: url,
+  });
+
+  return async (url, init) => {
+    if (init.post) {
+      return url === GOOGLE_NEWS_BATCH_URL
+        ? page(READER_FIXTURES.googleNewsBatch, url)
+        : { status: 404, body: '', finalUrl: url };
+    }
+    if (isGoogleNewsLink(url)) return page(READER_FIXTURES.googleNewsArticle, url);
+
+    switch (url) {
+      case READER_SAMPLE.missing:
+        return { status: 404, body: '', finalUrl: url };
+      case READER_SAMPLE.frontPage:
+        return page(READER_FIXTURES.frontPage, url);
+      case READER_SAMPLE.tamilArticle:
+        return page(READER_FIXTURES.tamilArticle, url);
+      default:
+        return page(READER_FIXTURES.article, url);
+    }
   };
 }

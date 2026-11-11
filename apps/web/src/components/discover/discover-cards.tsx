@@ -18,13 +18,17 @@
  * card is not the one call to action, and Draft With AI is (Arvind's pick on
  * 2026-11-10). It opens the Create Post sheet (`create-post-sheet.tsx`); the
  * overflow menu after Open holds Draft In Copilot (`card-menu.tsx`).
+ *
+ * **Read** (Module 08) sits between the two on a trend and a story that have
+ * an address of their own: it opens the page in the reader sheet without
+ * leaving Discover. A video has none, since a video page is not an article.
  */
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { AspectRatio, Button, cn, Link, MotionIcon } from '@postgear/ui';
 import { type ReactNode, useId, useState } from 'react';
 import type { DiscoverItem } from '@/types/discover';
 import { ActionLink } from '../home/home-actions';
-import { itemMeta, openHref, safeHref } from './discover-model';
+import { itemMeta, openHref, readHref, safeHref } from './discover-model';
 
 /** Up to three related headlines on a card; one on a phone. */
 const RELATED_SHOWN = 3;
@@ -34,8 +38,31 @@ export interface ItemCardProps {
   now: Date;
   /** Opens the Create Post sheet. Without it there is no Create Post (the playground). */
   onCreatePost?: (item: DiscoverItem) => void;
+  /** Opens the reader sheet on the item's page (Module 08). Without it there is no Read. */
+  onRead?: (item: DiscoverItem) => void;
   /** Extra controls after Open (Module 04's overflow menu). */
   extra?: ReactNode;
+}
+
+/**
+ * Read, for anything with a page of its own to read: a card, or a competitor's
+ * row. It draws nothing for an item with no web address, so a `javascript:`
+ * link in a feed never becomes something to press.
+ */
+export function ReadButton({
+  item,
+  onRead,
+}: {
+  item: DiscoverItem;
+  onRead: (item: DiscoverItem) => void;
+}) {
+  if (readHref(item) === null) return null;
+
+  return (
+    <Button variant="secondary" size="sm" onClick={() => onRead(item)}>
+      Read
+    </Button>
+  );
 }
 
 function ItemImage({ src }: { src: string }) {
@@ -97,6 +124,7 @@ function ItemCard({
   item,
   now,
   onCreatePost,
+  onRead,
   extra,
   byline,
   openLabel,
@@ -144,6 +172,7 @@ function ItemCard({
               Create Post
             </Button>
           ) : null}
+          {onRead ? <ReadButton item={item} onRead={onRead} /> : null}
           {href ? (
             <ActionLink
               href={href}
@@ -176,9 +205,10 @@ export function StoryCard(props: ItemCardProps) {
 
 /**
  * A trending video (Module 05): the thumbnail, the title as the uploader
- * wrote it, the channel, "1.2M views, 3 days ago", and Open to YouTube.
+ * wrote it, the channel, "1.2M views, 3 days ago", and Open to YouTube. It
+ * never has Read: a video page is not an article.
  */
-export function VideoCard(props: ItemCardProps) {
+export function VideoCard({ onRead: _noRead, ...props }: ItemCardProps) {
   const { item } = props;
   return (
     <ItemCard

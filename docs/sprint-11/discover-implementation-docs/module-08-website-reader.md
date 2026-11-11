@@ -1,6 +1,6 @@
 # Module 08: Website Reader
 
-> **Sprint 11, Discover** | Status: Not started | Size: M (one session)
+> **Sprint 11, Discover** | Status: Done (2026-11-11) | Size: M (one session)
 > **Depends on**: [Module 04](module-04-create-post.md) (the sheet); [Module 03](module-03-discover-page-and-location.md)
 > **Stories**: DC-8.1, 8.2, 8.3
 > **Next**: [Module 09](module-09-hardening-e2e-closeout.md)
@@ -44,12 +44,12 @@ Read opens a story in a side sheet from a safe fetch with Readability, never sto
 
 ## Tasks
 
-- [ ] `extractArticle` with tests (a normal article, a page without `<article>`, a non-article, Tamil text preserved, `readMinutes` rounding, cap).
-- [ ] `decodeGoogleNewsLink` with tests on recorded bodies (base64 path, page plus batchexecute path, malformed answer throws).
-- [ ] `reader.service.ts` and routes with specs (private 422 without a fetch, throttle at the 11th call, cache hit skips the fetch, link decode budget, `read_not_article`, `link_unresolved`).
-- [ ] `ReaderSheet`, Read on cards and competitor rows, Read A Page, Create Post From This; tests (failure sentences, Open kept, brief built from the article, resolving state).
-- [ ] Playwright once: Read on a Trends card (real URL), Read on a News card (resolves under simulation from the fixture), Create Post From This drafts. Screenshots `s11-13` to `s11-15`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `extractArticle` with tests (a normal article, a page without `<article>`, a non-article, Tamil text preserved, `readMinutes` rounding, cap).
+- [x] `decodeGoogleNewsLink` with tests on recorded bodies (base64 path, page plus batchexecute path, malformed answer throws).
+- [x] `reader.service.ts` and routes with specs (private 422 without a fetch, throttle at the 11th call, cache hit skips the fetch, link decode budget, `read_not_article`, `link_unresolved`).
+- [x] `ReaderSheet`, Read on cards and competitor rows, Read A Page, Create Post From This; tests (failure sentences, Open kept, brief built from the article, resolving state).
+- [x] Playwright once: Read on a Trends card (real URL), Read on a News card (resolves under simulation from the fixture), Create Post From This drafts. Screenshots `s11-43` to `s11-49` (the numbers `s11-13` to `s11-15` were taken; Draft With AI itself was not pressed, see the Progress row).
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

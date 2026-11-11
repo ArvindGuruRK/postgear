@@ -81,11 +81,19 @@ export function createSafeDiscoverFetch(userAgent: string): DiscoverFetch {
       maxBytes: init.maxBytes,
       accept: init.accept,
       userAgent: init.userAgent ?? userAgent,
-      requireHtml: false,
+      // Only the reader asks for a page and nothing else (Module 08).
+      requireHtml: init.requireHtml ?? false,
       rejectBadStatus: false,
       verifyCertificate: true,
+      // Only resolving a Google News link sends anything (Module 08).
+      ...(init.post ? { post: init.post } : {}),
     });
-    return { status: response.statusCode, body: response.body, finalUrl: response.finalUrl };
+    return {
+      status: response.statusCode,
+      body: response.body,
+      finalUrl: response.finalUrl,
+      contentType: response.contentType,
+    };
   };
 }
 

@@ -132,6 +132,10 @@ export type SecurityEvent =
   // guard refuses is recorded, by reason and never by address.
   | 'discover.competitor_unsafe_url'
   | 'discover.competitor_throttled'
+  // The reader fetches whatever address a person pastes: the same surface, and
+  // the same record. By reason, never by address.
+  | 'discover.read_private'
+  | 'discover.read_throttled'
   // Analytics (Sprint 7): a request naming a channel or post outside the
   // workspace, and a sync the worker could not complete.
   | 'analytics.foreign_reference'

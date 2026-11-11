@@ -9,21 +9,41 @@
  *
  * `isAdmin` and the workspace's saved `settings` (Module 06) come from the
  * server page and go straight through to the view.
+ *
+ * Module 08 adds the reader beside it. Read on a card, or Read A Page on the
+ * News tab, opens the reader sheet with the place and language being read;
+ * Create Post From This, at the end of a read, closes the reader and opens
+ * the Create Post sheet on the article. One sheet is open at a time.
  */
 import { useState } from 'react';
 import { CardMenu } from './card-menu';
 import { CreatePostSheet, type CreatePostTarget } from './create-post-sheet';
 import { DiscoverView, type DiscoverViewProps } from './discover-view';
+import { type ReadRequest, ReaderSheet } from './reader-sheet';
 
-export function DiscoverPage(props: Omit<DiscoverViewProps, 'onCreatePost' | 'renderCardExtra'>) {
+export function DiscoverPage(
+  props: Omit<DiscoverViewProps, 'onCreatePost' | 'onRead' | 'renderCardExtra'>,
+) {
   const [target, setTarget] = useState<CreatePostTarget | null>(null);
+  const [reading, setReading] = useState<ReadRequest | null>(null);
 
   return (
     <>
       <DiscoverView
         {...props}
         onCreatePost={setTarget}
+        onRead={setReading}
         renderCardExtra={(item) => <CardMenu orgId={props.orgId} item={item} />}
+      />
+      <ReaderSheet
+        target={reading?.target ?? null}
+        place={reading?.place ?? null}
+        language={reading?.language ?? null}
+        onClose={() => setReading(null)}
+        onCreatePost={(post) => {
+          setReading(null);
+          setTarget(post);
+        }}
       />
       <CreatePostSheet orgId={props.orgId} target={target} onClose={() => setTarget(null)} />
     </>

@@ -50,11 +50,47 @@ export {
   MAX_DISCOVERED_FEEDS,
 } from './discover-feeds';
 export {
+  ARTICLE_EXCERPT_CHARS,
+  ARTICLE_MIN_WORDS,
+  ARTICLE_TEXT_MAX_CHARS,
+  type Article,
+  countWords,
+  EXTRACT_ARTICLE_FILE,
+  extractArticle,
+  MAX_ELEMENT_ATTRIBUTES,
+  MAX_PAGE_ATTRIBUTES,
+  MAX_PAGE_COST,
+  MAX_PAGE_DEPTH,
+  MAX_PAGE_ELEMENTS,
+  MAX_PAGE_LINKS,
+  MAX_PAGE_TAGS,
+  PageTooComplexError,
+  paragraphsOf,
+  readMinutesOf,
+} from './reader/extract-article';
+export {
+  batchRequestBody,
+  type DecodeOptions,
+  decodeGoogleNewsLink,
+  decodeLocally,
+  GOOGLE_NEWS_BATCH_URL,
+  googleNewsArticleId,
+  googleNewsArticleUrl,
+  isGoogleNewsLink,
+  LinkUnresolvedError,
+  type LinkUnresolvedReason,
+  readBatchAnswer,
+  readDecodingParams,
+} from './reader/google-news-link';
+export {
   COMPETITOR_FIXTURES,
   COMPETITOR_SAMPLE,
   createFixtureFetch,
+  createReaderFixtureFetch,
   FIXTURE_FEEDS,
   type FixtureFeed,
+  READER_FIXTURES,
+  READER_SAMPLE,
 } from './simulation';
 export { BLUESKY_TRENDS_URL, createBlueskySource } from './sources/bluesky';
 export {

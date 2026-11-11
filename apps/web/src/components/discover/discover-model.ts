@@ -6,7 +6,9 @@
  * far off it is, and when a post about it should go out. Module 06 adds what
  * a workspace saved: where a visit starts, what Save For This Workspace
  * sends, and the News topic. Module 07 adds a competitor's rows: which of the
- * five kinds one is, and where its group says it reads from.
+ * five kinds one is, and where its group says it reads from. Module 08 adds
+ * the reader: which address Read reads, the line over an article, and what
+ * Create Post From This hands the Create Post sheet.
  *
  * The words are the page's (place, trend, story, festival, Worldwide), never
  * the API's.
@@ -25,6 +27,7 @@ import type {
   DiscoverTab,
   Locality,
   NewsTopic,
+  ReaderArticle,
 } from '@/types/discover';
 import { DISCOVER_TABS, NEWS_TOPICS } from '@/types/discover';
 import { viewerTimeZone } from '../home/home-model';
@@ -823,4 +826,226 @@ export function competitorSources(
 
   const last = places.pop();
   return places.length > 0 ? `From ${places.join(', ')} and ${last}.` : `From ${last}.`;
+}
+
+/*
+ * The reader (Module 08). A page read into the side sheet, and what Create
+ * Post From This makes of it. Everything from the page is plain text.
+ */
+
+/** A brief built from an article is held to what `buildBrief` holds every other brief to. */
+export const READER_BRIEF_MAX = 1_800;
+
+/**
+ * The address Read reads: the item's own, else Google's redirect, which the
+ * API turns into the publisher's. Not the first related story: that is a
+ * different page from the one the card names. Null when neither is a web
+ * address, and then the item has no Read.
+ */
+export function readHref(item: Pick<DiscoverItem, 'url' | 'opaqueUrl'>): string | null {
+  return safeHref(item.url) ?? safeHref(item.opaqueUrl);
+}
+
+/** Whether Read has to turn a Google News link into a publisher's address first. */
+export function readResolvesLink(item: Pick<DiscoverItem, 'url' | 'opaqueUrl'>): boolean {
+  return safeHref(item.url) === null && safeHref(item.opaqueUrl) !== null;
+}
+
+/**
+ * Whether a competitor's row is a page worth reading here: a post from their
+ * own feeds, or a story about them. A video or a social post is not an article.
+ */
+export function competitorRowReads(item: Pick<DiscoverItem, 'source' | 'url' | 'opaqueUrl'>): boolean {
+  const kind = competitorKind(item);
+  return (kind === 'blog' || kind === 'news') && readHref(item) !== null;
+}
+
+const ARTICLE_DAY = { day: 'numeric', month: 'short', year: 'numeric' } as const;
+
+/** "4 Nov 2026" in the viewer's zone, or nothing for a date that is not one. */
+export function articleDay(iso: string | null | undefined, timeZone?: string): string {
+  const time = iso ? Date.parse(iso) : Number.NaN;
+  if (Number.isNaN(time)) return '';
+
+  const format = (zone: string | undefined) =>
+    new Intl.DateTimeFormat('en-GB', { ...ARTICLE_DAY, timeZone: zone }).format(new Date(time));
+  try {
+    return format(timeZone);
+  } catch {
+    // A zone the runtime does not know: the browser's own.
+    return format(undefined);
+  }
+}
+
+/**
+ * The line over an article's title: "The Hindu, by A. Reporter, 4 Nov 2026,
+ * 3 min read". Whatever the page did not say is left out. Commas, as every
+ * list on the page is joined.
+ */
+export function readerMeta(
+  article: Pick<ReaderArticle, 'siteName' | 'byline' | 'publishedAt' | 'readMinutes'>,
+  timeZone?: string,
+): string {
+  return [
+    article.siteName?.trim(),
+    article.byline?.trim() ? `by ${article.byline.trim()}` : null,
+    articleDay(article.publishedAt, timeZone),
+    article.readMinutes > 0 ? `${article.readMinutes} min read` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/** An article's text as its paragraphs: the API puts a blank line between them. */
+export function readerParagraphs(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' ').trim())
+    .filter((paragraph) => paragraph !== '');
+}
+
+/**
+ * What Create Post From This sends as the topic: "{title} ({site}). {excerpt}",
+ * on one line, cut by code point so a Tamil letter or an emoji is never halved.
+ *
+ * Two limits, and the tighter one wins: 1,800 code points, and the 2,000 the
+ * route counts its topic in (an emoji is one code point and counts as two
+ * there). So `draftTopic`, which cuts by that second count, never has to cut
+ * this again, in the middle of an emoji.
+ */
+export function readerBrief(
+  article: Pick<ReaderArticle, 'title' | 'siteName' | 'excerpt'>,
+  /** Characters kept free for a sentence that goes in front (a competitor's). */
+  reserve = 0,
+): string {
+  const title = article.title.replace(/\s+/g, ' ').trim();
+  const site = article.siteName?.replace(/\s+/g, ' ').trim();
+  const excerpt = article.excerpt.replace(/\s+/g, ' ').trim();
+
+  const head = title && site ? `${title} (${site}).` : title ? `${title}.` : '';
+  const whole = [head, excerpt].filter(Boolean).join(' ');
+
+  let brief = '';
+  let points = 0;
+  for (const point of whole) {
+    if (
+      points === READER_BRIEF_MAX - reserve ||
+      brief.length + point.length > DRAFT_TOPIC_MAX - reserve
+    ) {
+      break;
+    }
+    brief += point;
+    points += 1;
+  }
+  return brief.length === whole.length ? brief : brief.trimEnd();
+}
+
+/**
+ * What every competitor brief ends on (the API's own sentence, `brief.ts` in the
+ * engine). An article read from a competitor's row is still theirs, so the
+ * draft still has to be ours: the sentence goes in front, where a cut can never
+ * reach it.
+ */
+export const OUR_OWN_TAKE =
+  'Write our own take on this topic for our audience, not a summary of theirs.';
+
+function primarySubtag(tag: string): string {
+  return tag.toLowerCase().split('-')[0];
+}
+
+/**
+ * The language a draft from an article starts in: the article's own when the
+ * place speaks it (`en-GB` is the place's `en`, in the place's spelling), else
+ * the one the chip shows.
+ */
+export function readerLanguage(
+  article: Pick<ReaderArticle, 'language'>,
+  place: Pick<Locality, 'languages'>,
+  language: string,
+): string {
+  if (!article.language) return language;
+  const wanted = primarySubtag(article.language);
+  return place.languages.find((tag) => primarySubtag(tag) === wanted) ?? language;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+/** What Create Post From This hands the Create Post sheet. The sheet's own target shape. */
+export interface ReaderPost {
+  item: DiscoverItem;
+  place: Locality;
+  language: string;
+}
+
+/**
+ * The Create Post target for an article that was just read.
+ *
+ * From a card or a row, the item stays that item, with the article's brief and
+ * with the publisher's own address when all it had was Google's redirect. The
+ * article is what the draft cites: a story is already its own first source,
+ * and any other kind (a trend, a competitor's post) gets the article put first
+ * among its related headlines, which is what the sheet sends as research.
+ *
+ * From a pasted address there is no item, so one is made: a story, named
+ * after the site.
+ */
+export function readerPostTarget(
+  article: ReaderArticle,
+  item: DiscoverItem | null,
+  place: Locality,
+  language: string,
+): ReaderPost {
+  const brief =
+    item?.kind === 'competitor'
+      ? `${OUR_OWN_TAKE} ${readerBrief(article, OUR_OWN_TAKE.length + 1)}`
+      : readerBrief(article);
+  const draftLanguage = readerLanguage(article, place, language);
+  const finalUrl = safeHref(article.finalUrl) ?? article.finalUrl;
+  const site = article.siteName?.trim() || hostOf(finalUrl);
+
+  if (!item) {
+    return {
+      item: {
+        id: `read:${finalUrl}`,
+        kind: 'news',
+        source: { id: 'rss', name: site, url: finalUrl },
+        title: article.title,
+        url: finalUrl,
+        summary: article.excerpt,
+        ...(article.publishedAt ? { publishedAt: article.publishedAt } : {}),
+        ...(article.language ? { language: article.language } : {}),
+        brief,
+      },
+      place,
+      language: draftLanguage,
+    };
+  }
+
+  const url = safeHref(item.url) ?? finalUrl;
+  const related = item.related ?? [];
+  const citesItself =
+    OWN_SOURCE_KINDS.has(item.kind) ||
+    related.some((headline) => {
+      const address = safeHref(headline.url);
+      return address === url || address === finalUrl;
+    });
+
+  return {
+    item: {
+      ...item,
+      url,
+      brief,
+      ...(citesItself
+        ? {}
+        : { related: [{ title: article.title, url: finalUrl, source: site }, ...related] }),
+    },
+    place,
+    language: draftLanguage,
+  };
 }

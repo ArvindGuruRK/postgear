@@ -18,8 +18,10 @@
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "countries-and-timezones": "^3.11.0",
     "date-holidays": "^3.39.1",
+    "linkedom": "0.18.12",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {

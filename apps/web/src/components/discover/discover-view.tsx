@@ -30,6 +30,11 @@
  * by `discover-page.tsx`; without it a card shows Open only. A festival's
  * Plan A Post opens the same sheet with a date for the draft.
  *
+ * Module 08 adds the reader the same way: Read on a trend, a story, a
+ * competitor's blog post or a story about them, and Read A Page beside the
+ * News tab's topic, each call `onRead` with the place and language being read.
+ * The sheet itself is the page's, not this view's.
+ *
  * Module 06 brings in what the workspace saved (`settings`, read by the
  * server page): the place a first visit starts from, the News tab's default
  * topic, and the groups an admin switched off. Videos and Festivals say so
@@ -70,8 +75,10 @@ import { DISCOVER_TABS } from '@/types/discover';
 import { useMounted } from '../posts/use-mounted';
 import { CompetitorsTab } from './competitors-tab';
 import type { CreatePostTarget } from './create-post-sheet';
+import { ReadButton } from './discover-cards';
 import { DiscoverGroup, DiscoverSkeleton } from './discover-group';
 import {
+  competitorRowReads,
   festivalPublishAt,
   isWorldwide,
   locationSourceFor,
@@ -86,6 +93,7 @@ import {
 import { PlacesCredit } from './discover-ui';
 import { LanguageChip } from './language-chip';
 import { PlaceChip } from './place-chip';
+import type { ReadRequest } from './reader-sheet';
 import { TopicSelect } from './topic-select';
 import { useFeed } from './use-feed';
 import { usePlace } from './use-place';
@@ -187,6 +195,13 @@ export interface DiscoverViewProps {
   isAdmin: boolean;
   /** Opens the Create Post sheet for an item, read in this place and language (Module 04). */
   onCreatePost?: (target: CreatePostTarget) => void;
+  /**
+   * Opens the reader sheet (Module 08): on an item's own page from Read on a
+   * card or a competitor's row, or on an address field from Read A Page. It
+   * carries the place and language being read, as Create Post does. Without
+   * it nothing on the page offers Read.
+   */
+  onRead?: (request: ReadRequest) => void;
   /** Per-card controls after Open (Module 04's overflow menu). */
   renderCardExtra?: (item: DiscoverItem) => ReactNode;
 }
@@ -198,6 +213,7 @@ export function DiscoverView({
   settings: initialSettings,
   isAdmin,
   onCreatePost,
+  onRead,
   renderCardExtra,
 }: DiscoverViewProps) {
   const mounted = useMounted();
@@ -257,6 +273,17 @@ export function DiscoverView({
           const publishAt = festivalPublishAt(item, current.timeZone);
           onCreatePost({ item, place: current, language, ...(publishAt ? { publishAt } : {}) });
         }
+      : undefined;
+
+  // Read carries the same two, for Create Post From This at the end of it.
+  const read =
+    onRead && current && language
+      ? (item: DiscoverItem) =>
+          onRead({ target: { mode: 'item', item }, place: current, language })
+      : undefined;
+  const readAPage =
+    onRead && current && language
+      ? () => onRead({ target: { mode: 'page' }, place: current, language })
       : undefined;
 
   function tryAgain() {
@@ -409,6 +436,7 @@ export function DiscoverView({
                 today={feed.data?.today}
                 onCreatePost={createPost}
                 onPlanPost={planPost}
+                onRead={read}
                 renderExtra={renderCardExtra}
               />
             ))}
@@ -503,8 +531,14 @@ export function DiscoverView({
             {tab === value && value === 'news' && ready ? (
               // Above the groups, and still there when a topic has nothing,
               // so the way back to All is never lost.
-              <div className="mb-4">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
                 <TopicSelect value={place.topic} onChange={place.setTopic} />
+                {readAPage ? (
+                  // Any address, not only a story on this tab (story DC-8.3).
+                  <Button variant="secondary" size="sm" className="h-10" onClick={readAPage}>
+                    Read A Page
+                  </Button>
+                ) : null}
               </div>
             ) : null}
             {tab === value ? feedTab() : null}
@@ -518,6 +552,13 @@ export function DiscoverView({
               now={now}
               refreshKey={competitorsRefresh}
               onCreatePost={createPost}
+              // A blog post or a story about them is a page to read; a video or a social post is not.
+              renderRowExtra={
+                read
+                  ? (item) =>
+                      competitorRowReads(item) ? <ReadButton item={item} onRead={read} /> : null
+                  : undefined
+              }
             />
           ) : null}
         </TabsContent>

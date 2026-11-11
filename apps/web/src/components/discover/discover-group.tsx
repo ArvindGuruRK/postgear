@@ -10,6 +10,8 @@
  * What sits inside depends on the group (Module 05): trends, stories and
  * videos are cards in a grid, Wikipedia's most-read articles are rows, the
  * social topics are chips, and festivals are a list in sections by week.
+ * Trends and stories also carry Read (Module 08); the card decides whether
+ * an item has a page to read.
  */
 import { Skeleton } from '@postgear/ui';
 import { type ReactNode, useId } from 'react';
@@ -30,6 +32,8 @@ export interface DiscoverGroupProps {
   onCreatePost?: (item: DiscoverItem) => void;
   /** Festivals only: opens the Create Post sheet with the festival's date. */
   onPlanPost?: (item: DiscoverItem) => void;
+  /** Opens the reader sheet on a trend's or a story's page (Module 08). */
+  onRead?: (item: DiscoverItem) => void;
   /** Per-card controls after Open (Module 04's overflow menu). */
   renderExtra?: (item: DiscoverItem) => ReactNode;
 }
@@ -40,6 +44,7 @@ export function DiscoverGroup({
   today,
   onCreatePost,
   onPlanPost,
+  onRead,
   renderExtra,
 }: DiscoverGroupProps) {
   const headingId = useId();
@@ -67,6 +72,7 @@ export function DiscoverGroup({
               item={item}
               now={now}
               onCreatePost={onCreatePost}
+              onRead={onRead}
               extra={renderExtra?.(item)}
             />
           );

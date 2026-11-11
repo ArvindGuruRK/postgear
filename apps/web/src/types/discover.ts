@@ -298,6 +298,36 @@ export interface CompetitorItemsResponse {
   pending: boolean;
 }
 
+/**
+ * A page as the reader shows it (Module 08): `POST /discover/read` answers
+ * `{ article }`. Everything in it is plain text. Nothing here is markup, and
+ * nothing here is ever rendered as markup.
+ */
+export interface ReaderArticle {
+  /** The address that was asked for. */
+  url: string;
+  /**
+   * Where the page really was: after redirects, or the publisher's own address
+   * behind a Google News link. Open goes here.
+   */
+  finalUrl: string;
+  title: string;
+  byline: string | null;
+  /** The site's name, or its host when it gives none. */
+  siteName: string | null;
+  /** BCP-47, as the page declares it. */
+  language: string | null;
+  /** The first 400 characters of the text. */
+  excerpt: string;
+  /** Plain paragraphs with a blank line between them, at most 20,000 characters. */
+  text: string;
+  image: string | null;
+  /** ISO 8601. */
+  publishedAt: string | null;
+  wordCount: number;
+  readMinutes: number;
+}
+
 /** The page's tabs, in order. The open one lives in `?tab=`. */
 export const DISCOVER_TABS = ['trending', 'news', 'videos', 'festivals', 'competitors'] as const;
 

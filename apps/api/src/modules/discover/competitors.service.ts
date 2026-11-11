@@ -59,12 +59,7 @@ import {
   type SourceResult,
   WORLDWIDE,
 } from '@postgear/discover-engine';
-import {
-  isSeoCrawlError,
-  normaliseUrl,
-  type UrlRejectReason,
-  type UrlSafetyResult,
-} from '@postgear/seo-engine';
+import type { UrlRejectReason, UrlSafetyResult } from '@postgear/seo-engine';
 import { securityLogger } from '../../common/logging/security-logger';
 import { RedisService } from '../redis/redis.service';
 import { COMPETITOR_ENGINE, COMPETITOR_GATE, type CompetitorEngine } from './competitors.engine';
@@ -73,6 +68,7 @@ import {
   CompetitorsRepository,
   type CompetitorWrite,
 } from './competitors.repository';
+import { addressOf, hopRefusal, isPrivate, judgeAddress } from './discover.addresses';
 import { type CacheEntry, DiscoverCache, LOCK_SECONDS } from './discover.cache';
 import { DiscoverGate } from './discover.gate';
 import { type DiscoverKeys, discoverKeys, workspaceKeys } from './discover.keys';
@@ -207,24 +203,6 @@ function toView(row: CompetitorRow): CompetitorView {
   };
 }
 
-/**
- * An address as a person types it ("acme.com", "https://acme.com/blog") as the
- * address to read, or null when it cannot be one. Only http and https, never
- * credentials.
- */
-export function addressOf(input: string): string | null {
-  const text = input.trim();
-  if (!text) return null;
-
-  // Only `scheme://` counts as a scheme: `localhost:3000` is a host and a port.
-  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`;
-  try {
-    return normaliseUrl(withScheme);
-  } catch {
-    return null;
-  }
-}
-
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname.toLowerCase();
@@ -242,17 +220,6 @@ function newestFirst(a: ComposedItem, b: ComposedItem): number {
   const [left, right] = [timeOf(a), timeOf(b)];
   if (left === right) return 0;
   return right > left ? 1 : -1;
-}
-
-function isPrivate(reason: UrlRejectReason): boolean {
-  return reason === 'private_address' || reason === 'host_forbidden';
-}
-
-/** The guard's own refusal of a redirect hop, as the reason it gave. */
-function hopRefusal(error: unknown): UrlRejectReason | null {
-  return isSeoCrawlError(error) && error.kind === 'unsafe_url'
-    ? (error.reason ?? 'private_address')
-    : null;
 }
 
 @Injectable()
@@ -754,23 +721,9 @@ export class CompetitorsService {
     return verdict.url.toString();
   }
 
-  /**
-   * The guard's verdict, with one second look: an address refused for its port
-   * is judged again without it, so `http://127.0.0.1:3000` is refused for being
-   * the local machine, which is the sentence its typist needs.
-   */
-  private async judge(url: string): Promise<UrlSafetyResult> {
-    const verdict = await this.engine.guard(url);
-    if (verdict.ok || verdict.reason !== 'port') return verdict;
-
-    try {
-      const bare = new URL(url);
-      bare.port = '';
-      const again = await this.engine.guard(bare.toString());
-      return !again.ok && isPrivate(again.reason) ? again : verdict;
-    } catch {
-      return verdict;
-    }
+  /** The guard's verdict on an address, with the second look a port refusal gets (`discover.addresses.ts`). */
+  private judge(url: string): Promise<UrlSafetyResult> {
+    return judgeAddress(this.engine.guard, url);
   }
 
   /** The fetch for a website and its feed addresses, one gate slot per request. */

@@ -46,6 +46,10 @@ export const workspaceKeys = {
   feedDiscovery: (orgId: string) => `discover:feedfind:${orgId}`,
   /** How often a workspace makes the server read a competitor it has no copy of (Module 07). */
   competitorReads: (orgId: string) => `discover:competitorread:${orgId}`,
+  /** How often a workspace presses Read or resolves a story link (Module 08). */
+  readThrottle: (orgId: string) => `discover:readthrottle:${orgId}`,
+  /** One workspace's share of the Google News links resolved through Google in a minute (Module 08). */
+  decodeShare: (orgId: string) => `discover:decodeshare:${orgId}`,
 };
 
 export function discoverKeys(simulation: boolean) {
@@ -85,6 +89,16 @@ export function discoverKeys(simulation: boolean) {
      * list of who follows whom.
      */
     hostBreaker: (host: string) => `${root}:breaker:host:${hashed(host).slice(0, 32)}`,
+    /**
+     * A page the reader read (Module 08), by a hash of its address: what someone
+     * chose to read cannot be read off a key list, and an address with a token
+     * in it never becomes a key. Shared by every workspace, as the page is public.
+     */
+    read: (url: string) => `${root}:read:${hashed(url)}`,
+    /** Where a Google News link leads, by a hash of its id (an id can run to two thousand characters). */
+    link: (id: string) => `${root}:link:${hashed(id)}`,
+    /** `minute` is a count of minutes since 1970. The whole deployment shares it. */
+    decodeBudget: (minute: number) => `${root}:budget:decode:${minute}`,
     geoReverse: (lat: number, lng: number) => `${root}:geo:rev:${hashed(`${lat}:${lng}`)}`,
     geoSearch: (normalisedQuery: string) => `${root}:geo:q:${hashed(normalisedQuery)}`,
     nominatimBudget: `${root}:budget:nominatim`,

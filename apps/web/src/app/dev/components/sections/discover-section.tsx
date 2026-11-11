@@ -4,8 +4,8 @@
  * Sprint 11's Discover pieces, as the page uses them: the place chip in each
  * of its states, the language chip, the popover's body (with the blocked
  * warning), a trend card and a story card, Module 05's Wikipedia rows, social
- * chips, video cards and festival rows, Module 07's competitor rows, and the
- * loading footprint. They are built from the design system (blueprint section
+ * chips, video cards and festival rows, Module 07's competitor rows, Module
+ * 08's reader article, and the loading footprint. They are built from the design system (blueprint section
  * 11), so this section is where a change to one of those is checked against
  * Discover too.
  *
@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { CardMenu } from '@/components/discover/card-menu';
 import { CompetitorRows } from '@/components/discover/competitor-row';
 import { DiscoverGroup, DiscoverSkeleton } from '@/components/discover/discover-group';
+import { readerMeta } from '@/components/discover/discover-model';
 import { INSET_NOTE } from '@/components/discover/discover-ui';
 import { LanguageChip } from '@/components/discover/language-chip';
 import { PlaceChip } from '@/components/discover/place-chip';
@@ -28,6 +29,7 @@ import {
   WorkspaceDefault,
   type WorkspaceDefaultProps,
 } from '@/components/discover/place-popover';
+import { ReaderArticleBody } from '@/components/discover/reader-sheet';
 import { TopicSelect } from '@/components/discover/topic-select';
 import { LOCATION_MESSAGES } from '@/components/discover/use-place';
 import { useMounted } from '@/components/posts/use-mounted';
@@ -49,6 +51,21 @@ const INDIA: Locality = {
   timeZone: 'Asia/Kolkata',
   languages: ['hi', 'en', 'ta'],
   newsLanguages: ['hi', 'en', 'ta'],
+};
+
+/** A made-up article, in Tamil and English, as the reader draws one. No picture: the playground loads nothing from outside. */
+const READER_ARTICLE = {
+  siteName: 'The Sample Courier',
+  byline: 'A. Reporter',
+  publishedAt: '2026-11-04T06:30:00.000Z',
+  readMinutes: 3,
+  image: null,
+  text: [
+    'The old harbour market opened its gates again on Wednesday morning, two years after a winter storm tore away most of its roof.',
+    'கோயம்புத்தூர் மாவட்டத்தில் நேற்று இரவு முதல் கனமழை பெய்து வருகிறது. இதனால் நகரின் பல பகுதிகளில் சாலைகளில் தண்ணீர் தேங்கியுள்ளது.',
+    'Sixty stalls have returned, a few more than the market held before it closed. Most of the old names are back, joined by a dozen newcomers.',
+    'The market is open from Tuesday to Sunday, from seven in the morning until two in the afternoon.',
+  ].join('\n\n'),
 };
 
 const CHENNAI: Locality = {
@@ -594,6 +611,20 @@ export function DiscoverSection() {
           <p className={INSET_NOTE}>Nothing new from Acme Analytics in the last 30 days.</p>
         </div>
         <Spec>INSET_NOTE: rounded-lg border-2 bg-inset, type-muted, no shadow</Spec>
+      </Row>
+
+      <Row label="The Reader's Article (Module 08: the line over the title, then the text)">
+        <div className="flex w-full max-w-xl flex-col gap-3">
+          <p className="m-0 font-sans text-sm font-medium text-ink muted-tone">
+            {readerMeta(READER_ARTICLE, 'UTC')}
+          </p>
+          <ReaderArticleBody article={READER_ARTICLE} className="max-h-72" />
+        </div>
+        <Spec>
+          Meta joined with commas (never a middle dot); text is INSET (bg-inset), one p per
+          paragraph with dir=&quot;auto&quot;, max-w-prose, text nodes only; the region scrolls and
+          takes focus
+        </Spec>
       </Row>
 
       <Row label="Loading">
