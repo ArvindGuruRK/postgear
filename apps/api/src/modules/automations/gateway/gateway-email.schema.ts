@@ -23,4 +23,6 @@ export interface GatewayEmailOutput {
   sent: number;
   /** Masked: `k***@example.com`. */
   recipients: string[];
+  /** Masked; addresses not emailed because they bounce or reported spam. */
+  skipped?: string[];
 }

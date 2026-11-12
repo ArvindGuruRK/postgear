@@ -1622,3 +1622,28 @@ model Competitor {
   @@index([organizationId, deletedAt])
   @@index([deletedAt, lastCheckedAt])
 }
+
+/// An address PostGear stops emailing (2026-11-12, mail for Resend): it bounced
+/// for good, or its owner marked a PostGear email as spam. Written only by
+/// Resend's signed webhook. Security mail (activation, reset, lockout) is still
+/// attempted, because a person locked out must always be able to recover;
+/// invitations, notifications and workflow emails skip the address.
+/// Not tied to a User: invitations and workflow emails reach people who have
+/// no account. `email` is stored lower case.
+model EmailSuppression {
+  id        String                 @id @default(uuid())
+  email     String                 @unique
+  reason    EmailSuppressionReason
+  /// The provider's own short description (bounce type, sub type), capped.
+  detail    String?
+  source    String                 @default("resend")
+  /// The webhook delivery that wrote it last (svix-id), for tracing.
+  eventId   String?
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+}
+
+enum EmailSuppressionReason {
+  BOUNCE
+  COMPLAINT
+}

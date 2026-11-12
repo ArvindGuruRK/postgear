@@ -12,6 +12,9 @@
  */
 import { z } from 'zod';
 
+/** The local sender. Refused in production, where it would never deliver. */
+export const DEFAULT_MAIL_FROM = 'PostGear <no-reply@postgear.local>';
+
 /** Anything shorter is not a credible HMAC key for HS256. */
 const MIN_SECRET_LENGTH = 32;
 
@@ -313,14 +316,24 @@ const envSchema = z
     SENTRY_DSN: blankAsUnset(z.string().url().optional()),
     SENTRY_TRACES_SAMPLE_RATE: blankAsUnset(z.coerce.number().min(0).max(1).default(0)),
 
-    // Absent SMTP_HOST selects the console transport, which prints the mail to
-    // stdout. That is the sprint's "stub the send": a real transport is a
-    // config change, not a code change.
-    SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.coerce.number().int().positive().default(587),
-    SMTP_USER: z.string().optional(),
-    SMTP_PASS: z.string().optional(),
-    SMTP_FROM: z.string().default('PostGear <no-reply@postgear.local>'),
+    // Email (see `modules/mail/mail.transport.ts`). The transport is picked in
+    // this order: RESEND_API_KEY (Resend's HTTP API), then SMTP_HOST (any SMTP
+    // server), then, outside production only, the console, which prints each
+    // message (links included) to stdout. Production refuses to boot without
+    // one of the first two below: printed reset links in a live log are a leak.
+    RESEND_API_KEY: blankAsUnset(z.string().min(1).optional()),
+    // Signs Resend's bounce and complaint webhooks (`whsec_...`). Without it
+    // `POST /mail/webhooks/resend` answers 503 and nothing is suppressed.
+    RESEND_WEBHOOK_SECRET: blankAsUnset(z.string().min(1).optional()),
+    SMTP_HOST: blankAsUnset(z.string().min(1).optional()),
+    SMTP_PORT: blankAsUnset(z.coerce.number().int().positive().default(587)),
+    SMTP_USER: blankAsUnset(z.string().optional()),
+    SMTP_PASS: blankAsUnset(z.string().optional()),
+    // The From line of every message, whichever transport sends it.
+    SMTP_FROM: blankAsUnset(z.string().min(1).default(DEFAULT_MAIL_FROM)),
+    // Where mail meant for the people running PostGear goes (cancellation
+    // feedback). Never the From address: nobody reads a no-reply inbox.
+    OWNER_EMAIL: blankAsUnset(z.string().email().optional()),
   })
   .superRefine((env, context) => {
     // Simulated AI output must never reach a real audience. In production the
@@ -378,6 +391,35 @@ const envSchema = z
         path: ['AUTOMATION_SIMULATION'],
         message: 'AUTOMATION_SIMULATION cannot be "true" when NODE_ENV=production',
       });
+    }
+
+    // Mail in production: a real transport, a real sender and a real owner.
+    // Without a transport the console one would print live activation and
+    // reset links into the logs; the local default sender is not a domain
+    // anyone can send from.
+    if (env.NODE_ENV === 'production') {
+      if (!env.RESEND_API_KEY && !env.SMTP_HOST) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['RESEND_API_KEY'],
+          message: 'RESEND_API_KEY (or SMTP_HOST) is required when NODE_ENV=production',
+        });
+      }
+      if (env.SMTP_FROM === DEFAULT_MAIL_FROM || /@postgear\.local>?$/i.test(env.SMTP_FROM)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SMTP_FROM'],
+          message:
+            'SMTP_FROM must be an address on your verified sending domain when NODE_ENV=production',
+        });
+      }
+      if (!env.OWNER_EMAIL) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['OWNER_EMAIL'],
+          message: 'OWNER_EMAIL is required when NODE_ENV=production',
+        });
+      }
     }
 
     // Recorded headlines presented as today's news would be a quiet lie.

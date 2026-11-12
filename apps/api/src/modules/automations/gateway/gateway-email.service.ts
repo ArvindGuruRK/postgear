@@ -1,7 +1,7 @@
 /**
- * The Email step's API side (Module 12): plain-text mail through
- * PostGear's own `MailService` (SMTP when `SMTP_HOST` is set, the API
- * console otherwise, as for activation links).
+ * The Email step's API side (Module 12): mail through PostGear's own
+ * `MailService` (the message's lines as paragraphs in the PostGear frame,
+ * with a plain-text part; Resend, SMTP, or the API console in development).
  *
  * - **Bound**: the call must name a live run's `notify.email` step.
  * - **Checked**: up to 10 addresses (the schema), each a real address
@@ -18,6 +18,9 @@
  *   after a failure skips everyone already written to; a finished step's
  *   retry returns the stored answer. A `sendPlain` that reports failure is
  *   503 `mail_unavailable`, which the worker retries.
+ * - **Never stuck**: an address on the suppression list (it bounces, or its
+ *   owner reported spam) is skipped up front and named in `skipped`, since
+ *   retrying it could never succeed.
  */
 import {
   Injectable,
@@ -62,13 +65,14 @@ function oneLine(value: string): string {
     .trim();
 }
 
-/** The progress an earlier attempt saved: who already got the email (lower case). */
-function sentSoFar(previous: Prisma.JsonValue | null): string[] {
+/**
+ * The progress an earlier attempt saved (lower case): who already got the
+ * email, and who was skipped because their address bounces or complained.
+ */
+function progressSoFar(previous: Prisma.JsonValue | null, key: 'sentTo' | 'skipped'): string[] {
   if (typeof previous !== 'object' || previous === null || Array.isArray(previous)) return [];
-  const sentTo = (previous as { sentTo?: unknown }).sentTo;
-  return Array.isArray(sentTo)
-    ? sentTo.filter((item): item is string => typeof item === 'string')
-    : [];
+  const list = (previous as Record<string, unknown>)[key];
+  return Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string') : [];
 }
 
 /** Emails one effect row stands for: its saved progress, or its finished output's count. */
@@ -139,8 +143,12 @@ export class GatewayEmailService {
     ];
 
     return this.binding.runEffect(binding, EMAIL_EFFECT_KIND, async ({ previous, save }) => {
-      const sentTo = sentSoFar(previous);
-      const remaining = recipients.filter((address) => !sentTo.includes(address.toLowerCase()));
+      const sentTo = progressSoFar(previous, 'sentTo');
+      const skipped = progressSoFar(previous, 'skipped');
+      const remaining = recipients.filter(
+        (address) =>
+          !sentTo.includes(address.toLowerCase()) && !skipped.includes(address.toLowerCase()),
+      );
 
       if (remaining.length > 0) {
         const used = await this.sentToday(binding.organizationId);
@@ -162,6 +170,13 @@ export class GatewayEmailService {
       }
 
       for (const address of remaining) {
+        // A bouncing or complaining address will never succeed: skip it
+        // rather than fail the step into endless retries.
+        if (await this.mail.isSuppressed(address)) {
+          skipped.push(address.toLowerCase());
+          await save({ sentTo, skipped });
+          continue;
+        }
         const ok = await this.mail.sendPlain(address, fullSubject, lines);
         if (!ok) {
           throw new ServiceUnavailableException({
@@ -170,11 +185,18 @@ export class GatewayEmailService {
           });
         }
         sentTo.push(address.toLowerCase());
-        await save({ sentTo });
+        await save({ sentTo, skipped });
       }
 
+      const skippedRecipients = recipients.filter((address) =>
+        skipped.includes(address.toLowerCase()),
+      );
       return {
-        output: { sent: recipients.length, recipients: recipients.map(maskEmail) },
+        output: {
+          sent: recipients.length - skippedRecipients.length,
+          recipients: recipients.map(maskEmail),
+          ...(skippedRecipients.length > 0 ? { skipped: skippedRecipients.map(maskEmail) } : {}),
+        },
         credits: 0,
       };
     });

@@ -6,6 +6,7 @@ import {
   Calendar,
   LayoutGrid,
   LayoutTemplate,
+  Mail,
   Palette,
   Search,
   Settings,
@@ -37,6 +38,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { label: 'Team', href: '#team', icon: Users },
   { label: 'Design System', href: '/dev/components', icon: Palette, active: true },
   { label: 'Templates', href: '/dev/studio', icon: LayoutTemplate },
+  { label: 'Emails', href: '/dev/emails', icon: Mail },
 ];
 
 const BOTTOM_ITEMS: SidebarItem[] = [{ label: 'Settings', href: '#settings', icon: Settings }];

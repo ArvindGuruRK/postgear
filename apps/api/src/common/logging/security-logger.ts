@@ -160,6 +160,11 @@ export type SecurityEvent =
   | 'webhook.delivery_failed'
   // Notifications (Sprint 8): an email the dispatcher could not send.
   | 'notification.email_failed'
+  // Mail (2026-11-12): a Resend webhook whose signature failed, and the
+  // one-click unsubscribe, refused or done.
+  | 'mail.webhook_rejected'
+  | 'mail.unsubscribe_rejected'
+  | 'mail.unsubscribed'
   // Design Studio (Sprint 9). Brand extraction fetches a user-supplied URL
   // server-side, the SEO analyzer's SSRF surface again; a logo upload is the
   // media upload's smuggling surface again; and a design or kit naming

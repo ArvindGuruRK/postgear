@@ -8,12 +8,14 @@ const nextConfig = {
   // pre-built. Only social-core's `composer` entry point is imported here; see
   // the path alias in tsconfig.json for why never its root. design-engine is
   // Studio's renderer (Sprint 9), browser-safe source like the other two.
-  // automation is the Workflow Builder's pure engine (Sprint 10).
+  // automation is the Workflow Builder's pure engine (Sprint 10). email holds
+  // every email template, previewed at /dev/emails (2026-11-12).
   transpilePackages: [
     '@postgear/ui',
     '@postgear/social-core',
     '@postgear/design-engine',
     '@postgear/automation',
+    '@postgear/email',
   ],
   // The "N" badge sat on top of the workflow canvas's controls. Build and
   // runtime errors still show without it.

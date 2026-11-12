@@ -36,13 +36,19 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { securityLogger } from '../../common/logging/security-logger';
 import { MailService } from '../mail/mail.service';
+import type { UnsubscribeTopic } from '../mail/mail.unsubscribe';
 import {
   type EmailOutcome,
   type NotificationRecord,
   NotificationsRepository,
 } from './notifications.repository';
 import { NotificationStreamRegistry } from './notifications.stream';
-import { AUDIENCE_BY_TYPE, composeEmail, isNotificationType } from './notifications.types';
+import {
+  AUDIENCE_BY_TYPE,
+  composeEmail,
+  type EmailAudience,
+  isNotificationType,
+} from './notifications.types';
 
 export const DISPATCH_INTERVAL_MS = 3_000;
 
@@ -64,7 +70,19 @@ export type DispatcherStore = Pick<
 >;
 
 /** The mail surface the dispatcher uses. */
-export type DispatcherMail = Pick<MailService, 'sendPlain' | 'linkTo'>;
+export type DispatcherMail = Pick<MailService, 'sendNotification' | 'linkTo'>;
+
+/**
+ * The switch a one-click unsubscribe turns off, per audience. Admin mail
+ * (billing, webhooks) has no switch of its own, so it carries no header.
+ */
+const UNSUBSCRIBE_TOPIC: Record<EmailAudience, UnsubscribeTopic | null> = {
+  failure_emails: 'failure',
+  success_emails: 'success',
+  digest_emails: 'digest',
+  admins: null,
+  none: null,
+};
 
 /** Injection token for a test clock; production takes the real one. */
 export const DISPATCHER_CLOCK = Symbol('DISPATCHER_CLOCK');
@@ -184,10 +202,12 @@ export class NotificationsDispatcher implements OnModuleInit, OnModuleDestroy {
       if (members.length === 0) {
         outcome = 'SKIPPED';
       } else {
-        const { subject, lines } = composeEmail(row, (path) => this.mail.linkTo(path));
+        const content = composeEmail(row, (path) => this.mail.linkTo(path));
+        const topic = UNSUBSCRIBE_TOPIC[audience];
+        const options = topic ? { unsubscribe: { topic, orgId: row.organizationId } } : {};
 
         for (const member of members) {
-          if (await this.mail.sendPlain(member.email, subject, lines)) {
+          if (await this.mail.sendNotification(member.email, content, options)) {
             delivered += 1;
           }
         }

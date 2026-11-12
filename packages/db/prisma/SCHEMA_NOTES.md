@@ -595,6 +595,22 @@ Additive: three tables, five columns, every column nullable or with a default.
 - **`User.sendDigestEmails`** defaults to true and is the member's own switch
   in the notification preferences; the outbox reads it before it emails.
 
+## Mail additions (2026-11-12, `20261112120000_mail_email_suppression`)
+
+- **`EmailSuppression`**: addresses PostGear stops emailing, written only by
+  Resend's signed webhook (`POST /mail/webhooks/resend`): a permanent bounce
+  (`BOUNCE`) or a spam complaint (`COMPLAINT`). One row per address, stored
+  lower case and unique, so a redelivered event is an upsert, not a duplicate.
+- Deliberately **not** a column on `User`: invitations and workflow emails go
+  to people without an account, and those are the addresses most likely to
+  bounce.
+- `MailService` skips a suppressed address for invitations, notifications and
+  workflow emails, never for activation, reset or lockout mail, so nobody is
+  locked out of their own account by a list. Removing a row (by hand, in SQL)
+  lets mail through again.
+- One-click unsubscribe (List-Unsubscribe) needs no table: it turns off the
+  existing `User.sendSuccessEmails`, `sendFailureEmails` or `sendDigestEmails`.
+
 ## A user may legitimately belong to zero organizations
 
 Signup collects credentials only; the workspace is created afterward, in a real

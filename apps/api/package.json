@@ -29,6 +29,7 @@
     "@postgear/db": "*",
     "@postgear/design-engine": "*",
     "@postgear/discover-engine": "*",
+    "@postgear/email": "*",
     "@postgear/seo-engine": "*",
     "@postgear/social-core": "*",
     "@sentry/nestjs": "^11.8.0",
@@ -43,8 +44,10 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "reflect-metadata": "^0.2.2",
+    "resend": "6.35.0",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.4",
+    "standardwebhooks": "1.1.1",
     "stripe": "^23.0.0",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.25.2"

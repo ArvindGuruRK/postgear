@@ -24,6 +24,7 @@
  * even one page of 24 presets in four formats is several hundred slides.
  */
 import { ComponentIcon } from '@animateicons/react/lucide/component-icon';
+import { MailIcon } from '@animateicons/react/lucide/mail-icon';
 import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
 import { FORMAT_IDS } from '@postgear/design-engine';
 import {
@@ -76,6 +77,7 @@ import { PresetSection } from './preset-section';
 const NAV_ITEMS: SidebarItem[] = [
   { label: 'Design System', href: '/dev/components', animatedIcon: ComponentIcon },
   { label: 'Templates', href: '/dev/studio', animatedIcon: PaletteIcon, active: true },
+  { label: 'Emails', href: '/dev/emails', animatedIcon: MailIcon },
 ];
 
 /** Brings a slide into view and marks it. A jump, not a glide: gliding past a few hundred slides would draw every one on the way. */

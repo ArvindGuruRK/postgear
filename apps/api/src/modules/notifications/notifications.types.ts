@@ -2,10 +2,10 @@
  * The notification catalogue (Sprint 8, contract §5.2).
  *
  * One table of every `Notifications.type` the system writes, who should be
- * emailed about it, and how that email reads. Plain text only: a channel
- * name and a provider's error message are interpolated as text, never as
- * markup, so nothing a platform returns can become HTML in someone's inbox;
- * `MailService.sendPlain` keeps it that way on the wire.
+ * emailed about it, and what that email says. The email itself is drawn by
+ * `@postgear/email` as a summary card: a channel name and a provider's error
+ * message go in as text, which the template escapes and caps, so nothing a
+ * platform returns can become HTML in someone's inbox.
  *
  * The worker writes `post.*` and `channel.*` rows; the API's billing and
  * webhook modules write theirs through `NotificationsService.notify()`.
@@ -13,6 +13,7 @@
  * have no title, no meta and no email.
  */
 import type { NotificationEmailStatus } from '@postgear/db';
+import type { Fact, NotificationEmailProps, Tone } from '@postgear/email';
 
 export const NOTIFICATION_TYPES = [
   'post.published',
@@ -49,7 +50,12 @@ export function isNotificationType(value: string): value is NotificationType {
  * - `digest_emails`: every live member whose `sendDigestEmails` is on (Sprint 11).
  * - `none`: never emailed, whatever `emailStatus` says.
  */
-export type EmailAudience = 'failure_emails' | 'success_emails' | 'admins' | 'digest_emails' | 'none';
+export type EmailAudience =
+  | 'failure_emails'
+  | 'success_emails'
+  | 'admins'
+  | 'digest_emails'
+  | 'none';
 
 export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   'post.published': 'success_emails',
@@ -131,10 +137,12 @@ export interface EmailableNotification {
   createdAt: Date;
 }
 
-export interface EmailContent {
-  subject: string;
-  lines: string[];
-}
+/**
+ * What an email about a row says: the `@postgear/email` notification card's
+ * props. `MailService.sendNotification` renders it as HTML with a plain-text
+ * part; every value here is text, which the template escapes and caps.
+ */
+export type EmailContent = NotificationEmailProps;
 
 const SUBJECT_PREFIX = '[PostGear]';
 
@@ -177,8 +185,41 @@ function channelPhrase(meta: NotificationMeta): string {
   return platform ? `a ${platform} channel` : 'a channel';
 }
 
+/** The band colour, the badge and the Title Case heading for each type. */
+const LOOK: Record<NotificationType, { tone: Tone; badge: string; heading: string | null }> = {
+  'post.published': { tone: 'success', badge: 'Published', heading: 'Post Published' },
+  'post.failed': { tone: 'danger', badge: 'Post Failed', heading: 'Post Failed' },
+  'channel.needs_reconnect': {
+    tone: 'warning',
+    badge: 'Channel',
+    heading: 'Channel Needs Reconnecting',
+  },
+  'billing.activated': { tone: 'success', badge: 'Billing', heading: 'Subscription Active' },
+  'billing.payment_failed': { tone: 'danger', badge: 'Billing', heading: 'Payment Failed' },
+  'billing.canceled': { tone: 'warning', badge: 'Billing', heading: 'Subscription Canceled' },
+  'billing.trial_started': { tone: 'brand', badge: 'Billing', heading: 'Your Trial Has Started' },
+  'webhook.failed': { tone: 'danger', badge: 'Webhook', heading: 'Webhook Delivery Failed' },
+  // A workflow's own title is whatever its author wrote, so it is kept as written.
+  automation: { tone: 'brand', badge: 'Workflow', heading: null },
+  'automation.review': { tone: 'warning', badge: 'Workflow', heading: 'Review Needed' },
+  'automation.failed': { tone: 'danger', badge: 'Workflow', heading: 'Workflow Failed' },
+  'automation.paused': { tone: 'warning', badge: 'Workflow', heading: 'Workflow Paused' },
+  'discover.digest': { tone: 'brand', badge: 'Discover', heading: 'Your Discover Week' },
+  info: { tone: 'brand', badge: 'Notification', heading: null },
+};
+
+/** Why each audience got the email, for the footer. */
+const REASON: Record<EmailAudience, string> = {
+  failure_emails: 'You got this email because failure emails are on in your notification settings.',
+  success_emails: 'You got this email because success emails are on in your notification settings.',
+  digest_emails:
+    'You got this email because the weekly digest is on in your notification settings.',
+  admins: 'You got this email because you are an admin of this PostGear workspace.',
+  none: 'You got this email because of your notification settings in PostGear.',
+};
+
 /**
- * The subject and body for a row, as plain-text lines.
+ * The email for a row, as the notification card's props.
  *
  * `linkTo` turns an app path into an absolute URL; an absolute link (a
  * published post's URL on the platform) is passed through as it is.
@@ -191,26 +232,20 @@ export function composeEmail(
   const meta = readMeta(row.meta);
   const title = row.title ?? DEFAULT_TITLES[type];
   const link = row.link ? (isAbsoluteUrl(row.link) ? row.link : linkTo(row.link)) : null;
+  const look = LOOK[type];
 
-  const subject = subjectFor(type, title, meta);
-  const lines: string[] = [title, '', row.content];
-
-  const details = detailLines(type, meta);
-  if (details.length > 0) {
-    lines.push('', ...details);
-  }
-
-  if (link) {
-    lines.push('', linkLabel(type), link);
-  }
-
-  lines.push(
-    '',
-    'You are receiving this because of your notification settings in PostGear.',
-    `Change them: ${linkTo(`/${row.organizationId}/settings/notifications`)}`,
-  );
-
-  return { subject, lines };
+  return {
+    subject: subjectFor(type, title, meta),
+    tone: look.tone,
+    badge: look.badge,
+    heading: look.heading ?? title,
+    message: row.content,
+    facts: factsFor(type, meta, row.createdAt),
+    bullets: type === 'discover.digest' ? highlightsOf(meta) : undefined,
+    action: link ? { label: linkLabel(type), url: link } : undefined,
+    reason: REASON[AUDIENCE_BY_TYPE[type]],
+    settingsUrl: linkTo(`/${row.organizationId}/settings/notifications`),
+  };
 }
 
 function subjectFor(type: NotificationType, title: string, meta: NotificationMeta): string {
@@ -242,97 +277,125 @@ function subjectFor(type: NotificationType, title: string, meta: NotificationMet
   }
 }
 
-function detailLines(type: NotificationType, meta: NotificationMeta): string[] {
-  const lines: string[] = [];
+/** The summary card's rows. Labels are Title Case, like table headers. */
+function factsFor(type: NotificationType, meta: NotificationMeta, createdAt: Date): Fact[] {
+  const facts: Fact[] = [];
 
   switch (type) {
     case 'post.failed':
     case 'post.published': {
       if (meta.preview) {
-        lines.push(`Post:     ${meta.preview}`);
+        facts.push({ label: 'Post', value: meta.preview });
       }
       if (meta.channelName || meta.provider) {
-        lines.push(`Channel:  ${channelPhrase(meta)}`);
+        facts.push({ label: 'Channel', value: channelPhrase(meta) });
       }
       if (type === 'post.failed') {
         if (meta.reason) {
-          lines.push(`Reason:   ${describeReason(meta.reason)}`);
+          facts.push({ label: 'Reason', value: describeReason(meta.reason) });
         }
         if (meta.message) {
-          lines.push(`Details:  ${meta.message}`);
+          facts.push({ label: 'Details', value: meta.message });
         }
         if (typeof meta.attempts === 'number') {
-          lines.push(`Attempts: ${meta.attempts}`);
+          facts.push({ label: 'Attempts', value: String(meta.attempts) });
         }
       }
-      return lines;
+      return facts;
     }
     case 'channel.needs_reconnect':
       if (meta.channelName || meta.provider) {
-        lines.push(`Channel: ${channelPhrase(meta)}`);
+        facts.push({ label: 'Channel', value: channelPhrase(meta) });
       }
-      lines.push('Posts scheduled to this channel will fail until it is reconnected.');
-      return lines;
+      facts.push({
+        label: 'What Happens',
+        value: 'Posts scheduled to this channel will fail until it is reconnected.',
+      });
+      return facts;
     case 'webhook.failed':
       if (meta.webhookName) {
-        lines.push(`Webhook: ${meta.webhookName}`);
+        facts.push({ label: 'Webhook', value: meta.webhookName });
       }
       if (typeof meta.statusCode === 'number') {
-        lines.push(`Last status: ${meta.statusCode}`);
+        facts.push({ label: 'Last Status', value: String(meta.statusCode) });
       }
       if (meta.error) {
-        lines.push(`Error: ${meta.error}`);
+        facts.push({ label: 'Error', value: meta.error });
       }
-      return lines;
+      return facts;
     case 'billing.activated':
     case 'billing.payment_failed':
     case 'billing.canceled':
     case 'billing.trial_started':
       if (meta.tier) {
-        lines.push(`Plan: ${meta.tier}`);
+        facts.push({ label: 'Plan', value: meta.tier, badge: true });
       }
-      return lines;
+      if (typeof meta.amountCents === 'number' && Number.isFinite(meta.amountCents)) {
+        const currency = typeof meta.currency === 'string' ? meta.currency.toUpperCase() : 'USD';
+        facts.push({
+          label: 'Amount',
+          value: `${(meta.amountCents / 100).toFixed(2)} ${currency}`,
+        });
+      }
+      facts.push({ label: 'Date', value: utcDate(createdAt) });
+      return facts;
     case 'discover.digest':
-      // Plain text, one highlight a line; each was cleaned when the feed was read.
-      for (const highlight of Array.isArray(meta.highlights) ? meta.highlights.slice(0, 12) : []) {
-        if (typeof highlight === 'string' && highlight.length > 0) lines.push(`- ${highlight}`);
+      if (meta.place) {
+        facts.push({ label: 'Place', value: meta.place });
       }
-      return lines;
+      return facts;
     case 'automation':
     case 'automation.review':
     case 'automation.failed':
     case 'automation.paused':
     case 'info':
-      return lines;
+      return facts;
   }
 }
 
+/** Each highlight was cleaned when the feed was read; at most 12. */
+function highlightsOf(meta: NotificationMeta): string[] {
+  return (Array.isArray(meta.highlights) ? meta.highlights.slice(0, 12) : []).filter(
+    (item): item is string => typeof item === 'string' && item.length > 0,
+  );
+}
+
+function utcDate(date: Date): string {
+  return `${date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })} (UTC)`;
+}
+
+/** The button's label: Title Case, like every button. */
 function linkLabel(type: NotificationType): string {
   switch (type) {
     case 'post.published':
-      return 'See the post:';
+      return 'See The Post';
     case 'post.failed':
-      return 'Open the queue:';
+      return 'Open The Queue';
     case 'channel.needs_reconnect':
-      return 'Reconnect it here:';
+      return 'Reconnect Channel';
     case 'billing.activated':
     case 'billing.payment_failed':
     case 'billing.canceled':
     case 'billing.trial_started':
-      return 'Manage billing:';
+      return 'Manage Billing';
     case 'webhook.failed':
-      return 'Check the webhook:';
+      return 'Check The Webhook';
     case 'automation':
     case 'automation.failed':
-      return 'Open the run:';
+      return 'Open The Run';
     case 'automation.review':
-      return 'Review it here:';
+      return 'Review It';
     case 'automation.paused':
-      return 'Open the workflow:';
+      return 'Open The Workflow';
     case 'discover.digest':
-      return 'Open Discover:';
+      return 'Open Discover';
     case 'info':
-      return 'Open:';
+      return 'Open PostGear';
   }
 }
 

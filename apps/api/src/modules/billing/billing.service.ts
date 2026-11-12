@@ -76,7 +76,8 @@ type ChangeableOrg = OrgBilling & {
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
-  private readonly ownerAddress: string;
+  /** Where cancellation feedback goes (OWNER_EMAIL); never the From address, which nobody reads. */
+  private readonly ownerAddress: string | null;
 
   constructor(
     private readonly repository: BillingRepository,
@@ -86,7 +87,7 @@ export class BillingService {
     private readonly mail: MailService,
     configService: ConfigService<Env, true>,
   ) {
-    this.ownerAddress = configService.get('SMTP_FROM', { infer: true });
+    this.ownerAddress = configService.get('OWNER_EMAIL', { infer: true }) ?? null;
   }
 
   /** `GET /billing/status`. */
@@ -203,7 +204,9 @@ export class BillingService {
       input,
     );
 
-    return { preview: await this.provider('preview', () => this.gateway.previewChange(request, now)) };
+    return {
+      preview: await this.provider('preview', () => this.gateway.previewChange(request, now)),
+    };
   }
 
   /**
@@ -211,10 +214,16 @@ export class BillingService {
    * downgrade is scheduled for the period end and recorded on the row.
    * Choosing the current plan while a downgrade is pending cancels it.
    */
-  async change(orgId: string, input: PlanSelectionInput): Promise<{ subscription: SubscriptionView }> {
+  async change(
+    orgId: string,
+    input: PlanSelectionInput,
+  ): Promise<{ subscription: SubscriptionView }> {
     this.requireConfigured();
     const org = await this.requireChangeable(orgId);
-    const request = changeRequestFor(snapshotOf(org, org.subscription, org.paymentId, org.subscription.identifier), input);
+    const request = changeRequestFor(
+      snapshotOf(org, org.subscription, org.paymentId, org.subscription.identifier),
+      input,
+    );
 
     await this.provider('change', () => this.gateway.changePlan(request));
 
@@ -224,7 +233,10 @@ export class BillingService {
         scheduledPeriod: request.toPeriod,
       });
     } else if (org.subscription.scheduledTier) {
-      await this.repository.updateSubscription(orgId, { scheduledTier: null, scheduledPeriod: null });
+      await this.repository.updateSubscription(orgId, {
+        scheduledTier: null,
+        scheduledPeriod: null,
+      });
     }
 
     return { subscription: (await this.subscription(orgId)).subscription };
@@ -239,7 +251,10 @@ export class BillingService {
     await this.provider('cancel', () => this.gateway.cancelAtPeriodEnd(snapshot));
 
     if (org.subscription.scheduledTier) {
-      await this.repository.updateSubscription(orgId, { scheduledTier: null, scheduledPeriod: null });
+      await this.repository.updateSubscription(orgId, {
+        scheduledTier: null,
+        scheduledPeriod: null,
+      });
     }
 
     await this.mailFeedback(org, snapshot, input);
@@ -257,7 +272,9 @@ export class BillingService {
     }
 
     await this.provider('resume', () =>
-      this.gateway.resume(snapshotOf(org, org.subscription, org.paymentId, org.subscription.identifier)),
+      this.gateway.resume(
+        snapshotOf(org, org.subscription, org.paymentId, org.subscription.identifier),
+      ),
     );
 
     return { subscription: (await this.subscription(orgId)).subscription };
@@ -397,17 +414,33 @@ export class BillingService {
     snapshot: SubscriptionSnapshot,
     input: CancelInput,
   ): Promise<void> {
+    // OWNER_EMAIL is required in production (env.ts); locally it may be unset.
+    if (!this.ownerAddress) {
+      this.logger.warn(
+        `OWNER_EMAIL is not set, so cancellation feedback for ${org.id} was not mailed.`,
+      );
+      return;
+    }
+
     try {
-      await this.mail.sendPlain(this.ownerAddress, `Cancellation feedback from ${org.name}`, [
-        'A workspace scheduled its PostGear plan to end.',
-        '',
-        `Workspace: ${org.name} (${org.id})`,
-        `Plan: ${planLabel(snapshot.tier)}, billed ${snapshot.period.toLowerCase()}`,
-        `Reason: ${CANCEL_REASON_LABELS[input.reason]}`,
-        '',
-        'Feedback:',
-        input.feedback ?? '(none given)',
-      ]);
+      await this.mail.sendNotification(this.ownerAddress, {
+        subject: `Cancellation feedback from ${org.name}`,
+        tone: 'warning',
+        badge: 'Cancellation',
+        heading: 'A Plan Was Canceled',
+        message: 'A workspace scheduled its PostGear plan to end.',
+        facts: [
+          { label: 'Workspace', value: `${org.name} (${org.id})` },
+          {
+            label: 'Plan',
+            value: `${planLabel(snapshot.tier)}, billed ${snapshot.period.toLowerCase()}`,
+          },
+          { label: 'Reason', value: CANCEL_REASON_LABELS[input.reason] },
+        ],
+        quote: { label: 'Their Feedback', text: input.feedback || 'None given.' },
+        reason:
+          'You got this email because this address is the PostGear owner address (OWNER_EMAIL).',
+      });
     } catch (error) {
       this.logger.warn(
         `Could not mail cancellation feedback for ${org.id}: ${

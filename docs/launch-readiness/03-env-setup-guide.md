@@ -77,7 +77,11 @@ Railway lets you define **shared variables** once per environment and reference 
 | `S3_BUCKET_NAME`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | yes | no | no | From R2 (section 5.3) |
 | `S3_PUBLIC_URL` | yes | yes | no | `https://media-staging.rkay.in` |
 | `S3_FORCE_PATH_STYLE` | yes | no | no | `true` (research suggests R2 works with it; confirm at first upload) |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | yes | no | no | Resend (section 5.2) |
+| `RESEND_API_KEY` | yes | no | no | Resend (section 5.2). Required in production unless `SMTP_HOST` is set |
+| `RESEND_WEBHOOK_SECRET` | yes | no | no | Resend webhook signing secret, `whsec_...` (section 5.2) |
+| `SMTP_FROM` | yes | no | no | `PostGear <no-reply@send.rkay.in>`. Required in production (the local default is refused) |
+| `OWNER_EMAIL` | yes | no | no | Your own inbox, for cancellation feedback. Required in production |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | yes | no | no | Only if you use SMTP instead of `RESEND_API_KEY`. Leave unset with Resend |
 | `OPENAI_API_KEY` | yes | no | no | OpenAI (section 5.4) |
 | `TAVILY_API_KEY` | yes | no | no | Tavily |
 | `AI_MODEL`, `AI_IMAGE_MODEL` | yes | no | no | Leave blank unless the defaults are retired |
@@ -130,15 +134,20 @@ Create an empty Railway environment named **production** and do nothing else. Wh
 ### 5.2 Resend (email)
 1. resend.com, sign up, Domains, Add domain, use a subdomain such as `send.rkay.in`.
 2. Add the DNS records Resend shows (DKIM, SPF, MX, optional DMARC). Do not proxy these in Cloudflare. Wait for "Verified" (usually 15 minutes, up to 72 hours).
-3. API Keys, Create key (sending access).
-4. Railway api variables:
-   - `SMTP_HOST=smtp.resend.com`
-   - `SMTP_PORT=465` (or 587)
-   - `SMTP_USER=resend`
-   - `SMTP_PASS=<the API key>`
-   - `SMTP_FROM=PostGear <no-reply@send.rkay.in>`
-   (These SMTP details come from Resend's usual setup; confirm on Resend's SMTP page when you create the key.)
-5. Free plan: 3,000 per month, 100 per day, 3 domains. Enough for the demo.
+3. API Keys, Create key, permission **Sending access**, limited to the `send.rkay.in` domain.
+4. Railway **api** variables (the worker sends no mail):
+   - `RESEND_API_KEY=<the key, starts with re_>`
+   - `SMTP_FROM=PostGear <no-reply@send.rkay.in>` (the From line; must be on the verified domain)
+   - `OWNER_EMAIL=<your own inbox>` (where cancellation feedback goes; never the no-reply address)
+   - Leave every `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` unset. The API uses Resend's HTTP API when `RESEND_API_KEY` is set, which also works where Railway blocks outbound SMTP ports, and its idempotency key stops a retried send from arriving twice.
+5. Webhooks (bounces and spam complaints), after the API has a public URL:
+   - Resend, Webhooks, Add endpoint: `https://api.postgear-staging.rkay.in/mail/webhooks/resend`.
+   - Events: `email.bounced` and `email.complained` (others are accepted and ignored).
+   - Copy the signing secret (`whsec_...`) into the Railway api variable `RESEND_WEBHOOK_SECRET`.
+   - What it does: a permanent bounce or a spam complaint puts the address on PostGear's `EmailSuppression` list. Invitations, notifications and workflow emails then skip it. Activation, password reset and lockout mail is always attempted, so nobody is ever stuck out of their account. Without the secret the endpoint answers 503 and nothing is suppressed.
+6. What production refuses (the API will not boot, and names the variable): no `RESEND_API_KEY` and no `SMTP_HOST`; `SMTP_FROM` left at the local `@postgear.local` default; no `OWNER_EMAIL`. The console transport (mail printed to the log, links included) only ever runs outside production.
+7. Free plan: 3,000 per month, 100 per day, 3 domains. Enough for the demo.
+8. Check it: open `/dev/emails` locally to see every email, then sign up on staging with a real inbox and look at the activation mail in the inbox, the spam folder, Gmail's dark mode and a phone. The API log shows one JSON line per send (`mail.sent`, `mail.retry`, `mail.failed`, `mail.suppressed`) with the address masked and never the link.
 
 ### 5.3 Cloudflare R2 (media)
 1. Cloudflare dashboard, R2, create bucket `postgear-staging-media`.
@@ -203,7 +212,7 @@ Callback pattern for every one: `https://api.postgear-staging.rkay.in/channels/c
 - [ ] `WEB_URL`, `API_URL`, `COOKIE_DOMAIN`, cookie names, all `https`
 - [ ] `TEMPORAL_HOST` points at the private Temporal service
 - [ ] `STORAGE_PROVIDER=s3` plus the 5 S3 values
-- [ ] SMTP set (Resend)
+- [ ] Mail: `RESEND_API_KEY`, `SMTP_FROM` on `send.rkay.in`, `OWNER_EMAIL`, `RESEND_WEBHOOK_SECRET`
 - [ ] `OPENAI_API_KEY`
 - [ ] Stripe pair set together
 - [ ] Sentry DSNs
@@ -212,7 +221,8 @@ Callback pattern for every one: `https://api.postgear-staging.rkay.in/channels/c
 - [ ] Social credentials added to **both** api and worker
 
 ### Staging "ready for investors" checklist
-- [ ] Fresh activation email arrives and the link works
+- [ ] Fresh activation email arrives (inbox, not spam), looks right in Gmail dark mode and on a phone, and the link works
+- [ ] Resend dashboard shows the webhook endpoint with a green test delivery
 - [ ] Image upload shows a working public URL
 - [ ] One real publish per platform listed in the plan
 - [ ] Stripe test payment flips the plan
@@ -231,7 +241,7 @@ Create the empty environment. When ready: new secrets, new database, new bucket,
 ## 9. Mistakes That Waste Hours (Learned From The Audit) 🧯
 1. A redirect URI with a trailing slash or `127.0.0.1` instead of `localhost` is rejected with unhelpful errors.
 2. Placeholder values pass silently in some places (the old `.env.example` JWT secret is long enough to pass validation). We add a check on Day 1; until then, be careful.
-3. A missing `REDIS_URL`, SMTP or S3 setting does not stop the boot in the current code. After our Day 1 change it will in production.
+3. A missing `REDIS_URL` or S3 setting does not stop the boot in the current code. Mail now does: in production the API refuses to start without `RESEND_API_KEY` (or `SMTP_HOST`), a real `SMTP_FROM` and `OWNER_EMAIL`.
 4. `NEXT_PUBLIC_API_URL` unset at build time silently points browsers at localhost.
 5. Putting the API behind a different parent domain than the web app breaks login. Keep the sibling layout.
 6. Cloudflare proxy (orange cloud) on the two-level API hostname can fail to get a certificate. Keep that record grey.

@@ -60,7 +60,7 @@ function body(overrides: Record<string, unknown> = {}) {
 }
 
 describe('GatewayEmailService', () => {
-  let mail: { sendPlain: jest.Mock };
+  let mail: { sendPlain: jest.Mock; isSuppressed: jest.Mock };
   let service: GatewayEmailService;
 
   beforeEach(() => {
@@ -72,7 +72,10 @@ describe('GatewayEmailService', () => {
       graph: graphWith({ mail01: 'notify.email' }),
       automation: { name: 'Weekly Mail' },
     });
-    mail = { sendPlain: jest.fn(async () => true) };
+    mail = {
+      sendPlain: jest.fn(async () => true),
+      isSuppressed: jest.fn(async (_address: string) => false),
+    };
     service = new GatewayEmailService(new GatewayBindingService(), mail as never);
   });
 
@@ -155,6 +158,25 @@ describe('GatewayEmailService', () => {
       sent: 2,
       recipients: ['k***@example.com', 'a***@example.com'],
     });
+  });
+
+  it('skips an address that bounces instead of failing the step into endless retries', async () => {
+    mail.isSuppressed.mockImplementation(async (address: string) => address === 'kim@example.com');
+
+    const answer = await service.send(body());
+
+    expect(mail.sendPlain).toHaveBeenCalledTimes(1);
+    expect(mail.sendPlain).toHaveBeenCalledWith(
+      'ash@example.com',
+      expect.any(String),
+      expect.any(Array),
+    );
+    expect(answer.output).toEqual({
+      sent: 1,
+      recipients: ['k***@example.com', 'a***@example.com'],
+      skipped: ['k***@example.com'],
+    });
+    expect(db.effect(KEY)).toMatchObject({ status: 'DONE' });
   });
 
   it('a retry after success returns the stored answer without emailing again', async () => {

@@ -26,6 +26,9 @@
       // Workflows (Sprint 10): the graph, the step catalog and validation, pure
       // by design, so the canvas checks a workflow with the API's own rules.
       "@postgear/automation": ["../../packages/automation/src"],
+      // Every email PostGear sends (2026-11-12), for the /dev/emails preview. Pure:
+      // React and react-dom/server only, so the browser renders the same HTML the API sends.
+      "@postgear/email": ["../../packages/email/src"],
       "@postgear/config/*": ["../../packages/config/*"]
     }
   },

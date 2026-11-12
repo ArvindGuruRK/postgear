@@ -54,13 +54,15 @@ class FakeRepository {
     });
     return wanted.map((m) => ({ email: m.email }));
   });
-  markEmail = jest.fn(async (id: string, status: 'SENT' | 'SKIPPED' | 'FAILED', emailedAt: Date | null) => {
-    const row = this.rows.find((candidate) => candidate.id === id);
-    if (row) {
-      row.emailStatus = status;
-      (row as NotificationRecord & { emailedAt?: Date | null }).emailedAt = emailedAt;
-    }
-  });
+  markEmail = jest.fn(
+    async (id: string, status: 'SENT' | 'SKIPPED' | 'FAILED', emailedAt: Date | null) => {
+      const row = this.rows.find((candidate) => candidate.id === id);
+      if (row) {
+        row.emailStatus = status;
+        (row as NotificationRecord & { emailedAt?: Date | null }).emailedAt = emailedAt;
+      }
+    },
+  );
   findNewerThan = jest.fn(async (since: Date, limit: number) =>
     this.rows
       .filter((row) => row.createdAt.getTime() > since.getTime())
@@ -108,7 +110,7 @@ function fakeSink(): StreamSink & { events: { type: string; data: unknown }[] } 
 
 describe('NotificationsDispatcher', () => {
   let repository: FakeRepository;
-  let mail: { sendPlain: jest.Mock; linkTo: jest.Mock };
+  let mail: { sendNotification: jest.Mock; linkTo: jest.Mock };
   let streams: NotificationStreamRegistry;
   let clock: Date;
   let dispatcher: NotificationsDispatcher;
@@ -131,7 +133,7 @@ describe('NotificationsDispatcher', () => {
       { email: 'quiet@example.com', role: 'USER', success: false, failure: false },
     ]);
     mail = {
-      sendPlain: jest.fn(async () => true),
+      sendNotification: jest.fn(async () => true),
       linkTo: jest.fn((path: string) => `http://localhost:3000${path}`),
     };
     streams = new NotificationStreamRegistry();
@@ -155,14 +157,19 @@ describe('NotificationsDispatcher', () => {
 
       expect(repository.claimPending).toHaveBeenCalledWith(CLAIM_BATCH, NOW);
       expect(repository.findRecipients).toHaveBeenCalledWith('org_1', 'failure_emails');
-      expect(mail.sendPlain).toHaveBeenCalledTimes(2);
-      expect(mail.sendPlain.mock.calls.map(([to]) => to)).toEqual([
+      expect(mail.sendNotification).toHaveBeenCalledTimes(2);
+      expect(mail.sendNotification.mock.calls.map(([to]) => to)).toEqual([
         'admin@example.com',
         'member@example.com',
       ]);
-      const [, subject, lines] = mail.sendPlain.mock.calls[0];
-      expect(subject).toBe('[PostGear] Could not publish to Acme Marketing on LinkedIn');
-      expect(lines).toContain('http://localhost:3000/org_1/queue?state=ERROR');
+      const [, content, options] = mail.sendNotification.mock.calls[0];
+      expect(content.subject).toBe('[PostGear] Could not publish to Acme Marketing on LinkedIn');
+      expect(content.action).toEqual({
+        label: 'Open The Queue',
+        url: 'http://localhost:3000/org_1/queue?state=ERROR',
+      });
+      // Failure emails can be switched off in one click from the inbox.
+      expect(options).toEqual({ unsubscribe: { topic: 'failure', orgId: 'org_1' } });
       expect(repository.markEmail).toHaveBeenCalledWith('n1', 'SENT', NOW);
       expect(report.emailed).toEqual({ sent: 1, skipped: 0, failed: 0 });
       expect(warn).not.toHaveBeenCalled();
@@ -183,10 +190,16 @@ describe('NotificationsDispatcher', () => {
         'admins',
       ]);
       // Only the admin has success emails on; only the admin is an admin.
-      expect(mail.sendPlain.mock.calls.map(([to]) => to)).toEqual([
+      expect(mail.sendNotification.mock.calls.map(([to]) => to)).toEqual([
         'admin@example.com',
         'admin@example.com',
         'admin@example.com',
+      ]);
+      // Billing and webhook mail to admins has no switch, so no unsubscribe header.
+      expect(mail.sendNotification.mock.calls.map(([, , options]) => options)).toEqual([
+        { unsubscribe: { topic: 'success', orgId: 'org_1' } },
+        {},
+        {},
       ]);
     });
 
@@ -198,7 +211,7 @@ describe('NotificationsDispatcher', () => {
 
       const report = await dispatcher.runOnce();
 
-      expect(mail.sendPlain).not.toHaveBeenCalled();
+      expect(mail.sendNotification).not.toHaveBeenCalled();
       expect(repository.markEmail).toHaveBeenCalledWith('n1', 'SKIPPED', null);
       expect(report.emailed).toEqual({ sent: 0, skipped: 1, failed: 0 });
     });
@@ -208,13 +221,13 @@ describe('NotificationsDispatcher', () => {
 
       await dispatcher.runOnce();
 
-      expect(mail.sendPlain).not.toHaveBeenCalled();
+      expect(mail.sendNotification).not.toHaveBeenCalled();
       expect(repository.status('n1')).toBe('SKIPPED');
     });
 
     it('marks FAILED and logs when every send fails, SENT when at least one went out', async () => {
       repository.rows.push(row('n1'), row('n2'));
-      mail.sendPlain
+      mail.sendNotification
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(false)
@@ -237,7 +250,7 @@ describe('NotificationsDispatcher', () => {
 
     it('marks FAILED when the transport throws, and carries on with the next row', async () => {
       repository.rows.push(row('n1'), row('n2'));
-      mail.sendPlain.mockRejectedValueOnce(new Error('SMTP down'));
+      mail.sendNotification.mockRejectedValueOnce(new Error('SMTP down'));
 
       const report = await dispatcher.runOnce();
 
@@ -251,7 +264,7 @@ describe('NotificationsDispatcher', () => {
 
       const report = await dispatcher.runOnce();
 
-      expect(mail.sendPlain).not.toHaveBeenCalled();
+      expect(mail.sendNotification).not.toHaveBeenCalled();
       expect(report.emailed).toEqual({ sent: 0, skipped: 0, failed: 0 });
     });
   });
@@ -272,7 +285,10 @@ describe('NotificationsDispatcher', () => {
 
       expect(first.pushed).toBe(2);
       expect(a.events.map((event) => event.type)).toEqual(['ready', 'notification']);
-      expect(a.events[1].data).toMatchObject({ notification: { id: 'n1', read: false }, unread: 1 });
+      expect(a.events[1].data).toMatchObject({
+        notification: { id: 'n1', read: false },
+        unread: 1,
+      });
       expect(b.events[1].data).toMatchObject({ notification: { id: 'n2' }, unread: 1 });
       expect(dispatcher.seenUpTo).toEqual(NOW);
 
@@ -300,9 +316,10 @@ describe('NotificationsDispatcher', () => {
     it('returns the pass in flight instead of starting another', async () => {
       let release: (rows: NotificationRecord[]) => void = () => undefined;
       repository.claimPending.mockImplementationOnce(
-        () => new Promise<NotificationRecord[]>((resolve) => {
-          release = resolve;
-        }),
+        () =>
+          new Promise<NotificationRecord[]>((resolve) => {
+            release = resolve;
+          }),
       );
 
       const first = dispatcher.runOnce();

@@ -1,9 +1,10 @@
 /**
- * The email catalogue: one subject and one plain-text body per type, with
- * the channel, the reason and the link where the row has them, and never any
- * markup; a provider message is interpolated as the text it is.
+ * The email catalogue: one subject and one summary card per type, with the
+ * channel, the reason and the link where the row has them. A provider message
+ * goes in as the text it is; the template escapes it (packages/email tests).
  */
 import { NotificationEmailStatus } from '@postgear/db';
+import { notificationEmail } from '@postgear/email';
 import { AUTOMATION_NOTIFICATION_TYPES } from '@postgear/scheduling';
 import {
   AUDIENCE_BY_TYPE,
@@ -33,7 +34,7 @@ function row(overrides: Partial<EmailableNotification>): EmailableNotification {
 
 describe('composeEmail', () => {
   it('names the channel and platform in a failed post subject and lists the details', () => {
-    const { subject, lines } = composeEmail(
+    const email = composeEmail(
       row({
         meta: {
           channelName: 'Acme Marketing',
@@ -47,28 +48,28 @@ describe('composeEmail', () => {
       linkTo,
     );
 
-    expect(subject).toBe('[PostGear] Could not publish to Acme Marketing on LinkedIn');
-    expect(lines).toEqual([
-      'Post failed',
-      '',
-      'Could not publish to Acme Marketing: LinkedIn rejected the post.',
-      '',
-      'Post:     Our Q3 recap',
-      'Channel:  Acme Marketing on LinkedIn',
-      'Reason:   The platform rejected the content',
-      'Details:  LinkedIn rejected the post (simulated).',
-      'Attempts: 1',
-      '',
-      'Open the queue:',
-      'http://localhost:3000/org_1/queue?state=ERROR',
-      '',
-      'You are receiving this because of your notification settings in PostGear.',
-      'Change them: http://localhost:3000/org_1/settings/notifications',
-    ]);
+    expect(email).toEqual({
+      subject: '[PostGear] Could not publish to Acme Marketing on LinkedIn',
+      tone: 'danger',
+      badge: 'Post Failed',
+      heading: 'Post Failed',
+      message: 'Could not publish to Acme Marketing: LinkedIn rejected the post.',
+      facts: [
+        { label: 'Post', value: 'Our Q3 recap' },
+        { label: 'Channel', value: 'Acme Marketing on LinkedIn' },
+        { label: 'Reason', value: 'The platform rejected the content' },
+        { label: 'Details', value: 'LinkedIn rejected the post (simulated).' },
+        { label: 'Attempts', value: '1' },
+      ],
+      bullets: undefined,
+      action: { label: 'Open The Queue', url: 'http://localhost:3000/org_1/queue?state=ERROR' },
+      reason: 'You got this email because failure emails are on in your notification settings.',
+      settingsUrl: 'http://localhost:3000/org_1/settings/notifications',
+    });
   });
 
   it('passes an absolute link through and uses the published wording', () => {
-    const { subject, lines } = composeEmail(
+    const email = composeEmail(
       row({
         type: 'post.published',
         title: 'Post published',
@@ -79,46 +80,96 @@ describe('composeEmail', () => {
       linkTo,
     );
 
-    expect(subject).toBe('[PostGear] Published to Acme Marketing');
-    expect(lines).toContain('See the post:');
-    expect(lines).toContain('https://www.linkedin.com/feed/update/123');
-    expect(lines).not.toContain('Attempts: 1');
+    expect(email.subject).toBe('[PostGear] Published to Acme Marketing');
+    expect(email.tone).toBe('success');
+    expect(email.action).toEqual({
+      label: 'See The Post',
+      url: 'https://www.linkedin.com/feed/update/123',
+    });
+    expect(email.facts?.map((fact) => fact.label)).not.toContain('Attempts');
   });
 
-  it('interpolates a provider message as text, markup included', () => {
-    const { lines } = composeEmail(
+  it('keeps a provider message as text, and the rendered email escapes it', () => {
+    const email = composeEmail(
       row({ meta: { message: '<script>alert(1)</script> & "quotes"' } }),
       linkTo,
     );
 
-    expect(lines).toContain('Details:  <script>alert(1)</script> & "quotes"');
+    expect(email.facts).toContainEqual({
+      label: 'Details',
+      value: '<script>alert(1)</script> & "quotes"',
+    });
+    const rendered = notificationEmail({ webUrl: 'http://localhost:3000' }, email);
+    expect(rendered.html).not.toContain('<script>alert(1)</script>');
+    expect(rendered.text).toContain('Details: <script>alert(1)</script> & "quotes"');
   });
 
-  it('falls back to the catalogue title and a generic subject for a row without one', () => {
-    const { subject, lines } = composeEmail(
+  it('shows the plan, the amount and the date for billing', () => {
+    const email = composeEmail(
+      row({
+        type: 'billing.activated',
+        title: 'Pro plan is active',
+        content: 'Your workspace is now on the Pro plan.',
+        link: '/org_1/settings/billing',
+        meta: { tier: 'Pro', amountCents: 2_900, currency: 'usd' },
+      }),
+      linkTo,
+    );
+
+    expect(email.subject).toBe('[PostGear] Your Pro plan is active');
+    expect(email.facts).toEqual([
+      { label: 'Plan', value: 'Pro', badge: true },
+      { label: 'Amount', value: '29.00 USD' },
+      { label: 'Date', value: '16 October 2026 (UTC)' },
+    ]);
+    expect(email.reason).toContain('admin of this PostGear workspace');
+  });
+
+  it('lists the Discover highlights as bullets', () => {
+    const email = composeEmail(
+      row({
+        type: 'discover.digest',
+        title: null,
+        content: 'Here is your week.',
+        link: '/org_1/discover',
+        meta: { place: 'Chennai', highlights: ['One', '', 'Two', 3] },
+      }),
+      linkTo,
+    );
+
+    expect(email.subject).toBe('[PostGear] What is trending in Chennai this week');
+    expect(email.bullets).toEqual(['One', 'Two']);
+  });
+
+  it('falls back to the catalogue heading and a generic subject for a row without one', () => {
+    const email = composeEmail(
       row({ type: 'channel.needs_reconnect', title: null, link: '/org_1/channels', meta: {} }),
       linkTo,
     );
 
-    expect(subject).toBe('[PostGear] A channel needs reconnecting');
-    expect(lines[0]).toBe('Channel needs reconnecting');
-    expect(lines).toContain('Reconnect it here:');
+    expect(email.subject).toBe('[PostGear] A channel needs reconnecting');
+    expect(email.heading).toBe('Channel Needs Reconnecting');
+    expect(email.action?.label).toBe('Reconnect Channel');
   });
 
-  it('treats an unknown type as info', () => {
-    const { subject } = composeEmail(
-      row({ type: 'something.else', title: 'Hello', link: null }),
-      linkTo,
-    );
+  it('treats an unknown type as info and keeps its own title as the heading', () => {
+    const email = composeEmail(row({ type: 'something.else', title: 'Hello', link: null }), linkTo);
 
-    expect(subject).toBe('[PostGear] Hello');
+    expect(email.subject).toBe('[PostGear] Hello');
+    expect(email.heading).toBe('Hello');
+    expect(email.action).toBeUndefined();
   });
 
-  it('has a subject for every type in the catalogue', () => {
+  it('has a subject, a heading and a reason for every type in the catalogue', () => {
     for (const type of NOTIFICATION_TYPES) {
-      const { subject, lines } = composeEmail(row({ type, title: null, meta: {} }), linkTo);
-      expect(subject.startsWith('[PostGear] ')).toBe(true);
-      expect(lines.length).toBeGreaterThan(2);
+      const email = composeEmail(row({ type, title: null, meta: {} }), linkTo);
+      expect(email.subject.startsWith('[PostGear] ')).toBe(true);
+      expect(email.heading.length).toBeGreaterThan(0);
+      expect(email.reason.length).toBeGreaterThan(0);
+      // Every one renders.
+      expect(notificationEmail({ webUrl: 'http://localhost:3000' }, email).text).toContain(
+        email.heading,
+      );
     }
   });
 });

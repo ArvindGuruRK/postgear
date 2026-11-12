@@ -26,6 +26,7 @@
       "@postgear/discover-engine": ["packages/discover-engine/src"],
       "@postgear/design-engine": ["packages/design-engine/src"],
       "@postgear/ai-engine": ["packages/ai-engine/src"],
+      "@postgear/email": ["packages/email/src"],
       "@postgear/ui": ["packages/ui/src"],
       "@postgear/config": ["packages/config"]
     }

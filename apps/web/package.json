@@ -24,6 +24,7 @@
     "@postgear/automation": "*",
     "@postgear/config": "*",
     "@postgear/design-engine": "*",
+    "@postgear/email": "*",
     "@postgear/social-core": "*",
     "@postgear/ui": "*",
     "@react-pdf/renderer": "^4.9.0",
