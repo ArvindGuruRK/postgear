@@ -13,7 +13,9 @@ import {
   createCompetitor,
   getCompetitorItems,
   getCompetitors,
+  markCompetitorsSeen,
   removeCompetitor,
+  researchCompetitor,
   updateCompetitor,
 } from '@/lib/discover-api';
 import type {
@@ -41,6 +43,8 @@ jest.mock('@/lib/discover-api', () => ({
   updateCompetitor: jest.fn(),
   removeCompetitor: jest.fn(),
   findCompetitorFeeds: jest.fn(),
+  markCompetitorsSeen: jest.fn(),
+  researchCompetitor: jest.fn(),
 }));
 
 const mockedList = getCompetitors as jest.MockedFunction<typeof getCompetitors>;
@@ -48,6 +52,8 @@ const mockedItems = getCompetitorItems as jest.MockedFunction<typeof getCompetit
 const mockedCreate = createCompetitor as jest.MockedFunction<typeof createCompetitor>;
 const mockedUpdate = updateCompetitor as jest.MockedFunction<typeof updateCompetitor>;
 const mockedRemove = removeCompetitor as jest.MockedFunction<typeof removeCompetitor>;
+const mockedSeen = markCompetitorsSeen as jest.MockedFunction<typeof markCompetitorsSeen>;
+const mockedResearch = researchCompetitor as jest.MockedFunction<typeof researchCompetitor>;
 
 beforeAll(stubBrowserLayout);
 
@@ -63,6 +69,7 @@ function competitor(id: string, name: string, patch: Partial<Competitor> = {}): 
     blueskyHandle: null,
     mastodonAcct: null,
     newsQuery: null,
+    instagramUsername: null,
     lastCheckedAt: null,
     lastError: null,
     createdAt: '2026-11-10T08:00:00.000Z',
@@ -147,7 +154,10 @@ beforeEach(() => {
   mockedCreate.mockReset();
   mockedUpdate.mockReset();
   mockedRemove.mockReset();
+  mockedSeen.mockReset();
+  mockedResearch.mockReset();
   mockedItems.mockResolvedValue(items());
+  mockedSeen.mockResolvedValue(undefined);
 });
 
 describe('CompetitorsTab', () => {
@@ -494,6 +504,126 @@ describe('CompetitorsTab, the group menu', () => {
     expect(await within(confirm).findByTestId('competitor-remove-error')).toHaveTextContent(
       REMOVE_FAILED,
     );
+  });
+});
+
+describe('CompetitorsTab, Module 10', () => {
+  const SEEN = '2026-11-09T12:00:00.000Z';
+
+  it('tags what is new since the last look, counts it, and marks the visit seen once', async () => {
+    const onUnseenChange = jest.fn();
+    const fresh = { ...row('a1', 'A fresh post'), publishedAt: '2026-11-10T09:00:00Z' };
+    const old = { ...row('a2', 'An old post'), publishedAt: '2026-11-08T09:00:00Z' };
+    mockedList.mockResolvedValue(listOf(ACME, BOLT));
+    mockedItems.mockImplementation(async (id) =>
+      id === 'acme'
+        ? items({ items: [fresh, old], lastSeenAt: SEEN })
+        : items({ items: [row('b1', 'Bolt ships dashboards')], lastSeenAt: null }),
+    );
+    const view = renderTab({ onUnseenChange });
+
+    await screen.findByText('A fresh post');
+    const acme = group('Acme Analytics');
+    expect(within(acme).getByTestId('competitor-new-count')).toHaveTextContent('1 New');
+    expect(within(acme).getAllByTestId('competitor-new')).toHaveLength(1);
+    await within(group('Bolt Metrics')).findByText('Bolt ships dashboards');
+    // A first look marks nothing new.
+    expect(within(group('Bolt Metrics')).queryByTestId('competitor-new')).not.toBeInTheDocument();
+
+    await waitFor(() => expect(mockedSeen).toHaveBeenCalledTimes(1));
+    expect(mockedSeen).toHaveBeenCalledWith(['acme', 'bolt']);
+    await waitFor(() => expect(onUnseenChange).toHaveBeenCalledWith(0));
+
+    // Refresh keeps this visit's tags and marks nothing again.
+    mockedItems.mockImplementation(async () =>
+      items({ items: [fresh, old], lastSeenAt: '2026-11-10T12:00:00.000Z' }),
+    );
+    view.again({ onUnseenChange, refreshKey: 1 });
+    await waitFor(() => expect(mockedItems).toHaveBeenCalledTimes(4));
+    expect(within(group('Acme Analytics')).getAllByTestId('competitor-new')).toHaveLength(1);
+    expect(mockedSeen).toHaveBeenCalledTimes(1);
+  });
+
+  it('says nothing when marking seen fails', async () => {
+    const onUnseenChange = jest.fn();
+    mockedSeen.mockRejectedValue(new ApiError('Failed to fetch', 0));
+    mockedList.mockResolvedValue(listOf(ACME));
+    mockedItems.mockResolvedValue(items({ items: [row('a1', 'A post')], lastSeenAt: SEEN }));
+    renderTab({ onUnseenChange });
+
+    await screen.findByText('A post');
+    await waitFor(() => expect(mockedSeen).toHaveBeenCalled());
+    expect(onUnseenChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('offers Research only when AI is set up and there are rows', async () => {
+    mockedList.mockResolvedValue({ ...listOf(ACME, BOLT), research: true });
+    mockedItems.mockImplementation(async (id) =>
+      id === 'acme' ? items({ items: [row('a1', 'A post')] }) : items(),
+    );
+    renderTab();
+
+    expect(await screen.findByRole('button', { name: 'Research Acme Analytics' })).toHaveClass(
+      'bg-actionAi',
+    );
+    await within(group('Bolt Metrics')).findByTestId('competitor-nothing-new');
+    expect(screen.queryByRole('button', { name: 'Research Bolt Metrics' })).not.toBeInTheDocument();
+  });
+
+  it('shows the research, and an opening becomes a Create Post', async () => {
+    const onCreatePost = jest.fn();
+    mockedList.mockResolvedValue({ ...listOf(ACME), research: true });
+    mockedItems.mockResolvedValue(items({ items: [row('a1', 'A post')] }));
+    mockedResearch.mockResolvedValue({
+      research: {
+        themes: ['Churn', 'Pricing'],
+        rhythm: 'About three posts a week, most on Tuesdays.',
+        openings: ['Open on a churn number.', 'Ask what a dashboard is for.'],
+        basedOn: 8,
+        createdAt: '2026-11-10T10:00:00.000Z',
+      },
+      cached: false,
+    });
+    renderTab({ onCreatePost });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Research Acme Analytics' }));
+
+    const panel = await screen.findByTestId('competitor-research');
+    expect(mockedResearch).toHaveBeenCalledWith('acme');
+    expect(within(panel).getByText('Churn')).toBeInTheDocument();
+    expect(
+      within(panel).getByText('About three posts a week, most on Tuesdays.'),
+    ).toBeInTheDocument();
+    expect(within(panel).getAllByTestId('competitor-research-opening')).toHaveLength(2);
+    expect(within(panel).getByTestId('competitor-research-basis')).toHaveTextContent(
+      'Based on 8 posts, written 2 hours ago.',
+    );
+
+    fireEvent.click(
+      within(panel).getByRole('button', { name: 'Create Post for Ask what a dashboard is for.' }),
+    );
+    expect(onCreatePost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'research-acme-1',
+        kind: 'competitor',
+        title: 'Ask what a dashboard is for.',
+        brief: 'Idea from researching Acme Analytics: Ask what a dashboard is for.',
+      }),
+    );
+  });
+
+  it("shows the API's sentence when Research is refused", async () => {
+    const sentence = 'You are out of AI credits. They reset on 1 Dec.';
+    mockedList.mockResolvedValue({ ...listOf(ACME), research: true });
+    mockedItems.mockResolvedValue(items({ items: [row('a1', 'A post')] }));
+    mockedResearch.mockRejectedValue(new ApiError(sentence, 402));
+    renderTab();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Research Acme Analytics' }));
+
+    expect(await screen.findByTestId('competitor-research-error')).toHaveTextContent(sentence);
+    expect(screen.queryByTestId('competitor-research')).not.toBeInTheDocument();
   });
 });
 

@@ -3,8 +3,9 @@
 /**
  * Add Competitor and Edit Competitor (Module 07, story DC-7.1): a name and a
  * website, the feeds PostGear found there as a list to tick, and the channels
- * no website can tell us (a YouTube channel id, a Bluesky handle, a Mastodon
- * account, a news search phrase).
+ * no website can tell us (a YouTube channel id, an Instagram username, a
+ * Bluesky handle, a Mastodon account, a news search phrase). Instagram is read
+ * through the workspace's own connected business account (Module 10).
  *
  * ## Finding feeds
  *
@@ -61,6 +62,7 @@ import {
   feedChoiceShowsAddress,
   formFrom,
   formProblems,
+  INSTAGRAM_HINT,
   MASTODON_HINT,
   mergeFoundFeeds,
   NEWS_HINT,
@@ -366,6 +368,25 @@ export function CompetitorDialog({ open, competitor, onClose, onSaved }: Competi
                 <FormErrorMessage>{problems.youtube}</FormErrorMessage>
               ) : (
                 <FormHelperText>{YOUTUBE_HINT}</FormHelperText>
+              )}
+            </FormField>
+
+            <FormField>
+              <FormLabel htmlFor={field('instagram')}>Instagram</FormLabel>
+              <Input
+                id={field('instagram')}
+                value={form.instagram}
+                onChange={(event) => change({ instagram: event.target.value })}
+                maxLength={120}
+                placeholder="Enter your competitor's Instagram username"
+                autoComplete="off"
+                spellCheck={false}
+                variant={problems.instagram ? 'error' : 'default'}
+              />
+              {problems.instagram ? (
+                <FormErrorMessage>{problems.instagram}</FormErrorMessage>
+              ) : (
+                <FormHelperText>{INSTAGRAM_HINT}</FormHelperText>
               )}
             </FormField>
 

@@ -21,6 +21,11 @@
  * is the first thing to check when an outside service has a complaint. It also says
  * whether videos are set up, and never the key that sets them up.
  *
+ * Module 10 adds `DiscoverIdea` (Saved Ideas, shared by the workspace),
+ * `DiscoverUserPlace` (each member's own place) and `CompetitorView` (when
+ * someone last looked at a competitor), each behind its own repository, and
+ * the worker's jobs behind `internal/discover/*`.
+ *
  * Exports `DiscoverService` for Create Post (Module 04).
  */
 import {
@@ -32,20 +37,30 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env';
+import { AiModule } from '../ai/ai.module';
+import { InternalTokenGuard } from '../automations/gateway/internal-token.guard';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { CompetitorResearchService } from './competitor-research.service';
 import { CompetitorsController } from './competitors.controller';
-import {
-  COMPETITOR_ENGINE,
-  COMPETITOR_GATE,
-  createCompetitorEngine,
-} from './competitors.engine';
+import { COMPETITOR_ENGINE, COMPETITOR_GATE, createCompetitorEngine } from './competitors.engine';
 import { CompetitorsRepository } from './competitors.repository';
 import { CompetitorsService } from './competitors.service';
 import { DiscoverCache } from './discover.cache';
+import { DiscoverDigestService } from './digest.service';
 import { DiscoverController } from './discover.controller';
 import { createDiscoverEngine, DISCOVER_ENGINE, describeEngine } from './discover.engine';
 import { DiscoverGate } from './discover.gate';
 import { DiscoverService } from './discover.service';
+import { DiscoverIdeasController } from './ideas.controller';
+import { DiscoverIdeasRepository } from './ideas.repository';
+import { DiscoverIdeasService } from './ideas.service';
+import { DiscoverInternalController } from './internal.controller';
+import { IpCountryService } from './ip-country.service';
 import { LocalityService } from './locality.service';
+import { DiscoverMaintenanceService } from './maintenance.service';
+import { DiscoverMyPlaceRepository } from './my-place.repository';
+import { DiscoverMyPlaceService } from './my-place.service';
+import { DiscoverPlacesController } from './places.controller';
 import { ReaderController } from './reader.controller';
 import { createReaderEngine, READER_ENGINE, READER_GATE } from './reader.engine';
 import {
@@ -63,7 +78,16 @@ const MAX_READER_FETCHES = 4;
 const GATE_WAIT_MS = 4_000;
 
 @Module({
-  controllers: [DiscoverController, CompetitorsController, ReaderController],
+  // Module 10: AI for Research This Competitor, notifications for the weekly digest.
+  imports: [AiModule, NotificationsModule],
+  controllers: [
+    DiscoverController,
+    DiscoverPlacesController,
+    CompetitorsController,
+    DiscoverIdeasController,
+    ReaderController,
+    DiscoverInternalController,
+  ],
   providers: [
     {
       // Module 07: what reads a competitor's own places. Its own token, because
@@ -83,6 +107,7 @@ const GATE_WAIT_MS = 4_000;
     },
     CompetitorsRepository,
     CompetitorsService,
+    CompetitorResearchService,
     {
       // The reader's own slots: a page someone named never makes a feed or a competitor wait.
       provide: READER_GATE,
@@ -104,6 +129,7 @@ const GATE_WAIT_MS = 4_000;
           DISCOVER_SIMULATION: config.get('DISCOVER_SIMULATION', { infer: true }),
           DISCOVER_GEOCODER_USER_AGENT: config.get('DISCOVER_GEOCODER_USER_AGENT', { infer: true }),
           DISCOVER_LINK_DECODE: config.get('DISCOVER_LINK_DECODE', { infer: true }),
+          DISCOVER_READER_RENDER: config.get('DISCOVER_READER_RENDER', { infer: true }),
         }),
     },
     ReaderService,
@@ -116,6 +142,10 @@ const GATE_WAIT_MS = 4_000;
           DISCOVER_GEOCODER: config.get('DISCOVER_GEOCODER', { infer: true }),
           DISCOVER_GEOCODER_USER_AGENT: config.get('DISCOVER_GEOCODER_USER_AGENT', { infer: true }),
           YOUTUBE_API_KEY: config.get('YOUTUBE_API_KEY', { infer: true }),
+          DISCOVER_GEOCODER_URL: config.get('DISCOVER_GEOCODER_URL', { infer: true }),
+          DISCOVER_NEWS_PROVIDER: config.get('DISCOVER_NEWS_PROVIDER', { infer: true }),
+          SERPAPI_API_KEY: config.get('SERPAPI_API_KEY', { infer: true }),
+          NEWSDATA_API_KEY: config.get('NEWSDATA_API_KEY', { infer: true }),
         });
         new Logger('Discover').log(JSON.stringify(describeEngine(engine)));
         return engine;
@@ -130,6 +160,15 @@ const GATE_WAIT_MS = 4_000;
     DiscoverSettingsRepository,
     DiscoverSettingsService,
     LocalityService,
+    // Module 10.
+    DiscoverIdeasRepository,
+    DiscoverIdeasService,
+    DiscoverMyPlaceRepository,
+    DiscoverMyPlaceService,
+    IpCountryService,
+    DiscoverDigestService,
+    DiscoverMaintenanceService,
+    InternalTokenGuard,
   ],
   exports: [DiscoverService],
 })

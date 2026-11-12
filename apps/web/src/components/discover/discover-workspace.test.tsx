@@ -45,7 +45,6 @@ const mockedToast = toast as jest.MockedFunction<typeof toast>;
 
 beforeAll(stubBrowserLayout);
 
-
 const CHENNAI: Locality = {
   countryCode: 'IN',
   countryName: 'India',
@@ -100,6 +99,8 @@ function saved(patch: Partial<DiscoverSettings> = {}): DiscoverSettings {
     languages: ['ta', 'en'],
     topics: ['BUSINESS'],
     sources: null,
+    interests: [],
+    weeklyDigest: false,
     locationSource: 'SEARCH',
     place: CHENNAI,
     updatedAt: '2026-11-10T08:00:00.000Z',
@@ -539,7 +540,10 @@ describe('a tab the workspace switched off', () => {
     await waitFor(() =>
       expect(screen.getByTestId('discover-place-chip')).toHaveTextContent('Chennai, Tamil Nadu'),
     );
-    expect(mockedApi).not.toHaveBeenCalled();
+    // Module 10: the page also asks for the saved ideas and the unseen count; the feed is never asked.
+    expect(
+      mockedApi.mock.calls.filter(([path]) => String(path).startsWith('/discover/feed')),
+    ).toEqual([]);
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
   });
 
@@ -552,7 +556,10 @@ describe('a tab the workspace switched off', () => {
     await waitFor(() =>
       expect(screen.getByTestId('discover-place-chip')).toHaveTextContent('Chennai, Tamil Nadu'),
     );
-    expect(mockedApi).not.toHaveBeenCalled();
+    // Module 10: the page also asks for the saved ideas and the unseen count; the feed is never asked.
+    expect(
+      mockedApi.mock.calls.filter(([path]) => String(path).startsWith('/discover/feed')),
+    ).toEqual([]);
   });
 
   it('tells an admin where to turn it back on', async () => {

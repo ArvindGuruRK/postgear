@@ -59,6 +59,7 @@ import {
   type SourceResult,
   WORLDWIDE,
 } from '@postgear/discover-engine';
+import { decrypt } from '@postgear/db';
 import type { UrlRejectReason, UrlSafetyResult } from '@postgear/seo-engine';
 import { securityLogger } from '../../common/logging/security-logger';
 import { RedisService } from '../redis/redis.service';
@@ -125,7 +126,34 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export type CompetitorKind = keyof typeof COMPETITOR_KIND_NAMES;
 
 /** In the order the notes read: their own places first, what others say last. */
-const KIND_ORDER: readonly CompetitorKind[] = ['blog', 'youtube', 'bluesky', 'mastodon', 'news'];
+const KIND_ORDER: readonly CompetitorKind[] = [
+  'blog',
+  'youtube',
+  'instagram',
+  'bluesky',
+  'mastodon',
+  'news',
+];
+
+/** Module 10: a competitor is read again by the worker when nobody has looked for this long. */
+export const DAILY_REFRESH_AFTER_MS = 20 * 60 * MINUTE_MS;
+
+/** Module 10: what simulation reads Instagram as. The fixtures answer whatever the account. */
+const SIMULATED_INSTAGRAM = { id: '17841400000000000', token: 'simulation' } as const;
+
+/** What every competitor of one workspace is read with: its place and its Instagram account. */
+interface PlanContext {
+  locality: Locality;
+  language: string;
+  /** Opened for the request, never stored. Null without a connected business account. */
+  instagram: { id: string; token: string } | null;
+}
+
+/** Module 10: what a person has not seen yet, per competitor. */
+export interface UnseenAnswer {
+  total: number;
+  competitors: Record<string, number>;
+}
 
 export interface CompetitorView {
   id: string;
@@ -136,6 +164,7 @@ export interface CompetitorView {
   blueskyHandle: string | null;
   mastodonAcct: string | null;
   newsQuery: string | null;
+  instagramUsername: string | null;
   lastCheckedAt: string | null;
   lastError: string | null;
   createdAt: string;
@@ -156,10 +185,15 @@ export interface CompetitorItemsAnswer {
    * page keeps waiting and asks again, and never says "nothing new" for it.
    */
   pending: boolean;
+  /**
+   * Module 10: when the person asking last looked at this competitor, so the
+   * page can mark what is new since. Null the first time.
+   */
+  lastSeenAt: string | null;
 }
 
 /** Reached, or read: the two sentences a failed source can get. */
-type Trouble = 'unreachable' | 'unreadable';
+type Trouble = 'unreachable' | 'unreadable' | 'reconnect';
 
 interface CachedPart {
   kind: CompetitorKind;
@@ -203,6 +237,7 @@ function toView(row: CompetitorRow): CompetitorView {
     blueskyHandle: row.blueskyHandle,
     mastodonAcct: row.mastodonAcct,
     newsQuery: row.newsQuery,
+    instagramUsername: row.instagramUsername,
     lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null,
     lastError: row.lastError,
     createdAt: row.createdAt.toISOString(),
@@ -253,6 +288,11 @@ export class CompetitorsService {
     return (await this.repository.list(orgId)).map(toView);
   }
 
+  /** One competitor of the workspace, or a 404. */
+  async view(orgId: string, id: string): Promise<CompetitorView> {
+    return toView(await this.require(orgId, id));
+  }
+
   async create(
     orgId: string,
     userId: string | null,
@@ -273,6 +313,7 @@ export class CompetitorsService {
         blueskyHandle: input.blueskyHandle ?? null,
         mastodonAcct: input.mastodonAcct ?? null,
         newsQuery: input.newsQuery ?? null,
+        instagramUsername: input.instagramUsername ?? null,
       },
       MAX_COMPETITORS,
     );
@@ -293,6 +334,7 @@ export class CompetitorsService {
     if (input.blueskyHandle !== undefined) write.blueskyHandle = input.blueskyHandle;
     if (input.mastodonAcct !== undefined) write.mastodonAcct = input.mastodonAcct;
     if (input.newsQuery !== undefined) write.newsQuery = input.newsQuery;
+    if (input.instagramUsername !== undefined) write.instagramUsername = input.instagramUsername;
 
     const row = await this.repository.update(orgId, id, write);
     if (!row) throw this.notFound();
@@ -367,9 +409,13 @@ export class CompetitorsService {
   // What a competitor published
   // ---------------------------------------------------------------------------
 
-  async items(orgId: string, id: string): Promise<CompetitorItemsAnswer> {
+  async items(orgId: string, id: string, userId?: string): Promise<CompetitorItemsAnswer> {
     const row = await this.require(orgId, id);
-    const { tasks, sources } = await this.plan(orgId, row);
+    const context = await this.planContext(orgId);
+    const { tasks, sources } = this.plan(row, context);
+    const lastSeenAt = userId
+      ? ((await this.repository.lastSeen(userId, [row.id])).get(row.id)?.toISOString() ?? null)
+      : null;
 
     const { entry } = await this.cache.load<CachedCompetitor>(
       this.keys.competitor(row.id, sources),
@@ -391,10 +437,128 @@ export class CompetitorsService {
         fetchedAt: new Date().toISOString(),
         stale: false,
         pending: true,
+        lastSeenAt,
       };
     }
 
-    return this.present(row, entry);
+    const answer = this.present(row, entry);
+    // An Instagram account named with nothing to read it through: the one note that is not trouble.
+    if (row.instagramUsername && !context.instagram) {
+      answer.notes.push(DISCOVER_MESSAGES.instagramNeedsChannel);
+    }
+    return { ...answer, lastSeenAt };
+  }
+
+  // ---------------------------------------------------------------------------
+  // New since you last looked (Module 10)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * How many items each competitor has that this person has not seen: newer
+   * than their last look, or than the day the competitor was added when they
+   * never looked. Read from the copies only: counting never fetches.
+   */
+  async unseen(orgId: string, userId: string): Promise<UnseenAnswer> {
+    const rows = await this.repository.list(orgId);
+    if (rows.length === 0) return { total: 0, competitors: {} };
+
+    const [seen, context] = await Promise.all([
+      this.repository.lastSeen(
+        userId,
+        rows.map((row) => row.id),
+      ),
+      this.planContext(orgId),
+    ]);
+
+    const competitors: Record<string, number> = {};
+    for (const row of rows) {
+      const { sources } = this.plan(row, context);
+      const entry = await this.cache.peek<CachedCompetitor>(this.keys.competitor(row.id, sources));
+      const since = (seen.get(row.id) ?? row.createdAt).getTime();
+      competitors[row.id] = entry
+        ? this.itemsOf(entry).filter((item) => timeOf(item) > since).length
+        : 0;
+    }
+
+    const total = Object.values(competitors).reduce((sum, count) => sum + count, 0);
+    return { total, competitors };
+  }
+
+  /** This person has now seen these competitors (all of the workspace's when `ids` is absent). */
+  async markSeen(orgId: string, userId: string, ids?: readonly string[]): Promise<void> {
+    const owned = (await this.repository.list(orgId)).map((row) => row.id);
+    const chosen = ids ? owned.filter((id) => ids.includes(id)) : owned;
+    await this.repository.markSeen(userId, chosen, new Date());
+  }
+
+  /**
+   * Module 10, the worker's daily refresh: reads up to `limit` competitors that
+   * nobody has looked at for a day, oldest first, one after the other, so a
+   * morning's "3 New" is already there. The gate, the host breakers and the
+   * guard hold as they do for a person; the workspace's read limit does not,
+   * since nobody is asking. Answers how many were read.
+   */
+  async refreshDue(limit: number, deadline = Number.POSITIVE_INFINITY): Promise<number> {
+    const due = await this.repository.due(new Date(Date.now() - DAILY_REFRESH_AFTER_MS), limit);
+    const contexts = new Map<string, PlanContext>();
+    let read = 0;
+
+    for (const row of due) {
+      if (Date.now() > deadline) break;
+      const orgId = row.organizationId;
+      try {
+        let context = contexts.get(orgId);
+        if (!context) {
+          context = await this.planContext(orgId);
+          contexts.set(orgId, context);
+        }
+
+        const { tasks, sources } = this.plan(row, context);
+        const warmed = await this.cache.warm<CachedCompetitor>(
+          this.keys.competitor(row.id, sources),
+          {
+            keepSeconds: COMPETITOR_KEEP_SECONDS,
+            olderThanMs: 0,
+            refresh: (previous) => this.refresh(orgId, row, tasks, previous),
+          },
+        );
+        if (warmed) read += 1;
+      } catch (error) {
+        // One competitor's trouble is the next look's note; the others still get read.
+        this.logger.warn(
+          JSON.stringify({
+            event: 'discover.competitor.refresh_due_failed',
+            reason: error instanceof Error ? error.name : 'unknown',
+          }),
+        );
+      }
+    }
+    return read;
+  }
+
+  /**
+   * What every competitor of a workspace is read with: the place and first
+   * language its news search follows, and its Instagram account, opened here
+   * for this request only.
+   */
+  private async planContext(orgId: string): Promise<PlanContext> {
+    const [saved, account] = await Promise.all([
+      this.settings.get(orgId),
+      this.engine.simulation ? Promise.resolve(null) : this.repository.instagramAccount(orgId),
+    ]);
+    const locality: Locality = saved.place ?? WORLDWIDE;
+    const language = saved.languages[0] ?? locality.languages[0] ?? 'en';
+
+    let instagram: PlanContext['instagram'] = this.engine.simulation ? SIMULATED_INSTAGRAM : null;
+    if (account) {
+      try {
+        instagram = { id: account.id, token: decrypt(account.token) };
+      } catch {
+        // A token that will not open is a channel to reconnect, never an error page here.
+        this.logger.warn(JSON.stringify({ event: 'discover.competitor.instagram_token_unreadable' }));
+      }
+    }
+    return { locality, language, instagram };
   }
 
   /**
@@ -402,10 +566,7 @@ export class CompetitorsService {
    * The news search follows the workspace's own place and first language, so
    * stories arrive in the edition its members read.
    */
-  private async plan(
-    orgId: string,
-    row: CompetitorRow,
-  ): Promise<{ tasks: ReadTask[]; sources: string }> {
+  private plan(row: CompetitorRow, context: PlanContext): { tasks: ReadTask[]; sources: string } {
     const { engine } = this;
     const tasks: ReadTask[] = [];
 
@@ -445,9 +606,22 @@ export class CompetitorsService {
       });
     }
 
-    const saved = await this.settings.get(orgId);
-    const locality: Locality = saved.place ?? WORLDWIDE;
-    const language = saved.languages[0] ?? locality.languages[0] ?? 'en';
+    const { instagram } = context;
+    if (row.instagramUsername && instagram) {
+      const username = row.instagramUsername;
+      tasks.push({
+        kind: 'instagram',
+        ref: username,
+        host: 'graph.facebook.com',
+        read: (signal) =>
+          engine.instagram.read(
+            { username, igUserId: instagram.id, accessToken: instagram.token },
+            signal,
+          ),
+      });
+    }
+
+    const { locality, language } = context;
     const phrase = row.newsQuery ?? row.name;
     tasks.push({
       kind: 'news',
@@ -456,10 +630,13 @@ export class CompetitorsService {
       read: (signal) => engine.news.search(phrase, { locality, language, signal }),
     });
 
+    // The account Instagram is read through is in it (its id, never its token):
+    // connecting one moves the key, so the first look after it reads at once.
     const sources = JSON.stringify([
       tasks.map((task) => [task.kind, task.ref]),
       locality.countryCode,
       language,
+      ...(row.instagramUsername ? [instagram?.id ?? null] : []),
     ]);
     return { tasks, sources };
   }
@@ -575,12 +752,15 @@ export class CompetitorsService {
 
     try {
       const result = await task.read(AbortSignal.timeout(SOURCE_DEADLINE_MS));
-      await this.recordHealth(task.host, result);
+      // Module 10: Instagram's "reconnect" (an expired token, a missing permission)
+      // is this workspace's own trouble, so it never counts against a host every
+      // workspace shares.
+      if (!result.reconnect) await this.recordHealth(task.host, result);
 
       if (result.failed === undefined) return { state: 'answered', result };
       return {
         state: 'trouble',
-        trouble: result.unreadable ? 'unreadable' : 'unreachable',
+        trouble: result.reconnect ? 'reconnect' : result.unreadable ? 'unreadable' : 'unreachable',
         retryAfterMs:
           result.failed === 'upstream' ? RETRY_AFTER_TROUBLE_MS : RETRY_AFTER_MISSING_MS,
       };
@@ -608,22 +788,29 @@ export class CompetitorsService {
   }
 
   private troubleSentence(kind: CompetitorKind, trouble: Trouble): string {
+    if (trouble === 'reconnect') return DISCOVER_MESSAGES.instagramReconnect;
     return DISCOVER_MESSAGES.competitorTrouble(
       COMPETITOR_KIND_NAMES[kind],
       trouble === 'unreadable',
     );
   }
 
-  private present(row: CompetitorRow, entry: CachedCompetitor): CompetitorItemsAnswer {
-    const now = Date.now();
+  /** A copy's items as the group shows them: each once, newest first, fifteen at most. */
+  private itemsOf(entry: CachedCompetitor): ComposedItem[] {
     // Two feeds of one site can carry the same post.
     const unique = new Map<string, ComposedItem>();
     for (const item of entry.parts.flatMap((part) => part.items)) {
       if (!unique.has(item.id)) unique.set(item.id, item);
     }
-    const items = [...unique.values()]
-      .sort(newestFirst)
-      .slice(0, ITEMS_PER_COMPETITOR)
+    return [...unique.values()].sort(newestFirst).slice(0, ITEMS_PER_COMPETITOR);
+  }
+
+  private present(
+    row: CompetitorRow,
+    entry: CachedCompetitor,
+  ): Omit<CompetitorItemsAnswer, 'lastSeenAt'> {
+    const now = Date.now();
+    const items = this.itemsOf(entry)
       // Per request and never stored: it carries the name the workspace gave them.
       .map((item) => ({
         ...item,
@@ -634,9 +821,11 @@ export class CompetitorsService {
     const notes = unavailable.map((kind) => {
       const failed = entry.parts.filter((part) => part.kind === kind && part.trouble);
       // "could not be read" only when that is all that went wrong with this kind.
-      const trouble: Trouble = failed.every((part) => part.trouble === 'unreadable')
-        ? 'unreadable'
-        : 'unreachable';
+      const trouble: Trouble = failed.some((part) => part.trouble === 'reconnect')
+        ? 'reconnect'
+        : failed.every((part) => part.trouble === 'unreadable')
+          ? 'unreadable'
+          : 'unreachable';
       const sentence = this.troubleSentence(kind, trouble);
 
       const kept = failed.filter((part) => part.items.length > 0);

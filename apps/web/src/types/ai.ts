@@ -147,6 +147,8 @@ export interface AiCredits {
     seo_advice: number;
     /** Sprint 10: a workflow's Generate Hashtags or Rewrite In Brand Voice step. */
     generate_snippet: number;
+    /** Sprint 11 Module 10: Research This Competitor in Discover. Optional for older APIs. */
+    competitor_research?: number;
   };
 }
 

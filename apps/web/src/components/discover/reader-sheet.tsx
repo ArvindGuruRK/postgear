@@ -100,24 +100,39 @@ function sentenceOf(cause: unknown): string {
   return cause instanceof ApiError && cause.status !== 0 ? cause.message : READ_FAILED;
 }
 
-/** The article's picture: lazy, no referrer, and gone if it does not load. */
+/** Smaller than this, a "picture" is a tracking pixel or an icon, not the article's photo. */
+export const MIN_PICTURE_WIDTH = 120;
+
+/**
+ * The article's picture: no referrer, and gone if it does not load. The box
+ * stays closed until the picture is in (Module 10), so a slow or broken one
+ * never leaves an empty frame at the top of the sheet, and a tracking pixel
+ * counts as no picture. Not lazy: it is the first thing in view, and a lazy
+ * picture inside a closed box would never be asked for.
+ */
 function HeroImage({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  const [state, setState] = useState<'loading' | 'shown' | 'failed'>('loading');
+  if (state === 'failed') return null;
 
   return (
     <AspectRatio
       ratio={16 / 9}
-      className="shrink-0 overflow-hidden rounded-lg border-2 border-outline"
+      data-state={state}
+      className={cn(
+        'shrink-0 overflow-hidden rounded-lg border-2 border-outline',
+        state === 'loading' && 'invisible absolute h-0 w-0 border-0',
+      )}
     >
       {/* biome-ignore lint/performance/noImgElement: a picture from the publisher's own host, with no remote pattern for the optimizer */}
       <img
         src={src}
         alt=""
-        loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
+        onLoad={(event) =>
+          setState(event.currentTarget.naturalWidth >= MIN_PICTURE_WIDTH ? 'shown' : 'failed')
+        }
+        onError={() => setState('failed')}
         data-testid="reader-image"
         className="h-full w-full object-cover"
       />

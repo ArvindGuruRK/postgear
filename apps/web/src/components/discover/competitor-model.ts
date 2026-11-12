@@ -8,8 +8,18 @@
  * input" and nothing else, so the sentence that says which field is wrong has
  * to come from here. The website is checked for being an address at all; where
  * it leads is the API's to judge, in its own sentence.
+ *
+ * Module 10 adds what a group reads: which rows are new since the person last
+ * looked, and the words and the Create Post target of Research This Competitor.
  */
-import type { Competitor, CompetitorInput, DiscoveredFeed } from '@/types/discover';
+import type {
+  Competitor,
+  CompetitorInput,
+  CompetitorResearch,
+  DiscoveredFeed,
+  DiscoverItem,
+} from '@/types/discover';
+import { formatRelative } from '../seo/seo-view-model';
 
 export const COMPETITOR_NAME_MAX = 80;
 export const MAX_COMPETITOR_FEEDS = 5;
@@ -32,6 +42,9 @@ export const STILL_READING = 'We are still reading what they published. Try agai
 export const YOUTUBE_HINT = 'A channel id starts with UC and is 24 characters long.';
 export const BLUESKY_HINT = 'A handle looks like name.bsky.social.';
 export const MASTODON_HINT = 'An account looks like name@instance.';
+export const INSTAGRAM_HINT = 'Read through your connected Instagram business account.';
+export const INSTAGRAM_SHAPE =
+  'A username is up to 30 letters, numbers, periods and underscores, or paste their profile address.';
 export const NEWS_HINT =
   'What Google News is searched for. Leave it as the name to follow the name.';
 export const NEWS_LENGTH = 'A search phrase is 2 to 80 characters.';
@@ -52,6 +65,7 @@ export interface CompetitorForm {
   website: string;
   feeds: FeedChoice[];
   youtube: string;
+  instagram: string;
   bluesky: string;
   mastodon: string;
   news: string;
@@ -84,6 +98,7 @@ export function formFrom(competitor: Competitor | null): CompetitorForm {
       website: '',
       feeds: [],
       youtube: '',
+      instagram: '',
       bluesky: '',
       mastodon: '',
       news: '',
@@ -96,6 +111,7 @@ export function formFrom(competitor: Competitor | null): CompetitorForm {
     website: competitor.websiteUrl ?? '',
     feeds: competitor.feedUrls.map((url) => ({ url, title: '', kind: null, checked: true })),
     youtube: competitor.youtubeChannelId ?? '',
+    instagram: competitor.instagramUsername ?? '',
     bluesky: competitor.blueskyHandle ?? '',
     mastodon: competitor.mastodonAcct ?? '',
     news: competitor.newsQuery ?? '',
@@ -213,7 +229,61 @@ const HOST = '(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?:[a-z]{2,63}|xn--[a-
 const BLUESKY_HANDLE = new RegExp(`^${HOST}$`, 'i');
 const MASTODON_ACCOUNT = new RegExp(`^[A-Za-z0-9_]{1,64}@${HOST}$`, 'i');
 
-export type CompetitorField = 'name' | 'website' | 'youtube' | 'bluesky' | 'mastodon' | 'news';
+/*
+ * An Instagram username the way the API reads one (`instagramUsername` in the
+ * discover engine): up to 30 letters, numbers, periods and underscores, never
+ * starting or ending on a period or holding two in a row.
+ */
+const INSTAGRAM_USERNAME = /^(?!\.)(?!.*\.\.)(?!.*\.$)[A-Za-z0-9._]{1,30}$/;
+const INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com', 'm.instagram.com']);
+/** The first part of an address that is a page of Instagram's own, never a profile. */
+const INSTAGRAM_PAGES = new Set([
+  'p',
+  'reel',
+  'reels',
+  'tv',
+  'stories',
+  'explore',
+  'accounts',
+  'direct',
+  'about',
+  'developer',
+  'legal',
+]);
+
+function instagramProfile(text: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+  } catch {
+    return null;
+  }
+  if (!INSTAGRAM_HOSTS.has(url.hostname)) return null;
+  const parts = url.pathname.split('/').filter(Boolean);
+  return parts.length === 1 && !INSTAGRAM_PAGES.has(parts[0].toLowerCase()) ? parts[0] : null;
+}
+
+/**
+ * `@Acme.Sample`, `acme.sample` or `https://www.instagram.com/acme.sample/` to
+ * the bare, lower-case username the API keeps. Null when it cannot be one (a
+ * post's address included).
+ */
+export function instagramName(text: string): string | null {
+  const typed = text.trim();
+  const isAddress = /^(?:https?:\/\/)?(?:[a-z]+\.)?instagram\.com(?:[/?#]|$)/i.test(typed);
+  const candidate = isAddress ? instagramProfile(typed) : typed.replace(/^@/, '');
+  const name = candidate?.toLowerCase() ?? '';
+  return INSTAGRAM_USERNAME.test(name) ? name : null;
+}
+
+export type CompetitorField =
+  | 'name'
+  | 'website'
+  | 'youtube'
+  | 'instagram'
+  | 'bluesky'
+  | 'mastodon'
+  | 'news';
 
 /** What is wrong with the form, field by field. Empty when it can be sent. */
 export function formProblems(form: CompetitorForm): Partial<Record<CompetitorField, string>> {
@@ -225,6 +295,10 @@ export function formProblems(form: CompetitorForm): Partial<Record<CompetitorFie
 
   const youtube = form.youtube.trim();
   if (youtube && !/^UC[A-Za-z0-9_-]{22}$/.test(youtube)) problems.youtube = YOUTUBE_HINT;
+
+  if (form.instagram.trim() && !instagramName(form.instagram)) {
+    problems.instagram = INSTAGRAM_SHAPE;
+  }
 
   const bluesky = withoutAt(form.bluesky);
   if (bluesky && !BLUESKY_HANDLE.test(bluesky)) problems.bluesky = BLUESKY_HINT;
@@ -261,6 +335,8 @@ export function competitorInput(form: CompetitorForm): CompetitorInput {
     blueskyHandle: withoutAt(form.bluesky).toLowerCase() || null,
     mastodonAcct: withoutAt(form.mastodon) || null,
     newsQuery: news && news !== name ? news : null,
+    // The bare name, as the API keeps it, so an unchanged one is never sent again.
+    instagramUsername: instagramName(form.instagram) ?? (form.instagram.trim() || null),
   };
 }
 
@@ -290,6 +366,78 @@ export function competitorPatch(form: CompetitorForm, saved: Competitor): Partia
   }
   if ((input.mastodonAcct ?? null) !== saved.mastodonAcct) patch.mastodonAcct = input.mastodonAcct;
   if ((input.newsQuery ?? null) !== saved.newsQuery) patch.newsQuery = input.newsQuery;
+  if ((input.instagramUsername ?? null) !== (saved.instagramUsername ?? null)) {
+    patch.instagramUsername = input.instagramUsername;
+  }
 
   return patch;
+}
+
+/*
+ * New since you last looked (Module 10). The API says when this person last
+ * looked at a competitor (`lastSeenAt`); a row published after that is new.
+ * The first look (no `lastSeenAt`) marks nothing, so a competitor just added
+ * does not open with every row shouting.
+ */
+
+/** Whether a row was published after the person last looked. Never for a row with no date. */
+export function isNewSince(
+  item: Pick<DiscoverItem, 'publishedAt'>,
+  lastSeenAt: string | null | undefined,
+): boolean {
+  if (!lastSeenAt || !item.publishedAt) return false;
+  const seen = Date.parse(lastSeenAt);
+  const published = Date.parse(item.publishedAt);
+  return !Number.isNaN(seen) && !Number.isNaN(published) && published > seen;
+}
+
+export function newItemCount(
+  items: readonly Pick<DiscoverItem, 'publishedAt'>[],
+  lastSeenAt: string | null | undefined,
+): number {
+  return items.filter((item) => isNewSince(item, lastSeenAt)).length;
+}
+
+/** The group's count badge: "3 New". */
+export function newCountText(count: number): string {
+  return `${count} New`;
+}
+
+/*
+ * Research This Competitor (Module 10): the API reads the rows listed under a
+ * competitor and writes back the themes, the rhythm and a few openings.
+ */
+
+/** What one research costs, unless today's copy answers for the same rows. */
+export const RESEARCH_COST = 3;
+export const RESEARCH_COST_TEXT = `${RESEARCH_COST} credits`;
+export const RESEARCH_FAILED = 'We could not research this competitor. Try again in a moment.';
+export const RESEARCHING = 'Researching...';
+
+/** "Based on 8 posts, written 2 hours ago." */
+export function researchBasedOn(
+  research: Pick<CompetitorResearch, 'basedOn' | 'createdAt'>,
+  now: Date,
+): string {
+  const posts = `${research.basedOn} ${research.basedOn === 1 ? 'post' : 'posts'}`;
+  const when = formatRelative(research.createdAt, now);
+  return when ? `Based on ${posts}, written ${when}.` : `Based on ${posts}.`;
+}
+
+/**
+ * An opening as something Create Post can start from: a competitor item of
+ * its own, named after the opening, its brief saying where the idea came from.
+ */
+export function researchIdea(
+  competitor: Pick<Competitor, 'id' | 'name'>,
+  opening: string,
+  index: number,
+): DiscoverItem {
+  return {
+    id: `research-${competitor.id}-${index}`,
+    kind: 'competitor',
+    source: { id: 'rss', name: competitor.name },
+    title: opening,
+    brief: `Idea from researching ${competitor.name}: ${opening}`,
+  };
 }

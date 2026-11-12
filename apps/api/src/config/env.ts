@@ -263,8 +263,25 @@ const envSchema = z
     ),
     // Module 08: resolving a Google News link so Read can open the article.
     DISCOVER_LINK_DECODE: blankAsUnset(z.enum(['true', 'false']).default('true')),
+    // Module 10: Read opens a page whose text only appears once its scripts run
+    // in the shared headless browser (the SEO crawler's, guarded the same way).
+    DISCOVER_READER_RENDER: blankAsUnset(z.enum(['true', 'false']).default('true')),
     // Module 05: optional. Without it the Videos tab says it is not set up.
     YOUTUBE_API_KEY: blankAsUnset(z.string().min(1).optional()),
+    // Module 10: a self-hosted Nominatim (the `geocoder` compose profile). When
+    // set, places are found there instead of the public instance, the one-a-second
+    // limit no longer applies, and the city field searches as you type.
+    DISCOVER_GEOCODER_URL: blankAsUnset(z.string().url().optional()),
+    // Module 10: which service answers the News tab. `google` (the free feeds) by
+    // default; `serpapi` and `newsdata` are paid or keyed, and need their key.
+    DISCOVER_NEWS_PROVIDER: blankAsUnset(
+      z.enum(['google', 'serpapi', 'newsdata']).default('google'),
+    ),
+    SERPAPI_API_KEY: blankAsUnset(z.string().min(1).optional()),
+    NEWSDATA_API_KEY: blankAsUnset(z.string().min(1).optional()),
+    // Module 10: the DB-IP Lite country file (`npm run discover:ip-db`). Without
+    // it the first guess is the time zone alone, as before.
+    DISCOVER_IP_COUNTRY_FILE: blankAsUnset(z.string().min(1).optional()),
 
     // The worker's key to the internal step gateway (`/internal/automation/*`,
     // Module 10): steps that need API services (posts, AI, email) call it with
@@ -364,6 +381,20 @@ const envSchema = z
     }
 
     // Recorded headlines presented as today's news would be a quiet lie.
+    if (env.DISCOVER_NEWS_PROVIDER === 'serpapi' && !env.SERPAPI_API_KEY) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SERPAPI_API_KEY'],
+        message: 'DISCOVER_NEWS_PROVIDER="serpapi" needs SERPAPI_API_KEY',
+      });
+    }
+    if (env.DISCOVER_NEWS_PROVIDER === 'newsdata' && !env.NEWSDATA_API_KEY) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['NEWSDATA_API_KEY'],
+        message: 'DISCOVER_NEWS_PROVIDER="newsdata" needs NEWSDATA_API_KEY',
+      });
+    }
     if (env.NODE_ENV === 'production' && env.DISCOVER_SIMULATION === 'true') {
       context.addIssue({
         code: z.ZodIssueCode.custom,

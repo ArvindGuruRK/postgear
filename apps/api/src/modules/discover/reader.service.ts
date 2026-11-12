@@ -20,6 +20,13 @@
  *    only, 1 MiB at most, ten seconds in all, every redirect hop judged.
  * 6. **The article**, found off this thread (`reader.extractor.ts`): a worker
  *    that is killed if a page takes more than two seconds.
+ * 7. **The rendered page** (Module 10, backlog #7). A page whose HTML holds
+ *    almost no text is usually a shell its scripts fill in. When the parse
+ *    finds no article there, the page is opened once in the shared headless
+ *    browser (the SEO crawler's pool: every request it makes, redirects and
+ *    scripts included, meets the private-address guard), and what it drew is
+ *    parsed again. A few a workspace every ten minutes, never under
+ *    simulation, and off with `DISCOVER_READER_RENDER="false"`.
  *
  * ## Nothing is stored but a copy in Redis
  *
@@ -55,6 +62,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import {
@@ -64,6 +72,8 @@ import {
   googleNewsArticleId,
   LinkUnresolvedError,
 } from '@postgear/discover-engine';
+import type { BrowserPool, PooledPage } from '@postgear/seo-engine';
+import { BROWSER_POOL } from '../../common/browser/browser-pool.module';
 import { securityLogger } from '../../common/logging/security-logger';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -104,6 +114,32 @@ const PAGE_ACCEPT = 'text/html,application/xhtml+xml;q=0.9';
 /** The page and every redirect before it. One request gets 8 seconds of that. */
 const READ_DEADLINE_MS = 10_000;
 const DECODE_DEADLINE_MS = 8_000;
+
+/** Pages one workspace may have opened in the headless browser, per window below. */
+export const RENDERS_PER_WORKSPACE = 5;
+const RENDER_SHARE_SECONDS = 10 * 60;
+/** The whole rendered read: the page, its scripts, and a moment for the network to settle. */
+const RENDER_DEADLINE_MS = 15_000;
+const RENDER_IDLE_GRACE_MS = 2_500;
+/**
+ * Below this much visible text, a page that has no article is worth opening in
+ * the browser: it is most likely a shell its scripts fill in. A real page with
+ * no article (a home page, a list) has plenty and is not opened.
+ */
+export const SHELL_TEXT_CHARS = 1_500;
+
+/** The words a person would see, roughly: no scripts, no styles, no tags. */
+export function visibleTextLength(html: string): number {
+  return (
+    html
+      .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      // An entity is one character on the screen (`&amp;` is the `&` a person sees).
+      .replace(/&[a-z#0-9]+;/gi, '&')
+      .replace(/\s+/g, ' ')
+      .trim().length
+  );
+}
 
 /** What `keys.link` holds for an id that would not open. Never a valid address. */
 const UNRESOLVED_MARK = '!';
@@ -203,6 +239,7 @@ export class ReaderService {
     @Inject(READER_GATE) private readonly gate: DiscoverGate,
     private readonly redis: RedisService,
     @Inject(ARTICLE_EXTRACTOR) private readonly extractor: ArticleExtractor,
+    @Optional() @Inject(BROWSER_POOL) private readonly browser?: BrowserPool,
   ) {
     this.keys = discoverKeys(engine.simulation);
   }
@@ -228,7 +265,14 @@ export class ReaderService {
       // pages may have been parsed, and charged, while this one was on its way.
       if (this.parseTime.isSpent(orgId)) throw this.throttled(orgId);
 
-      return this.extract(orgId, page.body, page.finalUrl);
+      const plain = await this.extract(orgId, page.body, page.finalUrl);
+      if (!('refusal' in plain) || plain.refusal !== 'read_not_article') return plain;
+      if (visibleTextLength(page.body) >= SHELL_TEXT_CHARS) return plain;
+
+      // Module 10: a shell its scripts fill in. Opened once in the browser.
+      const rendered = await this.renderPage(orgId, page.finalUrl);
+      if (!rendered || this.parseTime.isSpent(orgId)) return plain;
+      return this.extract(orgId, rendered.html, rendered.finalUrl);
     });
 
     await this.redis.set(
@@ -390,6 +434,68 @@ export class ReaderService {
       throw this.failed();
     } finally {
       release();
+    }
+  }
+
+  /**
+   * The page as the headless browser drew it, or null when it cannot be had:
+   * rendering off, no browser on this server, this workspace's share spent,
+   * a bad status, or anything going wrong on the way. Never an error of its
+   * own: the plain read's sentence stands.
+   *
+   * The pool's route hook judges every request the page makes, and the final
+   * address is judged again with the reader's own guard, so a redirect into a
+   * private network is refused here as it is on the plain fetch.
+   */
+  private async renderPage(
+    orgId: string,
+    url: string,
+  ): Promise<{ html: string; finalUrl: string } | null> {
+    if (!this.engine.render || !this.browser) return null;
+
+    const own = await this.redis.incrementWithTtl(
+      workspaceKeys.renderShare(orgId),
+      RENDER_SHARE_SECONDS,
+    );
+    if (own > RENDERS_PER_WORKSPACE) return null;
+    if (!(await this.browser.available().catch(() => false))) return null;
+
+    const deadline = AbortSignal.timeout(RENDER_DEADLINE_MS);
+    let lease: PooledPage | null = null;
+    try {
+      lease = await this.browser.acquire({ signal: deadline });
+      const response = await lease.page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: RENDER_DEADLINE_MS,
+      });
+      if (response?.status() !== 200) {
+        this.unreadable('render_status', { status: response?.status() ?? 0 });
+        return null;
+      }
+      await lease.page
+        .waitForLoadState('networkidle', { timeout: RENDER_IDLE_GRACE_MS })
+        .catch(() => undefined);
+
+      const finalUrl = response.url() || lease.page.url() || url;
+      const verdict = await judgeAddress(this.engine.guard, finalUrl);
+      if (!verdict.ok) {
+        if (isPrivate(verdict.reason)) {
+          securityLogger.warn('discover.read_private', {
+            orgId,
+            reason: verdict.reason,
+            via: 'render',
+          });
+        }
+        return null;
+      }
+
+      const html = await lease.page.content();
+      return { html: html.slice(0, PAGE_MAX_BYTES), finalUrl: verdict.url.toString() };
+    } catch (error) {
+      this.unreadable(error instanceof Error ? `render_${error.name}` : 'render');
+      return null;
+    } finally {
+      await lease?.release().catch(() => undefined);
     }
   }
 

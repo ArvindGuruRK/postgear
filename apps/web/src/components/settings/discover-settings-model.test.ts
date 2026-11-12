@@ -7,6 +7,14 @@ import type { Locality } from '@/types/discover';
 import {
   addableLanguages,
   addLanguageHelp,
+  INTEREST_CHARACTERS,
+  INTEREST_REPEATED,
+  INTEREST_TOO_LONG,
+  INTEREST_TOO_SHORT,
+  INTERESTS_FULL,
+  interestProblem,
+  interestsWith,
+  interestsWithout,
   LANGUAGES_ALL_ADDED,
   LANGUAGES_FULL,
   LANGUAGES_NEED_PLACE,
@@ -126,11 +134,12 @@ describe('news topics', () => {
 });
 
 describe('source switches', () => {
-  it('names the five groups, News not among them', () => {
+  it('names the six groups in page order, the world press with News, News itself not among them', () => {
     expect(SOURCE_FIELDS.map((field) => field.label)).toEqual([
       'Rising Searches',
       'Wikipedia',
       'Worldwide Social',
+      'World Press',
       'Videos',
       'Festivals',
     ]);
@@ -138,6 +147,7 @@ describe('source switches', () => {
       'trends',
       'wikipedia',
       'social',
+      'gdelt',
       'videos',
       'festivals',
     ]);
@@ -151,13 +161,14 @@ describe('source switches', () => {
     expect(sourceOn({ videos: false }, 'social')).toBe(true);
   });
 
-  it('sends all five when one is flipped', () => {
+  it('sends every switch when one is flipped', () => {
     expect(sourcesWith(null, 'social', false)).toEqual({
       trends: true,
       wikipedia: true,
       social: false,
       videos: true,
       festivals: true,
+      gdelt: true,
     });
     expect(sourcesWith({ social: false }, 'videos', false)).toEqual({
       trends: true,
@@ -165,6 +176,7 @@ describe('source switches', () => {
       social: false,
       videos: false,
       festivals: true,
+      gdelt: true,
     });
     expect(sourcesWith({ social: false, videos: false }, 'social', true)).toEqual({
       trends: true,
@@ -172,7 +184,33 @@ describe('source switches', () => {
       social: true,
       videos: false,
       festivals: true,
+      gdelt: true,
     });
+  });
+});
+
+describe('interests', () => {
+  it("holds a typed interest to the API's rule, with one sentence for each refusal", () => {
+    expect(interestProblem('yoga', [])).toBeNull();
+    expect(interestProblem('C++', [])).toBeNull();
+    expect(interestProblem("Rock 'n' Roll", [])).toBeNull();
+    expect(interestProblem('தமிழ் சினிமா', [])).toBeNull();
+    expect(interestProblem(' a ', [])).toBe(INTEREST_TOO_SHORT);
+    expect(interestProblem('x'.repeat(41), [])).toBe(INTEREST_TOO_LONG);
+    expect(interestProblem('x'.repeat(40), [])).toBeNull();
+    expect(interestProblem('#yoga', [])).toBe(INTEREST_CHARACTERS);
+    expect(interestProblem('yoga!', [])).toBe(INTEREST_CHARACTERS);
+    expect(interestProblem('Electric  Cars', ['electric cars'])).toBe(INTEREST_REPEATED);
+    expect(interestProblem('tea', ['a1', 'b2', 'c3', 'd4', 'e5'])).toBe(INTERESTS_FULL);
+    for (const sentence of [INTEREST_TOO_SHORT, INTEREST_TOO_LONG, INTEREST_CHARACTERS]) {
+      expect(sentence).toMatch(/\.$/);
+    }
+  });
+
+  it('adds tidied at the end, never twice, and removes one', () => {
+    expect(interestsWith(['Yoga'], '  electric   cars ')).toEqual(['Yoga', 'electric cars']);
+    expect(interestsWith(['Yoga'], 'yoga')).toEqual(['Yoga']);
+    expect(interestsWithout(['Yoga', 'Tea'], 'Yoga')).toEqual(['Tea']);
   });
 });
 

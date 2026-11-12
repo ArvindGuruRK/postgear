@@ -348,9 +348,8 @@ findings, all fixed except where said:
    `DISCOVER_LINK_DECODE=false` and Open are the fallback.
 3. **OpenStreetMap's place finder has never been called for real**, and no
    YouTube key exists. Both are free; both are your call (§10).
-4. **With the place finder off, the popover offers Worldwide only.** The
-   stories ask for a country and region picker there. Not built: a new control,
-   out of Module 09's scope.
+4. **Closed in Module 10.** With the place finder off, the popover now
+   offers a country and region picker as well as Worldwide.
 5. **14 countries get no `date-holidays` rows** (BN, CC, CN, CX, HK, ID, KR, MU,
    MY, PH, SG, SR, TW, VN): `date-chinese@2.2.0` breaks under `require`, and no
    newer release exists (checked 2026-11-11). Singapore reads its calendar
@@ -403,8 +402,9 @@ Nothing is merged and no pull request is open.
    `workflows-page-revamp` and has it merged in (`c7c41f4`), so a pull request
    to `master` carries every earlier unmerged branch with it. Merge those
    first, or accept one large merge.
-2. **The local database is ready.** The worktree is gone; `postgear_db` has both
-   Sprint 11 migrations, and `.env` has `DISCOVER_SIMULATION="true"`. The old
+2. **The local database is ready.** The worktree is gone; `postgear_db` has all
+   three Sprint 11 migrations (the third from Module 10), and `.env` has
+   `DISCOVER_SIMULATION="false"` since Module 10 (Arvind's word, 2026-11-12). The old
    notes about main's `.env`, main's database and stale copies of the Sprint 11
    documents no longer apply. `postgear_discover_db` was dropped.
 3. **Any other machine or database** (a teammate, staging, production):
@@ -426,7 +426,7 @@ Nothing is merged and no pull request is open.
    as soft-deleted rows. `npm run db:seed` does not remove them; they are
    invisible in the app.
 10. **`screenshots/` is untracked and must stay out of the commit** (`s11-01` to
-    `s11-59`). Say when it can be cleared.
+    `s11-107`). Say when it can be cleared.
 11. **Google's feeds** (Known gaps 13): pick option A, B or C before real users
     see Trending and News.
 
@@ -448,3 +448,105 @@ Nothing is merged and no pull request is open.
 
 The whole sprint against its base: 290 files and about 72,800 lines before this
 pass, most of them recorded feeds and tests.
+
+---
+
+## 11. Module 10: the P2 backlog (2026-11-12, not committed)
+
+Built on Arvind's word ("implement all the backlogs"), in the main folder on
+`postgear_db`, with Discover's real feeds on (`DISCOVER_SIMULATION="false"` in
+the root `.env`). **Nothing of Module 10 is committed.** The item by item record
+is [module-10-p2-backlog.md](../sprint-11/discover-implementation-docs/module-10-p2-backlog.md);
+the decisions are at the end of the modules' README.
+
+**16 of the 18 backlog items are built**: pre-warm, competitor refresh with New
+counts, Saved ideas, Home's Trending Near You, Instagram Business Discovery,
+the per-user place, the rendered reader fallback, GDELT, the SerpApi and
+NewsData adapters (off), the IP first guess, Tamil Nadu's own festivals, the
+weekly digest, Research This Competitor, topic interests and the self-hosted
+geocoder with type-ahead. **Skipped**: #9 (Trends CSV through a browser,
+against Google's terms) and #10 (the official Trends API, application-gated).
+
+Also closed: Known gaps 4 above (the country and region picker now shows when
+the place finder is off) and the four look items from Module 09 (the phone tab
+bar has an edge fade, the card menu stays on the action row, the reader hides
+its picture box until the picture loads, the skeleton and the sheet stop moving
+under reduced motion).
+
+### Evidence
+
+| Check | Result |
+|---|---|
+| Typecheck: web, API, worker, discover-engine, ui | all clean |
+| Web tests (whole workspace) | 134 suites, 1949 of 1949 |
+| API tests (whole workspace) | 2,707 passed, 7 failed, 20 skipped in the full run. 3 were specs this module made stale (the credits ledger types, the notification columns): fixed, with 2 tests added, and those two files pass on their own (16 of 16). The other 4 are the Sprint 9 image tests over 5 seconds (Known gaps 11) |
+| Worker tests | 36 suites, 463 of 463 |
+| Engine tests | 37 suites, 1740 of 1740 |
+| API Discover suites after the spec review | 20 suites, 894 tests |
+| Lint | biome on every file touched in the last pass, one at a time: clean |
+| Look pass against the real feeds | screenshots `s11-60` to `s11-107`, no page errors in the browser |
+
+Not run: `npm run validate` as one command, the e2e spec (Module 10 adds no e2e
+test), and any real call to Instagram, SerpApi, NewsData, YouTube or OpenAI.
+
+### How to check it by hand
+
+Start with `npm run dev`, sign in as `demo@postgear.local`, open Discover.
+
+1. **Trending**: the first card is wide with its picture beside the words and
+   a big rank; every card has one row: Create Post, Read, the bookmark, the
+   menu. The title opens the story in a new tab.
+2. **News**: Google News stories have no pictures, so every card is the same
+   width (no wide empty lead). In Settings, Discover, add an interest
+   ("fintech"): News gets a group for it. The World Press group (GDELT) is on
+   by default and has its switch in the same card; GDELT allows one call every
+   6 seconds for the whole deployment, so it may show on the second look.
+3. **Saved**: press a bookmark on any card, open Saved (its count shows on the
+   tab), add a note, press Create Post from the idea, remove it. A second
+   member sees the same list.
+4. **Festivals**: calendar tiles, the next 7 days in blue; Tamil Nadu's own
+   days (Karthigai Deepam) are in the list.
+5. **Competitors**: add one with a website. With the worker running, it is
+   read again once nobody has looked at it for 20 hours; new items then show
+   a New badge and the tab a count. Research This Competitor needs AI on (3
+   credits, simulated locally).
+6. **Place**: choose a city, open Discover in another browser signed in as the
+   same person: it opens on that city. Back to the workspace place clears it.
+   The popover hides Save For This Workspace while the workspace's own place is
+   shown.
+7. **Home**: Trending Near You lists five rising searches with Create Post and
+   See More.
+8. **Phone width**: the tab bar fades at its edge, and the language chip shows
+   the language's own name.
+9. **Digest**: turn on the weekly digest in Settings, Discover. It goes out on
+   Monday 08:00 to 10:00 in the workspace's zone; locally the email is printed
+   to the API console. Members can turn it off in their notification
+   preferences.
+
+### Module 10 known gaps
+
+1. Instagram Business Discovery, SerpApi and NewsData have never made a real
+   call. Business Discovery needs Meta's app review and possibly the
+   `instagram_manage_insights` permission, which the Instagram connection does
+   not ask for today, so a real workspace may see Reconnect.
+2. Research This Competitor is open to every member (3 credits), like the
+   other AI features. Make it admin-only if you prefer.
+3. In simulation an interest's group has no recording, so it is left out.
+4. Trends uses Google's older region codes: a region Google does not list
+   falls back to its country.
+5. The news provider is not part of the feed cache key: switching
+   `DISCOVER_NEWS_PROVIDER` serves the old copies until they expire.
+6. The IP first guess needs the operator to download DB-IP's table
+   (`npm run discover:ip-db`) and set `DISCOVER_IP_COUNTRY_FILE`; without it the
+   guess is the time zone only.
+
+### Before committing Module 10
+
+- `screenshots/` (now `s11-01` to `s11-107`) stays out of the commit.
+- The migration is applied locally; staging and production need
+  `npm run migrate:deploy --workspace=packages/db`.
+- New settings in `.env.example`: `DISCOVER_READER_RENDER`,
+  `DISCOVER_GEOCODER_URL`, `DISCOVER_NEWS_PROVIDER`, `SERPAPI_API_KEY`,
+  `NEWSDATA_API_KEY`, `DISCOVER_IP_COUNTRY_FILE`.
+- `docs/launch-readiness/` is another session's work and is not part of this
+  module.

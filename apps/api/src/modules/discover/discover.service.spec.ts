@@ -133,7 +133,10 @@ function failure(failed: SourceFailure): SourceResult {
   return answer([], { failed });
 }
 
-type FakeEngine = Pick<DiscoverEngine, 'simulation' | 'userAgent' | 'geocoder'> & {
+type FakeEngine = Pick<
+  DiscoverEngine,
+  'simulation' | 'userAgent' | 'geocoder' | 'geocoderSelfHosted' | 'newsProvider'
+> & {
   trends: jest.Mocked<DiscoverSource>;
   news: jest.Mocked<GoogleNewsSource>;
   wikipedia: jest.Mocked<DiscoverSource>;
@@ -141,6 +144,8 @@ type FakeEngine = Pick<DiscoverEngine, 'simulation' | 'userAgent' | 'geocoder'> 
   mastodon: jest.Mocked<DiscoverSource>;
   videos: jest.Mocked<DiscoverSource> | null;
   holidays: jest.Mocked<DiscoverSource>;
+  /** Module 10: off here, so a News test sees only the stories it set up. */
+  gdelt: jest.Mocked<DiscoverSource> | null;
 };
 
 function fakeSource(id: DiscoverSource['id'], result: SourceResult): jest.Mocked<DiscoverSource> {
@@ -168,6 +173,9 @@ function fakeEngine(simulation: boolean, hasVideos: boolean): FakeEngine {
     simulation,
     userAgent: 'PostGear/1.0',
     geocoder: null,
+    geocoderSelfHosted: false,
+    newsProvider: 'google',
+    gdelt: null,
     trends: {
       id: 'google-trends',
       name: 'Google Trends',
@@ -206,6 +214,8 @@ function fakeSettingsRepository(stored: Record<string, unknown>) {
         languages: [],
         topics: [],
         sources: stored[orgId],
+        interests: [],
+        weeklyDigest: false,
         locationSource: 'NONE',
         updatedAt: NOW,
       };
@@ -351,6 +361,9 @@ describe('status', () => {
     expect(build({ simulation: true }).service.status()).toEqual({
       simulation: true,
       geocoder: 'off',
+      // No place finder, so no search as someone types.
+      typeahead: false,
+      newsProvider: 'google',
       sources: {
         trends: true,
         news: true,
@@ -2397,8 +2410,9 @@ describe('Festivals', () => {
     expect(result.unavailable).toEqual([]);
     expect(result.today).toBe('2026-11-11');
     const [group] = result.groups;
+    // Tamil Nadu has a hand-kept list of its own days (Module 10), so it is credited too.
     expect(group.attribution).toEqual({
-      name: 'Public holiday calendars and date-holidays',
+      name: 'Public holiday calendars, date-holidays and state lists',
       url: expect.stringContaining('https://calendar.google.com/calendar/embed?src=en.indian'),
     });
     expect(group.items).toContainEqual(
@@ -2415,11 +2429,16 @@ describe('Festivals', () => {
     expect(dates).toEqual([...dates].sort());
     expect(dates.every((date) => date >= '2026-11-04' && date <= '2026-12-11')).toBe(true);
 
-    // The copy holds next year's Diwali too, as a row of its own.
-    const diwali = stored(built.redis, TAMIL_NADU_COPY).groups[0].items.filter(
-      (item) => item.title === 'Diwali/Deepavali',
+    // The copy holds next year's Diwali too, as a row of its own. In Tamil Nadu that
+    // is the state list's Deepavali on 28 October 2027, which wins over the national
+    // calendar's 29th (Module 10, `curated/tamil-nadu.ts`).
+    const diwali = stored(built.redis, TAMIL_NADU_COPY).groups[0].items.filter((item) =>
+      item.title.includes('Deepavali'),
     );
-    expect(diwali.map((item) => item.date).sort()).toEqual(['2026-11-08', '2027-10-29']);
+    expect(diwali.map((item) => [item.date, item.title]).sort()).toEqual([
+      ['2026-11-08', 'Diwali/Deepavali'],
+      ['2027-10-28', 'Deepavali'],
+    ]);
     expect(diwali[0].id).not.toBe(diwali[1].id);
   });
 
@@ -2626,6 +2645,8 @@ describe('what counts as a new place', () => {
 
 describe('simulated and real, on one Redis', () => {
   const REAL = [
+    // Module 10: the places the worker warms before the morning.
+    'discover:active:v1',
     'discover:budget:youtube:2026-11-04',
     'discover:feed:v1:festivals:IN:IN-TN',
     'discover:feed:v1:social:bluesky',
@@ -2733,6 +2754,7 @@ describe("a workspace's switches", () => {
     social: false,
     videos: false,
     festivals: false,
+    gdelt: false,
   };
 
   /** A request as the page sends it: the one asker that wants its workspace's switches. */
@@ -2836,7 +2858,7 @@ describe("a workspace's switches", () => {
 
   it.each([
     ['trending', ['trends', 'wikipedia', 'social']],
-    ['news', []],
+    ['news', ['gdelt']],
     ['videos', ['videos']],
     ['festivals', ['festivals']],
   ] as const)(
@@ -2844,6 +2866,7 @@ describe("a workspace's switches", () => {
     async (kind, hidden) => {
       // Stored in an order no tab shows them in.
       const stored = {
+        gdelt: false,
         festivals: false,
         videos: false,
         social: false,
@@ -2871,16 +2894,19 @@ describe("a workspace's switches", () => {
     expect(result.hidden).toEqual(['trends']);
   });
 
-  it('never switches News, and reads nothing to know that', async () => {
+  it("never switches News's own stories, and reads the row once for what it can switch", async () => {
     const { service, engine, settings } = build({ sources: { [ORG]: EVERYTHING_OFF } });
 
     const result = await service.feed(ORG, fromThePage(news()));
 
     expect(ids(result)).toEqual(['place', 'top']);
-    expect(result.hidden).toEqual([]);
+    // Module 10: the world's press (GDELT) is the one part of News a workspace can switch off.
+    expect(result.hidden).toEqual(['gdelt']);
     expect(result.unavailable).toEqual([]);
     expect(engine.news.top).toHaveBeenCalledTimes(1);
-    expect(settings.find).not.toHaveBeenCalled();
+    // One read of its own row, for the GDELT switch and the interests together.
+    expect(settings.find).toHaveBeenCalledTimes(1);
+    expect(settings.find).toHaveBeenCalledWith(ORG);
   });
 
   it.each([

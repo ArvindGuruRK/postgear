@@ -338,6 +338,8 @@ const SAVED: DiscoverSettings = {
   languages: ['ta', 'en'],
   topics: ['BUSINESS'],
   sources: null,
+  interests: [],
+  weeklyDigest: false,
   locationSource: 'SEARCH',
   place: CHENNAI,
   updatedAt: '2026-11-10T08:00:00.000Z',

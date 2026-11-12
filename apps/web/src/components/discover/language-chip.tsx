@@ -7,10 +7,11 @@
  * the English one ("தமிழ் Tamil"). The place's full list stays for the
  * Create Post sheet, where the AI can write in a language News cannot read.
  *
- * On a phone it shortens to the code ("ta").
+ * On a phone it shortens to the language's own name ("தமிழ்"), which the
+ * person reading it knows, where a code like "ta" means nothing to most.
  */
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@postgear/ui';
-import { languageLabel } from './language-names';
+import { languageLabel, languageName } from './language-names';
 
 export function LanguageChip({
   languages,
@@ -32,7 +33,7 @@ export function LanguageChip({
       >
         <SelectValue>
           <span className="hidden truncate sm:inline">{languageLabel(value)}</span>
-          <span className="sm:hidden">{value}</span>
+          <span className="truncate sm:hidden">{languageName(value).native}</span>
         </SelectValue>
       </SelectTrigger>
       <SelectContent align="start">

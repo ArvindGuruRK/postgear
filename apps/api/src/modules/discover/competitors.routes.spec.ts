@@ -1,13 +1,19 @@
 /**
  * Who may call the competitor routes, read from the real route metadata through
  * the real guards, in the shape of `discover.routes.spec.ts`: any member may
- * list, add, edit and read; only an admin may remove; nothing is public; and a
- * new route can only be added by adding it to this table.
+ * list, add, edit, read, mark seen and research; only an admin may remove;
+ * nothing is public; and a new route can only be added by adding it to this
+ * table.
  *
  * Then what the simulated engine does with the addresses the hand check types,
  * because that is the one place a mistake would let simulation fetch something.
  */
-import { ForbiddenException, RequestMethod, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  RequestMethod,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -23,6 +29,7 @@ jest.mock('@postgear/db', () => ({
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import type { CompetitorResearchService } from './competitor-research.service';
 import { CompetitorsController } from './competitors.controller';
 import { createCompetitorEngine } from './competitors.engine';
 import type { CompetitorsService } from './competitors.service';
@@ -32,8 +39,17 @@ const { prisma } = jest.requireMock('@postgear/db') as {
   prisma: { userOrganization: { findFirst: jest.Mock } };
 };
 
-/** What any member may do. */
-const MEMBER_ROUTES = ['list', 'create', 'discoverFeeds', 'update', 'items'];
+/** What any member may do. Module 10 added the unseen count, marking seen and Research. */
+const MEMBER_ROUTES = [
+  'list',
+  'create',
+  'discoverFeeds',
+  'update',
+  'items',
+  'unseen',
+  'seen',
+  'research',
+];
 /** The one route that is an admin's. */
 const REMOVE = 'remove';
 const ROUTES = [...MEMBER_ROUTES, REMOVE];
@@ -80,9 +96,14 @@ describe('Competitor routes', () => {
     expect(at('update')).toEqual(['PATCH', ':id']);
     expect(at('remove')).toEqual(['DELETE', ':id']);
     expect(at('items')).toEqual(['GET', ':id/items']);
-    // A new competitor is 201; finding feeds creates nothing, so it is a plain 200.
+    expect(at('unseen')).toEqual(['GET', 'unseen']);
+    expect(at('seen')).toEqual(['POST', 'seen']);
+    expect(at('research')).toEqual(['POST', ':id/research']);
+    // A new competitor is 201; finding feeds, marking seen and a research create nothing, so 200.
     expect(Reflect.getMetadata(HTTP_CODE_METADATA, proto.create)).toBe(201);
     expect(Reflect.getMetadata(HTTP_CODE_METADATA, proto.discoverFeeds)).toBe(200);
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, proto.seen)).toBe(200);
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, proto.research)).toBe(200);
   });
 
   it.each(MEMBER_ROUTES)('lets a member call %s', async (name) => {
@@ -138,7 +159,7 @@ describe('CompetitorsController', () => {
   const org = { id: ORG_ID, role: Role.USER };
   const SAVED = { id: 'c1', name: 'Acme' };
 
-  function build() {
+  function build(researcher?: { available: boolean; research: jest.Mock }) {
     const service = {
       list: jest.fn(async () => [SAVED]),
       create: jest.fn(async () => SAVED),
@@ -148,21 +169,34 @@ describe('CompetitorsController', () => {
         { url: 'https://acme.example/feed', title: '', kind: 'rss' },
       ]),
       items: jest.fn(async () => ({ items: [], unavailable: [], notes: [] })),
+      unseen: jest.fn(async () => ({ total: 0, competitors: {} })),
+      markSeen: jest.fn(async () => undefined),
     };
     return {
       service,
-      controller: new CompetitorsController(service as unknown as CompetitorsService),
+      controller: new CompetitorsController(
+        service as unknown as CompetitorsService,
+        researcher as unknown as CompetitorResearchService | undefined,
+      ),
     };
   }
 
-  it("lists the active workspace's competitors with the limit", async () => {
+  it("lists the active workspace's competitors with the limit, and no Research without AI", async () => {
     const { controller, service } = build();
 
     await expect(controller.list(org)).resolves.toEqual({
       competitors: [SAVED],
       limit: MAX_COMPETITORS,
+      research: false,
     });
     expect(service.list).toHaveBeenCalledWith(ORG_ID);
+  });
+
+  it('offers Research when the instance has AI', async () => {
+    const research = jest.fn(async () => ({ research: {}, cached: false, credits: 3 }));
+    const { controller } = build({ available: true, research });
+
+    await expect(controller.list(org)).resolves.toMatchObject({ research: true });
   });
 
   it('adds for the active workspace, noting who added it', async () => {
@@ -179,13 +213,36 @@ describe('CompetitorsController', () => {
 
     await controller.update(org, 'c1', { name: 'Acme' });
     await controller.remove(org, 'c1');
-    await controller.items(org, 'c1');
+    await controller.items(org, 'c1', user);
     await controller.discoverFeeds(org, { url: 'acme.example' });
 
     expect(service.update).toHaveBeenCalledWith(ORG_ID, 'c1', { name: 'Acme' });
     expect(service.remove).toHaveBeenCalledWith(ORG_ID, 'c1');
-    expect(service.items).toHaveBeenCalledWith(ORG_ID, 'c1');
+    // Module 10: the person asking rides along, for "new since you last looked".
+    expect(service.items).toHaveBeenCalledWith(ORG_ID, 'c1', 'u1');
     expect(service.discoverFeeds).toHaveBeenCalledWith(ORG_ID, 'acme.example');
+  });
+
+  it('counts and marks what is seen for the active workspace and the person asking', async () => {
+    const { controller, service } = build();
+
+    await controller.unseen(org, user);
+    await expect(controller.seen(org, user, { ids: ['c1'] })).resolves.toEqual({ ok: true });
+    await controller.seen(org, user, {});
+
+    expect(service.unseen).toHaveBeenCalledWith(ORG_ID, 'u1');
+    expect(service.markSeen).toHaveBeenNthCalledWith(1, ORG_ID, 'u1', ['c1']);
+    expect(service.markSeen).toHaveBeenNthCalledWith(2, ORG_ID, 'u1', undefined);
+  });
+
+  it('researches a competitor of the active workspace, and answers 503 with no AI on the instance', async () => {
+    const research = jest.fn(async () => ({ research: {}, cached: false, credits: 3 }));
+    const { controller } = build({ available: true, research });
+
+    await controller.research(org, 'c1');
+    expect(research).toHaveBeenCalledWith(ORG_ID, 'c1');
+
+    expect(() => build().controller.research(org, 'c1')).toThrow(ServiceUnavailableException);
   });
 
   it('answers a removal with a sentence', async () => {

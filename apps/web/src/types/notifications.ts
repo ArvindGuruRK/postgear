@@ -17,6 +17,7 @@ export type NotificationType =
   | 'automation.review'
   | 'automation.failed'
   | 'automation.paused'
+  | 'discover.digest'
   | 'info';
 
 export interface NotificationView {
@@ -39,6 +40,8 @@ export interface NotificationsPage {
 export interface NotificationPreferences {
   successEmails: boolean;
   failureEmails: boolean;
+  /** Sprint 11 Module 10: Monday's Discover digest. */
+  digestEmails: boolean;
 }
 
 /** `event: notification` on `GET /notifications/stream`. */

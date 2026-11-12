@@ -1,0 +1,55 @@
+{
+  "_sample": "Written by hand for tests and simulation, in the shape of an IG User business_discovery answer. Not a recording: there is no token to record with.",
+  "business_discovery": {
+    "username": "acme.sample",
+    "name": "Acme Analytics (Sample)",
+    "profile_picture_url": "https://scontent.cdninstagram.com/v/sample/acme-profile.jpg",
+    "followers_count": 18420,
+    "media_count": 214,
+    "media": {
+      "data": [
+        {
+          "caption": "Scheduled reports are live. (A sample post.)\nPick a day, pick a time, and stop exporting by hand.\n#analytics #reporting",
+          "permalink": "https://www.instagram.com/p/SAMPLEacme01/",
+          "timestamp": "2026-11-09T09:30:00+0000",
+          "media_type": "IMAGE",
+          "media_url": "https://scontent.cdninstagram.com/v/sample/acme01.jpg",
+          "like_count": 1284,
+          "comments_count": 37,
+          "id": "17900000000000001"
+        },
+        {
+          "caption": "Reading a retention chart in four minutes. (A sample reel.)",
+          "permalink": "https://www.instagram.com/reel/SAMPLEacme02/",
+          "timestamp": "2026-11-06T15:00:00+0000",
+          "media_type": "VIDEO",
+          "media_url": "https://scontent.cdninstagram.com/v/sample/acme02.mp4",
+          "thumbnail_url": "https://scontent.cdninstagram.com/v/sample/acme02-thumb.jpg",
+          "comments_count": 12,
+          "id": "17900000000000002"
+        },
+        {
+          "caption": "Five ways to cut churn, one slide each. (A sample carousel.)",
+          "permalink": "https://www.instagram.com/p/SAMPLEacme03/",
+          "timestamp": "2026-11-03T11:15:00+0000",
+          "media_type": "CAROUSEL_ALBUM",
+          "media_url": "https://scontent.cdninstagram.com/v/sample/acme03-1.jpg",
+          "like_count": 46210,
+          "comments_count": 1,
+          "id": "17900000000000003"
+        },
+        {
+          "permalink": "https://www.instagram.com/p/SAMPLEacme04/",
+          "timestamp": "2026-10-28T08:00:00+0000",
+          "media_type": "IMAGE",
+          "media_url": "https://scontent.cdninstagram.com/v/sample/acme04.jpg",
+          "like_count": 1,
+          "comments_count": 0,
+          "id": "17900000000000004"
+        }
+      ]
+    },
+    "id": "17841400000000099"
+  },
+  "id": "17841400000000001"
+}

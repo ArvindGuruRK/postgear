@@ -297,7 +297,8 @@ describe('the recorded answers, through the engine the API builds', () => {
 
     expect(result.failed).toBeUndefined();
     expect(result.partial).toBeUndefined();
-    expect(result.attribution.name).toBe('Public holiday calendars and date-holidays');
+    // Chennai is in Tamil Nadu, which has a hand-kept list of its own days (Module 10).
+    expect(result.attribution.name).toBe('Public holiday calendars, date-holidays and state lists');
     expect(result.items).toContainEqual(
       expect.objectContaining({
         kind: 'festival',
@@ -306,8 +307,12 @@ describe('the recorded answers, through the engine the API builds', () => {
         observance: false,
       }),
     );
-    // More than the tab shows: next year's is in the same answer.
+    // More than the tab shows: next year's is in the same answer, on the day Tamil
+    // Nadu keeps (the state list's 28 October wins over the national calendar's 29th).
     expect(result.items).toContainEqual(
+      expect.objectContaining({ title: 'Deepavali', date: '2027-10-28', observance: false }),
+    );
+    expect(result.items).not.toContainEqual(
       expect.objectContaining({ title: 'Diwali/Deepavali', date: '2027-10-29' }),
     );
   });
@@ -431,6 +436,8 @@ describe('describeEngine', () => {
       geocoder: 'nominatim',
       userAgent: USER_AGENT,
       videos: true,
+      // Module 10: which service answers News. A name, never a key.
+      news: 'google',
     });
     expect(JSON.stringify(describeEngine(engine))).not.toContain(YOUTUBE_KEY);
     // The engine as a whole has nowhere to read the key from either.
@@ -499,6 +506,8 @@ describe('the module, at boot', () => {
       geocoder: 'nominatim',
       userAgent: USER_AGENT,
       videos: true,
+      // Module 10: which service answers News. A name, never a key.
+      news: 'google',
     });
     expect(JSON.stringify(log.mock.calls)).not.toContain(YOUTUBE_KEY);
     expect(fetchUrlSafely).not.toHaveBeenCalled();

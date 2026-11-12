@@ -76,22 +76,27 @@ export function useFeed(
     }
 
     const request = ++latest.current;
+    // Module 10: a question nobody is waiting for any more is cancelled, not
+    // only ignored, so a quick run through three places costs one request.
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    (about ? getFeed(kind, place, language, about) : getFeed(kind, place, language))
+    getFeed(kind, place, language, about ?? undefined, controller.signal)
       .then((answer) => {
         if (request !== latest.current) return;
         setData(answer);
         setDataKey(key);
       })
       .catch((cause: unknown) => {
-        if (request !== latest.current) return;
+        if (request !== latest.current || controller.signal.aborted) return;
         setError(cause instanceof ApiError && cause.status !== 0 ? cause.message : FEED_FAILED);
       })
       .finally(() => {
         if (request === latest.current) setLoading(false);
       });
+
+    return () => controller.abort();
   }, [key, version]);
 
   const refresh = useCallback(() => setVersion((count) => count + 1), []);

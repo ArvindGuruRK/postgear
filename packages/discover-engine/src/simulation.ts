@@ -14,27 +14,35 @@
  * by hand, named `.sample.` and marked inside as samples, and a real recording,
  * if one is ever made, is served in their place.
  *
+ * GDELT (Module 10) is matched by its whole address, which names the place and
+ * the language, so each recording answers only the place and language it was
+ * made for. Any other GDELT address answers an empty article list, not a 404.
+ *
  * Competitors (Module 07) have one invented company, {@link COMPETITOR_SAMPLE},
  * whose website, feeds, channel and accounts are all hand-written samples in
  * `fixtures/competitors/acme/`. Anything else a person types under simulation is
- * a 404, so no stranger's site is ever fetched.
+ * a 404, so no stranger's site is ever fetched. Its Instagram (Module 10) is a
+ * sample too, and any other Instagram username is Graph's "not found".
  */
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { editionFor, type NewsLocale } from './geo/editions';
+import { CHENNAI, PARIS, SAN_FRANCISCO } from './geo/geocoder/simulated';
 import { GOOGLE_NEWS_BATCH_URL, isGoogleNewsLink } from './reader/google-news-link';
 import { BLUESKY_TRENDS_URL } from './sources/bluesky';
 import { blueskyAuthorFeedUrl } from './sources/bluesky-author';
+import { GDELT_DOC_URL, gdeltDocUrl, gdeltQuery } from './sources/gdelt';
 import { newsPlaceUrl, newsTopUrl } from './sources/google-news';
 import { trendsFeedUrl } from './sources/google-trends';
 import { HOLIDAY_CALENDAR_IDS, holidayCalendarUrl } from './sources/holidays/google-calendar';
+import { businessDiscoveryUsername, instagramBusinessPrefix } from './sources/instagram-business';
 import { mastodonTrendsUrl } from './sources/mastodon';
 import { mastodonLookupUrl, mastodonStatusesUrl } from './sources/mastodon-account';
 import { wikipediaTopPrefix } from './sources/wikipedia';
 import { youtubePopularPrefix } from './sources/youtube';
 import { youtubeChannelFeedUrl } from './sources/youtube-channel';
-import type { DiscoverFetch } from './types';
+import type { DiscoverFetch, Locality } from './types';
 
 export { createSimulatedGeocoder } from './geo/geocoder/simulated';
 
@@ -49,6 +57,12 @@ export interface FixtureFeed {
   url: string;
   /** `prefix` when the address ends in something that moves: a day, or a key. */
   match?: 'prefix';
+  /**
+   * Decides instead of `url` and `match`, for an address whose moving parts sit
+   * in the middle: Instagram's names a Graph version and the workspace's own
+   * account before the competitor.
+   */
+  matches?: (url: string) => boolean;
   /** The recording's file type. A feed (`xml`) when left out. */
   type?: FixtureType;
   /** The address ends in a UTC day (`YYYY/MM/DD`), which the recorder fills in. */
@@ -120,7 +134,32 @@ export const FIXTURE_FEEDS: readonly FixtureFeed[] = [
   youtubeSample('chennai', 'IN'),
   youtubeSample('san-francisco', 'US'),
   youtubeSample('paris', 'FR'),
+
+  // Module 10. One article list per place, in its first language. Paris is a
+  // recording; GDELT refused Chennai and San Francisco with a 429 twice on the
+  // day, so theirs are hand-written until a real one is made.
+  gdelt('chennai', CHENNAI, 'ta', { sample: true }),
+  gdelt('san-francisco', SAN_FRANCISCO, 'en', { sample: true }),
+  gdelt('paris', PARIS, 'fr'),
 ];
+
+function gdelt(
+  place: string,
+  locality: Locality,
+  language: string,
+  extra: Pick<FixtureFeed, 'sample'> = {},
+): FixtureFeed {
+  const query = gdeltQuery(locality, language);
+  if (!query) throw new Error(`No GDELT query for ${place}.`);
+  return { place, name: 'gdelt', url: gdeltDocUrl(query), type: 'json', ...extra };
+}
+
+/**
+ * An article list with nothing in it: what simulation answers for a GDELT
+ * address it has no recording of (another place, or another language), so a
+ * place it does not know reads as a quiet day rather than as GDELT being down.
+ */
+const GDELT_NOTHING = '{"articles":[]}';
 
 /**
  * The competitor every simulated screen follows (Module 07). All of it is
@@ -136,6 +175,8 @@ export const COMPETITOR_SAMPLE = {
   blueskyHandle: 'acme.example',
   mastodonAcct: 'acme@mastodon.example',
   mastodonAccountId: '110000000000000001',
+  /** Module 10. A username is not a host name, so this one needs no `.example`. */
+  instagramUsername: 'acme.sample',
 } as const;
 
 const COMPETITOR_FOLDER = 'competitors/acme';
@@ -143,7 +184,7 @@ const COMPETITOR_FOLDER = 'competitors/acme';
 function competitorSample(
   name: string,
   url: string,
-  extra: Pick<FixtureFeed, 'type' | 'match'> = {},
+  extra: Pick<FixtureFeed, 'type' | 'match' | 'matches'> = {},
 ): FixtureFeed {
   return { place: COMPETITOR_FOLDER, name, url, sample: true, ...extra };
 }
@@ -155,6 +196,9 @@ function competitorSample(
  *
  * The news search is matched on how its address starts, so it answers for any
  * phrase that opens with the sample's name, in whichever edition is asked.
+ * Instagram (Module 10) is matched on the username it asks about, at any Graph
+ * version, for any account and token; every other username is Graph's
+ * "Cannot find User".
  */
 export const COMPETITOR_FIXTURES: readonly FixtureFeed[] = [
   competitorSample('site', COMPETITOR_SAMPLE.website, { type: 'html' }),
@@ -179,7 +223,36 @@ export const COMPETITOR_FIXTURES: readonly FixtureFeed[] = [
     `https://news.google.com/rss/search?q=${encodeURIComponent(`"${COMPETITOR_SAMPLE.name}`)}`,
     { match: 'prefix' },
   ),
+  competitorSample(
+    'instagram',
+    instagramBusinessPrefix({
+      igUserId: '17841400000000001',
+      username: COMPETITOR_SAMPLE.instagramUsername,
+    }),
+    {
+      type: 'json',
+      matches: (url) => businessDiscoveryUsername(url) === COMPETITOR_SAMPLE.instagramUsername,
+    },
+  ),
 ];
+
+/**
+ * Graph's answer to Business Discovery for a username it cannot find, or one
+ * that is a personal account, in the shape Meta's developer forums report (its
+ * error table leaves code 110 out).
+ */
+const GRAPH_USER_NOT_FOUND = JSON.stringify({
+  error: {
+    message: 'Invalid user id',
+    type: 'OAuthException',
+    code: 110,
+    error_subcode: 2207013,
+    is_transient: false,
+    error_user_title: 'Cannot find User',
+    error_user_msg: 'The user cannot be found. (A simulated answer.)',
+    fbtrace_id: 'SimulatedTrace',
+  },
+});
 
 /** `trends-IN.2026-11-04.xml`, and for a hand-written one `youtube-IN.sample.json`. */
 export function fixtureFileName(feed: FixtureFeed, stamp: string): string {
@@ -213,9 +286,10 @@ function asRecordedUrl(url: string): string {
 
 function feedFor(url: string): FixtureFeed | undefined {
   const asked = asRecordedUrl(url);
-  return [...FIXTURE_FEEDS, ...COMPETITOR_FIXTURES].find((entry) =>
-    entry.match === 'prefix' ? asked.startsWith(entry.url) : entry.url === asked,
-  );
+  return [...FIXTURE_FEEDS, ...COMPETITOR_FIXTURES].find((entry) => {
+    if (entry.matches) return entry.matches(asked);
+    return entry.match === 'prefix' ? asked.startsWith(entry.url) : entry.url === asked;
+  });
 }
 
 /** The files recorded for a feed, oldest first, and a hand-written sample only when there are none. */
@@ -241,7 +315,14 @@ export function createFixtureFetch(options: { directory?: string } = {}): Discov
 
   return async (url) => {
     const feed = feedFor(url);
-    if (!feed) return { status: 404, body: '', finalUrl: url };
+    if (!feed) {
+      if (businessDiscoveryUsername(url) !== null) {
+        return { status: 400, body: GRAPH_USER_NOT_FOUND, finalUrl: url };
+      }
+      return url.startsWith(`${GDELT_DOC_URL}?`)
+        ? { status: 200, body: GDELT_NOTHING, finalUrl: url }
+        : { status: 404, body: '', finalUrl: url };
+    }
 
     const newest = (await recordingsOf(directory, feed)).at(-1);
     if (!newest) return { status: 404, body: '', finalUrl: url };

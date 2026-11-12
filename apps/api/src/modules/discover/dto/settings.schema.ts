@@ -26,6 +26,21 @@ import { countryCode, languageTag, placeName, regionCode, timeZone } from './dis
 /** How many languages a workspace can keep in its order. */
 export const MAX_LANGUAGES = 6;
 
+/** Module 10: how many interests a workspace keeps. Each one is a search on every News load. */
+export const MAX_INTERESTS = 5;
+
+/**
+ * An interest is a few words a person typed ("yoga", "electric cars", "C++"):
+ * letters and digits in any script, with spaces and a little punctuation, so
+ * nothing that is not a phrase reaches a search address or a key.
+ */
+export const interest = z
+  .string()
+  .trim()
+  .min(2)
+  .max(40)
+  .regex(/^[\p{L}\p{N}][\p{L}\p{N}\p{M} &'+.#-]*$/u);
+
 /** The fields that are one place together, saved and cleared as one. */
 export const PLACE_FIELDS = [
   'countryCode',
@@ -50,6 +65,7 @@ const sources = z
     social: switchValue,
     videos: switchValue,
     festivals: switchValue,
+    gdelt: switchValue,
   } satisfies Record<DiscoverSourceSwitch, typeof switchValue>)
   .strict();
 
@@ -65,6 +81,9 @@ export const updateSettingsSchema = z
     topics: z.array(z.enum(NEWS_TOPICS)).max(NEWS_TOPICS.length).refine(hasNoRepeats).optional(),
     // The whole value every time: a save replaces it, and null is every group on.
     sources: sources.nullable().optional(),
+    // Module 10. Searched in the order given; the same words twice are one interest.
+    interests: z.array(interest).max(MAX_INTERESTS).refine(hasNoRepeats).optional(),
+    weeklyDigest: z.boolean().optional(),
     locationSource: z.nativeEnum(DiscoverLocationSource).optional(),
   })
   .strict()
@@ -76,7 +95,7 @@ export const updateSettingsSchema = z
     const source = body.locationSource;
     const namesAPlace = PLACE_FIELDS.some((field) => body[field] !== undefined);
 
-    // Languages, topics or switches on their own: no place is being saved.
+    // Languages, topics, switches, interests or the digest on their own: no place is being saved.
     if (!namesAPlace && source === undefined) return;
 
     if (source === undefined) {

@@ -37,8 +37,17 @@ export const INSET_NOTE =
   'm-0 rounded-lg border-2 border-outline bg-inset p-4 font-sans text-sm text-ink type-muted';
 
 export const OSM_COPYRIGHT_URL = 'https://www.openstreetmap.org/copyright';
+/** DB-IP's Lite database is CC BY 4.0: a page showing its guess links back (Module 10). */
+export const DBIP_URL = 'https://db-ip.com';
 
-export function PlacesCredit({ className }: { className?: string }) {
+export function PlacesCredit({
+  className,
+  ipGuess = false,
+}: {
+  className?: string;
+  /** The place on screen was guessed from the network address, so DB-IP is credited too. */
+  ipGuess?: boolean;
+}) {
   return (
     <p className={cn('m-0 font-sans text-xs text-ink type-muted', className)}>
       Places by{' '}
@@ -50,6 +59,19 @@ export function PlacesCredit({ className }: { className?: string }) {
       >
         OpenStreetMap contributors
       </a>
+      {ipGuess ? (
+        <>
+          {', '}
+          <a
+            href={DBIP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-1 underline-offset-2 hover:opacity-100"
+          >
+            IP geolocation by DB-IP
+          </a>
+        </>
+      ) : null}
     </p>
   );
 }

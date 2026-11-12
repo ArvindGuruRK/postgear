@@ -24,7 +24,6 @@ const mockedToast = toast as jest.MockedFunction<typeof toast>;
 
 beforeAll(stubBrowserLayout);
 
-
 const CHENNAI: Locality = {
   countryCode: 'IN',
   countryName: 'India',
@@ -68,6 +67,8 @@ function saved(patch: Partial<DiscoverSettings> = {}): DiscoverSettings {
     languages: ['ta', 'en'],
     topics: ['BUSINESS'],
     sources: null,
+    interests: [],
+    weeklyDigest: false,
     locationSource: 'SEARCH',
     place: CHENNAI,
     updatedAt: '2026-11-10T08:00:00.000Z',
@@ -170,12 +171,19 @@ beforeEach(() => {
 });
 
 describe('what the page shows', () => {
-  it('shows the four cards with what is saved, and asks for nothing', () => {
+  it('shows the six cards with what is saved, and asks for nothing', () => {
     renderForm({ initial: saved({ sources: { social: false } }) });
 
     expect(
       screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent),
-    ).toEqual(['Workspace Place', 'Languages', 'News Topics', 'Sources']);
+    ).toEqual([
+      'Workspace Place',
+      'Languages',
+      'News Topics',
+      'Interests',
+      'Sources',
+      'Weekly Digest',
+    ]);
     expect(placeText()).toHaveTextContent('Chennai, Tamil Nadu, India');
     expect(languageRows()).toEqual(['தமிழ் Tamil', 'English']);
     expect(screen.getByRole('checkbox', { name: 'Business' })).toBeChecked();
@@ -192,7 +200,11 @@ describe('what the page shows', () => {
     ]);
     expect(screen.getByRole('switch', { name: 'Worldwide Social' })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: 'Rising Searches' })).toBeChecked();
-    expect(screen.getAllByRole('switch')).toHaveLength(5);
+    expect(screen.getByRole('switch', { name: 'World Press' })).toBeChecked();
+    // Six source switches and the digest, which is off until an admin turns it on.
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
+    expect(screen.getByRole('switch', { name: 'Send the weekly digest' })).not.toBeChecked();
+    expect(screen.queryByTestId('discover-settings-digest-worldwide')).not.toBeInTheDocument();
     expect(screen.queryByTestId('discover-settings-read-only')).not.toBeInTheDocument();
     expect(mockedApi).not.toHaveBeenCalled();
   });
@@ -206,11 +218,20 @@ describe('what the page shows', () => {
       screen.getByText('No languages yet. Discover opens in the first language of the place.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Save a workspace place to add its languages.')).toBeInTheDocument();
-    for (const toggle of screen.getAllByRole('switch')) expect(toggle).toBeChecked();
+    expect(
+      screen.getByText('No interests yet. News shows your place, your topics and the world.'),
+    ).toBeInTheDocument();
+    for (const toggle of screen.getAllByTestId(/^discover-settings-source-/)) {
+      expect(toggle).toBeChecked();
+    }
+    expect(screen.getByTestId('discover-settings-digest-worldwide')).toHaveTextContent(
+      'No place is saved, so the digest covers Worldwide until one is.',
+    );
   });
 
   it('loads for itself when the server could not, and offers Try Again when that fails too', async () => {
-    mockedApi.mockRejectedValueOnce(new ApiError('Try again in a moment.', 503));
+    // A 500, which the client never tries again (it retries a 502, 503 or 504 by itself).
+    mockedApi.mockRejectedValueOnce(new ApiError('Try again in a moment.', 500));
     renderForm({ initial: null });
 
     const alert = await screen.findByTestId('discover-settings-error');
@@ -233,7 +254,8 @@ describe('what the page shows', () => {
 
   it('takes the settings the server reads a moment later, over a read of its own that failed', async () => {
     // The first page after signing in: no workspace cookie yet, so the server hands down null.
-    mockedApi.mockRejectedValueOnce(new ApiError('Try again in a moment.', 503));
+    // A 500, which the client never tries again (it retries a 502, 503 or 504 by itself).
+    mockedApi.mockRejectedValueOnce(new ApiError('Try again in a moment.', 500));
     const { rerender } = renderForm({ initial: null });
     expect(await screen.findByTestId('discover-settings-error')).toBeInTheDocument();
 
@@ -315,7 +337,10 @@ describe('Workspace Place', () => {
     await click(screen.getByRole('button', { name: 'Use My Location' }));
 
     await waitFor(() => expect(saves()).toHaveLength(1));
-    expect(mockedApi).toHaveBeenCalledWith('/discover/locality?lat=48.86&lng=2.35');
+    expect(mockedApi).toHaveBeenCalledWith(
+      '/discover/locality?lat=48.86&lng=2.35',
+      expect.anything(),
+    );
     expect(saves()[0]).toEqual({
       countryCode: 'FR',
       regionCode: 'FR-IDF',
@@ -503,15 +528,98 @@ describe('News Topics', () => {
   });
 });
 
+function interestChips(): string[] {
+  return screen
+    .queryAllByTestId('discover-settings-interest')
+    .map((chip) => chip.textContent ?? '');
+}
+
+async function typeInterest(text: string) {
+  const field = screen.getByLabelText('Add an interest');
+  fireEvent.change(field, { target: { value: text } });
+  await act(async () => {
+    fireEvent.submit(field.closest('form') as HTMLFormElement);
+  });
+}
+
+describe('Interests', () => {
+  it('adds a tidied interest on Enter and removes one, sending the whole list each time', async () => {
+    renderForm({ initial: saved({ interests: ['Yoga'] }) });
+
+    await typeInterest('  electric   cars ');
+    expect(saves()).toEqual([{ interests: ['Yoga', 'electric cars'] }]);
+    expect(interestChips()).toEqual(['Yoga', 'electric cars']);
+    expect(screen.getByLabelText('Add an interest')).toHaveValue('');
+    expect(mockedToast).toHaveBeenLastCalledWith({
+      title: 'Saved',
+      description: 'Interests updated for this workspace.',
+    });
+
+    await click(screen.getByRole('button', { name: 'Remove Yoga' }));
+    expect(saves()[1]).toEqual({ interests: ['electric cars'] });
+    expect(interestChips()).toEqual(['electric cars']);
+  });
+
+  it('refuses the same words twice and what the API would refuse, with a sentence and no save', async () => {
+    renderForm({ initial: saved({ interests: ['Yoga'] }) });
+
+    await typeInterest('YOGA');
+    expect(screen.getByRole('alert')).toHaveTextContent('That interest is already in the list.');
+    expect(screen.getByLabelText('Add an interest')).toHaveValue('YOGA');
+
+    await typeInterest('#yoga');
+    expect(screen.getByRole('alert')).toHaveTextContent('starting with a letter or a number');
+
+    // Typing again clears the sentence.
+    fireEvent.change(screen.getByLabelText('Add an interest'), { target: { value: 'C' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    expect(saves()).toEqual([]);
+  });
+
+  it('stops at five, and says so', () => {
+    renderForm({ initial: saved({ interests: ['Yoga', 'Cricket', 'C++', 'Tea', 'Jazz'] }) });
+
+    expect(interestChips()).toHaveLength(5);
+    expect(screen.getByLabelText('Add an interest')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    expect(
+      screen.getByText('You can keep up to 5 interests. Remove one to add another.'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Weekly Digest', () => {
+  it('turns the digest on alone', async () => {
+    renderForm();
+
+    await click(screen.getByRole('switch', { name: 'Send the weekly digest' }));
+
+    expect(saves()).toEqual([{ weeklyDigest: true }]);
+    expect(screen.getByRole('switch', { name: 'Send the weekly digest' })).toBeChecked();
+    expect(mockedToast).toHaveBeenCalledWith({
+      title: 'Saved',
+      description: 'The weekly digest is on for this workspace.',
+    });
+  });
+});
+
 describe('Sources', () => {
-  it('sends all five switches when one is turned off', async () => {
+  it('sends every switch when one is turned off', async () => {
     renderForm();
 
     await click(screen.getByRole('switch', { name: 'Worldwide Social' }));
 
     expect(saves()).toEqual([
       {
-        sources: { trends: true, wikipedia: true, social: false, videos: true, festivals: true },
+        sources: {
+          trends: true,
+          wikipedia: true,
+          social: false,
+          videos: true,
+          festivals: true,
+          gdelt: true,
+        },
       },
     ]);
     expect(screen.getByRole('switch', { name: 'Worldwide Social' })).not.toBeChecked();
@@ -528,7 +636,14 @@ describe('Sources', () => {
 
     expect(saves()).toEqual([
       {
-        sources: { trends: true, wikipedia: true, social: false, videos: true, festivals: true },
+        sources: {
+          trends: true,
+          wikipedia: true,
+          social: false,
+          videos: true,
+          festivals: true,
+          gdelt: true,
+        },
       },
     ]);
     expect(mockedToast).toHaveBeenCalledWith({
@@ -628,27 +743,32 @@ describe('a member', () => {
   });
 
   it('finds every control disabled', () => {
-    renderForm({ isAdmin: false });
+    renderForm({ isAdmin: false, initial: saved({ interests: ['Yoga'] }) });
 
     for (const button of screen.getAllByRole('button')) expect(button).toBeDisabled();
     for (const box of screen.getAllByRole('checkbox')) expect(box).toBeDisabled();
     for (const toggle of screen.getAllByRole('switch')) expect(toggle).toBeDisabled();
     expect(screen.getByPlaceholderText('Enter your city')).toBeDisabled();
     expect(screen.getByTestId('discover-settings-add-language')).toBeDisabled();
+    expect(screen.getByLabelText('Add an interest')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove Yoga' })).toBeDisabled();
     expect(screen.getAllByRole('checkbox')).toHaveLength(8);
-    expect(screen.getAllByRole('switch')).toHaveLength(5);
+    expect(screen.getAllByRole('switch')).toHaveLength(7);
   });
 
   it('never sends a save, whatever is pressed', async () => {
-    renderForm({ isAdmin: false });
+    renderForm({ isAdmin: false, initial: saved({ interests: ['Yoga'] }) });
 
     await click(screen.getByRole('button', { name: 'Clear' }));
     await click(screen.getByRole('button', { name: 'Worldwide' }));
     await click(screen.getByRole('button', { name: 'Use My Location' }));
     await click(screen.getByRole('button', { name: 'Move Tamil down' }));
     await click(screen.getByRole('button', { name: 'Remove English' }));
+    await click(screen.getByRole('button', { name: 'Remove Yoga' }));
     await click(screen.getByRole('checkbox', { name: 'Sports' }));
     await click(screen.getByRole('switch', { name: 'Videos' }));
+    await click(screen.getByRole('switch', { name: 'Send the weekly digest' }));
+    await typeInterest('cricket');
     await searchFor('paris');
 
     expect(mockedApi).not.toHaveBeenCalled();
@@ -662,6 +782,6 @@ describe('a member', () => {
     expect(await screen.findByTestId('discover-settings-place-text')).toHaveTextContent(
       'Chennai, Tamil Nadu, India',
     );
-    expect(mockedApi.mock.calls).toEqual([['/discover/settings']]);
+    expect(mockedApi.mock.calls.map(([path]) => path)).toEqual(['/discover/settings']);
   });
 });

@@ -64,6 +64,9 @@ model Organization {
   discoverSettings    DiscoverSettings?
   // Sprint 11: the competitors the workspace follows in Discover.
   competitors         Competitor[]
+  // Sprint 11 Module 10: saved items, and each member's own place in Discover.
+  discoverIdeas       DiscoverIdea[]
+  discoverUserPlaces  DiscoverUserPlace[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -126,6 +129,9 @@ model User {
   sendSuccessEmails     Boolean              @default(true)
   sendFailureEmails     Boolean              @default(true)
   sendStreakEmails      Boolean              @default(true)
+  /// Sprint 11 Module 10: Discover's weekly digest, for workspaces whose admin
+  /// turned it on. A person can still say no to it here.
+  sendDigestEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
   // Sprint 8: where this user has read up to, per workspace.
   notificationCursors   NotificationCursor[]
@@ -143,6 +149,10 @@ model User {
   automationConnectionsUpdated AutomationConnection[] @relation("AutomationConnectionEditor")
   // Sprint 11: the Discover settings this user saved last.
   discoverSettingsUpdated DiscoverSettings[]   @relation("DiscoverSettingsEditor")
+  // Sprint 11 Module 10: Discover's saved items, own places and competitor views.
+  discoverIdeas         DiscoverIdea[]       @relation("DiscoverIdeaAuthor")
+  discoverPlaces        DiscoverUserPlace[]
+  competitorViews       CompetitorView[]
 
   // --- Sprint 2: auth lifecycle -------------------------------------------
   // Tokens are stored as SHA-256 hashes, never as the value mailed to the
@@ -1492,15 +1502,90 @@ model DiscoverSettings {
   languages      String[]               @default([])
   /// Google News topic ids ("BUSINESS"). The first is the News tab's default.
   topics         String[]               @default([])
-  /// { trends, wikipedia, social, videos, festivals } to booleans. Null, or a
-  /// missing key, means the group is on.
+  /// { trends, wikipedia, social, videos, festivals, gdelt } to booleans. Null,
+  /// or a missing key, means the group is on.
   sources        Json?
+  /// Module 10: what the audience cares about ("yoga", "fintech"), at most 5.
+  /// Each becomes a News group of its own, searched in the place's edition.
+  interests      String[]               @default([])
+  /// Module 10: whether the members get "This week where your audience is" on
+  /// Monday morning in the place's time zone. Off until an admin turns it on.
+  weeklyDigest   Boolean                @default(false)
+  /// When the last digest went out, so a week never gets two.
+  digestSentAt   DateTime?
   locationSource DiscoverLocationSource @default(NONE)
   updatedById    String?
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   updatedBy      User?                  @relation("DiscoverSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/// Module 10: a person's own place in one workspace, so the choice follows
+/// them to another device. Written only when they choose (their location, a
+/// search, Worldwide), never for a guess or the workspace default. Like the
+/// workspace's place it is a city, a region, a country and a time zone, never
+/// a position. A null country means Worldwide.
+model DiscoverUserPlace {
+  userId         String
+  organizationId String
+  countryCode    String?
+  regionCode     String?
+  regionName     String?
+  city           String?
+  timeZone       String?
+  /// BCP-47, the language chip's choice. Null means the place's first.
+  language       String?
+  /// A Google News topic id, "ALL" for All, null for the workspace's default.
+  topic          String?
+  locationSource DiscoverLocationSource @default(SEARCH)
+  updatedAt      DateTime               @updatedAt
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, organizationId])
+  @@index([organizationId])
+}
+
+/// Module 10: an item someone saved from Discover to write about later (the
+/// Saved tab). Shared by the workspace, one row per item: the item's own id
+/// says whether a card is saved. The item is a snapshot of what the card
+/// showed, so an idea outlives the feed it came from.
+model DiscoverIdea {
+  id             String       @id @default(uuid())
+  organizationId String
+  /// The feed's id for the item (a hash of its source and title).
+  itemId         String
+  /// The card as it was: a Discover item, brief included.
+  item           Json
+  /// The place it was read in, so a draft later writes for the same audience.
+  place          Json
+  /// BCP-47, the language it was read in.
+  language       String
+  /// A line of the team's own, at most 280 characters.
+  note           String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?        @relation("DiscoverIdeaAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, itemId])
+  @@index([organizationId, createdAt])
+}
+
+/// Module 10: when a person last looked at a competitor's group, so the tab
+/// can say how many items are new since then. One row per person per
+/// competitor, written when the Competitors tab shows that group.
+model CompetitorView {
+  userId       String
+  competitorId String
+  lastSeenAt   DateTime
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competitor   Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@id([userId, competitorId])
+  @@index([competitorId])
 }
 
 /// A competitor a workspace follows in Discover (Module 07): a name, and the
@@ -1521,6 +1606,9 @@ model Competitor {
   mastodonAcct     String?
   /// What Google News is searched for. Null means the name.
   newsQuery        String?
+  /// Module 10: a public Instagram business or creator account, read through
+  /// the workspace's own connected Instagram account (Business Discovery).
+  instagramUsername String?
   lastCheckedAt    DateTime?
   /// One sentence of ours, never a response body.
   lastError        String?
@@ -1529,6 +1617,8 @@ model Competitor {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  views            CompetitorView[]
 
   @@index([organizationId, deletedAt])
+  @@index([deletedAt, lastCheckedAt])
 }

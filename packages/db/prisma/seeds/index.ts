@@ -516,11 +516,13 @@ const AI_LEDGER_TYPES = [
   'copilot_message',
   'seo_advice',
   'generate_snippet',
+  'competitor_research',
   'refund:generate_post',
   'refund:generate_image',
   'refund:copilot_message',
   'refund:seo_advice',
   'refund:generate_snippet',
+  'refund:competitor_research',
 ];
 
 /**

@@ -81,7 +81,7 @@ export class UsersController {
   async notificationPreferences(@CurrentUser() current: AuthenticatedUser) {
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: current.id },
-      select: { sendSuccessEmails: true, sendFailureEmails: true },
+      select: PREFERENCE_SELECT,
     });
 
     return { preferences: toPreferences(user) };
@@ -98,14 +98,29 @@ export class UsersController {
       data: {
         ...(dto.successEmails !== undefined ? { sendSuccessEmails: dto.successEmails } : {}),
         ...(dto.failureEmails !== undefined ? { sendFailureEmails: dto.failureEmails } : {}),
+        ...(dto.digestEmails !== undefined ? { sendDigestEmails: dto.digestEmails } : {}),
       },
-      select: { sendSuccessEmails: true, sendFailureEmails: true },
+      select: PREFERENCE_SELECT,
     });
 
     return { preferences: toPreferences(user) };
   }
 }
 
-function toPreferences(user: { sendSuccessEmails: boolean; sendFailureEmails: boolean }) {
-  return { successEmails: user.sendSuccessEmails, failureEmails: user.sendFailureEmails };
+const PREFERENCE_SELECT = {
+  sendSuccessEmails: true,
+  sendFailureEmails: true,
+  sendDigestEmails: true,
+} as const;
+
+function toPreferences(user: {
+  sendSuccessEmails: boolean;
+  sendFailureEmails: boolean;
+  sendDigestEmails: boolean;
+}) {
+  return {
+    successEmails: user.sendSuccessEmails,
+    failureEmails: user.sendFailureEmails,
+    digestEmails: user.sendDigestEmails,
+  };
 }

@@ -25,11 +25,33 @@
  *
  * The News topic is remembered in the same record. Until the person picks
  * one it follows the workspace's first topic.
+ *
+ * ## Module 10
+ *
+ * - **It follows the person** (backlog #6): each of their own choices (Use My
+ *   Location, a search, Worldwide, a language or a topic on one of those) is
+ *   also kept for them in this workspace (`PUT /discover/my-place`), and
+ *   following the workspace's place clears it. A browser with no choice of
+ *   its own asks for it before guessing, so a second laptop opens on the
+ *   same city. The browser's own choice still wins in that browser. Every
+ *   one of these calls is best effort: a failure changes nothing on screen.
+ * - **A better first guess** (backlog #13): when the time zone says nothing
+ *   (UTC, a server-style zone), the API guesses a country from the address
+ *   the request came from, when it is set up to. Still a guess, still never
+ *   written down.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
-import { localityFromPosition, localityFromTimeZone } from '@/lib/discover-api';
-import type { DiscoverSettings, Locality, NewsTopic } from '@/types/discover';
+import {
+  clearMyPlace,
+  getMyPlace,
+  getPickedLocality,
+  guessLocalityFromAddress,
+  localityFromPosition,
+  localityFromTimeZone,
+  saveMyPlace,
+} from '@/lib/discover-api';
+import type { DiscoverSettings, Locality, MyPlace, NewsTopic } from '@/types/discover';
 import { viewerTimeZone } from '../home/home-model';
 import {
   firstLanguage,
@@ -68,6 +90,8 @@ export interface PlaceHandle {
   message: string | null;
   /** The guess could not be made (the API did not answer). */
   failed: boolean;
+  /** Module 10: the guess on screen came from the network address (DB-IP), which asks for a credit. */
+  guessedFromAddress: boolean;
   /** The News topic: the person's own once they picked, else the workspace's first. Null is All. */
   topic: NewsTopic | null;
   locate: () => Promise<boolean>;
@@ -99,6 +123,78 @@ function writeStorage(key: string, value: string): void {
   } catch {
     // Private window or blocked site data: the choice holds until a reload.
   }
+}
+
+/** A call that may throw before it returns a promise (a test's partial mock) still only rejects. */
+function safely<T>(call: () => Promise<T>): Promise<T> {
+  return Promise.resolve().then(call);
+}
+
+/** The choices that are the person's own, and so follow them to another browser. */
+const OWN_SOURCES: ReadonlySet<PlaceSource> = new Set(['browser', 'search', 'worldwide']);
+
+/** What `PUT /discover/my-place` keeps for a choice. */
+export function myPlaceOf(
+  place: Locality,
+  source: PlaceSource,
+  language: string,
+  topic: TopicChoice | null,
+): Omit<MyPlace, 'updatedAt'> {
+  return {
+    countryCode: place.countryCode,
+    regionCode: place.countryCode ? place.regionCode : null,
+    regionName: place.countryCode ? place.regionName : null,
+    city: place.countryCode ? place.city : null,
+    timeZone: place.timeZone,
+    language,
+    topic,
+    locationSource: source === 'browser' ? 'BROWSER' : 'SEARCH',
+  };
+}
+
+/** How a kept choice reads on the chip again. */
+function sourceOfMine(mine: MyPlace): PlaceSource {
+  if (!mine.countryCode) return 'worldwide';
+  return mine.locationSource === 'BROWSER' ? 'browser' : 'search';
+}
+
+/**
+ * The whole place a kept choice names. The API rebuilds the country's
+ * languages and editions; the city and the region's name come back as they
+ * were kept. Null when the country is not one the API knows any more.
+ */
+async function localityOfMine(mine: MyPlace): Promise<Locality | null> {
+  if (!mine.countryCode) return WORLDWIDE_PLACE;
+  let base: Locality;
+  try {
+    base = await getPickedLocality(mine.countryCode, mine.regionCode);
+  } catch {
+    if (!mine.regionCode) return null;
+    try {
+      // A region the lists do not carry: the country is still worth having.
+      base = await getPickedLocality(mine.countryCode, null);
+    } catch {
+      return null;
+    }
+  }
+  return {
+    ...base,
+    regionCode: mine.regionCode ?? base.regionCode,
+    regionName: mine.regionName ?? base.regionName,
+    city: mine.city ?? base.city,
+    timeZone: mine.timeZone ?? base.timeZone,
+  };
+}
+
+/** The person's kept choice, whole, or null. Never rejects. */
+function findMine(): Promise<{ mine: MyPlace; place: Locality } | null> {
+  return safely(getMyPlace)
+    .then(async (mine) => {
+      if (!mine) return null;
+      const place = await localityOfMine(mine);
+      return place ? { mine, place } : null;
+    })
+    .catch(() => null);
 }
 
 function preferredLanguages(): readonly string[] {
@@ -181,6 +277,7 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
   const [status, setStatus] = useState<PlaceStatus>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [fromAddress, setFromAddress] = useState(false);
   const [attempt, setAttempt] = useState(0);
   // The person's own topic; null until they pick one.
   const [chosenTopic, setChosenTopic] = useState<TopicChoice | null>(null);
@@ -194,6 +291,9 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
   // True while the place on screen is only a guess nobody chose. The
   // workspace's saved place may still replace it if it arrives late (below).
   const adoptable = useRef(false);
+  // True once the person chose something on this visit: the choice they kept
+  // on another browser, arriving late, must not undo it.
+  const chose = useRef(false);
 
   const remember = useCallback(
     (
@@ -204,6 +304,7 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
     ) => {
       // A choice, or a save: from here on the place is the person's.
       adoptable.current = false;
+      chose.current = true;
       setPlaceState(next);
       setSource(nextSource);
       setLanguageState(nextLanguage);
@@ -216,6 +317,15 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
           ...(nextTopic ? { topic: nextTopic } : {}),
         }),
       );
+      // Module 10: the person's own choice follows them; following the
+      // workspace forgets it. Best effort either way.
+      if (OWN_SOURCES.has(nextSource)) {
+        safely(() => saveMyPlace(myPlaceOf(next, nextSource, nextLanguage, nextTopic))).catch(
+          () => undefined,
+        );
+      } else if (nextSource === 'workspace') {
+        safely(clearMyPlace).catch(() => undefined);
+      }
     },
     [orgId, chosenTopic],
   );
@@ -223,6 +333,7 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the explicit retry trigger
   useEffect(() => {
     owner.current = orgId;
+    chose.current = false;
     setStatus('idle');
     setMessage(null);
     setFailed(false);
@@ -232,33 +343,85 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
 
     const start = placeStart(remembered, saved.current);
     adoptable.current = start.from === 'guess';
-    if (start.from !== 'guess') {
-      // Neither is written to storage here: a remembered choice is already
-      // there, and a workspace start is read from the workspace every visit.
+    if (start.from === 'remembered') {
+      // Already in storage: this browser's own choice wins in this browser.
       setPlaceState(start.place);
-      setSource(start.from === 'workspace' ? 'workspace' : start.source);
+      setSource(start.source);
       setLanguageState(start.language);
       return;
     }
 
-    setPlaceState(null);
-    setLanguageState(null);
-    setSource('guess');
     let cancelled = false;
+    const stillAsking = () => !cancelled && owner.current === orgId;
 
-    localityFromTimeZone(viewerTimeZone())
-      .then((guess) => {
-        // The workspace's place got here first, or the person chose one: no guess needed.
-        if (cancelled || owner.current !== orgId || !adoptable.current) return;
-        // Not written to storage: a guess is made again on the next visit,
-        // so a laptop that travelled guesses its new country.
-        setPlaceState(guess);
-        setSource(guess.countryCode ? 'guess' : 'worldwide');
-        setLanguageState(firstLanguage(guess, preferredLanguages()));
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
+    if (start.from === 'workspace') {
+      // Not written to storage: a workspace start is read from the workspace every visit.
+      setPlaceState(start.place);
+      setSource('workspace');
+      setLanguageState(start.language);
+    } else {
+      setPlaceState(null);
+      setLanguageState(null);
+      setSource('guess');
+    }
+
+    // The guess is asked first and side by side with the kept choice below,
+    // and used only when there is none.
+    const guessing =
+      start.from === 'guess'
+        ? safely(() => localityFromTimeZone(viewerTimeZone())).then(async (guess) => {
+            if (guess.countryCode) return { guess, byAddress: false };
+            // Module 10: a zone that names no country; the address may.
+            const found = await safely(guessLocalityFromAddress).catch(() => null);
+            return found ? { guess: found, byAddress: true } : { guess, byAddress: false };
+          })
+        : null;
+    guessing?.catch(() => undefined);
+
+    // Module 10: a choice the person kept on another browser beats both the
+    // workspace's place and a guess. Once adopted it is written here too, so
+    // the next visit in this browser starts on it without asking.
+    const mine = findMine().then((found) => {
+      if (!found || !stillAsking() || chose.current) return false;
+      const source = sourceOfMine(found.mine);
+      const language = languageFor(found.place, found.mine.language);
+      const topic = found.mine.topic ?? null;
+      adoptable.current = false;
+      setFailed(false);
+      setPlaceState(found.place);
+      setSource(source);
+      setLanguageState(language);
+      if (topic) setChosenTopic(topic);
+      writeStorage(
+        placeStorageKey(orgId),
+        serializeRememberedPlace({
+          place: found.place,
+          source,
+          language,
+          ...(topic ? { topic } : {}),
+        }),
+      );
+      return true;
+    });
+
+    if (guessing) {
+      mine
+        .then(async (adopted) => {
+          if (adopted) return;
+          const { guess, byAddress } = await guessing;
+          // The workspace's place got here first, or the person chose one: no guess needed.
+          if (!stillAsking() || !adoptable.current) return;
+          // Not written to storage: a guess is made again on the next visit,
+          // so a laptop that travelled guesses its new country.
+          setFromAddress(byAddress);
+          setPlaceState(guess);
+          setSource(guess.countryCode ? 'guess' : 'worldwide');
+          setLanguageState(firstLanguage(guess, preferredLanguages()));
+        })
+        .catch(() => {
+          if (!cancelled) setFailed(true);
+        });
+    }
 
     return () => {
       cancelled = true;
@@ -356,6 +519,8 @@ export function usePlace(orgId: string, workspace: DiscoverSettings | null = nul
     status,
     message,
     failed,
+    // Only while that guess is what is on screen.
+    guessedFromAddress: fromAddress && source === 'guess',
     topic,
     locate,
     pickPlace,

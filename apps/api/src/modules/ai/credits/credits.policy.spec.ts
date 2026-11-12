@@ -53,12 +53,18 @@ describe('credits policy', () => {
       'copilot_message',
       'seo_advice',
       'generate_snippet',
+      'competitor_research',
       'refund:generate_post',
       'refund:generate_image',
       'refund:copilot_message',
       'refund:seo_advice',
       'refund:generate_snippet',
+      'refund:competitor_research',
     ]);
+  });
+
+  it("prices Discover's Research This Competitor like the SEO advice (Sprint 11 Module 10)", () => {
+    expect(AI_CREDIT_COSTS.competitor_research).toBe(AI_CREDIT_COSTS.seo_advice);
   });
 
   it('gives each tier its allowance, and a trial to a workspace with no active subscription', () => {
@@ -81,11 +87,15 @@ describe('credits policy', () => {
 
     expect(tierOf(trial('2026-10-30'), now)).toBe('PRO');
     expect(tierOf(trial('2026-10-19'), now)).toBe('NONE');
-    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'PAST_DUE' }), now)).toBe('TEAM');
+    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'PAST_DUE' }), now)).toBe(
+      'TEAM',
+    );
     expect(
       tierOf(subscription({ subscriptionTier: 'TEAM', cancelAt: utc('2026-11-13') }), now),
     ).toBe('TEAM');
-    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'CANCELED' }), now)).toBe('NONE');
+    expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'CANCELED' }), now)).toBe(
+      'NONE',
+    );
     expect(tierOf(subscription({ subscriptionTier: 'TEAM', status: 'INCOMPLETE' }), now)).toBe(
       'NONE',
     );

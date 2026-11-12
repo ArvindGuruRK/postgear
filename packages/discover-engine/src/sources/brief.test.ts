@@ -523,6 +523,26 @@ describe("the line for a competitor's row", () => {
     expect(brief).not.toContain('Acme published');
   });
 
+  it('says the same of an Instagram post and of a story from a keyed news provider (Module 10)', () => {
+    const instagramPost: ComposedItem = {
+      id: '25',
+      kind: 'competitor',
+      source: { id: 'instagram', name: 'Instagram' },
+      title: 'Scheduled reports are live. (A sample post.)',
+    };
+    expect(buildBrief(instagramPost, chennai, 'en', acme)).toBe(
+      `Acme posted on Instagram: 'Scheduled reports are live. (A sample post.)'. ${OUR_OWN_TAKE}`,
+    );
+
+    for (const id of ['serpapi', 'newsdata'] as const) {
+      expect(
+        buildBrief({ ...mention, source: { id, name: 'Sample Daily' } }, chennai, 'en', acme),
+      ).toBe(
+        `News about Acme: 'Acme Analytics raises a sample round' (Sample Daily). ${OUR_OWN_TAKE}`,
+      );
+    }
+  });
+
   it('is the whole brief: one line, the same in every place and language', () => {
     for (const row of rows) {
       const brief = buildBrief(row, chennai, 'ta', acme);

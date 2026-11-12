@@ -120,12 +120,16 @@ function competitorLine(item: ComposedItem, title: string, context: BriefContext
   const name = stripHtml(context.competitor ?? '') || 'A competitor';
 
   switch (item.source.id) {
+    // The keyed news providers (Module 10) stand in for Google News, row for row.
     case 'google-news':
+    case 'serpapi':
+    case 'newsdata':
       return `News about ${name}: '${title}' (${stripHtml(item.source.name)}). ${OUR_OWN_TAKE}`;
     case 'youtube':
       return `${name} published a video: '${title}'. ${OUR_OWN_TAKE}`;
     case 'bluesky':
     case 'mastodon':
+    case 'instagram':
       return `${name} posted on ${stripHtml(item.source.name)}: '${title}'. ${OUR_OWN_TAKE}`;
     default:
       return `${name} published: '${title}'. ${OUR_OWN_TAKE}`;

@@ -23,6 +23,7 @@ export {
   placeFromNominatim,
 } from './geo/geocoder/nominatim';
 export { CHENNAI, createSimulatedGeocoder, PARIS, SAN_FRANCISCO } from './geo/geocoder/simulated';
+export { type IpCountryTable, lookupCountry, parseIpCountryCsv } from './geo/ip-country';
 export { countryOf, isCountryCode, isRegionCode, trendsGeo } from './geo/iso3166';
 export { resolveLanguages } from './geo/languages';
 export { CLDR_VERSION, COUNTRY_LANGUAGES } from './geo/languages.generated';
@@ -32,7 +33,14 @@ export {
   localityFromTimeZone,
   WORLDWIDE,
 } from './geo/locality';
+export {
+  buildLocalityFromPicker,
+  listCountries,
+  listRegions,
+  type PlaceOption,
+} from './geo/places-list';
 export { REGION_LANGUAGES, REGION_NAMES } from './geo/region-languages';
+export { COUNTRY_REGIONS } from './geo/regions.generated';
 export {
   countryFromTimeZone,
   countryName,
@@ -126,6 +134,22 @@ export {
   stripHtml,
 } from './sources/feed-parser';
 export {
+  createGdeltSource,
+  GDELT_DOC_URL,
+  gdeltDocUrl,
+  gdeltQuery,
+  parseGdeltBody,
+  seenDateIso,
+  tidyGdeltTitle,
+} from './sources/gdelt';
+export {
+  GDELT_LANGUAGE_NAMES,
+  gdeltCountry,
+  gdeltLanguage,
+  ISO_TO_FIPS,
+  languageTagOf,
+} from './sources/gdelt-codes';
+export {
   createGoogleNewsSource,
   type GoogleNewsSource,
   isNewsTopic,
@@ -153,9 +177,30 @@ export {
   festivalsInWindow,
   todayIn,
 } from './sources/holidays';
+export {
+  CURATED_DAYS,
+  type CuratedDate,
+  type CuratedDay,
+  type CuratedYearlyDay,
+  curatedFestivals,
+  hasCuratedDays,
+  NEAR_DAYS,
+} from './sources/holidays/curated';
 export { holidayRegion } from './sources/holidays/date-holidays';
 export { HOLIDAY_CALENDAR_IDS, holidayCalendarUrl } from './sources/holidays/google-calendar';
 export { calendarName, type IcsEvent, parseIcs } from './sources/holidays/ics';
+export {
+  businessDiscoveryFields,
+  createInstagramBusinessSource,
+  INSTAGRAM_GRAPH_VERSION,
+  type InstagramBusinessReference,
+  type InstagramBusinessSource,
+  type InstagramBusinessSourceOptions,
+  instagramBusinessPrefix,
+  instagramBusinessUrl,
+  instagramUsername,
+  isInstagramUsername,
+} from './sources/instagram-business';
 export { cleanText, decodeEntities, safeHttpUrl, stripControlChars } from './sources/html-text';
 export { createMastodonSource, MASTODON_INSTANCE, mastodonTrendsUrl } from './sources/mastodon';
 export {
@@ -165,7 +210,19 @@ export {
   mastodonLookupUrl,
   mastodonStatusesUrl,
 } from './sources/mastodon-account';
+export {
+  createNewsDataSource,
+  NEWSDATA_CATEGORIES,
+  newsDataPrefix,
+  newsDataUrl,
+} from './sources/newsdata';
 export { createRssSource, FEED_ACCEPT } from './sources/rss';
+export {
+  createSerpApiNewsSource,
+  SERPAPI_TOPIC_TOKENS,
+  serpApiNewsPrefix,
+  serpApiNewsUrl,
+} from './sources/serpapi-news';
 export {
   createWikipediaSource,
   isWikipediaArticle,

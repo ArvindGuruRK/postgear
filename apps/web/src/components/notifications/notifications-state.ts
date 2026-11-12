@@ -122,6 +122,7 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   'automation.review': 'Review needed',
   'automation.failed': 'Workflow failed',
   'automation.paused': 'Workflow paused',
+  'discover.digest': 'Your Discover week',
   info: 'Notification',
 };
 

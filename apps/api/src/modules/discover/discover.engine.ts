@@ -21,11 +21,14 @@
 import {
   createBlueskySource,
   createFixtureFetch,
+  createGdeltSource,
   createGoogleNewsSource,
   createGoogleTrendsSource,
   createHolidaysSource,
   createMastodonSource,
+  createNewsDataSource,
   createNominatimGeocoder,
+  createSerpApiNewsSource,
   createSimulatedGeocoder,
   createWikipediaSource,
   createYoutubeSource,
@@ -35,6 +38,7 @@ import {
   type GoogleNewsSource,
 } from '@postgear/discover-engine';
 import { fetchUrlSafely } from '@postgear/seo-engine';
+import { createOperatorFetch } from '../../common/http/operator-fetch';
 import type { Env } from '../../config/env';
 
 export const DISCOVER_ENGINE = Symbol('DISCOVER_ENGINE');
@@ -44,13 +48,25 @@ const REQUEST_TIMEOUT_MS = 8_000;
 /** What simulation asks its recordings with. They answer whatever the key, so the real one stays at home. */
 const SIMULATED_YOUTUBE_KEY = 'simulation';
 
+export type NewsProvider = 'google' | 'serpapi' | 'newsdata';
+
 export interface DiscoverEngine {
   simulation: boolean;
   userAgent: string;
   /** Null when finding places is turned off. */
   geocoder: Geocoder | null;
+  /**
+   * Module 10: the place finder is the operator's own Nominatim. Its policy is
+   * theirs, so the one-a-second budget is lifted and the field may search as
+   * someone types.
+   */
+  geocoderSelfHosted: boolean;
   trends: DiscoverSource;
+  /** Google News, or a keyed stand-in with the same shape (Module 10, `DISCOVER_NEWS_PROVIDER`). */
   news: GoogleNewsSource;
+  newsProvider: NewsProvider;
+  /** Module 10: a place's coverage in the world's press, through GDELT. */
+  gdelt: DiscoverSource | null;
   wikipedia: DiscoverSource;
   bluesky: DiscoverSource;
   mastodon: DiscoverSource;
@@ -62,7 +78,39 @@ export interface DiscoverEngine {
 export type DiscoverEnv = Pick<
   Env,
   'DISCOVER_SIMULATION' | 'DISCOVER_GEOCODER' | 'DISCOVER_GEOCODER_USER_AGENT' | 'YOUTUBE_API_KEY'
->;
+> &
+  Partial<
+    Pick<
+      Env,
+      'DISCOVER_GEOCODER_URL' | 'DISCOVER_NEWS_PROVIDER' | 'SERPAPI_API_KEY' | 'NEWSDATA_API_KEY'
+    >
+  >;
+
+/**
+ * The News tab's service. Simulation always reads Google's recordings: the keyed
+ * services are never asked from a laptop by accident, and the env check refuses
+ * a provider whose key is missing before this runs.
+ */
+function newsSource(
+  env: DiscoverEnv,
+  simulation: boolean,
+  feedFetch: DiscoverFetch,
+): { news: GoogleNewsSource; provider: NewsProvider } {
+  const provider = env.DISCOVER_NEWS_PROVIDER ?? 'google';
+  if (!simulation && provider === 'serpapi' && env.SERPAPI_API_KEY) {
+    return {
+      news: createSerpApiNewsSource({ fetch: feedFetch, apiKey: env.SERPAPI_API_KEY }),
+      provider,
+    };
+  }
+  if (!simulation && provider === 'newsdata' && env.NEWSDATA_API_KEY) {
+    return {
+      news: createNewsDataSource({ fetch: feedFetch, apiKey: env.NEWSDATA_API_KEY }),
+      provider,
+    };
+  }
+  return { news: createGoogleNewsSource({ fetch: feedFetch }), provider: 'google' };
+}
 
 /**
  * The engine's fetch over the guarded one.
@@ -102,21 +150,35 @@ export function createDiscoverEngine(env: DiscoverEnv): DiscoverEngine {
   const userAgent = env.DISCOVER_GEOCODER_USER_AGENT;
   const feedFetch = simulation ? createFixtureFetch() : createSafeDiscoverFetch(userAgent);
 
+  // Module 10: the operator's own Nominatim, reached through a fetch locked to
+  // its one address (it usually sits on a private network the guard refuses).
+  const ownGeocoder = !simulation && env.DISCOVER_GEOCODER_URL ? env.DISCOVER_GEOCODER_URL : null;
+
   let geocoder: Geocoder | null = null;
   if (env.DISCOVER_GEOCODER !== 'off') {
     geocoder = simulation
       ? createSimulatedGeocoder()
       : // English always: the cached answer is shared by everyone in that place, and
         // Google's place feed reads English place names best.
-        createNominatimGeocoder({ fetch: feedFetch, userAgent, acceptLanguage: 'en' });
+        createNominatimGeocoder({
+          fetch: ownGeocoder ? createOperatorFetch(ownGeocoder, { userAgent }) : feedFetch,
+          userAgent,
+          acceptLanguage: 'en',
+          ...(ownGeocoder ? { baseUrl: ownGeocoder } : {}),
+        });
   }
+
+  const { news, provider } = newsSource(env, simulation, feedFetch);
 
   return {
     simulation,
     userAgent,
     geocoder,
+    geocoderSelfHosted: geocoder !== null && ownGeocoder !== null,
     trends: createGoogleTrendsSource({ fetch: feedFetch }),
-    news: createGoogleNewsSource({ fetch: feedFetch }),
+    news,
+    newsProvider: provider,
+    gdelt: createGdeltSource({ fetch: feedFetch }),
     wikipedia: createWikipediaSource({ fetch: feedFetch }),
     bluesky: createBlueskySource({ fetch: feedFetch }),
     mastodon: createMastodonSource({ fetch: feedFetch }),
@@ -138,8 +200,9 @@ export function describeEngine(engine: DiscoverEngine) {
   return {
     event: 'discover.boot',
     simulation: engine.simulation,
-    geocoder: engine.geocoder ? 'nominatim' : 'off',
+    geocoder: engine.geocoder ? (engine.geocoderSelfHosted ? 'self-hosted' : 'nominatim') : 'off',
     userAgent: engine.userAgent,
     videos: engine.videos !== null,
+    news: engine.newsProvider,
   };
 }

@@ -19,7 +19,9 @@
 import { Badge, Button, cn } from '@postgear/ui';
 import { useId } from 'react';
 import type { DiscoverItem } from '@/types/discover';
+import { type SaveControl, SaveButton } from './discover-cards';
 import {
+  daysUntil,
   type FestivalSection,
   festivalBadge,
   festivalDay,
@@ -34,46 +36,100 @@ export interface FestivalRowProps {
   today: string | null | undefined;
   /** Opens the Create Post sheet with the festival's date. Without it there is no Plan A Post (the playground). */
   onPlanPost?: (item: DiscoverItem) => void;
+  /** Module 10: the bookmark. */
+  save?: SaveControl;
 }
 
-/** One festival: "8 Nov, Sunday  Diwali/Deepavali  Public Holiday  2 days ago  Plan A Post". */
-export function FestivalRow({ item, today, onPlanPost }: FestivalRowProps) {
+/** A festival inside the coming week: its tile's month band is blue, so the near ones stand out. */
+const SOON_DAYS = 7;
+
+/**
+ * The date as a desk calendar's page: the month on a band over the day.
+ * The band is blue for the coming week, plain later on, and the whole tile
+ * fades once the day has passed. A screen reader hears "8 Nov" once.
+ */
+function CalendarTile({
+  date,
+  iso,
+  days,
+}: {
+  date: NonNullable<ReturnType<typeof festivalDay>>;
+  iso: string;
+  days: number | null;
+}) {
+  const past = days !== null && days < 0;
+  const soon = days !== null && days >= 0 && days < SOON_DAYS;
+
+  return (
+    <time
+      dateTime={iso}
+      data-testid="festival-tile"
+      data-soon={soon || undefined}
+      className={cn(
+        'flex w-14 shrink-0 flex-col overflow-hidden rounded-md border-2 border-outline text-center',
+        past && 'opacity-60',
+      )}
+    >
+      <span className="sr-only">{date.day}</span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'border-b-2 border-outline px-1 py-0.5 type-label text-xs',
+          soon ? 'bg-actionPrimary text-onActionPrimary' : 'bg-chrome text-ink',
+        )}
+      >
+        {date.month}
+      </span>
+      <span
+        aria-hidden="true"
+        className="bg-secondary py-1 type-heading text-xl leading-none text-ink tabular-nums"
+      >
+        {date.dayOfMonth}
+      </span>
+    </time>
+  );
+}
+
+/** One festival: a calendar tile for 8 Nov, "Diwali/Deepavali", "Sunday, 2 days ago", Public Holiday, Plan A Post. */
+export function FestivalRow({ item, today, onPlanPost, save }: FestivalRowProps) {
   const date = festivalDay(item.date);
   const badge = festivalBadge(item);
   const when = festivalWhen(item.date, today);
+  const days = daysUntil(item.date, today);
 
   return (
     <li
       data-testid="discover-festival-row"
       className={cn(ROW, 'animate-fadeIn motion-reduce:animate-none')}
     >
-      {date ? (
-        <time dateTime={item.date} className="flex w-20 shrink-0 flex-col">
-          <span className="type-heading text-base text-ink">{date.day}</span>
-          <span className="font-sans text-xs text-ink type-muted">{date.weekday}</span>
-        </time>
-      ) : null}
-      <div className="flex min-w-0 flex-1 basis-56 flex-wrap items-center gap-x-3 gap-y-1">
-        <span dir="auto" className="min-w-0 break-words type-ui text-sm text-ink">
-          {item.title}
-        </span>
-        <Badge variant={badge.variant}>{badge.label}</Badge>
-        {when ? (
-          <span className="font-sans text-xs text-ink type-muted" data-testid="festival-when">
-            {when}
+      {date && item.date ? <CalendarTile date={date} iso={item.date} days={days} /> : null}
+      <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <span dir="auto" className="min-w-0 break-words type-heading text-base text-ink">
+            {item.title}
           </span>
-        ) : null}
+          <Badge variant={badge.variant}>{badge.label}</Badge>
+        </div>
+        <p className="m-0 font-sans text-xs text-ink type-muted">
+          {date ? <span>{date.weekday}</span> : null}
+          {date && when ? ', ' : null}
+          {when ? <span data-testid="festival-when">{when}</span> : null}
+        </p>
       </div>
-      {onPlanPost ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          className="shrink-0"
-          aria-label={`Plan A Post for ${item.title}`}
-          onClick={() => onPlanPost(item)}
-        >
-          Plan A Post
-        </Button>
+      {onPlanPost || save ? (
+        <div className="flex shrink-0 items-center gap-1">
+          {onPlanPost ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              aria-label={`Plan A Post for ${item.title}`}
+              onClick={() => onPlanPost(item)}
+            >
+              Plan A Post
+            </Button>
+          ) : null}
+          {save ? <SaveButton item={item} save={save} /> : null}
+        </div>
       ) : null}
     </li>
   );
@@ -83,10 +139,12 @@ function FestivalSectionList({
   section,
   today,
   onPlanPost,
+  renderSave,
 }: {
   section: FestivalSection;
   today: string | null | undefined;
   onPlanPost?: (item: DiscoverItem) => void;
+  renderSave?: (item: DiscoverItem) => SaveControl | undefined;
 }) {
   const headingId = useId();
 
@@ -104,7 +162,13 @@ function FestivalSectionList({
       ) : null}
       <ul className={ROW_LIST}>
         {section.items.map((item) => (
-          <FestivalRow key={item.id} item={item} today={today} onPlanPost={onPlanPost} />
+          <FestivalRow
+            key={item.id}
+            item={item}
+            today={today}
+            onPlanPost={onPlanPost}
+            save={renderSave?.(item)}
+          />
         ))}
       </ul>
     </section>
@@ -116,11 +180,14 @@ export function FestivalList({
   items,
   today,
   onPlanPost,
+  renderSave,
 }: {
   items: readonly DiscoverItem[];
   /** Today in the place's own calendar, from the answer. */
   today: string | null | undefined;
   onPlanPost?: (item: DiscoverItem) => void;
+  /** Module 10: the bookmark on each row. */
+  renderSave?: (item: DiscoverItem) => SaveControl | undefined;
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -130,6 +197,7 @@ export function FestivalList({
           section={section}
           today={today}
           onPlanPost={onPlanPost}
+          renderSave={renderSave}
         />
       ))}
     </div>

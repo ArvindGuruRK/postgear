@@ -15,12 +15,12 @@ import type { AiCredits, AiStatus } from '@/types/ai';
 import type { Channel } from '@/types/channel';
 import type {
   Competitor,
-  DiscoverGroup as Group,
   DiscoverItem,
   DiscoverStatus,
   DiscoverTab,
   FeedKind,
   FeedResponse,
+  DiscoverGroup as Group,
   Locality,
   ReaderArticle,
 } from '@/types/discover';
@@ -172,12 +172,13 @@ function actionsOf(card: HTMLElement): string[] {
 }
 
 describe('Read on a card', () => {
-  it('sits between Create Post and Open on a trend, and hands back the item', () => {
+  it('follows Create Post on a trend, and hands back the item', () => {
     const onRead = jest.fn();
     render(<TrendCard item={TREND} now={NOW} onCreatePost={jest.fn()} onRead={onRead} />);
 
     const card = screen.getByRole('article', { name: 'weather coimbatore' });
-    expect(actionsOf(card)).toEqual(['Create Post', 'Read', 'Open']);
+    // Module 10: no Open button; the title is the way out.
+    expect(actionsOf(card)).toEqual(['Create Post', 'Read']);
 
     fireEvent.click(within(card).getByRole('button', { name: /^Read(?! A Page)( |$)/ }));
     expect(onRead).toHaveBeenCalledWith(TREND);
@@ -195,11 +196,11 @@ describe('Read on a card', () => {
     expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 
-  it('is not there for an item with no page of its own, though Open may still go somewhere', () => {
+  it('is not there for an item with no page of its own, though its title may still go somewhere', () => {
     render(<TrendCard item={{ ...TREND, url: undefined }} now={NOW} onRead={jest.fn()} />);
 
-    // Open falls back to the first related story; Read does not read a different page.
-    expect(screen.getByRole('link', { name: /^Open/ })).toBeInTheDocument();
+    // The title falls back to the first related story; Read does not read a different page.
+    expect(screen.getByRole('link', { name: 'weather coimbatore' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Read(?! A Page)( |$)/ })).not.toBeInTheDocument();
   });
 
@@ -273,6 +274,7 @@ const ACME: Competitor = {
   blueskyHandle: 'acme.example',
   mastodonAcct: 'acme@mastodon.example',
   newsQuery: null,
+  instagramUsername: null,
   lastCheckedAt: null,
   lastError: null,
   createdAt: '2026-11-10T08:00:00.000Z',
@@ -390,7 +392,9 @@ describe('Read on the page', () => {
 
     await screen.findByText('A blog post');
     const rows = screen.getAllByTestId('discover-competitor-row');
-    const reads = rows.map((row) => within(row).queryByRole('button', { name: /^Read(?! A Page)( |$)/ }) !== null);
+    const reads = rows.map(
+      (row) => within(row).queryByRole('button', { name: /^Read(?! A Page)( |$)/ }) !== null,
+    );
     expect(rows.map((row) => row.getAttribute('data-kind'))).toEqual([
       'blog',
       'youtube',

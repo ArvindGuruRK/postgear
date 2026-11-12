@@ -18,9 +18,11 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Optional,
   Param,
   Patch,
   Post,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { type ActiveOrg, CurrentOrg } from '../../common/decorators/current-org.decorator';
@@ -30,6 +32,7 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
+import { CompetitorResearchService } from './competitor-research.service';
 import { CompetitorsService } from './competitors.service';
 import { DISCOVER_MESSAGES } from './discover.messages';
 import {
@@ -41,15 +44,42 @@ import {
   type UpdateCompetitorInput,
   updateCompetitorSchema,
 } from './dto/competitors.schema';
+import { type SeenInput, seenSchema } from './dto/my-place.schema';
 
 @Controller('discover/competitors')
 @Roles(Role.ADMIN, Role.USER)
 export class CompetitorsController {
-  constructor(private readonly competitors: CompetitorsService) {}
+  constructor(
+    private readonly competitors: CompetitorsService,
+    // Optional so a spec can build the controller with the list service alone.
+    @Optional() private readonly researcher?: CompetitorResearchService,
+  ) {}
 
   @Get()
   async list(@CurrentOrg() org: ActiveOrg) {
-    return { competitors: await this.competitors.list(org.id), limit: MAX_COMPETITORS };
+    return {
+      competitors: await this.competitors.list(org.id),
+      limit: MAX_COMPETITORS,
+      research: this.researcher?.available ?? false,
+    };
+  }
+
+  /** Module 10: how much each competitor has that this person has not seen. Reads copies only. */
+  @Get('unseen')
+  unseen(@CurrentOrg() org: ActiveOrg, @CurrentUser() user: AuthenticatedUser) {
+    return this.competitors.unseen(org.id, user.id);
+  }
+
+  /** Module 10: this person has seen these competitors now (all of them without ids). */
+  @Post('seen')
+  @HttpCode(HttpStatus.OK)
+  async seen(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodBody(seenSchema, 'discover/competitors/seen')) body: SeenInput,
+  ) {
+    await this.competitors.markSeen(org.id, user.id, body.ids);
+    return { ok: true };
   }
 
   @Post()
@@ -92,7 +122,19 @@ export class CompetitorsController {
   }
 
   @Get(':id/items')
-  items(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
-    return this.competitors.items(org.id, id);
+  items(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('id') id: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return this.competitors.items(org.id, id, user?.id);
+  }
+
+  /** Module 10: Research This Competitor. 3 AI credits, and free again the same day. */
+  @Post(':id/research')
+  @HttpCode(HttpStatus.OK)
+  research(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
+    if (!this.researcher) throw new ServiceUnavailableException();
+    return this.researcher.research(org.id, id);
   }
 }

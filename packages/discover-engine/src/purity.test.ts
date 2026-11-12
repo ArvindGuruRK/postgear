@@ -242,6 +242,13 @@ describe('the public surface', () => {
       'holidayCalendarUrl',
       'parseIcs',
       'calendarName',
+      // Module 10: Instagram competitors, and the two keyed news providers.
+      'createInstagramBusinessSource',
+      'instagramUsername',
+      'isInstagramUsername',
+      'INSTAGRAM_GRAPH_VERSION',
+      'createSerpApiNewsSource',
+      'createNewsDataSource',
     ]) {
       expect((engine as Record<string, unknown>)[name]).toBeDefined();
     }

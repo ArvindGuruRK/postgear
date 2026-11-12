@@ -163,6 +163,13 @@ export interface FeedAnswer {
 export interface DiscoverStatus {
   simulation: boolean;
   geocoder: 'nominatim' | 'off';
+  /**
+   * Module 10: whether the city field may search as someone types. Only with the
+   * operator's own place finder, or the stand-in: never the public instance.
+   */
+  typeahead: boolean;
+  /** Module 10: which service answers News. */
+  newsProvider: 'google' | 'serpapi' | 'newsdata';
   sources: {
     trends: boolean;
     news: boolean;
@@ -216,6 +223,42 @@ interface ShownGroup {
   items: DiscoverItem[];
   ageMs: number;
   stale: boolean;
+  /** Module 10: the interest this group stands for, from its load, since the copy is shared. */
+  interest?: { index: number; words: string };
+}
+
+/**
+ * Module 10: a place someone opened Trending or News for, as the pre-warm list
+ * keeps it. A place and a language, nothing about who asked.
+ */
+export interface ActivePlace {
+  country: string;
+  region: string | null;
+  regionName: string | null;
+  city: string | null;
+  tz: string | null;
+  lang: string;
+}
+
+/** How long a looked-at place stays on the pre-warm list, and how many it holds. */
+const ACTIVE_PLACE_SECONDS = 2 * 24 * 60 * 60;
+export const ACTIVE_PLACES_KEPT = 300;
+
+/** The order of the News tab's groups: what was asked for, then the place, then the wider world. */
+function newsRank(id: FeedGroupId): number {
+  if (id === 'topic') return 0;
+  if (id === 'place') return 1;
+  if (id.startsWith('interest-')) return 2;
+  if (id === 'top' || id === 'world') return 3;
+  return 4;
+}
+
+/** A headline as two groups would both carry it: case, spaces and punctuation set aside. */
+function headlineKey(title: string): string {
+  return title
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu, ' ')
+    .trim();
 }
 
 const TROUBLE: GroupOutcome = { retryAfterMs: RETRY_AFTER_TROUBLE_MS };
@@ -299,6 +342,9 @@ export class DiscoverService {
     return {
       simulation: this.engine.simulation,
       geocoder: this.engine.geocoder ? 'nominatim' : 'off',
+      typeahead:
+        this.engine.geocoder !== null && (this.engine.geocoderSelfHosted || this.engine.simulation),
+      newsProvider: this.engine.newsProvider,
       sources: {
         trends: true,
         news: true,
@@ -311,12 +357,18 @@ export class DiscoverService {
     };
   }
 
-  async feed(orgId: string, request: FeedRequest): Promise<FeedAnswer> {
+  async feed(orgId: string | null, request: FeedRequest): Promise<FeedAnswer> {
     const language = answerLanguage(request);
     // Read before anything is planned, so a group that is off is never asked for.
-    const hidden = request.workspaceSources ? await this.hiddenFor(orgId, request.kind) : undefined;
+    // News also brings the workspace's interests along, from the same row.
+    const preferences =
+      request.workspaceSources && orgId ? await this.preferencesFor(orgId, request.kind) : undefined;
+    const hidden = preferences?.hidden;
+    const planned: FeedRequest = preferences?.interests.length
+      ? { ...request, interests: preferences.interests }
+      : request;
     // No loads means nothing to fetch, so nothing to cache either.
-    const loads = planLoads(this.engine, this.keys, request, hidden);
+    const loads = planLoads(this.engine, this.keys, planned, hidden);
 
     // Side by side: each has its own copy, its own lock and its own age. All of
     // them are waited for, so a refusal leaves no fetch running behind the answer.
@@ -327,26 +379,95 @@ export class DiscoverService {
       return { load: loads[index], entry: result.value };
     });
 
+    const isWarmable = request.kind === 'trending' || request.kind === 'news';
+    if (orgId && request.locality.countryCode && isWarmable) {
+      // Never in the way of the answer: a list that cannot be written is only a colder morning.
+      void this.rememberPlace(request).catch(() => undefined);
+    }
+
     return this.present(request, language, loaded, hidden);
   }
 
   /**
    * Of the groups this tab shows, the ones the workspace has switched off, in the
-   * tab's own order. A tab with no switch (News) has nothing to read.
+   * tab's own order, and for News the workspace's interests (Module 10). A tab
+   * with no switch and no interests has nothing to read.
    */
-  private async hiddenFor(orgId: string, kind: FeedKind): Promise<DiscoverSourceSwitch[]> {
+  private async preferencesFor(
+    orgId: string,
+    kind: FeedKind,
+  ): Promise<{ hidden: DiscoverSourceSwitch[]; interests: string[] }> {
     const switches = switchesOf(kind);
-    if (switches.length === 0) return [];
+    if (switches.length === 0 && kind !== 'news') return { hidden: [], interests: [] };
 
-    const off = await this.settings.switchedOff(orgId);
-    return switches.filter((id) => off.includes(id));
+    const { off, interests } = await this.settings.feedPreferences(orgId);
+    return {
+      hidden: switches.filter((id) => off.includes(id)),
+      interests: kind === 'news' ? interests : [],
+    };
   }
 
-  private async load(orgId: string, load: LoadPlan): Promise<CachedFeed | null> {
+  /**
+   * Module 10: puts the place on the list the worker warms before the morning.
+   * The place and the language only, scored by now; the list keeps the most
+   * recent few hundred and is gone after two quiet days.
+   */
+  private async rememberPlace({ locality, language }: FeedRequest): Promise<void> {
+    const place: ActivePlace = {
+      country: locality.countryCode as string,
+      region: locality.regionCode,
+      regionName: locality.regionName,
+      city: locality.city,
+      tz: locality.timeZone,
+      lang: language,
+    };
+    await this.redis.rememberMember(
+      this.keys.activePlaces,
+      JSON.stringify(place),
+      Date.now(),
+      ACTIVE_PLACE_SECONDS,
+      ACTIVE_PLACES_KEPT,
+    );
+  }
+
+  /** Module 10: the places looked at since `since`, newest first, for the pre-warm. */
+  async activePlaces(since: number, limit: number): Promise<ActivePlace[]> {
+    const members = await this.redis.membersSince(this.keys.activePlaces, since, limit);
+    return members.flatMap((member) => {
+      try {
+        const place = JSON.parse(member) as ActivePlace;
+        return typeof place.country === 'string' && typeof place.lang === 'string' ? [place] : [];
+      } catch {
+        return [];
+      }
+    });
+  }
+
+  /**
+   * Module 10: makes sure the shared copies a tab reads exist and are not older
+   * than `olderThanMs`, waiting for each fetch. For the worker's pre-warm only:
+   * no workspace, no throttle, every load one after the other so the gate, the
+   * breakers and the budgets hold as they do for a person. Answers how many
+   * loads it fetched.
+   */
+  async warm(request: FeedRequest, olderThanMs: number): Promise<number> {
+    let fetched = 0;
+    for (const load of planLoads(this.engine, this.keys, request)) {
+      const warmed = await this.cache.warm<CachedFeed>(load.key, {
+        keepSeconds: load.windows.keepSeconds,
+        olderThanMs: Math.max(olderThanMs, load.windows.freshMs),
+        refresh: (previous) => this.fetchGroups(load, previous),
+      });
+      if (warmed) fetched += 1;
+    }
+    return fetched;
+  }
+
+  private async load(orgId: string | null, load: LoadPlan): Promise<CachedFeed | null> {
     const { entry } = await this.cache.load<CachedFeed>(load.key, {
       keepSeconds: load.windows.keepSeconds,
       freshMs: (cached) => cached.retryAfterMs ?? this.freshFor(load, cached),
-      beforeMiss: load.placeBound ? () => this.countNewPlace(orgId) : undefined,
+      beforeMiss: load.placeBound && orgId ? () => this.countNewPlace(orgId) : undefined,
       refresh: (previous) => this.fetchGroups(load, previous),
     });
     return entry;
@@ -482,6 +603,14 @@ export class DiscoverService {
       if (plan.budget && !(await this.reserve(plan.budget))) {
         return { spent: true, retryAfterMs: RETRY_AFTER_SPENT_MS };
       }
+      // A source with its own pace for the whole deployment (GDELT): a held key is a
+      // full gate, not trouble, so the copy stays and nothing counts for the breaker.
+      if (
+        plan.spacing &&
+        !(await this.redis.setIfAbsent(plan.spacing.key, '1', plan.spacing.seconds))
+      ) {
+        return { retryAfterMs: RETRY_AFTER_BUSY_MS };
+      }
 
       const result = await plan.fetch(AbortSignal.timeout(GROUP_DEADLINE_MS));
       if (plan.budget) await this.settle(plan.budget, result);
@@ -565,16 +694,33 @@ export class DiscoverService {
             // Each group against its own load's window. A spent budget is why a copy
             // is still the answer, however young it is.
             stale: ageMs >= load.windows.freshMs || group.spent === true,
+            ...(load.interest ? { interest: load.interest } : {}),
           };
         }),
       )
       // An empty group has nothing to say: the page just does not show it.
       .filter((part) => part.items.length > 0);
 
+    if (kind === 'news') {
+      // Several loads answer News (Module 10), and each composes only its own
+      // groups. In the tab's order, a headline already shown above is left out
+      // below, so an interest and the top stories never show the same story twice.
+      shown.sort((a, b) => newsRank(this.idOf(a)) - newsRank(this.idOf(b)));
+      const seen = new Set<string>();
+      for (const part of shown) {
+        part.items = part.items.filter((item) => {
+          const key = headlineKey(item.title);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+    }
+
     // The two networks are fetched and kept apart, and shown as one group.
     const networks = shown.filter((part) => part.group.id === 'social');
     const groups = shown
-      .filter((part) => part.group.id !== 'social')
+      .filter((part) => part.group.id !== 'social' && part.items.length > 0)
       .map((part) => this.groupOf(part, request));
     if (networks.length > 0) groups.push(this.socialGroup(networks, request));
 
@@ -621,11 +767,18 @@ export class DiscoverService {
     return groups.length === 0 && isSpent ? 'resting' : undefined;
   }
 
+  /** A group's id in this answer: an interest's comes from its place in this workspace's list. */
+  private idOf(part: ShownGroup): FeedGroupId {
+    return part.interest ? `interest-${part.interest.index}` : part.group.id;
+  }
+
   private groupOf(part: ShownGroup, request: FeedRequest): FeedGroup {
     const { group, items, stale } = part;
     return {
-      id: group.id,
-      title: this.titleOf(group, request),
+      id: this.idOf(part),
+      title: part.interest
+        ? DISCOVER_MESSAGES.interestTitle(part.interest.words)
+        : this.titleOf(group, request),
       subtitle: this.subtitleOf(part),
       attribution: group.attribution,
       items,
@@ -682,8 +835,13 @@ export class DiscoverService {
         return DISCOVER_MESSAGES.videosSubtitle;
       case 'festivals':
         return DISCOVER_MESSAGES.festivalsSubtitle;
+      case 'gdelt':
+        return DISCOVER_MESSAGES.gdeltSubtitle;
       default:
-        return DISCOVER_MESSAGES.newsSubtitle;
+        // A keyed service answering News says so (Module 10); Google's line is as it was.
+        return this.engine.newsProvider === 'google'
+          ? DISCOVER_MESSAGES.newsSubtitle
+          : DISCOVER_MESSAGES.newsVia(group.attribution.name);
     }
   }
 
@@ -714,6 +872,11 @@ export class DiscoverService {
         return DISCOVER_MESSAGES.videosTitle(country);
       case 'festivals':
         return DISCOVER_MESSAGES.festivalsTitle(country);
+      case 'gdelt':
+        return DISCOVER_MESSAGES.gdeltTitle(locality.city ?? locality.regionName ?? country);
+      default:
+        // An interest's group is named in `groupOf`, which knows the words.
+        return group.attribution.name;
     }
   }
 }

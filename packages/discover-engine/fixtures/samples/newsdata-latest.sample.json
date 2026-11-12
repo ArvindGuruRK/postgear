@@ -1,0 +1,57 @@
+{
+  "_sample": "Written by hand for tests, in the shape NewsData.io's /api/1/latest documents. Not a recording: there is no NewsData.io key.",
+  "status": "success",
+  "totalResults": 3,
+  "results": [
+    {
+      "article_id": "sample00000000000000000000000001",
+      "title": "Chennai metro opens two sample stations",
+      "link": "https://news.example/chennai/metro-sample-stations",
+      "keywords": ["metro", "chennai"],
+      "creator": ["A Sample Writer"],
+      "description": "Two new stations open on the sample line this morning, with trains every six minutes.",
+      "content": "ONLY AVAILABLE IN PAID PLANS",
+      "pubDate": "2026-11-10 06:30:00",
+      "pubDateTZ": "UTC",
+      "image_url": "https://news.example/images/metro.jpg",
+      "video_url": null,
+      "source_id": "samplechennaitimes",
+      "source_name": "Sample Chennai Times",
+      "source_priority": 12345,
+      "source_url": "https://news.example",
+      "source_icon": "https://news.example/icon.png",
+      "language": "english",
+      "country": ["india"],
+      "category": ["top"],
+      "duplicate": false
+    },
+    {
+      "article_id": "sample00000000000000000000000002",
+      "title": "Chennai metro opens two sample stations",
+      "link": "https://copy.example/metro",
+      "description": "The same story, picked up elsewhere.",
+      "pubDate": "2026-11-10 06:40:00",
+      "pubDateTZ": "UTC",
+      "source_id": "samplecopy",
+      "source_name": "Sample Copy",
+      "language": "english",
+      "duplicate": true
+    },
+    {
+      "article_id": "sample00000000000000000000000003",
+      "title": "Sample port handles record cargo",
+      "link": "https://business.example/port-record",
+      "description": null,
+      "pubDate": "2026-11-09 18:45:00",
+      "pubDateTZ": "UTC",
+      "image_url": null,
+      "source_id": "samplebusinessline",
+      "source_url": "https://business.example",
+      "language": "english",
+      "country": ["india"],
+      "category": ["business"],
+      "duplicate": false
+    }
+  ],
+  "nextPage": "sample-next-page"
+}

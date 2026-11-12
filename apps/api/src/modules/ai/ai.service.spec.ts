@@ -57,6 +57,7 @@ function credits(used: number): AiCredits {
       copilot_message: 1,
       seo_advice: 3,
       generate_snippet: 2,
+      competitor_research: 3,
     },
   };
 }

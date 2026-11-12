@@ -220,6 +220,7 @@ describe('DiscoverView', () => {
     expect(screen.getByTestId('discover-updated')).toHaveTextContent('Updated 25 min ago');
     expect(mockedApi).toHaveBeenCalledWith(
       expect.stringMatching(/^\/discover\/feed\?kind=trending&country=IN&region=IN-TN/),
+      expect.anything(),
     );
   });
 
@@ -249,10 +250,13 @@ describe('DiscoverView', () => {
     ).toHaveAttribute('rel', 'noopener noreferrer');
     expect(within(card).queryByText('Bad link')).not.toBeInTheDocument();
 
-    const open = within(card).getByRole('link', { name: /^Open/ });
+    // Module 10: the title is the link out (there is no Open button).
+    const open = within(card).getByRole('link', { name: 'weather coimbatore' });
     expect(open).toHaveAttribute('href', 'https://www.thehindu.com/rain');
     expect(open).toHaveAttribute('target', '_blank');
     expect(open).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(open).toHaveAccessibleDescription('opens in a new tab');
+    expect(within(card).queryByRole('link', { name: /^Open/ })).not.toBeInTheDocument();
 
     expect(within(card).getByRole('heading', { name: 'weather coimbatore' })).toHaveAttribute(
       'dir',
@@ -276,7 +280,9 @@ describe('DiscoverView', () => {
     renderView();
 
     const card = await screen.findByRole('article', { name: 'weather coimbatore' });
-    expect(within(card).queryByRole('button', { name: /^Create Post( for |$)/ })).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole('button', { name: /^Create Post( for |$)/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('hands Create Post the item with the place and language it was read in', async () => {
@@ -310,7 +316,7 @@ describe('DiscoverView', () => {
 
     const card = await screen.findByRole('article', { name: 'சென்னையில் கனமழை' });
     expect(within(card).getByText(/Nakkheeran/)).toBeInTheDocument();
-    expect(within(card).getByRole('link', { name: /^Open/ })).toHaveAttribute(
+    expect(within(card).getByRole('link', { name: 'சென்னையில் கனமழை' })).toHaveAttribute(
       'href',
       'https://news.google.com/rss/articles/abc',
     );
@@ -384,7 +390,7 @@ describe('DiscoverView', () => {
       'data-state',
       'active',
     );
-    expect(mockedApi).toHaveBeenCalledWith('/discover/competitors');
+    expect(mockedApi).toHaveBeenCalledWith('/discover/competitors', expect.anything());
     expect(feedCalls()).toEqual([]);
     expect(screen.queryByTestId('discover-updated')).not.toBeInTheDocument();
   });
@@ -408,7 +414,14 @@ describe('DiscoverView', () => {
     mockedApi.mockImplementation(async (path: string) =>
       path === '/discover/competitors'
         ? { competitors: [competitor], limit: 20 }
-        : { items: [], unavailable: [], notes: [], fetchedAt: FETCHED, stale: false, pending: false },
+        : {
+            items: [],
+            unavailable: [],
+            notes: [],
+            fetchedAt: FETCHED,
+            stale: false,
+            pending: false,
+          },
     );
     renderView(STATUS, 'competitors');
 
@@ -459,7 +472,14 @@ describe('DiscoverView', () => {
             ],
             limit: 20,
           }
-        : { items: [post], unavailable: [], notes: [], fetchedAt: FETCHED, stale: false, pending: false },
+        : {
+            items: [post],
+            unavailable: [],
+            notes: [],
+            fetchedAt: FETCHED,
+            stale: false,
+            pending: false,
+          },
     );
     renderView(STATUS, 'competitors', { onCreatePost });
 
@@ -630,7 +650,8 @@ describe('Videos (Module 05)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('discover-place-chip')).toHaveTextContent('Chennai, Tamil Nadu'),
     );
-    expect(mockedApi).not.toHaveBeenCalled();
+    // Module 10: the page also asks for the saved ideas and the unseen count; the feed is never asked.
+    expect(feedCalls()).toEqual([]);
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
   });
 
@@ -672,9 +693,8 @@ describe('Videos (Module 05)', () => {
     fireEvent.error(image as HTMLImageElement);
     expect(card.querySelector('img')).toBeNull();
 
-    const open = within(card).getByRole('link', {
-      name: `Open ${VIDEO.title} on YouTube in a new tab`,
-    });
+    const open = within(card).getByRole('link', { name: VIDEO.title });
+    expect(open).toHaveAccessibleDescription('opens on YouTube in a new tab');
     expect(open).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abc123DEF_-');
     expect(open).toHaveAttribute('target', '_blank');
     expect(open).toHaveAttribute('rel', 'noopener noreferrer');
@@ -867,7 +887,8 @@ describe('Festivals (Module 05)', () => {
 
     expect(await screen.findByText(FESTIVALS_NEED_PLACE)).toBeInTheDocument();
     expect(screen.getByText(FESTIVALS_NEED_PLACE_HINT)).toBeInTheDocument();
-    expect(mockedApi).not.toHaveBeenCalled();
+    // Module 10: the page also asks for the saved ideas and the unseen count; the feed is never asked.
+    expect(feedCalls()).toEqual([]);
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
   });
 });

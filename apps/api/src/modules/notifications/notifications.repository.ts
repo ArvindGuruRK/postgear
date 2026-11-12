@@ -206,6 +206,7 @@ export class NotificationsRepository {
           activated: true,
           ...(audience === 'failure_emails' ? { sendFailureEmails: true } : {}),
           ...(audience === 'success_emails' ? { sendSuccessEmails: true } : {}),
+          ...(audience === 'digest_emails' ? { sendDigestEmails: true } : {}),
         },
       },
       select: { user: { select: { email: true } } },

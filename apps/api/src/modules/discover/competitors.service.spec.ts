@@ -55,6 +55,7 @@ const ACME: CompetitorWrite = {
   blueskyHandle: 'acme.example',
   mastodonAcct: 'acme@mastodon.example',
   newsQuery: null,
+  instagramUsername: null,
 };
 
 function post(source: SourceItem['source']['id'], title: string, minutesAgo: number): SourceItem {
@@ -157,6 +158,17 @@ function fakeRepository() {
         if (row) Object.assign(row, note);
       },
     ),
+    /** Module 10: no connected Instagram business account, unless a test says otherwise. */
+    instagramAccount: jest.fn(
+      async (_orgId: string): Promise<{ id: string; token: string } | null> => null,
+    ),
+    /** Module 10: nobody has looked at anything yet, unless a test says otherwise. */
+    lastSeen: jest.fn(
+      async (_userId: string, _ids: string[]): Promise<Map<string, Date>> => new Map(),
+    ),
+    markSeen: jest.fn(
+      async (_userId: string, _ids: string[], _at: Date): Promise<void> => undefined,
+    ),
   };
   return table;
 }
@@ -184,6 +196,12 @@ function build(
     youtube: reader('youtube', ok([post('youtube', 'A video', 120)])),
     bluesky: reader('bluesky', ok([post('bluesky', 'A Bluesky post', 30)])),
     mastodon: reader('mastodon', ok([post('mastodon', 'A Mastodon post', 90)])),
+    instagram: {
+      read: jest.fn(
+        async (_account: unknown, _signal?: AbortSignal): Promise<SourceResult> =>
+          ok([post('instagram', 'An Instagram post', 75)]),
+      ),
+    },
     news: {
       search: jest.fn(
         async (): Promise<SourceResult> => ok([post('google-news', 'A story about them', 45)]),
@@ -208,6 +226,7 @@ function build(
     engine.youtube.read.mock.calls.length +
     engine.bluesky.read.mock.calls.length +
     engine.mastodon.read.mock.calls.length +
+    engine.instagram.read.mock.calls.length +
     engine.news.search.mock.calls.length;
 
   return { service, engine, repository, redis, resolve, gate, readsMade };
@@ -717,6 +736,8 @@ describe('CompetitorsService.items', () => {
       languages: ['ta', 'en'],
       topics: [],
       sources: null,
+      interests: [],
+      weeklyDigest: false,
       locationSource: 'SEARCH',
       updatedAt: NOW,
     };

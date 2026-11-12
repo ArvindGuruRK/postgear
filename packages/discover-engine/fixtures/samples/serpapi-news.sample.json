@@ -1,0 +1,68 @@
+{
+  "_sample": "Written by hand for tests, in the shape SerpApi's Google News engine documents. Not a recording: there is no SerpApi key.",
+  "search_metadata": { "status": "Success" },
+  "search_parameters": { "engine": "google_news", "gl": "in", "hl": "en-in" },
+  "news_results": [
+    {
+      "position": 1,
+      "title": "Chennai metro opens two sample stations",
+      "source": {
+        "name": "Sample Chennai Times",
+        "icon": "https://news.example/icon.png",
+        "authors": ["A Sample Writer"]
+      },
+      "link": "https://news.example/chennai/metro-sample-stations",
+      "thumbnail": "https://news.example/images/metro.jpg",
+      "thumbnail_small": "https://news.example/images/metro-small.jpg",
+      "date": "11/10/2026, 06:30 AM, +0000 UTC",
+      "iso_date": "2026-11-10T06:30:00Z"
+    },
+    {
+      "position": 2,
+      "highlight": {
+        "title": "Monsoon rain closes sample schools for a day",
+        "source": { "name": "Sample Daily" },
+        "link": "https://daily.example/rain-schools",
+        "thumbnail": "https://daily.example/rain.jpg",
+        "iso_date": "2026-11-10T04:00:00Z"
+      },
+      "stories": [
+        {
+          "title": "Monsoon rain closes sample schools for a day",
+          "source": { "name": "Sample Daily" },
+          "link": "https://daily.example/rain-schools",
+          "iso_date": "2026-11-10T04:00:00Z"
+        },
+        {
+          "title": "What the rain means for your commute",
+          "source": { "name": "Sample Herald" },
+          "link": "https://herald.example/rain-commute",
+          "iso_date": "2026-11-10T03:10:00Z"
+        }
+      ],
+      "story_token": "SAMPLE_STORY_TOKEN"
+    },
+    {
+      "position": 3,
+      "stories": [
+        {
+          "title": "Sample port handles record cargo",
+          "source": { "name": "Sample Business Line" },
+          "link": "https://business.example/port-record",
+          "iso_date": "2026-11-09T18:45:00Z"
+        },
+        {
+          "title": "Port record, in three charts",
+          "source": { "name": "Sample Charts" },
+          "link": "https://charts.example/port",
+          "iso_date": "2026-11-09T17:00:00Z"
+        }
+      ]
+    },
+    {
+      "position": 4,
+      "title": "A row with no link, which is left out"
+    }
+  ],
+  "menu_links": [{ "title": "World", "topic_token": "SAMPLE_TOPIC_TOKEN" }]
+}

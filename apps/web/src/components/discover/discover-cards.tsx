@@ -5,7 +5,7 @@
  * when there is one, the title, a quiet line (how many searched, who
  * published it or how many watched, and when), up to three related headlines
  * with their publishers, then the actions. A video names its channel under
- * the title, and its Open goes to YouTube.
+ * the title, and its title goes to YouTube.
  *
  * The card is a box you read, so it sits on `bg-inset` inside its group and
  * does not move; its buttons do. Everything that came from a feed carries
@@ -17,21 +17,48 @@
  * **Create Post** is the neutral secondary, not blue: the same action on every
  * card is not the one call to action, and Draft With AI is (Arvind's pick on
  * 2026-11-10). It opens the Create Post sheet (`create-post-sheet.tsx`); the
- * overflow menu after Open holds Draft In Copilot (`card-menu.tsx`).
+ * overflow menu at the end of the row holds Draft In Copilot (`card-menu.tsx`).
  *
- * **Read** (Module 08) sits between the two on a trend and a story that have
- * an address of their own: it opens the page in the reader sheet without
- * leaving Discover. A video has none, since a video page is not an article.
+ * **Read** (Module 08) follows it on a trend and a story that have an address
+ * of their own: it opens the page in the reader sheet without leaving
+ * Discover. A video has none, since a video page is not an article.
+ *
+ * ## Module 10
+ *
+ * - **Rank**: Trends and stories come in the order their source ranked them,
+ *   so a card carries its place in that order, and the first one in a group
+ *   is the **lead**: two columns wide, a larger title, its picture beside the
+ *   words. The order is information, so it is shown, never invented.
+ * - **Search volume**: a trend with Google's approximate traffic gets a bar
+ *   measured against the busiest trend in its group, so "which of these is
+ *   big" reads at a glance. The number itself stays in words beside it.
+ * - **Save**: a bookmark at the end of the action row keeps the card in the
+ *   workspace's Saved tab. It sits with the overflow menu in a group that
+ *   never wraps, so the menu no longer drops onto a row of its own.
+ * - **The title is the way out**: it links to the story, the trend's top
+ *   story or the video, in a new tab, as a headline does on any news page.
+ *   Open was a third button doing the same, and pushed the row onto two
+ *   lines on a card a quarter of the page wide.
+ * - **A lead needs its picture**: one with none, or whose picture fails, is
+ *   drawn as an ordinary card rather than a wide box that is mostly empty.
  */
-import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
-import { AspectRatio, Button, cn, Link, MotionIcon } from '@postgear/ui';
+import { BookmarkCheckIcon } from '@animateicons/react/lucide/bookmark-check-icon';
+import { BookmarkIcon } from '@animateicons/react/lucide/bookmark-icon';
+import { Button, cn, Link, MotionIcon } from '@postgear/ui';
 import { type ReactNode, useId, useState } from 'react';
 import type { DiscoverItem } from '@/types/discover';
-import { ActionLink } from '../home/home-actions';
 import { itemMeta, openHref, readHref, safeHref } from './discover-model';
 
 /** Up to three related headlines on a card; one on a phone. */
 const RELATED_SHOWN = 3;
+
+/** What the bookmark on a card does: the card is in the Saved tab, or can be put there. */
+export interface SaveControl {
+  saved: boolean;
+  /** While the save or the removal is on its way, so a double press is one request. */
+  busy?: boolean;
+  onToggle: () => void;
+}
 
 export interface ItemCardProps {
   item: DiscoverItem;
@@ -40,8 +67,16 @@ export interface ItemCardProps {
   onCreatePost?: (item: DiscoverItem) => void;
   /** Opens the reader sheet on the item's page (Module 08). Without it there is no Read. */
   onRead?: (item: DiscoverItem) => void;
-  /** Extra controls after Open (Module 04's overflow menu). */
+  /** Extra controls at the end of the row (Module 04's overflow menu). */
   extra?: ReactNode;
+  /** Module 10: its place in the source's order, from 1. Without it no rank is shown. */
+  rank?: number;
+  /** Module 10: the first of its group, drawn wide. */
+  lead?: boolean;
+  /** Module 10: its search volume against the busiest in its group, from 0 to 1. */
+  volume?: number | null;
+  /** Module 10: the bookmark. Without it the card has none (the playground, a saved idea). */
+  save?: SaveControl;
 }
 
 /**
@@ -71,12 +106,51 @@ export function ReadButton({
   );
 }
 
-function ItemImage({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
-
+/**
+ * The bookmark. A toggle (`aria-pressed`), so a screen reader says whether the
+ * card is saved, and its name says which card.
+ */
+export function SaveButton({ item, save }: { item: DiscoverItem; save: SaveControl }) {
   return (
-    <AspectRatio ratio={16 / 9} className="overflow-hidden border-b-2 border-outline">
+    <Button
+      variant="ghost"
+      size="sm"
+      className={cn('w-9 px-0', save.saved && 'text-actionPrimary')}
+      aria-pressed={save.saved}
+      aria-label={save.saved ? `Remove ${item.title} from Saved` : `Save ${item.title}`}
+      title={save.saved ? 'Saved for your workspace' : 'Save for later'}
+      disabled={save.busy}
+      onClick={save.onToggle}
+      data-testid="discover-save"
+    >
+      <MotionIcon icon={save.saved ? BookmarkCheckIcon : BookmarkIcon} className="h-4 w-4" />
+    </Button>
+  );
+}
+
+/**
+ * The card's picture, 16:9 above the words. On the lead card at desktop width
+ * it sits beside them instead and fills its half from top to bottom, so the
+ * card has no dark gap under a short picture. A plain box with the ratio (not
+ * `AspectRatio`, whose outer box always takes the full width).
+ */
+function ItemImage({
+  src,
+  className,
+  onFail,
+}: {
+  src: string;
+  className?: string;
+  /** The picture did not load, or was a pixel: the card draws itself without one. */
+  onFail: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        'relative aspect-video min-w-0 overflow-hidden border-outline bg-chrome',
+        className,
+      )}
+    >
       {/* biome-ignore lint/performance/noImgElement: a picture from the publisher's own host, with no remote pattern for the optimizer */}
       <img
         src={src}
@@ -84,10 +158,14 @@ function ItemImage({ src }: { src: string }) {
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-        className="h-full w-full object-cover"
+        // A tracking pixel or a favicon is not a picture of the story.
+        onLoad={(event) => {
+          if (event.currentTarget.naturalWidth < 80) onFail();
+        }}
+        onError={onFail}
+        className="absolute inset-0 h-full w-full object-cover"
       />
-    </AspectRatio>
+    </div>
   );
 }
 
@@ -126,6 +204,35 @@ function RelatedHeadlines({ item }: { item: DiscoverItem }) {
   );
 }
 
+/** A trend's search volume against the busiest in its group. The words beside it say the number. */
+function VolumeBar({ volume }: { volume: number }) {
+  const width = Math.max(4, Math.round(Math.min(1, Math.max(0, volume)) * 100));
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="discover-volume"
+      className="h-2 w-full overflow-hidden rounded-full border-2 border-outline bg-chrome"
+    >
+      <div className="h-full rounded-full bg-actionPrimary" style={{ width: `${width}%` }} />
+    </div>
+  );
+}
+
+/** Its place in the source's order. The list is not an `<ol>`, so the number is read out. */
+function Rank({ rank, lead }: { rank: number; lead?: boolean }) {
+  return (
+    <span
+      className={cn(
+        'shrink-0 type-heading text-ink tabular-nums leading-none',
+        lead ? 'text-4xl md:text-5xl' : 'text-xl',
+      )}
+    >
+      <span className="sr-only">Number </span>
+      {rank}
+    </span>
+  );
+}
+
 function ItemCard({
   item,
   now,
@@ -133,30 +240,57 @@ function ItemCard({
   onRead,
   extra,
   byline,
-  openLabel,
+  opensWhere = 'opens in a new tab',
+  rank,
+  lead: leadAsked = false,
+  volume,
+  save,
 }: ItemCardProps & {
   /** A name under the title: a video's channel. */
   byline?: string;
-  /** What a screen reader says for Open, when "in a new tab" is not the whole story. */
-  openLabel?: string;
+  /** What a screen reader hears after the title, which is the link out. */
+  opensWhere?: string;
 }) {
   const titleId = useId();
+  const hintId = useId();
   const href = safeHref(openHref(item));
-  const image = safeHref(item.image);
+  const [pictureFailed, setPictureFailed] = useState(false);
+  const image = pictureFailed ? null : safeHref(item.image);
+  // A lead is drawn wide around its picture. Without one (a Google News story,
+  // a picture that never loads) it is an ordinary card, not a wide empty box.
+  const lead = leadAsked && image !== null;
   const meta = itemMeta(item, now);
+  const showVolume = typeof volume === 'number' && Number.isFinite(volume) && volume > 0;
 
-  return (
-    <article
-      aria-labelledby={titleId}
-      data-testid="discover-card"
-      data-kind={item.kind}
-      className="flex min-w-0 animate-fadeIn flex-col overflow-hidden rounded-lg border-2 border-outline bg-inset motion-reduce:animate-none"
-    >
-      {image ? <ItemImage src={image} /> : null}
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex flex-col gap-1">
-          <h3 id={titleId} dir="auto" className="m-0 break-words type-heading text-base text-ink">
-            {item.title}
+  const words = (
+    <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
+      <div className="flex min-w-0 items-start gap-3">
+        {rank !== undefined ? <Rank rank={rank} lead={lead} /> : null}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h3
+            id={titleId}
+            dir="auto"
+            className={cn(
+              'm-0 break-words type-heading text-ink',
+              lead ? 'text-xl md:text-2xl' : 'text-base',
+            )}
+          >
+            {href ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                dir="auto"
+                // A description, not part of the name: the card and its heading
+                // are still called by the title alone.
+                aria-describedby={hintId}
+                className="rounded-sm text-ink no-underline decoration-2 underline-offset-4 outline-none hover:underline focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+              >
+                {item.title}
+              </a>
+            ) : (
+              item.title
+            )}
           </h3>
           {byline ? (
             <p dir="auto" className="m-0 break-words type-ui text-xs text-ink">
@@ -169,10 +303,24 @@ function ItemCard({
             </p>
           ) : null}
         </div>
+      </div>
 
-        <RelatedHeadlines item={item} />
+      {showVolume ? <VolumeBar volume={volume} /> : null}
+      {lead && item.summary && item.kind !== 'video' ? (
+        <p dir="auto" className="m-0 line-clamp-3 font-sans text-sm text-ink">
+          {item.summary}
+        </p>
+      ) : null}
 
-        <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+      <RelatedHeadlines item={item} />
+      {href ? (
+        <span id={hintId} hidden>
+          {opensWhere}
+        </span>
+      ) : null}
+
+      <div className="mt-auto flex items-center gap-2 pt-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {onCreatePost ? (
             <Button
               variant="secondary"
@@ -185,22 +333,41 @@ function ItemCard({
             </Button>
           ) : null}
           {onRead ? <ReadButton item={item} onRead={onRead} /> : null}
-          {href ? (
-            <ActionLink
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              prefetch={false}
-              // Every card has an Open; the name says which story, and that it leaves.
-              aria-label={openLabel ?? `Open ${item.title} in a new tab`}
-            >
-              <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
-              Open
-            </ActionLink>
-          ) : null}
-          {extra}
         </div>
+        {save || extra ? (
+          // Together and never wrapped, so the menu stays at the end of the row.
+          <div className="flex shrink-0 items-center gap-1 self-end">
+            {save ? <SaveButton item={item} save={save} /> : null}
+            {extra}
+          </div>
+        ) : null}
       </div>
+    </div>
+  );
+
+  return (
+    <article
+      aria-labelledby={titleId}
+      data-testid="discover-card"
+      data-kind={item.kind}
+      data-lead={lead || undefined}
+      className={cn(
+        'flex min-w-0 animate-fadeIn flex-col overflow-hidden rounded-lg border-2 border-outline bg-inset motion-reduce:animate-none',
+        lead && 'sm:col-span-2 xl:flex-row',
+      )}
+    >
+      {image ? (
+        <ItemImage
+          src={image}
+          onFail={() => setPictureFailed(true)}
+          className={cn(
+            'border-b-2',
+            lead &&
+              'xl:aspect-auto xl:w-1/2 xl:shrink-0 xl:self-stretch xl:border-e-2 xl:border-b-0',
+          )}
+        />
+      ) : null}
+      {words}
     </article>
   );
 }
@@ -226,7 +393,7 @@ export function VideoCard({ onRead: _noRead, ...props }: ItemCardProps) {
     <ItemCard
       {...props}
       byline={item.summary}
-      openLabel={`Open ${item.title} on ${item.source.name} in a new tab`}
+      opensWhere={`opens on ${item.source.name} in a new tab`}
     />
   );
 }

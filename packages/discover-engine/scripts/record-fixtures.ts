@@ -36,10 +36,13 @@ import {
   fixtureFileName,
   recordingsOf,
 } from '../src/simulation';
+import { GDELT_DOC_URL } from '../src/sources/gdelt';
 
 /** The same name Discover gives every outside service (`DISCOVER_GEOCODER_USER_AGENT`'s default). */
 const USER_AGENT = 'PostGear/1.0 (+https://postgear.rkay.in)';
 const PAUSE_MS = 2_000;
+/** GDELT asks for one request every five seconds from an address, and answers 429 sooner. */
+const GDELT_PAUSE_MS = 6_000;
 const TIMEOUT_MS = 20_000;
 const SOFT_LIMIT_BYTES = 1024 * 1024;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -110,14 +113,16 @@ async function main(): Promise<void> {
     const addresses = addressesOf(feed);
 
     if (dryRun) {
-      console.log(`  ${label}: ${addresses[0]}${addresses[1] ? ' (then the day before on a 404)' : ''}`);
+      console.log(
+        `  ${label}: ${addresses[0]}${addresses[1] ? ' (then the day before on a 404)' : ''}`,
+      );
       continue;
     }
 
     try {
       let answer: { status: number; body: string } | null = null;
       for (const address of addresses) {
-        if (asked > 0) await pause(PAUSE_MS);
+        if (asked > 0) await pause(address.startsWith(GDELT_DOC_URL) ? GDELT_PAUSE_MS : PAUSE_MS);
         asked += 1;
         answer = await ask(address, type);
         if (answer.status !== 404) break;

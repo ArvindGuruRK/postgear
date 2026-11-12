@@ -1,8 +1,9 @@
 'use client';
 
 /**
- * The email preferences (Sprint 8): two toggles over the inherited
- * `sendSuccessEmails` / `sendFailureEmails`, saved as they are switched.
+ * The email preferences (Sprint 8): toggles over the inherited
+ * `sendSuccessEmails` / `sendFailureEmails`, and Sprint 11's
+ * `sendDigestEmails`, saved as they are switched.
  *
  * Each change is optimistic (the toggle moves at once) and reverted if
  * the save fails, with the failure in an alert whose "Try again" repeats
@@ -50,6 +51,12 @@ const FIELDS: Array<{
     help: 'An email when a post cannot be published, or a channel needs reconnecting.',
     savedAs: (on) =>
       on ? "You'll be emailed when a post fails." : 'No more emails for failed posts or channels.',
+  },
+  {
+    key: 'digestEmails',
+    label: 'Discover digest',
+    help: "On Monday mornings, what is trending in your workspace's place, when an admin has the digest on.",
+    savedAs: (on) => (on ? "You'll get the Monday digest." : 'No more Monday digests.'),
   },
 ];
 

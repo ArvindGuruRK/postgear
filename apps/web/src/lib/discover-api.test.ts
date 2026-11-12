@@ -78,12 +78,16 @@ describe('the place routes', () => {
     await localityFromTimeZone('America/Argentina/Buenos_Aires');
     expect(mockedApi).toHaveBeenCalledWith(
       '/discover/locality?tz=America%2FArgentina%2FBuenos_Aires',
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
     );
   });
 
   it('searches with the typed text, encoded', async () => {
     await searchPlaces('São Paulo & co');
-    expect(mockedApi).toHaveBeenCalledWith('/discover/locality/search?q=S%C3%A3o+Paulo+%26+co');
+    expect(mockedApi).toHaveBeenCalledWith(
+      '/discover/locality/search?q=S%C3%A3o+Paulo+%26+co',
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
+    );
   });
 });
 
@@ -137,6 +141,7 @@ describe('feedQuery', () => {
     await getFeed('news', CHENNAI, 'ta');
     expect(mockedApi).toHaveBeenCalledWith(
       `/discover/feed?${feedQuery('news', CHENNAI, 'ta').toString()}`,
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
     );
   });
 
@@ -156,6 +161,8 @@ describe('the workspace settings routes (Module 06)', () => {
     languages: ['ta', 'en'],
     topics: ['BUSINESS'],
     sources: null,
+    interests: [],
+    weeklyDigest: false,
     locationSource: 'SEARCH',
     place: CHENNAI,
     updatedAt: '2026-11-10T08:00:00.000Z',
@@ -165,7 +172,10 @@ describe('the workspace settings routes (Module 06)', () => {
     mockedApi.mockResolvedValueOnce({ settings: SETTINGS });
 
     await expect(getDiscoverSettings()).resolves.toEqual(SETTINGS);
-    expect(mockedApi).toHaveBeenCalledWith('/discover/settings');
+    expect(mockedApi).toHaveBeenCalledWith(
+      '/discover/settings',
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
+    );
   });
 
   it('saves a patch as one PATCH and hands back all the settings', async () => {
@@ -178,6 +188,7 @@ describe('the workspace settings routes (Module 06)', () => {
     expect(mockedApi).toHaveBeenCalledWith('/discover/settings', {
       method: 'PATCH',
       body: { languages: ['en', 'ta'] },
+      timeoutMs: expect.any(Number),
     });
   });
 });

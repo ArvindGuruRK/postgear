@@ -18,7 +18,7 @@ import {
   PageTooComplexError,
   READER_SAMPLE,
 } from '@postgear/discover-engine';
-import { assertSafeUrl, SeoCrawlError } from '@postgear/seo-engine';
+import { assertSafeUrl, type BrowserPool, SeoCrawlError } from '@postgear/seo-engine';
 import { securityLogger } from '../../common/logging/security-logger';
 import { DiscoverGate } from './discover.gate';
 import type { ReaderEngine } from './reader.engine';
@@ -36,6 +36,9 @@ import {
   ReaderService,
   READS_IN_FLIGHT,
   READS_PER_MINUTE,
+  RENDERS_PER_WORKSPACE,
+  SHELL_TEXT_CHARS,
+  visibleTextLength,
 } from './reader.service';
 import { FakeRedis } from './testing/fake-redis';
 
@@ -77,6 +80,9 @@ function build(
     gate?: DiscoverGate;
     /** What a host resolves to. A host not named here is public. */
     dns?: Record<string, string[]>;
+    /** Module 10: the headless browser, and whether the reader may use it. */
+    browser?: BrowserPool;
+    render?: boolean;
   } = {},
 ) {
   const redis = new FakeRedis();
@@ -88,6 +94,7 @@ function build(
     guard: jest.fn((url: string) => assertSafeUrl(url, { resolve })),
     fetch,
     linkDecode: options.linkDecode ?? true,
+    render: options.render ?? false,
   };
   const gate = options.gate ?? new DiscoverGate(4, 4_000);
   // The engine's own article finder, in this thread. The worker that runs it in
@@ -102,7 +109,7 @@ function build(
         : { outcome: 'failed', ms: 0 };
     }
   });
-  const service = new ReaderService(engine, gate, redis.asService(), { extract });
+  const service = new ReaderService(engine, gate, redis.asService(), { extract }, options.browser);
 
   /** The requests made, as "GET address" or "POST address". */
   const requests = () =>
@@ -919,5 +926,101 @@ describe('ReaderService: refused addresses are counted (Module 09)', () => {
     await refusalOf(service.read(ORG, 'javascript:alert(1)'));
 
     expect(redis.keys).not.toContain(`discover:addrrefused:${ORG}`);
+  });
+});
+
+describe('the rendered page (Module 10, backlog #7)', () => {
+  /** A page whose HTML is an empty shell its scripts fill in. */
+  const SHELL = 'https://reader.example/app/harbour-market';
+  const SHELL_HTML =
+    '<!doctype html><html><head><title>Harbour</title></head><body><div id="root"></div><script src="/app.js"></script></body></html>';
+
+  /** What the browser draws: the sample article, as if the scripts had written it. */
+  async function articleHtml(): Promise<string> {
+    const page = await createReaderFixtureFetch()(READER_SAMPLE.article, INIT);
+    return page.body;
+  }
+
+  function fakeBrowser(html: string, finalUrl = SHELL, status = 200) {
+    const page = {
+      goto: jest.fn(async () => ({ status: () => status, url: () => finalUrl })),
+      waitForLoadState: jest.fn(async () => undefined),
+      content: jest.fn(async () => html),
+      url: () => finalUrl,
+    };
+    const release = jest.fn(async () => undefined);
+    const pool = {
+      available: jest.fn(async () => true),
+      acquire: jest.fn(async () => ({ page, refused: [], release })),
+    } as unknown as BrowserPool;
+    return { pool, page, release };
+  }
+
+  function shellFirst(fetch: jest.Mock) {
+    fetch.mockImplementationOnce(async () => ({
+      status: 200,
+      body: SHELL_HTML,
+      finalUrl: SHELL,
+      contentType: 'text/html; charset=utf-8',
+    }));
+  }
+
+  it('opens a shell page in the browser and reads what it drew', async () => {
+    const browser = fakeBrowser(await articleHtml());
+    const { service, fetch } = build({ browser: browser.pool, render: true });
+    shellFirst(fetch);
+
+    const article = await service.read(ORG, SHELL);
+
+    expect(article.title.length).toBeGreaterThan(0);
+    expect(browser.page.goto).toHaveBeenCalledWith(SHELL, expect.anything());
+    expect(browser.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the browser alone when rendering is off, and says not an article', async () => {
+    const browser = fakeBrowser(await articleHtml());
+    const { service, fetch } = build({ browser: browser.pool, render: false });
+    shellFirst(fetch);
+
+    await expect(refusalOf(service.read(ORG, SHELL))).resolves.toMatchObject({
+      code: 'read_not_article',
+    });
+    expect(browser.pool.acquire).not.toHaveBeenCalled();
+  });
+
+  it('takes only a page with almost no text of its own for a shell', () => {
+    expect(visibleTextLength(SHELL_HTML)).toBeLessThan(SHELL_TEXT_CHARS);
+    const wordy = `<html><body><script>${'x'.repeat(5_000)}</script><p>${'Market day. '.repeat(200)}</p></body></html>`;
+    // The script's 5,000 characters are not text anyone sees; the paragraph's are.
+    expect(visibleTextLength(wordy)).toBeGreaterThanOrEqual(SHELL_TEXT_CHARS);
+    expect(visibleTextLength('<style>p{}</style><p>Hi &amp; bye</p>')).toBe(8);
+  });
+
+  it('refuses what the browser drew when it ended up on a private address', async () => {
+    const browser = fakeBrowser(await articleHtml(), 'http://10.0.0.5/admin');
+    const { service, fetch } = build({ browser: browser.pool, render: true });
+    shellFirst(fetch);
+
+    await expect(refusalOf(service.read(ORG, SHELL))).resolves.toMatchObject({
+      code: 'read_not_article',
+    });
+    expect(browser.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives each workspace a few browser reads every ten minutes', async () => {
+    const browser = fakeBrowser('<html><body><div id="root"></div></body></html>');
+    const { service, fetch } = build({ browser: browser.pool, render: true });
+
+    for (let index = 0; index <= RENDERS_PER_WORKSPACE; index += 1) {
+      fetch.mockImplementationOnce(async () => ({
+        status: 200,
+        body: SHELL_HTML,
+        finalUrl: `${SHELL}-${index}`,
+        contentType: 'text/html',
+      }));
+      await refusalOf(service.read(ORG, `${SHELL}-${index}`));
+    }
+
+    expect(browser.pool.acquire).toHaveBeenCalledTimes(RENDERS_PER_WORKSPACE);
   });
 });

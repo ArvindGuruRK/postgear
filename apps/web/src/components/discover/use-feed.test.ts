@@ -76,7 +76,13 @@ describe('useFeed', () => {
 
     rerender({ language: 'en' });
     await waitFor(() => expect(mockedGetFeed).toHaveBeenCalledTimes(2));
-    expect(mockedGetFeed).toHaveBeenLastCalledWith('trending', CHENNAI, 'en');
+    expect(mockedGetFeed).toHaveBeenLastCalledWith(
+      'trending',
+      CHENNAI,
+      'en',
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it('asks again on Refresh, on any tab', async () => {
@@ -112,16 +118,34 @@ describe('the News topic (Module 06)', () => {
       { initialProps: { topic: 'BUSINESS' as NewsTopic | null } },
     );
     await waitFor(() => expect(result.current.data?.kind).toBe('news'));
-    expect(mockedGetFeed).toHaveBeenLastCalledWith('news', CHENNAI, 'ta', 'BUSINESS');
+    expect(mockedGetFeed).toHaveBeenLastCalledWith(
+      'news',
+      CHENNAI,
+      'ta',
+      'BUSINESS',
+      expect.any(AbortSignal),
+    );
 
     rerender({ topic: 'SPORTS' });
     await waitFor(() => expect(mockedGetFeed).toHaveBeenCalledTimes(2));
-    expect(mockedGetFeed).toHaveBeenLastCalledWith('news', CHENNAI, 'ta', 'SPORTS');
+    expect(mockedGetFeed).toHaveBeenLastCalledWith(
+      'news',
+      CHENNAI,
+      'ta',
+      'SPORTS',
+      expect.any(AbortSignal),
+    );
 
     // All is asked without a topic at all.
     rerender({ topic: null });
     await waitFor(() => expect(mockedGetFeed).toHaveBeenCalledTimes(3));
-    expect(mockedGetFeed).toHaveBeenLastCalledWith('news', CHENNAI, 'ta');
+    expect(mockedGetFeed).toHaveBeenLastCalledWith(
+      'news',
+      CHENNAI,
+      'ta',
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it('never sends the topic with another tab, nor asks again for it', async () => {
@@ -135,6 +159,12 @@ describe('the News topic (Module 06)', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(mockedGetFeed).toHaveBeenCalledTimes(1);
-    expect(mockedGetFeed).toHaveBeenLastCalledWith('trending', CHENNAI, 'ta');
+    expect(mockedGetFeed).toHaveBeenLastCalledWith(
+      'trending',
+      CHENNAI,
+      'ta',
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 });

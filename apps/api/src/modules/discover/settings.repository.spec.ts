@@ -23,6 +23,7 @@ const NOW = new Date('2026-11-10T10:00:00Z');
 const COLUMNS = [
   'city',
   'countryCode',
+  'interests',
   'languages',
   'locationSource',
   'regionCode',
@@ -31,6 +32,7 @@ const COLUMNS = [
   'timeZone',
   'topics',
   'updatedAt',
+  'weeklyDigest',
 ];
 
 const CHENNAI_ROW = {
@@ -42,6 +44,8 @@ const CHENNAI_ROW = {
   languages: ['ta', 'en'],
   topics: ['BUSINESS'],
   sources: null,
+  interests: [],
+  weeklyDigest: false,
   locationSource: 'SEARCH',
   updatedAt: NOW,
 };

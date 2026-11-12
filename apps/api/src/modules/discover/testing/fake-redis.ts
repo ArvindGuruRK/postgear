@@ -7,7 +7,7 @@ import type { RedisService } from '../../redis/redis.service';
 
 type DiscoverRedis = Pick<
   RedisService,
-  'incrementWithTtl' | 'get' | 'set' | 'setIfAbsent' | 'delete'
+  'incrementWithTtl' | 'get' | 'set' | 'setIfAbsent' | 'delete' | 'rememberMember' | 'membersSince'
 >;
 
 export class FakeRedis implements DiscoverRedis {
@@ -63,6 +63,35 @@ export class FakeRedis implements DiscoverRedis {
 
   async delete(key: string): Promise<void> {
     this.store.delete(key);
+  }
+
+  /** Module 10's scored list (the places looked at today), kept as JSON under its key. */
+  async rememberMember(
+    key: string,
+    member: string,
+    score: number,
+    ttlSeconds: number,
+    keep: number,
+  ): Promise<void> {
+    const scores = this.scoresOf(key);
+    scores[member] = score;
+    const kept = Object.entries(scores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, keep);
+    this.write(key, JSON.stringify(Object.fromEntries(kept)), ttlSeconds);
+  }
+
+  async membersSince(key: string, minScore: number, limit: number): Promise<string[]> {
+    return Object.entries(this.scoresOf(key))
+      .filter(([, score]) => score >= minScore)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([member]) => member);
+  }
+
+  private scoresOf(key: string): Record<string, number> {
+    const raw = this.read(key);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
   }
 
   private expiryOf(key: string): number {

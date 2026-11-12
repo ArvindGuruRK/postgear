@@ -12,8 +12,10 @@
  * 4. Up next beside Comments;
  * 5. what needs attention, only when something does (moved under the panels
  *    2026-10-26, the owner's call);
- * 6. starter templates that open the composer with text in it;
- * 7. from the blog.
+ * 6. trending near you: the place's rising searches, each with Create Post
+ *    (Sprint 11, Module 10), loaded by the card itself once mounted;
+ * 7. starter templates that open the composer with text in it;
+ * 8. from the blog.
  *
  * One column on a phone in the same order. Data: see the page and
  * `use-home-data.ts`; the dialogs here are the same ones the calendar's
@@ -40,6 +42,7 @@ import { bannersFor } from './home-model';
 import { HomePanels } from './home-panels';
 import { StatTiles } from './stat-tiles';
 import { TemplatesRow } from './templates-row';
+import { TrendingNearYou } from './trending-near-you';
 import { useClock, useDashboard, useUpNext } from './use-home-data';
 
 export function HomeView({
@@ -150,6 +153,8 @@ export function HomeView({
         onFinishSetup={setSetupChannel}
         onRetryStats={dashboard.reload}
       />
+
+      <TrendingNearYou orgId={orgId} />
 
       <TemplatesRow orgId={orgId} />
 

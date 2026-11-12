@@ -43,12 +43,19 @@ export interface ReaderEngine {
   fetch: DiscoverFetch;
   /** False when `DISCOVER_LINK_DECODE` is off: a Google News link is then never resolved. */
   linkDecode: boolean;
+  /**
+   * Module 10: whether a page with no article in its HTML may be opened in the
+   * shared headless browser and read again. Never under simulation, which
+   * reaches no stranger's site.
+   */
+  render: boolean;
 }
 
 export type ReaderEnv = Pick<
   Env,
   'DISCOVER_SIMULATION' | 'DISCOVER_GEOCODER_USER_AGENT' | 'DISCOVER_LINK_DECODE'
->;
+> &
+  Partial<Pick<Env, 'DISCOVER_READER_RENDER'>>;
 
 export function createReaderEngine(env: ReaderEnv): ReaderEngine {
   const simulation = env.DISCOVER_SIMULATION === 'true';
@@ -60,5 +67,6 @@ export function createReaderEngine(env: ReaderEnv): ReaderEngine {
       ? createReaderFixtureFetch()
       : createSafeDiscoverFetch(env.DISCOVER_GEOCODER_USER_AGENT),
     linkDecode: env.DISCOVER_LINK_DECODE === 'true',
+    render: !simulation && env.DISCOVER_READER_RENDER !== 'false',
   };
 }

@@ -16,6 +16,7 @@ import {
   FEEDS_FULL,
   FIND_FAILED,
   FINDING_FEEDS,
+  INSTAGRAM_SHAPE,
   NAME_NEEDED,
   NO_FEEDS_FOUND,
   SAVE_FAILED,
@@ -51,6 +52,7 @@ const ACME: Competitor = {
   blueskyHandle: 'acme.example',
   mastodonAcct: 'acme@mastodon.example',
   newsQuery: 'Acme funding',
+  instagramUsername: null,
   lastCheckedAt: null,
   lastError: null,
   createdAt: '2026-11-10T08:00:00.000Z',
@@ -99,6 +101,7 @@ describe('CompetitorDialog, adding', () => {
       "Enter your competitor's website",
       'Enter your feed address',
       "Enter your competitor's YouTube channel id",
+      "Enter your competitor's Instagram username",
       "Enter your competitor's Bluesky handle",
       "Enter your competitor's Mastodon account",
       'Enter your news search phrase',
@@ -273,6 +276,7 @@ describe('CompetitorDialog, adding', () => {
       blueskyHandle: null,
       mastodonAcct: null,
       newsQuery: null,
+      instagramUsername: null,
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -302,6 +306,7 @@ describe('CompetitorDialog, adding', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find Feeds' }));
     fireEvent.click(await screen.findByRole('checkbox', { name: /Changelog, Atom/ }));
     type('YouTube channel id', 'UCacmeSampleChannel00000');
+    type('Instagram', 'https://www.instagram.com/Acme.Sample/');
     type('Bluesky handle', '@acme.example');
     type('Mastodon account', 'acme@mastodon.example');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -315,7 +320,19 @@ describe('CompetitorDialog, adding', () => {
       blueskyHandle: 'acme.example',
       mastodonAcct: 'acme@mastodon.example',
       newsQuery: null,
+      instagramUsername: 'acme.sample',
     });
+  });
+
+  it('names the Instagram field when it is not a username, and sends nothing', () => {
+    renderDialog();
+
+    type(NAME, 'Acme');
+    type('Instagram', 'acme..sample');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(screen.getByText(INSTAGRAM_SHAPE)).toBeInTheDocument();
+    expect(mockedCreate).not.toHaveBeenCalled();
   });
 
   it('names the wrong field instead of sending it', () => {

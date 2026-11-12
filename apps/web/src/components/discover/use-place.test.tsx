@@ -94,7 +94,10 @@ describe('usePlace', () => {
     expect(result.current.source).toBe('guess');
     // The browser prefers English and India offers it.
     expect(result.current.language).toBe('en');
-    expect(mockedApi).toHaveBeenCalledWith('/discover/locality?tz=Asia%2FKolkata');
+    expect(mockedApi).toHaveBeenCalledWith(
+      '/discover/locality?tz=Asia%2FKolkata',
+      expect.anything(),
+    );
     expect(getCurrentPosition).not.toHaveBeenCalled();
     expect(permissionsQuery).not.toHaveBeenCalled();
     // A guess is made again next time, not remembered.
@@ -180,7 +183,10 @@ describe('usePlace', () => {
       expect.any(Function),
       POSITION_OPTIONS,
     );
-    expect(mockedApi).toHaveBeenCalledWith('/discover/locality?lat=13.08&lng=80.27');
+    expect(mockedApi).toHaveBeenCalledWith(
+      '/discover/locality?lat=13.08&lng=80.27',
+      expect.anything(),
+    );
     expect(result.current.place).toEqual(CHENNAI);
     expect(result.current.source).toBe('browser');
     expect(result.current.language).toBe('ta');
@@ -291,6 +297,8 @@ function saved(patch: Partial<DiscoverSettings> = {}): DiscoverSettings {
     languages: ['fr', 'en'],
     topics: ['BUSINESS', 'SPORTS'],
     sources: null,
+    interests: [],
+    weeklyDigest: false,
     locationSource: 'SEARCH',
     place: PARIS,
     updatedAt: '2026-11-10T08:00:00.000Z',
@@ -345,7 +353,10 @@ describe('usePlace with a workspace place (Module 06)', () => {
 
     await waitFor(() => expect(result.current.place).toEqual(INDIA));
     expect(result.current.source).toBe('guess');
-    expect(mockedApi).toHaveBeenCalledWith('/discover/locality?tz=Asia%2FKolkata');
+    expect(mockedApi).toHaveBeenCalledWith(
+      '/discover/locality?tz=Asia%2FKolkata',
+      expect.anything(),
+    );
   });
 
   it('lets a remembered choice win on this device', () => {
@@ -375,10 +386,24 @@ describe('usePlace with a workspace place (Module 06)', () => {
     expect(result.current.place).toEqual(CHENNAI);
     expect(result.current.source).toBe('browser');
     expect(stored()).toMatchObject({ source: 'browser', language: 'ta' });
-    // One request, for the place. Nothing was sent to the workspace's settings.
+    // One request for the place, and nothing sent to the workspace's settings.
+    // Module 10: the person's own place is asked for first and kept for them after.
     expect(mockedApi.mock.calls.map(([path]) => path)).toEqual([
+      '/discover/my-place',
       '/discover/locality?lat=13.08&lng=80.27',
+      '/discover/my-place',
     ]);
+    expect(mockedApi).toHaveBeenLastCalledWith(
+      '/discover/my-place',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.objectContaining({
+          city: 'Chennai',
+          locationSource: 'BROWSER',
+          language: 'ta',
+        }),
+      }),
+    );
   });
 
   it('remembers a search and Worldwide over the workspace place too', () => {

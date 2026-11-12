@@ -41,11 +41,19 @@
  * without asking when the settings already do. Save For This Workspace in the
  * place popover is the one thing here that writes them, and only for an
  * admin.
+ *
+ * Module 10 adds the sixth tab, Saved: the bookmark on every card and row
+ * keeps it for the workspace (`use-saved-ideas.ts`), and the tab lists them.
+ * The Competitors and Saved tabs carry counts (new posts since this person
+ * last looked, and how many are saved), so there is a reason to open them.
+ * On a phone the tab row scrolls sideways, and its edge fades while more tabs
+ * are hidden past it.
  */
 import { RefreshCwIcon } from '@animateicons/react/lucide/refresh-cw-icon';
 import {
   Alert,
   Badge,
+  type BadgeProps,
   Button,
   cn,
   EmptyState,
@@ -61,7 +69,7 @@ import {
   toast,
 } from '@postgear/ui';
 import { CalendarDays, Clapperboard, Compass, MapPin } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { saveDiscoverSettings } from '@/lib/discover-api';
 import type {
@@ -75,7 +83,7 @@ import { DISCOVER_TABS } from '@/types/discover';
 import { useMounted } from '../posts/use-mounted';
 import { CompetitorsTab } from './competitors-tab';
 import type { CreatePostTarget } from './create-post-sheet';
-import { ReadButton } from './discover-cards';
+import { ReadButton, SaveButton } from './discover-cards';
 import { DiscoverGroup, DiscoverSkeleton } from './discover-group';
 import {
   competitorRowReads,
@@ -94,9 +102,12 @@ import { PlacesCredit } from './discover-ui';
 import { LanguageChip } from './language-chip';
 import { PlaceChip } from './place-chip';
 import type { ReadRequest } from './reader-sheet';
+import { SavedTab } from './saved-tab';
 import { TopicSelect } from './topic-select';
+import { useCompetitorUnseen } from './use-competitor-unseen';
 import { useFeed } from './use-feed';
 import { usePlace } from './use-place';
+import { useSavedIdeas } from './use-saved-ideas';
 
 export const VIDEOS_TURNED_OFF = 'Videos are turned off for this workspace.';
 export const FESTIVALS_TURNED_OFF = 'Festivals are turned off for this workspace.';
@@ -112,8 +123,80 @@ export const VIDEOS_NEED_PLACE_HINT = 'Choose a country or a city to see what is
 export const FESTIVALS_NEED_PLACE = 'Festivals need a place.';
 export const FESTIVALS_NEED_PLACE_HINT = 'Choose a country or a city to see what is coming up.';
 
-/** The tabs the feed answers, in the page's order. */
-const FEED_TABS = DISCOVER_TABS.filter((tab): tab is FeedKind => tab !== 'competitors');
+/** The tabs the feed answers, in the page's order. Competitors and Saved load themselves. */
+const FEED_TABS = DISCOVER_TABS.filter(
+  (tab): tab is FeedKind => tab !== 'competitors' && tab !== 'saved',
+);
+
+/**
+ * Whether a sideways scroller has more past its left or right edge, so the
+ * edge can fade only while there is something to scroll to.
+ */
+function useScrollEdges(ref: RefObject<HTMLElement | null>): { left: boolean; right: boolean } {
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const measure = () => {
+      const left = node.scrollLeft > 1;
+      const right = node.scrollLeft + node.clientWidth < node.scrollWidth - 1;
+      setEdges((current) =>
+        current.left === left && current.right === right ? current : { left, right },
+      );
+    };
+    measure();
+    node.addEventListener('scroll', measure, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(node);
+    return () => {
+      node.removeEventListener('scroll', measure);
+      observer?.disconnect();
+    };
+  }, [ref]);
+
+  return edges;
+}
+
+/** The fade on a scroller's edge while more is hidden past it. */
+function edgeMask(edges: { left: boolean; right: boolean }): string | undefined {
+  if (!edges.left && !edges.right) return undefined;
+  const from = edges.left ? 'transparent, black 2rem' : 'black';
+  const to = edges.right ? 'black calc(100% - 2rem), transparent' : 'black';
+  return `linear-gradient(to right, ${from}, ${to})`;
+}
+
+/**
+ * A count on a tab, like the Queue's: blue on a resting tab, the card surface
+ * on the chosen one (which is itself blue), with the words read out.
+ */
+function TabCount({
+  count,
+  words,
+  variant = 'primary',
+}: {
+  count: number;
+  words: string;
+  variant?: BadgeProps['variant'];
+}) {
+  if (count <= 0) return null;
+  return (
+    <>
+      <Badge
+        aria-hidden="true"
+        variant={variant}
+        data-testid="discover-tab-count"
+        className={cn(
+          'min-w-6 justify-center px-1.5 py-0.5 leading-none tabular-nums',
+          'group-data-[state=active]:bg-secondary group-data-[state=active]:text-ink',
+        )}
+      >
+        {count > 99 ? '99+' : count}
+      </Badge>
+      <span className="sr-only">{words}</span>
+    </>
+  );
+}
 
 /** How often "Updated 5 min ago" and the cards' times move on. */
 const CLOCK_MS = 30_000;
@@ -139,7 +222,7 @@ function feedKindFor(
   worldwide: boolean,
   turnedOff: boolean,
 ): FeedKind | null {
-  if (tab === 'competitors' || turnedOff) return null;
+  if (tab === 'competitors' || tab === 'saved' || turnedOff) return null;
   if (tab === 'videos' && (videosOff || worldwide)) return null;
   if (tab === 'festivals' && worldwide) return null;
   return tab;
@@ -243,6 +326,15 @@ export function DiscoverView({
   // Competitors loads itself; each press of Refresh on that tab moves this on.
   const [competitorsRefresh, setCompetitorsRefresh] = useState(0);
   const onCompetitors = tab === 'competitors';
+  const onSaved = tab === 'saved';
+  // Module 10: what the workspace saved, for every bookmark and the Saved tab.
+  const saved = useSavedIdeas(mounted);
+  // Module 10: new competitor posts since this person last looked. Asked
+  // again on Refresh; the tab itself says 0 once it has marked them seen.
+  const unseenAsked = useCompetitorUnseen(mounted, competitorsRefresh);
+  const [unseen, setUnseen] = useState(0);
+  useEffect(() => setUnseen(unseenAsked), [unseenAsked]);
+  const tabEdges = useScrollEdges(tabsRef);
 
   // The open tab lives in the URL without a navigation, which would re-run
   // the server page for nothing.
@@ -285,13 +377,39 @@ export function DiscoverView({
   // Read carries the same two, for Create Post From This at the end of it.
   const read =
     onRead && current && language
-      ? (item: DiscoverItem) =>
-          onRead({ target: { mode: 'item', item }, place: current, language })
+      ? (item: DiscoverItem) => onRead({ target: { mode: 'item', item }, place: current, language })
       : undefined;
   const readAPage =
     onRead && current && language
       ? () => onRead({ target: { mode: 'page' }, place: current, language })
       : undefined;
+
+  // The bookmark on a card or row: saved with where it was read, so Create
+  // Post from the Saved tab writes for that place days later.
+  const where =
+    current && language
+      ? {
+          place: {
+            label: isWorldwide(current) ? 'Worldwide' : placeChipText(current, 'search'),
+            countryCode: current.countryCode,
+          },
+          language,
+        }
+      : null;
+  const renderSave = (item: DiscoverItem) => saved.controlFor(item, where);
+
+  /** Refresh asks again for whatever the open tab shows. */
+  function refreshTab() {
+    if (onCompetitors) setCompetitorsRefresh((count) => count + 1);
+    else if (onSaved) saved.reload();
+    else feed.refresh();
+  }
+  const refreshing = onSaved ? saved.loading : Boolean(kind) && feed.loading;
+  const refreshDisabled = onCompetitors
+    ? !mounted
+    : onSaved
+      ? !mounted || saved.loading
+      : !kind || !ready || feed.loading;
 
   function tryAgain() {
     if (place.failed) place.retry();
@@ -423,8 +541,10 @@ export function DiscoverView({
     return (
       <div
         aria-busy={feed.loading}
-        className={cn('flex flex-col gap-6 transition-opacity motion-reduce:transition-none',
-          feed.loading && 'opacity-70')}
+        className={cn(
+          'flex flex-col gap-6 transition-opacity motion-reduce:transition-none',
+          feed.loading && 'opacity-70',
+        )}
       >
         {feed.error ? (
           <Alert variant="warning" className="items-center py-3">
@@ -446,6 +566,7 @@ export function DiscoverView({
                 onPlanPost={planPost}
                 onRead={read}
                 renderExtra={renderCardExtra}
+                renderSave={renderSave}
               />
             ))}
       </div>
@@ -465,6 +586,7 @@ export function DiscoverView({
                   status={place.status}
                   message={place.message}
                   geocoder={status?.geocoder ?? 'nominatim'}
+                  typeahead={status?.typeahead === true}
                   onLocate={place.locate}
                   onPick={place.pickPlace}
                   onWorldwide={place.pickWorldwide}
@@ -474,6 +596,10 @@ export function DiscoverView({
                     saving: savingDefault,
                     error: saveError,
                     onSave: () => void saveForWorkspace(),
+                    // Reading the workspace's own place in its own first
+                    // language: there is nothing to save.
+                    upToDate:
+                      place.source === 'workspace' && settings?.languages[0] === place.language,
                   }}
                 />
                 <LanguageChip
@@ -490,7 +616,7 @@ export function DiscoverView({
               </>
             )}
           </div>
-          <PlacesCredit />
+          <PlacesCredit ipGuess={place.guessedFromAddress} />
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -503,17 +629,12 @@ export function DiscoverView({
             variant="secondary"
             size="sm"
             className="h-10"
-            onClick={
-              onCompetitors ? () => setCompetitorsRefresh((count) => count + 1) : feed.refresh
-            }
-            disabled={onCompetitors ? !mounted : !kind || !ready || feed.loading}
+            onClick={refreshTab}
+            disabled={refreshDisabled}
           >
             <MotionIcon
               icon={RefreshCwIcon}
-              className={cn(
-                'h-4 w-4',
-                feed.loading && kind && 'animate-spin motion-reduce:animate-none',
-              )}
+              className={cn('h-4 w-4', refreshing && 'animate-spin motion-reduce:animate-none')}
             />
             Refresh
           </Button>
@@ -525,11 +646,22 @@ export function DiscoverView({
         <TabsList
           ref={tabsRef}
           aria-label="Discover tabs"
+          data-more-left={tabEdges.left || undefined}
+          data-more-right={tabEdges.right || undefined}
+          style={{ maskImage: edgeMask(tabEdges), WebkitMaskImage: edgeMask(tabEdges) }}
           className="flex w-full justify-start overflow-x-auto sm:inline-flex sm:w-auto"
         >
           {DISCOVER_TABS.map((value) => (
-            <TabsTrigger key={value} value={value} className="shrink-0">
+            <TabsTrigger key={value} value={value} className="group shrink-0">
               {TAB_NAMES[value]}
+              {value === 'competitors' ? <TabCount count={unseen} words={`${unseen} new`} /> : null}
+              {value === 'saved' ? (
+                <TabCount
+                  count={saved.ideas.length}
+                  words={`${saved.ideas.length} saved`}
+                  variant="secondary"
+                />
+              ) : null}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -560,14 +692,25 @@ export function DiscoverView({
               now={now}
               refreshKey={competitorsRefresh}
               onCreatePost={createPost}
+              onUnseenChange={setUnseen}
               // A blog post or a story about them is a page to read; a video or a social post is not.
-              renderRowExtra={
-                read
-                  ? (item) =>
-                      competitorRowReads(item) ? <ReadButton item={item} onRead={read} /> : null
-                  : undefined
-              }
+              renderRowExtra={(item) => {
+                const reads = read && competitorRowReads(item);
+                const save = renderSave(item);
+                if (!reads && !save) return null;
+                return (
+                  <>
+                    {reads ? <ReadButton item={item} onRead={read} /> : null}
+                    {save ? <SaveButton item={item} save={save} /> : null}
+                  </>
+                );
+              }}
             />
+          ) : null}
+        </TabsContent>
+        <TabsContent value="saved">
+          {onSaved && mounted ? (
+            <SavedTab saved={saved} now={now} onCreatePost={onCreatePost} />
           ) : null}
         </TabsContent>
       </Tabs>

@@ -8,6 +8,7 @@
 import { createAnalyticsActivities } from './analytics.activities';
 import { createAutomationActivities } from './automation.activities';
 import type { ActivityDeps } from './deps';
+import { createDiscoverActivities } from './discover.activities';
 import { createIntegrationActivities } from './integration.activities';
 import { createMaintenanceActivities } from './maintenance.activities';
 import { createPublishActivities } from './publish.activities';
@@ -27,6 +28,7 @@ export type {
 export type { AnalyticsSchedule, AnalyticsSyncResult } from './analytics.activities';
 export type { AutomationActivityOptions } from './automation.activities';
 export type { ActivityDeps } from './deps';
+export type { DiscoverMaintenanceReport } from './discover.activities';
 export type { IntegrationSchedule } from './integration.activities';
 export type { ReconcileReport } from './maintenance.activities';
 export type {
@@ -48,6 +50,8 @@ export function createActivities(deps: ActivityDeps) {
     ...createWebhookActivities(deps),
     // Sprint 10: workflow runs (the Workflow Builder).
     ...createAutomationActivities(deps),
+    // Sprint 11 Module 10: Discover's pre-warm, competitor refresh and digest.
+    ...createDiscoverActivities(deps),
   };
 }
 

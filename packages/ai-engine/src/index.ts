@@ -68,6 +68,7 @@ export {
   createSnippetWriter,
   generateHashtags,
   hashtagCount,
+  researchCompetitor,
   rewriteInVoice,
 } from './agents/snippets';
 export {
@@ -80,6 +81,13 @@ export {
   withTimeout,
 } from './model/resilience';
 export { type PartLimits, partLimits } from './prompts/content';
+export {
+  buildCompetitorResearchPrompt,
+  competitorResearchSchema,
+  RESEARCH_MAX_OPENINGS,
+  RESEARCH_MAX_POSTS,
+  RESEARCH_MAX_THEMES,
+} from './prompts/competitor-research';
 export { HASHTAG_COUNT_MAX, HASHTAG_COUNT_MIN } from './prompts/hashtags';
 export {
   buildSeoAdvicePrompt,

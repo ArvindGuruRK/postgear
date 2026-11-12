@@ -30,10 +30,29 @@
  * Anyone in the workspace adds and edits. Only an admin removes, so a member's
  * menu has no Remove at all (the API refuses a member's delete anyway).
  * Removing asks first, with the solid red button every delete has.
+ *
+ * ## New since you last looked (Module 10)
+ *
+ * Each group's answer says when this person last looked at it (`lastSeenAt`).
+ * Rows published after that wear a New tag and the group's header counts
+ * them. That moment is kept from the visit's first answer, so a Refresh does
+ * not wipe the tags while the person is still reading. Once every group has
+ * answered, the ones that loaded are marked seen in one request, so the next
+ * visit starts clean; a failed mark says nothing. `onUnseenChange(0)` then
+ * tells the page its count on the tab is spent.
+ *
+ * ## Research This Competitor (Module 10)
+ *
+ * When AI is set up (`research` on the list answer) and a group has rows, its
+ * header offers Research, the one violet button, with its cost beside it. The
+ * answer opens in an inset panel above the rows; each opening has Create Post.
+ * A refusal (out of credits, not enough to research yet, the AI failed) is the
+ * API's own sentence in an alert inside that group.
  */
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { PencilIcon } from '@animateicons/react/lucide/pencil-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Alert,
@@ -45,6 +64,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Badge,
   Button,
   cn,
   DropdownMenu,
@@ -69,18 +89,35 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { ApiError } from '@/lib/api';
-import { getCompetitorItems, getCompetitors, removeCompetitor } from '@/lib/discover-api';
+import {
+  getCompetitorItems,
+  getCompetitors,
+  markCompetitorsSeen,
+  removeCompetitor,
+  researchCompetitor,
+} from '@/lib/discover-api';
 import type {
   Competitor,
   CompetitorItemsResponse,
+  CompetitorResearch,
   CompetitorsResponse,
   DiscoverItem,
 } from '@/types/discover';
 import { AnalyticsPanel, PanelHeader } from '../analytics/analytics-ui';
 import { useOptionalWorkspace } from '../navigation/workspace-provider';
 import { CompetitorDialog } from './competitor-dialog';
-import { COMPETITORS_FAILED, ITEMS_FAILED, REMOVE_FAILED, STILL_READING } from './competitor-model';
-import { CompetitorRows } from './competitor-row';
+import {
+  COMPETITORS_FAILED,
+  ITEMS_FAILED,
+  newCountText,
+  newItemCount,
+  REMOVE_FAILED,
+  RESEARCH_COST_TEXT,
+  RESEARCH_FAILED,
+  RESEARCHING,
+  STILL_READING,
+} from './competitor-model';
+import { CompetitorResearchPanel, CompetitorRows } from './competitor-row';
 import { competitorGroupTitle, competitorSources } from './discover-model';
 import { INSET_NOTE, ROW_LIST } from './discover-ui';
 
@@ -107,6 +144,42 @@ export function removeQuestion(name: string): string {
 /** The API's own sentence for a refusal; ours when it never answered. */
 function sentenceOf(cause: unknown, fallback: string): string {
   return cause instanceof ApiError && cause.status !== 0 ? cause.message : fallback;
+}
+
+interface ResearchProblem {
+  text: string;
+  /** Out of credits, or not enough to research yet: something to wait for, not a fault. */
+  variant: 'warning' | 'danger';
+}
+
+/** Why Research gave nothing back, in the API's own sentence (a 402 names the reset date). */
+function researchProblem(cause: unknown): ResearchProblem {
+  const status = cause instanceof ApiError ? cause.status : 0;
+  return {
+    text: sentenceOf(cause, RESEARCH_FAILED),
+    variant: status === 402 || status === 422 ? 'warning' : 'danger',
+  };
+}
+
+/** A research's footprint while the AI writes it: the inset box the panel will sit in. */
+function ResearchSkeleton({ name }: { name: string }) {
+  return (
+    <div
+      aria-busy="true"
+      aria-label={`Researching ${name}`}
+      className="flex flex-col gap-3 rounded-lg border-2 border-outline bg-inset p-4"
+      role="status"
+    >
+      <Skeleton className="h-4 w-24" />
+      <div className="flex flex-wrap gap-2">
+        <Skeleton className="h-6 w-20" />
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-6 w-16" />
+      </div>
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  );
 }
 
 /** A group's footprint while its items load: three rows in the box the rows will sit in. */
@@ -138,6 +211,10 @@ interface CompetitorGroupProps {
   renderRowExtra?: (item: DiscoverItem) => ReactNode;
   onEdit: (competitor: Competitor) => void;
   onRemove: (competitor: Competitor) => void;
+  /** Research This Competitor can run on this PostGear (AI is set up). */
+  canResearch?: boolean;
+  /** The group's first answer landed (`loaded`) or it gave up; again if it loads after that. */
+  onSettled?: (id: string, loaded: boolean) => void;
 }
 
 /** One competitor: its name, where its rows come from, its menu, and the rows. */
@@ -150,8 +227,11 @@ export function CompetitorGroup({
   renderRowExtra,
   onEdit,
   onRemove,
+  canResearch = false,
+  onSettled,
 }: CompetitorGroupProps) {
   const headingId = useId();
+  const costId = useId();
   const [data, setData] = useState<CompetitorItemsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +240,33 @@ export function CompetitorGroup({
   // How often this group asked again by itself for an answer that was not ready.
   const waits = useRef(0);
   const askedAgain = useRef(false);
+  // When the person last looked, as the visit's first answer said: undefined until it lands.
+  const [seenBefore, setSeenBefore] = useState<string | null | undefined>(undefined);
+  // Null until the first answer; false when it failed, true once rows loaded.
+  const settled = useRef<boolean | null>(null);
+  const settledWith = useRef(onSettled);
+  useEffect(() => {
+    settledWith.current = onSettled;
+  }, [onSettled]);
+
+  const [research, setResearch] = useState<CompetitorResearch | null>(null);
+  const [researching, setResearching] = useState(false);
+  const [researchError, setResearchError] = useState<ResearchProblem | null>(null);
+  const alive = useRef(true);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  // Told once, and once more when a failed group loads after Try Again.
+  function settle(loaded: boolean) {
+    if (settled.current === true || (settled.current === false && !loaded)) return;
+    settled.current = loaded;
+    settledWith.current?.(competitor.id, loaded);
+  }
 
   // Asked again on Refresh, on Try Again, and after an edit (the API stamps
   // `updatedAt`), since an edit can change which sources there are.
@@ -181,12 +288,16 @@ export function CompetitorGroup({
       .then((answer) => {
         if (asked.current !== mine) return;
         setData(answer);
+        // The visit's first answer sets what New means for the whole visit.
+        setSeenBefore((before) => (before === undefined ? (answer.lastSeenAt ?? null) : before));
         if (!answer.pending) {
           setError(null);
+          settle(true);
           return;
         }
         if (waits.current >= PENDING_TRIES) {
           setError(STILL_READING);
+          settle(false);
           return;
         }
         setError(null);
@@ -199,6 +310,7 @@ export function CompetitorGroup({
       .catch((cause: unknown) => {
         if (asked.current !== mine) return;
         setError(sentenceOf(cause, ITEMS_FAILED));
+        settle(false);
       })
       .finally(() => {
         if (asked.current === mine) setLoading(false);
@@ -214,6 +326,26 @@ export function CompetitorGroup({
   const notes = data?.notes ?? [];
   const items = data?.items ?? [];
   const pending = data?.pending === true;
+  const fresh = newItemCount(items, seenBefore);
+  const offerResearch = canResearch && items.length > 0 && research === null;
+
+  async function runResearch() {
+    if (researching) return;
+    setResearching(true);
+    setResearchError(null);
+
+    try {
+      // Never cancelled on the way: the credits are spent once the API starts.
+      const answer = await researchCompetitor(competitor.id);
+      if (!alive.current) return;
+      setResearch(answer.research);
+    } catch (cause) {
+      if (!alive.current) return;
+      setResearchError(researchProblem(cause));
+    } finally {
+      if (alive.current) setResearching(false);
+    }
+  }
 
   function body(): ReactNode {
     if (!data && loading) return <RowsSkeleton name={competitor.name} />;
@@ -241,6 +373,7 @@ export function CompetitorGroup({
           now={now}
           onCreatePost={onCreatePost}
           renderExtra={renderRowExtra}
+          lastSeenAt={seenBefore}
         />
       </div>
     );
@@ -274,35 +407,81 @@ export function CompetitorGroup({
             </div>
           }
           aside={
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-9 shrink-0 px-0"
-                  aria-label={`More actions for ${competitor.name}`}
-                >
-                  <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => onEdit(competitor)}>
-                  <MotionIcon icon={PencilIcon} className="h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                {isAdmin ? (
-                  <DropdownMenuItem
-                    className="text-dangerInk"
-                    onSelect={() => onRemove(competitor)}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {fresh > 0 ? (
+                <Badge variant="primary" className="shrink-0" data-testid="competitor-new-count">
+                  {newCountText(fresh)}
+                </Badge>
+              ) : null}
+              {offerResearch ? (
+                <>
+                  <span id={costId} className="font-sans text-xs text-ink type-muted">
+                    {RESEARCH_COST_TEXT}
+                  </span>
+                  <Button
+                    variant="highlight"
+                    size="sm"
+                    className="shrink-0"
+                    aria-label={`Research ${competitor.name}`}
+                    aria-describedby={costId}
+                    aria-busy={researching}
+                    disabled={researching}
+                    onClick={() => void runResearch()}
                   >
-                    <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
-                    Remove
+                    <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
+                    {researching ? RESEARCHING : 'Research'}
+                  </Button>
+                </>
+              ) : null}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-9 shrink-0 px-0"
+                    aria-label={`More actions for ${competitor.name}`}
+                  >
+                    <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => onEdit(competitor)}>
+                    <MotionIcon icon={PencilIcon} className="h-4 w-4" />
+                    Edit
                   </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {isAdmin ? (
+                    <DropdownMenuItem
+                      className="text-dangerInk"
+                      onSelect={() => onRemove(competitor)}
+                    >
+                      <MotionIcon icon={Trash2Icon} className="h-4 w-4" />
+                      Remove
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           }
         />
+        {researchError ? (
+          <Alert
+            variant={researchError.variant}
+            className="py-3"
+            data-testid="competitor-research-error"
+          >
+            {researchError.text}
+          </Alert>
+        ) : null}
+        {researching && research === null ? <ResearchSkeleton name={competitor.name} /> : null}
+        {research ? (
+          <CompetitorResearchPanel
+            competitor={competitor}
+            research={research}
+            now={now}
+            onCreatePost={onCreatePost}
+            onClose={() => setResearch(null)}
+          />
+        ) : null}
         {error ? (
           <Alert variant="warning" className="items-center py-3" data-testid="competitor-error">
             <span className="flex-1">{error}</span>
@@ -389,6 +568,12 @@ export interface CompetitorsTabProps {
   onCreatePost?: (item: DiscoverItem) => void;
   /** A control after a row's Open (Read, Module 08). */
   renderRowExtra?: (item: DiscoverItem) => ReactNode;
+  /**
+   * Module 10: what is left unseen after this visit marked its competitors
+   * seen (0), so the count on the page's tab can drop. Never called when the
+   * mark failed.
+   */
+  onUnseenChange?: (total: number) => void;
 }
 
 export function CompetitorsTab({
@@ -398,12 +583,56 @@ export function CompetitorsTab({
   refreshKey,
   onCreatePost,
   renderRowExtra,
+  onUnseenChange,
 }: CompetitorsTabProps) {
   const [list, setList] = useState<CompetitorsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const asked = useRef(0);
+
+  // New since you last looked: which groups have answered this visit (true when
+  // they loaded), which were already marked seen, and whether the first batch went.
+  const settled = useRef(new Map<string, boolean>());
+  const [settledCount, setSettledCount] = useState(0);
+  const markedSeen = useRef(new Set<string>());
+  const firstMarkSent = useRef(false);
+  const unseenChanged = useRef(onUnseenChange);
+  useEffect(() => {
+    unseenChanged.current = onUnseenChange;
+  }, [onUnseenChange]);
+
+  const groupSettled = useCallback((id: string, loaded: boolean) => {
+    const before = settled.current.get(id);
+    if (before === true || (before === false && !loaded)) return;
+    settled.current.set(id, loaded);
+    setSettledCount((count) => count + 1);
+  }, []);
+
+  // Once every group has answered, the ones that loaded are marked seen in one
+  // request; a group added later in the visit is marked on its own. After the
+  // badges are drawn, so they show for this visit. A failed mark is silent: the
+  // next visit simply shows the same rows as new.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `settledCount` is a trigger; the answers are in a ref
+  useEffect(() => {
+    if (!list || list.competitors.length === 0) return;
+    const ids = list.competitors.map((competitor) => competitor.id);
+    if (!firstMarkSent.current) {
+      if (!ids.every((id) => settled.current.has(id))) return;
+      firstMarkSent.current = true;
+    }
+
+    const toMark = ids.filter(
+      (id) => settled.current.get(id) === true && !markedSeen.current.has(id),
+    );
+    if (toMark.length === 0) return;
+    for (const id of toMark) markedSeen.current.add(id);
+
+    Promise.resolve()
+      .then(() => markCompetitorsSeen(toMark))
+      .then(() => unseenChanged.current?.(0))
+      .catch(() => undefined);
+  }, [list, settledCount]);
 
   // The dialog's competitor is kept apart from whether it is open, so the form
   // does not blank while the dialog fades out.
@@ -611,6 +840,8 @@ export function CompetitorsTab({
               setRemoveError(null);
               setRemoving(target);
             }}
+            canResearch={list.research === true}
+            onSettled={groupSettled}
           />
         ))}
       </div>

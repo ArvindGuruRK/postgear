@@ -187,7 +187,8 @@ describe('ReaderSheet, reading an item', () => {
 
     const image = screen.getByTestId('reader-image');
     expect(image).toHaveAttribute('src', 'https://img.example/rain.jpg');
-    expect(image).toHaveAttribute('loading', 'lazy');
+    // Not lazy: its box stays hidden until it loads, and a hidden lazy picture never would.
+    expect(image).not.toHaveAttribute('loading', 'lazy');
     expect(image).toHaveAttribute('referrerpolicy', 'no-referrer');
 
     const text = screen.getByTestId('reader-text');

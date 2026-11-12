@@ -9,9 +9,9 @@
  */
 import '@testing-library/jest-dom';
 import { TooltipProvider } from '@postgear/ui';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ApiError } from '@/lib/api';
-import { searchPlaces } from '@/lib/discover-api';
+import { getCountries, searchPlaces } from '@/lib/discover-api';
 import type { DiscoverSettings, Locality } from '@/types/discover';
 import { stubBrowserLayout } from '../workflows/fields/test-dom';
 import {
@@ -27,7 +27,13 @@ import {
 } from './place-popover';
 import { LOCATION_MESSAGES } from './use-place';
 
-jest.mock('@/lib/discover-api', () => ({ searchPlaces: jest.fn() }));
+jest.mock('@/lib/discover-api', () => ({
+  searchPlaces: jest.fn(),
+  // Module 10: the lists offered when finding places is turned off.
+  getCountries: jest.fn(() => Promise.resolve([{ code: 'IN', name: 'India' }])),
+  getRegions: jest.fn(() => Promise.resolve([])),
+  getPickedLocality: jest.fn(),
+}));
 
 const mockedSearch = searchPlaces as jest.MockedFunction<typeof searchPlaces>;
 
@@ -239,12 +245,16 @@ describe('PlacePopover', () => {
     );
   });
 
-  it('offers only Worldwide when finding places is turned off', () => {
+  it('offers the country list and Worldwide when finding places is turned off', async () => {
     renderPopover({ geocoder: 'off' });
     expect(screen.getByText(GEOCODER_OFF)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Use My Location' })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Enter your city')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Worldwide' })).toBeInTheDocument();
+    // Module 10: the lists stand in for the search.
+    expect(await screen.findByLabelText('Country')).toBeInTheDocument();
+    expect(getCountries).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Use This Place' })).toBeDisabled();
   });
 
   it('draws nothing about the workspace unless it is handed in', () => {
@@ -276,6 +286,8 @@ const SAVED: DiscoverSettings = {
   languages: ['ta', 'en'],
   topics: ['BUSINESS'],
   sources: null,
+  interests: [],
+  weeklyDigest: false,
   locationSource: 'SEARCH',
   place: CHENNAI,
   updatedAt: '2026-11-10T08:00:00.000Z',
@@ -392,6 +404,23 @@ describe('the workspace place in the popover (Module 06)', () => {
     expect(props.onSave).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves the button out while the workspace place is already the one being read', () => {
+    renderPopover({ workspace: workspace({ upToDate: true }) });
+
+    expect(screen.getByTestId('discover-workspace-default')).toHaveTextContent(
+      'Workspace default: Chennai, Tamil Nadu',
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Save For This Workspace' }),
+    ).not.toBeInTheDocument();
+    cleanup();
+
+    // A refused save keeps Try Again, and the button, whatever is on screen.
+    renderPopover({ workspace: workspace({ upToDate: true, error: 'Try again later.' }) });
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save For This Workspace' })).toBeInTheDocument();
+  });
+
   it('keeps the button but drops the line when the settings could not be read', () => {
     renderPopover({ workspace: workspace({ settings: null }) });
 
@@ -399,8 +428,9 @@ describe('the workspace place in the popover (Module 06)', () => {
     expect(screen.getByRole('button', { name: 'Save For This Workspace' })).toBeEnabled();
   });
 
-  it('still shows the line and the button with the place finder off', () => {
+  it('still shows the line and the button with the place finder off', async () => {
     renderPopover({ geocoder: 'off', workspace: workspace() });
+    await screen.findByLabelText('Country');
 
     expect(screen.getByText(GEOCODER_OFF)).toBeInTheDocument();
     expect(screen.getByTestId('discover-workspace-default')).toHaveTextContent(

@@ -16,6 +16,12 @@
  * results are a plain list of buttons: arrow keys walk them from the field,
  * Enter picks the one in focus.
  *
+ * Module 10: a PostGear running its own place finder (or the stand-in) says
+ * so in its status (`typeahead`), and only then does the field suggest
+ * places as someone types: after a pause, from two letters, with the
+ * question before it cancelled. A PostGear with no place finder at all gets
+ * the country and region lists instead (`place-picker.tsx`).
+ *
  * When the browser says no, or cannot find a position, the sentence becomes a
  * warning and the field takes the focus, since typing the city is the way on.
  *
@@ -33,6 +39,7 @@ import { searchPlaces } from '@/lib/discover-api';
 import type { DiscoverSettings, Locality } from '@/types/discover';
 import { ADMINS_ONLY_PLACE, placeResultText, workspaceDefaultText } from './discover-model';
 import { PlacesCredit } from './discover-ui';
+import { PlacePicker } from './place-picker';
 import type { PlaceStatus } from './use-place';
 
 export const CONSENT_SENTENCE =
@@ -40,6 +47,10 @@ export const CONSENT_SENTENCE =
 export const SEARCH_TOO_SHORT = 'Enter at least two letters of the city.';
 export const SEARCH_FAILED = 'Places are not available right now. Try again in a few minutes.';
 export const GEOCODER_OFF = 'Finding places is turned off on this PostGear.';
+export const PICK_FROM_LIST = 'Choose a country, and a region if you like.';
+
+/** How long the field waits after the last key before suggesting places. */
+const TYPEAHEAD_PAUSE_MS = 350;
 
 /** The API returns up to eight; the story says no more are shown. */
 const MAX_RESULTS = 8;
@@ -55,6 +66,8 @@ export interface PlaceFinderProps {
   onWorldwide: () => void;
   /** Every control off: a member reading Settings, or a save on its way. */
   disabled?: boolean;
+  /** Module 10: suggest places as someone types. Only with the operator's own place finder. */
+  typeahead?: boolean;
 }
 
 /**
@@ -70,6 +83,7 @@ export function PlaceFinder({
   onPick,
   onWorldwide,
   disabled = false,
+  typeahead = false,
 }: PlaceFinderProps) {
   const fieldId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +100,33 @@ export function PlaceFinder({
   useEffect(() => {
     if (blocked) inputRef.current?.focus();
   }, [blocked]);
+
+  // Module 10: suggestions as someone types, only where the place finder is
+  // the operator's own. A pause first, and a newer question cancels the last.
+  const typed = text.replace(/\s+/g, ' ').trim();
+  useEffect(() => {
+    if (!typeahead || disabled || typed.length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      searchPlaces(typed, controller.signal)
+        .then((answer) => {
+          setProblem(null);
+          setResults(answer.localities.slice(0, MAX_RESULTS));
+          setNote(answer.message ?? null);
+        })
+        .catch(() => {
+          // A suggestion that failed is not worth a warning: Search still works.
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSearching(false);
+        });
+    }, TYPEAHEAD_PAUSE_MS);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [typeahead, disabled, typed]);
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -155,7 +196,11 @@ export function PlaceFinder({
   if (geocoder === 'off') {
     return (
       <div className="flex flex-col gap-4">
-        <p className="m-0 font-sans text-sm text-ink">{GEOCODER_OFF}</p>
+        <div className="flex flex-col gap-1">
+          <p className="m-0 font-sans text-sm text-ink">{GEOCODER_OFF}</p>
+          <p className="m-0 font-sans text-xs text-ink type-muted">{PICK_FROM_LIST}</p>
+        </div>
+        <PlacePicker onPick={onPick} disabled={disabled} />
         <Button
           variant="secondary"
           onClick={onWorldwide}
@@ -204,7 +249,7 @@ export function PlaceFinder({
             onChange={(event) => setText(event.target.value)}
             onKeyDown={fieldKeys}
             placeholder="Enter your city"
-            autoComplete="address-level2"
+            autoComplete={typeahead ? 'off' : 'address-level2'}
             maxLength={80}
             disabled={disabled}
             className="h-10 min-w-0 flex-1"
@@ -280,6 +325,11 @@ export interface WorkspaceDefaultProps {
   error: string | null;
   /** Saves the place and language being read as the workspace's. Try Again calls it too. */
   onSave: () => void;
+  /**
+   * The place and language being read already are the workspace's, so a save
+   * would change nothing: the line above says so and the button is left out.
+   */
+  upToDate?: boolean;
 }
 
 /**
@@ -292,7 +342,9 @@ export function WorkspaceDefault({
   saving,
   error,
   onSave,
+  upToDate = false,
 }: WorkspaceDefaultProps) {
+  const offerSave = !upToDate || saving || error !== null;
   return (
     <div className="flex flex-col gap-2 border-t-2 border-outline pt-4">
       {settings ? (
@@ -308,22 +360,24 @@ export function WorkspaceDefault({
           </Button>
         </Alert>
       ) : null}
-      <TooltipHint
-        label={ADMINS_ONLY_PLACE}
-        disabled={!isAdmin}
-        hidden={isAdmin}
-        triggerClassName="self-start"
-      >
-        <Button
-          variant="secondary"
-          onClick={onSave}
-          disabled={!isAdmin || saving}
-          aria-busy={saving}
-          className="self-start"
+      {offerSave ? (
+        <TooltipHint
+          label={ADMINS_ONLY_PLACE}
+          disabled={!isAdmin}
+          hidden={isAdmin}
+          triggerClassName="self-start"
         >
-          {saving ? 'Saving…' : 'Save For This Workspace'}
-        </Button>
-      </TooltipHint>
+          <Button
+            variant="secondary"
+            onClick={onSave}
+            disabled={!isAdmin || saving}
+            aria-busy={saving}
+            className="self-start"
+          >
+            {saving ? 'Saving…' : 'Save For This Workspace'}
+          </Button>
+        </TooltipHint>
+      ) : null}
     </div>
   );
 }

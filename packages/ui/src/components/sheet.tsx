@@ -18,7 +18,10 @@ export const SheetOverlay = forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn('fixed inset-0 z-50 bg-outline/60 data-[state=open]:animate-fadeIn', className)}
+    className={cn(
+      'fixed inset-0 z-50 bg-outline/60 data-[state=open]:animate-fadeIn motion-reduce:data-[state=open]:animate-none',
+      className,
+    )}
     {...props}
   />
 ));

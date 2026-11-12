@@ -50,6 +50,8 @@ export const workspaceKeys = {
   readThrottle: (orgId: string) => `discover:readthrottle:${orgId}`,
   /** One workspace's share of the Google News links resolved through Google in a minute (Module 08). */
   decodeShare: (orgId: string) => `discover:decodeshare:${orgId}`,
+  /** One workspace's share of the pages Read opens in the headless browser (Module 10). */
+  renderShare: (orgId: string) => `discover:rendershare:${orgId}`,
   /** Addresses of this workspace the private-network guard refused in the last minute (Module 09). */
   addressRefusals: (orgId: string) => `discover:addrrefused:${orgId}`,
 };
@@ -104,6 +106,28 @@ export function discoverKeys(simulation: boolean) {
     geoReverse: (lat: number, lng: number) => `${root}:geo:rev:${hashed(`${lat}:${lng}`)}`,
     geoSearch: (normalisedQuery: string) => `${root}:geo:q:${hashed(normalisedQuery)}`,
     nominatimBudget: `${root}:budget:nominatim`,
+    /**
+     * Module 10: one News search per interest, by the edition read and the words
+     * lower-cased, so every workspace in India that follows "yoga" in English
+     * shares a copy. Encoded, so the words cannot add a field.
+     */
+    interest: (country: string | null, language: string, words: string) =>
+      `${root}:feed:v1:interest:${country ?? '-'}:${language}:${encodeURIComponent(words.toLowerCase())}`,
+    /** Module 10: GDELT for a place, by what its query is made of. */
+    gdelt: (country: string, region: string | null, city: string | null, language: string) =>
+      `${root}:feed:v1:gdelt:${country}:${region ?? '-'}:${city ? encodeURIComponent(city.toLowerCase()) : '-'}:${language}`,
+    /** GDELT allows about one request every five seconds per address: one key, held that long. */
+    gdeltSpacing: `${root}:budget:gdelt`,
+    /**
+     * Module 10: the places someone opened Trending or News for in the last day,
+     * scored by when, so the worker can warm them before the morning. Places only:
+     * no workspace, no person, no position.
+     */
+    activePlaces: `${root}:active:v1`,
+    /** Module 10: held while one worker run warms places or refreshes competitors, so two never overlap. */
+    maintenanceLock: (job: 'prewarm' | 'competitors') => `${root}:lock:maintenance:${job}`,
+    /** Module 10: a competitor's research summary, per row and per what it is about. */
+    research: (id: string, about: string) => `${root}:research:${id}:${hashed(about).slice(0, 16)}`,
     /** `day` is the date in the zone the quota resets in. The key that pays for the calls is never part of it. */
     youtubeBudget: (day: string) => `${root}:budget:youtube:${day}`,
   };

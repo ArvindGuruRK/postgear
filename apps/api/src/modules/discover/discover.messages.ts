@@ -22,12 +22,25 @@ function ageInWords(minutes: number): string {
   return `${count} ${count === 1 ? unit : `${unit}s`}`;
 }
 
+/**
+ * "electric cars" to "Electric Cars": a group's name is Title Case, and an
+ * interest is whatever a person typed. Only the first letter of each word
+ * changes, so "iPhone" and "C++" keep their own shape.
+ */
+export function titleCase(words: string): string {
+  return words
+    .split(/(\s+)/)
+    .map((word) => (word.trim() ? word.charAt(0).toLocaleUpperCase('en') + word.slice(1) : word))
+    .join('');
+}
+
 export const DISCOVER_MESSAGES = {
   localityThrottled: 'Try again in a moment.',
   geocoderOff: 'Finding places is turned off on this PostGear.',
   localityUnavailable: 'We could not find your location. Search for your city instead.',
   searchUnavailable: 'We could not look up places just now. Try again in a moment.',
   notFound: (query: string) => `No places found for '${query}'. Try the city's English name.`,
+  placeNotListed: 'That place is not in the list. Choose a country, then a region.',
 
   feedThrottled: 'That is a lot of new places at once. Try again in a moment.',
 
@@ -40,6 +53,13 @@ export const DISCOVER_MESSAGES = {
   topTitle: (country: string) => `Top Stories In ${country}`,
   worldTitle: 'Top Stories Worldwide',
   newsSubtitle: 'Via Google News.',
+  /** Module 10: the News tab's line when a keyed service answers it instead. */
+  newsVia: (service: string) => `Via ${service}.`,
+  /** Module 10: an interest's own group. The words are the workspace's, title-cased. */
+  interestTitle: (words: string) => `Stories About ${titleCase(words)}`,
+  /** Module 10: GDELT names the most local thing it was asked about. */
+  gdeltTitle: (place: string) => `${place} In The World Press`,
+  gdeltSubtitle: 'Via the GDELT Project, from news sites around the world.',
 
   /** `language` is its English name ("Tamil"), or null when it has none we can say. */
   wikipediaTitle: (language: string | null) =>
@@ -77,6 +97,18 @@ export const DISCOVER_MESSAGES = {
   /** "YouTube could not be reached.", or "could not be read" when it answered with something else. */
   competitorTrouble: (kind: string, unreadable: boolean) =>
     `${kind} could not be ${unreadable ? 'read' : 'reached'}.`,
+  // Module 10.
+  instagramNeedsChannel:
+    'Connect an Instagram business account under Channels to see their Instagram posts here.',
+  instagramReconnect:
+    'Instagram needs your channel reconnected before it can show their posts. Reconnect it under Channels.',
+  researchNeedsPosts:
+    'There is not enough to research yet. Once a few of their posts show up here, try again.',
+  researchRefunded: 'Your credits were not used.',
+  ideaNotFound: 'Saved idea not found.',
+  ideaLimit: (limit: number) =>
+    `You can keep up to ${limit} saved ideas. Remove one to save another.`,
+  ideaRemoved: 'Idea removed.',
 
   // The reader (Module 08). Each failure is one sentence, and Open always works.
   readPrivate: 'This page is private or on your own network.',
@@ -92,6 +124,7 @@ export const COMPETITOR_KIND_NAMES = {
   youtube: 'YouTube',
   bluesky: 'Bluesky',
   mastodon: 'Mastodon',
+  instagram: 'Instagram',
   news: 'News',
 } as const;
 

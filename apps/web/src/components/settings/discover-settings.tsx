@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * Settings, Discover (Sprint 11, Module 06): what a workspace saves for
- * Discover. Four cards, each saved as it is changed: the place a first visit
- * starts from, the languages in order, the News topics, and which groups are
- * on.
+ * Settings, Discover (Sprint 11, Modules 06 and 10): what a workspace saves
+ * for Discover. Six cards, each saved as it is changed: the place a first
+ * visit starts from, the languages in order, the News topics, the interests
+ * (each one a News group of its own), which groups are on, and whether
+ * members get Monday's digest email.
  *
  * It follows the notification preferences: every change is optimistic (the
  * card moves at once) and reverted if the save fails, with the failure in one
@@ -14,7 +15,8 @@
  *
  * Each save is one request carrying only its own card: a place whole (so a
  * new city never keeps the old region) together with that place's languages,
- * the language list, the topic list, or all five switches.
+ * the language list, the topic list, the interest list, every switch, or the
+ * digest on its own.
  *
  * Only a workspace admin can change any of it. A member reads the same page
  * with every control disabled and one line saying why, and nothing here sends
@@ -25,6 +27,7 @@
  */
 import { ArrowDownIcon } from '@animateicons/react/lucide/arrow-down-icon';
 import { ArrowUpIcon } from '@animateicons/react/lucide/arrow-up-icon';
+import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
 import {
   Alert,
@@ -37,6 +40,8 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  FormErrorMessage,
+  Input,
   Label,
   MotionIcon,
   Select,
@@ -50,7 +55,7 @@ import {
   toast,
 } from '@postgear/ui';
 import { MapPin } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { getDiscoverSettings, saveDiscoverSettings } from '@/lib/discover-api';
 import type {
@@ -60,7 +65,7 @@ import type {
   Locality,
   NewsTopic,
 } from '@/types/discover';
-import { NEWS_TOPICS } from '@/types/discover';
+import { MAX_INTERESTS, NEWS_TOPICS } from '@/types/discover';
 import {
   NO_WORKSPACE_DEFAULT,
   placePatch,
@@ -76,6 +81,14 @@ import { findBrowserPlace, type PlaceStatus } from '../discover/use-place';
 import {
   addableLanguages,
   addLanguageHelp,
+  DIGEST_HELP,
+  DIGEST_WORLDWIDE,
+  INTERESTS_EMPTY,
+  INTERESTS_FULL,
+  INTERESTS_HELP,
+  interestProblem,
+  interestsWith,
+  interestsWithout,
   LANGUAGES_EMPTY,
   languagesMoved,
   languagesWith,
@@ -90,7 +103,7 @@ import {
 } from './discover-settings-model';
 
 /** The card a save belongs to, so that card can say it is busy. */
-type CardId = 'place' | 'languages' | 'topics' | 'sources';
+type CardId = 'place' | 'languages' | 'topics' | 'interests' | 'sources' | 'digest';
 
 function describe(cause: unknown, fallback: string): string {
   return cause instanceof ApiError && cause.status !== 0 ? cause.message : fallback;
@@ -133,6 +146,9 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
   // Use My Location, as the place popover tracks it.
   const [locating, setLocating] = useState<PlaceStatus>('idle');
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
+  // The interest being typed, and the sentence saying why it cannot be added.
+  const [interestDraft, setInterestDraft] = useState('');
+  const [interestError, setInterestError] = useState<string | null>(null);
 
   const load = useCallback(async (first = false) => {
     setLoading(true);
@@ -268,10 +284,51 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
     );
   }
 
+  const interests = settings?.interests ?? [];
+  const interestsFull = interests.length >= MAX_INTERESTS;
+
+  function saveInterests(next: string[]) {
+    void save(
+      'interests',
+      { interests: next },
+      (previous) => ({ ...previous, interests: next }),
+      'Interests updated for this workspace.',
+    );
+  }
+
+  /** Enter or Add: the typed interest joins the end of the list, or the field says why not. */
+  function addInterest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (locked || interestDraft.trim() === '') return;
+    const problem = interestProblem(interestDraft, interests);
+    if (problem) {
+      setInterestError(problem);
+      return;
+    }
+    setInterestError(null);
+    setInterestDraft('');
+    saveInterests(interestsWith(interests, interestDraft));
+  }
+
+  function saveDigest(on: boolean) {
+    void save(
+      'digest',
+      { weeklyDigest: on },
+      (previous) => ({ ...previous, weeklyDigest: on }),
+      on
+        ? 'The weekly digest is on for this workspace.'
+        : 'The weekly digest is off for this workspace.',
+    );
+  }
+
   const languages = settings?.languages ?? [];
   const addable = settings ? addableLanguages(languages, settings.place) : [];
   const addHelp = settings ? addLanguageHelp(languages, settings.place) : null;
   const addId = `${ids}-add-language`;
+
+  const interestId = `${ids}-add-interest`;
+  const interestNoteId = `${interestId}-note`;
+  const digestId = `${ids}-weekly-digest`;
 
   return (
     <Stack gap="lg">
@@ -477,12 +534,103 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
         </CardContent>
       </Card>
 
+      <Card
+        data-testid="discover-settings-interests"
+        aria-busy={saving === 'interests' || undefined}
+      >
+        <CardHeader>
+          <CardTitle>Interests</CardTitle>
+          <CardDescription>
+            What your audience cares about. Each interest gets its own group on the News tab, such
+            as Stories About Electric Cars.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {settings ? (
+            <Stack gap="md">
+              {interests.length === 0 ? (
+                <p className="m-0 font-sans text-sm text-ink type-muted">{INTERESTS_EMPTY}</p>
+              ) : (
+                <ul
+                  className="m-0 flex list-none flex-wrap gap-2 p-0"
+                  aria-label="Workspace interests"
+                >
+                  {interests.map((interest) => (
+                    <li
+                      key={interest}
+                      className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-lg border-2 border-outline bg-inset py-0.5 ps-3 pe-0.5"
+                      data-testid="discover-settings-interest"
+                    >
+                      <span dir="auto" className="min-w-0 truncate font-sans text-sm text-ink">
+                        {interest}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 shrink-0 px-0"
+                        aria-label={`Remove ${interest}`}
+                        disabled={locked}
+                        onClick={() => saveInterests(interestsWithout(interests, interest))}
+                      >
+                        <MotionIcon icon={XIcon} className="h-4 w-4" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <form className="flex flex-col gap-2" onSubmit={addInterest} noValidate>
+                <Label htmlFor={interestId}>Add an interest</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    id={interestId}
+                    className="min-w-0 flex-1 basis-56 sm:max-w-sm"
+                    value={interestDraft}
+                    onChange={(event) => {
+                      setInterestDraft(event.target.value);
+                      setInterestError(null);
+                    }}
+                    placeholder="Enter your audience's interest"
+                    autoComplete="off"
+                    // Typing goes on during a save; only adding waits for it.
+                    disabled={!isAdmin || loading || interestsFull}
+                    variant={interestError ? 'error' : 'default'}
+                    aria-invalid={interestError ? true : undefined}
+                    aria-describedby={interestNoteId}
+                    data-testid="discover-settings-add-interest"
+                  />
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    disabled={locked || interestsFull || interestDraft.trim() === ''}
+                  >
+                    <MotionIcon icon={PlusIcon} className="h-4 w-4" />
+                    Add
+                  </Button>
+                </div>
+                {interestError ? (
+                  <FormErrorMessage id={interestNoteId} className="m-0">
+                    {interestError}
+                  </FormErrorMessage>
+                ) : (
+                  <p id={interestNoteId} className="m-0 font-sans text-xs text-ink type-muted">
+                    {interestsFull ? INTERESTS_FULL : INTERESTS_HELP}
+                  </p>
+                )}
+              </form>
+            </Stack>
+          ) : (
+            <Skeleton className="h-28 w-full rounded-lg" />
+          )}
+        </CardContent>
+      </Card>
+
       <Card data-testid="discover-settings-sources" aria-busy={saving === 'sources' || undefined}>
         <CardHeader>
           <CardTitle>Sources</CardTitle>
           <CardDescription>
             Turn off what this workspace does not need. A group that is off is hidden for everyone
-            here and is never fetched. News is always on.
+            here and is never fetched. The News tab's own stories are always on.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -512,6 +660,45 @@ export function DiscoverSettingsForm({ initial, isAdmin, geocoder }: DiscoverSet
                 </div>
               );
             })}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="discover-settings-digest" aria-busy={saving === 'digest' || undefined}>
+        <CardHeader>
+          <CardTitle>Weekly Digest</CardTitle>
+          <CardDescription>
+            An email each Monday with the top trends, the top stories and the next festival for your
+            place.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Stack gap="md">
+            <div className="flex items-start justify-between gap-6">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={digestId}>Send the weekly digest</Label>
+                <p className="m-0 font-sans text-xs text-ink type-muted">{DIGEST_HELP}</p>
+              </div>
+              {settings ? (
+                <Toggle
+                  id={digestId}
+                  checked={settings.weeklyDigest === true}
+                  disabled={locked}
+                  data-testid="discover-settings-weekly-digest"
+                  onCheckedChange={saveDigest}
+                />
+              ) : (
+                <Skeleton className="h-7 w-12 shrink-0 rounded-full" />
+              )}
+            </div>
+            {settings && settings.place === null ? (
+              <p
+                className="m-0 font-sans text-sm text-ink type-muted"
+                data-testid="discover-settings-digest-worldwide"
+              >
+                {DIGEST_WORLDWIDE}
+              </p>
+            ) : null}
           </Stack>
         </CardContent>
       </Card>

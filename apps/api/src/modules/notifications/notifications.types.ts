@@ -29,6 +29,8 @@ export const NOTIFICATION_TYPES = [
   // Sprint 10, Module 09: a live run failed (grouped), and a workflow paused itself.
   'automation.failed',
   'automation.paused',
+  // Sprint 11 Module 10: Monday's Discover digest for the workspace's place.
+  'discover.digest',
   'info',
 ] as const;
 
@@ -44,9 +46,10 @@ export function isNotificationType(value: string): value is NotificationType {
  * - `failure_emails` / `success_emails`: every live member whose
  *   `sendFailureEmails` / `sendSuccessEmails` is on.
  * - `admins`: every live `ADMIN` membership (`SUPERADMIN` counts as one).
+ * - `digest_emails`: every live member whose `sendDigestEmails` is on (Sprint 11).
  * - `none`: never emailed, whatever `emailStatus` says.
  */
-export type EmailAudience = 'failure_emails' | 'success_emails' | 'admins' | 'none';
+export type EmailAudience = 'failure_emails' | 'success_emails' | 'admins' | 'digest_emails' | 'none';
 
 export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   'post.published': 'success_emails',
@@ -63,6 +66,7 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   // Both mean a workflow needs fixing.
   'automation.failed': 'failure_emails',
   'automation.paused': 'failure_emails',
+  'discover.digest': 'digest_emails',
   info: 'none',
 };
 
@@ -80,6 +84,7 @@ export const DEFAULT_TITLES: Record<NotificationType, string> = {
   'automation.review': 'Review needed',
   'automation.failed': 'Workflow failed',
   'automation.paused': 'Workflow paused',
+  'discover.digest': 'Your Discover week',
   info: 'Notification',
 };
 
@@ -107,6 +112,9 @@ export interface NotificationMeta {
   webhookName?: string;
   statusCode?: number | null;
   error?: string | null;
+  /** Discover digest: the place it is for, and one line per highlight. */
+  place?: string;
+  highlights?: string[];
   [key: string]: unknown;
 }
 
@@ -223,6 +231,8 @@ function subjectFor(type: NotificationType, title: string, meta: NotificationMet
       return `${SUBJECT_PREFIX} Your free trial has started`;
     case 'webhook.failed':
       return `${SUBJECT_PREFIX} Webhook ${meta.webhookName ? `"${meta.webhookName}" ` : ''}could not be delivered`;
+    case 'discover.digest':
+      return `${SUBJECT_PREFIX} What is trending${meta.place ? ` in ${meta.place}` : ''} this week`;
     case 'automation':
     case 'automation.review':
     case 'automation.failed':
@@ -282,6 +292,12 @@ function detailLines(type: NotificationType, meta: NotificationMeta): string[] {
         lines.push(`Plan: ${meta.tier}`);
       }
       return lines;
+    case 'discover.digest':
+      // Plain text, one highlight a line; each was cleaned when the feed was read.
+      for (const highlight of Array.isArray(meta.highlights) ? meta.highlights.slice(0, 12) : []) {
+        if (typeof highlight === 'string' && highlight.length > 0) lines.push(`- ${highlight}`);
+      }
+      return lines;
     case 'automation':
     case 'automation.review':
     case 'automation.failed':
@@ -313,6 +329,8 @@ function linkLabel(type: NotificationType): string {
       return 'Review it here:';
     case 'automation.paused':
       return 'Open the workflow:';
+    case 'discover.digest':
+      return 'Open Discover:';
     case 'info':
       return 'Open:';
   }

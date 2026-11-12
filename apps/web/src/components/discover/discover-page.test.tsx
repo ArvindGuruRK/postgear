@@ -282,6 +282,7 @@ describe('DiscoverPage by keyboard (Module 09)', () => {
       'Videos',
       'Festivals',
       'Competitors',
+      'Saved',
     ]);
     const open = tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true');
     expect(open).toHaveLength(1);

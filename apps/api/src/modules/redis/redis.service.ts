@@ -141,6 +141,68 @@ export class RedisService implements CounterStore, OnModuleDestroy {
   }
 
   /**
+   * Notes a member in a scored list (a sorted set) with `score`, keeping only
+   * the `keep` highest scores and letting the whole list expire after
+   * `ttlSeconds` without a write. Discover uses it for the places someone looked
+   * at today, scored by time, so the worker can warm them (Sprint 11, Module 10).
+   * Without Redis it is kept in the process, like every other counter here.
+   */
+  async rememberMember(
+    key: string,
+    member: string,
+    score: number,
+    ttlSeconds: number,
+    keep: number,
+  ): Promise<void> {
+    await this.callWithFallback(
+      async (client) => {
+        await client
+          .multi()
+          .zadd(key, score, member)
+          // Ranks are lowest first: everything below the `keep` highest goes.
+          .zremrangebyrank(key, 0, -(keep + 1))
+          .expire(key, ttlSeconds)
+          .exec();
+      },
+      () => {
+        const scores = this.readScores(key);
+        scores[member] = score;
+        const kept = Object.entries(scores)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, keep);
+        this.memory.set(key, {
+          value: JSON.stringify(Object.fromEntries(kept)),
+          expiresAt: Date.now() + ttlSeconds * 1000,
+        });
+      },
+    );
+  }
+
+  /** The members of a scored list with a score of at least `minScore`, highest first, `limit` at most. */
+  async membersSince(key: string, minScore: number, limit: number): Promise<string[]> {
+    return this.callWithFallback(
+      (client) => client.zrevrangebyscore(key, '+inf', minScore, 'LIMIT', 0, limit),
+      () =>
+        Object.entries(this.readScores(key))
+          .filter(([, score]) => score >= minScore)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, limit)
+          .map(([member]) => member),
+    );
+  }
+
+  private readScores(key: string): Record<string, number> {
+    const raw = this.readMemory(key);
+    if (!raw) return {};
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  /**
    * The underlying ioredis client, or null without `REDIS_URL`.
    *
    * For the one consumer that needs a real client rather than a counter: the

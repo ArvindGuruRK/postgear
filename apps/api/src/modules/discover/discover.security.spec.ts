@@ -2,12 +2,13 @@
  * Module 09, the security sweep: one spec for the whole of Discover.
  *
  * Every other Discover spec proves a part of this beside the code it belongs
- * to. This is the one place it is all asserted together, across the three
- * controllers and the services behind them:
+ * to. This is the one place it is all asserted together, across every
+ * controller of the module and the services behind them:
  *
  * 1. **Who may call what**, from the real route metadata through the real
- *    guards. A route that is not in the table below fails the spec, so a new
- *    one cannot be added without saying who it is for.
+ *    guards. A route that is not in the tables below fails the spec, so a new
+ *    one cannot be added without saying who it is for. The worker's routes
+ *    (Module 10) have a table of their own: no session, the internal token.
  * 2. **Another workspace's id learns nothing**: foreign, removed and malformed
  *    ids are a 404 with no outside read.
  * 3. **Private addresses are refused on every way in** (a competitor being
@@ -33,7 +34,7 @@ import {
   RequestMethod,
   UnauthorizedException,
 } from '@nestjs/common';
-import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { JwtService } from '@nestjs/jwt';
@@ -68,6 +69,10 @@ import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { securityLogger } from '../../common/logging/security-logger';
+import {
+  INTERNAL_TOKEN_HEADER,
+  InternalTokenGuard,
+} from '../automations/gateway/internal-token.guard';
 import { CompetitorsController } from './competitors.controller';
 import { type CompetitorEngine, createCompetitorEngine } from './competitors.engine';
 import type {
@@ -85,8 +90,12 @@ import {
   type DiscoverEngine,
 } from './discover.engine';
 import { DiscoverGate } from './discover.gate';
+import { DiscoverModule } from './discover.module';
 import { DiscoverService } from './discover.service';
+import { DiscoverIdeasController } from './ideas.controller';
+import { DiscoverInternalController } from './internal.controller';
 import { LocalityService } from './locality.service';
+import { DiscoverPlacesController } from './places.controller';
 import { ReaderController } from './reader.controller';
 import { createReaderEngine, type ReaderEngine } from './reader.engine';
 import type { ExtractOutcome } from './reader.extractor';
@@ -148,11 +157,47 @@ const ROUTES: RouteRow[] = [
   row(CompetitorsController, 'update', 'PATCH', 'discover/competitors/:id'),
   row(CompetitorsController, 'remove', 'DELETE', 'discover/competitors/:id', 'admin'),
   row(CompetitorsController, 'items', 'GET', 'discover/competitors/:id/items'),
+  // Module 10.
+  row(CompetitorsController, 'unseen', 'GET', 'discover/competitors/unseen'),
+  row(CompetitorsController, 'seen', 'POST', 'discover/competitors/seen'),
+  row(CompetitorsController, 'research', 'POST', 'discover/competitors/:id/research'),
+  row(DiscoverPlacesController, 'countries', 'GET', 'discover/locality/countries'),
+  row(DiscoverPlacesController, 'regions', 'GET', 'discover/locality/regions'),
+  row(DiscoverPlacesController, 'pick', 'GET', 'discover/locality/pick'),
+  row(DiscoverPlacesController, 'guess', 'GET', 'discover/locality/guess'),
+  row(DiscoverPlacesController, 'get', 'GET', 'discover/my-place'),
+  row(DiscoverPlacesController, 'save', 'PUT', 'discover/my-place'),
+  row(DiscoverPlacesController, 'clear', 'DELETE', 'discover/my-place'),
+  row(DiscoverIdeasController, 'list', 'GET', 'discover/ideas'),
+  row(DiscoverIdeasController, 'save', 'POST', 'discover/ideas'),
+  row(DiscoverIdeasController, 'update', 'PATCH', 'discover/ideas/:id'),
+  row(DiscoverIdeasController, 'remove', 'DELETE', 'discover/ideas/:id'),
   row(ReaderController, 'read', 'POST', 'discover/read'),
   row(ReaderController, 'resolveLink', 'POST', 'discover/resolve-link'),
 ];
 
-const CONTROLLERS = [DiscoverController, CompetitorsController, ReaderController];
+const CONTROLLERS = [
+  DiscoverController,
+  DiscoverPlacesController,
+  CompetitorsController,
+  DiscoverIdeasController,
+  ReaderController,
+];
+
+/**
+ * Module 10: the worker's routes. There is no session to check, so they are
+ * public to the session guard and carry the internal token guard instead.
+ */
+const INTERNAL_ROUTES = [
+  { handler: 'prewarm', verb: 'POST', path: 'internal/discover/prewarm' },
+  { handler: 'refreshCompetitors', verb: 'POST', path: 'internal/discover/competitors/refresh' },
+  { handler: 'digest', verb: 'POST', path: 'internal/discover/digest' },
+] as const;
+
+/** Every controller the module serves, as Nest reads it: a new one cannot go unlisted. */
+const MODULE_CONTROLLERS = Reflect.getMetadata('controllers', DiscoverModule) as Array<
+  RouteRow['controller']
+>;
 
 function handlerOf(route: Pick<RouteRow, 'controller' | 'handler'>): object {
   return (route.controller.prototype as Record<string, object>)[route.handler];
@@ -189,8 +234,12 @@ describe('Discover routes: who may call what', () => {
     jest.restoreAllMocks();
   });
 
-  it('has every route of the three controllers in the table, with its verb and path, and nothing else', () => {
-    const found = CONTROLLERS.flatMap((controller) => {
+  it('has every route of every controller of the module in a table, with its verb and path, and nothing else', () => {
+    expect(MODULE_CONTROLLERS.map((controller) => controller.name).sort()).toEqual(
+      [...CONTROLLERS, DiscoverInternalController].map((controller) => controller.name).sort(),
+    );
+
+    const found = MODULE_CONTROLLERS.flatMap((controller) => {
       const proto = controller.prototype as unknown as Record<string, object>;
       const prefix = Reflect.getMetadata(PATH_METADATA, controller) as string;
       return Object.getOwnPropertyNames(proto)
@@ -207,9 +256,15 @@ describe('Discover routes: who may call what', () => {
         });
     });
 
-    const listed = ROUTES.map(
-      (route) => `${route.controller.name}.${route.handler} ${route.verb} /${route.path}`,
-    );
+    const listed = [
+      ...ROUTES.map(
+        (route) => `${route.controller.name}.${route.handler} ${route.verb} /${route.path}`,
+      ),
+      ...INTERNAL_ROUTES.map(
+        (route) =>
+          `${DiscoverInternalController.name}.${route.handler} ${route.verb} /${route.path}`,
+      ),
+    ];
     expect(found.sort()).toEqual([...listed].sort());
   });
 
@@ -300,6 +355,65 @@ describe('Discover routes: who may call what', () => {
   });
 });
 
+describe('Discover internal routes (Module 10): the worker, and nobody else', () => {
+  const TOKEN = 'internal-token-for-the-sweep';
+  const proto = DiscoverInternalController.prototype as unknown as Record<string, object>;
+
+  function guardWithToken(token: string | undefined) {
+    // The guard reads AUTOMATION_INTERNAL_TOKEN and nothing else.
+    return new InternalTokenGuard({ get: () => token } as never);
+  }
+
+  function callTo(handler: string, headers: Record<string, string>) {
+    return {
+      switchToHttp: () => ({
+        getRequest: () => ({ headers, cookies: {}, path: `/internal/discover/${handler}` }),
+      }),
+      getHandler: () => proto[handler],
+      getClass: () => DiscoverInternalController,
+    } as never;
+  }
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it.each(INTERNAL_ROUTES.map((route) => [`${route.verb} /${route.path}`, route] as const))(
+    '%s carries the internal token guard in place of a session',
+    (_name, route) => {
+      const guards = [
+        ...(Reflect.getMetadata(GUARDS_METADATA, DiscoverInternalController) ?? []),
+        ...(Reflect.getMetadata(GUARDS_METADATA, proto[route.handler]) ?? []),
+      ];
+      expect(guards).toContain(InternalTokenGuard);
+    },
+  );
+
+  it.each(INTERNAL_ROUTES.map((route) => [`${route.verb} /${route.path}`, route] as const))(
+    '%s refuses no token, a wrong one, and every call when none is set; lets the right one through',
+    (_name, route) => {
+      const guard = guardWithToken(TOKEN);
+
+      expect(() => guard.canActivate(callTo(route.handler, {}))).toThrow(UnauthorizedException);
+      expect(() =>
+        guard.canActivate(callTo(route.handler, { [INTERNAL_TOKEN_HEADER]: 'not-the-token' })),
+      ).toThrow(UnauthorizedException);
+      expect(() =>
+        guardWithToken(undefined).canActivate(
+          callTo(route.handler, { [INTERNAL_TOKEN_HEADER]: TOKEN }),
+        ),
+      ).toThrow(UnauthorizedException);
+      expect(guard.canActivate(callTo(route.handler, { [INTERNAL_TOKEN_HEADER]: TOKEN }))).toBe(
+        true,
+      );
+    },
+  );
+});
+
 /* ───────────────────────────── shared fakes ───────────────────────────── */
 
 const ACME: CompetitorWrite = {
@@ -310,6 +424,7 @@ const ACME: CompetitorWrite = {
   blueskyHandle: COMPETITOR_SAMPLE.blueskyHandle,
   mastodonAcct: COMPETITOR_SAMPLE.mastodonAcct,
   newsQuery: null,
+  instagramUsername: null,
 };
 
 /** The competitors table, as far as the service uses it: scoped by workspace, soft deleted. */
@@ -363,6 +478,16 @@ function fakeCompetitors() {
       return true;
     }),
     noteCheck: jest.fn(async () => undefined),
+    /** Module 10: no connected Instagram business account. */
+    instagramAccount: jest.fn(
+      async (_orgId: string): Promise<{ id: string; token: string } | null> => null,
+    ),
+    lastSeen: jest.fn(
+      async (_userId: string, _ids: string[]): Promise<Map<string, Date>> => new Map(),
+    ),
+    markSeen: jest.fn(
+      async (_userId: string, _ids: string[], _at: Date): Promise<void> => undefined,
+    ),
   };
   return table;
 }
@@ -402,6 +527,7 @@ function buildCompetitors(options: { dns?: Record<string, string[]>; fetch?: Dis
     youtube: read(real.youtube),
     bluesky: read(real.bluesky),
     mastodon: read(real.mastodon),
+    instagram: { ...real.instagram, read: jest.fn(real.instagram.read) },
     news: { ...real.news, search: jest.fn(real.news.search) },
   };
   const service = new CompetitorsService(
@@ -419,6 +545,7 @@ function buildCompetitors(options: { dns?: Record<string, string[]>; fetch?: Dis
     engine.youtube.read.mock.calls.length +
     engine.bluesky.read.mock.calls.length +
     engine.mastodon.read.mock.calls.length +
+    engine.instagram.read.mock.calls.length +
     engine.news.search.mock.calls.length;
 
   return { service, repository, redis, fetch, reads };
@@ -444,6 +571,7 @@ function buildReader(options: { dns?: Record<string, string[]> } = {}) {
     guard: guardWith(options.dns),
     fetch,
     linkDecode: true,
+    render: false,
   };
   const service = new ReaderService(engine, new DiscoverGate(4, 4_000), redis.asService(), {
     extract: jest.fn(extractHere),
@@ -876,6 +1004,9 @@ describe('Discover answers, keys and logs: nothing leaks', () => {
       mastodon: createMastodonSource({ fetch }),
       videos: createYoutubeSource({ fetch, apiKey: KEY }),
       holidays: createHolidaysSource({ fetch }),
+      geocoderSelfHosted: false,
+      newsProvider: 'google',
+      gdelt: null,
     };
   }
 

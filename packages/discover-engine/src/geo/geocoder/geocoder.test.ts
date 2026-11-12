@@ -57,6 +57,31 @@ describe('Nominatim reverse', () => {
     const { geocoder } = geocoderAnswering({ body: '{"error":"Unable to geocode"}' });
     expect(await geocoder.reverse(0, 0)).toEqual(WORLDWIDE);
   });
+
+  it('asks a self-hosted instance when given one, and refuses an address that is not a web one', async () => {
+    const fetchMock = jest.fn<ReturnType<DiscoverFetch>, Parameters<DiscoverFetch>>(
+      async (url) => ({ status: 200, body: CHENNAI_ANSWER, finalUrl: url }),
+    );
+    const geocoder = createNominatimGeocoder({
+      fetch: fetchMock,
+      userAgent: USER_AGENT,
+      baseUrl: 'https://geo.internal.example/nominatim/',
+    });
+    await geocoder.reverse(13.08, 80.27);
+    await geocoder.search('Chennai');
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(
+      /^https:\/\/geo\.internal\.example\/nominatim\/reverse\?/,
+    );
+    expect(fetchMock.mock.calls[1][0]).toMatch(
+      /^https:\/\/geo\.internal\.example\/nominatim\/search\?/,
+    );
+    for (const baseUrl of ['file:///etc/passwd', 'not an address', 'https://geo.example/?q=1']) {
+      expect(() =>
+        createNominatimGeocoder({ fetch: fetchMock, userAgent: USER_AGENT, baseUrl }),
+      ).toThrow();
+    }
+  });
 });
 
 describe('Nominatim search', () => {

@@ -25,8 +25,8 @@ import type { SourceItem } from '../../types';
 import { stripHtml } from '../html-text';
 import { isCalendarDate } from './dates';
 
-/** Which reader a row came from. It is the row's `source.name`. */
-export type FestivalOrigin = 'Google Calendar' | 'date-holidays';
+/** Which reader a row came from. It is the row's `source.name`. `State list` is `curated.ts`. */
+export type FestivalOrigin = 'Google Calendar' | 'date-holidays' | 'State list';
 
 const HAS_LETTER = /\p{L}/u;
 
@@ -115,8 +115,9 @@ export function byDateThenName(
 const isObservance = (item: SourceItem) => item.observance ?? true;
 
 /**
- * Whose name a merged row shows. Between the two readers it is the calendar's.
- * Within one reader (India's calendar lists "Janmashtami" and "Janmashtami
+ * Whose name a merged row shows. Between two readers it is the calendar's, and
+ * without the calendar the one merged first (the library's before a state
+ * list's, which takes the library's spelling on purpose). Within one reader (India's calendar lists "Janmashtami" and "Janmashtami
  * (Smarta)" on one date) it is the day off, and failing that the plainer name.
  */
 function shownOf(first: SourceItem, second: SourceItem): SourceItem {

@@ -1,0 +1,45 @@
+{
+  "_sample": "Written by hand for tests and simulation, in the shape of the GDELT DOC 2.0 artlist JSON. Not a recording: GDELT answered 429 twice when it was asked on 2026-11-11.",
+  "articles": [
+    {
+      "url": "https://bay-gazette.example/transit/2026/11/11/muni-late-night-n-judah",
+      "url_mobile": "",
+      "title": "Sample story: Muni adds late - night service on the N Judah",
+      "seendate": "20261111T163000Z",
+      "socialimage": "",
+      "domain": "bay-gazette.example",
+      "language": "English",
+      "sourcecountry": "United States"
+    },
+    {
+      "url": "https://bay-gazette.example/weather/2026/11/11/fog-returns-to-the-sunset",
+      "url_mobile": "",
+      "title": "Sample story: Fog returns to the Sunset after a warm week",
+      "seendate": "20261111T150000Z",
+      "socialimage": "",
+      "domain": "bay-gazette.example",
+      "language": "English",
+      "sourcecountry": "United States"
+    },
+    {
+      "url": "https://mission-local-sample.example/2026/11/ferry-building-market-hours",
+      "url_mobile": "",
+      "title": "Sample story: Ferry Building farmers market moves its Saturday hours",
+      "seendate": "20261111T141500Z",
+      "socialimage": "",
+      "domain": "mission-local-sample.example",
+      "language": "English",
+      "sourcecountry": "United States"
+    },
+    {
+      "url": "https://golden-gate-times.example/arts/free-concert-golden-gate-park",
+      "url_mobile": "",
+      "title": "Sample story: Golden Gate Park bandshell hosts a free weekend concert",
+      "seendate": "20261111T120000Z",
+      "socialimage": "",
+      "domain": "golden-gate-times.example",
+      "language": "English",
+      "sourcecountry": "United States"
+    }
+  ]
+}

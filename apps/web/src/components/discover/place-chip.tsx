@@ -29,6 +29,8 @@ export interface PlaceChipProps {
   status: PlaceStatus;
   message: string | null;
   geocoder: 'nominatim' | 'off';
+  /** Module 10: the city field suggests places as someone types. */
+  typeahead?: boolean;
   /** Resolves true once the browser's city is in. */
   onLocate: () => Promise<boolean>;
   onPick: (place: Locality) => void;
@@ -45,6 +47,7 @@ export function PlaceChip({
   status,
   message,
   geocoder,
+  typeahead = false,
   onLocate,
   onPick,
   onWorldwide,
@@ -87,6 +90,7 @@ export function PlaceChip({
           status={status}
           message={message}
           geocoder={geocoder}
+          typeahead={typeahead}
           workspace={workspace}
           onLocate={() => {
             void onLocate().then((found) => {

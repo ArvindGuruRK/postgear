@@ -13,6 +13,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "languages": "ts-node scripts/generate-languages.ts && biome format --write src/geo/languages.generated.ts",
+    "regions": "ts-node scripts/generate-regions.ts && biome format --write src/geo/regions.generated.ts",
+    "ip-db": "ts-node scripts/download-ip-country.ts",
     "fixtures": "ts-node scripts/record-fixtures.ts",
     "print-feed": "ts-node scripts/print-feed.ts",
     "clean": "rm -rf dist .turbo node_modules"

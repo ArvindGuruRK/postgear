@@ -566,6 +566,35 @@ and one enum, nothing changed on an existing model. The design is in
   brand kits: every read filters on it, and the API answers 404 for the id
   afterwards. Its items were never stored, so there is nothing else to clean.
 
+### Module 10 (`20261111120000_sprint11_discover_p2`)
+
+Additive: three tables, five columns, every column nullable or with a default.
+
+- **`DiscoverUserPlace` is one row per person per workspace** (`@@id([userId,
+  organizationId])`), the place that person chose, so Discover opens where they
+  left it on any browser. Like `DiscoverSettings` it holds a place, never a
+  position. Only a person's own choices are written (found, searched,
+  Worldwide); going back to the workspace's place deletes the row, so "no row"
+  means "follow the workspace".
+- **`DiscoverIdea` is shared by the workspace, one row per item**
+  (`@@unique([organizationId, itemId])`): whether a card is saved is a lookup on
+  the feed's own item id. `item` is a copy of the card as it was (checked by
+  the API's schema before it is written), so an idea outlives the feed. This is
+  the one place a feed's words are stored, on purpose, because a person chose to
+  keep them. At most 200 per workspace, in the API. `createdById` is `SetNull`:
+  an idea stays when its author leaves.
+- **`CompetitorView` is one row per person per competitor**, `lastSeenAt` only.
+  The tab's "N New" counts the items newer than it; nothing about the items is
+  stored.
+- **`Competitor.instagramUsername`** is read through the workspace's own
+  connected Instagram account (Business Discovery). No token is copied here.
+- **`DiscoverSettings.interests`** is an ordered list of at most 5 short
+  phrases (in the API); **`weeklyDigest`** is the admin's switch, off by
+  default; **`digestSentAt`** is the week's claim, moved in one conditional
+  update before anything is read, so a digest is never sent twice.
+- **`User.sendDigestEmails`** defaults to true and is the member's own switch
+  in the notification preferences; the outbox reads it before it emails.
+
 ## A user may legitimately belong to zero organizations
 
 Signup collects credentials only; the workspace is created afterward, in a real

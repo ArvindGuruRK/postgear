@@ -27,6 +27,7 @@ export interface CompetitorRow {
   blueskyHandle: string | null;
   mastodonAcct: string | null;
   newsQuery: string | null;
+  instagramUsername: string | null;
   lastCheckedAt: Date | null;
   lastError: string | null;
   createdAt: Date;
@@ -42,6 +43,7 @@ export interface CompetitorWrite {
   blueskyHandle: string | null;
   mastodonAcct: string | null;
   newsQuery: string | null;
+  instagramUsername: string | null;
 }
 
 export type CreateOutcome = { outcome: 'created'; row: CompetitorRow } | { outcome: 'limit' };
@@ -55,6 +57,7 @@ const COMPETITOR_SELECT = {
   blueskyHandle: true,
   mastodonAcct: true,
   newsQuery: true,
+  instagramUsername: true,
   lastCheckedAt: true,
   lastError: true,
   createdAt: true,
@@ -75,6 +78,7 @@ function columnsOf(write: Partial<CompetitorWrite>) {
     blueskyHandle: write.blueskyHandle,
     mastodonAcct: write.mastodonAcct,
     newsQuery: write.newsQuery,
+    instagramUsername: write.instagramUsername,
   };
 }
 
@@ -159,6 +163,69 @@ export class CompetitorsRepository {
       data: { deletedAt: new Date() },
     });
     return removed.count > 0;
+  }
+
+  /**
+   * Module 10: the workspace's connected Instagram business account, which is
+   * what Business Discovery reads another account through. The token is still
+   * encrypted here; only the service opens it, for one request. Null without a
+   * usable one (disconnected, disabled, half connected or waiting for a refresh).
+   */
+  async instagramAccount(orgId: string): Promise<{ id: string; token: string } | null> {
+    const row = await prisma.integration.findFirst({
+      where: {
+        organizationId: orgId,
+        providerIdentifier: 'instagram',
+        deletedAt: null,
+        disabled: false,
+        refreshNeeded: false,
+        inBetweenSteps: false,
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { internalId: true, token: true },
+    });
+    return row ? { id: row.internalId, token: row.token } : null;
+  }
+
+  /**
+   * Module 10, the daily refresh: live competitors of every workspace whose
+   * items were last read before `before`, never-read ones first, then the
+   * oldest. Each with its workspace, since the read is the workspace's.
+   */
+  async due(
+    before: Date,
+    limit: number,
+  ): Promise<Array<CompetitorRow & { organizationId: string }>> {
+    return prisma.competitor.findMany({
+      where: { deletedAt: null, OR: [{ lastCheckedAt: null }, { lastCheckedAt: { lt: before } }] },
+      orderBy: [{ lastCheckedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+      take: limit,
+      select: { ...COMPETITOR_SELECT, organizationId: true },
+    });
+  }
+
+  /** Module 10: when this person last looked at each of these competitors. A missing id was never looked at. */
+  async lastSeen(userId: string, competitorIds: string[]): Promise<Map<string, Date>> {
+    if (competitorIds.length === 0) return new Map();
+    const rows = await prisma.competitorView.findMany({
+      where: { userId, competitorId: { in: competitorIds } },
+      select: { competitorId: true, lastSeenAt: true },
+    });
+    return new Map(rows.map((row) => [row.competitorId, row.lastSeenAt]));
+  }
+
+  /** Module 10: this person has now seen these competitors' items. The ids are checked by the service. */
+  async markSeen(userId: string, competitorIds: string[], at: Date): Promise<void> {
+    if (competitorIds.length === 0) return;
+    await prisma.$transaction(
+      competitorIds.map((competitorId) =>
+        prisma.competitorView.upsert({
+          where: { userId_competitorId: { userId, competitorId } },
+          create: { userId, competitorId, lastSeenAt: at },
+          update: { lastSeenAt: at },
+        }),
+      ),
+    );
   }
 
   /** When its items were last read, and the one sentence about what went wrong, or null. */

@@ -22,6 +22,7 @@ import { Button, cn, Link, MotionIcon } from '@postgear/ui';
 import type { DiscoverItem } from '@/types/discover';
 import { FOCUS } from '../analytics/analytics-ui';
 import { ActionLink } from '../home/home-actions';
+import { type SaveControl, SaveButton } from './discover-cards';
 import { openHref, safeHref, socialChipLabel } from './discover-model';
 import { ROW, ROW_LIST } from './discover-ui';
 
@@ -31,10 +32,12 @@ export interface WikipediaRowProps {
   rank: number;
   /** Opens the Create Post sheet. Without it there is no Create Post (the playground). */
   onCreatePost?: (item: DiscoverItem) => void;
+  /** Module 10: the bookmark. */
+  save?: SaveControl;
 }
 
 /** One article: "1  Thirukkural  284 reads  Create Post  Open". */
-export function WikipediaRow({ item, rank, onCreatePost }: WikipediaRowProps) {
+export function WikipediaRow({ item, rank, onCreatePost, save }: WikipediaRowProps) {
   const href = safeHref(openHref(item));
 
   return (
@@ -90,6 +93,7 @@ export function WikipediaRow({ item, rank, onCreatePost }: WikipediaRowProps) {
             Open
           </ActionLink>
         ) : null}
+        {save ? <SaveButton item={item} save={save} /> : null}
       </div>
     </li>
   );
@@ -99,14 +103,22 @@ export function WikipediaRow({ item, rank, onCreatePost }: WikipediaRowProps) {
 export function WikipediaRows({
   items,
   onCreatePost,
+  renderSave,
 }: {
   items: readonly DiscoverItem[];
   onCreatePost?: (item: DiscoverItem) => void;
+  renderSave?: (item: DiscoverItem) => SaveControl | undefined;
 }) {
   return (
     <ol className={ROW_LIST}>
       {items.map((item, index) => (
-        <WikipediaRow key={item.id} item={item} rank={index + 1} onCreatePost={onCreatePost} />
+        <WikipediaRow
+          key={item.id}
+          item={item}
+          rank={index + 1}
+          onCreatePost={onCreatePost}
+          save={renderSave?.(item)}
+        />
       ))}
     </ol>
   );

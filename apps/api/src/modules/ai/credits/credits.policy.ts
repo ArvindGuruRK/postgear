@@ -41,6 +41,8 @@ export const AI_CREDIT_COSTS = {
    * Brand Voice); one short structured call each.
    */
   generate_snippet: 2,
+  /** Sprint 11 Module 10: Research This Competitor; one structured call over posts already read. */
+  competitor_research: 3,
 } as const;
 
 export type AiCreditType = keyof typeof AI_CREDIT_COSTS;

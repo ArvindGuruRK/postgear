@@ -26,10 +26,15 @@ export const notificationPreferencesSchema = z
   .object({
     successEmails: z.boolean().optional(),
     failureEmails: z.boolean().optional(),
+    /** Sprint 11 Module 10: Monday's Discover digest. */
+    digestEmails: z.boolean().optional(),
   })
   .strict()
   .refine(
-    (value) => value.successEmails !== undefined || value.failureEmails !== undefined,
+    (value) =>
+      value.successEmails !== undefined ||
+      value.failureEmails !== undefined ||
+      value.digestEmails !== undefined,
     'Nothing to change',
   );
 

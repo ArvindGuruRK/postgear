@@ -33,6 +33,15 @@ jest.mock('./date-holidays', () => {
 });
 const libraryMock = jest.mocked(libraryFestivals);
 
+/**
+ * These tests are about the two readers. The hand-kept state lists, which give
+ * Chennai days of its own, have their tests in `curated.test.ts`.
+ */
+jest.mock('./curated', () => {
+  const actual = jest.requireActual('./curated');
+  return { ...actual, curatedFestivals: jest.fn(() => []) };
+});
+
 const FIXTURES = join(__dirname, '..', '..', '..', 'fixtures');
 const recording = (file: string) => readFileSync(join(FIXTURES, file), 'utf8');
 

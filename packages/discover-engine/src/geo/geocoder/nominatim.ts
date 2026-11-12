@@ -35,6 +35,33 @@ export interface NominatimOptions {
   userAgent: string;
   /** Names come back in this language. Default English, which Google News' place feed reads best. */
   acceptLanguage?: string;
+  /**
+   * Where Nominatim answers: the public instance by default, or a self-hosted one
+   * (which may sit under a path, `https://geo.internal/nominatim`). Its own usage
+   * policy then applies instead of OpenStreetMap's.
+   */
+  baseUrl?: string;
+}
+
+/**
+ * The address without its trailing slashes. Anything but `http` or `https` is a
+ * mistake in the settings, so it throws when the geocoder is made, at boot,
+ * rather than on a person's first search.
+ */
+function nominatimBase(baseUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    throw new Error('The Nominatim address is not a web address.');
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('The Nominatim address must start with http or https.');
+  }
+  if (url.search || url.hash) {
+    throw new Error('The Nominatim address cannot carry a query or a fragment.');
+  }
+  return url.toString().replace(/\/+$/, '');
 }
 
 interface NominatimAddress {
@@ -96,6 +123,7 @@ function placeKey(place: Locality): string {
 
 export function createNominatimGeocoder(options: NominatimOptions): Geocoder {
   const { fetch: nominatimFetch, userAgent, acceptLanguage = 'en' } = options;
+  const base = nominatimBase(options.baseUrl ?? BASE_URL);
 
   async function getJson(url: string): Promise<unknown> {
     let response: Awaited<ReturnType<DiscoverFetch>>;
@@ -138,7 +166,7 @@ export function createNominatimGeocoder(options: NominatimOptions): Geocoder {
         lon: String(lng),
         'accept-language': language,
       });
-      const answer = (await getJson(`${BASE_URL}/reverse?${query}`)) as NominatimPlace;
+      const answer = (await getJson(`${base}/reverse?${query}`)) as NominatimPlace;
       // The open sea answers `{ "error": "Unable to geocode" }`: a place with no country.
       return placeFromNominatim(answer) ?? { ...WORLDWIDE };
     },
@@ -151,7 +179,7 @@ export function createNominatimGeocoder(options: NominatimOptions): Geocoder {
         limit: String(MAX_RESULTS),
         'accept-language': language,
       });
-      const answer = await getJson(`${BASE_URL}/search?${query}`);
+      const answer = await getJson(`${base}/search?${query}`);
       if (!Array.isArray(answer)) return [];
 
       const places = new Map<string, Locality>();

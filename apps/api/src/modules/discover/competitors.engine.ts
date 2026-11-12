@@ -29,11 +29,13 @@ import {
   createBlueskyAuthorSource,
   createFixtureFetch,
   createGoogleNewsSource,
+  createInstagramBusinessSource,
   createMastodonAccountSource,
   createRssSource,
   createYoutubeChannelSource,
   type DiscoverFetch,
   type GoogleNewsSource,
+  type InstagramBusinessSource,
 } from '@postgear/discover-engine';
 import { assertSafeUrl } from '@postgear/seo-engine';
 import type { UrlGuard } from './discover.addresses';
@@ -61,6 +63,8 @@ export interface CompetitorEngine {
   youtube: CompetitorSource;
   bluesky: CompetitorSource;
   mastodon: CompetitorSource;
+  /** Module 10: through the workspace's own connected Instagram business account. */
+  instagram: InstagramBusinessSource;
   news: GoogleNewsSource;
 }
 
@@ -99,6 +103,9 @@ export function createCompetitorEngine(env: CompetitorEnv): CompetitorEngine {
     youtube: createYoutubeChannelSource(options),
     bluesky: createBlueskyAuthorSource(options),
     mastodon: createMastodonAccountSource(options),
+    // INSTAGRAM_GRAPH_VERSION matches social-core's GRAPH_VERSION (v21.0, live until
+    // January 2027); social-core keeps its constant private, so bump both together.
+    instagram: createInstagramBusinessSource(options),
     news: createGoogleNewsSource({ fetch }),
   };
 }

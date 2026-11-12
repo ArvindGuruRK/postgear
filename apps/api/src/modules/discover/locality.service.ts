@@ -36,6 +36,11 @@ import { type DiscoverKeys, discoverKeys, workspaceKeys } from './discover.keys'
 import { DISCOVER_MESSAGES } from './discover.messages';
 
 export const LOCALITY_LIMIT_PER_MINUTE = 5;
+/**
+ * Module 10: with the operator's own Nominatim the field searches as someone
+ * types, a request every few letters, and the public policy is not ours to keep.
+ */
+export const SELF_HOSTED_LIMIT_PER_MINUTE = 60;
 const LOCALITY_WINDOW_SECONDS = 60;
 export const GEO_CACHE_SECONDS = 30 * 24 * 60 * 60;
 
@@ -111,7 +116,10 @@ export class LocalityService {
       workspaceKeys.localityThrottle(orgId),
       LOCALITY_WINDOW_SECONDS,
     );
-    if (count > LOCALITY_LIMIT_PER_MINUTE) throw this.throttled(orgId);
+    const limit = this.engine.geocoderSelfHosted
+      ? SELF_HOSTED_LIMIT_PER_MINUTE
+      : LOCALITY_LIMIT_PER_MINUTE;
+    if (count > limit) throw this.throttled(orgId);
   }
 
   private throttled(orgId: string): HttpException {
@@ -131,7 +139,8 @@ export class LocalityService {
     const cached = await this.readCached<T>(key);
     if (cached !== null) return cached;
 
-    if (await this.waitForBudget(orgId)) {
+    // The public instance allows one request a second; the operator's own sets its own pace.
+    if (!this.engine.geocoderSelfHosted && (await this.waitForBudget(orgId))) {
       // Whoever had the slot may have been asking the same thing.
       const arrived = await this.readCached<T>(key);
       if (arrived !== null) return arrived;

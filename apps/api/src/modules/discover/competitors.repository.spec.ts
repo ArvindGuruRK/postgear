@@ -39,6 +39,7 @@ const COLUMNS = [
   'createdAt',
   'feedUrls',
   'id',
+  'instagramUsername',
   'lastCheckedAt',
   'lastError',
   'mastodonAcct',
@@ -57,6 +58,7 @@ const ACME: CompetitorWrite = {
   blueskyHandle: 'acme.example',
   mastodonAcct: null,
   newsQuery: null,
+  instagramUsername: null,
 };
 
 const ROW = {

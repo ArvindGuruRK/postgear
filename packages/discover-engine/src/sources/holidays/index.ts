@@ -2,7 +2,9 @@
  * Festivals and public holidays for a place, merged from two readers: the
  * country's Google calendar (rich, English, country level; `google-calendar.ts`)
  * and `date-holidays` (offline rules, and the only one that knows a state's own
- * days off; `date-holidays.ts`). `merge.ts` decides when two rows are one.
+ * days off; `date-holidays.ts`). `merge.ts` decides when two rows are one. A
+ * state with a hand-kept list of its own (`curated.ts`) adds those days, and the
+ * attribution then credits the state lists too.
  *
  * ## The source answers far more than the tab shows
  *
@@ -22,7 +24,7 @@
  * A calendar that is simply not there (a 404) is different: nothing is missing
  * that asking again would bring back, so the library's rows are the answer.
  */
-import { isCountryCode } from '../../geo/iso3166';
+import { countryOf, isCountryCode } from '../../geo/iso3166';
 import type {
   DiscoverFetch,
   DiscoverSource,
@@ -32,10 +34,11 @@ import type {
   SourceItem,
   SourceResult,
 } from '../../types';
+import { curatedFestivals, mergeWithStateDays } from './curated';
 import { libraryFestivals } from './date-holidays';
 import { addDays, dayNumber, todayIn } from './dates';
 import { holidayCalendarId, holidayCalendarPageUrl, readHolidayCalendar } from './google-calendar';
-import { byDateThenName, mergeFestivals } from './merge';
+import { byDateThenName } from './merge';
 
 export { daysUntil, todayIn } from './dates';
 
@@ -48,12 +51,13 @@ export const FESTIVAL_SPAN_DAYS_BACK = 45;
 export const FESTIVAL_SPAN_DAYS_AHEAD = 400;
 
 const SOURCE_NAME = 'Public holiday calendars and date-holidays';
+/** What the group credits when a state's own days (`curated.ts`) are among the rows. */
+const WITH_STATE_LISTS = 'Public holiday calendars, date-holidays and state lists';
 
 /** The country's calendar as a page a person can open, when it has one. */
-function attributionFor(calendarId: string | null): SourceAttribution {
-  return calendarId
-    ? { name: SOURCE_NAME, url: holidayCalendarPageUrl(calendarId) }
-    : { name: SOURCE_NAME };
+function attributionFor(calendarId: string | null, withStateDays = false): SourceAttribution {
+  const name = withStateDays ? WITH_STATE_LISTS : SOURCE_NAME;
+  return calendarId ? { name, url: holidayCalendarPageUrl(calendarId) } : { name };
 }
 
 /**
@@ -107,7 +111,6 @@ export function createHolidaysSource(options: {
         item.date !== undefined && item.date >= from && item.date <= to;
 
       const calendarId = holidayCalendarId(country);
-      const attribution = attributionFor(calendarId);
       const calendar = calendarId
         ? await readHolidayCalendar(calendarFetch, calendarId, signal)
         : null;
@@ -117,29 +120,38 @@ export function createHolidaysSource(options: {
         from,
         to,
       });
+      // Only a region of this country: a mismatched pair must not borrow another country's days.
+      const region = locality.regionCode;
+      const fromState =
+        region && countryOf(region) === country
+          ? curatedFestivals({ regionCode: region, from, to })
+          : [];
+      const attribution = attributionFor(calendarId, fromState.length > 0);
 
       if (calendar?.ok) {
         return {
-          items: mergeFestivals(calendar.items.filter(inSpan), fromLibrary),
+          items: mergeWithStateDays(calendar.items.filter(inSpan), fromLibrary, fromState),
           attribution,
           warnings: [],
         };
       }
 
       const failure: SourceFailure = calendar?.failure ?? 'not_found';
-      if (fromLibrary.length === 0) {
+      if (fromLibrary.length === 0 && fromState.length === 0) {
         return { items: [], attribution, warnings: [], failed: failure };
       }
 
-      const items = mergeFestivals([], fromLibrary);
+      const items = mergeWithStateDays([], fromLibrary, fromState);
       if (calendar === null) return { items, attribution, warnings: [] };
 
+      const known =
+        fromState.length > 0 ? 'date-holidays and the state list know' : 'date-holidays knows';
       if (failure === 'upstream') {
         return {
           items,
           attribution,
           warnings: [
-            `The holiday calendar for ${country} did not answer, so these are the days date-holidays knows.`,
+            `The holiday calendar for ${country} did not answer, so these are the days ${known}.`,
           ],
           partial: true,
         };
@@ -148,7 +160,7 @@ export function createHolidaysSource(options: {
         items,
         attribution,
         warnings: [
-          `There is no holiday calendar for ${country} at its address, so these are the days date-holidays knows.`,
+          `There is no holiday calendar for ${country} at its address, so these are the days ${known}.`,
         ],
       };
     },

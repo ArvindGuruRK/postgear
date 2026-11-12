@@ -1,0 +1,55 @@
+{
+  "_sample": "Written by hand for tests and simulation, in the shape of the GDELT DOC 2.0 artlist JSON. Not a recording: GDELT answered 429 twice when it was asked on 2026-11-11.",
+  "articles": [
+    {
+      "url": "https://tamil-daily.example/chennai/2026/11/11/heavy-rain-warning",
+      "url_mobile": "",
+      "title": "மாதிரி செய்தி: சென்னையில் கனமழை எச்சரிக்கை , பள்ளிகளுக்கு விடுமுறை",
+      "seendate": "20261111T061500Z",
+      "socialimage": "",
+      "domain": "tamil-daily.example",
+      "language": "Tamil",
+      "sourcecountry": "India"
+    },
+    {
+      "url": "https://tamil-daily.example/chennai/2026/11/11/metro-new-route",
+      "url_mobile": "",
+      "title": "மாதிரி செய்தி: சென்னை மெட்ரோ புதிய வழித்தடம் திறப்பு",
+      "seendate": "20261111T053000Z",
+      "socialimage": "",
+      "domain": "tamil-daily.example",
+      "language": "Tamil",
+      "sourcecountry": "India"
+    },
+    {
+      "url": "https://kural-news.example/news/marina-beach-cleanup",
+      "url_mobile": "",
+      "title": "மாதிரி செய்தி: மெரினா கடற்கரையில் தூய்மைப் பணி",
+      "seendate": "20261111T044500Z",
+      "socialimage": "",
+      "domain": "kural-news.example",
+      "language": "Tamil",
+      "sourcecountry": "India"
+    },
+    {
+      "url": "https://kural-news.example/news/book-fair-dates",
+      "url_mobile": "",
+      "title": "மாதிரி செய்தி: சென்னை புத்தகக் காட்சி தேதிகள் அறிவிப்பு",
+      "seendate": "20261111T030000Z",
+      "socialimage": "",
+      "domain": "kural-news.example",
+      "language": "Tamil",
+      "sourcecountry": "India"
+    },
+    {
+      "url": "https://chennai-express-tamil.example/2026/11/11/metro-new-route",
+      "url_mobile": "",
+      "title": "மாதிரி செய்தி: சென்னை மெட்ரோ புதிய வழித்தடம் திறப்பு",
+      "seendate": "20261111T023000Z",
+      "socialimage": "",
+      "domain": "chennai-express-tamil.example",
+      "language": "Tamil",
+      "sourcecountry": "India"
+    }
+  ]
+}

@@ -13,7 +13,12 @@
  *
  * Null clears an optional field. A name is never cleared.
  */
-import { blueskyHandle, isYoutubeChannelId, mastodonAccount } from '@postgear/discover-engine';
+import {
+  blueskyHandle,
+  instagramUsername,
+  isYoutubeChannelId,
+  mastodonAccount,
+} from '@postgear/discover-engine';
 import { z } from 'zod';
 import { sanitizeText, stripControlChars } from '../../../common/sanitize';
 
@@ -69,6 +74,13 @@ const mastodon = z
   })
   .pipe(z.string());
 
+/** Module 10: `@acme`, `acme` or a profile address, kept as the bare name. */
+const instagram = z
+  .string()
+  .max(120)
+  .transform((text) => instagramUsername(text))
+  .pipe(z.string());
+
 const fields = {
   websiteUrl: address.nullable().optional(),
   // The whole list every time: a save replaces it.
@@ -76,6 +88,7 @@ const fields = {
   youtubeChannelId: youtubeChannelId.nullable().optional(),
   blueskyHandle: bluesky.nullable().optional(),
   mastodonAcct: mastodon.nullable().optional(),
+  instagramUsername: instagram.nullable().optional(),
   // Null means "search for the name".
   newsQuery: cleanedText(NEWS_QUERY_MIN, NEWS_QUERY_MAX).nullable().optional(),
 };

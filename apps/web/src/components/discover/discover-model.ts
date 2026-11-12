@@ -408,6 +408,7 @@ export const TAB_NAMES: Record<DiscoverTab, string> = {
   videos: 'Videos',
   festivals: 'Festivals',
   competitors: 'Competitors',
+  saved: 'Saved',
 };
 
 /**
@@ -588,19 +589,23 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
- * A festival's date as the row writes it: "8 Nov" and "Sunday". From tables,
- * not `Intl`, so the server and every browser write the same words.
+ * A festival's date as the row writes it: "8 Nov" and "Sunday", plus the two
+ * halves of the calendar tile (Module 10): "Nov" over "8". From tables, not
+ * `Intl`, so the server and every browser write the same words.
  */
 export function festivalDay(
   date: string | null | undefined,
-): { day: string; weekday: string } | null {
+): { day: string; weekday: string; month: string; dayOfMonth: number } | null {
   const number = dayNumber(date);
   if (number === null) return null;
 
   const at = new Date(number * DAY_MS);
+  const month = MONTHS[at.getUTCMonth()] ?? '';
   return {
-    day: `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}`,
+    day: `${at.getUTCDate()} ${month}`,
     weekday: WEEKDAYS[at.getUTCDay()] ?? '',
+    month,
+    dayOfMonth: at.getUTCDate(),
   };
 }
 
@@ -788,6 +793,7 @@ export function festivalPublishAt(
 const COMPETITOR_KINDS: Partial<Record<DiscoverItem['source']['id'], CompetitorKind>> = {
   rss: 'blog',
   youtube: 'youtube',
+  instagram: 'instagram',
   bluesky: 'bluesky',
   mastodon: 'mastodon',
   'google-news': 'news',
@@ -796,17 +802,18 @@ const COMPETITOR_KINDS: Partial<Record<DiscoverItem['source']['id'], CompetitorK
 export const COMPETITOR_KIND_NAMES: Record<CompetitorKind, string> = {
   blog: 'Blog',
   youtube: 'YouTube',
+  instagram: 'Instagram',
   bluesky: 'Bluesky',
   mastodon: 'Mastodon',
   news: 'News',
 };
 
-/** Which of the five rows a competitor's item is. A source nobody expected reads as its blog. */
+/** Which of the six rows a competitor's item is. A source nobody expected reads as its blog. */
 export function competitorKind(item: Pick<DiscoverItem, 'source'>): CompetitorKind {
   return COMPETITOR_KINDS[item.source.id] ?? 'blog';
 }
 
-/** The row's badge: Blog, YouTube, Bluesky, Mastodon or News. */
+/** The row's badge: Blog, YouTube, Instagram, Bluesky, Mastodon or News. */
 export function competitorKindLabel(item: Pick<DiscoverItem, 'source'>): string {
   return COMPETITOR_KIND_NAMES[competitorKind(item)];
 }
@@ -827,11 +834,13 @@ export function competitorGroupTitle(name: string): string {
  * (it falls back to the name), so Google News is always in it.
  */
 export function competitorSources(
-  competitor: Pick<Competitor, 'feedUrls' | 'youtubeChannelId' | 'blueskyHandle' | 'mastodonAcct'>,
+  competitor: Pick<Competitor, 'feedUrls' | 'youtubeChannelId' | 'blueskyHandle' | 'mastodonAcct'> &
+    Partial<Pick<Competitor, 'instagramUsername'>>,
 ): string {
   const places = [
     competitor.feedUrls.length > 0 ? 'their feeds' : null,
     competitor.youtubeChannelId ? 'YouTube' : null,
+    competitor.instagramUsername ? 'Instagram' : null,
     competitor.blueskyHandle ? 'Bluesky' : null,
     competitor.mastodonAcct ? 'Mastodon' : null,
     'Google News',
@@ -868,7 +877,9 @@ export function readResolvesLink(item: Pick<DiscoverItem, 'url' | 'opaqueUrl'>):
  * Whether a competitor's row is a page worth reading here: a post from their
  * own feeds, or a story about them. A video or a social post is not an article.
  */
-export function competitorRowReads(item: Pick<DiscoverItem, 'source' | 'url' | 'opaqueUrl'>): boolean {
+export function competitorRowReads(
+  item: Pick<DiscoverItem, 'source' | 'url' | 'opaqueUrl'>,
+): boolean {
   const kind = competitorKind(item);
   return (kind === 'blog' || kind === 'news') && readHref(item) !== null;
 }

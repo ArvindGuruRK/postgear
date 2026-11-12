@@ -86,6 +86,29 @@ export class DiscoverCache {
     return arrived ? { entry: arrived, state: 'fresh' } : { entry: null, state: 'missing' };
   }
 
+  /** Module 10: the copy under a key, if there is one, without fetching anything. */
+  peek<T extends CacheEntry>(key: string): Promise<T | null> {
+    return this.read<T>(key);
+  }
+
+  /**
+   * Module 10, the worker's pre-warm: fetches a copy only when it is missing or
+   * older than `olderThanMs`, and only when nobody else is fetching it, and waits
+   * for the fetch. Says whether it fetched. It takes the same lock as a person's
+   * request, so the two never fetch one place twice.
+   */
+  async warm<T extends CacheEntry>(
+    key: string,
+    options: Pick<LoadOptions<T>, 'keepSeconds' | 'refresh'> & { olderThanMs: number },
+  ): Promise<boolean> {
+    const cached = await this.read<T>(key);
+    if (cached && Date.now() - Date.parse(cached.fetchedAt) < options.olderThanMs) return false;
+    if (!(await this.takeLock(key))) return false;
+
+    await this.fetchAndStore(key, cached, options);
+    return true;
+  }
+
   private takeLock(key: string): Promise<boolean> {
     return this.redis.setIfAbsent(`discover:lock:${key}`, '1', LOCK_SECONDS);
   }
@@ -93,7 +116,7 @@ export class DiscoverCache {
   private async fetchAndStore<T extends CacheEntry>(
     key: string,
     previous: T | null,
-    options: LoadOptions<T>,
+    options: Pick<LoadOptions<T>, 'keepSeconds' | 'refresh'>,
   ): Promise<T> {
     const entry = await options.refresh(previous);
     await this.redis.set(key, JSON.stringify(entry), options.keepSeconds);

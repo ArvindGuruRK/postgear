@@ -60,6 +60,10 @@ export interface DiscoverSettingsAnswer {
   topics: string[];
   /** Null means every group is on. */
   sources: DiscoverSources | null;
+  /** Module 10: what the audience cares about. Each is a News group of its own. */
+  interests: string[];
+  /** Module 10: whether members get "This week where your audience is" on Monday mornings. */
+  weeklyDigest: boolean;
   locationSource: DiscoverLocationSource;
   /** The saved place as every Discover answer carries a place. Null when none was ever saved. */
   place: LocalityAnswer | null;
@@ -78,6 +82,8 @@ function neverSaved(): DiscoverSettingsAnswer {
     languages: [],
     topics: [],
     sources: null,
+    interests: [],
+    weeklyDigest: false,
     locationSource: DiscoverLocationSource.NONE,
     place: null,
     updatedAt: null,
@@ -130,6 +136,8 @@ function answerOf(row: SettingsRow): DiscoverSettingsAnswer {
     // The page sends the first of these back as the feed's topic, so only real ones leave.
     topics: row.topics.filter(isNewsTopic),
     sources: readSources(row.sources),
+    interests: row.interests,
+    weeklyDigest: row.weeklyDigest,
     locationSource: row.locationSource,
     place: placeOf(row),
     updatedAt: row.updatedAt.toISOString(),
@@ -152,6 +160,8 @@ function patchOf(input: UpdateSettingsInput): SettingsPatch {
   if (input.languages !== undefined) patch.languages = input.languages;
   if (input.topics !== undefined) patch.topics = input.topics;
   if (input.sources !== undefined) patch.sources = input.sources;
+  if (input.interests !== undefined) patch.interests = input.interests;
+  if (input.weeklyDigest !== undefined) patch.weeklyDigest = input.weeklyDigest;
 
   return patch;
 }
@@ -182,9 +192,21 @@ export class DiscoverSettingsService {
    * next request.
    */
   async switchedOff(orgId: string): Promise<DiscoverSourceSwitch[]> {
+    return (await this.feedPreferences(orgId)).off;
+  }
+
+  /**
+   * What a News or Trending request needs from the workspace in one read: the
+   * groups it switched off and the interests it searches (Module 10). Neither
+   * reaches a shared copy: they only decide which loads this request asks for.
+   */
+  async feedPreferences(orgId: string): Promise<{ off: DiscoverSourceSwitch[]; interests: string[] }> {
     const row = await this.repository.find(orgId);
     const sources = readSources(row?.sources);
-    return SOURCE_SWITCHES.filter((id) => sources?.[id] === false);
+    return {
+      off: SOURCE_SWITCHES.filter((id) => sources?.[id] === false),
+      interests: row?.interests ?? [],
+    };
   }
 
   /** An admin of the workspace, or a super admin acting in it. */

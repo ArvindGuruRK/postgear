@@ -35,29 +35,58 @@ const current: AuthenticatedUser = {
 describe('UsersController notification preferences', () => {
   const controller = new UsersController();
 
-  it('reads the two columns under their API names', async () => {
-    db.user.findUniqueOrThrow.mockResolvedValue({ sendSuccessEmails: true, sendFailureEmails: false });
+  // Sprint 11 Module 10 added the third, Discover's weekly digest.
+  const COLUMNS = { sendSuccessEmails: true, sendFailureEmails: true, sendDigestEmails: true };
+
+  it('reads the three columns under their API names', async () => {
+    db.user.findUniqueOrThrow.mockResolvedValue({
+      sendSuccessEmails: true,
+      sendFailureEmails: false,
+      sendDigestEmails: true,
+    });
 
     const result = await controller.notificationPreferences(current);
 
     expect(db.user.findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      select: { sendSuccessEmails: true, sendFailureEmails: true },
+      select: COLUMNS,
     });
-    expect(result).toEqual({ preferences: { successEmails: true, failureEmails: false } });
+    expect(result).toEqual({
+      preferences: { successEmails: true, failureEmails: false, digestEmails: true },
+    });
   });
 
   it('writes only the column that was sent', async () => {
-    db.user.update.mockResolvedValue({ sendSuccessEmails: true, sendFailureEmails: false });
+    db.user.update.mockResolvedValue({
+      sendSuccessEmails: true,
+      sendFailureEmails: false,
+      sendDigestEmails: true,
+    });
 
-    const result = await controller.updateNotificationPreferences(current, { failureEmails: false });
+    const result = await controller.updateNotificationPreferences(current, {
+      failureEmails: false,
+    });
 
     expect(db.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
       data: { sendFailureEmails: false },
-      select: { sendSuccessEmails: true, sendFailureEmails: true },
+      select: COLUMNS,
     });
-    expect(result).toEqual({ preferences: { successEmails: true, failureEmails: false } });
+    expect(result).toEqual({
+      preferences: { successEmails: true, failureEmails: false, digestEmails: true },
+    });
+  });
+
+  it('turns the weekly digest email off on its own', async () => {
+    db.user.update.mockResolvedValue({
+      sendSuccessEmails: true,
+      sendFailureEmails: true,
+      sendDigestEmails: false,
+    });
+
+    await controller.updateNotificationPreferences(current, { digestEmails: false });
+
+    expect(db.user.update.mock.calls[0][0].data).toEqual({ sendDigestEmails: false });
   });
 
   it('writes both when both were sent', async () => {

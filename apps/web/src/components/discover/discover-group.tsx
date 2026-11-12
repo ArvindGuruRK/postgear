@@ -12,12 +12,17 @@
  * social topics are chips, and festivals are a list in sections by week.
  * Trends and stories also carry Read (Module 08); the card decides whether
  * an item has a page to read.
+ *
+ * Module 10: a ranked group (trends, videos) numbers its cards in the
+ * source's order, every card group draws its first item as the lead, two
+ * columns wide, and trends measure their search volume against the group's
+ * busiest. `renderSave` gives each card its bookmark.
  */
 import { Skeleton } from '@postgear/ui';
 import { type ReactNode, useId } from 'react';
 import type { DiscoverItem, DiscoverGroup as Group } from '@/types/discover';
 import { AnalyticsPanel, PanelHeader } from '../analytics/analytics-ui';
-import { StoryCard, TrendCard, VideoCard } from './discover-cards';
+import { type SaveControl, StoryCard, TrendCard, VideoCard } from './discover-cards';
 import { SocialChips, WikipediaRows } from './discover-rows';
 import { ROW_LIST } from './discover-ui';
 import { FestivalList } from './festival-list';
@@ -36,6 +41,19 @@ export interface DiscoverGroupProps {
   onRead?: (item: DiscoverItem) => void;
   /** Per-card controls after Open (Module 04's overflow menu). */
   renderExtra?: (item: DiscoverItem) => ReactNode;
+  /** Module 10: each item's bookmark, or undefined for none. */
+  renderSave?: (item: DiscoverItem) => SaveControl | undefined;
+}
+
+/** The groups whose order is a ranking worth numbering: Google's rising searches, YouTube's chart. */
+const RANKED_GROUPS: ReadonlySet<string> = new Set(['trends', 'videos']);
+
+/** Each trend's search volume against the busiest in its group, or null when the source gave none. */
+export function volumesOf(items: readonly DiscoverItem[]): Array<number | null> {
+  const most = Math.max(0, ...items.map((item) => item.signal?.traffic ?? 0));
+  return items.map((item) =>
+    most > 0 && typeof item.signal?.traffic === 'number' ? item.signal.traffic / most : null,
+  );
 }
 
 export function DiscoverGroup({
@@ -46,24 +64,37 @@ export function DiscoverGroup({
   onPlanPost,
   onRead,
   renderExtra,
+  renderSave,
 }: DiscoverGroupProps) {
   const headingId = useId();
   if (group.items.length === 0) return null;
 
   function body(): ReactNode {
     if (group.id === 'wikipedia') {
-      return <WikipediaRows items={group.items} onCreatePost={onCreatePost} />;
+      return (
+        <WikipediaRows items={group.items} onCreatePost={onCreatePost} renderSave={renderSave} />
+      );
     }
     if (group.id === 'social') {
       return <SocialChips items={group.items} />;
     }
     if (group.id === 'festivals') {
-      return <FestivalList items={group.items} today={today} onPlanPost={onPlanPost} />;
+      return (
+        <FestivalList
+          items={group.items}
+          today={today}
+          onPlanPost={onPlanPost}
+          renderSave={renderSave}
+        />
+      );
     }
+
+    const ranked = RANKED_GROUPS.has(group.id);
+    const volumes = group.id === 'trends' ? volumesOf(group.items) : null;
 
     return (
       <div className={CARD_GRID}>
-        {group.items.map((item) => {
+        {group.items.map((item, index) => {
           const ItemCard =
             item.kind === 'news' ? StoryCard : item.kind === 'video' ? VideoCard : TrendCard;
           return (
@@ -74,6 +105,10 @@ export function DiscoverGroup({
               onCreatePost={onCreatePost}
               onRead={onRead}
               extra={renderExtra?.(item)}
+              save={renderSave?.(item)}
+              rank={ranked ? index + 1 : undefined}
+              lead={index === 0 && group.items.length > 2}
+              volume={volumes?.[index] ?? null}
             />
           );
         })}

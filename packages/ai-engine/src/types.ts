@@ -231,10 +231,31 @@ export interface RewriteResult {
   shortened: boolean;
 }
 
+/** Sprint 11 Module 10: one competitor's recent posts, as Discover read them. */
+export interface CompetitorResearchRequest {
+  competitor: string;
+  workspaceName?: string;
+  posts: ReadonlyArray<{ title: string; where: string; publishedAt: string | null }>;
+}
+
+export interface CompetitorResearchResult {
+  /** What they keep posting about, strongest first. 1 to 4. */
+  themes: string[];
+  /** One sentence on how often and where. */
+  rhythm: string;
+  /** What the workspace could post that they do not cover. 1 to 3 sentences. */
+  openings: string[];
+}
+
 /** The snippet jobs bound to one model client. Rejects with an {@link AiProviderError}. */
 export interface SnippetWriter {
   hashtags(request: HashtagRequest, options?: { signal?: AbortSignal }): Promise<HashtagResult>;
   rewrite(request: RewriteRequest, options?: { signal?: AbortSignal }): Promise<RewriteResult>;
+  /** Sprint 11 Module 10: Research This Competitor. */
+  research(
+    request: CompetitorResearchRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<CompetitorResearchResult>;
 }
 
 // ---------------------------------------------------------------------------

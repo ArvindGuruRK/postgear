@@ -25,6 +25,7 @@
 import type { default as Holidays, HolidaysTypes } from 'date-holidays';
 import { countryOf, isCountryCode, isRegionCode } from '../../geo/iso3166';
 import type { SourceItem } from '../../types';
+import { hasCuratedDays } from './curated';
 import { isCalendarDate } from './dates';
 import { festivalItem } from './merge';
 
@@ -79,10 +80,12 @@ function stateFor(
 }
 
 /**
- * The region as the library knows it (`US-CA`), or null for one it has no rules
- * for, which includes one that does not exist. The API keys its shared copy on
- * this, so a made-up region reads the country's copy instead of costing a fetch
- * and a month-long copy of its own. Never throws.
+ * The region as the library knows it (`US-CA`), or as the hand-kept state lists
+ * do (`IN-TS`, which the library knows only as `IN-TG`), or null for one with no
+ * days of its own, which includes one that does not exist. The API keys its
+ * shared copy on this, so a made-up region reads the country's copy instead of
+ * costing a fetch and a month-long copy of its own, and a region with days of
+ * its own never shares a copy with its country. Never throws.
  */
 export function holidayRegion(
   countryCode: string,
@@ -90,6 +93,7 @@ export function holidayRegion(
   load: () => HolidaysLibrary = loadLibrary,
 ): string | null {
   if (!regionCode || !isCountryCode(countryCode)) return null;
+  if (hasCuratedDays(regionCode) && countryOf(regionCode) === countryCode) return regionCode;
   try {
     const Library = load();
     return stateFor(new Library(), countryCode, regionCode) ? regionCode : null;

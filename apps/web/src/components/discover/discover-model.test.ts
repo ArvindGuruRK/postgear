@@ -650,9 +650,24 @@ describe('a festival row', () => {
   });
 
   it('writes the date and its weekday', () => {
-    expect(festivalDay('2026-11-08')).toEqual({ day: '8 Nov', weekday: 'Sunday' });
-    expect(festivalDay('2026-09-01')).toEqual({ day: '1 Sep', weekday: 'Tuesday' });
-    expect(festivalDay('2027-01-15')).toEqual({ day: '15 Jan', weekday: 'Friday' });
+    expect(festivalDay('2026-11-08')).toEqual({
+      day: '8 Nov',
+      weekday: 'Sunday',
+      month: 'Nov',
+      dayOfMonth: 8,
+    });
+    expect(festivalDay('2026-09-01')).toEqual({
+      day: '1 Sep',
+      weekday: 'Tuesday',
+      month: 'Sep',
+      dayOfMonth: 1,
+    });
+    expect(festivalDay('2027-01-15')).toEqual({
+      day: '15 Jan',
+      weekday: 'Friday',
+      month: 'Jan',
+      dayOfMonth: 15,
+    });
     expect(festivalDay('15 January')).toBeNull();
     expect(festivalDay(undefined)).toBeNull();
   });
@@ -774,6 +789,8 @@ function settings(patch: Partial<DiscoverSettings> = {}): DiscoverSettings {
     languages: ['ta', 'en'],
     topics: ['BUSINESS'],
     sources: null,
+    interests: [],
+    weeklyDigest: false,
     locationSource: 'SEARCH',
     place: CHENNAI,
     updatedAt: '2026-11-10T08:00:00.000Z',

@@ -20,11 +20,18 @@ import {
   feedChoiceShowsAddress,
   formFrom,
   formProblems,
+  INSTAGRAM_SHAPE,
+  instagramName,
+  isNewSince,
   MASTODON_HINT,
   mergeFoundFeeds,
   NAME_NEEDED,
   NEWS_LENGTH,
+  newCountText,
+  newItemCount,
   newsPhrase,
+  researchBasedOn,
+  researchIdea,
   toggleFeed,
   WEBSITE_HINT,
   websiteAddress,
@@ -58,6 +65,7 @@ const ACME: Competitor = {
   blueskyHandle: 'acme.example',
   mastodonAcct: 'acme@mastodon.example',
   newsQuery: null,
+  instagramUsername: null,
   lastCheckedAt: null,
   lastError: null,
   createdAt: '2026-11-10T08:00:00.000Z',
@@ -166,6 +174,7 @@ describe('the form', () => {
       website: '',
       feeds: [],
       youtube: '',
+      instagram: '',
       bluesky: '',
       mastodon: '',
       news: '',
@@ -179,6 +188,7 @@ describe('the form', () => {
       website: 'https://acme.example/',
       feeds: [{ url: BLOG.url, title: '', kind: null, checked: true }],
       youtube: 'UCacmeSampleChannel00000',
+      instagram: '',
       bluesky: 'acme.example',
       mastodon: 'acme@mastodon.example',
       news: '',
@@ -258,6 +268,7 @@ describe('the form', () => {
       blueskyHandle: 'acme.example',
       mastodonAcct: 'acme@mastodon.example',
       newsQuery: 'Acme funding',
+      instagramUsername: null,
     });
   });
 
@@ -270,7 +281,41 @@ describe('the form', () => {
       blueskyHandle: null,
       mastodonAcct: null,
       newsQuery: null,
+      instagramUsername: null,
     });
+  });
+
+  it('reads an Instagram username the way the API does, and sends the bare name', () => {
+    for (const typed of ['@Acme.Sample', 'acme.sample', 'https://www.instagram.com/acme.sample/']) {
+      expect(instagramName(typed)).toBe('acme.sample');
+    }
+    for (const typed of [
+      'acme..sample',
+      '.acme',
+      'acme.',
+      'a'.repeat(31),
+      'acme sample',
+      'https://www.instagram.com/p/ABC123/',
+      'https://example.com/acme',
+    ]) {
+      expect(instagramName(typed)).toBeNull();
+    }
+    expect(formProblems(form({ instagram: 'acme..sample' }))).toEqual({
+      instagram: INSTAGRAM_SHAPE,
+    });
+    expect(competitorInput(form({ instagram: ' @Acme_1 ' })).instagramUsername).toBe('acme_1');
+    expect(
+      competitorPatch(
+        { ...formFrom(ACME), instagram: 'acme' },
+        { ...ACME, instagramUsername: null },
+      ),
+    ).toEqual({ instagramUsername: 'acme' });
+    expect(
+      competitorPatch(formFrom({ ...ACME, instagramUsername: 'acme' }), {
+        ...ACME,
+        instagramUsername: 'acme',
+      }),
+    ).toEqual({});
   });
 
   it('sends no search phrase when it is the name, or was cleared', () => {
@@ -284,10 +329,10 @@ describe("a competitor's group", () => {
     const of = (id: string) => ({ source: { id, name: 'x' } }) as never;
 
     expect(
-      ['rss', 'youtube', 'bluesky', 'mastodon', 'google-news'].map((id) =>
+      ['rss', 'youtube', 'instagram', 'bluesky', 'mastodon', 'google-news'].map((id) =>
         competitorKindLabel(of(id)),
       ),
-    ).toEqual(['Blog', 'YouTube', 'Bluesky', 'Mastodon', 'News']);
+    ).toEqual(['Blog', 'YouTube', 'Instagram', 'Bluesky', 'Mastodon', 'News']);
     expect(competitorKind(of('google-news'))).toBe('news');
     // A source nobody expected still gets a tag.
     expect(competitorKindLabel(of('wikipedia'))).toBe('Blog');
@@ -300,6 +345,9 @@ describe("a competitor's group", () => {
   it('says where its rows come from, Google News always among them', () => {
     expect(competitorSources(ACME)).toBe(
       'From their feeds, YouTube, Bluesky, Mastodon and Google News.',
+    );
+    expect(competitorSources({ ...ACME, instagramUsername: 'acme' })).toBe(
+      'From their feeds, YouTube, Instagram, Bluesky, Mastodon and Google News.',
     );
     expect(
       competitorSources({
@@ -323,6 +371,44 @@ describe("a competitor's group", () => {
     const now = new Date('2026-11-10T12:00:00Z');
     expect(competitorWhen({ publishedAt: '2026-11-10T10:00:00Z' }, now)).toBe('2 hours ago');
     expect(competitorWhen({}, now)).toBe('');
+  });
+});
+
+describe('new since you last looked', () => {
+  const SEEN = '2026-11-10T09:00:00.000Z';
+  const rows = [
+    { publishedAt: '2026-11-10T10:00:00Z' },
+    { publishedAt: '2026-11-10T09:30:00Z' },
+    { publishedAt: '2026-11-10T08:00:00Z' },
+    {},
+  ];
+
+  it('marks only rows published after the last look, and none on the first look', () => {
+    expect(rows.map((row) => isNewSince(row, SEEN))).toEqual([true, true, false, false]);
+    expect(newItemCount(rows, SEEN)).toBe(2);
+    expect(newItemCount(rows, null)).toBe(0);
+    expect(newItemCount(rows, undefined)).toBe(0);
+    expect(isNewSince({ publishedAt: 'not a date' }, SEEN)).toBe(false);
+    expect(newCountText(3)).toBe('3 New');
+  });
+});
+
+describe('research this competitor', () => {
+  it('says what it read and when, and turns an opening into a Create Post target', () => {
+    const now = new Date('2026-11-10T12:00:00Z');
+    expect(researchBasedOn({ basedOn: 8, createdAt: '2026-11-10T10:00:00Z' }, now)).toBe(
+      'Based on 8 posts, written 2 hours ago.',
+    );
+    expect(researchBasedOn({ basedOn: 1, createdAt: '2026-11-10T11:59:50Z' }, now)).toBe(
+      'Based on 1 post, written just now.',
+    );
+    expect(researchIdea(ACME, 'Open on a churn number.', 2)).toEqual({
+      id: 'research-c1-2',
+      kind: 'competitor',
+      source: { id: 'rss', name: 'Acme Analytics' },
+      title: 'Open on a churn number.',
+      brief: 'Idea from researching Acme Analytics: Open on a churn number.',
+    });
   });
 });
 

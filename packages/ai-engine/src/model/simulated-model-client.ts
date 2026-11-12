@@ -785,6 +785,91 @@ function simulateRewrite(user: string): { rewrite: string } {
   return { rewrite: rewritten.length > 0 ? rewritten : text };
 }
 
+// ---------------------------------------------------------------------------
+// Research This Competitor (Sprint 11 Module 10)
+// ---------------------------------------------------------------------------
+
+/** Words that say nothing about a theme, on top of the hashtag list. */
+const RESEARCH_STOPWORDS = new Set([
+  ...HASHTAG_STOPWORDS,
+  'new',
+  'how',
+  'why',
+  'the',
+  'and',
+  'for',
+  'you',
+  'our',
+  'are',
+  'can',
+  'its',
+  'out',
+  'now',
+  'get',
+  'all',
+  'one',
+  'day',
+  'week',
+  'year',
+]);
+
+function titleWord(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/**
+ * The competitor's posts read the way a quick human pass would: the words
+ * they repeat are the themes, the dates and places are the rhythm, and the
+ * openings turn their themes into angles they have not taken.
+ */
+function simulateCompetitorResearch(user: string): {
+  themes: string[];
+  rhythm: string;
+  openings: string[];
+} {
+  const competitor = readField(user, 'Competitor') ?? 'This competitor';
+  const lines = (readBlock(user, 'Posts') ?? '')
+    .split('\n')
+    .map((line) => line.split(' | '))
+    .filter((parts) => parts.length >= 3);
+
+  const tally = new Map<string, number>();
+  const places = new Map<string, number>();
+  const days: number[] = [];
+  for (const [day, where, ...rest] of lines) {
+    places.set(where, (places.get(where) ?? 0) + 1);
+    const time = Date.parse(day);
+    if (!Number.isNaN(time)) days.push(time);
+    const words = rest.join(' | ').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+    for (const word of new Set(words)) {
+      if (word.length < 4 || RESEARCH_STOPWORDS.has(word) || /^\d+$/.test(word)) continue;
+      tally.set(word, (tally.get(word) ?? 0) + 1);
+    }
+  }
+
+  const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const themes = ranked.slice(0, 4).map(([word]) => titleWord(word));
+  if (themes.length === 0) themes.push('Product Updates');
+
+  const busiest = [...places.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'their own site';
+  let rhythm = `${competitor} posted ${lines.length} times lately, mostly on ${busiest}.`;
+  if (days.length >= 2) {
+    const spanDays = Math.max(1, Math.round((Math.max(...days) - Math.min(...days)) / 86_400_000));
+    const perWeek = Math.max(1, Math.round((days.length / spanDays) * 7));
+    rhythm = `${competitor} posts about ${perWeek} ${perWeek === 1 ? 'time' : 'times'} a week, mostly on ${busiest}.`;
+  }
+
+  const [first, second] = themes;
+  const openings = [
+    `Show a real customer result around ${first.toLowerCase()}, with the numbers they leave out.`,
+    second
+      ? `Make a short how-to that connects ${first.toLowerCase()} and ${second.toLowerCase()}, which they only cover one at a time.`
+      : `Answer the questions people ask about ${first.toLowerCase()} in a short video.`,
+    `Post behind the scenes of how your team handles ${(themes[2] ?? first).toLowerCase()}: they only post announcements.`,
+  ];
+  return { themes, rhythm, openings };
+}
+
 function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   const keys = schemaKeys(schema);
   const brief = readBlock(user, 'Brief') ?? user;
@@ -799,6 +884,9 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   }
   if (keys.includes('rewrite')) {
     return simulateRewrite(user);
+  }
+  if (keys.includes('openings') && keys.includes('themes')) {
+    return simulateCompetitorResearch(user);
   }
   if (keys.includes('category')) {
     return { category: classifyTopic(brief) };

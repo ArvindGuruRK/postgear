@@ -64,6 +64,12 @@ export interface FeedRequest {
    * neither this nor they are ever part of a key.
    */
   workspaceSources?: boolean;
+  /**
+   * Module 10: the workspace's interests, read with its switches. Each is a News
+   * group of its own. Only the request that asked for its workspace's settings
+   * has any, and the words reach a key only as a shared search copy.
+   */
+  interests?: readonly string[];
 }
 
 export type FeedGroupId =
@@ -75,7 +81,9 @@ export type FeedGroupId =
   | 'world'
   | 'topic'
   | 'videos'
-  | 'festivals';
+  | 'festivals'
+  | 'gdelt'
+  | `interest-${number}`;
 
 /**
  * The groups a workspace can switch off, each by the id of the group it hides.
@@ -87,6 +95,7 @@ export const SOURCE_SWITCHES = [
   'social',
   'videos',
   'festivals',
+  'gdelt',
 ] as const satisfies readonly FeedGroupId[];
 
 export type DiscoverSourceSwitch = (typeof SOURCE_SWITCHES)[number];
@@ -111,7 +120,12 @@ export const WINDOWS = {
   videos: { freshMs: HOUR_MS, keepSeconds: 6 * HOUR_SECONDS },
   // The source hands over more than a year of dates, so a month-old copy still covers the tab.
   festivals: { freshMs: 7 * 24 * HOUR_MS, keepSeconds: 30 * DAY_SECONDS },
+  // Module 10: GDELT asks for a light touch, so one call per place an hour, kept half a day.
+  gdelt: { freshMs: HOUR_MS, keepSeconds: 12 * HOUR_SECONDS },
 } as const satisfies Record<string, Windows>;
+
+/** GDELT answers about one request every five seconds from one address; six leaves room. */
+export const GDELT_SPACING_SECONDS = 6;
 
 /** Google gives a project 10,000 units a day and a call costs one. The rest is room for a mistake. */
 export const YOUTUBE_DAILY_UNITS = 8_000;
@@ -138,6 +152,12 @@ export interface GroupPlan {
   fetch: (signal: AbortSignal) => Promise<SourceResult>;
   /** Set when every call costs something. Past the limit the source is not asked at all. */
   budget?: Budget;
+  /**
+   * Module 10: a source that allows one call every few seconds for the whole
+   * deployment (GDELT). The key is held that long; a call that finds it held is
+   * not made, which counts as a full gate, not as trouble.
+   */
+  spacing?: { key: string; seconds: number };
 }
 
 export interface LoadPlan {
@@ -154,6 +174,12 @@ export interface LoadPlan {
    */
   compose: boolean;
   groups: GroupPlan[];
+  /**
+   * Module 10: an interest's load is shared by everyone who follows the same
+   * words, so the copy cannot know which of this workspace's interests it is.
+   * The answer names it from here instead: its place in the list and the words.
+   */
+  interest?: { index: number; words: string };
 }
 
 const TRENDS_ATTRIBUTION = { name: 'Google Trends', url: 'https://trends.google.com/trending' };
@@ -162,6 +188,7 @@ const BLUESKY_ATTRIBUTION = { name: 'Bluesky', url: 'https://bsky.app' };
 const MASTODON_ATTRIBUTION = { name: 'Mastodon', url: `https://${MASTODON_INSTANCE}` };
 const YOUTUBE_ATTRIBUTION = { name: 'YouTube', url: 'https://www.youtube.com' };
 const HOLIDAYS_ATTRIBUTION = { name: 'Public holiday calendars and date-holidays' };
+const GDELT_ATTRIBUTION = { name: 'GDELT Project', url: 'https://www.gdeltproject.org' };
 
 /** News answers in an edition that exists. Nothing else has a language of its own to report. */
 export function answerLanguage({ kind, locality, language }: FeedRequest): string {
@@ -307,6 +334,62 @@ function newsLoad({ engine, keys, request }: PlanContext): LoadPlan {
   };
 }
 
+/**
+ * Module 10: one Google News search per interest, in the edition the News tab
+ * reads. Shared by every workspace that follows the same words in that edition,
+ * so the key holds the words and the edition, never the workspace.
+ */
+function interestLoads({ engine, keys, request }: PlanContext): LoadPlan[] {
+  const { locality, language } = request;
+  const edition = answerLanguage(request);
+
+  return (request.interests ?? []).map((words, index) => ({
+    key: keys.interest(locality.countryCode, edition, words),
+    windows: WINDOWS.news,
+    placeBound: true,
+    compose: true,
+    interest: { index, words },
+    groups: [
+      {
+        id: `interest-${index}`,
+        source: 'google-news',
+        attribution: NEWS_ATTRIBUTION,
+        fetch: (signal) => engine.news.search(words, { locality, language, signal }),
+      },
+    ],
+  }));
+}
+
+/**
+ * Module 10: GDELT, a place's coverage in the world's press without Google.
+ * Keyed by what its query is made of (country, region, city, language). Its
+ * spacing key keeps the whole deployment to one call every six seconds, and its
+ * window to one call per place an hour.
+ */
+function gdeltLoad(
+  { keys, request }: PlanContext,
+  gdelt: DiscoverSource,
+  country: string,
+): LoadPlan {
+  const { locality } = request;
+  const language = primarySubtag(answerLanguage(request));
+  return {
+    key: keys.gdelt(country, locality.regionCode, locality.city, language),
+    windows: WINDOWS.gdelt,
+    placeBound: true,
+    compose: true,
+    groups: [
+      {
+        id: 'gdelt',
+        source: 'gdelt',
+        attribution: GDELT_ATTRIBUTION,
+        fetch: (signal) => gdelt.fetch({ locality, language, signal }),
+        spacing: { key: keys.gdeltSpacing, seconds: GDELT_SPACING_SECONDS },
+      },
+    ],
+  };
+}
+
 function videosLoad(
   { keys, request }: PlanContext,
   videos: DiscoverSource,
@@ -383,7 +466,19 @@ const TAB_PARTS: Record<FeedKind, readonly TabPart[]> = {
       ],
     },
   ],
-  news: [{ loads: (context) => [newsLoad(context)] }],
+  news: [
+    { loads: (context) => [newsLoad(context)] },
+    // Module 10: the workspace's interests. No switch: an admin removes an interest instead.
+    { loads: (context) => interestLoads(context) },
+    {
+      offSwitch: 'gdelt',
+      loads: (context) => {
+        const { gdelt } = context.engine;
+        const country = context.request.locality.countryCode;
+        return gdelt && country ? [gdeltLoad(context, gdelt, country)] : [];
+      },
+    },
+  ],
   videos: [
     {
       offSwitch: 'videos',
@@ -410,7 +505,7 @@ function partsOf(kind: FeedKind): readonly TabPart[] {
   return TAB_PARTS[kind] ?? [];
 }
 
-/** The switches a tab answers to, in the order its groups are shown. News has none. */
+/** The switches a tab answers to, in the order its groups are shown. News has only GDELT's. */
 export function switchesOf(kind: FeedKind): DiscoverSourceSwitch[] {
   return partsOf(kind).flatMap((part) => part.offSwitch ?? []);
 }

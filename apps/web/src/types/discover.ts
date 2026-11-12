@@ -15,7 +15,12 @@ export type DiscoverSourceId =
   | 'bluesky'
   | 'mastodon'
   | 'holidays'
-  | 'rss';
+  | 'rss'
+  // Module 10: the world press, a competitor's Instagram, and the keyed news services.
+  | 'gdelt'
+  | 'instagram'
+  | 'serpapi'
+  | 'newsdata';
 
 export type DiscoverItemKind =
   | 'trend'
@@ -86,8 +91,10 @@ export interface DiscoverItem {
 }
 
 /**
- * Trending: `trends`, `wikipedia`, `social`. News: `topic`, `place`, `top`,
- * `world`. Videos: `videos`. Festivals: `festivals`.
+ * Trending: `trends`, `wikipedia`, `social`. News: `topic`, `place`,
+ * `interest-0` to `interest-4` (Module 10, one per workspace interest),
+ * `top`, `world`, `gdelt` (the world press). Videos: `videos`. Festivals:
+ * `festivals`.
  */
 export type DiscoverGroupId =
   | 'trends'
@@ -97,6 +104,8 @@ export type DiscoverGroupId =
   | 'top'
   | 'world'
   | 'topic'
+  | 'gdelt'
+  | `interest-${number}`
   | 'videos'
   | 'festivals';
 
@@ -142,13 +151,14 @@ export interface FeedResponse {
   hidden?: DiscoverSourceSwitch[];
 }
 
-/** The five groups a workspace can switch off (Module 06). News has no switch. */
+/** The groups a workspace can switch off (Module 06; Module 10 adds the world press on News). */
 export const DISCOVER_SOURCE_SWITCHES = [
   'trends',
   'wikipedia',
   'social',
   'videos',
   'festivals',
+  'gdelt',
 ] as const;
 
 export type DiscoverSourceSwitch = (typeof DISCOVER_SOURCE_SWITCHES)[number];
@@ -170,6 +180,10 @@ export interface DiscoverSettings {
   topics: NewsTopic[];
   /** A missing key means on; null means every group is on. */
   sources: Partial<Record<DiscoverSourceSwitch, boolean>> | null;
+  /** Module 10: what the audience cares about, at most 5; each is a News group of its own. */
+  interests: string[];
+  /** Module 10: whether members get Monday's digest email. Off until an admin turns it on. */
+  weeklyDigest: boolean;
   locationSource: DiscoverLocationSource;
   /** The saved place as every Discover answer carries one. Null when no place was ever saved. */
   place: Locality | null;
@@ -193,13 +207,27 @@ export type DiscoverSettingsPatch = Partial<
     | 'languages'
     | 'topics'
     | 'sources'
+    | 'interests'
+    | 'weeklyDigest'
     | 'locationSource'
   >
 >;
 
+/** Module 10: how many interests a workspace keeps, and how long one may be. */
+export const MAX_INTERESTS = 5;
+export const INTEREST_MAX_LENGTH = 40;
+
 export interface DiscoverStatus {
   simulation: boolean;
   geocoder: 'nominatim' | 'off';
+  /**
+   * Module 10: whether the city field may suggest places as someone types.
+   * Only with the operator's own place finder (or the stand-in), never the
+   * public one. Missing from an older API, which reads as false.
+   */
+  typeahead?: boolean;
+  /** Module 10: who answers News: Google News, or a keyed service. */
+  newsProvider?: 'google' | 'serpapi' | 'newsdata';
   sources: {
     trends: boolean;
     news: boolean;
@@ -224,7 +252,7 @@ export interface LocalitySearchResponse {
  * What a competitor's row is, which is also its badge: Blog (their own feeds),
  * YouTube, Bluesky, Mastodon, or News (stories that name them).
  */
-export type CompetitorKind = 'blog' | 'youtube' | 'bluesky' | 'mastodon' | 'news';
+export type CompetitorKind = 'blog' | 'youtube' | 'instagram' | 'bluesky' | 'mastodon' | 'news';
 
 /** A competitor the workspace follows (Module 07). `GET /discover/competitors` lists them. */
 export interface Competitor {
@@ -239,6 +267,8 @@ export interface Competitor {
   mastodonAcct: string | null;
   /** What Google News is searched for. Null means the name. */
   newsQuery: string | null;
+  /** Module 10: an Instagram business or creator account, read through the workspace's own. */
+  instagramUsername: string | null;
   /** ISO 8601, null until its items were first read. */
   lastCheckedAt: string | null;
   /** One sentence ("YouTube could not be reached."), null when the last read went well. */
@@ -251,6 +281,30 @@ export interface CompetitorsResponse {
   competitors: Competitor[];
   /** How many a workspace may follow (20). */
   limit: number;
+  /** Module 10: whether Research This Competitor can run on this PostGear (AI is set up). */
+  research?: boolean;
+}
+
+/** Module 10: `GET /discover/competitors/unseen`, what this person has not seen yet. */
+export interface CompetitorUnseen {
+  total: number;
+  /** By competitor id. A competitor missing here has nothing new. */
+  competitors: Record<string, number>;
+}
+
+/** Module 10: Research This Competitor, written from the posts listed under it. */
+export interface CompetitorResearch {
+  themes: string[];
+  rhythm: string;
+  openings: string[];
+  basedOn: number;
+  createdAt: string;
+}
+
+export interface CompetitorResearchResponse {
+  research: CompetitorResearch;
+  /** True when this is today's copy and nothing was charged. */
+  cached: boolean;
 }
 
 /**
@@ -265,6 +319,7 @@ export interface CompetitorInput {
   blueskyHandle?: string | null;
   mastodonAcct?: string | null;
   newsQuery?: string | null;
+  instagramUsername?: string | null;
 }
 
 /** A feed found on a website: `POST /discover/competitors/discover-feeds` answers these. */
@@ -296,6 +351,49 @@ export interface CompetitorItemsResponse {
    * seconds, and never read an empty `items` as "nothing new" while this is true.
    */
   pending: boolean;
+  /** Module 10: when this person last looked at the competitor; null the first time. */
+  lastSeenAt?: string | null;
+}
+
+/** Module 10: a card someone saved to come back to, shared by the workspace. */
+export interface SavedIdea {
+  id: string;
+  item: DiscoverItem;
+  /** Where it was read: a label for the card, and the country Create Post writes for. */
+  place: { label: string; countryCode: string | null };
+  language: string;
+  note: string | null;
+  savedBy: { id: string; name: string | null } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SavedIdeasResponse {
+  ideas: SavedIdea[];
+  /** How many one workspace may keep (200). */
+  limit: number;
+}
+
+export const IDEA_NOTE_MAX = 280;
+
+/** Module 10: the place a member chose, kept for them so it follows them to another browser. */
+export interface MyPlace {
+  countryCode: string | null;
+  regionCode: string | null;
+  regionName: string | null;
+  city: string | null;
+  timeZone: string | null;
+  language: string | null;
+  /** A topic id, `ALL`, or null for the workspace's default. */
+  topic: NewsTopic | 'ALL' | null;
+  locationSource: DiscoverLocationSource;
+  updatedAt?: string;
+}
+
+/** Module 10: a country or a region, as the picker lists them. */
+export interface PlaceOption {
+  code: string;
+  name: string;
 }
 
 /**
@@ -328,8 +426,15 @@ export interface ReaderArticle {
   readMinutes: number;
 }
 
-/** The page's tabs, in order. The open one lives in `?tab=`. */
-export const DISCOVER_TABS = ['trending', 'news', 'videos', 'festivals', 'competitors'] as const;
+/** The page's tabs, in order. The open one lives in `?tab=`. Saved is Module 10's. */
+export const DISCOVER_TABS = [
+  'trending',
+  'news',
+  'videos',
+  'festivals',
+  'competitors',
+  'saved',
+] as const;
 
 export type DiscoverTab = (typeof DISCOVER_TABS)[number];
 

@@ -16,7 +16,11 @@ export type SourceId =
   | 'bluesky'
   | 'mastodon'
   | 'holidays'
-  | 'rss';
+  | 'rss'
+  | 'gdelt'
+  | 'instagram'
+  | 'serpapi'
+  | 'newsdata';
 
 export type DiscoverItemKind =
   | 'trend'
@@ -140,6 +144,14 @@ export interface SourceResult {
    * "could not be read" for it, and "could not be reached" for any other failure.
    */
   unreadable?: boolean;
+  /**
+   * Instagram (Module 10): the workspace's own connected account was refused (its
+   * token expired or was revoked, or a permission is missing), or it has none to
+   * ask with. One workspace's trouble, not Instagram's, so it must never count
+   * towards a breaker other workspaces share. The page asks for the channel to be
+   * reconnected.
+   */
+  reconnect?: boolean;
 }
 
 export interface SourceInput {

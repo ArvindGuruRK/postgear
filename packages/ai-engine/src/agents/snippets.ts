@@ -24,8 +24,17 @@ import {
   hashtagsSchema,
   normaliseHashtags,
 } from '../prompts/hashtags';
+import {
+  buildCompetitorResearchPrompt,
+  competitorResearchSchema,
+  RESEARCH_MAX_CHARS,
+  RESEARCH_MAX_OPENINGS,
+  RESEARCH_MAX_THEMES,
+} from '../prompts/competitor-research';
 import { buildRewritePrompt, rewriteSchema } from '../prompts/rewrite';
 import type {
+  CompetitorResearchRequest,
+  CompetitorResearchResult,
   HashtagRequest,
   HashtagResult,
   ModelClient,
@@ -126,10 +135,66 @@ export async function rewriteInVoice(
   return { text, shortened: false };
 }
 
-/** Both jobs bound to one model client, for the API's engine. */
+/** One line of an answer: single spaces, no wrapping quotes or list marks, cut at a sentence. */
+function oneLine(text: string, max: number): string {
+  const line = text
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s"'\-*\u2022]+|["'\s]+$/g, '')
+    .trim();
+  return line.length > max ? truncateAtSentence(line, max) : line;
+}
+
+/** Each kept once (case aside), empties dropped, at most `max`. */
+function distinctLines(lines: readonly string[], max: number, chars: number): string[] {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const raw of lines) {
+    const line = oneLine(raw, chars);
+    const key = line.toLowerCase();
+    if (line.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    kept.push(line);
+    if (kept.length === max) break;
+  }
+  return kept;
+}
+
+/**
+ * Research This Competitor (Sprint 11 Module 10): what one competitor focuses
+ * on, and where the workspace could stand out, from the posts Discover read.
+ */
+export async function researchCompetitor(
+  model: ModelClient,
+  request: CompetitorResearchRequest,
+  options: CallOptions = {},
+): Promise<CompetitorResearchResult> {
+  const prompt = buildCompetitorResearchPrompt(request);
+
+  let raw: { themes: string[]; rhythm: string; openings: string[] };
+  try {
+    raw = await model.structured({
+      schema: competitorResearchSchema,
+      ...prompt,
+      signal: options.signal,
+    });
+  } catch (error) {
+    throw normaliseRunError(error, options.signal);
+  }
+
+  const themes = distinctLines(raw.themes, RESEARCH_MAX_THEMES, 60);
+  const openings = distinctLines(raw.openings, RESEARCH_MAX_OPENINGS, RESEARCH_MAX_CHARS);
+  const rhythm = oneLine(raw.rhythm, RESEARCH_MAX_CHARS);
+  if (themes.length === 0 || openings.length === 0 || rhythm.length === 0) {
+    throw providerError('bad_output', { message: 'The model returned an empty research note.' });
+  }
+  return { themes, rhythm, openings };
+}
+
+/** Every snippet job bound to one model client, for the API's engine. */
 export function createSnippetWriter(model: ModelClient): SnippetWriter {
   return {
     hashtags: (request, options) => generateHashtags(model, request, options),
     rewrite: (request, options) => rewriteInVoice(model, request, options),
+    research: (request, options) => researchCompetitor(model, request, options),
   };
 }

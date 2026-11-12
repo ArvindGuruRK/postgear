@@ -23,6 +23,10 @@ export interface ComboboxProps {
   emptyText?: string;
   disabled?: boolean;
   className?: string;
+  /** The trigger's id, so a `<label htmlFor>` names it. */
+  id?: string;
+  /** The trigger's name when no visible label points at it. */
+  'aria-label'?: string;
 }
 
 export function Combobox({
@@ -34,6 +38,8 @@ export function Combobox({
   emptyText = 'No results found.',
   disabled,
   className,
+  id,
+  'aria-label': ariaLabel,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -59,6 +65,8 @@ export function Combobox({
       <PopoverTrigger asChild>
         <button
           type="button"
+          id={id}
+          aria-label={ariaLabel}
           disabled={disabled}
           className={cn(
             'flex h-11 w-full items-center justify-between gap-2 rounded-md border-2 border-outline bg-field px-4',
@@ -74,13 +82,17 @@ export function Combobox({
           <MotionIcon icon={ChevronDownIcon} className="h-4 w-4 shrink-0" strokeWidth={3} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-2 shadow-none">
+      <PopoverContent
+        align="start"
+        className="w-[var(--radix-popover-trigger-width)] p-2 shadow-none"
+      >
         <input
           // biome-ignore lint/a11y/noAutofocus: opening the combobox is itself the user's focus action
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
           className={cn(
             'mb-2 w-full rounded-md border-2 border-outline bg-field px-3 py-2 font-sans text-sm text-ink',
             FIELD_FOCUS,

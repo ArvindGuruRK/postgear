@@ -67,32 +67,67 @@ export interface ApiOptions {
    * save as someone leaves it. Browsers cap such a body at 64 KB.
    */
   keepalive?: boolean;
+  /** Cancels the request: a page that moved on, or a component that left. */
+  signal?: AbortSignal;
+  /**
+   * Gives up after this long. A request that times out throws an `ApiError`
+   * with status 0, the same as one that never reached the API.
+   */
+  timeoutMs?: number;
+}
+
+/** Status 0: the API was not reached (offline, refused, timed out). */
+export const API_UNREACHABLE = 0;
+
+function signalFor(options: ApiOptions): AbortSignal | undefined {
+  const { signal, timeoutMs } = options;
+  if (!timeoutMs) return signal;
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
 async function request<T>(baseUrl: string, path: string, options: ApiOptions = {}): Promise<T> {
   const { method = 'GET', body, cookie, throwOnUnauthorized = true, keepalive } = options;
+  const signal = signalFor(options);
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(cookie ? { cookie } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include',
-    // Session-dependent by definition; a cached response would show one user
-    // another user's data.
-    cache: 'no-store',
-    keepalive,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(cookie ? { cookie } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
+      // Session-dependent by definition; a cached response would show one user
+      // another user's data.
+      cache: 'no-store',
+      keepalive,
+      signal,
+    });
+  } catch (cause) {
+    // A cancel the caller asked for stays an AbortError, so it can be told apart.
+    if (options.signal?.aborted) throw cause;
+    throw new ApiError(
+      'PostGear could not be reached. Check your connection and try again.',
+      API_UNREACHABLE,
+    );
+  }
 
   if (response.status === 401 && !throwOnUnauthorized) {
     return null as T;
   }
 
-  // 204 and an empty body would both make .json() throw.
+  // 204 and an empty body would both make .json() throw, and a proxy's HTML
+  // error page is not JSON: either reads as an answer with nothing in it.
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  let payload: Record<string, unknown> = {};
+  try {
+    payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    payload = {};
+  }
 
   if (!response.ok) {
     throw new ApiError(

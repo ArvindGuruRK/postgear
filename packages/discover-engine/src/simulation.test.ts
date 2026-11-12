@@ -46,6 +46,7 @@ import {
 import { createGoogleTrendsSource, trendsFeedUrl } from './sources/google-trends';
 import { createHolidaysSource, festivalsInWindow, todayIn } from './sources/holidays';
 import { HOLIDAY_CALENDAR_IDS, holidayCalendarUrl } from './sources/holidays/google-calendar';
+import { createInstagramBusinessSource, instagramBusinessUrl } from './sources/instagram-business';
 import { createMastodonSource, mastodonTrendsUrl } from './sources/mastodon';
 import {
   createMastodonAccountSource,
@@ -317,12 +318,13 @@ describe('the recorded Module 05 answers, through the real sources', () => {
     const shown = festivalsInWindow(items, '2026-11-10');
 
     expect(items.length).toBeGreaterThan(shown.length);
-    // Pongal is two months out: not on the tab today, and an observance when it is.
+    // Pongal is two months out: not on the tab today, and a day off when it is,
+    // because Tamil Nadu's own list (Module 10) says so where the calendar does not.
     expect(on(shown, '2027-01-15')).toEqual([]);
-    expect(on(items, '2027-01-15')).toContainEqual(['Pongal', true]);
+    expect(on(items, '2027-01-15')).toContainEqual(['Pongal', false]);
     expect(on(festivalsInWindow(items, '2027-01-10'), '2027-01-15')).toContainEqual([
       'Pongal',
-      true,
+      false,
     ]);
   });
 
@@ -632,8 +634,8 @@ describe('the fixtures themselves', () => {
   const root = join(__dirname, '..', 'fixtures');
   const files = filesUnder(root);
 
-  it('are all there: twenty-three feeds, three places and Worldwide', async () => {
-    expect(FIXTURE_FEEDS).toHaveLength(23);
+  it('are all there: twenty-six feeds, three places and Worldwide', async () => {
+    expect(FIXTURE_FEEDS).toHaveLength(26);
     expect([...new Set(FIXTURE_FEEDS.map((feed) => feed.place))].sort()).toEqual([
       'chennai',
       'paris',
@@ -652,9 +654,17 @@ describe('the fixtures themselves', () => {
     }
   });
 
-  it('have three hand-written samples, YouTube for each place, and say so inside', () => {
-    const samples = FIXTURE_FEEDS.filter((feed) => feed.sample).map((feed) => feed.name);
-    expect(samples.sort()).toEqual(['youtube-FR', 'youtube-IN', 'youtube-US']);
+  it('have five hand-written samples, YouTube for each place and two GDELT, and say so inside', () => {
+    const samples = FIXTURE_FEEDS.filter((feed) => feed.sample).map(
+      (feed) => `${feed.place}/${feed.name}`,
+    );
+    expect(samples.sort()).toEqual([
+      'chennai/gdelt',
+      'chennai/youtube-IN',
+      'paris/youtube-FR',
+      'san-francisco/gdelt',
+      'san-francisco/youtube-US',
+    ]);
 
     // A recording must never carry the mark, and a sample must never lack it.
     for (const file of files.filter((path) => path.endsWith('.json'))) {
@@ -696,11 +706,12 @@ describe('the competitor samples (Module 07)', () => {
   const options = { fetch: fixtureFetch, maxAgeMs: null };
   const page = { ...INIT, accept: 'text/html' };
 
-  it('are eight hand-written answers, every one with its file', async () => {
+  it('are nine hand-written answers, every one with its file', async () => {
     expect(COMPETITOR_FIXTURES.map((feed) => feed.name).sort()).toEqual([
       'blog-rss',
       'bluesky-author',
       'changelog-atom',
+      'instagram',
       'mastodon-lookup',
       'mastodon-statuses',
       'news-search',
@@ -744,11 +755,12 @@ describe('the competitor samples (Module 07)', () => {
     }
   });
 
-  it('live on a name reserved for examples, apart from the three real services they stand in for', () => {
+  it('live on a name reserved for examples, apart from the four real services they stand in for', () => {
     const hosts = [...new Set(COMPETITOR_FIXTURES.map((feed) => new URL(feed.url).hostname))];
 
     expect(hosts.sort()).toEqual([
       'acme.example',
+      'graph.facebook.com',
       'mastodon.example',
       'news.google.com',
       'public.api.bsky.app',
@@ -796,6 +808,11 @@ describe('the competitor samples (Module 07)', () => {
       mastodonLookupUrl({ user: 'acme', instance: 'mastodon.example' }),
       mastodonStatusesUrl('mastodon.example', S.mastodonAccountId),
       newsSearchUrl(S.name, editionFor(null, 'en')),
+      instagramBusinessUrl({
+        igUserId: '17841400000000001',
+        username: S.instagramUsername,
+        accessToken: 'any-token',
+      }),
     ];
 
     for (const address of addresses) {
@@ -803,6 +820,25 @@ describe('the competitor samples (Module 07)', () => {
       expect([address, answer.status, answer.finalUrl]).toEqual([address, 200, address]);
       expect(answer.body.length).toBeGreaterThan(100);
     }
+  });
+
+  it('answer the Instagram sample for any account and Graph version, and "not found" for anyone else (Module 10)', async () => {
+    const source = (graphVersion: string) =>
+      createInstagramBusinessSource({ fetch: fixtureFetch, maxAgeMs: null, graphVersion });
+    const asking = { igUserId: '17841499999999999', accessToken: 'simulated-token' };
+
+    const sample = await source('v24.0').read({ ...asking, username: `@${S.instagramUsername}` });
+    expect([sample.failed, sample.items.length, sample.items[0]?.source.id]).toEqual([
+      undefined,
+      4,
+      'instagram',
+    ]);
+
+    expect(await source('v21.0').read({ ...asking, username: 'globex.sample' })).toMatchObject({
+      items: [],
+      failed: 'not_found',
+      unreadable: true,
+    });
   });
 
   it('answer the news search for any phrase that starts with the name, in any edition', async () => {
