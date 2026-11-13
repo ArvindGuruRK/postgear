@@ -36,7 +36,7 @@ This is the long, detailed version of [05 Hosting And Costs](launch-readiness/05
 |---|---|---|---|
 | **Investor demo, fastest and least stress** | **Railway (Hobby plan)**, Singapore region | **about $35 to $45** (about ₹3,100 to ₹4,000) | Low |
 | **Cheapest that is still dependable** | **Hetzner CX33 server + Coolify** (Germany or Finland), pay monthly | **about $12 to $14** (about ₹1,100 to ₹1,250) | Medium to high |
-| **Cheapest with servers in India** | **Hostinger VPS KVM 2 + Coolify template** (Mumbai) | **₹779 per month** (about $8.85) on a 24-month prepaid plan, so **₹18,696 upfront**; renews at ₹1,199 per month | Medium to high |
+| **Cheapest with servers in India** | **Hostinger VPS KVM 2 + Coolify template** (Mumbai) | **₹1,533 for the first month, no commitment** (₹1,299 plus GST, seen in the real cart); or ₹779 per month on a 24-month prepaid plan (₹18,696 upfront) | Medium to high |
 | Free, if you accept real risk | Oracle Cloud Always Free (Mumbai or Hyderabad) | $0 | High, and it can break |
 | Easy but costly | Render | about $95 to $115 | Low |
 | Middle ground | Fly.io | about $40 to $75 | Medium |
@@ -46,7 +46,7 @@ This is the long, detailed version of [05 Hosting And Costs](launch-readiness/05
 
 1. **Use Railway Hobby for the investor demo.** It runs all six PostGear pieces in one project, it has a Singapore region (close to India), private networking between services, and it is the least work for a 3 to 4 day deadline. The bill is small next to the value of your time.
 2. **Keep a single cheap server (VPS) with Coolify as the written backup**, and consider it as your cheaper long-term home once the demo is done. It costs about a quarter to a third of Railway for the same stack, but you become the system administrator. Two good choices:
-   - **Hostinger KVM 2 (Mumbai)** if you are fine paying 2 years upfront (₹18,696 before GST). It is the cheapest per month, the servers are in India, Coolify comes pre-installed, and there is a 30-day money-back guarantee.
+   - **Hostinger KVM 2 (Mumbai)**. A 1-month plan is ₹1,533 with GST (renews at ₹2,099 plus GST, so switch off auto-renew), or ₹779 per month if you prepay 2 years (₹18,696 before GST). It is the cheapest per month, the servers are in India, Coolify comes pre-installed, and there is a 30-day money-back guarantee.
    - **Hetzner CX33 (EU)** if you want to pay month by month and cancel any time. It has twice the CPU cores, but the servers are in Europe.
 3. **Do not use Hostinger's normal web hosting (shared or "Cloud" hosting plans) for PostGear.** Only the Hostinger **VPS** works. The web hosting plans cannot run background workers, Docker or Redis (section 8 explains why).
 4. **Do not split the app across Vercel plus something else** for the demo. Vercel or Netlify can only host the web part. You would still need a second platform for the other five pieces, which adds cost, a second dashboard and cookie headaches, and saves almost nothing.
@@ -111,7 +111,8 @@ All numbers are **monthly, for staging, always on, light traffic**. Storage (R2)
 |---|---|---|---|---|---|---|
 | 1 | **Railway Hobby** | **$35 to $45** | ₹3,100 to ₹4,000 | Yes | Low | 🧮 from ✅ rates |
 | 2 | **Hetzner CX33 + Coolify** | **$12 to $14** | ₹1,100 to ₹1,250 | Yes (one server) | Medium to high | 🧮 from 🔎/✅ |
-| 2b | **Hostinger VPS KVM 2 + Coolify** (Mumbai) | **about $8.85** (24 months prepaid) | **₹779** (₹1,199 after renewal) | Yes (one server) | Medium to high | ✅ |
+| 2b | **Hostinger VPS KVM 2 + Coolify** (Mumbai), 1-month plan | **about $17.40** (₹1,533 with GST, first month) | **₹1,533** first month, then ₹2,099 plus GST if renewed | Yes (one server) | Medium to high | ✅ (real cart) |
+| 2c | Hostinger VPS KVM 2, 24-month plan | about $8.85 | ₹779 (₹18,696 upfront, ₹1,199 after renewal) | Yes (one server) | Medium to high | ✅ |
 | 3 | Oracle Always Free | $0 | ₹0 | Yes, if capacity exists | High | ✅ with ❓ cuts |
 | 4 | Fly.io (self-run Postgres) | $40 to $50 | ₹3,500 to ₹4,400 | Yes | Medium | 🧮 |
 | 4b | Fly.io (Managed Postgres) | $70 to $80 | ₹6,200 to ₹7,000 | Yes | Medium | 🧮 |
@@ -190,7 +191,27 @@ Other official facts ✅:
 - **Free weekly backups**, restorable from the dashboard. I found no price for daily backups, so do daily database backups yourself with Coolify (section 8).
 - **30-day money-back guarantee.**
 - ⚠️ Hostinger's limits page says VPS **CPU use can drop to 20% of your share when "CPU credits" run out**. Normal PostGear use is light, but many SEO audits in a row (Chromium) could hit this. KVM 2 also has 2 cores where Hetzner's CX33 has 4.
-- I could not find a month-to-month price for VPS plans. ❓ The cart may offer 1-month or 12-month terms at a higher monthly price.
+- **A 1-month plan exists** (confirmed in a real cart on 2026-11-14, see the table below).
+
+**The real 1-month cart for KVM 2 (seen in India, 2026-11-14)** ✅
+
+| Line in the cart | Amount |
+|---|---|
+| KVM 2 plan, 1-month period (crossed out price ₹2,099) | ₹1,299 |
+| Free domain for 1 year (normally ₹6,199) | ₹0 |
+| Domain privacy protection | ₹0 |
+| Taxes (18% GST) | ₹233.82 |
+| **Total to pay today** | **₹1,532.82** |
+| Optional "Daily auto-backup" (not ticked by default) | +₹589 per month |
+| Renewal after 1 month | **₹2,099 per month** (plus GST), "cancel anytime" |
+
+What this means:
+- **Prices exclude GST.** The 18% tax is added at checkout, so the 24-month price from the earlier table would also get 18% on top.
+- **It is a fixed price, not pay-per-use.** Using the server a lot or a little costs the same. There are no credits to top up, and you are not billed for CPU, RAM or traffic (8 TB of bandwidth is included).
+- **Auto-renew is the only surprise to watch.** If you forget to switch it off, the next month is ₹2,099 plus GST (about ₹2,477), not ₹1,299.
+- **Daily auto-backup (₹589 a month) is optional.** Skip it. Coolify can do daily Postgres backups to Cloudflare R2 for free.
+- The cart also gives a **free domain for 1 year**. You already own `rkay.in`, so you do not need it.
+- The **30-day money-back guarantee** is shown in the cart. Read Hostinger's refund terms before relying on it.
 
 **Which size for PostGear:** **KVM 2 (8 GB)** is the right fit (section 3 says 8 GB gives room to spare). KVM 1 (4 GB) works only with the SEO browser off. KVM 4 (16 GB) is for production later or if you want staging and production on separate servers that both fit comfortably.
 
@@ -318,6 +339,8 @@ Either way you still need Railway, a VPS or similar for api, worker, Temporal, P
 | Domain `rkay.in` | already owned | already owned | already owned |
 | **Total per month** | **about $45 to $60 (₹4,000 to ₹5,300)** | **about $22 to $30 (₹1,900 to ₹2,600)** | **about $19 to $24 (₹1,700 to ₹2,100)** |
 | Paid upfront | nothing | nothing | ₹18,696 (plus GST if charged) |
+
+**Hostinger on a 1-month plan instead:** the hosting line becomes **₹1,533 once** (₹1,299 plus GST, real cart), which is about $17.40. Month one total is then about ₹1,533 plus whatever you spend on OpenAI and X credits (₹0 if you skip real calls). Nothing is charged again unless auto-renew stays on (₹2,099 plus GST).
 
 ---
 
@@ -485,7 +508,10 @@ This is the same recipe as Hetzner (section 7). Only the buying and server setup
 ### 8.1 Buy The Right Product
 1. Go to Hostinger's **VPS Hosting** page (hostinger.in for rupee prices). **Not** "Web Hosting" and **not** "Cloud Hosting": those cannot run PostGear (section 4.2).
 2. Pick **KVM 2** (2 vCPU, 8 GB RAM, 100 GB NVMe).
-3. In the cart, choose the term. **24 months** gives ₹779 per month (₹18,696 upfront). Shorter terms cost more per month ❓. Check whether GST is added at checkout.
+3. In the cart, choose the term:
+   - **1 month:** ₹1,299, plus 18% GST = **₹1,532.82 total** (seen in a real cart). It renews at ₹2,099 per month, so **turn off auto-renew** if you only want one month. Best for a short demo.
+   - **24 months:** ₹779 per month, ₹18,696 upfront, plus GST. Best only once the product is real.
+   - Leave the optional "Daily auto-backup" (₹589 per month) **unticked**.
 4. Pay. Note the date: you have a **30-day money-back guarantee** if it does not work out.
 
 ### 8.2 Set Up The Server In hPanel
