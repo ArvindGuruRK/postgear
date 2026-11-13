@@ -273,6 +273,25 @@ describe('retries and failures', () => {
     await expect(service.sendPlain('a@b.c\r\nBcc: x@y.z', 'Hi', ['x'])).resolves.toBe(false);
     expect(transport.signals).toHaveLength(0);
   });
+
+  it('never hands a reserved test domain to a real transport', async () => {
+    const { service, transport } = harness();
+
+    await expect(service.sendPlain('demo@postgear.local', 'Hi', ['x'])).resolves.toBe(false);
+    await expect(service.sendPlain('qa@site.test', 'Hi', ['x'])).resolves.toBe(false);
+    await service.sendPasswordReset('member@postgear.local', 'reset-token');
+    await settle();
+
+    expect(transport.signals).toHaveLength(0);
+    expect(logs.join('\n')).toContain('mail.reserved_domain');
+  });
+
+  it('still prints mail for reserved domains with the console transport', async () => {
+    const service = new MailService(config({ NODE_ENV: 'development' }));
+
+    await expect(service.sendPlain('demo@postgear.local', 'Hi', ['x'])).resolves.toBe(true);
+    expect(logs.join('\n')).not.toContain('mail.reserved_domain');
+  });
 });
 
 describe('suppression', () => {

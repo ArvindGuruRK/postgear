@@ -24,10 +24,9 @@ const GENERATORS: Record<string, () => string> = {
   // The worker's key to the API's step gateway (Sprint 10): both env schemas
   // check 64 hex characters.
   AUTOMATION_INTERNAL_TOKEN: () => randomBytes(32).toString('hex'),
-  // base64 rather than hex for the JWT/NextAuth secrets: they are opaque
-  // strings with no length contract, and base64 packs more entropy per char.
+  // base64 rather than hex for the JWT secret: an opaque string with no length
+  // contract, and base64 packs more entropy per char.
   JWT_SECRET: () => randomBytes(48).toString('base64'),
-  NEXTAUTH_SECRET: () => randomBytes(48).toString('base64'),
 };
 
 function generate(): Record<string, string> {

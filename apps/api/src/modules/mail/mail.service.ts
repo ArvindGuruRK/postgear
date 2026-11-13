@@ -91,6 +91,14 @@ export const MAIL_RETRY = {
 
 const ADDRESS = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
 
+/**
+ * Domains that can never receive mail (RFC 2606, 6761 and 6762), such as the
+ * seeded `@postgear.local` accounts. A real transport would only turn them
+ * into hard bounces, which count against the sending domain's reputation, so
+ * they are skipped unless the mail is just being printed to the console.
+ */
+const RESERVED_DOMAIN = /\.(?:local|localhost|test|invalid|example)$/i;
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -323,6 +331,11 @@ export class MailService {
 
     if (!ADDRESS.test(to) || to.length > 254) {
       this.logger.warn(JSON.stringify({ event: 'mail.invalid_address', ...base }));
+      return false;
+    }
+
+    if (this.transport.name !== 'console' && RESERVED_DOMAIN.test(to)) {
+      this.logger.warn(JSON.stringify({ event: 'mail.reserved_domain', ...base }));
       return false;
     }
 

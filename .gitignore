@@ -59,3 +59,5 @@ test-results/
 .playwright-mcp/
 # Local design reference (a 24 MB PDF), kept on disk but out of the repo
 docs/pdf-inspiration-or-editing/
+# The security review names weak spots; the repo is public, so it stays local
+docs/launch-readiness/04-security-review.md

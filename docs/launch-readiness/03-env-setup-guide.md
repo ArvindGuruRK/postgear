@@ -40,7 +40,7 @@ The repo has a helper. It prints new values; it does not need a `.env` unless yo
 npm run generate:keys
 ```
 
-It prints `ENCRYPTION_KEY_AES256` (64 hex), `AUTOMATION_INTERNAL_TOKEN` (64 hex), `JWT_SECRET` (base64) and `NEXTAUTH_SECRET` (dead variable, ignore). **Run it separately for staging and keep the printed output out of the repo.** Alternative without the repo:
+It prints `ENCRYPTION_KEY_AES256` (64 hex), `AUTOMATION_INTERNAL_TOKEN` (64 hex), and `JWT_SECRET` (base64). **Run it separately for staging and keep the printed output out of the repo.** Alternative without the repo:
 
 ```bash
 openssl rand -hex 32      # ENCRYPTION_KEY_AES256 and AUTOMATION_INTERNAL_TOKEN (run twice)
@@ -100,7 +100,7 @@ Railway lets you define **shared variables** once per environment and reference 
 
 **Build-time variables.** `NEXT_PUBLIC_*` values are baked into the web bundle at build time. Changing them needs a rebuild. In Railway, add them as service variables and mark them to be available at build.
 
-**Dead variables to ignore:** `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `GITHUB_CLIENT_*`.
+**Removed variables:** `NEXTAUTH_SECRET`, `NEXTAUTH_URL` and `GITHUB_CLIENT_*` were never read and are gone from `.env.example`; delete them from any older `.env`.
 
 ---
 
@@ -175,14 +175,14 @@ See [02 Plan, section 6](02-four-day-staging-plan.md). The three values: `STRIPE
 1. console.cloud.google.com, create project `PostGear Staging`.
 2. Google Auth Platform: configure consent screen, **External**, status **Testing**. Add your Google accounts under Test users. Privacy policy and terms URLs go here once published.
 3. Clients, Create OAuth client, type Web application. Authorised redirect URIs:
-   - `https://api.postgear-staging.rkay.in/auth/google/callback` (confirm the exact login callback path in the code before saving)
+   - `https://api.postgear-staging.rkay.in/auth/oauth/google/callback` (locally `http://localhost:3001/auth/oauth/google/callback`)
    - `https://api.postgear-staging.rkay.in/channels/connect/youtube/callback`
    (Use two separate clients if you want to keep login and YouTube apart. The env has separate variables: `GOOGLE_CLIENT_*` for login, `YOUTUBE_CLIENT_*` for YouTube.)
 4. Enable the **YouTube Data API v3** in the library.
 5. Login-only scopes (openid, email, profile) never expire in testing mode. YouTube upload authorisations expire every 7 days in testing mode: reconnect before the demo.
 
 ### 5.8 Facebook Login (Sign In)
-Separate small Meta app of type Consumer/Other with Facebook Login, scopes email and public_profile only. Callback `https://api.postgear-staging.rkay.in/auth/facebook/callback` (confirm path in code). Variables `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`. Do not reuse the publishing app.
+Separate small Meta app of type Consumer/Other with Facebook Login, scopes email and public_profile only. Callback `https://api.postgear-staging.rkay.in/auth/oauth/facebook/callback` (locally `http://localhost:3001/auth/oauth/facebook/callback`). Variables `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`. Do not reuse the publishing app.
 
 ---
 
