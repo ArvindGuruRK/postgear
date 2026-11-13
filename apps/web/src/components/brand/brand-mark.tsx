@@ -98,17 +98,20 @@ export function BrandWordmark({ className, label }: { className?: string; label?
  * wherever "PostGear" is shown as a name; sentences (descriptions, errors,
  * toasts) and plain strings (tab titles, metadata) keep the typed word.
  *
- * It sizes itself from the surrounding text, so it needs no size of its own:
- * the letters stand as tall as the text's capitals (Sora's are about 0.72 em,
- * and the outline's capitals are 773 of its 817 units), sit on the same
- * baseline, and take the text's colour. The real word sits beside it for
- * screen readers, find in page and copying, and the two never wrap apart.
+ * It sizes itself from the surrounding text, so it needs no size of its own.
+ * The letters stand a step taller than the text's capitals so the name reads
+ * as the logo (0.95 em box, so capitals of about 0.9 em against Sora's 0.72;
+ * the outline's capitals are 773 of its 817 units), keep the text's baseline
+ * (the box reaches 44 units below it, hence the 0.05 em drop), take the text's
+ * colour, and stand a little apart from the word before them (2026-11-13, the
+ * owner's ask). The real word sits beside it for screen readers, find in page
+ * and copying, and the two never wrap apart.
  */
 export function BrandName({ className }: { className?: string }) {
   return (
-    <span className={cn('inline-block whitespace-nowrap', className)}>
+    <span className={cn('ml-[0.12em] inline-block whitespace-nowrap', className)}>
       <span className="sr-only">PostGear</span>
-      <BrandWordmark className="inline-block h-[0.76em] align-[-0.04em]" />
+      <BrandWordmark className="inline-block h-[0.95em] align-[-0.05em]" />
     </span>
   );
 }

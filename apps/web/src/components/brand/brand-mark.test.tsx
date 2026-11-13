@@ -52,7 +52,7 @@ describe('BrandName', () => {
     const { container } = render(<BrandName />);
     const svg = container.querySelector('svg');
     expect(svg?.getAttribute('aria-hidden')).toBe('true');
-    expect(svg?.getAttribute('class')).toContain('h-[0.76em]');
+    expect(svg?.getAttribute('class')).toContain('h-[0.95em]');
     expect(svg?.getAttribute('class')).toContain('fill-current');
     expect(container.textContent).toBe('PostGear');
     expect(container.querySelector('.sr-only')?.textContent).toBe('PostGear');
