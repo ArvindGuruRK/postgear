@@ -76,6 +76,7 @@ MCP servers (`.mcp.json`): the Postgres MCP was removed because every session le
 
 - Rules for consuming design tokens live in `docs/design-patterns/design-system-rules.md`. One font (Sora) via role utilities (`type-heading`, `type-ui`, `type-label`) defined in `apps/web/src/app/globals.css`; never hand-write weight/tracking to fake a role.
 - Names are Title Case, every word ("Create Post", "Connect A Channel", "From The Blog"): headings, card/dialog titles, buttons, tabs, menu items, table headers, badges. Sentences stay sentence case (descriptions, explaining tooltips, banners, errors, toasts, empty-state messages, form labels). No all-caps text: `type-label` and `Badge` no longer uppercase. Write the real text (never CSS `capitalize`); `apps/web/src/lib/title-case.test.ts` enforces it.
+- The product name in a heading, button or brand line is `<BrandName />` (`components/brand/brand-mark.tsx`): the wordmark's own lettering, sized from the surrounding text. Never type "PostGear" in a font to fake it. Sentences (descriptions, errors, toasts) and plain strings (tab titles, metadata) keep the typed word.
 - No in-page titles, taglines or decorative dividers: the top bar names the page. Pages open with a `PageActions` row, then content.
 - Clickable icons use animated icons (`@animateicons/react` via `MotionIcon`); purely decorative/state icons stay lucide. One exception: a navigation menu's values show a plain lucide icon beside the name.
 - Input placeholders read "Enter your ...", never sample values.

@@ -3,7 +3,7 @@
  * naming the product, and the mark draws the gear plus both letters.
  */
 import { render, screen } from '@testing-library/react';
-import { BrandMark, BrandTile, BrandWordmark } from './brand-mark';
+import { BrandMark, BrandName, BrandTile, BrandWordmark } from './brand-mark';
 import { BRAND_MARK, BRAND_TILE_LETTERS } from './brand-paths';
 
 // The design-system barrel pulls in animated-icon subpaths this jest setup
@@ -44,6 +44,24 @@ describe('BrandWordmark', () => {
   it('is announced as an image when given a label', () => {
     render(<BrandWordmark label="PostGear" />);
     expect(screen.getByRole('img', { name: 'PostGear' })).toBeTruthy();
+  });
+});
+
+describe('BrandName', () => {
+  it('draws the wordmark sized from the text, with the real word for screen readers', () => {
+    const { container } = render(<BrandName />);
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(svg?.getAttribute('class')).toContain('h-[0.76em]');
+    expect(svg?.getAttribute('class')).toContain('fill-current');
+    expect(container.textContent).toBe('PostGear');
+    expect(container.querySelector('.sr-only')?.textContent).toBe('PostGear');
+  });
+
+  it('never wraps the name apart from itself', () => {
+    const { container } = render(<BrandName className="ml-1" />);
+    expect(container.firstElementChild?.getAttribute('class')).toContain('whitespace-nowrap');
+    expect(container.firstElementChild?.getAttribute('class')).toContain('ml-1');
   });
 });
 

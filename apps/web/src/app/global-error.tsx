@@ -2,6 +2,7 @@
 
 import { Button, Card, CardContent, Container, ErrorState } from '@postgear/ui';
 import { TriangleAlert } from 'lucide-react';
+import { BrandName } from '@/components/brand/brand-mark';
 import { NO_FLASH_APPEARANCE_SCRIPT } from '@/lib/appearance';
 import { brandFont } from './fonts';
 import './globals.css';
@@ -43,7 +44,11 @@ export default function GlobalError({
                 className="py-8"
               />
               <div className="flex justify-center pb-8">
-                <Button onClick={reset}>Reload PostGear</Button>
+                <Button onClick={reset}>
+                  <span>
+                    Reload <BrandName />
+                  </span>
+                </Button>
               </div>
               {error.digest ? (
                 <p className="pb-6 text-center font-sans text-xs text-ink opacity-60">

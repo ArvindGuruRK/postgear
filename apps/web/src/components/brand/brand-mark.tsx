@@ -93,6 +93,27 @@ export function BrandWordmark({ className, label }: { className?: string; label?
 }
 
 /**
+ * The product's name inside a heading, button or brand line, drawn in the
+ * wordmark's own lettering (2026-11-13) instead of the text font. Use it
+ * wherever "PostGear" is shown as a name; sentences (descriptions, errors,
+ * toasts) and plain strings (tab titles, metadata) keep the typed word.
+ *
+ * It sizes itself from the surrounding text, so it needs no size of its own:
+ * the letters stand as tall as the text's capitals (Sora's are about 0.72 em,
+ * and the outline's capitals are 773 of its 817 units), sit on the same
+ * baseline, and take the text's colour. The real word sits beside it for
+ * screen readers, find in page and copying, and the two never wrap apart.
+ */
+export function BrandName({ className }: { className?: string }) {
+  return (
+    <span className={cn('inline-block whitespace-nowrap', className)}>
+      <span className="sr-only">PostGear</span>
+      <BrandWordmark className="inline-block h-[0.76em] align-[-0.04em]" />
+    </span>
+  );
+}
+
+/**
  * The sidebar's tile (2026-11-05): the rail's old "P" tile, as it stood until
  * 2026-10-27, now holding "PG" in Luckiest Guy. The sidebar is the only place
  * it appears; the gear (`BrandMark`) stays the logo everywhere else.

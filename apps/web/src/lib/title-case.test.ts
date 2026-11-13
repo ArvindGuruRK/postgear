@@ -253,8 +253,11 @@ function readChildren(children: ts.NodeArray<ts.JsxChild>, sourceFile: ts.Source
       parts.push(expressionChoices(child.expression, sourceFile));
     } else if (ts.isJsxElement(child) || ts.isJsxFragment(child)) {
       parts.push(readChildren(child.children, sourceFile));
+    } else if (ts.isJsxSelfClosingElement(child) && tagName(child) === 'BrandName') {
+      // The product's name drawn in the wordmark's lettering still reads as it.
+      parts.push(['PostGear']);
     }
-    // A self-closing child (an icon) shows no text.
+    // Any other self-closing child (an icon) shows no text.
   }
 
   return combine(parts);

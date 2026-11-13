@@ -1,6 +1,7 @@
 import { buttonVariants, cn, Heading, Stack, Text } from '@postgear/ui';
 import type { Metadata } from 'next';
 import NextLink from 'next/link';
+import { BrandName } from '@/components/brand/brand-mark';
 import { roleWithArticle } from '@/components/settings/team-view-model';
 import { ApiError, serverApi } from '@/lib/api';
 import { getSession, getSessionCookieHeader } from '@/lib/session';
@@ -49,7 +50,13 @@ export default async function InvitePage({ params }: PageProps<'/invite/[token]'
           href={session ? '/' : '/login'}
           className={cn(buttonVariants({ variant: 'secondary', size: 'lg' }), 'w-full')}
         >
-          {session ? 'Go to PostGear' : 'Login'}
+          {session ? (
+            <span>
+              Go To <BrandName />
+            </span>
+          ) : (
+            'Login'
+          )}
         </NextLink>
       </Stack>
     );

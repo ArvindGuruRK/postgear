@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { BrandMark } from '@/components/brand/brand-mark';
+import { BrandMark, BrandName } from '@/components/brand/brand-mark';
 import { type ShareProblem, shareProblem } from '@/components/studio/preview-model';
 import {
   SharedDesignFailure,
@@ -82,7 +82,9 @@ export default async function SharedDesignPage({ params }: PageProps<'/share/des
         <ShareExpiry expiresAt={view.expiresAt} />
         <p className="m-0 flex items-center gap-2">
           <BrandMark className="h-5 w-5" />
-          Made with PostGear
+          <span>
+            Made with <BrandName />
+          </span>
         </p>
       </footer>
     </main>

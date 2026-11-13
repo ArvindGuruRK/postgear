@@ -17,6 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { Ref } from 'react';
+import { BrandName } from '@/components/brand/brand-mark';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { OnboardingHeader } from './onboarding-chrome';
 
@@ -186,7 +187,9 @@ export function WelcomeScreen({
                 </picture>
               </span>
             </span>
-            <span>Welcome To PostGear</span>
+            <span>
+              Welcome To <BrandName />
+            </span>
           </h1>
 
           <Button size="lg" onClick={onStart}>
