@@ -88,7 +88,7 @@ export function createAnalyticsSource(
 const DIRECTIVE = /\[simulate:analytics:(401|403|429)\]/i;
 
 /** Platforms whose content is watched rather than read, and so report views. */
-const VIDEO_PLATFORMS = new Set(['youtube', 'tiktok', 'instagram']);
+const VIDEO_PLATFORMS = new Set(['youtube', 'tiktok', 'instagram', 'instagram-standalone']);
 
 /** Sunday first. Business accounts are quiet at the weekend. */
 const WEEKDAY_SHAPE = [0.6, 1.0, 1.1, 1.15, 1.1, 1.0, 0.7];

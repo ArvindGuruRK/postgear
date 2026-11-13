@@ -6,7 +6,8 @@
  *
  * Keyed by provider identifier, the same value stored in
  * `Integration.providerIdentifier`. LinkedIn profiles and LinkedIn Pages are
- * two providers that look identical in the feed, so they share one preview.
+ * two providers that look identical in the feed, so they share one preview, as
+ * do the two ways of connecting Instagram.
  */
 import type { ProviderRules } from '@postgear/social-core/composer';
 import { Text } from '@postgear/ui';
@@ -17,6 +18,7 @@ import { InstagramPreview } from './instagram.preview';
 import { LinkedInPreview } from './linkedin.preview';
 import { PinterestPreview } from './pinterest.preview';
 import type { PlatformPreviewProps, PreviewChannel, PreviewPart } from './preview-parts';
+import { ThreadsPreview } from './threads.preview';
 import { TikTokPreview } from './tiktok.preview';
 import { XPreview } from './x.preview';
 import { YouTubePreview } from './youtube.preview';
@@ -26,7 +28,9 @@ const PREVIEWS: Record<string, ComponentType<PlatformPreviewProps>> = {
   linkedin: LinkedInPreview,
   'linkedin-page': LinkedInPreview,
   facebook: FacebookPreview,
+  'instagram-standalone': InstagramPreview,
   instagram: InstagramPreview,
+  threads: ThreadsPreview,
   youtube: YouTubePreview,
   tiktok: TikTokPreview,
   pinterest: PinterestPreview,

@@ -5,7 +5,14 @@
  * input. Where PostGear's implementation deliberately differs, the test says
  * so and asserts the difference is an over-count: the safe direction.
  */
-import { measureLength, overflowIndex, utf16Length, X_URL_LENGTH, xWeightedLength } from './length';
+import {
+  measureLength,
+  overflowIndex,
+  threadsLength,
+  utf16Length,
+  X_URL_LENGTH,
+  xWeightedLength,
+} from './length';
 import { styleText } from './unicode';
 
 describe('xWeightedLength', () => {
@@ -104,5 +111,42 @@ describe('measureLength', () => {
   it('dispatches on the method', () => {
     expect(measureLength('日本', 'utf16')).toBe(2);
     expect(measureLength('日本', 'x-weighted')).toBe(4);
+    expect(measureLength('日本', 'threads')).toBe(2);
+  });
+});
+
+describe('threadsLength', () => {
+  it('counts plain text as it is written', () => {
+    expect(threadsLength('Hello, Threads')).toBe(14);
+  });
+
+  it('counts an emoji as its UTF-8 bytes, as Threads does', () => {
+    expect(threadsLength('😀')).toBe(4);
+    // Thumbs up plus a skin tone: two code points of four bytes each.
+    expect(threadsLength('👍🏽')).toBe(8);
+    // A heart drawn as an emoji: the heart (3 bytes) and its selector (3 bytes).
+    expect(threadsLength('❤️')).toBe(6);
+    // A flag is two regional letters of four bytes each.
+    expect(threadsLength('🇮🇳')).toBe(8);
+    // A keycap: the digit (1), its selector (3) and the keycap itself (3).
+    expect(threadsLength(String.fromCodePoint(0x31, 0xfe0f, 0x20e3))).toBe(7);
+    // England: a black flag (4), five tag letters and the closing tag (4 each).
+    expect(
+      threadsLength(
+        String.fromCodePoint(0x1f3f4, 0xe0067, 0xe0062, 0xe0065, 0xe006e, 0xe0067, 0xe007f),
+      ),
+    ).toBe(28);
+  });
+
+  it('never counts lower than the UTF-16 length', () => {
+    for (const sample of [
+      'abc',
+      '日本語',
+      '😀 ok',
+      styleText('bold', { bold: true }),
+      '👨‍👩‍👧‍👦',
+    ]) {
+      expect(threadsLength(sample)).toBeGreaterThanOrEqual(utf16Length(sample));
+    }
   });
 });

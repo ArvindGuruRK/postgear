@@ -10,21 +10,24 @@
  * - `local`: `<API_URL>/uploads/<key>`, served by the API's static route.
  * - `s3`:    `<S3_PUBLIC_URL>/<key>`.
  *
- * Platforms that fetch media themselves (Instagram, Facebook, Pinterest,
- * TikTok) receive these URLs, so for them the local backend only works behind
- * a tunnel: see docs/social-platform-setup.md.
+ * Platforms that fetch media themselves (Instagram, Threads, Facebook,
+ * Pinterest, TikTok) receive these URLs, so for them the local backend only
+ * works behind a tunnel. `CHANNELS_PUBLIC_URL` is that tunnel: when set, local
+ * media is addressed through it instead of `API_URL`, and the browser (which
+ * gets its URLs from the API) is unaffected. See docs/social-platform-setup.md.
  */
 import type { WorkerEnv } from '../config/env';
 
 const KEY_PATTERN = /^\d{4}\/\d{2}\/[0-9a-f]{32}(?:\.thumb)?\.(?:jpg|png|gif|webp|mp4|mov)$/;
 
-export type MediaUrlConfig = Pick<WorkerEnv, 'STORAGE_PROVIDER' | 'API_URL' | 'S3_PUBLIC_URL'>;
+export type MediaUrlConfig = Pick<WorkerEnv, 'STORAGE_PROVIDER' | 'API_URL' | 'S3_PUBLIC_URL'> &
+  Partial<Pick<WorkerEnv, 'CHANNELS_PUBLIC_URL'>>;
 
 export function mediaUrlBuilder(config: MediaUrlConfig): (key: string) => string {
   const base =
     config.STORAGE_PROVIDER === 's3'
       ? `${(config.S3_PUBLIC_URL ?? '').replace(/\/+$/, '')}/`
-      : `${config.API_URL.replace(/\/+$/, '')}/uploads/`;
+      : `${(config.CHANNELS_PUBLIC_URL ?? config.API_URL).replace(/\/+$/, '')}/uploads/`;
 
   return (key: string) => {
     if (!KEY_PATTERN.test(key)) {

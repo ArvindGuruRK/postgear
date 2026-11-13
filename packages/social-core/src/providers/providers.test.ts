@@ -287,7 +287,7 @@ describe('post validation', () => {
 });
 
 describe('IntegrationManager', () => {
-  it('registers all eight channel types under stable identifiers', () => {
+  it('registers all ten channel types under stable identifiers', () => {
     const identifiers = new IntegrationManager().list().map((p) => p.identifier);
 
     expect(identifiers).toEqual(
@@ -296,7 +296,9 @@ describe('IntegrationManager', () => {
         'linkedin',
         'linkedin-page',
         'facebook',
+        'instagram-standalone',
         'instagram',
+        'threads',
         'youtube',
         'tiktok',
         'pinterest',

@@ -33,7 +33,9 @@ const ACCOUNT_KIND: Record<string, string> = {
   linkedin: 'Profile',
   'linkedin-page': 'Company Page',
   facebook: 'Page',
+  'instagram-standalone': 'Business Or Creator',
   instagram: 'Business Or Creator',
+  threads: 'Profile',
   youtube: 'Channel',
   tiktok: 'Business Or Personal',
   pinterest: 'Profile',
@@ -44,8 +46,10 @@ const ACCOUNT_KIND: Record<string, string> = {
  * at the top. A provider not listed here goes after these, in API order.
  */
 const POPULARITY = [
+  'instagram-standalone',
   'instagram',
   'facebook',
+  'threads',
   'x',
   'linkedin',
   'linkedin-page',

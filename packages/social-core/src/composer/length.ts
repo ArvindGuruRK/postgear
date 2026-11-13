@@ -13,10 +13,72 @@
  * reproduced, the estimate errs high.
  */
 
-export type LengthMethod = 'utf16' | 'x-weighted';
+export type LengthMethod = 'utf16' | 'x-weighted' | 'threads';
 
 export function measureLength(text: string, method: LengthMethod): number {
-  return method === 'x-weighted' ? xWeightedLength(text) : utf16Length(text);
+  switch (method) {
+    case 'x-weighted':
+      return xWeightedLength(text);
+    case 'threads':
+      return threadsLength(text);
+    default:
+      return utf16Length(text);
+  }
+}
+
+/**
+ * The pieces of an emoji: the pictographs themselves, skin tones, the flag
+ * letters, and the joiner, variation selector, keycap and tag letters that
+ * glue a sequence together.
+ */
+const PICTOGRAPH = /\p{Extended_Pictographic}/u;
+
+function isEmojiPart(character: string): boolean {
+  const code = character.codePointAt(0) ?? 0;
+
+  return (
+    PICTOGRAPH.test(character) ||
+    // Skin tones.
+    (code >= 0x1f3fb && code <= 0x1f3ff) ||
+    // The regional letters a flag is spelled with.
+    (code >= 0x1f1e6 && code <= 0x1f1ff) ||
+    // The joiner and the variation selector.
+    code === 0x200d ||
+    code === 0xfe0f ||
+    // The keycap that turns a digit into a button.
+    code === 0x20e3 ||
+    // The tag letters a regional flag (England, Scotland, Wales) is spelled with.
+    (code >= 0xe0020 && code <= 0xe007f)
+  );
+}
+
+/** How many bytes one code point takes in UTF-8. Arithmetic, so it runs anywhere. */
+function utf8Bytes(character: string): number {
+  const code = character.codePointAt(0) ?? 0;
+
+  if (code < 0x80) return 1;
+  if (code < 0x800) return 2;
+  if (code < 0x10000) return 3;
+  return 4;
+}
+
+/**
+ * Threads: 500 characters, except that "emojis are counted as the number of
+ * UTF-8 bytes" (Meta's Threads API overview). So a plain smiley costs 4 and a
+ * family joined from four people costs 25.
+ *
+ * Everything that is not part of an emoji counts as UTF-16 units, the same
+ * conservative reading `utf16Length` gives every other platform, so this count
+ * is never lower than that one.
+ */
+export function threadsLength(text: string): number {
+  let length = 0;
+
+  for (const character of text) {
+    length += isEmojiPart(character) ? utf8Bytes(character) : character.length;
+  }
+
+  return length;
 }
 
 /**

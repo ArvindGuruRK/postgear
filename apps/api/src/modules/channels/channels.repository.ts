@@ -543,6 +543,19 @@ export class ChannelsRepository {
    * instead. The rename must not happen on delete: keeping `internalId` intact
    * there is exactly what lets a reconnect resurrect the original row.
    */
+  /**
+   * Frees a platform id held only by a disconnected row, so the same account
+   * can be connected afresh through a different provider. The dead row keeps
+   * everything else (its posts stay attached to it); it just stops answering
+   * to that id, and the new connection gets a row of its own.
+   */
+  async releaseDisconnected(orgId: string, internalId: string): Promise<void> {
+    await prisma.integration.updateMany({
+      where: { organizationId: orgId, internalId, deletedAt: { not: null } },
+      data: { internalId: `deleted_${internalId}_${randomBytes(6).toString('hex')}` },
+    });
+  }
+
   private async vacateInternalId(
     tx: PrismaTransactionClient,
     orgId: string,

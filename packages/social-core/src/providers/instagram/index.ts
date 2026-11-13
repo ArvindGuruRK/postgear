@@ -1,10 +1,12 @@
 /**
- * Instagram Business: publishing via the Meta Graph API.
+ * Instagram Via Facebook Page: publishing through the Facebook Graph API.
  *
  * ## Instagram is reached through Facebook
  *
- * There is no standalone Instagram publishing API for business accounts. An IG
- * Business account must be linked to a Facebook Page, and it is that Page's
+ * This is the older of PostGear's two Instagram doors (the other, with no
+ * Page, is `instagram-standalone`). It is kept because Discover's competitor
+ * tracking reads other accounts through it, which only this API allows. Here an
+ * Instagram account must be linked to a Facebook Page, and it is that Page's
  * token which authorises publishing. So the entity list here is "the Instagram
  * accounts behind the Pages you administer": pages without a linked IG account
  * simply do not appear, which is the single most common reason a user sees an
@@ -16,66 +18,28 @@
  * for video the container is processed asynchronously: publishing too early is
  * rejected. Hence the poll between the two steps.
  */
-import {
-  asCount,
-  clampDays,
-  DAY_MS,
-  dayKey,
-  type MetricEntry,
-  sumByDay,
-  todayKey,
-  utcMidnight,
-  windowStart,
-} from '../../abstract/analytics';
 import { BadBodyError, RetryableError } from '../../abstract/errors';
 import { sleep } from '../../abstract/social.abstract';
-import {
-  type AuthenticateParams,
-  type AuthTokenDetails,
-  type ChannelContext,
-  type ChannelMetricPoint,
-  EMPTY_POST_METRICS,
-  type PostDetails,
-  type PostMetrics,
-  type PostResponse,
-  type ProviderEntity,
-  type SocialAnalytics,
-  type SocialProvider,
-  type SupportsEntitySelection,
+import type {
+  AuthenticateParams,
+  AuthTokenDetails,
+  ChannelContext,
+  ChannelMetricPoint,
+  PostDetails,
+  PostMetrics,
+  PostResponse,
+  ProviderEntity,
+  SocialAnalytics,
+  SocialProvider,
+  SupportsEntitySelection,
 } from '../../abstract/social.provider.interface';
 import { checkAgainstRules } from '../../abstract/validity';
 import type { ProviderRules } from '../../composer/rules';
-import {
-  GRAPH_BASE,
-  type GraphInsight,
-  graphInsightEntries,
-  isGraphMissingObject,
-  MetaGraphProvider,
-} from '../meta/meta.graph';
+import { instagramChannelAnalytics, instagramPostAnalytics } from '../meta/instagram.insights';
+import { GRAPH_BASE, MetaGraphProvider } from '../meta/meta.graph';
 
 const MAX_LENGTH = 2_200;
 const MAX_CAROUSEL_ITEMS = 10;
-
-/**
- * Instagram reports interactions (`likes`, `comments`, `shares`, `saves`) as
- * one total over the requested span: `metric_type=total_value` is the only
- * form those metrics support. A per-day series therefore takes one call per
- * day. Rather than ninety calls a sync, each sync reads today and the two
- * days before it, and the daily cadence fills the window over time: a day
- * is written once, as its own total, and overwritten if a later read revises
- * it. The three-day overlap is what survives a missed sync.
- */
-const TOTAL_VALUE_BACKFILL_DAYS = 3;
-
-/** Media insight names → post counters. `reach` is the closest Instagram has to impressions. */
-const MEDIA_INSIGHTS: Record<string, keyof PostMetrics> = {
-  likes: 'likes',
-  comments: 'comments',
-  shares: 'shares',
-  saved: 'saves',
-  views: 'views',
-  reach: 'impressions',
-};
 
 /**
  * What Instagram's Content Publishing API accepts.
@@ -127,7 +91,7 @@ export class InstagramProvider
   implements SocialProvider, SupportsEntitySelection, SocialAnalytics
 {
   readonly identifier = 'instagram';
-  readonly name = 'Instagram';
+  readonly name = 'Instagram Via Facebook Page';
 
   readonly scopes = [
     'instagram_basic',
@@ -255,67 +219,19 @@ export class InstagramProvider
     return results;
   }
 
-  /**
-   * The account's follower level, daily reach, and its interactions for the
-   * last few days: see `TOTAL_VALUE_BACKFILL_DAYS` for why only a few.
-   *
-   * The level is the account's `followers_count` field. The `follower_count`
-   * *insight* is new followers per day (a flow), and is withheld for accounts
-   * under a hundred followers, so it is not what a level chart needs.
-   */
+  /** The account's follower level, daily reach and recent interactions. */
   async channelAnalytics(
     channel: ChannelContext,
     accessToken: string,
     days: number,
   ): Promise<ChannelMetricPoint[]> {
-    const base = `${GRAPH_BASE}/${encodeURIComponent(channel.internalId)}`;
-    const window = clampDays(days);
-    const now = Date.now();
-    const entries: MetricEntry[] = [];
-
-    const account = await this.fetchJson<{ followers_count?: number }>(
-      `${base}?${new URLSearchParams({ fields: 'followers_count', access_token: accessToken })}`,
+    return instagramChannelAnalytics(
+      (url) => this.fetchJson(url),
+      GRAPH_BASE,
+      channel.internalId,
+      accessToken,
+      days,
     );
-
-    if (account.followers_count !== undefined) {
-      entries.push({
-        metric: 'followers',
-        date: todayKey(now),
-        value: asCount(account.followers_count),
-      });
-    }
-
-    const daily = await this.fetchJson<{ data?: GraphInsight[] }>(
-      `${base}/insights?${new URLSearchParams({
-        metric: 'reach',
-        period: 'day',
-        since: String(Math.floor(windowStart(window, now).getTime() / 1_000)),
-        until: String(Math.floor(now / 1_000)),
-        access_token: accessToken,
-      })}`,
-    );
-
-    entries.push(...graphInsightEntries(daily.data ?? [], { reach: 'reach' }));
-
-    for (let back = 0; back < Math.min(window, TOTAL_VALUE_BACKFILL_DAYS); back += 1) {
-      const dayStart = utcMidnight(now - back * DAY_MS).getTime();
-      const dayEnd = Math.min(dayStart + DAY_MS - 1_000, now);
-
-      const totals = await this.fetchJson<{ data?: GraphInsight[] }>(
-        `${base}/insights?${new URLSearchParams({
-          metric: 'likes,comments,shares,saves,views',
-          metric_type: 'total_value',
-          period: 'day',
-          since: String(Math.floor(dayStart / 1_000)),
-          until: String(Math.floor(dayEnd / 1_000)),
-          access_token: accessToken,
-        })}`,
-      );
-
-      entries.push(...this.totalValueEntries(totals.data ?? [], dayKey(dayStart)));
-    }
-
-    return sumByDay(entries);
   }
 
   /** One media item's lifetime insights. */
@@ -324,71 +240,12 @@ export class InstagramProvider
     accessToken: string,
     platformPostId: string,
   ): Promise<PostMetrics | null> {
-    try {
-      const response = await this.fetchJson<{ data?: GraphInsight[] }>(
-        `${GRAPH_BASE}/${encodeURIComponent(platformPostId)}/insights?${new URLSearchParams({
-          metric: Object.keys(MEDIA_INSIGHTS).join(','),
-          access_token: accessToken,
-        })}`,
-      );
-
-      const metrics: PostMetrics = { ...EMPTY_POST_METRICS };
-
-      for (const insight of response.data ?? []) {
-        const key = insight.name ? MEDIA_INSIGHTS[insight.name] : undefined;
-
-        if (key) {
-          metrics[key] = asCount(insight.values?.[0]?.value ?? insight.total_value?.value);
-        }
-      }
-
-      return metrics;
-    } catch (error) {
-      if (isGraphMissingObject(error)) {
-        return null;
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * A day's interaction totals as entries. `saves` has no channel metric of
-   * its own; like likes, comments and shares it counts towards engagements.
-   */
-  private totalValueEntries(insights: GraphInsight[], date: string): MetricEntry[] {
-    const entries: MetricEntry[] = [];
-    let engagements = 0;
-
-    for (const insight of insights) {
-      const value = asCount(insight.total_value?.value ?? insight.values?.[0]?.value);
-
-      switch (insight.name) {
-        case 'likes':
-          entries.push({ metric: 'likes', date, value });
-          engagements += value;
-          break;
-        case 'comments':
-          entries.push({ metric: 'comments', date, value });
-          engagements += value;
-          break;
-        case 'shares':
-          entries.push({ metric: 'shares', date, value });
-          engagements += value;
-          break;
-        case 'saves':
-          engagements += value;
-          break;
-        case 'views':
-          entries.push({ metric: 'views', date, value });
-          break;
-      }
-    }
-
-    if (entries.length > 0) {
-      entries.push({ metric: 'engagements', date, value: engagements });
-    }
-
-    return entries;
+    return instagramPostAnalytics(
+      (url) => this.fetchJson(url),
+      GRAPH_BASE,
+      platformPostId,
+      accessToken,
+    );
   }
 
   private async createPost(

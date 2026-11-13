@@ -99,9 +99,9 @@ export const DISCOVER_MESSAGES = {
     `${kind} could not be ${unreadable ? 'read' : 'reached'}.`,
   // Module 10.
   instagramNeedsChannel:
-    'Connect an Instagram business account under Channels to see their Instagram posts here.',
+    'Connect Instagram Via Facebook Page under Channels to see their Instagram posts here.',
   instagramReconnect:
-    'Instagram needs your channel reconnected before it can show their posts. Reconnect it under Channels.',
+    'Instagram needs your Instagram Via Facebook Page channel reconnected before it can show their posts. Reconnect it under Channels.',
   researchNeedsPosts:
     'There is not enough to research yet. Once a few of their posts show up here, try again.',
   researchRefunded: 'Your credits were not used.',

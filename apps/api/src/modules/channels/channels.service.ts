@@ -287,7 +287,47 @@ export class ChannelsService {
             path: `${handshake.returnPath}?error=wrong_account&provider=${provider.identifier}`,
           };
         }
-      } else if (!(await this.hasRowFor(handshake.orgId, details.id))) {
+      }
+
+      let holder = await this.rowFor(handshake.orgId, details.id);
+
+      // A disconnected channel of another provider is not in the way: its row
+      // lets go of the id and this connection gets a row of its own. (The
+      // upsert would otherwise bring that row back with its old provider.)
+      if (
+        holder?.deletedAt &&
+        holder.providerIdentifier !== provider.identifier &&
+        !details.requiresEntitySelection
+      ) {
+        await this.repository.releaseDisconnected(handshake.orgId, String(details.id));
+        holder = null;
+      }
+
+      // One platform account can be reachable through two providers (an
+      // Instagram account on its own and through a Facebook Page). A row is
+      // keyed by workspace and account id, so the second connection would land
+      // on the first one's row and swap in a token its provider cannot use.
+      //
+      // Only a finished channel is protected, and only from a provider that
+      // connects in one hop. A row still waiting for its page to be picked
+      // holds the person's own id for the moment, which LinkedIn's profile
+      // and Page providers share by design.
+      if (
+        holder &&
+        holder.providerIdentifier !== provider.identifier &&
+        !holder.inBetweenSteps &&
+        !details.requiresEntitySelection
+      ) {
+        securityLogger.warn('channel.oauth.connected_another_way', {
+          orgId: handshake.orgId,
+          provider: provider.identifier,
+        });
+        return {
+          path: `${handshake.returnPath}?error=connected_another_way&provider=${provider.identifier}`,
+        };
+      }
+
+      if (!handshake.reconnectChannelId && !holder) {
         // Re-checked here because the limit can have been reached between the
         // handshake starting and the platform calling back: another admin
         // connecting at the same time, or a plan that ended meanwhile. Only a
@@ -605,17 +645,24 @@ export class ChannelsService {
   }
 
   /**
-   * Whether a row, live or soft-deleted, already holds this platform id for
-   * the workspace. The upsert in `completeConnect` keys on exactly this pair,
-   * so "a row exists" is "no new channel will be created".
+   * The row, live or soft-deleted, that already holds this platform id for
+   * the workspace, with the provider it was connected through. The upsert in
+   * `completeConnect` keys on exactly this pair, so "a row exists" is "no new
+   * channel will be created".
    */
-  private async hasRowFor(orgId: string, internalId: string): Promise<boolean> {
-    const row = await prisma.integration.findFirst({
+  private rowFor(
+    orgId: string,
+    internalId: string,
+  ): Promise<{
+    id: string;
+    providerIdentifier: string;
+    inBetweenSteps: boolean;
+    deletedAt: Date | null;
+  } | null> {
+    return prisma.integration.findFirst({
       where: { organizationId: orgId, internalId: String(internalId) },
-      select: { id: true },
+      select: { id: true, providerIdentifier: true, inBetweenSteps: true, deletedAt: true },
     });
-
-    return row !== null;
   }
 
   /**
@@ -623,8 +670,14 @@ export class ChannelsService {
    * `authenticate`: platforms compare the two and reject a mismatch.
    */
   private redirectUriFor(providerIdentifier: string): string {
-    const apiUrl = this.config.get<string>('API_URL', 'http://localhost:3001');
-    return `${apiUrl}/channels/connect/${providerIdentifier}/callback`;
+    // CHANNELS_PUBLIC_URL, when set, is the API's public https address (a
+    // tunnel, locally): Instagram and Threads refuse a plain http callback.
+    // Coming back on a different host than the one the person left from is
+    // safe here because the handshake is looked up by state, not by cookie.
+    const apiUrl =
+      this.config.get<string>('CHANNELS_PUBLIC_URL') ||
+      this.config.get<string>('API_URL', 'http://localhost:3001');
+    return `${apiUrl.replace(/\/+$/, '')}/channels/connect/${providerIdentifier}/callback`;
   }
 
   /**

@@ -59,6 +59,14 @@ export abstract class SocialAbstract {
   abstract readonly identifier: string;
 
   /**
+   * What the fallback messages below call this platform. The identifier, unless
+   * a provider whose identifier does not read as a name says otherwise.
+   */
+  protected get displayName(): string {
+    return this.identifier;
+  }
+
+  /**
    * Maps a platform's error response onto an action.
    *
    * Overridden per provider: this is where each platform's opaque strings
@@ -95,7 +103,7 @@ export abstract class SocialAbstract {
       }
 
       throw new RetryableError(
-        `${this.identifier} could not be reached. Please try again shortly.`,
+        `${this.displayName} could not be reached. Please try again shortly.`,
         this.identifier,
         error instanceof Error ? error.message : String(error),
       );
@@ -136,7 +144,7 @@ export abstract class SocialAbstract {
       return JSON.parse(text) as T;
     } catch {
       throw new BadBodyError(
-        `${this.identifier} returned a response PostGear could not read.`,
+        `${this.displayName} returned a response PostGear could not read.`,
         this.identifier,
         text,
         response.status,
@@ -149,7 +157,7 @@ export abstract class SocialAbstract {
     if (handled?.type === 'refresh-token' || (!handled && status === 401)) {
       return new RefreshTokenError(
         handled?.value ??
-          `Your ${this.identifier} connection has expired. Please reconnect the channel.`,
+          `Your ${this.displayName} connection has expired. Please reconnect the channel.`,
         this.identifier,
         body,
         status,
@@ -158,7 +166,7 @@ export abstract class SocialAbstract {
 
     if (handled?.type === 'retry' || RETRYABLE_STATUSES.has(status) || status >= 500) {
       return new RetryableError(
-        handled?.value ?? `${this.identifier} is temporarily unavailable.`,
+        handled?.value ?? `${this.displayName} is temporarily unavailable.`,
         this.identifier,
         body,
         status,
@@ -172,12 +180,12 @@ export abstract class SocialAbstract {
       return new NotEnoughScopesError(
         this.identifier,
         [],
-        `Your ${this.identifier} account has not granted PostGear permission to do that.`,
+        `Your ${this.displayName} account has not granted PostGear permission to do that.`,
       );
     }
 
     return new BadBodyError(
-      handled?.value ?? `${this.identifier} rejected the request.`,
+      handled?.value ?? `${this.displayName} rejected the request.`,
       this.identifier,
       body,
       status,

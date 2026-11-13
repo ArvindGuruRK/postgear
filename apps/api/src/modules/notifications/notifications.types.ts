@@ -160,6 +160,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   x: 'Twitter / X',
   facebook: 'Facebook',
   instagram: 'Instagram',
+  'instagram-standalone': 'Instagram',
   threads: 'Threads',
   tiktok: 'TikTok',
   youtube: 'YouTube',

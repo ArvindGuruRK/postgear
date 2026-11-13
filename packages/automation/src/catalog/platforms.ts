@@ -21,7 +21,18 @@ export interface PublishPlatform {
 
 /** One Social Channels card per platform, in library order. */
 export const PUBLISH_PLATFORMS: readonly PublishPlatform[] = [
-  { id: 'instagram', title: 'Instagram', providers: ['instagram'], icon: 'instagram' },
+  // Threads has no card yet: a workflow cannot publish to a Threads channel.
+  // Adding one means a card here, an icon key, a logo colour token and the
+  // AI step's platform list, together.
+  //
+  // Instagram connects two ways (on its own, or through a Facebook Page): two
+  // providers and two picker options, but one platform card.
+  {
+    id: 'instagram',
+    title: 'Instagram',
+    providers: ['instagram-standalone', 'instagram'],
+    icon: 'instagram',
+  },
   { id: 'facebook', title: 'Facebook', providers: ['facebook'], icon: 'facebook' },
   { id: 'x', title: 'X', providers: ['x'], icon: 'x' },
   // A LinkedIn profile and a LinkedIn Page are separate channels (and picker

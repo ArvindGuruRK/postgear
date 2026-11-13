@@ -23,8 +23,10 @@ import { type SocialProvider, supportsAnalytics } from '../abstract/social.provi
 import type { ProviderRules } from '../composer/rules';
 import { FacebookProvider } from '../providers/facebook';
 import { InstagramProvider } from '../providers/instagram';
+import { InstagramStandaloneProvider } from '../providers/instagram-standalone';
 import { LinkedInPageProvider, LinkedInProvider } from '../providers/linkedin';
 import { PinterestProvider } from '../providers/pinterest';
+import { ThreadsProvider } from '../providers/threads';
 import { TikTokProvider } from '../providers/tiktok';
 import { XProvider } from '../providers/twitter';
 import { YouTubeProvider } from '../providers/youtube';
@@ -65,7 +67,9 @@ export class IntegrationManager {
       new LinkedInProvider(),
       new LinkedInPageProvider(),
       new FacebookProvider(),
+      new InstagramStandaloneProvider(),
       new InstagramProvider(),
+      new ThreadsProvider(),
       new YouTubeProvider(),
       new TikTokProvider(),
       new PinterestProvider(),

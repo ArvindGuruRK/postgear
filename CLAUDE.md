@@ -63,7 +63,7 @@ MCP servers (`.mcp.json`): the Postgres MCP was removed because every session le
 
 **Shared packages** (all consumed as TS source; `main` points at `src/index.ts`, resolved via tsconfig `paths`):
 - `db`: Prisma client, token encryption (`crypto.ts`), webhook signing. `prisma/SCHEMA_NOTES.md` explains schema decisions.
-- `social-core`: provider implementations (X, LinkedIn, Facebook, Instagram, YouTube, TikTok, Pinterest) on `abstract/social.abstract.ts`. The web app may import only `@postgear/social-core/composer` (browser-safe); the root pulls in `node:crypto`.
+- `social-core`: provider implementations (X, LinkedIn, Facebook, Instagram, Threads, YouTube, TikTok, Pinterest) on `abstract/social.abstract.ts`. Instagram has two providers: `instagram-standalone` (the "Instagram" tile, Instagram Login, no Page) and `instagram` ("Instagram Via Facebook Page", which Discover's competitor tracking needs). Instagram on its own and Threads share `providers/meta/meta.login.ts`; they take only https callbacks, so locally `CHANNELS_PUBLIC_URL` (an https tunnel) carries channel callbacks and media URLs while login stays on `API_URL`. The web app may import only `@postgear/social-core/composer` (browser-safe); the root pulls in `node:crypto`.
 - `ai-engine`: LangGraph agents, prompts, tools, model wiring (OpenAI + Tavily).
 - `seo-engine`: Playwright crawler (falls back to plain fetch) + scoring.
 - `discover-engine`: Discover's sources (Google Trends, Google News), places and languages. Never imports another workspace and never reaches the network on its own: its fetch is injected (the API binds `fetchUrlSafely`, simulation binds recorded files).

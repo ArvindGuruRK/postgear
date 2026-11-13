@@ -57,7 +57,13 @@ const BRANDS: Record<string, Brand> = {
   },
   linkedin: { label: 'LinkedIn', src: '/icon/linkedin.svg' },
   'linkedin-page': { label: 'LinkedIn Page', src: '/icon/linkedin.svg' },
-  instagram: { label: 'Instagram', src: '/icon/instagram.svg' },
+  // Instagram on its own and Instagram through a Facebook Page are one logo.
+  'instagram-standalone': { label: 'Instagram', src: '/icon/instagram.svg' },
+  instagram: { label: 'Instagram Via Facebook Page', src: '/icon/instagram.svg' },
+  // One black tile in both modes (the owner's choice, 2026-11-14). threads.svg
+  // draws its tile 4 units in from each edge of a 64-unit canvas, as
+  // twitter.svg does, so it takes the same 64 / 56 scale.
+  threads: { label: 'Threads', src: '/icon/threads.svg', fit: 'scale-[1.143]' },
   youtube: { label: 'YouTube', src: '/icon/youtube.svg' },
   tiktok: { label: 'TikTok', src: '/icon/tiktok.svg' },
   pinterest: { label: 'Pinterest', src: '/icon/pinterest.svg' },

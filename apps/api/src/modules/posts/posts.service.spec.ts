@@ -355,7 +355,7 @@ describe('PostsService', () => {
             channels: [{ channelId: 'ch_ig', customized: false }],
           }),
         ),
-      ).rejects.toThrow('Acme Studio: Instagram only accepts JPEG images.');
+      ).rejects.toThrow('Acme Studio: Instagram Via Facebook Page only accepts JPEG images.');
     });
 
     it('refuses a channel that still needs setting up, but not one needing reconnection', async () => {

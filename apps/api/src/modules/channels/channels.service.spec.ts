@@ -53,7 +53,12 @@ const prismaMock = prisma as unknown as PrismaMock;
 const usage = { used: 5, limit: 5, tier: 'STANDARD' as const };
 
 describe('ChannelsService: the channel limit', () => {
-  let repository: { findById: jest.Mock; upsertFromAuth: jest.Mock; listForOrg: jest.Mock };
+  let repository: {
+    findById: jest.Mock;
+    upsertFromAuth: jest.Mock;
+    listForOrg: jest.Mock;
+    releaseDisconnected: jest.Mock;
+  };
   let oauth: { begin: jest.Mock; consume: jest.Mock };
   let scheduling: { ensureTokenRefresh: jest.Mock };
   let entitlements: {
@@ -70,6 +75,7 @@ describe('ChannelsService: the channel limit', () => {
         .fn()
         .mockResolvedValue({ id: 'ch_new', name: 'New Page', inBetweenSteps: false }),
       listForOrg: jest.fn().mockResolvedValue([]),
+      releaseDisconnected: jest.fn().mockResolvedValue(undefined),
     };
     oauth = {
       begin: jest.fn().mockResolvedValue('state_1'),
@@ -140,12 +146,66 @@ describe('ChannelsService: the channel limit', () => {
 
   it('lets an account that already has a row through at the limit (a resurrect is not a new channel)', async () => {
     entitlements.checkConnect.mockResolvedValue({ allowed: false, usage });
-    prismaMock.integration.findFirst.mockResolvedValue({ id: 'ch_old' });
+    prismaMock.integration.findFirst.mockResolvedValue({
+      id: 'ch_old',
+      providerIdentifier: 'linkedin',
+      inBetweenSteps: false,
+      deletedAt: null,
+    });
 
     const result = await service.completeConnect({ provider: 'linkedin', code: 'c', state: 's' });
 
     expect(result.path).toBe('/org_1/channels?connected=New%20Page');
     expect(entitlements.checkConnect).not.toHaveBeenCalled();
+    expect(repository.upsertFromAuth).toHaveBeenCalled();
+  });
+
+  it('refuses an account already connected through another provider, leaving its row alone', async () => {
+    // An Instagram account connected through a Facebook Page, now being
+    // connected on its own: same account id, different provider.
+    prismaMock.integration.findFirst.mockResolvedValue({
+      id: 'ch_old',
+      providerIdentifier: 'instagram',
+      inBetweenSteps: false,
+      deletedAt: null,
+    });
+
+    await expect(
+      service.completeConnect({ provider: 'linkedin', code: 'c', state: 's' }),
+    ).resolves.toEqual({
+      path: '/org_1/channels?error=connected_another_way&provider=linkedin',
+    });
+    expect(repository.upsertFromAuth).not.toHaveBeenCalled();
+  });
+
+  it('lets the account in once that other channel has been disconnected, on a row of its own', async () => {
+    prismaMock.integration.findFirst.mockResolvedValue({
+      id: 'ch_old',
+      providerIdentifier: 'instagram',
+      inBetweenSteps: false,
+      deletedAt: new Date('2026-11-01T00:00:00Z'),
+    });
+
+    const result = await service.completeConnect({ provider: 'linkedin', code: 'c', state: 's' });
+
+    expect(repository.releaseDisconnected).toHaveBeenCalledWith('org_1', 'acct_new');
+    // A new row, so the plan's limit applies to it.
+    expect(entitlements.checkConnect).toHaveBeenCalledWith('org_1');
+    expect(result.path).toBe('/org_1/channels?connected=New%20Page');
+    expect(repository.upsertFromAuth).toHaveBeenCalled();
+  });
+
+  it('still folds a connection into a row that is waiting for its page to be picked', async () => {
+    prismaMock.integration.findFirst.mockResolvedValue({
+      id: 'ch_old',
+      providerIdentifier: 'linkedin-page',
+      inBetweenSteps: true,
+      deletedAt: null,
+    });
+
+    const result = await service.completeConnect({ provider: 'linkedin', code: 'c', state: 's' });
+
+    expect(result.path).toBe('/org_1/channels?connected=New%20Page');
     expect(repository.upsertFromAuth).toHaveBeenCalled();
   });
 
@@ -156,6 +216,46 @@ describe('ChannelsService: the channel limit', () => {
     expect(entitlements.checkConnect).toHaveBeenCalledWith('org_1');
     expect(repository.upsertFromAuth).toHaveBeenCalledWith(
       expect.objectContaining({ orgId: 'org_1', internalId: 'acct_new' }),
+    );
+  });
+});
+
+describe('ChannelsService: the callback address', () => {
+  const build = (values: Record<string, string | undefined>) => {
+    const oauth = { begin: jest.fn().mockResolvedValue('state_1') };
+    const service = new ChannelsService(
+      { findById: jest.fn() } as unknown as ChannelsRepository,
+      oauth as unknown as ChannelOAuthService,
+      {
+        get: (key: string, fallback?: string) => values[key] ?? fallback,
+      } as unknown as ConfigService,
+      {} as unknown as SchedulingService,
+      { assertCanConnect: jest.fn().mockResolvedValue(usage) } as unknown as EntitlementsService,
+    );
+
+    return service.beginConnect({ provider: 'linkedin', orgId: 'org_1', userId: 'user_1' });
+  };
+
+  beforeEach(() => {
+    fakeProvider.generateAuthUrl.mockClear();
+  });
+
+  it('is built from API_URL when no public address is set', async () => {
+    await build({ API_URL: 'http://localhost:3001' });
+
+    expect(fakeProvider.generateAuthUrl).toHaveBeenCalledWith(
+      'http://localhost:3001/channels/connect/linkedin/callback',
+    );
+  });
+
+  it('is built from CHANNELS_PUBLIC_URL when one is set, so a tunnel can receive it', async () => {
+    await build({
+      API_URL: 'http://localhost:3001',
+      CHANNELS_PUBLIC_URL: 'https://demo.trycloudflare.com/',
+    });
+
+    expect(fakeProvider.generateAuthUrl).toHaveBeenCalledWith(
+      'https://demo.trycloudflare.com/channels/connect/linkedin/callback',
     );
   });
 });

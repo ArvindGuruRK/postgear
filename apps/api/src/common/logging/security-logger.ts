@@ -101,6 +101,7 @@ export type SecurityEvent =
   | 'channel.oauth.state_mismatch'
   | 'channel.oauth.membership_revoked'
   | 'channel.oauth.reconnect_mismatch'
+  | 'channel.oauth.connected_another_way'
   | 'channel.oauth.failed'
   | 'channel.oauth.succeeded'
   | 'channel.revoke.failed'

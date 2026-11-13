@@ -39,6 +39,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   channel_oauth: 'We could not connect that account. Please try again.',
   wrong_account:
     'That is a different account from the one this channel uses. Login to the original account and try again.',
+  connected_another_way:
+    'That account is already connected here another way. Disconnect that channel first, then connect it again.',
   unknown_provider: 'PostGear does not support that platform.',
   no_workspace: 'Select a workspace before connecting a channel.',
   channel_limit:

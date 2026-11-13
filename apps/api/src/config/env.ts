@@ -114,6 +114,31 @@ const envSchema = z
     TIKTOK_CLIENT_SECRET: z.string().optional(),
     PINTEREST_APP_ID: z.string().optional(),
     PINTEREST_APP_SECRET: z.string().optional(),
+    // Instagram on its own (Instagram API with Instagram Login) and Threads.
+    // Each has an app id and secret of its own, shown under that product in
+    // the Meta dashboard: they are not FACEBOOK_APP_*, even inside one Meta app.
+    INSTAGRAM_APP_ID: z.string().optional(),
+    INSTAGRAM_APP_SECRET: z.string().optional(),
+    THREADS_APP_ID: z.string().optional(),
+    THREADS_APP_SECRET: z.string().optional(),
+
+    // The API's public https address, for the two things a social platform has
+    // to reach from the internet: the channel OAuth callback and, with local
+    // storage, the media it fetches. Unset means API_URL serves both.
+    //
+    // Separate from API_URL so a local machine can sit behind an https tunnel
+    // for channels (Instagram and Threads refuse a plain http callback) while
+    // sign-in with Google and Facebook stays registered on localhost. That
+    // works because the connect handshake is kept server-side, keyed by the
+    // state value, so the callback needs no cookie from the tunnel's host.
+    CHANNELS_PUBLIC_URL: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z
+        .string()
+        .url()
+        .startsWith('https://', 'CHANNELS_PUBLIC_URL must be an https address')
+        .optional(),
+    ),
 
     // Media storage (Sprint 4). One variable picks the backend, which is the
     // factory pattern the sprint document asks for: develop against local disk,

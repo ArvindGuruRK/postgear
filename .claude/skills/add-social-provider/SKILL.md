@@ -70,7 +70,9 @@ The API owns the flow: `GET /channels/connect/:provider` and `@Public() GET /cha
 <API_URL>/channels/connect/<identifier>/callback      (locally http://localhost:3001/...)
 ```
 
-Many platforms refuse localhost, so the callback must be registered on a deployed `API_URL` (production `postgear.rkay.in`, staging `postgear-staging.rkay.in`). Where the API sits on those domains (an `api.` subdomain or an `/api` path) is not decided yet, so confirm `API_URL` with the user before giving them a callback URL. Platforms that fetch media by URL (Instagram, Facebook, Pinterest, TikTok style) also need publicly reachable media, see "Media has to be reachable" in `docs/social-platform-setup.md`.
+When `CHANNELS_PUBLIC_URL` is set (an https tunnel to the API, for local work), it replaces `API_URL` in every channel callback and in the local media URLs the worker hands to platforms; sign-in callbacks stay on `API_URL`. Providers built on `providers/meta/meta.login.ts` (Instagram on its own, Threads) need it locally.
+
+Many platforms refuse localhost, so without that tunnel the callback must be registered on a deployed `API_URL` (production `postgear.rkay.in`, staging `postgear-staging.rkay.in`). Where the API sits on those domains (an `api.` subdomain or an `/api` path) is not decided yet, so confirm `API_URL` with the user before giving them a callback URL. Platforms that fetch media by URL (Instagram, Facebook, Pinterest, TikTok style) also need publicly reachable media, see "Media has to be reachable" in `docs/social-platform-setup.md`.
 
 ## 7. Simulation
 

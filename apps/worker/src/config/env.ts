@@ -36,6 +36,17 @@ const envSchema = z
     STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
     API_URL: z.string().url().default('http://localhost:3001'),
     S3_PUBLIC_URL: z.string().url().optional(),
+    // The API's public https address (a tunnel, locally). With local storage,
+    // media URLs handed to platforms are built from it instead of API_URL, so
+    // Instagram and Threads can fetch them. Same variable as the API's.
+    CHANNELS_PUBLIC_URL: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z
+        .string()
+        .url()
+        .startsWith('https://', 'CHANNELS_PUBLIC_URL must be an https address')
+        .optional(),
+    ),
 
     // The web app, for links in workflow data (Sprint 10, Module 09: a
     // post's PostGear link that a Slack step can send). Same variable as the
