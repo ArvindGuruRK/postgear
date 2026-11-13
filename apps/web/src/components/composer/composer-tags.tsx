@@ -45,7 +45,6 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
 import { TAG_COLOR_CLASS, TAG_COLOR_LABEL, TAG_COLORS, type Tag, type TagColor } from '@/types/tag';
 import { MAX_TAGS } from './composer-state';
-import { FIELD_TRIGGER } from './toolbar';
 
 /** Mirrors the API's limit on a tag's name. */
 const MAX_NAME = 40;
@@ -156,13 +155,13 @@ export function TagsControl({
   return (
     <Popover modal open={open} onOpenChange={openWith}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           disabled={disabled}
           aria-label={
-            selected.length > 0 ? `Tags: ${selected.map((tag) => tag.name).join(', ')}` : 'Add tag'
+            selected.length > 0 ? `Tags: ${selected.map((tag) => tag.name).join(', ')}` : 'Add Tag'
           }
-          className={cn(FIELD_TRIGGER, 'max-w-60')}
+          className="h-11 max-w-60 px-3 text-sm"
         >
           <MotionIcon icon={TagIcon} className="h-4 w-4 shrink-0" />
           {first ? (
@@ -173,7 +172,7 @@ export function TagsControl({
               ) : null}
             </span>
           ) : (
-            <span className="truncate">Add tag</span>
+            <span className="truncate">Add Tag</span>
           )}
           <MotionIcon
             icon={ChevronDownIcon}
@@ -183,7 +182,7 @@ export function TagsControl({
               open && 'rotate-180',
             )}
           />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         side="top"

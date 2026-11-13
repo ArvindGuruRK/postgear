@@ -5,12 +5,13 @@
  * per-channel "Settings" bar): a YouTube title and visibility, who can reply
  * on X, a Pin's link, TikTok's privacy and so on.
  *
- * Placed where Postiz places it: a bar along the bottom of the writing
- * column that opens to the fields. With a channel's tab open it reads
- * "<channel> Settings" and holds that channel's fields; on "All channels" it
- * reads "Settings" and holds a block per selected channel that has any, each
- * headed by the channel. A platform with no options gets no bar, as Postiz
- * shows no settings for a provider without a settings component.
+ * A button in the footer, beside Tags and Repeat (2026-11-14, it was a bar
+ * under the editor), opening a popover above it with a close button. With a
+ * channel's tab open it reads "<channel> Settings" and holds that channel's
+ * fields; on "All channels" it reads "Settings" and holds a block per
+ * selected channel that has any, each headed by the channel. A platform with
+ * no options gets no button, as Postiz shows no settings for a provider
+ * without a settings component.
  *
  * Unlike Postiz, which writes a component per provider, the fields are drawn
  * from data: social-core's `settingsFieldsFor` lists them, and the API and
@@ -22,6 +23,7 @@ import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
 import { type SettingField, tagsTotalLength } from '@postgear/social-core/composer';
 import {
+  Button,
   Checkbox,
   cn,
   FormErrorMessage,
@@ -32,6 +34,10 @@ import {
   FormLabel,
   Input,
   MotionIcon,
+  Popover,
+  PopoverClose,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -80,44 +86,48 @@ export function SettingsBar({
   className?: string;
 }) {
   const panelId = useId();
-  const errorCount = blocks.reduce((total, block) => total + Object.keys(block.errors).length, 0);
 
   return (
-    <div
-      className={cn(
-        'flex min-h-0 flex-col overflow-hidden rounded-lg border-2 border-outline bg-chrome',
-        className,
-      )}
-    >
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => onOpenChange(!open)}
-        className={cn(
-          'flex h-11 w-full shrink-0 items-center gap-2.5 px-4 text-start type-ui text-sm text-ink hover:bg-actionPrimary/10',
-          FOCUS,
-          'focus-visible:-outline-offset-4',
-        )}
-      >
-        <MotionIcon icon={SettingsIcon} className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{title}</span>
-        {errorCount > 0 && !open ? (
-          <span className="shrink-0 font-sans text-xs text-dangerInk">{errorCount} to fix</span>
-        ) : null}
-        <MotionIcon
-          icon={ChevronDownIcon}
-          strokeWidth={3}
-          className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-180')}
-        />
-      </button>
-
-      {open ? (
-        <section
-          id={panelId}
-          aria-label={title}
-          className="flex flex-col gap-6 bg-secondary p-4 lg:max-h-[40dvh] lg:overflow-y-auto pg-scrollbar pg-scrollbar-secondary"
+    // Modal, like the Tags and Repeat menus beside it: see `DateTimePicker`.
+    <Popover modal open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="secondary"
+          aria-controls={open ? panelId : undefined}
+          className={cn('h-11 max-w-60 px-3 text-sm', className)}
         >
+          <MotionIcon icon={SettingsIcon} className="h-4 w-4 shrink-0" />
+          <span className="truncate">{title}</span>
+          <MotionIcon
+            icon={ChevronDownIcon}
+            strokeWidth={3}
+            className={cn('h-4 w-4 shrink-0 transition-transform duration-200', open && 'rotate-180')}
+          />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        id={panelId}
+        side="top"
+        align="start"
+        aria-label={title}
+        className="flex max-h-[var(--radix-popover-content-available-height)] w-[26rem] max-w-[calc(100vw-2rem)] flex-col p-0"
+      >
+        {/* The header the dialogs have: the title, and the design system's
+            close button in the corner. */}
+        <div className="flex shrink-0 items-center gap-3 border-b-2 border-outline px-4 py-3">
+          <h3 className="m-0 min-w-0 flex-1 truncate type-heading text-lg text-ink">{title}</h3>
+          <PopoverClose
+            aria-label="Close settings"
+            className={cn(
+              'rounded-sm border-2 border-outline bg-secondary p-1',
+              'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+            )}
+          >
+            <MotionIcon icon={XIcon} className="h-4 w-4 text-ink" strokeWidth={3} />
+          </PopoverClose>
+        </div>
+
+        <div className="flex min-h-0 flex-col gap-6 overflow-y-auto p-4 pg-scrollbar pg-scrollbar-secondary">
           {blocks.map((block) => (
             <section
               key={block.channel.id}
@@ -153,9 +163,9 @@ export function SettingsBar({
               ))}
             </section>
           ))}
-        </section>
-      ) : null}
-    </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

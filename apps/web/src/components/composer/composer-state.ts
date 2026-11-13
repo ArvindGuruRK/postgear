@@ -47,6 +47,7 @@ import {
 import type { MediaItem } from '@/types/media';
 import type { PostDetail, PostPart, PostState, RepeatInterval } from '@/types/post';
 import type { Tag } from '@/types/tag';
+import { type PublishedLink, publishedLinks } from '../posts/published-links';
 
 /** The tab that edits the thread every non-customized channel uses. */
 export const SHARED = 'shared';
@@ -99,6 +100,11 @@ export interface ComposerState {
    * set. See "Tags, repeat and platform settings" above.
    */
   settings: Record<string, Record<string, unknown>>;
+  /**
+   * Where the saved post went out: each published channel's own page, read
+   * from the server on load and on every save. Empty until something is live.
+   */
+  published: PublishedLink[];
 }
 
 export type ComposerAction =
@@ -268,6 +274,7 @@ export function initialComposerState(options: {
       tags: [],
       intervalInDays: null,
       settings: {},
+      published: [],
     };
   }
 
@@ -301,6 +308,8 @@ export function initialComposerState(options: {
         .filter((channel) => channel.settings && Object.keys(channel.settings).length > 0)
         .map((channel) => [channel.channelId, { ...channel.settings }]),
     ),
+    // Every channel, a disconnected one too: its post is still live.
+    published: publishedLinks(post.channels),
   };
 }
 
@@ -472,6 +481,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
         savedState: action.post.state,
         savedRevision: action.revision,
         disconnected: [],
+        published: publishedLinks(action.post.channels),
         shared: state.shared.map((part) => ({ ...part, removedMedia: 0 })),
         custom: Object.fromEntries(
           Object.entries(state.custom).map(([id, parts]) => [

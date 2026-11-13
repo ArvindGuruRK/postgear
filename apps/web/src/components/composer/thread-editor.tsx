@@ -206,14 +206,6 @@ function SortablePart({
 
   const label = `Part ${index + 1}`;
   const thread = total > 1;
-  const issues = reports.flatMap((report) =>
-    report.issues
-      .filter((issue) => issue.part === index)
-      .map((issue) => ({
-        key: `${report.channel.id}-${issue.code}`,
-        text: `${report.channel.name}: ${issue.message}`,
-      })),
-  );
 
   return (
     <li
@@ -322,15 +314,6 @@ function SortablePart({
           </p>
         ) : null}
 
-        {issues.length > 0 ? (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label={`${label} issues`}>
-            {issues.map((issue) => (
-              <li key={issue.key} className="font-sans text-xs font-bold text-dangerInk">
-                {issue.text}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
 
       {thread && !disabled ? (

@@ -100,8 +100,6 @@ export function PreviewPanel({
               <legend className="sr-only">Preview channel</legend>
               {reports.map((report) => {
                 const selected = report === active;
-                const problems = report.issues.length + (report.channelProblem ? 1 : 0);
-
                 return (
                   <button
                     key={report.channel.id}
@@ -135,19 +133,6 @@ export function PreviewPanel({
                       title={report.channel.providerName}
                       className="h-5 w-5"
                     />
-                    {problems > 0 ? (
-                      <>
-                        <span
-                          aria-hidden="true"
-                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-actionDanger px-1 text-[10px] text-onActionLight"
-                        >
-                          {problems}
-                        </span>
-                        <span className="sr-only">
-                          , {problems} {problems === 1 ? 'issue' : 'issues'}
-                        </span>
-                      </>
-                    ) : null}
                   </button>
                 );
               })}
@@ -174,31 +159,6 @@ export function PreviewPanel({
             ) : null}
           </section>
 
-          {active.channelProblem || active.issues.length > 0 ? (
-            <div className="rounded-md border-2 border-outline bg-inset p-3">
-              <Text size="sm" weight="bold">
-                Before this can be queued for {active.channel.name}
-              </Text>
-              <ul className="m-0 mt-1 flex list-disc flex-col gap-1 ps-5">
-                {active.channelProblem ? (
-                  <li className="font-sans text-sm text-dangerInk">{active.channelProblem}</li>
-                ) : null}
-                {active.issues.map((issue) => (
-                  <li
-                    key={`${issue.part}-${issue.code}`}
-                    className="font-sans text-sm text-dangerInk"
-                  >
-                    {active.parts.length > 1 ? `Part ${issue.part + 1}: ` : ''}
-                    {issue.message}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <Text size="sm" muted>
-              Ready for {active.channel.name}.
-            </Text>
-          )}
         </>
       )}
     </div>

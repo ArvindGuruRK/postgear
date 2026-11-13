@@ -6,8 +6,10 @@
  *
  * - **The strip** carries the state as its fill (scheduled is primary,
  *   published is success, and so on: post-status.ts), the time, and the drag
- *   grip. On hover or keyboard focus it also shows the reference's quick
- *   actions, in its order: duplicate (a new post from this one's text and
+ *   grip. On hover or keyboard focus it also shows the quick actions: first
+ *   the published post on its platform, once a channel has gone out
+ *   (2026-11-14, see view-published-post.tsx), then the reference's own, in its
+ *   order: duplicate (a new post from this one's text and
  *   media, in the composer), preview (the detail dialog, with reschedule and
  *   post-now), statistics once something has gone out, and delete while the
  *   API still allows it.
@@ -38,6 +40,7 @@
  */
 import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
 import { CopyPlusIcon } from '@animateicons/react/lucide/copy-plus-icon';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { EyeIcon } from '@animateicons/react/lucide/eye-icon';
 import { GripVerticalIcon } from '@animateicons/react/lucide/grip-vertical-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
@@ -56,6 +59,8 @@ import {
   hasPublishedChannel,
   type PostTone,
 } from '../posts/post-status';
+import { publishedLinks } from '../posts/published-links';
+import { ViewPublishedPost } from '../posts/view-published-post';
 
 /** The strip: the state's fill, with the text color that clears contrast on it. */
 const STRIP: Record<PostTone, string> = {
@@ -110,6 +115,7 @@ export function PostCard({
   const tags = post.tags ?? [];
   const repeatsEvery = post.intervalInDays ?? null;
   const tagNames = tags.map((tag) => tag.name).join(', ');
+  const links = publishedLinks(post.channels);
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
     useDraggable({
@@ -174,7 +180,7 @@ export function PostCard({
             // show, as the reference's strip holds only its icons then. It
             // stays in the card's label, and in wider cards (the day view).
             !overlay &&
-              'group-focus-within/card:@max-[10rem]:hidden group-hover/card:@max-[10rem]:hidden',
+              'group-focus-within/card:@max-[10rem]:hidden group-hover/card:@max-[10rem]:hidden group-has-data-[state=open]/card:@max-[10rem]:hidden',
           )}
         >
           {formatClock(when)}
@@ -197,7 +203,8 @@ export function PostCard({
             className={cn(
               'min-w-0 flex-1 truncate font-sans text-[11px]',
               // Gives way to the actions, as the reference's tag names do.
-              !overlay && 'group-focus-within/card:hidden group-hover/card:hidden',
+              !overlay &&
+                'group-focus-within/card:hidden group-hover/card:hidden group-has-data-[state=open]/card:hidden',
             )}
           >
             {tagNames}
@@ -206,14 +213,25 @@ export function PostCard({
         {published ? (
           <Lock
             // Steps aside while the hover actions take the strip's end.
-            className="ms-auto h-3 w-3 shrink-0 opacity-70 group-focus-within/card:hidden group-hover/card:hidden"
+            className="ms-auto h-3 w-3 shrink-0 opacity-70 group-focus-within/card:hidden group-hover/card:hidden group-has-data-[state=open]/card:hidden"
             strokeWidth={3}
             aria-hidden="true"
           />
         ) : null}
 
         {overlay ? null : (
-          <span className="ms-auto hidden shrink-0 items-center gap-0.5 group-focus-within/card:flex group-hover/card:flex">
+          <span
+            className={cn(
+              'ms-auto hidden shrink-0 items-center gap-0.5 group-focus-within/card:flex group-hover/card:flex',
+              // The links menu lives in a portal: while it is open the
+              // pointer may leave the card, and the strip must stay so the
+              // menu keeps its anchor.
+              'has-data-[state=open]:flex',
+            )}
+          >
+            <ViewPublishedPost links={links} iconOnly align="start" className={STRIP_ACTION}>
+              <MotionIcon icon={ExternalLinkIcon} size={14} className="h-3.5 w-3.5" />
+            </ViewPublishedPost>
             {onDuplicate ? (
               <StripAction label="Duplicate Post">
                 <button

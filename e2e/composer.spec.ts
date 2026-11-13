@@ -120,9 +120,6 @@ test.describe('composer', () => {
     await expect(instagram.getByRole('img', { name: fileName })).toBeVisible();
     await expect(instagram.getByText('Launch day for the composer.')).toBeVisible();
     await expect(instagram.getByText('acme.studio', { exact: true }).last()).toBeVisible();
-
-    // With the image attached, Instagram has nothing left to object to.
-    await expect(page.getByText('Ready for Acme Studio.')).toBeVisible();
   });
 
   test('builds a three-part thread and reorders it, by button and by keyboard drag', async ({
@@ -223,12 +220,13 @@ test.describe('composer', () => {
 
     await page.getByRole('button', { name: 'Add to calendar' }).click();
 
-    const alert = page.getByRole('alert').filter({ hasText: 'Not ready for the queue yet' });
+    // A toast, shown only once Add to calendar is pressed.
+    const alert = page.getByText('Not ready for the calendar yet').locator('..');
     await expect(alert).toContainText(
       'Acme on X: Twitter / X allows 280 characters; this post has 290.',
     );
     await expect(alert).toContainText(
-      'Acme Studio: Instagram posts must include at least one image or video.',
+      'Acme Studio: Instagram Via Facebook Page posts must include at least one image or video.',
     );
 
     // Nothing was saved.

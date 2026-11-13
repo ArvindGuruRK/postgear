@@ -48,6 +48,7 @@
  */
 import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { ExpandIcon } from '@animateicons/react/lucide/expand-icon';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { GlobeIcon } from '@animateicons/react/lucide/globe-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { SendIcon } from '@animateicons/react/lucide/send-icon';
@@ -69,7 +70,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertTitle,
   ANIMATED_ICON_CLASS,
   Avatar,
   AvatarFallback,
@@ -111,6 +111,7 @@ import { announcePostsChanged } from '@/lib/post-events';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
 import type { PostDetail, PostPart } from '@/types/post';
+import { ViewPublishedPost, viewPublishedLabel } from '../posts/view-published-post';
 import { buildReport, queueBlockers, renderDraftParts } from './channel-report';
 import { ComposerChannels } from './composer-channels';
 import { RepeatControl } from './composer-repeat';
@@ -161,10 +162,12 @@ interface ComposerProps {
   onCreated?: (group: string) => void;
 }
 
-type Notice =
-  | { kind: 'error'; message: string }
-  | { kind: 'conflict'; message: string }
-  | { kind: 'blockers'; items: string[] };
+/**
+ * What stays pinned above the footer: only a save conflict, which needs its
+ * Reload link. Every other problem is a toast (2026-11-14), and only once
+ * Add To Calendar or Post Now is pressed.
+ */
+type Notice = { kind: 'conflict'; message: string };
 
 const FOCUS =
   'outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
@@ -383,12 +386,12 @@ export function Composer({
       setNotice(null);
 
       if (state.selected.length === 0) {
-        setNotice({ kind: 'error', message: 'Choose at least one channel to save this post for.' });
+        toast({ variant: 'danger', title: 'Choose at least one channel to save this post for.' });
         return;
       }
 
       if (!isValidPublishAt(state.publishAt)) {
-        setNotice({ kind: 'error', message: 'Choose a date and time for this post.' });
+        toast({ variant: 'danger', title: 'Choose a date and time for this post.' });
         return;
       }
 
@@ -435,7 +438,11 @@ export function Composer({
         ];
 
         if (problems.length > 0) {
-          setNotice({ kind: 'blockers', items: problems });
+          toast({
+            variant: 'danger',
+            title: publishNow ? 'Not ready to post yet' : 'Not ready for the calendar yet',
+            description: `${problems.join(' ')} It can still be saved as a draft.`,
+          });
           return;
         }
       }
@@ -510,11 +517,11 @@ export function Composer({
           return;
         }
 
-        setNotice(
-          cause instanceof ApiError && cause.status === 409 && !locked
-            ? { kind: 'conflict', message }
-            : { kind: 'error', message },
-        );
+        if (cause instanceof ApiError && cause.status === 409 && !locked) {
+          setNotice({ kind: 'conflict', message });
+        } else {
+          toast({ variant: 'danger', title: message });
+        }
       } finally {
         setSaving(null);
       }
@@ -570,9 +577,9 @@ export function Composer({
       announcePostsChanged();
       close();
     } catch (cause) {
-      setNotice({
-        kind: 'error',
-        message: cause instanceof ApiError ? cause.message : 'The post could not be deleted.',
+      toast({
+        variant: 'danger',
+        title: cause instanceof ApiError ? cause.message : 'The post could not be deleted.',
       });
     } finally {
       setConfirmDelete(false);
@@ -667,7 +674,19 @@ export function Composer({
               </Badge>
             ) : null}
             <div className="ms-auto flex shrink-0 items-center gap-2">
-              <TemplatesButton onPick={applyTemplate} disabled={locked} />
+              {/* A published post takes no template, so its place goes to
+                  the post itself, on its platform (2026-11-14). */}
+              {locked && state.published.length > 0 ? (
+                <ViewPublishedPost
+                  links={state.published}
+                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                >
+                  <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
+                  {viewPublishedLabel(state.published)}
+                </ViewPublishedPost>
+              ) : (
+                <TemplatesButton onPick={applyTemplate} disabled={locked} />
+              )}
               <DraftsButton onClick={() => setDraftsOpen(true)} />
               {state.group ? (
                 <a
@@ -861,29 +880,6 @@ export function Composer({
               </div>
             )}
           </div>
-
-          {settingsBlocks.length > 0 ? (
-            <div
-              className={cn(
-                'flex min-h-0 shrink-0 flex-col px-5 pb-5',
-                // Centred with the writing in fullscreen: see above.
-                '[&>*]:mx-auto [&>*]:w-full',
-                fullscreen ? '[&>*]:max-w-3xl' : '[&>*]:max-w-full',
-                resizeAnimated &&
-                  '[&>*]:transition-[max-width] [&>*]:duration-400 [&>*]:ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:[&>*]:transition-none',
-              )}
-            >
-              <SettingsBar
-                title={scopeChannel ? `${scopeChannel.name} Settings` : 'Settings'}
-                blocks={settingsBlocks}
-                headed={!scopeChannel}
-                open={settingsOpen}
-                onOpenChange={setSettingsOpen}
-                onChange={changeSetting}
-                disabled={locked}
-              />
-            </div>
-          ) : null}
         </section>
 
         <aside
@@ -952,33 +948,16 @@ export function Composer({
 
       {notice ? (
         <div className="shrink-0 border-t-2 border-outline px-5 py-3">
-          {notice.kind === 'blockers' ? (
-            <Alert variant="danger">
-              {/* Alert lays its children out in a row, for an icon beside content. */}
-              <div className="flex flex-col gap-1">
-                <AlertTitle>Not ready for the queue yet</AlertTitle>
-                <ul className="m-0 list-disc ps-5">
-                  {notice.items.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-                <span>It can still be saved as a draft.</span>
-              </div>
-            </Alert>
-          ) : notice.kind === 'conflict' ? (
-            <Alert variant="danger">
-              {notice.message}{' '}
-              <button
-                type="button"
-                className="font-bold underline"
-                onClick={() => window.location.reload()}
-              >
-                Reload
-              </button>
-            </Alert>
-          ) : (
-            <Alert variant="danger">{notice.message}</Alert>
-          )}
+          <Alert variant="danger">
+            {notice.message}{' '}
+            <button
+              type="button"
+              className="font-bold underline"
+              onClick={() => window.location.reload()}
+            >
+              Reload
+            </button>
+          </Alert>
         </div>
       ) : null}
 
@@ -996,6 +975,17 @@ export function Composer({
             onChange={(value) => dispatch({ type: 'setRepeat', value })}
             disabled={locked}
           />
+          {settingsBlocks.length > 0 ? (
+            <SettingsBar
+              title={scopeChannel ? `${scopeChannel.name} Settings` : 'Settings'}
+              blocks={settingsBlocks}
+              headed={!scopeChannel}
+              open={settingsOpen}
+              onOpenChange={setSettingsOpen}
+              onChange={changeSetting}
+              disabled={locked}
+            />
+          ) : null}
         </div>
 
         <p aria-live="polite" className="m-0 me-auto flex flex-col font-sans text-xs text-ink">
@@ -1008,12 +998,6 @@ export function Composer({
                   ? 'All changes saved'
                   : ''}
           </span>
-          {blockers.length > 0 && selectedChannels.length > 0 ? (
-            <span className="text-dangerInk">
-              {blockers.length} {blockers.length === 1 ? 'issue' : 'issues'} to fix before
-              scheduling
-            </span>
-          ) : null}
         </p>
 
         <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">

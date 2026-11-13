@@ -38,6 +38,7 @@ import { isSafeHref } from '@postgear/social-core/composer';
 import {
   Button,
   cn,
+  FIELD_FOCUS_WITHIN,
   Input,
   MotionIcon,
   Popover,
@@ -151,7 +152,8 @@ export function PostEditor({
     <div
       className={cn(
         'pg-editor flex flex-col rounded-lg border-2 border-outline bg-field shadow-surfaceSm',
-        'focus-within:outline focus-within:outline-[3px] focus-within:outline-offset-2 focus-within:outline-focusRing',
+        // The plain blue line every focused field has, not the orange ring.
+        FIELD_FOCUS_WITHIN,
         tall ? '[&_.ProseMirror]:min-h-48' : '[&_.ProseMirror]:min-h-20',
       )}
     >

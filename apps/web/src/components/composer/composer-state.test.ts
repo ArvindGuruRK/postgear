@@ -193,7 +193,12 @@ describe('composerReducer', () => {
     state = composerReducer(state, {
       type: 'saved',
       revision: sentRevision,
-      post: { group: 'g', updatedAt: '2026-09-14T10:00:00.000Z', state: 'DRAFT' } as PostDetail,
+      post: {
+        group: 'g',
+        updatedAt: '2026-09-14T10:00:00.000Z',
+        state: 'DRAFT',
+        channels: [],
+      } as unknown as PostDetail,
     });
 
     expect(state.group).toBe('g');
@@ -282,6 +287,39 @@ describe('initialComposerState from a saved post', () => {
     expect(isDirty(state)).toBe(true);
   });
 
+  it('keeps where a published post went out, from the load and from a save', () => {
+    const live: PostDetail = {
+      ...saved,
+      state: 'PUBLISHED',
+      channels: saved.channels.map((channel) =>
+        channel.channelId === 'ch_x'
+          ? { ...channel, state: 'PUBLISHED', releaseURL: 'https://x.com/acme/status/1' }
+          : channel.channelId === 'ch_gone'
+            ? { ...channel, state: 'PUBLISHED', releaseURL: 'https://facebook.com/1_2' }
+            : channel,
+      ),
+    };
+
+    const loaded = initialComposerState({
+      post: live,
+      availableChannelIds: new Set(['ch_x', 'ch_li']),
+      now: new Date(),
+    });
+
+    // A disconnected channel's post is still live, so it keeps its link.
+    expect(loaded.published.map((link) => [link.channelId, link.url])).toEqual([
+      ['ch_x', 'https://x.com/acme/status/1'],
+      ['ch_gone', 'https://facebook.com/1_2'],
+    ]);
+    expect(
+      initialComposerState({ post: saved, availableChannelIds: new Set(), now: new Date() })
+        .published,
+    ).toEqual([]);
+
+    const afterSave = composerReducer(fresh(), { type: 'saved', revision: 0, post: live });
+    expect(afterSave.published).toHaveLength(2);
+  });
+
   it('sends the loaded version back, so a stale save is refused', () => {
     const state = initialComposerState({
       post: saved,
@@ -330,7 +368,7 @@ describe('initialComposerState from a saved post', () => {
       post: {
         ...older,
         channels: older.channels.map(({ settings: _settings, ...channel }) => channel),
-      } as unknown as PostDetail,
+      } as PostDetail,
       availableChannelIds: new Set(['ch_x', 'ch_li']),
       now: new Date(),
     });
@@ -366,7 +404,12 @@ describe('tags, repeat and settings', () => {
     state = composerReducer(state, {
       type: 'saved',
       revision: state.revision,
-      post: { group: 'g', updatedAt: '2026-09-14T10:00:00.000Z', state: 'DRAFT' } as PostDetail,
+      post: {
+        group: 'g',
+        updatedAt: '2026-09-14T10:00:00.000Z',
+        state: 'DRAFT',
+        channels: [],
+      } as unknown as PostDetail,
     });
 
     state = composerReducer(state, {

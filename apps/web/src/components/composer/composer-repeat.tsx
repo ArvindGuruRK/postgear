@@ -13,6 +13,7 @@
 import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { RepeatIcon } from '@animateicons/react/lucide/repeat-icon';
 import {
+  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +25,6 @@ import {
 } from '@postgear/ui';
 import { useState } from 'react';
 import { REPEAT_INTERVALS, type RepeatInterval } from '@/types/post';
-import { FIELD_TRIGGER } from './toolbar';
 
 export const REPEAT_LABEL: Record<RepeatInterval, string> = {
   1: 'Every day',
@@ -55,14 +55,14 @@ export function RepeatControl({
     // Modal, like every menu in the composer's dialog: see `DateTimePicker`.
     <DropdownMenu modal open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           disabled={disabled}
-          aria-label={value ? `Repeat: ${REPEAT_LABEL[value]}` : 'Repeat post'}
-          className={cn(FIELD_TRIGGER, 'max-w-60')}
+          aria-label={value ? `Repeat: ${REPEAT_LABEL[value]}` : 'Repeat Post'}
+          className="h-11 max-w-60 px-3 text-sm"
         >
           <MotionIcon icon={RepeatIcon} className="h-4 w-4 shrink-0" />
-          <span className="truncate">{value ? REPEAT_LABEL[value] : 'Repeat post'}</span>
+          <span className="truncate">{value ? REPEAT_LABEL[value] : 'Repeat Post'}</span>
           <MotionIcon
             icon={ChevronDownIcon}
             strokeWidth={3}
@@ -71,7 +71,7 @@ export function RepeatControl({
               open && 'rotate-180',
             )}
           />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-60">
         <DropdownMenuLabel>Repeat Post</DropdownMenuLabel>

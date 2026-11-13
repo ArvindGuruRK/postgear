@@ -1,4 +1,4 @@
-import { cn, FIELD_FOCUS } from '@postgear/ui';
+import { cn } from '@postgear/ui';
 
 /**
  * The editor toolbar's icon buttons and their pressed (format on) state,
@@ -17,16 +17,3 @@ export const TOOL = cn(
 
 export const TOOL_PRESSED =
   'border-outline bg-actionPrimary text-onActionPrimary hover:bg-actionPrimary';
-
-/**
- * A picker trigger in the footer row: the date picker's own look
- * (`CalendarTrigger`), so Tags, Repeat and the date read as one row of
- * fields.
- */
-export const FIELD_TRIGGER = cn(
-  'flex h-11 min-w-0 items-center gap-2 rounded-md border-2 border-outline bg-field px-3',
-  'font-sans text-sm text-ink shadow-surfaceSm',
-  FIELD_FOCUS,
-  'aria-expanded:border-actionPrimary',
-  'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
-);
