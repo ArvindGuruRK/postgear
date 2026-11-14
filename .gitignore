@@ -61,3 +61,7 @@ test-results/
 docs/pdf-inspiration-or-editing/
 # The security review names weak spots; the repo is public, so it stays local
 docs/launch-readiness/04-security-review.md
+# Screenshots of other products (Buffer, Postiz, n8n, StreamLadder, OpusClip, VidsSave)
+# and Claude's own captures: kept on disk, never in the public repo
+docs/screenshots/
+/screenshots/
