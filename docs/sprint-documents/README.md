@@ -28,6 +28,8 @@
 | 10 | [Workflow Builder (Visual Automations)](sprint-10-workflow-builder.md) | New module (background in [`../new-modules/`](../new-modules/README.md)) | Sprint 5, 6, 8 (9 for the Render Design node) |
 | 10b | [Workflow Builder UI Revamp (Immersive Canvas)](sprint-10b-workflow-builder-ui-revamp.md) | None (look and feel of Sprint 10's builder; behaviour unchanged) | Sprint 10 (best after its Module 14) |
 | 11 | [Discover (Location-Aware Trending Content For AI Posts)](sprint-11-discover.md) | New module (research and build plan in [`../sprint-11/`](../sprint-11/README.md)); touches 5.5 AI content | Sprint 4, 6, 7 |
+| 12 | [Clips (Turn Any Long Video Into Short Clips)](sprint-12-clips.md) | New module (research, build plan and real-test plan in [`../sprint-12/`](../sprint-12/README.md)); touches 5.3 composer, 5.4 media, 5.5 AI. Documents written 2026-11-14, not built | Sprint 4, 5, 6, 8, 9, 10 |
+| 13 | [Clips AI (Captions, Smarter AI And Auto-Reframe)](sprint-13-clips-ai.md) | Extends Sprint 12 (research, build plan and real-test plan in [`../sprint-13/`](../sprint-13/README.md)); adds the Python media service. Documents written 2026-11-15, not built; starts only after Sprint 12's exit gate | Sprint 12 |
 
 ## Cross-Cutting Notes
 
