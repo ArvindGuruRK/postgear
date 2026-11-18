@@ -5,7 +5,7 @@
  */
 import { NotificationEmailStatus } from '@postgear/db';
 import { notificationEmail } from '@postgear/email';
-import { AUTOMATION_NOTIFICATION_TYPES } from '@postgear/scheduling';
+import { AUTOMATION_NOTIFICATION_TYPES, CLIP_NOTIFICATION_TYPES } from '@postgear/scheduling';
 import {
   AUDIENCE_BY_TYPE,
   composeEmail,
@@ -191,6 +191,19 @@ describe('the catalogue', () => {
     }
     expect(AUDIENCE_BY_TYPE['automation.failed']).toBe('failure_emails');
     expect(AUDIENCE_BY_TYPE['automation.paused']).toBe('failure_emails');
+  });
+
+  it('knows the Clips import and export types, in the bell only', () => {
+    const clipTypes = [
+      CLIP_NOTIFICATION_TYPES.videoReady,
+      CLIP_NOTIFICATION_TYPES.videoFailed,
+      CLIP_NOTIFICATION_TYPES.exportReady,
+      CLIP_NOTIFICATION_TYPES.exportFailed,
+    ];
+    for (const type of clipTypes) {
+      expect(isNotificationType(type)).toBe(true);
+      expect(AUDIENCE_BY_TYPE[type as keyof typeof AUDIENCE_BY_TYPE]).toBe('none');
+    }
   });
 
   it('recognises its own types and nothing else', () => {

@@ -1,0 +1,28 @@
+{
+  "_type": "video",
+  "id": "v900000001",
+  "extractor": "twitch:vod",
+  "extractor_key": "TwitchVod",
+  "webpage_url": "https://www.twitch.tv/videos/900000001",
+  "title": "PostGear Sample: A Ten Minute Stream",
+  "uploader": "Acme",
+  "uploader_id": "acme",
+  "timestamp": 1767312000,
+  "duration": 600,
+  "is_live": false,
+  "was_live": true,
+  "live_status": "was_live",
+  "thumbnail": "https://img.sim.invalid/twitch/900000001/thumb-1280x720.jpg",
+  "thumbnails": [
+    { "url": "https://img.sim.invalid/twitch/900000001/thumb-320x180.jpg", "width": 320, "height": 180 },
+    { "url": "https://img.sim.invalid/twitch/900000001/thumb-1280x720.jpg", "width": 1280, "height": 720 }
+  ],
+  "formats": [
+    { "format_id": "sb0", "format_note": "storyboard", "ext": "mhtml", "protocol": "mhtml", "vcodec": "none", "acodec": "none", "width": 220, "height": 124, "url": "https://img.sim.invalid/twitch/900000001/storyboard-0.jpg" },
+    { "format_id": "Audio_Only", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "none", "acodec": "mp4a.40.2", "tbr": 160, "url": "https://cdn.sim.invalid/vod/900000001/audio_only/index-dvr.m3u8", "manifest_url": "https://usher.sim.invalid/vod/900000001.m3u8", "http_headers": { "User-Agent": "Mozilla/5.0 (PostGear simulation)", "Accept": "*/*" } },
+    { "format_id": "480p30", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "avc1.4D401E", "acodec": "mp4a.40.2", "width": 852, "height": 480, "fps": 30, "tbr": 1430, "url": "https://cdn.sim.invalid/vod/900000001/480p30/index-dvr.m3u8", "manifest_url": "https://usher.sim.invalid/vod/900000001.m3u8" },
+    { "format_id": "720p60", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "avc1.4D4020", "acodec": "mp4a.40.2", "width": 1280, "height": 720, "fps": 60, "tbr": 3420, "url": "https://cdn.sim.invalid/vod/900000001/720p60/index-dvr.m3u8", "manifest_url": "https://usher.sim.invalid/vod/900000001.m3u8" },
+    { "format_id": "1080p60", "format_note": "source", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "avc1.64002A", "acodec": "mp4a.40.2", "width": 1920, "height": 1080, "fps": 60, "tbr": 6210, "url": "https://cdn.sim.invalid/vod/900000001/chunked/index-dvr.m3u8", "manifest_url": "https://usher.sim.invalid/vod/900000001.m3u8", "http_headers": { "User-Agent": "Mozilla/5.0 (PostGear simulation)", "Accept": "*/*", "X-Not-Forwarded": "secret" } },
+    { "format_id": "1080p60-av1", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "av01.0.09M.08", "acodec": "mp4a.40.2", "width": 1920, "height": 1080, "fps": 60, "tbr": 5100, "url": "https://cdn.sim.invalid/vod/900000001/av1/index-dvr.m3u8" }
+  ]
+}

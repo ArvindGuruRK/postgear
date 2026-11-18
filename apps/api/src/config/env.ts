@@ -10,7 +10,26 @@
  * validates request bodies in `common/pipes/zod-validation.pipe.ts`: one
  * validation vocabulary across the app.
  */
+import { CLIP_PLATFORMS } from '@postgear/video-engine';
 import { z } from 'zod';
+
+/**
+ * A comma-separated variable as a list of distinct values, each checked by
+ * `item`: `"twitch, kick"` is `['twitch', 'kick']`. Empty entries are dropped,
+ * so `""` is an empty list. The default is given as the raw string.
+ */
+function commaList<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .string()
+    .transform((raw) =>
+      raw
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0),
+    )
+    .pipe(z.array(item))
+    .transform((values) => [...new Set(values)] as Array<z.output<T>>);
+}
 
 /** The local sender. Refused in production, where it would never deliver. */
 export const DEFAULT_MAIL_FROM = 'PostGear <no-reply@postgear.local>';
@@ -143,16 +162,18 @@ const envSchema = z
     // Media storage (Sprint 4). One variable picks the backend, which is the
     // factory pattern the sprint document asks for: develop against local disk,
     // deploy against S3 or any S3-compatible store (MinIO, Cloudflare R2) without
-    // a code change. See `modules/media/storage/storage.factory.ts`.
+    // a code change. See `packages/storage/src/storage.factory.ts`.
     //
     // `local` is the default so a fresh clone uploads with no extra setup. It is
     // not suitable for production publishing: Instagram, Facebook, Pinterest and
     // TikTok fetch media from its URL themselves, and a localhost URL is
     // unreachable to them.
     STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
-    // Absent means `apps/api/uploads`, resolved from the API package rather than
-    // the working directory: `npm run dev:api` and `npm run dev:api:e2e` start
-    // from different directories and would otherwise write to two places.
+    // Absent means the repo root's `apps/api/uploads`, found from the workspace
+    // root rather than the working directory, so the API and the worker (Sprint
+    // 12) land on the same folder whichever directory they start from. When set,
+    // use an absolute path. Clips' private files go beside it, in
+    // `uploads-private`, which is never served by key.
     UPLOAD_DIRECTORY: z.string().min(1).optional(),
     S3_ENDPOINT: z.string().url().optional(),
     S3_REGION: z.string().min(1).default('us-east-1'),
@@ -359,6 +380,35 @@ const envSchema = z
     // Where mail meant for the people running PostGear goes (cancellation
     // feedback). Never the From address: nobody reads a no-reply inbox.
     OWNER_EMAIL: blankAsUnset(z.string().email().optional()),
+
+    // Clips (Sprint 12). `CLIPS_SIMULATION=true` binds the link probe, the
+    // downloader and the channel lists to fixtures (no platform is ever
+    // contacted); refused in production below.
+    CLIPS_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // Which platforms may be imported from and browsed. YouTube is switched on
+    // in production only after the legal read (D12-15): one value to change.
+    CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
+    // Signs the private file links (`/clips/files/<token>`) of the local
+    // storage binding. Optional in development (a fixed development key is
+    // used), required in production below.
+    CLIPS_URL_SECRET: blankAsUnset(
+      z.string().min(MIN_SECRET_LENGTH, 'CLIPS_URL_SECRET must be at least 32 characters').optional(),
+    ),
+    // The private bucket of the S3 binding. Never public.
+    CLIPS_PRIVATE_BUCKET: blankAsUnset(z.string().min(3).default('postgear-clips')),
+    // In production only these addresses count as platform operators (the
+    // entitlement screens, the library, removal). Ignored in development.
+    OPERATOR_EMAILS: blankAsUnset(commaList(z.string().trim().toLowerCase().email()).default('')),
+    // `seed` answers every entitlement from the constants in
+    // `@postgear/entitlements` and ignores the tables: the kill switch for a
+    // bad plan edit. Needs a restart.
+    ENTITLEMENTS_SOURCE: blankAsUnset(z.enum(['db', 'seed']).default('db')),
+    // Channel lists (Module 03): a dedicated Twitch application, and a YouTube
+    // Data API key from a Google project separate from the publishing one.
+    // Without them that platform's list says it is not set up.
+    TWITCH_CLIENT_ID: blankAsUnset(z.string().min(1).optional()),
+    TWITCH_CLIENT_SECRET: blankAsUnset(z.string().min(1).optional()),
+    CLIPS_YOUTUBE_API_KEY: blankAsUnset(z.string().min(1).optional()),
   })
   .superRefine((env, context) => {
     // Simulated AI output must never reach a real audience. In production the
@@ -467,6 +517,27 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['DISCOVER_SIMULATION'],
         message: 'DISCOVER_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+    if (env.NODE_ENV === 'production' && env.CLIPS_SIMULATION === 'true') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CLIPS_SIMULATION'],
+        message: 'CLIPS_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+    if (env.NODE_ENV === 'production' && !env.CLIPS_URL_SECRET) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CLIPS_URL_SECRET'],
+        message: 'CLIPS_URL_SECRET is required when NODE_ENV=production',
+      });
+    }
+    if (Boolean(env.TWITCH_CLIENT_ID) !== Boolean(env.TWITCH_CLIENT_SECRET)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [env.TWITCH_CLIENT_ID ? 'TWITCH_CLIENT_SECRET' : 'TWITCH_CLIENT_ID'],
+        message: 'TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET must be set together',
       });
     }
     // Stripe needs both halves: a secret key to call it and a signing secret

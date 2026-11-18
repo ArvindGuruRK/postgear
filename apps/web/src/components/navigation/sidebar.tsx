@@ -19,6 +19,12 @@ interface SidebarItemBase {
   label: string;
   href: string;
   active?: boolean;
+  /**
+   * A desktop-only module (Clips): on the rail, never in the phone's tab bar
+   * or its More sheet, since the page itself only says to open it on a bigger
+   * screen there.
+   */
+  desktopOnly?: boolean;
 }
 
 /** Either a static lucide glyph or an animated one, never both. */
@@ -166,7 +172,7 @@ export function TabBar({
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreIcon = useIconAnimation();
-  const all = [...items, ...bottomItems];
+  const all = [...items, ...bottomItems].filter((item) => !item.desktopOnly);
   const fits = all.length <= TAB_SLOTS;
   const shown = fits ? all : all.slice(0, TAB_SLOTS - 1);
   const overflow = fits ? [] : all.slice(TAB_SLOTS - 1);

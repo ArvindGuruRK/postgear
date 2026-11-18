@@ -1,6 +1,6 @@
 # Module 01: Contracts And Data
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session, may need a second: the entitlement foundation is Part B, see Tasks)
+> **Sprint 12, Clips** | Status: Done (2026-11-18) | Size: L (one full session, may need a second: the entitlement foundation is Part B, see Tasks)
 > **Depends on**: nothing (first module; creates the branch)
 > **Stories**: foundations for every story; CL-1.1 (the rail entry, the tabs, the small-screen sentence); the tables behind CL-1.7 (channels), CL-7.5 and CL-9.4 (favourites), CL-13.6 and CL-13.7 (operator editing and the library)
 > **Next**: [Module 02](module-02-media-runtime.md) (Media Runtime)
@@ -85,7 +85,7 @@ The Clips keys (placeholders the operator edits; `clips.downloads_per_day` is a 
 | `clips.queue_priority` | enum `low, normal, high` | low | normal | normal | high | high |
 | `clips.browse_channels` | number (channels a workspace may add) | 1 | 3 | 5 | 10 | 20 |
 
-Refusal codes are fixed here so every module uses the same ones: `clips_not_in_plan`, `clips_video_too_long`, `clips_minutes_used` (renamed from `clips_hours_used`), `clips_storage_full`, `clips_upload_too_big`, `clips_quality_requires_plan`, `clips_ai_minutes_used`, `clips_downloads_today`, `clips_channel_limit`.
+Refusal codes are fixed here so every module uses the same ones: `clips_not_in_plan`, `clips_video_too_long`, `clips_minutes_used` (renamed from `clips_hours_used`), `clips_storage_full`, `clips_upload_too_big`, `clips_quality_requires_plan`, `clips_ai_minutes_used`, `clips_downloads_today`, `channel_limit`.
 
 Tests: `validateValue` per type and edge; resolve order including an expired override and a stored value that fails validation; `toMilli` and the display rounding; `cycleFor` with its old tests; every message gives whole numbers; a **registry and seed agreement** test (every key has all five tiers, every seed value passes `validateValue`, no key in the seed is missing in code).
 
@@ -156,26 +156,26 @@ A third migration, from research 10 section 6 and research 11 section 6.1 (Modul
 
 Part A (first session):
 
-- [ ] Branch `sprint-12-clips`; note it in the README.
-- [ ] `packages/video-engine` scaffold, tsconfig paths, the purity test, the empty `src/render/` with its README note.
-- [ ] Document schema, `upgrade`, `createClipDocument`, limits (`CLIP_MAX_MS` 30 minutes), canvases.
-- [ ] Time map, edits, formatters, geometry, `aiMinutesCost`, with tests.
-- [ ] Job, link, signal and transcript types.
-- [ ] `packages/scheduling/src/clips.ts` and its export.
-- [ ] Clips tables migration, generate, SCHEMA_NOTES.
-- [ ] Library and channel tables migration with the raw search SQL.
-- [ ] Env flags in the API and the worker with production refusals; `.env.example`.
-- [ ] Rail entry, title, the page with four tabs, `ClipsDesktopOnly`; title-case test green.
+- [x] Branch `sprint-12-clips`; note it in the README.
+- [x] `packages/video-engine` scaffold, tsconfig paths, the purity test, the empty `src/render/` with its README note.
+- [x] Document schema, `upgrade`, `createClipDocument`, limits (`CLIP_MAX_MS` 30 minutes), canvases.
+- [x] Time map, edits, formatters, geometry, `aiMinutesCost`, with tests.
+- [x] Job, link, signal and transcript types.
+- [x] `packages/scheduling/src/clips.ts` and its export.
+- [x] Clips tables migration, generate, SCHEMA_NOTES.
+- [x] Library and channel tables migration with the raw search SQL.
+- [x] Env flags in the API and the worker with production refusals; `.env.example`.
+- [x] Rail entry, title, the page with four tabs, `ClipsDesktopOnly`; title-case test green.
 
 Part B (the entitlement foundation, a second session if the first is full):
 
-- [ ] `packages/entitlements`: registry, Clips keys, seed, validate, resolve, cycle (moved, re-exported), units, messages, with tests.
-- [ ] Entitlement tables migration with the 65 seed rows; the registry and seed agreement test.
-- [ ] `EntitlementsModule`: resolver, usage service, the refusal exception, the cache and stamps, `GET /entitlements/me`, the kill switch.
-- [ ] The webhook writes the org stamp; `GET /billing/plans` gains `entitlements`; plan cards read their Clips lines from it.
-- [ ] Remove the `clips` object, `clipLimitsFor` and the upload constant from `plans.ts`.
-- [ ] `lib/entitlements.ts` and its store on the web.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `packages/entitlements`: registry, Clips keys, seed, validate, resolve, cycle (moved, re-exported), units, messages, with tests.
+- [x] Entitlement tables migration with the 65 seed rows; the registry and seed agreement test.
+- [x] `EntitlementsModule`: resolver, usage service, the refusal exception, the cache and stamps, `GET /entitlements/me`, the kill switch.
+- [x] The webhook writes the org stamp; `GET /billing/plans` gains `entitlements`; plan cards read their Clips lines from it.
+- [x] Remove the `clips` object, `clipLimitsFor` and the upload constant from `plans.ts`.
+- [x] `lib/entitlements.ts` and its store on the web.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

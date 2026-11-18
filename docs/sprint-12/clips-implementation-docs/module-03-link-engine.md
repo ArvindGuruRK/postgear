@@ -1,6 +1,6 @@
 # Module 03: Link Engine
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-18: the link spike waits for Arvind's OK) | Size: L (one full session)
 > **Depends on**: [Module 02](module-02-media-runtime.md)
 > **Stories**: CL-1.2 (server side), CL-13.4; CL-1.7 (server side: the channel lister and its routes, Add A Channel And Browse Its Streams) and CL-1.8 (the hidden ids); foundations for CL-1.4, CL-12.1
 > **Next**: [Module 04](module-04-import-pipeline.md) (Import Pipeline)
@@ -99,14 +99,14 @@ A selector picks the binding per call: the official one first; the flat lister o
 
 | Route | What |
 |---|---|
-| `POST /clips/channels` `{ platform, handle }` | Validate, resolve, create a `ClipChannel`. 402 `clips_channel_limit` over the plan (`clips.browse_channels` through the resolver: Free 1, Standard 3, Pro 5, Team 10, Ultimate 20) |
+| `POST /clips/channels` `{ platform, handle }` | Validate, resolve, create a `ClipChannel`. 402 `channel_limit` over the plan (`clips.browse_channels` through the resolver: Free 1, Standard 3, Pro 5, Team 10, Ultimate 20) |
 | `GET /clips/channels` | The workspace's channels |
 | `GET /clips/channels/:id/streams?kind&cursor&sort&hidden` | One page of 50 items. `sort` is `newest` or `views` (YouTube lists newest first only, so `views` is refused for it with a sentence). Items hidden by this workspace are left out unless `hidden=true`. Each item carries `imported: true` and the `videoId` when this workspace already has it |
 | `PUT /clips/channels/:id/hidden/:externalId`, `DELETE` the same path | Hide and unhide one item (ids only, never titles) |
 | `DELETE /clips/channels/:id` | Remove the channel and its hidden ids |
 | `POST /clips/channels/:id/refresh` | Drop the cache for this channel (one a 30 seconds) |
 
-Messages (in `clips.messages.ts`): `channel_not_found` "We could not find that channel. Check the spelling."; `clips_channel_limit` "Your plan allows {n} channels. Remove one to add another."; `list_unavailable` "This channel's list is not available right now. Try again in a few minutes."; `quota_exhausted` "We have reached today's limit for YouTube lists. Try again tomorrow, or paste a video link."; `platform_changed` "We could not read this list. We are looking into it. You can paste a link instead."
+Messages (in `clips.messages.ts`): `channel_not_found` "We could not find that channel. Check the spelling."; `channel_limit` "Your plan allows {n} channels. Remove one to add another."; `list_unavailable` "This channel's list is not available right now. Try again in a few minutes."; `quota_exhausted` "We have reached today's limit for YouTube lists. Try again tomorrow, or paste a video link."; `platform_changed` "We could not read this list. We are looking into it. You can paste a link instead."
 
 **Registration and keys guide.** This feature registers a Twitch application, which binds PostGear to Twitch's Developer Services Agreement; so use a **dedicated Twitch application** for listing only (a revoked app then touches nothing else). Add to the keys guide (`docs/sprint-12/` and `.env.example`): create the app at dev.twitch.tv/console (category "Website Integration", OAuth redirect `http://localhost` is enough because no user logs in), copy the **Client ID** into `TWITCH_CLIENT_ID`, press **New Secret** and copy it into `TWITCH_CLIENT_SECRET` (shown once). For YouTube: a **separate** Google Cloud project, enable "YouTube Data API v3", create an API key restricted to that API and the server's address, and put it in `CLIPS_YOUTUBE_API_KEY`. Neither key is ever logged (the logger redacts both names and the token).
 
@@ -131,20 +131,20 @@ Run once, with links and channels Arvind supplies, and write `../research/14-lin
 
 ## Tasks
 
-- [ ] `recogniseLink` with its table tests.
-- [ ] The yt-dlp binding: argument base, `probe`, `fetchProxy`, `fetchRange` (both strategies), `fetchFormat`, the error mapper.
-- [ ] The playlist slicer with tests.
-- [ ] `npm run clips:samples`, the sample facts JSON, the chat fixture, the fixture binding.
-- [ ] Both bindings in `createClipProviders`; the doctor warns when yt-dlp is missing outside simulation.
-- [ ] Platform switch, breaker, throttle.
-- [ ] `clipProbeWorkflow`, `ClipLinksService`, `POST /clips/links/probe`, the thumbnail route, messages.
-- [ ] `validateHandle` and the canonical link builder for listed items.
-- [ ] `ChannelLister`: the four bindings, the selector, the cache, the throttles and the YouTube 60 percent counter, the listing yt-dlp argument builder and its allowlist.
-- [ ] The simulated lister and its `simstreamer` fixtures.
-- [ ] `ClipChannel` routes (`POST`, `GET`, `streams`, hide and unhide, `DELETE`, refresh), the entitlement `clips.browse_channels`, messages.
-- [ ] `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` and `CLIPS_YOUTUBE_API_KEY` in the API env, `.env.example` and the keys guide; log redaction.
+- [x] `recogniseLink` with its table tests.
+- [x] The yt-dlp binding: argument base, `probe`, `fetchProxy`, `fetchRange` (both strategies), `fetchFormat`, the error mapper.
+- [x] The playlist slicer with tests.
+- [x] `npm run clips:samples`, the sample facts JSON, the chat fixture, the fixture binding.
+- [x] Both bindings in `createClipProviders`; the doctor warns when yt-dlp is missing outside simulation.
+- [x] Platform switch, breaker, throttle.
+- [x] `clipProbeWorkflow`, `ClipLinksService`, `POST /clips/links/probe`, the thumbnail route, messages.
+- [x] `validateHandle` and the canonical link builder for listed items.
+- [x] `ChannelLister`: the four bindings, the selector, the cache, the throttles and the YouTube 60 percent counter, the listing yt-dlp argument builder and its allowlist.
+- [x] The simulated lister and its `simstreamer` fixtures.
+- [x] `ClipChannel` routes (`POST`, `GET`, `streams`, hide and unhide, `DELETE`, refresh), the entitlement `clips.browse_channels`, messages.
+- [x] `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` and `CLIPS_YOUTUBE_API_KEY` in the API env, `.env.example` and the keys guide; log redaction.
 - [ ] The spike and `14-link-spike-report.md` (only with Arvind's OK).
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 
@@ -164,7 +164,7 @@ npm run clips:samples
 - With YouTube removed from `CLIPS_PLATFORMS`, a YouTube link answers `platform_paused` and Twitch still works.
 - With the worker stopped, the probe route answers within about 25 seconds with a plain sentence, not a hang.
 - Under simulation, adding `simstreamer` on each platform lists about 30 items in pages of 50 or fewer; a second call inside ten minutes does not call the binding again; hiding an item removes it from the list and `hidden=true` brings it back.
-- A workspace over its `clips.browse_channels` limit gets 402 `clips_channel_limit` with the plan's number in the sentence; another workspace's channel id answers 404.
+- A workspace over its `clips.browse_channels` limit gets 402 `channel_limit` with the plan's number in the sentence; another workspace's channel id answers 404.
 - With both Twitch keys unset, a Twitch channel falls back to flat listing (simulated); a stale cache older than 24 hours is never served.
 - No listing answer contains a download address, and no log line contains either Twitch value or the token.
 

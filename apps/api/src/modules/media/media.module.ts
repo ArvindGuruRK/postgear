@@ -4,8 +4,32 @@ import type { Env } from '../../config/env';
 import { MediaController } from './media.controller';
 import { MediaRepository } from './media.repository';
 import { MediaService } from './media.service';
-import { STORAGE_BACKEND } from './storage/storage.interface';
-import { createStorage, type StorageConfig } from './storage/storage.factory';
+import { PRIVATE_STORAGE, STORAGE_BACKEND } from './storage/storage.interface';
+import {
+  createPrivateStorage,
+  createStorage,
+  type PrivateStorageConfig,
+  type StorageConfig,
+} from '@postgear/storage';
+
+/** Sprint 12: the Clips private space, from the same variables plus its own bucket and key. */
+export function privateStorageConfigFrom(config: ConfigService<Env, true>): PrivateStorageConfig {
+  return {
+    provider: config.get('STORAGE_PROVIDER', { infer: true }),
+    nodeEnv: config.get('NODE_ENV', { infer: true }),
+    uploadDirectory: config.get('UPLOAD_DIRECTORY', { infer: true }),
+    apiUrl: config.get('API_URL', { infer: true }),
+    urlSecret: config.get('CLIPS_URL_SECRET', { infer: true }),
+    s3: {
+      endpoint: config.get('S3_ENDPOINT', { infer: true }),
+      region: config.get('S3_REGION', { infer: true }),
+      bucket: config.get('CLIPS_PRIVATE_BUCKET', { infer: true }),
+      accessKeyId: config.get('S3_ACCESS_KEY', { infer: true }),
+      secretAccessKey: config.get('S3_SECRET_KEY', { infer: true }),
+      forcePathStyle: config.get('S3_FORCE_PATH_STYLE', { infer: true }),
+    },
+  };
+}
 
 /**
  * Builds storage config from validated environment values.
@@ -54,7 +78,15 @@ export function storageConfigFrom(config: ConfigService<Env, true>): StorageConf
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => createStorage(storageConfigFrom(config)),
     },
+    // Sprint 12: the Clips private space (imported videos, previews, exports
+    // before they become Media). Refused on local disk in production.
+    {
+      provide: PRIVATE_STORAGE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) =>
+        createPrivateStorage(privateStorageConfigFrom(config)),
+    },
   ],
-  exports: [MediaService, STORAGE_BACKEND],
+  exports: [MediaService, STORAGE_BACKEND, PRIVATE_STORAGE],
 })
 export class MediaModule {}

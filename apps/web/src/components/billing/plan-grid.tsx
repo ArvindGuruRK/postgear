@@ -69,7 +69,8 @@ export function PlanGrid({
         {plans.map((plan) => {
           const action = planAction(plan, period, view, canManage);
           const price = planPrice(plan, period);
-          const current = action.kind === 'current' || (plan.tier === 'FREE' && view.tier === 'FREE');
+          const current =
+            action.kind === 'current' || (plan.tier === 'FREE' && view.tier === 'FREE');
           const callsStripe = action.kind !== 'current' && action.kind !== 'free';
           const busy = busyTier === plan.tier;
 
@@ -83,7 +84,9 @@ export function PlanGrid({
               price={price.amount}
               period={price.per}
               description={price.note ?? plan.description}
-              features={plan.features}
+              features={
+                plan.clipsLines?.length ? [...plan.features, ...plan.clipsLines] : plan.features
+              }
               highlighted={plan.highlighted}
               badge={current ? 'Current' : plan.highlighted ? 'Popular' : undefined}
               actionLabel={busy ? 'Opening…' : action.label}

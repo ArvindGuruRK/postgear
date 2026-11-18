@@ -3,6 +3,7 @@
 // Per-icon subpaths rather than the `lucide` barrel, so dev compiles the
 // rail's icons and not all of them.
 import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
+import { ClapperboardIcon } from '@animateicons/react/lucide/clapperboard-icon';
 import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
 import { CompassIcon } from '@animateicons/react/lucide/compass-icon';
 import { HouseIcon } from '@animateicons/react/lucide/house-icon';
@@ -36,7 +37,9 @@ import type { SidebarItem } from './sidebar';
  * under a 20px icon in a 64px tile; the top bar shows the page's full name.
  *
  * Studio (Sprint 9) sits right after Media: it makes the images Media keeps.
- * Workflows (Sprint 10) follows Studio: it puts the other pages to work.
+ * Clips (Sprint 12) follows Studio: long videos into short clips, the other
+ * maker of things to post.
+ * Workflows (Sprint 10) follows Clips: it puts the other pages to work.
  * Discover (Sprint 11) follows Workflows: what to post about, where the
  * audience is. On a phone the first four stay in the tab bar and the rest,
  * Discover among them, open from More (`TabBar` in sidebar.tsx).
@@ -46,7 +49,7 @@ import type { SidebarItem } from './sidebar';
  * page button and each channel's menu) and from Home, and their routes stay
  * as they were.
  */
-const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
+const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon; desktopOnly?: boolean }> = [
   { segment: 'home', label: 'Home', icon: HouseIcon },
   { segment: 'calendar', label: 'Calendar', icon: CalendarDaysIcon },
   { segment: 'ai-copilot', label: 'Copilot', icon: SparklesIcon },
@@ -54,6 +57,7 @@ const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon }> = [
   { segment: 'analytics', label: 'Analytics', icon: ChartColumnIcon },
   { segment: 'media', label: 'Media', icon: ImageIcon },
   { segment: 'studio', label: 'Studio', icon: PaletteIcon },
+  { segment: 'clips', label: 'Clips', icon: ClapperboardIcon, desktopOnly: true },
   { segment: 'workflows', label: 'Workflows', icon: WorkflowIcon },
   { segment: 'discover', label: 'Discover', icon: CompassIcon },
   { segment: 'seo-analyzer', label: 'SEO', icon: SearchIcon },
@@ -68,6 +72,7 @@ const TITLES: Record<string, string> = {
   analytics: 'Analytics',
   media: 'Media',
   studio: 'Design Studio',
+  clips: 'Clips',
   workflows: 'Workflows',
   discover: 'Discover',
   'seo-analyzer': 'SEO Analyzer',
@@ -141,6 +146,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
     href: `${base}/${item.segment}`,
     animatedIcon: item.icon,
     active: segment === item.segment,
+    desktopOnly: item.desktopOnly,
   }));
 
   // Billing lives in Settings only (2026-10-18): whether it earns a rail

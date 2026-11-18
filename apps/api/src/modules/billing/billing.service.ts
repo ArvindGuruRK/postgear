@@ -29,6 +29,8 @@
  * and a `sub_sim_…` subscription are written), so every flow on the page
  * can be exercised against the seeded workspace.
  */
+
+import { randomUUID } from 'node:crypto';
 import {
   HttpException,
   Inject,
@@ -39,7 +41,14 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
+import {
+  KEYS,
+  type Key,
+  planCardLines,
+  resolveValue,
+  TIER_SEED,
+  TIERS,
+} from '@postgear/entitlements';
 import type { Env } from '../../config/env';
 import { cycleFor } from '../ai/credits/credits.policy';
 import { MailService } from '../mail/mail.service';
@@ -55,7 +64,7 @@ import type {
   SubscriptionView,
 } from './billing.types';
 import type { CancelInput, PlanSelectionInput } from './dto/billing.schema';
-import { EntitlementsService, channelLimitOf } from './entitlements.service';
+import { channelLimitOf, EntitlementsService } from './entitlements.service';
 import {
   allowanceFor,
   type Entitlement,
@@ -66,6 +75,15 @@ import {
   resolveEntitlement,
 } from './plans';
 import { STRIPE_GATEWAY, type StripeGateway } from './stripe.client';
+
+/**
+ * A plan card's data (Sprint 12): the plan, its entitlement values (null
+ * when the table could not be read) and its Clips lines, one sentence each.
+ */
+export interface PlanWithEntitlements extends Plan {
+  entitlements: Record<Key, unknown> | null;
+  clipsLines: string[];
+}
 
 /** A row with a Stripe (or simulated) subscription behind it that can still be acted on. */
 type ChangeableOrg = OrgBilling & {
@@ -88,7 +106,11 @@ export class BillingService {
     configService: ConfigService<Env, true>,
   ) {
     this.ownerAddress = configService.get('OWNER_EMAIL', { infer: true }) ?? null;
+    this.entitlementsSource =
+      configService.get('ENTITLEMENTS_SOURCE', { infer: true }) === 'seed' ? 'seed' : 'db';
   }
+
+  private readonly entitlementsSource: 'db' | 'seed';
 
   /** `GET /billing/status`. */
   status(): BillingStatus {
@@ -100,8 +122,60 @@ export class BillingService {
   }
 
   /** `GET /billing/plans`. */
-  plans(): { plans: Plan[]; trialDays: number } {
-    return { plans: PLAN_ORDER.map(planFor), trialDays: this.config.trialDays };
+  async plans(): Promise<{ plans: PlanWithEntitlements[]; trialDays: number }> {
+    const values = await this.planEntitlementValues();
+    return {
+      plans: PLAN_ORDER.map((tier) => {
+        const entitlements = values?.get(tier) ?? null;
+        return {
+          ...planFor(tier),
+          entitlements,
+          clipsLines: entitlements ? planCardLines(entitlements) : [],
+        };
+      }),
+      trialDays: this.config.trialDays,
+    };
+  }
+
+  /**
+   * Sprint 12: each tier's plan values, resolved by the same pure `resolve`
+   * every gate uses, from the same `PlanEntitlement` rows (or `TIER_SEED`
+   * under the kill switch), so a plan card can never promise what a gate
+   * refuses. Read here rather than through the entitlements module, which
+   * imports billing. Null when the table cannot be read: the cards then
+   * show no Clips lines instead of guessed ones.
+   */
+  private async planEntitlementValues(): Promise<Map<string, Record<Key, unknown>> | null> {
+    const now = new Date();
+    let rows: Array<{ tier: string; key: string; value: unknown }> = [];
+    if (this.entitlementsSource !== 'seed') {
+      try {
+        rows = await this.repository.planEntitlementRows();
+      } catch (error) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'billing.plan_entitlements_unavailable',
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return null;
+      }
+    }
+
+    const result = new Map<string, Record<Key, unknown>>();
+    for (const tier of TIERS) {
+      const stored = new Map(
+        rows.filter((row) => row.tier === tier).map((row) => [row.key, row.value]),
+      );
+      const values = {} as Record<Key, unknown>;
+      for (const key of KEYS) {
+        const planValue =
+          this.entitlementsSource === 'seed' ? TIER_SEED[tier][key] : stored.get(key);
+        values[key] = resolveValue(key, { planValue, now });
+      }
+      result.set(tier, values);
+    }
+    return result;
   }
 
   /** `GET /billing/subscription`: the entitlement and both usage meters. */

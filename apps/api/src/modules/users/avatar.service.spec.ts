@@ -28,7 +28,7 @@ import {
 import { prisma } from '@postgear/db';
 import sharp from 'sharp';
 import type { StorageBackend } from '../media/storage/storage.interface';
-import { isAvatarKey } from '../media/storage/storage-keys';
+import { isAvatarKey } from '@postgear/storage';
 import { AvatarService, MAX_AVATAR_UPLOAD_BYTES } from './avatar.service';
 
 const db = prisma as unknown as {

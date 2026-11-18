@@ -79,11 +79,11 @@ function build(
 }
 
 describe('BillingService', () => {
-  it('reports the status and the plan table', () => {
+  it('reports the status and the plan table', async () => {
     const { service } = build(new FakeBillingStore(), { mode: 'simulation', publishableKey: null });
 
     expect(service.status()).toEqual({ mode: 'simulation', publishableKey: null, trialDays: 14 });
-    expect(service.plans().plans.map((plan) => plan.tier)).toEqual([
+    expect((await service.plans()).plans.map((plan) => plan.tier)).toEqual([
       'FREE',
       'STANDARD',
       'PRO',

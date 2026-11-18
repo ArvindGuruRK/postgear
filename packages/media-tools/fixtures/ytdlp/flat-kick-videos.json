@@ -1,0 +1,14 @@
+{
+  "_type": "playlist",
+  "id": "acme",
+  "title": "acme",
+  "channel": "Acme",
+  "uploader": "acme",
+  "extractor": "kick:videos",
+  "entries": [
+    { "_type": "url", "ie_key": "KickVOD", "id": "00000000-0000-4000-8000-000000000103", "url": "https://kick.com/acme/videos/00000000-0000-4000-8000-000000000103", "title": "Acme On Kick: Co-op Night", "duration": 600, "view_count": 2240, "timestamp": 1767312000, "thumbnail": "https://img.sim.invalid/kick/103.webp" },
+    { "_type": "url", "ie_key": "KickVOD", "id": "00000000-0000-4000-8000-000000000104", "url": "https://kick.com/acme/videos/00000000-0000-4000-8000-000000000104", "title": "Acme On Kick: Base Building", "duration": null, "upload_date": "20260101" },
+    { "_type": "url", "ie_key": "KickVOD", "id": "not-a-uuid", "url": "https://kick.com/acme/videos/not-a-uuid", "title": "Dropped: the id does not fit" },
+    { "_type": "url", "ie_key": "KickVOD", "id": "00000000-0000-4000-8000-000000000105", "url": "https://kick.com/acme/videos/00000000-0000-4000-8000-000000000105", "title": "Acme On Kick: Viewer Games", "live_status": "is_live", "thumbnail": "http://img.sim.invalid/insecure.webp" }
+  ]
+}

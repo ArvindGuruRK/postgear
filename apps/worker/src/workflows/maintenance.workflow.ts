@@ -15,6 +15,9 @@
  * (pre-warm the places people look at in their morning, refresh competitors,
  * send Monday's digests), behind a `patched` of its own for the same reason.
  *
+ * Sprint 12: each pass also asks the API to reconcile clip jobs (lost
+ * starts, gone workflows), behind `patched('clips-reconcile')`.
+ *
  * `continueAsNew` every ninety-six iterations (a day) keeps the history short.
  */
 import { continueAsNew, patched, proxyActivities, sleep } from '@temporalio/workflow';
@@ -41,10 +44,20 @@ const { discoverMaintenance } = proxyActivities<Activities>({
   retry: { maximumAttempts: 1 },
 });
 
+/**
+ * Sprint 12: the API's Clips reconcile, one short call. It never throws (a
+ * pass that could not run is tried again next interval), so one attempt.
+ */
+const { clipsReconcile } = proxyActivities<Activities>({
+  startToCloseTimeout: '2 minutes',
+  retry: { maximumAttempts: 1 },
+});
+
 export const RECONCILE_INTERVAL = '15 minutes';
 const ITERATIONS_PER_RUN = 96;
 export const AUTOMATION_PRUNE_PATCH = 'automation-run-prune';
 export const DISCOVER_MAINTENANCE_PATCH = 'discover-maintenance';
+export const CLIPS_RECONCILE_PATCH = 'clips-reconcile';
 
 export async function maintenanceWorkflow(): Promise<void> {
   for (let iteration = 0; iteration < ITERATIONS_PER_RUN; iteration++) {
@@ -68,6 +81,14 @@ export async function maintenanceWorkflow(): Promise<void> {
         await discoverMaintenance();
       } catch {
         // Warm copies and digests wait for the next pass; nothing else depends on them.
+      }
+    }
+
+    if (patched(CLIPS_RECONCILE_PATCH)) {
+      try {
+        await clipsReconcile();
+      } catch {
+        // Lost clip job starts wait for the next pass; the API's own settle starts most of them.
       }
     }
 

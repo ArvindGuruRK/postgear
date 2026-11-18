@@ -12,6 +12,7 @@
  * and keeping this package free of them is what lets a workflow import it.
  */
 export * from './automations';
+export * from './clips';
 export * from './publish-status';
 export * from './retry-policy';
 export * from './workflows';

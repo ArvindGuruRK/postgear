@@ -26,6 +26,8 @@ import {
   UnprocessableEntityException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
+import type { PrismaTransactionClient } from '@postgear/db';
+import { CONTENT_TYPES, createMediaKey, isMediaKey, thumbnailKeyFor } from '@postgear/storage';
 import { fileNameParts } from '../../common/attachment';
 import { securityLogger } from '../../common/logging/security-logger';
 import { stripControlChars } from '../../common/sanitize';
@@ -41,7 +43,6 @@ import {
 } from './media.messages';
 import { type MediaKind, type MediaRecord, MediaRepository } from './media.repository';
 import { STORAGE_BACKEND, type StorageBackend } from './storage/storage.interface';
-import { CONTENT_TYPES, createMediaKey, thumbnailKeyFor } from './storage/storage-keys';
 
 /** How many of the newest items a search looks through. */
 const SEARCH_CANDIDATES = 60;
@@ -89,6 +90,29 @@ export interface GeneratedFileInput {
    * (Sprint 9b; see `ProcessImageOptions`).
    */
   encode?: { prefer?: 'jpeg' | 'png'; quality?: number; maxEdge?: number };
+}
+
+/** An exported clip the worker already stored in the public space (Sprint 12). */
+export interface RenderedVideoInput {
+  orgId: string;
+  /** The MP4's media key. */
+  key: string;
+  /** Its poster's media key, or null. */
+  posterKey: string | null;
+  bytes: number;
+  durationMs: number;
+  width: number;
+  height: number;
+  fps: number;
+  /** The name it gets in the library. */
+  name: string;
+}
+
+/** `Media.fileSize` is a 32-bit column; a bigger file is recorded at the column's ceiling. */
+const MAX_INT = 2_147_483_647;
+
+function wholeOrNull(value: number): number | null {
+  return Number.isFinite(value) && value > 0 ? Math.min(MAX_INT, Math.round(value)) : null;
 }
 
 /** One image to save, and the name to save it under. */
@@ -277,6 +301,55 @@ export class MediaService {
 
       throw error;
     }
+  }
+
+  /**
+   * Records an exported clip (Sprint 12, Module 05) as an ordinary library
+   * video. The worker rendered it and stored it, with its poster, in the
+   * public media space under keys it made with `createMediaKey`; this only
+   * writes the row (`type: 'video'`, `origin: 'clip'`, its length, size and
+   * frame rate, the poster as its thumbnail), inside the caller's
+   * transaction when it gives one, so the row lands with the clip's export
+   * mark or not at all.
+   *
+   * The keys are checked against the media key shape (a worker bug can never
+   * point a library row at an avatar or a private key) and the numbers are
+   * kept in range. Nothing is uploaded here and nothing is removed on
+   * failure: the files are the worker's until the row exists, and an
+   * orphaned pair is left for the storage sweep.
+   */
+  async saveRendered(input: RenderedVideoInput, tx?: PrismaTransactionClient): Promise<MediaView> {
+    if (!isMediaKey(input.key) || !input.key.endsWith('.mp4')) {
+      throw new BadRequestException(MEDIA_MESSAGES.UNSUPPORTED);
+    }
+    if (
+      input.posterKey !== null &&
+      (!isMediaKey(input.posterKey) || input.posterKey.endsWith('.mp4'))
+    ) {
+      throw new BadRequestException(MEDIA_MESSAGES.UNSUPPORTED);
+    }
+
+    const name = displayName(input.name);
+    const record = await this.repository.create(
+      {
+        orgId: input.orgId,
+        name,
+        originalName: name,
+        path: input.key,
+        thumbnail: input.posterKey,
+        type: 'video',
+        mimeType: CONTENT_TYPES.mp4,
+        fileSize: Math.min(MAX_INT, Math.max(0, Math.round(input.bytes))),
+        width: wholeOrNull(input.width),
+        height: wholeOrNull(input.height),
+        origin: 'clip',
+        durationMs: wholeOrNull(input.durationMs),
+        fps: Number.isFinite(input.fps) && input.fps > 0 ? input.fps : null,
+      },
+      tx,
+    );
+
+    return this.toView(record);
   }
 
   async list(

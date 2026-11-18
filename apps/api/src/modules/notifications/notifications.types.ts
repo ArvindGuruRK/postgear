@@ -14,6 +14,7 @@
  */
 import type { NotificationEmailStatus } from '@postgear/db';
 import type { Fact, NotificationEmailProps, Tone } from '@postgear/email';
+import { CLIP_NOTIFICATION_TITLES } from '@postgear/scheduling';
 
 export const NOTIFICATION_TYPES = [
   'post.published',
@@ -32,6 +33,13 @@ export const NOTIFICATION_TYPES = [
   'automation.paused',
   // Sprint 11 Module 10: Monday's Discover digest for the workspace's place.
   'discover.digest',
+  // Sprint 12 (Clips): in-app only, never emailed. The worker writes the video
+  // rows when an import ends; the API writes the export rows (and both kinds
+  // when the reconcile fails a job whose workflow is gone).
+  'clip_video_ready',
+  'clip_video_failed',
+  'clip_export_ready',
+  'clip_export_failed',
   'info',
 ] as const;
 
@@ -73,6 +81,10 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   'automation.failed': 'failure_emails',
   'automation.paused': 'failure_emails',
   'discover.digest': 'digest_emails',
+  clip_video_ready: 'none',
+  clip_video_failed: 'none',
+  clip_export_ready: 'none',
+  clip_export_failed: 'none',
   info: 'none',
 };
 
@@ -91,6 +103,10 @@ export const DEFAULT_TITLES: Record<NotificationType, string> = {
   'automation.failed': 'Workflow failed',
   'automation.paused': 'Workflow paused',
   'discover.digest': 'Your Discover week',
+  clip_video_ready: CLIP_NOTIFICATION_TITLES.videoReady,
+  clip_video_failed: CLIP_NOTIFICATION_TITLES.videoFailed,
+  clip_export_ready: CLIP_NOTIFICATION_TITLES.exportReady,
+  clip_export_failed: CLIP_NOTIFICATION_TITLES.exportFailed,
   info: 'Notification',
 };
 
@@ -206,6 +222,10 @@ const LOOK: Record<NotificationType, { tone: Tone; badge: string; heading: strin
   'automation.failed': { tone: 'danger', badge: 'Workflow', heading: 'Workflow Failed' },
   'automation.paused': { tone: 'warning', badge: 'Workflow', heading: 'Workflow Paused' },
   'discover.digest': { tone: 'brand', badge: 'Discover', heading: 'Your Discover Week' },
+  clip_video_ready: { tone: 'success', badge: 'Clips', heading: 'Video Ready' },
+  clip_video_failed: { tone: 'danger', badge: 'Clips', heading: 'Import Failed' },
+  clip_export_ready: { tone: 'success', badge: 'Clips', heading: 'Clip Ready' },
+  clip_export_failed: { tone: 'danger', badge: 'Clips', heading: 'Export Failed' },
   info: { tone: 'brand', badge: 'Notification', heading: null },
 };
 
@@ -273,6 +293,10 @@ function subjectFor(type: NotificationType, title: string, meta: NotificationMet
     case 'automation.review':
     case 'automation.failed':
     case 'automation.paused':
+    case 'clip_video_ready':
+    case 'clip_video_failed':
+    case 'clip_export_ready':
+    case 'clip_export_failed':
     case 'info':
       return `${SUBJECT_PREFIX} ${title}`;
   }
@@ -349,6 +373,10 @@ function factsFor(type: NotificationType, meta: NotificationMeta, createdAt: Dat
     case 'automation.review':
     case 'automation.failed':
     case 'automation.paused':
+    case 'clip_video_ready':
+    case 'clip_video_failed':
+    case 'clip_export_ready':
+    case 'clip_export_failed':
     case 'info':
       return facts;
   }
@@ -395,6 +423,12 @@ function linkLabel(type: NotificationType): string {
       return 'Open The Workflow';
     case 'discover.digest':
       return 'Open Discover';
+    case 'clip_video_ready':
+    case 'clip_video_failed':
+      return 'Open The Video';
+    case 'clip_export_ready':
+    case 'clip_export_failed':
+      return 'Open The Clip';
     case 'info':
       return 'Open PostGear';
   }

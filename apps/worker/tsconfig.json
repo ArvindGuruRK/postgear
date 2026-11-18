@@ -20,6 +20,7 @@
     "paths": {
       "@postgear/db": ["packages/db/src"],
       "@postgear/scheduling": ["packages/scheduling/src"],
+      "@postgear/storage": ["packages/storage/src"],
       "@postgear/social-core": ["packages/social-core/src"],
       "@postgear/seo-engine": ["packages/seo-engine/src"],
       "@postgear/ai-engine": ["packages/ai-engine/src"],

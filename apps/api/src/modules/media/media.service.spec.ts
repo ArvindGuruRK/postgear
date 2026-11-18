@@ -23,6 +23,10 @@ import type { MediaRecord, MediaRepository } from './media.repository';
 import { displayName, MediaService } from './media.service';
 import type { StorageBackend } from './storage/storage.interface';
 
+// The image cases run real sharp work; under the full suite's load the
+// default 5 s limit failed them. The limit guards hangs, not speed.
+jest.setTimeout(30_000);
+
 describe('MediaService', () => {
   let directory: string;
   let storage: jest.Mocked<StorageBackend>;

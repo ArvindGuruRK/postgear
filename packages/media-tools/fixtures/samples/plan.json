@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "note": "What `npm run clips:samples` generates. Every moment is fixed here so Module 16's highlights on the stream sample are predictable. Times are seconds of the sample. The counter is centred so a centred 9:16 crop keeps it.",
+  "talk": {
+    "file": "talk.mp4",
+    "durationSec": 180,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "bedToneHz": 180,
+    "burstToneHz": 880,
+    "toneBursts": [
+      { "startSec": 30, "endSec": 32 },
+      { "startSec": 95, "endSec": 97 },
+      { "startSec": 150, "endSec": 151.5 }
+    ]
+  },
+  "stream": {
+    "file": "stream.mp4",
+    "durationSec": 600,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "bedToneHz": 220,
+    "scenes": [
+      { "startSec": 0, "source": "testsrc2" },
+      { "startSec": 40, "source": "smptehdbars" },
+      { "startSec": 62, "source": "life" },
+      { "startSec": 100, "source": "rgbtestsrc" },
+      { "startSec": 148, "source": "testsrc2" },
+      { "startSec": 190, "source": "smptehdbars" },
+      { "startSec": 237, "source": "life" },
+      { "startSec": 270, "source": "rgbtestsrc" },
+      { "startSec": 305, "source": "testsrc2" },
+      { "startSec": 350, "source": "smptehdbars" },
+      { "startSec": 391, "source": "life" },
+      { "startSec": 430, "source": "rgbtestsrc" },
+      { "startSec": 478, "source": "testsrc2" },
+      { "startSec": 520, "source": "smptehdbars" },
+      { "startSec": 552, "source": "life" },
+      { "startSec": 580, "source": "rgbtestsrc" }
+    ],
+    "loudBursts": [
+      { "startSec": 62, "endSec": 66 },
+      { "startSec": 148, "endSec": 152 },
+      { "startSec": 237, "endSec": 241 },
+      { "startSec": 305, "endSec": 309 },
+      { "startSec": 391, "endSec": 395 },
+      { "startSec": 478, "endSec": 482 },
+      { "startSec": 552, "endSec": 556 }
+    ],
+    "chat": {
+      "fixture": "stream-chat.json",
+      "lagSec": 8,
+      "burstLengthSec": 15,
+      "burstPerSecond": 3,
+      "baselineEverySec": 3
+    }
+  }
+}

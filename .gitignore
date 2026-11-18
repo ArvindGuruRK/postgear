@@ -46,6 +46,8 @@ minio_data/
 
 # Local media uploads (Sprint 4, STORAGE_PROVIDER=local)
 apps/api/uploads/
+# Clips private files (Sprint 12), beside the public folder, never served by key
+apps/api/uploads-private/
 
 # Misc
 *.tgz
@@ -65,3 +67,6 @@ docs/launch-readiness/04-security-review.md
 # and Claude's own captures: kept on disk, never in the public repo
 docs/screenshots/
 /screenshots/
+
+# Clips sample videos made by npm run clips:samples (about 190 MB, regenerated on demand)
+packages/media-tools/samples/

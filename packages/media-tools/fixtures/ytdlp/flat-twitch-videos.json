@@ -1,0 +1,11 @@
+{
+  "_type": "playlist",
+  "id": "acme",
+  "title": "acme - Past broadcasts sorted by Date",
+  "extractor": "twitch:videos",
+  "entries": [
+    { "_type": "url_transparent", "ie_key": "TwitchVod", "id": "v900000103", "url": "https://www.twitch.tv/videos/900000103", "title": "Acme Live: Co-op Night With Friends", "duration": 600, "view_count": 3120, "timestamp": 1767312000, "thumbnail": "https://img.sim.invalid/twitch/103-320x180.jpg" },
+    { "_type": "url_transparent", "ie_key": "TwitchVod", "id": "v900000104", "url": "https://www.twitch.tv/videos/900000104", "title": "Acme Live: Building The Big Base", "duration": 587.0, "view_count": 2875, "timestamp": 1767225600 },
+    { "_type": "url_transparent", "ie_key": "TwitchVod", "id": "v900000104", "url": "https://www.twitch.tv/videos/900000104", "title": "Duplicate rows are dropped" }
+  ]
+}

@@ -38,7 +38,7 @@ import { securityLogger } from '../../common/logging/security-logger';
 import { SNIFF_BYTES, type SniffedMedia, sniffMedia } from '../media/file-type';
 import { processAvatarImage, UnreadableImageError } from '../media/image-processor';
 import { STORAGE_BACKEND, type StorageBackend } from '../media/storage/storage.interface';
-import { CONTENT_TYPES, createAvatarKey, isAvatarKey } from '../media/storage/storage-keys';
+import { CONTENT_TYPES, createAvatarKey, isAvatarKey } from '@postgear/storage';
 import { isAvatarPresetId } from './avatar.presets';
 import { type SessionAvatar, toSessionAvatar } from './session-avatar';
 

@@ -15,6 +15,8 @@ import { AutomationGatewayModule } from './modules/automations/gateway/automatio
 import { AutomationRunsModule } from './modules/automations/runs/automation-runs.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
+import { ClipsModule } from './modules/clips/clips.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { DiscoverModule } from './modules/discover/discover.module';
 import { DevelopersModule } from './modules/developers/developers.module';
@@ -104,6 +106,9 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     AutomationGatewayModule,
     // Sprint 11: Discover, what is rising and what is news in a place.
     DiscoverModule,
+    // Sprint 12: plans as data (limits and meters), and Clips.
+    EntitlementsModule,
+    ClipsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

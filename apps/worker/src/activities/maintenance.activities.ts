@@ -27,6 +27,8 @@ import {
   AUTOMATION_RUN_WORKFLOW,
   analyticsSyncWorkflowId,
   automationRunWorkflowId,
+  CLIP_INTERNAL_ROUTES,
+  type ClipReconcileAnswer,
   POST_PUBLISH_WORKFLOW,
   publishWorkflowId,
   SCHEDULING_TASK_QUEUE,
@@ -251,7 +253,62 @@ export function createMaintenanceActivities(deps: ActivityDeps) {
     async pruneAutomationRuns(): Promise<PruneReport> {
       return pruneAutomationRuns(prisma, new Date());
     },
+
+    /** Sprint 12: the API's Clips reconcile (lost starts, gone workflows). Never throws. */
+    async clipsReconcile(): Promise<ClipsReconcileReport> {
+      return runClipsReconcile({
+        apiUrl: deps.env.API_URL,
+        token: deps.env.AUTOMATION_INTERNAL_TOKEN,
+      });
+    },
   };
+}
+
+/** What the Clips reconcile answered, or why it could not run. */
+export type ClipsReconcileReport = ClipReconcileAnswer | { failed: string };
+
+/** The API answers well inside this; the activity's own limit is two minutes. */
+export const CLIPS_RECONCILE_TIMEOUT_MS = 90_000;
+
+type ReconcileFetch = (url: string, init: RequestInit) => Promise<Response>;
+
+/**
+ * Sprint 12: asks the API to reconcile clip jobs (start QUEUED jobs whose
+ * start was lost, fail RUNNING jobs whose workflow is gone and give back
+ * their charges). The work lives in the API, next to the plan resolver and
+ * the usage ledger it needs, so the publishing role calls it the way
+ * Discover's jobs are called: `${API_URL}` with `X-PostGear-Internal`. Never
+ * throws: a pass that could not run is tried again in fifteen minutes.
+ * Exported for tests.
+ */
+export async function runClipsReconcile(config: {
+  apiUrl: string;
+  token: string;
+  fetch?: ReconcileFetch;
+}): Promise<ClipsReconcileReport> {
+  const doFetch: ReconcileFetch = config.fetch ?? ((url, init) => fetch(url, init));
+  try {
+    const response = await doFetch(
+      `${config.apiUrl.replace(/\/+$/, '')}${CLIP_INTERNAL_ROUTES.reconcile}`,
+      {
+        method: 'POST',
+        headers: { 'x-postgear-internal': config.token, 'content-type': 'application/json' },
+        body: '{}',
+        redirect: 'error',
+        signal: AbortSignal.timeout(CLIPS_RECONCILE_TIMEOUT_MS),
+      },
+    );
+    if (!response.ok) {
+      return { failed: `status ${response.status}` };
+    }
+    const body = (await response.json().catch(() => ({}))) as Partial<ClipReconcileAnswer>;
+    return {
+      started: typeof body.started === 'number' ? body.started : 0,
+      failed: typeof body.failed === 'number' ? body.failed : 0,
+    };
+  } catch (error) {
+    return { failed: error instanceof Error ? error.name : 'unknown' };
+  }
 }
 
 /** ACTIVE, not deleted workflows whose active version starts on a Schedule. */

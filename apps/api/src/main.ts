@@ -14,14 +14,13 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { resolveUploadDirectory, UPLOADS_ROUTE } from '@postgear/storage';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import type { Env } from './config/env';
-import { storageConfigFrom } from './modules/media/media.module';
 import { setupOpenApi } from './modules/developers/openapi/setup-openapi';
-import { UPLOADS_ROUTE } from './modules/media/storage/local.storage';
-import { resolveUploadDirectory } from './modules/media/storage/storage.factory';
+import { storageConfigFrom } from './modules/media/media.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -58,7 +57,15 @@ async function bootstrap(): Promise<void> {
     // Studio's Download All (Sprint 9) is fetched, not followed as a link, so
     // a refusal arrives as a sentence; the browser may only read the zip's
     // own name from this header when the API says it can.
-    exposedHeaders: ['Content-Disposition'],
+    // Clips (Sprint 12): a player reads the range it got back, and a browser
+    // upload reports each part's ETag on complete.
+    exposedHeaders: [
+      'Content-Disposition',
+      'Content-Range',
+      'Accept-Ranges',
+      'Content-Length',
+      'ETag',
+    ],
   });
 
   // A post is sent whole: every part of a thread, for every channel that has

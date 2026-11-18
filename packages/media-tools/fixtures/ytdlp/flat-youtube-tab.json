@@ -1,0 +1,14 @@
+{
+  "_type": "playlist",
+  "id": "UCsimacme000000000000001",
+  "title": "Acme - Videos",
+  "channel": "Acme",
+  "channel_id": "UCsimacme000000000000001",
+  "uploader_id": "@acme",
+  "extractor": "youtube:tab",
+  "entries": [
+    { "_type": "url", "ie_key": "Youtube", "id": "simacmeu001", "url": "https://www.youtube.com/watch?v=simacmeu001", "title": "How We Plan A Stream Week", "duration": 180, "view_count": 2304, "timestamp": 1767268800, "live_status": null, "thumbnails": [{ "url": "https://img.sim.invalid/vi/simacmeu001/hqdefault.jpg", "width": 480 }, { "url": "https://img.sim.invalid/vi/simacmeu001/default.jpg", "width": 120 }] },
+    { "_type": "url", "ie_key": "Youtube", "id": "simacmes001", "url": "https://www.youtube.com/shorts/simacmes001", "title": "That Jump", "duration": 28, "view_count": 40200 },
+    { "_type": "url", "ie_key": "Youtube", "id": "simacmel002", "url": "https://www.youtube.com/watch?v=simacmel002", "title": "Live: Saturday Special", "live_status": "is_upcoming", "release_timestamp": 1767400000 }
+  ]
+}

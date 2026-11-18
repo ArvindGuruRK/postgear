@@ -3,7 +3,7 @@
  *
  * `Media.path` is a storage key (`2026/10/<hex>.jpg`), never a URL, so that
  * moving the store does not orphan every row. The API builds URLs through its
- * storage backend (`apps/api/src/modules/media/storage/`); this is the same
+ * storage backend (`@postgear/storage`); this is the same
  * rule written for the worker, which has no Nest module to ask. The two must
  * agree, and the test beside this file pins the shape they agree on:
  *
@@ -16,9 +16,8 @@
  * media is addressed through it instead of `API_URL`, and the browser (which
  * gets its URLs from the API) is unaffected. See docs/social-platform-setup.md.
  */
+import { isMediaKey } from '@postgear/storage';
 import type { WorkerEnv } from '../config/env';
-
-const KEY_PATTERN = /^\d{4}\/\d{2}\/[0-9a-f]{32}(?:\.thumb)?\.(?:jpg|png|gif|webp|mp4|mov)$/;
 
 export type MediaUrlConfig = Pick<WorkerEnv, 'STORAGE_PROVIDER' | 'API_URL' | 'S3_PUBLIC_URL'> &
   Partial<Pick<WorkerEnv, 'CHANNELS_PUBLIC_URL'>>;
@@ -30,7 +29,7 @@ export function mediaUrlBuilder(config: MediaUrlConfig): (key: string) => string
       : `${(config.CHANNELS_PUBLIC_URL ?? config.API_URL).replace(/\/+$/, '')}/uploads/`;
 
   return (key: string) => {
-    if (!KEY_PATTERN.test(key)) {
+    if (!isMediaKey(key)) {
       throw new Error('Refusing to build a URL for a storage key PostGear did not generate');
     }
 

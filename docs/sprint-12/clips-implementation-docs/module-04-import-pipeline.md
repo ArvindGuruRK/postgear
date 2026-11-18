@@ -1,6 +1,6 @@
 # Module 04: Import Pipeline
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done (2026-11-18) | Size: L (one full session)
 > **Depends on**: [Module 03](module-03-link-engine.md)
 > **Stories**: CL-1.3, 1.4, 1.5, 1.6 (server side); foundations for CL-2.1, CL-3.1
 > **Next**: [Module 05](module-05-thin-slice-render.md) (Thin Slice), [Module 06](module-06-clips-home-and-videos.md) (Clips Home And Videos)
@@ -84,17 +84,17 @@ Add `clip_video_ready` and `clip_video_failed` to the catalogue (in-app only, no
 
 ## Tasks
 
-- [ ] `ClipLimitsGuard` over the resolver; the import minutes charge with key `clips.import:<jobId>` and its reversals; `limits`, meters and `usage.storageBytes` in `GET /clips/status`.
-- [ ] `estimateEtaSeconds` and `etaSeconds` on every job view.
-- [ ] The concurrent import cap and priority order; the internal charge and reverse routes.
-- [ ] `POST /clips/videos` with the server-side probe, rights, limits, dedup.
-- [ ] The three upload routes on `PrivateStorage`.
-- [ ] List, get (with signed addresses), retry, cancel, delete; the view mapper.
-- [ ] `clipImportWorkflow` and its activities; the FFmpeg argument builders; asset meta types.
-- [ ] Failure cleanup and the cancel path.
-- [ ] Notification types and rows.
-- [ ] The simulation integration test.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `ClipLimitsGuard` over the resolver; the import minutes charge with key `clips.import:<jobId>` and its reversals; `limits`, meters and `usage.storageBytes` in `GET /clips/status`.
+- [x] `estimateEtaSeconds` and `etaSeconds` on every job view.
+- [x] The concurrent import cap and priority order; the internal charge and reverse routes.
+- [x] `POST /clips/videos` with the server-side probe, rights, limits, dedup.
+- [x] The three upload routes on `PrivateStorage`.
+- [x] List, get (with signed addresses), retry, cancel, delete; the view mapper.
+- [x] `clipImportWorkflow` and its activities; the FFmpeg argument builders; asset meta types.
+- [x] Failure cleanup and the cancel path.
+- [x] Notification types and rows.
+- [x] The simulation integration test.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

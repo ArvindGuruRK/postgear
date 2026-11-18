@@ -1,6 +1,6 @@
 # Module 05: Thin Slice: Render A Clip To Media
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session, may need a second)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-18: no Playwright pass; the slice was run for real through the API instead) | Size: L (one full session, may need a second)
 > **Depends on**: [Module 04](module-04-import-pipeline.md)
 > **Stories**: foundations for CL-10.1 and CL-10.4, CL-5.1; the rule "the editor matches the export closely, and Preview Export shows it exactly"
 > **Next**: [Module 06](module-06-clips-home-and-videos.md), [Module 07](module-07-manual-clipping-and-clips-library.md), [Module 08](module-08-editor-shell.md)
@@ -100,17 +100,17 @@ libass cannot read WOFF2, so the 52 Studio fonts need TTF or OTF twins (cookbook
 
 ## Tasks
 
-- [ ] `video-engine/src/render/`: `frameState`, `buildRenderPlan`, `compileFfmpeg`, the `buildAss` stub, the quality record, the typed compile errors, with tests (graph snapshot, the `atempo` chain, even sizes, determinism, missing input).
-- [ ] `fonts.ts`: the manifest shape, `checkFonts`, the `clips:fonts:build` stub.
-- [ ] `media-tools`: `renderClip` with `.part`, progress parsing as a running maximum, cancel, scratch cleanup, tests with a fake runner and one real run guarded by `ffmpeg` being present.
-- [ ] `POST /clips`, `GET /clips/:clipId`, `sharpSourceFor`.
-- [ ] `clipSegmentWorkflow` with the gone fallback.
-- [ ] `clipRenderWorkflow` and its three activities.
-- [ ] `POST /clips/:clipId/exports`, the internal finish route, `MediaService.saveRendered`, the export notifications.
-- [ ] `/dev/clips`.
-- [ ] `clips:benchmark`, `clips:stills`, the first parity test; the benchmark table in the Progress notes.
+- [x] `video-engine/src/render/`: `frameState`, `buildRenderPlan`, `compileFfmpeg`, the `buildAss` stub, the quality record, the typed compile errors, with tests (graph snapshot, the `atempo` chain, even sizes, determinism, missing input).
+- [x] `fonts.ts`: the manifest shape, `checkFonts`, the `clips:fonts:build` stub.
+- [x] `media-tools`: `renderClip` with `.part`, progress parsing as a running maximum, cancel, scratch cleanup, tests with a fake runner and one real run guarded by `ffmpeg` being present.
+- [x] `POST /clips`, `GET /clips/:clipId`, `sharpSourceFor`.
+- [x] `clipSegmentWorkflow` with the gone fallback.
+- [x] `clipRenderWorkflow` and its three activities.
+- [x] `POST /clips/:clipId/exports`, the internal finish route, `MediaService.saveRendered`, the export notifications.
+- [x] `/dev/clips`.
+- [x] `clips:benchmark`, `clips:stills`, the first parity test; the benchmark table in the Progress notes.
 - [ ] Playwright once on `/dev/clips` under simulation; screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log (record the input-seek result and the benchmark).
+- [x] `verify-change`; update the Progress table and the Decision Log (record the input-seek result and the benchmark).
 
 ## Tests
 

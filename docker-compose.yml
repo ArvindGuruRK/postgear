@@ -40,6 +40,61 @@ services:
     volumes:
       - minio_data:/data
 
+  # One-shot bucket setup for MinIO (Sprint 12, Module 02). Runs on every
+  # `docker compose up`, changes nothing when the buckets are already right,
+  # then exits.
+  #
+  # - postgear-media: the public space. Anonymous GetObject on its objects only,
+  #   the same policy it had before (no anonymous listing, so a key stays
+  #   unguessable). The Clips catalogue lives under its `library/` prefix
+  #   (immutable files, uploaded with `Cache-Control: public, max-age=31536000,
+  #   immutable`); an empty `library/.keep` makes the prefix show in the console.
+  #   Production applies the same read policy to `library/*` on its public bucket.
+  # - postgear-clips: the private Clips space. No anonymous access at all;
+  #   browsers reach it only through presigned URLs that expire.
+  # - CORS on both for the web app at http://localhost:3000: GET, HEAD and PUT
+  #   (browser part uploads), any request header (so Range), and Content-Range,
+  #   Accept-Ranges, Content-Length and ETag exposed for the players and uploads.
+  #   The community MinIO build refuses bucket CORS ("not implemented") and
+  #   answers CORS server-wide instead (`api cors_allow_origin`, `*` by
+  #   default, exposing those headers), so that step is best effort here; R2
+  #   and AWS S3 take the same rule as a bucket CORS setting in production.
+  minio-setup:
+    image: minio/mc
+    container_name: postgear_minio_setup
+    depends_on:
+      - minio
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        tries=0
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc ls local >/dev/null 2>&1; do
+          tries=$$((tries + 1))
+          if [ "$$tries" -ge 60 ]; then
+            echo "minio-setup: MinIO did not answer within 60 seconds" >&2
+            exit 1
+          fi
+          sleep 1
+        done
+        mc mb --ignore-existing local/postgear-media
+        mc mb --ignore-existing local/postgear-clips
+        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::postgear-media/*"]}]}' > /tmp/public-read.json
+        mc anonymous set-json /tmp/public-read.json local/postgear-media
+        mc anonymous set none local/postgear-clips
+        printf '%s' '<CORSConfiguration><CORSRule><AllowedOrigin>http://localhost:3000</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>Content-Range</ExposeHeader><ExposeHeader>Accept-Ranges</ExposeHeader><ExposeHeader>Content-Length</ExposeHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' > /tmp/cors.xml
+        if mc cors set local/postgear-media /tmp/cors.xml >/dev/null 2>&1 && mc cors set local/postgear-clips /tmp/cors.xml >/dev/null 2>&1; then
+          echo "minio-setup: bucket CORS set for http://localhost:3000"
+        else
+          echo "minio-setup: this MinIO has no bucket CORS; its server-wide CORS (api cors_allow_origin, * by default) already covers http://localhost:3000"
+        fi
+        mc stat local/postgear-media/library/.keep >/dev/null 2>&1 || printf '' | mc pipe local/postgear-media/library/.keep
+        echo "minio-setup: postgear-media (public read) and postgear-clips (private) are ready"
+
   # Temporal (Sprint 5): the durable scheduler behind every queued post.
   #
   # `auto-setup` creates and migrates its own two databases (`temporal` and

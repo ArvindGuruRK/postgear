@@ -235,6 +235,11 @@ export class BillingRepository extends PrismaBillingStore {
     });
   }
 
+  /** Sprint 12: every plan's stored entitlement values, for the plan cards. */
+  async planEntitlementRows(): Promise<Array<{ tier: string; key: string; value: unknown }>> {
+    return prisma.planEntitlement.findMany({ select: { tier: true, key: true, value: true } });
+  }
+
   /** Live (not disconnected) channels. The number the channel limit is checked against. */
   async countLiveChannels(orgId: string): Promise<number> {
     return prisma.integration.count({ where: { organizationId: orgId, deletedAt: null } });

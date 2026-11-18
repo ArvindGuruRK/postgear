@@ -6,7 +6,7 @@
  * so what reaches a caller is decided here once.
  */
 import { Injectable } from '@nestjs/common';
-import { prisma, State } from '@postgear/db';
+import { type PrismaTransactionClient, prisma, State } from '@postgear/db';
 
 export type MediaKind = 'image' | 'video';
 
@@ -39,6 +39,10 @@ export interface CreateMediaInput {
   height: number | null;
   /** Alt text. Uploads have none yet; an AI image (Sprint 6) keeps its prompt here. */
   alt?: string | null;
+  /** Sprint 12: where the file came from (`upload`, `ai`, `studio`, `clip`), and a video's facts. */
+  origin?: string | null;
+  durationMs?: number | null;
+  fps?: number | null;
 }
 
 const MEDIA_SELECT = {
@@ -56,8 +60,12 @@ const MEDIA_SELECT = {
 
 @Injectable()
 export class MediaRepository {
-  async create(input: CreateMediaInput): Promise<MediaRecord> {
-    const row = await prisma.media.create({
+  /** Writes a row; inside `tx` when it must land with other rows (an export's hand-over). */
+  async create(
+    input: CreateMediaInput,
+    tx: PrismaTransactionClient = prisma,
+  ): Promise<MediaRecord> {
+    const row = await tx.media.create({
       data: {
         organizationId: input.orgId,
         name: input.name,
@@ -70,6 +78,9 @@ export class MediaRepository {
         width: input.width,
         height: input.height,
         alt: input.alt ?? null,
+        ...(input.origin !== undefined ? { origin: input.origin } : {}),
+        ...(input.durationMs !== undefined ? { durationMs: input.durationMs } : {}),
+        ...(input.fps !== undefined ? { fps: input.fps } : {}),
       },
       select: MEDIA_SELECT,
     });

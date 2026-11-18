@@ -1,0 +1,45 @@
+{
+  "_type": "video",
+  "id": "simtalk0001",
+  "extractor": "youtube",
+  "extractor_key": "Youtube",
+  "webpage_url": "https://www.youtube.com/watch?v=simtalk0001",
+  "title": "PostGear Sample: A Three Minute Talk",
+  "uploader": "PostGear Samples",
+  "uploader_id": "@postgearsamples",
+  "channel": "PostGear Samples",
+  "channel_id": "UCsim0000000000000000001",
+  "timestamp": 1767225600,
+  "upload_date": "20260101",
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/vi/simtalk0001/maxresdefault.jpg",
+  "thumbnails": [
+    { "url": "https://img.sim.invalid/vi/simtalk0001/default.jpg", "width": 120, "height": 90, "preference": -10 },
+    { "url": "https://img.sim.invalid/vi/simtalk0001/maxresdefault.jpg", "width": 1280, "height": 720, "preference": 0 }
+  ],
+  "heatmap": [
+    { "start_time": 0, "end_time": 30, "value": 0.2 },
+    { "start_time": 30, "end_time": 36, "value": 1 },
+    { "start_time": 36, "end_time": 90, "value": 0.3 },
+    { "start_time": 90, "end_time": 100, "value": 0.8 },
+    { "start_time": 100, "end_time": 180, "value": 0.25 }
+  ],
+  "formats": [
+    { "format_id": "sb0", "format_note": "storyboard", "ext": "mhtml", "protocol": "mhtml", "vcodec": "none", "acodec": "none", "width": 160, "height": 90, "url": "https://img.sim.invalid/sb/simtalk0001/M0.jpg" },
+    { "format_id": "139", "format_note": "low", "ext": "m4a", "protocol": "https", "vcodec": "none", "acodec": "mp4a.40.5", "abr": 48.8, "tbr": 48.8, "filesize": 1100000, "url": "https://media.sim.invalid/videoplayback?itag=139" },
+    { "format_id": "140", "format_note": "medium", "ext": "m4a", "protocol": "https", "vcodec": "none", "acodec": "mp4a.40.2", "abr": 129.5, "tbr": 129.5, "filesize": 2913000, "url": "https://media.sim.invalid/videoplayback?itag=140" },
+    { "format_id": "251", "format_note": "medium", "ext": "webm", "protocol": "https", "vcodec": "none", "acodec": "opus", "abr": 135.1, "tbr": 135.1, "filesize": 3040000, "url": "https://media.sim.invalid/videoplayback?itag=251" },
+    { "format_id": "18", "format_note": "360p", "ext": "mp4", "protocol": "https", "vcodec": "avc1.42001E", "acodec": "mp4a.40.2", "width": 640, "height": 360, "fps": 30, "tbr": 420.5, "filesize_approx": 9460000, "url": "https://media.sim.invalid/videoplayback?itag=18" },
+    { "format_id": "134", "format_note": "360p", "ext": "mp4", "protocol": "https", "vcodec": "avc1.4D401E", "acodec": "none", "width": 640, "height": 360, "fps": 30, "tbr": 310.2, "filesize": 6980000, "url": "https://media.sim.invalid/videoplayback?itag=134" },
+    { "format_id": "135", "format_note": "480p", "ext": "mp4", "protocol": "https", "vcodec": "avc1.4D401F", "acodec": "none", "width": 854, "height": 480, "fps": 30, "tbr": 590.4, "filesize": 13280000, "url": "https://media.sim.invalid/videoplayback?itag=135" },
+    { "format_id": "136", "format_note": "720p", "ext": "mp4", "protocol": "https", "vcodec": "avc1.4D401F", "acodec": "none", "width": 1280, "height": 720, "fps": 30, "tbr": 1210.7, "filesize": 27240000, "url": "https://media.sim.invalid/videoplayback?itag=136" },
+    { "format_id": "247", "format_note": "720p", "ext": "webm", "protocol": "https", "vcodec": "vp9", "acodec": "none", "width": 1280, "height": 720, "fps": 30, "tbr": 1105.3, "filesize": 24870000, "url": "https://media.sim.invalid/videoplayback?itag=247" },
+    { "format_id": "137", "format_note": "1080p", "ext": "mp4", "protocol": "https", "vcodec": "avc1.640028", "acodec": "none", "width": 1920, "height": 1080, "fps": 30, "tbr": 2420.9, "filesize": 54470000, "url": "https://media.sim.invalid/videoplayback?itag=137" },
+    { "format_id": "248", "format_note": "1080p", "ext": "webm", "protocol": "https", "vcodec": "vp9", "acodec": "none", "width": 1920, "height": 1080, "fps": 30, "tbr": 2201.6, "filesize": 49530000, "url": "https://media.sim.invalid/videoplayback?itag=248" }
+  ]
+}

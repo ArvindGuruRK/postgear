@@ -57,6 +57,14 @@
   --radius-card: 0.75rem;
 }
 
+/* The desktop line: 1366 px (85.375rem), the smallest laptop screen the
+   desktop-only modules are designed for (Clips, Sprint 12). `desk:` and
+   `max-desk:` switch on it, in CSS, so a page never flashes the wrong state
+   while a script measures the window. */
+@theme {
+  --breakpoint-desk: 85.375rem;
+}
+
 /* ── Theme mapping ──────────────────────────────────────────────────────
    `@theme inline` (rather than plain `@theme`) is used deliberately: it
    tells Tailwind to reference these CSS variables live at paint time

@@ -16,6 +16,9 @@ const nextConfig = {
     '@postgear/design-engine',
     '@postgear/automation',
     '@postgear/email',
+    // Clips (Sprint 12): pure engines shared with the API and the worker.
+    '@postgear/video-engine',
+    '@postgear/entitlements',
   ],
   // The "N" badge sat on top of the workflow canvas's controls. Build and
   // runtime errors still show without it.

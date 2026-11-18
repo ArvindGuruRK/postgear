@@ -65,7 +65,7 @@ On worker boot with the `media` or `render` role: delete any scratch folders lef
 | Sound and sticker uploads | Video space |
 | Export | Best quality `clips.export_max_quality` (`clips_quality_requires_plan`), the mark `clips.export_watermark` (copied into the job, never in the document) |
 | More video (a wider sharp range) | Video space |
-| Channels added | `clips.browse_channels` (`clips_channel_limit`) |
+| Channels added | `clips.browse_channels` (`channel_limit`) |
 | Concurrency and order | `clips.concurrent_imports` and `clips.queue_priority`: no refusal, the job waits ("Waiting for its turn") |
 
 - **A downgrade never deletes.** When the video space is over the new plan's limit, new imports, uploads and wider ranges are refused with `clips_storage_full` ("Your videos use {used} GB, over your plan's {limit} GB. Delete some, or upgrade, to bring in more."); existing clips still export. A `clips.storage_over_limit` notification goes to the workspace's admins when a downgrade lands (and when an operator lowers a plan value that pushes a workspace over), and the Clips page shows an `Alert variant="warning"` until the workspace is under the limit. Quality and the mark apply from the next export; a running render keeps its snapshot.

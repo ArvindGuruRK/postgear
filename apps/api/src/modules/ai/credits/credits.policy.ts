@@ -15,6 +15,8 @@
  *
  * ## Why the cycle follows the subscription's day of the month
  *
+ * (The rule now lives in `@postgear/entitlements` `cycle.ts`; see below.)
+ *
  * A calendar month would give a workspace that subscribes on the 28th three
  * days of allowance before a reset. Anchoring on the day the subscription
  * started (or, with no subscription, the day the workspace was created) gives
@@ -23,6 +25,7 @@
  * February 28 and then March 31, never skipping a month.
  */
 import type { SubscriptionTier } from '@postgear/db';
+import { cycleFor, type UsageWindow } from '@postgear/entitlements';
 import {
   PLAN_ORDER,
   type SubscriptionLike as PlanSubscriptionLike,
@@ -128,41 +131,16 @@ export function isLow(remaining: number, allowance: number): boolean {
   return remaining < allowance * LOW_CREDITS_FRACTION;
 }
 
-export interface CreditCycle {
-  /** Inclusive. */
-  start: Date;
-  /** Exclusive: the next reset. */
-  end: Date;
-}
-
 /**
- * The cycle `now` falls in, for an anchor date.
+ * A credit cycle: start inclusive, end exclusive (the next reset).
  *
- * Boundaries fall at midnight UTC on the anchor's day of the month, clamped
- * to the length of each month. Midnight rather than the anchor's own time of
- * day, so a reset is a date a person can be told ("refreshes on November 13")
- * rather than a timestamp.
+ * `cycleFor` moved to `@postgear/entitlements` in Sprint 12, unchanged, so AI
+ * credits and the Clips meters (AI minutes, import minutes) reset on the same
+ * date. It is re-exported here so every credits caller and test keeps its import.
  */
-export function cycleFor(anchor: Date, now: Date): CreditCycle {
-  const day = anchor.getUTCDate();
-  let start = anchoredDate(now.getUTCFullYear(), now.getUTCMonth(), day);
+export type CreditCycle = UsageWindow;
 
-  if (start.getTime() > now.getTime()) {
-    start = anchoredDate(now.getUTCFullYear(), now.getUTCMonth() - 1, day);
-  }
-
-  const end = anchoredDate(start.getUTCFullYear(), start.getUTCMonth() + 1, day);
-
-  return { start, end };
-}
-
-/** Midnight UTC on `day` of the given month, or on its last day if it is shorter. */
-function anchoredDate(year: number, month: number, day: number): Date {
-  // `Date.UTC` normalises month -1 and 12 into the neighbouring year; day 0 of
-  // the *following* month is this month's last day.
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(year, month, Math.min(day, lastDay)));
-}
+export { cycleFor };
 
 export function buildCredits(params: { tier: AiTier; used: number; resetsAt: Date }): AiCredits {
   const allowance = allowanceFor(params.tier);

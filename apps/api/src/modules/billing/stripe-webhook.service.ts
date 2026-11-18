@@ -30,7 +30,9 @@
  * the organization and the subscription id on the row. An event that
  * resolves to no workspace is `ignored:unknown_org`.
  */
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
+import { touchOrgEntitlements } from '../entitlements/entitlement-stamps';
+import { RedisService } from '../redis/redis.service';
 import type { Period, Subscription, SubscriptionStatus, SubscriptionTier } from '@postgear/db';
 import { securityLogger } from '../../common/logging/security-logger';
 import { BILLING_MESSAGES, BILLING_NOTIFICATIONS, planLabel } from './billing.messages';
@@ -86,6 +88,10 @@ export class StripeWebhookService {
   constructor(
     private readonly repository: BillingRepository,
     @Inject(STRIPE_EVENT_VERIFIER) private readonly verify: StripeEventVerifier,
+    // Sprint 12: after a subscription change commits, the workspace's plan
+    // stamp is rewritten so every API instance re-reads its limits within a
+    // second. Optional so the service still builds without Redis in tests.
+    @Optional() private readonly redis?: RedisService,
   ) {}
 
   /** The route: a bad signature is a 400 and a security event; anything verified is applied. */
@@ -122,22 +128,26 @@ export class StripeWebhookService {
     }
 
     try {
-      const outcome = await this.repository.transaction(async (store) => {
+      const applied = await this.repository.transaction(async (store) => {
         await store.recordEvent({
           id: event.id,
           type: event.type,
           organizationId: null,
           outcome: 'processing',
         });
-        const applied = await this.handle(event, store);
+        const result = await this.handle(event, store);
         await store.finishEvent(event.id, {
-          organizationId: applied.orgId,
-          outcome: applied.outcome,
+          organizationId: result.orgId,
+          outcome: result.outcome,
         });
-        return applied.outcome;
+        return result;
       });
 
-      return { received: true, outcome };
+      if (applied.orgId && applied.outcome === 'applied' && this.redis) {
+        await touchOrgEntitlements(this.redis, applied.orgId);
+      }
+
+      return { received: true, outcome: applied.outcome };
     } catch (error) {
       if (isUniqueViolation(error)) {
         securityLogger.log('billing.webhook_duplicate', { eventId: event.id, type: event.type });

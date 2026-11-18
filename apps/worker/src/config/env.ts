@@ -6,7 +6,31 @@
  * fix, not a mystery at the first publish three hours later. Only what the
  * worker itself reads is listed; Prisma reads `DATABASE_URL` on its own.
  */
+import { WORKER_ROLES, type WorkerRole } from '@postgear/scheduling';
+import { CLIP_PLATFORMS } from '@postgear/video-engine';
 import { z } from 'zod';
+
+/** Reads an empty or whitespace-only variable as absent, so a schema default applies. */
+function blankAsUnset<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    schema,
+  );
+}
+
+/** A comma-separated variable as a list of distinct values, each checked by `item`. */
+function commaList<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .string()
+    .transform((raw) =>
+      raw
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0),
+    )
+    .pipe(z.array(item))
+    .transform((values) => [...new Set(values)] as Array<z.output<T>>);
+}
 
 const envSchema = z
   .object({
@@ -137,6 +161,67 @@ const envSchema = z
       (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
       z.enum(['true', 'false']).default('false'),
     ),
+
+    // ---- Clips (Sprint 12) -------------------------------------------------
+
+    /**
+     * Which task queues this process serves (Module 02): `publishing` (posts,
+     * analytics, webhooks, workflows, maintenance), `media` (imports, probes,
+     * channel lists, downloads) and `render` (exports, one at a time).
+     * Locally all three; in production one role per container, so a render
+     * can never delay a scheduled post.
+     */
+    WORKER_ROLES: blankAsUnset(
+      commaList(z.enum(WORKER_ROLES))
+        .refine((roles) => roles.length > 0, 'WORKER_ROLES needs at least one role')
+        .default('publishing,media,render'),
+    ),
+    // How many media activities run at once (downloads and FFmpeg imports).
+    WORKER_MEDIA_CONCURRENCY: blankAsUnset(z.coerce.number().int().min(1).max(16).default(2)),
+    // Renders are CPU bound: one at a time unless the machine is sized for more.
+    RENDER_CONCURRENCY: blankAsUnset(z.coerce.number().int().min(1).max(8).default(1)),
+
+    /**
+     * Fetch from fixtures instead of YouTube, Twitch and Kick: recorded probe
+     * answers, the two generated sample videos, recorded channel lists. No
+     * platform is ever contacted. Refused in production.
+     */
+    CLIPS_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // The same list as the API's: a paused platform is never fetched from.
+    CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
+    // The operator's library ingest refuses to start unless this is true.
+    CLIPS_LIBRARY_INGEST: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // Every job works in `<CLIPS_SCRATCH_DIR>/<jobId>/`, removed when it ends.
+    // Unset means `<os temp>/postgear-clips`.
+    CLIPS_SCRATCH_DIR: blankAsUnset(z.string().min(1).optional()),
+    // Reading Twitch chat as a highlight signal (Module 16). Off by default.
+    CLIPS_TWITCH_CHAT: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    TWITCH_CHAT_QUERY: blankAsUnset(z.string().min(1).optional()),
+
+    // The programs Clips starts. A name on PATH or an absolute path.
+    FFMPEG_PATH: blankAsUnset(z.string().min(1).default('ffmpeg')),
+    FFPROBE_PATH: blankAsUnset(z.string().min(1).default('ffprobe')),
+    YTDLP_PATH: blankAsUnset(z.string().min(1).default('yt-dlp')),
+    // The JavaScript runtime yt-dlp needs for YouTube; `none` turns it off.
+    YTDLP_JS_RUNTIME: blankAsUnset(z.string().min(1).default('deno')),
+    YTDLP_PROXY: blankAsUnset(z.string().url().optional()),
+    YTDLP_COOKIES_FILE: blankAsUnset(z.string().min(1).optional()),
+    YTDLP_EXTRACTOR_ARGS: blankAsUnset(z.string().min(1).optional()),
+    YTDLP_SELF_UPDATE: blankAsUnset(z.enum(['true', 'false']).default('false')),
+
+    // Storage, the same variables as the API: the worker writes imported
+    // files to the private space and finished exports to the media library.
+    UPLOAD_DIRECTORY: blankAsUnset(z.string().min(1).optional()),
+    S3_ENDPOINT: blankAsUnset(z.string().url().optional()),
+    S3_REGION: blankAsUnset(z.string().min(1).default('us-east-1')),
+    S3_BUCKET_NAME: blankAsUnset(z.string().min(1).optional()),
+    S3_ACCESS_KEY: blankAsUnset(z.string().min(1).optional()),
+    S3_SECRET_KEY: blankAsUnset(z.string().min(1).optional()),
+    S3_FORCE_PATH_STYLE: blankAsUnset(z.enum(['true', 'false']).optional()),
+    CLIPS_PRIVATE_BUCKET: blankAsUnset(z.string().min(3).default('postgear-clips')),
+    CLIPS_URL_SECRET: blankAsUnset(
+      z.string().min(32, 'CLIPS_URL_SECRET must be at least 32 characters').optional(),
+    ),
   })
   .transform((env) => ({
     ...env,
@@ -182,7 +267,42 @@ const envSchema = z
         message: 'WEBHOOK_ALLOW_PRIVATE_URLS cannot be enabled in production',
       });
     }
+
+    if (env.CLIPS_SIMULATION === 'true' && env.NODE_ENV === 'production') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CLIPS_SIMULATION'],
+        message: 'CLIPS_SIMULATION cannot be enabled in production',
+      });
+    }
+
+    if (env.NODE_ENV === 'production' && !env.CLIPS_URL_SECRET) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CLIPS_URL_SECRET'],
+        message: 'CLIPS_URL_SECRET is required when NODE_ENV=production',
+      });
+    }
+
+    // The worker now writes to storage (imports and exports), so a half-set S3
+    // binding must fail at boot, not on the first finished render.
+    if (env.STORAGE_PROVIDER === 's3') {
+      for (const key of ['S3_BUCKET_NAME', 'S3_ACCESS_KEY', 'S3_SECRET_KEY'] as const) {
+        if (!env[key]) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required when STORAGE_PROVIDER=s3`,
+          });
+        }
+      }
+    }
   });
+
+/** Whether this process serves `role`'s task queue. */
+export function servesRole(env: Pick<WorkerEnv, 'WORKER_ROLES'>, role: WorkerRole): boolean {
+  return env.WORKER_ROLES.includes(role);
+}
 
 export type WorkerEnv = z.infer<typeof envSchema>;
 

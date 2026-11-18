@@ -16,6 +16,8 @@ const production = {
   ...base,
   NODE_ENV: 'production',
   AUTOMATION_INTERNAL_TOKEN: 'b'.repeat(64),
+  // Sprint 12: Clips' signed file addresses.
+  CLIPS_URL_SECRET: 'c'.repeat(32),
 };
 
 /** A complete production mail setup, with placeholder values. */

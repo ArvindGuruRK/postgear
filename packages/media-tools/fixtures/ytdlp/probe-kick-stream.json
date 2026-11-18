@@ -1,0 +1,21 @@
+{
+  "_type": "video",
+  "id": "00000000-0000-4000-8000-000000000001",
+  "extractor": "kick:vod",
+  "extractor_key": "KickVOD",
+  "webpage_url": "https://kick.com/simstreamer/videos/00000000-0000-4000-8000-000000000001",
+  "title": "PostGear Sample: A Ten Minute Stream",
+  "uploader": "simstreamer",
+  "uploader_id": "simstreamer",
+  "channel": "simstreamer",
+  "timestamp": 1767312000,
+  "duration": 600,
+  "is_live": false,
+  "live_status": "was_live",
+  "thumbnail": "https://img.sim.invalid/kick/00000000-0000-4000-8000-000000000001/thumb.webp",
+  "formats": [
+    { "format_id": "hls-360p30", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "avc1.4D401E", "acodec": "mp4a.40.2", "width": 640, "height": 360, "fps": 30, "tbr": 900, "url": "https://stream.sim.invalid/vod/sim0001/360p30/playlist.m3u8", "http_headers": { "User-Agent": "Mozilla/5.0 (PostGear simulation)", "Referer": "https://kick.com/" } },
+    { "format_id": "hls-720p60", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "avc1.4D4020", "acodec": "mp4a.40.2", "width": 1280, "height": 720, "fps": 60, "tbr": 3800, "url": "https://stream.sim.invalid/vod/sim0001/720p60/playlist.m3u8", "http_headers": { "User-Agent": "Mozilla/5.0 (PostGear simulation)", "Referer": "https://kick.com/" } },
+    { "format_id": "hls-1080p60", "ext": "mp4", "protocol": "m3u8_native", "vcodec": "avc1.64002A", "acodec": "mp4a.40.2", "width": 1920, "height": 1080, "fps": 60, "tbr": 7500, "url": "https://stream.sim.invalid/vod/sim0001/1080p60/playlist.m3u8", "http_headers": { "User-Agent": "Mozilla/5.0 (PostGear simulation)", "Referer": "https://kick.com/" } }
+  ]
+}

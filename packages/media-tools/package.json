@@ -1,0 +1,36 @@
+{
+  "name": "@postgear/media-tools",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./listing": "./src/listing.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome lint ./src ./scripts",
+    "lint:fix": "biome check --write ./src ./scripts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist .turbo node_modules",
+    "doctor": "ts-node --project tsconfig.scripts.json scripts/doctor.ts",
+    "samples": "ts-node --project tsconfig.scripts.json scripts/make-samples.ts",
+    "benchmark": "ts-node --project tsconfig.scripts.json scripts/benchmark.ts",
+    "stills": "ts-node --project tsconfig.scripts.json scripts/stills.ts",
+    "fonts:build": "ts-node --project tsconfig.scripts.json scripts/fonts-build.ts"
+  },
+  "dependencies": {
+    "@postgear/video-engine": "*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.5.0"
+  }
+}

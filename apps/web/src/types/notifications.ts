@@ -18,6 +18,10 @@ export type NotificationType =
   | 'automation.failed'
   | 'automation.paused'
   | 'discover.digest'
+  | 'clip_video_ready'
+  | 'clip_video_failed'
+  | 'clip_export_ready'
+  | 'clip_export_failed'
   | 'info';
 
 export interface NotificationView {

@@ -42,6 +42,12 @@ import {
   automationScheduledWorkflowIdPrefix,
   automationScheduleId,
   CANCEL_SIGNAL,
+  CLIP_JOB_QUEUES,
+  CLIP_JOB_TIMEOUTS_MS,
+  CLIP_JOB_WORKFLOWS,
+  type ClipJobKindName,
+  type ClipJobWorkflowInput,
+  clipJobWorkflowId,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
   PUBLISH_RETRY_POLICY,
@@ -64,6 +70,7 @@ import {
   ScheduleNotFoundError,
   type ScheduleOptions,
   WorkflowExecutionAlreadyStartedError,
+  WorkflowFailedError,
   WorkflowIdReusePolicy,
   WorkflowNotFoundError,
 } from '@temporalio/client';
@@ -96,6 +103,18 @@ export interface SchedulerStatus {
  * be reached. The caller decides what each means for its row.
  */
 export type RunSignalOutcome = 'signalled' | 'notFound' | 'unavailable';
+
+/** What Temporal knows of one clip job's workflow (Sprint 12, Module 04: the reconcile). */
+export type ClipWorkflowState = 'running' | 'closed' | 'notFound' | 'unavailable';
+
+/**
+ * What waiting for a short Clips workflow found (Sprint 12): its answer, the
+ * failure it ended with (the cause carries our code), or no answer in time.
+ */
+export type ClipQueryOutcome<T> =
+  | { outcome: 'answered'; value: T }
+  | { outcome: 'failed'; error: unknown }
+  | { outcome: 'unavailable' };
 
 /** The minimal client surface this service uses: what a test substitutes. */
 export interface SchedulingClient {
@@ -457,6 +476,133 @@ export class SchedulingService implements OnModuleDestroy {
         ),
       );
     });
+  }
+
+  /**
+   * Sprint 12: starts the workflow for a `ClipJob` row the API created. The
+   * queue follows the kind (renders on `postgear-render`, the rest on
+   * `postgear-media`), the id is `clip-job:<jobId>` with duplicates
+   * rejected, so one row can only ever have one workflow, and the execution
+   * timeout comes from the contract. Best-effort like the others: a failed
+   * start leaves the row QUEUED and the maintenance reconcile starts it.
+   */
+  async startClipJob(
+    jobId: string,
+    organizationId: string,
+    kind: ClipJobKindName,
+  ): Promise<boolean> {
+    return this.attempt('clip job', async (client) => {
+      try {
+        await client.workflow.start(CLIP_JOB_WORKFLOWS[kind], {
+          workflowId: clipJobWorkflowId(jobId),
+          taskQueue: CLIP_JOB_QUEUES[kind],
+          args: [{ jobId, organizationId } satisfies ClipJobWorkflowInput],
+          workflowExecutionTimeout: CLIP_JOB_TIMEOUTS_MS[kind],
+          workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+          throw error;
+        }
+      }
+    });
+  }
+
+  /** Sprint 12: asks a clip job's workflow to stop; the workflow writes CANCELLED itself. */
+  async cancelClipJob(jobId: string): Promise<RunSignalOutcome> {
+    return this.signalAutomationRun(clipJobWorkflowId(jobId), 'clip cancel', CANCEL_SIGNAL, []);
+  }
+
+  /**
+   * Sprint 12, Module 04: what Temporal knows of a clip job's workflow, for
+   * the reconcile. `running` (started and not closed, including one waiting
+   * for a worker), `closed` (it ended, whatever way), `notFound` (never
+   * started, or so old Temporal forgot it), or `unavailable` (Temporal could
+   * not be reached: the reconcile then does nothing this pass).
+   */
+  async describeClipJob(jobId: string): Promise<ClipWorkflowState> {
+    let state: ClipWorkflowState = 'notFound';
+    const reached = await this.attempt('clip describe', async (client) => {
+      try {
+        const description = await client.workflow.getHandle(clipJobWorkflowId(jobId)).describe();
+        state = description.status.name === 'RUNNING' ? 'running' : 'closed';
+      } catch (error) {
+        if (!(error instanceof WorkflowNotFoundError)) {
+          throw error;
+        }
+        state = 'notFound';
+      }
+    });
+    return reached ? state : 'unavailable';
+  }
+
+  /**
+   * Sprint 12: runs a short workflow and waits for its answer (the link
+   * probe, a channel page, the runtime check). Requests for the same id
+   * share one execution (`USE_EXISTING`), so ten people pasting the same
+   * link start one probe. The wait is capped at `waitMs`; past it, or with
+   * Temporal unreachable, the caller gets `unavailable` and answers that the
+   * video tools are not running, never a hung request. A workflow that
+   * failed comes back as `failed` with its error, for the caller to map.
+   */
+  async runClipQuery<T>(request: {
+    workflowType: string;
+    workflowId: string;
+    taskQueue: string;
+    args: unknown[];
+    waitMs: number;
+    executionTimeoutMs: number;
+  }): Promise<ClipQueryOutcome<T>> {
+    let client: SchedulingClient;
+    try {
+      client = await withTimeout(this.client(), CALL_TIMEOUT_MS);
+    } catch (error) {
+      this.discardClient();
+      this.logUnavailable('clip query', error);
+      return { outcome: 'unavailable' };
+    }
+
+    let result: Promise<T>;
+    try {
+      const handle = await withTimeout(
+        client.workflow.start(request.workflowType, {
+          workflowId: request.workflowId,
+          taskQueue: request.taskQueue,
+          args: request.args,
+          workflowExecutionTimeout: request.executionTimeoutMs,
+          workflowIdReusePolicy: WorkflowIdReusePolicy.ALLOW_DUPLICATE,
+          workflowIdConflictPolicy: 'USE_EXISTING',
+        }),
+        CALL_TIMEOUT_MS,
+      );
+      result = handle.result() as Promise<T>;
+    } catch (error) {
+      this.discardClient();
+      this.logUnavailable('clip query', error);
+      return { outcome: 'unavailable' };
+    }
+
+    try {
+      return { outcome: 'answered', value: await withTimeout(result, request.waitMs) };
+    } catch (error) {
+      if (error instanceof WorkflowFailedError) {
+        return { outcome: 'failed', error: error.cause ?? error };
+      }
+      // Timed out waiting: no worker on the queue, or one that is very busy.
+      result.catch(() => undefined);
+      return { outcome: 'unavailable' };
+    }
+  }
+
+  private logUnavailable(label: string, error: unknown): void {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'scheduling.unavailable',
+        action: label,
+        address: this.address,
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+    );
   }
 
   /** One signal to one run's workflow, telling "no such workflow" apart from "unreachable". */

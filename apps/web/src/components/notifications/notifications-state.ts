@@ -123,6 +123,10 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   'automation.failed': 'Workflow failed',
   'automation.paused': 'Workflow paused',
   'discover.digest': 'Your Discover week',
+  clip_video_ready: 'Your video is ready',
+  clip_video_failed: 'Your video could not be imported',
+  clip_export_ready: 'Your clip is ready',
+  clip_export_failed: 'Your clip could not be exported',
   info: 'Notification',
 };
 

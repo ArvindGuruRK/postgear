@@ -49,10 +49,40 @@ export class ApiError extends Error {
      * without matching on copy. Absent for most errors.
      */
     readonly code?: string,
+    /**
+     * Whole numbers the API attached to a coded refusal (a plan limit's
+     * `limit`, `used`, `needed`), for the lock dialog's sentence.
+     */
+    readonly details?: Readonly<Record<string, number>>,
   ) {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+type RefusalListener = (error: ApiError) => void;
+const refusalListeners = new Set<RefusalListener>();
+
+/**
+ * Calls `listener` with every 402 (a plan limit refused a request) that
+ * `api()` throws in the browser. The entitlements store uses it to refetch
+ * what the plan allows, so a lock drawn from a stale answer corrects itself.
+ * Returns the unsubscribe.
+ */
+export function onPaymentRequired(listener: RefusalListener): () => void {
+  refusalListeners.add(listener);
+  return () => {
+    refusalListeners.delete(listener);
+  };
+}
+
+/** The API's `details`, kept only when every value is a whole number. */
+function detailsFrom(raw: unknown): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const entries = Object.entries(raw as Record<string, unknown>).filter(
+    (entry): entry is [string, number] => Number.isInteger(entry[1]),
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 export interface ApiOptions {
@@ -130,11 +160,22 @@ async function request<T>(baseUrl: string, path: string, options: ApiOptions = {
   }
 
   if (!response.ok) {
-    throw new ApiError(
+    const error = new ApiError(
       typeof payload.error === 'string' ? payload.error : 'Something went wrong. Please try again.',
       response.status,
       typeof payload.code === 'string' ? payload.code : undefined,
+      detailsFrom(payload.details),
     );
+    if (response.status === 402) {
+      for (const listener of refusalListeners) {
+        try {
+          listener(error);
+        } catch {
+          // A listener's own failure never replaces the refusal the caller handles.
+        }
+      }
+    }
+    throw error;
   }
 
   return payload as T;

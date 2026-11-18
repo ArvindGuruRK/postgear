@@ -1,6 +1,6 @@
 # Module 02: Media Runtime
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done (2026-11-18) | Size: L (one full session)
 > **Depends on**: [Module 01](module-01-contracts-and-data.md)
 > **Stories**: foundations for CL-1.4, CL-10.1; CL-13.3 (videos are private); CL-9.4 and CL-7.5 (the public `library/` prefix the catalogue files live under)
 > **Next**: [Module 03](module-03-link-engine.md) (Link Engine)
@@ -88,16 +88,16 @@ interface PrivateStorage {
 
 ## Tasks
 
-- [ ] `packages/storage`: move the code, fix imports in the API and the worker, delete the duplicated key pattern; media tests green.
-- [ ] `PrivateStorage` with the local and S3 bindings, clip keys, the signed file route with Range.
-- [ ] Explicit upload directory; storage variables in the worker env; `ActivityDeps` gains both storages.
-- [ ] `minio-setup` in `docker-compose.yml` (buckets, policy, CORS); `.env.example` updated.
-- [ ] `packages/media-tools`: `runTool`, `toolPaths`, `doctor`, `withScratch`, `assertFreeDisk`, `probeFile`; the `child_process` guard; `npm run clips:doctor`.
-- [ ] Worker roles and queues; boot doctor; `createClipProviders` with stand-ins.
-- [ ] `ClipJobsService`, `startClipJob`, `cancelClipJob`, the events service and routes, `job-progress.ts`.
-- [ ] `clipRuntimeCheckWorkflow`, `GET /clips/status`, the reconcile activity.
-- [ ] `clips-api.ts`, `use-clip-job.ts`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `packages/storage`: move the code, fix imports in the API and the worker, delete the duplicated key pattern; media tests green.
+- [x] `PrivateStorage` with the local and S3 bindings, clip keys, the signed file route with Range.
+- [x] Explicit upload directory; storage variables in the worker env; `ActivityDeps` gains both storages.
+- [x] `minio-setup` in `docker-compose.yml` (buckets, policy, CORS); `.env.example` updated.
+- [x] `packages/media-tools`: `runTool`, `toolPaths`, `doctor`, `withScratch`, `assertFreeDisk`, `probeFile`; the `child_process` guard; `npm run clips:doctor`.
+- [x] Worker roles and queues; boot doctor; `createClipProviders` with stand-ins.
+- [x] `ClipJobsService`, `startClipJob`, `cancelClipJob`, the events service and routes, `job-progress.ts`.
+- [x] `clipRuntimeCheckWorkflow`, `GET /clips/status`, the reconcile activity.
+- [x] `clips-api.ts`, `use-clip-job.ts`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

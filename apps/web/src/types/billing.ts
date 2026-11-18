@@ -33,6 +33,13 @@ export interface Plan {
   members: number | null;
   features: string[];
   highlighted: boolean;
+  /**
+   * Sprint 12: the plan's limits as data (`GET /billing/plans` only; null
+   * when the table could not be read). Read through `lib/entitlements.ts`.
+   */
+  entitlements?: Record<string, unknown> | null;
+  /** Sprint 12: the plan's Clips allowances, one sentence each, for the plan card. */
+  clipsLines?: string[];
 }
 
 export interface BillingStatus {

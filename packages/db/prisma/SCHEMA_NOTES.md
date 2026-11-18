@@ -611,6 +611,100 @@ Additive: three tables, five columns, every column nullable or with a default.
 - One-click unsubscribe (List-Unsubscribe) needs no table: it turns off the
   existing `User.sendSuccessEmails`, `sendFailureEmails` or `sendDigestEmails`.
 
+## Sprint 12 additions
+
+Migrations `20261117120000_entitlements_and_usage`,
+`20261117130000_sprint12_clips` and
+`20261117140000_sprint12_clip_library_and_channels`. Additive only: new
+tables and enums, and three nullable columns on `Media` (`durationMs`, `fps`,
+`origin`). The design is in
+[`docs/sprint-12/clips-implementation-docs/`](../../../docs/sprint-12/clips-implementation-docs/README.md).
+
+### Plans as data
+
+- **`PlanEntitlement`** is one value per plan tier and key (`@@unique([tier, key])`).
+  `value` is JSON because a key may be a number, a boolean, a quality or a
+  priority; the pure registry in `packages/entitlements` validates every value
+  when it is written and again when it is read. A missing row means the
+  registry's default, so a new key needs no migration and no backfill.
+- **`OrgEntitlementOverride`** is one value per workspace and key, always
+  with a `reason` and an `expiresAt` (an override never lasts for ever). The
+  resolver reads override, then plan, then default.
+- **`EntitlementChange`** is the audit trail: every write to either table
+  (who, when, old and new value, why). Rows are never updated or deleted.
+- **The API caches resolved values** for 15 seconds in process and checks two
+  Redis stamps (`ent:plans`, `ent:org:<orgId>`) at most once a second, so a
+  change applies everywhere within about a second. `ENTITLEMENTS_SOURCE=seed`
+  ignores these tables entirely (the kill switch).
+
+### The usage ledger
+
+- **`UsageEntry` is append only.** A charge is a positive `CHARGE` row; a
+  refund is a negative `REVERSAL` row pointing at what it reverses
+  (`reversesId`, idempotency key `rev:<entryId>`, the original's
+  `cycleStart`); an operator's correction is an `ADJUSTMENT` with its reason
+  in `meta`. Nothing is ever updated, so the meter is
+  always `SUM(units)` over the cycle and history can be replayed.
+- **Units are thousandths** (`Int`): 61.5 import minutes is `61500`. No
+  floating point anywhere in money-like sums.
+- **`@@unique([organizationId, idempotencyKey])` is what makes a charge
+  happen once.** The key names the thing charged (`clips.import:<jobId>`),
+  so a double click, a retried request or a replayed workflow hits the unique
+  index (P2002) and is answered as "already charged". Charges run in a
+  Serializable transaction, retried on P2034, so two concurrent charges cannot
+  both pass a limit.
+- **`cycleStart`** is stored on the row (the billing cycle it counts in), so
+  a meter is one indexed range read, and a plan change mid-cycle does not
+  move old rows.
+
+### Clips
+
+- **Two clocks.** `Clip.document` is the whole clip as JSON (validated by
+  `clipDocumentSchema` in `packages/video-engine`); times inside are whole
+  milliseconds in source time (where in the video) or output time (where in
+  the clip). `Clip.revision` goes up on every save; a save names the
+  revision it was made from, so a stale tab is refused (`clip_changed_elsewhere`).
+- **`ClipJob` is the one table for long work** (IMPORT, SEGMENT, HIGHLIGHTS,
+  RENDER, DOWNLOAD). The API writes the row first and then starts the
+  workflow `clip-job:<id>`, so the reconcile can start any job whose start
+  was lost. `input` holds plan values copied at creation (a plan change does
+  not alter a running job); `output` may hold storage keys and is never sent
+  to a browser as it is. `error` is always `{ code, message }` with our own
+  sentence. `priority` is copied from `clips.queue_priority` at creation.
+- **`ClipAsset.key` is unique** and always a private key under
+  `clips/<orgId>/` (`packages/storage/src/clip-keys.ts` builds and checks
+  every one); `bytes` is `BigInt` because a long video's original passes
+  2 GB. `SUM(bytes)` per workspace is the video space gauge.
+- **`ClipVideo` has no unique on `(organizationId, platform, externalId)`**
+  on purpose: a deleted video keeps its row (`deletedAt`), and the same video
+  may be imported again later. Dedup of live videos is a Serializable check
+  in the API.
+- **Workspace ids are not always UUIDs.** The seeded workspaces are
+  `seed-demo-org` and `seed-second-org`, so the private key builders accept a
+  lowercase slug for the workspace segment (videos and jobs stay UUIDs).
+- **Finished exports are ordinary `Media` rows** (`origin: 'clip'`, with
+  `durationMs`, `fps`, `width`, `height`), in the public media space, so the
+  composer and the Media page need no Clips knowledge.
+
+### Generated search columns: a known drift to remove by hand
+
+`ClipSound.search` and `ClipSticker.search` are `tsvector` columns
+`GENERATED ALWAYS AS (...)`, written by hand in the migration because Prisma
+cannot declare a generated column (the schema has them as
+`Unsupported("tsvector")?`). Prisma therefore sees a difference it cannot
+express, and **every future `prisma migrate dev` generates these two lines:**
+
+```sql
+ALTER TABLE "ClipSound" ALTER COLUMN "search" DROP DEFAULT;
+ALTER TABLE "ClipSticker" ALTER COLUMN "search" DROP DEFAULT;
+```
+
+**Delete them from the new migration before applying it.** Postgres refuses
+`DROP DEFAULT` on a generated column, so leaving them in fails the migration.
+They are the only drift: `prisma migrate diff --from-migrations
+prisma/migrations --to-schema-datamodel prisma/schema.prisma` shows nothing
+else (checked 2026-11-18).
+
 ## A user may legitimately belong to zero organizations
 
 Signup collects credentials only; the workspace is created afterward, in a real

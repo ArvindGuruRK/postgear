@@ -44,7 +44,14 @@ async function photo(width: number, height: number): Promise<Buffer> {
     .toBuffer();
 }
 
+// Real sharp work on photos up to 4000 px: well under a second alone, but
+// several seconds while the whole API suite shares the CPU, so the default
+// 5 s limit failed it under load. The limit guards hangs, not speed.
+const HEAVY_IMAGE_MS = 30_000;
+
 describe('processImage', () => {
+  jest.setTimeout(HEAVY_IMAGE_MS);
+
   it('fits a large photo inside 2048 px, as a smaller JPEG', async () => {
     const original = await photo(4000, 3000);
     const result = await processImage(original, sniffImage(original));

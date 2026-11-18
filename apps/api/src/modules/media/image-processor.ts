@@ -38,7 +38,7 @@
 import { readFile } from 'node:fs/promises';
 import sharp, { type Sharp } from 'sharp';
 import type { SniffedMedia } from './file-type';
-import type { StoredExtension } from './storage/storage-keys';
+import type { StoredExtension } from '@postgear/storage';
 
 /** Long-edge cap for stored images. */
 export const IMAGE_MAX_EDGE = 2048;
