@@ -14,6 +14,10 @@ import {
 import { ClipCard, ClipPosterBox, posterLayout, ratioValue } from './clip-card';
 import { fixtureClipItem, fixtureClipSummary, fixtureClipView } from './clip-list-fixtures';
 
+jest.mock('@/lib/api', () => ({
+  ...jest.requireActual('@/lib/api'),
+  downloadFile: jest.fn(async () => undefined),
+}));
 jest.mock('@/lib/clips-api', () => ({
   updateClip: jest.fn(),
   duplicateClip: jest.fn(),
@@ -219,6 +223,29 @@ describe('ClipCard', () => {
     openMenu(clip.title);
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Hide' }));
     expect(actions.toggleHidden).toHaveBeenCalledWith(clip);
+  });
+
+  it('shows a ring on the poster while an export runs', () => {
+    renderCard(fixtureClipItem({ exportProgress: 42 }));
+    expect(screen.getByRole('img', { name: 'Exporting, 42% done' })).toBeInTheDocument();
+  });
+
+  it('has no ring and no Download before the first export', async () => {
+    renderCard();
+    expect(screen.queryByTestId('clip-card-exporting')).toBeNull();
+    openMenu('Team Talk (0:30)');
+    await screen.findByRole('menuitem', { name: 'Duplicate' });
+    expect(screen.queryByRole('menuitem', { name: 'Download' })).toBeNull();
+  });
+
+  it('downloads the exported file from the menu, named after the clip', async () => {
+    const { downloadFile } = jest.requireMock('@/lib/api') as { downloadFile: jest.Mock };
+    renderCard(fixtureClipItem({ exported: true, exportedMediaId: 'media-7', state: 'exported' }));
+    openMenu('Team Talk (0:30)');
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Download' }));
+    await waitFor(() =>
+      expect(downloadFile).toHaveBeenCalledWith('/media/media-7/download', 'Team Talk (0:30).mp4'),
+    );
   });
 });
 

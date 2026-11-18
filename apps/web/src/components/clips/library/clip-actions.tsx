@@ -11,6 +11,7 @@
  * so the next try uses the new revision.
  */
 import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { EyeIcon } from '@animateicons/react/lucide/eye-icon';
 import { EyeOffIcon } from '@animateicons/react/lucide/eye-off-icon';
@@ -37,7 +38,7 @@ import {
   toast,
 } from '@postgear/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, downloadFile } from '@/lib/api';
 import { deleteClip, duplicateClip, updateClip } from '@/lib/clips-api';
 import type { ClipSummary, ClipView } from '@/types/clips';
 
@@ -184,6 +185,11 @@ export function RenameField({
 }
 
 /** The ghost menu beside a clip, and the red confirm its Delete Clip opens. */
+/** The clip's last export from Media, named after the clip. */
+export function downloadClipFile(mediaId: string, title: string): Promise<void> {
+  return downloadFile(`/media/${encodeURIComponent(mediaId)}/download`, `${title}.mp4`);
+}
+
 export function ClipMenu({
   clip,
   actions,
@@ -235,6 +241,17 @@ export function ClipMenu({
             <MotionIcon icon={PencilIcon} className="h-4 w-4" />
             Rename
           </DropdownMenuItem>
+          {clip.exportedMediaId ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                const mediaId = clip.exportedMediaId;
+                if (mediaId) void downloadClipFile(mediaId, clip.title).catch(() => undefined);
+              }}
+            >
+              <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+              Download
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={() => void actions.duplicate(clip)}>
             <MotionIcon icon={CopyIcon} className="h-4 w-4" />
             Duplicate

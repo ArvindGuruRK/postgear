@@ -19,6 +19,7 @@ export function fixtureClipSummary(overrides: Partial<ClipSummary> = {}): ClipSu
     revision: 3,
     exported: false,
     exportedMediaId: null,
+    exportProgress: null,
     createdAt: '2026-11-18T10:00:00.000Z',
     updatedAt: '2026-11-18T10:05:00.000Z',
     state: 'draft',

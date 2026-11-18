@@ -12,7 +12,15 @@
  *   FFmpeg uses every core by itself).
  */
 import { mkdir } from 'node:fs/promises';
-import { createRunTool, toolPaths } from '@postgear/media-tools';
+import {
+  createRunTool,
+  defaultWatermarkFile,
+  type FontsFolder,
+  loadFontsFolder,
+  loadWatermark,
+  toolPaths,
+  type WatermarkFile,
+} from '@postgear/media-tools';
 import {
   MEDIA_QUICK_CONCURRENCY,
   MEDIA_QUICK_TASK_QUEUE,
@@ -26,6 +34,7 @@ import type { Duration } from '@temporalio/common';
 import type { WorkerEnv } from '../config/env';
 import {
   clipsSimulated,
+  fontsDirFrom,
   privateStorageConfigFrom,
   publicStorageConfigFrom,
   scratchRootFrom,
@@ -106,6 +115,51 @@ export function workerPlan(
 }
 
 /**
+ * The fonts folder for text in exports. Missing is a warning, not a stop:
+ * clips without text still export, and one with text fails `font_missing`.
+ * An unreadable or old manifest stops a render worker (the build must be rerun).
+ */
+async function loadClipFonts(env: WorkerEnv, roles: { render: boolean }): Promise<FontsFolder | null> {
+  const dir = fontsDirFrom(env);
+  if (!dir) {
+    if (roles.render) {
+      console.warn('[worker:clips] CLIPS_FONTS_DIR is not set: exports with text will fail.');
+    }
+    return null;
+  }
+  try {
+    const folder = await loadFontsFolder(dir);
+    if (!folder && roles.render) {
+      console.warn(
+        `[worker:clips] No fonts in ${dir}: exports with text will fail. Run npm run clips:fonts:build.`,
+      );
+    }
+    return folder;
+  } catch (error) {
+    if (!roles.render) return null;
+    throw new Error(
+      `The fonts manifest in ${dir} cannot be read (${(error as Error).message}). Run npm run clips:fonts:build.`,
+    );
+  }
+}
+
+/**
+ * The "Made with PostGear" mark for exports on a plan without the
+ * watermark-free feature (Module 15). Missing is a warning: an export that
+ * asks for the mark then fails, every other export works.
+ */
+async function loadClipWatermark(roles: { render: boolean }): Promise<WatermarkFile | null> {
+  const file = defaultWatermarkFile();
+  const mark = file ? await loadWatermark(file) : null;
+  if (!mark && roles.render) {
+    console.warn(
+      '[worker:clips] The watermark (packages/media-tools/assets/watermark.png) is missing: exports that carry the mark will fail. Run npm run watermark:make --workspace=@postgear/media-tools.',
+    );
+  }
+  return mark;
+}
+
+/**
  * Builds the clip dependencies: tool paths, the doctor (logged, and fatal for
  * a missing FFmpeg or, with `render`, a build that cannot render), both
  * storage spaces, the providers and the internal client. Throws a plain
@@ -143,6 +197,9 @@ export async function bootClips(
       '[worker:clips] yt-dlp is not ready, so link imports will fail. Uploads and exports still work.',
     );
   }
+  const fonts = await loadClipFonts(env, roles);
+  const watermark = await loadClipWatermark(roles);
+
   if (!env.AUTOMATION_INTERNAL_TOKEN) {
     console.warn(
       '[worker:clips] AUTOMATION_INTERNAL_TOKEN is not set: upload charges, refunds and finished exports cannot reach the API.',
@@ -156,6 +213,8 @@ export async function bootClips(
     runTool,
     paths,
     scratchRoot,
+    fonts,
+    watermark,
     providers: createClipProviders({ env, runTool, paths, scratchRoot }),
     runtime,
     internal: createClipInternalClient({

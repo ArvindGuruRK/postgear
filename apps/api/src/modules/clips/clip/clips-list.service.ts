@@ -36,6 +36,7 @@ import {
 } from '../videos/clip-video-view';
 import { CLIP_SUMMARY_SELECT } from '../videos/clip-videos.repository';
 import { type ClipSummaryView, toClipSummary } from '../videos/clip-videos.service';
+import { exportProgressOf } from './export-progress';
 import {
   type ClipPoster,
   type ClipPreview,
@@ -179,9 +180,13 @@ export class ClipsListService {
     }
 
     const sign = signOnce((key) => this.playback.address(key));
+    const exporting = await exportProgressOf(
+      orgId,
+      rows.map((row) => row.id),
+    );
     return Promise.all(
       rows.map(async (row) => {
-        const summary = toClipSummary(row, row.posts.length > 0);
+        const summary = toClipSummary(row, row.posts.length > 0, exporting.get(row.id) ?? null);
         const own = files.get(row.videoId) ?? null;
         const [poster, preview] = own
           ? await Promise.all([

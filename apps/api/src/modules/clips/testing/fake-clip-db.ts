@@ -5,7 +5,8 @@
  *
  * `matches` evaluates the subset of Prisma's filter language those services
  * write: equality and `null`, `in`, `not`, `equals` (a value or a field
- * reference made by `fieldRef`), `AND`, `OR`, `NOT`, and on clips the
+ * reference made by `fieldRef`), a JSON `path` with `equals` (a missing
+ * path is SQL NULL: never equal), `AND`, `OR`, `NOT`, and on clips the
  * relations `video` (one) and `posts` (`some` and `none`). A filter it does
  * not know throws, so a spec can never pass by ignoring part of a query.
  *
@@ -22,6 +23,20 @@ export interface FakePost {
   deletedAt: Date | null;
 }
 
+/** The part of a Media row the export history reads (Module 15). */
+export interface FakeMedia {
+  id: string;
+  organizationId: string;
+  name: string;
+  path: string;
+  thumbnail: string | null;
+  fileSize: number;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  deletedAt: Date | null;
+}
+
 export interface FakeTables {
   clips: Clip[];
   videos: ClipVideo[];
@@ -30,6 +45,8 @@ export interface FakeTables {
   assets: ClipAsset[];
   jobs: ClipJob[];
   layouts: ClipLayoutPreset[];
+  /** Optional: only the export specs seed Media rows. */
+  media?: FakeMedia[];
 }
 
 const FIELD = Symbol('field');
@@ -60,6 +77,14 @@ function resolve(row: Row, value: unknown): unknown {
 }
 
 function matchesScalar(row: Row, actual: unknown, filter: unknown): boolean {
+  if (isPlainObject(filter) && 'path' in filter) {
+    const { path, ...rest } = filter as { path: string[] };
+    let value: unknown = actual;
+    for (const key of path) value = isPlainObject(value) ? value[key] : undefined;
+    // A missing path reads as SQL NULL: no comparison with it is true.
+    if (value === undefined || value === null) return false;
+    return matchesScalar(row, value, rest);
+  }
   if (!isPlainObject(filter) || FIELD in filter) {
     const expected = resolve(row, filter);
     // SQL: a comparison with NULL on either side is not true.
@@ -250,6 +275,7 @@ export function fakeClipDb(tables: FakeTables) {
     },
     clipPost: table(() => tables.clipPosts as unknown as Row[]),
     post: table(() => tables.posts as unknown as Row[]),
+    media: table(() => (tables.media ?? []) as unknown as Row[]),
     clipAsset: {
       ...table(() => tables.assets as unknown as Row[]),
       deleteMany: jest.fn(async ({ where }: { where: unknown }) => {

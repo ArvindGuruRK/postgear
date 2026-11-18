@@ -54,6 +54,25 @@ describe('clipKeys', () => {
     expect(contentTypeForClipKey(key)).toBe('image/png');
   });
 
+  it("builds the shared library's licence reports outside every workspace", () => {
+    expect(clipKeys.libraryReport(job, 'md')).toBe(`ops/library-runs/${job}.md`);
+    expect(clipKeys.libraryReport(job, 'json')).toBe(`ops/library-runs/${job}.json`);
+    expect(contentTypeForClipKey(`ops/library-runs/${job}.md`)).toBe('text/markdown; charset=utf-8');
+    expect(() => clipKeys.libraryReport('../x', 'md')).toThrow(/UUID/);
+    expect(() => clipKeys.libraryReport(job, 'html' as 'md')).toThrow(/JSON or Markdown/);
+    for (const key of [
+      `ops/library-runs/${job}.html`,
+      `ops/library-runs/${job}/x.md`,
+      `ops/${job}.md`,
+      `ops/library-runs/../${job}.md`,
+      `clips/${org}/library/${hex}.md`,
+    ]) {
+      expect(isValidClipKey(key)).toBe(false);
+    }
+    // No delete may take the reports' folder.
+    expect(isValidClipPrefix('ops/library-runs/')).toBe(false);
+  });
+
   it('refuses ids, kinds, names and extensions that could escape', () => {
     expect(() => clipKeys.videoFile('../..', video, 'proxy', 'mp4')).toThrow(/workspace id/);
     expect(() => clipKeys.videoFile(org, `${video}/..`, 'proxy', 'mp4')).toThrow(/UUID/);

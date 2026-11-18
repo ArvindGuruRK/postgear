@@ -10,6 +10,7 @@
  */
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
+import { defaultFontsDir } from '@postgear/media-tools';
 import type { PrivateStorageConfig, StorageConfig } from '@postgear/storage';
 import type { WorkerEnv } from '../config/env';
 
@@ -52,6 +53,16 @@ export function privateStorageConfigFrom(env: WorkerEnv): PrivateStorageConfig {
 export function scratchRootFrom(env: Pick<WorkerEnv, 'CLIPS_SCRATCH_DIR'>): string {
   const configured = env.CLIPS_SCRATCH_DIR;
   if (!configured) return join(tmpdir(), 'postgear-clips');
+  return isAbsolute(configured) ? configured : resolve(configured);
+}
+
+/**
+ * The render's fonts folder: `CLIPS_FONTS_DIR`, or `.cache/clips-fonts` at the
+ * repo root (null outside a checkout, where the setting is required). Always absolute.
+ */
+export function fontsDirFrom(env: Pick<WorkerEnv, 'CLIPS_FONTS_DIR'>): string | null {
+  const configured = env.CLIPS_FONTS_DIR;
+  if (!configured) return defaultFontsDir();
   return isAbsolute(configured) ? configured : resolve(configured);
 }
 

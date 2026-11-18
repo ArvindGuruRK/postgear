@@ -1,24 +1,76 @@
 import { TooltipProvider } from '@postgear/ui';
-import { type ClipDocument, createClipDocument } from '@postgear/video-engine';
+import {
+  type ClipDocument,
+  createClipDocument,
+  type StickerItem,
+  type TextItem,
+} from '@postgear/video-engine';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import type { ClipDetail, ClipView } from '@/types/clips';
 import { fixtureVideo } from '../clips-fixtures';
 import type { ClipSaveState } from './clip-autosave';
 import { ClipEditor } from './clip-editor';
-import { CONFLICT_SENTENCE, LATER_PANEL_SENTENCE, SHARP_GONE_SENTENCE } from './clip-editor-model';
+import { CONFLICT_SENTENCE, SHARP_GONE_SENTENCE } from './clip-editor-model';
 
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+// The plan dialog links to this workspace's billing.
+jest.mock('@/components/navigation/workspace-provider', () => ({
+  useWorkspace: () => ({ activeOrgId: 'org-1' }),
+}));
 jest.mock('@/lib/clips-api', () => ({
   openClip: jest.fn(async () => ({})),
+  searchSounds: jest.fn(async () => ({ items: [], page: 1, pageSize: 24, total: 0, hasMore: false })),
+  soundCategories: jest.fn(async () => []),
+  favouriteSound: jest.fn(),
+  unfavouriteSound: jest.fn(),
+  listSoundUploads: jest.fn(async () => []),
+  uploadSound: jest.fn(),
+  deleteSoundUpload: jest.fn(),
+  soundFiles: jest.fn(async () => []),
   getClip: jest.fn(),
   updateClip: jest.fn(),
   exportClip: jest.fn(),
+  listClipExports: jest.fn(async () => []),
+  previewClip: jest.fn(),
+  latestClipPreview: jest.fn(async () => null),
+  cancelClipJob: jest.fn(),
   requestMoreVideo: jest.fn(async () => ({ job: null, sharp: 'fetching' })),
   listLayouts: jest.fn(async () => []),
   saveLayout: jest.fn(),
   renameLayout: jest.fn(),
   deleteLayout: jest.fn(),
+  searchStickers: jest.fn(async () => ({
+    items: [
+      {
+        id: '5c0e8a52-0000-4000-8000-000000000001',
+        kind: 'static',
+        name: 'Gold Star',
+        category: 'arrows-shapes',
+        tags: [],
+        fileUrl: 'https://space.test/gold-star.png',
+        previewUrl: null,
+        width: 256,
+        height: 128,
+        durationMs: null,
+        fps: null,
+        frames: null,
+        credit: null,
+        isFavourite: false,
+      },
+    ],
+    page: 1,
+    pageSize: 24,
+    total: 1,
+    hasMore: false,
+  })),
+  stickerCategories: jest.fn(async () => []),
+  listStickerUploads: jest.fn(async () => []),
+  stickerFiles: jest.fn(async () => []),
+  favouriteSticker: jest.fn(async () => undefined),
+  unfavouriteSticker: jest.fn(async () => undefined),
+  uploadSticker: jest.fn(),
+  deleteStickerUpload: jest.fn(),
 }));
 // The clock the keys read: no engine runs in jsdom, so the playhead is set here.
 const mockClock = { ms: 0 };
@@ -172,7 +224,7 @@ describe('ClipEditor frame', () => {
     const picture = screen.getByTestId('clip-stage-picture');
     fireEvent.click(screen.getByTestId('clip-tab-audio'));
     expect(panelTitle()).toHaveTextContent('Audio');
-    expect(within(panel()).getByText(LATER_PANEL_SENTENCE)).toBeInTheDocument();
+    expect(within(panel()).getByTestId('clip-audio-panel')).toBeInTheDocument();
     expect(screen.queryByTestId('clip-video-pane')).toBeNull();
     expect(screen.queryByTestId('clip-split-stage')).toBeNull();
     // The clip's stage is the same element: never remounted, so playback carries on.
@@ -198,7 +250,7 @@ describe('ClipEditor frame', () => {
     renderEditor();
     fireEvent.click(screen.getByTestId('clip-editor-export'));
     expect(panelTitle()).toHaveTextContent('Export');
-    expect(screen.getByRole('combobox', { name: 'Export Quality' })).toBeInTheDocument();
+    expect(screen.getByTestId('clip-export-summary')).toHaveTextContent('Vertical 9:16');
   });
 
   it('renames in place, and Undo brings the old name back', () => {
@@ -407,5 +459,218 @@ describe('layouts in the editor', () => {
     expect(screen.getByTestId('clip-timeline-status')).toHaveTextContent(
       'A layout needs at least one crop.',
     );
+  });
+});
+
+describe('effects in the editor', () => {
+  let clock: jest.SpyInstance<number, []>;
+  beforeEach(() => {
+    clock = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+  });
+  afterEach(() => clock.mockRestore());
+
+  it('Add Zoom puts a two second zoom at the playhead, selected, with its dot on the clip', () => {
+    mockClock.ms = 5_000;
+    renderEditor();
+    fireEvent.click(screen.getByTestId('clip-tab-effects'));
+    expect(panelTitle()).toHaveTextContent('Effects');
+    fireEvent.click(within(panel()).getByRole('button', { name: /^Zoom/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Zoom' }));
+    const [zoom] = lastDocument().zooms;
+    // 5 s into the clip is 15 s of the video.
+    expect(zoom).toMatchObject({ from: 15_000, to: 17_000, scale: 1.5 });
+    expect(screen.getByTestId('clip-selected-zoom')).toBeInTheDocument();
+    expect(screen.getByTestId('clip-zoom-focus')).toBeInTheDocument();
+    expect(screen.getByTestId('clip-bar-zoom')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('clip-announcer')).toHaveTextContent('Zoom added.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Zoom' }));
+    expect(lastDocument().zooms).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(lastDocument().zooms).toHaveLength(1);
+  });
+
+  it('selecting a part opens Speed Control; 2x halves it as one undo step', () => {
+    mockClock.ms = 12_000;
+    renderEditor();
+    key({ key: 's' });
+    const parts = screen.getAllByTestId('clip-part');
+    act(() => (parts[1] as HTMLElement).focus());
+    fireEvent.click(screen.getByTestId('clip-tab-effects'));
+    expect(within(panel()).getByRole('button', { name: /^Speed Control/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    fireEvent.click(within(panel()).getByRole('button', { name: '2x' }));
+    expect(lastDocument().segments.map((segment) => segment.speed)).toEqual([1, 2]);
+    expect(screen.getByTestId('clip-speed-length')).toHaveTextContent('18.0 s becomes 9.0 s');
+    const second = screen.getAllByTestId('clip-part')[1] as HTMLElement;
+    expect(within(second).getByText('2x')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(lastDocument().segments.map((segment) => segment.speed)).toEqual([1, 1]);
+  });
+
+  it('a look, its strength and the fades go on the whole clip; Preview Export opens Export', () => {
+    renderEditor();
+    fireEvent.click(screen.getByTestId('clip-tab-effects'));
+    fireEvent.click(within(panel()).getByRole('button', { name: /^Looks/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Black And White' }));
+    expect(lastDocument().looks).toEqual({ colour: 'black_white', strength: 1, vignette: 0 });
+    fireEvent.click(screen.getByRole('switch', { name: 'Fade Out' }));
+    expect(lastDocument().fades).toEqual({ inMs: 0, outMs: 1_000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Export' }));
+    expect(panelTitle()).toHaveTextContent('Export');
+  });
+});
+
+describe('text in the editor', () => {
+  const texts = () =>
+    lastDocument().tracks.flatMap((track) =>
+      track.kind === 'overlay' ? track.items : [],
+    ) as TextItem[];
+  const firstText = () => texts()[0] as TextItem;
+
+  // Edits sharing a key coalesce within 700 ms of the clock: a still clock keeps these
+  // tests from depending on how fast the machine runs them.
+  let clock: jest.SpyInstance<number, []>;
+  beforeEach(() => {
+    clock = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+  });
+  afterEach(() => clock.mockRestore());
+
+  function addText() {
+    fireEvent.click(screen.getByTestId('clip-tab-text'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
+    return screen.getByRole('textbox', { name: 'Text' });
+  }
+
+  function type(box: HTMLElement, words: string) {
+    act(() => {
+      box.textContent = words;
+      fireEvent.input(box);
+    });
+  }
+
+  it('Add Text puts a text at the playhead and starts typing on the clip, as two undo steps', () => {
+    mockClock.ms = 5_000;
+    renderEditor();
+    const box = addText();
+    expect(firstText().start).toBe(5_000);
+    expect(firstText().text).toBe('Your text here');
+    expect(box).toHaveFocus();
+    type(box, 'Hello');
+    type(box, 'Hello there');
+    expect(firstText().text).toBe('Hello there');
+    key({ key: 'Escape' }, box);
+    expect(screen.queryByTestId('clip-text-typing')).toBeNull();
+    // Escape ends the typing and keeps the words; the selection stays.
+    expect(firstText().text).toBe('Hello there');
+    expect(screen.getByRole('textbox', { name: 'Words' })).toHaveValue('Hello there');
+    // All the typing is one step; the add is the one before it.
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(firstText().text).toBe('Your text here');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(texts()).toHaveLength(0);
+  });
+
+  it('a text left empty when typing ends is removed', () => {
+    renderEditor();
+    const box = addText();
+    type(box, '');
+    act(() => {
+      fireEvent.blur(box);
+    });
+    expect(texts()).toHaveLength(0);
+    expect(screen.getByTestId('clip-announcer')).toHaveTextContent('Empty text removed.');
+  });
+
+  it('arrows nudge the selected text a pixel, Shift ten, as one undo step; Enter types again', () => {
+    renderEditor();
+    key({ key: 'Escape' }, addText());
+    const { x, y } = firstText().transform;
+    key({ key: 'ArrowRight' });
+    key({ key: 'ArrowDown', shiftKey: true });
+    expect(firstText().transform.x).toBeCloseTo(x + 1 / 1080, 6);
+    expect(firstText().transform.y).toBeCloseTo(y + 10 / 1920, 6);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(firstText().transform).toMatchObject({ x, y });
+    key({ key: 'Enter' });
+    expect(screen.getByRole('textbox', { name: 'Text' })).toBeInTheDocument();
+  });
+
+  it('the panel restyles the text, and Whole Clip stretches it over the clip', () => {
+    renderEditor();
+    key({ key: 'Escape' }, addText());
+    fireEvent.click(screen.getByRole('button', { name: 'On A Box' }));
+    expect(firstText().style.background).toMatchObject({ colour: '#FFFFFF', pad: 18 });
+    expect(firstText().style.outline).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Whole Clip' }));
+    expect(firstText()).toMatchObject({ anchor: 'clip', start: 0, duration: 30_000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Long' }));
+    expect(firstText()).toMatchObject({ fadeInMs: 500, fadeOutMs: 500 });
+  });
+
+  it('leaves an emoji out of the words and says where emoji go', () => {
+    renderEditor();
+    key({ key: 'Escape' }, addText());
+    fireEvent.change(screen.getByRole('textbox', { name: 'Words' }), {
+      target: { value: 'Big news \u{1F525}' },
+    });
+    expect(firstText().text).toBe('Big news ');
+    expect(screen.getByTestId('clip-text-emoji')).toHaveTextContent(
+      'Emoji are stickers. Add one from Elements.',
+    );
+  });
+});
+
+describe('stickers in the editor', () => {
+  const stickers = () =>
+    lastDocument().tracks.flatMap((track) =>
+      track.kind === 'overlay' ? track.items.filter((item) => item.type === 'sticker') : [],
+    ) as StickerItem[];
+  const firstSticker = () => stickers()[0] as StickerItem;
+
+  let clock: jest.SpyInstance<number, []>;
+  beforeEach(() => {
+    clock = jest.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
+  });
+  afterEach(() => clock.mockRestore());
+
+  async function addGoldStar() {
+    fireEvent.click(screen.getByTestId('clip-tab-elements'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add Gold Star' }));
+  }
+
+  it('a tile adds its sticker at the playhead in the picture shape, selected, as one undo step', async () => {
+    mockClock.ms = 4_000;
+    renderEditor();
+    await addGoldStar();
+    expect(screen.getByTestId('clip-announcer')).toHaveTextContent('Gold Star added.');
+    expect(firstSticker()).toMatchObject({
+      start: 4_000,
+      duration: 3_000,
+      ref: { library: 'sticker', id: '5c0e8a52-0000-4000-8000-000000000001' },
+      widthPx: 270,
+      heightPx: 135,
+      flipX: false,
+    });
+    // Selected at once: the panel shows its name and its own controls.
+    expect(screen.getByTestId('clip-selected-sticker')).toHaveTextContent('Gold Star');
+    // A still picture has no Loop to set.
+    expect(screen.queryByRole('switch', { name: 'Loop' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(stickers()).toHaveLength(0);
+  });
+
+  it('Flip mirrors the selected sticker, arrows nudge it, and Remove Sticker takes it out', async () => {
+    renderEditor();
+    await addGoldStar();
+    fireEvent.click(screen.getByRole('switch', { name: 'Flip' }));
+    expect(firstSticker().flipX).toBe(true);
+    const { x } = firstSticker().transform;
+    key({ key: 'ArrowLeft', shiftKey: true });
+    expect(firstSticker().transform.x).toBeCloseTo(x - 10 / 1080, 6);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Sticker' }));
+    expect(stickers()).toHaveLength(0);
   });
 });

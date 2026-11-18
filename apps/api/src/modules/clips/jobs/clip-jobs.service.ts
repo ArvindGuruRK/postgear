@@ -38,6 +38,7 @@ import {
   CLIP_JOB_INPUT_SCHEMAS,
   type ClipJobInputs,
   clipErrorMessage,
+  type JobPriority,
 } from '@postgear/video-engine';
 import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { UsageService } from '../../entitlements/usage.service';
@@ -62,6 +63,11 @@ export interface CreateClipJob<K extends ClipJobKind> {
   highlightRunId?: string | null;
   /** Downloads and previews only. */
   expiresAt?: Date | null;
+  /**
+   * Overrides the plan's `clips.queue_priority` (Module 15): a Preview Export
+   * is always `low`, and an export passes the value it already read.
+   */
+  priority?: JobPriority;
 }
 
 @Injectable()
@@ -101,7 +107,8 @@ export class ClipJobsService {
       throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'tool_failed');
     }
 
-    const priority = await this.resolver.get(params.orgId, 'clips.queue_priority');
+    const priority =
+      params.priority ?? (await this.resolver.get(params.orgId, 'clips.queue_priority'));
 
     return {
       id: params.id,

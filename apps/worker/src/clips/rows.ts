@@ -141,6 +141,12 @@ export interface ClipRows {
   finishSegment(args: FinishSegmentArgs): Promise<boolean>;
   /** Job FAILED or CANCELLED and what goes with it. False when it was already closed. */
   closeJob(args: CloseJobArgs): Promise<boolean>;
+  /**
+   * A Preview Export's file (Module 15): one PROOF row, its `meta.expiresAt`
+   * 24 hours ahead for the sweep. Keyed by the storage key, so a retried job
+   * updates its row instead of failing on the unique key.
+   */
+  recordProof(organizationId: string, asset: NewAsset): Promise<void>;
 }
 
 /** Thrown inside a transaction to roll it back when a conditional write found nothing. */
@@ -225,6 +231,8 @@ export const prismaClipRows: ClipRows = {
     const sum = await prisma.clipAsset.aggregate({
       where: {
         organizationId,
+        // Preview Export files (gone within 24 hours) never count (Module 15).
+        kind: { not: 'PROOF' },
         OR: [{ videoId: null }, { video: { deletedAt: null } }],
       },
       _sum: { bytes: true },
@@ -358,6 +366,14 @@ export const prismaClipRows: ClipRows = {
       if (error instanceof RowClosed) return false;
       throw error;
     }
+  },
+
+  async recordProof(organizationId, asset) {
+    await prisma.clipAsset.upsert({
+      where: { key: asset.key },
+      create: toAssetCreate(organizationId, asset),
+      update: { bytes: BigInt(asset.bytes), meta: asset.meta as Prisma.InputJsonValue },
+    });
   },
 };
 

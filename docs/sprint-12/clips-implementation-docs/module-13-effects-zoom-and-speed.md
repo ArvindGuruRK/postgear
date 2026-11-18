@@ -1,6 +1,6 @@
 # Module 13: Effects: Zoom, Speed And Looks
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (three tools instead of two; one full session, and if it runs long Looks is the half that can move to a second session)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19; see the README Progress row) | Size: L (three tools instead of two; one full session, and if it runs long Looks is the half that can move to a second session)
 > **Depends on**: [Module 09](module-09-timeline.md)
 > **Stories**: CL-8.1, CL-8.2, CL-8.3
 > **Next**: [Module 14](module-14-sound.md), [Module 15](module-15-export.md)
@@ -109,14 +109,16 @@ Three rows as cards (an icon tile, a name, a sentence), each opening its control
 
 ## Tasks
 
-- [ ] `zoomWindows`, `zoomAt`, zoom edits and clamps, `zoomBars`, with tests.
-- [ ] The compiler's `perspective` zoom and its parity cases.
-- [ ] Speed: the compiler's chain (verified frame-count case), `playbackRate` and `preservesPitch`, filmstrip spread, playhead mapping.
-- [ ] `LOOKS`, the `look` field in the schema, the compiler's looks, vignette and fades, `lookToCss` and the preview's overlay and ramps.
-- [ ] The Effects panel with all three tools.
-- [ ] The focus dot and the Zoom row.
-- [ ] Stills for zoom, speed and each look; the look numbers in the Decision Log; title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `zoomWindows`, `zoomAt`, zoom edits and clamps, `zoomBars`, with tests. (The bars are `zoomWindows` itself; the drags are `dragMoveZoom`, `dragResizeZoomStart` and `dragResizeZoomEnd`.)
+- [x] The compiler's `perspective` zoom and its parity cases.
+- [x] Speed: the compiler's chain (verified frame-count case), `playbackRate` and `preservesPitch`, filmstrip spread, playhead mapping.
+- [x] Looks, the compiler's looks, vignette and fades, and the preview's look, vignette and fade. (Built as one shared colour matrix instead of `LOOKS` filter steps and `lookToCss`, and on the existing `looks` and `fades` fields instead of a new `look` field: see the Decision Log.)
+- [x] The Effects panel with all three tools.
+- [x] The focus dot and the Zoom row.
+- [x] Stills for zoom, speed and the look; the look numbers in the Decision Log; title-case test green. (Every look is measured against FFmpeg in `effects-parity.test.ts`; the browser pass compared Vintage with a vignette by eye.)
+- [x] `verify-change`; update the Progress table and the Decision Log.
+
+**Gaps at close (2026-11-19)**: the sound at 2x, 0.5x and 0.25x was not listened to (a headless browser has no ears), so pitch is left to Hand Check 5; only Vintage with a 50% vignette was exported and compared by eye in the browser (the other seven looks are measured by the parity test on a flat colour, worst 3.09 levels); Fade In and Fade Out were checked by the parity test, not in a browser export. The look tiles are drawn on the video's filmstrip picture at the playhead, so they show the look on the video, not on the clip's layout. The From and For fields show a zoom bar's new place on release, not during the drag. With many overlay rows the Zoom row sits low in the dock and needs a scroll. Trimming the clip's start with a zoom on it (Hand Check 4), and the light and Lilac themes, are left to the hand check.
 
 ## Tests
 

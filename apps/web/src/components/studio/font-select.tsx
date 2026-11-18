@@ -41,6 +41,7 @@ export function FontSelect({
   label,
   value,
   defaultLabel,
+  only,
   disabled = false,
   className,
   onChange,
@@ -50,12 +51,18 @@ export function FontSelect({
   /** The accessible name when no visible label points at `id`. */
   label?: string;
   value: FontId | null;
-  /** The first option, standing for null: "Theme Font", "Design Font". */
-  defaultLabel: string;
+  /**
+   * The first option, standing for null: "Theme Font", "Design Font". Left
+   * out where a font is always chosen (a clip's text), so there is no first option.
+   */
+  defaultLabel?: string;
+  /** Offer only these fonts (a clip's text: the ones the export has). Every font when left out. */
+  only?: readonly FontId[];
   disabled?: boolean;
   className?: string;
   onChange: (value: FontId | null) => void;
 }) {
+  const offered = only ? new Set(only) : null;
   return (
     <Select
       value={value ?? NO_CHOICE}
@@ -66,17 +73,23 @@ export function FontSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NO_CHOICE}>{defaultLabel}</SelectItem>
-        {FONT_CATEGORIES.map((category) => (
-          <SelectGroup key={category}>
-            <SelectLabel>{FONT_CATEGORY_LABELS[category]}</SelectLabel>
-            {fontsInCategory(category).map((font) => (
-              <SelectItem key={font.id} value={font.id}>
-                <span style={{ fontFamily: fontStack(font.id) }}>{font.label}</span>
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
+        {defaultLabel === undefined ? null : (
+          <SelectItem value={NO_CHOICE}>{defaultLabel}</SelectItem>
+        )}
+        {FONT_CATEGORIES.map((category) => {
+          const fonts = fontsInCategory(category).filter((font) => !offered || offered.has(font.id));
+          if (fonts.length === 0) return null;
+          return (
+            <SelectGroup key={category}>
+              <SelectLabel>{FONT_CATEGORY_LABELS[category]}</SelectLabel>
+              {fonts.map((font) => (
+                <SelectItem key={font.id} value={font.id}>
+                  <span style={{ fontFamily: fontStack(font.id) }}>{font.label}</span>
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          );
+        })}
       </SelectContent>
     </Select>
   );

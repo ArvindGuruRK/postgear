@@ -121,8 +121,8 @@ function CardsSkeleton() {
   return (
     <ul className="m-0 grid list-none grid-cols-4 gap-4 p-0 2xl:grid-cols-5" aria-hidden="true">
       {Array.from({ length: 8 }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders
         <li
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders
           key={index}
           className="flex flex-col overflow-hidden rounded-card border-2 border-outline"
         >

@@ -9,6 +9,22 @@
  *
  * The fakes its tests use are at `@postgear/video-preview/testing`.
  */
+export {
+  DomOverlayLayer,
+  type DomOverlayLayerOptions,
+  type TextCss,
+  textCss,
+} from './dom-overlay-layer';
+export { WebAudioLayer, type WebAudioLayerOptions } from './audio-layer';
+export {
+  DRIFT_RESTART_MS,
+  GAIN_RAMP_MS,
+  gainRamp,
+  METER_WARN_LEVEL,
+  peakOf,
+  soundDriftMs,
+  soundStart,
+} from './audio-model';
 export { previewError } from './errors';
 export { EmptyOverlayLayer, SilentAudioLayer } from './layers';
 export {
@@ -22,6 +38,16 @@ export {
   sourceAt,
 } from './parts';
 export { IDLE_PREVIEW_SNAPSHOT, PreviewEngine, type PreviewEngineOptions } from './preview-engine';
+export {
+  BadgeShapesNode,
+  badgeShapeCss,
+  imageDecoderFrames,
+  PictureStickerNode,
+  type StickerFrames,
+  type StickerFramesLoader,
+  type StickerPicture,
+  stickerBoxCss,
+} from './sticker-nodes';
 export type {
   AudioLayer,
   FrameScheduler,

@@ -20,7 +20,10 @@
 import {
   assertFreeDisk,
   makePoster,
+  measureFileLoudness,
+  measureLoudness,
   probeFile,
+  readOutputFacts,
   renderClip,
   withScratch,
 } from '@postgear/media-tools';
@@ -36,6 +39,8 @@ import { allImportKeys } from '../keys';
 import { type RenderTools, runRender } from '../render/render.run';
 import { type ClipRows, prismaClipRows } from '../rows';
 import { runSegment } from '../segment/segment.run';
+import { prismaSoundFileRows, type SoundFileRows } from '../sounds/rows';
+import { prismaStickerFileRows, type StickerFileRows } from '../stickers/rows';
 
 /** What a work activity answers. `closed`: the job was closed by someone else; nothing was kept. */
 export interface ClipWorkResult {
@@ -51,6 +56,10 @@ export interface RenderWaitState {
 
 export interface ClipJobActivityOptions {
   rows?: ClipRows;
+  /** The rows a clip's sticker files come from (tests pass their own). */
+  stickerRows?: StickerFileRows;
+  /** The rows a clip's sound files come from (tests pass their own). */
+  soundRows?: SoundFileRows;
   importTools?: ImportTools;
   renderTools?: RenderTools;
   now?: () => Date;
@@ -75,6 +84,9 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
     probe: (file, opts) => probeFile(deps.runTool, file, opts),
     render: (input) => renderClip({ ...input, runTool: deps.runTool }),
     poster: (opts) => makePoster({ ...opts, runTool: deps.runTool }),
+    measure: (input) => measureLoudness({ ...input, runTool: deps.runTool }),
+    measureFile: (input) => measureFileLoudness({ ...input, runTool: deps.runTool }),
+    facts: (file, opts) => readOutputFacts(deps.runTool, file, opts),
   };
   const outcomeDeps = {
     rows,
@@ -193,7 +205,12 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             storage: deps.storage,
             internal: deps.internal,
             rows,
+            stickerRows: options.stickerRows ?? prismaStickerFileRows,
+            soundRows: options.soundRows ?? prismaSoundFileRows,
             progress,
+            fonts: deps.fonts,
+            watermark: deps.watermark ?? null,
+            now,
             heartbeat: activity.heartbeat,
           });
           return { status: outcome.finished ? 'done' : 'closed' };

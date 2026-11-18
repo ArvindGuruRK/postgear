@@ -21,6 +21,10 @@
  *   --layouts fullscreen,blurred,gameplay,screen_share   (or `all`)
  *   --keep <folder>                   keep each render there as <layout>-<quality>.mp4
  *                                     (for `clips:stills`); relative to where it was started
+ *   --text heavy                      put the text-heavy overlay on every clip: a four
+ *                                     line paragraph with an outline, a shadowed title
+ *                                     and a boxed label, the slowest thing libass draws
+ *                                     (needs `npm run clips:fonts:build`)
  */
 
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
@@ -31,13 +35,17 @@ import {
   buildRenderPlan,
   type ClipDocument,
   compileFfmpeg,
+  copyTextStyle,
   type ExportQuality,
   ffmpegArgsFor,
   GRAPH_FILE,
   isExportQuality,
   layoutsFor,
   type PresetKind,
+  type TextItem,
+  textStylePreset,
 } from '@postgear/video-engine';
+import { copyFontsInto, defaultFontsDir, type FontsFolder, loadFontsFolder } from '../src/render/fonts-folder';
 import { toolPaths } from '../src/run/paths';
 import { createRunTool } from '../src/run/runner';
 import { withScratch } from '../src/run/scratch';
@@ -55,10 +63,12 @@ interface Options {
   shapes: Shape[];
   layouts: Layout[];
   keepDir: string | null;
+  text: boolean;
 }
 
 interface Row {
-  layout: Layout;
+  /** The layout, with ` + text` when the text-heavy overlay was on. */
+  layout: string;
   shape: Shape;
   size: string;
   wallSeconds: number;
@@ -93,7 +103,12 @@ function readOptions(argv: readonly string[]): Options {
     }
   }
   const keep = value('--keep');
+  const text = value('--text') ?? 'none';
+  if (text !== 'none' && text !== 'heavy') {
+    throw new Error('--text must be none or heavy');
+  }
   return {
+    text: text === 'heavy',
     seconds,
     shapes: shapes as Shape[],
     layouts: layouts as Layout[],
@@ -101,8 +116,35 @@ function readOptions(argv: readonly string[]): Options {
   };
 }
 
+/** The text-heavy overlay: a four-line outlined paragraph, a shadowed title and a boxed label, all clip long. */
+function heavyText(seconds: number): TextItem[] {
+  const item = (id: string, styleId: 'bold-outline' | 'plain' | 'on-a-box', text: string, y: number): TextItem => ({
+    id,
+    type: 'text',
+    start: 0,
+    duration: seconds * 1000,
+    anchor: 'clip',
+    text,
+    style: copyTextStyle(textStylePreset(styleId).style),
+    transform: { x: 0.5, y, scale: 1, rotation: 0, opacity: 1 },
+    widthPx: 900,
+    fadeInMs: 0,
+    fadeOutMs: 0,
+  });
+  return [
+    item(
+      'txt_paragraph',
+      'bold-outline',
+      'This is the longest kind of text a clip carries: four full lines of words, each one with its own outline, wrapped inside the box',
+      0.62,
+    ),
+    item('txt_title', 'plain', 'A Title With A Shadow', 0.14),
+    item('txt_label', 'on-a-box', 'On A Box', 0.88),
+  ];
+}
+
 /** The benchmark clip: one segment, Vertical, with the real preset of `layout` for a 16:9 video. */
-function benchmarkDocument(layout: Layout, seconds: number): ClipDocument {
+function benchmarkDocument(layout: Layout, seconds: number, text: boolean): ClipDocument {
   const base: ClipDocument = {
     schemaVersion: 1,
     canvas: { ratio: '9:16', width: 1080, height: 1920, fps: 30, background: '#000000' },
@@ -134,7 +176,8 @@ function benchmarkDocument(layout: Layout, seconds: number): ClipDocument {
     fades: { inMs: 0, outMs: 0 },
     tracks: [],
   };
-  return applyLayout(base, layout, { width: 1920, height: 1080 });
+  const laidOut = applyLayout(base, layout, { width: 1920, height: 1080 });
+  return text ? { ...laidOut, tracks: [{ id: 'trk_text', kind: 'overlay', items: heavyText(seconds) }] } : laidOut;
 }
 
 async function makeSource(runTool: RunTool, dir: string, seconds: number): Promise<number> {
@@ -186,8 +229,9 @@ async function renderOnce(
   shape: Shape,
   seconds: number,
   sourceMs: number,
+  fonts: FontsFolder | null,
 ): Promise<Row> {
-  const plan = buildRenderPlan(benchmarkDocument(layout, seconds), {
+  const plan = buildRenderPlan(benchmarkDocument(layout, seconds, fonts !== null), {
     quality: shape === 'proof' ? '1080p' : shape,
     proof: shape === 'proof',
     watermark: false,
@@ -203,10 +247,20 @@ async function renderOnce(
           hasAudio: true,
         },
       },
+      fonts: fonts ? { dir: 'fonts', manifest: fonts.manifest } : null,
     },
   });
   const compiled = compileFfmpeg(plan);
   await writeFile(path.join(dir, GRAPH_FILE), compiled.filterComplexScript, 'utf8');
+  for (const file of compiled.assFiles) {
+    await writeFile(path.join(dir, file.name), file.content, 'utf8');
+  }
+  if (fonts && compiled.fonts) {
+    const missing = await copyFontsInto(fonts, compiled.fonts.files, dir, compiled.fonts.dir);
+    if (missing.length > 0) {
+      throw new Error(`The fonts folder lacks ${missing.join(', ')}: run npm run clips:fonts:build`);
+    }
+  }
 
   // The production arguments, with the log level raised so `-benchmark` prints its memory line.
   const args = ffmpegArgsFor(compiled, 'bench.mp4');
@@ -231,7 +285,7 @@ async function renderOnce(
     throw new Error(`FFmpeg exited with ${result.exitCode}`);
   }
   return {
-    layout,
+    layout: fonts ? `${layout} + text` : layout,
     shape,
     size: `${plan.output.width}x${plan.output.height} @ ${plan.output.fps}`,
     wallSeconds: result.durationMs / 1000,
@@ -265,6 +319,14 @@ async function main(): Promise<number> {
   const runTool = createRunTool(toolPaths(process.env));
   const root = process.env.CLIPS_SCRATCH_DIR?.trim() || os.tmpdir();
   const cpus = os.cpus();
+  let fonts: FontsFolder | null = null;
+  if (options.text) {
+    const fontsDir = process.env.CLIPS_FONTS_DIR?.trim() || defaultFontsDir();
+    fonts = fontsDir ? await loadFontsFolder(path.resolve(STARTED_IN, fontsDir)) : null;
+    if (!fonts) {
+      throw new Error('--text heavy needs the fonts folder: run npm run clips:fonts:build');
+    }
+  }
 
   await withScratch(path.resolve(root), `benchmark-${Date.now()}`, async (dir) => {
     const version = await ffmpegVersion(runTool, dir);
@@ -275,7 +337,7 @@ async function main(): Promise<number> {
     for (const layout of options.layouts) {
       for (const shape of options.shapes) {
         process.stdout.write(`Rendering ${layout} at ${shape}...\n`);
-        rows.push(await renderOnce(runTool, dir, layout, shape, options.seconds, sourceMs));
+        rows.push(await renderOnce(runTool, dir, layout, shape, options.seconds, sourceMs, fonts));
         if (options.keepDir) {
           await mkdir(options.keepDir, { recursive: true });
           await copyFile(
@@ -293,7 +355,7 @@ async function main(): Promise<number> {
         `${Math.round(os.totalmem() / 1024 ** 3)} GB memory; ${os.platform()} ${os.release()}\n`,
     );
     process.stdout.write(
-      `Clip: ${options.seconds} s, generated 1920x1080 30 fps source, veryfast (proof: ultrafast)\n\n`,
+      `Clip: ${options.seconds} s, generated 1920x1080 30 fps source, veryfast (proof: ultrafast)${options.text ? ', with the text-heavy overlay' : ''}\n\n`,
     );
     for (const line of formatTable(rows, options.seconds)) {
       process.stdout.write(`${line}\n`);

@@ -36,6 +36,9 @@ function sticker(id: string, start: number, duration: number): StickerItem {
     ref: { library: 'sticker', id: LIBRARY_ITEM },
     transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
     flipX: false,
+    widthPx: 270,
+    heightPx: 270,
+    loop: true,
   };
 }
 

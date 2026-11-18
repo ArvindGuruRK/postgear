@@ -10,12 +10,13 @@
  * video rows, re-exporting entitlements, scheduling and media),
  * `ClipLinksModule` (the link probe), `ClipChannelsModule`,
  * `NotificationsModule` (the bell for exports and lost jobs),
- * `ClipLayoutsModule` (saved layouts, Module 10) and, LAST, `ClipItemModule`.
+ * `ClipLayoutsModule` (saved layouts, Module 10), `ClipLibraryModule`
+ * (stickers, Module 12) and, LAST, `ClipItemModule`.
  *
  * Route order matters here. Nest registers a module's controllers before
  * those of the modules it imports, and in import order after that. So every
  * `/clips/<word>` route of this module (`status`, `videos`, `jobs`, `files`)
- * and of the channels, links and layouts modules is registered before
+ * and of the channels, links, layouts and library modules is registered before
  * `ClipItemModule`'s `GET /clips/:clipId`, which would otherwise swallow
  * them. `clips-routes.spec.ts` holds this in place.
  */
@@ -31,6 +32,7 @@ import { ClipsInternalService } from './internal/clips-internal.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
 import { ClipJobsController } from './jobs/clip-jobs.controller';
 import { ClipLayoutsModule } from './layouts/clip-layouts.module';
+import { ClipLibraryModule } from './library/clip-library.module';
 import { ClipLinksModule } from './links/clip-links.module';
 import { ClipsStatusController } from './status/clips-status.controller';
 import { ClipsStatusService } from './status/clips-status.service';
@@ -47,6 +49,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     NotificationsModule,
     // Module 10: `/clips/layouts`, a word route, so before `ClipItemModule`.
     ClipLayoutsModule,
+    // Module 12: `/clips/library` and `/clips/stickers`, word routes, so before `ClipItemModule`.
+    ClipLibraryModule,
     // Keep LAST: its `GET /clips/:clipId` must be registered after every other `/clips/<word>` route.
     ClipItemModule,
   ],

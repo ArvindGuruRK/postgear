@@ -24,16 +24,18 @@ export const RENDER_COMPILE_CODES = [
   'layout_unsupported',
   /** A crop that moves over time (Sprint 13's speaker tracking). */
   'crop_keyframes_unsupported',
-  /** Zooms (Module 13). */
+  /** Zooms: no longer refused since Module 13 renders them; kept so older logs still read. */
   'zoom_unsupported',
-  /** Colour looks and the vignette (Module 13). */
+  /** Colour looks and the vignette: no longer refused since Module 13; kept like the zoom code. */
   'looks_unsupported',
   /** Text items (Module 11). */
   'text_unsupported',
-  /** Stickers (Module 12). */
-  'stickers_unsupported',
-  /** Sound effects and music (Module 14). */
+  /** A sticker file the clip uses was not handed in (removed from the library, or a deleted upload). */
+  'sticker_missing',
+  /** Kept for older logs: sounds render since Module 14. */
   'sounds_unsupported',
+  /** A sound file the clip plays was not handed in (removed from the library, or a deleted upload). */
+  'sound_missing',
   /** Captions (Sprint 13). */
   'captions_unsupported',
 ] as const;
@@ -74,9 +76,12 @@ export function isRenderCompileError(error: unknown): error is RenderCompileErro
 
 /**
  * The job error a compile refusal becomes (a key of `CLIP_ERROR_MESSAGES`).
- * A missing font has its own code because a retry cannot fix it; everything
+ * A missing font or sticker has its own code because a retry cannot fix it; everything
  * else reads as a failed export.
  */
-export function jobErrorCodeFor(code: RenderCompileCode): 'font_missing' | 'export_failed' {
-  return code === 'font_missing' ? 'font_missing' : 'export_failed';
+export function jobErrorCodeFor(
+  code: RenderCompileCode,
+): 'font_missing' | 'sticker_missing' | 'sound_missing' | 'export_failed' {
+  if (code === 'font_missing' || code === 'sticker_missing' || code === 'sound_missing') return code;
+  return 'export_failed';
 }

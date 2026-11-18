@@ -187,12 +187,14 @@ export class ClipLimitsGuard {
 
   /**
    * Bytes the workspace's kept files take: assets of videos not removed, and
-   * clip files with no video. A gauge, not a ledger.
+   * clip files with no video. A gauge, not a ledger. Preview Export files
+   * (PROOF, gone within 24 hours) are ours to keep and never count (Module 15).
    */
   async storageUsedBytes(orgId: string): Promise<number> {
     const result = await prisma.clipAsset.aggregate({
       where: {
         organizationId: orgId,
+        kind: { not: 'PROOF' },
         OR: [{ videoId: null }, { video: { deletedAt: null } }],
       },
       _sum: { bytes: true },

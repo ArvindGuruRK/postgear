@@ -224,6 +224,7 @@ export class PreviewEngine {
       this.makeSlot(createVideo(), crossOrigin),
       this.makeSlot(createVideo(), crossOrigin),
     ];
+    this.audio.attachVideos?.(this.slots.map((slot) => slot.el));
     if (options.document) {
       this.setDocument(options.document);
     }
@@ -331,6 +332,8 @@ export class PreviewEngine {
       return;
     }
     if (!this.source || this.error) {
+      // No picture to draw, but text and stickers still show where they are.
+      this.updateLayers('seek');
       this.publish();
       return;
     }
@@ -437,6 +440,8 @@ export class PreviewEngine {
   play(): void {
     if (this.destroyed || this.wantPlaying || this.parts.length === 0) return;
     if (!this.source || this.error) return;
+    // Inside the click: the sound may start only after a gesture.
+    this.audio.wake?.();
     if (this.scrubbing) {
       this.resumeAfterScrub = true;
       return;
@@ -679,6 +684,21 @@ export class PreviewEngine {
     slot.el.volume = Math.min(1, Math.max(0, volume));
   }
 
+  /**
+   * The part's volume times the fade at this moment (`FrameState.videoGain`):
+   * through the audio layer when it carries the video's sound (up to 200%),
+   * else the element's own volume (at most 100%).
+   */
+  private applyGain(slot: Slot, gain: number): void {
+    const safe = Math.max(0, Number.isFinite(gain) ? gain : 0);
+    if (this.audio.videoGain?.(slot.el, safe)) {
+      if (slot.el.volume !== 1) slot.el.volume = 1;
+      return;
+    }
+    const volume = Math.min(1, safe);
+    if (Math.abs(slot.el.volume - volume) > 0.001) slot.el.volume = volume;
+  }
+
   /** Starts the front element at its part's speed and the clock on it. */
   private startFront(reason: LayerUpdateReason): void {
     const slot = this.slots[this.front];
@@ -896,6 +916,8 @@ export class PreviewEngine {
       this.setError(previewError('draw'));
       return false;
     }
+    // The video's sound follows the clip's fade frame by frame, as the export's `afade` does.
+    this.applyGain(frontSlot, state.videoGain);
     let drew = false;
     if (this.stage) {
       try {

@@ -31,6 +31,7 @@ import { type Clip, ClipAssetKind, ClipStatus, type Prisma, prisma } from '@post
 import type { PrivateStorage } from '@postgear/storage';
 import {
   type ClipDocument,
+  documentFingerprint,
   documentRange,
   outputDuration,
   parseClipDocument,
@@ -104,6 +105,15 @@ export class ClipEditsService {
         data.durationMs = outputDuration(document);
       } else if (clip.lastExportedRevision === clip.revision) {
         // A rename or a hide: the export still shows exactly this clip.
+        data.lastExportedRevision = clip.revision + 1;
+      }
+      // Module 15: a document saved back to exactly what was last exported
+      // (an undo, or a change and its reverse) is still that export.
+      if (
+        document &&
+        clip.lastExportedFingerprint !== null &&
+        documentFingerprint(document) === clip.lastExportedFingerprint
+      ) {
         data.lastExportedRevision = clip.revision + 1;
       }
 

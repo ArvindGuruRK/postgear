@@ -18,7 +18,10 @@
  * - Cover fit narrows the crop to the frame's shape about its centre; contain
  *   fit keeps the whole crop and centres it inside the frame.
  * - Zooms are keyed in source time but ease in output milliseconds:
- *   `z = 1 + (S - 1) x u x u x (3 - 2u)`, `u` the smoothstep ramp at each end.
+ *   `z = 1 + (S - 1) x u x u x (3 - 2u)`, `u` the smoothstep ramp at each end,
+ *   over the windows `zoomWindows` maps into the clip (a cut in the middle
+ *   makes two windows, each easing on its own; the ease is at most half a
+ *   window). The focus is a point of the clip's canvas and never moves.
  * - Fades multiply, as two `fade` filters in a row do.
  * - Overlay items and sounds sit in output time, in the window
  *   `[start, start + duration)`.
@@ -27,7 +30,6 @@
  * The preview calls it on every frame.
  */
 import type {
-  AudioItem,
   ClipDocument,
   CropKeyframe,
   LayoutArea,
@@ -36,9 +38,12 @@ import type {
   StickerItem,
   TextItem,
 } from '../document/schema';
+import { soundGainAt, soundLoops, soundRefKey } from '../document/sound';
 import { FULL_RECT, fitRect, type Point, type Rect, rectAspect } from '../geometry';
 import { layoutBase } from '../layout/base';
+import { textFadeAt } from './text-plan';
 import { frameToMs, outputDuration, segmentAt, toSource } from '../time/time-map';
+import { zoomAt } from '../time/zooms';
 
 /** What the caller knows about a source's picture (from the file it plays or renders). */
 export interface SourcePicture {
@@ -110,13 +115,18 @@ export interface OverlayState {
   id: string;
   trackId: string;
   type: 'text' | 'sticker';
+  /** The item itself, so a layer draws its words, style or picture without a second lookup. */
+  item: TextItem | StickerItem;
   /** The item's centre, a fraction of the canvas. */
   centre: Point;
   /** 1 is the item's natural size on the 1080 canvas. */
   scale: number;
   /** Degrees, clockwise positive (CSS `rotate`, FFmpeg `rotate`; ASS writes `\frz` as minus this). */
   rotationDeg: number;
-  /** The item's own opacity, 0 to 1 (the clip's fade is separate, in `fadeOpacity`). */
+  /**
+   * The item's own opacity, 0 to 1, times a text's own fade in and out (the
+   * same numbers as its ASS `\fad`). The clip's fade is separate, in `fadeOpacity`.
+   */
   opacity: number;
   flipX: boolean;
   /** Milliseconds since the item started (an animated sticker's clock). */
@@ -129,9 +139,17 @@ export interface SoundState {
   id: string;
   trackId: string;
   type: 'sfx' | 'music';
-  /** Linear gain: volume, the item's own fades and the clip's fade. */
+  /** The file it plays (`soundRefKey`). */
+  refKey: string;
+  /** Music loops to fill its item; an effect plays once (`soundLoops`). */
+  loop: boolean;
+  /** Linear gain: volume, the item's own fades (`soundGainAt`) and the clip's fade. */
   gain: number;
-  /** Where in the sound file playback is, in ms. */
+  /**
+   * Where in the sound file playback is, in ms, before any wrap: the player
+   * that knows the file's length wraps music and stops an effect at its end
+   * (`soundFileMsAt`).
+   */
   fileMs: number;
 }
 
@@ -275,23 +293,21 @@ export function fadeAt(t: number, durationMs: number, inMs: number, outMs: numbe
   return fadeIn * fadeOut;
 }
 
-function itemGain(item: AudioItem, localMs: number): number {
-  const fadeIn = item.fadeInMs > 0 ? clamp(localMs / item.fadeInMs, 0, 1) : 1;
-  const fadeOut = item.fadeOutMs > 0 ? clamp((item.duration - localMs) / item.fadeOutMs, 0, 1) : 1;
-  return item.volume * fadeIn * fadeOut;
-}
-
-function overlayState(item: TextItem | StickerItem, trackId: string, t: number): OverlayState {
+/** One text's or sticker's state at clip time `t` (the plan reads a sticker's numbers from here). */
+export function overlayState(item: TextItem | StickerItem, trackId: string, t: number): OverlayState {
+  const localMs = t - item.start;
+  const fade = item.type === 'text' ? textFadeAt(item, localMs) : 1;
   return {
     id: item.id,
     trackId,
     type: item.type,
+    item,
     centre: { x: item.transform.x, y: item.transform.y },
     scale: item.transform.scale,
     rotationDeg: item.transform.rotation,
-    opacity: item.transform.opacity,
+    opacity: item.transform.opacity * fade,
     flipX: item.type === 'sticker' ? item.flipX : false,
-    localMs: t - item.start,
+    localMs,
     startMs: item.start,
     endMs: item.start + item.duration,
   };
@@ -303,8 +319,8 @@ function overlayState(item: TextItem | StickerItem, trackId: string, t: number):
  *
  * `outputMs` may be fractional (the exact time of output frame n is
  * `n x 1000 / fps`; the preview's media clock is fractional too): the source
- * frame is read from it as given, everything else from the nearest whole
- * millisecond, which is also the `outputMs` the answer reports.
+ * frame and the zoom are read from it as given, everything else from the
+ * nearest whole millisecond, which is also the `outputMs` the answer reports.
  */
 export function frameState(
   doc: ClipDocument,
@@ -361,19 +377,11 @@ export function frameState(
       ? { kind: 'blurred', crop: blurredBaseCrop(sourceAspect, canvasAspect) }
       : { kind: 'colour', colour: doc.canvas.background };
 
-  // Zooms: source-time windows mapped through the playing segment, eased in output ms.
-  let zoom: ZoomState = { scale: 1, focus: { x: 0.5, y: 0.5 }, zoomId: null };
-  for (const z of doc.zooms) {
-    if (z.source !== segment.source) {
-      continue;
-    }
-    const a = placed.outStart + (z.from - segment.sourceIn) / segment.speed;
-    const b = placed.outStart + (z.to - segment.sourceIn) / segment.speed;
-    const scale = zoomScaleAt(t, a, b, z.ease, z.scale);
-    if (scale > zoom.scale) {
-      zoom = { scale, focus: { x: z.focus.x, y: z.focus.y }, zoomId: z.id };
-    }
-  }
+  // Zooms: source-time stretches mapped into the clip's windows (`zoomWindows`), eased in output ms.
+  // Read at the unrounded moment, as the export's `perspective` does: mid-ease a whole millisecond
+  // moves the picture by a sixth of a pixel.
+  const now = zoomAt(doc, exact);
+  const zoom: ZoomState = { scale: now.scale, focus: { x: now.focus.x, y: now.focus.y }, zoomId: now.zoomId };
 
   const fadeOpacity = fadeAt(t, durationMs, doc.fades.inMs, doc.fades.outMs);
 
@@ -394,7 +402,9 @@ export function frameState(
             id: item.id,
             trackId: track.id,
             type: item.type,
-            gain: itemGain(item, localMs) * fadeOpacity,
+            refKey: soundRefKey(item.ref),
+            loop: soundLoops(item),
+            gain: soundGainAt(item, localMs) * fadeOpacity,
             fileMs: item.offsetMs + localMs,
           });
         }

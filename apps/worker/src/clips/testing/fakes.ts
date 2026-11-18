@@ -19,6 +19,7 @@ import type {
   FinishImportArgs,
   FinishSegmentArgs,
   JobRow,
+  NewAsset,
   VideoRow,
 } from '../rows';
 
@@ -97,7 +98,12 @@ export class FakeRows implements ClipRows {
     this.assets = this.assets.filter((asset) => !ids.includes(asset.id));
   }
   async storageUsedBytes() {
-    return this.usedBytes + this.assets.reduce((sum, asset) => sum + asset.bytes, 0);
+    return (
+      this.usedBytes +
+      this.assets
+        .filter((asset) => asset.kind !== 'PROOF')
+        .reduce((sum, asset) => sum + asset.bytes, 0)
+    );
   }
   async openClipJobs() {
     return this.openSegments;
@@ -168,6 +174,22 @@ export class FakeRows implements ClipRows {
     }
     if (args.notification) this.notifications.push(args.notification);
     return true;
+  }
+
+  async recordProof(_organizationId: string, asset: NewAsset) {
+    const row: AssetRow = {
+      id: asset.id ?? `asset-${this.nextId++}`,
+      kind: asset.kind,
+      key: asset.key,
+      bytes: asset.bytes,
+      videoId: asset.videoId,
+      clipId: asset.clipId ?? null,
+      meta: asset.meta,
+      createdAt: new Date(),
+    };
+    const at = this.assets.findIndex((existing) => existing.key === asset.key);
+    if (at >= 0) this.assets[at] = { ...row, id: (this.assets[at] as AssetRow).id };
+    else this.assets.push(row);
   }
 }
 

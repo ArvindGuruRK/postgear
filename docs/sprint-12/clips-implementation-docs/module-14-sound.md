@@ -1,6 +1,6 @@
 # Module 14: Sound
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session, may need a second: the catalogue's sound ingest is half the work)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19; see the README Progress row) | Size: L (one full session, may need a second: the catalogue's sound ingest is half the work)
 > **Depends on**: [Module 01](module-01-contracts-and-data.md) (the library tables), [Module 09](module-09-timeline.md), [Module 12](module-12-stickers-and-gifs.md) (the shared ingest engine and library routes)
 > **Stories**: CL-9.1, CL-9.2, CL-9.3, CL-9.4
 > **Next**: [Module 15](module-15-export.md) (Export)
@@ -134,16 +134,18 @@ The preview **does no loudness normalisation**: it sums the gains. So the balanc
 
 ## Tasks
 
-- [ ] `AudioItem`, edits, limits, the volume and fade curve.
-- [ ] The sound side of the ingest: adapters `own` (generator), `kenney`, `opengameart`; the sound guard and the original-work rule; normalisation, encode, peaks, report; the seed bundle.
-- [ ] The sound search route and the shared pieces reused from Module 12; favourites; the sound credits groups.
-- [ ] Own sounds: upload, `clipSoundCheckWorkflow`, list, delete.
-- [ ] The compiler's sound graph and its parity cases.
-- [ ] The loudness passes in `renderClip` with skip rules and recorded values.
-- [ ] The preview's audio layer and level hint.
-- [ ] The Audio panel and sound bars.
-- [ ] Title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log (the limiter question, the launch counts reached).
+- [x] `AudioItem`, edits, limits, the volume and fade curve.
+- [x] The sound side of the ingest: adapters `own` (generator), `kenney`, `opengameart`; the sound guard and the original-work rule; normalisation, encode, peaks, report; the seed bundle.
+- [x] The sound search route and the shared pieces reused from Module 12; favourites; the sound credits groups.
+- [x] Own sounds: upload, `clipSoundCheckWorkflow`, list, delete.
+- [x] The compiler's sound graph and its parity cases.
+- [x] The loudness passes in `renderClip` with skip rules and recorded values.
+- [x] The preview's audio layer and level hint.
+- [x] The Audio panel and sound bars.
+- [x] Title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log (the limiter question, the launch counts reached).
+
+**Gaps at close (2026-11-19)**: the catalogue holds our own 92 sounds (80 effects, 12 music tracks), not the doc's launch volume of about 650 and 150: the Kenney and OpenGameArt adapters are built and tested, but their packs must be downloaded by a person into `CLIPS_LIBRARY_BUNDLE_DIR` (no outside fetch without the owner's word). Openverse and Freesound are built and switched off (Module 21). No limiter was added: the loud test came out at -14.0 LUFS and -1.4 dBTP from a +2.2 dBTP mix. The sound at 150% and the fades were checked by the meter and the export's measurement, not listened to (a headless browser has no ears), so Hand Check 3 is the ear test. Removing a library sound that a clip uses was checked in tests only.
 
 ## Tests
 

@@ -1,7 +1,9 @@
 /**
  * The clip routes (Sprint 12, Module 05; completed in Modules 07 to 09):
  * `GET /clips`, `POST /clips`, `GET`, `PATCH` and `DELETE /clips/:clipId`,
- * and `POST /clips/:clipId/open`, `/duplicate`, `/more-video`, `/exports`.
+ * and `POST /clips/:clipId/open`, `/duplicate`, `/more-video`, `/exports`;
+ * Module 15 adds `GET /clips/:clipId/exports`, `POST /clips/:clipId/previews`
+ * and `GET /clips/:clipId/previews/latest` (`ClipExportsService`).
  *
  * ## Route order matters here
  *
@@ -39,6 +41,7 @@ import {
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
 import { ClipEditsService } from './clip-edits.service';
+import { ClipExportsService } from './clip-exports.service';
 import {
   type CreateClipInput,
   createClipSchema,
@@ -49,7 +52,9 @@ import {
   type MoreVideoInput,
   moreVideoSchema,
   type PatchClipInput,
+  type PreviewClipInput,
   patchClipSchema,
+  previewClipSchema,
 } from './clip-item.schema';
 import { ClipItemService } from './clip-item.service';
 import { ClipsListService } from './clips-list.service';
@@ -61,6 +66,7 @@ export class ClipItemController {
     private readonly clips: ClipItemService,
     private readonly edits: ClipEditsService,
     private readonly library: ClipsListService,
+    private readonly exports: ClipExportsService,
   ) {}
 
   /** `{ clips, counts, page, pageSize, total }`. */
@@ -142,7 +148,10 @@ export class ClipItemController {
     return this.clips.moreVideo(org.id, user.id, clipId, body);
   }
 
-  /** 202 `{ job }`; 409 `export_running`. */
+  /**
+   * 202 `{ job }`; 402 `clips_quality_requires_plan`; 409 `export_running`,
+   * `clip_changed_elsewhere` (with `details.revision`), `video_not_ready`.
+   */
   @Post(':clipId/exports')
   @HttpCode(HttpStatus.ACCEPTED)
   export(
@@ -151,6 +160,33 @@ export class ClipItemController {
     @Param('clipId') clipId: string,
     @Body(new ZodBody(exportClipSchema, 'clips/export')) body: ExportClipInput,
   ) {
-    return this.clips.export(org.id, user.id, clipId, body);
+    return this.exports.start(org.id, user.id, clipId, body);
+  }
+
+  /** `{ exports }`: the last five exports, newest first, any status. */
+  @Get(':clipId/exports')
+  exportHistory(@CurrentOrg() org: ActiveOrg, @Param('clipId') clipId: string) {
+    return this.exports.history(org.id, clipId);
+  }
+
+  /**
+   * 202 `{ job }`: a Preview Export, or the one already QUEUED or RUNNING;
+   * 409 `clip_changed_elsewhere`, `video_not_ready`.
+   */
+  @Post(':clipId/previews')
+  @HttpCode(HttpStatus.ACCEPTED)
+  preview(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('clipId') clipId: string,
+    @Body(new ZodBody(previewClipSchema, 'clips/preview')) body: PreviewClipInput,
+  ) {
+    return this.exports.startPreview(org.id, user.id, clipId, body);
+  }
+
+  /** `{ preview }`: the newest preview with a signed address while its file is kept, or null. */
+  @Get(':clipId/previews/latest')
+  latestPreview(@CurrentOrg() org: ActiveOrg, @Param('clipId') clipId: string) {
+    return this.exports.latestPreview(org.id, clipId);
   }
 }

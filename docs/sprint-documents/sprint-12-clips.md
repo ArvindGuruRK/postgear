@@ -158,7 +158,8 @@ interface ChannelLister {                    // real: Twitch Helix, YouTube Data
   resolve(handle: string): Promise<ChannelRef>;
   list(ch: ChannelRef, q: { kind: ListKind; cursor?: string; limit: number; sort?: 'newest' | 'views' }): Promise<{ items: ListedItem[]; nextCursor?: string }>;
 }
-interface StickerProvider { search(query: StickerQuery, signal: AbortSignal): Promise<StickerResult[]>; fetch(id: string, outFile: string): Promise<FetchedFile>; }   // catalogue-backed
+interface StickerProvider { search(request: { orgId, q, kind, category, favouritesOnly, page, pageSize }, signal?: AbortSignal): Promise<{ items: LibraryStickerView[]; total: number }>; resolve(orgId: string, ids: string[]): Promise<ResolvedSticker[]>; }   // catalogue-backed (Module 12: CatalogueStickerProvider)
+interface SoundProvider { search(request: SoundSearchRequest): Promise<SoundSearchResult>; resolve(orgId: string, ids: string[]): Promise<{ sounds: ResolvedSound[]; removed: string[] }>; }   // catalogue-backed (Module 14: CatalogueSoundProvider)
 interface Renderer { render(input: RenderInput, on: Progress, signal: AbortSignal): Promise<RenderedFile>; }   // FFmpeg; RenderInput carries proof: boolean
 // Reserved for Sprint 13: Transcriber, FaceTracker
 ```

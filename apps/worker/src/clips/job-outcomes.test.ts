@@ -192,7 +192,7 @@ describe('segment and render bookkeeping', () => {
         type: 'clip_export_failed',
         title: 'Your clip could not be exported',
         content: expect.stringMatching(/^"Best Moment": /),
-        link: `/${ORG}/clips/edit/${CLIP_ID}`,
+        link: `/${ORG}/clips/edit/${CLIP_ID}?tab=export`,
       }),
     ]);
   });

@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`the sound graph measures the same mix, to nowhere, at the info level 1`] = `
+"[0:a]atrim=start=0.000:end=8.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0];
+[1:a]atrim=start=1.000:end=5.000,asetpts=PTS-STARTPTS,volume=0,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1];
+[a0][a1]concat=n=2:v=0:a=1[ac];
+anullsrc=r=48000:cl=stereo,atrim=duration=12.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[abase];
+[2:a]atrim=duration=1.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,adelay=3000|3000[as0];
+[abase][ac][as0]amix=inputs=3:normalize=0:duration=first:dropout_transition=0,afade=t=out:st=11.000:d=1.000[am];
+[am]loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json[aout]
+"
+`;
+
+exports[`the sound graph mixes over a silent base with normalize off, then fades, corrects and pads 1`] = `
+"[0:v]trim=start=0.000:end=8.000,crop=608:1080:656:0:exact=1,scale=1080:1920:flags=bicubic,setpts=PTS-STARTPTS,fps=30,setsar=1[v0];
+[0:a]atrim=start=0.000:end=8.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a0];
+[1:v]trim=start=1.000:end=5.000,crop=608:1080:656:0:exact=1,scale=1080:1920:flags=bicubic,setpts=PTS-STARTPTS,fps=30,setsar=1[v1];
+[1:a]atrim=start=1.000:end=5.000,asetpts=PTS-STARTPTS,volume=0,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[a1];
+[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac];
+[vc]fps=30,format=yuv420p,fade=t=out:st=11.000:d=1.000[vout];
+anullsrc=r=48000:cl=stereo,atrim=duration=12.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[abase];
+[2:a]atrim=duration=1.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,adelay=3000|3000[as0];
+[3:a]aloop=loop=-1:size=2147483647:start=0,atrim=start=0.000:duration=12.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=0.2[as1];
+[abase][ac][as0][as1]amix=inputs=4:normalize=0:duration=first:dropout_transition=0,afade=t=out:st=11.000:d=1.000[am];
+[am]loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=-24.30:measured_TP=-14.10:measured_LRA=6.20:measured_thresh=-34.60:offset=0.40:linear=true,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad=whole_dur=12.000[aout]
+"
+`;

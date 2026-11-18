@@ -1,4 +1,4 @@
-import type { ClipDocument } from '../document/schema';
+import type { ClipDocument, OverlayTrack } from '../document/schema';
 import {
   cropAt,
   cropIsConstant,
@@ -219,6 +219,9 @@ describe('frameState: zoom, fades, items', () => {
             ref: { asset: TEST_ASSET_ID },
             transform: { x: 0.25, y: 0.75, scale: 1.5, rotation: 30, opacity: 0.5 },
             flipX: true,
+            widthPx: 270,
+            heightPx: 270,
+            loop: true,
           },
         ],
       },
@@ -248,6 +251,7 @@ describe('frameState: zoom, fades, items', () => {
         id: 'st',
         trackId: 'ov',
         type: 'sticker',
+        item: (doc.tracks[0] as OverlayTrack).items[0],
         centre: { x: 0.25, y: 0.75 },
         scale: 1.5,
         rotationDeg: 30,

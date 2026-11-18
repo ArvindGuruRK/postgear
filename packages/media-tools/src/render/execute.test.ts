@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { CompiledFfmpeg } from '@postgear/video-engine';
 import { probeFile } from '../ffmpeg/probe';
 import { createRunTool } from '../run/runner';
 import { type RunTool, type RunToolOptions, ToolError } from '../run/types';
-import { RenderError, type RenderProgress, renderClip } from './execute';
+import { RenderError, type RenderProgress, renderClip, unexpectedFont } from './execute';
 
 let scratch: string;
 
@@ -27,6 +27,7 @@ function compiled(overrides: Partial<CompiledFfmpeg> = {}): CompiledFfmpeg {
     assFiles: [{ name: 'captions.ass', content: '[Script Info]\nScriptType: v4.00+\n' }],
     outputArgs: ['-map', '[v]', '-t', '20.000', '-c:v', 'libx264'],
     durationMs: 20_000,
+    fonts: null,
     ...overrides,
   };
 }
@@ -45,6 +46,8 @@ function progressLines(us: number, end = false): string[] {
 function fakeFfmpeg(behaviour: {
   write?: boolean;
   lines?: string[];
+  /** Lines on stderr; a run that is stopped while printing them ends as an aborted ToolError. */
+  stderr?: string[];
   throws?: Error;
   seen?: Array<{ args: readonly string[]; options: RunToolOptions }>;
 }): RunTool {
@@ -52,6 +55,12 @@ function fakeFfmpeg(behaviour: {
     behaviour.seen?.push({ args, options });
     if (behaviour.write !== false) {
       await writeFile(path.join(options.cwd, args[args.length - 1]), 'mp4 bytes');
+    }
+    for (const line of behaviour.stderr ?? []) {
+      options.onStderrLine?.(line);
+      if (options.signal?.aborted) {
+        throw new ToolError({ tool: 'ffmpeg', exitCode: null, aborted: true, stderrTail: line });
+      }
     }
     for (const line of behaviour.lines ?? []) options.onStdoutLine?.(line);
     if (behaviour.throws) throw behaviour.throws;
@@ -152,6 +161,87 @@ describe('renderClip with a fake FFmpeg', () => {
     expect(error.code).toBe('font_missing');
     expect(error.message).not.toContain('anton');
     expect(error.stderrTail).toContain('anton');
+  });
+
+  it('reads which font libass chose and flags any it was not given', () => {
+    const expected = new Set(['PGF-f04607-800', 'PGF-4bc567-700']);
+    const chose = (name: string) =>
+      `[Parsed_ass_0 @ 000001] fontselect: (PGF f04607 800, 800, 0) -> ${name}, 0, ${name}`;
+    expect(unexpectedFont(chose('PGF-f04607-800'), expected)).toBeNull();
+    expect(unexpectedFont(chose('ArialMT'), expected)).toBe('ArialMT');
+    expect(unexpectedFont('[Parsed_ass_0 @ 1] fontselect: failed to find any fallback with glyph 0x4E2D for font: (PGF f04607 800, 800, 0)', expected)).toBe('none');
+    expect(unexpectedFont('[Parsed_ass_0 @ 1] Added subtitle file: captions.ass (3 styles, 3 events)', expected)).toBeNull();
+  });
+
+  describe('a render with text', () => {
+    const withFonts = (files: string[] = ['montserrat-800.ttf']) =>
+      compiled({ fonts: { dir: 'fonts', files, psNames: ['PGF-f04607-800'] } });
+
+    beforeEach(async () => {
+      await mkdir(path.join(scratch, 'fonts'), { recursive: true });
+      await writeFile(path.join(scratch, 'fonts', 'montserrat-800.ttf'), 'font bytes');
+    });
+
+    it('logs at info so libass prints its font choices, and finishes when they match', async () => {
+      const seen: Array<{ args: readonly string[]; options: RunToolOptions }> = [];
+      await renderClip({
+        runTool: fakeFfmpeg({
+          seen,
+          stderr: ['fontselect: (PGF f04607 800, 800, 0) -> PGF-f04607-800, 0, PGF-f04607-800'],
+          lines: progressLines(20_000_000, true),
+        }),
+        scratchDir: scratch,
+        compiled: withFonts(),
+        outFile: 'render.mp4',
+      });
+      expect(seen[0].args[seen[0].args.indexOf('-loglevel') + 1]).toBe('info');
+      expect(seen[0].options.onStderrLine).toBeDefined();
+      expect(existsSync(path.join(scratch, 'render.mp4'))).toBe(true);
+    });
+
+    it('stops at the first font libass picked on its own, and leaves no file', async () => {
+      const error = (await renderClip({
+        runTool: fakeFfmpeg({
+          stderr: [
+            'fontselect: (PGF f04607 800, 800, 0) -> PGF-f04607-800, 0, PGF-f04607-800',
+            'fontselect: (PGF f04607 800, 800, 0) -> ArialMT, 0, ArialMT',
+          ],
+          lines: progressLines(20_000_000, true),
+        }),
+        scratchDir: scratch,
+        compiled: withFonts(),
+        outFile: 'render.mp4',
+      }).catch((e: unknown) => e)) as RenderError;
+      expect(error).toBeInstanceOf(RenderError);
+      expect(error.code).toBe('font_missing');
+      expect(existsSync(path.join(scratch, 'render.mp4'))).toBe(false);
+      expect(existsSync(path.join(scratch, 'render.mp4.part'))).toBe(false);
+    });
+
+    it('refuses to start when a font file the text needs is not in the fonts folder', async () => {
+      const seen: Array<{ args: readonly string[]; options: RunToolOptions }> = [];
+      const error = (await renderClip({
+        runTool: fakeFfmpeg({ seen }),
+        scratchDir: scratch,
+        compiled: withFonts(['montserrat-800.ttf', 'anton-400.ttf']),
+        outFile: 'render.mp4',
+      }).catch((e: unknown) => e)) as RenderError;
+      expect(error.code).toBe('font_missing');
+      expect(seen).toHaveLength(0);
+    });
+
+    it('still says cancelled when the person stops it', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const error = (await renderClip({
+        runTool: fakeFfmpeg({}),
+        scratchDir: scratch,
+        compiled: withFonts(),
+        outFile: 'render.mp4',
+        signal: controller.signal,
+      }).catch((e: unknown) => e)) as RenderError;
+      expect(error.code).toBe('cancelled');
+    });
   });
 
   it('says tool_failed for any other failure, and for a timeout', async () => {
@@ -287,6 +377,7 @@ describe('renderClip with the real FFmpeg', () => {
         `[ac]apad=whole_dur=${end}[a]`,
       ].join('\n'),
       assFiles: [],
+      fonts: null,
       outputArgs: [
         '-map',
         '[v]',

@@ -8,7 +8,6 @@ import { HttpException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { ClipJob, ClipVideo } from '@postgear/db';
 import { createClipDocument, HANDLE_MS } from '@postgear/video-engine';
-import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { RedisService } from '../../redis/redis.service';
 import type { ClipJobsRepository, NewClipJob } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
@@ -135,7 +134,6 @@ function setup(tables = seed()) {
     jobsRepository as unknown as ClipJobsRepository,
     new ClipVideosRepository(),
     limits as unknown as ClipLimitsGuard,
-    { get: jest.fn(async () => false) } as unknown as EntitlementResolver,
     playback as unknown as ClipPlaybackService,
     redis,
   );

@@ -12,7 +12,7 @@
 import {
   CLIP_NOTIFICATION_TITLES,
   CLIP_NOTIFICATION_TYPES,
-  clipEditPagePath,
+  clipExportPagePath,
   clipFailedLine,
   clipVideoPagePath,
   clipVideoReadyLine,
@@ -69,7 +69,7 @@ export function exportFailedNotification(
     type: CLIP_NOTIFICATION_TYPES.exportFailed,
     title: CLIP_NOTIFICATION_TITLES.exportFailed,
     content: clipFailedLine(clip.title, error.message, 'clip'),
-    link: clipEditPagePath(organizationId, clip.id),
+    link: clipExportPagePath(organizationId, clip.id),
     meta: { clipId: clip.id, videoId: clip.videoId, code: error.code },
   };
 }

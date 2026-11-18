@@ -1,0 +1,24 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`buildAss writes the three ready styles as the stored file 1`] = `
+"[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: S1,PGF f04607 800,118.71,&H00FFFFFF,&H00FFFFFF,&H00111111,&H66000000,800,0,0,0,100,100,0,0,1,5,0,5,0,0,0,1
+Style: S2,PGF b6708d 700,120.13,&H00111111,&H00111111,&H00FFFFFF,&H66000000,700,0,0,0,100,100,0,0,3,27,0,4,0,0,0,1
+Style: S3,PGF b6708d 600,91.53,&H00FFFFFF,&H00FFFFFF,&H00000000,&H66000000,600,-1,0,0,100,100,0,0,1,0,4,6,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,S1,,108,108,0,,{\\an5\\pos(540,576)\\org(540,576)}Hello there
+Dialogue: 1,0:00:02.00,0:00:04.00,S2,,-216,0,0,,{\\an4\\pos(-216,1152)\\org(432,1152)\\frz-15\\fad(200,500)\\1a&H80&\\3a&H80&\\4a&HB3&}On a box
+Dialogue: 2,0:00:04.00,0:00:06.00,S3,,108,108,0,,{\\an6\\pos(972,576)\\org(540,576)}Plain \\{braces\\} C:\\⁠path\\Nnext line
+"
+`;

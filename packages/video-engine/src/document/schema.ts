@@ -25,7 +25,9 @@
  */
 import { z } from 'zod';
 import { CANVAS_FPS, CANVASES, RATIOS } from '../canvas';
+import { hasEmoji } from './emoji';
 import {
+  BADGE_NAME_MAX,
   CLIP_MAX_MS,
   CLIP_MIN_MS,
   FADE_MAX_MS,
@@ -34,10 +36,16 @@ import {
   MAX_CROP_KEYFRAMES,
   MAX_ITEMS,
   MAX_SEGMENTS,
+  MAX_TRACKS,
   MAX_ZOOMS,
   SEGMENT_MIN_MS,
   SPEEDS,
+  STICKER_SIZE_MAX,
+  STICKER_SIZE_MIN,
+  TEXT_FADE_MAX_MS,
   TEXT_MAX,
+  TEXT_WIDTH_MAX,
+  TEXT_WIDTH_MIN,
   VOLUME_MAX,
   ZOOM_MAX,
 } from './limits';
@@ -176,7 +184,7 @@ export const zoomSchema = z
     from: msSchema,
     to: msSchema,
     scale: z.number().min(1).max(ZOOM_MAX),
-    /** The point zoomed into, a fraction of the area's picture. */
+    /** The point zoomed into, a fraction of the clip's canvas (it stays still while the rest grows). */
     focus: pointSchema,
     /** Milliseconds the zoom takes to come in and to go out, 0 for a cut. */
     ease: z.number().int().min(0).max(2_000),
@@ -236,6 +244,17 @@ const itemBase = {
   anchor: z.enum(ANCHORS),
 };
 
+/**
+ * How a text looks. Sizes are canvas pixels (the 1080 short side), so they
+ * mean the same at every export quality; `size` is a CSS-style em size and
+ * the compiler turns it into an ASS one with the font's own numbers.
+ *
+ * **Outline and box are one choice** (Module 11): an ASS box is the outline
+ * drawn as a filled rectangle (`BorderStyle 3`), so one text cannot have
+ * both. Box corners are square in Sprint 12 (`radius` is kept for Module 21
+ * and is 0 from every control); the box's `opacity` is the box colour's
+ * alpha, and the padding is its `pad`.
+ */
 export const textStyleSchema = z
   .object({
     /** A Studio font family name; the render fails with `font_missing` rather than swap it. */
@@ -251,29 +270,68 @@ export const textStyleSchema = z
       .strict()
       .nullable(),
     background: z
-      .object({ colour: hexColour, opacity: unit, radius: z.number().min(0).max(200) })
+      .object({
+        colour: hexColour,
+        opacity: unit,
+        radius: z.number().min(0).max(200),
+        /** The box's margin around the text, canvas pixels (the ASS `Outline` of a box). */
+        pad: z.number().min(0).max(120).optional(),
+      })
       .strict()
       .nullable(),
     shadow: z.boolean(),
     uppercase: z.boolean(),
   })
-  .strict();
+  .strict()
+  .refine((s) => !(s.outline && s.background), 'A text has an outline or a box, not both');
 
 export const textItemSchema = z
   .object({
     ...itemBase,
     type: z.literal('text'),
-    text: z.string().min(1).max(TEXT_MAX),
+    text: z
+      .string()
+      .min(1)
+      .max(TEXT_MAX)
+      .refine((text) => text.trim().length > 0, 'A text needs at least one letter')
+      .refine((text) => !hasEmoji(text), 'Emoji are stickers, not text'),
     style: textStyleSchema,
     transform: transformSchema,
+    /** The text box's width on the canvas before `transform.scale`; the words wrap inside it. */
+    widthPx: z.number().min(TEXT_WIDTH_MIN).max(TEXT_WIDTH_MAX),
+    /** The text's own fade in and out, from and to transparent (0 for none). */
+    fadeInMs: z.number().int().min(0).max(TEXT_FADE_MAX_MS),
+    fadeOutMs: z.number().int().min(0).max(TEXT_FADE_MAX_MS),
   })
   .strict();
 
-/** A library item, or the workspace's own upload: never both. */
+/** The platforms a Follow Badge can name (Module 12 section 8). */
+export const BADGE_PLATFORMS = ['twitch', 'youtube', 'kick', 'tiktok', 'instagram'] as const;
+export type BadgePlatform = (typeof BADGE_PLATFORMS)[number];
+
+/**
+ * What a sticker draws: a library item, the workspace's own upload, or the
+ * Follow Badge, which is drawn from its data (a platform and a channel name)
+ * and has no file.
+ */
 export const stickerRefSchema = z.union([
   z.object({ library: z.literal('sticker'), id: uuidSchema }).strict(),
   z.object({ asset: uuidSchema }).strict(),
+  z
+    .object({
+      badge: z.enum(BADGE_PLATFORMS),
+      name: z
+        .string()
+        .max(BADGE_NAME_MAX)
+        .refine((name) => name.trim().length > 0, 'A Follow Badge needs a name')
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
+        .refine((name) => !/[\u0000-\u001f\u007f]/.test(name), 'A Follow Badge name is one plain line')
+        .refine((name) => !hasEmoji(name), 'Emoji are stickers, not text'),
+    })
+    .strict(),
 ]);
+
+const stickerSize = z.number().min(STICKER_SIZE_MIN).max(STICKER_SIZE_MAX);
 
 export const stickerItemSchema = z
   .object({
@@ -282,6 +340,14 @@ export const stickerItemSchema = z
     ref: stickerRefSchema,
     transform: transformSchema,
     flipX: z.boolean(),
+    /** The box on the canvas before `transform.scale`, in canvas pixels (the picture's own shape). */
+    widthPx: stickerSize,
+    heightPx: stickerSize,
+    /**
+     * A moving sticker loops for the item's length, or plays once and holds
+     * its last frame until the item ends. A still one ignores it.
+     */
+    loop: z.boolean(),
   })
   .strict();
 
@@ -367,7 +433,7 @@ const documentShape = z
     zooms: z.array(zoomSchema).max(MAX_ZOOMS),
     looks: looksSchema,
     fades: fadesSchema,
-    tracks: z.array(trackSchema).max(16),
+    tracks: z.array(trackSchema).max(MAX_TRACKS),
     meta: documentMetaSchema.optional(),
   })
   .strict();

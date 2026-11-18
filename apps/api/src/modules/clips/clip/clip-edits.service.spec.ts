@@ -7,7 +7,12 @@
  */
 import { HttpException } from '@nestjs/common';
 import type { PrivateStorage } from '@postgear/storage';
-import { type ClipDocument, createClipDocument } from '@postgear/video-engine';
+import {
+  type ClipDocument,
+  createClipDocument,
+  documentFingerprint,
+  parseClipDocument,
+} from '@postgear/video-engine';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import {
@@ -187,6 +192,38 @@ describe('ClipEditsService.patch', () => {
       document: doc(60_000, 70_000),
     });
     expect(edited.clip).toMatchObject({ revision: 3, state: 'draft', exported: false });
+  });
+
+  it('keeps an export current when a save returns the document to what was exported (Module 15)', async () => {
+    const tables = seed();
+    const exported = doc();
+    const clip = tables.clips[0];
+    if (clip) {
+      clip.document = exported as unknown as typeof clip.document;
+      clip.lastExportedRevision = 1;
+      clip.lastExportedFingerprint = documentFingerprint(parseClipDocument(exported));
+    }
+    const { service } = setup(tables);
+    const edited = await service.patch(TEST_ORG, CLIP, { revision: 1, document: doc(60_000, 70_000) });
+    expect(edited.clip).toMatchObject({ revision: 2, exported: false });
+    // The undo: the very document that was exported, saved as revision 3.
+    const undone = await service.patch(TEST_ORG, CLIP, { revision: 2, document: exported });
+    expect(undone.clip).toMatchObject({ revision: 3, state: 'exported', exported: true });
+    expect(tables.clips[0]).toMatchObject({ lastExportedRevision: 3 });
+  });
+
+  it('never carries an export forward for a clip exported before fingerprints', async () => {
+    const tables = seed();
+    const exported = doc();
+    const clip = tables.clips[0];
+    if (clip) {
+      clip.document = exported as unknown as typeof clip.document;
+      clip.lastExportedRevision = 1;
+    }
+    const { service } = setup(tables);
+    await service.patch(TEST_ORG, CLIP, { revision: 1, document: doc(60_000, 70_000) });
+    const undone = await service.patch(TEST_ORG, CLIP, { revision: 2, document: exported });
+    expect(undone.clip).toMatchObject({ revision: 3, exported: false });
   });
 
   it("answers 404 for another workspace's clip, even with a broken body", async () => {

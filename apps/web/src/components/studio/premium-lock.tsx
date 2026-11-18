@@ -71,10 +71,16 @@ export function PremiumLockDialog({
   open,
   onOpenChange,
   newTab = false,
+  title = 'Premium Templates',
+  description,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   newTab?: boolean;
+  /** Another locked thing's name (the clip editor's export qualities); Premium Templates by default. */
+  title?: string;
+  /** Its sentence, in place of the templates' one. */
+  description?: string;
 }) {
   const { activeOrgId } = useWorkspace();
 
@@ -82,10 +88,10 @@ export function PremiumLockDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="premium-look-dialog">
         <DialogHeader>
-          <DialogTitle>Premium Templates</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {PREMIUM_LOCK_MESSAGE} Upgrade this workspace to use the Luxury collection and the
-            hand-made backgrounds in every design.
+            {description ??
+              `${PREMIUM_LOCK_MESSAGE} Upgrade this workspace to use the Luxury collection and the hand-made backgrounds in every design.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

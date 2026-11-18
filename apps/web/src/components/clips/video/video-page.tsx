@@ -81,6 +81,8 @@ export function summaryOf(clip: ClipView, range: ClipSummary['range']): ClipSumm
     revision: clip.revision,
     exported: clip.exported,
     exportedMediaId: clip.exportedMediaId,
+    // The clip answer does not carry it; a row that had a running export keeps its own.
+    exportProgress: null,
     createdAt: clip.createdAt,
     updatedAt: clip.updatedAt,
     range,
@@ -139,7 +141,11 @@ export function VideoPage({
   const actions = clipActions({
     onChanged: (clip) =>
       setClips((current) =>
-        current.map((one) => (one.id === clip.id ? summaryOf(clip, one.range) : one)),
+        current.map((one) =>
+          one.id === clip.id
+            ? { ...summaryOf(clip, one.range), exportProgress: one.exportProgress }
+            : one,
+        ),
       ),
     onAdded: (clip, source) => setClips((current) => [summaryOf(clip, source.range), ...current]),
     onRemoved: (clipId) => setClips((current) => current.filter((one) => one.id !== clipId)),

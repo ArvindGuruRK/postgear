@@ -273,10 +273,11 @@ describe('probeFile with the real ffprobe', () => {
       () => false,
     );
     if (!available) console.warn('FFmpeg is not on PATH: the real probe tests are skipped.');
-  });
+    // As long as the ffmpeg call may take: Jest's 5 s default is too short on a busy machine.
+  }, 60_000);
 
   afterAll(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   });
 
   it('reads a real MP4', async () => {

@@ -250,6 +250,7 @@ export function uploadFile<T>(
               ? 'That file is too large.'
               : 'The upload failed. Please try again.',
           request.status,
+          typeof payload.code === 'string' ? payload.code : undefined,
         ),
       );
     };

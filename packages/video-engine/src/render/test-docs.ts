@@ -3,9 +3,12 @@
  * test and scripts). Not exported from the package index: `createClipDocument`
  * is the real way to make one.
  */
-import type { ClipDocument, Segment } from '../document/schema';
+import type { ClipDocument, OverlayItem, Segment, StickerItem, TextItem } from '../document/schema';
+import { copyTextStyle, textStylePreset } from '../document/text';
 import type { Rect } from '../geometry';
+import { FONT_MANIFEST } from './fonts-manifest';
 import type { RenderContext, RenderSourceAsset } from './plan';
+import type { RenderStickerAsset } from './sticker-plan';
 
 export const TEST_VIDEO_ID = '6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4';
 export const TEST_ASSET_ID = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
@@ -79,4 +82,72 @@ export function testContext(overrides: Partial<RenderContext> = {}): RenderConte
     assets: { sources: { src: testSource() } },
     ...overrides,
   };
+}
+
+/** A Bold Outline text at the top third, 0 to 2 s, moment-anchored; `overrides` change any field. */
+export function testText(id: string, overrides: Partial<TextItem> = {}): TextItem {
+  return {
+    id,
+    type: 'text',
+    start: 0,
+    duration: 2_000,
+    anchor: 'moment',
+    text: 'Hello there',
+    style: copyTextStyle(textStylePreset('bold-outline').style),
+    transform: { x: 0.5, y: 0.3, scale: 1, rotation: 0, opacity: 1 },
+    widthPx: 864,
+    fadeInMs: 0,
+    fadeOutMs: 0,
+    ...overrides,
+  };
+}
+
+/** A clip document with the given texts on one overlay track. */
+export function withTexts(doc: ClipDocument, texts: TextItem[]): ClipDocument {
+  return { ...doc, tracks: [{ id: 'ov', kind: 'overlay', items: texts }] };
+}
+
+/** `testContext` with the committed font manifest under `fonts/`. */
+export function testContextWithFonts(overrides: Partial<RenderContext> = {}): RenderContext {
+  const base = testContext(overrides);
+  return { ...base, assets: { ...base.assets, fonts: { dir: 'fonts', manifest: FONT_MANIFEST } } };
+}
+
+/** A 270 px square sticker of the workspace's own upload, centred, 0 to 2 s; `overrides` change any field. */
+export function testSticker(id: string, overrides: Partial<StickerItem> = {}): StickerItem {
+  return {
+    id,
+    type: 'sticker',
+    start: 0,
+    duration: 2_000,
+    anchor: 'moment',
+    ref: { asset: TEST_ASSET_ID },
+    transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+    flipX: false,
+    widthPx: 270,
+    heightPx: 270,
+    loop: true,
+    ...overrides,
+  };
+}
+
+/** A Follow Badge for Twitch, 420 px wide, low on the clip, 0 to 2 s. */
+export function testBadge(id: string, overrides: Partial<StickerItem> = {}): StickerItem {
+  return testSticker(id, {
+    ref: { badge: 'twitch', name: 'simstreamer' },
+    transform: { x: 0.5, y: 0.8, scale: 1, rotation: 0, opacity: 1 },
+    widthPx: 420,
+    heightPx: 140,
+    ...overrides,
+  });
+}
+
+/** A still 512 px PNG for the upload `TEST_ASSET_ID`; `overrides` make it a moving one. */
+export function testStickerAsset(overrides: Partial<RenderStickerAsset> = {}): RenderStickerAsset {
+  return { file: 'sticker-0.png', animated: false, width: 512, height: 512, fps: null, frames: null, ...overrides };
+}
+
+/** A clip document with the given texts and stickers on one overlay track, in this order. */
+export function withItems(doc: ClipDocument, items: OverlayItem[]): ClipDocument {
+  return { ...doc, tracks: [{ id: 'ov', kind: 'overlay', items }] };
 }

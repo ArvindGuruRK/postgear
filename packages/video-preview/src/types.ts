@@ -112,6 +112,16 @@ export interface AudioLayer {
   /** Playback stopped (pause, the end, an error, scrubbing). */
   silence(): void;
   destroy(): void;
+  /** The engine's two video elements, once, so their sound can join the layer's graph. */
+  attachVideos?(elements: readonly HTMLVideoElement[]): void;
+  /** Called inside Play's click, the gesture a browser asks for before sound may start. */
+  wake?(): void;
+  /**
+   * The video's own gain this frame (`FrameState.videoGain`, up to 2). True
+   * when the layer applied it, and the element's own volume then stays at 1;
+   * false and the engine sets the element's volume (at most 1).
+   */
+  videoGain?(el: HTMLVideoElement, gain: number): boolean;
 }
 
 /** The animation frame clock, injectable so tests can step it. */

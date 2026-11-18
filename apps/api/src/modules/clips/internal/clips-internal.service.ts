@@ -121,13 +121,19 @@ export class ClipsInternalService {
       );
 
       // An older revision finishing late never overwrites a newer export's mark.
+      // The fingerprint (Module 15) lets a save that returns to this document
+      // keep the clip exported (see `ClipEditsService.patch`).
       await tx.clip.updateMany({
         where: {
           id: body.clipId,
           organizationId: orgId,
           OR: [{ lastExportedRevision: null }, { lastExportedRevision: { lte: body.revision } }],
         },
-        data: { lastExportedRevision: body.revision, exportedMediaId: media.id },
+        data: {
+          lastExportedRevision: body.revision,
+          lastExportedFingerprint: body.fingerprint ?? null,
+          exportedMediaId: media.id,
+        },
       });
       await tx.clipJob.update({
         where: { id: job.id },

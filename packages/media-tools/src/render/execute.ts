@@ -62,6 +62,8 @@ export interface RenderClipInput {
   onProgress?: (progress: RenderProgress) => void;
   /** Default: 15 minutes plus ten times the clip's length. */
   timeoutMs?: number;
+  /** `'low'` for a preview, so it never slows an export (see `RunToolOptions.priority`). */
+  priority?: 'normal' | 'low';
 }
 
 export interface RenderClipResult {
@@ -86,6 +88,31 @@ const MUXERS: Record<string, string> = {
 /** libass says this when a font file cannot be opened or a family has no usable face. */
 const FONT_TROUBLE =
   /error opening (memory )?font|no usable fontconfig|font(select)?:? .*not found|failed to (open|load) font/i;
+
+/**
+ * libass's choice for each font request, at `-loglevel info`:
+ * `fontselect: (PGF f04607 800, 800, 0) -> PGF-f04607-800, 0, PGF-f04607-800`.
+ * The name after the arrow is the PostScript name of the face it chose.
+ */
+const FONT_SELECTED = /fontselect: \(.*\) -> ([^,\s]+),/;
+/** libass found no font with a glyph at all. */
+const FONT_NO_FALLBACK = /fontselect: failed to find any fallback/i;
+
+/**
+ * The font libass chose when it is not one of `expected` (a silent fallback),
+ * or null when the line is fine or is not a font choice. Exported for tests.
+ */
+export function unexpectedFont(line: string, expected: ReadonlySet<string>): string | null {
+  if (FONT_NO_FALLBACK.test(line)) {
+    return 'none';
+  }
+  const match = FONT_SELECTED.exec(line);
+  if (!match) {
+    return null;
+  }
+  const chosen = match[1] as string;
+  return expected.has(chosen) ? null : chosen;
+}
 
 /**
  * Runs one render. Writes `graph.txt` and the ASS files, runs FFmpeg with
@@ -130,17 +157,39 @@ export async function renderClip(input: RenderClipInput): Promise<RenderClipResu
     : { ...input.compiled, outputArgs: [...input.compiled.outputArgs, '-f', muxer] };
   const args = ffmpegArgsFor(compiled, partName);
 
+  // A text render is watched for fonts libass chose on its own: the run stops at the first one.
+  const fonts = input.compiled.fonts;
+  const expected = new Set(fonts?.psNames ?? []);
+  const stopper = new AbortController();
+  let fellBack: string | null = null;
+  const onAbort = () => stopper.abort();
+  input.signal?.addEventListener('abort', onAbort, { once: true });
+
   await rm(partPath, { force: true });
   try {
     const result = await input.runTool('ffmpeg', args, {
       cwd: scratchDir,
       timeoutMs: input.timeoutMs ?? 15 * 60_000 + input.compiled.durationMs * 10,
-      signal: input.signal,
+      signal: stopper.signal,
       maxStdoutBytes: 64 * 1024 * 1024,
+      ...(input.priority === 'low' ? { priority: 'low' as const } : {}),
       onStdoutLine: (line) => {
         parser.push(line);
       },
+      onStderrLine: fonts
+        ? (line) => {
+            if (fellBack !== null) return;
+            const chosen = unexpectedFont(line, expected);
+            if (chosen !== null) {
+              fellBack = chosen;
+              stopper.abort();
+            }
+          }
+        : undefined,
     });
+    if (fellBack !== null) {
+      throw new RenderError('font_missing', { stderrTail: result.stderrTail });
+    }
     if (!parser.ended) {
       throw new RenderError('tool_failed', { stderrTail: result.stderrTail });
     }
@@ -158,7 +207,15 @@ export async function renderClip(input: RenderClipInput): Promise<RenderClipResu
     };
   } catch (error) {
     await rm(partPath, { force: true }).catch(() => undefined);
+    if (fellBack !== null) {
+      throw new RenderError('font_missing', {
+        stderrTail: error instanceof ToolError ? error.stderrTail : '',
+        cause: error,
+      });
+    }
     throw toRenderError(error, input.signal);
+  } finally {
+    input.signal?.removeEventListener('abort', onAbort);
   }
 }
 
@@ -175,7 +232,8 @@ function insideScratch(scratchDir: string, outFile: string): string {
 /** A plain file name: no folders, nothing hidden, nothing that reads as an option. */
 const PLAIN_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
 
-async function writeRenderFiles(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
+/** Writes `graph.txt` and the ASS files into the scratch folder (also used by the loudness measure). */
+export async function writeRenderFiles(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
   await writeFile(path.join(scratchDir, GRAPH_FILE), compiled.filterComplexScript, 'utf8');
   for (const ass of compiled.assFiles) {
     if (!PLAIN_NAME.test(ass.name) || ass.name === GRAPH_FILE) {
@@ -186,7 +244,7 @@ async function writeRenderFiles(scratchDir: string, compiled: CompiledFfmpeg): P
 }
 
 /** Every input the plan names must be a file inside the scratch folder, or the render would guess. */
-async function assertInputsPresent(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
+export async function assertInputsPresent(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
   for (const input of compiled.inputs) {
     const resolved = path.resolve(scratchDir, input.file);
     const relative = path.relative(scratchDir, resolved);
@@ -198,9 +256,24 @@ async function assertInputsPresent(scratchDir: string, compiled: CompiledFfmpeg)
       throw new RenderError('tool_failed');
     }
   }
+  // Every twin the text uses must be in the fonts folder, or libass would quietly pick another face.
+  const fonts = compiled.fonts;
+  if (fonts) {
+    if (!PLAIN_NAME.test(fonts.dir)) {
+      throw new RenderError('tool_failed');
+    }
+    for (const file of fonts.files) {
+      const info = PLAIN_NAME.test(file)
+        ? await stat(path.join(scratchDir, fonts.dir, file)).catch(() => null)
+        : null;
+      if (!info?.isFile()) {
+        throw new RenderError('font_missing');
+      }
+    }
+  }
 }
 
-function toRenderError(error: unknown, signal?: AbortSignal): RenderError {
+export function toRenderError(error: unknown, signal?: AbortSignal): RenderError {
   if (error instanceof RenderError) {
     return error;
   }

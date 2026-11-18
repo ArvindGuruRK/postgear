@@ -2,6 +2,7 @@ import { TooltipProvider } from '@postgear/ui';
 import {
   type ClipDocument,
   createClipDocument,
+  defaultSoundItem,
   dragTrimEnd,
   dragTrimStart,
   pxPerMs,
@@ -79,6 +80,9 @@ function text(id: string, start: number, duration: number): TextItem {
       uppercase: false,
     },
     transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
+    widthPx: 864,
+    fadeInMs: 0,
+    fadeOutMs: 0,
   };
 }
 
@@ -164,6 +168,25 @@ describe('TimelineDock rows', () => {
       .filter((name) => name !== 'Time Ruler');
     expect(names).toEqual(['Video', 'Video Sound', 'Overlay', 'Zoom', 'Sound']);
     expect(part()).toHaveAccessibleName('Part 1, from 0 seconds, 30 seconds long');
+  });
+
+  it('draws a sound bar with its shape and name, only as far as an effect plays', () => {
+    const doc = clip();
+    const whoosh = {
+      ...defaultSoundItem(doc, 1_000, { library: 'sound', id: '5c0e8a52-0000-4000-8000-0000000000a1' }, 'sfx', {
+        durationMs: 2_000,
+      }),
+      id: 'snd_a',
+    };
+    const soundShape = jest.fn(() => ({ peaks: [10, 200, 90], fill: 0.5, name: 'Quick Whoosh' }));
+    setup({
+      document: { ...doc, tracks: [{ id: 'trk_sound', kind: 'audio', items: [whoosh] }] },
+      soundShape,
+    });
+    const bar = within(screen.getByRole('group', { name: 'Sound' })).getByTestId('clip-bar-item');
+    expect(bar).toHaveTextContent('Quick Whoosh');
+    expect(within(bar).getByTestId('clip-sound-shape')).toBeInTheDocument();
+    expect(soundShape).toHaveBeenCalledWith('snd_a');
   });
 
   it('opens a second Overlay row when two overlays overlap', () => {
@@ -400,6 +423,95 @@ describe('items on the rows', () => {
     const item = commits(props)[0][1].tracks[0].items[0];
     expect(item.start).toBe(4_000);
     expect(item.duration).toBe(Math.round(edgeMs) - 4_000);
+  });
+});
+
+describe('zooms on the Zoom row', () => {
+  /** A 1.5x zoom on 14 to 16 s of the video: 4 to 6 s of the clip. */
+  function withZoom(): ClipDocument {
+    const doc = clip();
+    return {
+      ...doc,
+      zooms: [
+        {
+          id: 'z1',
+          source: doc.segments[0]?.source ?? '',
+          from: 14_000,
+          to: 16_000,
+          scale: 1.5,
+          focus: { x: 0.5, y: 0.5 },
+          ease: 300,
+        },
+      ],
+    };
+  }
+
+  it('moves a zoom by its bar, keeping its length, and hands the move over once', () => {
+    window.localStorage.setItem(SNAP_STORAGE_KEY, 'off');
+    const doc = withZoom();
+    const { props } = setup({ document: doc });
+    down(screen.getByTestId('clip-bar-zoom'), px(5_000));
+    expect(props.onSelect).toHaveBeenCalledWith({ kind: 'zoom', id: 'z1' });
+    pointer('pointerMove', px(8_000));
+    expect(props.onDraft).toHaveBeenLastCalledWith(
+      expect.objectContaining({ seekMs: null, doc: expect.anything() }),
+    );
+    pointer('pointerUp', px(8_000));
+    expect(props.onCommit).toHaveBeenCalledTimes(1);
+    const [start, next, options] = commits(props)[0];
+    expect(start).toBe(doc);
+    const moved = next.zooms[0];
+    expect(Math.abs(moved.from - (14_000 + msOf(8_000) - msOf(5_000)))).toBeLessThanOrEqual(1);
+    expect(moved.to - moved.from).toBe(2_000);
+    expect(options).toEqual({ select: { kind: 'zoom', id: 'z1' } });
+    expect(props.onAnnounce).toHaveBeenLastCalledWith(
+      expect.stringMatching(/^Zoom 1\.5x, from 7 seconds, 2 seconds long\.$/),
+    );
+    expect(props.onDraft).toHaveBeenLastCalledWith(null);
+  });
+
+  it('resizes a zoom from either end, keeping the other', () => {
+    window.localStorage.setItem(SNAP_STORAGE_KEY, 'off');
+    const doc = withZoom();
+    const { props } = setup({ document: doc });
+    const bar = screen.getByTestId('clip-bar-zoom');
+    down(grip(bar, 'end'), px(6_000) - 3);
+    pointer('pointerMove', px(9_000) - 3);
+    pointer('pointerUp', px(9_000) - 3);
+    const edgeMs = (px(9_000) - 3) / SCALE - ((px(6_000) - 3) / SCALE - 6_000);
+    const longer = commits(props)[0][1].zooms[0];
+    expect(longer.from).toBe(14_000);
+    expect(Math.abs(longer.to - (10_000 + edgeMs))).toBeLessThanOrEqual(1);
+
+    down(grip(bar, 'start'), px(4_000) + 3);
+    pointer('pointerMove', px(2_000) + 3);
+    pointer('pointerUp', px(2_000) + 3);
+    const startMs = (px(2_000) + 3) / SCALE - ((px(4_000) + 3) / SCALE - 4_000);
+    const earlier = commits(props)[1][1].zooms[0];
+    expect(earlier.to).toBe(16_000);
+    expect(Math.abs(earlier.from - (10_000 + startMs))).toBeLessThanOrEqual(1);
+  });
+
+  it('moves a selected zoom a frame with the arrows, a second with Shift, as one step', () => {
+    const doc = withZoom();
+    const { props } = setup({ document: doc, selection: { kind: 'zoom', id: 'z1' } });
+    const bar = screen.getByTestId('clip-bar-zoom');
+    expect(fireEvent.keyDown(bar, { key: 'ArrowRight' })).toBe(false);
+    const [start, next, options] = commits(props)[0];
+    expect(start).toBe(doc);
+    expect(next.zooms[0]).toMatchObject({ from: 14_033, to: 16_033 });
+    expect(options).toEqual({ select: { kind: 'zoom', id: 'z1' }, coalesceKey: 'nudge:z1' });
+    fireEvent.keyDown(bar, { key: 'ArrowLeft', shiftKey: true });
+    expect(commits(props)[1][1].zooms[0]).toMatchObject({ from: 13_000, to: 15_000 });
+  });
+
+  it('changes nothing when a zoom is let go where it began', () => {
+    const { props } = setup({ document: withZoom() });
+    down(screen.getByTestId('clip-bar-zoom'), px(5_000));
+    pointer('pointerMove', px(5_000) + 20);
+    pointer('pointerMove', px(5_000));
+    pointer('pointerUp', px(5_000));
+    expect(props.onCommit).not.toHaveBeenCalled();
   });
 });
 

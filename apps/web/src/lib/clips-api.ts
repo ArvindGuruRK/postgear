@@ -11,12 +11,14 @@ import type {
   ClipDocument,
   ClipChannelView,
   ClipDetail,
+  ClipExportView,
   ClipImportOutcome,
   ClipJobView,
   ClipLayout,
   ClipListPage,
   ClipListSort,
   ClipPlatformId,
+  ClipPreviewView,
   ClipProbe,
   ClipStreamsPage,
   ClipSharpState,
@@ -36,7 +38,21 @@ import type {
   Ratio,
   SavedLayoutView,
 } from '@/types/clips';
-import { api } from './api';
+import type {
+  LibraryCategoryCount,
+  LibrarySearchPage,
+  LibrarySoundPage,
+  SoundCategory,
+  SoundCategoryCount,
+  SoundFileView,
+  SoundKind,
+  SoundUploadView,
+  StickerCategory,
+  StickerFileView,
+  StickerKind,
+  StickerUploadView,
+} from '@postgear/video-engine';
+import { api, uploadFile } from './api';
 
 const jobPath = (jobId: string) => `/clips/jobs/${encodeURIComponent(jobId)}`;
 const clipPath = (clipId: string) => `/clips/${encodeURIComponent(clipId)}`;
@@ -78,13 +94,53 @@ export function getClip(
   return api<ClipDetail>(clipPath(clipId), { signal: options.signal });
 }
 
-/** Starts an export of the clip as it is now: 409 `export_running` while one runs. */
-export async function exportClip(clipId: string, quality: ExportQuality): Promise<ClipJobView> {
+/**
+ * Starts an export of the clip as it is now (Module 15): 409 `export_running`
+ * while one runs, 409 `clip_changed_elsewhere` when `revision` is not the
+ * saved one, 402 `clips_quality_requires_plan` above the plan's quality.
+ */
+export async function exportClip(
+  clipId: string,
+  quality: ExportQuality,
+  revision?: number,
+): Promise<ClipJobView> {
   const { job } = await api<{ job: ClipJobView }>(`${clipPath(clipId)}/exports`, {
     method: 'POST',
-    body: { quality },
+    body: revision === undefined ? { quality } : { quality, revision },
   });
   return job;
+}
+
+/** The clip's newest five exports, newest first, a running one included. */
+export async function listClipExports(
+  clipId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<ClipExportView[]> {
+  const { exports } = await api<{ exports: ClipExportView[] }>(`${clipPath(clipId)}/exports`, {
+    signal: options.signal,
+  });
+  return exports;
+}
+
+/** Preview Export: a small copy of the whole clip; answers the running one while it runs. */
+export async function previewClip(clipId: string, revision?: number): Promise<ClipJobView> {
+  const { job } = await api<{ job: ClipJobView }>(`${clipPath(clipId)}/previews`, {
+    method: 'POST',
+    body: revision === undefined ? {} : { revision },
+  });
+  return job;
+}
+
+/** The clip's newest Preview Export, with an address to play it once done. */
+export async function latestClipPreview(
+  clipId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<ClipPreviewView | null> {
+  const { preview } = await api<{ preview: ClipPreviewView | null }>(
+    `${clipPath(clipId)}/previews/latest`,
+    { signal: options.signal },
+  );
+  return preview;
 }
 
 /** The video tools, the platforms switched on, and the storage gauge. */
@@ -428,4 +484,194 @@ export async function renameLayout(layoutId: string, name: string): Promise<Save
 
 export function deleteLayout(layoutId: string): Promise<{ message: string }> {
   return api(`/clips/layouts/${encodeURIComponent(layoutId)}`, { method: 'DELETE' });
+}
+
+// --- Module 12: the sticker library and the workspace's own stickers ------------------
+
+export interface SearchStickersOptions {
+  q?: string;
+  kind?: StickerKind;
+  category?: StickerCategory;
+  /** The workspace's starred stickers only. */
+  favourites?: boolean;
+  page?: number;
+  pageSize?: number;
+  signal?: AbortSignal;
+}
+
+/** One page of the catalogue (24 by default), with `suggest` when nothing matched. 429 `library_throttled`. */
+export function searchStickers(options: SearchStickersOptions = {}): Promise<LibrarySearchPage> {
+  const query = new URLSearchParams();
+  const q = options.q?.trim();
+  if (q) query.set('q', q);
+  if (options.kind) query.set('kind', options.kind);
+  if (options.category) query.set('category', options.category);
+  if (options.favourites) query.set('favourites', 'true');
+  if (options.page && options.page > 1) query.set('page', String(options.page));
+  if (options.pageSize) query.set('pageSize', String(options.pageSize));
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return api<LibrarySearchPage>(`/clips/library/stickers${suffix}`, { signal: options.signal });
+}
+
+/** The chips: our categories that have stickers of that kind, with their counts. */
+export async function stickerCategories(
+  kind?: StickerKind,
+  options: { signal?: AbortSignal } = {},
+): Promise<LibraryCategoryCount[]> {
+  const suffix = kind ? `?kind=${encodeURIComponent(kind)}` : '';
+  const { categories } = await api<{ categories: LibraryCategoryCount[] }>(
+    `/clips/library/categories${suffix}`,
+    { signal: options.signal },
+  );
+  return categories;
+}
+
+/** Stars a sticker for the whole workspace. 404 `sticker_not_found` when it left the library. */
+export async function favouriteSticker(stickerId: string): Promise<void> {
+  await api('/clips/library/favourites', {
+    method: 'PUT',
+    body: { type: 'sticker', itemId: stickerId },
+  });
+}
+
+export async function unfavouriteSticker(stickerId: string): Promise<void> {
+  await api(`/clips/library/favourites/sticker/${encodeURIComponent(stickerId)}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Uploads a PNG, GIF or WebP (8 MB at most) and waits for its check: 201
+ * ready or still checking; 413, 415 or 422 with one sentence.
+ */
+export async function uploadSticker(file: File): Promise<StickerUploadView> {
+  const { sticker } = await uploadFile<{ sticker: StickerUploadView }>(
+    '/clips/stickers/uploads',
+    file,
+  );
+  return sticker;
+}
+
+export async function listStickerUploads(
+  options: { signal?: AbortSignal } = {},
+): Promise<StickerUploadView[]> {
+  const { stickers } = await api<{ stickers: StickerUploadView[] }>('/clips/stickers/uploads', {
+    signal: options.signal,
+  });
+  return stickers;
+}
+
+/** 409 `sticker_in_use` (with the number of clips) while a clip uses it. */
+export function deleteStickerUpload(assetId: string): Promise<{ message: string }> {
+  return api(`/clips/stickers/uploads/${encodeURIComponent(assetId)}`, { method: 'DELETE' });
+}
+
+/** The files a clip's stickers draw, by `stickerRefKey`; `missing` for one that is gone. */
+export async function stickerFiles(
+  refs: { library: readonly string[]; asset: readonly string[] },
+  options: { signal?: AbortSignal } = {},
+): Promise<StickerFileView[]> {
+  const query = new URLSearchParams();
+  if (refs.library.length > 0) query.set('library', refs.library.join(','));
+  if (refs.asset.length > 0) query.set('asset', refs.asset.join(','));
+  if (query.size === 0) return [];
+  const { files } = await api<{ files: StickerFileView[] }>(
+    `/clips/stickers/files?${query.toString()}`,
+    { signal: options.signal },
+  );
+  return files;
+}
+
+// --- Module 14: the sound library and the workspace's own sounds ----------------------
+
+export interface SearchSoundsOptions {
+  q?: string;
+  kind?: SoundKind;
+  category?: SoundCategory;
+  /** The workspace's starred sounds only. */
+  favourites?: boolean;
+  page?: number;
+  pageSize?: number;
+  signal?: AbortSignal;
+}
+
+/** One page of the sound catalogue (24 by default), with `suggest` when nothing matched. 429 `library_throttled`. */
+export function searchSounds(options: SearchSoundsOptions = {}): Promise<LibrarySoundPage> {
+  const query = new URLSearchParams();
+  const q = options.q?.trim();
+  if (q) query.set('q', q);
+  if (options.kind) query.set('kind', options.kind);
+  if (options.category) query.set('category', options.category);
+  if (options.favourites) query.set('favourites', 'true');
+  if (options.page && options.page > 1) query.set('page', String(options.page));
+  if (options.pageSize) query.set('pageSize', String(options.pageSize));
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return api<LibrarySoundPage>(`/clips/library/sounds${suffix}`, { signal: options.signal });
+}
+
+/** The chips: the sound categories of that kind that have sounds, with their counts. */
+export async function soundCategories(
+  kind?: SoundKind,
+  options: { signal?: AbortSignal } = {},
+): Promise<SoundCategoryCount[]> {
+  const query = new URLSearchParams({ type: 'sound' });
+  if (kind) query.set('kind', kind);
+  const { categories } = await api<{ categories: SoundCategoryCount[] }>(
+    `/clips/library/categories?${query.toString()}`,
+    { signal: options.signal },
+  );
+  return categories;
+}
+
+/** Stars a sound for the whole workspace. 404 `sound_not_found` when it left the library. */
+export async function favouriteSound(soundId: string): Promise<void> {
+  await api('/clips/library/favourites', {
+    method: 'PUT',
+    body: { type: 'sound', itemId: soundId },
+  });
+}
+
+export async function unfavouriteSound(soundId: string): Promise<void> {
+  await api(`/clips/library/favourites/sound/${encodeURIComponent(soundId)}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Uploads an MP3, WAV, M4A or AAC file (20 MB at most) and waits briefly for
+ * its check: 201 ready or still checking; 413, 415 or 422 with one sentence.
+ */
+export async function uploadSound(file: File): Promise<SoundUploadView> {
+  const { sound } = await uploadFile<{ sound: SoundUploadView }>('/clips/sounds/uploads', file);
+  return sound;
+}
+
+export async function listSoundUploads(
+  options: { signal?: AbortSignal } = {},
+): Promise<SoundUploadView[]> {
+  const { sounds } = await api<{ sounds: SoundUploadView[] }>('/clips/sounds/uploads', {
+    signal: options.signal,
+  });
+  return sounds;
+}
+
+/** 409 `sound_in_use` (with the number of clips) while a clip uses it. */
+export function deleteSoundUpload(assetId: string): Promise<{ message: string }> {
+  return api(`/clips/sounds/uploads/${encodeURIComponent(assetId)}`, { method: 'DELETE' });
+}
+
+/** The files a clip's sounds play, by `soundRefKey`; `missing` for one that is gone. */
+export async function soundFiles(
+  refs: { library: readonly string[]; asset: readonly string[] },
+  options: { signal?: AbortSignal } = {},
+): Promise<SoundFileView[]> {
+  const query = new URLSearchParams();
+  if (refs.library.length > 0) query.set('library', refs.library.join(','));
+  if (refs.asset.length > 0) query.set('asset', refs.asset.join(','));
+  if (query.size === 0) return [];
+  const { files } = await api<{ files: SoundFileView[] }>(
+    `/clips/sounds/files?${query.toString()}`,
+    { signal: options.signal },
+  );
+  return files;
 }

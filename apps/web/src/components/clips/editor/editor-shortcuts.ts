@@ -25,6 +25,7 @@ export type ClipShortcutCommand =
   | 'zoomOut'
   | 'fit'
   | 'escape'
+  | 'edit'
   | 'shortcuts';
 
 export interface ClipShortcutPress {
@@ -76,6 +77,8 @@ export function clipShortcutFor(press: ClipShortcutPress): ClipShortcutCommand |
       return 'delete';
     case 'Escape':
       return 'escape';
+    case 'Enter':
+      return 'edit';
     default:
       return null;
   }
@@ -94,7 +97,39 @@ export const CONTROL_OWNED: ReadonlySet<ClipShortcutCommand> = new Set([
   'secondForward',
   'start',
   'end',
+  // Enter presses a focused button; it types into the selected text only from elsewhere.
+  'edit',
 ]);
+
+/** Which way an arrow key moves the selected text or sticker on the clip. */
+export interface Nudge {
+  x: number;
+  y: number;
+  /** Shift: ten canvas pixels instead of one. */
+  big: boolean;
+}
+
+/**
+ * An arrow key as a nudge of the selected text or sticker (Module 11), or
+ * null for any other key. With a text or sticker selected the arrows move it
+ * instead of the playhead.
+ */
+export function nudgeFor(press: ClipShortcutPress): Nudge | null {
+  if (press.altKey || press.ctrlKey || press.metaKey) return null;
+  const big = press.shiftKey;
+  switch (press.key) {
+    case 'ArrowLeft':
+      return { x: -1, y: 0, big };
+    case 'ArrowRight':
+      return { x: 1, y: 0, big };
+    case 'ArrowUp':
+      return { x: 0, y: -1, big };
+    case 'ArrowDown':
+      return { x: 0, y: 1, big };
+    default:
+      return null;
+  }
+}
 
 export interface ClipShortcutRow {
   /** Each way to press it, as key names joined by "+" ("Ctrl+Shift+Z"). */
@@ -122,8 +157,10 @@ export const CLIP_SHORTCUT_GROUPS: readonly ClipShortcutGroup[] = [
     name: 'Editing',
     rows: [
       { keys: ['S'], label: 'Split at the playhead' },
-      { keys: ['Delete', 'Backspace'], label: 'Remove the selected part or item' },
+      { keys: ['Delete', 'Backspace'], label: 'Remove the selected part, item or zoom' },
       { keys: ['Ctrl+D'], label: 'Duplicate the selected item' },
+      { keys: ['Enter'], label: 'Type into the selected text' },
+      { keys: ['←', '→', '↑', '↓'], label: 'Move the selected text a pixel (Shift: ten)' },
       { keys: ['Ctrl+Z'], label: 'Undo' },
       { keys: ['Ctrl+Shift+Z', 'Ctrl+Y'], label: 'Redo' },
       { keys: ['Esc'], label: 'Clear the selection' },
@@ -134,6 +171,7 @@ export const CLIP_SHORTCUT_GROUPS: readonly ClipShortcutGroup[] = [
     rows: [
       { keys: ['+', '-'], label: 'Zoom the timeline in or out' },
       { keys: ['Shift+Z'], label: 'Fit the whole clip in the timeline' },
+      { keys: ['←', '→'], label: 'Move the selected bar a frame (Shift: a second)' },
       { keys: ['Alt'], label: 'Hold while dragging to turn snapping off' },
       { keys: ['?'], label: 'Show these shortcuts' },
     ],

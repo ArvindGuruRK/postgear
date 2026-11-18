@@ -50,8 +50,11 @@ import {
   type ClipDocument,
   clampZoom,
   dragMoveItem,
+  dragMoveZoom,
   dragResizeItemEnd,
   dragResizeItemStart,
+  dragResizeZoomEnd,
+  dragResizeZoomStart,
   dragTrimEnd,
   dragTrimStart,
   findItem,
@@ -66,6 +69,7 @@ import {
   scrollToShow,
   snapPoints,
   visibleRange,
+  windowsOfZoom,
   ZOOM_STEP,
   zoomBounds,
   zoomToAround,
@@ -97,7 +101,9 @@ import {
   timelineRows,
   trimShiftMs,
   writeSnapping,
+  zoomLabel,
 } from '../timeline/timeline-model';
+import { SoundShape } from '../panels/sound-rows';
 import { Waveform } from '../timeline/waveform';
 import {
   clampDockHeight,
@@ -170,6 +176,16 @@ export interface TimelineDockProps {
   onSplit: () => void;
   onRemove: () => void;
   onAnnounce: (words: string) => void;
+  /** A sticker bar's tiny picture (Module 12), by item id; null for none. */
+  stickerPicture?: (itemId: string) => string | null;
+  /**
+   * A sound bar's shape (Module 14), by item id: its peaks, the share of the
+   * bar its file fills (an effect stretched past its end is silent there),
+   * and its name; null while unknown.
+   */
+  soundShape?: (
+    itemId: string,
+  ) => { peaks: readonly number[]; fill: number; name: string | null } | null;
 }
 
 export function TimelineDock(props: TimelineDockProps) {
@@ -390,6 +406,14 @@ type DragView =
       shiftFromIndex: number;
     }
   | {
+      kind: 'zoom';
+      mode: 'move' | 'start' | 'end';
+      zoomId: string;
+      startDoc: ClipDocument;
+      result: GestureResult;
+      edgeMs: number;
+    }
+  | {
       kind: 'item';
       mode: 'move' | 'start' | 'end';
       itemId: string;
@@ -415,6 +439,8 @@ function EditingTimeline({
   onDraft,
   onAnnounce,
   onDragNeedsMore,
+  stickerPicture,
+  soundShape,
 }: TimelineDockProps & { snapping: boolean; onDragNeedsMore: (needs: boolean) => void }) {
   const scroller = useRef<HTMLDivElement | null>(null);
   const origin = useRef<HTMLDivElement | null>(null);
@@ -710,6 +736,55 @@ function EditingTimeline({
       });
     };
 
+  /** A zoom bar: move it, or drag an end (Module 13). The zoom keeps its moment of the video. */
+  const beginZoom =
+    (zoomId: string, piece: number, mode: 'move' | 'start' | 'end') =>
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0 || dragRef.current) return;
+      if (mode === 'move') event.stopPropagation();
+      const startDoc = document;
+      const bar = windowsOfZoom(startDoc, zoomId)[piece];
+      if (!bar) return;
+      const grabMs = msAt(event.clientX);
+      const edgeOffsetMs =
+        mode === 'start' ? grabMs - bar.startMs : mode === 'end' ? grabMs - bar.endMs : 0;
+      const points = snapPoints(startDoc, { playheadMs: playback.getCurrentMs() });
+      onSelect({ kind: 'zoom', id: zoomId });
+
+      const move = (clientX: number, alt: boolean) => {
+        const pointerMs = msAt(clientX);
+        const snap = snapping && !alt ? { points, pxPerMs: scaleNow.current } : undefined;
+        const edge = pointerMs - edgeOffsetMs;
+        const result =
+          mode === 'move'
+            ? dragMoveZoom(startDoc, { zoomId, piece, grabMs, pointerMs, snap })
+            : (mode === 'start' ? dragResizeZoomStart : dragResizeZoomEnd)(startDoc, {
+                zoomId,
+                piece,
+                pointerMs: edge,
+                snap,
+              });
+        const now = windowsOfZoom(result.doc, zoomId)[piece];
+        const shownEdgeMs = now ? (mode === 'end' ? now.endMs : now.startMs) : edge;
+        showDrag({ kind: 'zoom', mode, zoomId, startDoc, result, edgeMs: shownEdgeMs });
+        onDraft({ doc: result.doc, seekMs: null });
+      };
+
+      stopDrag.current = followDrag(event, scroller.current, move, (cancelled) => {
+        stopDrag.current = null;
+        const last = dragRef.current;
+        showDrag(null);
+        onDraft(null);
+        if (cancelled || !last) return;
+        const before = startDoc.zooms.find((zoom) => zoom.id === zoomId);
+        const after = last.result.doc.zooms.find((zoom) => zoom.id === zoomId);
+        if (!before || !after || (after.from === before.from && after.to === before.to)) return;
+        onCommit(startDoc, last.result.doc, { select: { kind: 'zoom', id: zoomId } });
+        const shown = windowsOfZoom(last.result.doc, zoomId)[0];
+        if (shown) onAnnounce(`${zoomLabel(after, shown.startMs, shown.endMs)}.`);
+      });
+    };
+
   // ---- Keys on a bar -------------------------------------------------------------
 
   const barKeys =
@@ -721,10 +796,21 @@ function EditingTimeline({
         onOpen(bar);
         return;
       }
-      if (bar.kind !== 'item' || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
-      // An item's arrows move it; the window's arrows (the playhead) do not also run.
+      if (bar.kind !== 'item' && bar.kind !== 'zoom') return;
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      // An item's or a zoom's arrows move it; the window's arrows (the playhead) do not also run.
       event.preventDefault();
       const step = event.shiftKey ? 1000 : 1000 / (fps > 0 ? fps : 30);
+      if (bar.kind === 'zoom') {
+        const pointerMs = event.key === 'ArrowLeft' ? -step : step;
+        const moved = dragMoveZoom(document, { zoomId: bar.id, grabMs: 0, pointerMs }).doc;
+        if (moved === document) return;
+        onCommit(document, moved, { select: bar, coalesceKey: `nudge:${bar.id}` });
+        const zoom = moved.zooms.find((candidate) => candidate.id === bar.id);
+        const shown = windowsOfZoom(moved, bar.id)[0];
+        if (zoom && shown) onAnnounce(`${zoomLabel(zoom, shown.startMs, shown.endMs)}.`);
+        return;
+      }
       const next = nudgeItem(document, bar.id, event.key === 'ArrowLeft' ? -step : step);
       if (next === document) return;
       onCommit(document, next, { select: bar, coalesceKey: `nudge:${bar.id}` });
@@ -884,17 +970,37 @@ function EditingTimeline({
                   leftPx={xOf(bar.startMs)}
                   widthPx={Math.max(6, xOf(bar.endMs - bar.startMs))}
                   selected={isSelected(bar.selection)}
+                  picture={bar.selection.kind === 'item' ? (stickerPicture?.(bar.selection.id) ?? null) : null}
+                  shape={
+                    bar.selection.kind === 'item' && row.kind === 'sound'
+                      ? (soundShape?.(bar.selection.id) ?? null)
+                      : null
+                  }
                   onBody={
-                    bar.movable
-                      ? beginItem(bar.selection.id, 'move')
-                      : (event) => {
+                    !bar.movable
+                      ? (event) => {
                           if (event.button !== 0) return;
                           event.stopPropagation();
                           onSelect(bar.selection);
                         }
+                      : bar.selection.kind === 'zoom'
+                        ? beginZoom(bar.selection.id, bar.piece ?? 0, 'move')
+                        : beginItem(bar.selection.id, 'move')
                   }
-                  onStart={bar.movable ? beginItem(bar.selection.id, 'start') : undefined}
-                  onEnd={bar.movable ? beginItem(bar.selection.id, 'end') : undefined}
+                  onStart={
+                    !bar.movable
+                      ? undefined
+                      : bar.selection.kind === 'zoom'
+                        ? beginZoom(bar.selection.id, bar.piece ?? 0, 'start')
+                        : beginItem(bar.selection.id, 'start')
+                  }
+                  onEnd={
+                    !bar.movable
+                      ? undefined
+                      : bar.selection.kind === 'zoom'
+                        ? beginZoom(bar.selection.id, bar.piece ?? 0, 'end')
+                        : beginItem(bar.selection.id, 'end')
+                  }
                   onKeyDown={barKeys(bar.selection)}
                   onFocus={focusBar(bar.selection, bar.label)}
                 />
@@ -964,6 +1070,8 @@ function ItemBar({
   leftPx,
   widthPx,
   selected,
+  picture,
+  shape,
   onBody,
   onStart,
   onEnd,
@@ -975,6 +1083,10 @@ function ItemBar({
   leftPx: number;
   widthPx: number;
   selected: boolean;
+  /** A sticker's tiny picture, before its name. */
+  picture: string | null;
+  /** A sound's shape, drawn behind its name. */
+  shape: { peaks: readonly number[]; fill: number; name: string | null } | null;
   onBody: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onStart?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onEnd?: (event: ReactPointerEvent<HTMLDivElement>) => void;
@@ -997,7 +1109,27 @@ function ItemBar({
       onKeyDown={onKeyDown}
       onFocus={onFocus}
     >
-      <span className="truncate font-sans text-[11px] font-bold">{bar.name}</span>
+      {picture ? (
+        // biome-ignore lint/performance/noImgElement: a tiny remote sticker preview, drawn as it is.
+        <img
+          src={picture}
+          alt=""
+          draggable={false}
+          decoding="async"
+          data-testid="clip-bar-picture"
+          className="pointer-events-none h-4 w-4 shrink-0 object-contain"
+        />
+      ) : null}
+      {shape && shape.peaks.length > 1 ? (
+        <SoundShape
+          peaks={shape.peaks}
+          fill={shape.fill}
+          className="pointer-events-none absolute inset-1 h-[calc(100%-0.5rem)] w-[calc(100%-0.5rem)] opacity-40"
+        />
+      ) : null}
+      <span className="relative truncate font-sans text-[11px] font-bold">
+        {shape?.name ?? bar.name}
+      </span>
     </TimelineBar>
   );
 }

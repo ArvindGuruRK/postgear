@@ -1,80 +1,207 @@
 'use client';
 
 /**
- * The Export tab for now (Module 08 section 5): Module 05's export, a
- * quality and **Export Clip**, with the progress and the outcome. Module 15
- * replaces this body with the full export options.
+ * The Export tab (Module 15 section 7).
  *
- * What is on screen is saved first: an export draws the saved version, so a
- * change still waiting for its pause would be left out. When the save cannot
- * land (offline, a conflict) the export does not start and says why.
+ * - **Quality**: the four tiles with their help lines. One above the plan's
+ *   `clips.export_max_quality` carries the lock and opens the plan dialog
+ *   instead of being chosen; with the sharp video gone, only 720p is left
+ *   (the copy we kept). The best one allowed is preselected.
+ * - **The summary**: "Vertical 9:16, 0:42, 1080p, about 26 MB", then the
+ *   notes that are true (the mark, 60 fps on a 30 fps video, the sharp
+ *   video gone or still coming, a zoom).
+ * - **Preview Export**: a small copy of the whole clip through the same
+ *   compiler, in a dialog (`PreviewDialog`). Export Clip is the panel's own
+ *   footer button, where Next sits on every other tab.
+ * - **While an export runs**: the step in words, the bar, the time left,
+ *   that closing is fine, and Cancel Export. Opening the editor on a clip
+ *   whose export runs picks it up (`GET /clips/:clipId/exports`).
+ * - **Done**: the result card (poster, quality, size, the loudness line,
+ *   Download, Send To Composer for Module 17, Open In Media), the
+ *   out-of-date alert once the clip changed, and the newest five exports.
+ * - **Failed**: one sentence and Try Again.
+ *
+ * What is on screen is saved first: an export draws the saved version.
  */
+import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
+import { PlayIcon } from '@animateicons/react/lucide/play-icon';
 import {
   Alert,
-  AlertDescription,
+  Button,
+  buttonVariants,
+  type ChoiceTileOption,
+  ChoiceTiles,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  MotionIcon,
   Progress,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  SummaryBox,
+  TooltipHint,
 } from '@postgear/ui';
 import {
+  allowedQualities,
+  bestAllowedQuality,
+  type ClipDocument,
   EXPORT_QUALITIES,
   type ExportQuality,
+  formatBytes,
+  QUALITY_HELP,
   QUALITY_LABELS,
   qualityAllowed,
+  qualityLockedSentence,
 } from '@postgear/video-engine';
+import { TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useState } from 'react';
-import { ApiError } from '@/lib/api';
-import { exportClip } from '@/lib/clips-api';
+import { useCallback, useEffect, useId, useState } from 'react';
+import { NOTE, PanelSection } from '@/components/studio/panel-ui';
+import { PremiumLockDialog, PremiumLockMark } from '@/components/studio/premium-lock';
+import { ApiError, downloadFile } from '@/lib/api';
+import {
+  cancelClipJob,
+  exportClip,
+  latestClipPreview,
+  listClipExports,
+  previewClip,
+} from '@/lib/clips-api';
 import { useEntitlements } from '@/lib/entitlements';
-import type { ClipSharpState } from '@/types/clips';
+import type { ClipExportView, ClipPreviewView, ClipSharpState } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
-import { useClipJob } from '../use-clip-job';
+import { LATER_STEP_SENTENCE } from '../clips-model';
+import { type ClipJobState, useClipJob } from '../use-clip-job';
+import {
+  CLOSE_IS_FINE,
+  changedSince,
+  EXPORT_FAILED_SENTENCE,
+  EXPORT_UNREACHABLE_SENTENCE,
+  EXPORT_UNSAVED_SENTENCE,
+  exportDate,
+  exportNotes,
+  isRunning,
+  latestDone,
+  loudnessLine,
+  OUT_OF_DATE,
+  PREVIEW_FAILED_SENTENCE,
+  PREVIEW_LINE,
+  PREVIEW_SMALLER,
+  PREVIEW_STALE,
+  QUALITY_LOCK_CODE,
+  runningExport,
+  SHARP_LOCK_LINE,
+  summaryLine,
+  timeLeft,
+} from './export-model';
 
-export const EXPORT_UNSAVED_SENTENCE =
-  'Your latest changes are not saved yet, so the export would leave them out. Try again once they are saved.';
-export const EXPORT_UNREACHABLE_SENTENCE =
-  'We could not start the export. Check your connection and try again.';
-export const EXPORT_DONE_SENTENCE = 'Your clip is ready in Media.';
-export const EXPORT_FAILED_SENTENCE = 'The export did not finish. Try again.';
-const SHARP_FETCHING_SENTENCE =
-  'We are still getting the sharp video. An export now waits for it before it starts.';
+export {
+  EXPORT_FAILED_SENTENCE,
+  EXPORT_UNREACHABLE_SENTENCE,
+  EXPORT_UNSAVED_SENTENCE,
+} from './export-model';
+
+/** The preview's state: the dialog, its job, and the file once made. */
+export interface ClipPreviewState {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  job: ClipJobState;
+  view: ClipPreviewView | null;
+  starting: boolean;
+  problem: string | null;
+  start: () => Promise<void>;
+  cancel: () => Promise<void>;
+}
 
 export interface ClipExportState {
   quality: ExportQuality;
   setQuality: (quality: ExportQuality) => void;
-  /** The plan's highest quality ('720p' and the rest), or null while unknown. */
+  /** The highest quality this clip may export at now (the plan's, or 720p with the sharp video gone); null while unknown. */
   ceiling: string | null;
+  /** The plan's own highest quality; null while unknown. */
+  planCeiling: string | null;
+  /** The plan puts the small mark on exports. */
+  mark: boolean;
+  exports: ClipExportView[];
+  job: ClipJobState;
   running: boolean;
   starting: boolean;
   problem: string | null;
   jobId: string | null;
+  /** The locked quality whose plan dialog is open. */
+  lockFor: ExportQuality | null;
+  setLockFor: (quality: ExportQuality | null) => void;
   start: () => Promise<void>;
+  cancel: () => Promise<void>;
+  preview: ClipPreviewState;
 }
 
-/** The export's state, kept by the editor so Next ("Export Clip") and the panel share it. */
+function sentenceOf(cause: unknown, fallback: string): string {
+  return cause instanceof ApiError && cause.status !== 0 ? cause.message : fallback;
+}
+
+/** The export's state, kept by the editor so the top bar, the footer and the panel share it. */
 export function useClipExport({
   orgId,
   clipId,
   flush,
+  sharp,
 }: {
   orgId: string;
   clipId: string;
   /** Saves what is on screen now; true once the server has it. */
   flush: () => Promise<boolean>;
-}): ClipExportState & { job: ReturnType<typeof useClipJob> } {
+  sharp: ClipSharpState;
+}): ClipExportState {
   const { snapshot } = useEntitlements(orgId);
-  const ceilingValue = snapshot?.values['clips.export_max_quality'];
-  const ceiling = typeof ceilingValue === 'string' ? ceilingValue : null;
-  const [quality, setQuality] = useState<ExportQuality>('1080p');
+  const planValue = snapshot?.values['clips.export_max_quality'];
+  const planCeiling = typeof planValue === 'string' ? planValue : null;
+  const mark = snapshot?.values['clips.export_watermark'] === true;
+  // With the sharp video gone, the copy we kept is 720p: nothing above it.
+  const ceiling = sharp === 'gone' && planCeiling !== null ? '720p' : planCeiling;
+  const [chosen, setChosen] = useState<ExportQuality | null>(null);
+  const allowed = ceiling === null ? [...EXPORT_QUALITIES] : allowedQualities(ceiling);
+  const quality =
+    chosen && allowed.includes(chosen)
+      ? chosen
+      : ceiling === null
+        ? '1080p'
+        : bestAllowedQuality(ceiling);
+
+  const [exports, setExports] = useState<ClipExportView[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [lockFor, setLockFor] = useState<ExportQuality | null>(null);
   const job = useClipJob(jobId);
   const running = job.job ? !isTerminalJob(job.job.status) : false;
+
+  const reload = useCallback(
+    async (signal?: AbortSignal) => {
+      const list = await listClipExports(clipId, { signal });
+      if (!signal?.aborted) setExports(list);
+      return list;
+    },
+    [clipId],
+  );
+
+  // On open: the newest exports, and a running one followed.
+  useEffect(() => {
+    const abort = new AbortController();
+    reload(abort.signal)
+      .then((list) => {
+        const run = runningExport(list);
+        if (run && !abort.signal.aborted) setJobId((current) => current ?? run.job.id);
+      })
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, [reload]);
+
+  // The followed export ended: read the list again for its file and its loudness.
+  const ended = job.job && isTerminalJob(job.job.status) ? `${job.job.id}:${job.job.status}` : null;
+  useEffect(() => {
+    if (ended) reload().catch(() => undefined);
+  }, [ended, reload]);
 
   const start = useCallback(async () => {
     if (starting || running) return;
@@ -85,104 +212,503 @@ export function useClipExport({
         setProblem(EXPORT_UNSAVED_SENTENCE);
         return;
       }
-      // A plan below the chosen quality exports at its own highest.
-      const wanted =
-        ceiling &&
-        !qualityAllowed(quality, ceiling) &&
-        (EXPORT_QUALITIES as readonly string[]).includes(ceiling)
-          ? (ceiling as ExportQuality)
-          : quality;
-      const made = await exportClip(clipId, wanted);
+      const made = await exportClip(clipId, quality);
       setJobId(made.id);
-    } catch (cause) {
-      setProblem(
-        cause instanceof ApiError && cause.status !== 0
-          ? cause.message
-          : EXPORT_UNREACHABLE_SENTENCE,
+      setExports((list) =>
+        [
+          { job: made, quality, fingerprint: null, media: null, loudness: null },
+          ...list.filter((row) => row.job.id !== made.id),
+        ].slice(0, 5),
       );
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === QUALITY_LOCK_CODE) {
+        setLockFor(quality);
+        return;
+      }
+      if (cause instanceof ApiError && cause.code === 'export_running') {
+        const list = await reload().catch(() => [] as ClipExportView[]);
+        const run = runningExport(list);
+        if (run) {
+          setJobId(run.job.id);
+          return;
+        }
+      }
+      setProblem(sentenceOf(cause, EXPORT_UNREACHABLE_SENTENCE));
     } finally {
       setStarting(false);
     }
-  }, [ceiling, clipId, flush, quality, running, starting]);
+  }, [clipId, flush, quality, reload, running, starting]);
 
-  return { quality, setQuality, ceiling, running, starting, problem, jobId, start, job };
+  const cancel = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      await cancelClipJob(jobId);
+    } catch (cause) {
+      setProblem(sentenceOf(cause, EXPORT_UNREACHABLE_SENTENCE));
+    }
+    job.refresh();
+  }, [job, jobId]);
+
+  const preview = useClipPreview({ clipId, flush });
+
+  return {
+    quality,
+    setQuality: setChosen,
+    ceiling,
+    planCeiling,
+    mark,
+    exports,
+    job,
+    running,
+    starting,
+    problem,
+    jobId,
+    lockFor,
+    setLockFor,
+    start,
+    cancel,
+    preview,
+  };
+}
+
+function useClipPreview({
+  clipId,
+  flush,
+}: {
+  clipId: string;
+  flush: () => Promise<boolean>;
+}): ClipPreviewState {
+  const [open, setOpen] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [view, setView] = useState<ClipPreviewView | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const job = useClipJob(jobId);
+
+  // On open: the newest preview (a running one followed; a done one known for its stale line).
+  useEffect(() => {
+    const abort = new AbortController();
+    latestClipPreview(clipId, { signal: abort.signal })
+      .then((found) => {
+        if (abort.signal.aborted) return;
+        setView(found);
+        if (found && isRunning(found.job)) setJobId((current) => current ?? found.job.id);
+      })
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, [clipId]);
+
+  // The followed preview is done: read it again for its address.
+  const doneId = job.job?.status === 'DONE' ? job.job.id : null;
+  useEffect(() => {
+    if (!doneId) return;
+    const abort = new AbortController();
+    latestClipPreview(clipId, { signal: abort.signal })
+      .then((found) => {
+        if (!abort.signal.aborted) setView(found);
+      })
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, [clipId, doneId]);
+
+  const start = useCallback(async () => {
+    setOpen(true);
+    if (starting || isRunning(job.job)) return;
+    setStarting(true);
+    setProblem(null);
+    try {
+      if (!(await flush())) {
+        setProblem(EXPORT_UNSAVED_SENTENCE);
+        return;
+      }
+      const made = await previewClip(clipId);
+      setJobId(made.id);
+      setView((current) => (current?.job.id === made.id ? current : null));
+    } catch (cause) {
+      setProblem(sentenceOf(cause, PREVIEW_FAILED_SENTENCE));
+    } finally {
+      setStarting(false);
+    }
+  }, [clipId, flush, job.job, starting]);
+
+  const cancel = useCallback(async () => {
+    if (!jobId) return;
+    await cancelClipJob(jobId).catch(() => undefined);
+    job.refresh();
+  }, [job, jobId]);
+
+  return { open, setOpen, job, view, starting, problem, start, cancel };
+}
+
+/** A file from Media: an API path through `downloadFile`, a full address straight. */
+async function download(url: string, name: string): Promise<void> {
+  if (/^https?:\/\//i.test(url)) {
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.rel = 'noopener';
+    link.click();
+    return;
+  }
+  await downloadFile(url, name);
 }
 
 export function ExportPanel({
   orgId,
   state,
   sharp,
+  document,
+  sourceFps,
+  onExport,
 }: {
   orgId: string;
-  state: ClipExportState & { job: ReturnType<typeof useClipJob> };
+  state: ClipExportState;
   sharp: ClipSharpState;
+  document: ClipDocument;
+  /** The video's own frame rate (60 fps tiles warn on a 30 fps one); null when unknown. */
+  sourceFps: number | null;
+  /** Export Clip from the preview dialog and Export Again (the editor asks first about removed items). */
+  onExport: () => void;
 }) {
-  const { job } = state;
-  const view = job.job;
-  // Only what the plan allows (all four while the plan is still loading: the API re-checks).
-  const options = EXPORT_QUALITIES.filter(
-    (value) => state.ceiling === null || qualityAllowed(value, state.ceiling),
-  );
-  const shown = options.includes(state.quality) ? state.quality : (options.at(-1) ?? state.quality);
+  const qualityId = useId();
+  const [downloadProblem, setDownloadProblem] = useState<string | null>(null);
+  const view = state.job.job;
+  const live = view && !isTerminalJob(view.status) ? view : null;
+  const failed = view?.status === 'FAILED' ? view : null;
+  const done = latestDone(state.exports);
+  const stale = done ? changedSince(document, done.fingerprint) : false;
+  const history = state.exports.filter((row) => row.job.status === 'DONE' && row.media !== null);
+
+  const options: ChoiceTileOption<ExportQuality>[] = EXPORT_QUALITIES.map((quality) => {
+    const locked = state.ceiling !== null && !qualityAllowed(quality, state.ceiling);
+    return {
+      value: quality,
+      label: QUALITY_LABELS[quality],
+      line: QUALITY_HELP[quality],
+      corner: locked ? <PremiumLockMark className="h-5 w-5" /> : undefined,
+      spokenLabel: locked ? `${QUALITY_LABELS[quality]}, locked` : undefined,
+    };
+  });
+
+  const choose = (quality: ExportQuality) => {
+    const lockedByPlan = state.planCeiling !== null && !qualityAllowed(quality, state.planCeiling);
+    if (lockedByPlan) {
+      state.setLockFor(quality);
+      return;
+    }
+    // Above 720p with the sharp video gone: the note says why; nothing to choose.
+    if (state.ceiling !== null && !qualityAllowed(quality, state.ceiling)) return;
+    state.setQuality(quality);
+  };
+
+  const fetchFile = (url: string, name: string) => {
+    setDownloadProblem(null);
+    download(url, name).catch((cause: unknown) =>
+      setDownloadProblem(sentenceOf(cause, EXPORT_UNREACHABLE_SENTENCE)),
+    );
+  };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5 pt-1" data-testid="clip-export-panel">
+      <PanelSection title="Quality" headingId={qualityId}>
+        <ChoiceTiles<ExportQuality>
+          labelledBy={qualityId}
+          columns={2}
+          options={options}
+          value={state.quality}
+          disabled={state.running || state.starting}
+          onValueChange={choose}
+        />
+        {sharp === 'gone' ? <p className={NOTE}>{SHARP_LOCK_LINE}</p> : null}
+      </PanelSection>
+
+      <SummaryBox
+        data-testid="clip-export-summary"
+        title={summaryLine(document, state.quality)}
+        notes={exportNotes({
+          doc: document,
+          quality: state.quality,
+          mark: state.mark,
+          sourceFps,
+          sharp,
+        })}
+      />
+
       <div className="flex flex-col gap-2">
-        <p className="m-0 font-sans text-sm text-ink type-label">Quality</p>
-        <Select value={shown} onValueChange={(value) => state.setQuality(value as ExportQuality)}>
-          <SelectTrigger aria-label="Export Quality" disabled={state.running || state.starting}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((value) => (
-              <SelectItem key={value} value={value}>
-                {QUALITY_LABELS[value]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={() => void state.preview.start()}
+          data-testid="clip-preview-export"
+        >
+          <MotionIcon icon={PlayIcon} className="h-4 w-4" />
+          Preview Export
+        </Button>
+        <p className={NOTE}>{PREVIEW_LINE}</p>
       </div>
 
-      {sharp === 'fetching' ? (
-        <p className="m-0 font-sans text-sm text-ink type-muted">{SHARP_FETCHING_SENTENCE}</p>
-      ) : null}
-
       {state.problem ? (
-        <Alert variant="warning">
-          <AlertDescription>{state.problem}</AlertDescription>
-        </Alert>
-      ) : null}
-      {job.error ? (
-        <Alert variant="danger">
-          <AlertDescription>{job.error}</AlertDescription>
+        <Alert variant="warning" className="items-center" data-testid="clip-export-problem">
+          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <p className="m-0 min-w-0 flex-1">{state.problem}</p>
         </Alert>
       ) : null}
 
-      {view && !isTerminalJob(view.status) ? (
+      {live ? (
         <div className="flex flex-col gap-2" data-testid="clip-export-progress">
           <div className="flex items-center justify-between gap-3 font-sans text-sm text-ink">
-            <span>{view.stageLabel}</span>
-            <span className="tabular-nums type-muted">{Math.round(view.progress)}%</span>
+            <span className="type-ui">{live.stageLabel}</span>
+            <span className="tabular-nums type-muted">{Math.round(live.progress)}%</span>
           </div>
-          <Progress value={view.progress} aria-label={view.stageLabel} />
+          <Progress value={live.progress} aria-label={live.stageLabel} />
+          {timeLeft(live.etaSeconds) ? <p className={NOTE}>{timeLeft(live.etaSeconds)}</p> : null}
+          <p className={NOTE}>{CLOSE_IS_FINE}</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-fit"
+            onClick={() => void state.cancel()}
+          >
+            Cancel Export
+          </Button>
         </div>
       ) : null}
-      {view?.status === 'DONE' ? (
-        <p className="m-0 font-sans text-sm text-ink" data-testid="clip-export-done">
-          {EXPORT_DONE_SENTENCE}{' '}
-          <Link
-            className="underline underline-offset-2"
-            href={`/${encodeURIComponent(orgId)}/media`}
-          >
-            Open Media
-          </Link>
-        </p>
-      ) : null}
-      {view?.status === 'FAILED' ? (
-        <Alert variant="danger">
-          <AlertDescription>{view.error?.message ?? EXPORT_FAILED_SENTENCE}</AlertDescription>
+
+      {failed ? (
+        <Alert variant="danger" className="items-center" data-testid="clip-export-failed">
+          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <p className="m-0 min-w-0 flex-1">{EXPORT_FAILED_SENTENCE}</p>
+          <Button variant="secondary" size="sm" onClick={onExport}>
+            Try Again
+          </Button>
         </Alert>
       ) : null}
+
+      {done && !live && stale ? (
+        <Alert variant="warning" className="items-center" data-testid="clip-export-stale">
+          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <p className="m-0 min-w-0 flex-1">{OUT_OF_DATE}</p>
+          <Button variant="secondary" size="sm" onClick={onExport}>
+            Export Again
+          </Button>
+        </Alert>
+      ) : null}
+
+      {done?.media ? (
+        <PanelSection title="Last Export">
+          <ResultCard orgId={orgId} row={done} onDownload={fetchFile} />
+        </PanelSection>
+      ) : null}
+
+      {downloadProblem ? (
+        <Alert variant="danger" className="items-center">
+          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <p className="m-0 min-w-0 flex-1">{downloadProblem}</p>
+        </Alert>
+      ) : null}
+
+      {history.length > 1 ? (
+        <PanelSection title="Recent Exports">
+          <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="clip-export-history">
+            {history.map((row) => (
+              <li
+                key={row.job.id}
+                className="flex items-center gap-2 rounded-md border-2 border-outline bg-inset p-2"
+              >
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="font-sans text-sm text-ink type-ui">
+                    {QUALITY_LABELS[row.quality]}
+                  </span>
+                  <span className="font-sans text-xs text-ink type-muted">
+                    {exportDate(row.job.finishedAt ?? row.job.createdAt)}
+                  </span>
+                </span>
+                {row.media ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-8 shrink-0 px-0"
+                    aria-label={`Download ${QUALITY_LABELS[row.quality]} From ${exportDate(row.job.finishedAt ?? row.job.createdAt)}`}
+                    onClick={() => row.media && fetchFile(row.media.url, row.media.name)}
+                  >
+                    <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </PanelSection>
+      ) : null}
+
+      <div className="flex flex-col gap-1 border-t-2 border-outline pt-3">
+        <Link
+          href="/credits/clips"
+          target="_blank"
+          rel="noopener"
+          className="w-fit font-sans text-sm text-ink underline underline-offset-2 type-ui hover:text-actionPrimary"
+        >
+          Credits
+        </Link>
+      </div>
+
+      <PremiumLockDialog
+        open={state.lockFor !== null}
+        onOpenChange={(open) => !open && state.setLockFor(null)}
+        newTab
+        title={state.lockFor ? `${QUALITY_LABELS[state.lockFor]} Export` : 'Export Quality'}
+        description={state.lockFor ? qualityLockedSentence(state.lockFor) : undefined}
+      />
+      <PreviewDialog preview={state.preview} document={document} onExport={onExport} />
     </div>
+  );
+}
+
+function ResultCard({
+  orgId,
+  row,
+  onDownload,
+}: {
+  orgId: string;
+  row: ClipExportView;
+  onDownload: (url: string, name: string) => void;
+}) {
+  const media = row.media;
+  if (!media) return null;
+  const loudness = loudnessLine(row.loudness);
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-md border-2 border-outline bg-inset p-3"
+      data-testid="clip-export-result"
+    >
+      <div className="flex items-center gap-3">
+        {media.posterUrl ? (
+          // biome-ignore lint/performance/noImgElement: a signed poster from storage, drawn as it is.
+          <img
+            src={media.posterUrl}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-sm border-2 border-outline object-cover"
+          />
+        ) : null}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate font-sans text-sm text-ink type-heading">{media.name}</span>
+          <span className="font-sans text-xs text-ink type-muted">
+            {QUALITY_LABELS[row.quality]}, {formatBytes(media.bytes)}
+          </span>
+          {loudness ? (
+            <span
+              className="font-sans text-xs text-ink type-muted"
+              data-testid="clip-export-loudness"
+            >
+              {loudness}
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onClick={() => onDownload(media.url, media.name)}>
+          <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+          Download
+        </Button>
+        <TooltipHint label={LATER_STEP_SENTENCE} disabled>
+          <Button size="sm" disabled>
+            Send To Composer
+          </Button>
+        </TooltipHint>
+        <Link
+          href={`/${encodeURIComponent(orgId)}/media`}
+          className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+        >
+          Open In Media
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PreviewDialog({
+  preview,
+  document,
+  onExport,
+}: {
+  preview: ClipPreviewState;
+  document: ClipDocument;
+  onExport: () => void;
+}) {
+  const job = preview.job.job;
+  const running = preview.starting || isRunning(job);
+  const failed = job?.status === 'FAILED';
+  const ready =
+    !running && preview.view?.job.status === 'DONE' && preview.view.url ? preview.view : null;
+  const stale = ready ? changedSince(document, ready.fingerprint) : false;
+
+  return (
+    <Dialog open={preview.open} onOpenChange={preview.setOpen}>
+      <DialogContent className="max-w-xl" data-testid="clip-preview-dialog">
+        <DialogHeader>
+          <DialogTitle>Preview Export</DialogTitle>
+          <DialogDescription>{ready ? PREVIEW_SMALLER : PREVIEW_LINE}</DialogDescription>
+        </DialogHeader>
+
+        {preview.problem ? (
+          <Alert variant="danger" className="items-center">
+            <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+            <p className="m-0 min-w-0 flex-1">{preview.problem}</p>
+          </Alert>
+        ) : null}
+
+        {running ? (
+          <div className="flex flex-col gap-2" data-testid="clip-preview-progress">
+            <div className="flex items-center justify-between gap-3 font-sans text-sm text-ink">
+              <span className="type-ui">{job?.stageLabel ?? 'Making the preview'}</span>
+              <span className="tabular-nums type-muted">{Math.round(job?.progress ?? 0)}%</span>
+            </div>
+            <Progress value={job?.progress ?? 0} aria-label="Making the preview" />
+          </div>
+        ) : failed ? (
+          <Alert variant="danger" className="items-center" data-testid="clip-preview-failed">
+            <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+            <p className="m-0 min-w-0 flex-1">{PREVIEW_FAILED_SENTENCE}</p>
+            <Button variant="secondary" size="sm" onClick={() => void preview.start()}>
+              Try Again
+            </Button>
+          </Alert>
+        ) : ready?.url ? (
+          <div className="flex flex-col gap-2">
+            {/* biome-ignore lint/a11y/useMediaCaption: the clip's own words are in the picture; there is no caption file. */}
+            <video
+              key={ready.url}
+              src={ready.url}
+              controls
+              playsInline
+              className="max-h-[60vh] w-full rounded-md border-2 border-outline bg-black"
+              data-testid="clip-preview-video"
+            />
+            {stale ? <p className={NOTE}>{PREVIEW_STALE}</p> : null}
+          </div>
+        ) : null}
+
+        <DialogFooter>
+          {running ? (
+            <Button variant="secondary" onClick={() => void preview.cancel()}>
+              Cancel
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => preview.setOpen(false)}>
+              Close
+            </Button>
+          )}
+          {ready ? (
+            <Button
+              onClick={() => {
+                preview.setOpen(false);
+                onExport();
+              }}
+            >
+              Export Clip
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

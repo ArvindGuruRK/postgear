@@ -10,6 +10,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ClipEditor } from '@/components/clips/editor/clip-editor';
+import { EDITOR_TABS, type EditorTab } from '@/components/clips/editor/editor-state';
 import { ClipUnreadable } from '@/components/clips/editor/clip-unreadable';
 import { ClipsDesktopOnly } from '@/components/clips/desktop-only';
 import { ClipsWorkspaceWaiting } from '@/components/clips/workspace-waiting';
@@ -19,8 +20,22 @@ import type { ClipDetail } from '@/types/clips';
 
 export const metadata: Metadata = { title: 'Clip Editor' };
 
-export default async function ClipEditRoute({ params }: PageProps<'/[orgId]/clips/edit/[clipId]'>) {
-  const [{ orgId, clipId }, cookie] = await Promise.all([params, getSessionCookieHeader()]);
+/** `?tab=export` (a ready export's notice) opens that tab; anything else opens the first. */
+function tabOf(value: string | string[] | undefined): EditorTab | undefined {
+  return typeof value === 'string' && (EDITOR_TABS as readonly string[]).includes(value)
+    ? (value as EditorTab)
+    : undefined;
+}
+
+export default async function ClipEditRoute({
+  params,
+  searchParams,
+}: PageProps<'/[orgId]/clips/edit/[clipId]'>) {
+  const [{ orgId, clipId }, query, cookie] = await Promise.all([
+    params,
+    searchParams,
+    getSessionCookieHeader(),
+  ]);
   // Opened before the workspace cookie names this workspace: fetch nothing until the
   // layout's switch lands and refreshes the page.
   if ((await getActiveOrgId()) !== orgId) {
@@ -44,7 +59,13 @@ export default async function ClipEditRoute({ params }: PageProps<'/[orgId]/clip
   return (
     <ClipsDesktopOnly>
       {document ? (
-        <ClipEditor key={clipId} orgId={orgId} initial={detail} document={document} />
+        <ClipEditor
+          key={clipId}
+          orgId={orgId}
+          initial={detail}
+          document={document}
+          initialTab={tabOf(query.tab)}
+        />
       ) : (
         <ClipUnreadable orgId={orgId} videoId={detail.video?.id ?? null} clipId={clipId} />
       )}

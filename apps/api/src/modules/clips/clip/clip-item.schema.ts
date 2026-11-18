@@ -44,8 +44,25 @@ const wholeClipSchema = z
 export const createClipSchema = z.union([rangeClipSchema, wholeClipSchema]);
 export type CreateClipInput = z.infer<typeof createClipSchema>;
 
-export const exportClipSchema = z.object({ quality: z.enum(EXPORT_QUALITIES) }).strict();
+/**
+ * Module 15: `revision` is the one the person is looking at; a newer one
+ * saved elsewhere is 409 `clip_changed_elsewhere`. Without it the clip's
+ * current revision is exported (the Module 05 shape still works).
+ */
+export const exportClipSchema = z
+  .object({
+    quality: z.enum(EXPORT_QUALITIES),
+    revision: z.number().int().min(1).optional(),
+  })
+  .strict();
 export type ExportClipInput = z.infer<typeof exportClipSchema>;
+
+/** Preview Export (Module 15): only the revision; an empty body previews the current one. */
+export const previewClipSchema = z
+  .object({ revision: z.number().int().min(1).optional() })
+  .strict()
+  .default({});
+export type PreviewClipInput = z.infer<typeof previewClipSchema>;
 
 /** A clip's name: the same cap as the titles the server writes. */
 export const MAX_CLIP_TITLE_LENGTH = 200;

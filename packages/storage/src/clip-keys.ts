@@ -10,6 +10,10 @@
  * - `clips/<orgId>/downloads/<jobId>/<name>.<ext>`: a prepared download, kept 24 hours.
  * - `clips/<orgId>/library/<hex>.<ext>`: a workspace's own stickers and sounds.
  *
+ * One more shape sits outside every workspace: the shared library's licence
+ * report, `ops/library-runs/<runId>.json` or `.md` (Module 12), written by
+ * the operator's ingest and read by the operator only.
+ *
  * Video and job ids are lowercase UUIDs. A workspace id is a lowercase slug of
  * letters, digits and single dashes, at most 64 long: a UUID for every real
  * workspace, and ids such as `seed-demo-org` for the seeded ones. The random
@@ -69,7 +73,7 @@ const KIND_PATTERN = new RegExp(`^${KIND}$`);
 const NAME_PATTERN = new RegExp(`^${NAME}$`);
 
 const CLIP_KEY_PATTERN = new RegExp(
-  `^clips/${ORG}/(?:${UUID}/${KIND}-${HEX}|${JOB_FOLDERS}/${UUID}/${NAME}|library/${HEX})\\.${EXT}$`,
+  `^(?:clips/${ORG}/(?:${UUID}/${KIND}-${HEX}|${JOB_FOLDERS}/${UUID}/${NAME}|library/${HEX})\\.${EXT}|ops/library-runs/${UUID}\\.(?:json|md))$`,
 );
 
 /**
@@ -245,6 +249,13 @@ export const clipKeys = {
     assertOrgId(orgId);
     return `clips/${orgId}/library/`;
   },
+
+  /** The shared library's licence report for one ingest run (operator only, never a workspace's). */
+  libraryReport(runId: string, ext: 'json' | 'md'): string {
+    assertUuid(runId, 'run');
+    if (ext !== 'json' && ext !== 'md') throw new Error('A licence report is JSON or Markdown');
+    return checked(`ops/library-runs/${runId}.${ext}`);
+  },
 } as const;
 
 const CLIP_CONTENT_TYPES: Record<ClipExtension, string> = {
@@ -274,6 +285,7 @@ export function contentTypeForClipKey(key: string): string {
   assertValidClipKey(key);
 
   if (key.endsWith('.json.gz')) return 'application/gzip';
+  if (key.endsWith('.md')) return 'text/markdown; charset=utf-8';
 
   const ext = key.slice(key.lastIndexOf('.') + 1) as ClipExtension;
   return CLIP_CONTENT_TYPES[ext];

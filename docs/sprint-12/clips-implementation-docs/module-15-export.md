@@ -1,6 +1,6 @@
 # Module 15: Export
 
-> **Sprint 12, Clips** | Status: Not started | Size: M (one session; the compiler and executor are Module 05's, this module builds the policy and the panel around them)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19; see the README Progress row) | Size: M (one session; the compiler and executor are Module 05's, this module builds the policy and the panel around them)
 > **Depends on**: [Module 05](module-05-thin-slice-render.md), [Module 08](module-08-editor-shell.md)
 > **Stories**: CL-10.1, CL-10.2, CL-10.3, CL-10.4
 > **Next**: [Module 17](module-17-send-to-composer.md) (Send To Composer), [Module 19](module-19-retention-quotas-and-safety.md)
@@ -110,18 +110,20 @@ The editor is a fast approximation (text may wrap on another word, a look may di
 
 ## Tasks
 
-- [ ] `export.ts` (`EXPORT_QUALITIES`, `PROOF_QUALITY`, `exportPlan`, `estimateBytes`, `allowedQualities`), `documentFingerprint`, with tests.
-- [ ] `lastExportedFingerprint` on `Clip` (`prisma-change`); the exported rule switched everywhere.
-- [ ] The export route: resolver reads, quality lock, mark, priority, save-then-freeze, fingerprint; the history route.
-- [ ] The mark overlay in the compiler; the editor's mark.
-- [ ] `POST /clips/:clipId/previews`, the lowest priority, the low-priority process option, the 24 hour asset, the dialog.
-- [ ] `verifyOutput` and the job's recorded facts.
-- [ ] The Export panel with every state and note; the top bar ring; picking up a running job.
-- [ ] Notification links; card ring and Download.
-- [ ] The typical-clip benchmark at every quality; the table in the Progress notes.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: export at 720p, close the tab, reopen and see it done; press Preview Export and watch it play; change the clip and see the out-of-date alert; on the Free workspace click 1080p. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `export.ts` (`EXPORT_QUALITIES`, `PROOF_QUALITY`, `exportPlan`, `estimateBytes`, `allowedQualities`), `documentFingerprint`, with tests.
+- [x] `lastExportedFingerprint` on `Clip` (`prisma-change`); the exported rule switched everywhere.
+- [x] The export route: resolver reads, quality lock, mark, priority, save-then-freeze, fingerprint; the history route.
+- [x] The mark overlay in the compiler; the editor's mark.
+- [x] `POST /clips/:clipId/previews`, the lowest priority, the low-priority process option, the 24 hour asset, the dialog.
+- [x] `verifyOutput` and the job's recorded facts.
+- [x] The Export panel with every state and note; the top bar ring; picking up a running job.
+- [x] Notification links; card ring and Download.
+- [x] The typical-clip benchmark at every quality; the table in the Progress notes.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: export at 720p, close the tab, reopen and see it done; press Preview Export and watch it play; change the clip and see the out-of-date alert; on the Free workspace click 1080p. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
+
+**Gaps at close (2026-11-19)**: Export Clip stays the panel footer's button rather than sitting beside Preview Export (see the Decision Log). The ask before leaving out a removed sticker or sound was checked in tests only (the seed has no removed item a clip uses). Exports made before this module have no fingerprint, so they never show the out-of-date alert. The benchmark has no stickers, sound mix or mark in it, so a real export runs somewhat slower than its table. A preview's 24 hours are kept in `ClipAsset.meta.expiresAt` (no column) for Module 19 to read. The light and Lilac themes are left to the hand check.
 
 ## Tests
 

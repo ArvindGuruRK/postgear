@@ -11,6 +11,12 @@
 /** The programs Clips may start. Nothing else can be named. */
 export type ToolName = 'ffmpeg' | 'ffprobe' | 'yt-dlp';
 
+/**
+ * Programs only the build scripts start, never a job: Python for
+ * `clips:fonts:build` (fontTools turns the Studio's WOFF2 files into TTF twins).
+ */
+export type BuildToolName = 'python';
+
 /** Where each program is, from `toolPaths(env)`: an absolute path or a name on PATH. */
 export interface ToolPaths {
   ffmpeg: string;
@@ -44,6 +50,19 @@ export interface RunToolOptions {
    * stop a download past its size cap (`--max-filesize` is ignored for HLS).
    */
   watch?: { everyMs: number; check: () => void | Promise<void> };
+  /**
+   * `'low'` starts the program below normal priority (Windows "below
+   * normal", nice 10 on Linux) so a preview never slows an export or the
+   * API on the same machine. Set right after the start; a host that refuses
+   * the change runs it at normal priority.
+   */
+  priority?: 'normal' | 'low';
+  /**
+   * Called once the program has started (and, for `'low'`, been moved below
+   * normal priority), with its process id: for a log line, or a test that
+   * reads the priority from outside.
+   */
+  onStart?: (pid: number) => void;
 }
 
 export interface RunToolResult {
@@ -66,7 +85,7 @@ export type RunTool = (
  * there for the log and for mapping a cause to one of our codes.
  */
 export class ToolError extends Error {
-  readonly tool: ToolName;
+  readonly tool: ToolName | BuildToolName;
   readonly exitCode: number | null;
   readonly timedOut: boolean;
   readonly aborted: boolean;
@@ -74,7 +93,7 @@ export class ToolError extends Error {
   readonly stdoutTail: string;
 
   constructor(params: {
-    tool: ToolName;
+    tool: ToolName | BuildToolName;
     exitCode: number | null;
     timedOut?: boolean;
     aborted?: boolean;

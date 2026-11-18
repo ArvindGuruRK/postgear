@@ -20,8 +20,9 @@ import {
   documentRange,
   dragMoveItem,
   type EditRefusalCode,
+  type ItemRefusalCode,
+  MAX_ITEMS,
   MAX_SEGMENTS,
-  type PlacedSegment,
   placeSegments,
   removeItem,
   removeSegment,
@@ -31,6 +32,7 @@ import {
   splitAt,
   type TimedItem,
   type Zoom,
+  zoomWindows,
 } from '@postgear/video-engine';
 import type { EditorSelection, EditorTab } from '../editor/editor-state';
 
@@ -83,7 +85,7 @@ export function itemName(item: TimedItem): string {
     case 'text':
       return item.text.replace(/\s+/g, ' ').trim();
     case 'sticker':
-      return 'Sticker';
+      return 'badge' in item.ref ? 'Follow Badge' : 'Sticker';
     case 'sfx':
       return 'Sound Effect';
     case 'music':
@@ -124,8 +126,10 @@ export interface TimelineBarModel {
   name: string;
   /** What a screen reader hears. */
   label: string;
-  /** Texts, stickers and sounds move and resize; zooms do in Module 13. */
+  /** Texts, stickers, sounds and zooms move and resize. */
   movable: boolean;
+  /** A zoom's window: 0, or 1 and on for the pieces after a cut. */
+  piece?: number;
 }
 
 export interface TimelineRowModel {
@@ -168,34 +172,6 @@ export function packLanes<T extends { startMs: number; endMs: number }>(bars: re
   return lanes.length > 0 ? lanes : [[]];
 }
 
-/**
- * Where a zoom shows in the clip: zooms live in the video's own time, so a
- * zoom shows wherever a part plays that stretch of the video, once per part,
- * with the pieces on either side of a cut joined into one.
- */
-export function zoomSpans(
-  placed: readonly PlacedSegment[],
-  zoom: Pick<Zoom, 'source' | 'from' | 'to'>,
-): { startMs: number; endMs: number }[] {
-  const spans: { startMs: number; endMs: number }[] = [];
-  for (const { segment, outStart, outEnd } of placed) {
-    if (segment.source !== zoom.source) continue;
-    const from = Math.max(zoom.from, segment.sourceIn);
-    const to = Math.min(zoom.to, segment.sourceOut);
-    if (to <= from) continue;
-    const startMs = Math.min(
-      outEnd,
-      outStart + Math.round((from - segment.sourceIn) / segment.speed),
-    );
-    const endMs = Math.min(outEnd, outStart + Math.round((to - segment.sourceIn) / segment.speed));
-    if (endMs <= startMs) continue;
-    const last = spans[spans.length - 1];
-    if (last && last.endMs === startMs) last.endMs = endMs;
-    else spans.push({ startMs, endMs });
-  }
-  return spans;
-}
-
 function lanesOf(kind: TimelineRowKind, bars: TimelineBarModel[]): TimelineRowModel[] {
   return packLanes(bars).map((lane, index) => ({
     key: `${kind}-${index}`,
@@ -225,19 +201,22 @@ export function timelineRows(doc: ClipDocument): TimelineRowModel[] {
     }
   }
 
-  const placed = placeSegments(doc);
+  // A zoom's bars are the engine's windows: one while the clip plays its stretch of the video
+  // without a jump, so each bar eases in and out as the export does.
+  const byId = new Map(doc.zooms.map((zoom) => [zoom.id, zoom] as const));
   const zooms: TimelineBarModel[] = [];
-  for (const zoom of doc.zooms) {
-    zoomSpans(placed, zoom).forEach((span, piece) => {
-      zooms.push({
-        key: `${zoom.id}:${piece}`,
-        selection: { kind: 'zoom', id: zoom.id },
-        startMs: span.startMs,
-        endMs: span.endMs,
-        name: zoomName(zoom),
-        label: zoomLabel(zoom, span.startMs, span.endMs),
-        movable: false,
-      });
+  for (const window of zoomWindows(doc)) {
+    const zoom = byId.get(window.zoomId);
+    if (!zoom) continue;
+    zooms.push({
+      key: `${zoom.id}:${window.piece}`,
+      selection: { kind: 'zoom', id: zoom.id },
+      startMs: window.startMs,
+      endMs: window.endMs,
+      name: zoomName(zoom),
+      label: zoomLabel(zoom, window.startMs, window.endMs),
+      movable: true,
+      piece: window.piece,
     });
   }
 
@@ -292,6 +271,20 @@ export const LAST_PART_SENTENCE = 'A clip needs at least one part.';
 export const SPLIT_EDGE_SENTENCE = `Move the playhead at least ${SEGMENT_MIN_MS / 1000} seconds inside a part to split it.`;
 export const SPLIT_LIMIT_SENTENCE = `A clip can have at most ${MAX_SEGMENTS} parts.`;
 export const SPLIT_FAILED_SENTENCE = 'This part cannot be split here.';
+export const ITEM_LIMIT_SENTENCE = `A clip can hold at most ${MAX_ITEMS} texts, stickers and sounds.`;
+export const TRACK_LIMIT_SENTENCE = 'There is no free row at this time. Move something first.';
+
+/** Why a text, sticker or sound could not be added or copied, or null when it simply is not there. */
+export function addRefusalSentence(code: ItemRefusalCode): string | null {
+  switch (code) {
+    case 'too_many_items':
+      return ITEM_LIMIT_SENTENCE;
+    case 'too_many_tracks':
+      return TRACK_LIMIT_SENTENCE;
+    default:
+      return null;
+  }
+}
 
 function splitSentence(code: EditRefusalCode): string {
   switch (code) {

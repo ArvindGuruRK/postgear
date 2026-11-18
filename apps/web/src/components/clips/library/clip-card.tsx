@@ -16,6 +16,7 @@ import { Badge, cn } from '@postgear/ui';
 import { Film } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ClipListItem, ClipPoster, ClipPreview } from '@/types/clips';
+import { ExportRing } from '../export-ring';
 import { PrimaryLink } from '../button-link';
 import { PLATFORM_LABELS } from '../home/home-model';
 import { clipEditHref, clipFacts } from '../video/video-clip-list';
@@ -179,10 +180,21 @@ export function ClipCard({
       }}
       onPointerLeave={() => setPreviewing(false)}
     >
-      <div className="border-b-2 border-outline bg-inset p-3">
+      <div className="relative border-b-2 border-outline bg-inset p-3">
         <div className="flex h-50 items-center justify-center" style={{ containerType: 'size' }}>
           <ClipPosterBox clip={clip} previewing={previewing} />
         </div>
+        {clip.exportProgress !== null ? (
+          <span
+            role="img"
+            aria-label={`Exporting, ${Math.round(clip.exportProgress)}% done`}
+            title={`Exporting, ${Math.round(clip.exportProgress)}% done`}
+            data-testid="clip-card-exporting"
+            className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-outline bg-secondary text-ink"
+          >
+            <ExportRing progress={clip.exportProgress} className="h-5 w-5 -rotate-90" />
+          </span>
+        ) : null}
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
         {renaming ? (

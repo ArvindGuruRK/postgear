@@ -6,6 +6,7 @@ import {
   type ClipShortcutPress,
   clipShortcutFor,
   keyCaps,
+  nudgeFor,
 } from './editor-shortcuts';
 import { EditorShortcutsSheet } from './editor-shortcuts-sheet';
 
@@ -33,6 +34,7 @@ describe('clipShortcutFor', () => {
     [press('-'), 'zoomOut'],
     [press('Z', { shiftKey: true }), 'fit'],
     [press('Escape'), 'escape'],
+    [press('Enter'), 'edit'],
     [press('?', { shiftKey: true }), 'shortcuts'],
   ] as const)('reads %o as %s', (keys, command) => {
     expect(clipShortcutFor(keys)).toBe(command);
@@ -47,15 +49,40 @@ describe('clipShortcutFor', () => {
     press(' ', { shiftKey: true }),
     press('Home', { shiftKey: true }),
     press('x'),
-    press('Enter'),
+    press('Enter', { ctrlKey: true }),
   ])('leaves %o alone', (keys) => {
     expect(clipShortcutFor(keys)).toBeNull();
   });
 
   it('leaves the playback keys to a focused control, and nothing else', () => {
     expect([...CONTROL_OWNED].sort()).toEqual(
-      ['end', 'frameBack', 'frameForward', 'secondBack', 'secondForward', 'start', 'toggle'].sort(),
+      [
+        'edit',
+        'end',
+        'frameBack',
+        'frameForward',
+        'secondBack',
+        'secondForward',
+        'start',
+        'toggle',
+      ].sort(),
     );
+  });
+});
+
+describe('nudgeFor', () => {
+  it('reads the arrows as a nudge of a pixel, or ten with Shift', () => {
+    expect(nudgeFor(press('ArrowLeft'))).toEqual({ x: -1, y: 0, big: false });
+    expect(nudgeFor(press('ArrowRight'))).toEqual({ x: 1, y: 0, big: false });
+    expect(nudgeFor(press('ArrowUp', { shiftKey: true }))).toEqual({ x: 0, y: -1, big: true });
+    expect(nudgeFor(press('ArrowDown'))).toEqual({ x: 0, y: 1, big: false });
+  });
+
+  it('leaves other keys and the arrows with Ctrl, Cmd or Alt alone', () => {
+    expect(nudgeFor(press('s'))).toBeNull();
+    expect(nudgeFor(press('ArrowLeft', { ctrlKey: true }))).toBeNull();
+    expect(nudgeFor(press('ArrowLeft', { metaKey: true }))).toBeNull();
+    expect(nudgeFor(press('ArrowLeft', { altKey: true }))).toBeNull();
   });
 });
 
@@ -94,11 +121,14 @@ describe('EditorShortcutsSheet', () => {
       expect.arrayContaining([
         'Play or pause',
         'Split at the playhead',
-        'Remove the selected part or item',
+        'Remove the selected part, item or zoom',
         'Duplicate the selected item',
         'Zoom the timeline in or out',
         'Fit the whole clip in the timeline',
         'Clear the selection',
+        'Type into the selected text',
+        'Move the selected text a pixel (Shift: ten)',
+        'Move the selected bar a frame (Shift: a second)',
         'Show these shortcuts',
       ]),
     );

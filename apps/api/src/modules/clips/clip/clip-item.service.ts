@@ -1,7 +1,7 @@
 /**
  * One clip (Sprint 12, Module 05; completed in Modules 07 to 09): make it
- * from a range or the whole video, read it, fetch more sharp video for it,
- * export it. Saving, opening, copying and deleting are `ClipEditsService`.
+ * from a range or the whole video, read it, fetch more sharp video for it.
+ * Saving, opening, copying and deleting are `ClipEditsService`.
  *
  * - **Create** checks the video is READY and the range is a clip we allow
  *   (the engine's 3 seconds to 30 minutes, inside the video), writes the
@@ -26,18 +26,14 @@
  *   clip every 10 seconds, so a burst of drags starts one job. An upload is
  *   cut from its kept original the same way: an export reads only a SEGMENT
  *   or the light copy, so answering `ready` without one would export soft.
- * - **Export** freezes the document and its revision into a RENDER job. A
- *   second export of the same clip while one is QUEUED or RUNNING is 409
- *   `export_running`, decided inside a serializable transaction so two
- *   clicks never both pass. Every quality is allowed here; plan locks and
- *   the mark's dialog are Module 15 (`watermark` already follows the plan).
+ * - **Export** and Preview Export live in `ClipExportsService` (Module 15),
+ *   which reuses `exportFileName` and the 404 helpers from here.
  */
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   type Clip,
   ClipJobKind,
-  ClipJobStatus,
   type ClipJob,
   type ClipVideo,
   type Prisma,
@@ -57,7 +53,6 @@ import {
   safeParseClipDocument,
 } from '@postgear/video-engine';
 import { stripControlChars } from '../../../common/sanitize';
-import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { RedisService } from '../../redis/redis.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { isUuid } from '../clips.ids';
@@ -74,7 +69,6 @@ import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { originOf } from '../videos/clip-videos.service';
 import {
   type CreateClipInput,
-  type ExportClipInput,
   MAX_CLIP_TITLE_LENGTH,
   type MoreVideoInput,
 } from './clip-item.schema';
@@ -138,7 +132,6 @@ export class ClipItemService {
     private readonly jobsRepository: ClipJobsRepository,
     private readonly videos: ClipVideosRepository,
     private readonly limits: ClipLimitsGuard,
-    private readonly resolver: EntitlementResolver,
     private readonly playback: ClipPlaybackService,
     private readonly redis: RedisService,
   ) {}
@@ -326,67 +319,6 @@ export class ClipItemService {
   }
 
   /** Starts an export of the clip as it is now. 202 `{ job }`; 409 `export_running`. */
-  async export(
-    orgId: string,
-    userId: string,
-    clipId: string,
-    body: ExportClipInput,
-  ): Promise<{ job: ClipJobView }> {
-    if (!isUuid(clipId)) throw clipNotFound();
-    await this.limits.assertEnabled(orgId);
-    const watermark = await this.resolver.get(orgId, 'clips.export_watermark');
-
-    const job = await serializable(async (tx) => {
-      const clip = await tx.clip.findFirst({ where: { id: clipId, organizationId: orgId } });
-      if (!clip) throw clipNotFound();
-      const video = await this.videos.findLive(orgId, clip.videoId, tx);
-      if (!video) throw videoNotFound();
-      if (video.status !== 'READY')
-        throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
-
-      const parsed = safeParseClipDocument(clip.document);
-      if (!parsed.ok) {
-        throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'tool_failed', {
-          message: CLIPS_MESSAGES.CLIP_UNREADABLE,
-        });
-      }
-
-      const running = await tx.clipJob.count({
-        where: {
-          organizationId: orgId,
-          clipId: clip.id,
-          kind: ClipJobKind.RENDER,
-          status: { in: [ClipJobStatus.QUEUED, ClipJobStatus.RUNNING] },
-        },
-      });
-      if (running > 0) throw new ClipErrorException(HttpStatus.CONFLICT, 'export_running');
-
-      const row = await this.jobs.build({
-        id: this.jobs.newJobId(),
-        orgId,
-        userId,
-        kind: 'RENDER',
-        videoId: video.id,
-        clipId: clip.id,
-        input: {
-          clipId: clip.id,
-          videoId: video.id,
-          revision: clip.revision,
-          document: parsed.doc,
-          quality: body.quality,
-          proof: false,
-          watermark,
-          name: exportFileName(clip.title),
-        },
-      });
-      return this.jobsRepository.create(row, tx);
-    });
-
-    await this.jobs.start(job);
-    const fresh = (await this.jobsRepository.find(orgId, job.id)) ?? job;
-    return { job: toJobView(fresh) };
-  }
-
   /** 404 for another workspace's clip, an unknown one, or an id that is not a UUID. */
   async requireClip(orgId: string, clipId: string): Promise<Clip> {
     const clip = isUuid(clipId)

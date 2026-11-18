@@ -14,9 +14,11 @@
  */
 import { spawn } from 'node:child_process';
 import { stat } from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import {
+  type BuildToolName,
   type RunTool,
   type RunToolOptions,
   type RunToolResult,
@@ -50,7 +52,7 @@ const PASSED_ENV = [
 
 /** The program could not be started at all: it is missing or not executable. */
 export class ToolMissingError extends ToolError {
-  constructor(tool: ToolName) {
+  constructor(tool: ToolName | BuildToolName) {
     super({ tool, exitCode: null, reason: 'is not installed or could not be started' });
     this.name = 'ToolMissingError';
   }
@@ -62,6 +64,21 @@ export class ToolMissingError extends ToolError {
  */
 export function createRunTool(paths: ToolPaths): RunTool {
   return (tool, args, options) => runProcess(tool, executableFor(paths, tool), args, options);
+}
+
+/**
+ * Starts a build-time program (`BuildToolName`) for a script such as
+ * `clips:fonts:build`, with the same rules as every job's tool: an argument
+ * array, the minimal environment, a time limit and a kill of the whole tree.
+ * `executable` is where the script found the program. Never used by a job.
+ */
+export function runBuildTool(
+  tool: BuildToolName,
+  executable: string,
+  args: readonly string[],
+  options: RunToolOptions,
+): Promise<RunToolResult> {
+  return runProcess(tool, executable, args, options);
 }
 
 function executableFor(paths: ToolPaths, tool: ToolName): string {
@@ -170,7 +187,7 @@ class Tail {
 }
 
 async function runProcess(
-  tool: ToolName,
+  tool: ToolName | BuildToolName,
   executable: string,
   args: readonly string[],
   options: RunToolOptions,
@@ -223,6 +240,9 @@ async function runProcess(
       detached: !isWindows,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    if (options.priority === 'low' && child.pid !== undefined) {
+      lowerPriority(child.pid);
+    }
 
     const toolErrorFor = (params: {
       exitCode: number | null;
@@ -383,7 +403,31 @@ async function runProcess(
         Math.max(50, everyMs),
       );
     }
+
+    // Last, so an abort from inside the callback reaches the listener above.
+    if (options.onStart && child.pid !== undefined) {
+      try {
+        options.onStart(child.pid);
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error('The start handler failed'));
+      }
+    }
   });
+}
+
+/**
+ * Moves a started program below normal priority: `BELOW_NORMAL_PRIORITY_CLASS`
+ * on Windows, nice 10 on Linux and macOS (`os.setPriority` maps the one
+ * constant to both). What it starts inherits the priority. A refusal (a
+ * locked-down host) leaves it at normal priority, which only costs speed.
+ */
+export function lowerPriority(pid: number): boolean {
+  try {
+    os.setPriority(pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -1,15 +1,15 @@
 /**
- * `buildAss(plan)`: the ASS subtitle files a render draws text from.
+ * `buildAss(plan)`: the ASS subtitle file a render draws text from (Module
+ * 11), burned in by one `ass=captions.ass:fontsdir=fonts` filter. Sprint 13's
+ * captions are written into the same file.
  *
- * Module 05 renders no text yet (the plan refuses text items), so `buildAss`
- * returns no files. What is already here, and already right, is the part that
- * is easy to get subtly wrong later: escaping a person's text so it can never
- * become an ASS override, colours in ASS's `&HAABBGGRR` order, and times in
- * `H:MM:SS.CC`. Module 11 adds the header, the styles and one `Dialogue` per
- * text item (cookbook section 6: `PlayRes` equal to the canvas, `\an`, `\pos`,
- * `\frz-ROT`, `\fad`, margins as the text box).
+ * Also here, and easy to get subtly wrong: escaping a person's text so it
+ * can never become an ASS override, colours in ASS's `&HAABBGGRR` order, and
+ * times in `H:MM:SS.CC`.
  */
+import { TEXT_SHADOW } from '../document/text';
 import type { RenderPlan } from './plan';
+import type { PlanShape, PlanText, PlanTextRun } from './text-plan';
 
 /** One ASS file the executor writes beside the graph, by relative name. */
 export interface AssFile {
@@ -87,14 +87,306 @@ export function assTime(ms: number): string {
   return `${hours}:${pad(minutes)}:${pad(seconds)}.${pad(cs)}`;
 }
 
+/** A number for an ASS file: at most two decimals, no trailing zeros. */
+export function assNumber(value: number): string {
+  if (!Number.isFinite(value)) {
+    throw new Error(`Cannot write ${String(value)} into an ASS file`);
+  }
+  const fixed = (Math.round(value * 100) / 100).toFixed(2);
+  const trimmed = fixed.replace(/0+$/, '').replace(/\.$/, '');
+  return trimmed === '-0' ? '0' : trimmed;
+}
+
+/** An opacity (0 to 1) as an ASS alpha override value, `&HXX&`: 00 opaque, FF transparent. */
+export function assAlpha(opacity: number): string {
+  const clamped = Math.min(1, Math.max(0, Number.isFinite(opacity) ? opacity : 1));
+  const alpha = Math.round((1 - clamped) * 255);
+  return `&H${alpha.toString(16).toUpperCase().padStart(2, '0')}&`;
+}
+
+/** An ASS `Bold` value: 0 for 400, otherwise the weight itself (libass reads 1 and -1 as 700). */
+export function assWeight(weight: number): string {
+  return weight === 400 ? '0' : String(weight);
+}
+
+/** `#RRGGBB` as an ASS colour override value, `&HBBGGRR&` (the alpha is set apart, with `\1a`). */
+export function assColourTag(hex: string): string {
+  const full = assColour(hex);
+  return `&H${full.slice(4)}&`;
+}
+
+/** Bezier handle length for a quarter circle: 4/3 x (sqrt 2 - 1). */
+const KAPPA = 0.5522847498;
+
 /**
- * The ASS files for a plan. None until Module 11: the plan refuses text, so a
- * plan that reaches here has nothing to draw.
+ * An ASS drawing (`\p1`) of a rectangle `width` by `height` with round
+ * corners of `radius`, from (0, 0) to (width, height): a circle when the
+ * radius is half of a square's side. Its bounding box starts at the origin,
+ * so `\an7` puts its top left at `\pos`.
+ */
+export function roundRectDrawing(width: number, height: number, radius: number): string {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const k = r * KAPPA;
+  const n = assNumber;
+  const w = width;
+  const h = height;
+  return [
+    `m ${n(r)} 0`,
+    `l ${n(w - r)} 0`,
+    `b ${n(w - r + k)} 0 ${n(w)} ${n(r - k)} ${n(w)} ${n(r)}`,
+    `l ${n(w)} ${n(h - r)}`,
+    `b ${n(w)} ${n(h - r + k)} ${n(w - r + k)} ${n(h)} ${n(w - r)} ${n(h)}`,
+    `l ${n(r)} ${n(h)}`,
+    `b ${n(r - k)} ${n(h)} 0 ${n(h - r + k)} 0 ${n(h - r)}`,
+    `l 0 ${n(r)}`,
+    `b 0 ${n(r - k)} ${n(r - k)} 0 ${n(r)} 0`,
+  ].join(' ');
+}
+
+/** An ASS drawing of a triangle pointing right, filling `width` by `height` from the origin. */
+export function playMarkDrawing(width: number, height: number): string {
+  return `m 0 0 l ${assNumber(width)} ${assNumber(height / 2)} l 0 ${assNumber(height)}`;
+}
+
+/** The ASS alignment for a text box, all vertically centred: `\an4`, `\an5` or `\an6`. */
+export function assAlignment(align: PlanText['align']): number {
+  return align === 'left' ? 4 : align === 'right' ? 6 : 5;
+}
+
+const STYLE_FORMAT =
+  'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, ' +
+  'Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, ' +
+  'Shadow, Alignment, MarginL, MarginR, MarginV, Encoding';
+
+const EVENT_FORMAT =
+  'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+
+/** One `Style:` line's fields after the name, for a text. Texts with the same fields share a style. */
+function styleFields(text: PlanText): string {
+  const { backing } = text;
+  const outlineColour =
+    backing.kind === 'outline'
+      ? assColour(backing.colour)
+      : backing.kind === 'box'
+        ? assColour(backing.colour, backing.opacity)
+        : assColour('#000000');
+  const borderStyle = backing.kind === 'box' ? 3 : 1;
+  const outline = backing.kind === 'outline' ? backing.width : backing.kind === 'box' ? backing.pad : 0;
+  const shadow = text.shadow ? text.geometry.shadowPx : 0;
+  return [
+    text.main.assName,
+    assNumber(text.main.fontSize),
+    assColour(text.colour),
+    assColour(text.colour),
+    outlineColour,
+    assColour(TEXT_SHADOW.colour, TEXT_SHADOW.opacity),
+    assWeight(text.main.weight),
+    text.italic ? '-1' : '0',
+    '0',
+    '0',
+    '100',
+    '100',
+    '0',
+    '0',
+    String(borderStyle),
+    assNumber(outline),
+    assNumber(shadow),
+    String(assAlignment(text.align)),
+    '0',
+    '0',
+    '0',
+    '1',
+  ].join(',');
+}
+
+/** The override that switches a run to its font, written only when the font changes. */
+function fontSwitch(run: PlanTextRun): string {
+  return `{\\fn${run.assName}\\fs${assNumber(run.fontSize)}\\b${assWeight(run.weight)}}`;
+}
+
+/** The `Text` field of one text: the placement block, then the runs with their font switches. */
+function dialogueText(text: PlanText, canvasWidth: number): { text: string; marginL: number; marginR: number } {
+  const g = text.geometry;
+  const anchorX =
+    text.align === 'left' ? g.boxLeft : text.align === 'right' ? g.boxLeft + g.boxWidth : g.cx;
+  const tags = [
+    `\\an${assAlignment(text.align)}`,
+    `\\pos(${assNumber(anchorX)},${assNumber(g.cy)})`,
+    // The turn is about the item's centre whatever the alignment (CSS rotates the box about its centre).
+    `\\org(${assNumber(g.cx)},${assNumber(g.cy)})`,
+  ];
+  if (text.rotationDeg !== 0) {
+    // ASS turns counter-clockwise; the document's rotation is clockwise.
+    tags.push(`\\frz${assNumber(-text.rotationDeg)}`);
+  }
+  if (text.fadeInMs > 0 || text.fadeOutMs > 0) {
+    tags.push(`\\fad(${Math.round(text.fadeInMs)},${Math.round(text.fadeOutMs)})`);
+  }
+  if (text.opacity < 1) {
+    // Per layer, never one `\alpha`: that would replace the box's own opacity instead of multiplying it.
+    const opacity = Math.max(0, text.opacity);
+    const backing = text.backing.kind === 'box' ? text.backing.opacity : 1;
+    tags.push(
+      `\\1a${assAlpha(opacity)}`,
+      `\\3a${assAlpha(opacity * backing)}`,
+      `\\4a${assAlpha(opacity * TEXT_SHADOW.opacity)}`,
+    );
+  }
+
+  let body = `{${tags.join('')}}`;
+  let current: PlanTextRun = text.main;
+  for (const run of text.runs) {
+    const same =
+      run.assName === current.assName &&
+      run.fontSize === current.fontSize &&
+      run.weight === current.weight;
+    if (!same) {
+      body += fontSwitch(run);
+      current = run;
+    }
+    body += escapeAssText(run.text);
+  }
+
+  // The box is the event's margins: libass wraps inside them even with `\pos`.
+  const marginL = Math.round(g.boxLeft);
+  const marginR = Math.round(canvasWidth - g.boxLeft - g.boxWidth);
+  return { text: body, marginL, marginR };
+}
+
+/** The `Text` field of one shape: placed by its top left, turned about its centre, filled flat. */
+function shapeText(shape: PlanShape): string {
+  const left = shape.cx - shape.width / 2;
+  const top = shape.cy - shape.height / 2;
+  const tags = [
+    '\\an7',
+    `\\pos(${assNumber(left)},${assNumber(top)})`,
+    `\\org(${assNumber(shape.cx)},${assNumber(shape.cy)})`,
+  ];
+  if (shape.rotationDeg !== 0) {
+    tags.push(`\\frz${assNumber(-shape.rotationDeg)}`);
+  }
+  tags.push(
+    '\\bord0',
+    '\\shad0',
+    `\\1c${assColourTag(shape.colour)}`,
+    `\\1a${assAlpha(shape.opacity)}`,
+    '\\p1',
+  );
+  const drawing =
+    shape.kind === 'mark'
+      ? playMarkDrawing(shape.width, shape.height)
+      : roundRectDrawing(shape.width, shape.height, shape.radius);
+  return `{${tags.join('')}}${drawing}{\\p0}`;
+}
+
+/** The style shapes are drawn with: no outline, no shadow (a drawing never uses its font). */
+function shapeStyle(fontName: string): string {
+  return [
+    fontName,
+    '20',
+    assColour('#FFFFFF'),
+    assColour('#FFFFFF'),
+    assColour('#000000'),
+    assColour('#000000'),
+    '0',
+    '0',
+    '0',
+    '0',
+    '100',
+    '100',
+    '0',
+    '0',
+    '1',
+    '0',
+    '0',
+    '7',
+    '0',
+    '0',
+    '0',
+    '1',
+  ].join(',');
+}
+
+/**
+ * The ASS file for a plan's texts and Follow Badge shapes (cookbook section
+ * 6), or no file when the clip has neither. One `Style` per distinct look, one `Dialogue` per text:
+ *
+ * - `PlayResX` and `PlayResY` are the document canvas, so every number is a
+ *   canvas pixel and a 720p export uses the same file (libass scales it);
+ *   `WrapStyle: 0` balances the lines; `ScaledBorderAndShadow: yes` scales
+ *   outlines and shadows with it; `YCbCr Matrix: None` keeps colours as set.
+ * - The box width is the event's margins, and `\pos` sits at the anchor
+ *   inside the box (`\an4`, `\an5`, `\an6`: left, centre, right, all
+ *   vertically centred); `\org` at the item's centre and `\frz` minus the
+ *   clockwise rotation turn it like CSS.
+ * - Times are absolute starts and ends rounded to centiseconds, never
+ *   durations, so two texts never drift apart.
+ * - Outline is `BorderStyle 1`; Box is `BorderStyle 3` with the box colour as
+ *   `OutlineColour` (its alpha the box's opacity) and the padding as
+ *   `Outline`; the shadow is the style's `Shadow` and `BackColour`.
  */
 export function buildAss(plan: RenderPlan): AssFile[] {
-  if (plan.fonts.families.length === 0) {
+  const shapes = plan.shapes ?? [];
+  if (plan.texts.length === 0 && shapes.length === 0) {
     return [];
   }
-  // A plan with text cannot be built yet (`text_unsupported`); keep the stub honest if one appears.
-  throw new Error('Text rendering arrives in Module 11');
+  const styles = new Map<string, string>();
+  const lines: Array<{ layer: number; order: number; line: string }> = [];
+  const ordered = [...plan.texts].sort((a, b) => a.layer - b.layer);
+  for (const text of ordered) {
+    const fields = styleFields(text);
+    let name = styles.get(fields);
+    if (!name) {
+      name = `S${styles.size + 1}`;
+      styles.set(fields, name);
+    }
+    const line = dialogueText(text, plan.canvas.width);
+    lines.push({
+      layer: text.layer,
+      order: lines.length,
+      line:
+        `Dialogue: ${text.layer},${assTime(text.startMs)},${assTime(text.endMs)},${name},,` +
+        `${line.marginL},${line.marginR},0,,${line.text}`,
+    });
+  }
+  if (shapes.length > 0) {
+    // A drawing never selects a font, but its style still names one the render has (the badge's own).
+    const fields = shapeStyle(ordered[0]?.main.assName ?? 'Sans');
+    let name = styles.get(fields);
+    if (!name) {
+      name = `S${styles.size + 1}`;
+      styles.set(fields, name);
+    }
+    for (const shape of shapes) {
+      lines.push({
+        layer: shape.layer,
+        order: lines.length,
+        line: `Dialogue: ${shape.layer},${assTime(shape.startMs)},${assTime(shape.endMs)},${name},,0,0,0,,${shapeText(shape)}`,
+      });
+    }
+  }
+  // Bottom first, so the file's order and the layers agree.
+  const events = lines
+    .sort((a, b) => a.layer - b.layer || a.order - b.order)
+    .map((entry) => entry.line);
+
+  const content = [
+    '[Script Info]',
+    'ScriptType: v4.00+',
+    `PlayResX: ${plan.canvas.width}`,
+    `PlayResY: ${plan.canvas.height}`,
+    'WrapStyle: 0',
+    'ScaledBorderAndShadow: yes',
+    'YCbCr Matrix: None',
+    '',
+    '[V4+ Styles]',
+    STYLE_FORMAT,
+    ...[...styles.entries()].map(([fields, name]) => `Style: ${name},${fields}`),
+    '',
+    '[Events]',
+    EVENT_FORMAT,
+    ...events,
+    '',
+  ].join('\n');
+  return [{ name: ASS_FILE, content }];
 }

@@ -25,6 +25,19 @@ export interface CompiledFfmpeg {
   outputArgs: string[];
   /** The output's exact length, for progress. */
   durationMs: number;
+  /**
+   * The fonts the text needs, or null when the clip has no text. The worker
+   * copies `files` into `dir`; the executor runs FFmpeg at a log level that
+   * prints libass's `fontselect:` lines and fails with `font_missing` when
+   * one names a font outside `psNames` (a silent fallback).
+   */
+  fonts: { dir: string; files: string[]; psNames: string[] } | null;
+  /**
+   * The log level when it is not the default (`info` with text, else
+   * `error`): the loudness measure runs at `info`, where `loudnorm` prints
+   * its JSON block.
+   */
+  logLevel?: 'info' | 'error';
 }
 
 /** The graph's file name inside the scratch folder. */
@@ -42,7 +55,8 @@ export function ffmpegArgsFor(compiled: CompiledFfmpeg, outFile: string): string
     '-nostdin',
     '-y',
     '-loglevel',
-    'error',
+    // A render with text logs at `info`, where libass prints its `fontselect:` lines (verified on 9.0.2).
+    compiled.logLevel ?? (compiled.fonts ? 'info' : 'error'),
     '-progress',
     'pipe:1',
     '-nostats',

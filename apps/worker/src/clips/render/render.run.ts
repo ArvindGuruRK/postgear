@@ -4,8 +4,8 @@
  *
  * | Step            | Stage, progress  | What it does |
  * |-----------------|------------------|--------------|
- * | `renderPrepare` | fetching 0-10    | Pick each video's file (the clip's sharp range or the light copy), download it, probe it, check the fonts, `buildRenderPlan` |
- * | `renderExecute` | rendering 10-90  | `compileFfmpeg`, then the executor (`render.mp4.part`, renamed only when FFmpeg ended cleanly) |
+ * | `renderPrepare` | fetching 0-10    | Check the fonts, pick each video's file (the clip's sharp range or the light copy), download it, probe it, `buildRenderPlan`, copy the fonts the text uses into `fonts/` |
+ * | `renderExecute` | rendering 10-90  | The loudness measure (`compileMeasure`, seconds), `compileFfmpeg` with its correction, the executor (`render.mp4.part`, renamed only when FFmpeg ended cleanly), the file checked against the plan (`verifyOutput`, Module 15), then measured again |
  * | `renderFinish`  | finishing 90-100 | The poster (a JPEG one second in), both files into the public media space, the API's finish route (the Media row, the clip marked exported, the bell), the job DONE |
  *
  * Waiting for a running SEGMENT job happens before this, in the workflow
@@ -14,14 +14,24 @@
  * The public keys are derived from the job id (`exportMediaKeys`), so a
  * retry overwrites what a dead attempt stored and the failure bookkeeping
  * removes it; the finish route is idempotent per job.
+ *
+ * A proof (Preview Export, Module 15) runs every program below normal
+ * priority, so it never slows an export, and ends as a private file with a
+ * PROOF asset row kept 24 hours: no Media row, no bell.
  */
 import * as path from 'node:path';
 import {
+  copyFontsInto,
+  copyWatermarkInto,
+  type FontsFolder,
   type MediaFacts,
+  type MeasureFileInput,
+  type MeasureLoudnessInput,
   mapPercent,
   type PosterResult,
   type RenderClipInput,
   type RenderClipResult,
+  type WatermarkFile,
 } from '@postgear/media-tools';
 import {
   clipKeys,
@@ -33,18 +43,31 @@ import {
   buildRenderPlan,
   checkFonts,
   compileFfmpeg,
-  emptyFontManifest,
+  compileMeasure,
+  decideLoudness,
+  expectedOutputOf,
+  FONTS_DIR,
   fontsNeeded,
+  type LoudnessDecision,
+  type LoudnessMeasure,
+  type LoudnessResult,
+  loudnessResult,
+  type RenderedFileFacts,
   type RenderInput,
   type RenderPlan,
   type RenderSourceAsset,
   renderOutputSchema,
+  verifyOutput,
 } from '@postgear/video-engine';
 import { ClipStepError } from '../failures';
 import type { ClipInternalClient } from '../internal-client';
 import type { JobProgress } from '../job-progress';
 import { exportMediaKeys } from '../keys';
 import type { ClipRows, JobRow } from '../rows';
+import { fetchSoundFiles } from '../sounds/files';
+import type { SoundFileRows } from '../sounds/rows';
+import { fetchStickerFiles } from '../stickers/files';
+import type { StickerFileRows } from '../stickers/rows';
 import { pickRenderSource, rangesBySource } from './render-source';
 
 export interface RenderTools {
@@ -58,7 +81,23 @@ export interface RenderTools {
     facts: Pick<MediaFacts, 'durationMs' | 'width' | 'height'>;
     atMs: number;
   }): Promise<PosterResult>;
+  /** The loudness measuring pass (Module 14); without it the export is not evened out (tests). */
+  measure?(input: Omit<MeasureLoudnessInput, 'runTool'>): Promise<LoudnessMeasure | null>;
+  /** The finished file's loudness, for the job's output. */
+  measureFile?(input: Omit<MeasureFileInput, 'runTool'>): Promise<LoudnessMeasure | null>;
+  /**
+   * What the finished file really is (Module 15), checked against the plan
+   * before anything is stored. The worker always passes it; a test without it
+   * skips the check.
+   */
+  facts?(
+    file: string,
+    options: { cwd: string; signal: AbortSignal; priority?: 'normal' | 'low' },
+  ): Promise<RenderedFileFacts>;
 }
+
+/** The render's file and the loudness the job records. */
+export type RenderedClip = RenderClipResult & { loudness: LoudnessResult };
 
 export interface RenderRun {
   job: JobRow;
@@ -67,10 +106,24 @@ export interface RenderRun {
   signal: AbortSignal;
   tools: RenderTools;
   privateStorage: Pick<PrivateStorage, 'getToFile' | 'putFile'>;
-  storage: Pick<StorageBackend, 'put' | 'delete'>;
+  storage: Pick<StorageBackend, 'put' | 'delete' | 'read'>;
   internal: Pick<ClipInternalClient, 'finishExport'>;
-  rows: Pick<ClipRows, 'video' | 'videoAssets' | 'segmentAssets'>;
+  rows: Pick<ClipRows, 'video' | 'videoAssets' | 'segmentAssets' | 'recordProof'>;
+  /** The library rows and upload assets a clip's stickers come from (Module 12). */
+  stickerRows: StickerFileRows;
+  /** The library rows and upload assets a clip's sounds come from (Module 14). */
+  soundRows?: SoundFileRows;
   progress: Pick<JobProgress, 'report' | 'flush' | 'done'>;
+  /** The fonts folder (null when it was never built): text in the clip then fails `font_missing`. */
+  fonts: FontsFolder | null;
+  /**
+   * The "Made with PostGear" mark read at boot (Module 15). A job whose input
+   * asks for the mark copies it into its scratch folder; without it such a
+   * job fails as the plan's `input_missing`.
+   */
+  watermark?: WatermarkFile | null;
+  /** The clock for the proof's 24 hours (tests pass their own). */
+  now?: () => Date;
   heartbeat(): void;
 }
 
@@ -80,6 +133,14 @@ export interface RenderOutcome {
   mediaId: string | null;
   proofKey: string | null;
   durationMs: number;
+}
+
+/** How long a Preview Export's file is kept (Module 15). */
+export const PROOF_KEEP_MS = 24 * 60 * 60 * 1000;
+
+/** A proof's programs run below normal priority; an export's at normal. */
+function priorityOf(input: RenderInput): { priority?: 'low' } {
+  return input.proof ? { priority: 'low' } : {};
 }
 
 /** An export problem no retry can fix (the video or its light copy is gone). */
@@ -92,8 +153,9 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
   const org = job.organizationId;
   await run.progress.report({ stage: 'fetching', progress: 0 });
 
-  // No fonts ship before Module 11: a document with text cannot render yet.
-  if (checkFonts(emptyFontManifest(), fontsNeeded(input.document)).length > 0) {
+  // A text's family must be in the fonts folder before anything is downloaded.
+  const families = fontsNeeded(input.document);
+  if (families.length > 0 && checkFonts(run.fonts?.manifest ?? null, families).length > 0) {
     throw new ClipStepError('font_missing');
   }
 
@@ -142,23 +204,81 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
     });
   }
 
+  // A sticker that is not there is left out, and the plan stops with `sticker_missing`.
+  const stickers = await fetchStickerFiles(
+    { rows: run.stickerRows, storage: run.storage, privateStorage: run.privateStorage },
+    org,
+    input.document,
+    dir,
+    signal,
+  );
+  run.heartbeat();
+
+  // A sound that is not there is left out too, and the plan stops with `sound_missing`.
+  const sounds = run.soundRows
+    ? await fetchSoundFiles(
+        { rows: run.soundRows, storage: run.storage, privateStorage: run.privateStorage },
+        org,
+        input.document,
+        dir,
+        signal,
+      )
+    : {};
+  run.heartbeat();
+
+  // The mark, when the plan asks for it: copied in under its plain name, with its real size.
+  const watermark =
+    input.watermark && run.watermark ? await copyWatermarkInto(run.watermark, dir) : null;
+
   // Throws a typed `RenderCompileError` (permanent) for anything it cannot draw.
-  return buildRenderPlan(input.document, {
+  const plan = buildRenderPlan(input.document, {
     quality: input.quality,
     proof: input.proof,
     watermark: input.watermark,
-    assets: { sources },
+    assets: {
+      sources,
+      stickers,
+      sounds,
+      fonts: run.fonts && families.length > 0 ? { dir: FONTS_DIR, manifest: run.fonts.manifest } : null,
+      watermark,
+    },
   });
+  // Only the twins this clip uses go into the job's fonts folder: libass sees nothing else to pick.
+  if (run.fonts && plan.fonts.files.length > 0) {
+    const missing = await copyFontsInto(run.fonts, plan.fonts.files, dir, FONTS_DIR);
+    if (missing.length > 0) throw new ClipStepError('font_missing');
+  }
+  return plan;
 }
 
-export async function renderExecute(run: RenderRun, plan: RenderPlan): Promise<RenderClipResult> {
+export async function renderExecute(run: RenderRun, plan: RenderPlan): Promise<RenderedClip> {
   await run.progress.report({ stage: 'rendering', progress: 10 });
-  const compiled = compileFfmpeg(plan);
-  return run.tools.render({
+  const priority = priorityOf(run.input);
+
+  // Pass 1: measure the mix (seconds); a clip with no sound skips both passes.
+  let decision: LoudnessDecision | null = null;
+  const measure = run.tools.measure ? compileMeasure(plan) : null;
+  if (measure && run.tools.measure) {
+    decision = decideLoudness(
+      await run.tools.measure({
+        scratchDir: run.dir,
+        compiled: measure,
+        signal: run.signal,
+        ...priority,
+      }),
+    );
+    run.heartbeat();
+    if (run.signal.aborted) throw new ClipStepError('cancelled');
+  }
+
+  // Pass 2: the render, with the correction when the measure asked for one.
+  const compiled = compileFfmpeg(plan, { loudness: decision });
+  const rendered = await run.tools.render({
     scratchDir: run.dir,
     compiled,
     outFile: 'render.mp4',
     signal: run.signal,
+    ...priority,
     onProgress: (update) => {
       void run.progress.report({
         stage: 'rendering',
@@ -166,6 +286,37 @@ export async function renderExecute(run: RenderRun, plan: RenderPlan): Promise<R
       });
     },
   });
+
+  // The file must be what the plan asked for before anything is stored or charged.
+  if (run.tools.facts) {
+    const facts = await run.tools.facts(rendered.file, {
+      cwd: run.dir,
+      signal: run.signal,
+      ...priority,
+    });
+    run.heartbeat();
+    const problems = verifyOutput(facts, expectedOutputOf(plan));
+    if (problems.length > 0) {
+      console.warn(
+        JSON.stringify({ event: 'clips.render.output_invalid', jobId: run.job.id, problems }),
+      );
+      throw new ClipStepError('render_output_invalid', {
+        cause: new Error(`The rendered file failed the check: ${problems.join(', ')}`),
+      });
+    }
+  }
+
+  // The finished file, measured again: the job records the loudness it really has.
+  let final: LoudnessMeasure | null = null;
+  if (decision?.apply && run.tools.measureFile) {
+    final = await run.tools.measureFile({
+      scratchDir: run.dir,
+      file: path.basename(rendered.file),
+      signal: run.signal,
+      ...priority,
+    });
+  }
+  return { ...rendered, loudness: loudnessResult(decision, final) };
 }
 
 /** The name in Media, always ending in `.mp4`. */
@@ -177,19 +328,32 @@ export function exportName(name: string): string {
 export async function renderFinish(
   run: RenderRun,
   plan: RenderPlan,
-  rendered: RenderClipResult,
+  rendered: RenderClipResult & { loudness?: LoudnessResult },
 ): Promise<RenderOutcome> {
+  const loudness = rendered.loudness ?? null;
   const { job, input } = run;
   const org = job.organizationId;
   const durationMs = plan.output.durationMs;
+  const { width, height, fps } = plan.output;
+  const facts = { durationMs, width, height, fps, bytes: rendered.bytes };
   await run.progress.report({ stage: 'finishing', progress: 90 });
 
   if (input.proof) {
     // Preview Export (Module 15): a private file kept 24 hours, no Media row, no bell.
     const proofKey = clipKeys.proofFile(org, job.id, 'proof', 'mp4');
     await run.privateStorage.putFile(proofKey, rendered.file, 'video/mp4');
+    const expiresAt = new Date((run.now ?? (() => new Date()))().getTime() + PROOF_KEEP_MS);
+    await run.rows.recordProof(org, {
+      videoId: input.videoId,
+      clipId: input.clipId,
+      kind: 'PROOF',
+      key: proofKey,
+      bytes: rendered.bytes,
+      mimeType: 'video/mp4',
+      meta: { jobId: job.id, expiresAt: expiresAt.toISOString(), durationMs, width, height },
+    });
     const finished = await run.progress.done(
-      renderOutputSchema.parse({ mediaId: null, proofKey, durationMs }),
+      renderOutputSchema.parse({ mediaId: null, proofKey, loudness, ...facts }),
     );
     return { finished, mediaId: null, proofKey, durationMs };
   }
@@ -222,13 +386,14 @@ export async function renderFinish(
     bytes: rendered.bytes,
     posterKey: keys.poster,
     durationMs,
-    width: plan.output.width,
-    height: plan.output.height,
-    fps: plan.output.fps,
+    width,
+    height,
+    fps,
     name: exportName(input.name),
+    fingerprint: input.fingerprint ?? null,
   });
   const finished = await run.progress.done(
-    renderOutputSchema.parse({ mediaId: answer.mediaId, proofKey: null, durationMs }),
+    renderOutputSchema.parse({ mediaId: answer.mediaId, proofKey: null, loudness, ...facts }),
   );
   return { finished, mediaId: answer.mediaId, proofKey: null, durationMs };
 }

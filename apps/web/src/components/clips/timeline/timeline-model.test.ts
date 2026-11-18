@@ -28,7 +28,6 @@ import {
   timelineRows,
   trimShiftMs,
   writeSnapping,
-  zoomSpans,
 } from './timeline-model';
 
 const VIDEO = '11111111-1111-4111-8111-111111111111';
@@ -61,6 +60,9 @@ function text(id: string, start: number, duration: number, words = 'HE REALLY DI
       uppercase: false,
     },
     transform: TRANSFORM,
+    widthPx: 864,
+    fadeInMs: 0,
+    fadeOutMs: 0,
   };
 }
 
@@ -74,6 +76,9 @@ function sticker(id: string, start: number, duration: number): StickerItem {
     ref: { library: 'sticker', id: LIBRARY_ITEM },
     transform: TRANSFORM,
     flipX: false,
+    widthPx: 270,
+    heightPx: 270,
+    loop: true,
   };
 }
 
@@ -156,6 +161,14 @@ describe('labels', () => {
     expect(itemLabel(sticker('s', 0, 1_500))).toBe('Sticker, from 0 seconds, 1.5 seconds long');
     expect(itemLabel(music('m', 0, 30_000))).toBe('Music, from 0 seconds, 30 seconds long');
   });
+
+  it('names a Follow Badge as one', () => {
+    const badge: StickerItem = {
+      ...sticker('b', 2_000, 3_000),
+      ref: { badge: 'twitch', name: 'Night Owl' },
+    };
+    expect(itemLabel(badge)).toBe('Follow Badge, from 2 seconds, 3 seconds long');
+  });
 });
 
 describe('packLanes', () => {
@@ -198,7 +211,7 @@ describe('timelineRows', () => {
     expect(rows[3].bars[0]).toMatchObject({ name: 'Music', movable: true });
   });
 
-  it('draws a zoom where its video plays, once per part, joined across a plain cut', () => {
+  it('draws a zoom where its video plays, joined across a split, movable', () => {
     const doc = twoParts();
     const placedZoom = zoom('z1', 15_000, 25_000, doc);
     const rows = timelineRows({ ...doc, zooms: [placedZoom] });
@@ -211,28 +224,35 @@ describe('timelineRows', () => {
         startMs: 5_000,
         endMs: 15_000,
         name: 'Zoom 1.5x',
-        movable: false,
+        movable: true,
+        piece: 0,
       }),
     ]);
   });
 });
 
-describe('zoomSpans', () => {
-  it('scales by the part speed and leaves out what was cut', () => {
+describe('zoom bars', () => {
+  it('scales by the part speed, leaves out what was cut, and gives each side of a cut its own bar', () => {
     const doc = clip();
-    const source = doc.sources[0].id;
-    const placed = [
-      {
-        segment: { ...doc.segments[0], sourceIn: 10_000, sourceOut: 20_000, speed: 2 as const },
-        index: 0,
-        outStart: 0,
-        outEnd: 5_000,
-      },
-    ];
-    expect(zoomSpans(placed, { source, from: 14_000, to: 30_000 })).toEqual([
-      { startMs: 2_000, endMs: 5_000 },
+    const fast = { ...doc, segments: [{ ...doc.segments[0], sourceIn: 10_000, sourceOut: 20_000, speed: 2 as const }] };
+    const bars = (d: ClipDocument) => timelineRows(d).find((row) => row.kind === 'zoom')?.bars ?? [];
+    expect(bars({ ...fast, zooms: [zoom('z1', 14_000, 30_000, fast)] })).toEqual([
+      expect.objectContaining({ startMs: 2_000, endMs: 5_000 }),
     ]);
-    expect(zoomSpans(placed, { source, from: 30_000, to: 40_000 })).toEqual([]);
+    expect(bars({ ...fast, zooms: [zoom('z1', 30_000, 40_000, fast)] })).toEqual([]);
+
+    // Video 15 to 18 s and 25 to 28 s with the middle cut out: two bars, two pieces.
+    const cut = {
+      ...doc,
+      segments: [
+        { ...doc.segments[0], id: 'sg_a', sourceIn: 15_000, sourceOut: 18_000 },
+        { ...doc.segments[0], id: 'sg_b', sourceIn: 25_000, sourceOut: 28_000 },
+      ],
+    };
+    expect(bars({ ...cut, zooms: [zoom('z1', 16_000, 27_000, cut)] })).toEqual([
+      expect.objectContaining({ key: 'z1:0', startMs: 1_000, endMs: 3_000, piece: 0 }),
+      expect.objectContaining({ key: 'z1:1', startMs: 3_000, endMs: 5_000, piece: 1 }),
+    ]);
   });
 });
 

@@ -1,6 +1,6 @@
 # Module 11: Canvas Handles And Text
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 09](module-09-timeline.md)
 > **Stories**: CL-7.1
 > **Next**: [Module 12](module-12-stickers-and-gifs.md) (Stickers And GIFs)
@@ -102,18 +102,18 @@ Double-click a text (or press Enter on a selected one) to edit in place: a `cont
 
 ## Tasks
 
-- [ ] `document/items.ts`, edits, `TEXT_STYLES`, `defaultTextItem`, emoji refusal, with tests.
-- [ ] The font spike and its Decision Log row; `clips:fonts:build` (twins, Tamil and Devanagari, the manifest with `assName`, `bold` and the three metrics); the committed manifest.
-- [ ] `render/ass.ts` (`buildAss`), the `fs` conversion, the box margins, `\org` and `\frz-ROT`, `font_missing` (pre-check and the `fontselect:` reading in the executor), the text parity cases, the text-heavy benchmark case.
-- [ ] The preview's text layer and `textBoxMetrics`.
-- [ ] The handle spike and its Decision Log row; `transform-layer.tsx`, `TransformBox`, hit-testing, snapping, keys.
-- [ ] In-place typing.
-- [ ] The Text panel with every control and When It Shows.
-- [ ] `ColorPicker` with a playground demo.
-- [ ] Text bars on the Overlay row.
-- [ ] `clips:stills` for text; title-case test green.
-- [ ] Playwright once under simulation: add a text, restyle, move, turn, time it, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `document/items.ts`, edits, `TEXT_STYLES`, `defaultTextItem`, emoji refusal, with tests.
+- [x] The font spike and its Decision Log row; `clips:fonts:build` (twins, Tamil and Devanagari, the manifest with `assName`, `bold` and the three metrics); the committed manifest.
+- [x] `render/ass.ts` (`buildAss`), the `fs` conversion, the box margins, `\org` and `\frz-ROT`, `font_missing` (pre-check and the `fontselect:` reading in the executor), the text parity cases, the text-heavy benchmark case.
+- [x] The preview's text layer and `textBoxMetrics`.
+- [x] The handle spike and its Decision Log row; `transform-layer.tsx`, `TransformBox`, hit-testing, snapping, keys.
+- [x] In-place typing.
+- [x] The Text panel with every control and When It Shows.
+- [x] `ColorPicker` with a playground demo.
+- [x] Text bars on the Overlay row.
+- [x] `clips:stills` for text; title-case test green.
+- [x] Playwright once under simulation: add a text, restyle, move, turn, time it, export. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

@@ -11,10 +11,12 @@
  *
  * What this version can render: every layout (one to four areas, cover or
  * contain, rounded corners, a solid or blurred base) with constant crops,
- * any mix of speeds, segment volumes, the clip's fades and the plan's mark.
- * Anything else (a moving crop, zooms, looks, text, stickers, sounds,
- * captions) is refused with a typed `RenderCompileError`; a render never
- * draws something other than the document.
+ * any mix of speeds, segment volumes, text (Module 11), stickers and the
+ * Follow Badge (Module 12), zooms, the look and the vignette (Module 13),
+ * sound effects and music (Module 14), the clip's fades and the plan's mark.
+ * Anything else (a moving crop, captions) is refused with a typed
+ * `RenderCompileError`; a render never draws something other than the
+ * document.
  *
  * No file access: the files are named by the caller (`ctx.assets`), relative
  * to the job's scratch folder.
@@ -22,10 +24,23 @@
 import { type ClipDocument, clipDocumentSchema, type Segment } from '../document/schema';
 import { type ExportQuality, isExportQuality } from '../quality';
 import { outputDuration, placeSegments } from '../time/time-map';
+import { zoomWindows } from '../time/zooms';
 import { RenderCompileError } from './errors';
 import { checkFonts, type FontManifest, fontsNeeded } from './fonts';
+import { type PlanLook, planLook } from './looks';
+import { type PlanSound, planSounds, type RenderSoundAsset } from './sound-plan';
+import { type PlanSticker, planStickers, type RenderStickerAsset } from './sticker-plan';
+import {
+  type PlanShape,
+  type PlanText,
+  planShapes,
+  planTexts,
+  textFontFiles,
+  textFontNames,
+} from './text-plan';
 import { cropIsConstant, effectiveFades, frameState, type SourcePicture } from './frame-state';
 import { type EncodeSpec, encodeSpecFor, evenPosition, evenSize, outputSizeFor } from './specs';
+import type { PlanZoom } from './zoom';
 
 /** The file the worker has for one of the document's sources. */
 export interface RenderSourceAsset {
@@ -62,6 +77,10 @@ export interface RenderAssets {
   sources: Readonly<Record<string, RenderSourceAsset>>;
   watermark?: RenderWatermarkAsset | null;
   fonts?: RenderFontsAsset | null;
+  /** Sticker pictures, keyed by `stickerRefKey` (`library:<id>`, `asset:<id>`). */
+  stickers?: Readonly<Record<string, RenderStickerAsset>> | null;
+  /** Sound files (`.m4a`), keyed by `soundRefKey` (`library:<id>`, `asset:<id>`). */
+  sounds?: Readonly<Record<string, RenderSoundAsset>> | null;
 }
 
 /** What the render job knows besides the document (copied from the job input and the fetched files). */
@@ -165,8 +184,32 @@ export interface RenderPlan {
   inputs: PlanInput[];
   segments: PlanSegment[];
   fades: { inMs: number; outMs: number };
+  /**
+   * The zoom windows in clip ms with the focus in output pixels (Module 13):
+   * one `perspective` each on the joined picture, before the look and the overlays.
+   */
+  zooms: PlanZoom[];
+  /** The look and the vignette, drawn on the joined picture after the zoom (Module 13). */
+  look: PlanLook;
   watermark: PlanWatermark | null;
-  fonts: { dir: string | null; families: string[] };
+  /** The document canvas: the ASS file's `PlayRes` (libass scales it to the output). */
+  canvas: { width: number; height: number };
+  /** Picture stickers, bottom first, in output pixels (Module 12), drawn after the layout. */
+  stickers: PlanSticker[];
+  /** Sound effects and music, in track order (Module 14), mixed over the video's own sound. */
+  sounds: PlanSound[];
+  /** Text items and the Follow Badges' lines, bottom first, in canvas pixels (Module 11). */
+  texts: PlanText[];
+  /** The Follow Badges' shapes, in canvas pixels, drawn in the same ASS file as the text. */
+  shapes: PlanShape[];
+  fonts: {
+    dir: string | null;
+    families: string[];
+    /** The twins the texts use, which the worker copies into the fonts folder. */
+    files: string[];
+    /** Their PostScript names: a `fontselect:` line naming any other font is a fallback. */
+    psNames: string[];
+  };
 }
 
 /** Input seeking starts this long before a run, and `trim` cuts the rest exactly. */
@@ -226,21 +269,6 @@ function refuseUnsupported(doc: ClipDocument): void {
         trackId: track.id,
       });
     }
-    for (const item of track.items) {
-      if (item.type === 'text') {
-        throw new RenderCompileError('text_unsupported', 'Text is not rendered yet', {
-          itemId: item.id,
-        });
-      }
-      if (item.type === 'sticker') {
-        throw new RenderCompileError('stickers_unsupported', 'Stickers are not rendered yet', {
-          itemId: item.id,
-        });
-      }
-      throw new RenderCompileError('sounds_unsupported', 'Sounds are not rendered yet', {
-        itemId: item.id,
-      });
-    }
   }
 
   // Every layout renders (Module 10). A crop that moves over time needs the
@@ -258,17 +286,11 @@ function refuseUnsupported(doc: ClipDocument): void {
       );
     }
   }
-  if (doc.zooms.length > 0) {
-    throw new RenderCompileError('zoom_unsupported', 'Zooms are not rendered yet', {
-      zooms: doc.zooms.length,
-    });
-  }
-  if (doc.looks.colour !== 'none' || doc.looks.vignette > 0) {
-    throw new RenderCompileError('looks_unsupported', 'Looks are not rendered yet', {
-      colour: doc.looks.colour,
-      vignette: doc.looks.vignette,
-    });
-  }
+}
+
+function roundTo(value: number, places: number): number {
+  const factor = 10 ** places;
+  return Math.round(value * factor) / factor;
 }
 
 /** Two segments play one after the other from the same stretch of the same video. */
@@ -317,6 +339,10 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
   }
 
   refuseUnsupported(doc);
+
+  // Text and badges: every number in canvas pixels, the font resolved against the manifest the render has.
+  const texts = planTexts(doc, fontsAsset?.manifest ?? null);
+  const shapes = planShapes(doc);
 
   const spec = encodeSpecFor(ctx.quality, ctx.proof);
   const size = outputSizeFor(doc.canvas, spec);
@@ -435,6 +461,14 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     previous = segment;
   }
 
+  // Stickers read the inputs after the video's; the mark comes after them.
+  const stickers = planStickers(
+    doc,
+    ctx.assets.stickers ?? {},
+    { width: size.width, height: size.height, scale: size.scale, durationMs },
+    inputs.length,
+  );
+
   let watermark: PlanWatermark | null = null;
   if (ctx.watermark) {
     const mark = ctx.assets.watermark ?? null;
@@ -452,7 +486,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     const markHeight = evenSize((markWidth * mark.height) / mark.width);
     const margin = Math.round(WATERMARK_MARGIN_FRACTION * size.width);
     watermark = {
-      inputIndex: inputs.length,
+      inputIndex: inputs.length + stickers.length,
       file: mark.file,
       width: markWidth,
       height: markHeight,
@@ -461,6 +495,25 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       opacity: WATERMARK_OPACITY,
     };
   }
+
+  // Sounds read the inputs after the mark (or after the stickers when there is none).
+  const sounds = planSounds(
+    doc,
+    ctx.assets.sounds ?? {},
+    durationMs,
+    inputs.length + stickers.length + (watermark ? 1 : 0),
+  );
+
+  // Zooms: the windows frameState reads, the focus in output pixels.
+  const zooms: PlanZoom[] = zoomWindows(doc).map((window) => ({
+    id: window.zoomId,
+    startMs: window.startMs,
+    endMs: window.endMs,
+    easeMs: window.easeMs,
+    scale: window.scale,
+    focusX: roundTo(window.focus.x * size.width, 2),
+    focusY: roundTo(window.focus.y * size.height, 2),
+  }));
 
   return {
     version: 1,
@@ -472,7 +525,19 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     inputs,
     segments,
     fades: effectiveFades(doc.fades, durationMs),
+    zooms,
+    look: planLook(doc.looks),
     watermark,
-    fonts: { dir: fontsAsset ? fontsAsset.dir : null, families },
+    canvas: { width: doc.canvas.width, height: doc.canvas.height },
+    stickers,
+    sounds,
+    texts,
+    shapes,
+    fonts: {
+      dir: fontsAsset ? fontsAsset.dir : null,
+      families,
+      files: fontsAsset && texts.length > 0 ? textFontFiles(texts, fontsAsset.manifest) : [],
+      psNames: textFontNames(texts),
+    },
   };
 }

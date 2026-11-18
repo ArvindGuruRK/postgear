@@ -3,14 +3,29 @@
  * container and redrawn from a frame state.
  *
  * ```
- * root (fills the container, which has the canvas's shape)
- *   looks wrapper      one CSS filter for the looks (neutral until Module 13)
- *     zoom wrapper     one CSS transform about the focus point (neutral until Module 13)
- *       base           the canvas colour, or the blurred copy of the video
- *       areas          one <canvas> per layout area
- *   overlays           text and stickers (Modules 11 and 12)
+ * root (fills the container, which has the canvas's shape; black)
+ *   frame              the clip's fade: one opacity over everything below
+ *     looks wrapper    the look: an SVG colour matrix (`filter: url(#...)`)
+ *       zoom wrapper   the zoom: one CSS `scale` about the focus point
+ *         base         the canvas colour, or the blurred copy of the video
+ *         areas        one <canvas> per layout area
+ *     vignette         a black radial gradient over the looked picture
+ *     overlays         text and stickers (Modules 11 and 12)
+ *   svg                the look's filter definition (no size)
  *   media              the two <video> elements, 1 px and invisible
  * ```
+ *
+ * The order is the export's (Module 13): zoom the joined picture, colour it,
+ * darken the edges, then draw the overlays, and fade the finished frame to
+ * black. So no overlay ever zooms or takes the look, and a solid sticker
+ * fades as one with the picture under it.
+ * - **Zoom.** `scale(z)` about the focus is `F + (p - F) z`, the export's
+ *   `perspective`; `z` is `frameState`'s, read at the exact moment.
+ * - **Look.** One `feColorMatrix` in sRGB with the matrix and offset of
+ *   `lookMatrix`: the same sum and the same single clamp as the export's
+ *   `colorchannelmixer`, so the two agree to within the video's rounding.
+ * - **Vignette.** `vignetteCss` draws `cos(angle x d)^4` as a gradient of
+ *   black, which multiplies by the same factor as the export's `vignette`.
  *
  * - **Areas.** Each area is a `<canvas>` whose pixels are its rectangle in
  *   canvas pixels (a Fullscreen area of a Vertical clip is 1080 by 1920),
@@ -27,7 +42,12 @@
  * - **The videos stay in the document** (never `display: none`), so the
  *   browser keeps decoding them and keeps calling their frame callbacks.
  */
-import type { AreaState, FrameState } from '@postgear/video-engine';
+import { type AreaState, type FrameState, lookSvgValues, vignetteCss } from '@postgear/video-engine';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Every stage's filter gets its own id, so two previews on a page never share one. */
+let nextStageId = 0;
 
 /** The Blurred base is drawn at a tenth of the clip's size, as the export's base is. */
 const BLUR_DOWNSCALE = 10;
@@ -88,12 +108,20 @@ function drawCrop(
 
 export class PreviewStage {
   readonly root: HTMLDivElement;
-  /** Module 13 sets the looks' CSS `filter` here. */
+  /** The clip's fade: one opacity over the picture, the vignette and the overlays. */
+  readonly frame: HTMLDivElement;
+  /** The look: `filter: url(#...)` to the stage's own colour matrix. */
   readonly looks: HTMLDivElement;
-  /** Module 13 sets the zoom's CSS `transform` and `transform-origin` here. */
+  /** The zoom: CSS `transform` and `transform-origin`. */
   readonly zoom: HTMLDivElement;
+  readonly vignette: HTMLDivElement;
   readonly overlayHost: HTMLDivElement;
   readonly mediaHost: HTMLDivElement;
+  /** The id of the stage's look filter. */
+  readonly lookFilterId: string;
+  private readonly lookMatrix: SVGFEColorMatrixElement;
+  private lookKey = '';
+  private vignetteKey = -1;
   private readonly base: HTMLDivElement;
   private readonly blurCanvas: HTMLCanvasElement;
   private blurContext: CanvasRenderingContext2D | null | undefined;
@@ -113,6 +141,10 @@ export class PreviewStage {
     this.root.style.overflow = 'hidden';
     // Black under everything, as the export's fades fade to black.
     this.root.style.background = '#000000';
+
+    this.frame = make();
+    this.frame.dataset.previewLayer = 'frame';
+    fill(this.frame);
 
     this.looks = make();
     this.looks.dataset.previewLayer = 'looks';
@@ -159,9 +191,38 @@ export class PreviewStage {
     this.mediaHost.style.opacity = '0';
     this.mediaHost.style.pointerEvents = 'none';
 
+    this.vignette = make();
+    this.vignette.dataset.previewLayer = 'vignette';
+    fill(this.vignette);
+    this.vignette.style.pointerEvents = 'none';
+    this.vignette.style.display = 'none';
+
+    // The look's filter: a colour matrix in sRGB, as the export's mixer works.
+    nextStageId += 1;
+    this.lookFilterId = `pg-clip-look-${nextStageId}`;
+    const svg = ownerDocument.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('width', '0');
+    svg.setAttribute('height', '0');
+    svg.style.position = 'absolute';
+    svg.style.width = '0';
+    svg.style.height = '0';
+    const filter = ownerDocument.createElementNS(SVG_NS, 'filter');
+    filter.setAttribute('id', this.lookFilterId);
+    filter.setAttribute('color-interpolation-filters', 'sRGB');
+    filter.setAttribute('x', '0');
+    filter.setAttribute('y', '0');
+    filter.setAttribute('width', '1');
+    filter.setAttribute('height', '1');
+    this.lookMatrix = ownerDocument.createElementNS(SVG_NS, 'feColorMatrix') as SVGFEColorMatrixElement;
+    this.lookMatrix.setAttribute('type', 'matrix');
+    filter.appendChild(this.lookMatrix);
+    svg.appendChild(filter);
+
     this.zoom.append(this.base, this.areasHost);
     this.looks.append(this.zoom);
-    this.root.append(this.looks, this.overlayHost, this.mediaHost);
+    this.frame.append(this.looks, this.vignette, this.overlayHost);
+    this.root.append(this.frame, svg, this.mediaHost);
   }
 
   /** Puts the stage into the editor's container (moving it out of any earlier one). */
@@ -204,6 +265,7 @@ export class PreviewStage {
   render(state: FrameState, video: HTMLVideoElement, drawPixels = true): boolean {
     this.syncAreas(state);
     this.syncBase(state);
+    this.syncEffects(state);
     if (!drawPixels || !(video.videoWidth > 0 && video.videoHeight > 0) || video.readyState < 2) {
       return false;
     }
@@ -236,6 +298,39 @@ export class PreviewStage {
       }
     }
     return drew;
+  }
+
+  /**
+   * The zoom, the look, the vignette and the fade for this moment. Each
+   * style is written only when it changed, so a still frame costs nothing.
+   */
+  syncEffects(state: FrameState): void {
+    const { scale, focus } = state.zoom;
+    const transform = scale > 1 ? `scale(${scale})` : '';
+    if (this.zoom.style.transform !== transform) this.zoom.style.transform = transform;
+    const origin = `${focus.x * 100}% ${focus.y * 100}%`;
+    if (transform && this.zoom.style.transformOrigin !== origin) {
+      this.zoom.style.transformOrigin = origin;
+    }
+
+    const values = lookSvgValues(state.looks);
+    const lookKey = values ?? '';
+    if (lookKey !== this.lookKey) {
+      this.lookKey = lookKey;
+      if (values) this.lookMatrix.setAttribute('values', values);
+      this.looks.style.filter = values ? `url(#${this.lookFilterId})` : '';
+    }
+
+    const vignette = state.looks.vignette;
+    if (vignette !== this.vignetteKey) {
+      this.vignetteKey = vignette;
+      const gradient = vignetteCss(vignette);
+      this.vignette.style.display = gradient ? 'block' : 'none';
+      this.vignette.style.background = gradient ?? '';
+    }
+
+    const opacity = state.fadeOpacity >= 1 ? '' : String(Math.max(0, state.fadeOpacity));
+    if (this.frame.style.opacity !== opacity) this.frame.style.opacity = opacity;
   }
 
   /** One canvas per area, placed from its rectangle; areas no longer in the layout go. */

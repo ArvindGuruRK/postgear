@@ -48,6 +48,25 @@ export const CLIP_DOWNLOAD_WORKFLOW = 'clipDownloadWorkflow';
 export const CLIP_PROBE_WORKFLOW = 'clipProbeWorkflow';
 export const CLIP_LIST_CHANNEL_WORKFLOW = 'clipListChannelWorkflow';
 export const CLIP_RUNTIME_CHECK_WORKFLOW = 'clipRuntimeCheckWorkflow';
+/**
+ * A workspace's uploaded sticker made a PNG or APNG (Module 12), on the quick
+ * media queue: it is one short ffprobe and FFmpeg call a person is waiting
+ * on, and must not queue behind long imports on `postgear-media`. The API
+ * waits up to `CLIP_WAIT_FOR_ANSWER_MS`; past that the row stays `checking`
+ * and the Uploaded tab asks again.
+ */
+export const CLIP_STICKER_CHECK_WORKFLOW = 'clipStickerCheckWorkflow';
+/** The check's whole limit: two attempts of a 6 second, 120 frame picture with room. */
+export const CLIP_STICKER_CHECK_TIMEOUT_MS = 90_000;
+/**
+ * A workspace's uploaded sound made the editor's AAC `.m4a` with its peaks
+ * (Module 14), on the quick media queue for the same reason: a person waits
+ * on it. The doc named `postgear-media`; the quick queue keeps an upload from
+ * waiting behind a long import.
+ */
+export const CLIP_SOUND_CHECK_WORKFLOW = 'clipSoundCheckWorkflow';
+/** The check's whole limit: two attempts of a 10 minute, 20 MB sound with room. */
+export const CLIP_SOUND_CHECK_TIMEOUT_MS = 180_000;
 
 /** The job kinds, as the `ClipJobKind` enum spells them. */
 export type ClipJobKindName = 'IMPORT' | 'SEGMENT' | 'HIGHLIGHTS' | 'RENDER' | 'DOWNLOAD';
@@ -77,6 +96,16 @@ export function clipJobWorkflowId(jobId: string): string {
 /** One probe per link at a time: the id is a hash of the canonical link. */
 export function clipProbeWorkflowId(linkHash: string): string {
   return `clip-probe:${linkHash}`;
+}
+
+/** One check per uploaded sticker. */
+export function clipStickerCheckWorkflowId(assetId: string): string {
+  return `clip-sticker-check:${assetId}`;
+}
+
+/** One check per uploaded sound. */
+export function clipSoundCheckWorkflowId(assetId: string): string {
+  return `clip-sound-check:${assetId}`;
 }
 
 export function clipListChannelWorkflowId(cacheKeyHash: string): string {
@@ -140,6 +169,13 @@ export const CLIP_NON_RETRYABLE: readonly string[] = [
   'clips_storage_full',
   'format_gone',
   'font_missing',
+  'render_output_invalid',
+  'sticker_missing',
+  'sticker_unusable',
+  'sticker_too_large',
+  'sound_missing',
+  'sound_unusable',
+  'sound_too_long',
   'cancelled',
 ];
 
@@ -189,6 +225,11 @@ export function clipVideoPagePath(organizationId: string, videoId: string): stri
 /** A clip's editor (Module 08): where every export notice leads. */
 export function clipEditPagePath(organizationId: string, clipId: string): string {
   return `/${organizationId}/clips/edit/${clipId}`;
+}
+
+/** The clip's editor opened on its Export tab: where an export notice leads (Module 15). */
+export function clipExportPagePath(organizationId: string, clipId: string): string {
+  return `${clipEditPagePath(organizationId, clipId)}?tab=export`;
 }
 
 function capLine(text: string): string {
@@ -342,6 +383,11 @@ export interface ClipFinishExportBody {
   fps: number;
   /** The name it gets in Media, ending in `.mp4`. */
   name: string;
+  /**
+   * `documentFingerprint` of the exported document (Module 15), stored on the
+   * clip as `lastExportedFingerprint`; null for a job started before it existed.
+   */
+  fingerprint?: string | null;
 }
 
 export interface ClipFinishExportAnswer {

@@ -191,9 +191,16 @@ const envSchema = z
     CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
     // The operator's library ingest refuses to start unless this is true.
     CLIPS_LIBRARY_INGEST: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // Openverse and Freesound sound intake (Module 21), each off until that
+    // source's written permission; their adapters refuse to run while false.
+    CLIPS_INGEST_OPENVERSE_OK: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    CLIPS_INGEST_FREESOUND_OK: blankAsUnset(z.enum(['true', 'false']).default('false')),
     // Every job works in `<CLIPS_SCRATCH_DIR>/<jobId>/`, removed when it ends.
     // Unset means `<os temp>/postgear-clips`.
     CLIPS_SCRATCH_DIR: blankAsUnset(z.string().min(1).optional()),
+    // The TTF twins and manifest `npm run clips:fonts:build` writes, for text in exports.
+    // Unset means `<repo>/.cache/clips-fonts`.
+    CLIPS_FONTS_DIR: blankAsUnset(z.string().min(1).optional()),
     // Reading Twitch chat as a highlight signal (Module 16). Off by default.
     CLIPS_TWITCH_CHAT: blankAsUnset(z.enum(['true', 'false']).default('false')),
     TWITCH_CHAT_QUERY: blankAsUnset(z.string().min(1).optional()),

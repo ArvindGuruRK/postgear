@@ -17,6 +17,7 @@ import { Button, buttonVariants, cn, MotionIcon, Spinner, TooltipHint } from '@p
 import { Check, CloudOff, RefreshCw, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { ExportRing } from '../export-ring';
 import { type ClipSaveState, clipSaveLabel } from './clip-autosave';
 import { cleanClipName, MAX_CLIP_NAME } from './editor-state';
 
@@ -37,6 +38,7 @@ export function EditorTopBar({
   onRedo,
   onShortcuts,
   onExport,
+  exportProgress = null,
 }: {
   backHref: string;
   /** "Back To Video", or "Back To Clips" for a clip whose video was deleted. */
@@ -52,6 +54,8 @@ export function EditorTopBar({
   onRedo: () => void;
   onShortcuts: () => void;
   onExport: () => void;
+  /** 0 to 100 while an export runs (a small ring in the Export button); null otherwise. */
+  exportProgress?: number | null;
 }) {
   return (
     <header
@@ -115,8 +119,17 @@ export function EditorTopBar({
             </Button>
           </TooltipHint>
         </div>
-        <Button size="sm" onClick={onExport} data-testid="clip-editor-export">
-          <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+        <Button
+          size="sm"
+          onClick={onExport}
+          data-testid="clip-editor-export"
+          aria-label={exportProgress === null ? undefined : `Export, ${Math.round(exportProgress)}% done`}
+        >
+          {exportProgress === null ? (
+            <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+          ) : (
+            <ExportRing progress={exportProgress} />
+          )}
           Export
         </Button>
       </div>

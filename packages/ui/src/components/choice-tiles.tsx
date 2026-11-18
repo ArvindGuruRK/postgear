@@ -23,6 +23,14 @@ export interface ChoiceTileOption<T extends string> {
   drawing?: ReactNode;
   /** One short sentence under the name. The tile grows to hold it. */
   line?: string;
+  /**
+   * A small mark on the tile's top right corner, such as a plan lock: it sits
+   * over the corner like a sticker, so it never covers the tile's own words.
+   * Decorative: say what it means in `spokenLabel`.
+   */
+  corner?: ReactNode;
+  /** The tile's spoken name when it differs from `label` ("1080p, locked"). */
+  spokenLabel?: string;
 }
 
 interface ChoiceTilesBase<T extends string> {
@@ -150,11 +158,11 @@ function Tile<T extends string>({
     <button
       type="button"
       aria-pressed={active}
-      aria-label={option.short ? option.label : undefined}
+      aria-label={option.spokenLabel ?? (option.short ? option.label : undefined)}
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex w-full flex-col items-center justify-center gap-1.5 px-1 type-ui text-sm',
+        'relative flex w-full flex-col items-center justify-center gap-1.5 px-1 type-ui text-sm',
         'disabled:pointer-events-none disabled:opacity-50',
         tall ? 'h-full px-3 py-4 text-center' : option.icon ? 'h-16' : 'h-10',
         keyTile(active),
@@ -170,6 +178,11 @@ function Tile<T extends string>({
       {option.short ?? option.label}
       {option.line ? (
         <span className="font-sans text-xs leading-snug type-muted">{option.line}</span>
+      ) : null}
+      {option.corner ? (
+        <span aria-hidden="true" className="absolute -top-2 -right-2 flex">
+          {option.corner}
+        </span>
       ) : null}
     </button>
   );

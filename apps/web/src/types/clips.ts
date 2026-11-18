@@ -14,6 +14,7 @@ import type {
   ClipJobKind,
   ClipJobStatus,
   ClipPlatformId,
+  ExportQuality,
   FilmstripMeta,
   LinkInfo,
   LinkRef,
@@ -154,6 +155,43 @@ export interface ClipView {
 /** Whether an export will read the sharp range: stored, still coming, or gone (the light copy). */
 export type ClipSharpState = 'ready' | 'fetching' | 'gone';
 
+/** What the export's loudness passes measured (Module 14), as the job recorded it. */
+export interface ClipExportLoudness {
+  inputLufs: number | null;
+  inputTp: number | null;
+  finalLufs: number | null;
+  mode: 'linear' | 'dynamic' | 'skipped';
+}
+
+/** One export of a clip (`GET /clips/:clipId/exports`, Module 15): the newest five, any state. */
+export interface ClipExportView {
+  job: ClipJobView;
+  quality: ExportQuality;
+  /** What the export drew (`documentFingerprint`); null for exports made before Module 15. */
+  fingerprint: string | null;
+  /** The file in Media, once done. */
+  media: {
+    id: string;
+    url: string;
+    posterUrl: string | null;
+    name: string;
+    bytes: number;
+    width: number | null;
+    height: number | null;
+    durationMs: number | null;
+  } | null;
+  loudness: ClipExportLoudness | null;
+}
+
+/** The newest Preview Export of a clip (`GET /clips/:clipId/previews/latest`). */
+export interface ClipPreviewView {
+  job: ClipJobView;
+  fingerprint: string | null;
+  /** A short-lived address to play it, once done and while it is kept (24 hours). */
+  url: string | null;
+  expiresAt: string | null;
+}
+
 /** `GET /clips/:clipId`: the clip, its video, and the video's light copy, filmstrip and waveform. */
 export interface ClipDetail {
   clip: ClipView;
@@ -251,6 +289,8 @@ export interface ClipSummary {
   revision: number;
   exported: boolean;
   exportedMediaId: string | null;
+  /** 0 to 100 while an export of this clip runs (the ring on its card); null otherwise. */
+  exportProgress: number | null;
   createdAt: string;
   updatedAt: string;
   state: ClipState;

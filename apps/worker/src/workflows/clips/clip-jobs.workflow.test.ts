@@ -16,6 +16,8 @@ import { Worker } from '@temporalio/worker';
 import type { ClipActivities } from '../../clips/activities';
 import { clipImportWorkflow, clipRenderWorkflow } from './job.workflows';
 import { clipProbeWorkflow } from './query.workflows';
+import { clipSoundCheckWorkflow } from './sound-check.workflow';
+import { clipStickerCheckWorkflow } from './sticker-check.workflow';
 
 jest.setTimeout(180_000);
 
@@ -29,6 +31,8 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     clipRuntimeCheck: jest.fn(),
     clipProbeLink: jest.fn(),
     clipListChannel: jest.fn(),
+    clipCheckSticker: jest.fn(),
+    clipCheckSound: jest.fn(),
     clipImport: jest.fn().mockResolvedValue({ status: 'done' }),
     clipSegment: jest.fn().mockResolvedValue({ status: 'done' }),
     clipRenderWaitState: jest.fn().mockResolvedValue({ closed: false, segmentRunning: false }),
@@ -249,5 +253,79 @@ describe('clipProbeWorkflow', () => {
     expect(cause).toBeInstanceOf(ApplicationFailure);
     expect((cause as ApplicationFailure).details).toEqual([{ code: 'link_private' }]);
     expect(activities.clipProbeLink).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('clipStickerCheckWorkflow', () => {
+  const ref = { organizationId: 'org-1', assetId: '5d1e2f3a-4b5c-4d6e-8f70-819203a4b5c6' };
+
+  it('answers the check, a picture we cannot use included, in one attempt', async () => {
+    const activities = mocks({
+      clipCheckSticker: jest.fn().mockResolvedValue({ status: 'failed', error: 'sticker_unusable' }),
+    });
+    const answer = await (await worker(activities)).runUntil(
+      env.client.workflow.execute(clipStickerCheckWorkflow, {
+        taskQueue: TASK_QUEUE,
+        workflowId: 'clip-sticker-check-ok',
+        args: [ref],
+      }),
+    );
+    expect(answer).toEqual({ status: 'failed', error: 'sticker_unusable' });
+    expect(activities.clipCheckSticker).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tool fault gets one more attempt, then reaches the API with our code', async () => {
+    const activities = mocks({
+      clipCheckSticker: jest.fn().mockRejectedValue(failure('tool_failed', true)),
+    });
+    const error = await (await worker(activities))
+      .runUntil(
+        env.client.workflow.execute(clipStickerCheckWorkflow, {
+          taskQueue: TASK_QUEUE,
+          workflowId: 'clip-sticker-check-fault',
+          args: [ref],
+        }),
+      )
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(WorkflowFailedError);
+    expect(((error as WorkflowFailedError).cause as ApplicationFailure).details).toEqual([{ code: 'tool_failed' }]);
+    expect(activities.clipCheckSticker).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('clipSoundCheckWorkflow', () => {
+  const ref = { organizationId: 'org-1', assetId: '6e2f3a4b-5c6d-4e7f-8a91-92a3b4c5d6e7' };
+
+  it('answers the check, a file we cannot use included, in one attempt', async () => {
+    const activities = mocks({
+      clipCheckSound: jest.fn().mockResolvedValue({ status: 'failed', error: 'sound_unusable' }),
+    });
+    const answer = await (await worker(activities)).runUntil(
+      env.client.workflow.execute(clipSoundCheckWorkflow, {
+        taskQueue: TASK_QUEUE,
+        workflowId: 'clip-sound-check-ok',
+        args: [ref],
+      }),
+    );
+    expect(answer).toEqual({ status: 'failed', error: 'sound_unusable' });
+    expect(activities.clipCheckSound).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tool fault gets one more attempt, then reaches the API with our code', async () => {
+    const activities = mocks({
+      clipCheckSound: jest.fn().mockRejectedValue(failure('tool_failed', true)),
+    });
+    const error = await (await worker(activities))
+      .runUntil(
+        env.client.workflow.execute(clipSoundCheckWorkflow, {
+          taskQueue: TASK_QUEUE,
+          workflowId: 'clip-sound-check-fault',
+          args: [ref],
+        }),
+      )
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(WorkflowFailedError);
+    expect(((error as WorkflowFailedError).cause as ApplicationFailure).details).toEqual([{ code: 'tool_failed' }]);
+    expect(activities.clipCheckSound).toHaveBeenCalledTimes(2);
   });
 });

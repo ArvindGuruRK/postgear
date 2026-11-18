@@ -14,7 +14,7 @@ import {
   type FakeTables,
   fakeClipDb,
 } from '../testing/fake-clip-db';
-import { TEST_ORG, videoRow } from '../testing/rows';
+import { jobRow, TEST_ORG, videoRow } from '../testing/rows';
 import type { ClipPlaybackService } from '../videos/clip-playback.service';
 import { listClipsQuerySchema } from './clip-item.schema';
 import { ClipsListService } from './clips-list.service';
@@ -303,5 +303,25 @@ describe('ClipsListService.list', () => {
     const page = await list({ videoId: VIDEO_A });
     expect(page.clips.length).toBeGreaterThan(0);
     expect(page.clips.every((clip) => clip.poster === null && clip.preview === null)).toBe(true);
+  });
+
+  it("gives each card its open export's progress for the ring, never a preview's (Module 15)", async () => {
+    const tables = seed();
+    const render = (n: number, clipId: string, progress: number, proof: boolean) =>
+      jobRow({
+        id: `77777777-7777-4777-8777-${String(n).padStart(12, '0')}`,
+        kind: 'RENDER',
+        status: 'RUNNING',
+        progress,
+        clipId,
+        input: { clipId, proof } as unknown as ReturnType<typeof jobRow>['input'],
+      });
+    tables.jobs.push(render(1, id(1), 42, false), render(2, id(2), 80, true));
+    const { list } = setup(tables);
+    const page = await list();
+    const byId = new Map(page.clips.map((clip) => [clip.id, clip.exportProgress]));
+    expect(byId.get(id(1))).toBe(42);
+    expect(byId.get(id(2))).toBeNull();
+    expect([...byId.values()].filter((value) => value !== null)).toEqual([42]);
   });
 });

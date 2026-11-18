@@ -2,6 +2,7 @@ export * from './disk';
 export * from './paths';
 export {
   createRunTool,
+  lowerPriority,
   DEFAULT_MAX_STDOUT_BYTES,
   STREAM_TAIL_BYTES,
   ToolMissingError,

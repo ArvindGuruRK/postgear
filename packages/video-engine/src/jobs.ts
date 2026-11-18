@@ -178,6 +178,12 @@ export const renderInputSchema = z
     watermark: z.boolean(),
     /** The file name the export gets in Media. */
     name: z.string().min(1).max(200),
+    /**
+     * `documentFingerprint` of the frozen document (Module 15): the clip is
+     * Exported while its document still has it, and a preview is stale once
+     * it differs. Absent on jobs made before Module 15.
+     */
+    fingerprint: z.string().min(1).max(64).optional(),
   })
   .strict();
 
@@ -227,12 +233,33 @@ export const segmentOutputSchema = z
 
 export const highlightsOutputSchema = z.object({ found: z.number().int().min(0) }).strict();
 
+/**
+ * The export's loudness (Module 14): what the measuring pass read, what the
+ * finished file reads, and which `loudnorm` mode ran (`skipped` for a clip
+ * with no sound, or one already in range). Module 15's result line reads it.
+ */
+export const renderLoudnessSchema = z
+  .object({
+    inputLufs: z.number().nullable(),
+    inputTp: z.number().nullable(),
+    finalLufs: z.number().nullable(),
+    mode: z.enum(['linear', 'dynamic', 'skipped']),
+  })
+  .strict();
+
 export const renderOutputSchema = z
   .object({
     mediaId: uuid.nullable(),
     /** Preview Export only: the private key of the small file. */
     proofKey: storageKey.nullable(),
     durationMs: wholeMs,
+    /** Absent on exports made before Module 14. */
+    loudness: renderLoudnessSchema.nullable().optional(),
+    /** The finished file's facts (Module 15), as `verifyOutput` read them; absent before. */
+    width: z.number().int().positive().optional(),
+    height: z.number().int().positive().optional(),
+    fps: z.number().positive().optional(),
+    bytes: z.number().int().min(0).optional(),
   })
   .strict();
 

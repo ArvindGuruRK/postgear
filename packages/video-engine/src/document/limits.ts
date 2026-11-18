@@ -35,6 +35,33 @@ export const MAX_ZOOMS = 50;
 /** Characters in one text item. */
 export const TEXT_MAX = 280;
 
+/** A text box's width on the canvas, in canvas pixels before its scale (the text wraps inside it). */
+export const TEXT_WIDTH_MIN = 40;
+export const TEXT_WIDTH_MAX = 4_000;
+
+/** A text's own fade in or out (Short and Long in the Text panel are 200 and 500 ms). */
+export const TEXT_FADE_MAX_MS = 2_000;
+
+/**
+ * A sticker's box on the canvas, in canvas pixels before its scale (Module
+ * 12). The picture fills it; its shape is the picture's own.
+ */
+export const STICKER_SIZE_MIN = 16;
+export const STICKER_SIZE_MAX = 4_000;
+
+/**
+ * Frames in a moving sticker (6 seconds at 20 fps). `normaliseSticker`
+ * makes nothing longer, and the render keeps a looping sticker's frames in
+ * memory, so the plan refuses a file that says it has more.
+ */
+export const STICKER_FRAMES_MAX = 120;
+
+/** Characters in a Follow Badge's channel name. */
+export const BADGE_NAME_MAX = 30;
+
+/** Overlay and sound tracks in one clip (the schema's cap on `tracks`). */
+export const MAX_TRACKS = 16;
+
 /** The speeds a part of the clip can play at. */
 export const SPEEDS = [0.25, 0.5, 1, 1.5, 2, 4] as const;
 export type Speed = (typeof SPEEDS)[number];

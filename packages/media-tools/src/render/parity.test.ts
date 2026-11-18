@@ -14,7 +14,15 @@
  * `FFMPEG_PATH`/`FFPROBE_PATH`; skipped with a message otherwise. Every later
  * render feature adds a case here.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import {
@@ -23,17 +31,28 @@ import {
   buildRenderPlan,
   type ClipDocument,
   compileFfmpeg,
+  copyTextStyle,
+  expectedOutputOf,
+  FONT_MANIFEST_FILE,
+  type FontManifest,
   frameState,
   layoutsFor,
+  parseFontManifest,
   type PresetKind,
   type Rect,
   type RenderContext,
   type Segment,
+  type TextItem,
+  type TextStyleId,
+  textGeometry,
+  textStylePreset,
+  verifyOutput,
 } from '@postgear/video-engine';
 import { toolPaths } from '../run/paths';
 import { createRunTool } from '../run/runner';
 import type { RunTool, ToolPaths } from '../run/types';
-import { renderClip } from './execute';
+import { RenderError, renderClip } from './execute';
+import { readOutputFacts } from './output-facts';
 
 const SOURCE_W = 256;
 const SOURCE_H = 128;
@@ -245,6 +264,8 @@ describeWithFfmpeg('render parity (real FFmpeg)', () => {
     const frameSeconds = 1 / plan.output.fps;
     expect(Math.abs(Number(video?.duration) - 4.5)).toBeLessThanOrEqual(frameSeconds);
     expect(Math.abs(Number(audio?.duration) - 4.5)).toBeLessThanOrEqual(frameSeconds);
+    // The check every export passes before it is stored (Module 15) passes a real one.
+    expect(verifyOutput(await readOutputFacts(runTool, result.file), expectedOutputOf(plan))).toEqual([]);
 
     // The source's top row and a thin centre strip of every output frame, decoded to grey.
     await ffmpeg(runTool, dir, [
@@ -606,5 +627,316 @@ describeWithFfmpeg('layout parity (real FFmpeg)', () => {
     const want = sample(source, GRADIENT_W, ...sourcePixelAt(a.content, a.visibleCrop, cx, cy));
     expect(Math.abs(got.r - want.r)).toBeLessThanOrEqual(4);
     expect(Math.abs(got.g - want.g)).toBeLessThanOrEqual(4);
+  }, 120_000);
+});
+
+/**
+ * Text parity: libass draws each text where `textGeometry` (which the
+ * preview reads too) says, through the twins in the fonts folder. Needs the
+ * folder `npm run clips:fonts:build` writes (`CLIPS_FONTS_DIR`, default
+ * `<repo>/.cache/clips-fonts`); skipped with a message without it.
+ */
+const FONTS_FOLDER =
+  process.env.CLIPS_FONTS_DIR ??
+  path.resolve(__dirname, '..', '..', '..', '..', '.cache', 'clips-fonts');
+const FONTS_READY = existsSync(path.join(FONTS_FOLDER, FONT_MANIFEST_FILE));
+const describeWithFonts = PATHS && FONTS_READY ? describe : describe.skip;
+if (PATHS && !FONTS_READY) {
+  console.warn('Text parity tests skipped: run npm run clips:fonts:build first.');
+}
+
+/** The bounding box and centre of the pixels `isInk` picks in a packed rgb24 frame. */
+interface Ink {
+  count: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  cx: number;
+  cy: number;
+}
+
+type Pick3 = (r: number, g: number, b: number) => boolean;
+
+function inkOf(frame: Uint8Array, isInk: Pick3): Ink {
+  let count = 0;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let y = 0; y < LAYOUT_H; y += 1) {
+    for (let x = 0; x < LAYOUT_W; x += 1) {
+      const at = (y * LAYOUT_W + x) * 3;
+      if (isInk(frame[at] as number, frame[at + 1] as number, frame[at + 2] as number)) {
+        count += 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return { count, minX, maxX, minY, maxY, cx: (minX + maxX + 1) / 2, cy: (minY + maxY + 1) / 2 };
+}
+
+/** The mean row of the ink between two columns. */
+function meanRow(frame: Uint8Array, isInk: Pick3, fromX: number, toX: number): number {
+  let sum = 0;
+  let n = 0;
+  for (let y = 0; y < LAYOUT_H; y += 1) {
+    for (let x = fromX; x <= toX; x += 1) {
+      const at = (y * LAYOUT_W + x) * 3;
+      if (isInk(frame[at] as number, frame[at + 1] as number, frame[at + 2] as number)) {
+        sum += y;
+        n += 1;
+      }
+    }
+  }
+  return sum / n;
+}
+
+const bright: Pick3 = (r, g, b) => r > 128 && g > 128 && b > 128;
+const whiteBox: Pick3 = (r, g, b) => r > 200 && g > 200 && b > 200;
+
+const BASE_STYLE = {
+  ...copyTextStyle(textStylePreset('plain').style),
+  font: 'Montserrat',
+  weight: 800,
+  size: 76,
+  // No shadow: its ink would widen what is measured.
+  shadow: false,
+};
+
+/** One text for the parity clip, half a second long at `start`. */
+function parityText(
+  id: string,
+  start: number,
+  overrides: Partial<TextItem> & { styleId?: TextStyleId } = {},
+): TextItem {
+  const { styleId, ...rest } = overrides;
+  const style = styleId ? copyTextStyle(textStylePreset(styleId).style) : { ...BASE_STYLE };
+  return {
+    id,
+    type: 'text',
+    start,
+    duration: 500,
+    anchor: 'moment',
+    text: 'HELLO PARITY',
+    style,
+    transform: { x: 0.5, y: 0.3, scale: 1, rotation: 0, opacity: 1 },
+    widthPx: 864,
+    fadeInMs: 0,
+    fadeOutMs: 0,
+    ...rest,
+  };
+}
+
+describeWithFonts('text parity (real FFmpeg and libass)', () => {
+  let dir = '';
+  let runTool: RunTool;
+  let manifest: FontManifest;
+  const frames = new Map<number, Uint8Array>();
+
+  /** Six texts, one every half second, on a 3 s black clip. */
+  const texts: TextItem[] = [
+    parityText('centred', 0),
+    parityText('left', 500, { text: 'HI', widthPx: 800, style: { ...BASE_STYLE, align: 'left' } }),
+    parityText('turned', 1_000, {
+      text: 'HI',
+      widthPx: 800,
+      style: { ...BASE_STYLE, align: 'left' },
+      transform: { x: 0.5, y: 0.3, scale: 1, rotation: 180, opacity: 1 },
+    }),
+    parityText('tilted', 1_500, {
+      text: 'HHHHHHHHHH',
+      transform: { x: 0.5, y: 0.5, scale: 1, rotation: 20, opacity: 1 },
+    }),
+    parityText('boxed', 2_000, {
+      styleId: 'on-a-box',
+      text: 'ON A BOX',
+      transform: { x: 0.5, y: 0.6, scale: 1, rotation: 0, opacity: 1 },
+    }),
+    parityText('scripts', 2_500, {
+      text: 'தமிழ் हिन्दी',
+      transform: { x: 0.5, y: 0.5, scale: 1.5, rotation: 0, opacity: 1 },
+    }),
+  ];
+  const frameAt = (text: TextItem) => text.start + 250;
+
+  function textDocument(items: TextItem[] = texts): ClipDocument {
+    const doc = applyLayout(parityDocument([segment('seg', 0, 3_000, 1)]), 'fullscreen', {
+      width: GRADIENT_W,
+      height: GRADIENT_H,
+    });
+    return { ...doc, tracks: [{ id: 'ov', kind: 'overlay', items }] };
+  }
+
+  function textContext(): RenderContext {
+    const ctx = contextFor('black.mp4', false);
+    ctx.quality = '1080p';
+    ctx.assets = {
+      sources: {
+        src: {
+          file: 'black.mp4',
+          sourceOffsetMs: 0,
+          durationMs: GRADIENT_MS,
+          width: GRADIENT_W,
+          height: GRADIENT_H,
+          fps: 30,
+          hasAudio: false,
+        },
+      },
+      fonts: { dir: 'fonts', manifest },
+    };
+    return ctx;
+  }
+
+  beforeAll(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'clips-text-parity-'));
+    runTool = createRunTool(PATHS as ToolPaths);
+    manifest = parseFontManifest(
+      JSON.parse(readFileSync(path.join(FONTS_FOLDER, FONT_MANIFEST_FILE), 'utf8')),
+    );
+    await ffmpeg(runTool, dir, [
+      '-f',
+      'lavfi',
+      '-i',
+      `color=c=black:s=${GRADIENT_W}x${GRADIENT_H}:r=30:d=${GRADIENT_MS / 1000}`,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-pix_fmt',
+      'yuv420p',
+      'black.mp4',
+    ]);
+    const plan = buildRenderPlan(textDocument(), textContext());
+    // As the worker does: only the twins the plan names go into the scratch fonts folder.
+    mkdirSync(path.join(dir, 'fonts'));
+    for (const file of plan.fonts.files) {
+      copyFileSync(path.join(FONTS_FOLDER, file), path.join(dir, 'fonts', file));
+    }
+    await renderClip({ runTool, scratchDir: dir, compiled: compileFfmpeg(plan), outFile: 'text.mp4' });
+    for (const text of texts) {
+      const ms = frameAt(text);
+      const name = `text-${ms}.rgb`;
+      await ffmpeg(runTool, dir, [
+        '-ss',
+        (ms / 1000).toFixed(3),
+        '-i',
+        'text.mp4',
+        '-frames:v',
+        '1',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        name,
+      ]);
+      frames.set(ms, new Uint8Array(readFileSync(path.join(dir, name))));
+    }
+  }, 180_000);
+
+  afterAll(() => {
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /** The frame showing one text, and that text's box from `textGeometry`. */
+  function shown(id: string) {
+    const text = texts.find((t) => t.id === id) as TextItem;
+    expect(frameState(textDocument(), frameAt(text)).overlays.map((o) => o.id)).toEqual([id]);
+    return {
+      text,
+      frame: frames.get(frameAt(text)) as Uint8Array,
+      g: textGeometry(text, { width: LAYOUT_W, height: LAYOUT_H }),
+    };
+  }
+
+  it('centres a line on the item centre, inside its box', () => {
+    const { frame, g, text } = shown('centred');
+    const ink = inkOf(frame, bright);
+    expect(ink.count).toBeGreaterThan(1_000);
+    expect(Math.abs(ink.cx - g.cx)).toBeLessThanOrEqual(3);
+    // Capitals sit a little above the line centre: within a tenth of the size.
+    expect(Math.abs(ink.cy - g.cy)).toBeLessThanOrEqual(text.style.size * 0.1);
+    expect(ink.minX).toBeGreaterThanOrEqual(g.boxLeft);
+    expect(ink.maxX).toBeLessThanOrEqual(g.boxLeft + g.boxWidth);
+    console.info(
+      `text parity centred: ink centre off by ${(ink.cx - g.cx).toFixed(1)}, ${(ink.cy - g.cy).toFixed(1)} px`,
+    );
+  });
+
+  it('starts a left-aligned text at the box edge, and turns it about the item centre', () => {
+    const left = shown('left');
+    const ink = inkOf(left.frame, bright);
+    // The first letter's side bearing is a few pixels.
+    expect(ink.minX - left.g.boxLeft).toBeGreaterThanOrEqual(0);
+    expect(ink.minX - left.g.boxLeft).toBeLessThanOrEqual(12);
+    const turned = shown('turned');
+    const flipped = inkOf(turned.frame, bright);
+    // Half a turn about the centre puts the words at the right end of the box, upside down.
+    const rightGap = turned.g.boxLeft + turned.g.boxWidth - 1 - flipped.maxX;
+    expect(rightGap).toBeGreaterThanOrEqual(-1);
+    expect(rightGap).toBeLessThanOrEqual(13);
+    expect(Math.abs(flipped.cy - (2 * turned.g.cy - ink.cy))).toBeLessThanOrEqual(3);
+  });
+
+  it('turns clockwise: the right end of a bar goes down', () => {
+    const { frame, g } = shown('tilted');
+    const ink = inkOf(frame, bright);
+    const fifth = Math.floor((ink.maxX - ink.minX) / 5);
+    const leftY = meanRow(frame, bright, ink.minX, ink.minX + fifth);
+    const rightY = meanRow(frame, bright, ink.maxX - fifth, ink.maxX);
+    expect(rightY - leftY).toBeGreaterThan(50);
+    expect(Math.abs(ink.cx - g.cx)).toBeLessThanOrEqual(3);
+    expect(Math.abs(ink.cy - g.cy)).toBeLessThanOrEqual(8);
+  });
+
+  it('draws a box about the padding wider than the words', () => {
+    const { frame, g } = shown('boxed');
+    const box = inkOf(frame, whiteBox);
+    expect(box.count).toBeGreaterThan(10_000);
+    expect(Math.abs(box.cx - g.cx)).toBeLessThanOrEqual(3);
+    // From the box's left edge, along its middle row, to the first dark pixel of the words.
+    const y = Math.round(box.cy);
+    let x = box.minX;
+    while (x < box.maxX && (frame[(y * LAYOUT_W + x) * 3] as number) > 80) x += 1;
+    const gap = x - box.minX;
+    expect(gap).toBeGreaterThanOrEqual(g.backingPx - 2);
+    expect(gap).toBeLessThanOrEqual(g.backingPx + 12);
+    console.info(`text parity box: padding ${g.backingPx} px, box edge to words ${gap} px`);
+  });
+
+  it('joins a Tamil and a Hindi word through the Noto twins', () => {
+    const { frame, g } = shown('scripts');
+    const ink = inkOf(frame, bright);
+    expect(ink.count).toBeGreaterThan(1_000);
+    expect(Math.abs(ink.cx - g.cx)).toBeLessThanOrEqual(6);
+  });
+
+  it('fails with font_missing and writes no file when libass falls back to another font', async () => {
+    const plan = buildRenderPlan(textDocument([texts[0] as TextItem]), textContext());
+    const compiled = compileFfmpeg(plan);
+    const main = plan.texts[0]?.main.assName as string;
+    // A name no file in the fonts folder carries: libass would quietly draw a system font.
+    const broken = {
+      ...compiled,
+      assFiles: compiled.assFiles.map((file) => ({
+        ...file,
+        content: file.content.split(main).join('PGF 000000 800'),
+      })),
+    };
+    const error = (await renderClip({
+      runTool,
+      scratchDir: dir,
+      compiled: broken,
+      outFile: 'fallback.mp4',
+    }).catch((e: unknown) => e)) as RenderError;
+    expect(error).toBeInstanceOf(RenderError);
+    expect(error.code).toBe('font_missing');
+    expect(existsSync(path.join(dir, 'fallback.mp4'))).toBe(false);
+    expect(existsSync(path.join(dir, 'fallback.mp4.part'))).toBe(false);
   }, 120_000);
 });

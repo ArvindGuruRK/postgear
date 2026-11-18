@@ -59,6 +59,9 @@ function messageOf(cause: unknown): string {
   return cause instanceof ApiError && cause.status !== 0 ? cause.message : CLIPS_LOAD_FAILED;
 }
 
+/** How often a list with a running export reads its rings again. */
+export const EXPORT_POLL_MS = 5_000;
+
 export function useClipsList(
   options: { load?: typeof listClips; enabled?: boolean } = {},
 ): ClipsListState {
@@ -112,6 +115,44 @@ export function useClipsList(
   }, [enabled, load, sort, sourceKey, status, tick]);
 
   const hasMore = clips.length < total;
+
+  // While a shown clip exports, its ring moves: the pages read so far are read
+  // again quietly and only the export fields change (no loading state, no reorder).
+  const exporting = clips.some((clip) => clip.exportProgress !== null);
+  useEffect(() => {
+    if (!enabled || !exporting) return;
+    const abort = new AbortController();
+    const timer = setInterval(() => {
+      const mine = sequence.current;
+      const pages = Array.from({ length: page }, (_, index) => index + 1);
+      Promise.all(
+        pages.map((one) => load({ status, sources, sort, page: one, signal: abort.signal })),
+      )
+        .then((answers) => {
+          if (mine !== sequence.current) return;
+          const fresh = new Map(answers.flatMap((answer) => answer.clips).map((clip) => [clip.id, clip]));
+          setClips((current) =>
+            current.map((clip) => {
+              const next = fresh.get(clip.id);
+              return next
+                ? {
+                    ...clip,
+                    exportProgress: next.exportProgress,
+                    state: next.state,
+                    exported: next.exported,
+                    exportedMediaId: next.exportedMediaId,
+                  }
+                : clip;
+            }),
+          );
+        })
+        .catch(() => undefined);
+    }, EXPORT_POLL_MS);
+    return () => {
+      clearInterval(timer);
+      abort.abort();
+    };
+  }, [enabled, exporting, load, page, sort, sources, status]);
 
   const loadMore = useCallback(() => {
     if (!hasMore || loadingMore || loading) return;

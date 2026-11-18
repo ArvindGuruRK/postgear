@@ -47,6 +47,7 @@ import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard, estimateImport } from '../limits/clip-limits.guard';
 import { CLIP_LINK_PROBER, type ClipLinkProber } from '../links/clip-links.types';
 import { type ClipState, clipStateOf, scheduledClipIds } from '../clip/clip-state';
+import { exportProgressOf } from '../clip/export-progress';
 import { storedDocumentRange } from '../clip/sharp-source';
 import { ClipPlaybackService } from './clip-playback.service';
 import { CLIP_RIGHTS_TEXT_VERSION } from './clip-rights';
@@ -94,6 +95,11 @@ export interface ClipSummaryView {
   /** The last export drew this very revision. */
   exported: boolean;
   exportedMediaId: string | null;
+  /**
+   * Module 15: the progress (0 to 100) of the clip's newest QUEUED or RUNNING
+   * export (Preview Export left out), for the card's ring; null when none is open.
+   */
+  exportProgress: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -261,22 +267,23 @@ export class ClipVideosService {
     ]);
     const ready = row.status === 'READY';
 
-    const [card, media, scheduled] = await Promise.all([
+    const clipIds = clips.map((clip) => clip.id);
+    const [card, media, scheduled, exporting] = await Promise.all([
       this.cardView(row),
       ready
         ? signVideoMedia(assets, (key) => this.playback.address(key))
         : Promise.resolve(NO_VIDEO_MEDIA),
-      scheduledClipIds(
-        orgId,
-        clips.map((clip) => clip.id),
-      ),
+      scheduledClipIds(orgId, clipIds),
+      exportProgressOf(orgId, clipIds),
     ]);
 
     return {
       video: card.video,
       ...media,
       job: card.job,
-      clips: clips.map((clip) => toClipSummary(clip, scheduled.has(clip.id))),
+      clips: clips.map((clip) =>
+        toClipSummary(clip, scheduled.has(clip.id), exporting.get(clip.id) ?? null),
+      ),
     };
   }
 
@@ -493,8 +500,15 @@ function cleanText(value: string, max: number): string {
   return stripControlChars(value).replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-/** A clip's summary; `scheduled` says whether one of its post groups still has a post waiting. */
-export function toClipSummary(row: ClipSummaryRow, scheduled = false): ClipSummaryView {
+/**
+ * A clip's summary; `scheduled` says whether one of its post groups still has
+ * a post waiting, `exportProgress` how far its open export is (Module 15).
+ */
+export function toClipSummary(
+  row: ClipSummaryRow,
+  scheduled = false,
+  exportProgress: number | null = null,
+): ClipSummaryView {
   return {
     id: row.id,
     state: clipStateOf(row, scheduled),
@@ -508,6 +522,7 @@ export function toClipSummary(row: ClipSummaryRow, scheduled = false): ClipSumma
     revision: row.revision,
     exported: row.lastExportedRevision !== null && row.lastExportedRevision === row.revision,
     exportedMediaId: row.exportedMediaId,
+    exportProgress,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

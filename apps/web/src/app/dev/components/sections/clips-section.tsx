@@ -8,7 +8,8 @@
  * field. They are presentational and work in px; the maths here is a stand-in
  * for the engine's `timeline/scale.ts` and `ruler.ts`.
  *
- * Module 06's pieces (LinkCard, VideoCard, StorageMeter, AiMinutesChip and
+ * Module 11's colour picker and transform box come next
+ * (`clips-canvas-specimens.tsx`), then Module 06's pieces (LinkCard, VideoCard, StorageMeter, AiMinutesChip and
  * My Channels) follow at the end, from `clips-home-specimens.tsx`.
  */
 import { SkipBackIcon } from '@animateicons/react/lucide/skip-back-icon';
@@ -30,6 +31,7 @@ import {
 } from '@postgear/ui';
 import { type PointerEvent, useMemo, useState } from 'react';
 import { Row, Section, Spec } from '../shared';
+import { ClipsCanvasSpecimens } from './clips-canvas-specimens';
 import { ClipsHomeSpecimens } from './clips-home-specimens';
 
 /** A 42 second clip at 16 px a second, 30 frames a second. */
@@ -254,6 +256,8 @@ export function ClipsSection() {
         />
         <Spec>{`TimeField: Input sm, tabular-nums, valueMs ${fieldMs}`}</Spec>
       </Row>
+
+      <ClipsCanvasSpecimens />
 
       <ClipsHomeSpecimens />
     </Section>

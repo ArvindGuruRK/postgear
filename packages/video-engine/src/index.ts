@@ -7,6 +7,7 @@
  * API, the worker and workflow code all import the identical rules.
  *
  * - `document/`: the clip document schema, its upgrade chain and the creator.
+ * - `effects/`: the looks and the vignette, as numbers both drawings read.
  * - `time/`: the time map between the video's clock and the clip's, the pure
  *   edits (trim, split, remove, speed, duplicate and remove an item) and the
  *   time formatters.
@@ -15,14 +16,16 @@
  * - `links/`: what a pasted link is, channel handles, canonical links.
  * - `render/`: `frameState` (the one definition of what is on screen),
  *   `buildRenderPlan`, `compileFfmpeg` and `buildAss`.
- * - `jobs.ts`, `errors.ts`, `quality.ts`, `pricing.ts`, `assets.ts`: the
+ * - `jobs.ts`, `errors.ts`, `quality.ts`, `export.ts`, `pricing.ts`, `assets.ts`, `library.ts`: the
  *   contracts the API, the worker and the web share.
  */
 
 export * from './assets';
 export * from './canvas';
 export * from './document';
+export * from './effects';
 export * from './errors';
+export * from './export';
 export {
   clampRect,
   FULL_RECT,
@@ -37,6 +40,7 @@ export {
 export * from './history';
 export * from './jobs';
 export * from './layout';
+export * from './library';
 export * from './links';
 export * from './pricing';
 export * from './quality';

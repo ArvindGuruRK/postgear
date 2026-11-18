@@ -17,6 +17,8 @@ export {
 } from './clips/job.workflows';
 export { clipListChannelWorkflow, clipProbeWorkflow } from './clips/query.workflows';
 export { clipRuntimeCheckWorkflow } from './clips/runtime-check.workflow';
+export { clipStickerCheckWorkflow } from './clips/sticker-check.workflow';
+export { clipSoundCheckWorkflow } from './clips/sound-check.workflow';
 export { maintenanceWorkflow } from './maintenance.workflow';
 export { postPublishWorkflow } from './post-publish.workflow';
 export { tokenRefreshWorkflow } from './token-refresh.workflow';

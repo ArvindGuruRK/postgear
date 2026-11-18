@@ -11,6 +11,8 @@ import type { ClipActivityDeps } from '../deps';
 import { type ClipJobActivityOptions, createJobActivities } from './jobs.activities';
 import { createProbeActivities } from './probe.activities';
 import { createRuntimeActivities } from './runtime.activities';
+import { createSoundActivities } from './sound.activities';
+import { createStickerActivities } from './sticker.activities';
 
 export type { ClipWorkResult, RenderWaitState } from './jobs.activities';
 
@@ -19,6 +21,10 @@ export function createClipActivities(deps: ClipActivityDeps, options: ClipJobAct
     ...createRuntimeActivities(deps),
     // Module 03: the probe and the channel list (postgear-media-quick).
     ...createProbeActivities(deps),
+    // Module 12: an uploaded sticker's check (postgear-media-quick).
+    ...createStickerActivities(deps),
+    // Module 14: an uploaded sound's check (postgear-media-quick).
+    ...createSoundActivities(deps),
     // Modules 04 and 05: import, sharp range, export, and their bookkeeping.
     ...createJobActivities(deps, options),
   };

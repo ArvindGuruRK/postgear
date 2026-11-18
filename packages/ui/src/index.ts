@@ -87,6 +87,10 @@ export * from './components/playhead';
 export * from './components/timeline-bar';
 export * from './components/timeline-row';
 export * from './components/video-player-bar';
+// Sprint 12 Module 11: the canvas frame and the colour picker.
+export * from './components/color-picker';
+export * from './components/transform-box';
+export * from './lib/color';
 export * from './components/toast';
 export * from './components/toaster';
 export * from './components/toggle';

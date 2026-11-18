@@ -463,6 +463,19 @@ describe('PreviewEngine: the fallback clock', () => {
 });
 
 describe('PreviewEngine: drawing', () => {
+  it('turns the sound down and up with the clip fade, frame by frame', () => {
+    const doc = { ...clipOf([part('a', 10_000, 14_000, 1, 0.8)]), fades: { inMs: 1_000, outMs: 1_000 } };
+    const { engine, v0 } = setup(doc);
+    engine.attach(document.createElement('div'));
+    engine.play();
+    v0.presentFrame(10_500);
+    expect(v0.el.volume).toBeCloseTo(0.8 * 0.5, 3);
+    v0.presentFrame(12_000);
+    expect(v0.el.volume).toBeCloseTo(0.8, 3);
+    v0.presentFrame(13_750);
+    expect(v0.el.volume).toBeCloseTo(0.8 * 0.25, 3);
+  });
+
   it('builds the stage and draws each area from its crop on seeked and on every frame', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -471,7 +484,7 @@ describe('PreviewEngine: drawing', () => {
 
     const stage = container.querySelector('[data-preview-stage]');
     expect(stage).not.toBeNull();
-    for (const layer of ['looks', 'zoom', 'base', 'areas', 'overlays', 'media']) {
+    for (const layer of ['frame', 'looks', 'zoom', 'base', 'areas', 'vignette', 'overlays', 'media']) {
       expect(container.querySelector(`[data-preview-layer="${layer}"]`)).not.toBeNull();
     }
     // The videos live in the stage, invisible, never display: none.

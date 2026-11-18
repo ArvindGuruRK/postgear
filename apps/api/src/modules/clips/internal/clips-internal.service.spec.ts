@@ -316,6 +316,28 @@ describe('ClipsInternalService.finishExport', () => {
     renderJob({ status: 'CANCELLED' });
     await expect(internal.finishExport(JOB_ID, FINISH)).rejects.toBeInstanceOf(ConflictException);
   });
+
+  it('stores the fingerprint on the clip and sends the bell to the Export tab (Module 15)', async () => {
+    const { internal, notifications } = deps();
+    renderJob();
+    await internal.finishExport(JOB_ID, { ...FINISH, fingerprint: 'v1-abc' });
+    expect(db.clips[0]).toEqual(
+      expect.objectContaining({ lastExportedRevision: 3, lastExportedFingerprint: 'v1-abc' }),
+    );
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'clip_export_ready',
+        link: `/${TEST_ORG}/clips/edit/${CLIP_ID}?tab=export`,
+      }),
+    );
+  });
+
+  it('clears the fingerprint for a finish from an older worker without one', async () => {
+    const { internal } = deps();
+    renderJob();
+    await internal.finishExport(JOB_ID, FINISH);
+    expect(db.clips[0]).toEqual(expect.objectContaining({ lastExportedFingerprint: null }));
+  });
 });
 
 describe('ClipReconcileService', () => {

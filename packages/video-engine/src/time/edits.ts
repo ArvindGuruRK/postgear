@@ -432,6 +432,10 @@ function placeItem<T extends TimedItem>(
   after: ClipDocument,
   total: number,
 ): T {
+  // Whole Clip: an item on the clip's clock that covered the clip still does.
+  if (item.anchor === 'clip' && item.start === 0 && item.duration === outputDuration(before)) {
+    return item.duration === total ? item : ({ ...item, duration: total } as T);
+  }
   const start = item.anchor === 'moment' ? momentStart(before, after, item.start) : item.start;
   return fitInside(item, start, total);
 }

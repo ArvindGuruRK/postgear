@@ -19,6 +19,7 @@ import {
   FfmpegError,
   ProbeError,
   RenderError,
+  StickerError,
   ToolError,
   ToolMissingError,
 } from '@postgear/media-tools';
@@ -71,6 +72,8 @@ export function classifyClipError(error: unknown): {
   if (error instanceof ProbeError || error instanceof FfmpegError || error instanceof RenderError) {
     return { code: error.code, retryable: !CLIP_NON_RETRYABLE.includes(error.code) };
   }
+  // A picture that is not usable is the same next time; only a tool fault is retried.
+  if (error instanceof StickerError) return { code: error.code, retryable: error.code === 'tool_failed' };
   // Out of disk here: another worker (or this one, a minute later) may have room.
   if (error instanceof DiskSpaceError) return { code: 'clips_busy', retryable: true };
   if (error instanceof ToolMissingError) return { code: 'tools_offline', retryable: true };

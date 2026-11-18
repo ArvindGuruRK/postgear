@@ -15,6 +15,10 @@
  *   `CLIP_MAX_MS`), reports `needsMoreVideo` past what we hold, and ends with
  *   `replaceItems` (the `anchor` rule). The clip closes up: trimming a start
  *   inward shortens the clip, it does not leave a gap.
+ * - Zooms (Module 13): `dragMoveZoom`, `dragResizeZoomStart` and
+ *   `dragResizeZoomEnd` read a bar (one window of `zoomWindows`) in clip time
+ *   and map it back to the video's time, where a zoom lives; `setZoomRange`
+ *   keeps it off its neighbours and at least `ZOOM_MIN_MS` long.
  * - Texts, stickers and sounds: `dragMoveItem`, `dragResizeItemStart` and
  *   `dragResizeItemEnd` keep the item inside the clip (0 to its end) and at
  *   least `ITEM_MIN_MS` long. No video moves, so no other item does either.
@@ -36,8 +40,15 @@ import {
   type NeedsMoreVideo,
   trimSegment,
 } from '../time/edits';
-import { findItem, type ItemRefusalCode, replaceItem } from '../time/items';
+import { anchorAfterRetime, findItem, type ItemRefusalCode, replaceItem } from '../time/items';
 import { outputDuration, placeSegments } from '../time/time-map';
+import {
+  setZoomRange,
+  sourceAtOutput,
+  windowsOfZoom,
+  type ZoomEditResult,
+  type ZoomRefusalCode,
+} from '../time/zooms';
 import { resolveSnap, SNAP_PX, type SnapPoint } from './snap';
 
 /** Snapping for one drag. */
@@ -58,7 +69,7 @@ export interface GestureResult {
   /** The point the dragged edge snapped to, or null. Null when a clamp moved it off the point. */
   snappedTo: SnapPoint | null;
   /** Set when nothing could be done; `doc` is then the start document. */
-  refused?: EditRefusalCode | ItemRefusalCode;
+  refused?: EditRefusalCode | ItemRefusalCode | ZoomRefusalCode;
 }
 
 export interface TrimDrag {
@@ -88,7 +99,10 @@ export interface ItemResizeDrag {
   snap?: GestureSnap;
 }
 
-function refused(doc: ClipDocument, code: EditRefusalCode | ItemRefusalCode): GestureResult {
+function refused(
+  doc: ClipDocument,
+  code: EditRefusalCode | ItemRefusalCode | ZoomRefusalCode,
+): GestureResult {
   return { doc, clamped: true, snappedTo: null, refused: code };
 }
 
@@ -148,12 +162,17 @@ function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
 }
 
-/** The item with a new start and length, or the same object when nothing changed. */
-function placed(item: TimedItem, start: number, duration: number): TimedItem {
-  if (item.start === start && item.duration === duration) {
+/**
+ * The item with a new start and length, or the same object when nothing
+ * changed. A Whole Clip text or sticker that no longer covers the clip goes
+ * back on its moment (`anchorAfterRetime`).
+ */
+function placed(item: TimedItem, start: number, duration: number, total: number): TimedItem {
+  const anchor = anchorAfterRetime(item, start, duration, total);
+  if (item.start === start && item.duration === duration && item.anchor === anchor) {
     return item;
   }
-  return { ...item, start, duration } as TimedItem;
+  return { ...item, start, duration, anchor } as TimedItem;
 }
 
 /**
@@ -192,7 +211,7 @@ export function dragMoveItem(startDoc: ClipDocument, drag: ItemMoveDrag): Gestur
   const wanted = Math.round(start);
   const final = clamp(wanted, 0, Math.max(0, total - duration));
   const clamped = final !== wanted;
-  const next = placed(item, final, duration);
+  const next = placed(item, final, duration, total);
   return {
     doc: next === item ? startDoc : replaceItem(startDoc, found, next),
     clamped,
@@ -219,7 +238,7 @@ export function dragResizeItemStart(startDoc: ClipDocument, drag: ItemResizeDrag
   const wanted = Math.round(snapped.ms);
   const start = clamp(wanted, 0, Math.max(0, end - ITEM_MIN_MS));
   const clamped = start !== wanted;
-  const next = placed(item, start, end - start);
+  const next = placed(item, start, end - start, total);
   return {
     doc: next === item ? startDoc : replaceItem(startDoc, found, next),
     clamped,
@@ -246,10 +265,124 @@ export function dragResizeItemEnd(startDoc: ClipDocument, drag: ItemResizeDrag):
   const wanted = Math.round(snapped.ms);
   const end = clamp(wanted, start + ITEM_MIN_MS, Math.max(start + ITEM_MIN_MS, total));
   const clamped = end !== wanted;
-  const next = placed(item, start, end - start);
+  const next = placed(item, start, end - start, total);
   return {
     doc: next === item ? startDoc : replaceItem(startDoc, found, next),
     clamped,
     snappedTo: clamped ? null : snapped.to,
   };
+}
+
+// --- Zooms (Module 13) --------------------------------------------------------------
+
+export interface ZoomMoveDrag {
+  zoomId: string;
+  /** Which of the zoom's windows (bars) is dragged: 0 unless it shows on both sides of a cut. */
+  piece?: number;
+  /** Where the pointer went down, in output time. */
+  grabMs: number;
+  /** Where the pointer is now, in output time. */
+  pointerMs: number;
+  snap?: GestureSnap;
+}
+
+export interface ZoomResizeDrag {
+  zoomId: string;
+  piece?: number;
+  /** Where the dragged edge should go, in output time. */
+  pointerMs: number;
+  snap?: GestureSnap;
+}
+
+function zoomResult(
+  startDoc: ClipDocument,
+  result: ZoomEditResult,
+  check: (doc: ClipDocument) => boolean,
+  snappedTo: SnapPoint | null,
+): GestureResult {
+  if (!result.ok) return refused(startDoc, result.code);
+  const clamped = !check(result.doc);
+  return { doc: result.doc, clamped, snappedTo: clamped ? null : snappedTo };
+}
+
+/**
+ * Moves a zoom by how far the pointer went, keeping its length in the
+ * video. With snapping, whichever edge of the dragged bar is nearer a point
+ * snaps (the start wins a tie).
+ */
+export function dragMoveZoom(startDoc: ClipDocument, drag: ZoomMoveDrag): GestureResult {
+  if (!Number.isFinite(drag.pointerMs) || !Number.isFinite(drag.grabMs)) {
+    return refused(startDoc, 'invalid_time');
+  }
+  const zoom = startDoc.zooms.find((z) => z.id === drag.zoomId);
+  const bar = windowsOfZoom(startDoc, drag.zoomId)[drag.piece ?? 0];
+  if (!zoom || !bar) return refused(startDoc, 'zoom_not_found');
+  const length = bar.endMs - bar.startMs;
+  let start = bar.startMs + (drag.pointerMs - drag.grabMs);
+  let snappedTo: SnapPoint | null = null;
+  if (drag.snap) {
+    const head = snapTime(start, drag.snap);
+    const tail = snapTime(start + length, drag.snap);
+    const headMove = head.to ? Math.abs(head.ms - start) : Number.POSITIVE_INFINITY;
+    const tailMove = tail.to ? Math.abs(tail.ms - (start + length)) : Number.POSITIVE_INFINITY;
+    if (head.to && headMove <= tailMove) {
+      start = head.ms;
+      snappedTo = head.to;
+    } else if (tail.to) {
+      start = tail.ms - length;
+      snappedTo = tail.to;
+    }
+  }
+  const wanted = Math.round(start);
+  // The bar's own video moment, then the zoom's start that far before it.
+  const barSource = sourceAtOutput(startDoc, bar.startMs, 'start');
+  const target = sourceAtOutput(startDoc, wanted, 'start');
+  if (!barSource || !target) return refused(startDoc, 'outside_clip');
+  if (target.sourceId !== zoom.source) return refused(startDoc, 'zoom_no_room');
+  const from = target.sourceMs - (barSource.sourceMs - zoom.from);
+  const result = setZoomRange(startDoc, zoom.id, from, from + (zoom.to - zoom.from), 'length');
+  return zoomResult(
+    startDoc,
+    result,
+    (doc) => windowsOfZoom(doc, zoom.id)[drag.piece ?? 0]?.startMs === wanted,
+    snappedTo,
+  );
+}
+
+/** Drags a zoom's start: its end stays where it is in the video. */
+export function dragResizeZoomStart(startDoc: ClipDocument, drag: ZoomResizeDrag): GestureResult {
+  if (!Number.isFinite(drag.pointerMs)) return refused(startDoc, 'invalid_time');
+  const zoom = startDoc.zooms.find((z) => z.id === drag.zoomId);
+  if (!zoom) return refused(startDoc, 'zoom_not_found');
+  const snapped = snapTime(drag.pointerMs, drag.snap);
+  const wanted = Math.round(snapped.ms);
+  const at = sourceAtOutput(startDoc, wanted, 'start');
+  if (!at) return refused(startDoc, 'outside_clip');
+  if (at.sourceId !== zoom.source) return refused(startDoc, 'zoom_no_room');
+  const result = setZoomRange(startDoc, zoom.id, at.sourceMs, zoom.to, 'to');
+  return zoomResult(
+    startDoc,
+    result,
+    (doc) => windowsOfZoom(doc, zoom.id).some((w) => w.startMs === wanted),
+    snapped.to,
+  );
+}
+
+/** Drags a zoom's end: its start stays where it is in the video. */
+export function dragResizeZoomEnd(startDoc: ClipDocument, drag: ZoomResizeDrag): GestureResult {
+  if (!Number.isFinite(drag.pointerMs)) return refused(startDoc, 'invalid_time');
+  const zoom = startDoc.zooms.find((z) => z.id === drag.zoomId);
+  if (!zoom) return refused(startDoc, 'zoom_not_found');
+  const snapped = snapTime(drag.pointerMs, drag.snap);
+  const wanted = Math.round(snapped.ms);
+  const at = sourceAtOutput(startDoc, wanted, 'end');
+  if (!at) return refused(startDoc, 'outside_clip');
+  if (at.sourceId !== zoom.source) return refused(startDoc, 'zoom_no_room');
+  const result = setZoomRange(startDoc, zoom.id, zoom.from, at.sourceMs, 'from');
+  return zoomResult(
+    startDoc,
+    result,
+    (doc) => windowsOfZoom(doc, zoom.id).some((w) => w.endMs === wanted),
+    snapped.to,
+  );
 }

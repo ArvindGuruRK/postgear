@@ -12,7 +12,16 @@ import {
 } from './fonts';
 import { buildRenderPlan, isSafeRelativeName, type RenderContext } from './plan';
 import { ENCODE_SPECS, encodeSpecFor, evenSize, outputSizeFor, PROOF_SPEC } from './specs';
-import { TEST_ASSET_ID, testContext, testDocument, testSegment, testSource } from './test-docs';
+import {
+  TEST_ASSET_ID,
+  testContext,
+  testContextWithFonts,
+  testDocument,
+  testSegment,
+  testSource,
+  testText,
+  withTexts,
+} from './test-docs';
 import { ffmpegArgsFor, GRAPH_FILE } from './types';
 
 /** Source 10 to 20 s at 1x, then 20 to 30 s at 2x: 15 s of clip from one stretch of video. */
@@ -324,7 +333,7 @@ describe('refusals', () => {
     expect(buildRenderPlan(rounded, testContext()).segments[0]?.picture.areas[0]?.radius).toBe(36);
   });
 
-  it('refuses a moving crop on any area, a zoom and a look', () => {
+  it('refuses a moving crop on any area, and no longer refuses a zoom or a look (Module 13)', () => {
     const second = twoSegmentDoc();
     const base = second.layout.areas[0];
     if (!base) throw new Error('no area');
@@ -354,68 +363,27 @@ describe('refusals', () => {
         ease: 200,
       },
     ];
-    expectCode(() => buildRenderPlan(zoomed, testContext()), 'zoom_unsupported');
+    expect(buildRenderPlan(zoomed, testContext()).zooms).toHaveLength(1);
 
     const looked = twoSegmentDoc();
-    looked.looks = { colour: 'warm', strength: 1, vignette: 0 };
-    expectCode(() => buildRenderPlan(looked, testContext()), 'looks_unsupported');
-    const vignette = twoSegmentDoc();
-    vignette.looks = { colour: 'none', strength: 0, vignette: 0.4 };
-    expectCode(() => buildRenderPlan(vignette, testContext()), 'looks_unsupported');
+    looked.looks = { colour: 'warm', strength: 1, vignette: 0.4 };
+    const plan = buildRenderPlan(looked, testContext());
+    expect(plan.look.matrix).not.toBeNull();
+    expect(plan.look.vignetteAngle).toBeGreaterThan(0);
   });
 
-  it('refuses text (after checking its font), stickers, sounds and captions', () => {
-    const text = twoSegmentDoc();
-    text.tracks = [
-      {
-        id: 'ov',
-        kind: 'overlay',
-        items: [
-          {
-            id: 't',
-            type: 'text',
-            start: 0,
-            duration: 1_000,
-            anchor: 'clip',
-            text: 'Hello',
-            style: {
-              font: 'Anton',
-              size: 64,
-              weight: 400,
-              italic: false,
-              colour: '#FFFFFF',
-              align: 'center',
-              outline: null,
-              background: null,
-              shadow: false,
-              uppercase: false,
-            },
-            transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
-          },
-        ],
-      },
-    ];
+  it('checks a text font, plans the text, stickers and sounds, and refuses captions', () => {
+    const text = withTexts(twoSegmentDoc(), [
+      testText('t', { anchor: 'clip', style: { ...testText('t').style, font: 'Anton', weight: 400 } }),
+    ]);
     expectCode(() => buildRenderPlan(text, testContext()), 'font_missing');
-    const withFont = testContext();
-    withFont.assets = {
-      ...withFont.assets,
-      fonts: {
-        dir: 'fonts',
-        manifest: {
-          version: 1,
-          fonts: [
-            {
-              family: 'anton',
-              file: 'anton-400.ttf',
-              unitsPerEm: 2048,
-              winAscent: 2398,
-              winDescent: 674,
-            },
-          ],
-        },
-      },
-    };
-    expectCode(() => buildRenderPlan(text, withFont), 'text_unsupported');
+    const unknown = withTexts(twoSegmentDoc(), [
+      testText('t', { style: { ...testText('t').style, font: 'Comic Sans MS' } }),
+    ]);
+    expectCode(() => buildRenderPlan(unknown, testContextWithFonts()), 'font_missing');
+    const planned = buildRenderPlan(text, testContextWithFonts());
+    expect(planned.texts).toHaveLength(1);
+    expect(planned.fonts.files).toEqual(['anton-400.ttf']);
 
     const sticker = twoSegmentDoc();
     sticker.tracks = [
@@ -432,11 +400,18 @@ describe('refusals', () => {
             ref: { asset: TEST_ASSET_ID },
             transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1 },
             flipX: false,
+            widthPx: 270,
+            heightPx: 270,
+            loop: true,
           },
         ],
       },
     ];
-    expectCode(() => buildRenderPlan(sticker, testContext()), 'stickers_unsupported');
+    // A sticker whose file was not handed in (removed from the library) is refused; with it, it is planned.
+    expectCode(() => buildRenderPlan(sticker, testContext()), 'sticker_missing');
+    const withFile = testContext();
+    withFile.assets = { ...withFile.assets, stickers: { [`asset:${TEST_ASSET_ID}`]: { file: 'sticker-0.png', animated: false, width: 512, height: 512, fps: null, frames: null } } };
+    expect(buildRenderPlan(sticker, withFile).stickers).toHaveLength(1);
 
     const sound = twoSegmentDoc();
     sound.tracks = [
@@ -460,7 +435,11 @@ describe('refusals', () => {
         ],
       },
     ];
-    expectCode(() => buildRenderPlan(sound, testContext()), 'sounds_unsupported');
+    // A sound whose file was not handed in is refused (`sound_missing`); with it, it is planned.
+    expectCode(() => buildRenderPlan(sound, testContext()), 'sound_missing');
+    const withSound = testContext();
+    withSound.assets = { ...withSound.assets, sounds: { [`asset:${TEST_ASSET_ID}`]: { file: 'sound-0.m4a', durationMs: 4_000 } } };
+    expect(buildRenderPlan(sound, withSound).sounds).toHaveLength(1);
 
     const captions = twoSegmentDoc();
     captions.tracks = [{ id: 'cc', kind: 'captions', transcriptAssetId: TEST_ASSET_ID, style: {} }];
@@ -578,17 +557,25 @@ describe('small pieces', () => {
   });
 
   it('checks fonts against the manifest', () => {
-    const manifest = parseFontManifest({
-      version: 1,
-      fonts: [
-        { family: 'Arial', file: 'arial.ttf', unitsPerEm: 2048, winAscent: 1854, winDescent: 434 },
-      ],
-    });
+    const arial = {
+      fontId: 'arial',
+      family: 'Arial',
+      weight: 400,
+      assName: 'PGF 000000 400',
+      psName: 'PGF-000000-400',
+      file: 'arial-400.ttf',
+      unitsPerEm: 2048,
+      winAscent: 1854,
+      winDescent: 434,
+      fallback: false,
+    };
+    const manifest = parseFontManifest({ version: 2, fonts: [arial], coverage: { arial: [[32, 126]] } });
     expect(checkFonts(manifest, ['arial', 'Anton', 'anton'])).toEqual(['Anton']);
     expect(checkFonts(null, ['Sora'])).toEqual(['Sora']);
     expect(checkFonts(emptyFontManifest(), [])).toEqual([]);
     // CSS 100 px Arial is ASS 111.72: the line height, not the em.
     expect(assFontSize(manifest.fonts[0] as (typeof manifest.fonts)[number], 100)).toBe(111.72);
+    // A version 1 manifest (one file per family, no names) is refused: the build must be rerun.
     expect(() =>
       parseFontManifest({ version: 1, fonts: [{ family: 'X', file: 'x.woff2' }] }),
     ).toThrow();

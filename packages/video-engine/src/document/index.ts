@@ -6,11 +6,14 @@ export {
   DEFAULT_SOURCE_ASPECT,
   newId,
 } from './create';
+export { hasEmoji, stripEmoji } from './emoji';
 export * from './limits';
 export {
   ANCHORS,
   type Anchor,
   type AudioItem,
+  BADGE_PLATFORMS,
+  type BadgePlatform,
   type AudioTrack,
   type CaptionsTrack,
   type ClipCanvas,
@@ -56,3 +59,6 @@ export {
   safeParseClipDocument,
   upgrade,
 } from './upgrade';
+export * from './sound';
+export * from './sticker';
+export * from './text';

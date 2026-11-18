@@ -328,12 +328,15 @@ export function PercentSlider({
   value,
   onValueChange,
   step = 5,
+  max = 100,
 }: {
   label: string;
-  /** 0 to 100. */
+  /** 0 to `max`. */
   value: number;
   onValueChange: (value: number) => void;
   step?: number;
+  /** The top of the scale (a sound's volume goes to 200%). */
+  max?: number;
 }) {
   const id = useId();
 
@@ -348,7 +351,7 @@ export function PercentSlider({
       <Slider
         value={[value]}
         min={0}
-        max={100}
+        max={max}
         step={step}
         thumbs={[{ 'aria-labelledby': id, 'aria-valuetext': `${value}%` }]}
         onValueChange={([next]) => {

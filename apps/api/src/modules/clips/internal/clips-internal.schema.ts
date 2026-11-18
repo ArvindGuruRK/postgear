@@ -38,6 +38,8 @@ export const finishExportSchema = z
     height: z.number().int().min(1).max(10_000),
     fps: z.number().positive().max(240),
     name: z.string().min(1).max(200),
+    /** Module 15: the exported document's fingerprint; absent or null from an older worker. */
+    fingerprint: z.string().min(1).max(64).nullable().optional(),
   })
   .strict();
 export type FinishExportBody = z.infer<typeof finishExportSchema>;

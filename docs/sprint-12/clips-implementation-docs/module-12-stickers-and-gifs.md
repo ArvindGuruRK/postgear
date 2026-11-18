@@ -1,6 +1,6 @@
 # Module 12: Stickers And GIFs
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session, may need a second: the catalogue and its ingest are half the work)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19; see the README Progress row) | Size: L (one full session, may need a second: the catalogue and its ingest are half the work)
 > **Depends on**: [Module 01](module-01-contracts-and-data.md) (the library tables), [Module 11](module-11-canvas-handles-and-text.md)
 > **Stories**: CL-7.2, CL-7.3, CL-7.4, CL-7.5
 > **Next**: [Module 13](module-13-effects-zoom-and-speed.md), [Module 14](module-14-sound.md), [Module 15](module-15-export.md)
@@ -134,18 +134,20 @@ Data only (`{ platform, name }`, platform one of Twitch, YouTube, Kick, TikTok, 
 
 ## Tasks
 
-- [ ] `StickerItem`, `defaultStickerItem`, the `loop` rule, tests.
-- [ ] The ingest engine: adapters `own`, `kenney`, `openpeeps`, `noto`; the licence guard; `normaliseSticker`; store, report, publish and remove; the `CLIPS_LIBRARY_INGEST` guard; the seed bundle.
-- [ ] Our own sticker art (or the note that it is not ready).
-- [ ] The library module: search, categories, favourites, credits; the `StickerProvider` interface and `CatalogueStickerProvider`.
-- [ ] Uploads: the route, `clipStickerCheckWorkflow`, list and delete.
-- [ ] The compiler's sticker overlays and the parity cases.
-- [ ] The preview's sticker layer with `ImageDecoder` and the `<img>` fallback.
-- [ ] The Follow Badge spike and build.
-- [ ] The Elements panel and sticker bars; the credits page.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: search, add a still and a moving sticker, star one, upload one, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `StickerItem`, `defaultStickerItem`, the `loop` rule, tests.
+- [x] The ingest engine: adapters `own`, `kenney`, `openpeeps`, `noto`; the licence guard; `normaliseSticker`; store, report, publish and remove; the `CLIPS_LIBRARY_INGEST` guard; the seed bundle.
+- [x] Our own sticker art (or the note that it is not ready).
+- [x] The library module: search, categories, favourites, credits; the `StickerProvider` interface and `CatalogueStickerProvider`.
+- [x] Uploads: the route, `clipStickerCheckWorkflow`, list and delete.
+- [x] The compiler's sticker overlays and the parity cases.
+- [x] The preview's sticker layer with `ImageDecoder` and the `<img>` fallback.
+- [x] The Follow Badge spike and build.
+- [x] The Elements panel and sticker bars; the credits page.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: search, add a still and a moving sticker, star one, upload one, export. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
+
+**Gaps at close (2026-11-19)**: the `kenney`, `openpeeps` and `noto` adapters are built and tested on recorded candidates but have never run, because they fetch from outside hosts (the README's security rule), so the seed bundle holds our own 193 stickers, not the launch set of about 1,600, and the credits page has no Noto line yet. A removed sticker shows its notice, but the export asks first only once Module 15 lands (until then it stops with `sticker_missing`). An uploaded sticker's signed address is not renewed after 6 hours while the editor stays open. Play-once, a second member's Favourites, a text file named `.png`, the sticker bars on the lower Overlay rows and the light and Lilac themes are left to the hand check.
 
 ## Tests
 

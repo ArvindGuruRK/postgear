@@ -6,7 +6,7 @@
  * doctor, no FFmpeg), so publishing never depends on video tools being
  * installed.
  */
-import type { RunTool, ToolPaths } from '@postgear/media-tools';
+import type { FontsFolder, RunTool, ToolPaths, WatermarkFile } from '@postgear/media-tools';
 import type { PrivateStorage, StorageBackend } from '@postgear/storage';
 import type { WorkerEnv } from '../config/env';
 import type { ClipInternalClient } from './internal-client';
@@ -23,6 +23,14 @@ export interface ClipActivityDeps {
   paths: ToolPaths;
   /** `CLIPS_SCRATCH_DIR` resolved: every job works in `<scratchRoot>/<jobId>/`. */
   scratchRoot: string;
+  /** The fonts folder read at boot, or null when it was never built (an export with text then fails `font_missing`). */
+  fonts: FontsFolder | null;
+  /**
+   * The "Made with PostGear" mark (`packages/media-tools/assets/watermark.png`)
+   * read at boot, or null when it is not there (an export that asks for the
+   * mark then fails). Optional so a spec can leave it out.
+   */
+  watermark?: WatermarkFile | null;
   providers: ClipProviders;
   runtime: ClipRuntime;
   internal: ClipInternalClient;
