@@ -65,6 +65,12 @@ function fakeRepository() {
       );
       return row ? { id: row.id } : null;
     }),
+    findByExternalId: jest.fn(async (orgId: string, platform: string, externalId: string) => {
+      const row = [...rows.values()].find(
+        (r) => r.organizationId === orgId && r.platform === platform && r.externalId === externalId,
+      );
+      return row ? { id: row.id } : null;
+    }),
     create: jest.fn(
       async (
         orgId: string,
@@ -309,6 +315,89 @@ describe('ClipChannelsService', () => {
     ).toMatchObject({
       status: 422,
       body: { code: 'platform_paused' },
+    });
+  });
+
+  describe('check (the Add dialog, Module 06)', () => {
+    it('resolves the channel through the lister and writes nothing', async () => {
+      const { service, repository, rows } = setup();
+      const checked = await service.check(ORG, { platform: 'twitch', handle: 'simstreamer' });
+      expect(checked).toEqual({
+        platform: 'twitch',
+        handle: expect.any(String),
+        displayName: expect.any(String),
+        avatarUrl: checked.avatarUrl,
+      });
+      expect(Object.keys(checked).sort()).toEqual([
+        'avatarUrl',
+        'displayName',
+        'handle',
+        'platform',
+      ]);
+      expect(repository.create).not.toHaveBeenCalled();
+      expect(rows.size).toBe(0);
+      // The add that follows still works.
+      await expect(
+        service.add(ORG, null, { platform: 'twitch', handle: 'simstreamer' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('refuses exactly as add does', async () => {
+      const { service } = setup({ platforms: ['twitch', 'kick'], browseChannels: 1 });
+      expect(
+        await refusal(
+          service.check(ORG, {
+            platform: 'twitch',
+            handle: 'https://www.twitch.tv/videos/900000001',
+          }),
+        ),
+      ).toMatchObject({ status: 422, body: { code: 'link_is_a_video' } });
+      expect(
+        await refusal(service.check(ORG, { platform: 'youtube', handle: '@simstreamer' })),
+      ).toMatchObject({ status: 422, body: { code: 'platform_paused' } });
+      expect(
+        await refusal(service.check(ORG, { platform: 'twitch', handle: 'nobody_here' })),
+      ).toMatchObject({ status: 422, body: { code: 'channel_not_found' } });
+
+      // At the plan's limit: the same 402 add answers, with the plan number.
+      await service.add(ORG, null, { platform: 'twitch', handle: 'simstreamer' });
+      expect(
+        await refusal(service.check(ORG, { platform: 'kick', handle: 'simstreamer' })),
+      ).toMatchObject({
+        status: 402,
+        body: { code: 'channel_limit', details: { limit: 1, used: 1 } },
+      });
+    });
+
+    it('answers channel_exists for a channel already saved, in any spelling', async () => {
+      const { service } = setup();
+      await service.add(ORG, null, { platform: 'twitch', handle: 'simstreamer' });
+      expect(
+        await refusal(service.check(ORG, { platform: 'twitch', handle: 'SimStreamer' })),
+      ).toMatchObject({ status: 409, body: { code: 'channel_exists' } });
+    });
+
+    it("judges against the caller's own workspace only", async () => {
+      const { service, rows } = setup({ browseChannels: 1 });
+      await service.add(ORG, null, { platform: 'twitch', handle: 'simstreamer' });
+      // Another workspace has neither the channel nor a full plan.
+      await expect(
+        service.check(OTHER_ORG, { platform: 'twitch', handle: 'simstreamer' }),
+      ).resolves.toMatchObject({ platform: 'twitch' });
+      expect(rows.size).toBe(1);
+    });
+
+    it('throttles checks on their own bucket, leaving adds alone', async () => {
+      const { service } = setup({ browseChannels: null });
+      for (let index = 0; index < 12; index++) {
+        await service.check(ORG, { platform: 'twitch', handle: 'simstreamer' });
+      }
+      expect(
+        await refusal(service.check(ORG, { platform: 'twitch', handle: 'simstreamer' })),
+      ).toMatchObject({ status: 429, body: { code: 'channels_throttled' } });
+      await expect(
+        service.add(ORG, null, { platform: 'twitch', handle: 'simstreamer' }),
+      ).resolves.toBeDefined();
     });
   });
 

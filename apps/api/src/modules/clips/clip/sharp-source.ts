@@ -9,9 +9,21 @@
  * browser.
  */
 import type { ClipAsset } from '@postgear/db';
-import { type ClipDocument, documentRange, pickSharpSource } from '@postgear/video-engine';
+import {
+  type ClipDocument,
+  documentRange,
+  pickSharpSource,
+  type SourceRange,
+  safeParseClipDocument,
+} from '@postgear/video-engine';
 
 export { documentRange };
+
+/** The range a stored document plays (Module 07, a clip's line on its video), or null if unreadable. */
+export function storedDocumentRange(stored: unknown): SourceRange | null {
+  const parsed = safeParseClipDocument(stored);
+  return parsed.ok ? documentRange(parsed.doc) : null;
+}
 
 export interface SharpSource {
   kind: 'segment' | 'proxy';

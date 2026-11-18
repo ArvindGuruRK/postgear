@@ -1,6 +1,6 @@
 # Module 07: Manual Clipping And The Clips Library
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 05](module-05-thin-slice-render.md), [Module 06](module-06-clips-home-and-videos.md)
 > **Stories**: CL-3.1, CL-3.2, CL-3.3, CL-2.2; CL-3.4 (Edit A Whole Video)
 > **Next**: [Module 08](module-08-editor-shell.md) (Editor Shell)
@@ -53,7 +53,7 @@ Each is shown on `/dev/components` first.
 - `GET /clips?status&videoId&source&page&sort`: the list and `counts`. `source` filters by where the video came from (`youtube`, `twitch`, `kick`, `upload`; repeatable) through the clip's `ClipVideo.platform`, and the counts follow the filter. Exported is `lastExportedRevision === revision`; Scheduled is "has a `ClipPost` whose post group still has a post waiting" (one query over the groups on the page, not one per clip); both are worked out in the service and returned as `state` on each `ClipView` (`new`, `draft`, `exported`, `scheduled`, `hidden`). The filter applies the same rules in the query.
 - `PATCH /clips/:clipId` `{ revision, title?, status?, document? }`: the revision lock as `Design` has it (409 `clip_changed_elsewhere`); `document` is validated with `parseClipDocument` and `ratio` and `durationMs` are copied from it; opening a NEW clip for editing sets DRAFT.
 - `POST /clips` also accepts `{ videoId, whole: true }` (Edit Whole Video): a clip from 0 to the video's length, refused with `clip_too_long` and the sentence above when the video is longer than `CLIP_MAX_MS`.
-- `POST /clips/:clipId/duplicate` (a new DRAFT with the same document, " copy" on the name), `DELETE /clips/:clipId` (its SEGMENT assets too; an exported `Media` row is left alone).
+- `POST /clips/:clipId/duplicate` (a new DRAFT with the same document, " (Copy)" on the name, like a duplicated design), `DELETE /clips/:clipId` (its SEGMENT assets too; an exported `Media` row is left alone).
 - A clip's poster for the cards: the proxy frame at the clip's start, cut from the filmstrip tile nearest to it (no new file).
 
 ### 5. The Clips Tab And Recent Clips
@@ -75,15 +75,15 @@ Each is shown on `/dev/components` first.
 
 ## Tasks
 
-- [ ] `timeline/scale.ts`, `ruler.ts`, `visible.ts` with tests.
-- [ ] `VideoPlayerBar`, `TimeRuler`, `Playhead`, `TimelineRow` in `packages/ui`; `Filmstrip`, `Waveform`; playground demos.
-- [ ] The video page: server page, `SourcePlayer`, `SourceTimeline`, marking, Create Clip, shortcuts, `VideoClipList`.
-- [ ] `GET /clips` with states, counts and the `source` filter, `POST /clips` with `whole: true`, `PATCH`, duplicate, delete.
-- [ ] **Edit Whole Video**: the button on the video page, the Videos tab menu item, the over-30-minutes sentence.
-- [ ] `ClipsTab` with the Source filter and the list or grid switch, `ClipCard`, `RecentClips`, the plain edit route.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: open the stream sample, mark two ranges, create two clips, see them in the Clips tab, rename and hide one. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `timeline/scale.ts`, `ruler.ts`, `visible.ts` with tests.
+- [x] `VideoPlayerBar`, `TimeRuler`, `Playhead`, `TimelineRow` in `packages/ui`; `Filmstrip`, `Waveform`; playground demos.
+- [x] The video page: server page, `SourcePlayer`, `SourceTimeline`, marking, Create Clip, shortcuts, `VideoClipList`.
+- [x] `GET /clips` with states, counts and the `source` filter, `POST /clips` with `whole: true`, `PATCH`, duplicate, delete.
+- [x] **Edit Whole Video**: the button on the video page, the Videos tab menu item, the over-30-minutes sentence.
+- [x] `ClipsTab` with the Source filter and the list or grid switch, `ClipCard`, `RecentClips`, the plain edit route.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: open the stream sample, mark two ranges, create two clips, see them in the Clips tab, rename and hide one. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

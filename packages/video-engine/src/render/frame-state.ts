@@ -37,6 +37,7 @@ import type {
   TextItem,
 } from '../document/schema';
 import { FULL_RECT, fitRect, type Point, type Rect, rectAspect } from '../geometry';
+import { layoutBase } from '../layout/base';
 import { frameToMs, outputDuration, segmentAt, toSource } from '../time/time-map';
 
 /** What the caller knows about a source's picture (from the file it plays or renders). */
@@ -354,8 +355,9 @@ export function frameState(
     };
   });
 
+  // Blurred and Screen Share (and a Custom layout made from them) draw a blurred copy behind.
   const background: BackgroundState =
-    doc.layout.kind === 'blurred'
+    layoutBase(doc.layout) === 'blurred'
       ? { kind: 'blurred', crop: blurredBaseCrop(sourceAspect, canvasAspect) }
       : { kind: 'colour', colour: doc.canvas.background };
 

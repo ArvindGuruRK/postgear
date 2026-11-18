@@ -64,6 +64,11 @@ const KINDS: Record<ClipVideo['kind'], ClipVideoKindName> = {
   UPLOAD: 'upload',
 };
 
+/** A video's platform as the browser names it (`youtube`, `twitch`, `kick`, `upload`). */
+export function platformOf(platform: ClipVideo['platform']): ClipVideoPlatform {
+  return PLATFORMS[platform];
+}
+
 /** The enum value for a probed link's platform. */
 export const PLATFORM_ENUM: Record<ClipPlatformId, ClipVideo['platform']> = {
   youtube: 'YOUTUBE',

@@ -46,19 +46,13 @@ import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard, estimateImport } from '../limits/clip-limits.guard';
 import { CLIP_LINK_PROBER, type ClipLinkProber } from '../links/clip-links.types';
-import { ClipPlaybackService, type SignedAddress } from './clip-playback.service';
+import { type ClipState, clipStateOf, scheduledClipIds } from '../clip/clip-state';
+import { storedDocumentRange } from '../clip/sharp-source';
+import { ClipPlaybackService } from './clip-playback.service';
 import { CLIP_RIGHTS_TEXT_VERSION } from './clip-rights';
-import {
-  type ClipVideoView,
-  filmstripMetaOf,
-  KIND_ENUM,
-  latestAsset,
-  orderedSheets,
-  PLATFORM_ENUM,
-  proxyMetaOf,
-  toVideoView,
-  waveformMetaOf,
-} from './clip-video-view';
+import { ClipSampleLink } from './clip-sample';
+import { NO_VIDEO_MEDIA, signVideoMedia, type VideoMedia } from './clip-video-media';
+import { type ClipVideoView, KIND_ENUM, PLATFORM_ENUM, toVideoView } from './clip-video-view';
 import {
   type ClipSummaryRow,
   ClipVideosRepository,
@@ -79,11 +73,17 @@ export interface ClipVideoCard {
   video: ClipVideoView;
   /** The newest import, so an IMPORTING card can show its step and follow it live. */
   job: ClipJobView | null;
+  /** Module 06: the video's clips that are not hidden (what the Clips tab's All counts). */
+  clipCount: number;
 }
 
 /** A clip on its video's page: never the document. */
 export interface ClipSummaryView {
   id: string;
+  /** Module 07: new, draft, exported, scheduled or hidden (see `clip/clip-state.ts`). */
+  state: ClipState;
+  /** Module 07: the part of the video the clip plays, in the video's time; null if unreadable. */
+  range: { fromMs: number; toMs: number } | null;
   title: string;
   status: ClipSummaryRow['status'];
   origin: ClipSummaryRow['origin'];
@@ -98,22 +98,9 @@ export interface ClipSummaryView {
   updatedAt: string;
 }
 
-export interface ClipVideoDetail {
+/** The video, its signed light copy, filmstrip and waveform (`VideoMedia`), its import and clips. */
+export interface ClipVideoDetail extends VideoMedia {
   video: ClipVideoView;
-  /** The light copy, playable and seekable, for six hours. */
-  playback: SignedAddress | null;
-  proxy: { width: number; height: number; fps: number } | null;
-  filmstrip: {
-    meta: NonNullable<ReturnType<typeof filmstripMetaOf>>;
-    /** One address per sheet, in strip order. */
-    sheets: string[];
-    expiresAt: string;
-  } | null;
-  waveform: {
-    url: string;
-    meta: NonNullable<ReturnType<typeof waveformMetaOf>>;
-    expiresAt: string;
-  } | null;
   job: ClipJobView | null;
   clips: ClipSummaryView[];
 }
@@ -122,6 +109,8 @@ export interface ImportOutcome {
   video: ClipVideoView;
   job: ClipJobView | null;
   existing: boolean;
+  /** Module 06: "You already have the sample video." on a repeated Try A Sample. */
+  message?: string;
 }
 
 @Injectable()
@@ -137,19 +126,37 @@ export class ClipVideosService {
     private readonly playback: ClipPlaybackService,
     @Inject(CLIP_LINK_PROBER) private readonly prober: ClipLinkProber,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
+    private readonly sample: ClipSampleLink,
   ) {}
 
   // ---- Import ----------------------------------------------------------------
 
   async importLink(orgId: string, userId: string, body: ImportVideoInput): Promise<ImportOutcome> {
-    const probe = await this.prober.probe(orgId, body.url);
-    if (body.rightsConfirmed !== true) {
+    // Try A Sample: our own video, so no rights tick; every limit and the charge still apply.
+    const sample = 'sample' in body;
+    const url = sample ? this.sample.url : body.url;
+    if (!url) {
+      throw new NotFoundException({
+        message: CLIPS_MESSAGES.SAMPLE_UNAVAILABLE,
+        code: 'sample_unavailable',
+      });
+    }
+
+    const probe = await this.prober.probe(orgId, url);
+    if (!sample && body.rightsConfirmed !== true) {
       throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'rights_required');
     }
+    const existing = (video: ClipVideo): Promise<ImportOutcome> =>
+      this.videoView(video).then((view) => ({
+        video: view,
+        job: null,
+        existing: true,
+        ...(sample ? { message: CLIPS_MESSAGES.SAMPLE_EXISTS } : {}),
+      }));
 
     const platform = PLATFORM_ENUM[probe.link.platform];
     const already = await this.repository.findLiveByLink(orgId, platform, probe.link.externalId);
-    if (already) return { video: await this.videoView(already), job: null, existing: true };
+    if (already) return existing(already);
 
     const durationMs = Math.max(0, Math.round(probe.info.durationMs));
     const estimate = estimateImport(probe.info);
@@ -199,9 +206,10 @@ export class ClipVideosService {
               ? cleanText(probe.info.channelName, MAX_CHANNEL_LENGTH) || null
               : null,
             durationMs,
-            rightsConfirmedAt: now,
-            rightsConfirmedById: userId,
-            rightsTextVersion: CLIP_RIGHTS_TEXT_VERSION,
+            // The sample is ours: nobody ticked the box, so no rights record is claimed.
+            rightsConfirmedAt: sample ? null : now,
+            rightsConfirmedById: sample ? null : userId,
+            rightsTextVersion: sample ? null : CLIP_RIGHTS_TEXT_VERSION,
             createdById: userId,
           },
         });
@@ -209,9 +217,7 @@ export class ClipVideosService {
         return { kind: 'created' as const, video, job };
       });
 
-      if (outcome.kind === 'existing') {
-        return { video: await this.videoView(outcome.video), job: null, existing: true };
-      }
+      if (outcome.kind === 'existing') return existing(outcome.video);
       written = true;
 
       await this.jobs.start(outcome.job);
@@ -255,40 +261,22 @@ export class ClipVideosService {
     ]);
     const ready = row.status === 'READY';
 
-    const proxyAsset = ready ? latestAsset(assets, 'PROXY') : null;
-    const waveAsset = ready ? latestAsset(assets, 'WAVEFORM') : null;
-    const sheets = ready ? orderedSheets(assets) : [];
-    const filmMeta = sheets[0] ? filmstripMetaOf(sheets[0].meta) : null;
-
-    const [card, playback, sheetAddresses, wave] = await Promise.all([
+    const [card, media, scheduled] = await Promise.all([
       this.cardView(row),
-      proxyAsset ? this.playback.address(proxyAsset.key) : Promise.resolve(null),
-      filmMeta
-        ? Promise.all(sheets.map((sheet) => this.playback.address(sheet.key)))
-        : Promise.resolve([]),
-      waveAsset ? this.playback.address(waveAsset.key) : Promise.resolve(null),
+      ready
+        ? signVideoMedia(assets, (key) => this.playback.address(key))
+        : Promise.resolve(NO_VIDEO_MEDIA),
+      scheduledClipIds(
+        orgId,
+        clips.map((clip) => clip.id),
+      ),
     ]);
-    const waveMeta = waveAsset ? waveformMetaOf(waveAsset.meta) : null;
-    const signedSheets = sheetAddresses.filter(
-      (address): address is SignedAddress => address !== null,
-    );
 
     return {
       video: card.video,
-      playback,
-      proxy: proxyAsset ? proxyMetaOf(proxyAsset.meta) : null,
-      filmstrip:
-        filmMeta && signedSheets.length === sheets.length && signedSheets[0]
-          ? {
-              meta: filmMeta,
-              sheets: signedSheets.map((s) => s.url),
-              expiresAt: signedSheets[0].expiresAt,
-            }
-          : null,
-      waveform:
-        wave && waveMeta ? { url: wave.url, meta: waveMeta, expiresAt: wave.expiresAt } : null,
+      ...media,
       job: card.job,
-      clips: clips.map(toClipSummary),
+      clips: clips.map((clip) => toClipSummary(clip, scheduled.has(clip.id))),
     };
   }
 
@@ -429,13 +417,14 @@ export class ClipVideosService {
   }
 
   async cardView(row: VideoWithCard): Promise<ClipVideoCard> {
-    const { assets, jobs, ...video } = row;
+    const { assets, jobs, _count, ...video } = row;
     const poster = assets[0];
     const posterAddress = poster ? await this.playback.address(poster.key) : null;
     const job = jobs[0];
     return {
       video: toVideoView(video, posterAddress?.url ?? null),
       job: job ? toJobView(job) : null,
+      clipCount: _count?.clips ?? 0,
     };
   }
 
@@ -504,9 +493,12 @@ function cleanText(value: string, max: number): string {
   return stripControlChars(value).replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-export function toClipSummary(row: ClipSummaryRow): ClipSummaryView {
+/** A clip's summary; `scheduled` says whether one of its post groups still has a post waiting. */
+export function toClipSummary(row: ClipSummaryRow, scheduled = false): ClipSummaryView {
   return {
     id: row.id,
+    state: clipStateOf(row, scheduled),
+    range: storedDocumentRange(row.document),
     title: row.title,
     status: row.status,
     origin: row.origin,

@@ -89,6 +89,18 @@ export class ClipChannelsRepository {
     });
   }
 
+  /** A channel already added with this platform id (the add's own duplicate rule), for the Check step. */
+  async findByExternalId(
+    orgId: string,
+    platform: ClipPlatform,
+    externalId: string,
+  ): Promise<{ id: string } | null> {
+    return prisma.clipChannel.findFirst({
+      where: { organizationId: orgId, platform, externalId },
+      select: { id: true },
+    });
+  }
+
   /** Adds the channel unless the workspace is at `limit` (null: unlimited) or already has it. */
   async create(
     orgId: string,

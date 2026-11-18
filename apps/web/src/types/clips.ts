@@ -10,24 +10,42 @@
 import type {
   ClipDocument,
   ClipError,
+  ClipLayout,
   ClipJobKind,
   ClipJobStatus,
   ClipPlatformId,
+  FilmstripMeta,
+  LinkInfo,
+  LinkRef,
+  ListedItem,
+  ListKind,
+  ListPeriod,
+  ListSort,
+  Ratio,
+  WaveformMeta,
 } from '@postgear/video-engine';
 
 export type {
+  ClipLayout,
   ClipCanvas,
   ClipDocument,
   ClipErrorCode,
   ClipJobKind,
   ClipJobStage,
   ClipJobStatus,
+  ClipPlatformId,
   ExportQuality,
+  FilmstripMeta,
   LinkFormat,
   LinkInfo,
   LinkRef,
+  ListedItem,
+  ListKind,
+  ListPeriod,
+  ListSort,
   Ratio,
   Segment,
+  WaveformMeta,
 } from '@postgear/video-engine';
 
 /** `GET /clips/jobs/:jobId` and every job event: never a storage key or a tool's text. */
@@ -115,6 +133,8 @@ export interface ClipView {
   videoId: string;
   title: string;
   status: ClipStatusName;
+  /** Worked out by the API from status, export and posts. */
+  state: ClipState;
   origin: ClipOriginName;
   ratio: string;
   durationMs: number;
@@ -134,14 +154,19 @@ export interface ClipView {
 /** Whether an export will read the sharp range: stored, still coming, or gone (the light copy). */
 export type ClipSharpState = 'ready' | 'fetching' | 'gone';
 
-/** `GET /clips/:clipId`. */
+/** `GET /clips/:clipId`: the clip, its video, and the video's light copy, filmstrip and waveform. */
 export interface ClipDetail {
   clip: ClipView;
   /** Null when the video was deleted (its exported clips stay). */
   video: ClipVideoView | null;
   /** The light copy of the whole video; play the clip's range of it. */
   playback: SignedAddress | null;
+  proxy: { width: number; height: number; fps: number } | null;
+  filmstrip: ClipFilmstrip | null;
+  waveform: ClipWaveform | null;
   sharp: ClipSharpState;
+  /** The stretch held sharp around the clip, in the video's time; null when nothing sharp touches it. */
+  held: { fromMs: number; toMs: number } | null;
 }
 
 /** The plan's Clips values `GET /clips/status` carries, as the resolver answered them. */
@@ -181,4 +206,197 @@ export interface ClipsStatus {
   limits: Record<ClipsStatusLimitKey, unknown>;
   meters: { importMinutes: ClipsMeterView; aiMinutes: ClipsMeterView };
   usage: { storageBytes: number };
+  /** Module 06: whether Try A Sample has a video to bring in (absent on an older API: read as false). */
+  sample?: { available: boolean };
+}
+
+// --- Module 06: links, videos, uploads, channels --------------------------------
+
+/** `POST /clips/links/probe`: the link as recognised, what the platform says, and whether we have it. */
+export interface ClipProbe {
+  link: LinkRef;
+  /** `thumbnailUrl` is our own signed picture route, never the platform's address. */
+  info: LinkInfo;
+  existingVideoId: string | null;
+}
+
+/** One card of `GET /clips/videos`: the video and its newest import, to follow live. */
+export interface ClipVideoCard {
+  video: ClipVideoView;
+  job: ClipJobView | null;
+  /** Live clips cut from it (absent on an older API). */
+  clipCount?: number;
+}
+
+export interface ClipVideoPage {
+  videos: ClipVideoCard[];
+  nextCursor: string | null;
+  total: number;
+}
+
+export type ClipVideoSort = 'newest' | 'oldest';
+
+/** A clip's state on a list: worked out by the API from status, export and posts. */
+export type ClipState = 'new' | 'draft' | 'exported' | 'scheduled' | 'hidden';
+
+/** A clip on its video's page (never its document). */
+export interface ClipSummary {
+  id: string;
+  title: string;
+  status: ClipStatusName;
+  origin: ClipOriginName;
+  ratio: string;
+  durationMs: number;
+  score: number | null;
+  revision: number;
+  exported: boolean;
+  exportedMediaId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  state: ClipState;
+  /** The part of the video it plays (the video's time), for its line on the timeline; null if unreadable. */
+  range: { fromMs: number; toMs: number } | null;
+}
+
+/** The filmstrip: sprite sheets of small pictures along the whole video. */
+export interface ClipFilmstrip {
+  meta: FilmstripMeta;
+  /** One signed address per sheet, in strip order. */
+  sheets: string[];
+  expiresAt: string;
+}
+
+/** The sound's shape: a file of peaks, `perSecond` a second. */
+export interface ClipWaveform {
+  url: string;
+  meta: WaveformMeta;
+  expiresAt: string;
+}
+
+/** `GET /clips/videos/:videoId`. */
+export interface ClipVideoDetail {
+  video: ClipVideoView;
+  playback: SignedAddress | null;
+  proxy: { width: number; height: number; fps: number } | null;
+  filmstrip: ClipFilmstrip | null;
+  waveform: ClipWaveform | null;
+  job: ClipJobView | null;
+  clips: ClipSummary[];
+}
+
+/** `POST /clips/videos/uploads`. */
+export interface ClipUploadStarted {
+  videoId: string;
+  uploadId: string;
+  partSize: number;
+  partCount: number;
+}
+
+/** What a channel can list, as the API offers it. */
+export interface ClipChannelList {
+  kind: ListKind;
+  /** The first is the default. */
+  sorts: ListSort[];
+  periods: ListPeriod[];
+}
+
+/** One saved channel (`GET /clips/channels`). */
+export interface ClipChannelView {
+  id: string;
+  platform: ClipPlatformId;
+  handle: string;
+  displayName: string;
+  /** The platform's own picture address; the browser loads it directly. */
+  avatarUrl: string | null;
+  broadcasterType: string | null;
+  lastSyncedAt: string | null;
+  error: string | null;
+  createdAt: string;
+  /** The platform is switched off: shown so it can be removed, never listed. */
+  paused: boolean;
+  lists: ClipChannelList[];
+}
+
+/** `POST /clips/channels/check`: the channel a name resolves to, not saved. */
+export interface ClipChannelPreview {
+  platform: ClipPlatformId;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+/** One row of a channel's list. */
+export interface ClipStreamItem extends ListedItem {
+  hidden: boolean;
+  imported: boolean;
+  videoId: string | null;
+}
+
+/** `GET /clips/channels/:id/streams`. */
+export interface ClipStreamsPage {
+  kind: ListKind;
+  sort: ListSort;
+  period: ListPeriod | null;
+  items: ClipStreamItem[];
+  nextCursor: string | null;
+  updatedAt: string;
+  stale: boolean;
+  capped: boolean;
+  notice: string | null;
+}
+
+// --- Module 07: the Clips library ------------------------------------------------
+
+/** The Clips tab's status filter: a state, or `all` (every state but hidden). */
+export type ClipStatusFilter = 'all' | ClipState;
+export type ClipCounts = Record<ClipStatusFilter, number>;
+export type ClipSource = ClipVideoPlatform;
+export type ClipListSort = 'newest' | 'oldest';
+
+/** A card's picture: one filmstrip tile, as a box on its sheet (or the whole poster). */
+export interface ClipPoster {
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sheetWidth: number;
+  sheetHeight: number;
+}
+
+/** The light copy and the clip's range, for the muted hover preview. */
+export interface ClipPreview {
+  url: string;
+  fromMs: number;
+  toMs: number;
+  expiresAt: string;
+}
+
+/** One clip of `GET /clips`. */
+export interface ClipListItem extends ClipSummary {
+  videoId: string;
+  videoTitle: string;
+  platform: ClipVideoPlatform;
+  poster: ClipPoster | null;
+  preview: ClipPreview | null;
+}
+
+export interface ClipListPage {
+  clips: ClipListItem[];
+  counts: ClipCounts;
+  page: number;
+  pageSize: number;
+  /** Clips matching every filter, the status included. */
+  total: number;
+}
+
+// --- Module 10: saved layouts ----------------------------------------------------
+
+export interface SavedLayoutView {
+  id: string;
+  name: string;
+  ratio: Ratio;
+  layout: ClipLayout;
+  createdAt: string;
+  updatedAt: string;
 }

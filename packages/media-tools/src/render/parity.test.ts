@@ -18,10 +18,15 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import {
+  type AreaState,
+  applyLayout,
   buildRenderPlan,
   type ClipDocument,
   compileFfmpeg,
   frameState,
+  layoutsFor,
+  type PresetKind,
+  type Rect,
   type RenderContext,
   type Segment,
 } from '@postgear/video-engine';
@@ -330,5 +335,276 @@ describeWithFfmpeg('render parity (real FFmpeg)', () => {
     expect(Math.abs(Number(audio?.duration) - 3)).toBeLessThanOrEqual(1 / 30);
     expect(Math.abs(Number(video?.duration) - 3)).toBeLessThanOrEqual(1 / 30);
     expect(statSync(path.join(dir, 'silent-render.mp4')).size).toBeGreaterThan(0);
+  }, 120_000);
+});
+
+/*
+ * Layout parity (Module 10): a 1920 by 1080 gradient whose red channel is x
+ * and green channel is y (scaled to 0 to 255), through each layout at 1080 by
+ * 1920. The centre of every area must show the source colour at the centre
+ * of its crop, both read from `frameState`, within 4 levels (the cookbook's
+ * 3-level gap is the yuv420p colour round trip). The plan's pixels must sit
+ * within 1 px of `frameState`'s fractions. Rounded camera boxes are also read
+ * just inside a corner, where the mask is transparent: the layer below shows.
+ */
+const GRADIENT_W = 1920;
+const GRADIENT_H = 1080;
+const GRADIENT_MS = 3_500;
+const LAYOUT_W = 1080;
+const LAYOUT_H = 1920;
+
+interface Rgb {
+  r: number;
+  g: number;
+}
+
+/** The mean red and green of a `(2k+1)` square around a pixel of a packed rgb24 picture. */
+function sample(buffer: Uint8Array, width: number, x: number, y: number, k = 2): Rgb {
+  let r = 0;
+  let g = 0;
+  let count = 0;
+  for (let dy = -k; dy <= k; dy += 1) {
+    for (let dx = -k; dx <= k; dx += 1) {
+      const at = ((y + dy) * width + (x + dx)) * 3;
+      r += buffer[at] as number;
+      g += buffer[at + 1] as number;
+      count += 1;
+    }
+  }
+  return { r: r / count, g: g / count };
+}
+
+/** The source pixel an output pixel shows through a picture placed at `content` from `crop`. */
+function sourcePixelAt(content: Rect, crop: Rect, outX: number, outY: number): [number, number] {
+  const u = ((outX + 0.5) / LAYOUT_W - content.x) / content.w;
+  const v = ((outY + 0.5) / LAYOUT_H - content.y) / content.h;
+  const sx = (crop.x + u * crop.w) * GRADIENT_W - 0.5;
+  const sy = (crop.y + v * crop.h) * GRADIENT_H - 0.5;
+  return [
+    Math.min(GRADIENT_W - 3, Math.max(2, Math.round(sx))),
+    Math.min(GRADIENT_H - 3, Math.max(2, Math.round(sy))),
+  ];
+}
+
+function gradientDocument(kind: PresetKind): ClipDocument {
+  return applyLayout(parityDocument([segment('a', 0, 3_000, 1)]), kind, {
+    width: GRADIENT_W,
+    height: GRADIENT_H,
+  });
+}
+
+describeWithFfmpeg('layout parity (real FFmpeg)', () => {
+  let dir = '';
+  let runTool: RunTool;
+  let source: Uint8Array;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'clips-layout-parity-'));
+    runTool = createRunTool(PATHS as ToolPaths);
+    await ffmpeg(runTool, dir, [
+      '-f',
+      'lavfi',
+      '-i',
+      `nullsrc=s=${GRADIENT_W}x${GRADIENT_H}:r=30:d=${GRADIENT_MS / 1000},format=rgb24,` +
+        `geq=r='X*255/${GRADIENT_W - 1}':g='Y*255/${GRADIENT_H - 1}':b='128'`,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-qp',
+      '0',
+      '-pix_fmt',
+      'yuv420p',
+      '-g',
+      '30',
+      'gradient.mp4',
+    ]);
+    // The source decoded the same way the render is, so both pass the same colour conversion.
+    await ffmpeg(runTool, dir, [
+      '-i',
+      'gradient.mp4',
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgb24',
+      'gradient.rgb',
+    ]);
+    source = new Uint8Array(readFileSync(path.join(dir, 'gradient.rgb')));
+  }, 120_000);
+
+  afterAll(() => {
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each(layoutsFor('9:16'))(
+    'draws every %s area where frameState says',
+    async (kind) => {
+      const doc = gradientDocument(kind);
+      const ctx = contextFor('gradient.mp4', false);
+      ctx.quality = '1080p';
+      const facts = { width: GRADIENT_W, height: GRADIENT_H, fps: 30 };
+      ctx.assets = {
+        sources: {
+          src: {
+            ...facts,
+            file: 'gradient.mp4',
+            sourceOffsetMs: 0,
+            durationMs: GRADIENT_MS,
+            hasAudio: false,
+          },
+        },
+      };
+      const plan = buildRenderPlan(doc, ctx);
+      expect(plan.output).toMatchObject({ width: LAYOUT_W, height: LAYOUT_H });
+      const out = `layout-${kind}.mp4`;
+      await renderClip({ runTool, scratchDir: dir, compiled: compileFfmpeg(plan), outFile: out });
+      await ffmpeg(runTool, dir, [
+        '-ss',
+        '1.000',
+        '-i',
+        out,
+        '-frames:v',
+        '1',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        `${kind}.rgb`,
+      ]);
+      const frame = new Uint8Array(readFileSync(path.join(dir, `${kind}.rgb`)));
+      expect(frame.length).toBe(LAYOUT_W * LAYOUT_H * 3);
+
+      const state = frameState(doc, 1_000, { sources: { src: facts } });
+      const areas = plan.segments[0]?.picture.areas ?? [];
+      expect(areas).toHaveLength(state.areas.length);
+
+      let worst = 0;
+      state.areas.forEach((area: AreaState, i) => {
+        // The plan's pixels are frameState's fractions, to within a pixel.
+        const pixels = areas[i];
+        if (!pixels) throw new Error('no plan area');
+        expect(Math.abs(pixels.x - area.content.x * LAYOUT_W)).toBeLessThanOrEqual(1);
+        expect(Math.abs(pixels.y - area.content.y * LAYOUT_H)).toBeLessThanOrEqual(1);
+        expect(Math.abs(pixels.width - area.content.w * LAYOUT_W)).toBeLessThanOrEqual(1);
+        expect(Math.abs(pixels.height - area.content.h * LAYOUT_H)).toBeLessThanOrEqual(1);
+
+        // The centre of the area shows the centre of its crop.
+        const cx = Math.floor((area.content.x + area.content.w / 2) * LAYOUT_W);
+        const cy = Math.floor((area.content.y + area.content.h / 2) * LAYOUT_H);
+        const [sx, sy] = sourcePixelAt(area.content, area.visibleCrop, cx, cy);
+        const got = sample(frame, LAYOUT_W, cx, cy);
+        const want = sample(source, GRADIENT_W, sx, sy);
+        worst = Math.max(worst, Math.abs(got.r - want.r), Math.abs(got.g - want.g));
+        expect([
+          kind,
+          area.name,
+          Math.abs(got.r - want.r) <= 4,
+          Math.abs(got.g - want.g) <= 4,
+        ]).toEqual([kind, area.name, true, true]);
+
+        if (area.radius > 0) {
+          // Just inside the top left corner the mask is transparent: the layer below shows.
+          const kx = pixels.x + 2;
+          const ky = pixels.y + 2;
+          const corner = sample(frame, LAYOUT_W, kx, ky, 1);
+          const own = sample(
+            source,
+            GRADIENT_W,
+            ...sourcePixelAt(area.content, area.visibleCrop, kx, ky),
+            1,
+          );
+          const below = i > 0 && kind === 'gameplay' ? (state.areas[0] as AreaState) : null;
+          const [bx, by] = below
+            ? sourcePixelAt(below.content, below.visibleCrop, kx, ky)
+            : sourcePixelAt(
+                { x: 0, y: 0, w: 1, h: 1 },
+                state.background.kind === 'blurred'
+                  ? state.background.crop
+                  : { x: 0, y: 0, w: 1, h: 1 },
+                kx,
+                ky,
+              );
+          const under = sample(source, GRADIENT_W, bx, by, 1);
+          expect(Math.max(Math.abs(corner.r - own.r), Math.abs(corner.g - own.g))).toBeGreaterThan(
+            20,
+          );
+          // The blurred base is a blurred gradient (still the gradient), so a little looser there.
+          expect(
+            Math.max(Math.abs(corner.r - under.r), Math.abs(corner.g - under.g)),
+          ).toBeLessThanOrEqual(below ? 4 : 8);
+        }
+      });
+      // Logged so the measured gap can be written down beside the tolerance.
+      console.info(`layout parity ${kind}: worst centre gap ${worst.toFixed(2)} levels`);
+    },
+    120_000,
+  );
+
+  it('draws a lone rounded area over the canvas colour (a Custom layout)', async () => {
+    const doc = gradientDocument('fullscreen');
+    const area = doc.layout.areas[0];
+    if (!area) throw new Error('no area');
+    doc.layout.kind = 'custom';
+    doc.canvas.background = '#336699';
+    area.frame = { x: 0.1, y: 0.2, w: 0.8, h: 0.45 };
+    area.radius = 60;
+    const facts = { width: GRADIENT_W, height: GRADIENT_H, fps: 30 };
+    const ctx = contextFor('gradient.mp4', false);
+    ctx.quality = '1080p';
+    ctx.assets = {
+      sources: {
+        src: {
+          ...facts,
+          file: 'gradient.mp4',
+          sourceOffsetMs: 0,
+          durationMs: GRADIENT_MS,
+          hasAudio: false,
+        },
+      },
+    };
+    const plan = buildRenderPlan(doc, ctx);
+    await renderClip({
+      runTool,
+      scratchDir: dir,
+      compiled: compileFfmpeg(plan),
+      outFile: 'lone.mp4',
+    });
+    await ffmpeg(runTool, dir, [
+      '-ss',
+      '1.000',
+      '-i',
+      'lone.mp4',
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgb24',
+      'lone.rgb',
+    ]);
+    const frame = new Uint8Array(readFileSync(path.join(dir, 'lone.rgb')));
+    const pixels = plan.segments[0]?.picture.areas[0];
+    if (!pixels) throw new Error('no plan area');
+    // Outside the area, and just inside its rounded corner: the canvas colour (0x33, 0x66).
+    for (const [x, y] of [
+      [20, 20],
+      [pixels.x + 3, pixels.y + 3],
+    ] as const) {
+      const got = sample(frame, LAYOUT_W, x, y, 1);
+      expect(Math.abs(got.r - 0x33)).toBeLessThanOrEqual(4);
+      expect(Math.abs(got.g - 0x66)).toBeLessThanOrEqual(4);
+    }
+    const state = frameState(doc, 1_000, { sources: { src: facts } });
+    const a = state.areas[0] as AreaState;
+    const cx = Math.floor((a.content.x + a.content.w / 2) * LAYOUT_W);
+    const cy = Math.floor((a.content.y + a.content.h / 2) * LAYOUT_H);
+    const got = sample(frame, LAYOUT_W, cx, cy);
+    const want = sample(source, GRADIENT_W, ...sourcePixelAt(a.content, a.visibleCrop, cx, cy));
+    expect(Math.abs(got.r - want.r)).toBeLessThanOrEqual(4);
+    expect(Math.abs(got.g - want.g)).toBeLessThanOrEqual(4);
   }, 120_000);
 });

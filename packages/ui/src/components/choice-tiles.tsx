@@ -15,6 +15,14 @@ export interface ChoiceTileOption<T extends string> {
   short?: string;
   /** Shown above the text. */
   icon?: AnimatedIcon;
+  /**
+   * A small picture of the choice, above the text, for a choice that is
+   * easier seen than named (the clip editor's Vertical, Horizontal, Square).
+   * Decorative: the label names it. Takes the place of `icon`.
+   */
+  drawing?: ReactNode;
+  /** One short sentence under the name. The tile grows to hold it. */
+  line?: string;
 }
 
 interface ChoiceTilesBase<T extends string> {
@@ -24,13 +32,24 @@ interface ChoiceTilesBase<T extends string> {
   options: readonly ChoiceTileOption<T>[];
   disabled?: boolean;
   className?: string;
+  /**
+   * Wraps the tiles into a grid of this many columns, for a choice of more
+   * than a row holds (the clip editor's seven layouts). Left out, one row.
+   */
+  columns?: 2 | 3 | 4;
 }
+
+const COLUMNS: Readonly<Record<2 | 3 | 4, string>> = {
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-4',
+};
 
 /**
  * One choice from a few, as a full-width row of equal keys in the time picker's
  * look. For a choice that is the point of a form (how often a schedule runs),
- * where `Segmented` reads as tabs. No frame and, as a toggle, no shadow. Always
- * one row, so keep the options few.
+ * where `Segmented` reads as tabs. No frame and, as a toggle, no shadow. One
+ * row, so keep the options few; `columns` wraps a longer set into a grid.
  */
 export function ChoiceTiles<T extends string>({
   labelledBy,
@@ -40,9 +59,10 @@ export function ChoiceTiles<T extends string>({
   onValueChange,
   disabled,
   className,
+  columns,
 }: ChoiceTilesBase<T> & { value: T; onValueChange: (value: T) => void }) {
   return (
-    <TileRow labelledBy={labelledBy} label={label} className={className}>
+    <TileRow labelledBy={labelledBy} label={label} className={className} columns={columns}>
       {options.map((option) => (
         <Tile
           key={option.value}
@@ -67,9 +87,10 @@ export function ChoiceTilesMany<T extends string>({
   onToggle,
   disabled,
   className,
+  columns,
 }: ChoiceTilesBase<T> & { values: readonly T[]; onToggle: (value: T) => void }) {
   return (
-    <TileRow labelledBy={labelledBy} label={label} className={className}>
+    <TileRow labelledBy={labelledBy} label={label} className={className} columns={columns}>
       {options.map((option) => (
         <Tile
           key={option.value}
@@ -87,11 +108,13 @@ function TileRow({
   labelledBy,
   label,
   className,
+  columns,
   children,
 }: {
   labelledBy?: string;
   label?: string;
   className?: string;
+  columns?: 2 | 3 | 4;
   children: ReactNode;
 }) {
   return (
@@ -100,7 +123,11 @@ function TileRow({
       role="group"
       aria-labelledby={labelledBy}
       aria-label={labelledBy ? undefined : label}
-      className={cn('grid w-full auto-cols-fr grid-flow-col gap-2', className)}
+      className={cn(
+        'grid w-full gap-2',
+        columns ? COLUMNS[columns] : 'auto-cols-fr grid-flow-col',
+        className,
+      )}
     >
       {children}
     </div>
@@ -118,6 +145,7 @@ function Tile<T extends string>({
   disabled?: boolean;
   onClick: () => void;
 }) {
+  const tall = option.drawing !== undefined || option.line !== undefined;
   const button = (
     <button
       type="button"
@@ -128,12 +156,21 @@ function Tile<T extends string>({
       className={cn(
         'flex w-full flex-col items-center justify-center gap-1.5 px-1 type-ui text-sm',
         'disabled:pointer-events-none disabled:opacity-50',
-        option.icon ? 'h-16' : 'h-10',
+        tall ? 'h-full px-3 py-4 text-center' : option.icon ? 'h-16' : 'h-10',
         keyTile(active),
       )}
     >
-      {option.icon ? <MotionIcon icon={option.icon} className="h-5 w-5" /> : null}
+      {option.drawing !== undefined ? (
+        <span aria-hidden="true" className="flex items-center justify-center">
+          {option.drawing}
+        </span>
+      ) : option.icon ? (
+        <MotionIcon icon={option.icon} className="h-5 w-5" />
+      ) : null}
       {option.short ?? option.label}
+      {option.line ? (
+        <span className="font-sans text-xs leading-snug type-muted">{option.line}</span>
+      ) : null}
     </button>
   );
 

@@ -8,10 +8,11 @@
  * fingerprint.
  *
  * The graph, in order (cookbook sections 1, 2, 7, 9 and 13):
- * 1. Per segment, picture: `trim` in the input's own time, the crop in source
- *    pixels (before `setpts`, so crops stay in source time), the scale to the
- *    area, the base (pad on a colour, or the blurred copy with `overlay
- *    format=yuv420 shortest=1`), `setpts=(PTS-STARTPTS)/S`, `fps`, `setsar=1`.
+ * 1. Per segment, picture: `trim` in the input's own time, then the layout
+ *    graph (`layout-graph.ts`: the base, one crop and scale per area in
+ *    source pixels, before `setpts` so crops stay in source time, rounded
+ *    masks, every overlay `format=yuv420 shortest=1`), then
+ *    `setpts=(PTS-STARTPTS)/S`, `fps`, `setsar=1`.
  * 2. Per segment, sound: `atrim`, `asetpts`, the segment's volume, the
  *    `atempo` chain (0.5 to 100 per filter), `aresample=48000` and a fixed
  *    stereo format; silence from `anullsrc` when the file has no sound.
@@ -21,18 +22,12 @@
  */
 
 import { buildAss } from './ass';
-import type { PixelRect, PlanSegment, RenderPlan } from './plan';
+import { ffmpegColour, formatNumber } from './filter-text';
+import { layoutGraph } from './layout-graph';
+import type { PlanSegment, RenderPlan } from './plan';
 import { type CompiledFfmpeg, type CompiledInput, msToSeconds } from './types';
 
-/** A number for filter text: at most six decimals, no trailing zeros, never exponent form. */
-export function formatNumber(value: number): string {
-  if (!Number.isFinite(value)) {
-    throw new Error(`Cannot write ${String(value)} into a filter graph`);
-  }
-  const fixed = value.toFixed(6);
-  const trimmed = fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed;
-  return trimmed === '-0' ? '0' : trimmed;
-}
+export { ffmpegColour, formatNumber };
 
 /**
  * The `atempo` filters for a speed. One filter takes 0.5 to 100 only, so a
@@ -63,18 +58,6 @@ export function setptsFor(speed: number): string {
   return speed === 1 ? 'setpts=PTS-STARTPTS' : `setpts=(PTS-STARTPTS)/${formatNumber(speed)}`;
 }
 
-/** `#RRGGBB` as FFmpeg's `0xRRGGBB`. */
-export function ffmpegColour(hex: string): string {
-  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
-    throw new Error(`A colour is #RRGGBB, not ${hex}`);
-  }
-  return `0x${hex.slice(1).toUpperCase()}`;
-}
-
-function cropFilter(rect: PixelRect): string {
-  return `crop=${rect.w}:${rect.h}:${rect.x}:${rect.y}:exact=1`;
-}
-
 const AUDIO_FORMAT =
   'aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo';
 
@@ -84,28 +67,11 @@ interface SegmentSources {
   audio: string | null;
 }
 
+/** One segment's picture: the layout graph between its `trim` and its timing filters. */
 function segmentPicture(segment: PlanSegment, source: string, plan: RenderPlan): string[] {
-  const { area, base, fillsOutput } = segment.picture;
-  const n = segment.index;
-  const { width: outW, height: outH, fps } = plan.output;
   const trim = `trim=start=${msToSeconds(segment.trimStartMs)}:end=${msToSeconds(segment.trimEndMs)}`;
-  const timing = `${setptsFor(segment.speed)},fps=${fps},setsar=1`;
-  const areaChain = `${cropFilter(area.crop)},scale=${area.width}:${area.height}:flags=bicubic`;
-
-  if (base.kind === 'colour') {
-    const pad = fillsOutput
-      ? ''
-      : `,setsar=1,pad=${outW}:${outH}:${area.x}:${area.y}:color=${ffmpegColour(base.colour)}`;
-    return [`${source}${trim},${areaChain}${pad},${timing}[v${n}]`];
-  }
-
-  return [
-    `${source}${trim},split=2[vb${n}][vf${n}]`,
-    `[vb${n}]${cropFilter(base.crop)},scale=${base.smallWidth}:${base.smallHeight}:flags=bilinear,` +
-      `gblur=sigma=3:steps=2,scale=${outW}:${outH}:flags=bicubic,setsar=1[vbb${n}]`,
-    `[vf${n}]${areaChain},setsar=1[vff${n}]`,
-    `[vbb${n}][vff${n}]overlay=x=${area.x}:y=${area.y}:format=yuv420:shortest=1,${timing}[v${n}]`,
-  ];
+  const timing = `${setptsFor(segment.speed)},fps=${plan.output.fps},setsar=1`;
+  return layoutGraph(segment, source, plan, { trim, timing });
 }
 
 function segmentSound(segment: PlanSegment, source: string | null): string {

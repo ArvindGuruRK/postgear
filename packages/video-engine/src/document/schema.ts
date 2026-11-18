@@ -150,10 +150,20 @@ export const areaSchema = z
     'Crop keyframes must be in time order',
   );
 
+/**
+ * What sits behind the areas: the canvas colour, or a blurred copy of the
+ * video. Optional: without it the kind decides (Blurred and Screen Share are
+ * blurred, the rest solid); a layout turned Custom writes it so it keeps the
+ * background it had (Module 10).
+ */
+export const LAYOUT_BASES = ['solid', 'blurred'] as const;
+export type LayoutBase = (typeof LAYOUT_BASES)[number];
+
 export const layoutSchema = z
   .object({
     kind: z.enum(LAYOUT_KINDS),
     fitCrop: z.enum(FIT_CROPS).optional(),
+    base: z.enum(LAYOUT_BASES).optional(),
     areas: z.array(areaSchema).min(1).max(MAX_AREAS),
   })
   .strict();
@@ -323,6 +333,19 @@ export const trackSchema = z.discriminatedUnion('kind', [
   captionsTrackSchema,
 ]);
 
+/**
+ * Editor facts that never reach the picture (Module 08). Optional, so every
+ * document written before it still reads, and strict like the rest.
+ *
+ * - `shapeChosen`: the first-open "What Do You Want To Make?" question was
+ *   answered, so it is never asked again (even if the answer kept the shape).
+ */
+export const documentMetaSchema = z
+  .object({
+    shapeChosen: z.boolean().optional(),
+  })
+  .strict();
+
 export const CURRENT_SCHEMA_VERSION = 1 as const;
 
 /** Output length of one part, rounded once. `time/time-map.ts` builds on this. */
@@ -345,6 +368,7 @@ const documentShape = z
     looks: looksSchema,
     fades: fadesSchema,
     tracks: z.array(trackSchema).max(16),
+    meta: documentMetaSchema.optional(),
   })
   .strict();
 
@@ -466,4 +490,5 @@ export type CaptionsTrack = z.infer<typeof captionsTrackSchema>;
 export type Track = z.infer<typeof trackSchema>;
 export type OverlayItem = TextItem | StickerItem;
 export type TimedItem = TextItem | StickerItem | AudioItem;
+export type ClipDocumentMeta = z.infer<typeof documentMetaSchema>;
 export type ClipDocument = z.infer<typeof clipDocumentSchema>;

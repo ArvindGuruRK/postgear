@@ -1,6 +1,6 @@
 # Module 06: Clips Home And Videos
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 04](module-04-import-pipeline.md) (and the channel routes of [Module 03](module-03-link-engine.md))
 > **Stories**: CL-1.1 to CL-1.6, CL-2.1, CL-2.3, CL-2.4; CL-1.7 (Add A Channel And Browse Its Streams), CL-1.8 (Hide Streams I Do Not Want), CL-2.5 (Try A Sample Video)
 > **Next**: [Module 07](module-07-manual-clipping-and-clips-library.md) (Manual Clipping And The Clips Library)
@@ -78,15 +78,15 @@ Module 01 built four tabs; this module adds a fifth, **Streams**, between Videos
 
 ## Tasks
 
-- [ ] Client functions and mirrored types.
-- [ ] `StorageMeter` (reads the resolved limit), `AiMinutesChip`, the tools warning.
-- [ ] `LinkBox` and `LinkCard` with every state and refusal; **Try A Sample** and the `{ sample: true }` form of the import route.
-- [ ] `use-video-upload` (preflight, parts, resume) and its row.
-- [ ] `VideosTab`, `VideoCard`, `stageLabel`, `etaLabel`, the delete dialog, the placeholder video route.
-- [ ] `ChannelBrowser`, the Streams tab (the fifth tab), the Add dialog, hide and show hidden, Import through the probe, the Browse dialog on the link box.
-- [ ] Playground section; title-case test green.
+- [x] Client functions and mirrored types.
+- [x] `StorageMeter` (reads the resolved limit), `AiMinutesChip`, the tools warning.
+- [x] `LinkBox` and `LinkCard` with every state and refusal; **Try A Sample** and the `{ sample: true }` form of the import route.
+- [x] `use-video-upload` (preflight, parts, resume) and its row.
+- [x] `VideosTab`, `VideoCard`, `stageLabel`, `etaLabel`, the delete dialog, the placeholder video route.
+- [x] `ChannelBrowser`, the Streams tab (the fifth tab), the Add dialog, hide and show hidden, Import through the probe, the Browse dialog on the link box.
+- [x] Playground section; title-case test green.
 - [ ] Playwright once under simulation: paste the Twitch simulation link, tick, import, watch it become ready; press Try A Sample; add the `simstreamer` channel, hide one stream, import another; upload the 3 minute sample file; delete a video. Screenshots in `screenshots/` (light, dark, Lilac).
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

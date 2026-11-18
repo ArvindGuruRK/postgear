@@ -54,6 +54,8 @@ import { type ListingFailure, toListingFailure } from './listers/listing-failure
 
 export const LIST_CALLS_PER_MINUTE = 30;
 export const ADD_CALLS_PER_MINUTE = 6;
+/** The Add dialog's Check step (Module 06): a few misspellings before the add. */
+export const CHECK_CALLS_PER_MINUTE = 12;
 export const REFRESH_EVERY_SECONDS = 30;
 /** Hidden items one channel may hold: ids only, but still a bound on what a workspace can write. */
 export const MAX_HIDDEN_PER_CHANNEL = 2_000;
@@ -91,6 +93,15 @@ export interface ChannelView {
   /** The platform is off in `CLIPS_PLATFORMS`: shown so it can be removed, never listed. */
   paused: boolean;
   lists: ListOptions[];
+}
+
+/** What the Add dialog's Check step shows before anything is saved. */
+export interface CheckedChannelView {
+  platform: ClipPlatformId;
+  handle: string;
+  displayName: string;
+  /** The platform's own picture address; the browser loads it, we never copy it. */
+  avatarUrl: string | null;
 }
 
 export interface StreamItemView extends ListedItem {
@@ -137,15 +148,52 @@ export class ClipChannelsService {
 
   /** `POST /clips/channels`: check, resolve on the platform, store. */
   async add(orgId: string, userId: string | null, input: AddChannelInput): Promise<ChannelView> {
+    const { platform, dbPlatform, channel, limit } = await this.resolveForAdd(orgId, input, 'add');
+
+    const outcome = await this.repository.create(orgId, userId, dbPlatform, channel, limit);
+    if (outcome.outcome === 'exists')
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'channel_exists');
+    if (outcome.outcome === 'too_many') {
+      // Another add won the last place meanwhile: the same refusal, with the count it saw.
+      await this.resolver.assert(orgId, 'clips.browse_channels', () => false, {
+        used: outcome.used,
+      });
+      throw new ClipErrorException(HttpStatus.PAYMENT_REQUIRED, 'channel_limit');
+    }
+    this.logger.log(JSON.stringify({ event: 'clips.channels.added', orgId, platform }));
+    return this.view(outcome.channel);
+  }
+
+  /**
+   * `POST /clips/channels/check` (Module 06, the Add A Channel dialog's
+   * Check step): every check add runs, and the channel resolved through the
+   * same lister, but nothing is written. Its own throttle bucket
+   * (`CHECK_CALLS_PER_MINUTE`), so checking first never halves the adds.
+   */
+  async check(orgId: string, input: AddChannelInput): Promise<CheckedChannelView> {
+    const { channel, dbPlatform } = await this.resolveForAdd(orgId, input, 'check');
+    // Add's insert refuses the same platform id under another spelling; say so now.
+    if (await this.repository.findByExternalId(orgId, dbPlatform, channel.externalId)) {
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'channel_exists');
+    }
+    return {
+      platform: channel.platform,
+      handle: channel.handle,
+      displayName: channel.displayName,
+      avatarUrl: channel.avatarUrl,
+    };
+  }
+
+  /** Add's checks in order, then the platform's answer: the plan, switch, handle, throttle, duplicate, limit. */
+  private async resolveForAdd(orgId: string, input: AddChannelInput, call: 'add' | 'check') {
     const { platform } = input;
     await this.resolver.assert(orgId, 'clips.enabled', (enabled) => enabled === true);
     this.assertPlatformOn(platform);
 
     const checked = validateHandle(platform, input.handle);
     if (!checked.ok) throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, checked.code);
-    if (
-      !(await withinRate(this.redis, `clips:channels:rate:add:${orgId}`, ADD_CALLS_PER_MINUTE, 60))
-    ) {
+    const perMinute = call === 'add' ? ADD_CALLS_PER_MINUTE : CHECK_CALLS_PER_MINUTE;
+    if (!(await withinRate(this.redis, `clips:channels:rate:${call}:${orgId}`, perMinute, 60))) {
       throw this.throttled();
     }
 
@@ -169,19 +217,7 @@ export class ClipChannelsService {
     } catch (error) {
       throw this.refusal(toListingFailure(error), platform);
     }
-
-    const outcome = await this.repository.create(orgId, userId, dbPlatform, channel, limit);
-    if (outcome.outcome === 'exists')
-      throw new ClipErrorException(HttpStatus.CONFLICT, 'channel_exists');
-    if (outcome.outcome === 'too_many') {
-      // Another add won the last place meanwhile: the same refusal, with the count it saw.
-      await this.resolver.assert(orgId, 'clips.browse_channels', () => false, {
-        used: outcome.used,
-      });
-      throw new ClipErrorException(HttpStatus.PAYMENT_REQUIRED, 'channel_limit');
-    }
-    this.logger.log(JSON.stringify({ event: 'clips.channels.added', orgId, platform }));
-    return this.view(outcome.channel);
+    return { platform, dbPlatform, channel, limit };
   }
 
   /** `GET /clips/channels/:id/streams`: one page of a channel's list. */

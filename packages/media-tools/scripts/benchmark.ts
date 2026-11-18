@@ -2,25 +2,32 @@
  * `npm run clips:benchmark`: how fast this machine renders a clip.
  *
  * Renders the same generated 20 second clip (a 1920 by 1080, 30 fps
- * `testsrc2` picture with a tone, cut to 9:16) through the real compiler at
- * 720p30, 1080p30, 1080p60 and the Preview Export shape, once Fullscreen and
- * once with the Blurred background (the heaviest base: a small copy, blurred,
- * scaled back up, with the picture overlaid). For each it prints the render
- * time per second of clip, "x realtime" (seconds of clip made per wall second,
- * the cookbook's figure), FFmpeg's peak memory and the CPU count. The plan
- * limits and the production worker size are read from this table, so paste it
- * into the Module 05 Progress notes with the host it ran on.
+ * `testsrc2` picture with a tone) through the real compiler at 720p30,
+ * 1080p30, 1080p60 and the Preview Export shape, once per layout. The
+ * layouts are the real Vertical presets (`applyLayout`): by default
+ * Fullscreen, Blurred (a small copy, blurred, scaled back up, with the
+ * picture overlaid), Gameplay (the game plus a rounded camera box: the looped
+ * mask and `alphamerge`) and Screen Share (the blurred base, a screen band
+ * and a rounded camera), the ones that decide the worker's size; `--layouts
+ * all` adds Split, Three and Four. For each it prints the render time per
+ * second of clip, "x realtime" (seconds of clip made per wall second, the
+ * cookbook's figure), FFmpeg's peak memory and the CPU count. The plan limits
+ * and the production worker size are read from this table, so paste it into
+ * the Progress notes with the host it ran on.
  *
  * Nothing is downloaded: the source is made with `lavfi`. Options:
  *   --seconds 20                      clip length
  *   --qualities 720p,1080p,1080p60,proof
- *   --layouts fullscreen,blurred
+ *   --layouts fullscreen,blurred,gameplay,screen_share   (or `all`)
+ *   --keep <folder>                   keep each render there as <layout>-<quality>.mp4
+ *                                     (for `clips:stills`); relative to where it was started
  */
 
-import { writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  applyLayout,
   buildRenderPlan,
   type ClipDocument,
   compileFfmpeg,
@@ -28,19 +35,26 @@ import {
   ffmpegArgsFor,
   GRAPH_FILE,
   isExportQuality,
+  layoutsFor,
+  type PresetKind,
 } from '@postgear/video-engine';
 import { toolPaths } from '../src/run/paths';
 import { createRunTool } from '../src/run/runner';
 import { withScratch } from '../src/run/scratch';
 import type { RunTool } from '../src/run/types';
 
-type Layout = 'fullscreen' | 'blurred';
+type Layout = PresetKind;
 type Shape = ExportQuality | 'proof';
+
+const VERTICAL_LAYOUTS: readonly Layout[] = layoutsFor('9:16');
+const DEFAULT_LAYOUTS = 'fullscreen,blurred,gameplay,screen_share';
+const STARTED_IN = process.env.INIT_CWD ?? process.cwd();
 
 interface Options {
   seconds: number;
   shapes: Shape[];
   layouts: Layout[];
+  keepDir: string | null;
 }
 
 interface Row {
@@ -70,19 +84,26 @@ function readOptions(argv: readonly string[]): Options {
       throw new Error(`Unknown quality ${shape}`);
     }
   }
-  const layouts = (value('--layouts') ?? 'fullscreen,blurred').split(',').map((s) => s.trim());
+  const layoutArg = value('--layouts') ?? DEFAULT_LAYOUTS;
+  const layouts =
+    layoutArg.trim() === 'all' ? [...VERTICAL_LAYOUTS] : layoutArg.split(',').map((s) => s.trim());
   for (const layout of layouts) {
-    if (layout !== 'fullscreen' && layout !== 'blurred') {
-      throw new Error(`Unknown layout ${layout}`);
+    if (!(VERTICAL_LAYOUTS as readonly string[]).includes(layout)) {
+      throw new Error(`Unknown layout ${layout}; expected one of ${VERTICAL_LAYOUTS.join(', ')}`);
     }
   }
-  return { seconds, shapes: shapes as Shape[], layouts: layouts as Layout[] };
+  const keep = value('--keep');
+  return {
+    seconds,
+    shapes: shapes as Shape[],
+    layouts: layouts as Layout[],
+    keepDir: keep ? path.resolve(STARTED_IN, keep) : null,
+  };
 }
 
-/** The benchmark clip: one segment, Fullscreen (a centred 9:16 crop) or Blurred (the whole picture). */
+/** The benchmark clip: one segment, Vertical, with the real preset of `layout` for a 16:9 video. */
 function benchmarkDocument(layout: Layout, seconds: number): ClipDocument {
-  const fullscreen = layout === 'fullscreen';
-  return {
+  const base: ClipDocument = {
     schemaVersion: 1,
     canvas: { ratio: '9:16', width: 1080, height: 1920, fps: 30, background: '#000000' },
     sources: [{ id: 'src', videoId: '6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4' }],
@@ -97,21 +118,14 @@ function benchmarkDocument(layout: Layout, seconds: number): ClipDocument {
       },
     ],
     layout: {
-      kind: layout,
+      kind: 'fullscreen',
       areas: [
         {
           id: 'main',
           name: 'Video',
           frame: { x: 0, y: 0, w: 1, h: 1 },
-          crop: [
-            {
-              at: 0,
-              rect: fullscreen
-                ? { x: (1 - 0.31640625) / 2, y: 0, w: 0.31640625, h: 1 }
-                : { x: 0, y: 0, w: 1, h: 1 },
-            },
-          ],
-          fit: fullscreen ? 'cover' : 'contain',
+          crop: [{ at: 0, rect: { x: (1 - 0.31640625) / 2, y: 0, w: 0.31640625, h: 1 } }],
+          fit: 'cover',
         },
       ],
     },
@@ -120,6 +134,7 @@ function benchmarkDocument(layout: Layout, seconds: number): ClipDocument {
     fades: { inMs: 0, outMs: 0 },
     tracks: [],
   };
+  return applyLayout(base, layout, { width: 1920, height: 1080 });
 }
 
 async function makeSource(runTool: RunTool, dir: string, seconds: number): Promise<number> {
@@ -261,6 +276,13 @@ async function main(): Promise<number> {
       for (const shape of options.shapes) {
         process.stdout.write(`Rendering ${layout} at ${shape}...\n`);
         rows.push(await renderOnce(runTool, dir, layout, shape, options.seconds, sourceMs));
+        if (options.keepDir) {
+          await mkdir(options.keepDir, { recursive: true });
+          await copyFile(
+            path.join(dir, 'bench.mp4'),
+            path.join(options.keepDir, `${layout}-${shape}.mp4`),
+          );
+        }
       }
     }
 

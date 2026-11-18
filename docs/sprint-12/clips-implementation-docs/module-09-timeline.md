@@ -1,6 +1,6 @@
 # Module 09: Timeline
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 08](module-08-editor-shell.md)
 > **Stories**: CL-5.3, CL-5.5
 > **Next**: [Module 10](module-10-layouts-and-crops.md), [Module 11](module-11-canvas-handles-and-text.md), [Module 13](module-13-effects-zoom-and-speed.md), [Module 14](module-14-sound.md) (any order)
@@ -81,16 +81,16 @@ All are ignored while typing and inside dialogs. The **Keyboard Shortcuts** shee
 
 ## Tasks
 
-- [ ] `snap.ts`, `gestures.ts`, the edits' clamps and `needsMoreVideo`, with tests.
-- [ ] The row selector, `TimelineBar`, the Video row with filmstrip and waveform, empty rows for Overlay, Zoom and Sound.
-- [ ] Trim with live preview, split, delete, selection, keyboard moves, announcements.
-- [ ] Snapping with the guide, Alt and the toggle; zoom, fit and follow-the-playhead.
-- [ ] `more-video`: the route, the hatched tail, the status line.
-- [ ] `TimeField` with a playground demo.
-- [ ] `editor-shortcuts.ts`, the handler, the sheet, tooltip shortcuts.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: trim both ends, split, delete the middle, undo all, redo all, drag past the handle. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `snap.ts`, `gestures.ts`, the edits' clamps and `needsMoreVideo`, with tests.
+- [x] The row selector, `TimelineBar`, the Video row with filmstrip and waveform, empty rows for Overlay, Zoom and Sound.
+- [x] Trim with live preview, split, delete, selection, keyboard moves, announcements.
+- [x] Snapping with the guide, Alt and the toggle; zoom, fit and follow-the-playhead.
+- [x] `more-video`: the route, the hatched tail, the status line.
+- [x] `TimeField` with a playground demo.
+- [x] `editor-shortcuts.ts`, the handler, the sheet, tooltip shortcuts.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: trim both ends, split, delete the middle, undo all, redo all, drag past the handle. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

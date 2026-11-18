@@ -17,13 +17,22 @@ const MAX_PART_NUMBER = 10_000;
 /** Part addresses asked for at once: a browser uploads a few parts in parallel. */
 const MAX_PARTS_PER_REQUEST = 100;
 
-export const importVideoSchema = z
+const importLinkSchema = z
   .object({
     url: z.string().trim().min(1).max(2_048),
     rightsConfirmed: z.boolean().optional(),
   })
   .strict();
+
+/**
+ * Try A Sample (Module 06): the server picks the link. Exactly one of `url`
+ * or `sample`: both shapes are strict, so a body with both matches neither.
+ */
+const importSampleSchema = z.object({ sample: z.literal(true) }).strict();
+
+export const importVideoSchema = z.union([importLinkSchema, importSampleSchema]);
 export type ImportVideoInput = z.infer<typeof importVideoSchema>;
+export type ImportLinkInput = z.infer<typeof importLinkSchema>;
 
 export const listVideosQuerySchema = z
   .object({

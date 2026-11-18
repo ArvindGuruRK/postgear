@@ -9,12 +9,12 @@
  * again. Every geometry number comes from `frameState`, so the plan, the
  * preview and the parity tests share one definition.
  *
- * What this version can render: the Fullscreen and Blurred layouts with one
- * area and a constant crop, any mix of speeds, segment volumes, the clip's
- * fades and the plan's mark. Anything else (more areas, a moving crop, zooms,
- * looks, text, stickers, sounds, captions) is refused with a typed
- * `RenderCompileError`; a render never draws something other than the
- * document.
+ * What this version can render: every layout (one to four areas, cover or
+ * contain, rounded corners, a solid or blurred base) with constant crops,
+ * any mix of speeds, segment volumes, the clip's fades and the plan's mark.
+ * Anything else (a moving crop, zooms, looks, text, stickers, sounds,
+ * captions) is refused with a typed `RenderCompileError`; a render never
+ * draws something other than the document.
  *
  * No file access: the files are named by the caller (`ctx.assets`), relative
  * to the job's scratch folder.
@@ -105,12 +105,26 @@ export type PlanBase =
       smallHeight: number;
     };
 
+/** One layout area of a segment, in output pixels. */
+export interface PlanArea {
+  id: string;
+  /** The source pixels it shows (the crop narrowed to the frame's shape for cover). */
+  crop: PixelRect;
+  /** Its picture's size and top left corner on the output (even numbers). */
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  /** Rounded corners in output pixels (whole, at most half the short side); 0 for square. */
+  radius: number;
+}
+
 /** How one segment's picture is drawn on the output. */
 export interface PlanPicture {
   base: PlanBase;
-  /** The area: the source pixels it shows, and its size and place on the output. */
-  area: { crop: PixelRect; width: number; height: number; x: number; y: number };
-  /** True when the area fills the whole output, so no base is drawn. */
+  /** The areas, bottom first. */
+  areas: PlanArea[];
+  /** True when the first area alone covers the whole output on a colour base, so no base is drawn. */
   fillsOutput: boolean;
 }
 
@@ -229,37 +243,20 @@ function refuseUnsupported(doc: ClipDocument): void {
     }
   }
 
-  const { layout } = doc;
-  if (layout.kind !== 'fullscreen' && layout.kind !== 'blurred') {
-    throw new RenderCompileError(
-      'layout_unsupported',
-      `The ${layout.kind} layout is not rendered yet`,
-      {
-        layout: layout.kind,
-      },
-    );
-  }
-  if (layout.areas.length !== 1) {
-    throw new RenderCompileError('layout_unsupported', 'Only one area is rendered yet', {
-      layout: layout.kind,
-      areas: layout.areas.length,
-    });
-  }
-  const area = layout.areas[0];
-  if (area && (area.radius ?? 0) > 0) {
-    throw new RenderCompileError('layout_unsupported', 'Rounded areas are not rendered yet', {
-      areaId: area.id,
-    });
-  }
-  if (area && !cropIsConstant(area.crop)) {
-    throw new RenderCompileError(
-      'crop_keyframes_unsupported',
-      'A moving crop is not rendered yet',
-      {
-        areaId: area.id,
-        keyframes: area.crop.length,
-      },
-    );
+  // Every layout renders (Module 10). A crop that moves over time needs the
+  // `sendcmd` file of cookbook section 3, which Sprint 13 writes; until then
+  // it is refused rather than drawn still.
+  for (const area of doc.layout.areas) {
+    if (!cropIsConstant(area.crop)) {
+      throw new RenderCompileError(
+        'crop_keyframes_unsupported',
+        'A moving crop is not rendered yet',
+        {
+          areaId: area.id,
+          keyframes: area.crop.length,
+        },
+      );
+    }
   }
   if (doc.zooms.length > 0) {
     throw new RenderCompileError('zoom_unsupported', 'Zooms are not rendered yet', {
@@ -386,18 +383,32 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
 
     // The picture, from the one definition of what is on screen.
     const state = frameState(doc, entry.outStart, { sources: pictures });
-    const area = state.areas[0];
-    if (!area) {
+    if (state.areas.length === 0) {
       throw new RenderCompileError('layout_unsupported', 'The layout has no area');
     }
-    const width = evenSize(area.content.w * size.width);
-    const height = evenSize(area.content.h * size.height);
-    const areaWidth = Math.min(size.width, width);
-    const areaHeight = Math.min(size.height, height);
-    const x = Math.min(size.width - areaWidth, evenPosition(area.content.x * size.width));
-    const y = Math.min(size.height - areaHeight, evenPosition(area.content.y * size.height));
+    const areas: PlanArea[] = state.areas.map((area) => {
+      const width = Math.min(size.width, evenSize(area.content.w * size.width));
+      const height = Math.min(size.height, evenSize(area.content.h * size.height));
+      const radius = Math.max(
+        0,
+        Math.min(Math.round(area.radius * size.scale), Math.floor(Math.min(width, height) / 2)),
+      );
+      return {
+        id: area.id,
+        crop: toPixels(area.visibleCrop, asset.width, asset.height),
+        width,
+        height,
+        x: Math.min(size.width - width, evenPosition(area.content.x * size.width)),
+        y: Math.min(size.height - height, evenPosition(area.content.y * size.height)),
+        radius,
+      };
+    });
+    const first = areas[0] as PlanArea;
     const fillsOutput =
-      areaWidth === size.width && areaHeight === size.height && state.background.kind === 'colour';
+      first.width === size.width &&
+      first.height === size.height &&
+      first.radius === 0 &&
+      state.background.kind === 'colour';
 
     const base: PlanBase =
       state.background.kind === 'blurred'
@@ -419,17 +430,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       volume: segment.volume,
       outStartMs: entry.outStart,
       outEndMs: entry.outEnd,
-      picture: {
-        base,
-        area: {
-          crop: toPixels(area.visibleCrop, asset.width, asset.height),
-          width: areaWidth,
-          height: areaHeight,
-          x,
-          y,
-        },
-        fillsOutput,
-      },
+      picture: { base, areas, fillsOutput },
     });
     previous = segment;
   }

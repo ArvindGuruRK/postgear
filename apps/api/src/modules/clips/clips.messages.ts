@@ -32,4 +32,16 @@ export const CLIPS_MESSAGES = {
   // Module 05: clips and exports.
   CLIP_NOT_FOUND: 'We could not find that clip.',
   CLIP_UNREADABLE: 'This clip could not be read. Make a new clip from the video.',
+  // Module 06: Try A Sample.
+  SAMPLE_EXISTS: 'You already have the sample video.',
+  SAMPLE_UNAVAILABLE:
+    'There is no sample video to try here. Paste a link or upload a file instead.',
+  // Modules 07 to 09: the clip library and the editor.
+  CLIP_TOO_LONG: 'Edit Whole Video works for videos up to 30 minutes. Mark a range to make a clip.',
+  CLIP_DOCUMENT_INVALID: 'This change could not be saved because part of it was not recognised.',
+  CLIP_DOCUMENT_TOO_LARGE:
+    'This clip has grown too large to save. Remove some items and try again.',
+  CLIP_DELETED: 'Clip deleted.',
+  MORE_VIDEO_THROTTLED: 'We are already getting more of the video. Try again in a few seconds.',
+  MORE_VIDEO_TOO_LONG: 'We can get up to an hour of extra video at a time.',
 } as const;

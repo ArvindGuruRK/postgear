@@ -10,6 +10,7 @@
  * |---|---|
  * | `GET /clips/channels` | 200 `{ channels }` |
  * | `POST /clips/channels` `{ platform, handle }` | 201 `{ channel }`; 422 `channel_not_found`, `link_is_a_video`, `platform_paused`; 409 `channel_exists`; 402 `channel_limit`, `clips_not_in_plan`; 429 `channels_throttled`; 503 when no binding can answer |
+ * | `POST /clips/channels/check` `{ platform, handle }` | 200 `{ channel: { platform, handle, displayName, avatarUrl } }`, nothing written; the same refusals as add (Module 06) |
  * | `GET /clips/channels/:id/streams?kind&cursor&sort&period&hidden` | 200 one page; 404; 422 `list_kind_unsupported`, `list_sort_unsupported`, `platform_paused`; 400 `list_cursor_invalid`; 429; 502 `platform_changed`; 503 |
  * | `PUT /clips/channels/:id/hidden/:externalId` | 200 `{ externalId, hidden: true }`; 404; 422 `hidden_limit` |
  * | `DELETE /clips/channels/:id/hidden/:externalId` | 200 `{ externalId, hidden: false }`; 404 |
@@ -62,6 +63,16 @@ export class ClipChannelsController {
     @Body(new ZodBody(addChannelSchema, 'clips/channels/add')) body: AddChannelInput,
   ) {
     return { channel: await this.channels.add(org.id, user.id, body) };
+  }
+
+  /** Module 06: add's checks and the platform's answer, nothing written. Declared before the `:id` routes. */
+  @Post('check')
+  @HttpCode(HttpStatus.OK)
+  async check(
+    @CurrentOrg() org: ActiveOrg,
+    @Body(new ZodBody(addChannelSchema, 'clips/channels/check')) body: AddChannelInput,
+  ) {
+    return { channel: await this.channels.check(org.id, body) };
   }
 
   @Get(':id/streams')

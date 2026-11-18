@@ -18,6 +18,8 @@ const nextConfig = {
     '@postgear/email',
     // Clips (Sprint 12): pure engines shared with the API and the worker.
     '@postgear/video-engine',
+    // The editor's preview engine (Module 08), web only.
+    '@postgear/video-preview',
     '@postgear/entitlements',
   ],
   // The "N" badge sat on top of the workflow canvas's controls. Build and

@@ -38,8 +38,8 @@ import {
   Toggle,
 } from '@postgear/ui';
 import { useState } from 'react';
-import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { DateRange } from 'react-day-picker';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { Row, Section } from '../shared';
 
 const PLATFORM_OPTIONS: ComboboxOption[] = [
@@ -59,6 +59,7 @@ const ICON_OPTIONS: IconSelectOption[] = PLATFORM_OPTIONS.map((option) => ({
 export function FormControlsSection() {
   const [checked, setChecked] = useState(true);
   const [toggled, setToggled] = useState(true);
+  const [size, setSize] = useState('m');
   const [radioValue, setRadioValue] = useState('draft');
   const [search, setSearch] = useState('');
   const [sliderValue, setSliderValue] = useState([40]);
@@ -234,6 +235,20 @@ export function FormControlsSection() {
             onToggle={(day) =>
               setDays((on) => (on.includes(day) ? on.filter((d) => d !== day) : [...on, day]))
             }
+          />
+          <ChoiceTiles
+            label="Size"
+            columns={3}
+            className="max-w-72"
+            options={[
+              { value: 'xs', label: 'Extra Small' },
+              { value: 's', label: 'Small' },
+              { value: 'm', label: 'Medium' },
+              { value: 'l', label: 'Large' },
+              { value: 'xl', label: 'Extra Large' },
+            ]}
+            value={size}
+            onValueChange={setSize}
           />
         </div>
       </Row>

@@ -10,7 +10,7 @@
  * validates request bodies in `common/pipes/zod-validation.pipe.ts`: one
  * validation vocabulary across the app.
  */
-import { CLIP_PLATFORMS } from '@postgear/video-engine';
+import { CLIP_PLATFORMS, recogniseLink } from '@postgear/video-engine';
 import { z } from 'zod';
 
 /**
@@ -392,7 +392,10 @@ const envSchema = z
     // storage binding. Optional in development (a fixed development key is
     // used), required in production below.
     CLIPS_URL_SECRET: blankAsUnset(
-      z.string().min(MIN_SECRET_LENGTH, 'CLIPS_URL_SECRET must be at least 32 characters').optional(),
+      z
+        .string()
+        .min(MIN_SECRET_LENGTH, 'CLIPS_URL_SECRET must be at least 32 characters')
+        .optional(),
     ),
     // The private bucket of the S3 binding. Never public.
     CLIPS_PRIVATE_BUCKET: blankAsUnset(z.string().min(3).default('postgear-clips')),
@@ -409,6 +412,19 @@ const envSchema = z
     TWITCH_CLIENT_ID: blankAsUnset(z.string().min(1).optional()),
     TWITCH_CLIENT_SECRET: blankAsUnset(z.string().min(1).optional()),
     CLIPS_YOUTUBE_API_KEY: blankAsUnset(z.string().min(1).optional()),
+    // Try A Sample (Module 06): a link to a video the operator owns, imported
+    // when someone presses Try A Sample. Unset hides the button (simulation
+    // always uses its own talk sample). Must be an https link Clips can read.
+    CLIPS_SAMPLE_LINK: blankAsUnset(
+      z
+        .string()
+        .max(2_048)
+        .refine(
+          (value) => value.startsWith('https://') && 'platform' in recogniseLink(value),
+          'CLIPS_SAMPLE_LINK must be an https YouTube, Twitch or Kick video link',
+        )
+        .optional(),
+    ),
   })
   .superRefine((env, context) => {
     // Simulated AI output must never reach a real audience. In production the

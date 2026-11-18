@@ -27,6 +27,10 @@
       // compiler, pure by design, so the editor preview reads the same numbers
       // the export does. And the plan values every gate reads.
       "@postgear/video-engine": ["../../packages/video-engine/src"],
+      // The browser preview of a clip (Module 08): PreviewEngine and its hook,
+      // plus the fake <video> its tests share.
+      "@postgear/video-preview": ["../../packages/video-preview/src"],
+      "@postgear/video-preview/testing": ["../../packages/video-preview/src/testing/index.ts"],
       "@postgear/entitlements": ["../../packages/entitlements/src"],
       // Workflows (Sprint 10): the graph, the step catalog and validation, pure
       // by design, so the canvas checks a workflow with the API's own rules.

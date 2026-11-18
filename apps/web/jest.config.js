@@ -20,6 +20,10 @@ module.exports = {
     // as tsconfig's `@postgear/ui/*`; the bare package still resolves through
     // node_modules.
     '^@postgear/ui/(.*)$': '<rootDir>/../../packages/ui/src/$1',
+    // The preview engine and its test fakes, as tsconfig's two entries.
+    '^@postgear/video-preview$': '<rootDir>/../../packages/video-preview/src/index.ts',
+    '^@postgear/video-preview/testing$':
+      '<rootDir>/../../packages/video-preview/src/testing/index.ts',
     // Per-icon paths ship as ES modules only; component tests get a stub.
     '^@animateicons/react/lucide/.+$': '<rootDir>/src/test-utils/animated-icon-stub.ts',
   },

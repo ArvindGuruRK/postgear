@@ -310,21 +310,31 @@ describe('encode specs and output arguments', () => {
 });
 
 describe('refusals', () => {
-  it('refuses a layout it cannot draw yet', () => {
+  it('no longer refuses other layouts, more areas or rounded corners (Module 10)', () => {
     const doc = twoSegmentDoc();
     doc.layout.kind = 'split';
-    expectCode(() => buildRenderPlan(doc, testContext()), 'layout_unsupported');
+    expect(() => buildRenderPlan(doc, testContext())).not.toThrow();
     const two = twoSegmentDoc();
     const area = two.layout.areas[0];
     if (!area) throw new Error('no area');
     two.layout.areas.push({ ...area, id: 'second' });
-    expectCode(() => buildRenderPlan(two, testContext()), 'layout_unsupported');
+    expect(buildRenderPlan(two, testContext()).segments[0]?.picture.areas).toHaveLength(2);
     const rounded = twoSegmentDoc();
     (rounded.layout.areas[0] as typeof area).radius = 36;
-    expectCode(() => buildRenderPlan(rounded, testContext()), 'layout_unsupported');
+    expect(buildRenderPlan(rounded, testContext()).segments[0]?.picture.areas[0]?.radius).toBe(36);
   });
 
-  it('refuses a moving crop, a zoom and a look', () => {
+  it('refuses a moving crop on any area, a zoom and a look', () => {
+    const second = twoSegmentDoc();
+    const base = second.layout.areas[0];
+    if (!base) throw new Error('no area');
+    second.layout.areas.push({
+      ...base,
+      id: 'second',
+      crop: [...base.crop, { at: 15_000, rect: { x: 0.1, y: 0, w: 0.31640625, h: 1 } }],
+    });
+    expectCode(() => buildRenderPlan(second, testContext()), 'crop_keyframes_unsupported');
+
     const moving = twoSegmentDoc();
     (moving.layout.areas[0] as { crop: unknown[] }).crop.push({
       at: 15_000,

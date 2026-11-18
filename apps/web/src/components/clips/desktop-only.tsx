@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Clips is desktop only (UX blueprint section 12), like Workflows and Studio:
  * nobody trims a clip or drags a crop box on a phone.
@@ -8,7 +10,9 @@
  * the markup; the hidden one costs nothing to draw, and the editor routes
  * that wrap a heavy canvas mount it only where it shows (`desk:contents`).
  *
- * A server component: it holds no state.
+ * A client component only because `EmptyState` takes an icon component,
+ * which a server component cannot hand across; it holds no state, and the
+ * pages' own content still renders on the server as its children.
  */
 import { EmptyState } from '@postgear/ui';
 import { MonitorIcon } from 'lucide-react';

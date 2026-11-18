@@ -6,7 +6,9 @@
  *
  * 1. **Import Sample**: one of the three simulation links (`POST /clips/videos`).
  * 2. **Make A 20 Second Clip**: from 30 seconds in (`POST /clips`); the light
- *    copy then plays the clip's range in a plain `<video>`.
+ *    copy then plays the clip through `PreviewEngine` (Module 08), drawn from
+ *    the clip's document on canvases as the editor's stage is, with the
+ *    canvas cost spike's frame counts under it.
  * 3. **Export**: at the chosen quality (`POST /clips/:clipId/exports`), with
  *    Cancel while it runs; the exported file then plays in a second `<video>`.
  *
@@ -36,8 +38,10 @@ import {
   SelectValue,
 } from '@postgear/ui';
 import { EXPORT_QUALITIES, QUALITY_LABELS } from '@postgear/video-engine';
+import { usePreviewEngine } from '@postgear/video-preview';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTerminalJob } from '@/components/clips/clip-job-model';
+import { usePlaybackStore } from '@/components/clips/editor/playback';
 import { useClipJob } from '@/components/clips/use-clip-job';
 import { AppShell } from '@/components/navigation/app-shell';
 import type { SidebarItem } from '@/components/navigation/sidebar';
@@ -52,6 +56,7 @@ import {
 } from '@/lib/clips-api';
 import type { ClipDetail, ClipJobView, ClipVideoView, ExportQuality } from '@/types/clips';
 import type { MediaItem } from '@/types/media';
+import { BenchPreview } from './bench-preview';
 import {
   benchClipRange,
   compareMoments,
@@ -75,16 +80,6 @@ function sentenceOf(cause: unknown): string {
   return 'Something went wrong. Try again.';
 }
 
-/** The clip's range of the light copy, in the video's time, from its document. */
-function rangeOf(detail: ClipDetail | null): { fromMs: number; toMs: number } | null {
-  const segments = detail?.clip.document?.segments ?? [];
-  if (segments.length === 0) return null;
-  return {
-    fromMs: Math.min(...segments.map((segment) => segment.sourceIn)),
-    toMs: Math.max(...segments.map((segment) => segment.sourceOut)),
-  };
-}
-
 export function ClipsTestBench() {
   // Step 1
   const [sample, setSample] = useState<SampleId>('twitch');
@@ -106,9 +101,23 @@ export function ClipsTestBench() {
   const segmentJob = useClipJob(segmentJobId);
   const exportJob = useClipJob(exportJobId);
 
-  const proxyPlayer = useRef<HTMLVideoElement>(null);
   const exportPlayer = useRef<HTMLVideoElement>(null);
   const [moment, setMoment] = useState<number | null>(null);
+
+  // The light copy plays through the editor's preview engine (Module 08):
+  // the clip's own document, drawn on canvases, measured for the cost spike.
+  const { engine, containerRef } = usePreviewEngine({
+    document: clip?.clip.document ?? null,
+    source: clip?.playback
+      ? {
+          url: clip.playback.url,
+          expiresAt: clip.playback.expiresAt,
+          fps: clip.video?.fps ?? null,
+        }
+      : null,
+    measure: true,
+  });
+  const playback = usePlaybackStore(engine);
 
   // The import ended: read the video again for its length and READY status.
   // Keyed on the id only: this effect sets the video itself.
@@ -209,28 +218,11 @@ export function ClipsTestBench() {
       exportJob.refresh();
     });
 
-  // The proxy plays only the clip's range: it starts at the range and stops at its end.
-  const clipRange = rangeOf(clip);
-  const toStart = () => {
-    const player = proxyPlayer.current;
-    if (player && clipRange) player.currentTime = clipRange.fromMs / 1000;
-  };
-  const stopAtEnd = () => {
-    const player = proxyPlayer.current;
-    if (player && clipRange && player.currentTime * 1000 >= clipRange.toMs) {
-      player.pause();
-      player.currentTime = clipRange.toMs / 1000;
-    }
-  };
-
   const compareAt = (atMs: number) => {
     setMoment(atMs);
-    const proxy = proxyPlayer.current;
+    playback.pause();
+    playback.seekMs(atMs);
     const output = exportPlayer.current;
-    if (proxy && clipRange) {
-      proxy.pause();
-      proxy.currentTime = (clipRange.fromMs + atMs) / 1000;
-    }
     if (output) {
       output.pause();
       output.currentTime = atMs / 1000;
@@ -395,18 +387,13 @@ export function ClipsTestBench() {
               <div className="grid gap-6 lg:grid-cols-2">
                 <figure className="m-0 flex flex-col gap-2">
                   <figcaption className="font-sans text-sm text-ink type-muted">
-                    Light copy, the clip's range
+                    Light copy, drawn by the preview engine
                   </figcaption>
-                  {clip.playback ? (
-                    // biome-ignore lint/a11y/useMediaCaption: a silent test sample with no words to caption.
-                    <video
-                      ref={proxyPlayer}
-                      src={clip.playback.url}
-                      controls
-                      preload="auto"
-                      onLoadedMetadata={toStart}
-                      onTimeUpdate={stopAtEnd}
-                      className="aspect-video w-full rounded-sm border-2 border-ink bg-inset"
+                  {clip.playback && clip.clip.document ? (
+                    <BenchPreview
+                      store={playback}
+                      containerRef={containerRef}
+                      canvas={clip.clip.document.canvas}
                     />
                   ) : (
                     <p className="m-0 font-sans text-sm text-ink type-muted">

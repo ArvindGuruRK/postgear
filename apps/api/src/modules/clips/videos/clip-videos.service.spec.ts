@@ -16,6 +16,8 @@ import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { ClipLinkProber } from '../links/clip-links.types';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import type { ClipPlaybackService } from './clip-playback.service';
+import { type ClipSampleLink, SIMULATION_SAMPLE_LINK, sampleLinkFor } from './clip-sample';
+import { importVideoSchema } from './clip-videos.schema';
 import type { ClipVideosRepository } from './clip-videos.repository';
 import { ClipVideosService } from './clip-videos.service';
 
@@ -65,7 +67,7 @@ const INFO: LinkInfo = {
   formats: [],
 };
 
-function build() {
+function build(options: { sampleUrl?: string | null } = {}) {
   const charges: string[] = [];
   const reversals: string[] = [];
 
@@ -154,16 +156,37 @@ function build() {
   };
   const playback = { address: jest.fn(async () => null) };
   const prober = {
-    probe: jest.fn(async () => ({
-      link: {
-        platform: 'twitch',
-        kind: 'past_stream',
-        externalId: '900000001',
-        canonicalUrl: 'https://www.twitch.tv/videos/900000001',
-      },
-      info: INFO,
-      existingVideoId: null,
-    })),
+    probe: jest.fn(async (_org: string, url: string) =>
+      url === SIMULATION_SAMPLE_LINK
+        ? {
+            link: {
+              platform: 'youtube',
+              kind: 'video',
+              externalId: 'simtalk0001',
+              canonicalUrl: SIMULATION_SAMPLE_LINK,
+            },
+            info: {
+              ...INFO,
+              platform: 'youtube',
+              kind: 'video',
+              externalId: 'simtalk0001',
+              canonicalUrl: SIMULATION_SAMPLE_LINK,
+              title: 'A three minute talk',
+              durationMs: 3 * 60_000,
+            },
+            existingVideoId: null,
+          }
+        : {
+            link: {
+              platform: 'twitch',
+              kind: 'past_stream',
+              externalId: '900000001',
+              canonicalUrl: 'https://www.twitch.tv/videos/900000001',
+            },
+            info: INFO,
+            existingVideoId: null,
+          },
+    ),
   };
   const storage = { deletePrefix: jest.fn(async () => undefined) };
 
@@ -176,8 +199,11 @@ function build() {
     playback as unknown as ClipPlaybackService,
     prober as unknown as ClipLinkProber,
     storage as unknown as PrivateStorage,
+    {
+      url: options.sampleUrl === undefined ? SIMULATION_SAMPLE_LINK : options.sampleUrl,
+    } as ClipSampleLink,
   );
-  return { service, charges, reversals, jobs, jobsRepository, limits, storage };
+  return { service, charges, reversals, jobs, jobsRepository, limits, storage, prober };
 }
 
 const BODY = { url: 'https://www.twitch.tv/videos/900000001', rightsConfirmed: true };
@@ -353,5 +379,92 @@ describe('ClipVideosService.retry and cancel', () => {
   it('answers 404 for an id that is not a UUID', async () => {
     const { service } = build();
     await expect(service.cancel(TEST_ORG, 'not-a-uuid')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('Try A Sample (Module 06)', () => {
+  it('imports the simulation talk sample with no link and no tick, and charges like any import', async () => {
+    const { service, charges, prober, limits } = build();
+    const answer = await service.importLink(TEST_ORG, TEST_USER, { sample: true });
+
+    expect(prober.probe).toHaveBeenCalledWith(TEST_ORG, SIMULATION_SAMPLE_LINK);
+    expect(answer.existing).toBe(false);
+    expect(answer.message).toBeUndefined();
+    expect(limits.checkLinkImport).toHaveBeenCalledWith(TEST_ORG, 3 * 60_000, expect.any(Number));
+    expect(charges).toHaveLength(1);
+    expect(store.videos[0]).toEqual(
+      expect.objectContaining({
+        platform: 'YOUTUBE',
+        externalId: 'simtalk0001',
+        // Nobody ticked the box, so no rights record is claimed.
+        rightsConfirmedAt: null,
+        rightsConfirmedById: null,
+      }),
+    );
+  });
+
+  it('answers existing with its sentence the second time, charging once', async () => {
+    const { service, charges } = build();
+    await service.importLink(TEST_ORG, TEST_USER, { sample: true });
+    const again = await service.importLink(TEST_ORG, TEST_USER, { sample: true });
+    expect(again).toMatchObject({ existing: true, message: 'You already have the sample video.' });
+    expect(charges).toHaveLength(1);
+    // A pasted link that already exists keeps its old answer, with no sentence.
+    await service.importLink(TEST_ORG, TEST_USER, BODY);
+    const pasted = await service.importLink(TEST_ORG, TEST_USER, BODY);
+    expect(pasted.message).toBeUndefined();
+  });
+
+  it('still applies every limit: a refusal charges nothing', async () => {
+    const { service, charges, limits } = build();
+    limits.checkLinkImport.mockRejectedValueOnce(new HttpException('refused', 402));
+    await expect(service.importLink(TEST_ORG, TEST_USER, { sample: true })).rejects.toMatchObject({
+      status: 402,
+    });
+    expect(charges).toEqual([]);
+  });
+
+  it('answers 404 sample_unavailable when this deployment has no sample, before any probe', async () => {
+    const { service, prober } = build({ sampleUrl: null });
+    const error = await service.importLink(TEST_ORG, TEST_USER, { sample: true }).catch((e) => e);
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(404);
+    expect((error as HttpException).getResponse()).toEqual({
+      message: 'There is no sample video to try here. Paste a link or upload a file instead.',
+      code: 'sample_unavailable',
+    });
+    expect(prober.probe).not.toHaveBeenCalled();
+  });
+
+  it('takes exactly one of url or sample', () => {
+    expect(importVideoSchema.safeParse({ sample: true }).success).toBe(true);
+    expect(importVideoSchema.safeParse({ url: BODY.url, rightsConfirmed: true }).success).toBe(
+      true,
+    );
+    expect(importVideoSchema.safeParse({ url: BODY.url, sample: true }).success).toBe(false);
+    expect(importVideoSchema.safeParse({ sample: false }).success).toBe(false);
+    expect(importVideoSchema.safeParse({ sample: true, rightsConfirmed: true }).success).toBe(
+      false,
+    );
+    expect(importVideoSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('picks the link: simulation talk, the configured link, or none', () => {
+    const all = ['youtube', 'twitch', 'kick'] as const;
+    expect(sampleLinkFor({ simulation: true, configured: undefined, platforms: all })).toBe(
+      SIMULATION_SAMPLE_LINK,
+    );
+    expect(
+      sampleLinkFor({
+        simulation: false,
+        configured: 'https://www.twitch.tv/videos/900000001',
+        platforms: all,
+      }),
+    ).toBe('https://www.twitch.tv/videos/900000001');
+    expect(sampleLinkFor({ simulation: false, configured: undefined, platforms: all })).toBeNull();
+    // A sample on a platform switched off is no sample, so the button is never offered to fail.
+    expect(
+      sampleLinkFor({ simulation: true, configured: undefined, platforms: ['twitch', 'kick'] }),
+    ).toBeNull();
   });
 });

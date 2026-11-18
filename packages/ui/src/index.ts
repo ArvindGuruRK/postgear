@@ -78,8 +78,15 @@ export * from './components/summary-box';
 export * from './components/table';
 export * from './components/tabs';
 export * from './components/textarea';
+export * from './components/time-field';
 export * from './components/time-picker';
+export * from './components/time-ruler';
 export * from './components/timeline';
+// Sprint 12 (Clips): the timeline and player pieces, kept together.
+export * from './components/playhead';
+export * from './components/timeline-bar';
+export * from './components/timeline-row';
+export * from './components/video-player-bar';
 export * from './components/toast';
 export * from './components/toaster';
 export * from './components/toggle';

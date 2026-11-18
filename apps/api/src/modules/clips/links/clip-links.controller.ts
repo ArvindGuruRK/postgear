@@ -66,10 +66,16 @@ export class ClipLinksController {
     @Query(new ZodQuery(thumbnailQuerySchema, 'clips/links/thumbnail')) query: ThumbnailQuery,
     @Res({ passthrough: true }) response: Response,
   ): Promise<StreamableFile> {
-    const image = await this.thumbnails.fetch(query.u);
-    response.setHeader('Cache-Control', 'private, max-age=3600');
+    // The link card shows it with an <img> on the web app, another origin;
+    // helmet's default `same-origin` would make the browser refuse it. Set
+    // before the fetch so a refusal reaches the page as its real status, not
+    // as a blocked response.
+    response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Content-Security-Policy', "default-src 'none'");
+    const image = await this.thumbnails.fetch(query.u);
+    // Only a picture is kept for the hour, never a refusal.
+    response.setHeader('Cache-Control', 'private, max-age=3600');
     return new StreamableFile(image.body, { type: image.contentType, length: image.body.length });
   }
 

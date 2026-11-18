@@ -20,7 +20,7 @@ export const RENDER_COMPILE_CODES = [
   'source_not_covered',
   /** A font family the text uses is not in the font manifest. */
   'font_missing',
-  /** A layout other than Fullscreen or Blurred with one area (Module 10). */
+  /** A layout with nothing to draw (every preset and Custom layout renders since Module 10). */
   'layout_unsupported',
   /** A crop that moves over time (Sprint 13's speaker tracking). */
   'crop_keyframes_unsupported',

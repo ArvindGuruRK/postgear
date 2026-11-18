@@ -6,10 +6,14 @@
  * are checked against the workspace in the service (another workspace's
  * video is a plain 404). Bodies are validated with `.strict()` Zod schemas.
  *
- * - `POST /clips/videos`: 201 `{ video, job, existing: false }`, or 200
- *   `{ video, job: null, existing: true }` when the workspace already has it.
- * - `GET /clips/videos?cursor&sort`: `{ videos, nextCursor, total }`.
- * - `GET /clips/videos/:videoId`: the video, signed addresses, job, clips.
+ * - `POST /clips/videos`: `{ url, rightsConfirmed }` or (Try A Sample,
+ *   Module 06) `{ sample: true }`. 201 `{ video, job, existing: false }`, or
+ *   200 `{ video, job: null, existing: true }` (plus `message` for the
+ *   sample) when the workspace already has it; 404 `sample_unavailable`.
+ * - `GET /clips/videos?cursor&sort`: `{ videos, nextCursor, total }`, each
+ *   card with `clipCount` (Module 06).
+ * - `GET /clips/videos/:videoId`: the video, signed addresses, job, clips
+ *   (each with `state` and `range`, Module 07).
  * - `POST /clips/videos/:videoId/retry` and `/cancel`, `DELETE /clips/videos/:videoId`.
  * - `POST /clips/videos/uploads`, `.../uploads/:uploadId/parts`, `.../uploads/:uploadId/complete`.
  */

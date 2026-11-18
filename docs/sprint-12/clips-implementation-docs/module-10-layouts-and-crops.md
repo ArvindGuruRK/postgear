@@ -1,6 +1,6 @@
 # Module 10: Layouts And Crops
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 09](module-09-timeline.md)
 > **Stories**: CL-6.1, CL-6.2, CL-6.3, CL-5.2 (changing the shape later)
 > **Next**: [Module 11](module-11-canvas-handles-and-text.md), [Module 13](module-13-effects-zoom-and-speed.md), [Module 14](module-14-sound.md)
@@ -96,15 +96,15 @@ Written from the cookbook's section 2 recipes, each verified by running FFmpeg 9
 
 ## Tasks
 
-- [ ] `layout/presets.ts` (seven layouts, four ratios, the Fit crop ratio), `applyLayout`, `areaCropAt`, `setAreaCrop`, add, remove, rename, `setFitRatio`, `setCanvasRatio`, with tests.
-- [ ] `render/layout-graph.ts`: base, areas, rounded masks, the two overlay rules; snapshot tests; parity cases per layout.
-- [ ] `PreviewEngine` areas, rounded boxes, the blurred base canvas.
-- [ ] The Layouts panel: shape, seven tiles, Crop Ratio, My Layouts, Save Layout.
-- [ ] The split stage and the crop boxes with snapping and keys.
-- [ ] Layout routes and the client.
+- [x] `layout/presets.ts` (seven layouts, four ratios, the Fit crop ratio), `applyLayout`, `areaCropAt`, `setAreaCrop`, add, remove, rename, `setFitRatio`, `setCanvasRatio`, with tests.
+- [x] `render/layout-graph.ts`: base, areas, rounded masks, the two overlay rules; snapshot tests; parity cases per layout.
+- [x] `PreviewEngine` areas, rounded boxes, the blurred base canvas.
+- [x] The Layouts panel: shape, seven tiles, Crop Ratio, My Layouts, Save Layout.
+- [x] The split stage and the crop boxes with snapping and keys.
+- [x] Layout routes and the client.
 - [ ] The benchmark re-run with real layouts; `clips:stills` for each layout; title-case test green.
-- [ ] Playwright once under simulation: Vertical, Split, move both boxes, save the layout, apply it to another clip, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Playwright once under simulation: Vertical, Split, move both boxes, save the layout, apply it to another clip, export. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

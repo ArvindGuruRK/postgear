@@ -8,7 +8,10 @@
  *
  * - `document/`: the clip document schema, its upgrade chain and the creator.
  * - `time/`: the time map between the video's clock and the clip's, the pure
- *   edits (trim, split, remove, speed) and the time formatters.
+ *   edits (trim, split, remove, speed, duplicate and remove an item) and the
+ *   time formatters.
+ * - `timeline/`: the timeline's maths: scale and zoom, the ruler, what is
+ *   visible, snapping and the drag reducers.
  * - `links/`: what a pasted link is, channel handles, canonical links.
  * - `render/`: `frameState` (the one definition of what is on screen),
  *   `buildRenderPlan`, `compileFfmpeg` and `buildAss`.
@@ -31,7 +34,9 @@ export {
   rectCentre,
   rectsEqual,
 } from './geometry';
+export * from './history';
 export * from './jobs';
+export * from './layout';
 export * from './links';
 export * from './pricing';
 export * from './quality';
@@ -39,4 +44,5 @@ export * from './render';
 export * from './signals/types';
 export * from './sources';
 export * from './time';
+export * from './timeline';
 export * from './transcript';

@@ -89,7 +89,10 @@ export class ClipJobEventsService {
         const view = toJobView(job, { samples, priorSeconds: priorSeconds ?? null });
 
         if (TERMINAL_JOB_STATUSES.has(job.status)) {
-          stream.send(job.status === 'DONE' ? 'done' : job.status === 'FAILED' ? 'failed' : 'cancelled', view);
+          stream.send(
+            job.status === 'DONE' ? 'done' : job.status === 'FAILED' ? 'failed' : 'cancelled',
+            view,
+          );
           return;
         }
 

@@ -19,6 +19,7 @@ describe('clipsTabFrom', () => {
   it('names every tab', () => {
     expect(CLIPS_TABS.map((tab) => CLIPS_TAB_NAMES[tab])).toEqual([
       'Create',
+      'Streams',
       'Videos',
       'Clips',
       'Downloads',

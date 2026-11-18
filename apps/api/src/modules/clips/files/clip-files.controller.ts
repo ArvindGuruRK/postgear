@@ -12,7 +12,8 @@
  * - `GET` serves the file with `Range` (players seek), `206` and
  *   `Content-Range`, `416` for a range past the end, the content type from
  *   the key's extension (never sniffed), and `Content-Disposition` when the
- *   link was made for a download.
+ *   link was made for a download. `Cross-Origin-Resource-Policy:
+ *   cross-origin` lets the web app (another origin) show what it serves.
  * - `PUT` takes one part of a browser upload (Module 04) to a part link.
  *
  * Every failure of the token reads the same (403), so nothing tells an
@@ -88,6 +89,13 @@ export class ClipFilesController {
     response.setHeader('Content-Length', String(object.bytes));
     response.setHeader('Cache-Control', 'private, max-age=3600');
     response.setHeader('X-Content-Type-Options', 'nosniff');
+    // Helmet's default `same-origin` makes the browser refuse these files
+    // inside the web app, a different origin (port 3000 vs 3001, or app vs
+    // api host): the player, the filmstrip and the thumbnails all load from
+    // here. The signed token is the access control, as with `/uploads`. The
+    // `sandbox` CSP keeps any file opened on its own from running script here.
+    response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     if (object.range) {
       response.setHeader(
         'Content-Range',

@@ -7,13 +7,15 @@
  */
 import { Module } from '@nestjs/common';
 import { ClipsCoreModule } from '../clips-core.module';
+import { ClipEditsService } from './clip-edits.service';
 import { ClipItemController } from './clip-item.controller';
 import { ClipItemService } from './clip-item.service';
+import { ClipsListService } from './clips-list.service';
 
 @Module({
   imports: [ClipsCoreModule],
   controllers: [ClipItemController],
-  providers: [ClipItemService],
+  providers: [ClipItemService, ClipEditsService, ClipsListService],
   exports: [ClipItemService],
 })
 export class ClipItemModule {}

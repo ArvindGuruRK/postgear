@@ -1,4 +1,10 @@
-import { documentRange, parseSegmentAssetMeta, pickSharpSource, rangesBySource } from './sources';
+import {
+  documentRange,
+  heldRange,
+  parseSegmentAssetMeta,
+  pickSharpSource,
+  rangesBySource,
+} from './sources';
 
 interface Row {
   id: string;
@@ -111,5 +117,38 @@ describe('pickSharpSource', () => {
   it('answers the light copy for a document with no parts, and null with nothing stored', () => {
     expect(pickSharpSource(null, [segment('s', 0, 1, 1080), proxy('p')])?.asset.id).toBe('p');
     expect(pickSharpSource(range, [])).toBeNull();
+  });
+});
+
+describe('heldRange', () => {
+  const range = { fromMs: 20_000, toMs: 40_000 };
+
+  it('answers null with no range or nothing sharp near it', () => {
+    expect(heldRange(null, [segment('s', 0, 60_000, 1080)])).toBeNull();
+    expect(heldRange(range, [proxy('p')])).toBeNull();
+    expect(heldRange(range, [segment('far', 50_000, 70_000, 1080)])).toBeNull();
+    expect(heldRange(range, [segment('touching', 40_000, 70_000, 1080)])).toBeNull();
+  });
+
+  it('answers the covering SEGMENT, the same one an export reads', () => {
+    const rows = [segment('low', 0, 60_000, 720, 5), segment('tall', 10_000, 50_000, 1080, 1)];
+    expect(heldRange(range, rows)).toEqual({ fromMs: 10_000, toMs: 50_000 });
+  });
+
+  it('answers the SEGMENT sharing the most time when none covers the range', () => {
+    const rows = [segment('a', 0, 25_000, 1080, 9), segment('b', 28_000, 39_000, 720, 1)];
+    expect(heldRange(range, rows)).toEqual({ fromMs: 28_000, toMs: 39_000 });
+  });
+
+  it('breaks an equal share by height, then by the newer row', () => {
+    const tall = [segment('a', 0, 30_000, 720, 9), segment('b', 30_000, 60_000, 1080, 1)];
+    expect(heldRange(range, tall)).toEqual({ fromMs: 30_000, toMs: 60_000 });
+    const newer = [segment('a', 0, 30_000, 1080, 1), segment('b', 30_000, 60_000, 1080, 9)];
+    expect(heldRange(range, newer)).toEqual({ fromMs: 30_000, toMs: 60_000 });
+  });
+
+  it('skips a SEGMENT whose meta does not read', () => {
+    const rows = [{ id: 'bad', kind: 'SEGMENT', meta: { fromMs: 'x' }, createdAt: at(0) }];
+    expect(heldRange(range, rows)).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 # Module 08: Editor Shell
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 05](module-05-thin-slice-render.md), [Module 07](module-07-manual-clipping-and-clips-library.md)
 > **Stories**: CL-5.1, CL-5.2, CL-5.4
 > **Next**: [Module 09](module-09-timeline.md) (Timeline)
@@ -93,17 +93,17 @@ On the first open of a clip (`document.canvas` still at its created default and 
 
 ## Tasks
 
-- [ ] `immersion()` for `clips/edit/<id>`; the route and its fonts layout; the rules docs updated.
-- [ ] The reducer, history, selection, selectors.
-- [ ] `packages/video-preview`: scaffold, `PreviewEngine` (clock, hand-over, speed, area canvases from `frameState`, scrubbing mode, empty overlay and audio slots), the canvas spike and its Decision Log row.
-- [ ] `PlaybackStore` and the transport bar.
-- [ ] `ClipEditor`: top bar, tab rail, panel with placeholders, stage with its scale, the read-only dock with `ResizeHandle`.
-- [ ] `ClipAutosave`, the conflict and gone alerts, the leave guard, undo and redo keys.
-- [ ] The shape dialog and the optional `meta` in the schema.
-- [ ] `/dev/clips` switched to `PreviewEngine` as a check.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: open a clip, pick Vertical, rename it, undo, reload and see it kept. Screenshots in `screenshots/` (light, dark, Lilac, 1366 and 1920).
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `immersion()` for `clips/edit/<id>`; the route and its fonts layout; the rules docs updated.
+- [x] The reducer, history, selection, selectors.
+- [x] `packages/video-preview`: scaffold, `PreviewEngine` (clock, hand-over, speed, area canvases from `frameState`, scrubbing mode, empty overlay and audio slots), the canvas spike and its Decision Log row.
+- [x] `PlaybackStore` and the transport bar.
+- [x] `ClipEditor`: top bar, tab rail, panel with placeholders, stage with its scale, the read-only dock with `ResizeHandle`.
+- [x] `ClipAutosave`, the conflict and gone alerts, the leave guard, undo and redo keys.
+- [x] The shape dialog and the optional `meta` in the schema.
+- [x] `/dev/clips` switched to `PreviewEngine` as a check.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: open a clip, pick Vertical, rename it, undo, reload and see it kept. Screenshots in `screenshots/` (light, dark, Lilac, 1366 and 1920).
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

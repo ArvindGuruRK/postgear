@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  // Web only: the browser preview of a clip. It reads @postgear/video-engine
+  // as source through the root `paths`, so there is no `rootDir` here (the
+  // engine's files sit outside src/), and nothing is emitted: Next compiles
+  // it inside the web app (`transpilePackages`).
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["jest"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}

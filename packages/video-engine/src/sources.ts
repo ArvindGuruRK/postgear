@@ -130,3 +130,43 @@ export function pickSharpSource<A extends SourceAsset>(
   }
   return proxy ? { asset: proxy, sharp: false, sourceOffsetMs: 0, height: null } : null;
 }
+
+/**
+ * The stretch of the video held in sharp quality around a clip (Module 09,
+ * the timeline's hatched tail), or null when nothing sharp touches it.
+ *
+ * The covering SEGMENT when there is one (the same pick as
+ * `pickSharpSource`); otherwise the SEGMENT sharing the most time with the
+ * range (then the taller, then the newer), which is what a clip trimmed
+ * past its handles still has. Only an overlapping SEGMENT counts: one
+ * elsewhere in the video says nothing about this clip.
+ */
+export function heldRange(
+  range: SourceRange | null,
+  assets: readonly SourceAsset[],
+): SourceRange | null {
+  if (!range) return null;
+  const covering = pickSharpSource(range, assets);
+  if (covering?.sharp) {
+    const meta = parseSegmentAssetMeta(covering.asset.meta);
+    if (meta) return { fromMs: meta.fromMs, toMs: meta.toMs };
+  }
+
+  let best: { meta: SegmentAssetMeta; overlap: number; createdAt: number } | null = null;
+  for (const asset of assets) {
+    if (asset.kind !== 'SEGMENT') continue;
+    const meta = parseSegmentAssetMeta(asset.meta);
+    if (!meta) continue;
+    const overlap = Math.min(meta.toMs, range.toMs) - Math.max(meta.fromMs, range.fromMs);
+    if (overlap <= 0) continue;
+    const createdAt = asset.createdAt.getTime();
+    const better =
+      !best ||
+      overlap > best.overlap ||
+      (overlap === best.overlap &&
+        (meta.height > best.meta.height ||
+          (meta.height === best.meta.height && createdAt > best.createdAt)));
+    if (better) best = { meta, overlap, createdAt };
+  }
+  return best ? { fromMs: best.meta.fromMs, toMs: best.meta.toMs } : null;
+}

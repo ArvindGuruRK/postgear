@@ -15,6 +15,7 @@
  *   cycle's import and AI minutes, so the page can show what is left before
  *   anyone imports.
  * - **Platforms and simulation**: what this deployment allows.
+ * - **Sample** (Module 06): whether Try A Sample has a video here.
  */
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -33,6 +34,7 @@ import { SchedulingService } from '../../scheduling/scheduling.service';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { gigabytesToBytes } from '../clips.units';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipSampleLink } from '../videos/clip-sample';
 
 const ANSWER_CACHE_MS = 60_000;
 const OFFLINE_CACHE_MS = 15_000;
@@ -83,6 +85,8 @@ export interface ClipsStatus {
   meters: { importMinutes: ClipsMeterView; aiMinutes: ClipsMeterView };
   /** Module 04: the space gauge again, under the name the sprint document uses. */
   usage: { storageBytes: number };
+  /** Module 06: whether Try A Sample has a video to import here. */
+  sample: { available: boolean };
 }
 
 const IMPORT_MINUTES: MeterKey = 'clips.import_minutes_per_month';
@@ -100,6 +104,7 @@ export class ClipsStatusService {
     private readonly resolver: EntitlementResolver,
     private readonly limits: ClipLimitsGuard,
     config: ConfigService<Env, true>,
+    private readonly sample: ClipSampleLink,
   ) {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
@@ -129,6 +134,7 @@ export class ClipsStatusService {
       limits,
       meters: { importMinutes: meterView(importMinutes), aiMinutes: meterView(aiMinutes) },
       usage: { storageBytes: usedBytes },
+      sample: { available: this.sample.url !== null },
     };
   }
 

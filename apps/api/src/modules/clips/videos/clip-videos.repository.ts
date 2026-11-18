@@ -14,6 +14,7 @@ import {
   type ClipJob,
   ClipJobKind,
   type ClipPlatform,
+  ClipStatus,
   type ClipVideo,
   ClipVideoStatus,
   type Prisma,
@@ -23,17 +24,29 @@ import type { ClipsTx } from '../clips.tx';
 
 const LIVE = { deletedAt: null, status: { not: ClipVideoStatus.REMOVED } } as const;
 
-/** A video row with the files a card needs (its poster) and its newest import. */
-export type VideoWithCard = ClipVideo & { assets: ClipAsset[]; jobs: ClipJob[] };
+/**
+ * A video row with the files a card needs (its poster), its newest import
+ * and (Module 06) how many of its clips are not hidden.
+ */
+export type VideoWithCard = ClipVideo & {
+  assets: ClipAsset[];
+  jobs: ClipJob[];
+  _count?: { clips: number };
+};
 
 export interface VideoCursor {
   createdAt: Date;
   id: string;
 }
 
-/** The fields of a clip a video page lists. */
+/**
+ * The fields of a clip a video page lists. `document` is read only to work
+ * out the clip's range (Module 07); the summary never carries it.
+ */
 export const CLIP_SUMMARY_SELECT = {
   id: true,
+  videoId: true,
+  document: true,
   title: true,
   status: true,
   origin: true,
@@ -197,5 +210,7 @@ function cardInclude() {
       orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
       take: 1,
     },
+    // Module 06: the card's clip count, the same clips the Clips tab's All counts.
+    _count: { select: { clips: { where: { status: { not: ClipStatus.HIDDEN } } } } },
   };
 }

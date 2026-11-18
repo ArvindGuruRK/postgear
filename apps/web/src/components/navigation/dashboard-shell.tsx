@@ -22,6 +22,7 @@ import { GlobalSearch } from '../search/global-search';
 import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
 import { DayStreak } from './day-streak';
+import { immersion } from './immersion';
 import type { SidebarItem } from './sidebar';
 
 // Client wrapper around AppShell so [orgId]/layout.tsx can stay a server
@@ -82,29 +83,6 @@ const TITLES: Record<string, string> = {
 
 /** Pages that lay out their own height-filling blocks: see AppShell. */
 const FULL_BLEED = new Set(['calendar']);
-
-/**
- * Whether a page is its own module and so takes the whole window: no rail, no
- * top bar (2026-10-31). Creating a workflow or a design moves into a separate
- * place, the way Figma or n8n open a file, so the app frame steps out of the
- * way and the page brings its own way back.
- *
- * - `'fixed'`: a workspace that fills the height and scrolls its own panels
- *   (Studio's editor, `studio/{designId}`).
- * - `'edge'`: the same, right up to the window's edge (the workflow builder,
- *   `workflows/{id}`, whose canvas has no frame).
- * - `'scroll'`: a page that scrolls as one (Studio's Create Design wizard,
- *   `studio/new`).
- *
- * The lists (`workflows`, `studio`) keep the frame.
- */
-function immersion(page: string): 'fixed' | 'edge' | 'scroll' | null {
-  const [segment, child, ...deeper] = page.split('/');
-  if (segment !== 'studio' && segment !== 'workflows') return null;
-  if (!child || deeper.length > 0) return null;
-  if (segment === 'studio') return child === 'new' ? 'scroll' : 'fixed';
-  return 'edge';
-}
 
 export function DashboardShell({ orgId, children }: { orgId: string; children: ReactNode }) {
   const pathname = usePathname();

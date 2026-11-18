@@ -22,7 +22,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { ClipChannelsModule } from './channels/clip-channels.module';
+import { ClipEditsService } from './clip/clip-edits.service';
 import { ClipItemService } from './clip/clip-item.service';
+import { ClipsListService } from './clip/clips-list.service';
+import { ClipLayoutsService } from './layouts/clip-layouts.service';
 import { ClipsModule } from './clips.module';
 import { ClipsCoreModule } from './clips-core.module';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
@@ -113,6 +116,19 @@ describe('Clips routes', () => {
       .useValue({ list: async () => ({ reached: 'videos' }) })
       .overrideProvider(ClipItemService)
       .useValue({ get: async (_org: string, clipId: string) => ({ reached: 'clip', clipId }) })
+      .overrideProvider(ClipEditsService)
+      .useValue({
+        patch: async (_org: string, clipId: string) => ({ reached: 'patch', clipId }),
+        remove: async (_org: string, clipId: string) => ({ reached: 'delete', clipId }),
+      })
+      .overrideProvider(ClipsListService)
+      .useValue({ list: async () => ({ reached: 'clips' }) })
+      .overrideProvider(ClipLayoutsService)
+      .useValue({
+        list: async () => ({ reached: 'layouts' }),
+        rename: async (_org: string, id: string) => ({ reached: 'layout-rename', id }),
+        remove: async (_org: string, id: string) => ({ reached: 'layout-delete', id }),
+      })
       .overrideProvider(ClipJobEventsService)
       .useValue({})
       .overrideProvider(ClipReconcileService)
@@ -149,6 +165,42 @@ describe('Clips routes', () => {
   it('sends a clip id to the clip controller', async () => {
     const response = await request(app.getHttpServer()).get(`/clips/${CLIP_ID}`).expect(200);
     expect(response.body).toEqual({ reached: 'clip', clipId: CLIP_ID });
+  });
+
+  it('sends /clips/layouts to the layouts controller, not the clip controller', async () => {
+    const list = await request(app.getHttpServer()).get('/clips/layouts').expect(200);
+    expect(list.body).toEqual({ reached: 'layouts' });
+    const rename = await request(app.getHttpServer())
+      .patch(`/clips/layouts/${CLIP_ID}`)
+      .send({ name: 'Mine' })
+      .expect(200);
+    expect(rename.body).toEqual({ reached: 'layout-rename', id: CLIP_ID });
+    const removed = await request(app.getHttpServer())
+      .delete(`/clips/layouts/${CLIP_ID}`)
+      .expect(200);
+    expect(removed.body).toEqual({ reached: 'layout-delete', id: CLIP_ID });
+  });
+
+  it('sends GET /clips to the library list, and PATCH and DELETE of a clip id to the clip controller', async () => {
+    const list = await request(app.getHttpServer()).get('/clips?status=draft').expect(200);
+    expect(list.body).toEqual({ reached: 'clips' });
+    const patched = await request(app.getHttpServer())
+      .patch(`/clips/${CLIP_ID}`)
+      .send({ revision: 1, title: 'New name' })
+      .expect(200);
+    expect(patched.body).toEqual({ reached: 'patch', clipId: CLIP_ID });
+    const removed = await request(app.getHttpServer()).delete(`/clips/${CLIP_ID}`).expect(200);
+    expect(removed.body).toEqual({ reached: 'delete', clipId: CLIP_ID });
+  });
+
+  it('refuses a list query or a patch body it does not describe', async () => {
+    await request(app.getHttpServer()).get('/clips?status=everything').expect(400);
+    await request(app.getHttpServer()).get('/clips?source=vimeo').expect(400);
+    await request(app.getHttpServer()).patch(`/clips/${CLIP_ID}`).send({ revision: 1 }).expect(400);
+    await request(app.getHttpServer())
+      .patch(`/clips/${CLIP_ID}`)
+      .send({ revision: 1, status: 'NEW' })
+      .expect(400);
   });
 
   it('refuses an internal call without the worker token', async () => {
