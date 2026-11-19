@@ -11,6 +11,10 @@
  * 4. **Store** the file and its thumbnail under fresh random keys.
  * 5. **Record** the row. If that fails, the stored files are removed, so a
  *    database error never leaves orphaned objects nobody can see or delete.
+ * 6. **Video only** (Sprint 12, Module 19): start `mediaVideoFactsWorkflow`,
+ *    which gives the row its poster and length on the media worker. Not
+ *    awaited, and a failed start is logged, never the upload's failure: the
+ *    maintenance pass picks up any video still without them.
  *
  * The multipart temp file is removed whatever happens.
  */
@@ -32,6 +36,7 @@ import { fileNameParts } from '../../common/attachment';
 import { securityLogger } from '../../common/logging/security-logger';
 import { stripControlChars } from '../../common/sanitize';
 import { matchesAllTerms, selectiveTerm } from '../../common/search-terms';
+import { SchedulingService } from '../scheduling/scheduling.service';
 import { type ListMediaQuery, MEDIA_PAGE_SIZE } from './dto/media.schema';
 import { SNIFF_BYTES, sniffMedia } from './file-type';
 import { processImage, UnreadableImageError } from './image-processor';
@@ -61,7 +66,10 @@ export interface MediaView {
   width: number | null;
   height: number | null;
   url: string;
-  /** A small preview for grids. Null for video, which has no generated poster yet. */
+  /**
+   * A small preview for grids. A video's is its poster (Module 19), null
+   * until the media worker has made it or when the file could not be read.
+   */
   thumbnailUrl: string | null;
   createdAt: Date;
   /**
@@ -144,6 +152,7 @@ export class MediaService {
   constructor(
     private readonly repository: MediaRepository,
     @Inject(STORAGE_BACKEND) private readonly storage: StorageBackend,
+    private readonly scheduling: SchedulingService,
   ) {}
 
   async upload(
@@ -200,6 +209,7 @@ export class MediaService {
           height: null,
         });
 
+        this.startVideoFacts(orgId, record.id);
         return { media: this.toView(record), originalBytes: file.size };
       }
 
@@ -549,6 +559,28 @@ export class MediaService {
       createdAt: record.createdAt,
       durationMs: record.durationMs ?? null,
     };
+  }
+
+  /**
+   * Starts the poster and length of a just-uploaded video, without waiting:
+   * the person's upload is done whatever Temporal says. A start that does
+   * not reach Temporal is logged; the maintenance pass covers the row.
+   */
+  private startVideoFacts(orgId: string, mediaId: string): void {
+    const logMissed = (reason: string) =>
+      this.logger.warn(
+        JSON.stringify({ event: 'media.video_facts_not_started', orgId, mediaId, reason }),
+      );
+    try {
+      void this.scheduling.startMediaVideoFacts(mediaId, orgId).then(
+        (started) => {
+          if (!started) logMissed('scheduler_unreachable');
+        },
+        (error: unknown) => logMissed(error instanceof Error ? error.message : String(error)),
+      );
+    } catch (error) {
+      logMissed(error instanceof Error ? error.message : String(error));
+    }
   }
 
   private async removeQuietly(keys: string[]): Promise<void> {

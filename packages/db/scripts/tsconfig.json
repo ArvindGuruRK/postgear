@@ -1,0 +1,15 @@
+{
+  // The operator scripts (Sprint 12, Module 19) run under ts-node like the
+  // seeder, so they use its CommonJS settings (see prisma/seeds/tsconfig.json).
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "../src/**/*.ts"]
+}

@@ -24,6 +24,7 @@ import type { ClipLinkProber } from '../links/clip-links.types';
 import { jobRow, TEST_ORG, TEST_USER } from '../testing/rows';
 import type { ClipDownloadsRepository } from './clip-downloads.repository';
 import { ClipDownloadsService, DOWNLOAD_LINK_SECONDS } from './clip-downloads.service';
+import { SAVE_TO_MEDIA_STALE_MS } from './clip-downloads.view';
 
 jest.mock('../clips.tx', () => {
   let chain: Promise<unknown> = Promise.resolve();
@@ -240,7 +241,10 @@ function build(options: { plan?: Record<string, unknown>; durationMs?: number } 
       if (!row) return { outcome: 'not_ready' };
       const output = row.output as Record<string, unknown>;
       if (output.media) return { outcome: 'already', job: row };
-      row.output = { ...output, media: { status: 'saving', mediaId: null } };
+      row.output = {
+        ...output,
+        media: { status: 'saving', mediaId: null, startedAt: new Date().toISOString() },
+      };
       return { outcome: 'started', job: row };
     }),
     saveNotStarted: jest.fn(async () => undefined),
@@ -625,6 +629,30 @@ describe('ClipDownloadsService file, save, delete and original', () => {
     // A second click while it saves starts nothing new.
     await service.saveToMedia(TEST_ORG, row.id);
     expect(scheduling.startClipSaveDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a save stuck past its time limit as failed, so the button comes back', async () => {
+    const { service, rows } = build();
+    const at = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+    const stuck = doneRow(
+      {},
+      { media: { status: 'saving', mediaId: null, startedAt: at(SAVE_TO_MEDIA_STALE_MS + 1_000) } },
+    );
+    const running = doneRow(
+      {},
+      { media: { status: 'saving', mediaId: null, startedAt: at(60_000) } },
+    );
+    rows.push(stuck, running);
+    const { downloads } = await service.list(TEST_ORG);
+    const view = (id: string) => downloads.find((download) => download.id === id);
+    expect(view(stuck.id)).toMatchObject({
+      canSaveToMedia: true,
+      media: { status: 'failed', mediaId: null },
+    });
+    expect(view(running.id)).toMatchObject({
+      canSaveToMedia: false,
+      media: { status: 'saving', mediaId: null },
+    });
   });
 
   it('refuses Save To Media for Audio Only and for a file over the Media limit', async () => {

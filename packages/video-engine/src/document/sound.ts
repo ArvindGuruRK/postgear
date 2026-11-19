@@ -15,13 +15,11 @@
  * - Effects sit on their moment (`anchor: 'moment'`), music on the clip's
  *   clock (`anchor: 'clip'`), and a clip holds at most `MAX_SOUNDS` sounds.
  */
-import { addItem, findItem, removeItem, updateItem, type ItemRefusalCode } from '../time/items';
+import { addItem, findItem, type ItemRefusalCode, removeItem, updateItem } from '../time/items';
 import { outputDuration } from '../time/time-map';
-import { FADE_MAX_MS, ITEM_MIN_MS, VOLUME_MAX } from './limits';
+import { FADE_MAX_MS, ITEM_MIN_MS, MAX_SOUNDS, VOLUME_MAX } from './limits';
 import type { AudioItem, ClipDocument, SoundRef } from './schema';
 
-/** Sounds a clip may hold (effects and music together). */
-export const MAX_SOUNDS = 20;
 /** The length of the Fade In and Fade Out switches. */
 export const SOUND_FADE_MS = 1_000;
 

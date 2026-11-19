@@ -13,7 +13,7 @@
  *
  * A run is cancelled with the job's own `POST /clips/jobs/:jobId/cancel`.
  */
-import { Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { type ActiveOrg, CurrentOrg } from '../../../common/decorators/current-org.decorator';
 import {
@@ -21,14 +21,19 @@ import {
   CurrentUser,
 } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { ClipStart } from '../limits/clips-create.guard';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 import { ClipHighlightsService } from './clip-highlights.service';
 
 @Controller('clips/videos')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipHighlightsController {
   constructor(private readonly highlights: ClipHighlightsService) {}
 
   @Post(':videoId/highlights')
+  @ClipStart()
   @HttpCode(HttpStatus.ACCEPTED)
   start(
     @CurrentOrg() org: ActiveOrg,

@@ -47,6 +47,7 @@ import { type ClipJobView, toJobView } from '../jobs/clip-job-view';
 import { ClipJobsRepository, OPEN_JOB_STATUSES } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipRetentionService } from '../retention/clip-retention.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import type { ExportClipInput, PreviewClipInput } from './clip-item.schema';
 import { clipNotFound, exportFileName, videoNotFound } from './clip-item.service';
@@ -151,6 +152,7 @@ export class ClipExportsService {
     private readonly resolver: EntitlementResolver,
     @Inject(STORAGE_BACKEND) private readonly storage: StorageBackend,
     @Inject(PRIVATE_STORAGE) private readonly privateStorage: PrivateStorage,
+    private readonly retention: ClipRetentionService,
   ) {}
 
   /** 202 `{ job }`. */
@@ -207,6 +209,8 @@ export class ClipExportsService {
       return this.jobsRepository.create(row, tx);
     });
 
+    // Module 19: an export counts as using the clip's video.
+    if (job.videoId) await this.retention.touchVideo(orgId, job.videoId);
     await this.jobs.start(job);
     const fresh = (await this.jobsRepository.find(orgId, job.id)) ?? job;
     return { job: toJobView(fresh) };

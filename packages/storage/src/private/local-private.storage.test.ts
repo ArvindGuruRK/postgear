@@ -117,6 +117,35 @@ describe('LocalPrivateStorage', () => {
     await expect(storage.deletePrefix('../')).rejects.toThrow(/did not generate/);
   });
 
+  it('lists every Clips file in key order, a page at a time, with sizes and dates (Module 19)', async () => {
+    const keys = [
+      clipKeys.videoFile(org, video, 'proxy', 'mp4'),
+      clipKeys.videoFile(org, otherVideo, 'poster', 'webp'),
+      clipKeys.downloadFile(org, job, 'talk', 'mp4'),
+    ];
+    for (const key of keys) await storage.put(key, Buffer.from('abc'), 'video/mp4');
+    const sorted = [...keys].sort();
+
+    const first = await storage.list('clips/', { limit: 2 });
+    expect(first.objects.map((object) => object.key)).toEqual(sorted.slice(0, 2));
+    expect(first.objects[0]?.bytes).toBe(3);
+    expect(first.objects[0]?.modifiedAt).toBeInstanceOf(Date);
+    expect(first.next).toBe(sorted[1]);
+
+    const second = await storage.list('clips/', { after: first.next, limit: 2 });
+    expect(second.objects.map((object) => object.key)).toEqual(sorted.slice(2));
+    expect(second.next).toBeNull();
+
+    const one = await storage.list(clipKeys.videoPrefix(org, video), { limit: 10 });
+    expect(one.objects.map((object) => object.key)).toEqual([keys[0]]);
+    expect(await storage.list(clipKeys.videoPrefix(org, job), { limit: 10 })).toEqual({
+      objects: [],
+      next: null,
+    });
+    await expect(storage.list('../', { limit: 1 })).rejects.toThrow(/did not generate/);
+    await expect(storage.list('', { limit: 1 })).rejects.toThrow(/did not generate/);
+  });
+
   it('refuses keys that could leave the folder before touching the disk', async () => {
     await expect(storage.put('../escape.mp4', Buffer.from('x'), 'video/mp4')).rejects.toThrow(
       /did not generate/,

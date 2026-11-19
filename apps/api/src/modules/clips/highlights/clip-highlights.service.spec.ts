@@ -253,6 +253,36 @@ describe('POST /clips/videos/:videoId/highlights', () => {
     expect(tables.runs).toHaveLength(0);
   });
 
+  it('a video that left READY after the first look is not ready (not "already looking"), charge given back', async () => {
+    const { service, tables, ledger } = setup();
+    // The video starts importing again between this request's look and its transaction.
+    const consume = ledger.usage.consume.getMockImplementation();
+    ledger.usage.consume.mockImplementationOnce(async (...args) => {
+      (tables.videos[0] as { status: string }).status = 'IMPORTING';
+      return (consume as NonNullable<typeof consume>)(...args);
+    });
+    const refused = await refusal(service.start(TEST_ORG, TEST_USER, VIDEO));
+    expect(refused.status).toBe(409);
+    expect(refused.body.code).toBe('video_not_ready');
+    expect(ledger.used()).toBe(0);
+    expect(tables.runs).toHaveLength(0);
+    expect(tables.jobs).toHaveLength(0);
+  });
+
+  it('a video deleted after the first look is a plain 404, charge given back', async () => {
+    const { service, tables, ledger } = setup();
+    const consume = ledger.usage.consume.getMockImplementation();
+    ledger.usage.consume.mockImplementationOnce(async (...args) => {
+      (tables.videos[0] as { deletedAt: Date | null }).deletedAt = new Date();
+      return (consume as NonNullable<typeof consume>)(...args);
+    });
+    const refused = await refusal(service.start(TEST_ORG, TEST_USER, VIDEO));
+    expect(refused.status).toBe(404);
+    expect(refused.body.code).toBe('video_not_found');
+    expect(ledger.used()).toBe(0);
+    expect(tables.runs).toHaveLength(0);
+  });
+
   it('refuses past the allowance with the typed 402 and the right numbers', async () => {
     const { service, tables, ledger } = setup({ limit: 2 });
     const refused = await refusal(service.start(TEST_ORG, TEST_USER, VIDEO));

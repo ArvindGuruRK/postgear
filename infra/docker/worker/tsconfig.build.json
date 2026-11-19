@@ -1,0 +1,45 @@
+{
+  // The worker image's compile (infra/docker/Dockerfile.worker), not used locally.
+  //
+  // apps/worker/tsconfig.json maps only some workspace packages in `paths`; the
+  // rest (media-tools, video-engine) are found through node_modules links, and
+  // tsc never emits a file it found that way. Mapping every package here makes
+  // tsc emit each one the worker reaches into the out folder as plain
+  // JavaScript (`<out>/packages/<name>/src`), which the image then serves as
+  // `node_modules/@postgear/<name>` (see prepare-runtime.js).
+  //
+  // `baseUrl` is inherited (the repo root), so the paths below are from there.
+  // `typeRoots` is spelled out because tsc looks for them beside this file:
+  // the worker's own @types/node (20) must win over the root's newer one,
+  // exactly as when apps/worker compiles itself.
+  "extends": "../../../apps/worker/tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../../../apps/worker/node_modules/@types", "../../../node_modules/@types"],
+    "incremental": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "paths": {
+      "@postgear/db": ["packages/db/src"],
+      "@postgear/scheduling": ["packages/scheduling/src"],
+      "@postgear/storage": ["packages/storage/src"],
+      "@postgear/social-core": ["packages/social-core/src"],
+      "@postgear/seo-engine": ["packages/seo-engine/src"],
+      "@postgear/ai-engine": ["packages/ai-engine/src"],
+      "@postgear/automation": ["packages/automation/src"],
+      "@postgear/media-tools": ["packages/media-tools/src"],
+      "@postgear/media-tools/listing": ["packages/media-tools/src/listing.ts"],
+      "@postgear/video-engine": ["packages/video-engine/src"],
+      "@postgear/entitlements": ["packages/entitlements/src"],
+      "@postgear/discover-engine": ["packages/discover-engine/src"],
+      "@postgear/design-engine": ["packages/design-engine/src"],
+      "@postgear/email": ["packages/email/src"]
+    }
+  },
+  "include": ["../../../apps/worker/src/**/*.ts"],
+  "exclude": [
+    "../../../apps/worker/src/**/*.test.ts",
+    "../../../apps/worker/src/**/*.spec.ts",
+    "../../../apps/worker/src/**/testing/**"
+  ]
+}

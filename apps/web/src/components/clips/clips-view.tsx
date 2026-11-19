@@ -23,6 +23,7 @@ import {
   Alert,
   Badge,
   Button,
+  EmptyState,
   PageActions,
   Tabs,
   TabsContent,
@@ -30,31 +31,44 @@ import {
   TabsTrigger,
   toast,
 } from '@postgear/ui';
-import { TriangleAlert } from 'lucide-react';
+import { Lock, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionLink } from '@/components/home/home-actions';
 import { ApiError } from '@/lib/api';
 import { createWholeClip, downloadOriginal, importSample } from '@/lib/clips-api';
-import type { ClipImportOutcome, ClipProbe, ClipsStatus, DownloadStarted } from '@/types/clips';
+import type {
+  ClipImportOutcome,
+  ClipProbe,
+  ClipsStatus,
+  ClipVideoSort,
+  DownloadStarted,
+} from '@/types/clips';
 import { ChannelBrowser } from './channels/channel-browser';
 import { BrowseChannelsDialog, LinkCardDialog } from './channels/channel-dialogs';
 import { useChannels } from './channels/use-channels';
 import { CLIPS_TAB_NAMES, CLIPS_TABS, type ClipsTab, DEFAULT_CLIPS_TAB } from './clips-model';
 import { AiMinutesChip, StorageMeter } from './home/clips-meters';
+import { ComingUp } from './home/coming-up';
 import { CreateTab } from './home/create-tab';
 import { DOWNLOAD_EXISTS, DOWNLOAD_STARTED, DownloadsTab } from './home/downloads-tab';
-import { UPLOAD_ACCEPT, uploadHelpLine } from './home/home-model';
+import {
+  CLIPS_NOT_IN_PLAN_SENTENCE,
+  clipsInPlan,
+  storageOverSentence,
+  UPLOAD_ACCEPT,
+  uploadHelpLine,
+} from './home/home-model';
 import { ALREADY_HERE } from './home/link-card';
+import { useDownloads } from './home/use-downloads';
 import { useLinkProbe } from './home/use-link-probe';
 import { useVideoUpload } from './home/use-video-upload';
 import { useVideos } from './home/use-videos';
 import { VideosTab, videoCardActions } from './home/videos-tab';
 import { ClipsTab as ClipsLibraryTab } from './library/clips-tab';
-import { ComingUp } from './home/coming-up';
 import { RecentClips } from './library/recent-clips';
 import { useClipsList } from './library/use-clips-list';
 import { useClipsStatus } from './use-clips-status';
-import { useDownloads } from './home/use-downloads';
 import { clipEditHref } from './video/video-clip-list';
 
 export const TOOLS_DOWN_SENTENCE =
@@ -69,10 +83,13 @@ export function videoHref(orgId: string, videoId: string): string {
 export function ClipsView({
   orgId,
   initialTab,
+  initialSort = 'newest',
   initialStatus = null,
 }: {
   orgId: string;
   initialTab: ClipsTab;
+  /** Module 19: the Videos order from `?sort=` (See What Uses Space lands on `size`). */
+  initialSort?: ClipVideoSort;
   initialStatus?: ClipsStatus | null;
 }) {
   const router = useRouter();
@@ -80,7 +97,7 @@ export function ClipsView({
   const statusState = useClipsStatus(initialStatus);
   const { status } = statusState;
   const refreshStatus = statusState.refresh;
-  const videos = useVideos();
+  const videos = useVideos(initialSort);
   const probe = useLinkProbe();
   const [browseOpen, setBrowseOpen] = useState(false);
   // Channels are asked for only once the Streams tab or the dialog opens.
@@ -96,14 +113,26 @@ export function ClipsView({
 
   // The open tab lives in the URL without a navigation, which would re-run
   // the server page for nothing.
+  // The Videos order (Module 19) rides along while the Videos tab is open.
   useEffect(() => {
     const url = new URL(window.location.href);
     const wanted = tab === DEFAULT_CLIPS_TAB ? null : tab;
-    if (url.searchParams.get('tab') === wanted) return;
+    const sort = tab === 'videos' && videos.sort !== 'newest' ? videos.sort : null;
+    if (url.searchParams.get('tab') === wanted && url.searchParams.get('sort') === sort) return;
     if (wanted) url.searchParams.set('tab', wanted);
     else url.searchParams.delete('tab');
+    if (sort) url.searchParams.set('sort', sort);
+    else url.searchParams.delete('sort');
     window.history.replaceState(window.history.state, '', url);
-  }, [tab]);
+  }, [tab, videos.sort]);
+
+  // Module 19: See What Uses Space, from the meter's panel or the over-the-plan warning.
+  const { setSort: setVideoSort } = videos;
+  const seeWhatUsesSpace = useCallback(() => {
+    setVideoSort('size');
+    setTab('videos');
+  }, [setVideoSort]);
+  const overSentence = status ? storageOverSentence(status) : null;
 
   const uploads = useVideoUpload(status, () => {
     videos.refresh();
@@ -199,10 +228,29 @@ export function ClipsView({
     setTab('create');
   };
 
+  // Module 19: a plan without Clips (an operator turned it off). Every other
+  // Clips route refuses with this sentence; the page says it once, calmly.
+  if (status && !clipsInPlan(status)) {
+    return (
+      <div className="flex flex-col gap-5" data-testid="clips-not-in-plan">
+        <EmptyState
+          icon={Lock}
+          title={CLIPS_NOT_IN_PLAN_SENTENCE}
+          description="Upgrade to turn long videos into short clips."
+          action={{
+            label: 'See Plans',
+            onClick: () => router.push(`/${encodeURIComponent(orgId)}/settings/billing`),
+            variant: 'primary',
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <PageActions>
-        {status ? <StorageMeter status={status} /> : null}
+        {status ? <StorageMeter status={status} onSeeWhatUsesSpace={seeWhatUsesSpace} /> : null}
         <AiMinutesChip orgId={orgId} fallback={status?.meters.aiMinutes ?? null} />
       </PageActions>
 
@@ -219,6 +267,16 @@ export function ClipsView({
         <Alert variant="warning" className="items-center" data-testid="clips-tools-warning">
           <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
           <p className="m-0 min-w-0 flex-1">{TOOLS_DOWN_SENTENCE}</p>
+        </Alert>
+      ) : null}
+      {overSentence ? (
+        <Alert variant="warning" className="items-center" data-testid="clips-storage-over">
+          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+          <p className="m-0 min-w-0 flex-1">{overSentence}</p>
+          <Button variant="secondary" size="sm" onClick={seeWhatUsesSpace}>
+            See What Uses Space
+          </Button>
+          <ActionLink href={`/${encodeURIComponent(orgId)}/settings/billing`}>See Plans</ActionLink>
         </Alert>
       ) : null}
 

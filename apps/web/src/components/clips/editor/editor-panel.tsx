@@ -2,8 +2,10 @@
 
 /**
  * The editor's panel (Module 08 section 5): the open tab's controls in a
- * `w-80` chrome panel, with **Back** and **Next** at its foot walking the
- * tabs in order, as StreamLadder does. On Export, Next is **Export Clip**.
+ * `w-80` chrome panel (`w-96` from 1536 px, so sound and sticker names have
+ * room on a wide screen; Module 20 look pass), with **Back** and **Next** at
+ * its foot walking the tabs in order, as StreamLadder does. On Export, Next
+ * is **Export Clip**.
  *
  * Until each tab's module lands (10 to 14) its body is one placeholder
  * sentence; Export shows Module 05's export.
@@ -60,7 +62,7 @@ export function EditorPanel({
     <section
       aria-labelledby={headingId}
       data-testid="clip-editor-panel"
-      className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card border-2 border-outline bg-chrome shadow-surfaceSm"
+      className="flex w-80 shrink-0 flex-col overflow-hidden rounded-card 2xl:w-96 border-2 border-outline bg-chrome shadow-surfaceSm"
     >
       <h2
         id={headingId}

@@ -1,6 +1,6 @@
 # Module 20: Hardening, E2E, Worker Image, Close-Out
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session, may need a second)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19) | Size: L (one full session, may need a second)
 > **Depends on**: Modules 01 to 19
 > **Stories**: the section 6 checklist of the user stories; the tests of CL-1.7, CL-10.4, CL-13.6 and CL-13.7 (channel browse, Preview Export, the operator screen and the library)
 > **Next**: [the real-test plan](../real-test-plan.md), then [Module 21](module-21-p2-backlog.md) only on Arvind's word
@@ -119,18 +119,18 @@ The API and web images are not this sprint's job; leave their placeholders.
 
 ## Tasks
 
-- [ ] The security sweep table: a test per line; fixes; `security-review` on the diff.
-- [ ] A test for each row of the stories' section 5; the simulation forcing switches.
-- [ ] `e2e/clips.spec.ts` (18 tests, including channel browse, library search, Preview Export and Try A Sample) and `e2e/operator.spec.ts` (edit a plan value and see a limit change, an override, the 404 for a member) green under simulation; CI able to run them with FFmpeg and MinIO, or the skips made visible.
-- [ ] A simulated plan change test (a Stripe-simulated upgrade moves the snapshot and the export quality tiles within seconds) and a load test of parallel imports against the meter (twenty at once with room for three: three charged, the rest refused, no negative `used`).
-- [ ] Parity checks wired into the test job (`frameState` numeric tests, per-feature compiler tests, the still-frame script).
-- [ ] Performance checks (long timeline, limits, memory, preview redraws).
-- [ ] Accessibility review and fixes; the look pass in three themes at two widths with its checklist.
-- [ ] `Dockerfile.worker` (Debian slim, FFmpeg GPL static build as a separate program, yt-dlp, Deno, the font folder and manifest, no browser), the compose profile, licences folder, the self-update switch.
-- [ ] Docs: testing guide, `.env.example`, `CLAUDE.md`, READMEs, SCHEMA_NOTES, Deviations; the checklist items for entitlements (Module 01 tables, the seed, the operator screen, the library screen) added to the completion checklist.
-- [ ] `npm run validate` green (or every red test listed with its cause).
-- [ ] The completion checklist through `sprint-closeout`.
-- [ ] Update the Progress table and the Decision Log; set the sprint doc's Definition Of Done boxes honestly.
+- [x] The security sweep table: a test per line; fixes; `security-review` on the diff. (Ten gaps fixed; the review found nothing at confidence 8 or above.)
+- [x] A test for each row of the stories' section 5; the simulation forcing switches. (Testing guide 5p lists them.)
+- [x] `e2e/clips.spec.ts` (18 tests, including channel browse, library search, Preview Export and Try A Sample) and `e2e/operator.spec.ts` (edit a plan value and see a limit change, an override, the 404 for a member) green under simulation; CI able to run them with FFmpeg and MinIO, or the skips made visible. (2026-11-19: `clips.spec.ts` 19 of 19, `operator.spec.ts` 3 of 3, `clips-limits.spec.ts` 3 of 3; three app bugs the run found were fixed first. CI runs no e2e spec of any module, which the completion checklist states as a gap.)
+- [x] A simulated plan change test (a Stripe-simulated upgrade moves the snapshot and the export quality tiles within seconds) and a load test of parallel imports against the meter (twenty at once with room for three: three charged, the rest refused, no negative `used`). (`plan-change.spec.ts`; `usage.load.spec.ts` runs on the local Postgres with `CLIPS_LEDGER_DB_TEST=1` and shows as skipped in CI.)
+- [x] Parity checks wired into the test job (`frameState` numeric tests, per-feature compiler tests, the still-frame script). (The numeric and compiler tests run in CI; the 35 real-frame parity tests skip there with a warning, since CI has no pinned FFmpeg, and pass locally.)
+- [x] Performance checks (long timeline, limits, memory, preview redraws). (`timeline-performance.test.tsx`; the hour-long heap run was not done, memory is bounded by design.)
+- [x] Accessibility review and fixes; the look pass in three themes at two widths with its checklist. (`docs/design-patterns/clips-heuristic-review-2026-11-19.md`; no screen reader run.)
+- [x] `Dockerfile.worker` (Debian slim, FFmpeg GPL static build as a separate program, yt-dlp, Deno, the font folder and manifest, no browser), the compose profile, licences folder, the self-update switch. (Proven live 2026-11-19: four queues polled, healthy, a Kick fixture import and a 720p export.)
+- [x] Docs: testing guide, `.env.example`, `CLAUDE.md`, READMEs, SCHEMA_NOTES, Deviations; the checklist items for entitlements (Module 01 tables, the seed, the operator screen, the library screen) added to the completion checklist.
+- [x] `npm run validate` green (or every red test listed with its cause). (2026-11-19: 71 of 71 tasks, 12,740 tests passed, 31 skipped. Two reds seen only under the full parallel load were fixed: the maintenance workflow test's poll, and Jest's limit on the two real FFmpeg runner tests.)
+- [x] The completion checklist through `sprint-closeout`. (`docs/sprint-completion-checklists/sprint-12-completion-checklist.md`.)
+- [x] Update the Progress table and the Decision Log; set the sprint doc's Definition Of Done boxes honestly. (23 of 25 met; the 2 GB upload and S3 left as **Partly**.)
 
 ## Tests
 

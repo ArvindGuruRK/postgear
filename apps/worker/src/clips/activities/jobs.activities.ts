@@ -289,6 +289,7 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             fonts: deps.fonts,
             watermark: deps.watermark ?? null,
             now,
+            simulated: deps.providers.simulated,
             heartbeat: activity.heartbeat,
           });
           return { status: outcome.finished ? 'done' : 'closed' };

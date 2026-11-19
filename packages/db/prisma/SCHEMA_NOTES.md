@@ -686,6 +686,38 @@ tables and enums, and three nullable columns on `Media` (`durationMs`, `fps`,
   `durationMs`, `fps`, `width`, `height`), in the public media space, so the
   composer and the Media page need no Clips knowledge.
 
+### Retention, rights and the storage notice (Module 19, `20261119120000_sprint12_clips_retention_and_safety`)
+
+Additive only: four nullable columns and two tables.
+
+- **`ClipVideo.expiresAt` follows `lastUsedAt` plus the plan's
+  `clips.retention_days`.** Opening a video, making or opening a clip and
+  exporting move `lastUsedAt` (at most once a day per video). The sweep
+  (`ClipSweepService`, every maintenance pass) moves a date that disagrees
+  with that sum before it warns or removes, so editing only `expiresAt` by
+  hand is undone; set `lastUsedAt` too when testing.
+- **`ClipVideo.expiryNoticeAt`** marks the one "removed in 3 days" notice.
+  Sending it also holds `expiresAt` at least three days out, so the notice is
+  never wrong. Using the video clears it.
+- **Removal keeps the rows.** A removed video gets `status REMOVED` and
+  `deletedAt`, its private files go, and its clips get **`Clip.removedAt`**;
+  exported `Media` rows stay (they belong to the person now). One service
+  method (`ClipRetentionService.removeVideo`, with a reason: `user`,
+  `expired`, `rights_request`) is the only path.
+- **`ClipBlockedVideo`** is one row per platform video removed after its
+  owner asked (`@@unique([platform, externalId])`, the reason and the
+  operator's address). It is global, not per workspace: the link probe refuses
+  a blocked video for everyone with 410 `video_removed` before anything is
+  fetched. Rows come only from the operator route and `npm run clips:remove`.
+- **`ClipStorageNotice`** is one row per workspace over its video space
+  (`organizationId` is the key): `overSince` when the sweep first saw it,
+  `notifiedAt` when the one notification went out. The row goes when the
+  workspace is back under, so the next time it goes over it is told again.
+  Nothing is ever deleted because a plan went down.
+- **`Media.factsCheckedAt`** is set once the poster and length step
+  (`mediaVideoFactsWorkflow`) has looked at a video, whether or not it could
+  read it, so a broken file is not retried for ever by the backfill.
+
 ### Generated search columns: a known drift to remove by hand
 
 `ClipSound.search` and `ClipSticker.search` are `tsvector` columns

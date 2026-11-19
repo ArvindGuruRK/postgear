@@ -60,6 +60,14 @@ describe('LinkCard', () => {
     expect(importButton()).toBeEnabled();
   });
 
+  it('links the rights box to how owners ask for a video to come out (Module 19)', () => {
+    renderCard(card());
+    const help = screen.getByRole('link', { name: 'Copyright Requests (opens in a new tab)' });
+    expect(help).toHaveAttribute('href', '/legal/copyright');
+    expect(help).toHaveAttribute('target', '_blank');
+    expect(help).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
   it('imports the canonical link with the tick and hands the outcome back', async () => {
     const importFn = jest.fn(async () => OUTCOME);
     const onImported = jest.fn();

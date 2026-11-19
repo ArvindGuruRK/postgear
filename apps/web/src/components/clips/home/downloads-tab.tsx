@@ -8,9 +8,10 @@
  * - **Preparing**: "Getting your file, 40%" with a `Progress`, followed live
  *   through `useClipJob`; when the job ends the list is asked again (for the
  *   size and the expiry).
- * - **Ready**: the size, **Save File** (primary, small: a plain link to the
- *   API's file route, which answers with a short-lived signed address, so the
- *   browser saves the file under the video's name), **Save To Media**
+ * - **Ready**: the size, **Save File** (primary, small: asks the API's file
+ *   route for a short-lived signed address and sends the browser there, so
+ *   it saves the file under the video's name; a refusal, such as a file
+ *   that expired, shows its sentence in the row), **Save To Media**
  *   (secondary, small, MP4 only, while it is not in Media yet) and "Expires
  *   in 23 hours" in `type-muted`. Once saved, an "In Media" badge.
  * - **Failed**: the reason in a danger `Alert`.
@@ -34,8 +35,6 @@ import {
   AlertDialogTitle,
   Badge,
   Button,
-  buttonVariants,
-  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -51,7 +50,7 @@ import { expiresInLine, formatBytes, isDownloadExpired } from '@postgear/video-e
 import { Download } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
-import { deleteDownload, downloadFileHref, saveDownloadToMedia } from '@/lib/clips-api';
+import { deleteDownload, saveDownloadFile, saveDownloadToMedia } from '@/lib/clips-api';
 import type { DownloadView } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { useClipJob } from '../use-clip-job';
@@ -151,6 +150,7 @@ export function DownloadRow({
   const live = useClipJob(preparing && follow ? view.id : null).job;
   const job = live ?? view.job;
   const [saving, setSaving] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -183,6 +183,19 @@ export function DownloadRow({
       setActionError(messageOf(cause));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onSaveFile = async () => {
+    if (fetching) return;
+    setFetching(true);
+    setActionError(null);
+    try {
+      await saveDownloadFile(view.id);
+    } catch (cause) {
+      setActionError(messageOf(cause));
+    } finally {
+      setFetching(false);
     }
   };
 
@@ -252,14 +265,14 @@ export function DownloadRow({
                 {saving ? 'Saving To Media' : 'Save To Media'}
               </Button>
             ) : null}
-            <a
-              href={downloadFileHref(view.id)}
-              download
+            <Button
+              size="sm"
+              disabled={fetching}
+              onClick={onSaveFile}
               data-testid="clips-download-save-file"
-              className={cn(buttonVariants({ variant: 'primary', size: 'sm' }))}
             >
               Save File
-            </a>
+            </Button>
           </>
         ) : null}
 

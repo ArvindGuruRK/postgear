@@ -148,8 +148,12 @@ export function useClipExport({
 }: {
   orgId: string;
   clipId: string;
-  /** Saves what is on screen now; true once the server has it. */
-  flush: () => Promise<boolean>;
+  /**
+   * Saves what is on screen now; the saved revision once the server has it,
+   * else null. The revision goes with the export, so a clip changed in
+   * another tab in between is refused (409) instead of drawn unseen.
+   */
+  flush: () => Promise<number | null>;
   sharp: ClipSharpState;
 }): ClipExportState {
   const { snapshot } = useEntitlements(orgId);
@@ -207,11 +211,12 @@ export function useClipExport({
     setStarting(true);
     setProblem(null);
     try {
-      if (!(await flush())) {
+      const revision = await flush();
+      if (revision === null) {
         setProblem(EXPORT_UNSAVED_SENTENCE);
         return;
       }
-      const made = await exportClip(clipId, quality);
+      const made = await exportClip(clipId, quality, revision);
       setJobId(made.id);
       setExports((list) =>
         [
@@ -275,7 +280,7 @@ function useClipPreview({
   flush,
 }: {
   clipId: string;
-  flush: () => Promise<boolean>;
+  flush: () => Promise<number | null>;
 }): ClipPreviewState {
   const [open, setOpen] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -316,11 +321,12 @@ function useClipPreview({
     setStarting(true);
     setProblem(null);
     try {
-      if (!(await flush())) {
+      const revision = await flush();
+      if (revision === null) {
         setProblem(EXPORT_UNSAVED_SENTENCE);
         return;
       }
-      const made = await previewClip(clipId);
+      const made = await previewClip(clipId, revision);
       setJobId(made.id);
       setView((current) => (current?.job.id === made.id ? current : null));
     } catch (cause) {
@@ -339,17 +345,13 @@ function useClipPreview({
   return { open, setOpen, job, view, starting, problem, start, cancel };
 }
 
-/** A file from Media: an API path through `downloadFile`, a full address straight. */
-async function download(url: string, name: string): Promise<void> {
-  if (/^https?:\/\//i.test(url)) {
-    const link = window.document.createElement('a');
-    link.href = url;
-    link.download = name;
-    link.rel = 'noopener';
-    link.click();
-    return;
-  }
-  await downloadFile(url, name);
+/**
+ * The export's file, through Media's own download route. Never its storage
+ * address: that is another origin, where the browser ignores `download` and
+ * opens the video in the tab instead of saving it.
+ */
+function download(mediaId: string, name: string): Promise<void> {
+  return downloadFile(`/media/${encodeURIComponent(mediaId)}/download`, name);
 }
 
 export function ExportPanel({
@@ -403,9 +405,9 @@ export function ExportPanel({
     state.setQuality(quality);
   };
 
-  const fetchFile = (url: string, name: string) => {
+  const fetchFile = (mediaId: string, name: string) => {
     setDownloadProblem(null);
-    download(url, name).catch((cause: unknown) =>
+    download(mediaId, name).catch((cause: unknown) =>
       setDownloadProblem(sentenceOf(cause, EXPORT_UNREACHABLE_SENTENCE)),
     );
   };
@@ -531,7 +533,7 @@ export function ExportPanel({
                     size="sm"
                     className="w-8 shrink-0 px-0"
                     aria-label={`Download ${QUALITY_LABELS[row.quality]} From ${exportDate(row.job.finishedAt ?? row.job.createdAt)}`}
-                    onClick={() => row.media && fetchFile(row.media.url, row.media.name)}
+                    onClick={() => row.media && fetchFile(row.media.id, row.media.name)}
                   >
                     <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
                   </Button>
@@ -573,7 +575,7 @@ function ResultCard({
 }: {
   orgId: string;
   row: ClipExportView;
-  onDownload: (url: string, name: string) => void;
+  onDownload: (mediaId: string, name: string) => void;
   onSend: (from: HTMLElement | null) => void;
 }) {
   const media = row.media;
@@ -609,7 +611,7 @@ function ResultCard({
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" onClick={() => onDownload(media.url, media.name)}>
+        <Button size="sm" variant="secondary" onClick={() => onDownload(media.id, media.name)}>
           <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
           Download
         </Button>

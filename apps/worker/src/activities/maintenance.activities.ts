@@ -29,6 +29,7 @@ import {
   automationRunWorkflowId,
   CLIP_INTERNAL_ROUTES,
   type ClipReconcileAnswer,
+  type ClipSweepAnswer,
   POST_PUBLISH_WORKFLOW,
   publishWorkflowId,
   SCHEDULING_TASK_QUEUE,
@@ -261,7 +262,52 @@ export function createMaintenanceActivities(deps: ActivityDeps) {
         token: deps.env.AUTOMATION_INTERNAL_TOKEN,
       });
     },
+
+    /** Module 19: the API's Clips sweep (expiry, cleanup, backstop, notices). Never throws. */
+    async clipsSweep(): Promise<ClipsSweepReport> {
+      return runClipsSweep({
+        apiUrl: deps.env.API_URL,
+        token: deps.env.AUTOMATION_INTERNAL_TOKEN,
+      });
+    },
   };
+}
+
+/** What the Clips sweep answered, or why it could not run. */
+export type ClipsSweepReport = ClipSweepAnswer | { failed: string };
+
+/** The sweep's own batches keep it well inside this; the activity allows five minutes. */
+export const CLIPS_SWEEP_TIMEOUT_MS = 4 * 60_000;
+
+/**
+ * Module 19: asks the API to sweep Clips. The work lives in the API next to
+ * the resolver, the ledger and the notifications it needs. Never throws: a
+ * pass that could not run is tried again in fifteen minutes. Exported for tests.
+ */
+export async function runClipsSweep(config: {
+  apiUrl: string;
+  token: string;
+  fetch?: ReconcileFetch;
+}): Promise<ClipsSweepReport> {
+  const doFetch: ReconcileFetch = config.fetch ?? ((url, init) => fetch(url, init));
+  try {
+    const response = await doFetch(
+      `${config.apiUrl.replace(/\/+$/, '')}${CLIP_INTERNAL_ROUTES.sweep}`,
+      {
+        method: 'POST',
+        headers: { 'x-postgear-internal': config.token, 'content-type': 'application/json' },
+        body: '{}',
+        redirect: 'error',
+        signal: AbortSignal.timeout(CLIPS_SWEEP_TIMEOUT_MS),
+      },
+    );
+    if (!response.ok) return { failed: `status ${response.status}` };
+    return (await response.json()) as ClipSweepAnswer;
+  } catch (error) {
+    // `fetch` errors can come from another realm, so read the name rather than `instanceof`.
+    const name = (error as { name?: unknown } | null)?.name;
+    return { failed: typeof name === 'string' && name ? name : 'unknown' };
+  }
 }
 
 /** What the Clips reconcile answered, or why it could not run. */

@@ -458,6 +458,7 @@ export function clipRow(
     ratio: '9:16',
     durationMs: 30_000,
     lastExportedRevision: null,
+    removedAt: null,
     lastExportedFingerprint: null,
     exportedMediaId: null,
     brandKitId: null,

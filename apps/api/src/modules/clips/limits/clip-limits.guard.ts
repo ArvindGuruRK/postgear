@@ -29,6 +29,7 @@
  */
 import { Injectable } from '@nestjs/common';
 import { prisma } from '@postgear/db';
+import { clipStorageOverLine } from '@postgear/scheduling';
 import {
   ENCODE_SPECS,
   EXPORT_QUALITIES,
@@ -37,6 +38,7 @@ import {
   type LinkFormat,
   type LinkInfo,
 } from '@postgear/video-engine';
+import { EntitlementRefusedException } from '../../entitlements/entitlement-refused.exception';
 import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { type ConsumeResult, UsageService } from '../../entitlements/usage.service';
 import { BYTES_PER_GB, gigabytesToBytes, MS_PER_MINUTE } from '../clips.units';
@@ -156,9 +158,22 @@ export class ClipLimitsGuard {
     );
   }
 
-  /** 3. The space used plus what this adds stays inside the plan's video space. */
+  /**
+   * 3. The space used plus what this adds stays inside the plan's video
+   * space. Module 19: a workspace already over its plan (a downgrade, or a
+   * lower plan value) gets the over sentence with both numbers; nothing it
+   * has is deleted, and exports of existing clips still work.
+   */
   async assertStorage(orgId: string, addingBytes: number): Promise<void> {
     const used = await this.storageUsedBytes(orgId);
+    const limitGb = Number(await this.resolver.get(orgId, 'clips.storage_gb'));
+    if (Number.isFinite(limitGb) && used > gigabytesToBytes(limitGb)) {
+      throw new EntitlementRefusedException(
+        'clips_storage_full',
+        clipStorageOverLine(used / BYTES_PER_GB, limitGb),
+        { limit: limitGb, used: Math.ceil(used / BYTES_PER_GB) },
+      );
+    }
     await this.resolver.assert(
       orgId,
       'clips.storage_gb',
@@ -264,6 +279,39 @@ export class ClipLimitsGuard {
   /** The tallest picture worth fetching for a clip's sharp range: the best quality's short side. */
   async bestExportHeight(orgId: string): Promise<number> {
     return ENCODE_SPECS[await this.bestExportQuality(orgId)].shortSide;
+  }
+
+  /**
+   * Module 19: the same gauge split by what holds the space: videos (every
+   * asset of a live video), prepared downloads, and the rest with no video
+   * (the workspace's own stickers and sounds). The three add up to
+   * `storageUsedBytes`.
+   */
+  async storageByKind(
+    orgId: string,
+  ): Promise<{ videos: number; downloads: number; library: number }> {
+    const rows = await prisma.clipAsset.groupBy({
+      by: ['kind'],
+      where: {
+        organizationId: orgId,
+        kind: { not: 'PROOF' },
+        OR: [{ videoId: null }, { video: { deletedAt: null } }],
+      },
+      _sum: { bytes: true },
+    });
+    const noVideo = await prisma.clipAsset.aggregate({
+      where: { organizationId: orgId, kind: { notIn: ['PROOF', 'DOWNLOAD'] }, videoId: null },
+      _sum: { bytes: true },
+    });
+    let total = 0;
+    let downloads = 0;
+    for (const row of rows) {
+      const bytes = Number(row._sum.bytes ?? 0n);
+      total += bytes;
+      if (row.kind === 'DOWNLOAD') downloads += bytes;
+    }
+    const library = Number(noVideo._sum.bytes ?? 0n);
+    return { videos: Math.max(0, total - downloads - library), downloads, library };
   }
 
   /**

@@ -12,6 +12,7 @@
  *   number written here.
  */
 import { refusalMessage } from '@postgear/entitlements';
+import { clipStorageOverLine } from '@postgear/scheduling';
 import { type ClipPlatformId, formatVideoLength, PLATFORM_NAMES } from '@postgear/video-engine';
 import type {
   ClipJobView,
@@ -104,6 +105,38 @@ export function storageMeterView(status: ClipsStatus): StorageMeterView {
     lines,
   };
 }
+
+/** Module 19: what the space holds, for the meter's panel ("Videos: 3.2 GB"). */
+export function storageBreakdown(
+  status: ClipsStatus,
+): Array<{ label: string; bytes: number; text: string }> {
+  const byKind = status.usage?.byKind;
+  if (!byKind) return [];
+  return [
+    { label: 'Videos', bytes: byKind.videos },
+    { label: 'Downloads', bytes: byKind.downloads },
+    { label: 'Your stickers and sounds', bytes: byKind.library },
+  ].map((row) => ({ ...row, text: formatSize(row.bytes) }));
+}
+
+/**
+ * Module 19: the page's warning after a downgrade, the same sentence the API
+ * refuses with (`clipStorageOverLine`), or null while under the plan.
+ */
+export function storageOverSentence(status: ClipsStatus): string | null {
+  const limit = status.storage.limitBytes;
+  if (!status.overLimit || limit === null) return null;
+  const used = status.usage?.storageBytes ?? status.storage.usedBytes;
+  return clipStorageOverLine(used / BYTES_PER_GB, limit / BYTES_PER_GB);
+}
+
+/** Module 19: whether the plan has Clips at all (`clips.enabled`); unknown reads as yes. */
+export function clipsInPlan(status: ClipsStatus | null): boolean {
+  return status?.limits?.['clips.enabled'] !== false;
+}
+
+/** The plan sentence, from the one place refusals are written. */
+export const CLIPS_NOT_IN_PLAN_SENTENCE = refusalMessage('clips_not_in_plan', {});
 
 // --- The AI minutes chip ------------------------------------------------------------
 
@@ -230,13 +263,17 @@ export function kindWords(kind: string): string {
 }
 
 /** "Twitch, 3 h 42 min, 12 clips". */
-export function videoMetaLine(card: ClipVideoCard): string {
+export function videoMetaLine(card: ClipVideoCard, options: { withSize?: boolean } = {}): string {
   const parts: string[] = [PLATFORM_LABELS[card.video.platform] ?? 'Video'];
   if (card.video.durationMs !== null && card.video.durationMs > 0) {
     parts.push(formatVideoLength(card.video.durationMs));
   }
   if (typeof card.clipCount === 'number' && card.clipCount > 0) {
     parts.push(card.clipCount === 1 ? '1 clip' : `${card.clipCount.toLocaleString('en-GB')} clips`);
+  }
+  // Module 19: sorted by size, each card says what it keeps.
+  if (options.withSize && typeof card.storedBytes === 'number') {
+    parts.push(formatSize(card.storedBytes));
   }
   return parts.join(', ');
 }
@@ -246,6 +283,35 @@ export function keptUntilLine(expiresAt: string | null): string | null {
   const day = formatShortDate(expiresAt);
   return day ? `Kept until ${day}` : null;
 }
+
+const DAY_MS = 86_400_000;
+/** Module 19: the card warns from here, matching the bell's "removed in 3 days" notice. */
+export const REMOVED_SOON_DAYS = 3;
+
+/**
+ * Module 19: the card's keeping line. "Kept until 28 Nov" while the date is
+ * far; inside three days "Removed in 2 days" (or "Removed today") in the
+ * warning colour, with a hint that opening the video keeps it longer.
+ */
+export function keptUntilView(
+  expiresAt: string | null,
+  now: number = Date.now(),
+): { text: string; soon: boolean } | null {
+  if (!expiresAt) return null;
+  const at = new Date(expiresAt).getTime();
+  if (Number.isNaN(at)) return null;
+  const left = at - now;
+  if (left > REMOVED_SOON_DAYS * DAY_MS) {
+    const day = formatShortDate(expiresAt);
+    return day ? { text: `Kept until ${day}`, soon: false } : null;
+  }
+  const days = Math.ceil(left / DAY_MS);
+  if (days <= 0) return { text: 'Removed today', soon: true };
+  return { text: days === 1 ? 'Removed in 1 day' : `Removed in ${days} days`, soon: true };
+}
+
+/** Module 19: the hint under a soon-removed card's line. */
+export const OPEN_TO_KEEP_HINT = 'Open it to keep it longer.';
 
 /**
  * Time left in words, from the job's estimate: whole minutes rounded up,

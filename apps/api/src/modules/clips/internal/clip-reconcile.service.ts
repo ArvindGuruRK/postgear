@@ -11,13 +11,14 @@
  * - **RUNNING with no write for the same time**: failed only when Temporal
  *   says its workflow is closed or gone; a quiet running one is left.
  * - A failed job gets our sentence, its charges reversed, and an IMPORT's
- *   video goes FAILED with the bell saying so.
+ *   video goes FAILED with the bell saying so. A DOWNLOAD's folder is
+ *   emptied (both its charges come back with the rest).
  * - **Temporal unreachable**: the pass stops and changes nothing more, so a
  *   network blip never fails healthy jobs.
  *
  * Answers `{ started, failed }`.
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   type ClipJob,
   ClipJobKind,
@@ -27,8 +28,10 @@ import {
   prisma,
 } from '@postgear/db';
 import { CLIP_RECONCILE_START_AFTER_MS, type ClipReconcileAnswer } from '@postgear/scheduling';
+import { clipKeys, type PrivateStorage } from '@postgear/storage';
 import { clipErrorMessage } from '@postgear/video-engine';
 import { UsageService } from '../../entitlements/usage.service';
+import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SchedulingService } from '../../scheduling/scheduling.service';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
@@ -39,10 +42,16 @@ import { exportFailedNotice, videoFailedNotice } from './clip-notices';
 export const RECONCILE_QUEUED_BATCH = 100;
 export const RECONCILE_RUNNING_BATCH = 50;
 
-/** The engine code a job that was lost fails with. */
-export function lostJobCode(job: Pick<ClipJob, 'kind' | 'input'>): string {
+/**
+ * The engine code a job that was lost fails with. A run Temporal stopped at
+ * its time limit (Module 19) says so ("This took too long and was
+ * stopped."), whatever its kind.
+ */
+export function lostJobCode(job: Pick<ClipJob, 'kind' | 'input'>, timedOut = false): string {
+  if (timedOut) return 'timed_out';
   if (job.kind === ClipJobKind.IMPORT) return 'import_failed';
   if (job.kind === ClipJobKind.HIGHLIGHTS) return 'highlights_failed';
+  if (job.kind === ClipJobKind.DOWNLOAD) return 'download_failed';
   if (job.kind === ClipJobKind.RENDER) {
     const proof = (job.input as { proof?: unknown } | null)?.proof === true;
     return proof ? 'preview_failed' : 'export_failed';
@@ -60,6 +69,7 @@ export class ClipReconcileService {
     private readonly scheduling: SchedulingService,
     private readonly usage: UsageService,
     private readonly notifications: NotificationsService,
+    @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
   ) {}
 
   async reconcile(now = new Date()): Promise<ClipReconcileAnswer> {
@@ -80,8 +90,8 @@ export class ClipReconcileService {
         break;
       }
       if (state === 'running') continue;
-      if (state === 'closed') {
-        if (await this.failJob(job, now)) failed += 1;
+      if (state === 'closed' || state === 'timedOut') {
+        if (await this.failJob(job, now, state === 'timedOut')) failed += 1;
         orgs.add(job.organizationId);
         continue;
       }
@@ -107,7 +117,7 @@ export class ClipReconcileService {
           break;
         }
         if (state === 'running') continue;
-        if (await this.failJob(job, now)) failed += 1;
+        if (await this.failJob(job, now, state === 'timedOut')) failed += 1;
         orgs.add(job.organizationId);
       }
     }
@@ -138,8 +148,8 @@ export class ClipReconcileService {
    * Fails a lost job, conditional on it still being open (the worker's own
    * last word always wins). True when this pass changed it.
    */
-  private async failJob(job: ClipJob, now: Date): Promise<boolean> {
-    const code = lostJobCode(job);
+  private async failJob(job: ClipJob, now: Date, timedOut = false): Promise<boolean> {
+    const code = lostJobCode(job, timedOut);
     const was = job.status === ClipJobStatus.RUNNING ? 'running' : 'queued';
     const error = { code, message: clipErrorMessage(code) } satisfies Prisma.InputJsonValue;
     if (!(await this.repository.failOpen(job.id, error, now))) return false;
@@ -153,6 +163,11 @@ export class ClipReconcileService {
         'FAILED',
         now,
       );
+    }
+
+    if (job.kind === ClipJobKind.DOWNLOAD) {
+      // What it fetched so far goes, as the worker's own failure does (no asset row yet: that comes with DONE).
+      await this.removeDownloadFiles(job);
     }
 
     if (job.kind === ClipJobKind.IMPORT && job.videoId) {
@@ -191,6 +206,21 @@ export class ClipReconcileService {
       }),
     );
     return true;
+  }
+
+  /** Best-effort: a storage hiccup is logged and left to the cleanup sweep. */
+  private async removeDownloadFiles(job: ClipJob): Promise<void> {
+    try {
+      await this.storage.deletePrefix(clipKeys.downloadPrefix(job.organizationId, job.id));
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.reconcile.download_files_left',
+          jobId: job.id,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   private async notify(

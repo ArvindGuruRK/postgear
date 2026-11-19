@@ -66,7 +66,12 @@ export default async function OrgLayout({ children, modal, params }: LayoutProps
       organizations={organizations}
       activeOrgId={active.id}
       role={active.role}
-      user={{ name: session.name, email: session.email, avatar: session.avatar }}
+      user={{
+        name: session.name,
+        email: session.email,
+        avatar: session.avatar,
+        isSuperAdmin: session.isSuperAdmin,
+      }}
     >
       {needsWorkspaceSync ? <SyncActiveWorkspace orgId={active.id} /> : null}
       {/* Brings this browser's appearance cookie in line with the account: see AppearanceSync. */}

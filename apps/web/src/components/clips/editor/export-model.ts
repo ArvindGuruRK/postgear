@@ -7,9 +7,9 @@
 import {
   type AudioItem,
   type ClipDocument,
-  documentFingerprint,
   type ExportQuality,
   estimateBytes,
+  fingerprintMatches,
   formatBytes,
   formatClipLength,
   isSixtyFps,
@@ -114,7 +114,7 @@ export function latestDone(exports: readonly ClipExportView[]): ClipExportView |
 
 /** Whether the clip changed after `fingerprint` was taken (null: nothing to compare). */
 export function changedSince(doc: ClipDocument, fingerprint: string | null): boolean {
-  return fingerprint !== null && fingerprint !== documentFingerprint(doc);
+  return fingerprint !== null && !fingerprintMatches(doc, fingerprint);
 }
 
 /** "Nov 19, 10:42" in the person's own locale. */

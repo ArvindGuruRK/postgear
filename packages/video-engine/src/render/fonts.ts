@@ -274,10 +274,16 @@ export function covers(coverage: FontCoverage | undefined, codePoint: number): b
   return false;
 }
 
-/** Characters every font may lack without harm: they draw nothing (spaces are in every font). */
+/**
+ * Characters every font may lack without harm: they draw nothing (spaces are
+ * in every font). Control characters (a tab, a carriage return from pasted
+ * text) are among them: `escapeAssText` drops them before the text is
+ * drawn, so a font lacking them is never `font_missing`.
+ */
 function drawsNothing(codePoint: number): boolean {
   return (
-    codePoint === 0x0a ||
+    codePoint < 0x20 ||
+    codePoint === 0x7f ||
     codePoint === 0x200b ||
     codePoint === 0x200c ||
     codePoint === 0x200d ||

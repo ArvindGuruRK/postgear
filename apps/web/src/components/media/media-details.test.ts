@@ -1,5 +1,5 @@
 import type { MediaItem } from '@/types/media';
-import { detailsOf, formatOf, stickerOf, tileLine, usageLine } from './media-details';
+import { detailsOf, formatOf, lengthOf, stickerOf, tileLine, usageLine } from './media-details';
 
 const item = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 'm1',
@@ -50,5 +50,34 @@ describe('media details', () => {
     expect(usageLine(0)).toBe('Not used in any draft or queued post');
     expect(usageLine(1)).toBe('Used in 1 unpublished post');
     expect(usageLine(3)).toBe('Used in 3 unpublished posts');
+  });
+
+  it("gives a video's length as a clock, past an hour too (Module 19)", () => {
+    const video = (durationMs: number | null | undefined) =>
+      item({ type: 'video', mimeType: 'video/mp4', durationMs });
+    expect(lengthOf(video(42_400))).toBe('0:42');
+    expect(lengthOf(video(62_000))).toBe('1:02');
+    expect(lengthOf(video(3_725_000))).toBe('1:02:05');
+    expect(lengthOf(video(400))).toBe('0:01');
+    expect(lengthOf(video(null))).toBeNull();
+    expect(lengthOf(video(undefined))).toBeNull();
+    expect(lengthOf(item({ durationMs: 5_000 }))).toBeNull();
+  });
+
+  it("lists a video's length in the viewer once it is known", () => {
+    const video = item({ type: 'video', mimeType: 'video/mp4', durationMs: 42_400 });
+    expect(detailsOf(video).map((row) => row.label)).toEqual([
+      'Format',
+      'Size',
+      'Dimensions',
+      'Length',
+      'Uploaded',
+    ]);
+    expect(detailsOf(video).find((row) => row.label === 'Length')?.value).toBe('0:42');
+    expect(
+      detailsOf(item({ type: 'video', mimeType: 'video/mp4', durationMs: null })).map(
+        (row) => row.label,
+      ),
+    ).not.toContain('Length');
   });
 });

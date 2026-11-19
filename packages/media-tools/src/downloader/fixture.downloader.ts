@@ -52,6 +52,15 @@ function abortError(): DownloaderError {
   return new DownloaderError('cancelled', { retryable: false });
 }
 
+/**
+ * A forcing link's recorded error line, read by the real error mapper. Never
+ * retried: the same link fails the same way, so a second try would only make
+ * a hand check wait.
+ */
+function forcedFailure(stderr: string): DownloaderError {
+  return new DownloaderError(mapYtDlpError(stderr), { retryable: false });
+}
+
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) return Promise.reject(abortError());
   if (ms <= 0) return Promise.resolve();
@@ -95,6 +104,11 @@ class FixtureDownloader implements Downloader {
       if (probe.info.durationMs > input.maxDurationMs) {
         throw new DownloaderError('clips_video_too_long');
       }
+      if (answer.fetchErrors?.proxy) {
+        // Forced (Module 20): the import gets half way, then stops.
+        await this.walkProgress(onProgress, signal, 45);
+        throw forcedFailure(answer.fetchErrors.proxy);
+      }
       const sample = await this.samplePath(answer);
       await this.walkProgress(onProgress, signal, 90);
       await this.takeFromSample(sample, answer, input.outFile, signal);
@@ -110,6 +124,8 @@ class FixtureDownloader implements Downloader {
     return this.guard(input.outFile, async (workDir) => {
       const { probe, answer } = await this.answer(input.link, signal);
       if (probe.info.live) throw new DownloaderError('link_live');
+      // Forced (Module 20): the sharp range is gone from the platform.
+      if (answer.fetchErrors?.range) throw forcedFailure(answer.fetchErrors.range);
       const sample = await this.samplePath(answer);
       const toMs = Math.min(input.toMs, answer.takeMs);
       if (!(input.fromMs >= 0) || toMs <= input.fromMs) {
@@ -147,6 +163,8 @@ class FixtureDownloader implements Downloader {
       if (probe.info.live) throw new DownloaderError('link_live');
       const pick = probe.picks.find((candidate) => candidate.format.id === input.formatId);
       if (!pick) throw new DownloaderError('format_gone');
+      // Forced (Module 20): the quality went away between the menu and the fetch.
+      if (answer.fetchErrors?.format) throw forcedFailure(answer.fetchErrors.format);
       const sample = await this.samplePath(answer);
       await this.walkProgress(onProgress, signal, 90);
       if (pick.format.audioOnly) {

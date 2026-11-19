@@ -31,8 +31,8 @@ import { type Clip, ClipAssetKind, ClipStatus, type Prisma, prisma } from '@post
 import type { PrivateStorage } from '@postgear/storage';
 import {
   type ClipDocument,
-  documentFingerprint,
   documentRange,
+  fingerprintMatches,
   outputDuration,
   parseClipDocument,
   parseSegmentAssetMeta,
@@ -112,7 +112,7 @@ export class ClipEditsService {
       if (
         document &&
         clip.lastExportedFingerprint !== null &&
-        documentFingerprint(document) === clip.lastExportedFingerprint
+        fingerprintMatches(document, clip.lastExportedFingerprint)
       ) {
         data.lastExportedRevision = clip.revision + 1;
       }

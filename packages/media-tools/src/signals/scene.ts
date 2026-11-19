@@ -15,6 +15,7 @@
 import { readFile, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 import { binTrack, type SignalTrack } from '@postgear/video-engine';
+import { INPUT_PROTOCOL_ALLOWLIST } from '../ffmpeg/probe';
 import { FFMPEG_HEAD, FfmpegError, runFfmpeg } from '../ffmpeg/run';
 import type { ProduceInput } from './loudness';
 import { parseMetadataPrint } from './metadata';
@@ -28,6 +29,8 @@ export const SCENE_MIN_BUDGET_MS = 2 * 60_000;
 export function sceneArgs(videoFile: string): string[] {
   return [
     ...FFMPEG_HEAD,
+    '-protocol_whitelist',
+    INPUT_PROTOCOL_ALLOWLIST,
     '-skip_frame',
     'nokey',
     '-i',

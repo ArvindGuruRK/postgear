@@ -342,4 +342,23 @@ describe('SchedulingService', () => {
       workerOnline: null,
     });
   });
+
+  it('tells a clip job stopped at its time limit apart from one that closed (Module 19)', async () => {
+    const { client, raw } = fakeClient();
+    const service = new SchedulingService(config, async () => client);
+    const answer = (name: string) =>
+      raw.workflow.getHandle.mockReturnValueOnce({
+        describe: jest.fn().mockResolvedValue({ status: { name } }),
+      });
+
+    answer('RUNNING');
+    await expect(service.describeClipJob('job-1')).resolves.toBe('running');
+    answer('TIMED_OUT');
+    await expect(service.describeClipJob('job-1')).resolves.toBe('timedOut');
+    for (const name of ['COMPLETED', 'FAILED', 'TERMINATED', 'CANCELLED']) {
+      answer(name);
+      await expect(service.describeClipJob('job-1')).resolves.toBe('closed');
+    }
+    expect(raw.workflow.getHandle).toHaveBeenLastCalledWith('clip-job:job-1');
+  });
 });

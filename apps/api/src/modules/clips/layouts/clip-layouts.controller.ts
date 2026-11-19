@@ -18,6 +18,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { type ActiveOrg, CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -36,9 +37,12 @@ import {
   renameLayoutSchema,
 } from './clip-layouts.schema';
 import { ClipLayoutsService } from './clip-layouts.service';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/layouts')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipLayoutsController {
   constructor(private readonly layouts: ClipLayoutsService) {}
 

@@ -109,7 +109,8 @@ function doneExport(id: string, fingerprint: string | null): ClipExportView {
     fingerprint,
     media: {
       id: `media-${id}`,
-      url: `/media/media-${id}/download`,
+      // Storage's own address, on another origin: never what Download fetches.
+      url: `https://space.test/clips/media-${id}.mp4`,
       posterUrl: null,
       name: 'First Clip.mp4',
       bytes: 25_872_000,
@@ -121,7 +122,7 @@ function doneExport(id: string, fingerprint: string | null): ClipExportView {
   };
 }
 
-let flush: jest.Mock<Promise<boolean>, []>;
+let flush: jest.Mock<Promise<number | null>, []>;
 let onExport: jest.Mock;
 let onSend: jest.Mock;
 
@@ -158,7 +159,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockJobs.clear();
   mockPlan.values = { 'clips.export_max_quality': '1080p', 'clips.export_watermark': false };
-  flush = jest.fn(async () => true);
+  flush = jest.fn(async (): Promise<number | null> => 3);
   onExport = jest.fn();
   onSend = jest.fn();
   list.mockResolvedValue([]);
@@ -214,7 +215,7 @@ describe('starting an export', () => {
     await renderPanel();
     mockJobs.set('e1', job('e1', 'RUNNING'));
     fireEvent.click(screen.getByRole('button', { name: 'Footer Export' }));
-    await waitFor(() => expect(make).toHaveBeenCalledWith(CLIP, '1080p'));
+    await waitFor(() => expect(make).toHaveBeenCalledWith(CLIP, '1080p', 3));
     expect(flush).toHaveBeenCalled();
     const progress = await screen.findByTestId('clip-export-progress');
     expect(progress).toHaveTextContent('Drawing the frames');
@@ -226,7 +227,7 @@ describe('starting an export', () => {
   });
 
   it('does not export what is not saved yet', async () => {
-    flush.mockResolvedValue(false);
+    flush.mockResolvedValue(null);
     await renderPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Footer Export' }));
     expect(await screen.findByText(EXPORT_UNSAVED_SENTENCE)).toBeInTheDocument();
@@ -316,6 +317,11 @@ describe('a finished export', () => {
     await renderPanel();
     const history = await screen.findByTestId('clip-export-history');
     expect(within(history).getAllByRole('listitem')).toHaveLength(2);
+    // An older one downloads through Media's route too, never from storage's address.
+    fireEvent.click(within(history).getAllByRole('button', { name: /^Download 1080p From/ })[1]);
+    await waitFor(() =>
+      expect(download).toHaveBeenCalledWith('/media/media-d4/download', 'First Clip.mp4'),
+    );
   });
 });
 
@@ -335,7 +341,7 @@ describe('Preview Export', () => {
       fireEvent.click(screen.getByTestId('clip-preview-export'));
     });
     expect(flush).toHaveBeenCalled();
-    expect(preview).toHaveBeenCalledWith(CLIP);
+    expect(preview).toHaveBeenCalledWith(CLIP, 3);
     const video = await screen.findByTestId('clip-preview-video');
     expect(video).toHaveAttribute('src', 'https://space.test/preview.mp4');
     const dialog = screen.getByTestId('clip-preview-dialog');

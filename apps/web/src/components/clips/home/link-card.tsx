@@ -21,7 +21,8 @@
  *   workspace can still be downloaded, so the tick and Download stay under
  *   "You already have this video." A refusal shows in the same alert.
  */
-import { Badge, Button, Checkbox, cn, Skeleton } from '@postgear/ui';
+import { CircleQuestionMarkIcon } from '@animateicons/react/lucide/circle-question-mark-icon';
+import { Badge, Button, Checkbox, cn, MotionIcon, Skeleton, TooltipHint } from '@postgear/ui';
 import { formatVideoLength } from '@postgear/video-engine';
 import { useId, useState } from 'react';
 import { ApiError } from '@/lib/api';
@@ -128,6 +129,19 @@ export function LinkCard({
       <label htmlFor={tickId} className="cursor-pointer font-sans text-sm font-bold text-ink">
         {RIGHTS_LINE}
       </label>
+      {/* Module 19: how an owner asks for a video to be taken out. */}
+      <TooltipHint label="Copyright Requests" side="top">
+        <a
+          href="/legal/copyright"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Copyright Requests (opens in a new tab)"
+          className="inline-flex shrink-0 rounded-full text-ink outline-none hover:text-actionPrimary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+          data-testid="clips-rights-help"
+        >
+          <MotionIcon icon={CircleQuestionMarkIcon} className="h-4 w-4" />
+        </a>
+      </TooltipHint>
     </div>
   );
   const downloadMenu = onDownloaded ? (

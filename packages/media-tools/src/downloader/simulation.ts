@@ -6,7 +6,9 @@
  * platform) or is an item of the simulated channel. Known links answer from
  * a recorded yt-dlp probe (with a few fields overridden) or a recorded
  * yt-dlp error line, so the fixture binding runs the same probe mapper and
- * error mapper as the real one. Anything else is "not found".
+ * error mapper as the real one. Anything else is "not found". A few links
+ * (Module 20) answer the probe and then fail one kind of fetch
+ * (`fetchErrors`), to force a state a hand check could not reach otherwise.
  */
 import type { ClipPlatformId, LinkRef } from '@postgear/video-engine';
 import { z } from 'zod';
@@ -24,6 +26,22 @@ const PROBES: Readonly<Record<string, unknown>> = Object.freeze({
   'kick-stream': kickStream,
 });
 
+/**
+ * Module 20's forcing switches: a link whose probe answers, but one kind of
+ * fetch then fails with a recorded yt-dlp error line (read by the real error
+ * mapper). `proxy` fails the import half way, `range` fails the sharp range
+ * (the clip exports at 720p from the light copy), `format` fails a download.
+ */
+const fetchErrorsSchema = z
+  .object({
+    proxy: z.string().min(1).optional(),
+    range: z.string().min(1).optional(),
+    format: z.string().min(1).optional(),
+  })
+  .strict();
+
+export type SimulationFetchErrors = z.infer<typeof fetchErrorsSchema>;
+
 const linkEntrySchema = z.object({
   platform: z.enum(['youtube', 'twitch', 'kick']),
   externalId: z.string().min(1),
@@ -32,6 +50,7 @@ const linkEntrySchema = z.object({
   sample: z.enum(['talk', 'stream']).optional(),
   stderr: z.string().optional(),
   overrides: z.record(z.unknown()).optional(),
+  fetchErrors: fetchErrorsSchema.optional(),
 });
 
 const linksSchema = z.object({
@@ -51,6 +70,8 @@ export type SimulationAnswer =
       sample: SampleName;
       /** How much of the sample this video is, from its start. */
       takeMs: number;
+      /** The fetches this link is forced to fail (Module 20); absent for every ordinary link. */
+      fetchErrors?: SimulationFetchErrors;
     };
 
 let linksCache: SimulationLinkEntry[] | null = null;
@@ -80,6 +101,7 @@ function fromEntry(entry: SimulationLinkEntry): SimulationAnswer {
     probeJson: withOverrides(probeFor(entry.probe ?? 'twitch-stream'), entry.overrides ?? {}),
     sample,
     takeMs: sampleDurationMs(sample),
+    ...(entry.fetchErrors ? { fetchErrors: entry.fetchErrors } : {}),
   };
 }
 

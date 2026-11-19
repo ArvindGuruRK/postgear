@@ -43,6 +43,7 @@ export {
 // Private Clips space.
 export {
   assertValidClipKey,
+  assertValidClipListPrefix,
   assertValidClipPrefix,
   CLIP_EXTENSIONS,
   CLIP_JOB_FOLDERS,
@@ -52,6 +53,7 @@ export {
   clipKindSegment,
   contentTypeForClipKey,
   isValidClipKey,
+  isValidClipListPrefix,
   isValidClipPrefix,
 } from './clip-keys';
 export {
@@ -61,6 +63,8 @@ export {
   MULTIPART_THRESHOLD_BYTES,
   PART_URL_SECONDS,
   PRIVATE_CACHE_CONTROL,
+  type PrivateListedObject,
+  type PrivateListPage,
   type PrivateObjectInfo,
   type PrivateObjectStream,
   type PrivateStorage,

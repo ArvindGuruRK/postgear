@@ -1069,6 +1069,109 @@ npm test --workspace=@postgear/web -- discover
 npm run test:e2e -- e2e/discover.spec.ts   # needs dev:api:e2e and both simulations, section 3a
 ```
 
+### 5p. Clips (Sprint 12)
+
+Clips turns a long video (a YouTube, Twitch or Kick link, or an upload) into short clips: by hand, or with Find Clips. It is desktop only (1366 px and up). Locally everything runs in simulation: **nothing is ever fetched from YouTube, Twitch or Kick**, and no paid service is called.
+
+**What to install.** FFmpeg with libass (it draws the exports and measures sound for Find Clips, so simulation needs it too). yt-dlp and Deno are needed only for real links, which you do not need locally. Then:
+
+```powershell
+npm run clips:doctor        # checks FFmpeg (libass, harfbuzz, x264), ffprobe, yt-dlp, Deno
+npm run clips:samples       # makes the two sample videos simulation serves (a 3 minute talk, a 10 minute stream)
+npm run clips:fonts:build   # the fonts exports draw text with (needs Python with fontTools)
+```
+
+**The `.env` block** (every variable is explained in `.env.example`, block "CLIPS"):
+
+```
+CLIPS_SIMULATION="true"
+AI_SIMULATION="true"
+BILLING_SIMULATION="true"
+WORKER_ROLES="publishing,media,render"
+```
+
+`npm run dev` then runs the API, the web app and one worker that serves all four queues. Open **<http://localhost:3000/seed-demo-org/clips>** as `demo@postgear.local`. The **Simulated** badge beside the tabs says simulation is on. **Try A Sample** imports the 3 minute talk sample with no link at all.
+
+**Simulation links** (paste them in the Create tab; they live in `packages/media-tools/fixtures/simulation/links.json`):
+
+| Link | What happens |
+|---|---|
+| `https://www.twitch.tv/videos/900000001` | A 10 minute past stream: imports and works everywhere |
+| `https://www.youtube.com/watch?v=simtalk0001` | A 3 minute talk: imports and works everywhere |
+| `https://kick.com/simstreamer/videos/00000000-0000-4000-8000-000000000001` | The stream sample on Kick |
+| `https://www.twitch.tv/videos/900000002` | Subscribers only: "This video is private or needs a login, so we cannot read it." |
+| `https://www.twitch.tv/videos/900000003` | Still live: "This stream is still live. Come back when it has ended." |
+| `https://www.twitch.tv/videos/900000004` | Gone: "We could not find a video at this link." |
+| `https://www.twitch.tv/videos/900000005` | The platform is not answering (429) |
+| `https://www.twitch.tv/videos/900000006` | A 30 hour marathon: longer than the plan allows, with See Plans |
+| `https://www.twitch.tv/videos/900000007` | Imports; Find Clips then fails and gives the AI minutes back |
+| `https://www.twitch.tv/videos/900000008` | Imports; Find Clips holds 30 seconds at scoring (to see the steps and Cancel) |
+| `https://www.youtube.com/watch?v=simprivate1`, `simlivenow1`, `simmissing1`, `simresting1`, `simtoolong1` | The same cases on YouTube (`simresting1` is YouTube asking for a sign-in) |
+| `https://www.twitch.tv/videos/900000009` | Imports; fetching the sharp range then fails, so the clip exports at 720p with the "sharp video is gone" sentence (no recorded chat) |
+| `https://www.twitch.tv/videos/900000010` | The import stops at 45% with "Something went wrong on our side. Try again in a little while." and Try Again |
+| `https://www.twitch.tv/videos/900000011` | Imports; every download quality then answers "format gone" (no recorded chat, so Find Clips uses sound and picture only) |
+
+Channels: on the Streams tab, **Add A Channel** with Twitch and `simstreamer` (or `acme`) lists recorded streams.
+
+**Forcing switches** (Module 20; each works only with `CLIPS_SIMULATION=true`, and with it off the names go to the real bindings like any other):
+
+| Switch | What it forces |
+|---|---|
+| `[simulate:render-fail]` in a clip's name | The export fails at 10% before FFmpeg starts: "We could not export this clip. Nothing was charged. Try again." in the panel and the bell |
+| `[simulate:preview-fail]` in a clip's name | Only Preview Export fails ("We could not make the preview. Try again."), with no bell |
+| Add A Channel `simempty` (YouTube `@simempty`, Twitch, Kick) | An empty list: "This channel has no public videos yet." |
+| Add A Channel `@simquota` (YouTube) | Today's YouTube list allowance is used: "We have reached today's limit for YouTube lists. Try again tomorrow, or paste a video link." |
+| Add A Channel `simflaky` (all three) | The first list works, every later one fails: press Refresh (30 s apart) to see the old list with "This channel's list is not available right now. Try again in a few minutes." and "Updated N ago". The memory lives in the API process, so a restart resets it |
+
+Cases with no switch: a platform switched off (take it out of `CLIPS_PLATFORMS`); plan limits (the Free "PostGear Second Org", or an override or a usage adjustment on `/operator`, with an end date a minute away to see an override end); a video with no sound (upload one made with `ffmpeg -f lavfi -i testsrc=duration=20:size=1280x720:rate=30 -an silent.mp4`); a dropped connection (DevTools offline during an upload or an edit); two people on one clip (two tabs); a window under 1366 px.
+
+**The ledger under load** (Module 20): twenty imports charged at once against a throwaway Free workspace with room for three, on the real local Postgres. It makes the workspace and deletes it again, and is skipped unless asked for:
+
+```bash
+CLIPS_LEDGER_DB_TEST=1 npx dotenv -e .env -- npx jest --config apps/api/jest.config.js usage.load
+```
+
+**The worker image** (Module 20): stop the local worker, then `docker compose --profile worker-image up -d --build worker`. The container forces every simulation flag on whatever .env says, and is ready when `docker logs postgear_worker` shows four `polling "postgear-..."` lines and `docker inspect -f '{{.State.Health.Status}}' postgear_worker` says `healthy`. Import a link and export a clip as usual, then `docker compose --profile worker-image rm -sf worker` and start the local worker again. Never run `docker compose config` without `--quiet`: it prints the .env secrets.
+
+**Retention by hand.** A video's removal date is "last used plus the plan's days" (14 on the demo plan), and the sweep puts back any date that disagrees, so move `lastUsedAt` too:
+
+```powershell
+# "Removed in 3 days" on the card and a bell notice (the date is held 3 days out):
+docker exec postgear_postgres psql -U postgres -d postgear_db -c "update \"ClipVideo\" set \"lastUsedAt\" = now() - interval '60 days', \"expiresAt\" = now() + interval '2 days', \"expiryNoticeAt\" = null where id = '<video id>';"
+# Removed on the next pass (it was told 4 days ago):
+docker exec postgear_postgres psql -U postgres -d postgear_db -c "update \"ClipVideo\" set \"lastUsedAt\" = now() - interval '60 days', \"expiresAt\" = now() - interval '1 day', \"expiryNoticeAt\" = now() - interval '4 days' where id = '<video id>';"
+```
+
+The sweep runs every 15 minutes in the worker's maintenance pass. To run it now (Git Bash; the token is `AUTOMATION_INTERNAL_TOKEN` from `.env`, `daily` also runs the once-a-day parts):
+
+```bash
+curl -s -X POST http://localhost:3001/internal/clips/sweep -H "x-postgear-internal: <token>" -H "Content-Type: application/json" -d '{"daily":true}'
+```
+
+It answers what it did (`noticed`, `expired`, `downloads`, `orphans`, ...).
+
+**Rights requests.** The question mark beside "This video is mine, or I have permission to use it." opens `/legal/copyright`. An operator removes a video everywhere and blocks its link with `npm run clips:remove -- --url <link> --reason "<10+ characters>" --by demo@postgear.local` (it only reads the link, never fetches it). Paste that link again: "This video was removed after a request from its owner."
+
+**The operator screen.** The seed makes `demo@postgear.local` an operator; for anyone else run `npm run operator:grant -- --email <address>` (and `operator:revoke`). Open the account menu, **Operator**, or **<http://localhost:3000/operator>**: Plans, Workspace Overrides, Usage, Change Log and Library. `member@postgear.local` gets the ordinary "not found" page there. Saves mail `OWNER_EMAIL` only in production; locally the mail is printed in the API console as `operator.mail_not_sent`. To test a lower plan, use the second workspace (Free) or give the demo workspace an override with an end date.
+
+**The library.** `CLIPS_LIBRARY_INGEST=true npm run clips:library:seed` draws the small sticker and sound fixtures and ingests them; publish a run from the operator Library tab. Never point an ingest at an outside source locally.
+
+**Where the files are.** With `STORAGE_PROVIDER="local"`, private files sit in a folder next to the upload folder with `-private` added to its name (for example `uploads-private`), under `clips/<workspace id>/`, and the browser reaches them only through signed `/clips/files/<token>` links that expire. With MinIO, open **<http://localhost:9001>** (`minioadmin` / `minioadmin`) and look in the `postgear-clips` bucket.
+
+**Limits you may hit while testing.** Each person can start 30 imports, exports, previews or downloads a minute (then "You are going very quickly. Wait a minute, then try again."), and the whole app refuses new work past `CLIPS_QUEUE_CEILING` waiting jobs.
+
+**Real keys** (Twitch and YouTube channel lists) are only for the real test plan: see `docs/sprint-12/clips-keys-guide.md` and `docs/sprint-12/real-test-plan.md`.
+
+Automated checks:
+
+```powershell
+npm test --workspace=@postgear/video-engine
+npm test --workspace=@postgear/api -- clips
+npm test --workspace=@postgear/worker -- clips
+npm test --workspace=@postgear/web -- clips
+npm run test:e2e -- e2e/clips.spec.ts e2e/operator.spec.ts   # needs dev:api:e2e, a seeded database and the worker, section 3a
+```
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 

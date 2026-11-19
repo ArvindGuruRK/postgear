@@ -81,6 +81,10 @@ export const CLIP_ERROR_MESSAGES = {
   tool_failed: 'Something went wrong on our side. Try again in a little while.',
   tools_offline: 'Video tools are not running right now. Try again in a minute.',
   clips_busy: 'Our video tools are busy. Try again in a minute.',
+  // Module 19: the per-person limit on the create routes (30 a minute).
+  clips_throttled: 'You are going very quickly. Wait a minute, then try again.',
+  // Module 19: a job that ran past its time from the contract.
+  timed_out: 'This took too long and was stopped. Try again.',
   cancelled: 'Cancelled.',
 } as const;
 
@@ -107,7 +111,11 @@ export function clipErrorMessage(code: string, platform?: ClipPlatformId): strin
   if (code === 'platform_paused' && platform) {
     return platformPausedMessage(platform);
   }
-  return (CLIP_ERROR_MESSAGES as Record<string, string>)[code] ?? CLIP_ERROR_MESSAGES.tool_failed;
+  // Own keys only: a code like `constructor` must not read a built-in object member.
+  const own = Object.hasOwn(CLIP_ERROR_MESSAGES, code)
+    ? (CLIP_ERROR_MESSAGES as Record<string, string>)[code]
+    : undefined;
+  return own ?? CLIP_ERROR_MESSAGES.tool_failed;
 }
 
 /**

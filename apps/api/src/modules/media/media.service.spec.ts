@@ -12,12 +12,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   BadRequestException,
+  Logger,
   NotFoundException,
   PayloadTooLargeException,
   UnprocessableEntityException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import sharp from 'sharp';
+import type { SchedulingService } from '../scheduling/scheduling.service';
 import { MEDIA_MESSAGES } from './media.messages';
 import type { MediaRecord, MediaRepository } from './media.repository';
 import { displayName, MediaService } from './media.service';
@@ -37,6 +39,7 @@ describe('MediaService', () => {
     >
   >;
   let service: MediaService;
+  let scheduling: { startMediaVideoFacts: jest.Mock };
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'postgear-media-'));
@@ -58,7 +61,12 @@ describe('MediaService', () => {
       list: jest.fn(),
     };
 
-    service = new MediaService(repository as unknown as MediaRepository, storage);
+    scheduling = { startMediaVideoFacts: jest.fn().mockResolvedValue(true) };
+    service = new MediaService(
+      repository as unknown as MediaRepository,
+      storage,
+      scheduling as unknown as SchedulingService,
+    );
   });
 
   afterEach(async () => {
@@ -151,6 +159,69 @@ describe('MediaService', () => {
       type: 'video',
       mimeType: 'video/mp4',
       thumbnail: null,
+    });
+  });
+
+  describe('poster and length (Module 19)', () => {
+    async function uploadVideo() {
+      const video = Buffer.concat([
+        Buffer.from([0, 0, 0, 0x18]),
+        Buffer.from('ftypmp42'),
+        Buffer.alloc(64),
+      ]);
+      return service.upload('org_1', await tempFile(video, 'clip.mp4'));
+    }
+
+    it('starts the facts workflow for the new row after it is written', async () => {
+      const { media } = await uploadVideo();
+
+      expect(media.id).toBe('m1');
+      expect(scheduling.startMediaVideoFacts).toHaveBeenCalledWith('m1', 'org_1');
+      expect(repository.create.mock.invocationCallOrder[0]).toBeLessThan(
+        scheduling.startMediaVideoFacts.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does not wait for the start: the upload answers while it hangs', async () => {
+      scheduling.startMediaVideoFacts.mockReturnValue(new Promise(() => undefined));
+
+      await expect(uploadVideo()).resolves.toMatchObject({ media: { id: 'm1', type: 'video' } });
+    });
+
+    it('logs a start that fails or does not reach Temporal, and the upload still succeeds', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      try {
+        scheduling.startMediaVideoFacts.mockRejectedValueOnce(new Error('connection refused'));
+        await expect(uploadVideo()).resolves.toMatchObject({ media: { id: 'm1' } });
+        scheduling.startMediaVideoFacts.mockResolvedValueOnce(false);
+        await expect(uploadVideo()).resolves.toMatchObject({ media: { id: 'm1' } });
+        scheduling.startMediaVideoFacts.mockImplementationOnce(() => {
+          throw new Error('not connected');
+        });
+        await expect(uploadVideo()).resolves.toMatchObject({ media: { id: 'm1' } });
+
+        // Let the unawaited answers settle before reading the log.
+        await new Promise((resolve) => setImmediate(resolve));
+        const logged = warn.mock.calls.map(([line]) => String(line));
+        expect(
+          logged.filter((line) => line.includes('media.video_facts_not_started')),
+        ).toHaveLength(3);
+        expect(logged.some((line) => line.includes('connection refused'))).toBe(true);
+        expect(logged.some((line) => line.includes('scheduler_unreachable'))).toBe(true);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('never starts it for an image, which has its thumbnail already', async () => {
+      const photo = await sharp({
+        create: { width: 40, height: 30, channels: 3, background: '#3366ff' },
+      })
+        .jpeg()
+        .toBuffer();
+      await service.upload('org_1', await tempFile(photo, 'photo.jpg'));
+
+      expect(scheduling.startMediaVideoFacts).not.toHaveBeenCalled();
     });
   });
 

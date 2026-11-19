@@ -104,17 +104,32 @@ export function formatBytes(bytes: number): string {
 
 // --- The fingerprint ------------------------------------------------------------------
 
-/** JSON with every object's keys in order, so the same document always reads the same. */
-function canonical(value: unknown): string {
+/**
+ * Significant digits a number keeps in the fingerprint (v2). A saved clip can
+ * come back from the database one bit away from what the editor holds (its
+ * split layout drew a crop at 0.24687499999999996 and the clip was stored as
+ * 0.246875), and the two must read as the same clip. Twelve digits is far
+ * finer than anything a person can move: a millionth of the frame still counts.
+ */
+const FINGERPRINT_DIGITS = 12;
+
+/**
+ * JSON with every object's keys in order, so the same document always reads
+ * the same; `round` also writes each fractional number at twelve digits (v2).
+ */
+function canonical(value: unknown, round: boolean): string {
+  if (typeof value === 'number' && round && Number.isFinite(value) && !Number.isInteger(value)) {
+    return JSON.stringify(Number(value.toPrecision(FINGERPRINT_DIGITS)));
+  }
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value === undefined ? null : value);
   }
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (Array.isArray(value)) return `[${value.map((inner) => canonical(inner, round)).join(',')}]`;
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record)
     .filter((key) => record[key] !== undefined)
     .sort();
-  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(',')}}`;
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(record[key], round)}`).join(',')}}`;
 }
 
 /** cyrb53: a fast 53-bit string hash (public domain), seeded so two lanes make one longer hash. */
@@ -137,12 +152,29 @@ function cyrb53(text: string, seed: number): number {
  * A fingerprint of what a document draws: the same for the same picture and
  * sound whatever the key order, different after any change to them. The
  * editor-only `meta` is left out, and the clip's name is not in the document,
- * so a rename never makes an export look out of date. Not a security hash:
- * it only tells "the same clip" from "a changed one".
+ * so a rename never makes an export look out of date. Numbers count to twelve
+ * significant digits (see `FINGERPRINT_DIGITS`). Not a security hash: it
+ * only tells "the same clip" from "a changed one". Compare with
+ * `fingerprintMatches`, which also reads the v1 ones stored before.
  */
 export function documentFingerprint(doc: ClipDocument): string {
+  return fingerprintOf(doc, 'v2');
+}
+
+function fingerprintOf(doc: ClipDocument, version: 'v1' | 'v2'): string {
   const { meta: _meta, ...drawn } = doc as ClipDocument & { meta?: unknown };
-  const text = canonical(drawn);
+  const text = canonical(drawn, version === 'v2');
   const lane = (seed: number) => cyrb53(text, seed).toString(16).padStart(14, '0');
-  return `v1-${lane(1)}${lane(2)}`;
+  return `${version}-${lane(1)}${lane(2)}`;
+}
+
+/**
+ * Whether `doc` is the document `fingerprint` was taken of. A v1 fingerprint
+ * (exports made before numbers were rounded) is checked the v1 way, so those
+ * exports do not all turn "changed" at once; anything else is never a match.
+ */
+export function fingerprintMatches(doc: ClipDocument, fingerprint: string): boolean {
+  if (fingerprint.startsWith('v2-')) return fingerprintOf(doc, 'v2') === fingerprint;
+  if (fingerprint.startsWith('v1-')) return fingerprintOf(doc, 'v1') === fingerprint;
+  return false;
 }

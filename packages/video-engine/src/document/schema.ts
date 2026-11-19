@@ -36,6 +36,8 @@ import {
   MAX_CROP_KEYFRAMES,
   MAX_ITEMS,
   MAX_SEGMENTS,
+  MAX_SOUNDS,
+  MAX_STICKERS,
   MAX_TRACKS,
   MAX_ZOOMS,
   SEGMENT_MIN_MS,
@@ -441,7 +443,8 @@ const documentShape = z
 /**
  * The document, with the rules that need more than one field: references
  * resolve, ids are unique, parts are long enough, the clip's length is in
- * range and the item count is under the cap.
+ * range, and the item, sound and sticker counts are under their caps (here,
+ * so a save the editor's own Add checks never saw is refused too).
  */
 export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
   const sourceIds = new Set(doc.sources.map((s) => s.id));
@@ -506,6 +509,8 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
   });
 
   let items = 0;
+  let sounds = 0;
+  let stickers = 0;
   doc.tracks.forEach((track, t) => {
     claim(track.id, ['tracks', t, 'id']);
     if (track.kind === 'captions') {
@@ -513,6 +518,8 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
     }
     track.items.forEach((item, i) => {
       items += 1;
+      if (track.kind === 'audio') sounds += 1;
+      else if (item.type === 'sticker') stickers += 1;
       claim(item.id, ['tracks', t, 'items', i, 'id']);
       if (item.start + item.duration > total) {
         ctx.addIssue({
@@ -529,6 +536,20 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
       code: z.ZodIssueCode.custom,
       path: ['tracks'],
       message: `A clip can hold up to ${MAX_ITEMS} texts, stickers and sounds`,
+    });
+  }
+  if (sounds > MAX_SOUNDS) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['tracks'],
+      message: `A clip can hold up to ${MAX_SOUNDS} sounds`,
+    });
+  }
+  if (stickers > MAX_STICKERS) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['tracks'],
+      message: `A clip can hold up to ${MAX_STICKERS} stickers`,
     });
   }
 });

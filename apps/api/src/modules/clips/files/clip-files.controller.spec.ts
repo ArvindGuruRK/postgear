@@ -125,3 +125,73 @@ describe('ClipFilesController', () => {
     expect(missing.status).toBe(404);
   });
 });
+
+/**
+ * Module 19 tenancy: a signed address names one key under one workspace's
+ * prefix and an expiry. Once it expires it stops working, and its key cannot
+ * be swapped for another workspace's file without breaking the signature.
+ */
+describe('ClipFilesController, an address after its expiry (Module 19)', () => {
+  const otherOrg = '9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b';
+  let root: string;
+  let clock: number;
+  let storage: LocalPrivateStorage;
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), 'postgear-files-expiry-'));
+    clock = Date.UTC(2026, 10, 19, 12, 0, 0);
+    storage = new LocalPrivateStorage(root, 'http://localhost:3001', secret, { now: () => clock });
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ClipFilesController],
+      providers: [{ provide: PRIVATE_STORAGE, useValue: storage }],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it('serves the file until it expires, then refuses it like a forged link', async () => {
+    const key = clipKeys.videoFile(org, video, 'poster', 'jpg');
+    await storage.put(key, Buffer.from('poster-bytes'), 'image/jpeg');
+    const path = new URL(await storage.signedUrl(key, { expiresInSeconds: 600 })).pathname;
+    const server = app.getHttpServer();
+
+    clock += 599_000;
+    expect((await request(server).get(path)).status).toBe(200);
+
+    clock += 2_000;
+    const expired = await request(server).get(path);
+    const junk = await request(server).get('/clips/files/not-a-token');
+    expect(expired.status).toBe(403);
+    expect(expired.body).toEqual(junk.body);
+  });
+
+  it("cannot be pointed at another workspace's file", async () => {
+    const mine = clipKeys.videoFile(org, video, 'poster', 'jpg');
+    const theirs = clipKeys.videoFile(otherOrg, video, 'poster', 'jpg');
+    await storage.put(mine, Buffer.from('mine'), 'image/jpeg');
+    await storage.put(theirs, Buffer.from('theirs'), 'image/jpeg');
+    const token = new URL(await storage.signedUrl(mine, { expiresInSeconds: 600 })).pathname
+      .split('/')
+      .pop() as string;
+    const [payload, sent] = token.split('.') as [string, string];
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<
+      string,
+      unknown
+    >;
+    const swapped = Object.fromEntries(
+      Object.entries(claims).map(([name, value]) => [name, value === mine ? theirs : value]),
+    );
+    expect(Object.values(swapped)).toContain(theirs);
+    const forged = `${Buffer.from(JSON.stringify(swapped), 'utf8').toString('base64url')}.${sent}`;
+
+    const response = await request(app.getHttpServer()).get(`/clips/files/${forged}`);
+    expect(response.status).toBe(403);
+    expect(response.text).not.toContain('theirs');
+  });
+});

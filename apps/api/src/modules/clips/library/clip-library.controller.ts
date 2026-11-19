@@ -22,6 +22,7 @@ import {
   ParseUUIDPipe,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { type ActiveOrg, CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -44,9 +45,12 @@ import {
   searchStickersQuerySchema,
 } from './clip-library.schemas';
 import { ClipLibraryService } from './clip-library.service';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/library')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipLibraryController {
   constructor(private readonly library: ClipLibraryService) {}
 

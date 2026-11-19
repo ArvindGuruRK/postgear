@@ -4,6 +4,7 @@ import { Badge, cn } from '@postgear/ui';
 import { Check, Film } from 'lucide-react';
 import type { MediaItem } from '@/types/media';
 import { describeMedia } from './media-limits';
+import { VideoStill } from './video-still';
 
 interface MediaTileProps {
   item: MediaItem;
@@ -16,9 +17,9 @@ interface MediaTileProps {
  * One library item.
  *
  * Images show their generated thumbnail, never the full file, so a page of
- * tiles costs a few kilobytes each. Video has no generated poster yet, so the
- * browser is asked for just enough of the file to paint its first frame
- * (`preload="metadata"`).
+ * tiles costs a few kilobytes each. A video shows its poster and length
+ * (Module 19), or its first frame until the media worker has made a poster
+ * (`VideoStill`).
  */
 export function MediaTile({ item, selected, onToggle }: MediaTileProps) {
   const preview = (
@@ -33,13 +34,7 @@ export function MediaTile({ item, selected, onToggle }: MediaTileProps) {
         />
       ) : (
         <>
-          <video
-            src={item.url}
-            preload="metadata"
-            muted
-            playsInline
-            className="h-full w-full object-cover"
-          />
+          <VideoStill item={item} />
           <span className="absolute start-2 top-2">
             <Badge variant="secondary" className="gap-1">
               <Film className="h-3 w-3" strokeWidth={3} />

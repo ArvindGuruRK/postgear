@@ -9,9 +9,11 @@
  *    key `clips.ai:signals:<jobId>` and the job as `refId` (402
  *    `clips_ai_minutes_used` with the "needs {need} and you have {n}"
  *    sentence when short). The price is `aiMinutesCost('signals', length)`.
- * 3. One serializable transaction re-checks that no run is open and writes
- *    the `ClipHighlightRun` (engine version, tuning, minutes, ledger entry)
- *    and its HIGHLIGHTS job. A request that lost the race is a 409.
+ * 3. One serializable transaction re-checks that no run is open and the
+ *    video is still live and READY, and writes the `ClipHighlightRun`
+ *    (engine version, tuning, minutes, ledger entry) and its HIGHLIGHTS job.
+ *    A request that lost the race is a 409 `highlights_running`; a video
+ *    that left READY meanwhile is a 409 `video_not_ready` (404 when deleted).
  * 4. The workflow is started; 202 `{ run, job, meter }`.
  *
  * Whatever happens before the rows land, the charge is given back
@@ -98,9 +100,7 @@ export class ClipHighlightsService {
   async start(orgId: string, userId: string, videoId: string): Promise<StartHighlightsOutcome> {
     await this.limits.assertEnabled(orgId);
     const video = await this.requireVideo(orgId, videoId);
-    if (video.status !== 'READY' || video.durationMs === null) {
-      throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
-    }
+    if (video.status !== 'READY' || video.durationMs === null) throw notReady();
     if ((await this.openRuns(orgId, video.id)) > 0) throw running();
 
     const price = highlightsPrice(video.durationMs);
@@ -124,7 +124,7 @@ export class ClipHighlightsService {
         meta: { step: 'signals', videoId: video.id },
       });
 
-      const rows = await serializable(async (tx) => {
+      const outcome = await serializable(async (tx) => {
         const open = await tx.clipJob.count({
           where: {
             organizationId: orgId,
@@ -133,9 +133,11 @@ export class ClipHighlightsService {
             status: { in: [...OPEN_JOB_STATUSES] },
           },
         });
-        if (open > 0) return null;
+        if (open > 0) return { kind: 'running' as const };
+        // The video may have gone, or left READY, since the first look.
         const live = await this.videos.findLive(orgId, video.id, tx);
-        if (live?.status !== 'READY') return null;
+        if (!live) return { kind: 'gone' as const };
+        if (live.status !== 'READY') return { kind: 'not_ready' as const };
 
         const run = await tx.clipHighlightRun.create({
           data: {
@@ -154,9 +156,12 @@ export class ClipHighlightsService {
           },
         });
         const job = await this.jobsRepository.create(jobRow, tx);
-        return { run, job };
+        return { kind: 'created' as const, run, job };
       });
-      if (!rows) throw running();
+      if (outcome.kind === 'running') throw running();
+      if (outcome.kind === 'gone') throw videoNotFound();
+      if (outcome.kind === 'not_ready') throw notReady();
+      const rows = outcome;
       written = true;
 
       await this.jobs.start(rows.job);
@@ -191,16 +196,22 @@ export class ClipHighlightsService {
   /** A live video of the workspace; a plain 404 otherwise (another workspace's reads the same). */
   private async requireVideo(orgId: string, videoId: string) {
     const video = isUuid(videoId) ? await this.videos.findLive(orgId, videoId) : null;
-    if (!video) {
-      throw new NotFoundException({
-        message: CLIPS_MESSAGES.VIDEO_NOT_FOUND,
-        code: 'video_not_found',
-      });
-    }
+    if (!video) throw videoNotFound();
     return video;
   }
 }
 
 function running(): ClipErrorException {
   return new ClipErrorException(HttpStatus.CONFLICT, 'highlights_running');
+}
+
+function notReady(): ClipErrorException {
+  return new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
+}
+
+function videoNotFound(): NotFoundException {
+  return new NotFoundException({
+    message: CLIPS_MESSAGES.VIDEO_NOT_FOUND,
+    code: 'video_not_found',
+  });
 }

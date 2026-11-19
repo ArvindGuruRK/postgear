@@ -116,6 +116,10 @@ export class ClipLinksService implements ClipLinkProber {
     }
     await this.resolver.assert(orgId, 'clips.enabled', (enabled) => enabled === true);
 
+    // Module 19: a video removed after a rights request, refused before any fetch.
+    // (The answer must carry the same id, see `sameVideo`, so one check covers it.)
+    await this.refuseBlocked(platform, [link.externalId]);
+
     const hash = linkHash(link.canonicalUrl);
     const info = (await this.cached(hash, link)) ?? (await this.ask(hash, link, orgId));
 
@@ -132,6 +136,13 @@ export class ClipLinksService implements ClipLinkProber {
 
     const existingVideoId = await this.repository.existingVideoId(orgId, platform, info.externalId);
     return { link, info, existingVideoId };
+  }
+
+  /** 410 `video_removed`: "This video was removed after a request from its owner." */
+  private async refuseBlocked(platform: ClipPlatformId, externalIds: string[]): Promise<void> {
+    if (await this.repository.isBlocked(platform, externalIds)) {
+      throw new ClipErrorException(HttpStatus.GONE, 'video_removed');
+    }
   }
 
   /** A cached answer for this link, if one is there and still reads as one. */

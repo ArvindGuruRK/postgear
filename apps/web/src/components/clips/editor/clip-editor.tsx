@@ -476,7 +476,12 @@ export function ClipEditor({
   });
   const { status, refusal, flush, letGo } = autosave;
 
-  const exporting = useClipExport({ orgId, clipId, flush, sharp: detail.sharp });
+  const exporting = useClipExport({
+    orgId,
+    clipId,
+    flush: autosave.flushRevision,
+    sharp: detail.sharp,
+  });
   const [leaveOut, setLeaveOut] = useState<{ stickers: string[]; sounds: string[] } | null>(null);
   const [exportQueued, setExportQueued] = useState(false);
   const startQueued = exporting.start;

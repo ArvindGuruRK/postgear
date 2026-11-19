@@ -17,7 +17,7 @@ import {
   ClipStatus,
   type ClipVideo,
   ClipVideoStatus,
-  type Prisma,
+  Prisma,
   prisma,
 } from '@postgear/db';
 import type { ClipsTx } from '../clips.tx';
@@ -36,6 +36,12 @@ export type VideoWithCard = ClipVideo & {
 
 export interface VideoCursor {
   createdAt: Date;
+  id: string;
+}
+
+/** Module 19: where a biggest-first page ended. */
+export interface SizeCursor {
+  bytes: number;
   id: string;
 }
 
@@ -119,6 +125,60 @@ export class ClipVideosRepository {
     }) as Promise<VideoWithCard[]>;
   }
 
+  /**
+   * Module 19 (See What Uses Space): one page of live video ids, biggest
+   * first, with the bytes each keeps (every file of the video except Preview
+   * Exports, the same rule as the space gauge). Keyset paging on (bytes, id).
+   */
+  async listIdsBySize(
+    orgId: string,
+    params: { cursor: SizeCursor | null; take: number },
+  ): Promise<Array<{ id: string; bytes: number }>> {
+    const kept = Prisma.sql`COALESCE(SUM(a.bytes) FILTER (WHERE a.kind <> 'PROOF'), 0)`;
+    const after = params.cursor
+      ? Prisma.sql`HAVING (${kept}, v.id) < (${BigInt(params.cursor.bytes)}, ${params.cursor.id})`
+      : Prisma.empty;
+    const rows = await prisma.$queryRaw<Array<{ id: string; bytes: bigint }>>`
+      SELECT v.id, ${kept}::bigint AS bytes
+      FROM "ClipVideo" v
+      LEFT JOIN "ClipAsset" a ON a."videoId" = v.id AND a."organizationId" = v."organizationId"
+      WHERE v."organizationId" = ${orgId} AND v."deletedAt" IS NULL AND v.status <> 'REMOVED'
+      GROUP BY v.id
+      ${after}
+      ORDER BY bytes DESC, v.id DESC
+      LIMIT ${params.take}`;
+    return rows.map((row) => ({ id: row.id, bytes: Number(row.bytes) }));
+  }
+
+  /** Cards for ids, in the order given (another workspace's ids are simply not found). */
+  async cardsByIds(orgId: string, ids: readonly string[]): Promise<VideoWithCard[]> {
+    if (ids.length === 0) return [];
+    const rows = (await prisma.clipVideo.findMany({
+      where: { id: { in: [...ids] }, organizationId: orgId, ...LIVE },
+      include: cardInclude(),
+    })) as VideoWithCard[];
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return ids.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [row] : [];
+    });
+  }
+
+  /** Module 19: the bytes each video keeps (Preview Exports left out), for the cards' size. */
+  async storedBytesOf(orgId: string, videoIds: readonly string[]): Promise<Map<string, number>> {
+    if (videoIds.length === 0) return new Map();
+    const rows = await prisma.clipAsset.groupBy({
+      by: ['videoId'],
+      where: { organizationId: orgId, videoId: { in: [...videoIds] }, kind: { not: 'PROOF' } },
+      _sum: { bytes: true },
+    });
+    return new Map(
+      rows.flatMap((row) =>
+        row.videoId ? [[row.videoId, Number(row._sum.bytes ?? 0n)] as const] : [],
+      ),
+    );
+  }
+
   countLive(orgId: string): Promise<number> {
     return prisma.clipVideo.count({ where: { organizationId: orgId, ...LIVE } });
   }
@@ -167,27 +227,6 @@ export class ClipVideosRepository {
     if (!asset?.video) return null;
     const { video, ...row } = asset;
     return { asset: row, video };
-  }
-
-  /**
-   * Soft deletes a video: the row and its rights record stay, its asset rows
-   * go (the files are removed after), and its clips that were never exported
-   * go too. Exported clips stay, so their Media and their post history keep
-   * a name. False when it was already gone.
-   */
-  async softDelete(orgId: string, videoId: string, now: Date): Promise<boolean> {
-    return prisma.$transaction(async (tx) => {
-      const removed = await tx.clipVideo.updateMany({
-        where: { id: videoId, organizationId: orgId, deletedAt: null },
-        data: { deletedAt: now, removedReason: 'deleted' },
-      });
-      if (removed.count === 0) return false;
-      await tx.clipAsset.deleteMany({ where: { organizationId: orgId, videoId } });
-      await tx.clip.deleteMany({
-        where: { organizationId: orgId, videoId, lastExportedRevision: null },
-      });
-      return true;
-    });
   }
 
   /** The newest IMPORT job of a video. */

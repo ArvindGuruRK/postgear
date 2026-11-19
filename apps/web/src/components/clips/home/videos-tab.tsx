@@ -14,14 +14,16 @@ import { Button, EmptyState, ErrorState, Segmented, toast } from '@postgear/ui';
 import { Film } from 'lucide-react';
 import { cancelVideo, deleteVideo, retryVideo } from '@/lib/clips-api';
 import type { ClipVideoSort } from '@/types/clips';
-import { type VideoCardActions, VideoCard, VideoCardsSkeleton } from './video-card';
 import type { VideosState } from './use-videos';
+import { VideoCard, type VideoCardActions, VideoCardsSkeleton } from './video-card';
 
 export const VIDEOS_EMPTY = 'No videos yet. Paste a link or upload a video to start.';
 
 const SORTS: ReadonlyArray<{ value: ClipVideoSort; label: string }> = [
   { value: 'newest', label: 'Newest' },
   { value: 'oldest', label: 'Oldest' },
+  // Module 19: See What Uses Space lands here.
+  { value: 'size', label: 'Biggest First' },
 ];
 
 /** The card actions over the API, shared with Recent Videos on the Create tab. */
@@ -105,7 +107,13 @@ export function VideosTab({
       </div>
       <ul className="m-0 grid list-none grid-cols-4 gap-4 p-0" aria-busy={videos.loading}>
         {videos.cards.map((card) => (
-          <VideoCard key={card.video.id} card={card} orgId={orgId} actions={actions} />
+          <VideoCard
+            key={card.video.id}
+            card={card}
+            orgId={orgId}
+            actions={actions}
+            showSize={videos.sort === 'size'}
+          />
         ))}
       </ul>
       {videos.hasMore ? (

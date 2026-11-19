@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@postgear/ui';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import { fixtureStatus } from '../clips-fixtures';
@@ -76,5 +76,33 @@ describe('StorageMeter', () => {
     const gauge = screen.getByTestId('clips-storage-meter');
     expect(gauge).toHaveTextContent('20 GB of 20 GB');
     expect(gauge).toHaveAttribute('data-percent', '100');
+  });
+
+  it('opens a panel with what the space holds and See What Uses Space (Module 19)', () => {
+    const onSee = jest.fn();
+    const status = fixtureStatus({
+      storage: { usedBytes: 3.4 * GB, limitBytes: 20 * GB },
+      usage: {
+        storageBytes: 3.4 * GB,
+        byKind: { videos: 3.2 * GB, downloads: 0.15 * GB, library: 0.05 * GB },
+      },
+    });
+    draw(<StorageMeter status={status} onSeeWhatUsesSpace={onSee} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Video space: 3.4 GB of 20 GB. Show what uses it.' }),
+    );
+
+    const panel = screen.getByTestId('clips-storage-panel');
+    expect(panel).toHaveTextContent('Videos3.2 GB');
+    expect(panel).toHaveTextContent('Downloads150 MB');
+    expect(panel).toHaveTextContent('Your stickers and sounds50 MB');
+    fireEvent.click(screen.getByRole('button', { name: 'See What Uses Space' }));
+    expect(onSee).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no button without a place to go (the playground)', () => {
+    draw(<StorageMeter status={at(0.2)} />);
+    fireEvent.click(screen.getByTestId('clips-storage-meter'));
+    expect(screen.queryByRole('button', { name: 'See What Uses Space' })).toBeNull();
   });
 });

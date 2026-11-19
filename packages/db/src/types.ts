@@ -23,6 +23,8 @@ export type {
   // Sprint 12: Clips, the sound and sticker library, My Channels.
   Clip,
   ClipAsset,
+  // Module 19: rights requests and the storage notice.
+  ClipBlockedVideo,
   ClipChannel,
   ClipChannelHidden,
   ClipFavourite,
@@ -36,6 +38,7 @@ export type {
   ClipPost,
   ClipSound,
   ClipSticker,
+  ClipStorageNotice,
   ClipVideo,
   Comments,
   Competitor,

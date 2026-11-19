@@ -27,6 +27,7 @@ import { ConfigService } from '@nestjs/config';
 import type { ClipPlatform } from '@postgear/db';
 import {
   type ChannelRef,
+  CLIP_ERROR_MESSAGES,
   type ClipPlatformId,
   type ListedItem,
   type ListKind,
@@ -120,7 +121,12 @@ export interface StreamsView {
   updatedAt: string;
   /** An older copy answered because a new fetch failed (never older than 24 hours). */
   stale: boolean;
-  /** The 1,000 item limit was reached; `notice` says so. */
+  /**
+   * The 1,000 item limit was reached. `notice` says so, or (first, Module 20)
+   * that the list could not be read and this is the last answer: the stories'
+   * "This channel's list is not available right now. Try again in a few
+   * minutes." beside "Updated 3 hours ago".
+   */
   capped: boolean;
   notice: string | null;
 }
@@ -327,7 +333,11 @@ export class ClipChannelsService {
       updatedAt: loaded.fetchedAt,
       stale: loaded.stale,
       capped,
-      notice: capped ? CLIP_CHANNELS_MESSAGES.LIST_CAPPED : null,
+      notice: loaded.stale
+        ? CLIP_ERROR_MESSAGES.channel_listing_failed
+        : capped
+          ? CLIP_CHANNELS_MESSAGES.LIST_CAPPED
+          : null,
     };
   }
 

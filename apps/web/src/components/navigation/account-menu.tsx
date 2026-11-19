@@ -4,6 +4,7 @@ import { Building2Icon } from '@animateicons/react/lucide/building-2-icon';
 import { LogOutIcon } from '@animateicons/react/lucide/log-out-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
+import { ShieldUserIcon } from '@animateicons/react/lucide/shield-user-icon';
 import { UserIcon } from '@animateicons/react/lucide/user-icon';
 import { UserMenu } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
@@ -128,6 +129,18 @@ export function AccountMenu() {
           animatedIcon: SettingsIcon,
           onSelect: () => leaveThen(() => router.push(`/${activeOrgId}/settings/team`)),
         },
+        // Sprint 12 Module 19: the platform operator's screens. Shown to a
+        // superadmin only; the page itself still answers 404 to anyone the
+        // API refuses (in production, a superadmin outside OPERATOR_EMAILS).
+        ...(user.isSuperAdmin
+          ? [
+              {
+                label: 'Operator',
+                animatedIcon: ShieldUserIcon,
+                onSelect: () => leaveThen(() => router.push('/operator')),
+              },
+            ]
+          : []),
         { label: 'Log Out', animatedIcon: LogOutIcon, danger: true, onSelect: signOut },
       ]}
     />

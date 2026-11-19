@@ -35,6 +35,8 @@ import {
   zoomWindows,
 } from '@postgear/video-engine';
 import type { EditorSelection, EditorTab } from '../editor/editor-state';
+import { TOO_MANY_SOUNDS } from '../panels/audio-model';
+import { TOO_MANY_STICKERS } from '../panels/elements-model';
 
 // ---------------------------------------------------------------------------
 // Spoken words
@@ -279,6 +281,10 @@ export function addRefusalSentence(code: ItemRefusalCode): string | null {
   switch (code) {
     case 'too_many_items':
       return ITEM_LIMIT_SENTENCE;
+    case 'too_many_sounds':
+      return TOO_MANY_SOUNDS;
+    case 'too_many_stickers':
+      return TOO_MANY_STICKERS;
     case 'too_many_tracks':
       return TRACK_LIMIT_SENTENCE;
     default:

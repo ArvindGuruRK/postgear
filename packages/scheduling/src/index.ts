@@ -13,6 +13,7 @@
  */
 export * from './automations';
 export * from './clips';
+export * from './media';
 export * from './publish-status';
 export * from './retry-policy';
 export * from './workflows';

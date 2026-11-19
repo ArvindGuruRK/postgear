@@ -241,6 +241,23 @@ describe('ClipAutosave', () => {
     await expect(flushed).resolves.toBe(true);
   });
 
+  it('flushRevision answers the revision the server saved, for an export to send', async () => {
+    const { autosave, calls } = harness();
+    // Nothing waiting: the revision the editor opened on.
+    await expect(autosave.flushRevision()).resolves.toBe(1);
+
+    autosave.update({ document: makeDoc(30_000), title: 'Clip' });
+    const flushed = autosave.flushRevision();
+    calls[0].resolve(clipAt(4));
+    await expect(flushed).resolves.toBe(4);
+
+    // A conflict: nothing the export could trust.
+    autosave.update({ document: makeDoc(31_000), title: 'Clip' });
+    const refused = autosave.flushRevision();
+    calls[1].reject(new ApiError('Changed elsewhere', 409, 'clip_changed_elsewhere'));
+    await expect(refused).resolves.toBeNull();
+  });
+
   it('sends what is unsaved as keepalive when the page hides or the editor closes', () => {
     const first = harness();
     first.autosave.update({ document: makeDoc(30_000), title: 'Clip' });

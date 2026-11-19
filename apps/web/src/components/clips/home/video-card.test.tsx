@@ -4,7 +4,7 @@ import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import { ApiError } from '@/lib/api';
 import type { ClipJobView, ClipVideoCard } from '@/types/clips';
 import { FIXTURE_CARDS, fixtureJob } from '../clips-fixtures';
-import { type VideoCardActions, VideoCard } from './video-card';
+import { VideoCard, type VideoCardActions } from './video-card';
 
 jest.mock('@/lib/clips-api', () => ({ getVideo: jest.fn() }));
 jest.mock('../use-clip-job', () => ({ useClipJob: jest.fn() }));
@@ -201,5 +201,39 @@ describe('VideoCard', () => {
     );
     await screen.findByRole('menuitem', { name: 'Delete Video' });
     expect(screen.queryByRole('menuitem', { name: 'Download Original' })).not.toBeInTheDocument();
+  });
+});
+
+describe('VideoCard keeping and size (Module 19)', () => {
+  const ready = FIXTURE_CARDS.ready;
+
+  it('says "Removed in 2 days" in the warning colour, with how to keep it', () => {
+    const soon = new Date(Date.now() + 2 * 86_400_000 - 60_000).toISOString();
+    renderCard({ ...ready, video: { ...ready.video, expiresAt: soon } });
+    const line = screen.getByTestId('clips-video-removed-soon');
+    expect(line).toHaveTextContent('Removed in 2 days');
+    expect(line).toHaveTextContent('Open it to keep it longer.');
+  });
+
+  it('keeps "Kept until" while the date is far', () => {
+    const far = new Date(Date.now() + 20 * 86_400_000).toISOString();
+    renderCard({ ...ready, video: { ...ready.video, expiresAt: far } });
+    expect(screen.queryByTestId('clips-video-removed-soon')).toBeNull();
+    expect(screen.getByText(/^Kept until /)).toBeInTheDocument();
+  });
+
+  it('shows the stored size only in the size view', () => {
+    const sized = { ...ready, storedBytes: 1_400_000_000 };
+    const { unmount } = render(
+      <TooltipProvider>
+        <ul>
+          <VideoCard card={sized} orgId="org-1" actions={actions()} follow={false} showSize />
+        </ul>
+      </TooltipProvider>,
+    );
+    expect(screen.getByText(/1\.4 GB/)).toBeInTheDocument();
+    unmount();
+    renderCard(sized, actions(), false);
+    expect(screen.queryByText(/1\.4 GB/)).toBeNull();
   });
 });

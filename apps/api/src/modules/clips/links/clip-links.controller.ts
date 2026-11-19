@@ -28,6 +28,7 @@ import {
   Query,
   Res,
   StreamableFile,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import type { Response } from 'express';
@@ -42,9 +43,12 @@ import {
 } from './clip-links.schemas';
 import { CLIP_LINK_PROBER, type ClipLinkProber, type ClipProbeResult } from './clip-links.types';
 import { ClipThumbnailsService } from './clip-thumbnails.service';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/links')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipLinksController {
   constructor(
     @Inject(CLIP_LINK_PROBER) private readonly prober: ClipLinkProber,

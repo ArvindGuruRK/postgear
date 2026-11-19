@@ -44,10 +44,18 @@ export interface CompiledFfmpeg {
 export const GRAPH_FILE = 'graph.txt';
 
 /**
- * The full argument array for one render: fixed head, the inputs, the graph
- * by file (FFmpeg 9.0.2 removed `-filter_complex_script`), the output
- * options and the output name. Never a shell string: the executor spawns
- * FFmpeg with this array.
+ * The only protocol a render input may be opened with: a plain file. The
+ * inputs are the person's own uploads (videos, stickers, sounds), so a file
+ * that is really a playlist or a `concat:` list can never reach the network
+ * or another file (security sweep, Module 20).
+ */
+export const RENDER_INPUT_PROTOCOLS = 'file';
+
+/**
+ * The full argument array for one render: fixed head, the inputs (each read
+ * with the protocol allowlist), the graph by file (FFmpeg 9.0.2 removed
+ * `-filter_complex_script`), the output options and the output name. Never a
+ * shell string: the executor spawns FFmpeg with this array.
  */
 export function ffmpegArgsFor(compiled: CompiledFfmpeg, outFile: string): string[] {
   const args = [
@@ -63,7 +71,7 @@ export function ffmpegArgsFor(compiled: CompiledFfmpeg, outFile: string): string
   ];
 
   for (const input of compiled.inputs) {
-    args.push(...input.options);
+    args.push(...input.options, '-protocol_whitelist', RENDER_INPUT_PROTOCOLS);
     if (input.seekMs !== null && input.seekMs > 0) {
       args.push('-ss', msToSeconds(input.seekMs));
     }

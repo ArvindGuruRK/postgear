@@ -133,7 +133,71 @@ services:
     ports:
       - "8233:8080"
 
+  # The real worker image (Sprint 12, Module 20: infra/docker/Dockerfile.worker),
+  # run against the services above to prove the image imports and exports.
+  # Never started by a plain `docker compose up`: it has its own profile.
+  #
+  #   docker compose --profile worker-image up --build worker
+  #
+  # Stop the local worker (`npm run dev:worker`) first, or two workers poll the
+  # same queues. The API stays on the host (`npm run dev:api`): the worker
+  # calls it at host.docker.internal:3001. Settings come from the root .env,
+  # like the local worker, with the addresses changed to these services and
+  # the image's own programs and folders kept whatever the .env says. Local
+  # storage is shared with the host API by mounting its two upload folders;
+  # the sample videos are mounted read only for CLIPS_SIMULATION. On a Linux
+  # host the mounted folders must be writable by uid 10001 (the image's user).
+  worker:
+    profiles: ["worker-image"]
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    image: postgear-worker:local
+    container_name: postgear_worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      minio:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgear_db?schema=public
+      REDIS_URL: redis://redis:6379
+      TEMPORAL_HOST: temporal:7233
+      S3_ENDPOINT: http://minio:9000
+      API_URL: http://host.docker.internal:3001
+      UPLOAD_DIRECTORY: /app/apps/api/uploads
+      FFMPEG_PATH: /opt/postgear/bin/ffmpeg
+      FFPROBE_PATH: /opt/postgear/bin/ffprobe
+      YTDLP_PATH: /opt/postgear/bin/yt-dlp
+      YTDLP_JS_RUNTIME: /opt/postgear/bin/deno
+      CLIPS_FONTS_DIR: /usr/share/postgear-fonts
+      CLIPS_SCRATCH_DIR: /var/lib/postgear/scratch
+      FONTCONFIG_FILE: /etc/fonts/postgear-fonts.conf
+      # This local image never publishes, fetches a video or calls a paid model
+      # for real, whatever .env says (the local .env keeps PUBLISH_SIMULATION
+      # false for the host worker). The WORKER_IMAGE_* names are not in .env, so
+      # these stay true unless set in the shell on purpose.
+      PUBLISH_SIMULATION: "${WORKER_IMAGE_PUBLISH_SIMULATION:-true}"
+      ANALYTICS_SIMULATION: "${WORKER_IMAGE_ANALYTICS_SIMULATION:-true}"
+      CLIPS_SIMULATION: "${WORKER_IMAGE_CLIPS_SIMULATION:-true}"
+      AI_SIMULATION: "${WORKER_IMAGE_AI_SIMULATION:-true}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - worker_scratch:/var/lib/postgear/scratch
+      - ./apps/api/uploads:/app/apps/api/uploads
+      - ./apps/api/uploads-private:/app/apps/api/uploads-private
+      - ./packages/media-tools/samples:/app/packages/media-tools/samples:ro
+    stop_grace_period: 1m
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  worker_scratch:

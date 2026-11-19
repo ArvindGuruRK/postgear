@@ -53,19 +53,37 @@ const MIN_BUDGET_MS = 60_000;
 
 export type ClipJobOutcome = 'done' | 'closed' | 'failed' | 'cancelled';
 
-/** The code a failed work activity carried (`details[0].code`), or `tool_failed`. */
+/**
+ * The code a failed work activity carried (`details[0].code`), or `tool_failed`.
+ * Failures are told apart by `instanceof` or by their name, so the same code
+ * reads them in the workflow sandbox and in a plain test (another realm).
+ */
 export function failureDetail(error: unknown): { code: string; platform?: string } {
-  const cause = error instanceof ActivityFailure ? error.cause : error;
-  if (cause instanceof ApplicationFailure) {
-    const detail = cause.details?.[0] as { code?: unknown; platform?: unknown } | undefined;
+  const cause = isFailure(error, ActivityFailure) ? (error as ActivityFailure).cause : error;
+  if (isFailure(cause, ApplicationFailure)) {
+    const detail = (cause as ApplicationFailure).details?.[0] as
+      | { code?: unknown; platform?: unknown }
+      | undefined;
     if (detail && typeof detail.code === 'string') {
       return typeof detail.platform === 'string'
         ? { code: detail.code, platform: detail.platform }
         : { code: detail.code };
     }
   }
-  if (cause instanceof TimeoutFailure) return { code: 'tool_failed' };
+  if (isFailure(cause, TimeoutFailure)) {
+    // Module 19: the work ran past its time from the contract and was stopped
+    // ("This took too long and was stopped."). A heartbeat timeout is a lost
+    // worker, not a slow job, so it keeps the plain failure.
+    return (cause as TimeoutFailure).timeoutType === 'HEARTBEAT'
+      ? { code: 'tool_failed' }
+      : { code: 'timed_out' };
+  }
   return { code: 'tool_failed' };
+}
+
+function isFailure(value: unknown, kind: { name: string; prototype: object }): boolean {
+  if (value instanceof (kind as unknown as new () => object)) return true;
+  return value instanceof Error && value.name === kind.name;
 }
 
 /** Milliseconds the work may still take: the job's deadline, less the reserve. */

@@ -42,10 +42,10 @@ function joinById(current: ClipVideoCard[], more: ClipVideoCard[]): ClipVideoCar
   return [...current, ...more.filter((card) => !seen.has(card.video.id))];
 }
 
-export function useVideos(): VideosState {
+export function useVideos(initialSort: ClipVideoSort = 'newest'): VideosState {
   const [cards, setCards] = useState<ClipVideoCard[]>([]);
   const [total, setTotal] = useState(0);
-  const [sort, setSort] = useState<ClipVideoSort>('newest');
+  const [sort, setSort] = useState<ClipVideoSort>(initialSort);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);

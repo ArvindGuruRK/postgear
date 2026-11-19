@@ -14,8 +14,12 @@
  * - Metadata is dropped (`-map_metadata -1`).
  *
  * The file is read by ffprobe first, with only the picture demuxers allowed
- * and file access only; anything else is `sticker_unusable`. Every program
- * runs through the runner with an argument array.
+ * and file access only; anything else is `sticker_unusable`. The first read
+ * takes only the kind and size from the header, so a picture too big on a
+ * side is refused before the second read decodes every frame to count them;
+ * both reads refuse to decode a frame of more than `STICKER_MAX_PIXELS`, so a
+ * header that lies about its size cannot make FFmpeg build a giant frame.
+ * Every program runs through the runner with an argument array.
  */
 import { stat } from 'node:fs/promises';
 import * as path from 'node:path';
@@ -51,6 +55,10 @@ export const STICKER_LIMITS = Object.freeze({
   maxSourceSide: 4_096,
   maxSourceFrames: 2_000,
 });
+
+/** The most pixels FFmpeg may decode in one frame while a sticker is read: the biggest square we accept. */
+export const STICKER_MAX_PIXELS = STICKER_LIMITS.maxSourceSide ** 2;
+const DECODE_CAP = ['-max_pixels', String(STICKER_MAX_PIXELS)];
 
 export type StickerErrorCode =
   | 'sticker_unusable'
@@ -145,13 +153,35 @@ function rate(text: string | undefined): number {
   return num / den;
 }
 
-/** The ffprobe arguments for `probeSticker`: picture demuxers only, every frame counted. */
+/**
+ * The ffprobe arguments for `probeSticker`'s first read: picture demuxers
+ * only, the kind and size from the header, no frame counted.
+ */
+export function buildStickerHeaderProbeArgs(file: string): string[] {
+  return [
+    '-hide_banner',
+    '-v',
+    'error',
+    ...SAFE_STICKER_INPUT,
+    ...DECODE_CAP,
+    '-select_streams',
+    'v:0',
+    '-print_format',
+    'json',
+    '-show_entries',
+    'format=format_name:stream=codec_type,codec_name,width,height',
+    fileInput(file),
+  ];
+}
+
+/** The ffprobe arguments for `probeSticker`'s second read: picture demuxers only, every frame counted. */
 export function buildStickerProbeArgs(file: string): string[] {
   return [
     '-hide_banner',
     '-v',
     'error',
     ...SAFE_STICKER_INPUT,
+    ...DECODE_CAP,
     '-count_frames',
     '-select_streams',
     'v:0',
@@ -163,31 +193,46 @@ export function buildStickerProbeArgs(file: string): string[] {
   ];
 }
 
-/** Maps ffprobe's JSON to `StickerFacts`, refusing anything that is not a picture we use. */
-export function stickerFactsFromProbe(json: unknown): StickerFacts {
+type ProbeJson = z.infer<typeof probeSchema>;
+
+/** The picture stream of a probe, when it is a kind we use at a size we read; else `sticker_unusable`. */
+function readablePicture(json: unknown): { probe: ProbeJson; video: ProbeJson['streams'][number] } {
   const parsed = probeSchema.safeParse(json);
   if (!parsed.success) throw new StickerError('sticker_unusable');
-  const format = parsed.data.format.format_name;
   const video = parsed.data.streams.find((stream) => stream.codec_type === 'video');
   if (!video?.codec_name || !STICKER_CODECS.has(video.codec_name)) {
     throw new StickerError('sticker_unusable');
   }
   const width = video.width ?? 0;
   const height = video.height ?? 0;
-  const frames = Number(video.nb_read_frames ?? 0);
   if (
     width < 1 ||
     height < 1 ||
     width > STICKER_LIMITS.maxSourceSide ||
-    height > STICKER_LIMITS.maxSourceSide ||
-    !Number.isInteger(frames) ||
-    frames < 1 ||
-    frames > STICKER_LIMITS.maxSourceFrames
+    height > STICKER_LIMITS.maxSourceSide
   ) {
     throw new StickerError('sticker_unusable');
   }
-  const fps = shortestFrameFps(parsed.data.frames) || rate(video.avg_frame_rate) || rate(video.r_frame_rate);
-  return { format, width, height, frames, fps, animated: frames > 1 };
+  return { probe: parsed.data, video };
+}
+
+/** Checks the first read's JSON (`buildStickerHeaderProbeArgs`): a picture we use, at a size we read. */
+export function checkStickerHeader(json: unknown): void {
+  readablePicture(json);
+}
+
+/** Maps ffprobe's JSON to `StickerFacts`, refusing anything that is not a picture we use. */
+export function stickerFactsFromProbe(json: unknown): StickerFacts {
+  const { probe, video } = readablePicture(json);
+  const width = video.width ?? 0;
+  const height = video.height ?? 0;
+  const frames = Number(video.nb_read_frames ?? 0);
+  if (!Number.isInteger(frames) || frames < 1 || frames > STICKER_LIMITS.maxSourceFrames) {
+    throw new StickerError('sticker_unusable');
+  }
+  const fps =
+    shortestFrameFps(probe.frames) || rate(video.avg_frame_rate) || rate(video.r_frame_rate);
+  return { format: probe.format.format_name, width, height, frames, fps, animated: frames > 1 };
 }
 
 async function runOrMap(
@@ -217,26 +262,30 @@ async function runOrMap(
   }
 }
 
-/** Reads `file` with ffprobe (picture demuxers only). */
+async function probeJson(
+  runTool: RunTool,
+  args: string[],
+  options: { cwd: string; signal?: AbortSignal },
+): Promise<unknown> {
+  const stdout = await runOrMap(runTool, 'ffprobe', args, options.cwd, options.signal);
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    throw new StickerError('sticker_unusable', { cause: error });
+  }
+}
+
+/**
+ * Reads `file` with ffprobe (picture demuxers only): the header first, and
+ * only a picture that passes it is decoded frame by frame to be counted.
+ */
 export async function probeSticker(
   runTool: RunTool,
   file: string,
   options: { cwd: string; signal?: AbortSignal },
 ): Promise<StickerFacts> {
-  const stdout = await runOrMap(
-    runTool,
-    'ffprobe',
-    buildStickerProbeArgs(file),
-    options.cwd,
-    options.signal,
-  );
-  let json: unknown;
-  try {
-    json = JSON.parse(stdout);
-  } catch (error) {
-    throw new StickerError('sticker_unusable', { cause: error });
-  }
-  return stickerFactsFromProbe(json);
+  checkStickerHeader(await probeJson(runTool, buildStickerHeaderProbeArgs(file), options));
+  return stickerFactsFromProbe(await probeJson(runTool, buildStickerProbeArgs(file), options));
 }
 
 /** The size a picture is made at: its longest side at most `targetPx`, never bigger, even, at least 2. */

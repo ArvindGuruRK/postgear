@@ -29,7 +29,7 @@ import {
   SIGNALS_MIME,
   type SignalProducers,
 } from '@postgear/media-tools';
-import type { PrivateStorage } from '@postgear/storage';
+import { type PrivateStorage, StorageNotFoundError } from '@postgear/storage';
 import {
   createClipDocument,
   findHighlights,
@@ -100,16 +100,18 @@ function throwIfCancelled(signal: AbortSignal): void {
   if (signal.aborted) throw new ClipStepError('cancelled', { retryable: false });
 }
 
-/** The newest stored SIGNALS file of the video, or none (a file that does not read is ignored). */
+/**
+ * The newest stored SIGNALS file of the video, or none. Only a file that is
+ * really gone from storage, or one that does not read, counts as none (its
+ * tracks are measured again). Any other storage failure fails the step, to
+ * be tried again: going on without the file would write a new one without
+ * the stored tracks no producer can measure again (the heat map).
+ */
 async function storedSignals(run: HighlightsRun, assets: AssetRow[]): Promise<SignalsFile | null> {
   const asset = assets.filter((row) => row.kind === 'SIGNALS').at(-1);
   if (!asset) return null;
   const file = path.join(run.dir, 'signals-stored.json.gz');
-  try {
-    await run.privateStorage.getToFile(asset.key, file, run.signal);
-    return await gunzipSignalsFile(await readFile(file));
-  } catch (error) {
-    throwIfCancelled(run.signal);
+  const skip = (error: unknown) => {
     console.warn(
       JSON.stringify({
         event: 'clips.highlights.signals_unreadable',
@@ -118,6 +120,20 @@ async function storedSignals(run: HighlightsRun, assets: AssetRow[]): Promise<Si
       }),
     );
     return null;
+  };
+  try {
+    await run.privateStorage.getToFile(asset.key, file, run.signal);
+  } catch (error) {
+    throwIfCancelled(run.signal);
+    if (error instanceof StorageNotFoundError) return skip(error);
+    // A storage hiccup: `tool_failed`, retryable (`classifyClipError`).
+    throw error;
+  }
+  try {
+    return await gunzipSignalsFile(await readFile(file));
+  } catch (error) {
+    // The same bytes read the same way next time: measuring again is the only way on.
+    return skip(error);
   }
 }
 

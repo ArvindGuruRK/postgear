@@ -57,7 +57,7 @@ import type {
   StickerKind,
   StickerUploadView,
 } from '@postgear/video-engine';
-import { api, BROWSER_API_URL, uploadFile } from './api';
+import { api, uploadFile } from './api';
 
 const jobPath = (jobId: string) => `/clips/jobs/${encodeURIComponent(jobId)}`;
 const downloadPath = (jobId: string) => `/clips/downloads/${encodeURIComponent(jobId)}`;
@@ -758,12 +758,15 @@ export async function listDownloads(
 }
 
 /**
- * Save File's address: a plain link to the file route, which redirects to a
- * five minute signed address named after the video. A link (not a fetch) so
- * the browser saves a large file itself instead of holding it in memory.
+ * Save File: asks for the five minute signed address named after the video,
+ * then sends the browser there, so it saves a large file itself instead of
+ * holding it in memory. Asked as JSON first, so a refusal (409 not ready yet,
+ * 410 expired, 404 gone) throws an `ApiError` with its sentence instead of
+ * showing the API's JSON as a page.
  */
-export function downloadFileHref(jobId: string): string {
-  return `${BROWSER_API_URL}${downloadPath(jobId)}/file`;
+export async function saveDownloadFile(jobId: string): Promise<void> {
+  const { url } = await api<{ url: string }>(`${downloadPath(jobId)}/file`);
+  window.location.assign(url);
 }
 
 /** Save To Media: 422 `media_too_big` with the sizes in its sentence over Media's video limit. */

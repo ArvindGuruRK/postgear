@@ -8,7 +8,10 @@
  * grant anything. To keep even that short-lived, the store refetches after
  * 15 seconds of age (the route's own cache time) and right after any 402 a
  * Clips request is refused with, so the lock the person sees next matches
- * the refusal they just got.
+ * the refusal they just got. A screen that stays open (the clip editor can
+ * stay open for an hour) checks that age every five seconds while its tab is
+ * in view, and again when the tab comes back, so a plan bought meanwhile
+ * unlocks its tiles without a reload (Module 20 e2e finding).
  *
  * `useSyncExternalStore` rather than a context: every Clips screen reads the
  * same answer, and a refusal anywhere has to reach all of them.
@@ -48,6 +51,9 @@ interface StoreState {
 
 /** The route answers with `Cache-Control: max-age=15`; older than that is refetched. */
 const MAX_AGE_MS = 15_000;
+
+/** How often an open screen looks at the answer's age (it asks again only past `MAX_AGE_MS`). */
+const AGE_CHECK_MS = 5_000;
 
 let state: StoreState = { orgId: null, status: 'idle', snapshot: null, fetchedAt: 0 };
 let inFlight: { orgId: string; promise: Promise<void> } | null = null;
@@ -133,6 +139,21 @@ export function useEntitlements(orgId: string): {
 
   useEffect(() => {
     void loadEntitlements(orgId);
+    // Concurrent checks from several screens share one request (`inFlight`),
+    // and a fresh answer is never asked again, so this costs one request per
+    // 15 seconds per tab at most, and nothing while the tab is hidden.
+    const check = () => {
+      if (window.document.visibilityState === 'hidden') return;
+      void loadEntitlements(orgId);
+    };
+    const timer = window.setInterval(check, AGE_CHECK_MS);
+    window.addEventListener('focus', check);
+    window.document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', check);
+      window.document.removeEventListener('visibilitychange', check);
+    };
   }, [orgId]);
 
   const refresh = useCallback(() => loadEntitlements(orgId, { force: true }), [orgId]);

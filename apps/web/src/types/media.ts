@@ -17,10 +17,17 @@ export interface MediaItem {
   width: number | null;
   height: number | null;
   url: string;
-  /** Null for video, which has no generated poster yet. */
+  /**
+   * An image's thumbnail, or a video's poster (Sprint 12, Module 19): null
+   * until the media worker has made it, or when the file could not be read.
+   */
   thumbnailUrl: string | null;
   createdAt: string;
-  /** Sprint 12: a video's length, so the composer holds it to each platform's length rules; null when unknown. */
+  /**
+   * Sprint 12: a video's length, so the composer holds it to each platform's
+   * length rules and the library shows it ("0:42"); null when unknown. Older
+   * uploads gain it over the maintenance passes (Module 19).
+   */
   durationMs?: number | null;
 }
 

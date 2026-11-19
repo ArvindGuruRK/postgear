@@ -2,6 +2,7 @@
  * `MediaService.search`: the database narrows by one word, the service checks
  * every word on the name, and a result carries URLs, never storage keys.
  */
+import type { SchedulingService } from '../scheduling/scheduling.service';
 import type { MediaRecord, MediaRepository } from './media.repository';
 import { MediaService } from './media.service';
 import type { StorageBackend } from './storage/storage.interface';
@@ -34,7 +35,9 @@ describe('MediaService.search', () => {
       read: jest.fn(),
       publicUrl: (key: string) => `http://localhost:3001/uploads/${key}`,
     };
-    service = new MediaService(repository as unknown as MediaRepository, storage);
+    service = new MediaService(repository as unknown as MediaRepository, storage, {
+      startMediaVideoFacts: jest.fn().mockResolvedValue(true),
+    } as unknown as SchedulingService);
   });
 
   it('asks the repository for the workspace, by the longest term, newest first page', async () => {

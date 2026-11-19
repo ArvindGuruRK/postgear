@@ -10,6 +10,7 @@
  * or a reload lands on the same tab; Create is the default and is left out
  * of the address.
  */
+import type { ClipVideoSort } from '@/types/clips';
 
 export const CLIPS_TABS = ['create', 'streams', 'videos', 'clips', 'downloads'] as const;
 export type ClipsTab = (typeof CLIPS_TABS)[number];
@@ -29,6 +30,11 @@ export function clipsTabFrom(value: string | string[] | undefined | null): Clips
   return typeof value === 'string' && (CLIPS_TABS as readonly string[]).includes(value)
     ? (value as ClipsTab)
     : DEFAULT_CLIPS_TAB;
+}
+
+/** Module 19: the Videos tab's order from `?sort=` (See What Uses Space links to `size`). */
+export function videoSortFrom(value: string | string[] | undefined | null): ClipVideoSort {
+  return value === 'size' || value === 'oldest' ? value : 'newest';
 }
 
 /** The one sentence every Clips route shows below 1366 px (UX blueprint section 12). */

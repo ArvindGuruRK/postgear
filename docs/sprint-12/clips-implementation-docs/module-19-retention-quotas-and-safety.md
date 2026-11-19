@@ -1,6 +1,6 @@
 # Module 19: Retention, Quotas, Safety And The Operator Screens
 
-> **Sprint 12, Clips** | Status: Not started | Size: XL (two sessions: **Part A** retention, quotas, abuse, rights and Media posters; **Part B** the operator screens and the library screen)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19) | Size: XL (two sessions: **Part A** retention, quotas, abuse, rights and Media posters; **Part B** the operator screens and the library screen)
 > **Depends on**: [Module 04](module-04-import-pipeline.md), [Module 12](module-12-stickers-and-gifs.md) and [Module 14](module-14-sound.md) (the catalogue the Library screen manages), [Module 15](module-15-export.md); Module 01's entitlement foundation
 > **Stories**: CL-13.1, CL-13.2, CL-13.3 (the checks), CL-13.4 (the checks), CL-13.5; CL-13.6 (The Operator Edits Plans And Limits), CL-13.7 (The Operator Looks After The Sound And Sticker Library)
 > **Next**: [Module 20](module-20-hardening-e2e-worker-image-closeout.md)
@@ -189,24 +189,24 @@ The fifth tab of the operator page, **Library**, is where an operator looks afte
 
 Part A:
 
-- [ ] The `PlatformAdminGuard` skeleton and `AdminModule` (so section 5's route is protected).
-- [ ] `touchVideo`, `expiryNoticeAt`, `removeVideo` used by every delete path; retention read through the resolver.
-- [ ] `sweepClips` with all its parts including the charge backstop; scratch cleanup on boot.
-- [ ] The limits audit and its tests; the downgrade rule, the `clips.storage_over_limit` notification and `Alert`; `usage.byKind`; sort by size; See What Uses Space.
-- [ ] Abuse limits and the busy refusal; timeouts' sentence.
-- [ ] `ClipBlockedVideo`, the refusal, the operator route, `clips:remove`, the copyright page and its link.
-- [ ] `mediaVideoFactsWorkflow`, the backfill, Media tiles with poster and length.
-- [ ] The tenancy and signed-address tests.
+- [x] The `PlatformAdminGuard` skeleton and `AdminModule` (so section 5's route is protected).
+- [x] `touchVideo`, `expiryNoticeAt`, `removeVideo` used by every delete path; retention read through the resolver.
+- [x] `sweepClips` with all its parts including the charge backstop; scratch cleanup on boot.
+- [x] The limits audit and its tests; the downgrade rule, the `clips.storage_over_limit` notification and `Alert`; `usage.byKind`; sort by size; See What Uses Space.
+- [x] Abuse limits and the busy refusal; timeouts' sentence.
+- [x] `ClipBlockedVideo`, the refusal, the operator route, `clips:remove`, the copyright page and its link.
+- [x] `mediaVideoFactsWorkflow`, the backfill, Media tiles with poster and length.
+- [x] The tenancy and signed-address tests.
 
 Part B:
 
-- [ ] `operator:grant` and `operator:revoke`; the production allowlist; the **Operator** item in the account menu; the `(operator)` layout (immersive, desktop only) and the 404 for others.
-- [ ] The operator routes for plans, overrides, usage and the Change Log, with transactions, the 409 check, the Redis stamps and the owner mail.
-- [ ] The Plans, Workspace Overrides, Usage and Change Log tabs with the exact copy above.
-- [ ] The daily upkeep step (expiry rows, the 7 day list, the reconcile report) and the `securityLogger` events.
-- [ ] The Library tab: runs, items, takedown view, deny list, gaps, the credits page and its warning; the library routes and the allow-list guard at publish.
-- [ ] Title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `operator:grant` and `operator:revoke`; the production allowlist; the **Operator** item in the account menu; the `(operator)` layout (immersive, desktop only) and the 404 for others.
+- [x] The operator routes for plans, overrides, usage and the Change Log, with transactions, the 409 check, the Redis stamps and the owner mail.
+- [x] The Plans, Workspace Overrides, Usage and Change Log tabs with the exact copy above.
+- [x] The daily upkeep step (expiry rows, the 7 day list, the reconcile report) and the `securityLogger` events. (The 7 day list is worked out when the Plans tab is read, not stored by the sweep.)
+- [x] The Library tab: runs, items, takedown view, deny list, gaps, the credits page and its warning; the library routes and the allow-list guard at publish.
+- [x] Title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log. (`npm run validate` green on 2026-11-19, 71 of 71 tasks.)
 
 ## Tests
 

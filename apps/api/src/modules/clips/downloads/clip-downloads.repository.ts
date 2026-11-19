@@ -26,6 +26,7 @@ import {
 } from '@postgear/video-engine';
 import { type ClipsTx, serializable } from '../clips.tx';
 import { OPEN_JOB_STATUSES } from '../jobs/clip-jobs.repository';
+import { saveMediaOf } from './clip-downloads.view';
 
 /** More than any plan's day of downloads, so the two days the tab shows always fit. */
 const LIST_LIMIT = 200;
@@ -85,11 +86,13 @@ export class ClipDownloadsRepository {
   }
 
   /**
-   * Marks Save To Media as started on a finished download, unless it is
-   * already saving or saved (answered as `already`, so a second click is
-   * harmless). Serializable: two clicks at once start one copy.
+   * Marks Save To Media as started on a finished download (with the time it
+   * started), unless it is already saving or saved (answered as `already`,
+   * so a second click is harmless). A `saving` past its time limit counts as
+   * failed (`saveMediaOf`), so a save whose workflow ended without a word can
+   * be asked again. Serializable: two clicks at once start one copy.
    */
-  startSaving(orgId: string, jobId: string): Promise<StartSavingOutcome> {
+  startSaving(orgId: string, jobId: string, now: Date = new Date()): Promise<StartSavingOutcome> {
     return serializable(async (tx) => {
       const job = await tx.clipJob.findFirst({
         where: { id: jobId, organizationId: orgId, kind: ClipJobKind.DOWNLOAD },
@@ -97,10 +100,14 @@ export class ClipDownloadsRepository {
       if (!job || job.status !== ClipJobStatus.DONE) return { outcome: 'not_ready' as const };
       const output = downloadOutputSchema.safeParse(job.output);
       if (!output.success) return { outcome: 'not_ready' as const };
-      const media = output.data.media;
+      const media = saveMediaOf(output.data.media, job, now);
       if (media && media.status !== 'failed') return { outcome: 'already' as const, job };
 
-      const saving: DownloadMedia = { status: 'saving', mediaId: null };
+      const saving: DownloadMedia = {
+        status: 'saving',
+        mediaId: null,
+        startedAt: now.toISOString(),
+      };
       const updated = await tx.clipJob.update({
         where: { id: job.id },
         data: { output: { ...output.data, media: saving } as Prisma.InputJsonValue },

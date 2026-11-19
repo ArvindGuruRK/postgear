@@ -42,6 +42,8 @@ export interface ClipAutosaveHandle {
   refusal: ClipSaveRefusal | null;
   /** Saves now; true once the server has everything on screen. */
   flush: () => Promise<boolean>;
+  /** Saves now; the saved revision once the server has everything on screen, else null. */
+  flushRevision: () => Promise<number | null>;
   retry: () => void;
   /** A new starting point after a conflict (Reload). */
   replace: (saved: ClipSavedVersion, screen: ClipScreenVersion) => void;
@@ -130,6 +132,10 @@ export function useClipAutosave({
   }, [document, title]);
 
   const flush = useCallback(() => controller.current?.flush() ?? Promise.resolve(false), []);
+  const flushRevision = useCallback(
+    () => controller.current?.flushRevision() ?? Promise.resolve(null),
+    [],
+  );
   const retry = useCallback(() => controller.current?.retry(), []);
   const replace = useCallback(
     (next: ClipSavedVersion, screen: ClipScreenVersion) =>
@@ -141,5 +147,5 @@ export function useClipAutosave({
   }, []);
   const isUnsaved = useCallback(() => controller.current?.unsaved ?? false, []);
 
-  return { status, refusal, flush, retry, replace, letGo, isUnsaved };
+  return { status, refusal, flush, flushRevision, retry, replace, letGo, isUnsaved };
 }

@@ -224,7 +224,9 @@ export function TimelineDock(props: TimelineDockProps) {
         grows="up"
         onChange={resize}
         valueText={`${shownHeight} pixels`}
-        className="-mt-1 mb-0"
+        // The strip is 8 px; its pointer area reaches 16 px up into the stage's
+        // empty padding so it is 24 px tall (WCAG 2.5.8), never over the tools row.
+        className="-mt-1 mb-0 before:absolute before:inset-x-0 before:-top-4 before:bottom-0"
       />
       <ToolsRow
         playback={props.playback}

@@ -26,7 +26,8 @@
 import {
   CLIP_FAILURE_TYPES,
   CLIP_HEARTBEAT_MS,
-  CLIP_SAVE_DOWNLOAD_TIMEOUT_MS,
+  CLIP_SAVE_DOWNLOAD_ATTEMPT_MS,
+  CLIP_SAVE_DOWNLOAD_WORK_MS,
   type ClipJobWorkflowInput,
 } from '@postgear/scheduling';
 import { log, proxyActivities, sleep } from '@temporalio/workflow';
@@ -59,9 +60,16 @@ export async function clipDownloadWorkflow(input: ClipJobWorkflowInput): Promise
   return runClipJob(input, 'DOWNLOAD', () => workActivities('DOWNLOAD').clipDownload(input));
 }
 
-/** Save To Media's copy: most of the workflow's time, two tries a minute apart. */
+/**
+ * Save To Media's copy: two tries a minute apart, both inside
+ * `CLIP_SAVE_DOWNLOAD_WORK_MS`, so the workflow (limited to
+ * `CLIP_SAVE_DOWNLOAD_TIMEOUT_MS`) is always still there to run the failure
+ * bookkeeping. One try that used most of the workflow's time left the second
+ * to be cut off by the execution limit, and the row said "Saving" for ever.
+ */
 const saveWork = proxyActivities<ClipActivities>({
-  startToCloseTimeout: CLIP_SAVE_DOWNLOAD_TIMEOUT_MS - 5 * 60_000,
+  startToCloseTimeout: CLIP_SAVE_DOWNLOAD_ATTEMPT_MS,
+  scheduleToCloseTimeout: CLIP_SAVE_DOWNLOAD_WORK_MS,
   heartbeatTimeout: 2 * CLIP_HEARTBEAT_MS,
   retry: {
     initialInterval: '1 minute',

@@ -15,6 +15,7 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { ClipJobsRepository } from './jobs/clip-jobs.repository';
 import { ClipJobsService } from './jobs/clip-jobs.service';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
+import { ClipRetentionService } from './retention/clip-retention.service';
 import { ClipPlaybackService } from './videos/clip-playback.service';
 import { ClipVideosRepository } from './videos/clip-videos.repository';
 
@@ -26,6 +27,8 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     ClipLimitsGuard,
     ClipPlaybackService,
     ClipVideosRepository,
+    // Module 19: touchVideo and removeVideo, shared by videos, clips, the sweep and the operator.
+    ClipRetentionService,
   ],
   exports: [
     EntitlementsModule,
@@ -36,6 +39,7 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     ClipLimitsGuard,
     ClipPlaybackService,
     ClipVideosRepository,
+    ClipRetentionService,
   ],
 })
 export class ClipsCoreModule {}

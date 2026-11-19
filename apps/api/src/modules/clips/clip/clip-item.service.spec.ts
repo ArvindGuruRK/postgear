@@ -9,9 +9,11 @@ import type { ConfigService } from '@nestjs/config';
 import type { ClipJob, ClipVideo } from '@postgear/db';
 import { createClipDocument, HANDLE_MS } from '@postgear/video-engine';
 import { RedisService } from '../../redis/redis.service';
+import { ClipErrorException } from '../clip-error.exception';
 import type { ClipJobsRepository, NewClipJob } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import type { ClipRetentionService } from '../retention/clip-retention.service';
 import {
   assetRow,
   clipRow,
@@ -24,7 +26,7 @@ import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import type { ClipPlaybackService } from '../videos/clip-playback.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { createClipSchema } from './clip-item.schema';
-import { ClipItemService } from './clip-item.service';
+import { ClipItemService, estimateSegmentBytes } from './clip-item.service';
 
 let mockDb: FakeClipDb;
 jest.mock('@postgear/db', () => {
@@ -120,6 +122,7 @@ function setup(tables = seed()) {
   };
   const limits = {
     assertEnabled: jest.fn(async () => undefined),
+    assertStorage: jest.fn(async (_org: string, _bytes: number) => undefined),
     bestExportHeight: jest.fn(async () => 1080),
   };
   const playback = {
@@ -129,6 +132,7 @@ function setup(tables = seed()) {
     })),
   };
   const redis = new RedisService({ get: () => undefined } as unknown as ConfigService);
+  const retention = { touchVideo: jest.fn(async () => false) };
   const service = new ClipItemService(
     jobs as unknown as ClipJobsService,
     jobsRepository as unknown as ClipJobsRepository,
@@ -136,8 +140,9 @@ function setup(tables = seed()) {
     limits as unknown as ClipLimitsGuard,
     playback as unknown as ClipPlaybackService,
     redis,
+    retention as unknown as ClipRetentionService,
   );
-  return { service, tables, jobs, jobsRepository };
+  return { service, tables, jobs, jobsRepository, retention, limits };
 }
 
 async function refusal(promise: Promise<unknown>) {
@@ -418,6 +423,28 @@ describe('ClipItemService.moreVideo', () => {
       toMs: 120_000 + HANDLE_MS,
     });
     expect(jobs.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks the space with the widened range before taking the throttle (Module 19)', async () => {
+    const { service, limits, jobs } = setup();
+    limits.assertStorage.mockRejectedValueOnce(
+      new ClipErrorException(402, 'clips_storage_full', { message: 'over' }),
+    );
+    expect(await refusal(service.moreVideo(TEST_ORG, TEST_USER, CLIP, RANGE))).toMatchObject({
+      status: 402,
+      body: { code: 'clips_storage_full' },
+    });
+    expect(limits.assertStorage).toHaveBeenCalledWith(TEST_ORG, estimateSegmentBytes(RANGE));
+    expect(jobs.start).not.toHaveBeenCalled();
+    // The refusal took no throttle key: the next try (after a delete) goes through at once.
+    expect((await service.moreVideo(TEST_ORG, TEST_USER, CLIP, RANGE)).sharp).toBe('fetching');
+  });
+
+  it('estimates a sharp range at 5 Mbps over the range and both handles', () => {
+    expect(estimateSegmentBytes({ fromMs: 0, toMs: 60_000 })).toBe(
+      Math.ceil(((60 + (2 * HANDLE_MS) / 1000) * 5_000_000) / 8),
+    );
+    expect(estimateSegmentBytes({ fromMs: 10, toMs: 0 })).toBeGreaterThanOrEqual(0);
   });
 
   it('answers gone when the platform copy is no longer online', async () => {

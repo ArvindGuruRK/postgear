@@ -80,6 +80,8 @@ export interface WorkspaceUser {
   email: string;
   /** UI revamp (2026-10-17): drawn by the account menu; null = initials. */
   avatar: SessionAvatar;
+  /** Sprint 12 Module 19: shows Operator in the account menu. */
+  isSuperAdmin?: boolean;
 }
 
 interface WorkspaceProviderProps {

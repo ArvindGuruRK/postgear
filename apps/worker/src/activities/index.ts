@@ -11,6 +11,7 @@ import type { ActivityDeps } from './deps';
 import { createDiscoverActivities } from './discover.activities';
 import { createIntegrationActivities } from './integration.activities';
 import { createMaintenanceActivities } from './maintenance.activities';
+import { createMediaFactsBackfillActivities } from './media-facts.activities';
 import { createPublishActivities } from './publish.activities';
 import { createRepeatActivities } from './repeat.activities';
 import { createWebhookActivities } from './webhook.activities';
@@ -31,6 +32,7 @@ export type { ActivityDeps } from './deps';
 export type { DiscoverMaintenanceReport } from './discover.activities';
 export type { IntegrationSchedule } from './integration.activities';
 export type { ReconcileReport } from './maintenance.activities';
+export type { MediaFactsBackfillReport } from './media-facts.activities';
 export type {
   MarkPublishFailedInput,
   PublishJob,
@@ -52,6 +54,8 @@ export function createActivities(deps: ActivityDeps) {
     ...createAutomationActivities(deps),
     // Sprint 11 Module 10: Discover's pre-warm, competitor refresh and digest.
     ...createDiscoverActivities(deps),
+    // Sprint 12 Module 19: starts posters and lengths for older Media videos.
+    ...createMediaFactsBackfillActivities(deps),
   };
 }
 

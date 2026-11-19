@@ -41,7 +41,8 @@ export const listVideosQuerySchema = z
       .max(200)
       .regex(/^[A-Za-z0-9_-]+$/)
       .optional(),
-    sort: z.enum(['newest', 'oldest']).default('newest'),
+    // Module 19: `size` lists the biggest first (See What Uses Space).
+    sort: z.enum(['newest', 'oldest', 'size']).default('newest'),
   })
   .strict();
 export type ListVideosQuery = z.infer<typeof listVideosQuerySchema>;

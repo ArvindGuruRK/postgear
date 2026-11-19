@@ -1,14 +1,14 @@
-import { testDocument, testSegment } from '../render/test-docs';
 import { frameState } from '../render/frame-state';
+import { testDocument, testSegment } from '../render/test-docs';
 import { findItem } from '../time/items';
 import { outputDuration } from '../time/time-map';
+import { MAX_SOUNDS } from './limits';
 import type { AudioItem, ClipDocument } from './schema';
 import { clipDocumentSchema } from './schema';
 import {
   addSound,
   countSounds,
   defaultSoundItem,
-  MAX_SOUNDS,
   removeSound,
   SOUND_FADE_MS,
   setSegmentVolume,

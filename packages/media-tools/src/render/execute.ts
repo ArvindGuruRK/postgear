@@ -10,7 +10,12 @@
  */
 import { rename, rm, stat, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
-import { type CompiledFfmpeg, GRAPH_FILE, ffmpegArgsFor } from '@postgear/video-engine';
+import {
+  type CompiledFfmpeg,
+  GRAPH_FILE,
+  ffmpegArgsFor,
+  isSafeRelativeName,
+} from '@postgear/video-engine';
 import { FfmpegProgressParser } from '../ffmpeg/progress';
 import type { RunTool } from '../run/types';
 import { ToolError } from '../run/types';
@@ -164,6 +169,10 @@ export async function renderClip(input: RenderClipInput): Promise<RenderClipResu
   let fellBack: string | null = null;
   const onAbort = () => stopper.abort();
   input.signal?.addEventListener('abort', onAbort, { once: true });
+  // A stop that came while the files were written fired before the listener
+  // was there, and a signal fires only once: pass it on now, or FFmpeg would
+  // run the whole render for a job that was cancelled.
+  if (input.signal?.aborted) stopper.abort();
 
   await rm(partPath, { force: true });
   try {
@@ -243,9 +252,18 @@ export async function writeRenderFiles(scratchDir: string, compiled: CompiledFfm
   }
 }
 
-/** Every input the plan names must be a file inside the scratch folder, or the render would guess. */
+/**
+ * Every input the plan names must be a file inside the scratch folder, or
+ * the render would guess. The name itself must be the plan's kind of name
+ * (`isSafeRelativeName`: letters, digits, `.`, `_`, `-`, folders by `/`), so
+ * no absolute path, protocol or dash-led name ever reaches `-i`, even if the
+ * plan's own check were bypassed (security sweep, Module 20).
+ */
 export async function assertInputsPresent(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
   for (const input of compiled.inputs) {
+    if (!isSafeRelativeName(input.file)) {
+      throw new RenderError('tool_failed');
+    }
     const resolved = path.resolve(scratchDir, input.file);
     const relative = path.relative(scratchDir, resolved);
     if (relative.length === 0 || relative.startsWith('..') || path.isAbsolute(relative)) {

@@ -52,6 +52,11 @@ import {
   clipJobWorkflowId,
   clipSaveDownloadWorkflowId,
   MEDIA_TASK_QUEUE,
+  MEDIA_VIDEO_FACTS_TASK_QUEUE,
+  MEDIA_VIDEO_FACTS_TIMEOUT_MS,
+  MEDIA_VIDEO_FACTS_WORKFLOW,
+  type MediaVideoFactsInput,
+  mediaVideoFactsWorkflowId,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
   PUBLISH_RETRY_POLICY,
@@ -108,8 +113,13 @@ export interface SchedulerStatus {
  */
 export type RunSignalOutcome = 'signalled' | 'notFound' | 'unavailable';
 
-/** What Temporal knows of one clip job's workflow (Sprint 12, Module 04: the reconcile). */
-export type ClipWorkflowState = 'running' | 'closed' | 'notFound' | 'unavailable';
+/**
+ * What Temporal knows of one clip job's workflow (Sprint 12, Module 04: the
+ * reconcile). `timedOut` (Module 19) is a run Temporal stopped at its time
+ * limit: the workflow never got to write its own failure, so the reconcile
+ * writes `timed_out` for it.
+ */
+export type ClipWorkflowState = 'running' | 'closed' | 'timedOut' | 'notFound' | 'unavailable';
 
 /**
  * What waiting for a short Clips workflow found (Sprint 12): its answer, the
@@ -536,6 +546,30 @@ export class SchedulingService implements OnModuleDestroy {
     });
   }
 
+  /**
+   * Sprint 12, Module 19: a video just uploaded to Media gets its poster and
+   * length on the media worker. One run per row at a time (a second start
+   * while one runs is taken as started). False when Temporal cannot be
+   * reached: the maintenance pass picks the row up within fifteen minutes.
+   */
+  async startMediaVideoFacts(mediaId: string, organizationId: string): Promise<boolean> {
+    return this.attempt('media video facts', async (client) => {
+      try {
+        await client.workflow.start(MEDIA_VIDEO_FACTS_WORKFLOW, {
+          workflowId: mediaVideoFactsWorkflowId(mediaId),
+          taskQueue: MEDIA_VIDEO_FACTS_TASK_QUEUE,
+          args: [{ mediaId, organizationId } satisfies MediaVideoFactsInput],
+          workflowExecutionTimeout: MEDIA_VIDEO_FACTS_TIMEOUT_MS,
+          workflowIdReusePolicy: WorkflowIdReusePolicy.ALLOW_DUPLICATE,
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+          throw error;
+        }
+      }
+    });
+  }
+
   /** Sprint 12: asks a clip job's workflow to stop; the workflow writes CANCELLED itself. */
   async cancelClipJob(jobId: string): Promise<RunSignalOutcome> {
     return this.signalAutomationRun(clipJobWorkflowId(jobId), 'clip cancel', CANCEL_SIGNAL, []);
@@ -553,7 +587,8 @@ export class SchedulingService implements OnModuleDestroy {
     const reached = await this.attempt('clip describe', async (client) => {
       try {
         const description = await client.workflow.getHandle(clipJobWorkflowId(jobId)).describe();
-        state = description.status.name === 'RUNNING' ? 'running' : 'closed';
+        const status = description.status.name;
+        state = status === 'RUNNING' ? 'running' : status === 'TIMED_OUT' ? 'timedOut' : 'closed';
       } catch (error) {
         if (!(error instanceof WorkflowNotFoundError)) {
           throw error;

@@ -39,6 +39,20 @@ export interface SignedUrlOptions {
 }
 
 /** One finished part of a multipart upload, as the browser reports it. */
+/** One stored object, as a listing sees it (Module 19's orphan check). */
+export interface PrivateListedObject {
+  key: string;
+  bytes: number;
+  /** When the object was last written. */
+  modifiedAt: Date;
+}
+
+/** One page of a listing, in key order; `next` continues after the last key. */
+export interface PrivateListPage {
+  objects: PrivateListedObject[];
+  next: string | null;
+}
+
 export interface UploadedPart {
   partNumber: number;
   etag: string;
@@ -82,6 +96,12 @@ export interface PrivateStorage {
    * number of objects.
    */
   deletePrefix(prefix: string): Promise<number>;
+  /**
+   * Module 19: one page of the objects under `clips/` (or a whole workspace,
+   * video, job or folder prefix), in key order, starting after `after`.
+   * Read only; the orphan check of the cleanup sweep is its one caller.
+   */
+  list(prefix: string, options: { after?: string | null; limit: number }): Promise<PrivateListPage>;
 
   /** A read address that expires; the only way a browser reaches a file. */
   signedUrl(key: string, opts: SignedUrlOptions): Promise<string>;

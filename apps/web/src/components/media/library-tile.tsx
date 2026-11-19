@@ -19,6 +19,7 @@ import { Film, Play } from 'lucide-react';
 import Link from 'next/link';
 import type { MediaItem } from '@/types/media';
 import { stickerOf, tileLine } from './media-details';
+import { VideoStill } from './video-still';
 
 /**
  * The corner buttons sit on a picture, where a hard shadow and the sink-on-
@@ -66,14 +67,8 @@ export function LibraryTile({
             />
           ) : (
             <>
-              {/* No poster is generated yet: just enough of the file for its first frame. */}
-              <video
-                src={item.url}
-                preload="metadata"
-                muted
-                playsInline
-                className="h-full w-full object-cover"
-              />
+              {/* The poster and length (Module 19), or the first frame until there is a poster. */}
+              <VideoStill item={item} />
               <span
                 aria-hidden="true"
                 className="absolute inset-0 flex items-center justify-center"

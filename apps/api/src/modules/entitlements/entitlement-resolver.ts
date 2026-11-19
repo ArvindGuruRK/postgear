@@ -31,6 +31,7 @@
  */
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { prisma } from '@postgear/db';
 import {
   type EntitlementDef,
   getDef,
@@ -50,12 +51,17 @@ import {
   type Tier,
   type ValueOf,
 } from '@postgear/entitlements';
-import { prisma } from '@postgear/db';
+import { securityLogger } from '../../common/logging/security-logger';
 import type { Env } from '../../config/env';
 import { resolveEntitlement } from '../billing/plans';
 import { RedisService } from '../redis/redis.service';
 import { EntitlementRefusedException } from './entitlement-refused.exception';
-import { orgStampKey, PLANS_STAMP_KEY, touchOrgEntitlements, touchPlanEntitlements } from './entitlement-stamps';
+import {
+  orgStampKey,
+  PLANS_STAMP_KEY,
+  touchOrgEntitlements,
+  touchPlanEntitlements,
+} from './entitlement-stamps';
 import { CLIPS_ALLOWANCE_UNAVAILABLE } from './entitlements.messages';
 import { EntitlementsRepository, type OrgBilling } from './entitlements.repository';
 
@@ -147,7 +153,11 @@ export class EntitlementResolver {
     return this.valueIn(await this.state(orgId, now), key, now, orgId);
   }
 
-  async getMany(orgId: string, keys: readonly Key[], now: Date = new Date()): Promise<Record<Key, unknown>> {
+  async getMany(
+    orgId: string,
+    keys: readonly Key[],
+    now: Date = new Date(),
+  ): Promise<Record<Key, unknown>> {
     const state = await this.state(orgId, now);
     const values = {} as Record<Key, unknown>;
     for (const key of keys) values[key] = this.valueIn(state, key, now, orgId);
@@ -180,7 +190,11 @@ export class EntitlementResolver {
 
   /** A meter's state now, in whole display units. */
   async meter(orgId: string, key: MeterKey, now: Date = new Date()): Promise<MeterState> {
-    const { usedMilli: _used, limitValue: _limit, ...state } = await this.exactMeter(orgId, key, now);
+    const {
+      usedMilli: _used,
+      limitValue: _limit,
+      ...state
+    } = await this.exactMeter(orgId, key, now);
     return state;
   }
 
@@ -191,7 +205,11 @@ export class EntitlementResolver {
   }
 
   /** The window a meter counts in for this workspace (`cycleStart` is the ledger's grouping). */
-  async windowFor(orgId: string, key: MeterKey, now: Date = new Date()): Promise<{ start: Date; end: Date }> {
+  async windowFor(
+    orgId: string,
+    key: MeterKey,
+    now: Date = new Date(),
+  ): Promise<{ start: Date; end: Date }> {
     const state = await this.state(orgId, now);
     return meterWindow(this.meterDef(key).window, state.anchor, now);
   }
@@ -218,12 +236,22 @@ export class EntitlementResolver {
     const meters = {} as Record<MeterKey, MeterState>;
     await Promise.all(
       METER_KEYS.map(async (key) => {
-        const { usedMilli: _used, limitValue: _limit, ...meter } = await this.exactMeterIn(state, key, now, orgId);
+        const {
+          usedMilli: _used,
+          limitValue: _limit,
+          ...meter
+        } = await this.exactMeterIn(state, key, now, orgId);
         meters[key] = meter;
       }),
     );
 
-    return { tier: state.tier, status: state.status, trialEndsAt: state.trialEndsAt, values, meters };
+    return {
+      tier: state.tier,
+      status: state.status,
+      trialEndsAt: state.trialEndsAt,
+      values,
+      meters,
+    };
   }
 
   /** The workspace's tier and cycle anchor (also what the ledger groups by). */
@@ -249,7 +277,12 @@ export class EntitlementResolver {
 
   // ---- Internals ---------------------------------------------------------------
 
-  private valueIn<K extends Key>(state: OrgPlanState, key: K, now: Date, orgId: string): ValueOf<K> {
+  private valueIn<K extends Key>(
+    state: OrgPlanState,
+    key: K,
+    now: Date,
+    orgId: string,
+  ): ValueOf<K> {
     const resolved = resolve(key, {
       override: state.overrides.get(key) ?? null,
       planValue: state.planValues.get(key),
@@ -412,21 +445,35 @@ export class EntitlementResolver {
     return value;
   }
 
-  private noteRejections(scope: string, key: string, rejected: readonly { source: string; code: string }[]): void {
+  private noteRejections(
+    scope: string,
+    key: string,
+    rejected: readonly { source: string; code: string }[],
+  ): void {
     for (const layer of rejected) {
       const id = `${scope}|${key}|${layer.source}|${layer.code}`;
       if (this.loggedRejections.has(id)) continue;
       this.loggedRejections.add(id);
       this.logger.warn(
-        JSON.stringify({ event: 'entitlement.value_ignored', scope, key, layer: layer.source, code: layer.code }),
+        JSON.stringify({
+          event: 'entitlement.value_ignored',
+          scope,
+          key,
+          layer: layer.source,
+          code: layer.code,
+        }),
       );
     }
   }
 
-  private logRefusal(orgId: string, key: string, code: string, limit: number | null, used?: number): void {
-    this.logger.log(
-      JSON.stringify({ event: 'entitlement.refused', orgId, key, code, limit, used: used ?? null }),
-    );
+  private logRefusal(
+    orgId: string,
+    key: string,
+    code: string,
+    limit: number | null,
+    used?: number,
+  ): void {
+    securityLogger.log('entitlement.refused', { orgId, key, code, limit, used: used ?? null });
   }
 
   private logFailure(scope: string, error: unknown): void {

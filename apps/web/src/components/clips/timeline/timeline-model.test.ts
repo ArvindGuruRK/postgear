@@ -2,13 +2,19 @@ import {
   type AudioItem,
   type ClipDocument,
   createClipDocument,
+  MAX_SOUNDS,
+  MAX_STICKERS,
   outputDuration,
   type StickerItem,
   type TextItem,
   type Zoom,
 } from '@postgear/video-engine';
+import { TOO_MANY_SOUNDS } from '../panels/audio-model';
+import { TOO_MANY_STICKERS } from '../panels/elements-model';
 import {
+  addRefusalSentence,
   edgeFrameMs,
+  ITEM_LIMIT_SENTENCE,
   itemLabel,
   LAST_PART_SENTENCE,
   missingRange,
@@ -22,8 +28,9 @@ import {
   SNAP_STORAGE_KEY,
   SPLIT_EDGE_SENTENCE,
   SPLIT_LIMIT_SENTENCE,
-  spokenTime,
   splitAtPlayhead,
+  spokenTime,
+  TRACK_LIMIT_SENTENCE,
   tabForSelection,
   timelineRows,
   trimShiftMs,
@@ -342,6 +349,22 @@ describe('split and remove', () => {
     expect(removeSelection(doc, null)).toBeNull();
     expect(removeSelection(doc, { kind: 'zoom', id: 'nope' })).toBeNull();
     expect(removeSelection(doc, { kind: 'area', id: doc.layout.areas[0]?.id ?? 'a' })).toBeNull();
+  });
+});
+
+describe('addRefusalSentence', () => {
+  it('says each cap in one sentence, and nothing for an item that is simply gone', () => {
+    expect(addRefusalSentence('too_many_items')).toBe(ITEM_LIMIT_SENTENCE);
+    expect(addRefusalSentence('too_many_tracks')).toBe(TRACK_LIMIT_SENTENCE);
+    expect(addRefusalSentence('too_many_sounds')).toBe(TOO_MANY_SOUNDS);
+    expect(addRefusalSentence('too_many_sounds')).toBe(
+      `A clip holds up to ${MAX_SOUNDS} sounds. Remove one to add another.`,
+    );
+    expect(addRefusalSentence('too_many_stickers')).toBe(TOO_MANY_STICKERS);
+    expect(addRefusalSentence('too_many_stickers')).toBe(
+      `A clip holds up to ${MAX_STICKERS} stickers. Remove one to add another.`,
+    );
+    expect(addRefusalSentence('item_not_found')).toBeNull();
   });
 });
 

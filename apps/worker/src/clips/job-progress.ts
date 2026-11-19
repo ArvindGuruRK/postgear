@@ -15,6 +15,7 @@
 
 import { ClipJobStatus, type Prisma, prisma } from '@postgear/db';
 import { type ClipJobKind, type ClipPlatformId, clipErrorMessage } from '@postgear/video-engine';
+import { scrubSecrets } from './log-redaction';
 
 const OPEN = [ClipJobStatus.QUEUED, ClipJobStatus.RUNNING];
 export const REPORT_EVERY_MS = 1_000;
@@ -128,7 +129,8 @@ export function jobProgress(jobId: string, options: JobProgressOptions = {}): Jo
     try {
       await store.report(jobId, update.stage, update.progress);
     } catch (error) {
-      onWriteError(error instanceof Error ? error.message : String(error));
+      // A database error can repeat what it was given: scrubbed like tool output (Module 20).
+      onWriteError(scrubSecrets(error instanceof Error ? error.message : String(error)));
     }
   };
 

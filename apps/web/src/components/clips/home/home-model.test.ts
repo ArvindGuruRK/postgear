@@ -2,10 +2,13 @@ import { FIXTURE_CARDS, fixtureStatus } from '../clips-fixtures';
 import {
   AI_MINUTES_HELP,
   aiMinutesChipView,
+  CLIPS_NOT_IN_PLAN_SENTENCE,
+  clipsInPlan,
   deleteVideoSentence,
   etaLabel,
   formatSize,
   keptUntilLine,
+  keptUntilView,
   linkPlaceholder,
   platformList,
   preflightClipUpload,
@@ -13,7 +16,9 @@ import {
   refusalExtras,
   STORAGE_HELP,
   stageLabel,
+  storageBreakdown,
   storageMeterView,
+  storageOverSentence,
   UPLOAD_NOT_VIDEO,
   uploadHelpLine,
   uploadTypeOf,
@@ -301,5 +306,66 @@ describe('the link box words', () => {
     expect(platformList([])).toBe('');
     expect(linkPlaceholder(['twitch', 'kick'])).toBe('Enter your Twitch or Kick link');
     expect(linkPlaceholder([])).toBe('Enter your video link');
+  });
+});
+
+describe('Module 19: keeping, size and the plan', () => {
+  const NOW = Date.parse('2026-11-19T12:00:00.000Z');
+  const DAY = 86_400_000;
+
+  it('says "Kept until" while far, and "Removed in N days" in the last three days', () => {
+    expect(keptUntilView(new Date(NOW + 10 * DAY).toISOString(), NOW)).toEqual({
+      text: 'Kept until 29 Nov',
+      soon: false,
+    });
+    expect(keptUntilView(new Date(NOW + 2 * DAY).toISOString(), NOW)).toEqual({
+      text: 'Removed in 2 days',
+      soon: true,
+    });
+    expect(keptUntilView(new Date(NOW + 3 * DAY).toISOString(), NOW)).toEqual({
+      text: 'Removed in 3 days',
+      soon: true,
+    });
+    expect(keptUntilView(new Date(NOW + 0.5 * DAY).toISOString(), NOW)?.text).toBe('Removed in 1 day');
+    expect(keptUntilView(new Date(NOW - DAY).toISOString(), NOW)?.text).toBe('Removed today');
+    expect(keptUntilView(null, NOW)).toBeNull();
+    expect(keptUntilView('not a date', NOW)).toBeNull();
+  });
+
+  it('adds the stored size to the meta line only when asked', () => {
+    const card = {
+      video: { platform: 'twitch', durationMs: 600_000 },
+      job: null,
+      clipCount: 2,
+      storedBytes: 1_400_000_000,
+    } as never;
+    expect(videoMetaLine(card)).toBe('Twitch, 10 min, 2 clips');
+    expect(videoMetaLine(card, { withSize: true })).toBe('Twitch, 10 min, 2 clips, 1.4 GB');
+  });
+
+  it('breaks the space down by kind', () => {
+    const status = {
+      ...storageAt(0, 3_000_000_000),
+      usage: { storageBytes: 0, byKind: { videos: 3_200_000_000, downloads: 120_000_000, library: 4_000_000 } },
+    };
+    expect(storageBreakdown(status).map((row) => `${row.label}: ${row.text}`)).toEqual([
+      'Videos: 3.2 GB',
+      'Downloads: 120 MB',
+      'Your stickers and sounds: 4 MB',
+    ]);
+  });
+
+  it('writes the over-the-plan sentence the API refuses with, only when over', () => {
+    const over = { ...storageAt(4_200_000_000, 3_000_000_000), overLimit: true };
+    expect(storageOverSentence(over)).toBe(
+      "Your videos use 4.2 GB, over your plan's 3 GB. Delete some, or upgrade, to bring in more.",
+    );
+    expect(storageOverSentence({ ...over, overLimit: false })).toBeNull();
+  });
+
+  it('reads whether the plan has Clips', () => {
+    expect(clipsInPlan(null)).toBe(true);
+    expect(clipsInPlan({ limits: { 'clips.enabled': false } } as never)).toBe(false);
+    expect(CLIPS_NOT_IN_PLAN_SENTENCE).toBe("Clips is not part of this workspace's plan.");
   });
 });

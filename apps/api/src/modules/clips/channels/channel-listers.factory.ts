@@ -22,6 +22,7 @@ import type { SchedulingService } from '../../scheduling/scheduling.service';
 import type { ClipPlatformBreaker } from '../links/platform-breaker';
 import type { ListerSet, ListerSets } from './channel-lister.selector';
 import { createListerHttp, type ListerHttp } from './listers/lister-http';
+import { withSimulationSwitches } from './listers/simulation-switches.lister';
 import { TwitchHelixLister } from './listers/twitch-helix.lister';
 import { WorkerFlatLister } from './listers/worker-flat.lister';
 import { YouTubeDataLister } from './listers/youtube-data.lister';
@@ -42,8 +43,9 @@ export function createListerSets(deps: ListerFactoryDeps): ListerSets {
 
   if (config.get('CLIPS_SIMULATION', { infer: true }) === 'true') {
     logger.log(JSON.stringify({ event: 'clips.channels.bindings', mode: 'simulation' }));
+    // Module 20: the forcing channels (`simempty`, `simquota`, `simflaky`) sit in front.
     const simulated = (platform: ClipPlatformId): ListerSet => ({
-      official: createSimulatedChannelLister(platform),
+      official: withSimulationSwitches(createSimulatedChannelLister(platform)),
       flat: null,
     });
     return Object.freeze({

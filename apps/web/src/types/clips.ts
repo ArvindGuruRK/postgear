@@ -261,6 +261,16 @@ export interface ClipsMeterView {
   cycleEnd: string;
 }
 
+/** Module 19: what the video space holds, in bytes. */
+export interface ClipsSpaceByKind {
+  /** Imported and uploaded videos with their working files. */
+  videos: number;
+  /** Prepared downloads, kept 24 hours. */
+  downloads: number;
+  /** The workspace's own stickers and sounds. */
+  library: number;
+}
+
 /**
  * `GET /clips/status`. Presentation only: the API re-checks every limit on
  * every request, so these values can draw a lock, never grant anything.
@@ -273,7 +283,13 @@ export interface ClipsStatus {
   /** Values as resolved: read them through `lib/entitlements.ts` helpers, never assume a type. */
   limits: Record<ClipsStatusLimitKey, unknown>;
   meters: { importMinutes: ClipsMeterView; aiMinutes: ClipsMeterView };
-  usage: { storageBytes: number };
+  /** Module 19 adds what the space holds, by kind (they add up to `storageBytes`). */
+  usage: { storageBytes: number; byKind?: ClipsSpaceByKind };
+  /**
+   * Module 19: the videos use more than the plan allows (after a downgrade):
+   * new imports, uploads and wider ranges are refused until some are deleted.
+   */
+  overLimit?: boolean;
   /** Module 06: whether Try A Sample has a video to bring in (absent on an older API: read as false). */
   sample?: { available: boolean };
 }
@@ -294,6 +310,8 @@ export interface ClipVideoCard {
   job: ClipJobView | null;
   /** Live clips cut from it (absent on an older API). */
   clipCount?: number;
+  /** Module 19: bytes the video keeps (every file but Preview Exports). */
+  storedBytes?: number;
 }
 
 export interface ClipVideoPage {
@@ -302,7 +320,8 @@ export interface ClipVideoPage {
   total: number;
 }
 
-export type ClipVideoSort = 'newest' | 'oldest';
+/** Module 19 adds `size`: the biggest first (See What Uses Space). */
+export type ClipVideoSort = 'newest' | 'oldest' | 'size';
 
 /** A clip's state on a list: worked out by the API from status, export and posts. */
 export type ClipState = 'new' | 'draft' | 'exported' | 'scheduled' | 'hidden';

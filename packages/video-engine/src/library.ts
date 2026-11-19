@@ -298,3 +298,99 @@ export type SoundFileView =
       peaks: number[];
     }
   | { key: string; missing: true; removed: boolean };
+
+// --- Module 19: the publish rules, shared by the ingest and the operator --------
+
+/**
+ * The licences a sticker may carry (research 10 section 5): SPDX ids, plus
+ * `OWN` for PostGear's own art. CC BY, MIT and Apache need a line on the
+ * credits page, which a sticker can carry because it is visible.
+ */
+export const LIBRARY_STICKER_LICENCES = [
+  'OWN',
+  'CC0-1.0',
+  'PDM-1.0',
+  'CC-BY-4.0',
+  'MIT',
+  'Apache-2.0',
+] as const;
+export type LibraryStickerLicence = (typeof LIBRARY_STICKER_LICENCES)[number];
+
+/**
+ * The licences a sound may carry: our own, CC0 and the Public Domain Mark.
+ * Never CC BY: a credit cannot ride along inside a sound in a finished video.
+ */
+export const LIBRARY_SOUND_LICENCES = ['OWN', 'CC0-1.0', 'PDM-1.0'] as const;
+export type LibrarySoundLicence = (typeof LIBRARY_SOUND_LICENCES)[number];
+
+/** The sticker adapters the ingest has (`--source`); an item from anywhere else is never published. */
+export const LIBRARY_STICKER_ORIGINS = ['own', 'kenney', 'openpeeps', 'noto'] as const;
+
+/** The five sound adapters the ingest has (`--source`); an item from anywhere else is never published. */
+export const LIBRARY_SOUND_ORIGINS = [
+  'own',
+  'kenney',
+  'opengameart',
+  'openverse',
+  'freesound',
+] as const;
+
+/**
+ * The origins whose sticker runs may publish without a review
+ * (`--auto-publish`). An open aggregator never may.
+ */
+export const LIBRARY_AUTO_PUBLISH_STICKER_ORIGINS = ['own', 'kenney', 'noto'] as const;
+
+/**
+ * The origins whose sound runs may publish without a review. Openverse and
+ * OpenGameArt never may: a person listens to a sample first.
+ */
+export const LIBRARY_AUTO_PUBLISH_SOUND_ORIGINS = ['own', 'kenney'] as const;
+
+/** The two kinds of library item. */
+export type LibraryItemType = 'sticker' | 'sound';
+
+/** The licences an item of this kind may be published with. */
+export function libraryLicencesFor(type: LibraryItemType): readonly string[] {
+  return type === 'sound' ? LIBRARY_SOUND_LICENCES : LIBRARY_STICKER_LICENCES;
+}
+
+/** The adapters an item of this kind may come from. */
+export function libraryOriginsFor(type: LibraryItemType): readonly string[] {
+  return type === 'sound' ? LIBRARY_SOUND_ORIGINS : LIBRARY_STICKER_ORIGINS;
+}
+
+/**
+ * Whether a run from this origin waits for a person before it is published
+ * (Openverse, OpenGameArt, Freesound, Open Peeps): the operator screen marks
+ * it "Needs review", and the ingest refuses `--auto-publish` for it.
+ */
+export function libraryRunNeedsReview(type: LibraryItemType, origin: string): boolean {
+  const auto: readonly string[] =
+    type === 'sound' ? LIBRARY_AUTO_PUBLISH_SOUND_ORIGINS : LIBRARY_AUTO_PUBLISH_STICKER_ORIGINS;
+  return !auto.includes(origin);
+}
+
+/** Why an item may not go live. */
+export type LibraryPublishRefusal =
+  | 'licence_not_allowed'
+  | 'unknown_source'
+  | 'credit_line_missing';
+
+/**
+ * The guard every publish and restore passes, whatever the screen sent
+ * (Module 19 section 9): the licence is on the allow-list for the item's
+ * kind (a sound never takes CC BY), the item came from one of the ingest's
+ * adapters, and a source that needs a credit line has one. Null when the
+ * item may go live.
+ */
+export function libraryPublishRefusal(
+  type: LibraryItemType,
+  item: { licence: string; origin: string },
+  source: { requiresCredit: boolean; creditLine: string | null },
+): LibraryPublishRefusal | null {
+  if (!libraryLicencesFor(type).includes(item.licence)) return 'licence_not_allowed';
+  if (!libraryOriginsFor(type).includes(item.origin)) return 'unknown_source';
+  if (source.requiresCredit && !source.creditLine?.trim()) return 'credit_line_missing';
+  return null;
+}

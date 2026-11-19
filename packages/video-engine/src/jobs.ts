@@ -70,7 +70,9 @@ export function stageLabel(
   if (!stage) {
     return WAITING_LABEL;
   }
-  return STAGE_LABELS[kind][stage] ?? WAITING_LABEL;
+  // Own keys only: a stage like `constructor` must not read a built-in object member.
+  const labels = STAGE_LABELS[kind];
+  return (Object.hasOwn(labels, stage) ? labels[stage] : undefined) ?? WAITING_LABEL;
 }
 
 /** What a finished job says under its card. */
@@ -318,12 +320,15 @@ export const renderOutputSchema = z
 /**
  * Save To Media on a finished download (Module 18): `saving` while the worker
  * copies it, `saved` with the Media row, `failed` when it could not (the
- * button comes back).
+ * button comes back). `startedAt` is when `saving` was written, so the API can
+ * tell a save whose workflow ended without a word from one still running;
+ * rows written before it was kept have none.
  */
 export const downloadMediaSchema = z
   .object({
     status: z.enum(['saving', 'saved', 'failed']),
     mediaId: uuid.nullable(),
+    startedAt: z.string().datetime().optional(),
   })
   .strict();
 

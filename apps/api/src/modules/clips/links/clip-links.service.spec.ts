@@ -82,13 +82,19 @@ function setup(
     enabled?: boolean;
     maxMinutes?: number | null;
     existing?: string | null;
+    blocked?: string[];
   } = {},
 ) {
   const redis = new RedisService({ get: () => undefined } as unknown as ConfigService);
   const scheduling = {
     runClipQuery: jest.fn(async () => options.answer ?? { outcome: 'answered', value: infoFor() }),
   };
-  const repository = { existingVideoId: jest.fn(async () => options.existing ?? null) };
+  const repository = {
+    existingVideoId: jest.fn(async () => options.existing ?? null),
+    isBlocked: jest.fn(async (_platform: string, ids: readonly string[]) =>
+      ids.some((id) => (options.blocked ?? []).includes(id)),
+    ),
+  };
   const breaker = new ClipPlatformBreaker(redis);
   const resolver = fakeResolver({ enabled: options.enabled, maxMinutes: options.maxMinutes });
   const service = new ClipLinksService(
@@ -259,6 +265,19 @@ describe('ClipLinksService.probe', () => {
     const result = await service.probe(ORG, TWITCH_LINK);
     expect(result.existingVideoId).toBe('a2b9c8d0-1111-4222-8333-444455556666');
     expect(repository.existingVideoId).toHaveBeenCalledWith(ORG, 'twitch', '900000001');
+  });
+
+  it('refuses a video removed after a rights request with 410 video_removed, before any fetch (Module 19)', async () => {
+    const { service, scheduling, repository } = setup({ blocked: ['900000001'] });
+    expect(await refusal(service.probe(ORG, TWITCH_LINK))).toEqual({
+      status: 410,
+      body: {
+        code: 'video_removed',
+        message: 'This video was removed after a request from its owner.',
+      },
+    });
+    expect(repository.isBlocked).toHaveBeenCalledWith('twitch', ['900000001']);
+    expect(scheduling.runClipQuery).not.toHaveBeenCalled();
   });
 
   it('answers 503 tools_offline when no worker answers in time', async () => {

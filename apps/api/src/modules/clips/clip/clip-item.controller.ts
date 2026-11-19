@@ -33,6 +33,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { type ActiveOrg, CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -42,6 +43,8 @@ import {
 } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
+import { ClipStart } from '../limits/clips-create.guard';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 import { ClipEditsService } from './clip-edits.service';
 import { ClipExportsService } from './clip-exports.service';
 import {
@@ -66,6 +69,8 @@ import { ClipsListService } from './clips-list.service';
 
 @Controller('clips')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipItemController {
   constructor(
     private readonly clips: ClipItemService,
@@ -89,6 +94,7 @@ export class ClipItemController {
    * `clip_too_long` (`whole: true` on a video over 30 minutes).
    */
   @Post()
+  @ClipStart()
   @HttpCode(HttpStatus.CREATED)
   create(
     @CurrentOrg() org: ActiveOrg,
@@ -169,6 +175,7 @@ export class ClipItemController {
    * `clip_changed_elsewhere` (with `details.revision`), `video_not_ready`.
    */
   @Post(':clipId/exports')
+  @ClipStart()
   @HttpCode(HttpStatus.ACCEPTED)
   export(
     @CurrentOrg() org: ActiveOrg,
@@ -190,6 +197,7 @@ export class ClipItemController {
    * 409 `clip_changed_elsewhere`, `video_not_ready`.
    */
   @Post(':clipId/previews')
+  @ClipStart()
   @HttpCode(HttpStatus.ACCEPTED)
   preview(
     @CurrentOrg() org: ActiveOrg,

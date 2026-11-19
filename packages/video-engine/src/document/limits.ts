@@ -24,6 +24,16 @@ export const MAX_SEGMENTS = 50;
 /** Text, stickers and sounds together, across every track. */
 export const MAX_ITEMS = 100;
 
+/** Sounds a clip may hold (effects and music together). */
+export const MAX_SOUNDS = 20;
+
+/**
+ * Stickers a clip may hold, Follow Badges included. Each is its own input to
+ * the export, and a moving one keeps its frames in memory there, so the
+ * count is capped like the sounds' rather than left to `MAX_ITEMS`.
+ */
+export const MAX_STICKERS = 20;
+
 /** Areas in one layout: the Four layout has four. */
 export const MAX_AREAS = 4;
 

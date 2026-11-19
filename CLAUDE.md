@@ -34,6 +34,14 @@ npm run db:migrate     # prisma migrate dev
 npm run migrate:deploy --workspace=packages/db
 npm run db:seed        # demo@postgear.local / DemoPassword123! (also member@, onboarding@), org seed-demo-org
 
+# Clips (Sprint 12): tools check, sample videos, the open library, rights removals
+npm run clips:doctor   # FFmpeg (libass, harfbuzz, x264), ffprobe, yt-dlp, Deno
+npm run clips:samples  # the local sample videos simulation serves
+npm run clips:library:seed   # draws the small sticker and sound fixtures and ingests them
+npm run clips:remove -- --url <video link> --reason "<10+ chars>" --by <operator email>
+npm run operator:grant -- --email <address>   # also operator:revoke; the only way to set isSuperAdmin
+docker compose --profile worker-image up -d --build worker   # the real worker image; stop the host worker first; forces every simulation flag on
+
 # E2E (Playwright, e2e/*.spec.ts). Needs docker services, a seeded DB, and the API started with
 # dev:api:e2e (raised login throttle) in its own terminal; Playwright only starts the web app.
 npm run dev:api:e2e
@@ -55,7 +63,7 @@ MCP servers (`.mcp.json`): the Postgres MCP was removed because every session le
 - Streaming endpoints (AI, SEO) use SSE (`common/sse.ts`); the web side consumes them with `apps/web/src/lib/sse.ts`.
 - `tsc` output lands in `dist/apps/api/src/` because workspace packages are compiled in as source.
 
-**apps/worker**: a Temporal worker on one task queue. Workflows in `src/workflows` (post publish, token refresh, analytics sync, webhook delivery, maintenance), activities in `src/activities`. The API never publishes: it writes rows and starts/signals/cancels workflows; the worker does the platform calls and writes status back.
+**apps/worker**: a Temporal worker. Workflows in `src/workflows` (post publish, token refresh, analytics sync, webhook delivery, maintenance, Clips jobs), activities in `src/activities` and `src/clips`. The API never publishes: it writes rows and starts/signals/cancels workflows; the worker does the platform calls and writes status back. `WORKER_ROLES` (default `publishing,media,render`) picks the queues one process polls: `postgear-publishing`, `postgear-media` (imports, downloads, Media posters), `postgear-media-quick` (probes, channel lists) and `postgear-render` (exports), so a render never delays a scheduled post. The worker never reads plan values or the ledger: it calls the API's `/internal/clips/...` routes (internal token) to charge, reverse, finish and sweep. `infra/docker/Dockerfile.worker` is the real image (GPL FFmpeg as a separate program: keep it in a private registry).
 
 **packages/scheduling**: the API/worker contract (workflow + signal names, workflow id derived from row id, retry policy, publish status shape stored in `Post.error`). Must stay pure (no Temporal, Prisma or Node built-ins) because workflow code imports it inside Temporal's sandbox.
 
@@ -68,9 +76,11 @@ MCP servers (`.mcp.json`): the Postgres MCP was removed because every session le
 - `seo-engine`: Playwright crawler (falls back to plain fetch) + scoring.
 - `discover-engine`: Discover's sources (Google Trends, Google News), places and languages. Never imports another workspace and never reaches the network on its own: its fetch is injected (the API binds `fetchUrlSafely`, simulation binds recorded files).
 - `email`: every email as typed props in, `{ subject, preview, html, text }` out (table layout, Outlook button, dark mode). Pure: React and `react-dom/server` only, so `/dev/emails` renders it in the browser. Logos are PNGs in `apps/web/public/email` (`node apps/web/scripts/generate-email-brand.mjs`).
+- Clips (Sprint 12): `video-engine` (pure: the clip document, time map, render plan and FFmpeg compiler, error sentences; imports nothing), `video-preview` (web only: the editor's fast preview from the same `frameState`), `storage` (public media and the private clips space with signed addresses; production needs S3), `media-tools` (Node only: FFmpeg, ffprobe, yt-dlp runners; the ONLY package that may import `child_process`, `guard.test.ts` enforces it), `entitlements` (pure: the key registry, plan values, refusal sentences).
+- Plan limits and allowances: every Clips limit is read through `EntitlementResolver` and every charge goes through `UsageService` (idempotency key plus a reversal); values live in `PlanEntitlement` rows and per-workspace overrides, edited on the operator screen at `/operator` (superadmin only; in production also `OPERATOR_EMAILS`). Never hard-code a Clips number or read it from `plans.ts`.
 - `ui`: design-system components; `config`: shared Jest preset, Tailwind config, tsconfig base; `sdk`: public API client.
 
-**Simulation modes** (how everything is tested locally without paid keys; each is refused when `NODE_ENV=production`): `PUBLISH_SIMULATION` (worker publishes to a stand-in; `[simulate:429]` etc. in post text forces failures), `ANALYTICS_SIMULATION` (defaults to following PUBLISH_SIMULATION), `AI_SIMULATION`, `BILLING_SIMULATION` (synthesises Stripe events through the real webhook handler), `DISCOVER_SIMULATION` (Discover reads the feeds recorded in `packages/discover-engine/fixtures` and finds places with a stand-in that knows Chennai, San Francisco and Paris; its one competitor is the hand-written sample at `acme.example`, and Read answers a hand-written sample article for any address, so no stranger's site is ever fetched), `WEBHOOK_ALLOW_PRIVATE_URLS`. Without `RESEND_API_KEY` or `SMTP_HOST`, mail (activation/reset links) is printed to the API console (refused in production); `/dev/emails` previews every email. `.env.example` documents every variable.
+**Simulation modes** (how everything is tested locally without paid keys; each is refused when `NODE_ENV=production`): `PUBLISH_SIMULATION` (worker publishes to a stand-in; `[simulate:429]` etc. in post text forces failures), `ANALYTICS_SIMULATION` (defaults to following PUBLISH_SIMULATION), `AI_SIMULATION`, `BILLING_SIMULATION` (synthesises Stripe events through the real webhook handler), `DISCOVER_SIMULATION` (Discover reads the feeds recorded in `packages/discover-engine/fixtures` and finds places with a stand-in that knows Chennai, San Francisco and Paris; its one competitor is the hand-written sample at `acme.example`, and Read answers a hand-written sample article for any address, so no stranger's site is ever fetched), `WEBHOOK_ALLOW_PRIVATE_URLS`, `CLIPS_SIMULATION` (links and channels answer from `packages/media-tools/fixtures/simulation`, imports and downloads copy the local samples, Find Clips measures those samples and reads Twitch chat from a recorded file; forcing links and `[simulate:...]` names are listed in the local testing guide; never fetches a real YouTube, Twitch or Kick video). Without `RESEND_API_KEY` or `SMTP_HOST`, mail (activation/reset links) is printed to the API console (refused in production); `/dev/emails` previews every email. `.env.example` documents every variable.
 
 ## UI conventions
 

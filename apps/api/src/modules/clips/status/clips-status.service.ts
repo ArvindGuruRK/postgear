@@ -16,6 +16,12 @@
  *   anyone imports.
  * - **Platforms and simulation**: what this deployment allows.
  * - **Sample** (Module 06): whether Try A Sample has a video here.
+ * - **Space by kind and the over flag** (Module 19): what the space holds
+ *   (videos, downloads, the workspace's own stickers and sounds) for the
+ *   meter's tooltip, and whether the videos use more than the plan allows
+ *   (after a downgrade) for the page's warning. `limits['clips.enabled']`
+ *   false means the plan has no Clips: this route still answers, every
+ *   other Clips route refuses with `clips_not_in_plan`.
  */
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -83,10 +89,25 @@ export interface ClipsStatus {
   limits: ClipsStatusLimits;
   /** Module 04: this cycle's import and AI minutes. */
   meters: { importMinutes: ClipsMeterView; aiMinutes: ClipsMeterView };
-  /** Module 04: the space gauge again, under the name the sprint document uses. */
-  usage: { storageBytes: number };
+  /**
+   * Module 04: the space gauge again, under the name the sprint document
+   * uses; Module 19 adds the bytes by kind (they add up to `storageBytes`).
+   */
+  usage: { storageBytes: number; byKind: ClipsSpaceByKind };
+  /** Module 19: the videos use more than the plan allows (a downgrade): new ones are refused. */
+  overLimit: boolean;
   /** Module 06: whether Try A Sample has a video to import here. */
   sample: { available: boolean };
+}
+
+/** Module 19: what the video space holds. */
+export interface ClipsSpaceByKind {
+  /** Imported and uploaded videos with their working files. */
+  videos: number;
+  /** Prepared downloads, kept 24 hours. */
+  downloads: number;
+  /** The workspace's own stickers and sounds. */
+  library: number;
 }
 
 const IMPORT_MINUTES: MeterKey = 'clips.import_minutes_per_month';
@@ -112,9 +133,9 @@ export class ClipsStatusService {
 
   async status(orgId: string): Promise<ClipsStatus> {
     const now = new Date();
-    const [tools, usedBytes, values, importMinutes, aiMinutes] = await Promise.all([
+    const [tools, byKind, values, importMinutes, aiMinutes] = await Promise.all([
       this.tools(),
-      this.limits.storageUsedBytes(orgId),
+      this.limits.storageByKind(orgId),
       this.resolver.getMany(orgId, CLIPS_STATUS_LIMIT_KEYS, now),
       this.resolver.meter(orgId, IMPORT_MINUTES, now),
       this.resolver.meter(orgId, AI_MINUTES, now),
@@ -123,17 +144,17 @@ export class ClipsStatusService {
       CLIPS_STATUS_LIMIT_KEYS.map((key) => [key, values[key]]),
     ) as ClipsStatusLimits;
     const limitGb = limits['clips.storage_gb'];
+    const usedBytes = byKind.videos + byKind.downloads + byKind.library;
+    const limitBytes = typeof limitGb === 'number' ? gigabytesToBytes(limitGb) : null;
     return {
       tools,
       simulation: this.simulation,
       platforms: this.platforms,
-      storage: {
-        usedBytes,
-        limitBytes: typeof limitGb === 'number' ? gigabytesToBytes(limitGb) : null,
-      },
+      storage: { usedBytes, limitBytes },
       limits,
       meters: { importMinutes: meterView(importMinutes), aiMinutes: meterView(aiMinutes) },
-      usage: { storageBytes: usedBytes },
+      usage: { storageBytes: usedBytes, byKind },
+      overLimit: limitBytes !== null && usedBytes > limitBytes,
       sample: { available: this.sample.url !== null },
     };
   }

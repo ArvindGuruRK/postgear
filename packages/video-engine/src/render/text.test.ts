@@ -104,6 +104,20 @@ describe('text runs and fallbacks', () => {
     expect(missingCharacters('Hello வணக்கம்', 'Montserrat', 800, FONT_MANIFEST)).toEqual([]);
     expect(missingCharacters('anything', 'Comic Sans MS', 400, FONT_MANIFEST)).toEqual([]);
   });
+
+  it('never calls a tab or a carriage return missing: they draw nothing', () => {
+    expect(
+      missingCharacters('Hi\tthere\r\nfriend\u007f', 'Montserrat', 800, FONT_MANIFEST),
+    ).toEqual([]);
+    const result = textRuns('Hi\tthere\r\n', main, FONT_MANIFEST);
+    expect(result.ok).toBe(true);
+    // A Tamil word then a tab: the tab rides along with the run before it.
+    const tamil = textRuns('வணக்கம்\t', main, FONT_MANIFEST);
+    if (!tamil.ok) throw new Error(tamil.missing.join(''));
+    expect(tamil.runs.map((run) => [run.text, run.entry.fontId])).toEqual([
+      ['வணக்கம்\t', 'noto-sans-tamil'],
+    ]);
+  });
 });
 
 describe('text geometry and fades', () => {

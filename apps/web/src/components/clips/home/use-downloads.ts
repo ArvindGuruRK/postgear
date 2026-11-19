@@ -6,7 +6,10 @@
  *
  * - Asked for the first time the tab opens (or a download is added), then
  *   again on `refresh()`: when a row's job ends (for its size and expiry)
- *   and every 3 seconds while a Save To Media is running.
+ *   and every 3 seconds while a Save To Media is running, for at most five
+ *   minutes (a copy takes well under one), so a save that never answers
+ *   does not keep asking. The server reads such a save as failed once its
+ *   time is over, and the next list brings the button back.
  * - Rows being prepared follow their own job live (`useClipJob` in the row).
  * - `now` moves every 30 seconds, so "Expires in 23 hours" counts down and a
  *   row turns Expired on time without asking the server.
@@ -16,7 +19,9 @@ import { ApiError } from '@/lib/api';
 import { listDownloads } from '@/lib/clips-api';
 import type { DownloadView } from '@/types/clips';
 
-const SAVING_POLL_MS = 3_000;
+export const SAVING_POLL_MS = 3_000;
+/** The longest the list is asked again for one run of saves. */
+export const SAVING_POLL_LIMIT_MS = 5 * 60_000;
 const CLOCK_MS = 30_000;
 const LOAD_FAILED = 'Your downloads could not be loaded. Check your connection.';
 
@@ -77,7 +82,14 @@ export function useDownloads(enabled: boolean): DownloadsState {
   const saving = rows.some((row) => row.media?.status === 'saving');
   useEffect(() => {
     if (!saving) return;
-    const timer = setInterval(() => setTick((value) => value + 1), SAVING_POLL_MS);
+    const until = Date.now() + SAVING_POLL_LIMIT_MS;
+    const timer = setInterval(() => {
+      if (Date.now() >= until) {
+        clearInterval(timer);
+        return;
+      }
+      setTick((value) => value + 1);
+    }, SAVING_POLL_MS);
     return () => clearInterval(timer);
   }, [saving]);
 

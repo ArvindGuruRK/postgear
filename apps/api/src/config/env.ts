@@ -399,6 +399,10 @@ const envSchema = z
     ),
     // The private bucket of the S3 binding. Never public.
     CLIPS_PRIVATE_BUCKET: blankAsUnset(z.string().min(3).default('postgear-clips')),
+    // Module 19: Clips jobs waiting across every workspace before new ones are
+    // refused with "Clips is very busy right now" (503 clips_busy). A safety
+    // cap for the media boxes, not a plan value.
+    CLIPS_QUEUE_CEILING: blankAsUnset(z.coerce.number().int().min(1).max(100_000).default(500)),
     // In production only these addresses count as platform operators (the
     // entitlement screens, the library, removal). Ignored in development.
     OPERATOR_EMAILS: blankAsUnset(commaList(z.string().trim().toLowerCase().email()).default('')),

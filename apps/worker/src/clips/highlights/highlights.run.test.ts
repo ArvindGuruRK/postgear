@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { gunzipSignalsFile, gzipSignalsFile, type SignalProducers } from '@postgear/media-tools';
 import { decodeSignalsFile, type SignalsFile, type SignalTrack } from '@postgear/video-engine';
-import { ClipStepError } from '../failures';
+import { ClipStepError, classifyClipError } from '../failures';
 import { highlightsSignalsKey } from '../keys';
 import type { AssetRow } from '../rows';
 import {
@@ -427,6 +427,40 @@ describe('runHighlights', () => {
     expect(run.producers.loudness).toHaveBeenCalledTimes(1);
     expect(outcome.measured).toEqual(['loudness', 'scene', 'chat']);
     expect(storage.deleted).toContain('clips/broken.json.gz');
+  });
+
+  it('a stored file gone from storage is measured again', async () => {
+    const { rows, make } = await setup();
+    rows.assets.push(asset('SIGNALS', 'clips/gone.json.gz', 'asset-gone'));
+    const run = make();
+    const outcome = await runHighlights(run);
+    expect(outcome.finished).toBe(true);
+    expect(outcome.measured).toEqual(['loudness', 'scene', 'chat']);
+  });
+
+  it('a storage hiccup reading the stored file fails the step, to be tried again, and keeps it', async () => {
+    const { rows, storage, make } = await setup();
+    const storedKey = 'clips/stored.json.gz';
+    const partial: SignalsFile = { ...recorded, tracks: [recordedTrack('loudness')] };
+    storage.objects.set(storedKey, await gzipSignalsFile(partial));
+    rows.assets.push(asset('SIGNALS', storedKey, 'asset-stored'));
+    const getToFile = storage.getToFile.bind(storage);
+    const hiccup = new Error('storage unavailable');
+    jest.spyOn(storage, 'getToFile').mockImplementation(async (key, file) => {
+      if (key === storedKey) throw hiccup;
+      return getToFile(key, file);
+    });
+
+    const run = make();
+    const failed = await runHighlights(run).catch((error: unknown) => error);
+    expect(failed).toBe(hiccup);
+    expect(classifyClipError(failed)).toEqual({ code: 'tool_failed', retryable: true });
+    // Nothing measured, nothing written: the stored file and its row stay for the retry.
+    expect(run.producers.loudness).not.toHaveBeenCalled();
+    expect(storage.objects.has(storedKey)).toBe(true);
+    expect(storage.deleted).not.toContain(storedKey);
+    expect(storage.objects.has(highlightsSignalsKey(ORG, VIDEO_ID, JOB_ID))).toBe(false);
+    expect(aiClips(rows)).toHaveLength(0);
   });
 
   it('keeps a stored track of another name when it measures the rest', async () => {

@@ -1,0 +1,10 @@
+# Python packages for `npm run clips:fonts:build` inside the worker image's
+# fonts stage only (build time; nothing at run time uses Python). The same
+# versions as the local venv in .cache/clips-fonts-tools, so the twins match
+# the committed manifest. Hashes are from pypi.org for CPython 3.11
+# (Debian 12's python3) on x86_64, plus the pure Python fonttools wheel.
+fonttools==4.65.0 \
+    --hash=sha256:a3991732c87b3f054a2a8cf86dd0d602833fa8cb37c911503173771646e1013d \
+    --hash=sha256:3060b8c1fc2329fa20265b7c138614143ea7c1624e26c5c180c76aeb74deae6f
+brotli==1.2.1 \
+    --hash=sha256:6b3c3d5794212a54434b4856f808f7bdf7ad48eacadaadb5b2346fc9a639365a

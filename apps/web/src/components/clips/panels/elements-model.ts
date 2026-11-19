@@ -13,6 +13,7 @@ import {
   type BadgePlatform,
   type ClipDocument,
   type LibraryStickerView,
+  MAX_STICKERS,
   type StickerFileView,
   type StickerItem,
   type StickerKind,
@@ -58,6 +59,7 @@ export const LOAD_FAILED = 'We could not load the stickers. Try again in a momen
 export const CHECKING = 'Checking';
 export const NOTHING_SELECTED =
   'Pick a sticker to add it at the playhead, or select one on the clip to change it.';
+export const TOO_MANY_STICKERS = `A clip holds up to ${MAX_STICKERS} stickers. Remove one to add another.`;
 
 /** The sentence for a search that found nothing. */
 export function noMatchSentence(query: string): string {

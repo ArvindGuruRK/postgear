@@ -24,7 +24,7 @@ import {
 } from '@postgear/ui';
 import { CANVASES, type Ratio } from '@postgear/video-engine';
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { SHAPE_LINES, shapeName } from './clip-editor-model';
 import { FIRST_SHAPES, type FirstShape } from './editor-state';
 
@@ -55,7 +55,6 @@ export function ShapeDialog({
   backLabel: string;
   onChoose: (ratio: FirstShape) => void;
 }) {
-  const labelId = useId();
   const [choice, setChoice] = useState<FirstShape>(() =>
     (FIRST_SHAPES as readonly Ratio[]).includes(initial) ? (initial as FirstShape) : '9:16',
   );
@@ -71,13 +70,14 @@ export function ShapeDialog({
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle id={labelId}>What Do You Want To Make?</DialogTitle>
+          {/* No id of our own: the dialog is named by the title's own id. */}
+          <DialogTitle>What Do You Want To Make?</DialogTitle>
           <DialogDescription>
             Pick the shape of your clip. You can change it later in Layouts.
           </DialogDescription>
         </DialogHeader>
         <ChoiceTiles
-          labelledBy={labelId}
+          label="Shape"
           value={choice}
           onValueChange={setChoice}
           className="mt-2"

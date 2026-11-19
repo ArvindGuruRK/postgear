@@ -9,12 +9,14 @@
  */
 import type { ClipActivityDeps } from '../deps';
 import { type ClipJobActivityOptions, createJobActivities } from './jobs.activities';
+import { createMediaFactsActivities } from './media-facts.activities';
 import { createProbeActivities } from './probe.activities';
 import { createRuntimeActivities } from './runtime.activities';
 import { createSoundActivities } from './sound.activities';
 import { createStickerActivities } from './sticker.activities';
 
 export type { ClipWorkResult, RenderWaitState } from './jobs.activities';
+export type { MediaVideoFactsOutcome } from './media-facts.activities';
 
 export function createClipActivities(deps: ClipActivityDeps, options: ClipJobActivityOptions = {}) {
   return {
@@ -27,6 +29,8 @@ export function createClipActivities(deps: ClipActivityDeps, options: ClipJobAct
     ...createSoundActivities(deps),
     // Modules 04 and 05: import, sharp range, export, and their bookkeeping.
     ...createJobActivities(deps, options),
+    // Module 19: a Media video's poster and length (postgear-media).
+    ...createMediaFactsActivities(deps),
   };
 }
 

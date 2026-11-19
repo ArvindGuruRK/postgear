@@ -276,7 +276,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
         )}
       >
         <MotionIcon icon={SearchIcon} className="h-4 w-4 shrink-0 text-ink" />
-        <span className="hidden flex-1 truncate text-start font-sans opacity-50 sm:block">
+        <span className="hidden flex-1 truncate text-start font-sans type-muted sm:block">
           Enter your search
         </span>
         <KbdGroup className="hidden sm:inline-flex" aria-hidden>

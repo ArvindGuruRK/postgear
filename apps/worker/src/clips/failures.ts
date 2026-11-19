@@ -26,6 +26,7 @@ import {
 import { CLIP_FAILURE_TYPES, CLIP_NON_RETRYABLE } from '@postgear/scheduling';
 import { type ClipPlatformId, isRenderCompileError, jobErrorCodeFor } from '@postgear/video-engine';
 import { ApplicationFailure, CancelledFailure } from '@temporalio/common';
+import { scrubSecrets } from './log-redaction';
 
 export interface ClipFailureDetail {
   code: string;
@@ -86,7 +87,11 @@ export function classifyClipError(error: unknown): {
   return { code: 'tool_failed', retryable: true };
 }
 
-/** The failure an activity throws. Logs the real cause (never stored, never shown). */
+/**
+ * The failure an activity throws. Logs the real cause (never stored, never
+ * shown), with the proxy, the cookies file and every other secret scrubbed
+ * out first: a tool's stderr can repeat what it was given.
+ */
 export function clipFailure(
   error: unknown,
   context: { activity: string; jobId?: string },
@@ -94,15 +99,18 @@ export function clipFailure(
   if (error instanceof ApplicationFailure) return error;
   const { code, retryable, platform } = classifyClipError(error);
   if (code === 'tool_failed' || code === 'tools_offline' || code === 'clips_busy') {
+    const stderrTail =
+      error instanceof ToolError || error instanceof RenderError ? error.stderrTail : undefined;
     console.warn(
       JSON.stringify({
         event: 'clips.activity.failed',
         activity: context.activity,
         jobId: context.jobId,
         code,
-        reason: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-        stderrTail:
-          error instanceof ToolError || error instanceof RenderError ? error.stderrTail : undefined,
+        reason: scrubSecrets(
+          error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        ),
+        stderrTail: stderrTail === undefined ? undefined : scrubSecrets(stderrTail),
       }),
     );
   }

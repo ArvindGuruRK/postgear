@@ -7,7 +7,17 @@
  * server-sent events on a GET, `@SkipThrottle()` because one long request
  * is not a burst.
  */
-import { Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Role } from '@postgear/db';
 import type { Request, Response } from 'express';
@@ -16,9 +26,12 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { openSseStream } from '../../../common/sse';
 import { ClipJobEventsService } from './clip-job-events.service';
 import { ClipJobsService } from './clip-jobs.service';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/jobs')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipJobsController {
   constructor(
     private readonly jobs: ClipJobsService,

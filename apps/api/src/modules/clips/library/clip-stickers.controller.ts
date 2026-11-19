@@ -24,6 +24,7 @@ import {
   Query,
   UploadedFile,
   UseFilters,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -36,6 +37,7 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodQuery } from '../../../common/pipes/zod-validation.pipe';
 import { type StickerFilesQuery, stickerFilesQuerySchema } from './clip-library.schemas';
 import { ClipStickerUploadsService, type StickerUploadFile } from './clip-sticker-uploads.service';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 const UPLOAD_OPTIONS = {
   // Held in memory: at most 8 MB, and the bytes are sniffed before anything is kept.
@@ -65,6 +67,8 @@ class StickerTooBigFilter implements ExceptionFilter {
 
 @Controller('clips/stickers')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipStickersController {
   constructor(private readonly uploads: ClipStickerUploadsService) {}
 

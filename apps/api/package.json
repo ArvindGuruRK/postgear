@@ -12,7 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "clean": "rm -rf dist .turbo node_modules"
+    "clean": "rm -rf dist .turbo node_modules",
+    "clips:remove": "dotenv -e ../../.env -- ts-node --transpile-only src/scripts/clips-remove.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1131.0",

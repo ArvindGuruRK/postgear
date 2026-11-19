@@ -19,7 +19,7 @@ import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 
 import { dirname, join, resolve, sep } from 'node:path';
 import { type Readable, Transform, type TransformCallback } from 'node:stream';
 import { finished, pipeline } from 'node:stream/promises';
-import { assertValidClipKey, assertValidClipPrefix } from '../clip-keys';
+import { assertValidClipKey, assertValidClipListPrefix, assertValidClipPrefix } from '../clip-keys';
 import { StorageNotFoundError, StorageRangeError, StorageUploadError } from './errors';
 import {
   expiryFrom,
@@ -33,6 +33,7 @@ import { orderedParts, unquoteEtag } from './parts';
 import {
   CLIP_FILES_ROUTE,
   PART_URL_SECONDS,
+  type PrivateListPage,
   type PrivateObjectInfo,
   type PrivateObjectStream,
   type PrivateStorage,
@@ -166,6 +167,37 @@ export class LocalPrivateStorage implements PrivateStorage {
 
     await rm(folder, { recursive: true, force: true });
     return count;
+  }
+
+  async list(
+    prefix: string,
+    options: { after?: string | null; limit: number },
+  ): Promise<PrivateListPage> {
+    assertValidClipListPrefix(prefix);
+    const folder = this.inside(resolve(this.root, ...prefix.split('/').filter(Boolean)));
+    let entries: string[];
+    try {
+      entries = (await readdir(folder, { recursive: true, withFileTypes: true }))
+        .filter((entry) => entry.isFile())
+        .map((entry) => join(entry.parentPath ?? entry.path, entry.name));
+    } catch (error) {
+      if (isMissing(error)) return { objects: [], next: null };
+      throw error;
+    }
+
+    const keys = entries
+      .map((path) => path.slice(this.root.length + 1).split(sep).join('/'))
+      .filter((key) => key.startsWith(prefix) && (!options.after || key > options.after))
+      .sort();
+    const limit = Math.max(1, Math.floor(options.limit));
+    const page = keys.slice(0, limit);
+    const objects = await Promise.all(
+      page.map(async (key) => {
+        const info = await stat(join(this.root, ...key.split('/')));
+        return { key, bytes: info.size, modifiedAt: new Date(info.mtimeMs) };
+      }),
+    );
+    return { objects, next: keys.length > limit ? (page[page.length - 1] ?? null) : null };
   }
 
   async signedUrl(key: string, opts: SignedUrlOptions): Promise<string> {

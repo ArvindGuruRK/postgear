@@ -1,3 +1,8 @@
+import {
+  CLIP_SAVE_DOWNLOAD_ATTEMPT_MS,
+  CLIP_SAVE_DOWNLOAD_TIMEOUT_MS,
+  CLIP_SAVE_DOWNLOAD_WORK_MS,
+} from './clips';
 import { parsePublishStatus, serializePublishStatus } from './publish-status';
 import { backoffAfterAttempt, PUBLISH_RETRY_POLICY } from './retry-policy';
 import { publishWorkflowId, tokenRefreshWorkflowId } from './workflows';
@@ -70,5 +75,18 @@ describe('workflow ids', () => {
   it('derive deterministically from the row id', () => {
     expect(publishWorkflowId('abc')).toBe('post-publish:abc');
     expect(tokenRefreshWorkflowId('ch1')).toBe('token-refresh:ch1');
+  });
+});
+
+describe("Save To Media's time (Module 18)", () => {
+  it('fits both tries of the copy, then the bookkeeping, inside the workflow limit', () => {
+    // The worker's copy: two tries a minute apart.
+    expect(2 * CLIP_SAVE_DOWNLOAD_ATTEMPT_MS + 60_000).toBeLessThanOrEqual(
+      CLIP_SAVE_DOWNLOAD_WORK_MS,
+    );
+    // Its failure bookkeeping: four tries of a minute, 35 seconds of backoff, with room.
+    expect(CLIP_SAVE_DOWNLOAD_WORK_MS + 5 * 60_000).toBeLessThanOrEqual(
+      CLIP_SAVE_DOWNLOAD_TIMEOUT_MS,
+    );
   });
 });

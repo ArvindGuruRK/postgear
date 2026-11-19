@@ -18,6 +18,15 @@
  * Sprint 12: each pass also asks the API to reconcile clip jobs (lost
  * starts, gone workflows), behind `patched('clips-reconcile')`.
  *
+ * Sprint 12, Module 19: each pass also asks the API to sweep Clips (expiry
+ * notices and removals, short-lived files, abandoned uploads, the charge
+ * backstop, the storage notice, and once a day orphan files and ended
+ * overrides), behind `patched('clips-sweep')`.
+ *
+ * Sprint 12, Module 19: each pass also starts posters and lengths for up to
+ * twenty older Media videos (`mediaVideoFactsWorkflow` on the media queue),
+ * behind `patched('media-video-facts')`.
+ *
  * `continueAsNew` every ninety-six iterations (a day) keeps the history short.
  */
 import { continueAsNew, patched, proxyActivities, sleep } from '@temporalio/workflow';
@@ -53,11 +62,32 @@ const { clipsReconcile } = proxyActivities<Activities>({
   retry: { maximumAttempts: 1 },
 });
 
+/**
+ * Module 19: the API's Clips sweep. Bounded batches keep it short; it never
+ * throws, so one attempt (the next pass carries on where this one stopped).
+ */
+const { clipsSweep } = proxyActivities<Activities>({
+  startToCloseTimeout: '5 minutes',
+  retry: { maximumAttempts: 1 },
+});
+
+/**
+ * Module 19: one query and at most twenty workflow starts; the FFmpeg work
+ * runs on the media worker. Never throws, so one attempt (the next pass picks
+ * up whatever this one did not).
+ */
+const { mediaVideoFactsBackfill } = proxyActivities<Activities>({
+  startToCloseTimeout: '2 minutes',
+  retry: { maximumAttempts: 1 },
+});
+
 export const RECONCILE_INTERVAL = '15 minutes';
 const ITERATIONS_PER_RUN = 96;
 export const AUTOMATION_PRUNE_PATCH = 'automation-run-prune';
 export const DISCOVER_MAINTENANCE_PATCH = 'discover-maintenance';
 export const CLIPS_RECONCILE_PATCH = 'clips-reconcile';
+export const CLIPS_SWEEP_PATCH = 'clips-sweep';
+export const MEDIA_VIDEO_FACTS_PATCH = 'media-video-facts';
 
 export async function maintenanceWorkflow(): Promise<void> {
   for (let iteration = 0; iteration < ITERATIONS_PER_RUN; iteration++) {
@@ -89,6 +119,22 @@ export async function maintenanceWorkflow(): Promise<void> {
         await clipsReconcile();
       } catch {
         // Lost clip job starts wait for the next pass; the API's own settle starts most of them.
+      }
+    }
+
+    if (patched(CLIPS_SWEEP_PATCH)) {
+      try {
+        await clipsSweep();
+      } catch {
+        // Expiry and cleanup wait for the next pass; every part is idempotent.
+      }
+    }
+
+    if (patched(MEDIA_VIDEO_FACTS_PATCH)) {
+      try {
+        await mediaVideoFactsBackfill();
+      } catch {
+        // Older videos wait for the next pass; the library shows their first frame meanwhile.
       }
     }
 

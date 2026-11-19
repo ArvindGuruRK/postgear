@@ -23,6 +23,8 @@ export { clipRuntimeCheckWorkflow } from './clips/runtime-check.workflow';
 export { clipStickerCheckWorkflow } from './clips/sticker-check.workflow';
 export { clipSoundCheckWorkflow } from './clips/sound-check.workflow';
 export { maintenanceWorkflow } from './maintenance.workflow';
+// Sprint 12, Module 19: a Media video's poster and length (postgear-media).
+export { mediaVideoFactsWorkflow } from './media-video-facts.workflow';
 export { postPublishWorkflow } from './post-publish.workflow';
 export { tokenRefreshWorkflow } from './token-refresh.workflow';
 export { webhookDeliveryWorkflow } from './webhook-delivery.workflow';

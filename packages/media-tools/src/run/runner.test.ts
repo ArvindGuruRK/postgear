@@ -280,60 +280,75 @@ describe('createRunTool with a real process', () => {
   });
 });
 
+/**
+ * Jest's own limit matches the tool's 30 seconds: starting the real FFmpeg
+ * took over Jest's default 5 seconds once while every workspace ran its
+ * tests at the same time (`npm run validate`, 2026-11-19).
+ */
+const FFMPEG_TEST_MS = 30_000;
+
 describe('createRunTool with FFmpeg', () => {
   const ffmpeg = createRunTool({ ...NODE_PATHS, ffmpeg: process.env.FFMPEG_PATH || 'ffmpeg' });
 
-  it('runs a tiny lavfi render to the null muxer and reports progress to the end', async () => {
-    if (!ffmpegAvailable) return;
-    const parser = new FfmpegProgressParser(1_000);
-    const result = await ffmpeg(
-      'ffmpeg',
-      [
-        '-hide_banner',
-        '-nostdin',
-        '-loglevel',
-        'error',
-        '-progress',
-        'pipe:1',
-        '-nostats',
-        '-f',
-        'lavfi',
-        '-i',
-        'testsrc=d=1:s=160x90:r=30',
-        '-f',
-        'null',
-        '-',
-      ],
-      { cwd, timeoutMs: 30_000, onStdoutLine: (line) => parser.push(line) },
-    );
-    expect(result.exitCode).toBe(0);
-    expect(parser.ended).toBe(true);
-    expect(parser.snapshot().percent).toBe(100);
-  });
+  it(
+    'runs a tiny lavfi render to the null muxer and reports progress to the end',
+    async () => {
+      if (!ffmpegAvailable) return;
+      const parser = new FfmpegProgressParser(1_000);
+      const result = await ffmpeg(
+        'ffmpeg',
+        [
+          '-hide_banner',
+          '-nostdin',
+          '-loglevel',
+          'error',
+          '-progress',
+          'pipe:1',
+          '-nostats',
+          '-f',
+          'lavfi',
+          '-i',
+          'testsrc=d=1:s=160x90:r=30',
+          '-f',
+          'null',
+          '-',
+        ],
+        { cwd, timeoutMs: 30_000, onStdoutLine: (line) => parser.push(line) },
+      );
+      expect(result.exitCode).toBe(0);
+      expect(parser.ended).toBe(true);
+      expect(parser.snapshot().percent).toBe(100);
+    },
+    FFMPEG_TEST_MS,
+  );
 
-  it('stops an endless FFmpeg run on abort', async () => {
-    if (!ffmpegAvailable) return;
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 500);
-    const started = Date.now();
-    const error = (await ffmpeg(
-      'ffmpeg',
-      [
-        '-hide_banner',
-        '-nostdin',
-        '-re',
-        '-f',
-        'lavfi',
-        '-i',
-        'testsrc=s=160x90',
-        '-f',
-        'null',
-        '-',
-      ],
-      { cwd, timeoutMs: 30_000, signal: controller.signal },
-    ).catch((e: unknown) => e)) as ToolError;
-    expect(error).toBeInstanceOf(ToolError);
-    expect(error.aborted).toBe(true);
-    expect(Date.now() - started).toBeLessThan(10_000);
-  });
+  it(
+    'stops an endless FFmpeg run on abort',
+    async () => {
+      if (!ffmpegAvailable) return;
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 500);
+      const started = Date.now();
+      const error = (await ffmpeg(
+        'ffmpeg',
+        [
+          '-hide_banner',
+          '-nostdin',
+          '-re',
+          '-f',
+          'lavfi',
+          '-i',
+          'testsrc=s=160x90',
+          '-f',
+          'null',
+          '-',
+        ],
+        { cwd, timeoutMs: 30_000, signal: controller.signal },
+      ).catch((e: unknown) => e)) as ToolError;
+      expect(error).toBeInstanceOf(ToolError);
+      expect(error.aborted).toBe(true);
+      expect(Date.now() - started).toBeLessThan(10_000);
+    },
+    FFMPEG_TEST_MS,
+  );
 });

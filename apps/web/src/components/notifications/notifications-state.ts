@@ -127,6 +127,9 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   clip_video_failed: 'Your video could not be imported',
   clip_export_ready: 'Your clip is ready',
   clip_export_failed: 'Your clip could not be exported',
+  clip_video_expiring: 'A video will be removed soon',
+  clip_video_removed: 'A video was removed',
+  clip_storage_over_limit: 'Your videos are over your plan',
   info: 'Notification',
 };
 

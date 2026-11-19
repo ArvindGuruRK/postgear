@@ -22,6 +22,9 @@ export type NotificationType =
   | 'clip_video_failed'
   | 'clip_export_ready'
   | 'clip_export_failed'
+  | 'clip_video_expiring'
+  | 'clip_video_removed'
+  | 'clip_storage_over_limit'
   | 'info';
 
 export interface NotificationView {

@@ -212,6 +212,41 @@ describe('ClipEditsService.patch', () => {
     expect(tables.clips[0]).toMatchObject({ lastExportedRevision: 3 });
   });
 
+  // Module 20 e2e finding: the editor holds a crop at 0.24687499999999996 and
+  // the stored clip reads 0.246875 (one bit apart on the way into the
+  // database). Saving the editor's copy back is still the exported clip.
+  it('keeps an export current when the saved numbers are one bit off what was exported', async () => {
+    const tables = seed();
+    // One document (its ids are random), drawn at two crop positions.
+    const base = doc();
+    const withCropX = (x: number) => {
+      return {
+        ...base,
+        layout: {
+          ...base.layout,
+          areas: base.layout.areas.map((area) => ({
+            ...area,
+            crop: area.crop.map((key) => ({ ...key, rect: { ...key.rect, x } })),
+          })),
+        },
+      };
+    };
+    const stored = withCropX(0.246875);
+    const clip = tables.clips[0];
+    if (clip) {
+      clip.document = stored as unknown as typeof clip.document;
+      clip.lastExportedRevision = 1;
+      clip.lastExportedFingerprint = documentFingerprint(parseClipDocument(stored));
+    }
+    const { service } = setup(tables);
+    await service.patch(TEST_ORG, CLIP, { revision: 1, document: doc(60_000, 70_000) });
+    const undone = await service.patch(TEST_ORG, CLIP, {
+      revision: 2,
+      document: withCropX(0.24687499999999996),
+    });
+    expect(undone.clip).toMatchObject({ revision: 3, exported: true });
+  });
+
   it('never carries an export forward for a clip exported before fingerprints', async () => {
     const tables = seed();
     const exported = doc();

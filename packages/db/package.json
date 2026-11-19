@@ -14,6 +14,7 @@
     "migrate:reset": "dotenv -e ../../.env -- prisma migrate reset",
     "seed": "dotenv -e ../../.env -- ts-node --project prisma/seeds/tsconfig.json prisma/seeds/index.ts",
     "studio": "dotenv -e ../../.env -- prisma studio",
+    "operator": "dotenv -e ../../.env -- ts-node --project scripts/tsconfig.json scripts/operator.ts",
     "lint": "biome lint ./src",
     "lint:fix": "biome check --write ./src",
     "typecheck": "tsc --noEmit",

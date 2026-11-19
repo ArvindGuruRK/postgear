@@ -29,7 +29,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { assertValidClipKey, assertValidClipPrefix } from '../clip-keys';
+import { assertValidClipKey, assertValidClipListPrefix, assertValidClipPrefix } from '../clip-keys';
 import { isS3InvalidRange, isS3NoSuchUpload, isS3NotFound } from '../s3-client';
 import { StorageNotFoundError, StorageRangeError, StorageUploadError } from './errors';
 import { assertSignedUrlSeconds, isPartNumber } from './file-token';
@@ -40,6 +40,7 @@ import {
   MULTIPART_THRESHOLD_BYTES,
   PART_URL_SECONDS,
   PRIVATE_CACHE_CONTROL,
+  type PrivateListPage,
   type PrivateObjectInfo,
   type PrivateObjectStream,
   type PrivateStorage,
@@ -280,6 +281,32 @@ export class S3PrivateStorage implements PrivateStorage {
     } while (continuationToken);
 
     return deleted;
+  }
+
+  async list(
+    prefix: string,
+    options: { after?: string | null; limit: number },
+  ): Promise<PrivateListPage> {
+    assertValidClipListPrefix(prefix);
+    const page = await this.client.send(
+      new ListObjectsV2Command({
+        Bucket: this.bucket,
+        Prefix: prefix,
+        MaxKeys: Math.min(1000, Math.max(1, Math.floor(options.limit))),
+        ...(options.after ? { StartAfter: options.after } : {}),
+      }),
+    );
+    const objects = (page.Contents ?? [])
+      .filter((object): object is typeof object & { Key: string } =>
+        typeof object.Key === 'string' && object.Key.startsWith(prefix),
+      )
+      .map((object) => ({
+        key: object.Key,
+        bytes: Number(object.Size ?? 0),
+        modifiedAt: object.LastModified ?? new Date(0),
+      }));
+    const last = objects[objects.length - 1];
+    return { objects, next: page.IsTruncated && last ? last.key : null };
   }
 
   async signedUrl(key: string, opts: SignedUrlOptions): Promise<string> {

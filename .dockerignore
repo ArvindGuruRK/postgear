@@ -1,0 +1,49 @@
+# What `docker build` never sends from the repo root (infra/docker/*).
+#
+# Secrets first: no .env file ever enters an image or a build cache. Then
+# everything generated, installed or local only: the images run their own
+# `npm ci` and builds, and the big local files (sample videos, uploads,
+# screenshots, caches) are not needed to build anything.
+
+# Secrets
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+
+# Version control and editors
+.git
+.github
+.vscode
+.idea
+.claude
+.playwright-mcp
+**/.DS_Store
+**/Thumbs.db
+
+# Installed and generated
+**/node_modules
+**/dist
+**/build
+**/out
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/*.log
+.cache
+.npm
+
+# Local data and large local files
+postgres_data
+redis_data
+minio_data
+apps/api/uploads
+apps/api/uploads-private
+packages/media-tools/samples
+screenshots
+docs
+e2e
+playwright-report
+test-results

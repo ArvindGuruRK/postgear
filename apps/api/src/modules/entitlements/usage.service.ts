@@ -35,7 +35,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma, prisma, type UsageEntry, UsageKind } from '@postgear/db';
+import { Prisma, type PrismaTransactionClient, prisma, type UsageEntry, UsageKind } from '@postgear/db';
 import {
   type EntitlementDef,
   fitsLimit,
@@ -310,6 +310,40 @@ export class UsageService {
       }
       throw this.unavailable('adjust', error);
     }
+  }
+
+  /**
+   * Module 19: the operator's correction inside the caller's transaction, so
+   * the ledger row and its Change Log row commit together or not at all. The
+   * same row as `adjust` (an ADJUSTMENT in the window that starts at
+   * `cycleStart`, the reason in `meta`), with a key the caller made once per
+   * dialog (`adj:<uuid>`). A key already used throws `P2002`, which ends the
+   * transaction; the caller answers the existing row as a duplicate.
+   */
+  async adjustWithin(
+    client: Pick<PrismaTransactionClient, 'usageEntry'>,
+    orgId: string,
+    meter: MeterKey,
+    units: number,
+    options: { reason: string; actorId: string; idempotencyKey: string; cycleStart: Date },
+  ): Promise<UsageEntry> {
+    if (!Number.isFinite(units) || units === 0) {
+      throw new RangeError('An adjustment must be a non-zero, finite amount.');
+    }
+    meterDef(meter);
+    assertKey(options.idempotencyKey);
+    return this.repository.insert(client, {
+      organizationId: orgId,
+      meter,
+      units: units > 0 ? toMilli(units) : -toMilli(-units),
+      kind: UsageKind.ADJUSTMENT,
+      idempotencyKey: options.idempotencyKey,
+      refId: null,
+      reversesId: null,
+      cycleStart: options.cycleStart,
+      meta: { reason: options.reason.slice(0, 200) },
+      createdBy: options.actorId,
+    });
   }
 
   /**

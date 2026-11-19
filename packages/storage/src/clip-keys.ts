@@ -84,6 +84,18 @@ const CLIP_PREFIX_PATTERN = new RegExp(
   `^clips/${ORG}/(?:${UUID}/|${JOB_FOLDERS}/(?:${UUID}/)?|library/)?$`,
 );
 
+/** True for a prefix a listing may read: every Clips file (`clips/`) or one a delete may take. */
+export function isValidClipListPrefix(prefix: string): boolean {
+  return prefix === 'clips/' || isValidClipPrefix(prefix);
+}
+
+/** Throws for a listing prefix outside the Clips space. */
+export function assertValidClipListPrefix(prefix: string): void {
+  if (!isValidClipListPrefix(prefix)) {
+    throw new Error('Refusing to list a private prefix PostGear did not generate');
+  }
+}
+
 const MAX_KIND_LENGTH = 48;
 const MAX_NAME_LENGTH = 64;
 

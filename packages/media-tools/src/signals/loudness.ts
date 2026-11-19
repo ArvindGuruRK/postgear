@@ -14,6 +14,7 @@
 import { readFile, rm } from 'node:fs/promises';
 import * as path from 'node:path';
 import { binTrack, type SignalTrack } from '@postgear/video-engine';
+import { INPUT_PROTOCOL_ALLOWLIST } from '../ffmpeg/probe';
 import { defaultTimeoutMs, FFMPEG_HEAD, runFfmpeg } from '../ffmpeg/run';
 import type { RunTool } from '../run/types';
 import { parseMetadataPrint } from './metadata';
@@ -28,6 +29,8 @@ const KEY = 'lavfi.r128.S';
 export function loudnessArgs(audioFile: string): string[] {
   return [
     ...FFMPEG_HEAD,
+    '-protocol_whitelist',
+    INPUT_PROTOCOL_ALLOWLIST,
     '-i',
     audioFile,
     '-vn',

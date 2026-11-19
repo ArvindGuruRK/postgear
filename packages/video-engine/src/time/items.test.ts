@@ -1,5 +1,5 @@
 import { createClipDocument } from '../document/create';
-import { MAX_ITEMS, MAX_TRACKS } from '../document/limits';
+import { MAX_ITEMS, MAX_SOUNDS, MAX_STICKERS, MAX_TRACKS } from '../document/limits';
 import {
   type AudioItem,
   type ClipDocument,
@@ -188,6 +188,50 @@ describe('addItem', () => {
     }
     expect(busy.tracks).toHaveLength(MAX_TRACKS);
     expect(addItem(busy, sticker('n', 0, 1_000))).toEqual({ ok: false, code: 'too_many_tracks' });
+  });
+
+  it(`refuses the sticker and the sound past ${MAX_STICKERS} and ${MAX_SOUNDS}, added or copied`, () => {
+    let full = empty();
+    for (let i = 0; i < MAX_STICKERS; i += 1) {
+      full = ok(addItem(full, sticker('n', (i % 10) * 3_000, 1_000))).doc;
+    }
+    for (let i = 0; i < MAX_SOUNDS; i += 1) {
+      const item = sound((i % 10) * 3_000, 1_000);
+      full = ok(addItem(full, i % 2 ? { ...item, type: 'music', anchor: 'clip' } : item)).doc;
+    }
+    expect(clipDocumentSchema.safeParse(full).success).toBe(true);
+
+    expect(addItem(full, sticker('n', 0, 1_000))).toEqual({ ok: false, code: 'too_many_stickers' });
+    expect(addItem(full, sound(0, 1_000))).toEqual({ ok: false, code: 'too_many_sounds' });
+    const stickerId = full.tracks.find((track) => track.kind === 'overlay')?.items[0]?.id as string;
+    const soundId = full.tracks.find((track) => track.kind === 'audio')?.items[0]?.id as string;
+    expect(duplicateItem(full, stickerId)).toEqual({ ok: false, code: 'too_many_stickers' });
+    expect(duplicateItem(full, soundId)).toEqual({ ok: false, code: 'too_many_sounds' });
+    // Text has no cap of its own.
+    expect(addItem(full, defaultTextItem(full, 0)).ok).toBe(true);
+  });
+
+  it('the schema refuses a document past the sticker or the sound cap, however it was made', () => {
+    const issues = (d: ClipDocument) => {
+      const parsed = clipDocumentSchema.safeParse(d);
+      return parsed.success ? [] : parsed.error.issues.map((issue) => issue.message);
+    };
+    const stickers = Array.from({ length: MAX_STICKERS + 1 }, (_, i) =>
+      sticker(`stk_${i}`, i * 1_000, 500),
+    );
+    expect(issues(doc(stickers))).toEqual([`A clip can hold up to ${MAX_STICKERS} stickers`]);
+    expect(issues(doc(stickers.slice(0, MAX_STICKERS)))).toEqual([]);
+
+    const sounds = Array.from({ length: MAX_SOUNDS + 1 }, (_, i) => ({
+      ...sound(i * 1_000, 500),
+      id: `snd_${i}`,
+    }));
+    const withSounds = (items: AudioItem[]): ClipDocument => ({
+      ...empty(),
+      tracks: [{ id: 'trk_sound', kind: 'audio', items }],
+    });
+    expect(issues(withSounds(sounds))).toEqual([`A clip can hold up to ${MAX_SOUNDS} sounds`]);
+    expect(issues(withSounds(sounds.slice(0, MAX_SOUNDS)))).toEqual([]);
   });
 });
 

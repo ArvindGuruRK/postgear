@@ -11,12 +11,13 @@ import { CLIP_ERROR_MESSAGES } from '@postgear/video-engine';
 
 export const CLIPS_MESSAGES = {
   ...CLIP_ERROR_MESSAGES,
-  JOB_NOT_FOUND: 'We could not find that job.',
+  // Creators never see the word "job" (Module 20 copy check): it is what they started.
+  JOB_NOT_FOUND: 'We could not find this. It may have been removed.',
   JOB_FINISHED: 'This has already finished.',
   JOB_NOT_STARTED: 'We could not start this right now. It will start on its own in a minute.',
   CANCEL_UNREACHABLE: 'We could not reach the video tools to stop this. Try again in a minute.',
   STREAM_STOPPED: 'Live progress stopped. Reload to see the latest.',
-  JOB_GONE: 'This job is no longer there.',
+  JOB_GONE: 'This is no longer there. Reload to see the latest.',
   TOOLS_NOT_RUNNING: 'The video tools are not running right now. Try again in a few minutes.',
   FILE_LINK_INVALID: 'This link has expired. Go back and open the file again.',
   FILE_NOT_FOUND: 'We could not find that file.',
@@ -43,6 +44,8 @@ export const CLIPS_MESSAGES = {
     'This clip has grown too large to save. Remove some items and try again.',
   CLIP_DELETED: 'Clip deleted.',
   MORE_VIDEO_THROTTLED: 'We are already getting more of the video. Try again in a few seconds.',
+  /** Module 19: the global ceiling on waiting jobs (503 `clips_busy`). */
+  BUSY: 'Clips is very busy right now. Try again in a few minutes.',
   MORE_VIDEO_TOO_LONG: 'We can get up to an hour of extra video at a time.',
   // Module 18: downloads.
   DOWNLOAD_DELETED: 'Download deleted.',

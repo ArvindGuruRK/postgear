@@ -36,6 +36,15 @@ const REDACTED_KEYS = [
   'credential',
   'refreshtoken',
   'clientsecret',
+  // Clips (Sprint 12, Module 20): the Twitch client id, S3 key ids and the
+  // yt-dlp proxy (it can carry a user name and password) are not passwords,
+  // but none of them belongs in a log line either.
+  'clientid',
+  'client_id',
+  'client-id',
+  'accesskey',
+  'access_key',
+  'proxy',
 ];
 
 const REDACTION_PLACEHOLDER = '[REDACTED]';
@@ -172,7 +181,17 @@ export type SecurityEvent =
   // another workspace's id is the stale-client-or-probe question once more.
   | 'studio.unsafe_url'
   | 'studio.logo_rejected'
-  | 'studio.foreign_reference';
+  | 'studio.foreign_reference'
+  // Clips and plans as data (Sprint 12, Modules 19 and 20): the abuse limits
+  // on the routes that start work, a plan refusal and every plan, override
+  // or usage change (research 12 section 12), and the operator screens: a
+  // refused operator route and every operator write.
+  | 'clips.throttled'
+  | 'clips.busy'
+  | 'entitlement.refused'
+  | 'entitlement.changed'
+  | 'operator.denied'
+  | 'operator.action';
 
 export class SecurityLogger {
   private readonly logger = new Logger('Security');

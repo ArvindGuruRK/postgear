@@ -124,7 +124,33 @@ export interface RenderRun {
   watermark?: WatermarkFile | null;
   /** The clock for the proof's 24 hours (tests pass their own). */
   now?: () => Date;
+  /** `CLIPS_SIMULATION` (Module 20): the forcing markers in the clip's name apply. */
+  simulated?: boolean;
   heartbeat(): void;
+}
+
+/**
+ * Module 20's forcing markers, read from the clip's name under
+ * `CLIPS_SIMULATION` only: `[simulate:render-fail]` fails an export,
+ * `[simulate:preview-fail]` fails a Preview Export. The job carries the name
+ * as its file name, where the colon became a space, so both are read.
+ */
+export const RENDER_FAIL_MARKER = '[simulate:render-fail]';
+export const PREVIEW_FAIL_MARKER = '[simulate:preview-fail]';
+const RENDER_FAIL = /\[simulate[: ]render-fail\]/i;
+const PREVIEW_FAIL = /\[simulate[: ]preview-fail\]/i;
+
+/** The forced failure for this render, or null (always null outside simulation). */
+export function forcedRenderFailure(run: Pick<RenderRun, 'input' | 'simulated'>): ClipStepError | null {
+  if (run.simulated !== true) return null;
+  if (run.input.proof) {
+    return PREVIEW_FAIL.test(run.input.name)
+      ? new ClipStepError('preview_failed', { retryable: false })
+      : null;
+  }
+  return RENDER_FAIL.test(run.input.name)
+    ? new ClipStepError('export_failed', { retryable: false })
+    : null;
 }
 
 export interface RenderOutcome {
@@ -253,6 +279,8 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
 
 export async function renderExecute(run: RenderRun, plan: RenderPlan): Promise<RenderedClip> {
   await run.progress.report({ stage: 'rendering', progress: 10 });
+  const forced = forcedRenderFailure(run);
+  if (forced) throw forced;
   const priority = priorityOf(run.input);
 
   // Pass 1: measure the mix (seconds); a clip with no sound skips both passes.

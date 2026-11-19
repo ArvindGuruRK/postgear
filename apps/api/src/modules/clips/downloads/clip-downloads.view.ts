@@ -15,6 +15,7 @@
  * - `cancelled`: CANCELLED (never listed; the route may still answer it).
  */
 import type { ClipJob } from '@postgear/db';
+import { CLIP_SAVE_DOWNLOAD_TIMEOUT_MS } from '@postgear/scheduling';
 import {
   type DownloadMedia,
   downloadInputSchema,
@@ -69,6 +70,30 @@ export function downloadOutputOf(job: Pick<ClipJob, 'status' | 'output'>) {
   return parsed.success ? parsed.data : null;
 }
 
+/**
+ * A `saving` is taken as ended this long after it started: the workflow's own
+ * limit, and a minute for the moment between the row's write and the start.
+ */
+export const SAVE_TO_MEDIA_STALE_MS = CLIP_SAVE_DOWNLOAD_TIMEOUT_MS + 60_000;
+
+/**
+ * Save To Media's state as the row reads at `now`. A `saving` older than
+ * `SAVE_TO_MEDIA_STALE_MS` reads as `failed`: its workflow has ended by then
+ * without writing (a start that was lost, a worker that went away), so the
+ * button comes back and the person can ask again. A row written before
+ * `startedAt` was kept is timed from its last write.
+ */
+export function saveMediaOf(
+  media: DownloadMedia | null | undefined,
+  job: Pick<ClipJob, 'updatedAt'>,
+  now: Date,
+): DownloadMedia | null {
+  if (media?.status !== 'saving') return media ?? null;
+  const started = media.startedAt ? Date.parse(media.startedAt) : job.updatedAt.getTime();
+  if (now.getTime() - started < SAVE_TO_MEDIA_STALE_MS) return media;
+  return { status: 'failed', mediaId: null };
+}
+
 /** The row's state at `now` (see the header). */
 export function downloadStateOf(
   job: Pick<ClipJob, 'status' | 'output' | 'expiresAt'>,
@@ -92,7 +117,7 @@ export function toDownloadView(job: ClipJob, now: Date = new Date()): DownloadVi
   const input = inputOf(job);
   const output = downloadOutputOf(job);
   const state = downloadStateOf(job, now);
-  const media = output?.media ?? null;
+  const media = saveMediaOf(output?.media, job, now);
   const ext = output?.ext ?? (input.audioOnly ? 'mp3' : 'mp4');
   return {
     id: job.id,

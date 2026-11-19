@@ -30,6 +30,7 @@ import {
   Post,
   Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import type { Response } from 'express';
@@ -41,6 +42,8 @@ import {
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
 import { ClipDownloadsService } from '../downloads/clip-downloads.service';
+import { ClipStart } from '../limits/clips-create.guard';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 import { ClipUploadsService } from './clip-uploads.service';
 import {
   type CompleteUploadInput,
@@ -58,6 +61,8 @@ import { ClipVideosService } from './clip-videos.service';
 
 @Controller('clips/videos')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipVideosController {
   constructor(
     private readonly videos: ClipVideosService,
@@ -66,6 +71,7 @@ export class ClipVideosController {
   ) {}
 
   @Post()
+  @ClipStart()
   async import(
     @CurrentOrg() org: ActiveOrg,
     @CurrentUser() user: AuthenticatedUser,
@@ -88,6 +94,7 @@ export class ClipVideosController {
   // --- Uploads (declared before `:videoId`, though the shapes never meet) ------
 
   @Post('uploads')
+  @ClipStart()
   @HttpCode(HttpStatus.CREATED)
   startUpload(
     @CurrentOrg() org: ActiveOrg,
@@ -126,6 +133,7 @@ export class ClipVideosController {
   }
 
   @Post(':videoId/retry')
+  @ClipStart()
   @HttpCode(HttpStatus.OK)
   retry(
     @CurrentOrg() org: ActiveOrg,
@@ -142,6 +150,7 @@ export class ClipVideosController {
   }
 
   @Post(':videoId/download-original')
+  @ClipStart()
   @HttpCode(HttpStatus.OK)
   downloadOriginal(@CurrentOrg() org: ActiveOrg, @Param('videoId') videoId: string) {
     return this.downloads.downloadOriginal(org.id, videoId);

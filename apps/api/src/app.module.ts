@@ -7,6 +7,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { ThrottlingModule } from './common/throttling/throttling.module';
 import { validateEnv } from './config/env';
+import { AdminModule } from './modules/admin/admin.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -16,10 +17,10 @@ import { AutomationRunsModule } from './modules/automations/runs/automation-runs
 import { BillingModule } from './modules/billing/billing.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { ClipsModule } from './modules/clips/clips.module';
-import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
-import { DiscoverModule } from './modules/discover/discover.module';
 import { DevelopersModule } from './modules/developers/developers.module';
+import { DiscoverModule } from './modules/discover/discover.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
 import { MediaModule } from './modules/media/media.module';
@@ -109,6 +110,8 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
     // Sprint 12: plans as data (limits and meters), and Clips.
     EntitlementsModule,
     ClipsModule,
+    // Sprint 12, Module 19: the operator screens (platform operators only).
+    AdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

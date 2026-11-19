@@ -101,7 +101,10 @@ export function SoundRow({
         <PreviewButton name={sound.name} playing={playing} onToggle={() => onPreview(sound)} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-baseline gap-2">
-            <span className="min-w-0 flex-1 truncate font-sans text-sm text-ink type-ui">
+            <span
+              className="min-w-0 flex-1 truncate font-sans text-sm text-ink type-ui"
+              title={sound.name}
+            >
               {sound.name}
             </span>
             <span className="shrink-0 font-sans text-xs tabular-nums text-ink type-muted">

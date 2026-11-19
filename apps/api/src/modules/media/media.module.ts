@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 import { MediaController } from './media.controller';
 import { MediaRepository } from './media.repository';
 import { MediaService } from './media.service';
@@ -69,6 +70,8 @@ export function storageConfigFrom(config: ConfigService<Env, true>): StorageConf
  * one. Avatars use the backend directly and never create a `Media` row.
  */
 @Module({
+  // Module 19: an uploaded video's poster and length start on the media worker.
+  imports: [SchedulingModule],
   controllers: [MediaController],
   providers: [
     MediaService,

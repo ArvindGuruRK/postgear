@@ -217,7 +217,8 @@ export class ClipDownloadsService {
    * Save To Media: a ready MP4 at or under Media's video limit is copied to
    * the Media library by the worker (`clipSaveDownloadWorkflow`), which makes
    * its poster and the Media row. The row reads "Saving to Media" meanwhile.
-   * Asking again while it saves, or after it saved, answers the row as it is.
+   * Asking again while it saves, or after it saved, answers the row as it is;
+   * a save past its time limit reads as failed and starts again.
    */
   async saveToMedia(orgId: string, jobId: string): Promise<{ download: DownloadView }> {
     const job = await this.require(orgId, jobId);

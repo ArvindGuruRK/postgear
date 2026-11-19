@@ -20,6 +20,7 @@ import {
   loadWatermark,
   toolPaths,
   type WatermarkFile,
+  clearStaleScratch,
 } from '@postgear/media-tools';
 import {
   MEDIA_QUICK_CONCURRENCY,
@@ -31,7 +32,7 @@ import {
 } from '@postgear/scheduling';
 import { createPrivateStorage, createStorage } from '@postgear/storage';
 import type { Duration } from '@temporalio/common';
-import type { WorkerEnv } from '../config/env';
+import { servesRole, type WorkerEnv } from '../config/env';
 import {
   clipsSimulated,
   fontsDirFrom,
@@ -43,6 +44,7 @@ import type { ClipActivityDeps } from './deps';
 import { createClipInternalClient } from './internal-client';
 import { createClipProviders } from './providers';
 import { bootRefusal, createClipRuntime, doctorLogLines } from './runtime';
+import { selfUpdateYtDlp } from './yt-dlp-update';
 
 /** Activity slots on the publishing worker (see the comment in `index.ts`). */
 export const PUBLISHING_ACTIVITY_SLOTS = 64;
@@ -169,12 +171,22 @@ export async function bootClips(
   env: WorkerEnv,
   roles: { render: boolean },
 ): Promise<ClipActivityDeps> {
-  const paths = toolPaths(env as unknown as Record<string, string | undefined>);
-  const runTool = createRunTool(paths);
   const scratchRoot = scratchRootFrom(env);
   await mkdir(scratchRoot, { recursive: true });
+  // Module 19: job folders a crash left behind (idle for two hours) go before any job runs.
+  const cleared = await clearStaleScratch(scratchRoot);
+  if (cleared > 0) console.log(`[clips] Removed ${cleared} scratch folders left by an earlier crash.`);
 
   const simulation = clipsSimulated(env);
+  // Module 20: with YTDLP_SELF_UPDATE, jobs use an updated copy of yt-dlp from the scratch folder.
+  const { paths } = await selfUpdateYtDlp({
+    enabled: env.YTDLP_SELF_UPDATE === 'true',
+    simulation,
+    importsLinks: servesRole(env, 'media'),
+    paths: toolPaths(env as unknown as Record<string, string | undefined>),
+    scratchRoot,
+  });
+  const runTool = createRunTool(paths);
   const runtime = createClipRuntime({
     runTool,
     paths,

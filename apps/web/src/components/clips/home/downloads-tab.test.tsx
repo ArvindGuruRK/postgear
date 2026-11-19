@@ -2,6 +2,7 @@ import { TooltipProvider } from '@postgear/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
+import { ApiError } from '@/lib/api';
 import type { DownloadView } from '@/types/clips';
 import { fixtureJob } from '../clips-fixtures';
 import {
@@ -16,11 +17,13 @@ import type { DownloadsState } from './use-downloads';
 jest.mock('@/lib/clips-api', () => ({
   ...jest.requireActual('@/lib/clips-api'),
   saveDownloadToMedia: jest.fn(),
+  saveDownloadFile: jest.fn(async () => undefined),
   deleteDownload: jest.fn(async () => undefined),
 }));
 
 const clipsApi = jest.requireMock('@/lib/clips-api') as {
   saveDownloadToMedia: jest.Mock;
+  saveDownloadFile: jest.Mock;
   deleteDownload: jest.Mock;
 };
 
@@ -115,18 +118,35 @@ describe('DownloadsTab', () => {
 });
 
 describe('DownloadRow', () => {
-  it('a ready file: size, Save File to the file route, Save To Media and the expiry', () => {
+  it('a ready file: size, Save File, Save To Media and the expiry', async () => {
     row(view());
     expect(screen.getByText('720p, 190 MB')).toBeInTheDocument();
-    const save = screen.getByRole('link', { name: 'Save File' });
-    expect(save.getAttribute('href')).toMatch(/\/clips\/downloads\/dl-1\/file$/);
     expect(screen.getByRole('button', { name: 'Save To Media' })).toBeEnabled();
     expect(screen.getByText('Expires in 23 hours')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save File' }));
+    });
+    expect(clipsApi.saveDownloadFile).toHaveBeenCalledWith('dl-1');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('Save File shows the API sentence in the row when the file is gone, never its JSON', async () => {
+    clipsApi.saveDownloadFile.mockRejectedValueOnce(
+      new ApiError('This download has expired. Prepare it again.', 410, 'download_expired'),
+    );
+    row(view());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save File' }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This download has expired. Prepare it again.',
+    );
+    expect(screen.getByRole('button', { name: 'Save File' })).toBeEnabled();
   });
 
   it('an MP3 has Save File but no Save To Media', () => {
     row(view({ label: 'Audio Only', audioOnly: true, ext: 'mp3', canSaveToMedia: false }));
-    expect(screen.getByRole('link', { name: 'Save File' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save File' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save To Media' })).not.toBeInTheDocument();
   });
 
@@ -141,7 +161,7 @@ describe('DownloadRow', () => {
       }),
     );
     expect(screen.getByText('Getting your file, 40%')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Save File' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save File' })).not.toBeInTheDocument();
   });
 
   it('a failed file shows its reason', () => {
@@ -158,13 +178,13 @@ describe('DownloadRow', () => {
       }),
     );
     expect(screen.getByText('This quality is no longer offered.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Save File' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save File' })).not.toBeInTheDocument();
   });
 
   it('an expired file says Expired and keeps only the menu', () => {
     row(view({ expiresAt: '2026-11-18T09:00:00.000Z' }));
     expect(screen.getByText('Expired')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Save File' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save File' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save To Media' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'More for A Talk On Plans 2027' })).toBeEnabled();
   });

@@ -67,6 +67,7 @@ import { ClipPlaybackService } from '../videos/clip-playback.service';
 import { NO_VIDEO_MEDIA, signVideoMedia, type VideoMedia } from '../videos/clip-video-media';
 import { type ClipVideoView, toVideoView } from '../videos/clip-video-view';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
+import { ClipRetentionService } from '../retention/clip-retention.service';
 import { originOf } from '../videos/clip-videos.service';
 import {
   type CreateClipInput,
@@ -137,6 +138,7 @@ export class ClipItemService {
     private readonly limits: ClipLimitsGuard,
     private readonly playback: ClipPlaybackService,
     private readonly redis: RedisService,
+    private readonly retention: ClipRetentionService,
   ) {}
 
   async create(
@@ -200,13 +202,11 @@ export class ClipItemService {
         },
       });
       const job = segmentJob ? await this.jobsRepository.create(segmentJob, tx) : null;
-      await tx.clipVideo.updateMany({
-        where: { id: video.id, organizationId: orgId },
-        data: { lastUsedAt: new Date() },
-      });
       return { clip, job };
     });
 
+    // Module 19: making a clip counts as using its video (at most one write a day).
+    await this.retention.touchVideo(orgId, video.id);
     if (job) await this.jobs.start(job);
     return { clip: toClipView(clip), job: job ? toJobView(job) : null };
   }
@@ -219,6 +219,8 @@ export class ClipItemService {
     ]);
     const live = video && video.deletedAt === null && video.status !== 'REMOVED' ? video : null;
     const view = toClipView(clip, scheduled.has(clip.id));
+    // Module 19: opening a clip in the editor counts as using its video.
+    if (live) await this.retention.touchVideo(orgId, live.id);
 
     if (!live || !view.document) {
       return {
@@ -345,6 +347,8 @@ export class ClipItemService {
     if (!origin || (origin.type === 'link' && !video.hdAvailable)) {
       return { job: null, sharp: 'gone' };
     }
+    // Module 19: a wider sharp range adds to the video space, so it is checked like an import.
+    await this.limits.assertStorage(orgId, estimateSegmentBytes(range));
 
     const first = await this.redis.setIfAbsent(
       `clips:more-video:${orgId}:${clip.id}`,
@@ -541,4 +545,13 @@ export function videoNotFound(): NotFoundException {
     message: CLIPS_MESSAGES.VIDEO_NOT_FOUND,
     code: 'video_not_found',
   });
+}
+
+/** Stored bits a second of a sharp range (fetched at the best export height, up to 1080p). */
+const SEGMENT_BITS_PER_SECOND = 5_000_000;
+
+/** Module 19: what a sharp range of `range` (with its handles) adds to the video space, at most. */
+export function estimateSegmentBytes(range: SourceRange): number {
+  const seconds = Math.max(0, range.toMs - range.fromMs + 2 * HANDLE_MS) / 1000;
+  return Math.ceil((seconds * SEGMENT_BITS_PER_SECOND) / 8);
 }

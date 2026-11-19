@@ -64,7 +64,8 @@ export function createListerHttp(options: ListerHttpOptions = {}): ListerHttp {
     } catch {
       throw new ListingFailure('channel_listing_failed');
     }
-    if (!origins.has(target.origin)) {
+    // An origin leaves out a user name and password, so those are refused on their own.
+    if (!origins.has(target.origin) || target.username !== '' || target.password !== '') {
       throw new ListingFailure('channel_listing_failed');
     }
 

@@ -5,13 +5,16 @@ import { toolPaths } from '../run/paths';
 import { createRunTool } from '../run/runner';
 import { type RunTool, ToolError, type ToolPaths } from '../run/types';
 import {
+  buildStickerHeaderProbeArgs,
   buildStickerProbeArgs,
+  checkStickerHeader,
   fitSize,
   movingStickerArgs,
   normaliseSticker,
   previewStickerArgs,
   STICKER_FORMAT_ALLOWLIST,
   STICKER_LIMITS,
+  STICKER_MAX_PIXELS,
   StickerError,
   sniffStickerType,
   stickerFactsFromProbe,
@@ -28,7 +31,38 @@ describe('reading a picture', () => {
     const args = buildStickerProbeArgs('in.webp');
     expect(args).toEqual(expect.arrayContaining(['-format_whitelist', STICKER_FORMAT_ALLOWLIST]));
     expect(args).toEqual(expect.arrayContaining(['-protocol_whitelist', 'file', '-count_frames']));
+    expect(args.join(' ')).toContain('-max_pixels 16777216');
     expect(args.at(-1)).toBe('file:in.webp');
+  });
+
+  it('reads the header first: no frame counted, and no frame bigger than 4096 by 4096 decoded', () => {
+    expect(STICKER_MAX_PIXELS).toBe(16_777_216);
+    const args = buildStickerHeaderProbeArgs('in.webp');
+    expect(args).toEqual(expect.arrayContaining(['-format_whitelist', STICKER_FORMAT_ALLOWLIST]));
+    expect(args).toEqual(expect.arrayContaining(['-protocol_whitelist', 'file']));
+    expect(args.join(' ')).toContain('-max_pixels 16777216');
+    expect(args).not.toContain('-count_frames');
+    expect(args.join(' ')).not.toContain('frame=');
+    expect(args.at(-1)).toBe('file:in.webp');
+  });
+
+  it('the header check refuses a giant, a zero size and a video, and passes a picture', () => {
+    const code = (json: unknown) => {
+      try {
+        checkStickerHeader(json);
+        return 'ok';
+      } catch (error) {
+        return (error as StickerError).code;
+      }
+    };
+    expect(code(probeJson({ codec_name: 'png', width: 5000, height: 40 }))).toBe(
+      'sticker_unusable',
+    );
+    expect(code(probeJson({ codec_name: 'png', width: 0, height: 0 }))).toBe('sticker_unusable');
+    expect(code(probeJson({ codec_name: 'h264', width: 100, height: 100 }))).toBe(
+      'sticker_unusable',
+    );
+    expect(code(probeJson({ codec_name: 'gif', width: 4096, height: 4096 }, 'gif'))).toBe('ok');
   });
 
   it('says a one-frame picture is still and a many-frame one moves', () => {
@@ -228,7 +262,21 @@ describe('normaliseSticker (with a stand-in runner)', () => {
       bytes: 10_000,
       previewBytes: 10_000,
     });
-    expect(calls).toHaveLength(3);
+    // The header read, the counting read, the sticker and its grid picture.
+    expect(calls).toHaveLength(4);
+  });
+
+  it('refuses a picture too big on a side from its header, before any frame is counted', async () => {
+    const { runTool, calls } = fakeRunTool(
+      dir,
+      { 'in.png': probeJson({ codec_name: 'png', width: 5000, height: 40, nb_read_frames: 1 }) },
+      () => 1,
+    );
+    await expect(
+      normaliseSticker({ runTool, cwd: dir, input: 'in.png', outputBase: 's', targetPx: 512 }),
+    ).rejects.toMatchObject({ code: 'sticker_unusable' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).not.toContain('-count_frames');
   });
 
   it('makes a still smaller once when it is over 300 KB, then refuses', async () => {
@@ -428,6 +476,20 @@ describeWithFfmpeg('normaliseSticker (real FFmpeg)', () => {
       frames: 120,
       durationMs: 6_000,
     });
+  }, 60_000);
+
+  it('refuses a picture wider than 4096 px from its header', async () => {
+    await make(['-f', 'lavfi', '-i', 'color=c=blue:s=5000x40', '-frames:v', '1', 'wide.png']);
+    await expect(
+      normaliseSticker({
+        runTool,
+        cwd: dir,
+        input: 'wide.png',
+        outputBase: 'wide-out',
+        targetPx: 512,
+      }),
+    ).rejects.toMatchObject({ code: 'sticker_unusable' });
+    expect(existsSync(path.join(dir, 'wide-out.png'))).toBe(false);
   }, 60_000);
 
   it('refuses a file that is not a picture', async () => {

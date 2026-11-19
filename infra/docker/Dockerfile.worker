@@ -1,6 +1,305 @@
-# Dockerfile for PostGear Worker (Temporal + BullMQ)
-# TODO: Implement multi-stage Docker build for the worker process
+# syntax=docker/dockerfile:1.7
+#
+# PostGear worker image (Sprint 12, Module 20): one image for every worker
+# role. WORKER_ROLES picks the role at run time (publishing, media, render).
+#
+#   docker build -f infra/docker/Dockerfile.worker -t postgear-worker:local .
+#   docker compose --profile worker-image up worker      (local services, see docker-compose.yml)
+#
+# PRIVATE IMAGE. It contains GPL programs: FFmpeg and ffprobe from a GPL static
+# build (x264 and other GPL libraries compiled in). They run as separate
+# programs: the worker only starts them with argument arrays and swaps files
+# with them, it never links to them. Keep this image in a private registry and
+# never publish it: pushing it to a public registry is distributing those
+# programs, and the GPL's source offer then applies. Notices are in /licenses.
+#
+# What is in it:
+# - Debian 12 slim (glibc, which yt-dlp's standalone Linux executable needs)
+#   with Node 22. No browser of any kind: FFmpeg draws the video and libass
+#   draws the text, so nothing here draws a web page.
+# - FFmpeg 9.0.2 and ffprobe (FFmpeg-Builds "gpl" static, linked from
+#   ffmpeg.org; research 02, section 2.2), yt-dlp's official Linux executable
+#   and Deno (the JavaScript runtime yt-dlp needs for YouTube). Each one is
+#   pinned below and its SHA-256 checked before it is used. The build ends by
+#   running the Clips doctor (libass, libharfbuzz, libx264, `-/filter_complex`
+#   from a file, yt-dlp, Deno) and a one-frame text render; it fails if any
+#   check fails. The same check is the image's HEALTHCHECK.
+# - /usr/share/postgear-fonts (CLIPS_FONTS_DIR, the render's fonts folder):
+#   the TTF twins of the 52 Studio fonts (libass cannot read WOFF2; the twins
+#   are converted here by `npm run clips:fonts:build`, losslessly, and renamed
+#   so no Reserved Font Name is used), Noto Sans Tamil and Noto Sans
+#   Devanagari, and manifest.json, which must equal the manifest the export
+#   compiler was built with. Only OFL and Apache fonts ship; the Logo Lab's
+#   personal-use fonts are never in it. In system/: Noto Sans (Latin) and the
+#   one-colour Noto Emoji as fontconfig's last fallback. An export that ends
+#   up drawing any font outside its plan still fails with font_missing.
+# - A non-root user (postgear, 10001), the scratch folder
+#   /var/lib/postgear/scratch (CLIPS_SCRATCH_DIR, a volume), tini as PID 1 so
+#   programs that yt-dlp starts are always reaped.
+#
+# Keeping yt-dlp current: YTDLP_SELF_UPDATE (off by default). When "true", a
+# worker with the media role copies this image's yt-dlp into the scratch
+# volume at boot, runs yt-dlp's own updater on the copy and uses it, so link
+# imports keep working when a platform changes without waiting for a rebuild.
+# The trade-off: that copy was not checked by this build (yt-dlp checks it only
+# against its own release's checksums), and two workers on different days can
+# run different yt-dlp versions. Leave it off when you rebuild on purpose
+# (bump YTDLP_VERSION and YTDLP_SHA256 below); turn it on only where a rebuild
+# is slow. It does nothing under CLIPS_SIMULATION.
+#
+# Updating a pinned tool: change its version and SHA-256 together, taking the
+# SHA-256 from the release's own checksum file (FFmpeg-Builds checksums.sha256,
+# yt-dlp SHA2-256SUMS, Deno's .sha256sum), and rebuild. A different FFmpeg
+# version means the render parity tests must pass again (research 02, 4.4).
 
-# FROM node:20-alpine AS builder
-# WORKDIR /app
-# ...
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+
+# -----------------------------------------------------------------------------
+# tools: FFmpeg, ffprobe, yt-dlp, Deno and the fallback fonts, each pinned and
+# checked. Downloads only from the projects' own release pages.
+# -----------------------------------------------------------------------------
+FROM --platform=linux/amd64 ${NODE_IMAGE} AS tools
+SHELL ["/bin/bash", "-o", "pipefail", "-euc"]
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl xz-utils unzip \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /download
+
+# FFmpeg 9.0.2 GPL static (FFmpeg-Builds, the last build of October 2026,
+# kept for two years by their retention rule). SHA-256 from that release's
+# checksums.sha256.
+ARG FFMPEG_RELEASE=autobuild-2026-10-31-12-59
+ARG FFMPEG_NAME=ffmpeg-n9.0.2-39-g7adfbe40dc-linux64-gpl-9.0
+ARG FFMPEG_SHA256=73e29a56974ae5a651133a04584c7483b21afe941e17dc91d79814a758b608d3
+RUN curl -fsSL --retry 3 -o ffmpeg.tar.xz \
+      "https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/${FFMPEG_RELEASE}/${FFMPEG_NAME}.tar.xz" \
+ && echo "${FFMPEG_SHA256}  ffmpeg.tar.xz" | sha256sum -c - \
+ && tar -xJf ffmpeg.tar.xz \
+ && install -D -m 0755 "${FFMPEG_NAME}/bin/ffmpeg" /out/bin/ffmpeg \
+ && install -D -m 0755 "${FFMPEG_NAME}/bin/ffprobe" /out/bin/ffprobe \
+ && install -D -m 0644 "${FFMPEG_NAME}/LICENSE.txt" /out/licenses/ffmpeg/LICENSE.txt \
+ && rm -rf ffmpeg.tar.xz "${FFMPEG_NAME}"
+
+# yt-dlp's standalone Linux executable (glibc). SHA-256 from the release's
+# SHA2-256SUMS; the two notices from the same tag.
+ARG YTDLP_VERSION=2026.10.26
+ARG YTDLP_SHA256=767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795
+ARG YTDLP_LICENSE_SHA256=7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c
+ARG YTDLP_THIRD_PARTY_SHA256=472aefe951c7db35e1657c1d13fd337140511ed6f2b329205105ad441c5a02b7
+RUN curl -fsSL --retry 3 -o yt-dlp \
+      "https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux" \
+ && echo "${YTDLP_SHA256}  yt-dlp" | sha256sum -c - \
+ && install -D -m 0755 yt-dlp /out/bin/yt-dlp \
+ && curl -fsSL --retry 3 -o LICENSE \
+      "https://raw.githubusercontent.com/yt-dlp/yt-dlp/${YTDLP_VERSION}/LICENSE" \
+ && echo "${YTDLP_LICENSE_SHA256}  LICENSE" | sha256sum -c - \
+ && curl -fsSL --retry 3 -o THIRD_PARTY_LICENSES.txt \
+      "https://raw.githubusercontent.com/yt-dlp/yt-dlp/${YTDLP_VERSION}/THIRD_PARTY_LICENSES.txt" \
+ && echo "${YTDLP_THIRD_PARTY_SHA256}  THIRD_PARTY_LICENSES.txt" | sha256sum -c - \
+ && install -D -m 0644 LICENSE /out/licenses/yt-dlp/LICENSE \
+ && install -D -m 0644 THIRD_PARTY_LICENSES.txt /out/licenses/yt-dlp/THIRD_PARTY_LICENSES.txt \
+ && rm -f yt-dlp LICENSE THIRD_PARTY_LICENSES.txt
+
+# Deno for yt-dlp's YouTube challenges. SHA-256 from the release's .sha256sum.
+ARG DENO_VERSION=2.9.8
+ARG DENO_SHA256=e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609
+ARG DENO_LICENSE_SHA256=f62497fffecc0852960c8d3e6934b9db86d16396e9b604072e923892cae3a588
+RUN curl -fsSL --retry 3 -o deno.zip \
+      "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" \
+ && echo "${DENO_SHA256}  deno.zip" | sha256sum -c - \
+ && unzip -q deno.zip deno \
+ && install -D -m 0755 deno /out/bin/deno \
+ && curl -fsSL --retry 3 -o LICENSE.md \
+      "https://raw.githubusercontent.com/denoland/deno/v${DENO_VERSION}/LICENSE.md" \
+ && echo "${DENO_LICENSE_SHA256}  LICENSE.md" | sha256sum -c - \
+ && install -D -m 0644 LICENSE.md /out/licenses/deno/LICENSE.md \
+ && rm -f deno.zip deno LICENSE.md
+
+# The last-resort fonts fontconfig offers (OFL), from google/fonts at a fixed
+# commit: Noto Sans (Latin) and the one-colour Noto Emoji (libass draws one
+# colour; emoji in a clip become sticker overlays instead).
+ARG GOOGLE_FONTS_COMMIT=5bd87dfc525c8a0d1d8529d3684716e00c3fc59a
+ARG NOTO_SANS_SHA256=bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d
+ARG NOTO_SANS_OFL_SHA256=cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a
+ARG NOTO_EMOJI_SHA256=de6c18832938afc99caf132b39d6a30a19bac7f2e812e28db2535b4608d27551
+ARG NOTO_EMOJI_OFL_SHA256=500bb1ccf43df7bbb522112f9133a52b16e1c35e809632f5d8609b179152de5b
+RUN base="https://raw.githubusercontent.com/google/fonts/${GOOGLE_FONTS_COMMIT}/ofl" \
+ && curl -fsSL --retry 3 -o NotoSans.ttf "${base}/notosans/NotoSans%5Bwdth,wght%5D.ttf" \
+ && curl -fsSL --retry 3 -o OFL-NotoSans.txt "${base}/notosans/OFL.txt" \
+ && curl -fsSL --retry 3 -o NotoEmoji.ttf "${base}/notoemoji/NotoEmoji%5Bwght%5D.ttf" \
+ && curl -fsSL --retry 3 -o OFL-NotoEmoji.txt "${base}/notoemoji/OFL.txt" \
+ && printf '%s  %s\n' \
+      "${NOTO_SANS_SHA256}" NotoSans.ttf \
+      "${NOTO_SANS_OFL_SHA256}" OFL-NotoSans.txt \
+      "${NOTO_EMOJI_SHA256}" NotoEmoji.ttf \
+      "${NOTO_EMOJI_OFL_SHA256}" OFL-NotoEmoji.txt \
+    | sha256sum -c - \
+ && install -D -m 0644 NotoSans.ttf /out/fonts-system/NotoSans.ttf \
+ && install -D -m 0644 NotoEmoji.ttf /out/fonts-system/NotoEmoji.ttf \
+ && install -D -m 0644 OFL-NotoSans.txt /out/licenses/fonts/OFL-NotoSans.txt \
+ && install -D -m 0644 OFL-NotoEmoji.txt /out/licenses/fonts/OFL-NotoEmoji.txt \
+ && rm -f ./*.ttf ./*.txt
+
+# -----------------------------------------------------------------------------
+# manifests: the lockfile and every workspace's package.json, alone, so the
+# npm installs below are cached until one of them changes.
+# -----------------------------------------------------------------------------
+FROM --platform=linux/amd64 ${NODE_IMAGE} AS manifests
+SHELL ["/bin/bash", "-o", "pipefail", "-euc"]
+WORKDIR /src
+COPY . .
+RUN mkdir -p /manifests \
+ && cp package.json package-lock.json /manifests/ \
+ && for file in apps/*/package.json packages/*/package.json; do \
+      install -D -m 0644 "${file}" "/manifests/${file}"; \
+    done
+
+# -----------------------------------------------------------------------------
+# deps: everything the build needs (the worker, the database package with the
+# Prisma CLI, media-tools with the fonts script, and the root's TypeScript).
+# -----------------------------------------------------------------------------
+FROM --platform=linux/amd64 ${NODE_IMAGE} AS deps
+SHELL ["/bin/bash", "-o", "pipefail", "-euc"]
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates openssl \
+ && rm -rf /var/lib/apt/lists/*
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    npm_config_audit=false \
+    npm_config_fund=false \
+    npm_config_update_notifier=false
+WORKDIR /repo
+COPY --from=manifests /manifests/ ./
+RUN npm ci --include-workspace-root \
+      --workspace=@postgear/worker \
+      --workspace=@postgear/db \
+      --workspace=@postgear/media-tools
+
+# -----------------------------------------------------------------------------
+# build: the Prisma client, then the worker and every package it reaches,
+# compiled to plain JavaScript and laid out the way the image runs it.
+# -----------------------------------------------------------------------------
+FROM deps AS build
+COPY . .
+RUN node_modules/.bin/prisma generate --schema packages/db/prisma/schema.prisma
+RUN node_modules/.bin/tsc -p infra/docker/worker/tsconfig.build.json --outDir /build/out \
+ && node infra/docker/worker/prepare-runtime.js /repo /build/out /stage
+
+# -----------------------------------------------------------------------------
+# fonts: the render's fonts folder, by the same script as local work, and a
+# check that it matches the manifest committed in packages/video-engine.
+# -----------------------------------------------------------------------------
+FROM deps AS fonts
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+COPY infra/docker/worker/fonts-requirements.txt /tmp/fonts-requirements.txt
+RUN python3 -m venv /opt/fonts-venv \
+ && /opt/fonts-venv/bin/pip install --no-cache-dir --disable-pip-version-check \
+      --require-hashes --no-deps --only-binary=:all: -r /tmp/fonts-requirements.txt
+COPY tsconfig.json ./
+COPY packages/design-engine/ packages/design-engine/
+COPY packages/video-engine/ packages/video-engine/
+COPY packages/media-tools/ packages/media-tools/
+RUN tr -d '\r' < packages/video-engine/src/render/fonts-manifest.ts > /tmp/committed-manifest.ts \
+ && CLIPS_FONTS_PYTHON=/opt/fonts-venv/bin/python npm run clips:fonts:build -- --out /out/fonts \
+ && tr -d '\r' < packages/video-engine/src/render/fonts-manifest.ts > /tmp/built-manifest.ts \
+ && if ! cmp -s /tmp/committed-manifest.ts /tmp/built-manifest.ts; then \
+      echo 'The fonts built here differ from packages/video-engine/src/render/fonts-manifest.ts.' >&2; \
+      echo 'Run npm run clips:fonts:build locally, commit the manifest, and build again.' >&2; \
+      exit 1; \
+    fi \
+ && mkdir -p /out/licenses \
+ && cp /out/fonts/OFL.txt /out/fonts/LICENSES.md /out/fonts/OFL-Noto.txt /out/licenses/
+
+# -----------------------------------------------------------------------------
+# runtime-deps: production dependencies of the worker only (no TypeScript, no
+# test tools), gathered in /runtime with any nested folders. npm still brings
+# the Prisma CLI as @prisma/client's optional peer: it is removed (the client
+# is generated in `build`, migrations never run from this image), and so are
+# Temporal's native bridges for the other four platforms.
+# -----------------------------------------------------------------------------
+FROM --platform=linux/amd64 ${NODE_IMAGE} AS runtime-deps
+SHELL ["/bin/bash", "-o", "pipefail", "-euc"]
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    npm_config_audit=false \
+    npm_config_fund=false \
+    npm_config_update_notifier=false
+WORKDIR /app
+COPY --from=manifests /manifests/ ./
+RUN npm ci --omit=dev --workspace=@postgear/worker \
+ && npm cache clean --force \
+ && rm -rf node_modules/prisma node_modules/.bin/prisma \
+      node_modules/@prisma/engines node_modules/@prisma/engines-version \
+      node_modules/@prisma/fetch-engine node_modules/@prisma/get-platform node_modules/@prisma/debug \
+ && bridges=node_modules/@temporalio/core-bridge/releases \
+ && if [ -d "${bridges}/x86_64-unknown-linux-gnu" ]; then \
+      find "${bridges}" -mindepth 1 -maxdepth 1 ! -name x86_64-unknown-linux-gnu -exec rm -rf {} +; \
+    fi \
+ && mkdir -p /runtime \
+ && mv node_modules /runtime/node_modules \
+ && for dir in apps/* packages/*; do \
+      if [ -d "${dir}/node_modules" ]; then \
+        mkdir -p "/runtime/${dir}" && mv "${dir}/node_modules" "/runtime/${dir}/node_modules"; \
+      fi; \
+    done
+
+# -----------------------------------------------------------------------------
+# runtime: the image.
+# -----------------------------------------------------------------------------
+FROM --platform=linux/amd64 ${NODE_IMAGE} AS runtime
+SHELL ["/bin/bash", "-o", "pipefail", "-euc"]
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates openssl tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --system --gid 10001 postgear \
+ && useradd --system --uid 10001 --gid postgear --create-home --home-dir /home/postgear \
+      --shell /usr/sbin/nologin postgear
+
+# Outside programs, fonts and notices.
+COPY --from=tools /out/bin/ /opt/postgear/bin/
+COPY --from=tools /out/licenses/ /licenses/
+COPY --from=tools /out/fonts-system/ /usr/share/postgear-fonts/system/
+COPY --from=fonts /out/fonts/ /usr/share/postgear-fonts/
+COPY --from=fonts /out/licenses/ /licenses/fonts/
+COPY infra/docker/worker/fonts.conf /etc/fonts/postgear-fonts.conf
+COPY infra/docker/worker/licenses/README.txt /licenses/README.txt
+RUN { /opt/postgear/bin/ffmpeg -hide_banner -version; echo; /opt/postgear/bin/ffmpeg -hide_banner -buildconf; } \
+      > /licenses/ffmpeg/BUILD.txt \
+ && find /usr/share/postgear-fonts /licenses /etc/fonts/postgear-fonts.conf -type f -exec chmod 0644 {} + \
+ && mkdir -p /var/lib/postgear/scratch /var/cache/postgear-fontconfig \
+ && chown postgear:postgear /var/lib/postgear/scratch /var/cache/postgear-fontconfig
+
+# The worker: production node_modules, the Prisma client, the compiled code.
+WORKDIR /app
+COPY --from=manifests /manifests/package.json ./package.json
+COPY --from=runtime-deps /runtime/ ./
+COPY --from=build /repo/node_modules/.prisma/ ./node_modules/.prisma/
+COPY --from=build /stage/ ./
+COPY infra/docker/worker/healthcheck.js ./bin/healthcheck.js
+
+ENV NODE_ENV=production \
+    HOME=/home/postgear \
+    PATH=/opt/postgear/bin:${PATH} \
+    FFMPEG_PATH=/opt/postgear/bin/ffmpeg \
+    FFPROBE_PATH=/opt/postgear/bin/ffprobe \
+    YTDLP_PATH=/opt/postgear/bin/yt-dlp \
+    YTDLP_JS_RUNTIME=/opt/postgear/bin/deno \
+    YTDLP_SELF_UPDATE=false \
+    CLIPS_FONTS_DIR=/usr/share/postgear-fonts \
+    CLIPS_SCRATCH_DIR=/var/lib/postgear/scratch \
+    FONTCONFIG_FILE=/etc/fonts/postgear-fonts.conf
+
+USER postgear
+
+# The doctor, the fonts and a one-frame text render, as the image's own user:
+# the build fails here if any of them is not right. It also fills the
+# fontconfig cache.
+RUN node bin/healthcheck.js --render
+
+VOLUME ["/var/lib/postgear/scratch"]
+
+HEALTHCHECK --interval=5m --timeout=90s --start-period=2m --start-interval=15s --retries=3 \
+  CMD ["node", "/app/bin/healthcheck.js", "--quiet"]
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "apps/worker/dist/apps/worker/src/index.js"]

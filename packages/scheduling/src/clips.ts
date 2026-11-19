@@ -125,8 +125,19 @@ export function clipSaveDownloadWorkflowId(jobId: string): string {
   return `clip-save-download:${jobId}`;
 }
 
-/** Copying at most 250 MB and one poster: a stuck save ends instead of saying "Saving" for ever. */
-export const CLIP_SAVE_DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
+/**
+ * Save To Media's time, smallest to largest, so the workflow always outlives
+ * its own retries and writes `failed` itself:
+ * - one try at the copy (at most 250 MB down and up again, one poster);
+ * - both tries with the minute between them: the activity's
+ *   `scheduleToCloseTimeout`;
+ * - the whole save, the failure bookkeeping included: the workflow's
+ *   execution limit. The API reads a `saving` row older than this as failed
+ *   (its workflow has ended by then), so the person can ask again.
+ */
+export const CLIP_SAVE_DOWNLOAD_ATTEMPT_MS = 12 * 60_000;
+export const CLIP_SAVE_DOWNLOAD_WORK_MS = 25 * 60_000;
+export const CLIP_SAVE_DOWNLOAD_TIMEOUT_MS = 35 * 60_000;
 
 /** Cancelling a clip job reuses the publishing `CANCEL_SIGNAL` (`workflows.ts`). */
 
@@ -226,6 +237,10 @@ export const CLIP_NOTIFICATION_TITLES = {
   videoFailed: 'Your video could not be imported',
   exportReady: 'Your clip is ready',
   exportFailed: 'Your clip could not be exported',
+  // Module 19: retention, rights requests and the storage notice (the API writes these).
+  videoExpiring: 'A video will be removed soon',
+  videoRemoved: 'A video was removed',
+  storageOverLimit: 'Your videos are over your plan',
 } as const;
 
 /** The longest line under a title: platform titles can be long. */
@@ -279,6 +294,48 @@ export function clipFailedLine(name: string, reason: string, kind: 'video' | 'cl
 /** The line under "Your clip is ready". */
 export function clipExportReadyLine(clipTitle: string): string {
   return capLine(`${quotedName(clipTitle, 'Your clip')} is in Media, ready to post.`);
+}
+
+/** Module 19: the line under "A video will be removed soon". */
+export function clipVideoExpiringLine(videoTitle: string): string {
+  return capLine(`${quotedName(videoTitle, 'Your video')} will be removed in 3 days. Open it to keep it longer.`);
+}
+
+/** Module 19: the line under "A video was removed" when nobody opened it for `days` days. */
+export function clipVideoExpiredLine(videoTitle: string, days: number): string {
+  const n = Math.max(1, Math.floor(days));
+  return capLine(
+    `${quotedName(videoTitle, 'Your video')} was removed because nobody opened it for ${n} ${n === 1 ? 'day' : 'days'}.`,
+  );
+}
+
+/** Module 19: the line under "A video was removed" after a rights request. */
+export const CLIP_VIDEO_RIGHTS_REMOVED_LINE = 'A video was removed after a request from its owner.';
+
+/**
+ * Module 19: the line under "Your videos are over your plan", to a tenth of a
+ * gigabyte rounded the way the space meter beside it rounds (so the two never
+ * disagree). Only where plain rounding would hide the overrun ("1 GB, over your
+ * plan's 1 GB") does the amount used round up instead.
+ */
+export function clipStorageOverLine(usedGb: number, limitGb: number): string {
+  const safe = (value: number) => (Number.isFinite(value) && value > 0 ? value : 0);
+  // The meter's steps: tenths under 100 GB, whole gigabytes from there.
+  const step = (value: number) => (safe(value) >= 100 ? 1 : 10);
+  const round = (value: number) => Math.round(safe(value) * step(value)) / step(value);
+  const limit = round(limitGb);
+  let used = round(usedGb);
+  if (used <= limit && safe(usedGb) > safe(limitGb)) {
+    const per = step(usedGb);
+    used = Math.max(Math.ceil(safe(usedGb) * per) / per, Math.round((limit + 1 / per) * per) / per);
+  }
+  const fmt = (value: number) => value.toLocaleString('en-GB');
+  return `Your videos use ${fmt(used)} GB, over your plan's ${fmt(limit)} GB. Delete some, or upgrade, to bring in more.`;
+}
+
+/** Module 19: the Clips page's Videos tab sorted by size, where the storage notice leads. */
+export function clipVideosBySizePath(organizationId: string): string {
+  return `/${organizationId}/clips?tab=videos&sort=size`;
 }
 
 /** A QUEUED job older than this with no running workflow is started by the reconcile. */
@@ -353,7 +410,33 @@ export const CLIP_INTERNAL_ROUTES = {
    * to the resolver and the ledger it needs.
    */
   reconcile: `${CLIP_INTERNAL_PREFIX}/reconcile`,
+  /**
+   * Module 19: the housekeeping pass (`ClipSweepService`): expiry notices and
+   * removals, expired downloads, abandoned uploads, stale sharp ranges,
+   * unused workspace stickers and sounds, old failed imports, the charge
+   * backstop, the storage notice, and once a day the orphan files and the
+   * override expiry. Each part in its own try, a bounded batch per pass.
+   */
+  sweep: `${CLIP_INTERNAL_PREFIX}/sweep`,
 } as const;
+
+/** Module 19: what one sweep pass did, part by part (counts only). */
+export interface ClipSweepAnswer {
+  noticed: number;
+  expired: number;
+  downloads: number;
+  uploads: number;
+  segments: number;
+  library: number;
+  failedImports: number;
+  charges: number;
+  storageNotices: number;
+  /** Null when the daily parts did not run in this pass. */
+  orphans: { objects: number; deleted: number; missing: number } | null;
+  overridesExpired: number | null;
+  /** Parts that threw (by name); the rest still ran. */
+  failedParts: string[];
+}
 
 export interface ClipSettledBody {
   organizationId: string;

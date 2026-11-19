@@ -28,6 +28,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { Role } from '@postgear/db';
 import { type ActiveOrg, CurrentOrg } from '../../../common/decorators/current-org.decorator';
@@ -44,9 +45,12 @@ import {
   listStreamsQuerySchema,
 } from './clip-channels.schemas';
 import { ClipChannelsService } from './clip-channels.service';
+import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/channels')
 @Roles(Role.ADMIN, Role.USER)
+// Module 19: `clips.enabled` on every route, through the resolver.
+@UseGuards(ClipsEnabledGuard)
 export class ClipChannelsController {
   constructor(private readonly channels: ClipChannelsService) {}
 

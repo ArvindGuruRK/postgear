@@ -117,6 +117,7 @@ jest.mock('./use-clip-autosave', () => ({
       status: autosave.status,
       refusal: autosave.refusal,
       flush: async () => true,
+      flushRevision: async () => 1,
       retry: jest.fn(),
       replace: jest.fn(),
       letGo: jest.fn(),
@@ -325,7 +326,10 @@ describe('the shape dialog', () => {
   ])('%s sets the shape as one undo step', async (name, ratio) => {
     renderEditor(makeDoc(false));
     const dialog = screen.getByTestId('clip-shape-dialog');
-    expect(within(dialog).getByText('What Do You Want To Make?')).toBeInTheDocument();
+    // Named by its title (Module 20 a11y finding: an id of our own on the
+    // title had left the dialog with no name), the tiles by their own label.
+    expect(screen.getByRole('dialog', { name: 'What Do You Want To Make?' })).toBe(dialog);
+    expect(within(dialog).getByRole('group', { name: 'Shape' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Close' })).toBeNull();
 
     fireEvent.click(within(dialog).getByRole('button', { name: new RegExp(`^${name}`) }));

@@ -43,7 +43,7 @@ import {
   TooltipHint,
 } from '@postgear/ui';
 import { CLIP_MAX_MS } from '@postgear/video-engine';
-import { CircleAlert, Film } from 'lucide-react';
+import { CircleAlert, Clock, Film } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { getVideo } from '@/lib/clips-api';
@@ -54,7 +54,8 @@ import { useClipJob } from '../use-clip-job';
 import {
   deleteVideoSentence,
   etaLabel,
-  keptUntilLine,
+  keptUntilView,
+  OPEN_TO_KEEP_HINT,
   stageLabel,
   videoMetaLine,
 } from './home-model';
@@ -85,6 +86,7 @@ export function VideoCard({
   orgId,
   actions,
   follow = true,
+  showSize = false,
   className,
 }: {
   card: ClipVideoCard;
@@ -92,6 +94,8 @@ export function VideoCard({
   actions: VideoCardActions;
   /** Follow a busy card's job live (off only in the playground, which has no API). */
   follow?: boolean;
+  /** Module 19: sorted by size, the meta line says what the video keeps. */
+  showSize?: boolean;
   className?: string;
 }) {
   const { video } = card;
@@ -134,7 +138,7 @@ export function VideoCard({
 
   const href = `/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(video.id)}`;
   const poster = video.posterUrl && !posterFailed ? video.posterUrl : null;
-  const kept = keptUntilLine(video.expiresAt);
+  const kept = keptUntilView(video.expiresAt);
   const tooLongForWhole = (video.durationMs ?? 0) > CLIP_MAX_MS;
   const canDownloadOriginal =
     actions.onDownloadOriginal !== undefined &&
@@ -196,9 +200,23 @@ export function VideoCard({
         <h3 className="m-0 line-clamp-2 type-heading text-base text-ink" title={video.title}>
           {video.title}
         </h3>
-        <p className="m-0 font-sans text-xs text-ink type-muted">{videoMetaLine(card)}</p>
+        <p className="m-0 font-sans text-xs text-ink type-muted">
+          {videoMetaLine(card, { withSize: showSize })}
+        </p>
         {video.status === 'READY' && kept ? (
-          <p className="m-0 font-sans text-xs text-ink type-muted">{kept}</p>
+          kept.soon ? (
+            <p
+              className="m-0 inline-flex items-center gap-1 font-sans text-xs font-bold text-accentInk"
+              data-testid="clips-video-removed-soon"
+              title={OPEN_TO_KEEP_HINT}
+            >
+              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+              {kept.text}
+              <span className="sr-only">. {OPEN_TO_KEEP_HINT}</span>
+            </p>
+          ) : (
+            <p className="m-0 font-sans text-xs text-ink type-muted">{kept.text}</p>
+          )
         ) : null}
 
         {video.status === 'FAILED' ? (

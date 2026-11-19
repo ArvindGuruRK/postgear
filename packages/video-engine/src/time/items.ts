@@ -10,7 +10,7 @@
  * `anchorAfterRetime` from here.
  */
 import { newId } from '../document/create';
-import { ITEM_MIN_MS, MAX_ITEMS, MAX_TRACKS } from '../document/limits';
+import { ITEM_MIN_MS, MAX_ITEMS, MAX_SOUNDS, MAX_STICKERS, MAX_TRACKS } from '../document/limits';
 import type {
   Anchor,
   AudioTrack,
@@ -28,6 +28,10 @@ export type ItemRefusalCode =
   | 'item_not_found'
   /** The clip already holds `MAX_ITEMS`. */
   | 'too_many_items'
+  /** The clip already holds `MAX_SOUNDS` sounds. */
+  | 'too_many_sounds'
+  /** The clip already holds `MAX_STICKERS` stickers. */
+  | 'too_many_stickers'
   /** Every track is busy at that time and the clip already has `MAX_TRACKS` tracks. */
   | 'too_many_tracks';
 
@@ -73,6 +77,34 @@ export function countItems(doc: ClipDocument): number {
   return count;
 }
 
+/** How many items of one kind the clip holds (`sfx` and `music` are counted apart). */
+function countOfType(doc: ClipDocument, type: TimedItem['type']): number {
+  let count = 0;
+  for (const track of doc.tracks) {
+    if (track.kind === 'captions') continue;
+    for (const item of track.items as TimedItem[]) if (item.type === type) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Why one more item of `type` would break a cap (the schema's: every item,
+ * the sounds, the stickers), or null when it fits.
+ */
+function capRefusal(doc: ClipDocument, type: TimedItem['type']): ItemRefusalCode | null {
+  if (countItems(doc) >= MAX_ITEMS) return 'too_many_items';
+  if (type === 'sticker' && countOfType(doc, 'sticker') >= MAX_STICKERS) {
+    return 'too_many_stickers';
+  }
+  if (
+    (type === 'sfx' || type === 'music') &&
+    countOfType(doc, 'sfx') + countOfType(doc, 'music') >= MAX_SOUNDS
+  ) {
+    return 'too_many_sounds';
+  }
+  return null;
+}
+
 /** Every id the document uses, so a new one never clashes. */
 export function usedIds(doc: ClipDocument): Set<string> {
   const ids = new Set<string>();
@@ -113,15 +145,17 @@ function withTrackItems(doc: ClipDocument, trackIndex: number, items: TimedItem[
  * Copies an item to just after itself on the same track, with a new id and
  * everything else the same. When it does not fit after the original, it
  * ends with the clip instead (overlapping the original, which the timeline
- * shows on a second row). Refused past `MAX_ITEMS`.
+ * shows on a second row). Refused past `MAX_ITEMS`, `MAX_SOUNDS` or
+ * `MAX_STICKERS`.
  */
 export function duplicateItem(doc: ClipDocument, itemId: string): ItemEditResult {
   const found = findItem(doc, itemId);
   if (!found) {
     return { ok: false, code: 'item_not_found' };
   }
-  if (countItems(doc) >= MAX_ITEMS) {
-    return { ok: false, code: 'too_many_items' };
+  const refused = capRefusal(doc, found.item.type);
+  if (refused) {
+    return { ok: false, code: refused };
   }
   const { item, trackIndex, itemIndex } = found;
   const total = outputDuration(doc);
@@ -184,11 +218,13 @@ function fitWindow(start: number, duration: number, total: number): { start: num
  * track with room at their time, sounds on the first sound track with room;
  * when none has room, a new track of that kind is added on top (drawn and
  * heard above the others). The item gets a fresh id of its kind (the `id`
- * it carries is ignored) and is kept inside the clip.
+ * it carries is ignored) and is kept inside the clip. Refused past
+ * `MAX_ITEMS`, `MAX_SOUNDS` or `MAX_STICKERS`.
  */
 export function addItem(doc: ClipDocument, item: TimedItem): ItemEditResult {
-  if (countItems(doc) >= MAX_ITEMS) {
-    return { ok: false, code: 'too_many_items' };
+  const refused = capRefusal(doc, item.type);
+  if (refused) {
+    return { ok: false, code: refused };
   }
   const total = outputDuration(doc);
   const window = fitWindow(item.start, item.duration, total);

@@ -58,8 +58,9 @@ describe('refusal sentences', () => {
     expect(refusalMessage('channel_limit', { n: 1 })).toBe(
       'Your plan allows 1 channel. Remove one to add another.',
     );
-    expect(refusalMessage('clips_ai_minutes_used', { need: 1, n: 0, date: DEC_1 })).toMatch(
-      /^This needs 1 AI minute and you have 0 left\./,
+    // None left never reads "you have 0 left" (Module 20 edge cases).
+    expect(refusalMessage('clips_ai_minutes_used', { need: 1, n: 0, date: DEC_1 })).toBe(
+      'This workspace has used all its AI minutes for this month. They come back on 1 December, or you can upgrade the plan.',
     );
   });
 

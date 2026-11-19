@@ -10,7 +10,12 @@
  *   checked against a strict pattern, never from user text;
  * - proxy, cookies and extractor settings come from the operator's env only.
  */
-import type { ClipPlatformId, LinkRef } from '@postgear/video-engine';
+import {
+  type ClipPlatformId,
+  isLinkRefusal,
+  type LinkRef,
+  recogniseLink,
+} from '@postgear/video-engine';
 import { jsRuntimeArg } from '../run/paths';
 import type { ToolPaths } from '../run/types';
 import { YTDLP_PROGRESS_TEMPLATE } from './progress';
@@ -39,8 +44,12 @@ const CANONICAL_HOSTS: Readonly<Record<ClipPlatformId, readonly string[]>> = Obj
 /** yt-dlp's own network timeout, in seconds. */
 export const YTDLP_SOCKET_TIMEOUT_SEC = 20;
 
-/** A format id from yt-dlp we are willing to put in `-f`: no selector syntax can hide in it. */
-export const FORMAT_ID_PATTERN = /^[A-Za-z0-9_.-]{1,80}$/;
+/**
+ * A format id from yt-dlp we are willing to put in `-f`: no selector syntax
+ * can hide in it, and it never starts with a dash or a dot, so even a
+ * platform's own text can never read as a flag (security sweep, Module 20).
+ */
+export const FORMAT_ID_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,79}$/;
 
 /** What every yt-dlp call needs from the environment. */
 export interface YtDlpConfig {
@@ -102,6 +111,18 @@ export function assertCanonicalUrl(link: LinkRef): string {
     hosts === undefined ||
     !hosts.includes(url.hostname) ||
     /[\0\r\n\s]/.test(link.canonicalUrl)
+  ) {
+    throw new DownloaderError('link_not_a_video', { retryable: false });
+  }
+  // The address must be the very one recognition rebuilds from this id: a
+  // list page, another video or extra parameters on an allowed host are
+  // refused here too, not only upstream (security sweep, Module 20).
+  const again = recogniseLink(link.canonicalUrl);
+  if (
+    isLinkRefusal(again) ||
+    again.platform !== link.platform ||
+    again.externalId !== link.externalId ||
+    again.canonicalUrl !== link.canonicalUrl
   ) {
     throw new DownloaderError('link_not_a_video', { retryable: false });
   }

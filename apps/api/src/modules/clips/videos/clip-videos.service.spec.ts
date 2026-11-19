@@ -4,6 +4,7 @@
  * would order two conflicting ones), a ledger that counts charges and
  * reversals, and a probe that answers a fixed link. No database, no network.
  */
+
 import { randomUUID } from 'node:crypto';
 import { ConflictException, HttpException } from '@nestjs/common';
 import type { ClipJob, ClipVideo } from '@postgear/db';
@@ -14,12 +15,18 @@ import type { ClipJobsRepository, NewClipJob } from '../jobs/clip-jobs.repositor
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { ClipLinkProber } from '../links/clip-links.types';
+import type { ClipRetentionService } from '../retention/clip-retention.service';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import type { ClipPlaybackService } from './clip-playback.service';
 import { type ClipSampleLink, SIMULATION_SAMPLE_LINK, sampleLinkFor } from './clip-sample';
-import { importVideoSchema } from './clip-videos.schema';
 import type { ClipVideosRepository } from './clip-videos.repository';
-import { ClipVideosService, replayedOf } from './clip-videos.service';
+import { importVideoSchema } from './clip-videos.schema';
+import {
+  ClipVideosService,
+  decodeSizeCursor,
+  encodeSizeCursor,
+  replayedOf,
+} from './clip-videos.service';
 
 /** One transaction at a time, in arrival order: a lost race reads the winner's rows. */
 let txChain: Promise<unknown> = Promise.resolve();
@@ -67,6 +74,8 @@ const INFO: LinkInfo = {
   formats: [],
 };
 
+let sizes: Array<{ id: string; bytes: number }> = [];
+
 function build(options: { sampleUrl?: string | null } = {}) {
   const charges: string[] = [];
   const reversals: string[] = [];
@@ -86,6 +95,32 @@ function build(options: { sampleUrl?: string | null } = {}) {
         store.videos.find((video) => video.id === id && video.deletedAt === null) ?? null,
     ),
     findCard: jest.fn(async () => null),
+    // Module 19: biggest first.
+    listIdsBySize: jest.fn(
+      async (
+        _org: string,
+        params: { cursor: { bytes: number; id: string } | null; take: number },
+      ) =>
+        [...sizes]
+          .sort((a, b) => b.bytes - a.bytes || (a.id < b.id ? 1 : -1))
+          .filter(
+            (one) =>
+              !params.cursor ||
+              one.bytes < params.cursor.bytes ||
+              (one.bytes === params.cursor.bytes && one.id < params.cursor.id),
+          )
+          .slice(0, params.take),
+    ),
+    cardsByIds: jest.fn(async (_org: string, ids: string[]) =>
+      ids.map((id) => ({
+        ...(store.videos.find((video) => video.id === id) ?? {}),
+        id,
+        assets: [],
+        jobs: [],
+        _count: { clips: 0 },
+      })),
+    ),
+    countLive: jest.fn(async () => sizes.length),
     latestImport: jest.fn(
       async (_org: string, videoId: string) =>
         [...store.jobs].reverse().find((job) => job.videoId === videoId) ?? null,
@@ -189,6 +224,10 @@ function build(options: { sampleUrl?: string | null } = {}) {
     ),
   };
   const storage = { deletePrefix: jest.fn(async () => undefined) };
+  const retention = {
+    touchVideo: jest.fn(async () => false),
+    removeVideo: jest.fn(async () => null),
+  };
 
   const service = new ClipVideosService(
     repository as unknown as ClipVideosRepository,
@@ -202,13 +241,15 @@ function build(options: { sampleUrl?: string | null } = {}) {
     {
       url: options.sampleUrl === undefined ? SIMULATION_SAMPLE_LINK : options.sampleUrl,
     } as ClipSampleLink,
+    retention as unknown as ClipRetentionService,
   );
-  return { service, charges, reversals, jobs, jobsRepository, limits, storage, prober };
+  return { service, charges, reversals, jobs, jobsRepository, limits, storage, prober, retention };
 }
 
 const BODY = { url: 'https://www.twitch.tv/videos/900000001', rightsConfirmed: true };
 
 beforeEach(() => {
+  sizes = [];
   store.videos = [];
   store.jobs = [];
   txFails = null;
@@ -485,5 +526,40 @@ describe('replayedOf (Module 16)', () => {
         { startMs: 30_000, endMs: 36_000, value: 1 },
       ],
     });
+  });
+});
+
+describe('See What Uses Space: sort by size (Module 19)', () => {
+  const id = (n: number) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
+
+  it('lists the biggest first with each size, 24 a page, and pages on (bytes, id)', async () => {
+    sizes = Array.from({ length: 30 }, (_, i) => ({ id: id(i + 1), bytes: (i + 1) * 1_000_000 }));
+    store.videos = sizes.map((one) => videoRow({ id: one.id }));
+    const { service } = build();
+
+    const first = await service.list(TEST_ORG, { sort: 'size' });
+    expect(first.videos).toHaveLength(24);
+    expect(first.videos[0]).toMatchObject({ video: { id: id(30) }, storedBytes: 30_000_000 });
+    expect(first.videos[23]).toMatchObject({ storedBytes: 7_000_000 });
+    expect(first.total).toBe(30);
+    expect(first.nextCursor).not.toBeNull();
+
+    const second = await service.list(TEST_ORG, {
+      sort: 'size',
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(second.videos.map((card) => card.storedBytes)).toEqual([
+      6_000_000, 5_000_000, 4_000_000, 3_000_000, 2_000_000, 1_000_000,
+    ]);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('reads the size cursor back, and refuses a date cursor or garbage as the first page', () => {
+    const cursor = encodeSizeCursor({ bytes: 42, id: id(1) });
+    expect(decodeSizeCursor(cursor)).toEqual({ bytes: 42, id: id(1) });
+    expect(
+      decodeSizeCursor(Buffer.from(`2026-11-19T00:00:00.000Z|${id(1)}`).toString('base64url')),
+    ).toBeNull();
+    expect(decodeSizeCursor('not-a-cursor')).toBeNull();
   });
 });

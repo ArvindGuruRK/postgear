@@ -40,6 +40,10 @@ export const NOTIFICATION_TYPES = [
   'clip_video_failed',
   'clip_export_ready',
   'clip_export_failed',
+  // Module 19: retention and the storage notice, in-app only like the rest.
+  'clip_video_expiring',
+  'clip_video_removed',
+  'clip_storage_over_limit',
   'info',
 ] as const;
 
@@ -85,6 +89,9 @@ export const AUDIENCE_BY_TYPE: Record<NotificationType, EmailAudience> = {
   clip_video_failed: 'none',
   clip_export_ready: 'none',
   clip_export_failed: 'none',
+  clip_video_expiring: 'none',
+  clip_video_removed: 'none',
+  clip_storage_over_limit: 'none',
   info: 'none',
 };
 
@@ -107,6 +114,9 @@ export const DEFAULT_TITLES: Record<NotificationType, string> = {
   clip_video_failed: CLIP_NOTIFICATION_TITLES.videoFailed,
   clip_export_ready: CLIP_NOTIFICATION_TITLES.exportReady,
   clip_export_failed: CLIP_NOTIFICATION_TITLES.exportFailed,
+  clip_video_expiring: CLIP_NOTIFICATION_TITLES.videoExpiring,
+  clip_video_removed: CLIP_NOTIFICATION_TITLES.videoRemoved,
+  clip_storage_over_limit: CLIP_NOTIFICATION_TITLES.storageOverLimit,
   info: 'Notification',
 };
 
@@ -226,6 +236,9 @@ const LOOK: Record<NotificationType, { tone: Tone; badge: string; heading: strin
   clip_video_failed: { tone: 'danger', badge: 'Clips', heading: 'Import Failed' },
   clip_export_ready: { tone: 'success', badge: 'Clips', heading: 'Clip Ready' },
   clip_export_failed: { tone: 'danger', badge: 'Clips', heading: 'Export Failed' },
+  clip_video_expiring: { tone: 'warning', badge: 'Clips', heading: 'Video Removed Soon' },
+  clip_video_removed: { tone: 'warning', badge: 'Clips', heading: 'Video Removed' },
+  clip_storage_over_limit: { tone: 'warning', badge: 'Clips', heading: 'Video Space Full' },
   info: { tone: 'brand', badge: 'Notification', heading: null },
 };
 
@@ -297,6 +310,9 @@ function subjectFor(type: NotificationType, title: string, meta: NotificationMet
     case 'clip_video_failed':
     case 'clip_export_ready':
     case 'clip_export_failed':
+    case 'clip_video_expiring':
+    case 'clip_video_removed':
+    case 'clip_storage_over_limit':
     case 'info':
       return `${SUBJECT_PREFIX} ${title}`;
   }
@@ -377,6 +393,9 @@ function factsFor(type: NotificationType, meta: NotificationMeta, createdAt: Dat
     case 'clip_video_failed':
     case 'clip_export_ready':
     case 'clip_export_failed':
+    case 'clip_video_expiring':
+    case 'clip_video_removed':
+    case 'clip_storage_over_limit':
     case 'info':
       return facts;
   }
@@ -429,6 +448,12 @@ function linkLabel(type: NotificationType): string {
     case 'clip_export_ready':
     case 'clip_export_failed':
       return 'Open The Clip';
+    case 'clip_video_expiring':
+      return 'Open The Video';
+    case 'clip_video_removed':
+      return 'Open Clips';
+    case 'clip_storage_over_limit':
+      return 'See What Uses Space';
     case 'info':
       return 'Open PostGear';
   }

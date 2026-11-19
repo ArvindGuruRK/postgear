@@ -9,6 +9,7 @@
 import type { ClipJob } from '@postgear/db';
 import {
   CLIP_JOB_OUTPUT_SCHEMAS,
+  CLIP_JOB_STAGES,
   type ClipError,
   type ClipJobKind,
   type ClipPlatformId,
@@ -50,15 +51,21 @@ const storedErrorSchema = z.object({
 /** Codes whose sentence names the platform, so the stored sentence is kept. */
 const PLATFORM_CODES = new Set(['platform_resting', 'platform_paused']);
 
+/** Our codes are short snake_case words; anything else is shown as `tool_failed`. */
+const CODE = /^[a-z][a-z0-9_]{1,63}$/;
+
 /**
  * The error a person reads. The worker stores our own sentence, but the view
  * re-derives it from the code anyway, so a row written by an older worker
- * (or tampered with) can never put other text on a page.
+ * (or tampered with) can never put other text on a page. The code itself is
+ * answered too, so one that is not a plain word (a path, a key, a tool's
+ * line) becomes `tool_failed` (security sweep, Module 20).
  */
 export function errorOf(raw: unknown): ClipError | null {
   const parsed = storedErrorSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const { code, message } = parsed.data;
+  const { message } = parsed.data;
+  const code = CODE.test(parsed.data.code) ? parsed.data.code : 'tool_failed';
   if (PLATFORM_CODES.has(code)) {
     const platform = /^(YouTube|Twitch|Kick) /.exec(message)?.[1]?.toLowerCase() as
       | ClipPlatformId
@@ -101,6 +108,16 @@ function resultOf(kind: ClipJobKind, raw: unknown): ClipJobView['result'] {
   }
 }
 
+/**
+ * The step, only when it is one of the kind's steps from the contract. Any
+ * other text on the row (a bug, or a row changed by hand) reads as none, so
+ * it never reaches a page (security sweep, Module 20).
+ */
+function stageOf(kind: ClipJobKind, stage: string | null): string | null {
+  if (stage === null) return null;
+  return (CLIP_JOB_STAGES[kind] as readonly string[]).includes(stage) ? stage : null;
+}
+
 /** Whether a RENDER job is a Preview Export (its input says so). */
 function isProof(job: Pick<ClipJob, 'kind' | 'input'>): boolean {
   if (job.kind !== 'RENDER' || !job.input || typeof job.input !== 'object') return false;
@@ -112,12 +129,13 @@ export function toJobView(
   eta: { samples: readonly ProgressSample[]; priorSeconds: number | null } | null = null,
 ): ClipJobView {
   const running = job.status === 'RUNNING';
+  const stage = stageOf(job.kind, job.stage);
   return {
     id: job.id,
     kind: job.kind,
     status: job.status,
-    stage: job.stage,
-    stageLabel: jobLabel(job.kind, job.status, job.stage, { proof: isProof(job) }),
+    stage,
+    stageLabel: jobLabel(job.kind, job.status, stage, { proof: isProof(job) }),
     progress: Math.max(0, Math.min(100, Math.round(job.progress))),
     etaSeconds: running && eta ? estimateEtaSeconds(eta.samples, eta.priorSeconds) : null,
     videoId: job.videoId,

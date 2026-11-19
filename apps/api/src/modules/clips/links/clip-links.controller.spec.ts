@@ -7,6 +7,7 @@ import { type INestApplication, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import helmet from 'helmet';
 import request from 'supertest';
+import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { ClipLinksController } from './clip-links.controller';
 import { CLIP_LINK_PROBER } from './clip-links.types';
 import { ClipThumbnailsService } from './clip-thumbnails.service';
@@ -22,6 +23,8 @@ describe('ClipLinksController thumbnail', () => {
       controllers: [ClipLinksController],
       providers: [
         { provide: CLIP_LINK_PROBER, useValue: {} },
+        // Module 19: ClipsEnabledGuard; the thumbnail route is public, so it is never asked.
+        { provide: EntitlementResolver, useValue: { assert: jest.fn() } },
         { provide: ClipThumbnailsService, useValue: { fetch: fetchThumbnail, linkFor: jest.fn() } },
       ],
     }).compile();

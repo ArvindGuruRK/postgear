@@ -148,6 +148,20 @@ describe('the DOWNLOAD job schemas', () => {
       downloadOutputSchema.safeParse({ ...output, media: { status: 'saving', mediaId: null } })
         .success,
     ).toBe(true);
+    // When the save started, so a save whose workflow ended without a word can be asked again.
+    const startedAt = '2026-11-19T10:00:00.000Z';
+    expect(
+      downloadOutputSchema.safeParse({
+        ...output,
+        media: { status: 'saving', mediaId: null, startedAt },
+      }).success,
+    ).toBe(true);
+    expect(
+      downloadOutputSchema.safeParse({
+        ...output,
+        media: { status: 'saving', mediaId: null, startedAt: 'yesterday' },
+      }).success,
+    ).toBe(false);
     expect(downloadOutputSchema.safeParse({ ...output, ext: 'm4a' }).success).toBe(false);
   });
 });

@@ -71,6 +71,7 @@ model Organization {
   entitlementOverrides     OrgEntitlementOverride[]
   usageEntries             UsageEntry[]
   clipVideos               ClipVideo[]
+  clipStorageNotice        ClipStorageNotice?
   clipAssets               ClipAsset[]
   clips                    Clip[]
   clipHighlightRuns        ClipHighlightRun[]
@@ -292,6 +293,9 @@ model Media {
   durationMs         Int?
   fps                Float?
   origin             String?
+  /// Module 19: when the video facts step last tried this row (poster and
+  /// length), so a file that cannot be read is not tried on every pass.
+  factsCheckedAt     DateTime?
   organization       Organization @relation(fields: [organizationId], references: [id])
   userPicture        User[]
   oauthApps          OAuthApp[]
@@ -1874,6 +1878,9 @@ model ClipVideo {
   rightsTextVersion   Int?
   lastUsedAt          DateTime        @default(now())
   expiresAt           DateTime?
+  /// Module 19: when the "removed in 3 days" notice went out; cleared when
+  /// the date moves forward again, so a later expiry gets its own notice.
+  expiryNoticeAt      DateTime?
   /// expired | deleted | rights_request
   removedReason       String?
   createdById         String?
@@ -1935,6 +1942,9 @@ model Clip {
   /// Output length, copied from the document.
   durationMs              Int
   lastExportedRevision    Int?
+  /// Module 19: set when the clip's video was removed. The exported Media row
+  /// stays; the clip cannot be edited or exported again without its video.
+  removedAt               DateTime?
   /// A hash of what the export drew, so a rename does not make it look out of date.
   lastExportedFingerprint String?
   exportedMediaId         String?
@@ -2244,6 +2254,34 @@ model ClipLibraryMiss {
   lastAt DateTime @updatedAt
 
   @@id([term, kind])
+}
+
+// ============================================================================
+// Sprint 12, Module 19: Rights requests and the storage notice
+// ============================================================================
+
+/// A video removed after a request from its owner. No relation: it applies to
+/// every workspace, and probe and import refuse a link that matches it.
+model ClipBlockedVideo {
+  id         String       @id @default(uuid())
+  platform   ClipPlatform
+  externalId String
+  reason     String
+  /// The operator's User id; null for the script.
+  createdBy  String?
+  createdAt  DateTime     @default(now())
+
+  @@unique([platform, externalId])
+}
+
+/// One row while a workspace's videos use more space than its plan allows
+/// (after a downgrade or a lower plan value). The sweep makes it, sends the
+/// notice once (`notifiedAt`) and deletes it when the workspace is under again.
+model ClipStorageNotice {
+  organizationId String       @id
+  overSince      DateTime     @default(now())
+  notifiedAt     DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================================

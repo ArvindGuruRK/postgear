@@ -33,6 +33,7 @@ export function videoRow(overrides: Partial<ClipVideo> = {}): ClipVideo {
     rightsTextVersion: 1,
     lastUsedAt: EPOCH,
     expiresAt: null,
+    expiryNoticeAt: null,
     removedReason: null,
     createdById: TEST_USER,
     deletedAt: null,

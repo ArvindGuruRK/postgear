@@ -45,20 +45,21 @@ import {
 import { stripControlChars } from '../../../common/sanitize';
 import { UsageService } from '../../entitlements/usage.service';
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
+import { type ClipPublishedPost, publishedPostsOf } from '../clip/clip-posts.service';
+import { type ClipState, clipStateOf, scheduledClipIds } from '../clip/clip-state';
+import { exportProgressOf } from '../clip/export-progress';
+import { storedDocumentRange } from '../clip/sharp-source';
 import { ClipErrorException } from '../clip-error.exception';
 import { isUuid } from '../clips.ids';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { serializable } from '../clips.tx';
+import { type HighlightsView, highlightsOf } from '../highlights/clip-highlights.view';
 import { type ClipJobView, toJobView } from '../jobs/clip-job-view';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard, estimateImport } from '../limits/clip-limits.guard';
 import { CLIP_LINK_PROBER, type ClipLinkProber } from '../links/clip-links.types';
-import { type ClipPublishedPost, publishedPostsOf } from '../clip/clip-posts.service';
-import { type ClipState, clipStateOf, scheduledClipIds } from '../clip/clip-state';
-import { exportProgressOf } from '../clip/export-progress';
-import { type HighlightsView, highlightsOf } from '../highlights/clip-highlights.view';
-import { storedDocumentRange } from '../clip/sharp-source';
+import { ClipRetentionService } from '../retention/clip-retention.service';
 import { ClipPlaybackService } from './clip-playback.service';
 import { CLIP_RIGHTS_TEXT_VERSION } from './clip-rights';
 import { ClipSampleLink } from './clip-sample';
@@ -67,6 +68,7 @@ import { type ClipVideoView, KIND_ENUM, PLATFORM_ENUM, toVideoView } from './cli
 import {
   type ClipSummaryRow,
   ClipVideosRepository,
+  type SizeCursor,
   type VideoCursor,
   type VideoWithCard,
 } from './clip-videos.repository';
@@ -86,6 +88,8 @@ export interface ClipVideoCard {
   job: ClipJobView | null;
   /** Module 06: the video's clips that are not hidden (what the Clips tab's All counts). */
   clipCount: number;
+  /** Module 19: bytes the video keeps (every file but Preview Exports), on list cards. */
+  storedBytes?: number;
 }
 
 /** A clip on its video's page: never the document. */
@@ -148,6 +152,7 @@ export class ClipVideosService {
     @Inject(CLIP_LINK_PROBER) private readonly prober: ClipLinkProber,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
     private readonly sample: ClipSampleLink,
+    private readonly retention: ClipRetentionService,
   ) {}
 
   // ---- Import ----------------------------------------------------------------
@@ -255,11 +260,15 @@ export class ClipVideosService {
 
   // ---- Reads -------------------------------------------------------------------
 
-  /** Newest first (or oldest), 24 a page, with a cursor for the next page. */
+  /**
+   * Newest first (or oldest, or (Module 19) biggest first), 24 a page, with a
+   * cursor for the next page. Each card carries the bytes its video keeps.
+   */
   async list(
     orgId: string,
     query: ListVideosQuery,
   ): Promise<{ videos: ClipVideoCard[]; nextCursor: string | null; total: number }> {
+    if (query.sort === 'size') return this.listBySize(orgId, query.cursor ?? null);
     const cursor = query.cursor ? decodeCursor(query.cursor) : null;
     const [rows, total] = await Promise.all([
       this.repository.list(orgId, { sort: query.sort, cursor, take: VIDEOS_PAGE_SIZE + 1 }),
@@ -267,16 +276,50 @@ export class ClipVideosService {
     ]);
     const page = rows.slice(0, VIDEOS_PAGE_SIZE);
     const last = page[page.length - 1];
+    const sizes = await this.repository.storedBytesOf(
+      orgId,
+      page.map((row) => row.id),
+    );
     return {
-      videos: await Promise.all(page.map((row) => this.cardView(row))),
+      videos: await Promise.all(page.map((row) => this.cardView(row, sizes.get(row.id) ?? 0))),
       nextCursor: rows.length > VIDEOS_PAGE_SIZE && last ? encodeCursor(last) : null,
       total,
     };
   }
 
-  /** One video with its signed addresses, its newest import and its clips. */
+  /** Module 19: biggest first, for See What Uses Space. */
+  private async listBySize(
+    orgId: string,
+    rawCursor: string | null,
+  ): Promise<{ videos: ClipVideoCard[]; nextCursor: string | null; total: number }> {
+    const cursor = rawCursor ? decodeSizeCursor(rawCursor) : null;
+    const [ids, total] = await Promise.all([
+      this.repository.listIdsBySize(orgId, { cursor, take: VIDEOS_PAGE_SIZE + 1 }),
+      this.repository.countLive(orgId),
+    ]);
+    const page = ids.slice(0, VIDEOS_PAGE_SIZE);
+    const rows = await this.repository.cardsByIds(
+      orgId,
+      page.map((one) => one.id),
+    );
+    const sizes = new Map(page.map((one) => [one.id, one.bytes]));
+    const last = page[page.length - 1];
+    return {
+      videos: await Promise.all(rows.map((row) => this.cardView(row, sizes.get(row.id) ?? 0))),
+      nextCursor: ids.length > VIDEOS_PAGE_SIZE && last ? encodeSizeCursor(last) : null,
+      total,
+    };
+  }
+
+  /**
+   * One video with its signed addresses, its newest import and its clips.
+   * Opening it counts as using it (Module 19): its date moves forward, at
+   * most once a day.
+   */
   async get(orgId: string, videoId: string): Promise<ClipVideoDetail> {
-    const row = await this.requireCard(orgId, videoId);
+    let row = await this.requireCard(orgId, videoId);
+    if (await this.retention.touchVideo(orgId, videoId))
+      row = await this.requireCard(orgId, videoId);
     const [assets, clips] = await Promise.all([
       this.repository.assetsOf(orgId, videoId),
       this.repository.clipsOf(orgId, videoId),
@@ -408,30 +451,15 @@ export class ClipVideosService {
   }
 
   /**
-   * Deletes a video: its open jobs are stopped, the row is soft deleted
-   * (the rights record stays), its files and unexported clips go. Import
-   * minutes already spent are not given back.
+   * Deletes a video through the one removal path (Module 19, `removeVideo`):
+   * its open jobs and its clips' are stopped, the row is kept with its rights
+   * record, its files and unexported clips go, exported clips are marked
+   * removed with their Media untouched. Import minutes already spent are
+   * not given back.
    */
   async remove(orgId: string, videoId: string): Promise<{ message: string }> {
     await this.requireLive(orgId, videoId);
-
-    for (const job of await this.jobsRepository.openForVideo(orgId, videoId)) {
-      try {
-        await this.jobs.cancel(orgId, job.id);
-      } catch (error) {
-        // Already finished, or Temporal is away: the workflow then finds its video gone.
-        this.logger.warn(
-          JSON.stringify({
-            event: 'clips.video.delete_cancel_skipped',
-            jobId: job.id,
-            reason: error instanceof Error ? error.name : 'unknown',
-          }),
-        );
-      }
-    }
-
-    await this.repository.softDelete(orgId, videoId, new Date());
-    await this.deleteFiles(orgId, videoId);
+    await this.retention.removeVideo(orgId, videoId, 'deleted');
     return { message: CLIPS_MESSAGES.VIDEO_DELETED };
   }
 
@@ -443,7 +471,7 @@ export class ClipVideosService {
     return card ? (await this.cardView(card)).video : toVideoView(video);
   }
 
-  async cardView(row: VideoWithCard): Promise<ClipVideoCard> {
+  async cardView(row: VideoWithCard, storedBytes?: number): Promise<ClipVideoCard> {
     const { assets, jobs, _count, ...video } = row;
     const poster = assets[0];
     const posterAddress = poster ? await this.playback.address(poster.key) : null;
@@ -452,6 +480,7 @@ export class ClipVideosService {
       video: toVideoView(video, posterAddress?.url ?? null),
       job: job ? toJobView(job) : null,
       clipCount: _count?.clips ?? 0,
+      ...(storedBytes === undefined ? {} : { storedBytes }),
     };
   }
 
@@ -572,6 +601,18 @@ export function toClipSummary(
 /** `createdAt|id` as base64url, so the next page starts exactly after the last row. */
 export function encodeCursor(row: VideoCursor): string {
   return Buffer.from(`${row.createdAt.toISOString()}|${row.id}`, 'utf8').toString('base64url');
+}
+
+/** Module 19: a biggest-first page's cursor, `z:<bytes>|<id>` (never mistaken for a date one). */
+export function encodeSizeCursor(row: SizeCursor): string {
+  return Buffer.from(`z:${row.bytes}|${row.id}`, 'utf8').toString('base64url');
+}
+
+export function decodeSizeCursor(value: string): SizeCursor | null {
+  const raw = Buffer.from(value, 'base64url').toString('utf8');
+  const match = /^z:(\d{1,18})\|(.+)$/.exec(raw);
+  if (!match?.[1] || !isUuid(match[2])) return null;
+  return { bytes: Number(match[1]), id: match[2] };
 }
 
 export function decodeCursor(value: string): VideoCursor | null {

@@ -8,20 +8,25 @@
  * come in through it with the licence guard, and nothing a user uploads ever
  * enters the shared catalogue.
  */
+import {
+  LIBRARY_AUTO_PUBLISH_SOUND_ORIGINS,
+  LIBRARY_AUTO_PUBLISH_STICKER_ORIGINS,
+  LIBRARY_SOUND_LICENCES,
+  LIBRARY_STICKER_LICENCES,
+  type LibrarySoundLicence,
+  type LibraryStickerLicence,
+} from '@postgear/video-engine';
 
 /** The sticker categories (slugs) and their names are the engine's, shared with the API and the web. */
 export { STICKER_CATEGORIES, type StickerCategory } from '@postgear/video-engine';
 
-/** The licences a sticker may have (SPDX ids, plus OWN for PostGear's own art). */
-export const ALLOWED_STICKER_LICENCES = [
-  'OWN',
-  'CC0-1.0',
-  'PDM-1.0',
-  'CC-BY-4.0',
-  'MIT',
-  'Apache-2.0',
-] as const;
-export type StickerLicence = (typeof ALLOWED_STICKER_LICENCES)[number];
+/**
+ * The licences a sticker may have (SPDX ids, plus OWN for PostGear's own art).
+ * The list itself lives in the engine (Module 19), so the operator's publish
+ * guard in the API reads the very same one.
+ */
+export const ALLOWED_STICKER_LICENCES = LIBRARY_STICKER_LICENCES;
+export type StickerLicence = LibraryStickerLicence;
 
 /** Why a candidate was turned away (research 10 section 8.2), each counted in the report. */
 export const REJECTION_REASONS = [
@@ -98,8 +103,11 @@ export interface LibrarySourceMeta {
   creditPerItem: boolean;
 }
 
-/** The origins that may publish without a review (`--auto-publish`); an open aggregator never may. */
-export const AUTO_PUBLISH_ORIGINS = ['own', 'kenney', 'noto'] as const;
+/**
+ * The origins that may publish without a review (`--auto-publish`); an open
+ * aggregator never may. The engine's list, read by the operator screen too.
+ */
+export const AUTO_PUBLISH_ORIGINS = LIBRARY_AUTO_PUBLISH_STICKER_ORIGINS;
 
 /** One source of stickers. Its fetch is injected; nothing here reaches the network on its own. */
 export interface StickerAdapter {
@@ -140,12 +148,14 @@ export {
 /**
  * The licences a sound may have: our own, CC0 and the Public Domain Mark.
  * Never CC BY: a credit cannot ride along inside a sound in a finished video.
+ * The engine holds the list (Module 19), so the operator's publish guard and
+ * this ingest can never disagree.
  */
-export const ALLOWED_SOUND_LICENCES = ['OWN', 'CC0-1.0', 'PDM-1.0'] as const;
-export type SoundLicence = (typeof ALLOWED_SOUND_LICENCES)[number];
+export const ALLOWED_SOUND_LICENCES = LIBRARY_SOUND_LICENCES;
+export type SoundLicence = LibrarySoundLicence;
 
-/** The origins whose sounds may publish without a review (`--auto-publish`). */
-export const AUTO_PUBLISH_SOUND_ORIGINS = ['own', 'kenney'] as const;
+/** The origins whose sounds may publish without a review (`--auto-publish`): the engine's list. */
+export const AUTO_PUBLISH_SOUND_ORIGINS = LIBRARY_AUTO_PUBLISH_SOUND_ORIGINS;
 
 /** One source of sounds. Its fetch is injected; nothing here reaches the network on its own. */
 export interface SoundAdapter {

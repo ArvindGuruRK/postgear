@@ -4,6 +4,7 @@
  * Prisma version is the only real one.
  */
 import { ClipLibraryStatus, ClipSoundKind, ClipStickerKind, Prisma, prisma } from '@postgear/db';
+import { type LibraryItemType, libraryPublishRefusal } from '@postgear/video-engine';
 import type {
   LibrarySourceMeta,
   SoundCategory,
@@ -240,7 +241,32 @@ export function prismaLibraryStore(): LibraryStore & SoundStore {
     },
     async publishRun(runId, byId) {
       // A run is stickers or sounds; both tables are asked, the other one answers 0.
-      const where = { runId, status: ClipLibraryStatus.STAGED };
+      // Only the items the shared rule allows go live (Module 20): the same
+      // `libraryPublishRefusal` the operator screen's Publish Run applies, so a
+      // run published from the command line cannot put an item with a licence
+      // or origin off the list, or a source still owing its credit line, live.
+      // The rest stay STAGED, where the Library screen lists them as held back.
+      const staged = { runId, status: ClipLibraryStatus.STAGED };
+      const select = {
+        id: true,
+        licence: true,
+        origin: true,
+        source: { select: { requiresCredit: true, creditLine: true } },
+      } as const;
+      const [stickerRows, soundRows] = await Promise.all([
+        prisma.clipSticker.findMany({ where: staged, select }),
+        prisma.clipSound.findMany({ where: staged, select }),
+      ]);
+      type StagedRow = {
+        id: string;
+        licence: string;
+        origin: string;
+        source: { requiresCredit: boolean; creditLine: string | null };
+      };
+      const allowed = (type: LibraryItemType, rows: readonly StagedRow[]) =>
+        rows
+          .filter((row) => libraryPublishRefusal(type, row, row.source) === null)
+          .map((row) => row.id);
       const data = {
         status: ClipLibraryStatus.ACTIVE,
         statusAt: new Date(),
@@ -248,8 +274,14 @@ export function prismaLibraryStore(): LibraryStore & SoundStore {
         statusReason: null,
       };
       const [stickers, sounds] = await prisma.$transaction([
-        prisma.clipSticker.updateMany({ where, data }),
-        prisma.clipSound.updateMany({ where, data }),
+        prisma.clipSticker.updateMany({
+          where: { ...staged, id: { in: allowed('sticker', stickerRows) } },
+          data,
+        }),
+        prisma.clipSound.updateMany({
+          where: { ...staged, id: { in: allowed('sound', soundRows) } },
+          data,
+        }),
       ]);
       return stickers.count + sounds.count;
     },

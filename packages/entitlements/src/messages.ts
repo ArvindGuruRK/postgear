@@ -48,6 +48,11 @@ export function isRefusalCode(value: unknown): value is RefusalCode {
 export interface RefusalTemplate {
   readonly template: string;
   readonly fallback: string;
+  /**
+   * Used instead of `template` when `{n}` (what is left) is 0, so a sentence
+   * never reads "you have 0 left" (Module 20 edge cases).
+   */
+  readonly none?: string;
 }
 
 /** The sentence for every code. */
@@ -84,6 +89,7 @@ export const REFUSAL_MESSAGES: Readonly<Record<RefusalCode, RefusalTemplate>> = 
   clips_ai_minutes_used: {
     template:
       'This needs {need} AI minute{s:need} and you have {n} left. They come back on {date}, or you can upgrade the plan.',
+    none: 'This workspace has used all its AI minutes for this month. They come back on {date}, or you can upgrade the plan.',
     fallback:
       'This workspace does not have enough AI minutes left this month. They come back when the month resets, or you can upgrade the plan.',
   },
@@ -166,7 +172,8 @@ export function refusalMessage(code: string, params: RefusalParams = {}): string
   const quality = typeof params.quality === 'string' ? params.quality.trim() : '';
 
   let missing = false;
-  const text = entry.template.replace(PLACEHOLDER, (_match, name: string) => {
+  const template = n === 0 && entry.none ? entry.none : entry.template;
+  const text = template.replace(PLACEHOLDER, (_match, name: string) => {
     switch (name) {
       case 'n':
         if (n === null) missing = true;

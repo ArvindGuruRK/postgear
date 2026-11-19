@@ -5,6 +5,7 @@
  */
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { ClipJob } from '@postgear/db';
+import type { PrivateStorage } from '@postgear/storage';
 import type { UsageService } from '../../entitlements/usage.service';
 import type { MediaService } from '../../media/media.service';
 import type { NotificationsService } from '../../notifications/notifications.service';
@@ -161,6 +162,7 @@ function deps() {
   const scheduling = {
     describeClipJob: jest.fn(async (): Promise<ClipWorkflowState> => 'running'),
   };
+  const storage = { deletePrefix: jest.fn(async () => 1) };
 
   const internal = new ClipsInternalService(
     jobs as unknown as ClipJobsService,
@@ -176,6 +178,7 @@ function deps() {
     scheduling as unknown as SchedulingService,
     usage as unknown as UsageService,
     notifications as unknown as NotificationsService,
+    storage as unknown as PrivateStorage,
   );
   return {
     internal,
@@ -187,6 +190,7 @@ function deps() {
     media,
     notifications,
     scheduling,
+    storage,
   };
 }
 
@@ -450,6 +454,24 @@ describe('ClipReconcileService', () => {
     );
   });
 
+  it('fails a job Temporal stopped at its time limit as timed out (Module 19)', async () => {
+    const { reconciler, scheduling, usage } = deps();
+    const video = videoRow({ status: 'IMPORTING' });
+    db.videos.push(video);
+    db.jobs.push(jobRow({ id: JOB_ID, status: 'RUNNING', videoId: video.id }));
+    scheduling.describeClipJob.mockResolvedValue('timedOut');
+
+    const answer = await reconciler.reconcile();
+    expect(answer.failed).toBe(1);
+    expect(db.jobs[0]?.status).toBe('FAILED');
+    expect(db.jobs[0]?.error).toEqual({
+      code: 'timed_out',
+      message: 'This took too long and was stopped. Try again.',
+    });
+    expect(usage.reverseAllFor).toHaveBeenCalledWith(TEST_ORG, JOB_ID);
+    expect(db.videos[0]?.status).toBe('FAILED');
+  });
+
   it('leaves a quiet job alone while its workflow still runs', async () => {
     const { reconciler, jobsRepository } = deps();
     db.jobs.push(jobRow({ id: JOB_ID, status: 'RUNNING' }));
@@ -475,6 +497,35 @@ describe('ClipReconcileService', () => {
     expect(lostJobCode({ kind: 'IMPORT', input: {} })).toBe('import_failed');
     expect(lostJobCode({ kind: 'RENDER', input: { proof: true } })).toBe('preview_failed');
     expect(lostJobCode({ kind: 'RENDER', input: { proof: false } })).toBe('export_failed');
+    expect(lostJobCode({ kind: 'DOWNLOAD', input: {} })).toBe('download_failed');
     expect(lostJobCode({ kind: 'SEGMENT', input: {} })).toBe('tool_failed');
+    // Module 19: a run stopped at its time limit says so, whatever its kind.
+    expect(lostJobCode({ kind: 'IMPORT', input: {} }, true)).toBe('timed_out');
+    expect(lostJobCode({ kind: 'RENDER', input: { proof: false } }, true)).toBe('timed_out');
+  });
+
+  it('fails a lost download with its own sentence, empties its folder and gives both charges back', async () => {
+    const { reconciler, scheduling, usage, storage, notifications } = deps();
+    db.jobs.push(jobRow({ id: JOB_ID, kind: 'DOWNLOAD', status: 'RUNNING', videoId: null }));
+    scheduling.describeClipJob.mockResolvedValue('notFound');
+
+    expect((await reconciler.reconcile()).failed).toBe(1);
+    expect(db.jobs[0]).toMatchObject({
+      status: 'FAILED',
+      error: { code: 'download_failed', message: 'We could not prepare this file. Try again.' },
+    });
+    expect(storage.deletePrefix).toHaveBeenCalledWith(`clips/${TEST_ORG}/downloads/${JOB_ID}/`);
+    expect(usage.reverseAllFor).toHaveBeenCalledWith(TEST_ORG, JOB_ID);
+    expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
+  it('still fails a lost download when its folder cannot be emptied (the sweep does it later)', async () => {
+    const { reconciler, scheduling, storage } = deps();
+    db.jobs.push(jobRow({ id: JOB_ID, kind: 'DOWNLOAD', status: 'RUNNING', videoId: null }));
+    scheduling.describeClipJob.mockResolvedValue('closed');
+    storage.deletePrefix.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    expect((await reconciler.reconcile()).failed).toBe(1);
+    expect(db.jobs[0]?.status).toBe('FAILED');
   });
 });

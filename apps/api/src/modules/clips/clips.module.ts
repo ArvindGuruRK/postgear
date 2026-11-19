@@ -33,6 +33,7 @@ import { ClipFilesController } from './files/clip-files.controller';
 import { ClipHighlightsController } from './highlights/clip-highlights.controller';
 import { ClipHighlightsService } from './highlights/clip-highlights.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
+import { ClipSweepService } from './retention/clip-sweep.service';
 import { ClipsInternalController } from './internal/clips-internal.controller';
 import { ClipsInternalService } from './internal/clips-internal.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
@@ -79,6 +80,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,
+    // Module 19: the cleanup sweep behind `/internal/clips/sweep`.
+    ClipSweepService,
     ClipSampleLink,
     ClipDownloadsRepository,
     ClipDownloadsService,

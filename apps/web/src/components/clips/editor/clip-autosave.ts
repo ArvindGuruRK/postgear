@@ -244,6 +244,15 @@ export class ClipAutosave {
     return done;
   }
 
+  /**
+   * `flush`, answering the revision the server holds once it has everything
+   * on screen (null when it cannot yet). An export or a preview sends it, so
+   * the API draws exactly this version or refuses with 409.
+   */
+  flushRevision(): Promise<number | null> {
+    return this.flush().then((saved) => (saved ? this.saved.revision : null));
+  }
+
   /** Try Again, after a refusal. */
   retry(): void {
     if (this.disposed || this.halt?.kind !== 'failed') return;

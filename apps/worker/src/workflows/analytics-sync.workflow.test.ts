@@ -34,6 +34,8 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     pruneAutomationRuns: jest.fn(),
     discoverMaintenance: jest.fn(),
     clipsReconcile: jest.fn(),
+    clipsSweep: jest.fn(),
+    mediaVideoFactsBackfill: jest.fn(),
     deliverWebhook: jest.fn(),
     markWebhookDeliveryFailed: jest.fn(),
     loadRunPlan: jest.fn(),

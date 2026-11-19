@@ -25,6 +25,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PostsModule } from '../posts/posts.module';
 import { PostsService } from '../posts/posts.service';
+import { RedisService } from '../redis/redis.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipEditsService } from './clip/clip-edits.service';
@@ -47,8 +48,10 @@ import { ClipStickerUploadsService } from './library/clip-sticker-uploads.servic
 import { SOUND_PROVIDER } from './library/sound-provider';
 import { STICKER_PROVIDER } from './library/sticker-provider';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
+import { ClipsCreateGuard } from './limits/clips-create.guard';
 import { ClipLinksModule } from './links/clip-links.module';
 import { CLIP_LINK_PROBER } from './links/clip-links.types';
+import { ClipRetentionService } from './retention/clip-retention.service';
 import { ClipsStatusService } from './status/clips-status.service';
 import { ClipPlaybackService } from './videos/clip-playback.service';
 import { ClipVideosRepository } from './videos/clip-videos.repository';
@@ -70,16 +73,24 @@ const SHARED = [
   ClipJobsService,
   ClipLimitsGuard,
   ClipPlaybackService,
+  ClipRetentionService,
   ClipVideosRepository,
   EntitlementResolver,
   UsageService,
   SchedulingService,
   MediaService,
+  // Global in the app (RedisModule); the Module 19 sweep takes it.
+  RedisService,
 ];
 
 @Module({
   providers: [
-    ...SHARED.map((token) => ({ provide: token, useValue: {} })),
+    ...SHARED.filter((token) => token !== EntitlementResolver).map((token) => ({
+      provide: token,
+      useValue: {},
+    })),
+    // Module 19: ClipsEnabledGuard reads `clips.enabled` on every Clips route.
+    { provide: EntitlementResolver, useValue: { assert: async () => true } },
     { provide: PRIVATE_STORAGE, useValue: {} },
     { provide: ConfigService, useValue: fakeConfig },
   ],
@@ -129,6 +140,9 @@ describe('Clips routes', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [ClipsModule] })
+      // Module 19: the abuse limits have their own spec (clips-create.guard.spec.ts).
+      .overrideGuard(ClipsCreateGuard)
+      .useValue({ canActivate: () => true })
       .overrideModule(ClipsCoreModule)
       .useModule(FakeCoreModule)
       .overrideModule(ClipLinksModule)
@@ -474,15 +488,18 @@ describe('Clips routes', () => {
           .expect(202)
       ).body,
     ).toEqual({ reached: 'download-start', existing: false });
-    const file = await request(server).get(`/clips/downloads/${CLIP_ID}/file`).expect(302);
-    expect(file.headers.location).toBe(`http://localhost:3001/clips/files/signed-${CLIP_ID}`);
+    // Save File answers the address as JSON, so a refusal reaches the row as its sentence.
+    const file = await request(server).get(`/clips/downloads/${CLIP_ID}/file`).expect(200);
+    expect(file.body).toEqual({ url: `http://localhost:3001/clips/files/signed-${CLIP_ID}` });
+    expect(file.headers.location).toBeUndefined();
     expect(file.headers['cache-control']).toBe('no-store');
     expect(
       (await request(server).post(`/clips/downloads/${CLIP_ID}/save-to-media`).expect(202)).body,
     ).toEqual({ reached: 'save-to-media', jobId: CLIP_ID });
-    expect((await request(server).delete(`/clips/downloads/${CLIP_ID}`).expect(200)).body).toEqual(
-      { reached: 'download-delete', jobId: CLIP_ID },
-    );
+    expect((await request(server).delete(`/clips/downloads/${CLIP_ID}`).expect(200)).body).toEqual({
+      reached: 'download-delete',
+      jobId: CLIP_ID,
+    });
     expect(
       (await request(server).post(`/clips/videos/${CLIP_ID}/download-original`).expect(200)).body,
     ).toEqual({ reached: 'download-original', videoId: CLIP_ID });

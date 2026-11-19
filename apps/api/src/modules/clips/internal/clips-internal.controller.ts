@@ -14,12 +14,14 @@ import type {
   ClipFinishExportAnswer,
   ClipFinishSaveDownloadAnswer,
   ClipReconcileAnswer,
+  ClipSweepAnswer,
   ClipReverseAnswer,
   ClipSettledAnswer,
 } from '@postgear/scheduling';
 import { Public } from '../../../common/decorators/public.decorator';
 import { ZodBody } from '../../../common/pipes/zod-validation.pipe';
 import { InternalTokenGuard } from '../../automations/gateway/internal-token.guard';
+import { ClipSweepService } from '../retention/clip-sweep.service';
 import { ClipReconcileService } from './clip-reconcile.service';
 import {
   type ChargeImportBody,
@@ -32,6 +34,8 @@ import {
   orgOnlySchema,
   type ReconcileBody,
   reconcileSchema,
+  type SweepBody,
+  sweepSchema,
 } from './clips-internal.schema';
 import { ClipsInternalService } from './clips-internal.service';
 
@@ -42,6 +46,7 @@ export class ClipsInternalController {
   constructor(
     private readonly internal: ClipsInternalService,
     private readonly reconciler: ClipReconcileService,
+    private readonly sweeper: ClipSweepService,
   ) {}
 
   @Post('jobs/:jobId/charge-import')
@@ -97,5 +102,14 @@ export class ClipsInternalController {
     @Body(new ZodBody(reconcileSchema, 'internal/clips/reconcile')) _body: ReconcileBody,
   ): Promise<ClipReconcileAnswer> {
     return this.reconciler.reconcile();
+  }
+
+  /** Module 19: the cleanup sweep, every maintenance pass. */
+  @Post('sweep')
+  @HttpCode(HttpStatus.OK)
+  sweep(
+    @Body(new ZodBody(sweepSchema, 'internal/clips/sweep')) body: SweepBody,
+  ): Promise<ClipSweepAnswer> {
+    return this.sweeper.sweep({ daily: body?.daily === true });
   }
 }

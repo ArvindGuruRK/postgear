@@ -5,6 +5,7 @@
  * one at a time) and its signed address, the card ring's progress, and
  * tenancy on every route.
  */
+import type { ClipRetentionService } from '../retention/clip-retention.service';
 import { HttpException } from '@nestjs/common';
 import type { ClipJob } from '@postgear/db';
 import type { PrivateStorage, StorageBackend } from '@postgear/storage';
@@ -160,6 +161,7 @@ function setup(
   const privateStorage = {
     signedUrl: jest.fn(async (key: string) => `https://signed.example/${key}`),
   };
+  const retention = { touchVideo: jest.fn(async () => false) };
   const service = new ClipExportsService(
     jobs as unknown as ClipJobsService,
     jobsRepository as unknown as ClipJobsRepository,
@@ -168,8 +170,9 @@ function setup(
     resolver as unknown as EntitlementResolver,
     storage as unknown as StorageBackend,
     privateStorage as unknown as PrivateStorage,
+    retention as unknown as ClipRetentionService,
   );
-  return { service, tables, jobs, jobsRepository, resolver, privateStorage };
+  return { service, tables, jobs, jobsRepository, resolver, privateStorage, retention };
 }
 
 async function refusal(

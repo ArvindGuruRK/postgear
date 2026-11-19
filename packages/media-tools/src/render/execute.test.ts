@@ -309,6 +309,32 @@ describe('renderClip with a fake FFmpeg', () => {
       }),
     ).rejects.toMatchObject({ code: 'cancelled' });
   });
+
+  it('passes on a stop that came while the files were being written', async () => {
+    const controller = new AbortController();
+    const seen: Array<{ args: readonly string[]; options: RunToolOptions }> = [];
+    // Like the real runner: a signal already stopped kills the program at once.
+    const runTool: RunTool = async (tool, args, options) => {
+      seen.push({ args, options });
+      if (options.signal?.aborted) throw new ToolError({ tool, exitCode: null, aborted: true });
+      return fakeFfmpeg({ lines: progressLines(20_000_000, true) })(tool, args, options);
+    };
+    const running = renderClip({
+      runTool,
+      scratchDir: scratch,
+      compiled: compiled(),
+      outFile: 'render.mp4',
+      signal: controller.signal,
+    });
+    // The checks at the start have passed; the files are still being written.
+    controller.abort();
+    const error = (await running.catch((e: unknown) => e)) as RenderError;
+    expect(error).toBeInstanceOf(RenderError);
+    expect(error.code).toBe('cancelled');
+    expect(seen[0]?.options.signal?.aborted).toBe(true);
+    expect(existsSync(path.join(scratch, 'render.mp4'))).toBe(false);
+    expect(existsSync(path.join(scratch, 'render.mp4.part'))).toBe(false);
+  });
 });
 
 describe('renderClip with the real FFmpeg', () => {

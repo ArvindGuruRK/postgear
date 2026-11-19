@@ -50,6 +50,8 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     clipJobFailed: jest.fn().mockResolvedValue(true),
     clipJobCancelled: jest.fn().mockResolvedValue(true),
     clipJobSettled: jest.fn().mockResolvedValue(undefined),
+    mediaVideoFacts: jest.fn(),
+    mediaVideoFactsGaveUp: jest.fn(),
     ...overrides,
   };
 }

@@ -62,3 +62,10 @@ export type FinishSaveDownloadBody = z.infer<typeof finishSaveDownloadSchema>;
 /** The pass takes nothing; an empty or missing body both read as `{}`. */
 export const reconcileSchema = z.object({}).strict().optional();
 export type ReconcileBody = z.infer<typeof reconcileSchema>;
+
+/**
+ * Module 19: the sweep. `daily: true` runs the daily parts now (tests and the
+ * hand check); the worker's loop sends nothing and lets the day decide.
+ */
+export const sweepSchema = z.object({ daily: z.boolean().optional() }).strict().optional();
+export type SweepBody = z.infer<typeof sweepSchema>;
