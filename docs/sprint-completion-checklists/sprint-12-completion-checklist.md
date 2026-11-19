@@ -5,7 +5,7 @@ Companion to [sprint-12-clips.md](../sprint-documents/sprint-12-clips.md), the m
 (Progress table and Decision Log) and the real-test plan
 [real-test-plan.md](../sprint-12/real-test-plan.md).
 Status as of **2026-11-19**. Branch `sprint-12-clips`, cut from `master`; Modules 01 to 18 pushed
-(e3948b0, 6d41791, bcf41f5, 0a16183), Modules 19 and 20 pushed with this checklist; not merged.
+(e3948b0, 6d41791, bcf41f5, 0a16183), Modules 19 and 20 pushed with this checklist (daf7eef); not merged.
 
 Sprint 12 started from nothing for Clips: no video tables, no video tools, no private storage, no
 render queue and no Clips screen. Plan limits lived in `apps/api/src/modules/billing/plans.ts` as
