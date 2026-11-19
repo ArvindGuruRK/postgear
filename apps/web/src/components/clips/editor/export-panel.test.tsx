@@ -123,6 +123,7 @@ function doneExport(id: string, fingerprint: string | null): ClipExportView {
 
 let flush: jest.Mock<Promise<boolean>, []>;
 let onExport: jest.Mock;
+let onSend: jest.Mock;
 
 function Harness({ sharp = 'ready' }: { sharp?: ClipSharpState }) {
   const state = useClipExport({ orgId: 'org-1', clipId: CLIP, flush, sharp });
@@ -135,6 +136,7 @@ function Harness({ sharp = 'ready' }: { sharp?: ClipSharpState }) {
         document={doc}
         sourceFps={30}
         onExport={onExport}
+        onSend={onSend}
       />
       {/* The editor's own Export Clip (the panel footer). */}
       <button type="button" onClick={() => void state.start()}>
@@ -158,6 +160,7 @@ beforeEach(() => {
   mockPlan.values = { 'clips.export_max_quality': '1080p', 'clips.export_watermark': false };
   flush = jest.fn(async () => true);
   onExport = jest.fn();
+  onSend = jest.fn();
   list.mockResolvedValue([]);
   latest.mockResolvedValue(null);
 });
@@ -282,7 +285,11 @@ describe('a finished export', () => {
     expect(card).toHaveTextContent('First Clip.mp4');
     expect(card).toHaveTextContent('1080p, 26 MB');
     expect(card).toHaveTextContent('Evened out to about -14 LUFS.');
-    expect(within(card).getByRole('button', { name: 'Send To Composer' })).toBeDisabled();
+    // Module 17: Send To Composer is live and hands its button over for the focus return.
+    const send = within(card).getByRole('button', { name: 'Send To Composer' });
+    expect(send).toBeEnabled();
+    fireEvent.click(send);
+    expect(onSend).toHaveBeenCalledWith(send);
     expect(within(card).getByRole('link', { name: 'Open In Media' })).toHaveAttribute(
       'href',
       '/org-1/media',

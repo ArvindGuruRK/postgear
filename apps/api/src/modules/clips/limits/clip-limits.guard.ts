@@ -18,6 +18,12 @@
  * and for uploads `clips.upload_max_gb` on the declared size, then again on
  * the real size at complete (`clips_upload_too_big`).
  *
+ * A download in any format (Module 18) runs checks 1 to 3 on its own length
+ * and size (`assertCanDownload`), then two charges once its job id exists:
+ * the import minutes (4, the same meter and key shape, so Download is never
+ * a way around the import limits) and one unit of `clips.downloads_per_day`
+ * (`clips_downloads_today`), key `clips.download:<jobId>`.
+ *
  * The worker never resolves a plan value: `importLimits` is what the API
  * copies into the job input, so a plan change mid-import changes nothing.
  */
@@ -28,6 +34,7 @@ import {
   EXPORT_QUALITIES,
   type ExportQuality,
   type ImportLimits,
+  type LinkFormat,
   type LinkInfo,
 } from '@postgear/video-engine';
 import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
@@ -56,6 +63,48 @@ export const IMPORT_METER = 'clips.import_minutes_per_month' as const;
 /** The idempotency key of a job's import charge. */
 export function importChargeKey(jobId: string): string {
   return `clips.import:${jobId}`;
+}
+
+/** The daily meter downloads are counted on (midnight UTC to midnight UTC). */
+export const DOWNLOADS_METER = 'clips.downloads_per_day' as const;
+
+/** The idempotency key of a download job's daily charge. */
+export function downloadChargeKey(jobId: string): string {
+  return `clips.download:${jobId}`;
+}
+
+/** Stored bits a second for a download whose platform gave no size, by height (and MP3's own rate). */
+const DOWNLOAD_BITS_PER_SECOND = {
+  1080: 5_000_000,
+  720: 2_500_000,
+  480: 1_200_000,
+  low: 800_000,
+  mp3: 192_000,
+} as const;
+
+/**
+ * How much space a prepared download takes while it is kept: the platform's
+ * size when it gave one, else the length times a typical bit rate for the
+ * height. Audio Only is converted to a 192 kbps MP3, so its size comes from
+ * the length, never from the platform's M4A. Never negative.
+ */
+export function estimateDownload(
+  format: Pick<LinkFormat, 'height' | 'bytes' | 'audioOnly'>,
+  durationMs: number,
+): number {
+  const seconds = Math.max(0, durationMs) / 1000;
+  if (format.audioOnly) return Math.ceil((seconds * DOWNLOAD_BITS_PER_SECOND.mp3) / 8);
+  if (typeof format.bytes === 'number' && format.bytes > 0) return Math.round(format.bytes);
+  const height = format.height ?? 0;
+  const rate =
+    height > 720
+      ? DOWNLOAD_BITS_PER_SECOND[1080]
+      : height > 480
+        ? DOWNLOAD_BITS_PER_SECOND[720]
+        : height > 360
+          ? DOWNLOAD_BITS_PER_SECOND[480]
+          : DOWNLOAD_BITS_PER_SECOND.low;
+  return Math.ceil((seconds * rate) / 8);
 }
 
 /** Import minutes for a length, in display units (a 61 min 30 s video is 61.5). */
@@ -133,6 +182,38 @@ export class ClipLimitsGuard {
     await this.assertEnabled(orgId);
     await this.assertLength(orgId, durationMs);
     await this.assertStorage(orgId, storedBytes);
+  }
+
+  /**
+   * Module 18: checks 1 to 3 for a download, in order: the switch, the
+   * length (`clips.max_video_minutes`), then the space the prepared file
+   * takes while it is kept. The charges follow once the job id exists.
+   */
+  async assertCanDownload(orgId: string, durationMs: number, storedBytes: number): Promise<void> {
+    await this.assertEnabled(orgId);
+    await this.assertLength(orgId, durationMs);
+    await this.assertStorage(orgId, storedBytes);
+  }
+
+  /**
+   * Module 18: one download counted on the day's meter. Idempotent through
+   * `clips.download:<jobId>`. Throws the typed 402 (`clips_downloads_today`,
+   * with the plan's number) past the allowance.
+   */
+  chargeDownload(orgId: string, jobId: string): Promise<ConsumeResult> {
+    return this.usage.consume(orgId, DOWNLOADS_METER, 1, {
+      idempotencyKey: downloadChargeKey(jobId),
+      refId: jobId,
+    });
+  }
+
+  /** Module 18: bytes the plan's video space still has (the most a download may write). */
+  async storageLeftBytes(orgId: string): Promise<number> {
+    const [gb, used] = await Promise.all([
+      this.resolver.get(orgId, 'clips.storage_gb'),
+      this.storageUsedBytes(orgId),
+    ]);
+    return Math.max(0, gigabytesToBytes(Number(gb)) - used);
   }
 
   /** The upload start's checks: the switch, the size, then the space. */

@@ -15,6 +15,8 @@
  * - `GET /clips/videos/:videoId`: the video, signed addresses, job, clips
  *   (each with `state` and `range`, Module 07).
  * - `POST /clips/videos/:videoId/retry` and `/cancel`, `DELETE /clips/videos/:videoId`.
+ * - `POST /clips/videos/:videoId/download-original` (Module 18): `{ url }`, a
+ *   five minute signed address for an uploaded video's own file; uploads only.
  * - `POST /clips/videos/uploads`, `.../uploads/:uploadId/parts`, `.../uploads/:uploadId/complete`.
  */
 import {
@@ -38,6 +40,7 @@ import {
 } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
+import { ClipDownloadsService } from '../downloads/clip-downloads.service';
 import { ClipUploadsService } from './clip-uploads.service';
 import {
   type CompleteUploadInput,
@@ -59,6 +62,7 @@ export class ClipVideosController {
   constructor(
     private readonly videos: ClipVideosService,
     private readonly uploads: ClipUploadsService,
+    private readonly downloads: ClipDownloadsService,
   ) {}
 
   @Post()
@@ -135,6 +139,12 @@ export class ClipVideosController {
   @HttpCode(HttpStatus.OK)
   cancel(@CurrentOrg() org: ActiveOrg, @Param('videoId') videoId: string) {
     return this.videos.cancel(org.id, videoId);
+  }
+
+  @Post(':videoId/download-original')
+  @HttpCode(HttpStatus.OK)
+  downloadOriginal(@CurrentOrg() org: ActiveOrg, @Param('videoId') videoId: string) {
+    return this.downloads.downloadOriginal(org.id, videoId);
   }
 
   @Delete(':videoId')

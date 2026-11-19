@@ -3,8 +3,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import { ApiError } from '@/lib/api';
-import type { ClipImportOutcome, ClipProbe } from '@/types/clips';
-import { FIXTURE_CARDS, fixtureProbe } from '../clips-fixtures';
+import type { ClipImportOutcome, ClipProbe, DownloadStarted, LinkFormat } from '@/types/clips';
+import { FIXTURE_CARDS, fixtureJob, fixtureProbe } from '../clips-fixtures';
+import { NO_QUALITIES } from './download-menu';
 import { ALREADY_HERE, LinkCard, RIGHTS_LINE, TWITCH_MUTED_LINE } from './link-card';
 
 beforeAll(() => stubBrowserLayout());
@@ -168,5 +169,155 @@ describe('LinkCard', () => {
     expect(
       screen.getByText('We could not reach Clips. Check your connection and try again.'),
     ).toBeInTheDocument();
+  });
+
+  describe('Download', () => {
+    const FORMATS: LinkFormat[] = [
+      {
+        id: 'h720',
+        label: '720p',
+        height: 720,
+        fps: 30,
+        ext: 'mp4',
+        bytes: null,
+        audioOnly: false,
+      },
+      {
+        id: 'audio',
+        label: 'Audio Only',
+        height: null,
+        fps: null,
+        ext: 'm4a',
+        bytes: 9_000_000,
+        audioOnly: true,
+      },
+      {
+        id: 'h2160',
+        label: '2160p',
+        height: 2160,
+        fps: 30,
+        ext: 'mp4',
+        bytes: 2_000_000_000,
+        audioOnly: false,
+      },
+      {
+        id: 'h1080',
+        label: '1080p',
+        height: 1080,
+        fps: 30,
+        ext: 'mp4',
+        bytes: 412_000_000,
+        audioOnly: false,
+      },
+    ];
+    const withFormats = (overrides: Partial<ClipProbe> = {}) =>
+      fixtureProbe({ info: { ...fixtureProbe().info, formats: FORMATS }, ...overrides });
+    const STARTED: DownloadStarted = {
+      job: fixtureJob({ id: 'dl-1', kind: 'DOWNLOAD', videoId: null }),
+      download: {
+        id: 'dl-1',
+        title: 'Friday Night Speedrun, Any Percent Attempts',
+        label: '720p',
+        audioOnly: false,
+        ext: 'mp4',
+        state: 'preparing',
+        job: fixtureJob({ id: 'dl-1', kind: 'DOWNLOAD', videoId: null }),
+        bytes: null,
+        expiresAt: null,
+        canSaveToMedia: false,
+        media: null,
+        createdAt: '2026-11-18T10:00:00.000Z',
+      },
+      existing: false,
+    };
+    const downloadButton = () => screen.getByRole('button', { name: /Download/ });
+    const openMenu = () => fireEvent.keyDown(downloadButton(), { key: 'Enter' });
+
+    it('has no Download when the page does not offer it', () => {
+      renderCard(card({ probe: withFormats() }));
+      expect(screen.queryByRole('button', { name: /Download/ })).not.toBeInTheDocument();
+    });
+
+    it('stays off until the rights box is ticked', () => {
+      renderCard(card({ probe: withFormats(), onDownloaded: jest.fn() }));
+      expect(downloadButton()).toBeDisabled();
+      fireEvent.click(rights());
+      expect(downloadButton()).toBeEnabled();
+    });
+
+    it('lists the qualities tallest first up to 1080p, sizes only when known, then Audio Only', async () => {
+      renderCard(card({ probe: withFormats(), onDownloaded: jest.fn() }));
+      fireEvent.click(rights());
+      openMenu();
+      const items = await screen.findAllByRole('menuitem');
+      expect(items.map((item) => item.textContent)).toEqual([
+        '1080p (412 MB)',
+        '720p',
+        'Audio Only',
+      ]);
+    });
+
+    it('says so when no quality can be downloaded', async () => {
+      renderCard(card({ onDownloaded: jest.fn() }));
+      fireEvent.click(rights());
+      openMenu();
+      expect(await screen.findByRole('menuitem', { name: NO_QUALITIES })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+    });
+
+    it('asks for the canonical link and the picked quality, with the tick', async () => {
+      const downloadFn = jest.fn(async () => STARTED);
+      const onDownloaded = jest.fn();
+      renderCard(card({ probe: withFormats(), onDownloaded, downloadFn }));
+      fireEvent.click(rights());
+      openMenu();
+      const item = await screen.findByRole('menuitem', { name: '720p' });
+      await act(async () => {
+        fireEvent.click(item);
+      });
+      expect(downloadFn).toHaveBeenCalledWith(
+        'https://www.twitch.tv/videos/1000000001',
+        'h720',
+        true,
+      );
+      expect(onDownloaded).toHaveBeenCalledWith(STARTED);
+    });
+
+    it("shows a refusal in the card's alert", async () => {
+      const downloadFn = jest.fn(async () => {
+        throw new ApiError(
+          "You have reached today's limit of 2 downloads. It resets at midnight UTC.",
+          402,
+          'clips_downloads_today',
+        );
+      });
+      const onDownloaded = jest.fn();
+      renderCard(card({ probe: withFormats(), onDownloaded, downloadFn }));
+      fireEvent.click(rights());
+      openMenu();
+      const item = await screen.findByRole('menuitem', { name: 'Audio Only' });
+      await act(async () => {
+        fireEvent.click(item);
+      });
+      expect(
+        screen.getByText(
+          "You have reached today's limit of 2 downloads. It resets at midnight UTC.",
+        ),
+      ).toBeInTheDocument();
+      expect(onDownloaded).not.toHaveBeenCalled();
+    });
+
+    it('still offers the tick and Download for a video the workspace already has', () => {
+      renderCard(
+        card({ probe: withFormats({ existingVideoId: 'video-ready' }), onDownloaded: jest.fn() }),
+      );
+      expect(screen.getByRole('link', { name: 'Open Video' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Import Video' })).not.toBeInTheDocument();
+      expect(downloadButton()).toBeDisabled();
+      fireEvent.click(rights());
+      expect(downloadButton()).toBeEnabled();
+    });
   });
 });

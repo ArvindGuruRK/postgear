@@ -7,7 +7,7 @@
  * | `importFetch`     | fetching 0-70    | Link: the light copy from the downloader. Upload: the ORIGINAL from private storage |
  * | `importInspect`   | preparing 72     | ffprobe; refuse what is not a video or too long; charge an upload's minutes; write the facts |
  * | `importNormalise` | preparing 72-85  | The light copy (remux when it already fits) |
- * | `importDerive`    | preparing 85-97  | Analysis sound and filmstrip in one decode, the waveform, the poster |
+ * | `importDerive`    | preparing 85-97  | Analysis sound and filmstrip in one decode, the waveform, the poster, a YouTube heat map as the first signal track |
  * | `importStore`     | preparing 97-100 | Recheck the space, store every file, then one transaction: rows, video READY, job DONE, the bell |
  *
  * They all run inside one activity and one scratch folder (`runImport`), so
@@ -16,17 +16,19 @@
  * are derived from the job id, so whatever a dead attempt stored is found
  * and removed (`allImportKeys`).
  */
-import { mkdir, rm, stat } from 'node:fs/promises';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   type DeriveResult,
   type Downloader,
   DownloaderError,
+  gzipSignalsFile,
   type MediaFacts,
   mapPercent,
   type NormaliseResult,
   type PosterResult,
   ProbeError,
+  SIGNALS_MIME,
 } from '@postgear/media-tools';
 import {
   CLIP_EXTENSIONS,
@@ -41,6 +43,9 @@ import {
   importOutputSchema,
   type PosterMeta,
   type ProxyMeta,
+  replayedTrack,
+  SIGNALS_FILE_FORMAT,
+  type SignalsAssetMeta,
   type WaveformMeta,
 } from '@postgear/video-engine';
 import { ClipStepError } from '../failures';
@@ -87,6 +92,11 @@ export interface DerivedFiles {
   /** The waveform as JSON, ready to store. */
   waveform: { file: string; bytes: number; meta: WaveformMeta };
   poster: PosterResult;
+  /**
+   * Module 16: the video's first signal track (YouTube's heat map, from the
+   * probe), gzipped; absent when the platform gave none.
+   */
+  signals?: { file: string; bytes: number; meta: SignalsAssetMeta };
 }
 
 export interface ImportOutcome {
@@ -306,12 +316,37 @@ export async function importDerive(
   });
   await run.progress.report({ stage: 'preparing', progress: 97 });
 
+  const signals = await replayedSignals(run, durationMs);
   return {
     analysisAudio: derived.analysisAudio,
     filmstrip: derived.filmstrip,
     waveform: { file: waveformJson, bytes: waveformBytes, meta: peaks.meta },
     poster,
+    ...(signals ? { signals } : {}),
   };
+}
+
+/**
+ * The heat map the API copied from the probe, as the video's first signal
+ * track (Module 16): stored now because the probe is the only time we see
+ * it, read by Find Clips later.
+ */
+export async function replayedSignals(
+  run: Pick<ImportRun, 'input' | 'dir'>,
+  durationMs: number,
+): Promise<DerivedFiles['signals'] | null> {
+  const points = run.input.replayed;
+  if (!points || points.length === 0) return null;
+  const track = replayedTrack(points, durationMs);
+  if (!track) return null;
+  const file = path.join(run.dir, 'signals.json.gz');
+  const bytes = await gzipSignalsFile({ format: SIGNALS_FILE_FORMAT, durationMs, tracks: [track] });
+  await writeFile(file, bytes);
+  const meta: SignalsAssetMeta = {
+    durationMs,
+    tracks: [{ name: track.name, version: track.version }],
+  };
+  return { file, bytes: bytes.length, meta };
 }
 
 // --- 5. Store ----------------------------------------------------------------------
@@ -378,6 +413,17 @@ export function filesToStore(
     'image/jpeg',
     { ...posterMeta },
   );
+
+  if (derived.signals) {
+    add(
+      'SIGNALS',
+      importKeys.signals(org, videoId, run.jobId),
+      derived.signals.file,
+      derived.signals.bytes,
+      SIGNALS_MIME,
+      { ...derived.signals.meta },
+    );
+  }
 
   // One row per sheet, in order: `sheet` says which one (0 first).
   const filmstripMeta: FilmstripMeta = derived.filmstrip.meta;

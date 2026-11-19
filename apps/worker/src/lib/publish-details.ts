@@ -30,6 +30,8 @@ export interface MediaRow {
   fileSize: number;
   width: number | null;
   height: number | null;
+  /** Sprint 12: a video's length; checked against the platform's length rules when known. */
+  durationMs?: number | null;
 }
 
 /**
@@ -138,6 +140,7 @@ export function toMediaDescriptor(
     bytes: media.fileSize,
     width: media.width ?? undefined,
     height: media.height ?? undefined,
+    durationMs: media.durationMs ?? undefined,
   };
 }
 

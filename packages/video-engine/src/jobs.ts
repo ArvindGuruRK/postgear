@@ -111,6 +111,19 @@ export const linkRefSchema = z
   .strict();
 
 const uuid = z.string().uuid();
+
+/** The most heat map points an import carries (YouTube sends 100). */
+export const MAX_REPLAYED_POINTS = 1_000;
+
+/** One point of YouTube's heat map, source time. */
+export const replayedPointSchema = z
+  .object({
+    startMs: z.number().int().min(0),
+    endMs: z.number().int().min(0),
+    value: z.number().min(0).max(1),
+  })
+  .strict()
+  .refine((point) => point.startMs < point.endMs, 'A point must end after it starts');
 const storageKey = z.string().min(1).max(300);
 const wholeMs = z.number().int().min(0);
 
@@ -140,6 +153,11 @@ export const importInputSchema = z
     limits: importLimitsSchema,
     /** From the probe, when the platform said; sizes the free-disk check. */
     expectedBytes: z.number().int().min(0).nullable(),
+    /**
+     * Module 16: YouTube's "most replayed" heat map from the probe, copied by
+     * the API; the import stores it as the video's first signal track.
+     */
+    replayed: z.array(replayedPointSchema).max(MAX_REPLAYED_POINTS).optional(),
   })
   .strict();
 
@@ -187,11 +205,39 @@ export const renderInputSchema = z
   })
   .strict();
 
+/**
+ * Who ticked the rights box, when, and under which wording (Module 18): a
+ * download makes no `ClipVideo`, so its job row is where the record lives.
+ */
+export const rightsRecordSchema = z
+  .object({
+    byUserId: z.string().min(1).max(64),
+    at: z.string().datetime(),
+    textVersion: z.string().min(1).max(32),
+  })
+  .strict();
+
+/**
+ * A download in any format (Module 18). The API probed the link again, found
+ * the format in the fresh probe and copied in everything the worker needs, so
+ * the worker never resolves a plan value: `maxBytes` is the space the plan
+ * still has (the fetch stops past it).
+ */
 export const downloadInputSchema = z
   .object({
     link: linkRefSchema,
+    /** `LinkFormat.id` from the probe: `h1080`, `h720`, `h360`, `audio`. */
     formatId: z.string().min(1).max(32),
+    /** "720p", "Audio Only": what the Downloads row calls it. */
+    label: z.string().min(1).max(40),
+    /** True for Audio Only, which is delivered as MP3. */
+    audioOnly: z.boolean(),
+    /** The video's title, for the row and the saved file's name. */
+    title: z.string().min(1).max(300),
+    durationMs: wholeMs,
     expectedBytes: z.number().int().min(0).nullable(),
+    maxBytes: z.number().int().positive(),
+    rights: rightsRecordSchema,
   })
   .strict();
 
@@ -231,7 +277,13 @@ export const segmentOutputSchema = z
   })
   .strict();
 
-export const highlightsOutputSchema = z.object({ found: z.number().int().min(0) }).strict();
+export const highlightsOutputSchema = z
+  .object({
+    found: z.number().int().min(0),
+    /** Module 16: the tracks the scorer used, in registry order. */
+    used: z.array(z.string().min(1).max(32)).max(16).optional(),
+  })
+  .strict();
 
 /**
  * The export's loudness (Module 14): what the measuring pass read, what the
@@ -263,8 +315,37 @@ export const renderOutputSchema = z
   })
   .strict();
 
+/**
+ * Save To Media on a finished download (Module 18): `saving` while the worker
+ * copies it, `saved` with the Media row, `failed` when it could not (the
+ * button comes back).
+ */
+export const downloadMediaSchema = z
+  .object({
+    status: z.enum(['saving', 'saved', 'failed']),
+    mediaId: uuid.nullable(),
+  })
+  .strict();
+
+/**
+ * A prepared download (Module 18): the DOWNLOAD asset row and its private key,
+ * the file's facts as `probeFile` read them (Save To Media needs them for the
+ * Media row), and Save To Media's state once someone asked for it.
+ */
 export const downloadOutputSchema = z
-  .object({ key: storageKey, bytes: z.number().int().min(0), fileName: z.string().min(1).max(200) })
+  .object({
+    assetId: uuid,
+    key: storageKey,
+    bytes: z.number().int().min(0),
+    ext: z.enum(['mp4', 'mp3']),
+    /** The saved file's name: the title made safe, with the extension. */
+    fileName: z.string().min(1).max(200),
+    durationMs: wholeMs,
+    width: z.number().int().positive().nullable(),
+    height: z.number().int().positive().nullable(),
+    fps: z.number().positive().nullable(),
+    media: downloadMediaSchema.optional(),
+  })
   .strict();
 
 export const CLIP_JOB_OUTPUT_SCHEMAS = {
@@ -279,6 +360,8 @@ export type ImportOutput = z.infer<typeof importOutputSchema>;
 export type SegmentOutput = z.infer<typeof segmentOutputSchema>;
 export type RenderOutput = z.infer<typeof renderOutputSchema>;
 export type DownloadOutput = z.infer<typeof downloadOutputSchema>;
+export type DownloadMedia = z.infer<typeof downloadMediaSchema>;
+export type RightsRecord = z.infer<typeof rightsRecordSchema>;
 
 // --- How long it will take ------------------------------------------------------
 

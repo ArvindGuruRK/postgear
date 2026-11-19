@@ -68,7 +68,23 @@ export interface MediaRules {
   maxVideoBytes?: number;
   /** Accepted image shapes. Checked only when the dimensions are known. */
   imageAspectRatio?: AspectRatioRange;
+  /**
+   * Sprint 12 (Clips, Module 17): what a video may be, checked by `videoFit`
+   * only when the video's facts are known (exported clips have them; older
+   * uploads get them from Module 19's backfill). Absent means no limit here.
+   */
+  /** The shortest accepted video, in milliseconds. */
+  videoMinMs?: number;
+  /** The longest accepted video, in milliseconds. */
+  videoMaxMs?: number;
+  /** The accepted shapes, or `'any'`. Absent means any. */
+  videoRatios?: 'any' | readonly VideoShape[];
+  /** The widest accepted video, in pixels. */
+  videoMaxWidth?: number;
 }
+
+/** A video's shape as Clips names them (`packages/video-engine`'s ratios). */
+export type VideoShape = '9:16' | '16:9' | '1:1' | '4:5';
 
 export interface TitleRules {
   maxLength: number;

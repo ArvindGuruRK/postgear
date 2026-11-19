@@ -45,9 +45,13 @@ import {
   CLIP_JOB_QUEUES,
   CLIP_JOB_TIMEOUTS_MS,
   CLIP_JOB_WORKFLOWS,
+  CLIP_SAVE_DOWNLOAD_TIMEOUT_MS,
+  CLIP_SAVE_DOWNLOAD_WORKFLOW,
   type ClipJobKindName,
   type ClipJobWorkflowInput,
   clipJobWorkflowId,
+  clipSaveDownloadWorkflowId,
+  MEDIA_TASK_QUEUE,
   POST_PUBLISH_WORKFLOW,
   PUBLISH_NOW_SIGNAL,
   PUBLISH_RETRY_POLICY,
@@ -499,6 +503,30 @@ export class SchedulingService implements OnModuleDestroy {
           args: [{ jobId, organizationId } satisfies ClipJobWorkflowInput],
           workflowExecutionTimeout: CLIP_JOB_TIMEOUTS_MS[kind],
           workflowIdReusePolicy: WorkflowIdReusePolicy.REJECT_DUPLICATE,
+        });
+      } catch (error) {
+        if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {
+          throw error;
+        }
+      }
+    });
+  }
+
+  /**
+   * Sprint 12, Module 18: Save To Media on a finished download. One per
+   * download at a time (a second ask while one runs is taken as started); a
+   * finished one may run again, so a failed save can be asked for again.
+   * False when Temporal cannot be reached.
+   */
+  async startClipSaveDownload(jobId: string, organizationId: string): Promise<boolean> {
+    return this.attempt('clip save download', async (client) => {
+      try {
+        await client.workflow.start(CLIP_SAVE_DOWNLOAD_WORKFLOW, {
+          workflowId: clipSaveDownloadWorkflowId(jobId),
+          taskQueue: MEDIA_TASK_QUEUE,
+          args: [{ jobId, organizationId } satisfies ClipJobWorkflowInput],
+          workflowExecutionTimeout: CLIP_SAVE_DOWNLOAD_TIMEOUT_MS,
+          workflowIdReusePolicy: WorkflowIdReusePolicy.ALLOW_DUPLICATE,
         });
       } catch (error) {
         if (!(error instanceof WorkflowExecutionAlreadyStartedError)) {

@@ -53,6 +53,16 @@ export interface AnalysisAudioMeta {
   channels: 1;
 }
 
+/**
+ * The video's highlight tracks (Module 16): one gzipped signals file per
+ * video. The meta names what is inside so a run can tell, without reading
+ * the file, whether a track needs measuring again.
+ */
+export interface SignalsAssetMeta {
+  durationMs: number;
+  tracks: Array<{ name: string; version: number }>;
+}
+
 /** At most about this many filmstrip pictures for any video. */
 export const FILMSTRIP_MAX_TILES = 1_200;
 

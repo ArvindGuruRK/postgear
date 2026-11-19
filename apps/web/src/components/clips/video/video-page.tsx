@@ -8,8 +8,10 @@
  *
  * Layout (desktop only): the actions row (back to Videos, the title, the
  * platform and length, Edit Whole Video); then the player with its bar and
- * the timeline on the left, and on the right Find Clips (off until Module 16)
- * over this video's clips.
+ * the timeline on the left, and on the right Find Clips (Module 16,
+ * `find-clips.tsx`) over this video's clips, AI picks first, with "How this
+ * was found" under them. Each AI pick has a small flag on the timeline that
+ * plays it.
  *
  * A video that is not ready shows its card (coming in, or failed) and the
  * way back. The light copy's signed address is renewed before it expires
@@ -17,7 +19,6 @@
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { ScissorsIcon } from '@animateicons/react/lucide/scissors-icon';
-import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   Alert,
   Badge,
@@ -40,6 +41,9 @@ import type { ClipSummary, ClipVideoDetail, ClipView } from '@/types/clips';
 import { PLATFORM_LABELS } from '../home/home-model';
 import { EDIT_WHOLE_TOO_LONG, VideoCard } from '../home/video-card';
 import { clipActions, clipErrorSentence } from '../library/clip-actions';
+import { useClipSender } from '../library/use-clip-sender';
+import { FindClips } from './find-clips';
+import { foundByLine } from './find-clips-model';
 import {
   type SourcePlayerStore,
   useFreshAddress,
@@ -50,7 +54,6 @@ import { SourceTimeline, type TimelineControls } from './source-timeline';
 import { clipEditHref, VideoClipList } from './video-clip-list';
 import {
   checkRange,
-  FIND_CLIPS_LATER,
   JUMP_MS,
   LARGE_STEP_MS,
   type MarkedRange,
@@ -78,6 +81,7 @@ export function summaryOf(clip: ClipView, range: ClipSummary['range']): ClipSumm
     ratio: clip.ratio,
     durationMs: clip.durationMs,
     score: clip.score,
+    reasons: clip.reasons,
     revision: clip.revision,
     exported: clip.exported,
     exportedMediaId: clip.exportedMediaId,
@@ -131,6 +135,8 @@ export function VideoPage({
     }
   }, [store, video.id]);
   useFreshAddress(store, detail.playback?.expiresAt ?? null, () => void refetch());
+  const settleRun = useCallback(() => void refetch(), [refetch]);
+  const foundBy = foundByLine(detail.highlights?.run ?? null);
 
   // Back from the editor: the player opens at the clip's start.
   const openedFrom = useRef(initial.clips.find((clip) => clip.id === initialClipId)?.range ?? null);
@@ -138,6 +144,7 @@ export function VideoPage({
     if (openedFrom.current) store.startAt(openedFrom.current.fromMs);
   }, [store]);
 
+  const sender = useClipSender(orgId);
   const actions = clipActions({
     onChanged: (clip) =>
       setClips((current) =>
@@ -150,6 +157,7 @@ export function VideoPage({
     onAdded: (clip, source) => setClips((current) => [summaryOf(clip, source.range), ...current]),
     onRemoved: (clipId) => setClips((current) => current.filter((one) => one.id !== clipId)),
     onStale: () => void refetch(),
+    send: sender.open,
   });
 
   const check = checkRange(mark);
@@ -376,18 +384,23 @@ export function VideoPage({
                 setSelectedId(clip.id);
                 if (clip.range) store.seek(clip.range.fromMs);
               }}
+              onPlayClip={(clip) => {
+                setSelectedId(clip.id);
+                if (clip.range) store.playRange(clip.range.fromMs, clip.range.toMs);
+              }}
               controlRef={controls}
             />
           </AnalyticsPanel>
         </div>
 
         <AnalyticsPanel aria-labelledby={clipsId} className="flex flex-col gap-4 p-4">
-          <TooltipHint label={FIND_CLIPS_LATER} disabled>
-            <Button variant="highlight" className="w-full" disabled>
-              <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
-              Find Clips
-            </Button>
-          </TooltipHint>
+          <FindClips
+            orgId={orgId}
+            videoId={video.id}
+            highlights={detail.highlights}
+            clips={clips}
+            onSettled={settleRun}
+          />
           <PanelHeader
             id={clipsId}
             title="Clips"
@@ -407,8 +420,17 @@ export function VideoPage({
               if (clip.range) store.playRange(clip.range.fromMs, clip.range.toMs);
             }}
           />
+          {foundBy ? (
+            <p
+              className="m-0 font-sans text-xs text-ink type-muted"
+              data-testid="find-clips-found-by"
+            >
+              {foundBy}
+            </p>
+          ) : null}
         </AnalyticsPanel>
       </div>
+      {sender.dialog}
     </div>
   );
 }

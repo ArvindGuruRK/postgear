@@ -3,7 +3,8 @@
 /**
  * The video page's timeline (Module 07, section 3): the ruler, the
  * filmstrip, the sound's shape, every clip already cut from the video as a
- * line, the marked range as a band with two handles and its length, and the
+ * line (an AI pick with a small flag at its start that plays it, Module 16),
+ * the marked range as a band with two handles and its length, and the
  * playhead.
  *
  * - **Maths** comes from the engine's `timeline/` (scale, ruler, visible),
@@ -21,6 +22,7 @@
  * Only the playhead layer listens to the clock, so the rest of the timeline
  * is not drawn again 60 times a second.
  */
+import { FlagIcon } from '@animateicons/react/lucide/flag-icon';
 import { MinusIcon } from '@animateicons/react/lucide/minus-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { ScanIcon } from '@animateicons/react/lucide/scan-icon';
@@ -116,6 +118,7 @@ export function SourceTimeline({
   clips,
   selectedClipId,
   onSelectClip,
+  onPlayClip,
   controlRef,
 }: {
   store: SourcePlayerStore;
@@ -128,6 +131,8 @@ export function SourceTimeline({
   clips: readonly ClipSummary[];
   selectedClipId: string | null;
   onSelectClip: (clip: ClipSummary) => void;
+  /** An AI pick's flag: play just that clip. No flags without it. */
+  onPlayClip?: (clip: ClipSummary) => void;
   /** The page's + and - keys reach the zoom through this. */
   controlRef?: RefObject<TimelineControls | null>;
 }) {
@@ -409,6 +414,25 @@ export function SourceTimeline({
                     />
                   ) : null,
                 )}
+                {onPlayClip
+                  ? clips.map((clip) =>
+                      clip.range && clip.origin === 'AI_SIGNALS' ? (
+                        <TooltipHint key={`flag-${clip.id}`} label={`Play ${clip.title}`}>
+                          <button
+                            type="button"
+                            data-testid="timeline-ai-flag"
+                            aria-label={`Play ${clip.title}`}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={() => onPlayClip(clip)}
+                            className="absolute top-1/2 z-10 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-sm border-2 border-outline bg-chrome text-ink outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
+                            style={{ left: msToPx(clip.range.fromMs, scale) }}
+                          >
+                            <MotionIcon icon={FlagIcon} className="h-3 w-3" />
+                          </button>
+                        </TooltipHint>
+                      ) : null,
+                    )
+                  : null}
               </TimelineRow>
             ) : null}
           </div>

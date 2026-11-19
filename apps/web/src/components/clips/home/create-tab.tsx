@@ -2,9 +2,9 @@
 
 /**
  * The Create tab (Module 06, section 3; blueprint section 2): the link box
- * with its upload rows, then Recent Videos (and, from Module 07, Recent
- * Clips) as `AnalyticsPanel` groups, drawn only when there is something to
- * show.
+ * with its upload rows, then Coming Up (Module 17), Recent Videos (and,
+ * from Module 07, Recent Clips) as `AnalyticsPanel` groups, drawn only when
+ * there is something to show.
  *
  * Everything that must outlive a tab switch (the probe, the uploads, the
  * video list) is owned by the page and passed in, so leaving the tab never
@@ -14,7 +14,7 @@ import { Button } from '@postgear/ui';
 import type { ClipPlatformId } from '@postgear/video-engine';
 import { useId } from 'react';
 import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui';
-import type { ClipImportOutcome } from '@/types/clips';
+import type { ClipImportOutcome, DownloadStarted } from '@/types/clips';
 import { LinkBox } from './link-box';
 import { UploadRow } from './upload-row';
 import type { LinkProbe } from './use-link-probe';
@@ -38,7 +38,9 @@ export function CreateTab({
   videos,
   videoActions,
   recentClips,
+  comingUp,
   onImported,
+  onDownloaded,
   onUpload,
   onBrowse,
   onSample,
@@ -57,7 +59,11 @@ export function CreateTab({
   videoActions: VideoCardActions;
   /** Module 07's Recent Clips panel; nothing until then. */
   recentClips?: React.ReactNode;
+  /** Module 17's Coming Up panel, under the link box. */
+  comingUp?: React.ReactNode;
   onImported: (outcome: ClipImportOutcome) => void;
+  /** Module 18: a download was asked for on the link card. */
+  onDownloaded?: (outcome: DownloadStarted) => void;
   onUpload: () => void;
   onBrowse?: () => void;
   onSample: () => void;
@@ -81,6 +87,7 @@ export function CreateTab({
         sampleBusy={sampleBusy}
         uploadHelp={uploadHelp}
         onImported={onImported}
+        onDownloaded={onDownloaded}
         onUpload={onUpload}
         onBrowse={onBrowse}
         onSample={onSample}
@@ -99,6 +106,8 @@ export function CreateTab({
           </ul>
         ) : null}
       </LinkBox>
+
+      {comingUp}
 
       {recent.length > 0 ? (
         <AnalyticsPanel aria-labelledby={recentId} className="flex flex-col gap-4 p-5">

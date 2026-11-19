@@ -7,12 +7,22 @@
  * write: equality and `null`, `in`, `not`, `equals` (a value or a field
  * reference made by `fieldRef`), a JSON `path` with `equals` (a missing
  * path is SQL NULL: never equal), `AND`, `OR`, `NOT`, and on clips the
- * relations `video` (one) and `posts` (`some` and `none`). A filter it does
- * not know throws, so a spec can never pass by ignoring part of a query.
+ * relations `video` (one) and `posts` (`some` and `none`); Module 17 adds
+ * `gte`, `lte` and `contains` (case-insensitive), `ClipPost` writes, and a
+ * post's channel (`integration`). A filter it does not know throws, so a
+ * spec can never pass by ignoring part of a query.
  *
  * Test-only: nothing outside a `*.spec.ts` imports this file.
  */
-import type { Clip, ClipAsset, ClipJob, ClipLayoutPreset, ClipPost, ClipVideo } from '@postgear/db';
+import type {
+  Clip,
+  ClipAsset,
+  ClipHighlightRun,
+  ClipJob,
+  ClipLayoutPreset,
+  ClipPost,
+  ClipVideo,
+} from '@postgear/db';
 import { TEST_ORG, TEST_USER, videoRow } from './rows';
 
 export interface FakePost {
@@ -21,6 +31,19 @@ export interface FakePost {
   group: string;
   state: 'QUEUE' | 'PUBLISHED' | 'ERROR' | 'DRAFT';
   deletedAt: Date | null;
+  /** Module 17: optional in a seed; a root post, published at the epoch, on `channel-1`, with no address. */
+  parentPostId?: string | null;
+  publishDate?: Date;
+  releaseURL?: string | null;
+  integrationId?: string;
+}
+
+/** Module 17: the channel a post goes to, as `post.integration` reads it. */
+export interface FakeIntegration {
+  id: string;
+  name: string;
+  providerIdentifier: string;
+  picture: string | null;
 }
 
 /** The part of a Media row the export history reads (Module 15). */
@@ -35,6 +58,8 @@ export interface FakeMedia {
   height: number | null;
   durationMs: number | null;
   deletedAt: Date | null;
+  /** Optional: when the file was made (Module 17's `exportedAt`). */
+  createdAt?: Date;
 }
 
 export interface FakeTables {
@@ -47,6 +72,10 @@ export interface FakeTables {
   layouts: ClipLayoutPreset[];
   /** Optional: only the export specs seed Media rows. */
   media?: FakeMedia[];
+  /** Optional: Module 16's highlight runs. */
+  runs?: ClipHighlightRun[];
+  /** Optional: Module 17's channels for posts. */
+  integrations?: FakeIntegration[];
 }
 
 const FIELD = Symbol('field');
@@ -103,7 +132,15 @@ function matchesScalar(row: Row, actual: unknown, filter: unknown): boolean {
         if (!(actual === null && operand === null)) return false;
       } else if (!same(actual, expected)) return false;
     } else if (op === 'mode') {
-      // Case is not exercised by these specs.
+      // `contains` below is always case-insensitive, the only mode these services use.
+    } else if (op === 'gte' || op === 'lte') {
+      if (actual === null || actual === undefined) return false;
+      const a = actual instanceof Date ? actual.getTime() : (actual as number);
+      const b = operand instanceof Date ? operand.getTime() : (operand as number);
+      if (op === 'gte' ? a < b : a > b) return false;
+    } else if (op === 'contains') {
+      if (typeof actual !== 'string') return false;
+      if (!actual.toLowerCase().includes(String(operand).toLowerCase())) return false;
     } else {
       throw new Error(`fake-clip-db: unknown operator ${op}`);
     }
@@ -273,8 +310,43 @@ export function fakeClipDb(tables: FakeTables) {
       ...table(() => tables.videos as unknown as Row[]),
       updateMany: jest.fn(async () => ({ count: 1 })),
     },
-    clipPost: table(() => tables.clipPosts as unknown as Row[]),
-    post: table(() => tables.posts as unknown as Row[]),
+    clipPost: {
+      ...table(() => tables.clipPosts as unknown as Row[]),
+      createMany: jest.fn(async ({ data }: { data: Partial<ClipPost>[] }) => {
+        for (const row of data) {
+          tables.clipPosts.push({
+            id: `cp-${tables.clipPosts.length + 1}-${Math.random().toString(36).slice(2, 8)}`,
+            createdAt: now(),
+            ...row,
+          } as ClipPost);
+        }
+        return { count: data.length };
+      }),
+      deleteMany: jest.fn(async ({ where }: { where: unknown }) => {
+        const before = tables.clipPosts.length;
+        tables.clipPosts = tables.clipPosts.filter((row) => !matches(row as unknown as Row, where));
+        return { count: before - tables.clipPosts.length };
+      }),
+    },
+    post: (() => {
+      const posts = table(() => tables.posts.map(postRow) as unknown as Row[]);
+      const withChannel = (row: Row) => {
+        const id = row.integrationId as string;
+        const integration = tables.integrations?.find((item) => item.id === id) ?? {
+          id,
+          name: 'Channel One',
+          providerIdentifier: 'youtube',
+          picture: null,
+        };
+        return { ...row, integration };
+      };
+      return {
+        ...posts,
+        findMany: jest.fn(async (args: FindArgs = {}) =>
+          ((await posts.findMany(args)) as Row[]).map(withChannel),
+        ),
+      };
+    })(),
     media: table(() => (tables.media ?? []) as unknown as Row[]),
     clipAsset: {
       ...table(() => tables.assets as unknown as Row[]),
@@ -290,6 +362,34 @@ export function fakeClipDb(tables: FakeTables) {
         const row = { ...data, createdAt: now(), updatedAt: now() } as ClipJob;
         tables.jobs.push(row);
         return row;
+      }),
+      updateMany: jest.fn(async ({ where, data }: { where: unknown; data: object }) => {
+        const found = tables.jobs.filter((row) => matches(row as unknown as Row, where));
+        for (const row of found) Object.assign(row, data, { updatedAt: now() });
+        return { count: found.length };
+      }),
+    },
+    clipHighlightRun: {
+      ...table(() => (tables.runs ?? []) as unknown as Row[]),
+      create: jest.fn(async ({ data }: { data: Partial<ClipHighlightRun> }) => {
+        const row = {
+          status: 'QUEUED',
+          tracks: [],
+          aiMinutesCharged: 0,
+          usageEntryId: null,
+          found: 0,
+          createdById: null,
+          finishedAt: null,
+          createdAt: now(),
+          ...data,
+        } as ClipHighlightRun;
+        tables.runs = [...(tables.runs ?? []), row];
+        return row;
+      }),
+      updateMany: jest.fn(async ({ where, data }: { where: unknown; data: object }) => {
+        const found = (tables.runs ?? []).filter((row) => matches(row as unknown as Row, where));
+        for (const row of found) Object.assign(row, data);
+        return { count: found.length };
       }),
     },
     clipLayoutPreset: {
@@ -322,6 +422,17 @@ export function fakeClipDb(tables: FakeTables) {
 }
 
 export type FakeClipDb = ReturnType<typeof fakeClipDb>;
+
+/** A seeded post with Module 17's fields filled in, so every filter can read them. */
+function postRow(post: FakePost): FakePost & Row {
+  return {
+    parentPostId: null,
+    publishDate: new Date('2026-11-01T10:00:00.000Z'),
+    releaseURL: null,
+    integrationId: 'channel-1',
+    ...post,
+  };
+}
 
 export function emptyTables(): FakeTables {
   return { clips: [], videos: [], clipPosts: [], posts: [], assets: [], jobs: [], layouts: [] };

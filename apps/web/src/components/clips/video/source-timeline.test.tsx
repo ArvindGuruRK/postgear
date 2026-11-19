@@ -53,7 +53,12 @@ const SHOWN = fixtureClipSummary({
 const UNREADABLE = fixtureClipSummary({ id: 'cut-3', title: 'Cut Three', range: null });
 
 function setup(
-  options: { mark?: MarkedRange; clips?: readonly ClipSummary[]; selectedClipId?: string } = {},
+  options: {
+    mark?: MarkedRange;
+    clips?: readonly ClipSummary[];
+    selectedClipId?: string;
+    onPlayClip?: (clip: ClipSummary) => void;
+  } = {},
 ) {
   const store = new SourcePlayerStore(DURATION);
   jest.spyOn(store, 'seek');
@@ -74,6 +79,7 @@ function setup(
         clips={options.clips ?? []}
         selectedClipId={options.selectedClipId ?? null}
         onSelectClip={onSelectClip}
+        onPlayClip={options.onPlayClip}
         controlRef={controlRef}
       />
     </TooltipProvider>,
@@ -322,5 +328,33 @@ describe('the clips already cut', () => {
     press(screen.getByRole('button', { name: 'Cut One' }), 150);
     expect(onSelectClip).toHaveBeenCalledWith(CUT);
     expect(store.seek).not.toHaveBeenCalled();
+  });
+});
+
+describe('AI picks (Module 16)', () => {
+  const PICK = fixtureClipSummary({
+    id: 'pick-1',
+    title: 'Stream Sample 1',
+    origin: 'AI_SIGNALS',
+    score: 92,
+    range: { fromMs: 60_000, toMs: 90_000 },
+  });
+
+  it('flags each AI pick at its start; the flag plays it without seeking the timeline', () => {
+    const onPlayClip = jest.fn();
+    const { store } = setup({ clips: [CUT, PICK], onPlayClip });
+    const flags = screen.getAllByTestId('timeline-ai-flag');
+    // Only the AI pick has a flag; a clip made by hand keeps its plain line.
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toHaveAccessibleName('Play Stream Sample 1');
+    fireEvent.pointerDown(flags[0] as HTMLElement, { pointerId: 1, button: 0, clientX: 10 });
+    fireEvent.click(flags[0] as HTMLElement);
+    expect(onPlayClip).toHaveBeenCalledWith(PICK);
+    expect(store.seek).not.toHaveBeenCalled();
+  });
+
+  it('draws no flags without a way to play them', () => {
+    setup({ clips: [PICK] });
+    expect(screen.queryByTestId('timeline-ai-flag')).toBeNull();
   });
 });

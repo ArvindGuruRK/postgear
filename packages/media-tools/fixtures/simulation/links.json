@@ -15,6 +15,8 @@
     { "platform": "twitch", "externalId": "900000004", "url": "https://www.twitch.tv/videos/900000004", "stderr": "ERROR: [twitch:vod] 900000004: Video 900000004 does not exist" },
     { "platform": "twitch", "externalId": "900000005", "url": "https://www.twitch.tv/videos/900000005", "stderr": "ERROR: [twitch:vod] 900000005: Unable to download JSON metadata: HTTP Error 429: Too Many Requests" },
     { "platform": "twitch", "externalId": "900000006", "url": "https://www.twitch.tv/videos/900000006", "probe": "twitch-stream", "sample": "stream", "overrides": { "id": "v900000006", "title": "PostGear Sample: A Thirty Hour Marathon", "duration": 108000 } },
+    { "platform": "twitch", "externalId": "900000007", "url": "https://www.twitch.tv/videos/900000007", "probe": "twitch-stream", "sample": "stream", "overrides": { "id": "v900000007", "title": "PostGear Sample: Find Clips Fails [simulate:highlights-fail]" } },
+    { "platform": "twitch", "externalId": "900000008", "url": "https://www.twitch.tv/videos/900000008", "probe": "twitch-stream", "sample": "stream", "overrides": { "id": "v900000008", "title": "PostGear Sample: Find Clips Is Slow [simulate:highlights-slow]" } },
 
     { "platform": "kick", "externalId": "00000000-0000-4000-8000-000000000001", "url": "https://kick.com/simstreamer/videos/00000000-0000-4000-8000-000000000001", "probe": "kick-stream", "sample": "stream" },
     { "platform": "kick", "externalId": "00000000-0000-4000-8000-000000000002", "url": "https://kick.com/simstreamer/videos/00000000-0000-4000-8000-000000000002", "stderr": "ERROR: [kick:vod] 00000000-0000-4000-8000-000000000002: This video requires a channel subscription" },

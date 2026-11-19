@@ -44,6 +44,36 @@ export class ClipJobsRepository {
     return prisma.clipJob.findFirst({ where: { id: jobId, organizationId: orgId } });
   }
 
+  /** QUEUED or RUNNING jobs of a kind for a video. */
+  countOpenForVideo(
+    orgId: string,
+    videoId: string,
+    kind: ClipJobKind,
+    tx: ClipsTx = prisma,
+  ): Promise<number> {
+    return tx.clipJob.count({
+      where: { organizationId: orgId, videoId, kind, status: { in: [...OPEN_JOB_STATUSES] } },
+    });
+  }
+
+  /**
+   * Module 16: a highlights run whose job was just closed here (a cancel of a
+   * job that never started, or the reconcile) takes the same end. Only while
+   * the run is still open, so the worker's own last word stands.
+   */
+  async closeHighlightRun(
+    orgId: string,
+    runId: string | null,
+    status: 'FAILED' | 'CANCELLED',
+    now: Date,
+  ): Promise<void> {
+    if (!runId) return;
+    await prisma.clipHighlightRun.updateMany({
+      where: { id: runId, organizationId: orgId, status: { in: [...OPEN_JOB_STATUSES] } },
+      data: { status, finishedAt: now },
+    });
+  }
+
   /**
    * Marks a job cancelled when its workflow never existed or is gone.
    * Conditional on the job still being open, so it never overwrites the

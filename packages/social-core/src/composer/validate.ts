@@ -13,6 +13,7 @@
  */
 import { measureLength } from './length';
 import type { ProviderRules } from './rules';
+import { type VideoFitReason, videoFit, videoFitSentence } from './video-fit';
 
 export type MediaKind = 'image' | 'video';
 
@@ -26,6 +27,8 @@ export interface ComposedMedia {
   /** Shape checks are skipped when either dimension is unknown. */
   width?: number;
   height?: number;
+  /** A video's length (Sprint 12). Length checks are skipped when unknown. */
+  durationMs?: number;
 }
 
 /** One part of a post: the whole post, or one entry of a thread. */
@@ -52,7 +55,11 @@ export type IssueCode =
   | 'thread_unsupported'
   | 'follow_up_media'
   | 'title_too_long'
-  | 'title_characters';
+  | 'title_characters'
+  | 'video_too_long'
+  | 'video_too_short'
+  | 'video_shape'
+  | 'video_too_wide';
 
 export interface ValidationIssue {
   code: IssueCode;
@@ -250,6 +257,46 @@ function validateMedia(
       'aspect_ratio',
       `${name} images must be between ${formatRatio(ratio.min)} (tall) and ${formatRatio(ratio.max)} (wide).`,
     );
+  }
+
+  if (media.maxVideos > 0) {
+    validateVideoFacts(rules, videos, name, add);
+  }
+}
+
+/**
+ * Sprint 12: a video's length, shape and width, checked by `videoFit` when
+ * they are known (exported clips have them). Its count and its size are the
+ * rules above, so only these four reasons become issues here, and only the
+ * first video that breaks one is reported.
+ */
+const VIDEO_ISSUES: Partial<Record<VideoFitReason, IssueCode>> = {
+  too_long: 'video_too_long',
+  too_short: 'video_too_short',
+  wrong_shape: 'video_shape',
+  too_wide: 'video_too_wide',
+};
+
+function validateVideoFacts(
+  rules: ProviderRules,
+  videos: ComposedMedia[],
+  name: string,
+  add: (code: IssueCode, message: string) => void,
+): void {
+  for (const video of videos) {
+    const facts = {
+      durationMs: video.durationMs ?? null,
+      width: video.width ?? null,
+      height: video.height ?? null,
+      // The size is `file_too_large`'s, so it is left out here.
+      bytes: null,
+    };
+    const fit = videoFit(rules, facts);
+    if (fit.ok) continue;
+    const code = VIDEO_ISSUES[fit.reason];
+    if (!code) continue;
+    add(code, videoFitSentence(fit, name, facts, 'video'));
+    return;
   }
 }
 

@@ -8,6 +8,8 @@ export {
   ffmpegSeconds,
   HLS_PROTOCOLS,
   hlsCopyArgs,
+  MP3_BITRATE,
+  mp3Args,
   NORMALISE,
   normaliseArgs,
   normaliseFps,

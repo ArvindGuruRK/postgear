@@ -29,7 +29,9 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { State } from '@postgear/db';
@@ -47,6 +49,7 @@ import {
 import { securityLogger } from '../../common/logging/security-logger';
 import { matchesAllTerms, selectiveTerm, snippetAround } from '../../common/search-terms';
 import { type ChannelColors, colorOf } from '../channels/channel-colors';
+import { ClipPostsService } from '../clips/clip/clip-posts.service';
 import type { ChannelView } from '../channels/channels.service';
 import { ChannelsService } from '../channels/channels.service';
 import type { MediaView } from '../media/media.service';
@@ -189,6 +192,7 @@ export interface QueuePage {
 @Injectable()
 export class PostsService {
   private readonly manager = new IntegrationManager();
+  private readonly logger = new Logger(PostsService.name);
 
   constructor(
     private readonly repository: PostsRepository,
@@ -196,6 +200,9 @@ export class PostsService {
     private readonly media: MediaService,
     private readonly scheduling: SchedulingService,
     private readonly tags: TagsService,
+    // Sprint 12 (Module 17): which clips this post uses. Optional, so the
+    // posts specs that build the service by hand need not know about Clips.
+    @Optional() private readonly clipPosts?: ClipPostsService,
   ) {}
 
   /** Every post with a channel scheduled inside the range, for the calendar. */
@@ -426,6 +433,7 @@ export class PostsService {
       ...write,
       ...(options.creationMethod ? { creationMethod: options.creationMethod } : {}),
     });
+    await this.syncClipLinks(orgId, group, mediaIdsOfWrite(write.channels));
 
     // "Post now" on save (2026-10-19, Postiz's button): the post was written
     // to the queue at the current time, and is handed to the worker through
@@ -482,6 +490,7 @@ export class PostsService {
       case 'conflict':
         throw new ConflictException(POST_MESSAGES.CONFLICT);
       case 'saved': {
+        await this.syncClipLinks(orgId, group, mediaIdsOfWrite(write.channels));
         const after = await this.repository.findRoots(orgId, group);
         const kept = new Set(after.map((root) => root.id));
         // Channels this save no longer targets: their rows are soft-deleted and
@@ -515,6 +524,24 @@ export class PostsService {
     }
 
     await this.scheduling.cancelPublish(roots.map((root) => root.id));
+    await this.syncClipLinks(orgId, group, []);
+  }
+
+  /**
+   * Sprint 12 (Module 17): the clips whose exported file is on this post
+   * now, so a clip shows Scheduled and View Post however it got here. The
+   * post is already saved, so a failure here is logged and never fails the
+   * save: the links only label clips, and the next save repairs them.
+   */
+  private async syncClipLinks(orgId: string, group: string, mediaIds: string[]): Promise<void> {
+    if (!this.clipPosts) return;
+    try {
+      await this.clipPosts.syncForPost(orgId, group, mediaIds);
+    } catch (error) {
+      this.logger.warn(
+        `clips.post_links_failed group=${group}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -690,6 +717,7 @@ export class PostsService {
               bytes: view.fileSize,
               width: view.width ?? undefined,
               height: view.height ?? undefined,
+              durationMs: view.durationMs ?? undefined,
             };
           }),
         })),
@@ -895,6 +923,11 @@ export function parseProviderSettings(
 }
 
 /** `Post.image` is `[{"id": …}]`. Anything else, including legacy URL lists, yields no ids. */
+/** Every media id a prepared write puts on its rows (Sprint 12: the clip links). */
+function mediaIdsOfWrite(channels: { parts: { image: string }[] }[]): string[] {
+  return channels.flatMap((channel) => channel.parts.flatMap((part) => parseImageIds(part.image)));
+}
+
 export function parseImageIds(raw: string | null): string[] {
   if (!raw) {
     return [];

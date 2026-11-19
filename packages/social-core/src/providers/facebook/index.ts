@@ -84,6 +84,11 @@ export const FACEBOOK_RULES: ProviderRules = {
     maxImages: 10,
     maxVideos: 1,
     allowMixed: false,
+    // Sprint 12 (Module 17): no video length, shape or size limit here. This
+    // provider posts a video through the Page's `/videos` edge, an ordinary
+    // Page video, not a Reel, so research 07's Reels row (3 to 90 seconds,
+    // 9:16) does not describe what it publishes. If posting moves to the Reels
+    // API, that row's values belong here.
   },
 };
 

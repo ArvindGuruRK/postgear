@@ -23,6 +23,7 @@
 export * from './assets';
 export * from './canvas';
 export * from './document';
+export * from './downloads';
 export * from './effects';
 export * from './errors';
 export * from './export';
@@ -45,7 +46,7 @@ export * from './links';
 export * from './pricing';
 export * from './quality';
 export * from './render';
-export * from './signals/types';
+export * from './signals';
 export * from './sources';
 export * from './time';
 export * from './timeline';

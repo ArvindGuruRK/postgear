@@ -18,7 +18,8 @@
  *   `held` (Module 09: the sharp stretch around the clip, so the timeline
  *   hatches what lies past it), and (Module 08) the same signed light copy,
  *   filmstrip and waveform the video page reads, so the editor's dock draws
- *   pictures and sound.
+ *   pictures and sound. An AI clip (Module 16) is made with no sharp range;
+ *   its first read starts the SEGMENT job (`firstOpenSegment`).
  * - **More video** (Module 09 section 3): a trim past the sharp range asks
  *   for a wider one. Nothing is fetched when a sharp range or an open job
  *   already covers it, or when the platform copy is gone; otherwise a
@@ -81,6 +82,8 @@ const MAX_TITLE_LENGTH = MAX_CLIP_TITLE_LENGTH;
 
 /** One More Video start per clip in this many seconds. */
 export const MORE_VIDEO_EVERY_SECONDS = 10;
+/** Module 16: an AI clip's first-open fetch, at most once a minute per clip. */
+export const FIRST_OPEN_EVERY_SECONDS = 60;
 /** The widest range one More Video asks for (before the handles): an hour. */
 export const MORE_VIDEO_MAX_MS = 2 * CLIP_MAX_MS;
 
@@ -243,9 +246,63 @@ export class ClipItemService {
       }),
     ]);
 
-    const sharp: SharpState = source?.kind === 'segment' ? 'ready' : open > 0 ? 'fetching' : 'gone';
+    let sharp: SharpState = source?.kind === 'segment' ? 'ready' : open > 0 ? 'fetching' : 'gone';
+    if (sharp === 'gone' && clip.origin === 'AI_SIGNALS' && live.status === 'READY') {
+      // Module 16: an AI clip is made without its sharp range; the first open fetches it.
+      if (await this.firstOpenSegment(orgId, clip, live, view.document, assets)) sharp = 'fetching';
+    }
     const held = heldRange(documentRange(view.document), assets);
     return { clip: view, video: toVideoView(live), ...media, sharp, held };
+  }
+
+  /**
+   * Starts the SEGMENT job of an AI clip that never had one (Module 16
+   * section 4): only when no sharp range of the clip was ever stored, the
+   * platform copy is still there, and not more than once a minute per clip
+   * (the editor reads the clip often). Never fails the read: a refusal or a
+   * hiccup is logged and the clip simply plays from the light copy.
+   */
+  private async firstOpenSegment(
+    orgId: string,
+    clip: Clip,
+    video: ClipVideo,
+    document: ClipDocument,
+    assets: Awaited<ReturnType<ClipVideosRepository['assetsOf']>>,
+  ): Promise<boolean> {
+    if (assets.some((asset) => asset.kind === 'SEGMENT' && asset.clipId === clip.id)) return false;
+    const range = documentRange(document);
+    if (!range || !video.hdAvailable) return false;
+    try {
+      await this.limits.assertEnabled(orgId);
+      const first = await this.redis.setIfAbsent(
+        `clips:ai-first-open:${orgId}:${clip.id}`,
+        '1',
+        FIRST_OPEN_EVERY_SECONDS,
+      );
+      if (!first) return false;
+      const row = await this.segmentRow(orgId, null, video, clip.id, range);
+      if (!row) return false;
+      const job = await this.jobsRepository.create(row);
+      await this.jobs.start(job);
+      this.logger.log(
+        JSON.stringify({
+          event: 'clips.clip.ai_first_open',
+          orgId,
+          clipId: clip.id,
+          jobId: job.id,
+        }),
+      );
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.clip.ai_first_open_failed',
+          clipId: clip.id,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return false;
+    }
   }
 
   /**
@@ -351,7 +408,7 @@ export class ClipItemService {
    */
   private async segmentRow(
     orgId: string,
-    userId: string,
+    userId: string | null,
     video: ClipVideo,
     clipId: string,
     range: SourceRange,

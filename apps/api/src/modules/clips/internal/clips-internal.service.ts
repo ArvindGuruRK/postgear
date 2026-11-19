@@ -15,6 +15,11 @@
  *   exported at the frozen revision, the job's output names the Media row
  *   and the bell says so. One serializable transaction: two calls at once
  *   make one Media row, and a second call answers the first one's id.
+ * - **finish-save-download** (Module 18): Save To Media's copy of a finished
+ *   download becomes a Media row (`origin: 'upload'`: the person's own file,
+ *   not a clip), and the download's `output.media` says `saved`. One
+ *   serializable transaction, so a retried call answers the same row; a call
+ *   for a download that is not saving (deleted, or never asked) is a 409.
  * - **settled**: a job ended; start the workspace's waiting imports.
  * - Tenancy: every job is looked up by its id AND the workspace the body
  *   names, so a mixed-up call is a 404, never a write to another workspace.
@@ -24,9 +29,11 @@ import { ClipJobKind, ClipJobStatus, type Prisma, prisma } from '@postgear/db';
 import type {
   ClipChargeImportAnswer,
   ClipFinishExportAnswer,
+  ClipFinishSaveDownloadAnswer,
   ClipReverseAnswer,
   ClipSettledAnswer,
 } from '@postgear/scheduling';
+import { type DownloadMedia, downloadOutputSchema } from '@postgear/video-engine';
 import { UsageService } from '../../entitlements/usage.service';
 import { MediaService } from '../../media/media.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -37,7 +44,12 @@ import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { exportReadyNotice } from './clip-notices';
-import type { ChargeImportBody, FinishExportBody, OrgOnlyBody } from './clips-internal.schema';
+import type {
+  ChargeImportBody,
+  FinishExportBody,
+  FinishSaveDownloadBody,
+  OrgOnlyBody,
+} from './clips-internal.schema';
 
 const OPEN: readonly ClipJobStatus[] = [ClipJobStatus.QUEUED, ClipJobStatus.RUNNING];
 
@@ -166,6 +178,54 @@ export class ClipsInternalService {
         );
     }
     return { mediaId: outcome.mediaId };
+  }
+
+  async finishSaveDownload(
+    jobId: string,
+    body: FinishSaveDownloadBody,
+  ): Promise<ClipFinishSaveDownloadAnswer> {
+    if (!isUuid(jobId)) throw jobNotFound();
+    const orgId = body.organizationId;
+
+    return serializable(async (tx) => {
+      const job = await tx.clipJob.findFirst({ where: { id: jobId, organizationId: orgId } });
+      if (!job || job.kind !== ClipJobKind.DOWNLOAD || job.status !== ClipJobStatus.DONE) {
+        throw jobNotFound();
+      }
+      const output = downloadOutputSchema.safeParse(job.output);
+      if (!output.success || output.data.ext !== 'mp4') throw jobNotFound();
+
+      const media = output.data.media;
+      if (media?.status === 'saved' && media.mediaId) return { mediaId: media.mediaId };
+      if (media?.status !== 'saving') {
+        throw new ConflictException({
+          message: CLIPS_MESSAGES.SAVE_NOT_STARTED,
+          code: 'save_not_started',
+        });
+      }
+
+      const saved = await this.media.saveRendered(
+        {
+          orgId,
+          key: body.key,
+          posterKey: body.posterKey,
+          bytes: body.bytes,
+          durationMs: body.durationMs,
+          width: body.width,
+          height: body.height,
+          fps: body.fps,
+          name: output.data.fileName,
+          origin: 'upload',
+        },
+        tx,
+      );
+      const done: DownloadMedia = { status: 'saved', mediaId: saved.id };
+      await tx.clipJob.update({
+        where: { id: job.id },
+        data: { output: { ...output.data, media: done } as Prisma.InputJsonValue },
+      });
+      return { mediaId: saved.id };
+    });
   }
 
   private async requireJob(orgId: string, jobId: string) {

@@ -137,6 +137,24 @@ describe('runDoctor', () => {
     expect(report.ffmpeg.render.libx264.ok).toBe(true);
   });
 
+  it('only warns when libmp3lame is missing (Audio Only downloads), and passes it when present', async () => {
+    const without = await runDoctor(fakeTools({}).runTool, PATHS, { now: NOW });
+    expect(without.ok).toBe(true);
+    expect(without.ffmpeg.ok).toBe(true);
+    expect(without.ffmpeg.audio.libmp3lame).toEqual({
+      ok: false,
+      reason:
+        'This FFmpeg cannot write MP3, so Audio Only downloads will fail: it has no libmp3lame.',
+    });
+
+    const withLame = await runDoctor(
+      fakeTools({ buildconf: `${FULL_BUILDCONF}\n    --enable-libmp3lame` }).runTool,
+      PATHS,
+      { now: NOW },
+    );
+    expect(withLame.ffmpeg.audio.libmp3lame).toEqual({ ok: true, reason: null });
+  });
+
   it('fails a build that cannot read a graph from a file', async () => {
     const { runTool } = fakeTools({ graphFails: true });
     const report = await runDoctor(runTool, PATHS, { now: NOW });

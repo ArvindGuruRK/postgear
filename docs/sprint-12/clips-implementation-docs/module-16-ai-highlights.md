@@ -1,6 +1,6 @@
 # Module 16: AI Highlights (Signals)
 
-> **Sprint 12, Clips** | Status: Not started | Size: L (one full session)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19; see the README Progress row) | Size: L (one full session)
 > **Depends on**: [Module 04](module-04-import-pipeline.md), [Module 07](module-07-manual-clipping-and-clips-library.md)
 > **Stories**: CL-4.1, CL-4.2, CL-4.3, CL-4.4
 > **Next**: [Module 17](module-17-send-to-composer.md), [Module 19](module-19-retention-quotas-and-safety.md)
@@ -86,15 +86,17 @@ Each implements `SignalProducer` and returns a track or null:
 
 ## Tasks
 
-- [ ] `SignalTrack`, the registry, the file format, `normalise`.
-- [ ] `findHighlights` and `tuning.ts`, with the synthetic and sample tests.
-- [ ] Producers: loudness, scene, chat (behind its switch), replayed; simulated bindings.
-- [ ] The route, the run, the AI minutes charge and its reversal, `clipHighlightsWorkflow`, the replace rule, the give-back on failure and cancel.
-- [ ] The sharp range fetched on first open of an AI clip.
-- [ ] The video page: button with its AI Minutes price, confirm, progress, list, flags, notes.
-- [ ] Measure a run on the 10 minute sample and note the time for each stage in the Progress notes.
-- [ ] Title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `SignalTrack`, the registry, the file format, `normalise`.
+- [x] `findHighlights` and `tuning.ts`, with the synthetic and sample tests.
+- [x] Producers: loudness, scene, chat (behind its switch), replayed; simulated bindings.
+- [x] The route, the run, the AI minutes charge and its reversal, `clipHighlightsWorkflow`, the replace rule, the give-back on failure and cancel.
+- [x] The sharp range fetched on first open of an AI clip.
+- [x] The video page: button with its AI Minutes price, confirm, progress, list, flags, notes.
+- [x] Measure a run on the 10 minute sample and note the time for each stage in the Progress notes.
+- [x] Title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log.
+
+**Gaps at close (2026-11-19)**: The sharp range fetched on the first open of an AI clip is covered by tests only: on the stream sample the sharp video was already there, so the fetch had nothing to do live. The AI minutes chip under the button appears a moment after the page loads (it waits for `GET /entitlements/me`). A flat video's "We did not find any stand-out moments." was checked in the scorer and page tests, not live (the talk sample still finds 3 clips from its sound). Everything ran under `CLIPS_SIMULATION`: loudness and scene changes were measured for real with FFmpeg on the sample files, but chat came only from the recorded fixture, and no real YouTube, Twitch or Kick video or chat was ever read. Kick and YouTube chat stay out (as the Scope says). The light and Lilac themes are left to the hand check.
 
 ## Tests
 

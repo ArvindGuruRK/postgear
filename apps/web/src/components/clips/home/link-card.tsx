@@ -15,20 +15,20 @@
  * - **Importing**: the button says so and nothing can be pressed twice.
  * - A refusal at import (a limit reached since the probe, the tick missing)
  *   shows as the same warning alert as the link box's.
- *
- * Download is drawn but stays off with "Arrives in a later step of this
- * sprint." until Module 18.
+ * - **Download** (Module 18): the qualities menu (`DownloadMenu`), behind the
+ *   same tick. Picking one asks the server to prepare the file and hands the
+ *   answer to the page, which opens the Downloads tab. A video already in the
+ *   workspace can still be downloaded, so the tick and Download stay under
+ *   "You already have this video." A refusal shows in the same alert.
  */
-import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
-import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
-import { Badge, Button, Checkbox, cn, MotionIcon, Skeleton, TooltipHint } from '@postgear/ui';
+import { Badge, Button, Checkbox, cn, Skeleton } from '@postgear/ui';
 import { formatVideoLength } from '@postgear/video-engine';
 import { useId, useState } from 'react';
 import { ApiError } from '@/lib/api';
-import { importVideo } from '@/lib/clips-api';
-import type { ClipImportOutcome, ClipProbe } from '@/types/clips';
+import { importVideo, startDownload } from '@/lib/clips-api';
+import type { ClipImportOutcome, ClipProbe, DownloadStarted, LinkFormat } from '@/types/clips';
 import { PrimaryLink } from '../button-link';
-import { LATER_STEP_SENTENCE } from '../clips-model';
+import { DownloadMenu } from './download-menu';
 import { kindWords, PLATFORM_LABELS } from './home-model';
 import { RefusalAlert } from './refusal-alert';
 
@@ -39,6 +39,11 @@ export const TWITCH_MUTED_LINE =
 const IMPORT_UNREACHABLE = 'We could not reach Clips. Check your connection and try again.';
 
 export type ImportFn = (url: string, rightsConfirmed: boolean) => Promise<ClipImportOutcome>;
+export type DownloadFn = (
+  url: string,
+  formatId: string,
+  rightsConfirmed: boolean,
+) => Promise<DownloadStarted>;
 
 export function LinkCard({
   probe,
@@ -46,8 +51,10 @@ export function LinkCard({
   disabled = false,
   autoFocusRights = false,
   onImported,
+  onDownloaded,
   onUpload,
   importFn = importVideo,
+  downloadFn = startDownload,
   className,
 }: {
   probe: ClipProbe;
@@ -57,13 +64,17 @@ export function LinkCard({
   /** Move focus to the tick (a channel row's Import sent the person here). */
   autoFocusRights?: boolean;
   onImported: (outcome: ClipImportOutcome) => void;
+  /** Module 18: a download was asked for (absent: no Download button). */
+  onDownloaded?: (outcome: DownloadStarted) => void;
   onUpload?: () => void;
   importFn?: ImportFn;
+  downloadFn?: DownloadFn;
   className?: string;
 }) {
   const tickId = useId();
   const [ticked, setTicked] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [refusal, setRefusal] = useState<{ message: string; code: string | undefined } | null>(
     null,
   );
@@ -71,23 +82,62 @@ export function LinkCard({
   const { info, existingVideoId } = probe;
   const picture = info.thumbnailUrl && !pictureFailed ? info.thumbnailUrl : null;
 
+  const refuse = (cause: unknown) =>
+    setRefusal(
+      cause instanceof ApiError && cause.status !== 0
+        ? { message: cause.message, code: cause.code }
+        : { message: IMPORT_UNREACHABLE, code: undefined },
+    );
+
   const onImport = async () => {
-    if (!ticked || busy || disabled) return;
+    if (!ticked || busy || downloading || disabled) return;
     setBusy(true);
     setRefusal(null);
     try {
       const outcome = await importFn(probe.link.canonicalUrl, true);
       onImported(outcome);
     } catch (cause) {
-      setRefusal(
-        cause instanceof ApiError && cause.status !== 0
-          ? { message: cause.message, code: cause.code }
-          : { message: IMPORT_UNREACHABLE, code: undefined },
-      );
+      refuse(cause);
     } finally {
       setBusy(false);
     }
   };
+
+  const onDownload = async (format: LinkFormat) => {
+    if (!ticked || busy || downloading || disabled || !onDownloaded) return;
+    setDownloading(true);
+    setRefusal(null);
+    try {
+      onDownloaded(await downloadFn(probe.link.canonicalUrl, format.id, true));
+    } catch (cause) {
+      refuse(cause);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const rightsTick = (
+    <div className="flex items-start gap-2">
+      <Checkbox
+        id={tickId}
+        checked={ticked}
+        disabled={busy || downloading}
+        autoFocus={autoFocusRights}
+        onCheckedChange={(value) => setTicked(value === true)}
+      />
+      <label htmlFor={tickId} className="cursor-pointer font-sans text-sm font-bold text-ink">
+        {RIGHTS_LINE}
+      </label>
+    </div>
+  );
+  const downloadMenu = onDownloaded ? (
+    <DownloadMenu
+      formats={info.formats}
+      disabled={!ticked || busy || disabled}
+      busy={downloading}
+      onPick={(format) => void onDownload(format)}
+    />
+  ) : null;
 
   const facts = [
     info.channelName,
@@ -128,42 +178,34 @@ export function LinkCard({
         </div>
 
         {existingVideoId ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="m-0 font-sans text-sm font-bold text-ink">{ALREADY_HERE}</p>
-            <PrimaryLink
-              href={`/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(existingVideoId)}`}
-            >
-              Open Video
-            </PrimaryLink>
-          </div>
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="m-0 font-sans text-sm font-bold text-ink">{ALREADY_HERE}</p>
+              <PrimaryLink
+                href={`/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(existingVideoId)}`}
+              >
+                Open Video
+              </PrimaryLink>
+            </div>
+            {downloadMenu ? (
+              <>
+                {rightsTick}
+                <div className="flex flex-wrap items-center gap-3">{downloadMenu}</div>
+              </>
+            ) : null}
+          </>
         ) : (
           <>
-            <div className="flex items-start gap-2">
-              <Checkbox
-                id={tickId}
-                checked={ticked}
-                disabled={busy}
-                autoFocus={autoFocusRights}
-                onCheckedChange={(value) => setTicked(value === true)}
-              />
-              <label
-                htmlFor={tickId}
-                className="cursor-pointer font-sans text-sm font-bold text-ink"
-              >
-                {RIGHTS_LINE}
-              </label>
-            </div>
+            {rightsTick}
             <div className="flex flex-wrap items-center gap-3">
-              <Button size="sm" onClick={onImport} disabled={!ticked || busy || disabled}>
+              <Button
+                size="sm"
+                onClick={onImport}
+                disabled={!ticked || busy || downloading || disabled}
+              >
                 {busy ? 'Importing' : 'Import Video'}
               </Button>
-              <TooltipHint label={LATER_STEP_SENTENCE} disabled>
-                <Button variant="secondary" size="sm" disabled>
-                  <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
-                  Download
-                  <MotionIcon icon={ChevronDownIcon} className="h-4 w-4" />
-                </Button>
-              </TooltipHint>
+              {downloadMenu}
             </div>
           </>
         )}

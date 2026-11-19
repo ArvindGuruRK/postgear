@@ -16,6 +16,11 @@ import {
 } from './clips-tab';
 import { type ClipsListState, EMPTY_COUNTS } from './use-clips-list';
 
+// Send To Composer (Module 17) opens the composer through the router.
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+  usePathname: () => '/org-1/clips',
+}));
 jest.mock('@/lib/clips-api', () => ({
   updateClip: jest.fn(),
   duplicateClip: jest.fn(),

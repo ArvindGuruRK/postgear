@@ -137,3 +137,53 @@ describe('VideoClipList', () => {
     expect(await screen.findByRole('menuitem', { name: 'Hide' })).toBeInTheDocument();
   });
 });
+
+describe('AI picks (Module 16)', () => {
+  const pick = (id: string, score: number, reasons: string[]) =>
+    fixtureClipSummary({
+      id,
+      title: `Stream Sample ${id}`,
+      origin: 'AI_SIGNALS',
+      status: 'NEW',
+      state: 'new',
+      score,
+      reasons,
+    });
+
+  it('lists AI picks best first with score and reasons, then the hand-made clips under their group', () => {
+    renderList([
+      ORIGINAL,
+      pick('low', 55, ['fast_cuts']),
+      pick('top', 91.6, ['chat_burst', 'loud', 'louder', 'replayed']),
+    ]);
+    const aiList = screen.getByRole('list', { name: 'Clips found by AI' });
+    const aiRows = within(aiList).getAllByTestId('video-clip-row');
+    expect(aiRows.map((row) => row.getAttribute('data-origin'))).toEqual([
+      'AI_SIGNALS',
+      'AI_SIGNALS',
+    ]);
+    expect(within(aiRows[0] as HTMLElement).getByTestId('video-clip-score')).toHaveTextContent(
+      '92',
+    );
+    expect(within(aiRows[0] as HTMLElement).getByTestId('video-clip-reasons')).toHaveTextContent(
+      'Chat exploded, Loud reaction, Louder than usual',
+    );
+    expect(within(aiRows[1] as HTMLElement).getByTestId('video-clip-score')).toHaveTextContent(
+      '55',
+    );
+
+    const hand = screen.getByRole('list', { name: 'Made By Hand' });
+    expect(within(hand).getAllByTestId('video-clip-row')).toHaveLength(1);
+    expect(within(hand).queryByTestId('video-clip-score')).toBeNull();
+  });
+
+  it('hides a poor pick from its menu', async () => {
+    const top = pick('top', 90, ['loud']);
+    const props = renderList([top]);
+    fireEvent.keyDown(screen.getByRole('button', { name: `More for ${top.title}` }), {
+      key: 'Enter',
+    });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Hide' }));
+    expect(props.actions.toggleHidden).toHaveBeenCalledWith(top);
+  });
+});

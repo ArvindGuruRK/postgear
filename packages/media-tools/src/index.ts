@@ -12,5 +12,6 @@ export * from './downloader';
 export * from './ffmpeg';
 export * from './render';
 export * from './run';
+export * from './signals';
 export * from './sounds';
 export * from './stickers';

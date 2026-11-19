@@ -10,6 +10,7 @@
 import type {
   ClipDocument,
   ClipError,
+  DownloadMedia,
   ClipLayout,
   ClipJobKind,
   ClipJobStatus,
@@ -68,6 +69,35 @@ export interface ClipJobView {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+}
+
+/** Module 18: a download row's state (see `toDownloadView` in the API). */
+export type DownloadState = 'preparing' | 'ready' | 'failed' | 'cancelled' | 'expired';
+
+/** Mirrors `/clips/downloads`: one prepared file. Never a storage key. */
+export interface DownloadView {
+  id: string;
+  title: string;
+  /** "720p", "Audio Only". */
+  label: string;
+  audioOnly: boolean;
+  ext: 'mp4' | 'mp3';
+  state: DownloadState;
+  job: ClipJobView;
+  bytes: number | null;
+  /** ISO time the file goes; null until it is ready. */
+  expiresAt: string | null;
+  canSaveToMedia: boolean;
+  media: DownloadMedia | null;
+  createdAt: string;
+}
+
+/** Mirrors `POST /clips/downloads`. */
+export interface DownloadStarted {
+  job: ClipJobView;
+  download: DownloadView;
+  /** The same file was already being prepared or ready. */
+  existing: boolean;
 }
 
 /** One event of `GET /clips/jobs/:jobId/events`. */
@@ -296,6 +326,96 @@ export interface ClipSummary {
   state: ClipState;
   /** The part of the video it plays (the video's time), for its line on the timeline; null if unreadable. */
   range: { fromMs: number; toMs: number } | null;
+  /** Why Find Clips picked it (`HIGHLIGHT_REASONS` codes, strongest first); empty for a hand-made clip. */
+  reasons: string[];
+  /**
+   * Module 17: the live posts it went out in, newest first, for the card's
+   * View Post. Sent by the Clips list and the video page; absent elsewhere.
+   */
+  posts?: ClipPublishedPost[];
+  /**
+   * Module 17: when its exported file was made, for the composer's Select A
+   * Clip; null with no export or once the file left Media. Sent by the Clips
+   * list only.
+   */
+  exportedAt?: string | null;
+}
+
+/** Module 17: one post a clip went out in, as View Post opens it. */
+export interface ClipPublishedPost {
+  group: string;
+  channelName: string;
+  providerIdentifier: string;
+  /** The live post's address (http or https only). */
+  url: string;
+  publishedAt: string;
+}
+
+/** Module 17: a channel a waiting post goes to. */
+export interface ComingUpChannel {
+  id: string;
+  name: string;
+  providerIdentifier: string;
+  picture: string | null;
+}
+
+/** Module 17: one row of the Create tab's Coming Up panel. */
+export interface ComingUpItem {
+  group: string;
+  publishDate: string;
+  channels: ComingUpChannel[];
+  clip: {
+    id: string;
+    title: string;
+    ratio: string;
+    durationMs: number;
+    videoId: string;
+    poster: ClipPoster | null;
+  };
+}
+
+/** `GET /clips/coming-up`: at most five rows, soonest first, and how many there are. */
+export interface ComingUpView {
+  items: ComingUpItem[];
+  total: number;
+  /** The workspace has an exported clip (not hidden): the panel is drawn only then. */
+  anyExported: boolean;
+}
+
+/** One Find Clips run (Module 16), as `GET /clips/videos/:videoId/highlights` gives it. */
+export interface HighlightRunView {
+  id: string;
+  /** The run's job, for progress and Cancel. */
+  jobId: string | null;
+  status: ClipJobStatus;
+  /** Clips the run made. */
+  found: number;
+  /** The tracks the scorer used ("loudness", "scene", "chat", "replayed"). */
+  tracks: string[];
+  /** "Sound, picture and chat": the "How this was found" line; null before the run ends. */
+  foundBy: string | null;
+  /** What the run was charged, in AI minutes. */
+  aiMinutes: number;
+  /** A failed or cancelled run had its AI minutes given back. */
+  refunded: boolean;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+/** Find Clips on the video page: the price, whether the video has sound, the latest run. */
+export interface HighlightsView {
+  /** What Find Clips costs for this video, in AI minutes. */
+  price: number;
+  noSound: boolean;
+  run: HighlightRunView | null;
+  job: ClipJobView | null;
+}
+
+/** `POST /clips/videos/:videoId/highlights` (202): the run, its job and the AI minutes meter after the charge. */
+export interface HighlightsStarted {
+  run: HighlightRunView;
+  job: ClipJobView;
+  meter: { used: number; remaining: number | null; limit: number | null; cycleEnd: string };
 }
 
 /** The filmstrip: sprite sheets of small pictures along the whole video. */
@@ -322,6 +442,8 @@ export interface ClipVideoDetail {
   waveform: ClipWaveform | null;
   job: ClipJobView | null;
   clips: ClipSummary[];
+  /** Find Clips (Module 16). */
+  highlights: HighlightsView;
 }
 
 /** `POST /clips/videos/uploads`. */

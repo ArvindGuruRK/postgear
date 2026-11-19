@@ -1,11 +1,11 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { DownloaderError, ProbeError } from '@postgear/media-tools';
+import { DownloaderError, gunzipSignalsFile, ProbeError } from '@postgear/media-tools';
 import type { PrivateStorage } from '@postgear/storage';
 import type { ImportInput } from '@postgear/video-engine';
 import { ClipStepError } from '../failures';
-import { allImportKeys } from '../keys';
+import { allImportKeys, importKeys } from '../keys';
 import {
   FakePrivateStorage,
   FakeRows,
@@ -150,6 +150,36 @@ describe('runImport', () => {
     expect(Math.max(...fetching)).toBeLessThanOrEqual(70);
     expect(Math.min(...preparing)).toBeGreaterThanOrEqual(72);
     expect(preparing).toEqual([...preparing].sort((a, b) => a - b));
+  });
+
+  it('a YouTube heat map from the probe is stored as the first signals file of the video', async () => {
+    const { run, rows, storage } = setup({
+      ...linkInput,
+      replayed: [
+        { startMs: 0, endMs: 60_000, value: 0.1 },
+        { startMs: 60_000, endMs: 120_000, value: 1 },
+        { startMs: 120_000, endMs: 180_000, value: 0.2 },
+      ],
+    });
+
+    const outcome = await runImport(run);
+    expect(outcome.assets).toBe(6);
+    const signals = rows.assets.find((asset) => asset.kind === 'SIGNALS');
+    expect(signals?.key).toBe(importKeys.signals(ORG, VIDEO_ID, JOB_ID));
+    expect(signals?.meta).toEqual({
+      durationMs: 180_000,
+      tracks: [{ name: 'replayed', version: 1 }],
+    });
+    const file = await gunzipSignalsFile(storage.objects.get(signals?.key ?? '') as Buffer);
+    expect(file.tracks.map((track) => track.name)).toEqual(['replayed']);
+    const values = file.tracks[0]?.values ?? [];
+    expect(Math.max(...values.map((value) => value ?? 0))).toBe(1);
+  });
+
+  it('no heat map, no signals file', async () => {
+    const { run, rows } = setup(linkInput);
+    await runImport(run);
+    expect(rows.assets.some((asset) => asset.kind === 'SIGNALS')).toBe(false);
   });
 
   it('an upload: reads the ORIGINAL, charges its minutes once the length is known', async () => {

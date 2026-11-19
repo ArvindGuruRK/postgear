@@ -12,6 +12,7 @@ import { Body, Controller, HttpCode, HttpStatus, Param, Post, UseGuards } from '
 import type {
   ClipChargeImportAnswer,
   ClipFinishExportAnswer,
+  ClipFinishSaveDownloadAnswer,
   ClipReconcileAnswer,
   ClipReverseAnswer,
   ClipSettledAnswer,
@@ -24,7 +25,9 @@ import {
   type ChargeImportBody,
   chargeImportSchema,
   type FinishExportBody,
+  type FinishSaveDownloadBody,
   finishExportSchema,
+  finishSaveDownloadSchema,
   type OrgOnlyBody,
   orgOnlySchema,
   type ReconcileBody,
@@ -66,6 +69,17 @@ export class ClipsInternalController {
     @Body(new ZodBody(finishExportSchema, 'internal/clips/finish-export')) body: FinishExportBody,
   ): Promise<ClipFinishExportAnswer> {
     return this.internal.finishExport(jobId, body);
+  }
+
+  /** Module 18: Save To Media's copy of a download becomes a Media row. */
+  @Post('jobs/:jobId/finish-save-download')
+  @HttpCode(HttpStatus.OK)
+  finishSaveDownload(
+    @Param('jobId') jobId: string,
+    @Body(new ZodBody(finishSaveDownloadSchema, 'internal/clips/finish-save-download'))
+    body: FinishSaveDownloadBody,
+  ): Promise<ClipFinishSaveDownloadAnswer> {
+    return this.internal.finishSaveDownload(jobId, body);
   }
 
   @Post('jobs/:jobId/settled')

@@ -340,6 +340,88 @@ describe('ClipsInternalService.finishExport', () => {
   });
 });
 
+describe('ClipsInternalService.finishSaveDownload (Module 18)', () => {
+  const SAVE = {
+    organizationId: TEST_ORG,
+    key: '2026/11/abcdef.mp4',
+    bytes: 80_000_000,
+    posterKey: '2026/11/abcdef.thumb.jpg',
+    durationMs: 600_000,
+    width: 1280,
+    height: 720,
+    fps: 30,
+  };
+  const OUTPUT = {
+    assetId: '77777777-7777-4777-8777-777777777777',
+    key: `clips/${TEST_ORG}/downloads/${JOB_ID}/file.mp4`,
+    bytes: 80_000_000,
+    ext: 'mp4',
+    fileName: 'Talk.mp4',
+    durationMs: 600_000,
+    width: 1280,
+    height: 720,
+    fps: 30,
+  };
+
+  function downloadJob(media: unknown, overrides: Partial<ClipJob> = {}) {
+    db.jobs.push(
+      jobRow({
+        id: JOB_ID,
+        kind: 'DOWNLOAD',
+        status: 'DONE',
+        videoId: null,
+        output: media === undefined ? OUTPUT : { ...OUTPUT, media },
+        ...overrides,
+      }),
+    );
+  }
+
+  it('makes one Media row (an upload, named after the file) for two calls at once', async () => {
+    const { internal, media } = deps();
+    downloadJob({ status: 'saving', mediaId: null });
+    const [a, b] = await Promise.all([
+      internal.finishSaveDownload(JOB_ID, SAVE),
+      internal.finishSaveDownload(JOB_ID, SAVE),
+    ]);
+    expect(a).toEqual({ mediaId: MEDIA_ID });
+    expect(b).toEqual({ mediaId: MEDIA_ID });
+    expect(media.saveRendered).toHaveBeenCalledTimes(1);
+    expect(media.saveRendered).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: TEST_ORG,
+        key: SAVE.key,
+        posterKey: SAVE.posterKey,
+        name: 'Talk.mp4',
+        origin: 'upload',
+      }),
+      fakePrisma,
+    );
+    expect(db.jobs[0]?.output).toEqual({ ...OUTPUT, media: { status: 'saved', mediaId: MEDIA_ID } });
+  });
+
+  it('refuses a download that is not being saved (409), and another workspace or kind (404)', async () => {
+    const { internal, media } = deps();
+    downloadJob(undefined);
+    await expect(internal.finishSaveDownload(JOB_ID, SAVE)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    await expect(
+      internal.finishSaveDownload(JOB_ID, { ...SAVE, organizationId: 'other-org' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    db.jobs = [];
+    downloadJob({ status: 'saving', mediaId: null }, { kind: 'RENDER' });
+    await expect(internal.finishSaveDownload(JOB_ID, SAVE)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    db.jobs = [];
+    downloadJob({ status: 'saving', mediaId: null }, { output: { ...OUTPUT, ext: 'mp3', media: { status: 'saving', mediaId: null } } });
+    await expect(internal.finishSaveDownload(JOB_ID, SAVE)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(media.saveRendered).not.toHaveBeenCalled();
+  });
+});
+
 describe('ClipReconcileService', () => {
   it('changes nothing while Temporal cannot be reached', async () => {
     const { reconciler, scheduling, jobsRepository, jobs } = deps();

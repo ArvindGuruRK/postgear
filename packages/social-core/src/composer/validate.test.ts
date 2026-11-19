@@ -255,3 +255,55 @@ describe('formatBytes', () => {
     expect(formatBytes(2048)).toBe('2 KB');
   });
 });
+
+describe('video facts (Sprint 12, Module 17)', () => {
+  const clipRules = rules({}, { videoMaxMs: 90_000, videoMinMs: 3_000, videoMaxWidth: 1920 });
+
+  it('holds a video with facts to the length, shape and width rules', () => {
+    const issues = validatePost(
+      clipRules,
+      [{ text: 'hi', media: [video({ durationMs: 130_000, width: 1080, height: 1920 })] }],
+      { providerName: 'Facebook' },
+    );
+    expect(issues).toEqual([
+      {
+        code: 'video_too_long',
+        part: 0,
+        message: 'This video is 2 min 10 s. Facebook takes up to 90 seconds.',
+      },
+    ]);
+    expect(
+      firstIssueMessage(
+        validatePost(clipRules, [{ text: 'hi', media: [video({ width: 2160, height: 3840 })] }], {
+          providerName: 'Threads',
+        }),
+      ),
+    ).toBe('This video is 2160 pixels wide. Threads takes up to 1920.');
+    expect(
+      validatePost(
+        rules({}, { videoRatios: ['9:16'] }),
+        [{ text: 'hi', media: [video({ width: 1920, height: 1080 })] }],
+        { providerName: 'X' },
+      ).map((issue) => issue.code),
+    ).toEqual(['video_shape']);
+  });
+
+  it('passes old media without facts exactly as before', () => {
+    const old = [{ text: 'hi', media: [video({ bytes: 10 * MB })] }];
+    expect(validatePost(clipRules, old, { providerName: 'Facebook' })).toEqual([]);
+    expect(
+      validatePost(rules(), [{ text: 'hi', media: [image({ width: 1080, height: 1080 })] }], {
+        providerName: 'X',
+      }),
+    ).toEqual([]);
+  });
+
+  it('reports the size once, as before, and not again as a video fact', () => {
+    const issues = validatePost(
+      rules({}, { maxVideoBytes: 300 * MB, videoMaxMs: 90_000 }),
+      [{ text: 'hi', media: [video({ bytes: 340 * MB, durationMs: 40_000 })] }],
+      { providerName: 'Instagram' },
+    );
+    expect(issues.map((issue) => issue.code)).toEqual(['file_too_large']);
+  });
+});

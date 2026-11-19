@@ -39,6 +39,7 @@ export function formatDoctorReport(
     checkLine('libass (text)', render.libass, false),
     checkLine('libharfbuzz (text shaping)', render.libharfbuzz, false),
     checkLine('libx264 (H.264)', render.libx264, false),
+    checkLine('libmp3lame (Audio Only downloads)', report.ffmpeg.audio.libmp3lame, true),
     toolLine('ffprobe', report.ffprobe, false),
     toolLine('yt-dlp', report.ytDlp, true),
     checkLine('yt-dlp browser impersonation (Kick)', report.ytDlp.impersonation, true),

@@ -15,7 +15,8 @@
  *
  * Route order matters here. Nest registers a module's controllers before
  * those of the modules it imports, and in import order after that. So every
- * `/clips/<word>` route of this module (`status`, `videos`, `jobs`, `files`)
+ * `/clips/<word>` route of this module (`status`, `videos`, `jobs`, `files`,
+ * `downloads`)
  * and of the channels, links, layouts and library modules is registered before
  * `ClipItemModule`'s `GET /clips/:clipId`, which would otherwise swallow
  * them. `clips-routes.spec.ts` holds this in place.
@@ -25,7 +26,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipItemModule } from './clip/clip-item.module';
 import { ClipsCoreModule } from './clips-core.module';
+import { ClipDownloadsController } from './downloads/clip-downloads.controller';
+import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
+import { ClipDownloadsService } from './downloads/clip-downloads.service';
 import { ClipFilesController } from './files/clip-files.controller';
+import { ClipHighlightsController } from './highlights/clip-highlights.controller';
+import { ClipHighlightsService } from './highlights/clip-highlights.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipsInternalController } from './internal/clips-internal.controller';
 import { ClipsInternalService } from './internal/clips-internal.service';
@@ -57,18 +63,25 @@ import { ClipVideosService } from './videos/clip-videos.service';
   controllers: [
     ClipsStatusController,
     ClipVideosController,
+    // Module 16: `/clips/videos/:videoId/highlights`.
+    ClipHighlightsController,
     ClipJobsController,
     ClipFilesController,
+    // Module 18: `/clips/downloads`, a word route, so before `ClipItemModule`.
+    ClipDownloadsController,
     ClipsInternalController,
   ],
   providers: [
     ClipJobEventsService,
     ClipsStatusService,
     ClipVideosService,
+    ClipHighlightsService,
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,
     ClipSampleLink,
+    ClipDownloadsRepository,
+    ClipDownloadsService,
   ],
   // Nothing outside Clips needs its providers; a later module imports `ClipsCoreModule` itself.
 })

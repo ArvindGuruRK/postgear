@@ -3,6 +3,8 @@
 /**
  * What can be done to a clip from a list (Module 07, section 5): Rename in
  * place, Duplicate, Hide or Unhide, and Delete Clip behind a red confirm.
+ * Module 17 adds Send To Composer (exported clips only) and View Post (one
+ * live post opens straight away; several are listed in a small popover).
  * The video page's list and the Clips tab use the same menu and the same
  * calls, so they never drift.
  *
@@ -15,7 +17,9 @@ import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { EyeIcon } from '@animateicons/react/lucide/eye-icon';
 import { EyeOffIcon } from '@animateicons/react/lucide/eye-off-icon';
+import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { PencilIcon } from '@animateicons/react/lucide/pencil-icon';
+import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   AlertDialog,
@@ -35,12 +39,16 @@ import {
   DropdownMenuTrigger,
   Input,
   MotionIcon,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
   toast,
 } from '@postgear/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, downloadFile } from '@/lib/api';
 import { deleteClip, duplicateClip, updateClip } from '@/lib/clips-api';
-import type { ClipSummary, ClipView } from '@/types/clips';
+import type { ClipPublishedPost, ClipSummary, ClipView } from '@/types/clips';
 
 export const MAX_CLIP_TITLE_LENGTH = 200;
 export const DELETE_CLIP_SENTENCE =
@@ -57,6 +65,24 @@ export interface ClipActions {
   duplicate: (clip: ClipSummary) => Promise<void>;
   toggleHidden: (clip: ClipSummary) => Promise<void>;
   remove: (clip: ClipSummary) => Promise<void>;
+  /**
+   * Module 17: opens Send To Composer for an exported clip. `from` is the
+   * control focus goes back to when the dialog or the composer closes.
+   */
+  send?: (clip: ClipSummary, from: HTMLElement | null) => void;
+}
+
+/** A live post opened in a new tab, with nothing of ours handed to it. */
+export function openPost(url: string): void {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/** "18 Nov": when a live post went out, for the View Post list. */
+export function postedDate(iso: string): string {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime())
+    ? ''
+    : at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 /**
@@ -69,18 +95,22 @@ export function clipActions({
   onAdded,
   onRemoved,
   onStale,
+  send,
 }: {
   onChanged: (clip: ClipView) => void;
   /** A duplicate: the new clip, and the one it was copied from (same range). */
   onAdded: (clip: ClipView, source: ClipSummary) => void;
   onRemoved: (clipId: string) => void;
   onStale: () => void;
+  /** Module 17: Send To Composer, where the list hosts the dialog. */
+  send?: ClipActions['send'];
 }): ClipActions {
   const failed = (cause: unknown) => {
     toast({ title: clipErrorSentence(cause), variant: 'danger' });
     if (cause instanceof ApiError && (cause.status === 409 || cause.status === 404)) onStale();
   };
   return {
+    send,
     rename: async (clip, title) => {
       const clean = title.replace(/\s+/g, ' ').trim().slice(0, MAX_CLIP_TITLE_LENGTH);
       if (clean === '' || clean === clip.title) return;
@@ -209,24 +239,43 @@ export function ClipMenu({
   // and closed). Radix calls `onCloseAutoFocus` after the trap is gone, as the
   // composer's inserts use it.
   const renamePicked = useRef(false);
+  // Send To Composer and View Post open their dialog or popover the same way,
+  // once the menu has closed and focus is back on the menu's button.
+  const nextPicked = useRef<'send' | 'posts' | null>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const [postsOpen, setPostsOpen] = useState(false);
   const hidden = clip.state === 'hidden';
+  const posts = clip.posts ?? [];
+  const send = clip.exportedMediaId ? actions.send : undefined;
 
   return (
-    <>
+    <Popover open={postsOpen} onOpenChange={setPostsOpen}>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`More for ${clip.title}`}
-            className={className}
-          >
-            <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
+        <PopoverAnchor asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              ref={trigger}
+              variant="ghost"
+              size="sm"
+              aria-label={`More for ${clip.title}`}
+              className={className}
+            >
+              <MotionIcon icon={EllipsisVerticalIcon} className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </PopoverAnchor>
         <DropdownMenuContent
           align="end"
           onCloseAutoFocus={(event) => {
+            const next = nextPicked.current;
+            nextPicked.current = null;
+            if (next) {
+              event.preventDefault();
+              trigger.current?.focus({ preventScroll: true });
+              if (next === 'send') send?.(clip, trigger.current);
+              else setPostsOpen(true);
+              return;
+            }
             if (!renamePicked.current) return;
             renamePicked.current = false;
             event.preventDefault();
@@ -241,6 +290,28 @@ export function ClipMenu({
             <MotionIcon icon={PencilIcon} className="h-4 w-4" />
             Rename
           </DropdownMenuItem>
+          {send ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                nextPicked.current = 'send';
+              }}
+            >
+              <MotionIcon icon={SendIcon} className="h-4 w-4" />
+              Send To Composer
+            </DropdownMenuItem>
+          ) : null}
+          {posts.length > 0 ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                const only = posts.length === 1 ? posts[0] : undefined;
+                if (only) openPost(only.url);
+                else nextPicked.current = 'posts';
+              }}
+            >
+              <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
+              View Post
+            </DropdownMenuItem>
+          ) : null}
           {clip.exportedMediaId ? (
             <DropdownMenuItem
               onSelect={() => {
@@ -268,6 +339,10 @@ export function ClipMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <PopoverContent align="end" className="w-72 p-2" data-testid="clip-posts">
+        <PostList posts={posts} onPicked={() => setPostsOpen(false)} />
+      </PopoverContent>
+
       <AlertDialog open={confirming} onOpenChange={(open) => !busy && setConfirming(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -293,7 +368,39 @@ export function ClipMenu({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </Popover>
+  );
+}
+
+/** The live posts of a clip sent more than once: each opens in a new tab. */
+function PostList({
+  posts,
+  onPicked,
+}: {
+  posts: readonly ClipPublishedPost[];
+  onPicked: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="m-0 px-2 pt-1 pb-1.5 font-sans text-xs text-ink type-label">Posts</p>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {posts.map((post) => (
+          <li key={post.url}>
+            <a
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onPicked}
+              className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-sans text-sm text-ink type-ui hover:bg-inset focus-visible:outline-2 focus-visible:outline-actionPrimary"
+            >
+              <PlatformIcon platform={post.providerIdentifier} className="h-4 w-4" />
+              <span className="min-w-0 flex-1 truncate">{post.channelName}</span>
+              <span className="shrink-0 text-xs type-muted">{postedDate(post.publishedAt)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

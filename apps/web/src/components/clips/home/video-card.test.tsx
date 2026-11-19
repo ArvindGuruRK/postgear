@@ -172,4 +172,34 @@ describe('VideoCard', () => {
     });
     expect(cardActions.onDelete).toHaveBeenCalledWith('video-ready');
   });
+
+  it('offers Download Original only on a ready uploaded video', async () => {
+    const cardActions = { ...actions(), onDownloadOriginal: jest.fn(async () => undefined) };
+    const uploaded: ClipVideoCard = {
+      ...FIXTURE_CARDS.ready,
+      video: {
+        ...FIXTURE_CARDS.ready.video,
+        id: 'video-upload',
+        platform: 'upload',
+        title: 'My Upload',
+      },
+    };
+    renderCard(uploaded, cardActions);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'More for My Upload' }), { key: 'Enter' });
+    const item = await screen.findByRole('menuitem', { name: 'Download Original' });
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    expect(cardActions.onDownloadOriginal).toHaveBeenCalledWith('video-upload');
+  });
+
+  it('has no Download Original on a video from a link', async () => {
+    renderCard(FIXTURE_CARDS.ready, { ...actions(), onDownloadOriginal: jest.fn() });
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `More for ${FIXTURE_CARDS.ready.video.title}` }),
+      { key: 'Enter' },
+    );
+    await screen.findByRole('menuitem', { name: 'Delete Video' });
+    expect(screen.queryByRole('menuitem', { name: 'Download Original' })).not.toBeInTheDocument();
+  });
 });

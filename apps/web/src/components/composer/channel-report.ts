@@ -85,6 +85,7 @@ export function buildReport(
         bytes: item.fileSize,
         width: item.width ?? undefined,
         height: item.height ?? undefined,
+        durationMs: item.durationMs ?? undefined,
       })),
     })),
     { providerName: provider.name },

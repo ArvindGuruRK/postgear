@@ -12,6 +12,7 @@ import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui
 import { listClips } from '@/lib/clips-api';
 import type { ClipListItem } from '@/types/clips';
 import { clipActions } from './clip-actions';
+import { useClipSender } from './use-clip-sender';
 import { ClipCard } from './clip-card';
 import { listChange } from './clips-tab';
 
@@ -39,6 +40,7 @@ export function RecentClips({
     return () => abort.abort();
   }, [load, tick]);
 
+  const sender = useClipSender(orgId);
   if (clips.length === 0) return null;
 
   const actions = clipActions({
@@ -51,6 +53,7 @@ export function RecentClips({
     onAdded: () => setTick((value) => value + 1),
     onRemoved: (clipId) => setClips((current) => current.filter((one) => one.id !== clipId)),
     onStale: () => setTick((value) => value + 1),
+    send: sender.open,
   });
 
   return (
@@ -69,6 +72,7 @@ export function RecentClips({
           <ClipCard key={clip.id} clip={clip} orgId={orgId} actions={actions} />
         ))}
       </ul>
+      {sender.dialog}
     </AnalyticsPanel>
   );
 }

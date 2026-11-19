@@ -4,7 +4,8 @@
  * A clip on the Clips tab's grid and in Recent Clips (Module 07, section 5;
  * blueprint section 4): the poster in the clip's own shape, a muted preview
  * of the clip's part on hover, the name (renamed in place), "0:42, 9:16",
- * the state, the video it came from, **Edit** and the menu.
+ * the state, the video it came from, **Edit** and the menu. A Find Clips
+ * pick (Module 16) also shows its score and its first reason.
  *
  * The poster is one filmstrip tile cut out of its sheet with CSS only (no new
  * file): a frame in the tile's shape covers the clip's shape, and the sheet
@@ -19,6 +20,7 @@ import type { ClipListItem, ClipPoster, ClipPreview } from '@/types/clips';
 import { ExportRing } from '../export-ring';
 import { PrimaryLink } from '../button-link';
 import { PLATFORM_LABELS } from '../home/home-model';
+import { reasonLabels, scoreText } from '../video/find-clips-model';
 import { clipEditHref, clipFacts } from '../video/video-clip-list';
 import {
   CLIP_STATE_BADGE,
@@ -165,6 +167,9 @@ export function ClipCard({
 }) {
   const [renaming, setRenaming] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const isAi = clip.origin === 'AI_SIGNALS';
+  const score = isAi ? scoreText(clip.score) : null;
+  const firstReason = isAi ? (reasonLabels(clip.reasons ?? [])[0] ?? null) : null;
 
   return (
     <li
@@ -209,11 +214,22 @@ export function ClipCard({
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
+          {score !== null ? (
+            <Badge variant="outline" data-testid="clip-score">
+              <span className="sr-only">Score </span>
+              {score}
+            </Badge>
+          ) : null}
           <span className="font-sans text-xs text-ink tabular-nums type-muted">
             {clipFacts(clip)}
           </span>
           <Badge variant={CLIP_STATE_BADGE[clip.state]}>{CLIP_STATE_NAMES[clip.state]}</Badge>
         </div>
+        {firstReason ? (
+          <p className="m-0 font-sans text-xs text-ink type-muted" data-testid="clip-reason">
+            {firstReason}
+          </p>
+        ) : null}
         <p className="m-0 truncate font-sans text-xs text-ink type-muted" title={clip.videoTitle}>
           {PLATFORM_LABELS[clip.platform]}, {clip.videoTitle}
         </p>

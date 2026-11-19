@@ -10,7 +10,6 @@ import { CLIP_MAX_MS, CLIP_MIN_MS, formatClipLength } from '@postgear/video-engi
 export const CLIP_TOO_SHORT = 'A clip needs at least 3 seconds.';
 export const CLIP_TOO_LONG = 'A clip can be up to 30 minutes.';
 export const MARK_FIRST = 'Mark a start with I and an end with O.';
-export const FIND_CLIPS_LATER = 'Arrives in a later step of this sprint.';
 
 /** Seconds the arrows move the playhead: one, or five with Shift. */
 export const STEP_MS = 1000;

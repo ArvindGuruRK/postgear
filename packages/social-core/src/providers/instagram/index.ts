@@ -71,6 +71,13 @@ export const INSTAGRAM_RULES: ProviderRules = {
     imageMimeTypes: ['image/jpeg'],
     maxImageBytes: 8 * 1024 * 1024,
     imageAspectRatio: { min: 0.8, max: 1.91 },
+    // Sprint 12 (Module 17): a single video goes out as a Reel. Reels take 3 s
+    // to 15 min, 300 MB and a width up to 1920 px, any shape from 0.01:1 to
+    // 10:1 (Meta's ig-user/media reference, read 2026-11-14; research 07, section 7).
+    videoMinMs: 3_000,
+    videoMaxMs: 15 * 60_000,
+    maxVideoBytes: 300 * 1024 * 1024,
+    videoMaxWidth: 1920,
   },
 };
 

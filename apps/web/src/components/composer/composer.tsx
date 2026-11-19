@@ -1079,6 +1079,7 @@ export function Composer({
         onOpenChange={(open) => !open && setPickerFor(null)}
         alreadyAttached={pickerPart?.media.map((item) => item.id) ?? []}
         remaining={MAX_MEDIA_PER_PART - (pickerPart?.media.length ?? 0)}
+        clips={{ orgId }}
         onAttach={(media) => {
           if (pickerFor) {
             dispatch({ type: 'attachMedia', scope: state.scope, key: pickerFor, media });

@@ -64,6 +64,11 @@ export interface MediaView {
   /** A small preview for grids. Null for video, which has no generated poster yet. */
   thumbnailUrl: string | null;
   createdAt: Date;
+  /**
+   * Sprint 12 (Module 17): a video's length, so the composer and the queue
+   * can hold it to a platform's length rules; null when unknown.
+   */
+  durationMs?: number | null;
 }
 
 /** The subset of Multer's file object this service reads. */
@@ -106,6 +111,11 @@ export interface RenderedVideoInput {
   fps: number;
   /** The name it gets in the library. */
   name: string;
+  /**
+   * `clip` for an exported clip (the default); `upload` for a download a
+   * person saved to Media (Module 18): a whole video, not a clip.
+   */
+  origin?: 'clip' | 'upload';
 }
 
 /** `Media.fileSize` is a 32-bit column; a bigger file is recorded at the column's ceiling. */
@@ -307,7 +317,8 @@ export class MediaService {
    * Records an exported clip (Sprint 12, Module 05) as an ordinary library
    * video. The worker rendered it and stored it, with its poster, in the
    * public media space under keys it made with `createMediaKey`; this only
-   * writes the row (`type: 'video'`, `origin: 'clip'`, its length, size and
+   * writes the row (`type: 'video'`, `origin: 'clip'` or, for a saved
+   * download (Module 18), `'upload'`, its length, size and
    * frame rate, the poster as its thumbnail), inside the caller's
    * transaction when it gives one, so the row lands with the clip's export
    * mark or not at all.
@@ -342,7 +353,7 @@ export class MediaService {
         fileSize: Math.min(MAX_INT, Math.max(0, Math.round(input.bytes))),
         width: wholeOrNull(input.width),
         height: wholeOrNull(input.height),
-        origin: 'clip',
+        origin: input.origin ?? 'clip',
         durationMs: wholeOrNull(input.durationMs),
         fps: Number.isFinite(input.fps) && input.fps > 0 ? input.fps : null,
       },
@@ -536,6 +547,7 @@ export class MediaService {
       url: this.storage.publicUrl(record.path),
       thumbnailUrl: record.thumbnail ? this.storage.publicUrl(record.thumbnail) : null,
       createdAt: record.createdAt,
+      durationMs: record.durationMs ?? null,
     };
   }
 

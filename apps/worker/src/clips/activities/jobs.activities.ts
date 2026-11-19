@@ -5,9 +5,15 @@
  * file has to survive a worker restart; see `import.steps.ts`):
  * - `clipImport` (`postgear-media`): fetch, inspect, normalise, derive, store.
  * - `clipSegment` (`postgear-media`): the sharp range of a clip.
+ * - `clipHighlights` (`postgear-media`, Module 16): Find Clips' measuring,
+ *   scoring and the new clips (`highlights/highlights.run.ts`).
  * - `clipRender` (`postgear-render`): prepare, render, finish.
  * - `clipRenderWaitState` (`postgear-render`): one short look at the job and
  *   at the clip's running SEGMENT job; the workflow sleeps between looks.
+ * - `clipDownload` (`postgear-media`, Module 18): fetch the chosen format,
+ *   MP3 for Audio Only, store it for 24 hours (`download/download.run.ts`).
+ * - `clipSaveDownload` and `saveDownloadFailed` (`postgear-media`, Module 18):
+ *   Save To Media on a finished download (`download/save-download.run.ts`).
  *
  * Bookkeeping (run by the workflow after the work finally failed or was
  * cancelled, in a non-cancellable scope; see `job-outcomes.ts`):
@@ -17,20 +23,28 @@
  * meanwhile (the API cancelled a job whose workflow it could not reach, or
  * the reconcile failed it) answers `closed` and the workflow ends quietly.
  */
+import * as path from 'node:path';
 import {
   assertFreeDisk,
   makePoster,
   measureFileLoudness,
   measureLoudness,
+  mp3Args,
   probeFile,
+  probeSound,
   readOutputFacts,
   renderClip,
+  runFfmpeg,
   withScratch,
 } from '@postgear/media-tools';
 import type { ClipJobWorkflowInput } from '@postgear/scheduling';
+import { downloadOutputSchema } from '@postgear/video-engine';
 import { runClipActivity } from '../activity-kit';
 import type { ClipActivityDeps } from '../deps';
+import { type DownloadTools, runDownload } from '../download/download.run';
+import { runSaveDownload, saveDownloadFailed } from '../download/save-download.run';
 import { ClipStepError } from '../failures';
+import { type HighlightsRun, runHighlights } from '../highlights/highlights.run';
 import { deleteQuietly, runImport } from '../import/import.steps';
 import { type ImportTools, mediaImportTools } from '../import/import.tools';
 import { cancelJob, failJob, type JobFailure, openJob } from '../job-outcomes';
@@ -56,12 +70,16 @@ export interface RenderWaitState {
 
 export interface ClipJobActivityOptions {
   rows?: ClipRows;
+  /** Module 16: tests shorten the slow marker's hold. */
+  sleep?: HighlightsRun['sleep'];
   /** The rows a clip's sticker files come from (tests pass their own). */
   stickerRows?: StickerFileRows;
   /** The rows a clip's sound files come from (tests pass their own). */
   soundRows?: SoundFileRows;
   importTools?: ImportTools;
   renderTools?: RenderTools;
+  /** Module 18: the probes and the MP3 conversion (tests pass their own). */
+  downloadTools?: DownloadTools;
   now?: () => Date;
 }
 
@@ -87,6 +105,21 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
     measure: (input) => measureLoudness({ ...input, runTool: deps.runTool }),
     measureFile: (input) => measureFileLoudness({ ...input, runTool: deps.runTool }),
     facts: (file, opts) => readOutputFacts(deps.runTool, file, opts),
+  };
+  const downloadTools: DownloadTools = options.downloadTools ?? {
+    probeVideo: (file, opts) => probeFile(deps.runTool, file, opts),
+    probeSound: (file, opts) => probeSound(deps.runTool, file, opts),
+    async toMp3(opts) {
+      // Both files sit in the scratch folder, so FFmpeg is given plain names.
+      await runFfmpeg({
+        runTool: deps.runTool,
+        cwd: opts.cwd,
+        signal: opts.signal,
+        durationMs: opts.durationMs,
+        args: mp3Args(path.basename(opts.input), path.basename(opts.output)),
+        onProgress: opts.onProgress,
+      });
+    },
   };
   const outcomeDeps = {
     rows,
@@ -168,6 +201,51 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
       });
     },
 
+    async clipHighlights(ref: ClipJobWorkflowInput): Promise<ClipWorkResult> {
+      return runClipActivity('clipHighlights', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'HIGHLIGHTS');
+        const run = await rows.highlightRun(job.organizationId, input.runId);
+        if (!run || run.videoId !== input.videoId) {
+          throw new ClipStepError('highlights_failed', { retryable: false });
+        }
+        const progress = jobProgress(job.id, { kind: 'HIGHLIGHTS' });
+        if (!(await start(progress))) return { status: 'closed' };
+        await rows.markRunRunning(job.organizationId, run.id);
+
+        const [video, link] = await Promise.all([
+          rows.video(job.organizationId, input.videoId),
+          rows.videoLink(job.organizationId, input.videoId),
+        ]);
+        if (!video || video.deletedAt || video.status !== 'READY' || !link) {
+          throw new ClipStepError('highlights_failed', { retryable: false });
+        }
+
+        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+          // The light copy and the analysis sound come down; a few hundred MB is plenty.
+          await assertFreeDisk(dir, 512 * 1024 * 1024);
+          const outcome = await runHighlights({
+            jobId: job.id,
+            organizationId: job.organizationId,
+            input,
+            run,
+            video,
+            link,
+            dir,
+            signal: activity.signal,
+            producers: deps.providers.signalProducers,
+            privateStorage: deps.privateStorage,
+            rows,
+            progress,
+            heartbeat: activity.heartbeat,
+            now,
+            simulated: deps.providers.simulated,
+            sleep: options.sleep,
+          });
+          return { status: outcome.finished ? 'done' : 'closed' };
+        });
+      });
+    },
+
     async clipRenderWaitState(
       ref: ClipJobWorkflowInput & { first: boolean },
     ): Promise<RenderWaitState> {
@@ -216,6 +294,68 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
           return { status: outcome.finished ? 'done' : 'closed' };
         });
       });
+    },
+
+    async clipDownload(ref: ClipJobWorkflowInput): Promise<ClipWorkResult> {
+      return runClipActivity('clipDownload', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'DOWNLOAD');
+        const progress = jobProgress(job.id, { kind: 'DOWNLOAD' });
+        if (!(await start(progress))) return { status: 'closed' };
+
+        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+          // The fetched file and, for Audio Only, its MP3 side by side.
+          const expected = input.expectedBytes ?? 0;
+          await assertFreeDisk(dir, Math.max(512 * 1024 * 1024, expected * 2));
+          const outcome = await runDownload({
+            job,
+            input,
+            dir,
+            signal: activity.signal,
+            downloader: deps.providers.downloader,
+            tools: downloadTools,
+            privateStorage: deps.privateStorage,
+            rows,
+            progress,
+            heartbeat: activity.heartbeat,
+            now,
+          });
+          return { status: outcome.finished ? 'done' : 'closed' };
+        });
+      });
+    },
+
+    async clipSaveDownload(ref: ClipJobWorkflowInput): Promise<{ mediaId: string }> {
+      return runClipActivity('clipSaveDownload', ref.jobId, async (activity) => {
+        const row = await rows.downloadRow(ref.organizationId, ref.jobId);
+        const output = row?.status === 'DONE' ? downloadOutputSchema.safeParse(row.output) : null;
+        if (
+          !row ||
+          !output?.success ||
+          output.data.ext !== 'mp4' ||
+          output.data.media?.status !== 'saving'
+        ) {
+          throw new ClipStepError('media_save_failed', { retryable: false });
+        }
+        return withScratch(deps.scratchRoot, activity.scratchId(`${row.id}-media`), (dir) =>
+          runSaveDownload({
+            row,
+            output: output.data,
+            dir,
+            signal: activity.signal,
+            privateStorage: deps.privateStorage,
+            storage: deps.storage,
+            internal: deps.internal,
+            poster: renderTools.poster,
+            heartbeat: activity.heartbeat,
+          }),
+        );
+      });
+    },
+
+    async clipSaveDownloadFailed(ref: ClipJobWorkflowInput): Promise<void> {
+      return runClipActivity('clipSaveDownloadFailed', ref.jobId, () =>
+        saveDownloadFailed({ rows, storage: deps.storage }, ref),
+      );
     },
 
     async clipJobFailed(failure: JobFailure): Promise<boolean> {

@@ -16,3 +16,4 @@ export * from './rules';
 export * from './settings';
 export * from './unicode';
 export * from './validate';
+export * from './video-fit';

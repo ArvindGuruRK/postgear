@@ -20,6 +20,8 @@ export interface MediaItem {
   /** Null for video, which has no generated poster yet. */
   thumbnailUrl: string | null;
   createdAt: string;
+  /** Sprint 12: a video's length, so the composer holds it to each platform's length rules; null when unknown. */
+  durationMs?: number | null;
 }
 
 export interface MediaPage {

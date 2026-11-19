@@ -24,6 +24,7 @@ export function fixtureClipSummary(overrides: Partial<ClipSummary> = {}): ClipSu
     updatedAt: '2026-11-18T10:05:00.000Z',
     state: 'draft',
     range: { fromMs: 30_000, toMs: 72_000 },
+    reasons: [],
     ...overrides,
   };
 }

@@ -33,7 +33,15 @@ import {
 } from '@nestjs/common';
 import { type ClipJob, ClipJobKind, type ClipVideo, Prisma } from '@postgear/db';
 import { clipKeys, type PrivateStorage } from '@postgear/storage';
-import { type LinkRef, type VideoOrigin, videoOriginSchema } from '@postgear/video-engine';
+import {
+  type HighlightReason,
+  isHighlightReason,
+  type LinkRef,
+  MAX_REPLAYED_POINTS,
+  type ReplayedPoint,
+  type VideoOrigin,
+  videoOriginSchema,
+} from '@postgear/video-engine';
 import { stripControlChars } from '../../../common/sanitize';
 import { UsageService } from '../../entitlements/usage.service';
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
@@ -46,8 +54,10 @@ import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard, estimateImport } from '../limits/clip-limits.guard';
 import { CLIP_LINK_PROBER, type ClipLinkProber } from '../links/clip-links.types';
+import { type ClipPublishedPost, publishedPostsOf } from '../clip/clip-posts.service';
 import { type ClipState, clipStateOf, scheduledClipIds } from '../clip/clip-state';
 import { exportProgressOf } from '../clip/export-progress';
+import { type HighlightsView, highlightsOf } from '../highlights/clip-highlights.view';
 import { storedDocumentRange } from '../clip/sharp-source';
 import { ClipPlaybackService } from './clip-playback.service';
 import { CLIP_RIGHTS_TEXT_VERSION } from './clip-rights';
@@ -91,6 +101,8 @@ export interface ClipSummaryView {
   ratio: string;
   durationMs: number;
   score: number | null;
+  /** Module 16: why an AI clip was picked, as reason codes (best first, up to three). */
+  reasons: HighlightReason[];
   revision: number;
   /** The last export drew this very revision. */
   exported: boolean;
@@ -108,7 +120,10 @@ export interface ClipSummaryView {
 export interface ClipVideoDetail extends VideoMedia {
   video: ClipVideoView;
   job: ClipJobView | null;
-  clips: ClipSummaryView[];
+  /** Each with the live posts it went out in (Module 17, View Post). */
+  clips: (ClipSummaryView & { posts: ClipPublishedPost[] })[];
+  /** Module 16: Find Clips' price and the latest run. */
+  highlights: HighlightsView;
 }
 
 export interface ImportOutcome {
@@ -182,6 +197,7 @@ export class ClipVideosService {
         origin: { type: 'link', link: linkRefOf(probe.link) },
         limits,
         expectedBytes: estimate.expectedBytes,
+        ...replayedOf(probe.info.replayed),
       },
     });
 
@@ -268,22 +284,26 @@ export class ClipVideosService {
     const ready = row.status === 'READY';
 
     const clipIds = clips.map((clip) => clip.id);
-    const [card, media, scheduled, exporting] = await Promise.all([
+    const [card, media, scheduled, exporting, highlights, published] = await Promise.all([
       this.cardView(row),
       ready
         ? signVideoMedia(assets, (key) => this.playback.address(key))
         : Promise.resolve(NO_VIDEO_MEDIA),
       scheduledClipIds(orgId, clipIds),
       exportProgressOf(orgId, clipIds),
+      highlightsOf(orgId, row),
+      publishedPostsOf(orgId, clipIds),
     ]);
 
     return {
       video: card.video,
       ...media,
       job: card.job,
-      clips: clips.map((clip) =>
-        toClipSummary(clip, scheduled.has(clip.id), exporting.get(clip.id) ?? null),
-      ),
+      clips: clips.map((clip) => ({
+        ...toClipSummary(clip, scheduled.has(clip.id), exporting.get(clip.id) ?? null),
+        posts: published.get(clip.id) ?? [],
+      })),
+      highlights,
     };
   }
 
@@ -488,6 +508,26 @@ function linkRefOf(link: LinkRef): LinkRef {
   };
 }
 
+/**
+ * Module 16: YouTube's heat map from the probe, cleaned to what the import
+ * input allows (whole milliseconds, values 0 to 1, at most
+ * `MAX_REPLAYED_POINTS`), or nothing when the platform gave none.
+ */
+export function replayedOf(points: readonly ReplayedPoint[] | undefined): {
+  replayed?: ReplayedPoint[];
+} {
+  if (!points || points.length === 0) return {};
+  const replayed = points
+    .map((point) => ({
+      startMs: Math.max(0, Math.round(point.startMs)),
+      endMs: Math.max(0, Math.round(point.endMs)),
+      value: Math.min(1, Math.max(0, point.value)),
+    }))
+    .filter((point) => Number.isFinite(point.value) && point.startMs < point.endMs)
+    .slice(0, MAX_REPLAYED_POINTS);
+  return replayed.length > 0 ? { replayed } : {};
+}
+
 /** Where the last attempt read the video from, re-checked with the engine's schema. */
 export function originOf(job: Pick<ClipJob, 'input'> | null): VideoOrigin | null {
   if (!job || typeof job.input !== 'object' || job.input === null) return null;
@@ -519,6 +559,7 @@ export function toClipSummary(
     ratio: row.ratio,
     durationMs: row.durationMs,
     score: row.score,
+    reasons: row.reasons.filter(isHighlightReason),
     revision: row.revision,
     exported: row.lastExportedRevision !== null && row.lastExportedRevision === row.revision,
     exportedMediaId: row.exportedMediaId,

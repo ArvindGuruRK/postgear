@@ -3,7 +3,9 @@
  * `GET /clips`, `POST /clips`, `GET`, `PATCH` and `DELETE /clips/:clipId`,
  * and `POST /clips/:clipId/open`, `/duplicate`, `/more-video`, `/exports`;
  * Module 15 adds `GET /clips/:clipId/exports`, `POST /clips/:clipId/previews`
- * and `GET /clips/:clipId/previews/latest` (`ClipExportsService`).
+ * and `GET /clips/:clipId/previews/latest` (`ClipExportsService`); Module 17
+ * adds `GET /clips/coming-up` (declared before `:clipId`, see below) and
+ * `POST /clips/:clipId/send` (`ClipSendService`).
  *
  * ## Route order matters here
  *
@@ -55,8 +57,11 @@ import {
   type PreviewClipInput,
   patchClipSchema,
   previewClipSchema,
+  type SendClipInput,
+  sendClipSchema,
 } from './clip-item.schema';
 import { ClipItemService } from './clip-item.service';
+import { ClipSendService } from './clip-send.service';
 import { ClipsListService } from './clips-list.service';
 
 @Controller('clips')
@@ -67,6 +72,7 @@ export class ClipItemController {
     private readonly edits: ClipEditsService,
     private readonly library: ClipsListService,
     private readonly exports: ClipExportsService,
+    private readonly sender: ClipSendService,
   ) {}
 
   /** `{ clips, counts, page, pageSize, total }`. */
@@ -90,6 +96,16 @@ export class ClipItemController {
     @Body(new ZodBody(createClipSchema, 'clips/create')) body: CreateClipInput,
   ) {
     return this.clips.create(org.id, user.id, body);
+  }
+
+  /**
+   * Module 17: `{ items, total }`, the waiting posts in the next 14 days that
+   * use a clip, soonest first, at most five. Declared before `:clipId`, so
+   * Express matches this word first.
+   */
+  @Get('coming-up')
+  comingUp(@CurrentOrg() org: ActiveOrg) {
+    return this.library.comingUp(org.id);
   }
 
   /** `{ clip, video, playback, sharp, proxy, filmstrip, waveform }`. */
@@ -182,6 +198,22 @@ export class ClipItemController {
     @Body(new ZodBody(previewClipSchema, 'clips/preview')) body: PreviewClipInput,
   ) {
     return this.exports.startPreview(org.id, user.id, clipId, body);
+  }
+
+  /**
+   * Module 17, Send To Composer: 201 `{ group }`, a draft with the clip's
+   * exported file on the chosen channels; 409 `clip_not_exported`,
+   * `clip_export_outdated`; 422 `clip_does_not_fit`; 400 for a channel that
+   * is not this workspace's.
+   */
+  @Post(':clipId/send')
+  @HttpCode(HttpStatus.CREATED)
+  send(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('clipId') clipId: string,
+    @Body(new ZodBody(sendClipSchema, 'clips/send')) body: SendClipInput,
+  ) {
+    return this.sender.send(org.id, clipId, body);
   }
 
   /** `{ preview }`: the newest preview with a signed address while its file is kept, or null. */

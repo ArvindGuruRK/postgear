@@ -19,7 +19,7 @@ import type { ClipPlaybackService } from './clip-playback.service';
 import { type ClipSampleLink, SIMULATION_SAMPLE_LINK, sampleLinkFor } from './clip-sample';
 import { importVideoSchema } from './clip-videos.schema';
 import type { ClipVideosRepository } from './clip-videos.repository';
-import { ClipVideosService } from './clip-videos.service';
+import { ClipVideosService, replayedOf } from './clip-videos.service';
 
 /** One transaction at a time, in arrival order: a lost race reads the winner's rows. */
 let txChain: Promise<unknown> = Promise.resolve();
@@ -466,5 +466,24 @@ describe('Try A Sample (Module 06)', () => {
     expect(
       sampleLinkFor({ simulation: true, configured: undefined, platforms: ['twitch', 'kick'] }),
     ).toBeNull();
+  });
+});
+
+describe('replayedOf (Module 16)', () => {
+  it("carries YouTube's heat map into the import, cleaned, and nothing when there is none", () => {
+    expect(replayedOf(undefined)).toEqual({});
+    expect(replayedOf([])).toEqual({});
+    expect(
+      replayedOf([
+        { startMs: 0, endMs: 30_000.4, value: 0.2 },
+        { startMs: 30_000, endMs: 36_000, value: 1.4 },
+        { startMs: 36_000, endMs: 36_000, value: 0.5 },
+      ]),
+    ).toEqual({
+      replayed: [
+        { startMs: 0, endMs: 30_000, value: 0.2 },
+        { startMs: 30_000, endMs: 36_000, value: 1 },
+      ],
+    });
   });
 });

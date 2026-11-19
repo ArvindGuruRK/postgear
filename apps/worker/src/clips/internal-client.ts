@@ -20,6 +20,8 @@ import {
   type ClipChargeImportBody,
   type ClipFinishExportAnswer,
   type ClipFinishExportBody,
+  type ClipFinishSaveDownloadAnswer,
+  type ClipFinishSaveDownloadBody,
   type ClipReconcileAnswer,
   type ClipReverseAnswer,
   type ClipReverseBody,
@@ -36,6 +38,11 @@ export interface ClipInternalClient {
   chargeImport(jobId: string, body: ClipChargeImportBody): Promise<ClipChargeImportAnswer>;
   reverseCharges(jobId: string, body: ClipReverseBody): Promise<ClipReverseAnswer>;
   finishExport(jobId: string, body: ClipFinishExportBody): Promise<ClipFinishExportAnswer>;
+  /** Module 18: Save To Media's copy becomes a Media row. */
+  finishSaveDownload(
+    jobId: string,
+    body: ClipFinishSaveDownloadBody,
+  ): Promise<ClipFinishSaveDownloadAnswer>;
   /** After any job ends; starts the workspace's next waiting jobs. Best effort: never throws. */
   settled(jobId: string, body: ClipSettledBody): Promise<ClipSettledAnswer | null>;
   /** The maintenance pass (publishing role). */
@@ -105,6 +112,8 @@ export function createClipInternalClient(config: ClipInternalClientConfig): Clip
     chargeImport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.chargeImport(jobId), body),
     reverseCharges: (jobId, body) => call(CLIP_INTERNAL_ROUTES.reverseCharges(jobId), body),
     finishExport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishExport(jobId), body),
+    finishSaveDownload: (jobId, body) =>
+      call(CLIP_INTERNAL_ROUTES.finishSaveDownload(jobId), body),
     async settled(jobId, body) {
       try {
         return await call<ClipSettledAnswer>(CLIP_INTERNAL_ROUTES.settled(jobId), body);

@@ -62,6 +62,8 @@ import {
   Button,
   cn,
   pushRecent,
+  ToastAction,
+  toast,
 } from '@postgear/ui';
 import {
   type AudioItem,
@@ -135,6 +137,7 @@ import {
   linkOf,
   settleWithin,
 } from '@/components/studio/studio-editor-model';
+import { useFocusAfterComposer } from '@/components/composer/composer-return';
 import { ApiError } from '@/lib/api';
 import { getClip, openClip, requestMoreVideo, soundFiles, stickerFiles } from '@/lib/clips-api';
 import { StudioFonts } from '@/components/studio/studio-fonts';
@@ -211,8 +214,18 @@ import {
   needsShape,
 } from './editor-state';
 import { EditorTopBar } from './editor-top-bar';
-import { goneItems, LEAVE_OUT_TITLE, leaveOutSentence } from './export-model';
+import { isTerminalJob } from '../clip-job-model';
+import {
+  changedSince,
+  EXPORT_DONE_SENTENCE,
+  goneItems,
+  LEAVE_OUT_TITLE,
+  latestDone,
+  leaveOutSentence,
+} from './export-model';
 import { ExportPanel, useClipExport } from './export-panel';
+import { SendClipDialog, type SendExportRun } from './send-dialog';
+import { composerHref } from './send-model';
 import { usePlaybackStore } from './playback';
 import { ShapeDialog } from './shape-dialog';
 import { Stage } from './stage';
@@ -473,6 +486,47 @@ export function ClipEditor({
     setExportQueued(false);
     void startQueued();
   }, [exportQueued, startQueued]);
+
+  // ---- Send To Composer (Module 17) ---------------------------------------------
+
+  const [sendOpen, setSendOpen] = useState(false);
+  const sendFrom = useRef<HTMLElement | null>(null);
+  const sendOpenNow = useRef(false);
+  sendOpenNow.current = sendOpen;
+  const openSend = useCallback((from: HTMLElement | null) => {
+    sendFrom.current = from;
+    setSendOpen(true);
+  }, []);
+  // Back from the composer: the Send button that opened it (the toast's has gone).
+  useFocusAfterComposer(
+    orgId,
+    () =>
+      (sendFrom.current?.isConnected ? sendFrom.current : null) ??
+      window.document.querySelector<HTMLElement>('[data-testid="clip-export-send"]'),
+  );
+
+  // An export this editor watched run is done: say so, with Send To Composer.
+  const exportView = exporting.job.job;
+  const watchedRun = useRef<string | null>(null);
+  useEffect(() => {
+    if (!exportView) return;
+    if (!isTerminalJob(exportView.status)) {
+      watchedRun.current = exportView.id;
+      return;
+    }
+    if (watchedRun.current !== exportView.id) return;
+    watchedRun.current = null;
+    // The send dialog follows its own Export Again; no second word about it.
+    if (exportView.status !== 'DONE' || sendOpenNow.current) return;
+    toast({
+      title: EXPORT_DONE_SENTENCE,
+      action: (
+        <ToastAction altText="Send To Composer" onClick={() => openSend(null)}>
+          Send To Composer
+        </ToastAction>
+      ),
+    });
+  }, [exportView, openSend]);
 
   // A change the schema refused never reaches the server; say so for whoever is debugging.
   useEffect(() => {
@@ -801,7 +855,8 @@ export function ClipEditor({
       const { width, height } = view;
       if (!width || !height) return;
       knowFiles([[tileKey(view, from), tileFileInfo(view)]]);
-      const ref = from === 'library' ? { library: 'sticker' as const, id: view.id } : { asset: view.id };
+      const ref =
+        from === 'library' ? { library: 'sticker' as const, id: view.id } : { asset: view.id };
       const id = placeNew(
         (doc, at) => defaultStickerItem(doc, at, ref, { width, height }),
         'elements',
@@ -872,8 +927,12 @@ export function ClipEditor({
       const durationMs = view.durationMs ?? 0;
       if (!(durationMs > 0)) return;
       knowSounds([[rowSoundKey(view, from), rowSoundInfo(view, kind)]]);
-      const ref = from === 'library' ? { library: 'sound' as const, id: view.id } : { asset: view.id };
-      const id = placeNew((current, at) => defaultSoundItem(current, at, ref, kind, { durationMs }), 'audio');
+      const ref =
+        from === 'library' ? { library: 'sound' as const, id: view.id } : { asset: view.id };
+      const id = placeNew(
+        (current, at) => defaultSoundItem(current, at, ref, kind, { durationMs }),
+        'audio',
+      );
       if (id) setAnnouncement(`${view.name} added.`);
     },
     [knowSounds, placeNew],
@@ -1381,6 +1440,16 @@ export function ClipEditor({
       },
     );
 
+  const lastExport = latestDone(exporting.exports);
+  const sendExportRun: SendExportRun = {
+    start: () => startExport(),
+    cancel: () => void exporting.cancel(),
+    jobId: exporting.jobId,
+    job: exporting.job.job,
+    busy: exporting.starting || leaveOut !== null || exportQueued,
+    problem: exporting.problem,
+  };
+
   const startExport = () => {
     setTab('export');
     const gone = goneNow();
@@ -1476,6 +1545,7 @@ export function ClipEditor({
               document={document}
               sourceFps={detail.video?.fps ?? null}
               onExport={startExport}
+              onSend={openSend}
             />
           ) : state.tab === 'layouts' ? (
             <LayoutsPanel
@@ -1643,6 +1713,25 @@ export function ClipEditor({
         onChoose={chooseFirstShape}
       />
       <EditorShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      {lastExport?.media ? (
+        <SendClipDialog
+          open={sendOpen}
+          onOpenChange={setSendOpen}
+          orgId={orgId}
+          clip={{
+            id: clipId,
+            title,
+            durationMs: outputDuration(document),
+            exportedMediaId: lastExport.media.id,
+          }}
+          outdated={changedSince(document, lastExport.fingerprint)}
+          exportRun={sendExportRun}
+          onSent={(group) => {
+            setSendOpen(false);
+            router.push(composerHref(orgId, group));
+          }}
+        />
+      ) : null}
       <AlertDialog open={leaveOut !== null} onOpenChange={(open) => !open && setLeaveOut(null)}>
         <AlertDialogContent data-testid="clip-leave-out">
           <AlertDialogHeader>

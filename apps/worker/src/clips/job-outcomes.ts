@@ -14,6 +14,15 @@
  *   import's minutes are given back in full.
  * - **Cancelled**: delete what the job stored, the job CANCELLED; an import's
  *   video is soft deleted with every file under it, and its minutes given back.
+ * - **Highlights** (Module 16), failed or cancelled: the signals file the run
+ *   may have stored is deleted, the job and its run take the same end (a
+ *   failure always reads "We could not finish looking for clips. Your AI
+ *   minutes were given back."), and the AI minutes are given back in full.
+ * - **Download** (Module 18), failed or cancelled: whatever it stored under
+ *   its download folder goes, the job takes the end (a failure keeps the
+ *   platform's own reason or reads "We could not prepare this file. Try
+ *   again."), and both charges (the day's download and the import minutes)
+ *   are given back in full.
  * - A job that is already DONE is never touched: a cancel that arrives after
  *   the finish loses, and the finished video stays.
  */
@@ -27,10 +36,11 @@ import {
   type ClipPlatformId,
   type RenderInput,
 } from '@postgear/video-engine';
+import { downloadFailureCode } from './download/download.run';
 import { ClipStepError } from './failures';
 import type { ClipInternalClient } from './internal-client';
 import { storedJobError } from './job-progress';
-import { allImportKeys, exportMediaKeys, segmentKey } from './keys';
+import { allImportKeys, exportMediaKeys, highlightsSignalsKey, segmentKey } from './keys';
 import { exportFailedNotification, videoFailedNotification } from './notifications';
 import type { ClipRows, JobRow } from './rows';
 
@@ -179,6 +189,9 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
       });
     }
 
+    case 'HIGHLIGHTS':
+      return closeHighlights(deps, job, 'FAILED', storedJobError('highlights_failed'), now);
+
     case 'RENDER': {
       const input = inputOf(job, 'RENDER');
       await cleanupRender(deps, job, input);
@@ -194,6 +207,15 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
         now,
       });
     }
+
+    case 'DOWNLOAD':
+      return closeDownload(
+        deps,
+        job,
+        'FAILED',
+        storedJobError(downloadFailureCode(failure.code), failure.platform),
+        now,
+      );
 
     default:
       return deps.rows.closeJob({
@@ -253,6 +275,9 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
       });
     }
 
+    case 'HIGHLIGHTS':
+      return closeHighlights(deps, job, 'CANCELLED', error, now);
+
     case 'RENDER': {
       await cleanupRender(deps, job, inputOf(job, 'RENDER'));
       return deps.rows.closeJob({
@@ -264,6 +289,9 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
       });
     }
 
+    case 'DOWNLOAD':
+      return closeDownload(deps, job, 'CANCELLED', error, now);
+
     default:
       return deps.rows.closeJob({
         jobId: job.id,
@@ -273,6 +301,64 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
         now,
       });
   }
+}
+
+/**
+ * A download that ended badly (Module 18): its folder emptied (no asset row
+ * exists yet: that is written with DONE), the job closed, and both charges
+ * given back (`rev:<entryId>`, through the API).
+ */
+async function closeDownload(
+  deps: OutcomeDeps,
+  job: JobRow,
+  status: 'FAILED' | 'CANCELLED',
+  error: { code: string; message: string },
+  now: Date,
+): Promise<boolean> {
+  await deps.privateStorage.deletePrefix(clipKeys.downloadPrefix(job.organizationId, job.id));
+  const closed = await deps.rows.closeJob({
+    jobId: job.id,
+    organizationId: job.organizationId,
+    status,
+    error,
+    now,
+  });
+  await reverse(deps, job);
+  return closed;
+}
+
+/**
+ * A highlights run that ended badly: its signals file out (the old one stays,
+ * since the row swap never happened), the job and the run closed together,
+ * and every AI minute it was charged given back (`rev:<entryId>`).
+ */
+async function closeHighlights(
+  deps: OutcomeDeps,
+  job: JobRow,
+  status: 'FAILED' | 'CANCELLED',
+  error: { code: string; message: string },
+  now: Date,
+): Promise<boolean> {
+  const org = job.organizationId;
+  const input = inputOf(job, 'HIGHLIGHTS');
+  const videoId = job.videoId ?? input?.videoId ?? null;
+  if (videoId) {
+    await deleteKeys(
+      (key) => deps.privateStorage.delete(key),
+      [highlightsSignalsKey(org, videoId, job.id)],
+      job.id,
+    );
+  }
+  const closed = await deps.rows.closeJob({
+    jobId: job.id,
+    organizationId: org,
+    status,
+    error,
+    highlightRunId: input?.runId ?? null,
+    now,
+  });
+  await reverse(deps, job);
+  return closed;
 }
 
 async function cleanupRender(

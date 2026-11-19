@@ -312,6 +312,36 @@ describe('ClipItemService.get', () => {
     expect(await refusal(service.get(OTHER_ORG, CLIP))).toMatchObject({ status: 404 });
     expect(await refusal(service.get(TEST_ORG, 'layouts'))).toMatchObject({ status: 404 });
   });
+
+  it("fetches an AI clip's sharp range on its first open, once, and never a hand-made clip's", async () => {
+    const tables = seed();
+    (tables.clips[0] as { origin: string; status: string }).origin = 'AI_SIGNALS';
+    (tables.clips[0] as { status: string }).status = 'NEW';
+    const { service, jobs } = setup(tables);
+
+    const first = await service.get(TEST_ORG, CLIP);
+    expect(first.sharp).toBe('fetching');
+    const segment = tables.jobs.find((job) => job.kind === 'SEGMENT');
+    expect(segment?.clipId).toBe(CLIP);
+    expect(segment?.input).toMatchObject({ fromMs: 60_000 - HANDLE_MS, toMs: 90_000 + HANDLE_MS });
+    expect(jobs.start).toHaveBeenCalledTimes(1);
+
+    // The job is open now: the next read says fetching and starts nothing more.
+    expect((await service.get(TEST_ORG, CLIP)).sharp).toBe('fetching');
+    expect(jobs.start).toHaveBeenCalledTimes(1);
+
+    const manual = setup();
+    expect((await manual.service.get(TEST_ORG, CLIP)).sharp).toBe('gone');
+    expect(manual.jobs.start).not.toHaveBeenCalled();
+  });
+
+  it('starts nothing for an AI clip whose platform copy is gone', async () => {
+    const tables = seed({ hdAvailable: false });
+    (tables.clips[0] as { origin: string }).origin = 'AI_SIGNALS';
+    const { service, jobs } = setup(tables);
+    expect((await service.get(TEST_ORG, CLIP)).sharp).toBe('gone');
+    expect(jobs.start).not.toHaveBeenCalled();
+  });
 });
 
 describe('ClipItemService.moreVideo', () => {

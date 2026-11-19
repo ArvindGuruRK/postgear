@@ -24,6 +24,8 @@ export interface MediaRecord {
   /** Storage key of the thumbnail, for images. */
   thumbnail: string | null;
   createdAt: Date;
+  /** Sprint 12: a video's length, filled for exported clips; null when unknown. */
+  durationMs?: number | null;
 }
 
 export interface CreateMediaInput {
@@ -56,6 +58,7 @@ const MEDIA_SELECT = {
   path: true,
   thumbnail: true,
   createdAt: true,
+  durationMs: true,
 } as const;
 
 @Injectable()

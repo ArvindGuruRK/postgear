@@ -15,6 +15,7 @@ import {
 import { State } from '@postgear/db';
 import { documentFromText } from '@postgear/social-core';
 import type { ChannelsService, ChannelView } from '../channels/channels.service';
+import type { ClipPostsService } from '../clips/clip/clip-posts.service';
 import type { MediaService, MediaView } from '../media/media.service';
 import type { SchedulingService } from '../scheduling/scheduling.service';
 import type { TagsService } from '../tags/tags.service';
@@ -902,6 +903,86 @@ describe('PostsService', () => {
       });
       await expect(service.findPostRef('org_1', '{{ oops }}')).resolves.toBeNull();
       expect(repository.findPostRef).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('clip links (Sprint 12, Module 17)', () => {
+    let clipPosts: { syncForPost: jest.Mock };
+
+    beforeEach(() => {
+      clipPosts = { syncForPost: jest.fn().mockResolvedValue({ added: 0, removed: 0 }) };
+      service = new PostsService(
+        repository as unknown as PostsRepository,
+        channels as unknown as ChannelsService,
+        media as unknown as MediaService,
+        scheduling as unknown as SchedulingService,
+        tags as unknown as TagsService,
+        clipPosts as unknown as ClipPostsService,
+      );
+    });
+
+    it('tells the clip links which media each save puts on the post, and that a delete leaves none', async () => {
+      const detail = await service.create(
+        'org_1',
+        input({
+          shared: [{ content: documentFromText('Hi'), media: [{ id: IMAGE_ID }] }],
+          channels: [
+            { channelId: 'ch_x', customized: false },
+            { channelId: 'ch_li', customized: false },
+          ],
+        }),
+      );
+      expect(clipPosts.syncForPost).toHaveBeenCalledWith('org_1', detail.group, [
+        IMAGE_ID,
+        IMAGE_ID,
+      ]);
+
+      await service.update('org_1', GROUP, {
+        ...input({ shared: [{ content: documentFromText('Hi'), media: [] }] }),
+        expectedUpdatedAt: '2026-09-14T10:00:00.000Z',
+      });
+      expect(clipPosts.syncForPost).toHaveBeenLastCalledWith('org_1', GROUP, []);
+
+      repository.findRoots.mockResolvedValueOnce([]);
+      repository.deleteGroup.mockResolvedValueOnce('deleted');
+      await service.remove('org_1', GROUP);
+      expect(clipPosts.syncForPost).toHaveBeenLastCalledWith('org_1', GROUP, []);
+    });
+
+    it('still saves when the clip links cannot be written', async () => {
+      clipPosts.syncForPost.mockRejectedValue(new Error('database away'));
+      await expect(service.create('org_1', input())).resolves.toEqual(
+        expect.objectContaining({ group: expect.any(String) }),
+      );
+    });
+
+    it('holds a video with a known length to the platform limit when queued', async () => {
+      const LONG_ID = '7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d';
+      media.findViews.mockResolvedValue(
+        new Map([
+          [
+            LONG_ID,
+            image({
+              id: LONG_ID,
+              type: 'video',
+              mimeType: 'video/mp4',
+              width: 1080,
+              height: 1920,
+              durationMs: 16 * 60_000,
+            }),
+          ],
+        ]),
+      );
+      await expect(
+        service.create(
+          'org_1',
+          input({
+            state: 'QUEUE',
+            shared: [{ content: documentFromText('A fine first line'), media: [{ id: LONG_ID }] }],
+            channels: [{ channelId: 'ch_yt', customized: false }],
+          }),
+        ),
+      ).rejects.toThrow('Acme: This video is 16 min. YouTube takes up to 15 minutes.');
     });
   });
 });

@@ -216,6 +216,14 @@ export class ClipJobsService {
       });
       if (changed) {
         await this.usage.reverseAllFor(orgId, job.id);
+        if (job.kind === ClipJobKind.HIGHLIGHTS) {
+          await this.repository.closeHighlightRun(
+            orgId,
+            job.highlightRunId,
+            'CANCELLED',
+            new Date(),
+          );
+        }
         if (job.kind === ClipJobKind.IMPORT && job.videoId) {
           await this.removeCancelledImport(orgId, job.videoId);
         }

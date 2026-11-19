@@ -44,6 +44,21 @@ export const finishExportSchema = z
   .strict();
 export type FinishExportBody = z.infer<typeof finishExportSchema>;
 
+/** Module 18: a download's copy in the public media space (`ClipFinishSaveDownloadBody`). */
+export const finishSaveDownloadSchema = z
+  .object({
+    organizationId,
+    key: z.string().min(1).max(300),
+    bytes: z.number().int().min(0),
+    posterKey: z.string().min(1).max(300).nullable(),
+    durationMs: z.number().int().min(0).max(MAX_VIDEO_MS),
+    width: z.number().int().min(1).max(10_000),
+    height: z.number().int().min(1).max(10_000),
+    fps: z.number().positive().max(240),
+  })
+  .strict();
+export type FinishSaveDownloadBody = z.infer<typeof finishSaveDownloadSchema>;
+
 /** The pass takes nothing; an empty or missing body both read as `{}`. */
 export const reconcileSchema = z.object({}).strict().optional();
 export type ReconcileBody = z.infer<typeof reconcileSchema>;

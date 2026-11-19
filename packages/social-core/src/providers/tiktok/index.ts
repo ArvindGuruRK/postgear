@@ -55,6 +55,14 @@ export const TIKTOK_RULES: ProviderRules = {
     maxImages: 0,
     maxVideos: 1,
     allowMixed: false,
+    // Sprint 12 (Module 17): ten minutes through the Content Posting API (the
+    // account's own cap can be lower), 4 GB, 360 to 4096 px each side. Reported:
+    // TikTok's site refused the connection and its media transfer guide was
+    // read through a reader on 2026-11-14 (research 07, section 7), so the
+    // real-test plan checks these.
+    videoMaxMs: 10 * 60_000,
+    maxVideoBytes: 4 * 1024 * 1024 * 1024,
+    videoMaxWidth: 4096,
   },
 };
 

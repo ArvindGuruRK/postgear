@@ -26,11 +26,28 @@ export const CLIP_ERROR_MESSAGES = {
   clip_range_invalid: 'A clip must be between 3 seconds and 30 minutes, inside the video.',
   clip_changed_elsewhere: 'Someone else changed this clip. Reload to see their version.',
   clip_not_exported: 'Export this clip first, then send it.',
+  clip_export_outdated:
+    'You changed this clip after the last export. Export it again, or send the old version.',
+  clip_does_not_fit: 'This clip does not fit one of the channels you chose.',
   export_running: 'This clip is already being exported. Wait for it to finish.',
   highlights_running: 'We are already looking for clips in this video.',
+  highlights_failed: 'We could not finish looking for clips. Your AI minutes were given back.',
   video_not_ready: 'This video is still coming in. Wait for it to be ready.',
   video_removed: 'This video was removed after a request from its owner.',
   format_gone: 'This quality is no longer offered for this video. Pick another.',
+  downloads_busy: 'Three downloads are already being prepared. Wait for one to finish.',
+  download_failed: 'We could not prepare this file. Try again.',
+  download_too_big:
+    'This file is bigger than the space your plan has left. Delete some videos or downloads, or pick a smaller quality.',
+  download_expired: 'This download has expired. Prepare it again.',
+  download_not_ready: 'This file is still being prepared. Wait for it to finish.',
+  download_not_found: 'We could not find this download. It may have been deleted.',
+  download_audio_only:
+    'Media takes videos and pictures. Save the MP3 to your computer instead.',
+  media_too_big: 'This file is too big for Media. Save it to your computer instead.',
+  media_save_failed: 'We could not save this file to Media. Try again.',
+  not_an_upload: 'Only a video you uploaded has an original to download.',
+  original_missing: 'The original file of this video is no longer here.',
   sharp_gone:
     'The sharp video is no longer online. This clip will export at 720p from the copy we kept.',
   channel_not_found: 'We could not find that channel. Check the spelling.',
@@ -39,7 +56,8 @@ export const CLIP_ERROR_MESSAGES = {
     "This channel's list is not available right now. Try again in a few minutes.",
   quota_exhausted:
     "We have reached today's limit for YouTube lists. Try again tomorrow, or paste a video link.",
-  platform_changed: 'We could not read this list. We are looking into it. You can paste a link instead.',
+  platform_changed:
+    'We could not read this list. We are looking into it. You can paste a link instead.',
   list_sort_unsupported: 'YouTube lists newest first only.',
   refresh_throttled: 'This list was just updated. Try again in a few seconds.',
   import_failed: 'This did not finish. Try again.',
@@ -66,7 +84,10 @@ export const CLIP_ERROR_MESSAGES = {
   cancelled: 'Cancelled.',
 } as const;
 
-export type ClipErrorCode = keyof typeof CLIP_ERROR_MESSAGES | 'platform_resting' | 'platform_paused';
+export type ClipErrorCode =
+  | keyof typeof CLIP_ERROR_MESSAGES
+  | 'platform_resting'
+  | 'platform_paused';
 
 /** "{Platform} is not answering us right now..." */
 export function platformRestingMessage(platform: ClipPlatformId): string {

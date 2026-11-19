@@ -158,6 +158,21 @@ describe('ClipCard', () => {
     return actions;
   }
 
+  it('shows a Find Clips pick with its score and its first reason (Module 16)', () => {
+    renderCard(
+      fixtureClipItem({ origin: 'AI_SIGNALS', score: 87.4, reasons: ['chat_burst', 'loud'] }),
+    );
+    const card = screen.getByTestId('clip-card');
+    expect(within(card).getByTestId('clip-score')).toHaveTextContent('87');
+    expect(within(card).getByTestId('clip-reason')).toHaveTextContent('Chat exploded');
+  });
+
+  it('a clip made by hand has no score or reason', () => {
+    renderCard();
+    expect(screen.queryByTestId('clip-score')).toBeNull();
+    expect(screen.queryByTestId('clip-reason')).toBeNull();
+  });
+
   it('shows the name, the facts, the state, the video it came from and Edit', () => {
     renderCard();
     const card = screen.getByTestId('clip-card');
@@ -433,5 +448,113 @@ describe('clipActions', () => {
     expect(hooks.onStale).not.toHaveBeenCalled();
     expect(clipErrorSentence(new TypeError('Failed to fetch'))).toBe(sentence);
     expect(clipErrorSentence(new ApiError('Not allowed.', 403))).toBe('Not allowed.');
+  });
+});
+
+describe('ClipMenu: Send To Composer and View Post (Module 17)', () => {
+  const POSTS = [
+    {
+      group: 'group-2',
+      channelName: 'Acme Reels',
+      providerIdentifier: 'instagram-standalone',
+      url: 'https://instagram.com/reel/xyz',
+      publishedAt: '2026-11-19T09:00:00.000Z',
+    },
+    {
+      group: 'group-1',
+      channelName: 'Acme Shorts',
+      providerIdentifier: 'youtube',
+      url: 'https://youtube.com/shorts/abc',
+      publishedAt: '2026-11-18T10:00:00.000Z',
+    },
+  ];
+
+  function renderMenu(clip: ClipSummary, actions: ClipActions) {
+    render(
+      <TooltipProvider>
+        <ClipMenu clip={clip} actions={actions} onStartRename={jest.fn()} />
+      </TooltipProvider>,
+    );
+  }
+
+  it('offers Send To Composer for an exported clip and hands over the menu button', async () => {
+    const send = jest.fn();
+    const clip = fixtureClipSummary({
+      exported: true,
+      exportedMediaId: 'media-7',
+      state: 'exported',
+    });
+    renderMenu(clip, { ...mockedActions(), send });
+    openMenu(clip.title);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Send To Composer' }));
+    await waitFor(() =>
+      expect(send).toHaveBeenCalledWith(
+        clip,
+        screen.getByRole('button', { name: `More for ${clip.title}` }),
+      ),
+    );
+  });
+
+  it('has no Send To Composer before an export, nor where the list cannot send', async () => {
+    const clip = fixtureClipSummary();
+    renderMenu(clip, { ...mockedActions(), send: jest.fn() });
+    openMenu(clip.title);
+    await screen.findByRole('menuitem', { name: 'Rename' });
+    expect(screen.queryByRole('menuitem', { name: 'Send To Composer' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'View Post' })).toBeNull();
+  });
+
+  it('View Post opens a clip single live post in a new tab', async () => {
+    const open = jest.spyOn(window, 'open').mockImplementation(() => null);
+    const clip = fixtureClipSummary({ exportedMediaId: 'media-7', posts: [POSTS[1]] });
+    renderMenu(clip, mockedActions());
+    openMenu(clip.title);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'View Post' }));
+    expect(open).toHaveBeenCalledWith(
+      'https://youtube.com/shorts/abc',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    open.mockRestore();
+  });
+
+  it('View Post lists the posts of a clip sent more than once, each its own link', async () => {
+    const clip = fixtureClipSummary({ exportedMediaId: 'media-7', posts: POSTS });
+    renderMenu(clip, mockedActions());
+    openMenu(clip.title);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'View Post' }));
+    const list = await screen.findByTestId('clip-posts');
+    const links = within(list).getAllByRole('link');
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Acme Reels19 Nov', 'https://instagram.com/reel/xyz'],
+      ['Acme Shorts18 Nov', 'https://youtube.com/shorts/abc'],
+    ]);
+    for (const link of links) {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+  });
+});
+
+describe('ClipCard: Scheduled (Module 17)', () => {
+  it('shows Scheduled while a post with the clip waits', () => {
+    render(
+      <TooltipProvider>
+        <ul>
+          <ClipCard
+            clip={fixtureClipItem({
+              state: 'scheduled',
+              exported: true,
+              exportedMediaId: 'media-7',
+            })}
+            orgId="seed-demo-org"
+            actions={mockedActions()}
+          />
+        </ul>
+      </TooltipProvider>,
+    );
+    const card = screen.getByTestId('clip-card');
+    expect(card).toHaveAttribute('data-state', 'scheduled');
+    expect(within(card).getByText('Scheduled')).toBeVisible();
   });
 });

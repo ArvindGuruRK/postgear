@@ -72,6 +72,12 @@ export const YOUTUBE_RULES: ProviderRules = {
     maxImages: 0,
     maxVideos: 1,
     allowMixed: false,
+    // Sprint 12 (Module 17): an ordinary upload, any shape (a vertical or
+    // square one up to three minutes shows as a Short on its own). Fifteen
+    // minutes until the account is verified, and PostGear cannot see whether
+    // it is, so the narrower limit is the rule (YouTube help 71673 and 15424877,
+    // read 2026-11-14; research 07, section 7).
+    videoMaxMs: 15 * 60_000,
   },
   title: { maxLength: MAX_TITLE_LENGTH, forbiddenCharacters: ['<', '>'] },
 };

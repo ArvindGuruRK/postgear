@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ChannelsModule } from '../channels/channels.module';
+import { ClipPostsModule } from '../clips/clip/clip-posts.module';
 import { MediaModule } from '../media/media.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { TagsModule } from '../tags/tags.module';
@@ -18,12 +19,16 @@ import { PostsService } from './posts.service';
  * Tags (2026-10-19) are checked through the tags service the same way; the
  * links from a post to its tags are the post's own rows and written here.
  *
+ * Clip posts (Sprint 12, Module 17): every save tells `ClipPostsService`
+ * which media is on the post, so a clip whose export is on it shows
+ * Scheduled and, once out, View Post.
+ *
  * `PostsService` is exported for the AI module (Sprint 6), whose copilot
  * drafts posts through it rather than writing rows, so a draft the
  * assistant makes is held to exactly the checks a person's is.
  */
 @Module({
-  imports: [ChannelsModule, MediaModule, SchedulingModule, TagsModule],
+  imports: [ChannelsModule, ClipPostsModule, MediaModule, SchedulingModule, TagsModule],
   controllers: [PostsController],
   providers: [PostsService, PostsRepository],
   exports: [PostsService],

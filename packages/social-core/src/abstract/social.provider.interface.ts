@@ -173,6 +173,8 @@ export interface MediaDescriptor {
   bytes?: number;
   width?: number;
   height?: number;
+  /** A video's length (Sprint 12): lets `checkValidity` hold it to the platform's length rules. */
+  durationMs?: number;
 }
 
 export interface PostDetails {

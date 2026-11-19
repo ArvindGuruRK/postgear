@@ -15,6 +15,10 @@
  *   light copy's signed address with the clip's range. Each stored file is
  *   signed at most once per request (`signOnce`), and only the sheets a
  *   poster on this page uses are signed. No storage key is answered.
+ * - **Module 17**: `withExport` (the composer's Clips tab: clips with an
+ *   exported file, whatever their state) and `q` (words of the name); each
+ *   card carries the live posts it went out in (`posts`, for View Post);
+ *   `comingUp` answers the Create tab's Coming Up panel with the same cards.
  */
 import { Injectable } from '@nestjs/common';
 import {
@@ -36,6 +40,11 @@ import {
 } from '../videos/clip-video-view';
 import { CLIP_SUMMARY_SELECT } from '../videos/clip-videos.repository';
 import { type ClipSummaryView, toClipSummary } from '../videos/clip-videos.service';
+import {
+  type ClipPublishedPost,
+  ClipPostsService,
+  type ComingUpChannel,
+} from './clip-posts.service';
 import { exportProgressOf } from './export-progress';
 import {
   type ClipPoster,
@@ -60,7 +69,32 @@ export interface ClipListItem extends ClipSummaryView {
   poster: ClipPoster | null;
   /** The light copy and the clip's range, for a muted hover preview; null when not playable. */
   preview: ClipPreview | null;
+  /** Module 17: the live posts it went out in, newest first (View Post). */
+  posts: ClipPublishedPost[];
+  /**
+   * Module 17: when its exported file was made (the composer's Select A
+   * Clip); null with no export, or once that file was deleted from Media.
+   */
+  exportedAt: string | null;
 }
+
+/** Module 17: one row of the Create tab's Coming Up panel. */
+export interface ComingUpItem {
+  group: string;
+  publishDate: string;
+  channels: ComingUpChannel[];
+  clip: Pick<ClipListItem, 'id' | 'title' | 'ratio' | 'durationMs' | 'videoId' | 'poster'>;
+}
+
+/** `GET /clips/coming-up`: at most five rows, how many there are, and whether any clip is exported. */
+export interface ComingUpAnswer {
+  items: ComingUpItem[];
+  total: number;
+  anyExported: boolean;
+}
+
+/** How many rows Coming Up shows; the rest are "and N more". */
+export const COMING_UP_LIMIT = 5;
 
 export type ClipCounts = Record<ClipStatusFilter, number>;
 
@@ -106,7 +140,10 @@ interface CardFiles {
 
 @Injectable()
 export class ClipsListService {
-  constructor(private readonly playback: ClipPlaybackService) {}
+  constructor(
+    private readonly playback: ClipPlaybackService,
+    private readonly clipPosts: ClipPostsService,
+  ) {}
 
   async list(orgId: string, query: ListClipsQuery): Promise<ClipListPage> {
     const groups = await waitingPostGroups(orgId);
@@ -117,6 +154,8 @@ export class ClipsListService {
       ...(query.source && query.source.length > 0
         ? { video: { platform: { in: query.source.map((source) => SOURCE_ENUM[source]) } } }
         : {}),
+      ...(query.withExport === 'true' ? { exportedMediaId: { not: null } } : {}),
+      ...(query.q ? { title: { contains: query.q, mode: 'insensitive' as const } } : {}),
     };
     const whereFor = (filter: ClipStatusFilter): Prisma.ClipWhereInput => ({
       AND: [base, stateWhere(filter, groups, revision)],
@@ -147,6 +186,50 @@ export class ClipsListService {
       pageSize: CLIPS_PAGE_SIZE,
       total: counts[query.status],
     };
+  }
+
+  /**
+   * Module 17, Coming Up: the waiting posts in the next 14 days that use a
+   * clip, soonest first, at most five, with the total for "and N more".
+   */
+  async comingUp(orgId: string, now: Date = new Date()): Promise<ComingUpAnswer> {
+    const [rows, exported] = await Promise.all([
+      this.clipPosts.comingUpRows(orgId, now),
+      // The panel is drawn once the workspace has an exported clip, and not before.
+      prisma.clip.findFirst({
+        where: { organizationId: orgId, exportedMediaId: { not: null }, status: { not: 'HIDDEN' } },
+        select: { id: true },
+      }),
+    ]);
+    const anyExported = exported !== null;
+    const shown = rows.slice(0, COMING_UP_LIMIT);
+    if (shown.length === 0) return { items: [], total: 0, anyExported };
+    const groups = await waitingPostGroups(orgId);
+    const clipRows = await prisma.clip.findMany({
+      where: { organizationId: orgId, id: { in: [...new Set(shown.map((row) => row.clipId))] } },
+      select: listSelect(groups),
+    });
+    const cards = new Map((await this.cards(orgId, clipRows)).map((card) => [card.id, card]));
+    const items = shown.flatMap((row): ComingUpItem[] => {
+      const card = cards.get(row.clipId);
+      if (!card) return [];
+      return [
+        {
+          group: row.group,
+          publishDate: row.publishDate.toISOString(),
+          channels: row.channels,
+          clip: {
+            id: card.id,
+            title: card.title,
+            ratio: card.ratio,
+            durationMs: card.durationMs,
+            videoId: card.videoId,
+            poster: card.poster,
+          },
+        },
+      ];
+    });
+    return { items, total: rows.length, anyExported };
   }
 
   private async cards(orgId: string, rows: ListRow[]): Promise<ClipListItem[]> {
@@ -180,9 +263,22 @@ export class ClipsListService {
     }
 
     const sign = signOnce((key) => this.playback.address(key));
-    const exporting = await exportProgressOf(
-      orgId,
-      rows.map((row) => row.id),
+    const ids = rows.map((row) => row.id);
+    const exportedIds = [
+      ...new Set(rows.flatMap((row) => (row.exportedMediaId ? [row.exportedMediaId] : []))),
+    ];
+    const [exporting, published, exportedFiles] = await Promise.all([
+      exportProgressOf(orgId, ids),
+      this.clipPosts.publishedPostsOf(orgId, ids),
+      exportedIds.length > 0
+        ? prisma.media.findMany({
+            where: { organizationId: orgId, id: { in: exportedIds }, deletedAt: null },
+            select: { id: true, createdAt: true },
+          })
+        : Promise.resolve([] as { id: string; createdAt: Date }[]),
+    ]);
+    const exportedAt = new Map(
+      exportedFiles.map((file) => [file.id, file.createdAt.toISOString()]),
     );
     return Promise.all(
       rows.map(async (row) => {
@@ -201,6 +297,8 @@ export class ClipsListService {
           platform: platformOf(row.video.platform),
           poster,
           preview,
+          posts: published.get(row.id) ?? [],
+          exportedAt: row.exportedMediaId ? (exportedAt.get(row.exportedMediaId) ?? null) : null,
         };
       }),
     );

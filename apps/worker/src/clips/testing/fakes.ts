@@ -16,12 +16,33 @@ import type {
   ClipRow,
   ClipRows,
   CloseJobArgs,
+  FinishHighlightsArgs,
+  FinishDownloadArgs,
+  FinishHighlightsResult,
   FinishImportArgs,
   FinishSegmentArgs,
+  HighlightRunRow,
   JobRow,
   NewAsset,
+  NewHighlightClip,
+  VideoLinkRow,
   VideoRow,
 } from '../rows';
+import { storedRange, withoutKept } from '../highlights/kept';
+
+/** A clip as the fake keeps it (Module 16 reads origin, status and the replace rule). */
+export interface FakeClip extends ClipRow {
+  organizationId: string;
+  origin?: 'MANUAL' | 'AI_SIGNALS';
+  status?: 'NEW' | 'DRAFT' | 'HIDDEN';
+  exported?: boolean;
+  sent?: boolean;
+  score?: number | null;
+  reasons?: string[];
+  highlightRunId?: string | null;
+  document?: unknown;
+  createdAt?: Date;
+}
 
 export const ORG = 'seed-demo-org';
 export const JOB_ID = '11111111-2222-4333-8444-555555555555';
@@ -76,9 +97,12 @@ export class FakeRows implements ClipRows {
     return video && video.organizationId === organizationId ? { ...video } : null;
   }
   /** One clip of the sample video unless a spec removes it. */
-  clips = new Map<string, ClipRow & { organizationId: string }>([
+  clips = new Map<string, FakeClip>([
     [CLIP_ID, { id: CLIP_ID, organizationId: ORG, title: 'Best Moment', videoId: VIDEO_ID }],
   ]);
+  /** Module 16: highlight runs, and where each video came from. */
+  runs = new Map<string, HighlightRunRow & { found?: number; tracks?: string[] }>();
+  links = new Map<string, VideoLinkRow>();
   async clip(organizationId: string, clipId: string) {
     const clip = this.clips.get(clipId);
     return clip && clip.organizationId === organizationId
@@ -160,8 +184,14 @@ export class FakeRows implements ClipRows {
     return true;
   }
 
+  /** Every close that landed, for specs that read the stored error. */
+  closed: CloseJobArgs[] = [];
+
   async closeJob(args: CloseJobArgs) {
     if (!this.closeIfOpen(args.jobId, args.status)) return false;
+    this.closed.push(args);
+    const run = args.highlightRunId ? this.runs.get(args.highlightRunId) : undefined;
+    if (run && (run.status === 'QUEUED' || run.status === 'RUNNING')) run.status = args.status;
     const video = args.video ? this.videos.get(args.video.id) : undefined;
     if (video && args.video?.mark === 'failed' && video.status === 'IMPORTING') {
       video.status = 'FAILED';
@@ -174,6 +204,137 @@ export class FakeRows implements ClipRows {
     }
     if (args.notification) this.notifications.push(args.notification);
     return true;
+  }
+
+  async highlightRun(organizationId: string, runId: string) {
+    const run = this.runs.get(runId);
+    return run && run.organizationId === organizationId ? { ...run } : null;
+  }
+
+  async markRunRunning(_organizationId: string, runId: string) {
+    const run = this.runs.get(runId);
+    if (run && run.status === 'QUEUED') run.status = 'RUNNING';
+  }
+
+  async videoLink(organizationId: string, videoId: string) {
+    const video = this.videos.get(videoId);
+    if (!video || video.organizationId !== organizationId) return null;
+    return (
+      this.links.get(videoId) ?? {
+        platform: 'upload' as const,
+        kind: 'upload' as const,
+        externalId: null,
+        width: 1280,
+        height: 720,
+      }
+    );
+  }
+
+  /** The real binding's rules: closed job writes nothing; only unopened AI clips are replaced. */
+  async finishHighlights(args: FinishHighlightsArgs): Promise<FinishHighlightsResult> {
+    if (!this.closeIfOpen(args.jobId, 'DONE'))
+      return { finished: false, replacedKeys: [], replaced: 0, covered: 0 };
+    const run = this.runs.get(args.runId);
+    if (run) Object.assign(run, { status: 'DONE', found: args.clips.length, tracks: args.tracks });
+
+    let replaced = 0;
+    for (const [id, clip] of [...this.clips]) {
+      const replaceable =
+        clip.organizationId === args.organizationId &&
+        clip.videoId === args.videoId &&
+        clip.origin === 'AI_SIGNALS' &&
+        clip.status === 'NEW' &&
+        !clip.exported &&
+        !clip.sent;
+      if (replaceable) {
+        this.clips.delete(id);
+        replaced += 1;
+      }
+    }
+    const kept = [...this.clips.values()]
+      .filter(
+        (clip) =>
+          clip.organizationId === args.organizationId &&
+          clip.videoId === args.videoId &&
+          clip.origin === 'AI_SIGNALS',
+      )
+      .map((clip) => storedRange(clip.document));
+    const fresh = withoutKept(args.clips, kept);
+    fresh.forEach((clip: NewHighlightClip, index) => {
+      this.clips.set(clip.id, {
+        id: clip.id,
+        organizationId: args.organizationId,
+        videoId: args.videoId,
+        title: clip.title,
+        origin: 'AI_SIGNALS',
+        status: 'NEW',
+        score: clip.score,
+        reasons: clip.reasons,
+        highlightRunId: args.runId,
+        document: clip.document,
+        createdAt: new Date(args.now.getTime() - index),
+      });
+    });
+
+    let replacedKeys: string[] = [];
+    if (args.signals) {
+      const signals = args.signals;
+      const old = this.assets.filter(
+        (asset) =>
+          asset.videoId === args.videoId && asset.kind === 'SIGNALS' && asset.key !== signals.key,
+      );
+      this.assets = this.assets.filter((asset) => !old.includes(asset));
+      this.assets.push({
+        id: signals.id ?? `asset-${this.nextId++}`,
+        kind: signals.kind,
+        key: signals.key,
+        bytes: signals.bytes,
+        videoId: signals.videoId,
+        clipId: null,
+        meta: signals.meta,
+        createdAt: args.now,
+      });
+      replacedKeys = old.map((asset) => asset.key);
+    }
+    return { finished: true, replacedKeys, replaced, covered: args.clips.length - fresh.length };
+  }
+
+  /** Module 18: the DONE downloads' outputs and expiry, by job id. */
+  downloads = new Map<string, { output: unknown; expiresAt: Date | null }>();
+
+  async finishDownload(args: FinishDownloadArgs) {
+    if (!this.closeIfOpen(args.jobId, 'DONE')) return false;
+    this.downloads.set(args.jobId, { output: args.output, expiresAt: args.expiresAt });
+    this.assets.push({
+      id: args.asset.id ?? `asset-${this.nextId++}`,
+      kind: args.asset.kind,
+      key: args.asset.key,
+      bytes: args.asset.bytes,
+      videoId: args.asset.videoId,
+      clipId: args.asset.clipId ?? null,
+      meta: args.asset.meta,
+      createdAt: args.now,
+    });
+    return true;
+  }
+
+  async downloadRow(organizationId: string, jobId: string) {
+    const job = this.jobs.get(jobId);
+    if (!job || job.organizationId !== organizationId || job.kind !== 'DOWNLOAD') return null;
+    return {
+      id: job.id,
+      organizationId: job.organizationId,
+      status: job.status,
+      output: this.downloads.get(jobId)?.output ?? null,
+      createdAt: job.createdAt,
+    };
+  }
+
+  async markSaveFailed(_organizationId: string, jobId: string) {
+    const entry = this.downloads.get(jobId);
+    const output = entry?.output as { media?: { status: string } } | undefined;
+    if (!entry || output?.media?.status !== 'saving') return;
+    entry.output = { ...output, media: { status: 'failed', mediaId: null } };
   }
 
   async recordProof(_organizationId: string, asset: NewAsset) {
@@ -326,14 +487,16 @@ export function fakeImportTools(options: { facts?: MediaFacts; probeError?: Erro
   return { tools, calls };
 }
 
-/** A downloader whose `fetchProxy` writes a small file, or throws `fail`. */
+/** A downloader whose `fetchProxy` and `fetchFormat` write a small file, or throw `fail`. */
 export function fakeDownloader(
-  options: { fail?: Error } = {},
-): Downloader & { proxyCalls: unknown[] } {
+  options: { fail?: Error; formatPercent?: number | null } = {},
+): Downloader & { proxyCalls: unknown[]; formatCalls: unknown[] } {
   const proxyCalls: unknown[] = [];
+  const formatCalls: unknown[] = [];
   return {
     simulated: true,
     proxyCalls,
+    formatCalls,
     async probe() {
       throw new Error('not used');
     },
@@ -348,8 +511,12 @@ export function fakeDownloader(
     async fetchRange() {
       throw new Error('not used');
     },
-    async fetchFormat() {
-      throw new Error('not used');
+    async fetchFormat(input, onProgress) {
+      formatCalls.push(input);
+      if (options.fail) throw options.fail;
+      onProgress({ percent: options.formatPercent === undefined ? 50 : options.formatPercent });
+      await writeFile(input.outFile, Buffer.alloc(3_000, 7));
+      return { path: input.outFile, bytes: 3_000 };
     },
   };
 }

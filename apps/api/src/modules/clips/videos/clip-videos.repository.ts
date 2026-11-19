@@ -53,6 +53,7 @@ export const CLIP_SUMMARY_SELECT = {
   ratio: true,
   durationMs: true,
   score: true,
+  reasons: true,
   revision: true,
   lastExportedRevision: true,
   exportedMediaId: true,

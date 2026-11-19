@@ -11,8 +11,11 @@ export { analyticsSyncWorkflow } from './analytics-sync.workflow';
 export { automationRunWorkflow } from './automation-run.workflow';
 // Sprint 12: Clips (on the media, media-quick and render queues).
 export {
+  clipDownloadWorkflow,
+  clipHighlightsWorkflow,
   clipImportWorkflow,
   clipRenderWorkflow,
+  clipSaveDownloadWorkflow,
   clipSegmentWorkflow,
 } from './clips/job.workflows';
 export { clipListChannelWorkflow, clipProbeWorkflow } from './clips/query.workflows';

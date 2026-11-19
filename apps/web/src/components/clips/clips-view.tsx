@@ -23,7 +23,6 @@ import {
   Alert,
   Badge,
   Button,
-  EmptyState,
   PageActions,
   Tabs,
   TabsContent,
@@ -31,24 +30,19 @@ import {
   TabsTrigger,
   toast,
 } from '@postgear/ui';
-import { DownloadIcon, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
-import { createWholeClip, importSample } from '@/lib/clips-api';
-import type { ClipImportOutcome, ClipProbe, ClipsStatus } from '@/types/clips';
+import { createWholeClip, downloadOriginal, importSample } from '@/lib/clips-api';
+import type { ClipImportOutcome, ClipProbe, ClipsStatus, DownloadStarted } from '@/types/clips';
 import { ChannelBrowser } from './channels/channel-browser';
 import { BrowseChannelsDialog, LinkCardDialog } from './channels/channel-dialogs';
 import { useChannels } from './channels/use-channels';
-import {
-  CLIPS_TAB_NAMES,
-  CLIPS_TABS,
-  type ClipsTab,
-  DEFAULT_CLIPS_TAB,
-  LATER_STEP_SENTENCE,
-} from './clips-model';
+import { CLIPS_TAB_NAMES, CLIPS_TABS, type ClipsTab, DEFAULT_CLIPS_TAB } from './clips-model';
 import { AiMinutesChip, StorageMeter } from './home/clips-meters';
 import { CreateTab } from './home/create-tab';
+import { DOWNLOAD_EXISTS, DOWNLOAD_STARTED, DownloadsTab } from './home/downloads-tab';
 import { UPLOAD_ACCEPT, uploadHelpLine } from './home/home-model';
 import { ALREADY_HERE } from './home/link-card';
 import { useLinkProbe } from './home/use-link-probe';
@@ -56,20 +50,17 @@ import { useVideoUpload } from './home/use-video-upload';
 import { useVideos } from './home/use-videos';
 import { VideosTab, videoCardActions } from './home/videos-tab';
 import { ClipsTab as ClipsLibraryTab } from './library/clips-tab';
+import { ComingUp } from './home/coming-up';
 import { RecentClips } from './library/recent-clips';
 import { useClipsList } from './library/use-clips-list';
 import { useClipsStatus } from './use-clips-status';
+import { useDownloads } from './home/use-downloads';
 import { clipEditHref } from './video/video-clip-list';
 
 export const TOOLS_DOWN_SENTENCE =
   'Video tools are not running right now. You can look at your videos, but nothing new can be brought in.';
 export const SAMPLE_ALREADY_HERE = 'You already have the sample video.';
 const SAMPLE_UNREACHABLE = 'We could not reach Clips. Check your connection and try again.';
-
-/** Tabs whose module has not landed yet, and the mark their placeholder shows. */
-const LATER_TABS = {
-  downloads: DownloadIcon,
-} as const;
 
 export function videoHref(orgId: string, videoId: string): string {
   return `/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(videoId)}`;
@@ -128,13 +119,32 @@ export function ClipsView({
     [orgId, router],
   );
 
+  // Download Original (Module 18): the browser follows a short-lived signed address.
+  const saveOriginal = useCallback(async (videoId: string) => {
+    window.location.assign(await downloadOriginal(videoId));
+  }, []);
+
   const videoActions = useMemo(
-    () => videoCardActions(videos, refreshStatus, editWhole),
-    [videos, refreshStatus, editWhole],
+    () => videoCardActions(videos, refreshStatus, editWhole, saveOriginal),
+    [videos, refreshStatus, editWhole, saveOriginal],
   );
 
   // The Clips tab's list is asked for while the tab is open, and again on each return.
   const clipsList = useClipsList({ enabled: tab === 'clips' });
+  // Downloads (Module 18): asked for once the tab opens or a download starts.
+  const downloads = useDownloads(tab === 'downloads');
+
+  /** A download was asked for on a link card: its row on top, the tab open. */
+  const onDownloaded = useCallback(
+    (outcome: DownloadStarted) => {
+      downloads.add(outcome.download);
+      downloads.refresh();
+      refreshStatus();
+      setTab('downloads');
+      toast({ title: outcome.existing ? DOWNLOAD_EXISTS : DOWNLOAD_STARTED });
+    },
+    [downloads.add, downloads.refresh, refreshStatus],
+  );
 
   /** An import started (the link card, a channel row, the sample). */
   const onImported = useCallback(
@@ -253,11 +263,21 @@ export function ClipsView({
             videos={videos}
             videoActions={videoActions}
             onImported={(outcome) => onImported(outcome)}
+            onDownloaded={onDownloaded}
             onUpload={openFilePicker}
             onBrowse={platforms.length > 0 ? () => setBrowseOpen(true) : undefined}
             onSample={() => void onSample()}
             onAllVideos={() => setTab('videos')}
             recentClips={<RecentClips orgId={orgId} onAllClips={() => setTab('clips')} />}
+            comingUp={
+              <ComingUp
+                orgId={orgId}
+                onSendAClip={() => {
+                  clipsList.setStatus('exported');
+                  setTab('clips');
+                }}
+              />
+            }
           />
         </TabsContent>
 
@@ -289,11 +309,9 @@ export function ClipsView({
           <ClipsLibraryTab orgId={orgId} list={clipsList} onVideos={() => setTab('videos')} />
         </TabsContent>
 
-        {(Object.keys(LATER_TABS) as Array<keyof typeof LATER_TABS>).map((value) => (
-          <TabsContent key={value} value={value} className="mt-0">
-            <EmptyState icon={LATER_TABS[value]} title={LATER_STEP_SENTENCE} />
-          </TabsContent>
-        ))}
+        <TabsContent value="downloads" className="mt-0">
+          <DownloadsTab downloads={downloads} onSettled={refreshStatus} />
+        </TabsContent>
       </Tabs>
 
       <BrowseChannelsDialog
@@ -311,6 +329,7 @@ export function ClipsView({
         orgId={orgId}
         disabled={disabled}
         onImported={(outcome) => onImported(outcome)}
+        onDownloaded={onDownloaded}
       />
     </div>
   );

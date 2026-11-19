@@ -96,6 +96,13 @@ export const X_RULES: ProviderRules = {
     maxImageBytes: 5 * MB,
     maxGifBytes: 15 * MB,
     maxVideoBytes: 512 * MB,
+    // Sprint 12 (Module 17): half a second to 20 minutes (125 on Premium, which
+    // PostGear cannot see), any shape from 1:3 to 3:1 (X's media best
+    // practices, read 2026-11-14; research 07, section 7). Its page also names
+    // a 1280 by 1024 ceiling that its own table contradicts; that is left to
+    // the real-test plan rather than blocking every 1080 by 1920 clip.
+    videoMinMs: 500,
+    videoMaxMs: 20 * 60_000,
   },
 };
 

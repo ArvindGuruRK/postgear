@@ -17,7 +17,7 @@
  *   that closing is fine, and Cancel Export. Opening the editor on a clip
  *   whose export runs picks it up (`GET /clips/:clipId/exports`).
  * - **Done**: the result card (poster, quality, size, the loudness line,
- *   Download, Send To Composer for Module 17, Open In Media), the
+ *   Download, Send To Composer (Module 17), Open In Media), the
  *   out-of-date alert once the clip changed, and the newest five exports.
  * - **Failed**: one sentence and Try Again.
  *
@@ -25,6 +25,7 @@
  */
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { PlayIcon } from '@animateicons/react/lucide/play-icon';
+import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import {
   Alert,
   Button,
@@ -40,7 +41,6 @@ import {
   MotionIcon,
   Progress,
   SummaryBox,
-  TooltipHint,
 } from '@postgear/ui';
 import {
   allowedQualities,
@@ -70,7 +70,6 @@ import {
 import { useEntitlements } from '@/lib/entitlements';
 import type { ClipExportView, ClipPreviewView, ClipSharpState } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
-import { LATER_STEP_SENTENCE } from '../clips-model';
 import { type ClipJobState, useClipJob } from '../use-clip-job';
 import {
   CLOSE_IS_FINE,
@@ -360,6 +359,7 @@ export function ExportPanel({
   document,
   sourceFps,
   onExport,
+  onSend,
 }: {
   orgId: string;
   state: ClipExportState;
@@ -369,6 +369,8 @@ export function ExportPanel({
   sourceFps: number | null;
   /** Export Clip from the preview dialog and Export Again (the editor asks first about removed items). */
   onExport: () => void;
+  /** Module 17: Send To Composer from the result card; `from` gets focus back. */
+  onSend: (from: HTMLElement | null) => void;
 }) {
   const qualityId = useId();
   const [downloadProblem, setDownloadProblem] = useState<string | null>(null);
@@ -496,7 +498,7 @@ export function ExportPanel({
 
       {done?.media ? (
         <PanelSection title="Last Export">
-          <ResultCard orgId={orgId} row={done} onDownload={fetchFile} />
+          <ResultCard orgId={orgId} row={done} onDownload={fetchFile} onSend={onSend} />
         </PanelSection>
       ) : null}
 
@@ -567,10 +569,12 @@ function ResultCard({
   orgId,
   row,
   onDownload,
+  onSend,
 }: {
   orgId: string;
   row: ClipExportView;
   onDownload: (url: string, name: string) => void;
+  onSend: (from: HTMLElement | null) => void;
 }) {
   const media = row.media;
   if (!media) return null;
@@ -609,11 +613,14 @@ function ResultCard({
           <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
           Download
         </Button>
-        <TooltipHint label={LATER_STEP_SENTENCE} disabled>
-          <Button size="sm" disabled>
-            Send To Composer
-          </Button>
-        </TooltipHint>
+        <Button
+          size="sm"
+          onClick={(event) => onSend(event.currentTarget)}
+          data-testid="clip-export-send"
+        >
+          <MotionIcon icon={SendIcon} className="h-4 w-4" />
+          Send To Composer
+        </Button>
         <Link
           href={`/${encodeURIComponent(orgId)}/media`}
           className={buttonVariants({ variant: 'secondary', size: 'sm' })}

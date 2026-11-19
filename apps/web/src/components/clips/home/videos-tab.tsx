@@ -29,6 +29,7 @@ export function videoCardActions(
   videos: VideosState,
   onChanged: () => void,
   onEditWhole?: (videoId: string) => Promise<void>,
+  onDownloadOriginal?: (videoId: string) => Promise<void>,
 ): VideoCardActions {
   return {
     onCancel: async (videoId) => {
@@ -52,6 +53,7 @@ export function videoCardActions(
       void videos.refreshOne(videoId).then(onChanged);
     },
     onEditWhole,
+    onDownloadOriginal,
   };
 }
 

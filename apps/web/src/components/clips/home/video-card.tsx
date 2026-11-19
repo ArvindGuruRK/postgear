@@ -12,9 +12,11 @@
  * - **Failed**: an `Alert variant="danger"` with the reason and Try Again.
  *
  * A card that only holds buttons does not move on hover; its buttons do.
- * The menu holds Edit Whole Video (Module 07, when the page offers it) and
- * Delete Video, whose confirm counts the clips that go with the video.
+ * The menu holds Edit Whole Video (Module 07, when the page offers it),
+ * Download Original (Module 18, an uploaded video only) and Delete Video,
+ * whose confirm counts the clips that go with the video.
  */
+import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { ScissorsIcon } from '@animateicons/react/lucide/scissors-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
@@ -68,6 +70,8 @@ export interface VideoCardActions {
   onSettled: (videoId: string) => void;
   /** Module 07: make a clip of the whole video and open it. */
   onEditWhole?: (videoId: string) => Promise<void>;
+  /** Module 18: save an uploaded video's own file again. */
+  onDownloadOriginal?: (videoId: string) => Promise<void>;
 }
 
 /** The card's job: the live one once it is known, else the one the list carried. */
@@ -93,7 +97,7 @@ export function VideoCard({
   const { video } = card;
   const importing = video.status === 'IMPORTING';
   const job = useLiveJob(card, importing && follow);
-  const [busy, setBusy] = useState<null | 'cancel' | 'retry' | 'whole'>(null);
+  const [busy, setBusy] = useState<null | 'cancel' | 'retry' | 'whole' | 'original'>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
@@ -109,7 +113,10 @@ export function VideoCard({
     }
   }, [importing, job, onSettled, video.id]);
 
-  const run = async (kind: 'cancel' | 'retry' | 'whole', action: () => Promise<void>) => {
+  const run = async (
+    kind: 'cancel' | 'retry' | 'whole' | 'original',
+    action: () => Promise<void>,
+  ) => {
     setBusy(kind);
     setActionError(null);
     try {
@@ -129,6 +136,10 @@ export function VideoCard({
   const poster = video.posterUrl && !posterFailed ? video.posterUrl : null;
   const kept = keptUntilLine(video.expiresAt);
   const tooLongForWhole = (video.durationMs ?? 0) > CLIP_MAX_MS;
+  const canDownloadOriginal =
+    actions.onDownloadOriginal !== undefined &&
+    video.status === 'READY' &&
+    video.platform === 'upload';
   const percent = Math.max(0, Math.min(100, Math.round(job?.progress ?? 0)));
   const eta = job?.status === 'RUNNING' ? etaLabel(job.etaSeconds) : null;
 
@@ -251,6 +262,20 @@ export function VideoCard({
                   >
                     <MotionIcon icon={ScissorsIcon} className="h-4 w-4" />
                     Edit Whole Video
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+              {canDownloadOriginal ? (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      const save = actions.onDownloadOriginal;
+                      if (save) void run('original', () => save(video.id));
+                    }}
+                  >
+                    <MotionIcon icon={DownloadIcon} className="h-4 w-4" />
+                    Download Original
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>

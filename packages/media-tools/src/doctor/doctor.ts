@@ -13,6 +13,8 @@
  * - That FFmpeg reads a graph from a file (`-/filter_complex <file>`), which
  *   the render depends on, by running a one-line graph into the null muxer.
  * - libass, libharfbuzz and libx264 in `-buildconf` (text, shaping, H.264).
+ * - libmp3lame in `-buildconf` (Module 18's Audio Only downloads): a warning,
+ *   never a stop, since only that one choice needs it.
  * - yt-dlp's version and age, its JavaScript runtime (for YouTube) and its
  *   browser impersonation extra (for Kick; a warning, not a stop).
  */
@@ -62,6 +64,10 @@ export interface FfmpegStatus extends ToolStatus {
     libass: DoctorLine;
     libharfbuzz: DoctorLine;
     libx264: DoctorLine;
+  };
+  /** Audio Only downloads (Module 18). Not part of `ok`: without it only MP3 fails. */
+  audio: {
+    libmp3lame: DoctorLine;
   };
 }
 
@@ -141,6 +147,7 @@ async function checkFfmpeg(
     return {
       ...strip(base),
       render: { filterComplexFile: notRun, libass: notRun, libharfbuzz: notRun, libx264: notRun },
+      audio: { libmp3lame: notRun },
     };
   }
 
@@ -165,6 +172,12 @@ async function checkFfmpeg(
     ),
     libx264: flag('libx264', 'This FFmpeg cannot write H.264 video: it has no libx264.'),
   };
+  const audio = {
+    libmp3lame: flag(
+      'libmp3lame',
+      'This FFmpeg cannot write MP3, so Audio Only downloads will fail: it has no libmp3lame.',
+    ),
+  };
 
   const versionOk = version !== null && compareVersions(version, MIN_FFMPEG_VERSION) >= 0;
   const renderOk = Object.values(render).every((line) => line.ok);
@@ -188,6 +201,7 @@ async function checkFfmpeg(
     reason,
     warning,
     render,
+    audio,
   };
 }
 

@@ -588,6 +588,7 @@ async function renderChain(
             fileSize: true,
             width: true,
             height: true,
+            durationMs: true,
           },
         });
 

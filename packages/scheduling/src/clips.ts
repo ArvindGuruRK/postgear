@@ -112,6 +112,22 @@ export function clipListChannelWorkflowId(cacheKeyHash: string): string {
   return `clip-list:${cacheKeyHash}`;
 }
 
+/**
+ * Save To Media on a finished download (Module 18), on `postgear-media`: the
+ * file copied to the public media space with a poster, then the API's
+ * `finishSaveDownload` makes the Media row. No job row of its own: the state
+ * is the download job's `output.media`. One per download at a time; a failed
+ * one may be asked again under the same id.
+ */
+export const CLIP_SAVE_DOWNLOAD_WORKFLOW = 'clipSaveDownloadWorkflow';
+
+export function clipSaveDownloadWorkflowId(jobId: string): string {
+  return `clip-save-download:${jobId}`;
+}
+
+/** Copying at most 250 MB and one poster: a stuck save ends instead of saying "Saving" for ever. */
+export const CLIP_SAVE_DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
+
 /** Cancelling a clip job reuses the publishing `CANCEL_SIGNAL` (`workflows.ts`). */
 
 /** The whole workflow's limit, per kind. A stuck job ends instead of holding a slot for ever. */
@@ -272,7 +288,7 @@ export const CLIP_SHORT_LIVED_MS = 24 * 60 * 60_000;
 
 /** One program the worker checked (`clipRuntimeCheckWorkflow`). */
 export interface ClipToolCheck {
-  /** `ffmpeg`, `ffprobe`, `yt-dlp`, `js-runtime`, `filter-graph`, `libass`, `libharfbuzz`, `libx264`. */
+  /** `ffmpeg`, `ffprobe`, `yt-dlp`, `js-runtime`, `filter-graph`, `libass`, `libharfbuzz`, `libx264`, `libmp3lame`. */
   name: string;
   ok: boolean;
   /** Required for the worker's roles; a missing optional tool is a warning. */
@@ -317,6 +333,13 @@ export const CLIP_INTERNAL_ROUTES = {
   reverseCharges: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/reverse`,
   /** A finished export becomes a Media row, the clip is marked exported, the notification written. */
   finishExport: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/finish-export`,
+  /**
+   * Module 18: a finished download the worker copied to the public media
+   * space becomes a Media row (`origin: 'upload'`), and the download's
+   * `output.media` says `saved`. A second call answers the first one's id.
+   */
+  finishSaveDownload: (jobId: string) =>
+    `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/finish-save-download`,
   /**
    * Any job ended (done, failed or cancelled): the API starts the next waiting
    * jobs of that workspace, highest priority first, within the plan's
@@ -391,5 +414,23 @@ export interface ClipFinishExportBody {
 }
 
 export interface ClipFinishExportAnswer {
+  mediaId: string;
+}
+
+/** Module 18: a download's copy in the public media space, ready to become a Media row. */
+export interface ClipFinishSaveDownloadBody {
+  organizationId: string;
+  /** The MP4 in the public media space. */
+  key: string;
+  bytes: number;
+  /** Its poster picture in the public media space. */
+  posterKey: string | null;
+  durationMs: number;
+  width: number;
+  height: number;
+  fps: number;
+}
+
+export interface ClipFinishSaveDownloadAnswer {
   mediaId: string;
 }

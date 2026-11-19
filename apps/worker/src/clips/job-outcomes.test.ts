@@ -1,5 +1,5 @@
 import { cancelJob, failJob, type OutcomeDeps, openJob } from './job-outcomes';
-import { allImportKeys, exportMediaKeys, segmentKey } from './keys';
+import { allImportKeys, exportMediaKeys, highlightsSignalsKey, segmentKey } from './keys';
 import {
   CLIP_ID,
   FakePrivateStorage,
@@ -205,5 +205,67 @@ describe('segment and render bookkeeping', () => {
     await failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'export_failed' });
     expect(rows.jobs.get(JOB_ID)?.status).toBe('FAILED');
     expect(rows.notifications).toHaveLength(0);
+  });
+});
+
+describe('highlights bookkeeping (Module 16)', () => {
+  const RUN_ID = 'cccccccc-dddd-4eee-8fff-000000000000';
+  const OLD_SIGNALS = `clips/${ORG}/${VIDEO_ID}/signals-old.json.gz`;
+
+  function highlightsSetup() {
+    const made = setup(jobRow({ kind: 'HIGHLIGHTS', input: { videoId: VIDEO_ID, runId: RUN_ID } }));
+    made.rows.runs.set(RUN_ID, {
+      id: RUN_ID,
+      organizationId: ORG,
+      videoId: VIDEO_ID,
+      status: 'RUNNING',
+      createdById: 'user-1',
+    });
+    made.privateStorage.objects.set(OLD_SIGNALS, Buffer.from('old'));
+    made.privateStorage.objects.set(
+      highlightsSignalsKey(ORG, VIDEO_ID, JOB_ID),
+      Buffer.from('new'),
+    );
+    return made;
+  }
+
+  it('a failure deletes the run own signals file, fails job and run with the sentence, gives the minutes back', async () => {
+    const { deps, rows, privateStorage, reverseCharges } = highlightsSetup();
+    await failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'tool_failed' });
+
+    expect(privateStorage.deleted).toEqual([highlightsSignalsKey(ORG, VIDEO_ID, JOB_ID)]);
+    expect(privateStorage.objects.has(OLD_SIGNALS)).toBe(true);
+    expect(rows.jobs.get(JOB_ID)?.status).toBe('FAILED');
+    expect(rows.runs.get(RUN_ID)?.status).toBe('FAILED');
+    expect(rows.closed[0]?.error).toEqual({
+      code: 'highlights_failed',
+      message: 'We could not finish looking for clips. Your AI minutes were given back.',
+    });
+    expect(rows.closed[0]?.highlightRunId).toBe(RUN_ID);
+    expect(rows.notifications).toHaveLength(0);
+    expect(reverseCharges).toHaveBeenCalledTimes(1);
+    expect(reverseCharges).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG });
+  });
+
+  it('a cancel closes job and run as CANCELLED and gives the minutes back', async () => {
+    const { deps, rows, reverseCharges } = highlightsSetup();
+    await cancelJob(deps, { jobId: JOB_ID, organizationId: ORG });
+
+    expect(rows.jobs.get(JOB_ID)?.status).toBe('CANCELLED');
+    expect(rows.runs.get(RUN_ID)?.status).toBe('CANCELLED');
+    expect(reverseCharges).toHaveBeenCalledTimes(1);
+  });
+
+  it('a run that already finished is never touched (its clips and charge stay)', async () => {
+    const { deps, rows, reverseCharges } = highlightsSetup();
+    const job = rows.jobs.get(JOB_ID);
+    if (job) job.status = 'DONE';
+    const run = rows.runs.get(RUN_ID);
+    if (run) run.status = 'DONE';
+
+    await failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'tool_failed' });
+    expect(rows.jobs.get(JOB_ID)?.status).toBe('DONE');
+    expect(rows.runs.get(RUN_ID)?.status).toBe('DONE');
+    expect(reverseCharges).not.toHaveBeenCalled();
   });
 });

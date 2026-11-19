@@ -15,20 +15,27 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
+import { ChannelsModule } from '../channels/channels.module';
+import { ChannelsService } from '../channels/channels.service';
 import { EntitlementResolver } from '../entitlements/entitlement-resolver';
 import { UsageService } from '../entitlements/usage.service';
 import { MediaService } from '../media/media.service';
 import { PRIVATE_STORAGE } from '../media/storage/storage.interface';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PostsModule } from '../posts/posts.module';
+import { PostsService } from '../posts/posts.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipEditsService } from './clip/clip-edits.service';
 import { ClipExportsService } from './clip/clip-exports.service';
 import { ClipItemService } from './clip/clip-item.service';
+import { ClipSendService } from './clip/clip-send.service';
 import { ClipsListService } from './clip/clips-list.service';
 import { ClipsModule } from './clips.module';
 import { ClipsCoreModule } from './clips-core.module';
+import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
+import { ClipDownloadsService } from './downloads/clip-downloads.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
 import { ClipJobsRepository } from './jobs/clip-jobs.repository';
@@ -103,6 +110,19 @@ class FakeChannelsModule {}
 })
 class FakeNotificationsModule {}
 
+/** Module 17: Send To Composer drafts through the posts and channels modules. */
+@Module({
+  providers: [{ provide: PostsService, useValue: {} }],
+  exports: [PostsService],
+})
+class FakePostsModule {}
+
+@Module({
+  providers: [{ provide: ChannelsService, useValue: {} }],
+  exports: [ChannelsService],
+})
+class FakeWorkspaceChannelsModule {}
+
 describe('Clips routes', () => {
   let app: INestApplication;
   const reconcile = jest.fn(async () => ({ started: 0, failed: 0 }));
@@ -117,10 +137,37 @@ describe('Clips routes', () => {
       .useModule(FakeChannelsModule)
       .overrideModule(NotificationsModule)
       .useModule(FakeNotificationsModule)
+      .overrideModule(PostsModule)
+      .useModule(FakePostsModule)
+      .overrideModule(ChannelsModule)
+      .useModule(FakeWorkspaceChannelsModule)
+      .overrideProvider(ClipSendService)
+      .useValue({
+        send: async (_org: string, clipId: string, body: { channelIds: string[] }) => ({
+          reached: 'send',
+          clipId,
+          channels: body.channelIds.length,
+        }),
+      })
       .overrideProvider(ClipsStatusService)
       .useValue({ status: async () => ({ reached: 'status' }) })
       .overrideProvider(ClipVideosService)
       .useValue({ list: async () => ({ reached: 'videos' }) })
+      .overrideProvider(ClipDownloadsRepository)
+      .useValue({})
+      .overrideProvider(ClipDownloadsService)
+      .useValue({
+        start: async () => ({ reached: 'download-start', existing: false }),
+        list: async () => ({ reached: 'downloads' }),
+        fileUrl: async (_org: string, jobId: string) =>
+          `http://localhost:3001/clips/files/signed-${jobId}`,
+        saveToMedia: async (_org: string, jobId: string) => ({ reached: 'save-to-media', jobId }),
+        remove: async (_org: string, jobId: string) => ({ reached: 'download-delete', jobId }),
+        downloadOriginal: async (_org: string, videoId: string) => ({
+          reached: 'download-original',
+          videoId,
+        }),
+      })
       .overrideProvider(ClipItemService)
       .useValue({ get: async (_org: string, clipId: string) => ({ reached: 'clip', clipId }) })
       .overrideProvider(ClipEditsService)
@@ -129,10 +176,16 @@ describe('Clips routes', () => {
         remove: async (_org: string, clipId: string) => ({ reached: 'delete', clipId }),
       })
       .overrideProvider(ClipsListService)
-      .useValue({ list: async () => ({ reached: 'clips' }) })
+      .useValue({
+        list: async () => ({ reached: 'clips' }),
+        comingUp: async () => ({ reached: 'coming-up' }),
+      })
       .overrideProvider(ClipExportsService)
       .useValue({
-        start: async (_org: string, _user: string, clipId: string) => ({ reached: 'export', clipId }),
+        start: async (_org: string, _user: string, clipId: string) => ({
+          reached: 'export',
+          clipId,
+        }),
         history: async (_org: string, clipId: string) => ({ reached: 'export-history', clipId }),
         startPreview: async (_org: string, _user: string, clipId: string) => ({
           reached: 'preview',
@@ -256,20 +309,29 @@ describe('Clips routes', () => {
 
   it('sends /clips/library/sounds and /clips/sounds to their own controllers, not the clip controller', async () => {
     const server = app.getHttpServer();
-    expect((await request(server).get('/clips/library/sounds?q=rain&kind=sfx').expect(200)).body).toEqual({
+    expect(
+      (await request(server).get('/clips/library/sounds?q=rain&kind=sfx').expect(200)).body,
+    ).toEqual({
       reached: 'library-sounds',
     });
     expect(
-      (await request(server).get('/clips/library/categories?type=sound&kind=music').expect(200)).body,
+      (await request(server).get('/clips/library/categories?type=sound&kind=music').expect(200))
+        .body,
     ).toEqual({ reached: 'library-categories' });
     await request(server).delete(`/clips/library/favourites/sound/${CLIP_ID}`).expect(204);
     expect((await request(server).get('/clips/sounds/uploads').expect(200)).body).toEqual({
       reached: 'sound-uploads',
     });
     expect(
-      (await request(server).get(`/clips/sounds/files?library=${CLIP_ID}&asset=${CLIP_ID}`).expect(200)).body,
+      (
+        await request(server)
+          .get(`/clips/sounds/files?library=${CLIP_ID}&asset=${CLIP_ID}`)
+          .expect(200)
+      ).body,
     ).toEqual({ reached: 'sound-files' });
-    expect((await request(server).delete(`/clips/sounds/uploads/${CLIP_ID}`).expect(200)).body).toEqual({
+    expect(
+      (await request(server).delete(`/clips/sounds/uploads/${CLIP_ID}`).expect(200)).body,
+    ).toEqual({
       reached: 'sound-delete',
       id: CLIP_ID,
     });
@@ -308,6 +370,41 @@ describe('Clips routes', () => {
     expect(removed.body).toEqual({ reached: 'delete', clipId: CLIP_ID });
   });
 
+  it('sends /clips/coming-up to Coming Up, not the clip controller, and a send to the sender (Module 17)', async () => {
+    const server = app.getHttpServer();
+    expect((await request(server).get('/clips/coming-up').expect(200)).body).toEqual({
+      reached: 'coming-up',
+    });
+    expect(
+      (
+        await request(server)
+          .post(`/clips/${CLIP_ID}/send`)
+          .send({ channelIds: ['channel-1', 'channel-2'], caption: 'Hello' })
+          .expect(201)
+      ).body,
+    ).toEqual({ reached: 'send', clipId: CLIP_ID, channels: 2 });
+    // The picker's list options are described.
+    await request(server).get('/clips?withExport=true&q=boss&sort=oldest').expect(200);
+  });
+
+  it('refuses a send body it does not describe (Module 17)', async () => {
+    const server = app.getHttpServer();
+    await request(server).post(`/clips/${CLIP_ID}/send`).send({ channelIds: [] }).expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/send`)
+      .send({ channelIds: ['a', 'a'] })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/send`)
+      .send({ channelIds: ['a'], publishDate: '2026-12-01' })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/send`)
+      .send({ channelIds: Array.from({ length: 21 }, (_, i) => `c${i}`) })
+      .expect(400);
+    await request(server).get('/clips?withExport=yes').expect(400);
+  });
+
   it('refuses a list query or a patch body it does not describe', async () => {
     await request(app.getHttpServer()).get('/clips?status=everything').expect(400);
     await request(app.getHttpServer()).get('/clips?source=vimeo').expect(400);
@@ -321,20 +418,29 @@ describe('Clips routes', () => {
   it('sends the export and preview routes of a clip id to the export service (Module 15)', async () => {
     const server = app.getHttpServer();
     expect(
-      (await request(server).post(`/clips/${CLIP_ID}/exports`).send({ quality: '1080p', revision: 2 }).expect(202))
-        .body,
+      (
+        await request(server)
+          .post(`/clips/${CLIP_ID}/exports`)
+          .send({ quality: '1080p', revision: 2 })
+          .expect(202)
+      ).body,
     ).toEqual({ reached: 'export', clipId: CLIP_ID });
     expect((await request(server).get(`/clips/${CLIP_ID}/exports`).expect(200)).body).toEqual({
       reached: 'export-history',
       clipId: CLIP_ID,
     });
-    expect((await request(server).post(`/clips/${CLIP_ID}/previews`).send({ revision: 2 }).expect(202)).body).toEqual({
+    expect(
+      (await request(server).post(`/clips/${CLIP_ID}/previews`).send({ revision: 2 }).expect(202))
+        .body,
+    ).toEqual({
       reached: 'preview',
       clipId: CLIP_ID,
     });
     // An empty body previews the current revision.
     await request(server).post(`/clips/${CLIP_ID}/previews`).expect(202);
-    expect((await request(server).get(`/clips/${CLIP_ID}/previews/latest`).expect(200)).body).toEqual({
+    expect(
+      (await request(server).get(`/clips/${CLIP_ID}/previews/latest`).expect(200)).body,
+    ).toEqual({
       reached: 'preview-latest',
       clipId: CLIP_ID,
     });
@@ -343,10 +449,60 @@ describe('Clips routes', () => {
   it('refuses an export or preview body it does not describe', async () => {
     const server = app.getHttpServer();
     await request(server).post(`/clips/${CLIP_ID}/exports`).send({ quality: '4k' }).expect(400);
-    await request(server).post(`/clips/${CLIP_ID}/exports`).send({ quality: '720p', revision: 0 }).expect(400);
-    await request(server).post(`/clips/${CLIP_ID}/exports`).send({ quality: '720p', proof: true }).expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/exports`)
+      .send({ quality: '720p', revision: 0 })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/exports`)
+      .send({ quality: '720p', proof: true })
+      .expect(400);
     await request(server).post(`/clips/${CLIP_ID}/previews`).send({ quality: '720p' }).expect(400);
     await request(server).post(`/clips/${CLIP_ID}/previews`).send({ revision: 'two' }).expect(400);
+  });
+
+  it('sends /clips/downloads to the downloads controller, not the clip controller (Module 18)', async () => {
+    const server = app.getHttpServer();
+    expect((await request(server).get('/clips/downloads').expect(200)).body).toEqual({
+      reached: 'downloads',
+    });
+    expect(
+      (
+        await request(server)
+          .post('/clips/downloads')
+          .send({ url: 'https://www.youtube.com/watch?v=simtalk0001', formatId: 'h720' })
+          .expect(202)
+      ).body,
+    ).toEqual({ reached: 'download-start', existing: false });
+    const file = await request(server).get(`/clips/downloads/${CLIP_ID}/file`).expect(302);
+    expect(file.headers.location).toBe(`http://localhost:3001/clips/files/signed-${CLIP_ID}`);
+    expect(file.headers['cache-control']).toBe('no-store');
+    expect(
+      (await request(server).post(`/clips/downloads/${CLIP_ID}/save-to-media`).expect(202)).body,
+    ).toEqual({ reached: 'save-to-media', jobId: CLIP_ID });
+    expect((await request(server).delete(`/clips/downloads/${CLIP_ID}`).expect(200)).body).toEqual(
+      { reached: 'download-delete', jobId: CLIP_ID },
+    );
+    expect(
+      (await request(server).post(`/clips/videos/${CLIP_ID}/download-original`).expect(200)).body,
+    ).toEqual({ reached: 'download-original', videoId: CLIP_ID });
+  });
+
+  it('refuses a download body it does not describe (Module 18)', async () => {
+    const server = app.getHttpServer();
+    await request(server).post('/clips/downloads').send({ url: 'x' }).expect(400);
+    await request(server)
+      .post('/clips/downloads')
+      .send({ url: 'https://example.com', formatId: 'bestvideo+bestaudio' })
+      .expect(400);
+    await request(server)
+      .post('/clips/downloads')
+      .send({ url: 'https://example.com', formatId: 'h720', quality: '4k' })
+      .expect(400);
+    await request(server)
+      .post('/clips/downloads')
+      .send({ url: '', formatId: 'h720', rightsConfirmed: true })
+      .expect(400);
   });
 
   it('refuses an internal call without the worker token', async () => {

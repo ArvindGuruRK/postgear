@@ -17,6 +17,7 @@ import {
 import { jobRow, TEST_ORG, videoRow } from '../testing/rows';
 import type { ClipPlaybackService } from '../videos/clip-playback.service';
 import { listClipsQuerySchema } from './clip-item.schema';
+import { ClipPostsService } from './clip-posts.service';
 import { ClipsListService } from './clips-list.service';
 
 let mockDb: FakeClipDb;
@@ -142,7 +143,10 @@ function setup(tables = seed()) {
       expiresAt: '2026-11-18T18:00:00.000Z',
     })),
   };
-  const service = new ClipsListService(playback as unknown as ClipPlaybackService);
+  const service = new ClipsListService(
+    playback as unknown as ClipPlaybackService,
+    new ClipPostsService(),
+  );
   const list = (query: Record<string, unknown> = {}) =>
     service.list(TEST_ORG, listClipsQuerySchema.parse(query));
   return { service, playback, list, tables };
@@ -323,5 +327,164 @@ describe('ClipsListService.list', () => {
     expect(byId.get(id(1))).toBe(42);
     expect(byId.get(id(2))).toBeNull();
     expect([...byId.values()].filter((value) => value !== null)).toEqual([42]);
+  });
+
+  describe('Module 17', () => {
+    const exportedSeed = () => {
+      const tables = seed();
+      for (const [n, media] of [
+        [3, 'media-3'],
+        [4, 'media-4'],
+        [5, 'media-5'],
+        [7, 'media-7'],
+      ] as const) {
+        const row = tables.clips.find((clip) => clip.id === id(n));
+        if (row) row.exportedMediaId = media;
+      }
+      return tables;
+    };
+
+    it('withExport lists every clip with an exported file, scheduled or changed since, hidden left out', async () => {
+      const { list } = setup(exportedSeed());
+      const newest = await list({ withExport: 'true' });
+      expect(newest.clips.map((clip) => clip.id)).toEqual([id(7), id(4), id(3)]);
+      expect(newest.clips.map((clip) => clip.state)).toEqual(['draft', 'scheduled', 'exported']);
+      expect(newest.total).toBe(3);
+      const oldest = await list({ withExport: 'true', sort: 'oldest' });
+      expect(oldest.clips.map((clip) => clip.id)).toEqual([id(3), id(4), id(7)]);
+    });
+
+    it('gives each exported clip the date of its file, and none once the file left Media', async () => {
+      const tables = exportedSeed();
+      const made = (mediaId: string, deleted: boolean) => ({
+        id: mediaId,
+        organizationId: TEST_ORG,
+        name: `${mediaId}.mp4`,
+        path: `media/${mediaId}.mp4`,
+        thumbnail: null,
+        fileSize: 1024,
+        width: 1080,
+        height: 1920,
+        durationMs: 30_000,
+        deletedAt: deleted ? new Date('2026-11-10T00:00:00.000Z') : null,
+        createdAt: new Date('2026-11-05T09:30:00.000Z'),
+      });
+      // media-4 was deleted from Media; media-7 belongs to another workspace's row id.
+      tables.media = [
+        made('media-3', false),
+        made('media-4', true),
+        { ...made('media-7', false), organizationId: OTHER_ORG },
+      ];
+      const { list } = setup(tables);
+      const page = await list({ withExport: 'true' });
+      const byId = new Map(page.clips.map((clip) => [clip.id, clip.exportedAt]));
+      expect(byId.get(id(3))).toBe('2026-11-05T09:30:00.000Z');
+      expect(byId.get(id(4))).toBeNull();
+      expect(byId.get(id(7))).toBeNull();
+      const all = await list();
+      expect(all.clips.find((clip) => clip.id === id(1))?.exportedAt).toBeNull();
+    });
+
+    it('q finds clips by words of their name, any case', async () => {
+      const tables = seed();
+      const named = tables.clips.find((clip) => clip.id === id(2));
+      if (named) named.title = 'Boss Fight Win';
+      const { list } = setup(tables);
+      const page = await list({ q: 'boss fight' });
+      expect(page.clips.map((clip) => clip.id)).toEqual([id(2)]);
+      expect((await list({ q: 'nothing like it' })).clips).toEqual([]);
+    });
+
+    it('gives each card the live posts it went out in, for View Post', async () => {
+      const tables = seed();
+      const published = tables.posts.find((row) => row.group === 'group-published');
+      if (published) published.releaseURL = 'https://youtube.com/shorts/abc';
+      const { list } = setup(tables);
+      const page = await list();
+      const byId = new Map(page.clips.map((clip) => [clip.id, clip.posts]));
+      expect(byId.get(id(6))).toEqual([
+        expect.objectContaining({
+          url: 'https://youtube.com/shorts/abc',
+          group: 'group-published',
+        }),
+      ]);
+      expect(byId.get(id(4))).toEqual([]);
+    });
+
+    it('Coming Up answers the waiting clips with their cards, at most five and the total', async () => {
+      const tables = exportedSeed();
+      // The waiting post is on 1 November; look from two days before.
+      const { service } = setup(tables);
+      const answer = await service.comingUp(TEST_ORG, new Date('2026-10-30T10:00:00.000Z'));
+      expect(answer.total).toBe(1);
+      expect(answer.items).toEqual([
+        {
+          group: 'group-waiting',
+          publishDate: '2026-11-01T10:00:00.000Z',
+          channels: [
+            { id: 'channel-1', name: 'Channel One', providerIdentifier: 'youtube', picture: null },
+          ],
+          clip: expect.objectContaining({ id: id(4), videoId: VIDEO_B, ratio: '9:16' }),
+        },
+      ]);
+      expect(answer.items[0]?.clip.poster).toEqual(
+        expect.objectContaining({ url: expect.any(String) }),
+      );
+      // From after it, nothing is coming up; another workspace sees only its own.
+      expect(answer.anyExported).toBe(true);
+      expect(await service.comingUp(TEST_ORG, new Date('2026-11-02T00:00:00.000Z'))).toEqual({
+        items: [],
+        total: 0,
+        anyExported: true,
+      });
+      const theirs = await service.comingUp(OTHER_ORG, new Date('2026-10-30T10:00:00.000Z'));
+      expect(theirs.items.map((item) => [item.group, item.clip.id])).toEqual([
+        ['group-theirs', id(9)],
+      ]);
+    });
+
+    it('Coming Up shows five and counts the rest', async () => {
+      const tables = exportedSeed();
+      for (let n = 0; n < 7; n += 1) {
+        const group = `group-more-${n}`;
+        tables.clipPosts.push({
+          id: `e1000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+          organizationId: TEST_ORG,
+          clipId: id(3),
+          postGroup: group,
+          mediaId: 'media-3',
+          createdAt: at(n),
+        });
+        tables.posts.push({
+          id: `post-more-${n}`,
+          organizationId: TEST_ORG,
+          group,
+          state: 'QUEUE',
+          deletedAt: null,
+          publishDate: new Date(Date.UTC(2026, 10, 2, n)),
+        });
+      }
+      const { service } = setup(tables);
+      const answer = await service.comingUp(TEST_ORG, new Date('2026-10-30T10:00:00.000Z'));
+      expect(answer.total).toBe(8);
+      expect(answer.items).toHaveLength(5);
+      expect(answer.items[0]?.group).toBe('group-waiting');
+    });
+
+    it('Coming Up says whether the workspace has an exported clip, hidden ones left out', async () => {
+      // The plain seed has no exported file at all.
+      const none = setup(seed());
+      expect((await none.service.comingUp(TEST_ORG)).anyExported).toBe(false);
+      const hiddenOnly = seed();
+      const row = hiddenOnly.clips.find((clip) => clip.id === id(1));
+      if (row) {
+        row.exportedMediaId = 'media-1';
+        row.status = 'HIDDEN';
+      }
+      const hidden = setup(hiddenOnly);
+      expect((await hidden.service.comingUp(TEST_ORG)).anyExported).toBe(false);
+      const exported = setup(exportedSeed());
+      expect((await exported.service.comingUp(TEST_ORG)).anyExported).toBe(true);
+    });
   });
 });

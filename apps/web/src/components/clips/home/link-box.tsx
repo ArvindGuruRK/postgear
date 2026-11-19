@@ -21,7 +21,7 @@ import { Button, Input, MotionIcon } from '@postgear/ui';
 import type { ClipPlatformId } from '@postgear/video-engine';
 import { Link2 } from 'lucide-react';
 import { type FormEvent, useEffect, useId, useState } from 'react';
-import type { ClipImportOutcome } from '@/types/clips';
+import type { ClipImportOutcome, DownloadStarted } from '@/types/clips';
 import { linkPlaceholder } from './home-model';
 import { LinkCard, LinkCardSkeleton } from './link-card';
 import { RefusalAlert } from './refusal-alert';
@@ -39,6 +39,7 @@ export function LinkBox({
   sampleBusy,
   uploadHelp,
   onImported,
+  onDownloaded,
   onUpload,
   onBrowse,
   onSample,
@@ -55,6 +56,8 @@ export function LinkBox({
   sampleBusy: boolean;
   uploadHelp: string;
   onImported: (outcome: ClipImportOutcome) => void;
+  /** Module 18: a download was asked for (absent: the card has no Download). */
+  onDownloaded?: (outcome: DownloadStarted) => void;
   onUpload: () => void;
   /** Opens Browse Channels; absent when no platform is switched on. */
   onBrowse?: () => void;
@@ -132,6 +135,7 @@ export function LinkBox({
           disabled={disabled}
           autoFocusRights={focusRights}
           onImported={onImported}
+          onDownloaded={onDownloaded}
           onUpload={onUpload}
         />
       ) : null}

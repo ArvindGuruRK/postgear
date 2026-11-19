@@ -44,4 +44,20 @@ export const CLIPS_MESSAGES = {
   CLIP_DELETED: 'Clip deleted.',
   MORE_VIDEO_THROTTLED: 'We are already getting more of the video. Try again in a few seconds.',
   MORE_VIDEO_TOO_LONG: 'We can get up to an hour of extra video at a time.',
+  // Module 18: downloads.
+  DOWNLOAD_DELETED: 'Download deleted.',
+  SAVE_NOT_STARTED: 'This file is not being saved to Media.',
 } as const;
+
+const BYTES_PER_MIB = 1024 * 1024;
+
+/**
+ * Module 18: "This file is 412 MB. Media takes videos up to 250 MB." Both in
+ * the binary megabytes Media's own limit is set in, the file rounded up, so
+ * a file just over the limit never reads as "250 MB".
+ */
+export function mediaTooBigSentence(bytes: number, limitBytes: number): string {
+  const size = Math.max(1, Math.ceil(bytes / BYTES_PER_MIB));
+  const limit = Math.floor(limitBytes / BYTES_PER_MIB);
+  return `This file is ${size} MB. Media takes videos up to ${limit} MB.`;
+}

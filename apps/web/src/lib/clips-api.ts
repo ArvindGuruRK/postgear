@@ -16,6 +16,7 @@ import type {
   ClipJobView,
   ClipLayout,
   ClipListPage,
+  ComingUpView,
   ClipListSort,
   ClipPlatformId,
   ClipPreviewView,
@@ -28,9 +29,13 @@ import type {
   ClipUploadStarted,
   ClipVideoDetail,
   ClipVideoPage,
+  HighlightsStarted,
+  HighlightsView,
   ClipVideoSort,
   ClipVideoView,
   ClipView,
+  DownloadStarted,
+  DownloadView,
   ExportQuality,
   ListKind,
   ListPeriod,
@@ -52,9 +57,10 @@ import type {
   StickerKind,
   StickerUploadView,
 } from '@postgear/video-engine';
-import { api, uploadFile } from './api';
+import { api, BROWSER_API_URL, uploadFile } from './api';
 
 const jobPath = (jobId: string) => `/clips/jobs/${encodeURIComponent(jobId)}`;
+const downloadPath = (jobId: string) => `/clips/downloads/${encodeURIComponent(jobId)}`;
 const clipPath = (clipId: string) => `/clips/${encodeURIComponent(clipId)}`;
 
 /**
@@ -225,6 +231,23 @@ export function getVideo(
   return api<ClipVideoDetail>(videoPath(videoId), { signal: options.signal });
 }
 
+/**
+ * Find Clips (Module 16): charges the video's AI minutes once and starts the
+ * run (202). 402 `clips_ai_minutes_used` when too few are left, 409
+ * `highlights_running` while a run is on, 409 `video_not_ready`.
+ */
+export function startHighlights(videoId: string): Promise<HighlightsStarted> {
+  return api<HighlightsStarted>(`${videoPath(videoId)}/highlights`, { method: 'POST' });
+}
+
+/** The price, the sound note and the latest Find Clips run of a video. */
+export function getHighlights(
+  videoId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<HighlightsView> {
+  return api<HighlightsView>(`${videoPath(videoId)}/highlights`, { signal: options.signal });
+}
+
 /** Tries a failed import again (409 `video_not_failed` when it is not failed any more). */
 export function retryVideo(videoId: string): Promise<{ video: ClipVideoView; job: ClipJobView }> {
   return api(`${videoPath(videoId)}/retry`, { method: 'POST' });
@@ -372,6 +395,10 @@ export interface ListClipsOptions {
   sources?: readonly ClipSource[];
   page?: number;
   sort?: ClipListSort;
+  /** Module 17, the composer's Clips tab: only clips with an exported file, whatever their state. */
+  withExport?: boolean;
+  /** Module 17: words of the clip's name. */
+  q?: string;
   signal?: AbortSignal;
 }
 
@@ -383,12 +410,37 @@ export function listClips(options: ListClipsOptions = {}): Promise<ClipListPage>
   if (options.sources && options.sources.length > 0) query.set('source', options.sources.join(','));
   if (options.page && options.page > 1) query.set('page', String(options.page));
   if (options.sort && options.sort !== 'newest') query.set('sort', options.sort);
+  if (options.withExport) query.set('withExport', 'true');
+  if (options.q?.trim()) query.set('q', options.q.trim());
   const suffix = query.size > 0 ? `?${query.toString()}` : '';
   return api<ClipListPage>(`/clips${suffix}`, { signal: options.signal });
 }
 
+export interface SendClipBody {
+  channelIds: string[];
+  caption: string;
+  /** Send the last export of a clip changed since (Send The Old Version). */
+  oldVersion?: boolean;
+}
+
+/**
+ * Module 17, Send To Composer: a draft with the clip's exported file on the
+ * chosen channels. 409 `clip_not_exported` or `clip_export_outdated`; 422
+ * `clip_does_not_fit`.
+ */
+export function sendClip(clipId: string, body: SendClipBody): Promise<{ group: string }> {
+  return api(`/clips/${encodeURIComponent(clipId)}/send`, { method: 'POST', body });
+}
+
+/** Module 17: the waiting posts in the next 14 days that use a clip (Coming Up). */
+export function getComingUp(options: { signal?: AbortSignal } = {}): Promise<ComingUpView> {
+  return api<ComingUpView>('/clips/coming-up', { signal: options.signal });
+}
+
 /** Edit Whole Video: a clip over the whole video (422 `clip_too_long` past 30 minutes). */
-export function createWholeClip(videoId: string): Promise<{ clip: ClipView; job: ClipJobView | null }> {
+export function createWholeClip(
+  videoId: string,
+): Promise<{ clip: ClipView; job: ClipJobView | null }> {
   return api('/clips', { method: 'POST', body: { videoId, whole: true } });
 }
 
@@ -674,4 +726,64 @@ export async function soundFiles(
     { signal: options.signal },
   );
   return files;
+}
+
+// ---- Downloads (Module 18) ---------------------------------------------------------
+
+/**
+ * Prepares a file in the chosen quality (`formatId` from the probe). The
+ * server probes the link again and finds the format in that fresh probe
+ * (422 `format_gone` when it is no longer offered). 402 with the plan's
+ * sentence past a limit, 409 `downloads_busy` with three being prepared.
+ */
+export function startDownload(
+  url: string,
+  formatId: string,
+  rightsConfirmed: boolean,
+): Promise<DownloadStarted> {
+  return api<DownloadStarted>('/clips/downloads', {
+    method: 'POST',
+    body: { url, formatId, rightsConfirmed },
+  });
+}
+
+/** The last two days of downloads, newest first. */
+export async function listDownloads(
+  options: { signal?: AbortSignal } = {},
+): Promise<DownloadView[]> {
+  const { downloads } = await api<{ downloads: DownloadView[] }>('/clips/downloads', {
+    signal: options.signal,
+  });
+  return downloads;
+}
+
+/**
+ * Save File's address: a plain link to the file route, which redirects to a
+ * five minute signed address named after the video. A link (not a fetch) so
+ * the browser saves a large file itself instead of holding it in memory.
+ */
+export function downloadFileHref(jobId: string): string {
+  return `${BROWSER_API_URL}${downloadPath(jobId)}/file`;
+}
+
+/** Save To Media: 422 `media_too_big` with the sizes in its sentence over Media's video limit. */
+export async function saveDownloadToMedia(jobId: string): Promise<DownloadView> {
+  const { download } = await api<{ download: DownloadView }>(`${downloadPath(jobId)}/save-to-media`, {
+    method: 'POST',
+  });
+  return download;
+}
+
+/** Delete Download: one still being prepared is cancelled, a finished one loses its file. */
+export function deleteDownload(jobId: string): Promise<{ message: string }> {
+  return api<{ message: string }>(downloadPath(jobId), { method: 'DELETE' });
+}
+
+/** Download Original: a five minute address for an uploaded video's own file. */
+export async function downloadOriginal(videoId: string): Promise<string> {
+  const { url } = await api<{ url: string }>(
+    `/clips/videos/${encodeURIComponent(videoId)}/download-original`,
+    { method: 'POST' },
+  );
+  return url;
 }

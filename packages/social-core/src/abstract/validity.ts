@@ -30,6 +30,7 @@ export function checkAgainstRules(
         bytes: item.bytes,
         width: item.width,
         height: item.height,
+        durationMs: item.durationMs,
       })),
     })),
     { providerName: provider.name, title },

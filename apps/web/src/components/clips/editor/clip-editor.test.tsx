@@ -13,14 +13,23 @@ import type { ClipSaveState } from './clip-autosave';
 import { ClipEditor } from './clip-editor';
 import { CONFLICT_SENTENCE, SHARP_GONE_SENTENCE } from './clip-editor-model';
 
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+  usePathname: () => '/org-1/clips/edit/clip-1',
+}));
 // The plan dialog links to this workspace's billing.
 jest.mock('@/components/navigation/workspace-provider', () => ({
   useWorkspace: () => ({ activeOrgId: 'org-1' }),
 }));
 jest.mock('@/lib/clips-api', () => ({
   openClip: jest.fn(async () => ({})),
-  searchSounds: jest.fn(async () => ({ items: [], page: 1, pageSize: 24, total: 0, hasMore: false })),
+  searchSounds: jest.fn(async () => ({
+    items: [],
+    page: 1,
+    pageSize: 24,
+    total: 0,
+    hasMore: false,
+  })),
   soundCategories: jest.fn(async () => []),
   favouriteSound: jest.fn(),
   unfavouriteSound: jest.fn(),

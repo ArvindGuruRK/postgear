@@ -42,6 +42,7 @@ export const RECONCILE_RUNNING_BATCH = 50;
 /** The engine code a job that was lost fails with. */
 export function lostJobCode(job: Pick<ClipJob, 'kind' | 'input'>): string {
   if (job.kind === ClipJobKind.IMPORT) return 'import_failed';
+  if (job.kind === ClipJobKind.HIGHLIGHTS) return 'highlights_failed';
   if (job.kind === ClipJobKind.RENDER) {
     const proof = (job.input as { proof?: unknown } | null)?.proof === true;
     return proof ? 'preview_failed' : 'export_failed';
@@ -144,6 +145,15 @@ export class ClipReconcileService {
     if (!(await this.repository.failOpen(job.id, error, now))) return false;
 
     await this.usage.reverseAllFor(job.organizationId, job.id);
+
+    if (job.kind === ClipJobKind.HIGHLIGHTS) {
+      await this.repository.closeHighlightRun(
+        job.organizationId,
+        job.highlightRunId,
+        'FAILED',
+        now,
+      );
+    }
 
     if (job.kind === ClipJobKind.IMPORT && job.videoId) {
       const changed = await prisma.clipVideo.updateMany({

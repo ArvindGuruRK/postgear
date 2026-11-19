@@ -86,6 +86,8 @@ export function toRuntimeReport(
     line('libass', render.libass, true),
     line('libharfbuzz', render.libharfbuzz, true),
     line('libx264', render.libx264, true),
+    // Module 18: only Audio Only downloads need it, so it never stops a worker.
+    line('libmp3lame', report.ffmpeg.audio.libmp3lame, false),
     // Links are fetched from fixtures in simulation, so yt-dlp is optional there.
     tool('yt-dlp', report.ytDlp, !simulation),
     tool('js-runtime', report.jsRuntime, false),

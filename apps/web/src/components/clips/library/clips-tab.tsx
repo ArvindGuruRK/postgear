@@ -42,12 +42,17 @@ import { PLATFORM_LABELS } from '../home/home-model';
 import { type ClipActions, clipActions } from './clip-actions';
 import { ClipCard } from './clip-card';
 import { ClipsTable } from './clips-table';
+import { type ClipsView, readClipsView, writeClipsView } from './clips-view-memory';
+import { useClipSender } from './use-clip-sender';
 import type { ClipsListState } from './use-clips-list';
 
 export const CLIPS_EMPTY = 'No clips yet. Open a video and mark a part to make one.';
-export const VIEW_STORAGE_KEY = 'postgear.clips.view';
-
-export type ClipsView = 'grid' | 'list';
+export {
+  type ClipsView,
+  readClipsView,
+  VIEW_STORAGE_KEY,
+  writeClipsView,
+} from './clips-view-memory';
 
 export const STATUS_FILTERS: ReadonlyArray<{
   value: ClipStatusFilter;
@@ -71,22 +76,6 @@ export function platformFilterSentence(sources: readonly ClipSource[]): string |
   return `Showing clips from ${sources.length} platforms`;
 }
 
-export function readClipsView(): ClipsView {
-  try {
-    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'list' ? 'list' : 'grid';
-  } catch {
-    return 'grid';
-  }
-}
-
-function writeClipsView(view: ClipsView) {
-  try {
-    window.localStorage.setItem(VIEW_STORAGE_KEY, view);
-  } catch {
-    // A blocked storage only means the choice is not remembered.
-  }
-}
-
 /** A changed clip as a list row: the row keeps what the clip answer does not carry. */
 export function listChange(clip: ClipView): Partial<ClipListItem> {
   return {
@@ -103,7 +92,7 @@ export function listChange(clip: ClipView): Partial<ClipListItem> {
 }
 
 /** The menu's calls wired to a list: change in place, add the copy, take off a deleted one. */
-export function listClipActions(list: ClipsListState): ClipActions {
+export function listClipActions(list: ClipsListState, send?: ClipActions['send']): ClipActions {
   return clipActions({
     onChanged: (clip) => list.patch(clip.id, listChange(clip)),
     onAdded: (clip, source) => {
@@ -114,6 +103,7 @@ export function listClipActions(list: ClipsListState): ClipActions {
     },
     onRemoved: (clipId) => list.drop(clipId),
     onStale: list.refresh,
+    send,
   });
 }
 
@@ -150,7 +140,8 @@ export function ClipsTab({
   // Read after the first paint: the server never knows the browser's choice.
   useEffect(() => setView(readClipsView()), []);
 
-  const actions = listClipActions(list);
+  const sender = useClipSender(orgId);
+  const actions = listClipActions(list, sender.open);
   const sentence = platformFilterSentence(list.sources);
   const filter = STATUS_FILTERS.find((one) => one.value === list.status) ?? STATUS_FILTERS[0];
   const nothingAtAll =
@@ -279,6 +270,7 @@ export function ClipsTab({
           </Button>
         </div>
       ) : null}
+      {sender.dialog}
     </div>
   );
 }

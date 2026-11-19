@@ -68,7 +68,15 @@ export const importKeys = {
     jobVideoFileKey(orgId, videoId, 'poster', jobId, 'jpg'),
   filmstrip: (orgId: string, videoId: string, jobId: string, sheet: number) =>
     jobVideoFileKey(orgId, videoId, `filmstrip-${sheet}`, jobId, 'jpg'),
+  /** Module 16: the heat map track, when YouTube gave one. */
+  signals: (orgId: string, videoId: string, jobId: string) =>
+    jobVideoFileKey(orgId, videoId, 'signals', jobId, 'json.gz'),
 };
+
+/** The signals file a highlights run writes (Module 16): every track of the video so far. */
+export function highlightsSignalsKey(orgId: string, videoId: string, jobId: string): string {
+  return jobVideoFileKey(orgId, videoId, 'signals', jobId, 'json.gz');
+}
 
 /**
  * Every key an import job could have written: what a failed or cancelled
@@ -80,6 +88,7 @@ export function allImportKeys(orgId: string, videoId: string, jobId: string): st
     importKeys.analysisAudio(orgId, videoId, jobId),
     importKeys.waveform(orgId, videoId, jobId),
     importKeys.poster(orgId, videoId, jobId),
+    importKeys.signals(orgId, videoId, jobId),
   ];
   for (let sheet = 0; sheet < FILMSTRIP_SHEET_LIMIT; sheet += 1) {
     keys.push(importKeys.filmstrip(orgId, videoId, jobId, sheet));

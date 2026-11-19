@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "note": "Recorded chat for the 10 minute stream sample (simulation link https://www.twitch.tv/videos/900000001 and the Kick twin). Message times only, in ms of the sample: no names and no text, as Module 16 keeps nothing else. A message about every 3 s, then a burst of 3 a second for 15 s starting 8 s after each loud burst in plan.json (chat lags the moment).",
-  "videoExternalIds": ["900000001", "00000000-0000-4000-8000-000000000001"],
+  "note": "Recorded chat for the 10 minute stream sample (simulation links https://www.twitch.tv/videos/900000001, its two Find Clips forcing twins 900000007 and 900000008, and the Kick twin). Message times only, in ms of the sample: no names and no text, as Module 16 keeps nothing else. A message about every 3 s, then a burst of 3 a second for 15 s starting 8 s after each loud burst in plan.json (chat lags the moment).",
+  "videoExternalIds": ["900000001", "900000007", "900000008", "00000000-0000-4000-8000-000000000001"],
   "durationSec": 600,
   "messageCount": 515,
   "messageOffsetsMs": [

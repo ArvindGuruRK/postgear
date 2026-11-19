@@ -208,6 +208,36 @@ export function remuxArgs(inFile: string, outFile: string, durationMs: number | 
   ];
 }
 
+/** Audio Only downloads (Module 18): MP3 at a constant 192 kbps, the most widely played setting. */
+export const MP3_BITRATE = '192k';
+
+/**
+ * An Audio Only download's M4A into MP3 (libmp3lame, 192 kbps, the source's
+ * sample rate). Pictures and the platform's metadata are dropped, so the
+ * file carries no cover art or tags we never checked.
+ */
+export function mp3Args(inFile: string, outFile: string): string[] {
+  return [
+    ...COMMON,
+    '-protocol_whitelist',
+    'file',
+    '-i',
+    inFile,
+    '-map',
+    '0:a:0',
+    '-vn',
+    '-map_metadata',
+    '-1',
+    '-c:a',
+    'libmp3lame',
+    '-b:a',
+    MP3_BITRATE,
+    '-f',
+    'mp3',
+    outFile,
+  ];
+}
+
 /** The sound alone into M4A: copied when it is AAC already, else encoded to AAC. */
 export function audioArgs(
   inFile: string,

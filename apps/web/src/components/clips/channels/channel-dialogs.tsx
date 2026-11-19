@@ -12,7 +12,7 @@
  */
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@postgear/ui';
 import type { ClipPlatformId } from '@postgear/video-engine';
-import type { ClipImportOutcome, ClipProbe } from '@/types/clips';
+import type { ClipImportOutcome, ClipProbe, DownloadStarted } from '@/types/clips';
 import { LinkCard } from '../home/link-card';
 import { ChannelBrowser } from './channel-browser';
 import { ONLY_PUBLIC_LINE } from './channels-model';
@@ -68,6 +68,7 @@ export function LinkCardDialog({
   orgId,
   disabled,
   onImported,
+  onDownloaded,
 }: {
   /** The probe to show; null closes the dialog. */
   shown: { url: string; probe: ClipProbe } | null;
@@ -75,6 +76,8 @@ export function LinkCardDialog({
   orgId: string;
   disabled: boolean;
   onImported: (outcome: ClipImportOutcome) => void;
+  /** Module 18: a download was asked for; the dialog closes first. */
+  onDownloaded?: (outcome: DownloadStarted) => void;
 }) {
   return (
     <Dialog open={shown !== null} onOpenChange={(open) => !open && onClose()}>
@@ -96,6 +99,14 @@ export function LinkCardDialog({
               onClose();
               onImported(outcome);
             }}
+            onDownloaded={
+              onDownloaded
+                ? (outcome) => {
+                    onClose();
+                    onDownloaded(outcome);
+                  }
+                : undefined
+            }
           />
         ) : null}
       </DialogContent>

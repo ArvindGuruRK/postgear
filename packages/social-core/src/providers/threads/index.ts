@@ -95,6 +95,10 @@ export const THREADS_RULES: ProviderRules = {
     maxImageBytes: 8 * 1024 * 1024,
     maxVideoBytes: 1024 * 1024 * 1024,
     imageAspectRatio: { min: 0.1, max: 10 },
+    // Sprint 12 (Module 17): five minutes and a width up to 1920 px (Meta's
+    // Threads posts guide, read 2026-11-14; research 07, section 7).
+    videoMaxMs: 5 * 60_000,
+    videoMaxWidth: 1920,
   },
 };
 

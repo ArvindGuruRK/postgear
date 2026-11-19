@@ -1,6 +1,6 @@
 # Module 18: Download In Any Format
 
-> **Sprint 12, Clips** | Status: Not started | Size: M (one session)
+> **Sprint 12, Clips** | Status: Done with gaps (2026-11-19) | Size: M (one session)
 > **Depends on**: [Module 03](module-03-link-engine.md), [Module 06](module-06-clips-home-and-videos.md)
 > **Stories**: CL-12.1, CL-12.2
 > **Next**: [Module 19](module-19-retention-quotas-and-safety.md)
@@ -74,13 +74,13 @@ Failure: the job FAILED with one sentence ("We could not prepare this file. Try 
 
 ## Tasks
 
-- [ ] `assertCanDownload` through the resolver; the import minutes charge and the daily downloads meter; the busy cap.
-- [ ] `POST /clips/downloads`, list, the file route, delete, download original.
-- [ ] `clipDownloadWorkflow` (video and audio), the reversal of both charges on failure.
-- [ ] Save To Media: the route, `clipSaveDownloadWorkflow`, the size rule.
-- [ ] `LinkCard` Download menu, `DownloadsTab`, Download Original in the Videos tab.
-- [ ] Title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `assertCanDownload` through the resolver; the import minutes charge and the daily downloads meter; the busy cap.
+- [x] `POST /clips/downloads`, list, the file route, delete, download original.
+- [x] `clipDownloadWorkflow` (video and audio), the reversal of both charges on failure.
+- [x] Save To Media: the route, `clipSaveDownloadWorkflow`, the size rule.
+- [x] `LinkCard` Download menu, `DownloadsTab`, Download Original in the Videos tab.
+- [x] Title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 
@@ -111,6 +111,38 @@ With `CLIPS_SIMULATION=true` and the demo admin:
 5. Start four downloads quickly: the fourth says three are already being prepared.
 5b. On a Free workspace make six downloads over the day (finish each): the sixth says "You have reached today's limit of 5 downloads. It resets at midnight UTC." with See Plans. Raise `clips.downloads_per_day` for FREE in psql and wait a few seconds: the sixth now works.
 6. Videos tab, on an uploaded video: Download Original.
+
+## What Was Built (2026-11-19)
+
+- **Engine** (`video-engine/downloads.ts`): `downloadableFormats` (tallest first up to 1080p, then Audio Only), `downloadMenuLabel`, `downloadFileName` (safe on Windows, 150 characters at most), `expiresInLine`, `isDownloadExpired`, `MAX_OPEN_DOWNLOADS = 3`, the `removed` stage; the sentence `download_too_big`.
+- **API** (`modules/clips/downloads`): `POST /clips/downloads` (answers `{ job, download, existing }`; the same file asked again while it is being prepared or ready answers the existing row with no charge), `GET /clips/downloads` (48 hours, newest first, cancelled and deleted rows hidden), `GET :jobId/file` (302 to a five minute signed address, `Cache-Control: no-store`), `POST :jobId/save-to-media` (answers `{ download }`), `DELETE :jobId`, `POST /clips/videos/:videoId/download-original`, and the internal `finish-save-download`.
+- **Worker**: `clipDownloadWorkflow` (fetch 0 to 85, MP3 at 192 kbps checked with `probeSound`, size checked against the space left, the DOWNLOAD asset with `videoId: null`), the DOWNLOAD case in `failJob` and `cancelJob` (files removed, both charges given back), `clipSaveDownloadWorkflow` (copy, poster, Media row with `origin: 'upload'`; on failure the public files go and the button comes back).
+- **Web**: `DownloadMenu` on the link card (also under "You already have this video."), the Downloads tab (`downloads-tab.tsx`, `use-downloads.ts`), Download Original in an uploaded video's menu.
+
+## Checked In The Browser (simulation, 1366 by 900, dark)
+
+- The empty tab: "No downloads yet. Paste a link and choose Download."
+- The talk link: the menu listed 1080p (57 MB), 720p (30 MB), 480p (16 MB), 360p and Audio Only. 720p opened the Downloads tab with the toast and "Getting your file" with a number, then the row with 69 MB, Save File, Save To Media and "Expires in 23 hours".
+- Save File: `PostGear Sample A Three Minute Talk.mp4`, H.264 720p and AAC, 3:00, decoded by FFmpeg with no error. Audio Only: an MP3 at 192 kbps, 3:00, decoded with no error, and no Save To Media on its row.
+- Save To Media: the row showed In Media; a Media row (1280 by 720, 180 s, `origin: upload`) and Video Space rose from 804 MB to 877 MB.
+- Meters (`GET /entitlements/me`, read with no cache): downloads 0 to 1, import minutes 49 to 52 for the 3 minute video; later 8 and 94, matching the ledger row for row, every charge keyed `clips.download:<id>` and `clips.import:<id>`.
+- Busy: a fourth file while three were being prepared gave 409 "Three downloads are already being prepared. Wait for one to finish." and charged nothing.
+- Daily limit on the Free workspace: five went through, the sixth gave 402 `clips_downloads_today` "You have reached today's limit of 5 downloads. It resets at midnight UTC."
+- A download deleted while being prepared: CANCELLED, both charges reversed (`rev:` keys), no file left.
+- Another workspace: the list was empty and the file, save, delete and job addresses all answered 404.
+- Expiry moved into the past in psql: the file route answered 410 "This download has expired. Prepare it again." and the stored file and its asset row were gone; the tab showed "Expired" with only the menu; Delete Download (red confirm) kept the job row as the rights record (stage `removed`) and gave nothing back.
+- Download Original on an uploaded video: the browser saved `talk.mp4`.
+
+Screenshots: `screenshots/m18-01` to `m18-10`.
+
+## Gaps
+
+- Simulation only: no real YouTube, Twitch or Kick file was fetched, and the simulated downloader serves the same sample file whatever the quality (so 360p and 1080p both show 69 MB). The platform's sizes in the menu are the fixture's.
+- The MP3 needs `libmp3lame` in FFmpeg: the local FFmpeg has it and the tools check already warns without it; the Module 20 worker image must ship it.
+- Save To Media over 250 MB (422 with the size sentence) and a Save To Media that fails were checked in tests only; no simulated file is that big.
+- A failed download in the worker (both charges given back) was checked in tests; live, the same give-back was seen through a cancel.
+- Save File is a plain link to the API: in the rare case the file expires between the page's clock and the click, the browser opens the API's 410 answer instead of a message on the row.
+- Light and Lilac left to the hand check.
 
 ## Handoff
 

@@ -27,6 +27,7 @@
     "discover:ip-db": "npm run ip-db --workspace=@postgear/discover-engine --",
     "clips:doctor": "npm run doctor --workspace=@postgear/media-tools --",
     "clips:samples": "npm run samples --workspace=@postgear/media-tools --",
+    "clips:signals:record": "npm run signals:record --workspace=@postgear/media-tools --",
     "clips:benchmark": "npm run benchmark --workspace=@postgear/media-tools --",
     "clips:stills": "npm run stills --workspace=@postgear/media-tools --",
     "clips:fonts:build": "npm run fonts:build --workspace=@postgear/media-tools --",

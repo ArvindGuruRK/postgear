@@ -3,7 +3,8 @@
 /**
  * The Clips tab's list view (Module 07, section 5): the same clips, filters
  * and menu as the grid, as rows. Name (renamed in place), the platform the
- * video came from, length, shape, state, made on, and Edit with the menu. The
+ * video came from, length, shape, a Find Clips pick's score (Module 16),
+ * state, made on, and Edit with the menu. The
  * design system's `Table` (no shadow); the page owns paging, so this is not
  * the self-paging `DataTable`.
  */
@@ -13,6 +14,7 @@ import { useState } from 'react';
 import type { ClipListItem } from '@/types/clips';
 import { PrimaryLink } from '../button-link';
 import { formatShortDate, PLATFORM_LABELS } from '../home/home-model';
+import { scoreText } from '../video/find-clips-model';
 import { clipEditHref } from '../video/video-clip-list';
 import {
   CLIP_STATE_BADGE,
@@ -41,6 +43,7 @@ export function ClipsTable({
           <TableHead>Platform</TableHead>
           <TableHead>Length</TableHead>
           <TableHead>Shape</TableHead>
+          <TableHead>Score</TableHead>
           <TableHead>State</TableHead>
           <TableHead>Made On</TableHead>
           <TableHead className="text-right">
@@ -72,6 +75,9 @@ export function ClipsTable({
             <TableCell>{PLATFORM_LABELS[clip.platform]}</TableCell>
             <TableCell className="tabular-nums">{formatClipLength(clip.durationMs)}</TableCell>
             <TableCell className="tabular-nums">{clip.ratio}</TableCell>
+            <TableCell className="tabular-nums" data-testid="clip-row-score">
+              {clip.origin === 'AI_SIGNALS' ? (scoreText(clip.score) ?? '') : ''}
+            </TableCell>
             <TableCell>
               <Badge variant={CLIP_STATE_BADGE[clip.state]}>{CLIP_STATE_NAMES[clip.state]}</Badge>
             </TableCell>

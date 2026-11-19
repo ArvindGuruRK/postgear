@@ -95,15 +95,17 @@ A panel on the **Create** tab (an `AnalyticsPanel` group like Recent Videos, und
 
 ## Tasks
 
-- [ ] `MediaRules` video fields and each provider's values with sources; `videoFit`; `validate.ts`; composer messages.
-- [ ] `POST /clips/:clipId/send` and its schema; `ClipPost`.
-- [ ] The dialog with reasons, the out-of-date step and the empty state.
-- [ ] Send on the result card, the card menus and the export toast; Scheduled and View Post.
-- [ ] The Clips tab (**Select A Clip**) in `media-picker-dialog.tsx`: sort, list and grid, search, empty state; `ClipPostsService.syncForPost` called from the post save path.
-- [ ] `GET /clips/coming-up` and the **Coming Up** panel with **View Calendar**.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation (`PUBLISH_SIMULATION=true`): export, send to two channels, see the composer open with the clip, schedule it, see Scheduled on the card and the post in Coming Up, let it publish, open View Post; in a new post pick a clip from the Clips tab of the picker. Screenshots in `screenshots/`.
-- [ ] `verify-change` (it must include `social-core`'s dependants); update the Progress table and the Decision Log.
+- [x] `MediaRules` video fields and each provider's values with sources; `videoFit`; `validate.ts`; composer messages.
+- [x] `POST /clips/:clipId/send` and its schema; `ClipPost`.
+- [x] The dialog with reasons, the out-of-date step and the empty state.
+- [x] Send on the result card, the card menus and the export toast; Scheduled and View Post.
+- [x] The Clips tab (**Select A Clip**) in `media-picker-dialog.tsx`: sort, list and grid, search, empty state; `ClipPostsService.syncForPost` called from the post save path.
+- [x] `GET /clips/coming-up` and the **Coming Up** panel with **View Calendar**.
+- [x] Title-case test green.
+- [x] Playwright once under simulation (`PUBLISH_SIMULATION=true`): export, send to two channels, see the composer open with the clip, schedule it, see Scheduled on the card and the post in Coming Up, let it publish, open View Post; in a new post pick a clip from the Clips tab of the picker. Screenshots in `screenshots/`.
+- [x] `verify-change` (it must include `social-core`'s dependants); update the Progress table and the Decision Log.
+
+**Gaps at close (2026-11-19)**: Everything ran under `PUBLISH_SIMULATION` and `CLIPS_SIMULATION`: no real platform post was made, and the address View Post opened is the stand-in's. Of the two channels sent to, Acme Studio published and Acme on X failed with "needs reconnecting" (the seed channel's own state; the failure path is Sprint 5's). No shipped provider has a 90 second limit or sets `videoRatios` yet, so hand check step 6 (a 2 minute horizontal clip) shows only LinkedIn's reason; the 90 second rule is covered in `social-core`'s `video-fit` and `validate` tests with a test rule, and the API's refusal by an 11 minute clip sent to TikTok (`clip-send`, 422 in the dialog's words). TikTok's 10 minutes, 4 GB and 4096 px are as reported, not tested. The composer's default time is the next full hour in UTC, which lands on a half hour in India (shared with Studio's send, not changed here). `type-heading`'s `text-wrap: balance` beats `truncate`, so long names wrap instead of ending in dots; fixed in the new Clips spots, left in 14 older ones (changing the role would move approved headings). The picker's footer button reads Add Selected Media on both tabs (one shared footer). The light and Lilac themes are left to the hand check.
 
 ## Tests
 
