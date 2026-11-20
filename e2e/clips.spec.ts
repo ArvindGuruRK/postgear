@@ -146,8 +146,15 @@ async function probeLink(target: Page, url: string): Promise<Response> {
   const box = await linkBox(target);
   await box.getByLabel('Video link').fill(url);
   const probed = answer(target, 'POST', '/clips/links/probe');
-  await box.getByRole('button', { name: 'Find Video', exact: true }).click();
+  await box.getByRole('button', { name: 'Find Clips', exact: true }).click();
   return probed;
+}
+
+/** Picks Kick in Add A Channel, when the dialog asks which platform at all. */
+async function pickKick(dialog: Locator): Promise<void> {
+  const group = dialog.getByRole('group', { name: 'Platform' });
+  if ((await group.count()) === 0) return;
+  await group.getByRole('button', { name: /^Kick/ }).click();
 }
 
 async function openEditorTab(target: Page, tab: string): Promise<void> {
@@ -246,24 +253,26 @@ test.afterAll(async () => {
   ).toBe(true);
 });
 
-test('1. The rail opens Clips with its five tabs; at 1280 px it asks for a bigger screen', async () => {
+test('1. The rail opens Clips on its entry card; at 1280 px it asks for a bigger screen', async () => {
   await page.goto(`/${DEMO_ORG}/home`);
   await page.locator(`a[href="/${DEMO_ORG}/clips"]`).filter({ visible: true }).first().click();
   // The dev server may first compile the Clips route (seconds after an app edit).
   await expect(page).toHaveURL(new RegExp(`/${DEMO_ORG}/clips(\\?|$)`), { timeout: 60_000 });
 
-  const tabs = page.getByRole('tablist', { name: 'Clips tabs' });
-  await expect(tabs).toBeVisible({ timeout: 30_000 });
-  await expect(tabs.getByRole('tab')).toHaveCount(5);
-  for (const name of ['Create', 'Streams', 'Videos', 'Clips', 'Downloads']) {
-    await expect(tabs.getByRole('tab', { name: new RegExp(`^${name}`) })).toBeVisible();
+  // One card holds every way in (2026-11-19 redo): no tab bar.
+  const box = await linkBox(page);
+  await expect(page.getByRole('tablist', { name: 'Clips tabs' })).toHaveCount(0);
+  await expect(box.getByRole('button', { name: 'Find Clips', exact: true })).toBeVisible();
+  await expect(box.getByTestId('clips-upload-area')).toContainText('Upload Your Own Video');
+  for (const name of ['Browse Twitch', 'Browse Kick']) {
+    await expect(box.getByRole('button', { name, exact: true })).toBeVisible();
   }
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(page.getByText(SENTENCES.biggerScreen)).toBeVisible();
-  await expect(tabs).toBeHidden();
+  await expect(box).toBeHidden();
   await page.setViewportSize(VIEWPORT);
-  await expect(tabs).toBeVisible();
+  await expect(box).toBeVisible();
 });
 
 test('2. A pasted link shows its card; Import needs the tick; the import becomes ready', async () => {
@@ -290,8 +299,13 @@ test('2. A pasted link shows its card; Import needs the tick; the import becomes
   shared.kickTitle = body.video.title;
   run.videos.push({ org: DEMO_ORG, id: body.video.id });
 
-  // The page moves to Videos, where the card turns ready.
-  await expect(page.getByRole('tab', { name: /^Videos/ })).toHaveAttribute('aria-selected', 'true');
+  // The home stays, says it is getting the stream ready, then opens its video
+  // page on its own (a stream is longer than one clip).
+  await expect(page.getByTestId('clips-opening-row')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/clips/video/${shared.kickVideoId}$`), {
+    timeout: 90_000,
+  });
+  await page.goto(clipsHome(DEMO_ORG, 'videos'));
   const ready = readyCard(page, shared.kickVideoId);
   await expect(ready).toBeVisible({ timeout: 90_000 });
   await expect(ready).toHaveAttribute('data-status', 'READY');
@@ -311,12 +325,12 @@ test('3. Private, live and unsupported links show their sentences', async () => 
 
   // An unsupported link is refused on sight; the probe may not even be asked.
   await box.getByLabel('Video link').fill(LINKS.unsupported);
-  await box.getByRole('button', { name: 'Find Video', exact: true }).click();
+  await box.getByRole('button', { name: 'Find Clips', exact: true }).click();
   await expect(box.getByText(SENTENCES.unsupported)).toBeVisible();
   await expect(page.getByTestId('clips-link-card')).toHaveCount(0);
 });
 
-test('4. Uploading the three minute sample brings it in', async () => {
+test('4. Uploading the three minute sample brings it in and opens the editor', async () => {
   const testInfo = test.info();
   const file = testInfo.outputPath(`${UPLOAD_NAME}.mp4`);
   copyFileSync(SAMPLE_TALK, file);
@@ -324,7 +338,7 @@ test('4. Uploading the three minute sample brings it in', async () => {
   await page.goto(clipsHome());
   const box = await linkBox(page);
   const chooser = page.waitForEvent('filechooser');
-  await box.getByRole('button', { name: 'Upload A Video', exact: true }).click();
+  await box.getByTestId('clips-upload-area').click();
   const completed = answer(page, 'POST', /^\/clips\/videos\/uploads\/[^/]+\/complete$/, 150_000);
   await (await chooser).setFiles(file);
 
@@ -339,6 +353,12 @@ test('4. Uploading the three minute sample brings it in', async () => {
   const video = await getVideo(page.request, shared.uploadVideoId);
   expect(video.title).toContain(UPLOAD_NAME);
   expect(video.durationMs ?? 0).toBeGreaterThan(170_000);
+
+  // A short upload goes straight into the editor as one whole clip.
+  await expect(page).toHaveURL(/\/clips\/edit\/[^/?]+/, { timeout: 60_000 });
+  const clipId = new URL(page.url()).pathname.split('/').pop() ?? '';
+  run.clips.push({ org: DEMO_ORG, id: clipId });
+  await expect(shapeDialog(page)).toBeVisible({ timeout: 30_000 });
 
   await page.goto(clipsHome(DEMO_ORG, 'videos'));
   await expect(readyCard(page, shared.uploadVideoId)).toHaveAttribute('data-status', 'READY', {
@@ -377,8 +397,9 @@ test('5. The video page plays, marks with I and O, and creates a clip', async ()
   expect(body.clip.durationMs).toBeGreaterThanOrEqual(9_000);
   expect(body.clip.durationMs).toBeLessThanOrEqual(11_000);
 
+  // Two: the whole clip test 4's upload opened in the editor, and this one.
   const mine = page.getByRole('list', { name: 'Clips from this video' });
-  await expect(mine.getByTestId('video-clip-row')).toHaveCount(1);
+  await expect(mine.getByTestId('video-clip-row')).toHaveCount(2);
 });
 
 test('6. Find Clips shows its price, its steps, scored clips and a flag; the AI chip drops by it', async () => {
@@ -722,10 +743,8 @@ test('12. Download 720p from a link; Save File answers', async () => {
   expect(body.existing).toBe(response.status() === 200);
   if (!body.existing) run.downloads.push({ org: DEMO_ORG, jobId: body.job.id });
 
-  await expect(page.getByRole('tab', { name: /^Downloads/ })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  // A download moves the page to the Downloads list.
+  await expect(page.getByTestId('clips-view-name')).toHaveText('Downloads');
   const row = page
     .getByTestId('clips-download-row')
     .filter({ has: page.getByTestId('clips-download-save-file') })
@@ -790,16 +809,15 @@ test("14. The second workspace cannot open the first one's video, clip or job", 
 });
 
 test('15. Channels: add one, its list, hide and show again, import from it; the Free limit', async () => {
-  await page.goto(clipsHome(DEMO_ORG, 'streams'));
-  const section = page.getByRole('region', { name: 'My Channels' });
+  // Browse Kick on the entry card opens Kick's saved channels in a dialog.
+  await page.goto(clipsHome());
+  await (await linkBox(page)).getByRole('button', { name: 'Browse Kick', exact: true }).click();
+  const section = page.getByRole('dialog', { name: 'Browse Kick' });
   await expect(section).toBeVisible({ timeout: 30_000 });
   await section.getByRole('button', { name: 'Add A Channel' }).first().click();
 
   const dialog = page.getByRole('dialog', { name: 'Add A Channel' });
-  await dialog
-    .getByRole('group', { name: 'Platform' })
-    .getByRole('button', { name: /^Kick/ })
-    .click();
+  await pickKick(dialog);
   await dialog.getByLabel('Channel name').fill('simstreamer');
   await dialog.getByRole('button', { name: 'Check', exact: true }).click();
   await expect(dialog.getByText('Acme', { exact: true })).toBeVisible({ timeout: 30_000 });
@@ -811,8 +829,8 @@ test('15. Channels: add one, its list, hide and show again, import from it; the 
   run.channels.push({ org: DEMO_ORG, id: channel.id });
   await expect(page.getByText('Acme is in your channels.', { exact: true })).toBeVisible();
 
-  const platforms = section.getByRole('tablist', { name: 'Platform' });
-  if (await platforms.isVisible()) await platforms.getByRole('tab', { name: 'Kick' }).click();
+  // Browse Kick shows Kick alone: no platform tabs to pick from.
+  await expect(section.getByRole('tablist', { name: 'Platform' })).toHaveCount(0);
   const hideButtons = section.getByRole('button', { name: /^Hide .+ from the list$/ });
   await expect(hideButtons.nth(3)).toBeVisible({ timeout: 30_000 });
   const hideLabel = (await hideButtons.nth(3).getAttribute('aria-label')) ?? '';
@@ -855,15 +873,13 @@ test('15. Channels: add one, its list, hide and show again, import from it; the 
     id: ((await first.json()) as { channel: { id: string } }).channel.id,
   });
 
+  // An old `?tab=streams` link still lands on every platform's channels.
   await pageB.goto(clipsHome(SECOND_ORG, 'streams'));
-  const sectionB = pageB.getByRole('region', { name: 'My Channels' });
+  const sectionB = pageB.getByRole('dialog', { name: 'Browse Channels' });
   await expect(sectionB).toBeVisible({ timeout: 30_000 });
   await sectionB.getByRole('button', { name: 'Add A Channel' }).first().click();
   const dialogB = pageB.getByRole('dialog', { name: 'Add A Channel' });
-  await dialogB
-    .getByRole('group', { name: 'Platform' })
-    .getByRole('button', { name: /^Kick/ })
-    .click();
+  await pickKick(dialogB);
   await dialogB.getByLabel('Channel name').fill('simstreamer');
   await dialogB.getByRole('button', { name: 'Check', exact: true }).click();
   const limit = dialogB.getByText(SENTENCES.oneChannel);
@@ -901,7 +917,10 @@ test('16. The library: search, a favourite under Favourites, and an uploaded sou
   await notYet.getByRole('button', { name: 'Add To Favourites' }).click();
   const stickerItem = (await favSticker).postDataJSON() as { type: 'sticker'; itemId: string };
   run.favourites.push({ org: DEMO_ORG, type: 'sticker', id: stickerItem.itemId });
-  await elements.getByRole('tab', { name: 'Favourites' }).click();
+  await elements
+    .getByRole('group', { name: 'Elements' })
+    .getByRole('button', { name: 'Favourites' })
+    .click();
   await expect(
     elements.getByRole('button', { name: `Add ${stickerName}`, exact: true }),
   ).toBeVisible();
@@ -909,7 +928,10 @@ test('16. The library: search, a favourite under Favourites, and an uploaded sou
   // Sounds.
   await openEditorTab(page, 'audio');
   const audio = page.getByTestId('clip-audio-panel');
-  await audio.getByRole('tab', { name: 'Sound Effects' }).click();
+  await audio
+    .getByRole('group', { name: 'Sounds' })
+    .getByRole('button', { name: 'Sound Effects' })
+    .click();
   await audio.getByLabel('Search Sound Effects').fill('o');
   const rows = audio.getByTestId('clip-sound-row');
   await expect(rows.first()).toBeVisible({ timeout: 30_000 });
@@ -924,11 +946,17 @@ test('16. The library: search, a favourite under Favourites, and an uploaded sou
   await row.getByRole('button', { name: 'Add To Favourites' }).click();
   const soundItem = (await favSound).postDataJSON() as { type: 'sound'; itemId: string };
   run.favourites.push({ org: DEMO_ORG, type: 'sound', id: soundItem.itemId });
-  await audio.getByRole('tab', { name: 'Favourites' }).click();
+  await audio
+    .getByRole('group', { name: 'Sounds' })
+    .getByRole('button', { name: 'Favourites' })
+    .click();
   await expect(audio.getByRole('button', { name: `Add ${soundName}`, exact: true })).toBeVisible();
 
   // Upload a sound.
-  await audio.getByRole('tab', { name: 'Uploaded' }).click();
+  await audio
+    .getByRole('group', { name: 'Sounds' })
+    .getByRole('button', { name: 'Uploaded' })
+    .click();
   const uploaded = answer(page, 'POST', '/clips/sounds/uploads');
   await audio.getByTestId('clip-sound-file').setInputFiles({
     name: `${UPLOAD_NAME}-tone.wav`,
@@ -1017,8 +1045,9 @@ test('18. Try A Sample imports with no tick; pressed again it says the video is 
   const pageC = await third.newPage();
 
   await pageC.goto(clipsHome(orgId));
-  const box = await linkBox(pageC);
-  const sample = box.getByRole('button', { name: 'Try A Sample', exact: true });
+  await linkBox(pageC);
+  // Try A Sample is the quiet line under the entry card, not one of its buttons.
+  const sample = pageC.getByRole('button', { name: 'Try A Sample', exact: true });
   const first = answer(pageC, 'POST', '/clips/videos');
   await sample.click();
   const response = await first;
@@ -1027,11 +1056,17 @@ test('18. Try A Sample imports with no tick; pressed again it says the video is 
   expect(response.request().postDataJSON()).toEqual({ sample: true });
   const { video } = (await response.json()) as { video: { id: string } };
   run.videos.push({ org: orgId, id: video.id });
-  await expect(readyCard(pageC, video.id)).toBeVisible({ timeout: 90_000 });
+  // The home stays until the sample is ready, then opens where it belongs.
+  await expect(pageC.getByTestId('clips-opening-row')).toBeVisible();
+  await expect(pageC).toHaveURL(new RegExp(`/${orgId}/clips/(video|edit)/`), { timeout: 90_000 });
+  if (pageC.url().includes('/clips/edit/')) {
+    run.clips.push({ org: orgId, id: new URL(pageC.url()).pathname.split('/').pop() ?? '' });
+  }
 
-  await pageC.getByRole('tab', { name: /^Create/ }).click();
+  await pageC.goto(clipsHome(orgId));
+  await linkBox(pageC);
   const again = answer(pageC, 'POST', '/clips/videos');
-  await (await linkBox(pageC)).getByRole('button', { name: 'Try A Sample', exact: true }).click();
+  await pageC.getByRole('button', { name: 'Try A Sample', exact: true }).click();
   const secondAnswer = await again;
   expect(secondAnswer.status()).toBe(200);
   expect(((await secondAnswer.json()) as { existing: boolean }).existing).toBe(true);

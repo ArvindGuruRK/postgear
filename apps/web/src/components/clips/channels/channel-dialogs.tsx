@@ -3,15 +3,15 @@
 /**
  * The two dialogs around My Channels (Module 06, section 6):
  *
- * - `BrowseChannelsDialog`: Browse Channels on the link box. The same
- *   `ChannelBrowser` as the Streams tab, with platform tabs; a row's Import
- *   closes it and the link card carries on in the link box.
- * - `LinkCardDialog`: Import on the Streams tab. The very `LinkCard` of the
+ * - `BrowseChannelsDialog`: Browse Twitch, Browse Kick (one platform, named
+ *   in the title) or, from an old `?tab=streams` link, Browse Channels with
+ *   platform tabs. A row's Import closes it and the link card carries on.
+ * - `LinkCardDialog`: Import on a channel row. The very `LinkCard` of the
  *   link box, with focus on the rights tick, so a channel row never offers a
  *   way around the tick or any refusal.
  */
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@postgear/ui';
-import type { ClipPlatformId } from '@postgear/video-engine';
+import { type ClipPlatformId, PLATFORM_NAMES } from '@postgear/video-engine';
 import type { ClipImportOutcome, ClipProbe, DownloadStarted } from '@/types/clips';
 import { LinkCard } from '../home/link-card';
 import { ChannelBrowser } from './channel-browser';
@@ -26,7 +26,10 @@ export function BrowseChannelsDialog({
   disabled,
   channelsState,
   onProbed,
+  only,
 }: {
+  /** Browse Twitch, Browse Kick: the dialog shows that platform alone. */
+  only?: ClipPlatformId;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgId: string;
@@ -39,7 +42,7 @@ export function BrowseChannelsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[min(860px,calc(100vh-4rem))] max-w-4xl flex-col gap-5 overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Browse Channels</DialogTitle>
+          <DialogTitle>{only ? `Browse ${PLATFORM_NAMES[only]}` : 'Browse Channels'}</DialogTitle>
           <DialogDescription>{ONLY_PUBLIC_LINE}</DialogDescription>
         </DialogHeader>
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
@@ -48,7 +51,8 @@ export function BrowseChannelsDialog({
               orgId={orgId}
               platforms={platforms}
               disabled={disabled}
-              platformTabs
+              platformTabs={only === undefined}
+              only={only}
               channelsState={channelsState}
               onProbed={(url, probe) => {
                 onOpenChange(false);

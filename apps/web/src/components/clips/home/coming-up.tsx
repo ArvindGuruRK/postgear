@@ -67,7 +67,16 @@ function useComingUp(orgId: string) {
   return { data, error, reload: () => setTick((value) => value + 1) };
 }
 
-export function ComingUp({ orgId, onSendAClip }: { orgId: string; onSendAClip: () => void }) {
+export function ComingUp({
+  orgId,
+  onSendAClip,
+  hideWhenEmpty = false,
+}: {
+  orgId: string;
+  onSendAClip: () => void;
+  /** The Clips home (2026-11-19): no panel at all while nothing is coming up. */
+  hideWhenEmpty?: boolean;
+}) {
   const headingId = useId();
   const { data, error, reload } = useComingUp(orgId);
   const opened = useRef<HTMLElement | null>(null);
@@ -89,6 +98,7 @@ export function ComingUp({ orgId, onSendAClip }: { orgId: string; onSendAClip: (
   if (!data?.anyExported) return null;
 
   const first = data.items[0];
+  if (!first && hideWhenEmpty) return null;
   const more = moreLine(data.total, data.items.length);
 
   return (

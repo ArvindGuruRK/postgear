@@ -1,5 +1,8 @@
 'use client';
 
+import { MusicIcon } from '@animateicons/react/lucide/music-icon';
+import { StarIcon } from '@animateicons/react/lucide/star-icon';
+import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
 /**
  * The Audio tab (Module 14 section 8).
  *
@@ -22,19 +25,18 @@
  */
 import { Volume2Icon } from '@animateicons/react/lucide/volume-2-icon';
 import { VolumeXIcon } from '@animateicons/react/lucide/volume-x-icon';
+import { ZapIcon } from '@animateicons/react/lucide/zap-icon';
 import {
   Alert,
+  type AnimatedIcon,
   Button,
+  ChoiceTiles,
   cn,
   EmptyState,
   MotionIcon,
   SearchInput,
   Slider,
   Spinner,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
   Toggle,
   TooltipHint,
 } from '@postgear/ui';
@@ -55,7 +57,6 @@ import type { PlaybackStore } from '../editor/playback';
 import {
   AUDIO_TABS,
   type AudioTab,
-  isAudioTab,
   LEVEL_NOTE,
   MIXED_VOLUME,
   MUSIC_NOTE,
@@ -104,6 +105,13 @@ export interface AudioPanelProps {
   onAnchor: (choice: 'moment' | 'whole') => void;
   onRemove: () => void;
 }
+
+const AUDIO_TAB_ICONS: Readonly<Record<AudioTab, AnimatedIcon>> = {
+  effects: ZapIcon,
+  music: MusicIcon,
+  favourites: StarIcon,
+  uploaded: UploadIcon,
+};
 
 export function AudioPanel({
   selected,
@@ -161,39 +169,22 @@ export function AudioPanel({
         </p>
       )}
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          if (isAudioTab(value)) setTab(value);
-        }}
-        className="flex flex-col gap-3"
-      >
-        {/* Columns as wide as their words: "Sound Effects" does not fit a quarter of the panel,
-            and the bar's usual 74 px floor per option would push four past its edge. */}
-        <TabsList className="grid w-full grid-cols-[repeat(4,auto)] gap-0.5">
-          {AUDIO_TABS.map((choice) => (
-            <TabsTrigger
-              key={choice.value}
-              value={choice.value}
-              className="px-0.5 text-xs sm:min-w-0"
-            >
-              {choice.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        {(['effects', 'music', 'favourites'] as const).map((value) => (
-          <TabsContent key={value} value={value} className="m-0">
-            {tab === value ? (
-              <SoundBrowser tab={value} preview={preview} onAdd={onAddLibrary} />
-            ) : null}
-          </TabsContent>
-        ))}
-        <TabsContent value="uploaded" className="m-0">
-          {tab === 'uploaded' ? (
-            <UploadedSounds uploads={uploads} preview={preview} onAdd={onAddUpload} />
-          ) : null}
-        </TabsContent>
-      </Tabs>
+      <div className="flex flex-col gap-3">
+        {/* Tiles, not a tab bar (2026-11-19): four names in a quarter of the panel each did
+            not fit ("Sound Effects"), and the owner asked for no more tab bars. */}
+        <ChoiceTiles<AudioTab>
+          label="Sounds"
+          columns={2}
+          value={tab}
+          onValueChange={setTab}
+          options={AUDIO_TABS.map((choice) => ({ ...choice, icon: AUDIO_TAB_ICONS[choice.value] }))}
+        />
+        {tab === 'uploaded' ? (
+          <UploadedSounds uploads={uploads} preview={preview} onAdd={onAddUpload} />
+        ) : (
+          <SoundBrowser key={tab} tab={tab} preview={preview} onAdd={onAddLibrary} />
+        )}
+      </div>
 
       {preview.error ? (
         <Alert variant="warning" className="items-center" data-testid="clip-sound-preview-failed">

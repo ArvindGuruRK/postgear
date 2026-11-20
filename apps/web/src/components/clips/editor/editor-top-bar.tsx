@@ -1,16 +1,20 @@
 'use client';
 
 /**
- * The clip editor's own top bar (Module 08 section 5, blueprint section 6),
- * copied in structure from Studio's: the way back to the video, the clip's
- * name (click to rename), the save status, Undo and Redo, the shortcuts, and
- * **Export**, which opens the Export tab.
+ * The clip editor's head row (Module 08 section 5, blueprint section 6;
+ * unframed 2026-11-19): the way back to the video, the clip's name (click to
+ * rename), the save status, Undo and Redo, and **Export**, which opens the
+ * Export tab. It sits over the stage only, on the page itself, with no frame
+ * of its own: the rail and the panel beside it run the full height, as in
+ * StreamLadder's editor. Keyboard Shortcuts moved to the rail's foot.
+ *
+ * While the panel is folded away, Show Panel leads the row.
  *
  * The name is the clip's, like a file name, not a page title.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
-import { KeyboardIcon } from '@animateicons/react/lucide/keyboard-icon';
+import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import { RedoIcon } from '@animateicons/react/lucide/redo-icon';
 import { UndoIcon } from '@animateicons/react/lucide/undo-icon';
 import { Button, buttonVariants, cn, MotionIcon, Spinner, TooltipHint } from '@postgear/ui';
@@ -36,7 +40,7 @@ export function EditorTopBar({
   canRedo,
   onUndo,
   onRedo,
-  onShortcuts,
+  onShowPanel,
   onExport,
   exportProgress = null,
 }: {
@@ -52,7 +56,8 @@ export function EditorTopBar({
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onShortcuts: () => void;
+  /** Present while the panel is folded away: opens it again. */
+  onShowPanel?: () => void;
   onExport: () => void;
   /** 0 to 100 while an export runs (a small ring in the Export button); null otherwise. */
   exportProgress?: number | null;
@@ -60,9 +65,23 @@ export function EditorTopBar({
   return (
     <header
       data-testid="clip-editor-top-bar"
-      className="flex shrink-0 items-center justify-between gap-4 rounded-card border-2 border-outline bg-chrome px-3 py-2 shadow-surfaceSm"
+      className="flex min-h-14 shrink-0 items-center justify-between gap-4"
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
+        {onShowPanel ? (
+          <TooltipHint label="Show Panel" side="bottom">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Show Panel"
+              className={ICON_BUTTON}
+              onClick={onShowPanel}
+              data-testid="clip-panel-show"
+            >
+              <MotionIcon icon={PanelLeftOpenIcon} className="h-4 w-4" />
+            </Button>
+          </TooltipHint>
+        ) : null}
         <TooltipHint label={backLabel} side="bottom">
           <Link
             href={backHref}
@@ -107,23 +126,14 @@ export function EditorTopBar({
               <MotionIcon icon={RedoIcon} className="h-4 w-4" />
             </Button>
           </TooltipHint>
-          <TooltipHint label="Keyboard Shortcuts" side="bottom" shortcut={['?']}>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Keyboard Shortcuts"
-              className={ICON_BUTTON}
-              onClick={onShortcuts}
-            >
-              <MotionIcon icon={KeyboardIcon} className="h-4 w-4" />
-            </Button>
-          </TooltipHint>
         </div>
         <Button
           size="sm"
           onClick={onExport}
           data-testid="clip-editor-export"
-          aria-label={exportProgress === null ? undefined : `Export, ${Math.round(exportProgress)}% done`}
+          aria-label={
+            exportProgress === null ? undefined : `Export, ${Math.round(exportProgress)}% done`
+          }
         >
           {exportProgress === null ? (
             <MotionIcon icon={DownloadIcon} className="h-4 w-4" />

@@ -18,16 +18,18 @@
  * goes to the editor (`onEdit`) as one undo step; a slider passes a
  * coalesce key so its whole drag is one step.
  */
+import { ClapperboardIcon } from '@animateicons/react/lucide/clapperboard-icon';
+import { ImageIcon } from '@animateicons/react/lucide/image-icon';
+import { StarIcon } from '@animateicons/react/lucide/star-icon';
+import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
 import {
   Alert,
+  type AnimatedIcon,
   Button,
+  ChoiceTiles,
   EmptyState,
   SearchInput,
   Spinner,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
   Toggle,
 } from '@postgear/ui';
 import type {
@@ -47,7 +49,6 @@ import {
   ELEMENTS_TABS,
   type ElementsTab,
   FAVOURITES_EMPTY,
-  isElementsTab,
   LIBRARY_NOTE,
   NOTHING_SELECTED,
   noMatchSentence,
@@ -88,6 +89,13 @@ export interface ElementsPanelProps {
   onRemove: () => void;
 }
 
+const ELEMENTS_TAB_ICONS: Readonly<Record<ElementsTab, AnimatedIcon>> = {
+  stickers: ImageIcon,
+  gifs: ClapperboardIcon,
+  favourites: StarIcon,
+  uploaded: UploadIcon,
+};
+
 export function ElementsPanel({
   selected,
   selectedFile,
@@ -125,31 +133,30 @@ export function ElementsPanel({
         </p>
       )}
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          if (isElementsTab(value)) setTab(value);
-        }}
-        className="flex flex-col gap-3"
-      >
-        <TabsList className="grid w-full grid-cols-4">
-          {ELEMENTS_TABS.map((choice) => (
-            <TabsTrigger key={choice.value} value={choice.value} className="px-1 text-xs">
-              {choice.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        {(['stickers', 'gifs', 'favourites'] as const).map((value) => (
-          <TabsContent key={value} value={value} className="m-0">
-            {tab === value ? (
-              <LibraryBrowser tab={value} onAdd={onAddLibrary} onBadge={() => setBadgeOpen(true)} />
-            ) : null}
-          </TabsContent>
-        ))}
-        <TabsContent value="uploaded" className="m-0">
-          {tab === 'uploaded' ? <UploadedStickers uploads={uploads} onAdd={onAddUpload} /> : null}
-        </TabsContent>
-      </Tabs>
+      <div className="flex flex-col gap-3">
+        {/* Tiles, not a tab bar (2026-11-19): "Uploaded" ran into the frame of a
+            four-way bar, and the owner asked for no more tab bars. */}
+        <ChoiceTiles<ElementsTab>
+          label="Elements"
+          columns={2}
+          value={tab}
+          onValueChange={setTab}
+          options={ELEMENTS_TABS.map((choice) => ({
+            ...choice,
+            icon: ELEMENTS_TAB_ICONS[choice.value],
+          }))}
+        />
+        {tab === 'uploaded' ? (
+          <UploadedStickers uploads={uploads} onAdd={onAddUpload} />
+        ) : (
+          <LibraryBrowser
+            key={tab}
+            tab={tab}
+            onAdd={onAddLibrary}
+            onBadge={() => setBadgeOpen(true)}
+          />
+        )}
+      </div>
 
       <div className="flex flex-col gap-1 border-t-2 border-outline pt-3">
         <p className={NOTE}>{LIBRARY_NOTE}</p>

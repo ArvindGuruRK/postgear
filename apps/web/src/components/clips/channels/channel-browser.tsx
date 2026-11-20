@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * My Channels (Module 06, section 6; stories CL-1.7 and CL-1.8): the one
- * component behind both the Streams tab and the Browse Channels dialog, so
- * the two never drift.
+ * My Channels (Module 06, section 6; stories CL-1.7 and CL-1.8): the
+ * component inside the Browse dialog. Browse Twitch or Browse Kick narrows it
+ * to that platform (`only`); an old `?tab=streams` link shows every platform
+ * with platform tabs (2026-11-19 redo: Streams is no page of its own).
  *
  * - **No channel yet**: the sentence, the platforms switched on, and
  *   **Add A Channel**.
@@ -57,7 +58,6 @@ import {
   TabsList,
   TabsTrigger,
   Toggle,
-  ToastAction,
   TooltipHint,
   toast,
 } from '@postgear/ui';
@@ -100,8 +100,13 @@ import {
   YOUTUBE_SORT_HINT,
 } from './channels-model';
 import { StreamRow, StreamRowsSkeleton } from './stream-row';
-import type { ChannelsState } from './use-channels';
 import { useChannelStreams } from './use-channel-streams';
+import type { ChannelsState } from './use-channels';
+
+/** What the list says once a row is hidden, beside its Undo. */
+export const HIDDEN_SENTENCE = 'Hidden from the list.';
+/** How long Undo stays after a row is hidden. */
+const UNDO_MS = 8_000;
 
 const UNREACHABLE = 'We could not reach Clips. Check your connection and try again.';
 const LINK_UNREADABLE = 'We could not read this video. Try again in a moment.';
@@ -152,6 +157,7 @@ export function ChannelBrowser({
   platforms,
   disabled = false,
   platformTabs = false,
+  only,
   channelsState,
   api = DEFAULT_API,
   onProbed,
@@ -163,6 +169,11 @@ export function ChannelBrowser({
   disabled?: boolean;
   /** The Browse dialog: platform tabs above the chips. */
   platformTabs?: boolean;
+  /**
+   * Browse Twitch, Browse Kick (2026-11-19): one platform only, no platform
+   * tabs, and Add A Channel set to it.
+   */
+  only?: ClipPlatformId;
   /** The page's channels (`useChannels`), shared by the Streams tab and the dialog. */
   channelsState: ChannelsState;
   api?: ChannelBrowserApi;
@@ -171,8 +182,12 @@ export function ChannelBrowser({
 }) {
   const channels = channelsState;
   const addApi = useMemo(() => ({ check: api.check, add: api.add }), [api.check, api.add]);
-  const shownPlatforms = useMemo(() => orderedPlatforms(platforms), [platforms]);
-  const [platform, setPlatform] = useState<ClipPlatformId | undefined>(shownPlatforms[0]);
+  const shownPlatforms = useMemo(
+    () => orderedPlatforms(platforms).filter((one) => only === undefined || one === only),
+    [platforms, only],
+  );
+  const [platform, setPlatform] = useState<ClipPlatformId | undefined>(only ?? shownPlatforms[0]);
+  const narrowed = platformTabs || only !== undefined;
   const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ClipChannelView | null>(null);
@@ -181,9 +196,9 @@ export function ChannelBrowser({
   const visible = useMemo(
     () =>
       channels.channels.filter(
-        (channel) => !platformTabs || platform === undefined || channel.platform === platform,
+        (channel) => !narrowed || platform === undefined || channel.platform === platform,
       ),
-    [channels.channels, platform, platformTabs],
+    [channels.channels, platform, narrowed],
   );
 
   // The chosen channel stays chosen while it is listed; otherwise the first.
@@ -243,7 +258,7 @@ export function ChannelBrowser({
         onRetry={channels.reload}
       />
     );
-  } else if (channels.channels.length === 0) {
+  } else if (channels.channels.length === 0 || (only !== undefined && visible.length === 0)) {
     body = <NoChannels platforms={shownPlatforms} action={addButton} />;
   } else {
     body = (
@@ -302,7 +317,7 @@ export function ChannelBrowser({
         onOpenChange={setAddOpen}
         orgId={orgId}
         platforms={shownPlatforms}
-        initialPlatform={platformTabs ? platform : undefined}
+        initialPlatform={narrowed ? platform : undefined}
         onAdded={onAdded}
         api={addApi}
       />
@@ -440,6 +455,9 @@ function ChannelLists({
   const [checking, setChecking] = useState<string | null>(null);
   const [rowRefusal, setRowRefusal] = useState<(Refusal & { externalId: string }) | null>(null);
   const [now, setNow] = useState(() => new Date());
+  // The row just hidden, for Undo. Drawn in the list, not in a toast: the list
+  // lives in the Browse dialog, which leaves a toast behind it unpressable.
+  const [undo, setUndo] = useState<{ item: ClipStreamItem; index: number } | null>(null);
   const hiddenId = useId();
   const probeController = useRef<AbortController | null>(null);
 
@@ -450,7 +468,15 @@ function ChannelLists({
     setSort(nextList?.sorts[0] ?? 'newest');
     setPeriod(nextList?.periods[0] ?? null);
     setRowRefusal(null);
+    setUndo(null);
   };
+
+  // Undo stays as long as a toast would, then goes.
+  useEffect(() => {
+    if (!undo) return;
+    const timer = window.setTimeout(() => setUndo(null), UNDO_MS);
+    return () => window.clearTimeout(timer);
+  }, [undo]);
 
   const query =
     channel.paused || kind === undefined
@@ -560,14 +586,7 @@ function ChannelLists({
       if (rowRefusal?.externalId === item.externalId) setRowRefusal(null);
       try {
         await api.hide(channel.id, item.externalId);
-        toast({
-          title: 'Hidden from the list.',
-          action: (
-            <ToastAction altText="Undo" onClick={() => void showAgain(item, index)}>
-              Undo
-            </ToastAction>
-          ),
-        });
+        setUndo({ item, index });
       } catch (cause) {
         // Put the row back where it was.
         update((items) => {
@@ -582,7 +601,7 @@ function ChannelLists({
         toast({ title: refusalOf(cause).message, variant: 'danger' });
       }
     },
-    [api, channel.id, rowRefusal, showAgain, showHidden, streams.items, update],
+    [api, channel.id, rowRefusal, showHidden, streams.items, update],
   );
 
   const refresh = async () => {
@@ -686,6 +705,29 @@ function ChannelLists({
           <Info className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
           <p className="m-0">{streams.notice}</p>
         </Alert>
+      ) : null}
+
+      {undo ? (
+        <div
+          role="status"
+          data-testid="clips-hidden-undo"
+          className="flex items-center justify-between gap-3 rounded-md border-2 border-outline bg-inset px-4 py-2"
+        >
+          <p className="m-0 min-w-0 truncate font-sans text-sm text-ink type-ui">
+            {HIDDEN_SENTENCE}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const { item, index } = undo;
+              setUndo(null);
+              void showAgain(item, index);
+            }}
+          >
+            Undo
+          </Button>
+        </div>
       ) : null}
 
       {streams.loading ? (

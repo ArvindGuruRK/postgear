@@ -220,7 +220,9 @@ describe('the sound lists', () => {
     search.mockResolvedValue(
       page([sound({ id: BED, name: 'Calm Bed', kind: 'music', category: 'calm' })]),
     );
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Music' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Sounds' })).getByRole('button', { name: 'Music' }),
+    );
     expect(await screen.findByRole('button', { name: 'Add Calm Bed' })).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ kind: 'music' });
     expect(screen.getByText(MUSIC_NOTE)).toBeInTheDocument();
@@ -278,7 +280,11 @@ describe('the sound lists', () => {
   it('an empty Favourites says how to fill it', async () => {
     search.mockResolvedValue(page([]));
     renderPanel();
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favourites' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Sounds' })).getByRole('button', {
+        name: 'Favourites',
+      }),
+    );
     expect(await screen.findByText(SOUND_FAVOURITES_EMPTY)).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ favourites: true, kind: undefined });
   });
@@ -346,7 +352,11 @@ describe('the selected sound', () => {
 
 describe('Uploaded', () => {
   function openUploaded() {
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Uploaded' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Sounds' })).getByRole('button', {
+        name: 'Uploaded',
+      }),
+    );
   }
 
   it('an upload shows Checking until it is ready, then adds', async () => {

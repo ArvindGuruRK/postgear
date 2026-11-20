@@ -5,7 +5,7 @@ import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import { ApiError } from '@/lib/api';
 import type { ClipChannelView, ClipStreamsPage } from '@/types/clips';
 import { FIXTURE_CHANNEL, FIXTURE_STREAMS, fixtureProbe } from '../clips-fixtures';
-import { type ChannelBrowserApi, ChannelBrowser } from './channel-browser';
+import { ChannelBrowser, type ChannelBrowserApi } from './channel-browser';
 import { CONNECT_SENTENCE, EMPTY_CHANNEL } from './channels-model';
 import type { ChannelsState } from './use-channels';
 
@@ -197,13 +197,17 @@ describe('ChannelBrowser', () => {
 
     expect(screen.queryByText(READY)).not.toBeInTheDocument();
     expect(api.hide).toHaveBeenCalledWith('channel-1', '1000000001');
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Hidden from the list.' }));
+    // Undo sits in the list, not in a toast: inside the Browse dialog a toast
+    // could not be pressed.
+    expect(toast).not.toHaveBeenCalled();
+    const undo = screen.getByTestId('clips-hidden-undo');
+    expect(undo).toHaveTextContent('Hidden from the list.');
     expect(screen.getByText(/3 streams/)).toBeInTheDocument();
 
-    const { action } = toast.mock.calls[0][0] as { action: ReactElement<{ onClick: () => void }> };
-    await act(async () => action.props.onClick());
+    await act(async () => fireEvent.click(within(undo).getByRole('button', { name: 'Undo' })));
     expect(api.unhide).toHaveBeenCalledWith('channel-1', '1000000001');
     expect(screen.getByText(READY)).toBeInTheDocument();
+    expect(screen.queryByTestId('clips-hidden-undo')).toBeNull();
   });
 
   it('puts a row back when the API refuses to hide it', async () => {

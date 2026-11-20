@@ -1,17 +1,25 @@
 'use client';
 
 /**
- * The editor's tab rail (Module 08 section 5): six buttons in the workflow
- * builder's `Tool` pattern, each an animated icon over its name. The open
- * tab is `aria-pressed` with the pressed look; no shadow.
+ * The editor's tab rail (Module 08 section 5; redone 2026-11-19): the app's
+ * own rail, so the editor reads as part of PostGear and not a second app. The
+ * frame, the PG tile on top and every tile are shared with `sidebar.tsx`
+ * (`RAIL_FRAME`, `TILE`): the open tab takes the primary fill and the small
+ * shadow, a tile under the pointer takes the outline, labels are 10 px.
+ *
+ * Six tabs in order, then Keyboard Shortcuts pinned to the bottom, where the
+ * app rail keeps Settings. The open tab is `aria-pressed`.
  */
 import { AudioLinesIcon } from '@animateicons/react/lucide/audio-lines-icon';
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
+import { KeyboardIcon } from '@animateicons/react/lucide/keyboard-icon';
 import { LayoutDashboardIcon } from '@animateicons/react/lucide/layout-dashboard-icon';
 import { ShapesIcon } from '@animateicons/react/lucide/shapes-icon';
 import { TypeIcon } from '@animateicons/react/lucide/type-icon';
 import { WandSparklesIcon } from '@animateicons/react/lucide/wand-sparkles-icon';
-import { type AnimatedIcon, cn, MotionIcon } from '@postgear/ui';
+import { type AnimatedIcon, cn, useIconAnimation } from '@postgear/ui';
+import { BrandTile } from '@/components/brand/brand-mark';
+import { ANIMATED_TILE_ICON, RAIL_FRAME, TILE, TILE_LABEL } from '@/components/navigation/sidebar';
 import { EDITOR_TAB_NAMES, EDITOR_TABS, type EditorTab } from './editor-state';
 
 export const TAB_ICONS: Readonly<Record<EditorTab, AnimatedIcon>> = {
@@ -23,39 +31,78 @@ export const TAB_ICONS: Readonly<Record<EditorTab, AnimatedIcon>> = {
   export: DownloadIcon,
 };
 
-export function TabRail({ tab, onTab }: { tab: EditorTab; onTab: (tab: EditorTab) => void }) {
+function RailButton({
+  icon: Icon,
+  label,
+  active,
+  testId,
+  onClick,
+  ariaPressed,
+}: {
+  icon: AnimatedIcon;
+  label: string;
+  active: boolean;
+  testId: string;
+  onClick: () => void;
+  ariaPressed?: boolean;
+}) {
+  const icon = useIconAnimation();
   return (
-    <nav aria-label="Editor tabs" className="flex shrink-0">
+    <button
+      type="button"
+      title={label}
+      aria-pressed={ariaPressed}
+      data-testid={testId}
+      onClick={onClick}
+      {...icon.triggers}
+      className={TILE(active)}
+    >
+      <Icon ref={icon.ref} aria-hidden size={20} className={ANIMATED_TILE_ICON} />
+      <span className={TILE_LABEL}>{label}</span>
+    </button>
+  );
+}
+
+export function TabRail({
+  tab,
+  onTab,
+  onShortcuts,
+}: {
+  tab: EditorTab;
+  onTab: (tab: EditorTab) => void;
+  /** Opens the keyboard shortcuts sheet. */
+  onShortcuts?: () => void;
+}) {
+  return (
+    <aside aria-label="Editor" className={cn(RAIL_FRAME, 'h-full')}>
+      <BrandTile label="PostGear" />
       <div
         role="toolbar"
         aria-label="Editor tabs"
         aria-orientation="vertical"
-        className="flex w-20 flex-col gap-1 rounded-card border-2 border-outline bg-chrome p-1.5 shadow-surfaceSm"
+        className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-hidden pg-scrollbar-hidden"
       >
-        {EDITOR_TABS.map((value) => {
-          const open = value === tab;
-          return (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={open}
-              data-testid={`clip-tab-${value}`}
-              onClick={() => onTab(value)}
-              className={cn(
-                'flex w-full flex-col items-center gap-1 rounded-md border-2 px-1 py-2',
-                'font-sans text-xs text-ink type-ui transition-colors duration-100',
-                'outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focusRing',
-                open
-                  ? 'border-outline bg-actionPrimary text-onActionPrimary'
-                  : 'border-transparent hover:border-outline hover:bg-secondary',
-              )}
-            >
-              <MotionIcon icon={TAB_ICONS[value]} className="h-5 w-5" />
-              {EDITOR_TAB_NAMES[value]}
-            </button>
-          );
-        })}
+        {EDITOR_TABS.map((value) => (
+          <RailButton
+            key={value}
+            icon={TAB_ICONS[value]}
+            label={EDITOR_TAB_NAMES[value]}
+            active={value === tab}
+            ariaPressed={value === tab}
+            testId={`clip-tab-${value}`}
+            onClick={() => onTab(value)}
+          />
+        ))}
       </div>
-    </nav>
+      {onShortcuts ? (
+        <RailButton
+          icon={KeyboardIcon}
+          label="Shortcuts"
+          active={false}
+          testId="clip-rail-shortcuts"
+          onClick={onShortcuts}
+        />
+      ) : null}
+    </aside>
   );
 }

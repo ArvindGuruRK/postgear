@@ -3,14 +3,16 @@
 /**
  * The Layouts tab (Module 10 section 4, blueprint section 8):
  *
- * - **Shape**: Vertical, Horizontal, Square and Portrait (4:5) as a
- *   `Segmented` of their ratios (the names are the tooltips and what a
- *   screen reader hears; four names in words do not fit the panel), with a
- *   line under it naming the shape in full.
+ * - **Shape**: Vertical, Horizontal, Square and Portrait (4:5) as
+ *   `ChoiceTiles`, each a small drawing of the shape over its ratio (the
+ *   names are the tooltips and what a screen reader hears; four names in
+ *   words do not fit the panel), with a line under it naming the shape in
+ *   full. Tiles, not a toggle bar, since the shape is the point of the tab
+ *   (2026-11-19).
  * - **The layouts**: `ChoiceTiles` in three columns, each with a drawing
  *   made from the layout's own data. Horizontal offers Fullscreen and
  *   Blurred only. A quiet line says when the layout is Custom.
- * - **Crop Ratio** (Blurred only): Original, 4:3, 1:1.
+ * - **Crop Ratio** (Blurred only): Original, 4:3, 1:1, as tiles too.
  * - **My Layouts**: the workspace's saved layouts for this shape.
  *
  * Every choice is one undo step and goes through the store's `apply`, which
@@ -18,7 +20,7 @@
  * reaches the server. The crop boxes themselves are on the Video pane
  * (`crop-stage.tsx`).
  */
-import { ChoiceTiles, Segmented } from '@postgear/ui';
+import { ChoiceTiles } from '@postgear/ui';
 import {
   applyLayout,
   applySavedLayout,
@@ -98,15 +100,16 @@ export function LayoutsPanel({
     <div className="flex flex-col gap-6 pt-1" data-testid="clip-layouts-panel">
       <div className="flex flex-col gap-2">
         <GroupLabel id={shapeId}>Shape</GroupLabel>
-        <Segmented
+        <ChoiceTiles<Ratio>
           labelledBy={shapeId}
-          tight
+          columns={4}
           value={ratio}
           onValueChange={chooseShape}
           options={LAYOUT_SHAPES.map((shape) => ({
             value: shape,
             label: layoutShapeName(shape),
             short: shape,
+            drawing: <ShapeDrawing ratio={shape} />,
           }))}
         />
         <p className={NOTE} data-testid="clip-shape-readback">
@@ -137,7 +140,7 @@ export function LayoutsPanel({
         {kind === 'blurred' ? (
           <div className="flex flex-col gap-2" data-testid="clip-crop-ratio">
             <GroupLabel id={fitId}>Crop Ratio</GroupLabel>
-            <Segmented
+            <ChoiceTiles<FitCrop>
               labelledBy={fitId}
               value={document.layout.fitCrop ?? 'original'}
               onValueChange={chooseFit}
@@ -149,5 +152,21 @@ export function LayoutsPanel({
 
       <SavedLayouts ratio={ratio} layout={document.layout} onApply={applySaved} />
     </div>
+  );
+}
+
+/** The outline of a shape, 32 px on its long side (decorative: the tile names it). */
+const SHAPE_BOX: Readonly<Record<Ratio, string>> = {
+  '9:16': 'h-8 w-[18px]',
+  '16:9': 'h-[18px] w-8',
+  '1:1': 'h-[26px] w-[26px]',
+  '4:5': 'h-8 w-[26px]',
+};
+
+function ShapeDrawing({ ratio }: { ratio: Ratio }) {
+  return (
+    <span className="flex h-8 w-8 items-center justify-center">
+      <span className={`${SHAPE_BOX[ratio]} rounded-[3px] border-2 border-current`} />
+    </span>
   );
 }

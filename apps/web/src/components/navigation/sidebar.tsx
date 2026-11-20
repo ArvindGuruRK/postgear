@@ -72,8 +72,12 @@ function RailItem({
   );
 }
 
-/** A rail tile's frame; the tab bar's tiles are the same tile, sized to share the row. */
-const TILE = (active?: boolean) =>
+/**
+ * A rail tile's frame; the tab bar's tiles are the same tile, sized to share
+ * the row. Exported (as are the icon and label classes and the rail's frame)
+ * so the clip editor's tab rail is this very rail (2026-11-19).
+ */
+export const TILE = (active?: boolean) =>
   cn(
     'flex w-16 flex-col items-center justify-center gap-1 rounded-xl border-2 px-0.5 py-2',
     'outline-none transition-[transform,box-shadow,background-color] duration-100',
@@ -83,9 +87,14 @@ const TILE = (active?: boolean) =>
       : 'border-transparent text-ink hover:border-outline hover:bg-primary',
   );
 
-const ANIMATED_TILE_ICON = '!block h-5 w-5 shrink-0 [&_svg]:[stroke-width:2.25]';
+export const ANIMATED_TILE_ICON = '!block h-5 w-5 shrink-0 [&_svg]:[stroke-width:2.25]';
 
-const TILE_LABEL = 'line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.15]';
+export const TILE_LABEL =
+  'line-clamp-2 w-full break-words text-center type-ui text-[10px] leading-[1.15]';
+
+/** The rail's own frame: an 80px column, framed and lifted like a card. */
+export const RAIL_FRAME =
+  'flex w-20 shrink-0 flex-col items-center gap-4 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd';
 
 /**
  * The app rail (UI revamp, 2026-10-18), after the reference's left menu: a
@@ -110,13 +119,7 @@ export function Sidebar({
   className?: string;
 }) {
   return (
-    <aside
-      aria-label="Main"
-      className={cn(
-        'flex w-20 shrink-0 flex-col items-center gap-4 rounded-2xl border-2 border-outline bg-chrome py-3 shadow-surfaceMd',
-        className,
-      )}
-    >
+    <aside aria-label="Main" className={cn(RAIL_FRAME, className)}>
       {/* The sidebar wears the PG tile, not the gear (the owner's call,
           2026-11-05): the old "P" tile, grown to 56px (the owner's pick), holding "PG"
           in Luckiest Guy. The gear stays the logo everywhere else. The rail is

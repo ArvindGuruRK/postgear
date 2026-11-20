@@ -91,7 +91,7 @@ interface PrivateStorage {
 - [x] `packages/storage`: move the code, fix imports in the API and the worker, delete the duplicated key pattern; media tests green.
 - [x] `PrivateStorage` with the local and S3 bindings, clip keys, the signed file route with Range.
 - [x] Explicit upload directory; storage variables in the worker env; `ActivityDeps` gains both storages.
-- [x] `minio-setup` in `docker-compose.yml` (buckets, policy, CORS); `.env.example` updated.
+- [x] Buckets, policy and CORS for MinIO; `.env.example` updated. (Was a `minio-setup` container in `docker-compose.yml`; replaced on 2026-11-19 by `npm run storage:buckets`, `scripts/ensure-buckets.ts`, because the `minio/mc` image was removed from Docker Hub.)
 - [x] `packages/media-tools`: `runTool`, `toolPaths`, `doctor`, `withScratch`, `assertFreeDisk`, `probeFile`; the `child_process` guard; `npm run clips:doctor`.
 - [x] Worker roles and queues; boot doctor; `createClipProviders` with stand-ins.
 - [x] `ClipJobsService`, `startClipJob`, `cancelClipJob`, the events service and routes, `job-progress.ts`.

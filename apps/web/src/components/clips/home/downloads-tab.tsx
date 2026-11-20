@@ -83,8 +83,11 @@ export function shownState(view: DownloadView, now: Date): DownloadView['state']
 export function DownloadsTab({
   downloads,
   onSettled,
+  limit,
 }: {
   downloads: DownloadsState;
+  /** The Clips home's preview (2026-11-19): the newest few rows only. */
+  limit?: number;
   /** A download ended or was deleted: the page reads its storage meter again. */
   onSettled?: () => void;
 }) {
@@ -115,7 +118,7 @@ export function DownloadsTab({
   }
   return (
     <ul data-testid="clips-downloads" className="m-0 flex list-none flex-col gap-3 p-0">
-      {rows.map((view) => (
+      {(limit === undefined ? rows : rows.slice(0, limit)).map((view) => (
         <DownloadRow
           key={view.id}
           view={view}

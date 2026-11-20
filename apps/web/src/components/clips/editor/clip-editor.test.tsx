@@ -243,17 +243,38 @@ describe('ClipEditor frame', () => {
     expect(screen.getByTestId('clip-tab-layouts')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('walks the tabs with Back and Next, and Next is Export Clip on Export', () => {
+  it('walks the tabs with buttons that name where they go, and ends on Export Clip', () => {
     renderEditor();
-    expect(screen.getByTestId('clip-panel-back')).toBeDisabled();
+    // The first tab has no way back; the way on names the next tab.
+    expect(screen.queryByTestId('clip-panel-back')).toBeNull();
+    expect(screen.getByTestId('clip-panel-next')).toHaveTextContent('Elements');
     fireEvent.click(screen.getByTestId('clip-panel-next'));
     expect(panelTitle()).toHaveTextContent('Elements');
+    expect(screen.getByTestId('clip-panel-back')).toHaveTextContent('Layouts');
+    expect(screen.getByTestId('clip-panel-next')).toHaveTextContent('Text');
     fireEvent.click(screen.getByTestId('clip-panel-back'));
     expect(panelTitle()).toHaveTextContent('Layouts');
     for (let i = 0; i < 5; i += 1) fireEvent.click(screen.getByTestId('clip-panel-next'));
     expect(panelTitle()).toHaveTextContent('Export');
     expect(screen.queryByTestId('clip-panel-next')).toBeNull();
     expect(screen.getByTestId('clip-panel-export')).toHaveTextContent('Export Clip');
+  });
+
+  it('says what each tab is for, and folds the panel away and back', () => {
+    renderEditor();
+    expect(screen.getByTestId('clip-editor-panel')).toHaveAccessibleDescription(
+      "Pick the clip's shape and how the video fills it.",
+    );
+    fireEvent.click(screen.getByTestId('clip-panel-hide'));
+    expect(screen.queryByTestId('clip-editor-panel')).toBeNull();
+    // Show Panel in the head row brings it back on the same tab.
+    fireEvent.click(screen.getByTestId('clip-panel-show'));
+    expect(panelTitle()).toHaveTextContent('Layouts');
+    // The open tab pressed again folds it; another tab opens it on that tab.
+    fireEvent.click(screen.getByTestId('clip-tab-layouts'));
+    expect(screen.queryByTestId('clip-editor-panel')).toBeNull();
+    fireEvent.click(screen.getByTestId('clip-tab-audio'));
+    expect(panelTitle()).toHaveTextContent('Audio');
   });
 
   it('Export in the top bar selects the Export tab', () => {

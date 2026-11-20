@@ -9,7 +9,8 @@
     "packages/*"
   ],
   "scripts": {
-    "predev": "docker compose up -d",
+    "predev": "docker compose up -d && npm run storage:buckets",
+    "storage:buckets": "dotenv -e .env -- ts-node --project scripts/tsconfig.json scripts/ensure-buckets.ts",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

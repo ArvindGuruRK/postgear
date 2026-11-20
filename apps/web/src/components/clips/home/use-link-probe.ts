@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Reading a pasted link (Module 06): `probe(url)` on Enter or Find Video,
+ * Reading a pasted link (Module 06): `probe(url)` on Enter or Find Clips,
  * never while typing.
  *
  * A newer probe always wins. Each one aborts the one before it, and an answer

@@ -82,7 +82,6 @@ import {
   type CropHandle,
   cropBoxRadius,
   cropName,
-  nextCropName,
   cropSnapLines,
   cropsMove,
   firstCropOf,
@@ -90,6 +89,7 @@ import {
   moveCrop,
   NO_GUIDES,
   NO_VIDEO_SENTENCE,
+  nextCropName,
   nudgeCrop,
   type PaneSize,
   resizeCrop,
@@ -516,7 +516,7 @@ export function CropStage({
         </TooltipHint>
         <div className="flex items-center gap-2">
           <label htmlFor={switchId} className="font-sans text-sm text-ink">
-            Enable snapping
+            Snap crops to guides
           </label>
           <Toggle
             id={switchId}

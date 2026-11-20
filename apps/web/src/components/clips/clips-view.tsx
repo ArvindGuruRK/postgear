@@ -1,36 +1,31 @@
 'use client';
 
 /**
- * The Clips page (Sprint 12): the actions row, then five tabs, the open one
- * in `?tab=`.
+ * The Clips page (Sprint 12; redone 2026-11-19 with no tab bar, after
+ * StreamLadder's home). One view at a time, named in `?tab=` so a link or a
+ * reload lands on it (old links keep working):
  *
- * - **Actions row** (`PageActions`, right): the storage meter and the AI
- *   minutes chip. Clips never shows AI credits.
- * - **Tools warning**: when the video tools are not running, one warning
- *   above the tabs, and every button that would bring something in is off.
- *   Looking at videos still works.
- * - **Tabs**: Create (Module 06), Streams (Module 06, My Channels), Videos
- *   (Module 06), Clips (Module 07, with Recent Clips on Create) and
- *   Downloads (Module 18). The Simulated
- *   sticker sits at the right of the tab row under simulation.
+ * - **Home** (`create`, the default): the entry card, then Coming Up, Recent
+ *   Videos, Recent Clips and Downloads, each with See All (`create-tab.tsx`).
+ * - **Videos**, **Clips** and **Downloads**: the whole list, opened from its
+ *   See All, with Back to the home. They are views of this page, not routes,
+ *   so an upload running on the home carries on while a list is open.
+ * - **Streams** is not a view any more: Browse Twitch, Browse Kick and Browse
+ *   YouTube open the saved channels of that platform in a dialog, and
+ *   `?tab=streams` opens it for every platform.
  *
- * What must outlive a tab switch lives here: the link card, the uploads (a
- * tab switch never cancels one), the video list and the saved channels, so
- * the Create tab, the Videos tab, the Streams tab and the Browse dialog all
- * read the same state and never ask twice.
+ * The actions row carries the storage meter and the AI minutes chip on the
+ * right (Clips never shows AI credits), and on the left the Simulated sticker
+ * on the home, or Back and the list's name on a list. When the video tools
+ * are not running, one warning says so and every way in is off; looking at
+ * videos still works.
+ *
+ * After an upload or a new import the page waits for the video and opens it
+ * (`useOpenWhenReady`).
  */
-import {
-  Alert,
-  Badge,
-  Button,
-  EmptyState,
-  PageActions,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  toast,
-} from '@postgear/ui';
+import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
+import { Alert, Badge, Button, EmptyState, MotionIcon, PageActions, toast } from '@postgear/ui';
+import type { ClipPlatformId } from '@postgear/video-engine';
 import { Lock, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -44,10 +39,9 @@ import type {
   ClipVideoSort,
   DownloadStarted,
 } from '@/types/clips';
-import { ChannelBrowser } from './channels/channel-browser';
 import { BrowseChannelsDialog, LinkCardDialog } from './channels/channel-dialogs';
 import { useChannels } from './channels/use-channels';
-import { CLIPS_TAB_NAMES, CLIPS_TABS, type ClipsTab, DEFAULT_CLIPS_TAB } from './clips-model';
+import { CLIPS_TAB_NAMES, type ClipsTab, DEFAULT_CLIPS_TAB } from './clips-model';
 import { AiMinutesChip, StorageMeter } from './home/clips-meters';
 import { ComingUp } from './home/coming-up';
 import { CreateTab } from './home/create-tab';
@@ -62,6 +56,7 @@ import {
 import { ALREADY_HERE } from './home/link-card';
 import { useDownloads } from './home/use-downloads';
 import { useLinkProbe } from './home/use-link-probe';
+import { useOpenWhenReady } from './home/use-open-when-ready';
 import { useVideoUpload } from './home/use-video-upload';
 import { useVideos } from './home/use-videos';
 import { VideosTab, videoCardActions } from './home/videos-tab';
@@ -71,6 +66,9 @@ import { useClipsList } from './library/use-clips-list';
 import { useClipsStatus } from './use-clips-status';
 import { clipEditHref } from './video/video-clip-list';
 
+/** A list opened from the home; `create` is the home itself. */
+type ClipsView = Exclude<ClipsTab, 'streams'>;
+
 export const TOOLS_DOWN_SENTENCE =
   'Video tools are not running right now. You can look at your videos, but nothing new can be brought in.';
 export const SAMPLE_ALREADY_HERE = 'You already have the sample video.';
@@ -78,6 +76,22 @@ const SAMPLE_UNREACHABLE = 'We could not reach Clips. Check your connection and 
 
 export function videoHref(orgId: string, videoId: string): string {
   return `/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(videoId)}`;
+}
+
+/**
+ * Back to the top of the page's own scroll area (the shell scrolls a region,
+ * not the window; `scrollIntoView` would nudge the window too).
+ */
+function scrollToTop(element: HTMLElement | null) {
+  let node = element?.parentElement ?? null;
+  while (node) {
+    const overflow = getComputedStyle(node).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight) {
+      node.scrollTop = 0;
+      return;
+    }
+    node = node.parentElement;
+  }
 }
 
 export function ClipsView({
@@ -93,15 +107,22 @@ export function ClipsView({
   initialStatus?: ClipsStatus | null;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<ClipsTab>(initialTab);
+  // `?tab=streams` (an old link) lands on the home with every platform's channels open.
+  const [tab, setView] = useState<ClipsView>(initialTab === 'streams' ? 'create' : initialTab);
   const statusState = useClipsStatus(initialStatus);
   const { status } = statusState;
   const refreshStatus = statusState.refresh;
   const videos = useVideos(initialSort);
   const probe = useLinkProbe();
-  const [browseOpen, setBrowseOpen] = useState(false);
-  // Channels are asked for only once the Streams tab or the dialog opens.
-  const channels = useChannels(tab === 'streams' || browseOpen);
+  const openings = useOpenWhenReady(orgId);
+  const [browse, setBrowse] = useState<{ open: boolean; only?: ClipPlatformId }>({
+    open: initialTab === 'streams',
+  });
+  // Channels are asked for only once the Browse dialog opens.
+  const channels = useChannels(browse.open);
+  const top = useRef<HTMLDivElement | null>(null);
+  const heading = useRef<HTMLHeadingElement | null>(null);
+  const moved = useRef(false);
   const [focusRights, setFocusRights] = useState(false);
   const [streamCard, setStreamCard] = useState<{ url: string; probe: ClipProbe } | null>(null);
   const [sampleBusy, setSampleBusy] = useState(false);
@@ -111,9 +132,23 @@ export function ClipsView({
   const disabled = !toolsOk;
   const platforms = status?.platforms ?? [];
 
-  // The open tab lives in the URL without a navigation, which would re-run
+  /** Opens a list (or the home) from its top, with focus on its name. */
+  const setTab = useCallback((next: ClipsView) => {
+    moved.current = true;
+    setView(next);
+  }, []);
+  useEffect(() => {
+    // Runs once the new view is drawn, so its name is there to take focus.
+    void tab;
+    if (!moved.current) return;
+    moved.current = false;
+    scrollToTop(top.current);
+    heading.current?.focus();
+  }, [tab]);
+
+  // The open view lives in the URL without a navigation, which would re-run
   // the server page for nothing.
-  // The Videos order (Module 19) rides along while the Videos tab is open.
+  // The Videos order (Module 19) rides along while the Videos list is open.
   useEffect(() => {
     const url = new URL(window.location.href);
     const wanted = tab === DEFAULT_CLIPS_TAB ? null : tab;
@@ -131,12 +166,16 @@ export function ClipsView({
   const seeWhatUsesSpace = useCallback(() => {
     setVideoSort('size');
     setTab('videos');
-  }, [setVideoSort]);
+  }, [setVideoSort, setTab]);
   const overSentence = status ? storageOverSentence(status) : null;
 
-  const uploads = useVideoUpload(status, () => {
+  const uploads = useVideoUpload(status, (done) => {
     videos.refresh();
     refreshStatus();
+    // Straight on into the editor once the video is ready (2026-11-19).
+    if (done.videoId) {
+      openings.follow({ id: done.videoId, title: done.name, platform: 'upload', kind: 'upload' });
+    }
   });
 
   // Edit Whole Video: a clip over the whole video, opened at once (Module 07).
@@ -160,8 +199,8 @@ export function ClipsView({
 
   // The Clips tab's list is asked for while the tab is open, and again on each return.
   const clipsList = useClipsList({ enabled: tab === 'clips' });
-  // Downloads (Module 18): asked for once the tab opens or a download starts.
-  const downloads = useDownloads(tab === 'downloads');
+  // Downloads (Module 18): the home shows the newest few, so they are asked for at once.
+  const downloads = useDownloads(true);
 
   /** A download was asked for on a link card: its row on top, the tab open. */
   const onDownloaded = useCallback(
@@ -172,7 +211,7 @@ export function ClipsView({
       setTab('downloads');
       toast({ title: outcome.existing ? DOWNLOAD_EXISTS : DOWNLOAD_STARTED });
     },
-    [downloads.add, downloads.refresh, refreshStatus],
+    [downloads.add, downloads.refresh, refreshStatus, setTab],
   );
 
   /** An import started (the link card, a channel row, the sample). */
@@ -188,9 +227,11 @@ export function ClipsView({
       videos.replace({ video: outcome.video, job: outcome.job, clipCount: 0 });
       videos.refresh();
       refreshStatus();
-      setTab('videos');
+      // The home stays, with the video on its way in; it opens once ready (2026-11-19).
+      setTab('create');
+      openings.follow(outcome.video);
     },
-    [orgId, probe, refreshStatus, router, videos],
+    [orgId, probe, refreshStatus, router, videos, openings.follow, setTab],
   );
 
   const onSample = async () => {
@@ -213,13 +254,17 @@ export function ClipsView({
     if (!disabled) fileInput.current?.click();
   };
 
+  const addFiles = (files: File[]) => {
+    if (disabled || files.length === 0) return;
+    uploads.add(files);
+    setTab('create');
+  };
+
   const onFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     // Cleared so picking the same file again still fires.
     event.target.value = '';
-    if (files.length === 0) return;
-    uploads.add(files);
-    setTab('create');
+    addFiles(files);
   };
 
   const showFromChannel = (url: string, found: ClipProbe) => {
@@ -249,10 +294,35 @@ export function ClipsView({
 
   return (
     <div className="flex flex-col gap-5">
-      <PageActions>
-        {status ? <StorageMeter status={status} onSeeWhatUsesSpace={seeWhatUsesSpace} /> : null}
-        <AiMinutesChip orgId={orgId} fallback={status?.meters.aiMinutes ?? null} />
-      </PageActions>
+      <div ref={top} className="flex flex-wrap items-center justify-between gap-3">
+        {tab === 'create' ? (
+          <div>{status?.simulation ? <Badge variant="secondary">Simulated</Badge> : null}</div>
+        ) : (
+          <div className="flex min-w-0 items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setTab('create')}
+              data-testid="clips-back-home"
+            >
+              <MotionIcon icon={ArrowLeftIcon} className="h-4 w-4" />
+              Back
+            </Button>
+            <h2
+              ref={heading}
+              tabIndex={-1}
+              data-testid="clips-view-name"
+              className="m-0 truncate font-sans text-lg text-ink type-heading outline-none"
+            >
+              {CLIPS_TAB_NAMES[tab]}
+            </h2>
+          </div>
+        )}
+        <PageActions>
+          {status ? <StorageMeter status={status} onSeeWhatUsesSpace={seeWhatUsesSpace} /> : null}
+          <AiMinutesChip orgId={orgId} fallback={status?.meters.aiMinutes ?? null} />
+        </PageActions>
+      </div>
 
       {statusState.error && !status ? (
         <Alert variant="warning" className="items-center">
@@ -291,90 +361,65 @@ export function ClipsView({
         onChange={onFiles}
       />
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value as ClipsTab)}
-        className="flex flex-col gap-5"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <TabsList aria-label="Clips tabs">
-            {CLIPS_TABS.map((value) => (
-              <TabsTrigger key={value} value={value}>
-                {CLIPS_TAB_NAMES[value]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {status?.simulation ? <Badge variant="secondary">Simulated</Badge> : null}
-        </div>
-
-        <TabsContent value="create" className="mt-0">
-          <CreateTab
-            orgId={orgId}
-            platforms={platforms}
-            probe={probe}
-            disabled={disabled}
-            focusRights={focusRights}
-            sampleAvailable={status?.sample?.available ?? false}
-            sampleBusy={sampleBusy}
-            uploadHelp={uploadHelpLine(status)}
-            uploads={uploads}
-            videos={videos}
-            videoActions={videoActions}
-            onImported={(outcome) => onImported(outcome)}
-            onDownloaded={onDownloaded}
-            onUpload={openFilePicker}
-            onBrowse={platforms.length > 0 ? () => setBrowseOpen(true) : undefined}
-            onSample={() => void onSample()}
-            onAllVideos={() => setTab('videos')}
-            recentClips={<RecentClips orgId={orgId} onAllClips={() => setTab('clips')} />}
-            comingUp={
-              <ComingUp
-                orgId={orgId}
-                onSendAClip={() => {
-                  clipsList.setStatus('exported');
-                  setTab('clips');
-                }}
-              />
-            }
-          />
-        </TabsContent>
-
-        <TabsContent value="streams" className="mt-0">
-          <section
-            aria-label="My Channels"
-            className="rounded-card border-2 border-outline bg-chrome p-5 shadow-surfaceSm"
-          >
-            <ChannelBrowser
+      {tab === 'create' ? (
+        <CreateTab
+          orgId={orgId}
+          platforms={platforms}
+          probe={probe}
+          disabled={disabled}
+          focusRights={focusRights}
+          sampleAvailable={status?.sample?.available ?? false}
+          sampleBusy={sampleBusy}
+          uploadHelp={uploadHelpLine(status)}
+          uploads={uploads}
+          openings={openings}
+          videos={videos}
+          videoActions={videoActions}
+          downloads={downloads}
+          onImported={(outcome) => onImported(outcome)}
+          onDownloaded={onDownloaded}
+          onUpload={openFilePicker}
+          onDropFiles={addFiles}
+          onBrowse={platforms.length > 0 ? (only) => setBrowse({ open: true, only }) : undefined}
+          onSample={() => void onSample()}
+          onAllVideos={() => setTab('videos')}
+          onAllDownloads={() => setTab('downloads')}
+          onDownloadsSettled={refreshStatus}
+          recentClips={<RecentClips orgId={orgId} onAllClips={() => setTab('clips')} />}
+          comingUp={
+            <ComingUp
               orgId={orgId}
-              platforms={platforms}
-              disabled={disabled}
-              channelsState={channels}
-              onProbed={(url, found) => setStreamCard({ url, probe: found })}
+              hideWhenEmpty
+              onSendAClip={() => {
+                clipsList.setStatus('exported');
+                setTab('clips');
+              }}
             />
-          </section>
-        </TabsContent>
+          }
+        />
+      ) : null}
 
-        <TabsContent value="videos" className="mt-0">
-          <VideosTab
-            orgId={orgId}
-            videos={videos}
-            actions={videoActions}
-            onCreate={() => setTab('create')}
-          />
-        </TabsContent>
+      {tab === 'videos' ? (
+        <VideosTab
+          orgId={orgId}
+          videos={videos}
+          actions={videoActions}
+          onCreate={() => setTab('create')}
+        />
+      ) : null}
 
-        <TabsContent value="clips" className="mt-0">
-          <ClipsLibraryTab orgId={orgId} list={clipsList} onVideos={() => setTab('videos')} />
-        </TabsContent>
+      {tab === 'clips' ? (
+        <ClipsLibraryTab orgId={orgId} list={clipsList} onVideos={() => setTab('videos')} />
+      ) : null}
 
-        <TabsContent value="downloads" className="mt-0">
-          <DownloadsTab downloads={downloads} onSettled={refreshStatus} />
-        </TabsContent>
-      </Tabs>
+      {tab === 'downloads' ? (
+        <DownloadsTab downloads={downloads} onSettled={refreshStatus} />
+      ) : null}
 
       <BrowseChannelsDialog
-        open={browseOpen}
-        onOpenChange={setBrowseOpen}
+        open={browse.open}
+        only={browse.only}
+        onOpenChange={(open) => setBrowse((current) => ({ ...current, open }))}
         orgId={orgId}
         platforms={platforms}
         disabled={disabled}

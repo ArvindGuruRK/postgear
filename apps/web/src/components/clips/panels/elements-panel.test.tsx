@@ -205,7 +205,9 @@ describe('the library tabs', () => {
     expect(spy.onAddLibrary).toHaveBeenCalledWith(expect.objectContaining({ id: STAR_ID }));
 
     search.mockResolvedValue(page([sticker({ id: SPARK_ID, name: 'Sparkle', kind: 'animated' })]));
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'GIFs' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Elements' })).getByRole('button', { name: 'GIFs' }),
+    );
     expect(await screen.findByRole('button', { name: 'Add Sparkle' })).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ kind: 'animated' });
     expect(screen.queryByRole('button', { name: 'Follow Badge' })).toBeNull();
@@ -303,7 +305,11 @@ describe('the library tabs', () => {
     renderPanel();
     await screen.findByRole('button', { name: 'Add Gold Star' });
     search.mockResolvedValue(page([]));
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favourites' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Elements' })).getByRole('button', {
+        name: 'Favourites',
+      }),
+    );
     expect(await screen.findByText(FAVOURITES_EMPTY)).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ favourites: true, kind: undefined });
   });
@@ -332,7 +338,11 @@ describe('the Uploaded tab', () => {
   async function openUploaded() {
     renderPanel();
     await screen.findByRole('button', { name: 'Add Gold Star' });
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Uploaded' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Elements' })).getByRole('button', {
+        name: 'Uploaded',
+      }),
+    );
   }
 
   it('says how to start when there are none', async () => {
@@ -355,7 +365,11 @@ describe('the Uploaded tab', () => {
     ]);
     const spy = renderPanel();
     await screen.findByRole('button', { name: 'Add Gold Star' });
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Uploaded' }));
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Elements' })).getByRole('button', {
+        name: 'Uploaded',
+      }),
+    );
     const rows = await screen.findAllByTestId('clip-uploaded-row');
     expect(rows).toHaveLength(3);
     expect(rows[1]).toHaveTextContent('Checking');

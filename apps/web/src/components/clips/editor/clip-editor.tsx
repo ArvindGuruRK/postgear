@@ -70,8 +70,8 @@ import {
   addItem,
   addZoom,
   type BadgePlatform,
-  countSounds,
   type ClipDocument,
+  countSounds,
   defaultBadgeItem,
   defaultSoundItem,
   defaultStickerItem,
@@ -80,29 +80,29 @@ import {
   duplicateItem,
   type Fades,
   findItem,
+  type LibrarySoundView,
+  type LibraryStickerView,
   type Looks,
+  MAX_SOUNDS,
   outputDuration,
   removeArea,
   removeItem,
   removeSound,
   removeZoom,
-  type SourceRange,
-  type Speed,
-  setItemAnchor,
-  setItemTiming,
-  setSpeed,
-  setZoomTiming,
-  type LibrarySoundView,
-  type LibraryStickerView,
-  MAX_SOUNDS,
   type SoundPatch,
   type SoundUploadView,
+  type SourceRange,
+  type Speed,
   type StickerItem,
   type StickerUploadView,
+  setItemAnchor,
+  setItemTiming,
   setSegmentVolume,
+  setSpeed,
   setVideoVolume,
-  soundMaxDuration,
+  setZoomTiming,
   soundLoops,
+  soundMaxDuration,
   type TextItem,
   type TextStyleId,
   type TimedItem,
@@ -128,6 +128,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useFocusAfterComposer } from '@/components/composer/composer-return';
 import {
   editorShortcut,
   isApplePlatform,
@@ -137,12 +138,12 @@ import {
   linkOf,
   settleWithin,
 } from '@/components/studio/studio-editor-model';
-import { useFocusAfterComposer } from '@/components/composer/composer-return';
+import { StudioFonts } from '@/components/studio/studio-fonts';
 import { ApiError } from '@/lib/api';
 import { getClip, openClip, requestMoreVideo, soundFiles, stickerFiles } from '@/lib/clips-api';
-import { StudioFonts } from '@/components/studio/studio-fonts';
 import { registerLeaveGuard } from '@/lib/leave-guard';
 import type { ClipDetail } from '@/types/clips';
+import { isTerminalJob } from '../clip-job-model';
 import { CropStage } from '../layouts/crop-stage';
 import { LAST_CROP_SENTENCE } from '../layouts/layouts-model';
 import { type LayoutEdit, LayoutsPanel } from '../layouts/layouts-panel';
@@ -164,7 +165,6 @@ import {
   ZOOM_ROOM_SENTENCE,
 } from '../panels/effects-model';
 import { EffectsPanel } from '../panels/effects-panel';
-import { ElementsPanel, type StickerEdit } from '../panels/elements-panel';
 import {
   fileInfoOf,
   fileOfItem,
@@ -174,6 +174,7 @@ import {
   tileKey,
   unknownFiles,
 } from '../panels/elements-model';
+import { ElementsPanel, type StickerEdit } from '../panels/elements-panel';
 import { type TextEdit, TextPanel } from '../panels/text-panel';
 import { MoreVideoRequester } from '../timeline/more-video';
 import {
@@ -214,7 +215,6 @@ import {
   needsShape,
 } from './editor-state';
 import { EditorTopBar } from './editor-top-bar';
-import { isTerminalJob } from '../clip-job-model';
 import {
   changedSince,
   EXPORT_DONE_SENTENCE,
@@ -224,9 +224,9 @@ import {
   leaveOutSentence,
 } from './export-model';
 import { ExportPanel, useClipExport } from './export-panel';
+import { usePlaybackStore } from './playback';
 import { SendClipDialog, type SendExportRun } from './send-dialog';
 import { composerHref } from './send-model';
-import { usePlaybackStore } from './playback';
 import { ShapeDialog } from './shape-dialog';
 import { Stage } from './stage';
 import { TabRail } from './tab-rail';
@@ -661,7 +661,12 @@ export function ClipEditor({
   const latest = useRef({ document, selection: state.selection });
   latest.current = { document, selection: state.selection };
 
-  const setTab = useCallback((tab: EditorTab) => dispatch({ type: 'tab', tab }), []);
+  // The panel can be folded away for room (2026-11-19); opening any tab opens it again.
+  const [panelOpen, setPanelOpen] = useState(true);
+  const setTab = useCallback((tab: EditorTab) => {
+    setPanelOpen(true);
+    dispatch({ type: 'tab', tab });
+  }, []);
 
   const select = useCallback((selection: EditorSelection) => {
     dispatch({ type: 'select', selection });
@@ -1484,230 +1489,247 @@ export function ClipEditor({
     setExportQueued(true);
   };
 
-  return (
-    <div data-testid="clip-editor" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-      <StudioFonts />
-      <EditorTopBar
-        backHref={back.href}
-        backLabel={back.label}
-        title={title}
-        onRename={(next) => dispatch({ type: 'rename', title: next, now: Date.now() })}
-        status={status}
-        mod={mod}
-        canUndo={editorCanUndo(state)}
-        canRedo={editorCanRedo(state)}
-        onUndo={() => dispatch({ type: 'undo' })}
-        onRedo={() => dispatch({ type: 'redo' })}
-        onShortcuts={() => setShortcutsOpen(true)}
-        onExport={() => setTab('export')}
-        exportProgress={exporting.running ? (exporting.job.job?.progress ?? 0) : null}
+  const panelBody =
+    state.tab === 'export' ? (
+      <ExportPanel
+        orgId={orgId}
+        state={exporting}
+        sharp={detail.sharp}
+        document={document}
+        sourceFps={detail.video?.fps ?? null}
+        onExport={startExport}
+        onSend={openSend}
       />
+    ) : state.tab === 'layouts' ? (
+      <LayoutsPanel
+        document={document}
+        videoSize={videoSize}
+        labelledBy={panelHeadingId('layouts')}
+        onEdit={editLayout}
+      />
+    ) : state.tab === 'elements' ? (
+      <ElementsPanel
+        selected={selectedSticker}
+        selectedFile={selectedStickerFile}
+        totalMs={outputDuration(document)}
+        fps={fps}
+        onAddLibrary={(view) => addSticker(view, 'library')}
+        onAddUpload={(view) => addSticker(view, 'upload')}
+        onAddBadge={addBadge}
+        onEdit={editSticker}
+        onTiming={timeText}
+        onAnchor={anchorText}
+        onRemove={removeSelected}
+      />
+    ) : state.tab === 'audio' ? (
+      <AudioPanel
+        selected={selectedSound}
+        selectedFile={selectedSoundFile}
+        totalMs={outputDuration(document)}
+        fps={fps}
+        videoVolume={videoVolumeOf(document, videoPart)}
+        videoTarget={videoPart ? 'part' : 'clip'}
+        onVideoVolume={changeVideoVolume}
+        playback={playback}
+        readLevel={readLevel}
+        onAddLibrary={(view) => addSound(view, 'library')}
+        onAddUpload={(view) => addSound(view, 'upload')}
+        onEdit={editSound}
+        onTiming={timeSound}
+        onAnchor={anchorText}
+        onRemove={removeSelected}
+      />
+    ) : state.tab === 'effects' ? (
+      <EffectsPanel
+        document={document}
+        selection={state.selection}
+        fps={fps}
+        playback={playback}
+        filmstrip={detail.filmstrip}
+        onAddZoom={addZoomHere}
+        onZoom={editZoom}
+        onZoomTiming={timeZoom}
+        onRemoveZoom={removeZoomNow}
+        onSpeed={speedPart}
+        onLooks={editLooks}
+        onFades={editFades}
+        onPreviewExport={() => setTab('export')}
+      />
+    ) : state.tab === 'text' ? (
+      <TextPanel
+        item={selectedText}
+        totalMs={outputDuration(document)}
+        fps={fps}
+        recent={recentColours}
+        onRecent={(hex) => setRecentColours((current) => pushRecent(current, hex))}
+        emojiDropped={emojiDropped}
+        onEmoji={noteEmoji}
+        onAdd={addText}
+        onEdit={editText}
+        onTiming={timeText}
+        onAnchor={anchorText}
+        onRemove={removeSelected}
+      />
+    ) : undefined;
 
-      {status === 'conflict' ? (
-        <Alert variant="warning" className="items-center" data-testid="clip-conflict">
-          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-          <p className="m-0 min-w-0 flex-1">{reloadProblem ?? CONFLICT_SENTENCE}</p>
-          <Button variant="secondary" size="sm" onClick={() => void reload()} disabled={reloading}>
-            Reload
-          </Button>
-        </Alert>
-      ) : null}
-      {status === 'failed' && refusal ? (
-        <Alert variant="danger" className="items-center" data-testid="clip-save-refused">
-          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-          <p className="m-0 min-w-0 flex-1">{refusal.message}</p>
-          {refusal.kind === 'retry' ? (
-            <Button variant="secondary" size="sm" onClick={autosave.retry}>
-              Try Again
-            </Button>
-          ) : refusal.kind === 'signIn' ? (
-            <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
-              Login
-            </Button>
-          ) : null}
-        </Alert>
-      ) : null}
-      {detail.sharp === 'gone' ? (
-        <Alert variant="warning" className="items-center" data-testid="clip-sharp-gone">
-          <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-          <p className="m-0 min-w-0 flex-1">{SHARP_GONE_SENTENCE}</p>
-        </Alert>
-      ) : null}
-
-      <div className="flex min-h-0 flex-1 gap-3">
-        <TabRail tab={state.tab} onTab={setTab} />
+  return (
+    <div data-testid="clip-editor" className="flex min-h-0 min-w-0 flex-1 gap-3">
+      <StudioFonts />
+      <TabRail
+        tab={state.tab}
+        onTab={(tab) => {
+          // The open tab pressed again folds the panel, as an editor's activity bar does.
+          if (tab === state.tab && panelOpen) setPanelOpen(false);
+          else setTab(tab);
+        }}
+        onShortcuts={() => setShortcutsOpen(true)}
+      />
+      {panelOpen ? (
         <EditorPanel
           tab={state.tab}
           onTab={setTab}
           onExport={startExport}
           exportBusy={exporting.starting || exporting.running}
+          onHide={() => setPanelOpen(false)}
         >
-          {state.tab === 'export' ? (
-            <ExportPanel
-              orgId={orgId}
-              state={exporting}
-              sharp={detail.sharp}
-              document={document}
-              sourceFps={detail.video?.fps ?? null}
-              onExport={startExport}
-              onSend={openSend}
-            />
-          ) : state.tab === 'layouts' ? (
-            <LayoutsPanel
-              document={document}
-              videoSize={videoSize}
-              labelledBy={panelHeadingId('layouts')}
-              onEdit={editLayout}
-            />
-          ) : state.tab === 'elements' ? (
-            <ElementsPanel
-              selected={selectedSticker}
-              selectedFile={selectedStickerFile}
-              totalMs={outputDuration(document)}
-              fps={fps}
-              onAddLibrary={(view) => addSticker(view, 'library')}
-              onAddUpload={(view) => addSticker(view, 'upload')}
-              onAddBadge={addBadge}
-              onEdit={editSticker}
-              onTiming={timeText}
-              onAnchor={anchorText}
-              onRemove={removeSelected}
-            />
-          ) : state.tab === 'audio' ? (
-            <AudioPanel
-              selected={selectedSound}
-              selectedFile={selectedSoundFile}
-              totalMs={outputDuration(document)}
-              fps={fps}
-              videoVolume={videoVolumeOf(document, videoPart)}
-              videoTarget={videoPart ? 'part' : 'clip'}
-              onVideoVolume={changeVideoVolume}
-              playback={playback}
-              readLevel={readLevel}
-              onAddLibrary={(view) => addSound(view, 'library')}
-              onAddUpload={(view) => addSound(view, 'upload')}
-              onEdit={editSound}
-              onTiming={timeSound}
-              onAnchor={anchorText}
-              onRemove={removeSelected}
-            />
-          ) : state.tab === 'effects' ? (
-            <EffectsPanel
-              document={document}
-              selection={state.selection}
-              fps={fps}
-              playback={playback}
-              filmstrip={detail.filmstrip}
-              onAddZoom={addZoomHere}
-              onZoom={editZoom}
-              onZoomTiming={timeZoom}
-              onRemoveZoom={removeZoomNow}
-              onSpeed={speedPart}
-              onLooks={editLooks}
-              onFades={editFades}
-              onPreviewExport={() => setTab('export')}
-            />
-          ) : state.tab === 'text' ? (
-            <TextPanel
-              item={selectedText}
-              totalMs={outputDuration(document)}
-              fps={fps}
-              recent={recentColours}
-              onRecent={(hex) => setRecentColours((current) => pushRecent(current, hex))}
-              emojiDropped={emojiDropped}
-              onEmoji={noteEmoji}
-              onAdd={addText}
-              onEdit={editText}
-              onTiming={timeText}
-              onAnchor={anchorText}
-              onRemove={removeSelected}
-            />
-          ) : undefined}
+          {panelBody}
         </EditorPanel>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-          {/* The same tree in every tab, so the clip's stage is never remounted. */}
-          <div
-            className="flex min-h-0 min-w-0 flex-1 gap-3"
-            data-testid={split ? 'clip-split-stage' : undefined}
+      ) : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+        <EditorTopBar
+          backHref={back.href}
+          backLabel={back.label}
+          title={title}
+          onRename={(next) => dispatch({ type: 'rename', title: next, now: Date.now() })}
+          status={status}
+          mod={mod}
+          canUndo={editorCanUndo(state)}
+          canRedo={editorCanRedo(state)}
+          onUndo={() => dispatch({ type: 'undo' })}
+          onRedo={() => dispatch({ type: 'redo' })}
+          onShowPanel={panelOpen ? undefined : () => setPanelOpen(true)}
+          onExport={() => setTab('export')}
+          exportProgress={exporting.running ? (exporting.job.job?.progress ?? 0) : null}
+        />
+
+        {status === 'conflict' ? (
+          <Alert variant="warning" className="items-center" data-testid="clip-conflict">
+            <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+            <p className="m-0 min-w-0 flex-1">{reloadProblem ?? CONFLICT_SENTENCE}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void reload()}
+              disabled={reloading}
+            >
+              Reload
+            </Button>
+          </Alert>
+        ) : null}
+        {status === 'failed' && refusal ? (
+          <Alert variant="danger" className="items-center" data-testid="clip-save-refused">
+            <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+            <p className="m-0 min-w-0 flex-1">{refusal.message}</p>
+            {refusal.kind === 'retry' ? (
+              <Button variant="secondary" size="sm" onClick={autosave.retry}>
+                Try Again
+              </Button>
+            ) : refusal.kind === 'signIn' ? (
+              <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+                Login
+              </Button>
+            ) : null}
+          </Alert>
+        ) : null}
+        {detail.sharp === 'gone' ? (
+          <Alert variant="warning" className="items-center" data-testid="clip-sharp-gone">
+            <TriangleAlert className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+            <p className="m-0 min-w-0 flex-1">{SHARP_GONE_SENTENCE}</p>
+          </Alert>
+        ) : null}
+
+        {/* The same tree in every tab, so the clip's stage is never remounted. */}
+        <div
+          className="flex min-h-0 min-w-0 flex-1 gap-3"
+          data-testid={split ? 'clip-split-stage' : undefined}
+        >
+          {split ? (
+            <CropStage
+              engine={engine}
+              playback={playback}
+              document={document}
+              shown={shownDocument}
+              videoSize={videoSize}
+              hasVideo={detail.playback !== null}
+              selection={state.selection}
+              onSelect={select}
+              onCommit={commit}
+              onDraft={setDraft}
+              onEdit={editLayout}
+              onAnnounce={setAnnouncement}
+            />
+          ) : null}
+          <section
+            aria-label={split ? 'Clip' : undefined}
+            className={cn('flex min-h-0 min-w-0 flex-col gap-2', split ? 'flex-[2]' : 'flex-1')}
           >
             {split ? (
-              <CropStage
-                engine={engine}
-                playback={playback}
+              <p aria-hidden="true" className="m-0 shrink-0 type-label text-sm text-ink">
+                Clip
+              </p>
+            ) : null}
+            <Stage
+              canvas={shownDocument.canvas}
+              containerRef={containerRef}
+              playback={playback}
+              missing={detail.playback ? null : NO_PREVIEW_SENTENCE}
+              onRetry={() => void refreshAddress()}
+            >
+              <TransformLayer
                 document={document}
                 shown={shownDocument}
-                videoSize={videoSize}
-                hasVideo={detail.playback !== null}
                 selection={state.selection}
+                playback={playback}
+                heights={heights}
+                editingId={editingId}
+                fontFamily={clipFontFamily}
                 onSelect={select}
                 onCommit={commit}
                 onDraft={setDraft}
-                onEdit={editLayout}
-                onAnnounce={setAnnouncement}
+                onEdit={startTyping}
+                onTyping={typeText}
+                onTypingDone={finishTyping}
+                onEmoji={noteEmoji}
               />
-            ) : null}
-            <section
-              aria-label={split ? 'Clip' : undefined}
-              className={cn('flex min-h-0 min-w-0 flex-col gap-2', split ? 'flex-[2]' : 'flex-1')}
-            >
-              {split ? (
-                <p aria-hidden="true" className="m-0 shrink-0 type-label text-sm text-ink">
-                  Clip
-                </p>
-              ) : null}
-              <Stage
-                canvas={shownDocument.canvas}
-                containerRef={containerRef}
-                playback={playback}
-                missing={detail.playback ? null : NO_PREVIEW_SENTENCE}
-                onRetry={() => void refreshAddress()}
-              >
-                <TransformLayer
-                  document={document}
-                  shown={shownDocument}
-                  selection={state.selection}
-                  playback={playback}
-                  heights={heights}
-                  editingId={editingId}
-                  fontFamily={clipFontFamily}
-                  onSelect={select}
-                  onCommit={commit}
-                  onDraft={setDraft}
-                  onEdit={startTyping}
-                  onTyping={typeText}
-                  onTypingDone={finishTyping}
-                  onEmoji={noteEmoji}
-                />
-                {exporting.mark ? <StageMark canvas={shownDocument.canvas} /> : null}
-              </Stage>
-            </section>
-          </div>
-          <TransportBar playback={playback} dock={dock} disabled={!detail.playback} />
-          <TimelineDock
-            document={document}
-            selection={state.selection}
-            playback={playback}
-            filmstrip={detail.filmstrip}
-            waveform={detail.waveform}
-            fps={fps}
-            held={detail.held}
-            videoDurationMs={videoDurationMs}
-            gettingMore={gettingMore}
-            notice={notice}
-            splitProblemAt={splitProblemAt}
-            removeProblem={removeProblem}
-            controlRef={dock}
-            onSelect={select}
-            onOpen={openSelection}
-            onCommit={commit}
-            onDraft={setDraft}
-            onSplit={splitHere}
-            onRemove={removeSelected}
-            onAnnounce={setAnnouncement}
-            stickerPicture={stickerPicture}
-            soundShape={soundShape}
-          />
+              {exporting.mark ? <StageMark canvas={shownDocument.canvas} /> : null}
+            </Stage>
+          </section>
         </div>
+        <TransportBar playback={playback} dock={dock} disabled={!detail.playback} />
+        <TimelineDock
+          document={document}
+          selection={state.selection}
+          playback={playback}
+          filmstrip={detail.filmstrip}
+          waveform={detail.waveform}
+          fps={fps}
+          held={detail.held}
+          videoDurationMs={videoDurationMs}
+          gettingMore={gettingMore}
+          notice={notice}
+          splitProblemAt={splitProblemAt}
+          removeProblem={removeProblem}
+          controlRef={dock}
+          onSelect={select}
+          onOpen={openSelection}
+          onCommit={commit}
+          onDraft={setDraft}
+          onSplit={splitHere}
+          onRemove={removeSelected}
+          onAnnounce={setAnnouncement}
+          stickerPicture={stickerPicture}
+          soundShape={soundShape}
+        />
       </div>
 
       <ShapeDialog

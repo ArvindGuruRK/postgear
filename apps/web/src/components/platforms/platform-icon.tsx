@@ -65,6 +65,9 @@ const BRANDS: Record<string, Brand> = {
   // twitter.svg does, so it takes the same 64 / 56 scale.
   threads: { label: 'Threads', src: '/icon/threads.svg', fit: 'scale-[1.143]' },
   youtube: { label: 'YouTube', src: '/icon/youtube.svg' },
+  // Clips' sources (2026-11-19): the Browse buttons and the link card wear these.
+  twitch: { label: 'Twitch', src: '/icon/twitch.svg' },
+  kick: { label: 'Kick', src: '/icon/kick.svg' },
   tiktok: { label: 'TikTok', src: '/icon/tiktok.svg' },
   pinterest: { label: 'Pinterest', src: '/icon/pinterest.svg' },
 };

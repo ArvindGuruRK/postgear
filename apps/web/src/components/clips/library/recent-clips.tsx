@@ -1,20 +1,20 @@
 'use client';
 
 /**
- * Recent Clips on the Create tab (Module 07, section 5): the newest four
- * clips as cards, with All Clips. Drawn only when there is a clip to show,
+ * Recent Clips on the Clips home (Module 07, section 5): the newest four
+ * clips as cards, with See All. Drawn only when there is a clip to show,
  * like Recent Videos; a list that failed to load is simply left out (the
  * Clips tab shows the error with Try Again).
  */
-import { Button } from '@postgear/ui';
 import { useEffect, useId, useState } from 'react';
 import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui';
 import { listClips } from '@/lib/clips-api';
 import type { ClipListItem } from '@/types/clips';
+import { SeeAll } from '../home/see-all';
 import { clipActions } from './clip-actions';
-import { useClipSender } from './use-clip-sender';
 import { ClipCard } from './clip-card';
 import { listChange } from './clips-tab';
+import { useClipSender } from './use-clip-sender';
 
 export const RECENT_CLIPS = 4;
 
@@ -61,11 +61,7 @@ export function RecentClips({
       <PanelHeader
         id={headingId}
         title="Recent Clips"
-        aside={
-          <Button variant="secondary" size="sm" onClick={onAllClips}>
-            All Clips
-          </Button>
-        }
+        aside={<SeeAll label="See All Clips" onClick={onAllClips} />}
       />
       <ul className="m-0 grid list-none grid-cols-4 gap-4 p-0">
         {clips.map((clip) => (

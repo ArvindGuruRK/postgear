@@ -13,7 +13,12 @@
  */
 import { refusalMessage } from '@postgear/entitlements';
 import { clipStorageOverLine } from '@postgear/scheduling';
-import { type ClipPlatformId, formatVideoLength, PLATFORM_NAMES } from '@postgear/video-engine';
+import {
+  CLIP_MAX_MS,
+  type ClipPlatformId,
+  formatVideoLength,
+  PLATFORM_NAMES,
+} from '@postgear/video-engine';
 import type {
   ClipJobView,
   ClipsMeterView,
@@ -212,6 +217,29 @@ export function platformList(platforms: readonly ClipPlatformId[]): string {
 export function linkPlaceholder(platforms: readonly ClipPlatformId[]): string {
   const list = platformList(platforms);
   return list ? `Enter your ${list} link` : 'Enter your video link';
+}
+
+/**
+ * Where a newly brought in video opens once it is ready (2026-11-19): an
+ * upload, a platform clip or a short goes straight into the editor as one
+ * whole clip (it already is the moment); a video or a past stream opens its
+ * video page, where Find Clips and the moment picker are. A video longer
+ * than a clip may be always opens its video page.
+ */
+export function openTarget(video: {
+  platform: string;
+  kind: string;
+  durationMs: number | null;
+}): 'edit' | 'video' {
+  if (video.durationMs === null || video.durationMs > CLIP_MAX_MS) return 'video';
+  if (video.platform === 'upload') return 'edit';
+  return video.kind === 'clip' || video.kind === 'short' ? 'edit' : 'video';
+}
+
+/** What Find Clips says when it is pressed with an empty field (2026-11-19). */
+export function emptyLinkSentence(platforms: readonly ClipPlatformId[]): string {
+  const list = platformList(platforms);
+  return list ? `Paste a video link from ${list}.` : 'Paste a video link first.';
 }
 
 /** Platforms in the order the page draws them. */
