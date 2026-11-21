@@ -22,11 +22,8 @@ import {
 } from '@/lib/clips-api';
 import {
   DELETE_SOUND_SENTENCE,
-  LEVEL_NOTE,
-  MUSIC_NOTE,
   REMOVED_SOUND,
   SOUND_FAVOURITES_EMPTY,
-  SOUND_NOTHING_SELECTED,
   type SoundFileInfo,
 } from './audio-model';
 import { AudioPanel, type AudioPanelProps } from './audio-panel';
@@ -199,20 +196,18 @@ function renderPanel(props: Partial<AudioPanelProps> = {}, playing = false) {
 const lastSearch = () => search.mock.calls.at(-1)?.[0];
 
 describe('the sound lists', () => {
-  it('opens on Sound Effects: effects, the chips with counts, the notes and Credits', async () => {
+  it('opens on Sound Effects: effects, the chips with counts and Credits', async () => {
     renderPanel();
     expect(await screen.findByRole('button', { name: 'Add Quick Whoosh' })).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ q: '', kind: 'sfx', favourites: false, pageSize: 24 });
     expect(categories).toHaveBeenCalledWith('sfx', expect.anything());
     const chips = await screen.findByRole('group', { name: 'Categories' });
     expect(within(chips).getByRole('button', { name: 'Whooshes 40' })).toBeInTheDocument();
-    expect(screen.getByTestId('clip-audio-none')).toHaveTextContent(SOUND_NOTHING_SELECTED);
-    expect(screen.getByText(LEVEL_NOTE)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Credits' })).toHaveAttribute('href', '/credits/clips');
     expect(screen.getAllByTestId('clip-sound-shape').length).toBeGreaterThan(0);
   });
 
-  it('Add hands the sound over; Music lists music with the honest shelf line', async () => {
+  it('Add hands the sound over; Music lists music', async () => {
     const { spy } = renderPanel();
     fireEvent.click(await screen.findByRole('button', { name: 'Add Quick Whoosh' }));
     expect(spy.onAddLibrary).toHaveBeenCalledWith(expect.objectContaining({ id: WHOOSH }));
@@ -225,7 +220,6 @@ describe('the sound lists', () => {
     );
     expect(await screen.findByRole('button', { name: 'Add Calm Bed' })).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ kind: 'music' });
-    expect(screen.getByText(MUSIC_NOTE)).toBeInTheDocument();
   });
 
   it('a chip narrows the search; a search with no match says so and offers the nearest chips', async () => {

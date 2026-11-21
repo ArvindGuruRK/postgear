@@ -35,8 +35,7 @@ import {
 import type { StickerUploadView } from '@postgear/video-engine';
 import { ImageUp, TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { NOTE } from '@/components/studio/panel-ui';
-import { CHECKING, UPLOAD_NOTE, UPLOADS_EMPTY } from './elements-model';
+import { CHECKING, UPLOADS_EMPTY } from './elements-model';
 import { CHECKER, TilePicture } from './sticker-tiles';
 import type { StickerUploads } from './use-sticker-library';
 
@@ -75,7 +74,6 @@ export function UploadedStickers({
         <MotionIcon icon={UploadIcon} className="h-4 w-4" />
         Upload A Sticker
       </Button>
-      <p className={NOTE}>{UPLOAD_NOTE}</p>
 
       {uploads.error ? (
         <Alert variant="danger" className="items-center" data-testid="clip-sticker-refused">

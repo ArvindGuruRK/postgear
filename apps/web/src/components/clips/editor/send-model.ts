@@ -20,11 +20,7 @@ import type { Channel, ProviderSummary } from '@/types/channel';
 import type { ClipExportView } from '@/types/clips';
 
 export const SEND_TITLE = 'Send To Composer';
-export const SEND_HELP =
-  'The composer opens next. You can set the time and the details for each channel there.';
 export const SEND_OUTDATED = 'You changed this clip after the last export.';
-export const SEND_OUTDATED_LINE =
-  'Export it again to send what you see now, or send the version you exported before.';
 export const SEND_NO_CHANNELS = 'Connect a channel to post this clip.';
 export const SEND_CHANNELS_FAILED =
   'We could not load your channels. Check your connection and try again.';

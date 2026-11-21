@@ -69,11 +69,9 @@ export interface StorageMeterView {
   percent: number | null;
   warning: boolean;
   full: boolean;
-  /** Two lines for the tooltip. */
+  /** Lines for the panel (the import minutes left, when known). */
   lines: string[];
 }
-
-export const STORAGE_HELP = 'Videos you bring in count here. Exported clips are in Media.';
 
 /** "Import minutes this month: 120 of 900 left." (or "Unlimited import minutes this month."). */
 export function importMinutesLine(meter: ClipsMeterView | null | undefined): string | null {
@@ -88,7 +86,7 @@ export function importMinutesLine(meter: ClipsMeterView | null | undefined): str
 export function storageMeterView(status: ClipsStatus): StorageMeterView {
   const used = Math.max(0, status.usage?.storageBytes ?? status.storage.usedBytes);
   const limit = status.storage.limitBytes;
-  const lines = [STORAGE_HELP];
+  const lines: string[] = [];
   const minutes = importMinutesLine(status.meters?.importMinutes);
   if (minutes) lines.push(minutes);
 
@@ -416,12 +414,6 @@ export function maxVideoMs(status: ClipsStatus | null): number | null {
   return typeof minutes === 'number' && Number.isFinite(minutes) && minutes >= 0
     ? minutes * 60_000
     : null;
-}
-
-/** "MP4, MOV, MKV or WebM, up to 2 GB". */
-export function uploadHelpLine(status: ClipsStatus | null): string {
-  const max = uploadMaxBytes(status);
-  return max === null ? 'MP4, MOV, MKV or WebM' : `MP4, MOV, MKV or WebM, up to ${formatSize(max)}`;
 }
 
 /**

@@ -99,7 +99,7 @@ export function NameDialog({
         <form onSubmit={submit} noValidate>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
+            <DialogDescription className="sr-only">{description}</DialogDescription>
           </DialogHeader>
 
           <FormField className="mt-5">

@@ -49,8 +49,6 @@ import {
   ELEMENTS_TABS,
   type ElementsTab,
   FAVOURITES_EMPTY,
-  LIBRARY_NOTE,
-  NOTHING_SELECTED,
   noMatchSentence,
   REMOVED_STICKER,
   SEARCH_PLACEHOLDER,
@@ -127,11 +125,7 @@ export function ElementsPanel({
           onAnchor={onAnchor}
           onRemove={onRemove}
         />
-      ) : (
-        <p className={NOTE} data-testid="clip-elements-none">
-          {NOTHING_SELECTED}
-        </p>
-      )}
+      ) : null}
 
       <div className="flex flex-col gap-3">
         {/* Tiles, not a tab bar (2026-11-19): "Uploaded" ran into the frame of a
@@ -159,7 +153,6 @@ export function ElementsPanel({
       </div>
 
       <div className="flex flex-col gap-1 border-t-2 border-outline pt-3">
-        <p className={NOTE}>{LIBRARY_NOTE}</p>
         <Link
           href="/credits/clips"
           target="_blank"

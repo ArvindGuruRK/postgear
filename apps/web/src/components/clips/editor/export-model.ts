@@ -32,7 +32,6 @@ export const PREVIEW_LINE = 'The editor is a fast preview. Preview Export shows 
 export const PREVIEW_SMALLER = 'This preview is a smaller copy. Your export will be sharper.';
 export const PREVIEW_STALE = 'You changed this clip after the last preview.';
 export const OUT_OF_DATE = 'You changed this clip after the last export.';
-export const CLOSE_IS_FINE = 'You can close this. We will tell you when it is ready.';
 /** Module 17: the toast when an export this editor watched is done. */
 export const EXPORT_DONE_SENTENCE = 'Your clip is exported.';
 export const MARK_LINE = 'Exports on this plan carry a small PostGear mark.';

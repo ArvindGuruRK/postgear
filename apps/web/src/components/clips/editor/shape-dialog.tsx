@@ -72,7 +72,7 @@ export function ShapeDialog({
         <DialogHeader>
           {/* No id of our own: the dialog is named by the title's own id. */}
           <DialogTitle>What Do You Want To Make?</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             Pick the shape of your clip. You can change it later in Layouts.
           </DialogDescription>
         </DialogHeader>

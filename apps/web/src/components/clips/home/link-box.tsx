@@ -18,8 +18,8 @@
  * 4. **Browse** buttons, one per platform switched on, side by side: each
  *    opens that platform's saved channels.
  *
- * Try A Sample sits under the card as a quiet line. When the video tools are
- * not running every way in is off (the alert above says why).
+ * When the video tools are not running every way in is off (the alert above
+ * says why). Try A Sample was taken off the page on 2026-11-20.
  */
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
@@ -42,15 +42,11 @@ export function LinkBox({
   probe,
   disabled,
   focusRights,
-  sampleAvailable,
-  sampleBusy,
-  uploadHelp,
   onImported,
   onDownloaded,
   onUpload,
   onDropFiles,
   onBrowse,
-  onSample,
   children,
 }: {
   orgId: string;
@@ -60,9 +56,6 @@ export function LinkBox({
   disabled: boolean;
   /** The link card came from a channel row: put focus on its tick. */
   focusRights: boolean;
-  sampleAvailable: boolean;
-  sampleBusy: boolean;
-  uploadHelp: string;
   onImported: (outcome: ClipImportOutcome) => void;
   /** Module 18: a download was asked for (absent: the card has no Download). */
   onDownloaded?: (outcome: DownloadStarted) => void;
@@ -72,7 +65,6 @@ export function LinkBox({
   onDropFiles?: (files: File[]) => void;
   /** Opens one platform's saved channels; absent, no Browse buttons. */
   onBrowse?: (platform: ClipPlatformId) => void;
-  onSample: () => void;
   /** The upload rows, drawn inside the card under its buttons. */
   children?: React.ReactNode;
 }) {
@@ -200,12 +192,7 @@ export function LinkBox({
           />
         ) : null}
 
-        <UploadArea
-          disabled={disabled}
-          help={uploadHelp}
-          onUpload={onUpload}
-          onDropFiles={onDropFiles}
-        />
+        <UploadArea disabled={disabled} onUpload={onUpload} onDropFiles={onDropFiles} />
 
         {onBrowse && shown.length > 0 ? (
           <div
@@ -235,24 +222,6 @@ export function LinkBox({
 
         {children}
       </section>
-
-      {sampleAvailable ? (
-        <p className="m-0 flex flex-wrap items-center justify-center gap-1 font-sans text-sm text-ink type-muted">
-          No video at hand?
-          <button
-            type="button"
-            disabled={disabled || sampleBusy}
-            onClick={onSample}
-            className={cn(
-              'rounded-sm px-0.5 font-sans text-sm text-ink type-ui underline underline-offset-2',
-              'hover:text-actionPrimary disabled:pointer-events-none disabled:opacity-50',
-              'outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focusRing',
-            )}
-          >
-            {sampleBusy ? 'Bringing In The Sample' : 'Try A Sample'}
-          </button>
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -264,12 +233,10 @@ export function LinkBox({
  */
 function UploadArea({
   disabled,
-  help,
   onUpload,
   onDropFiles,
 }: {
   disabled: boolean;
-  help: string;
   onUpload: () => void;
   onDropFiles?: (files: File[]) => void;
 }) {
@@ -314,7 +281,7 @@ function UploadArea({
         <UploadIcon ref={icon.ref} aria-hidden size={20} className="h-5 w-5 shrink-0" />
         Upload Your Own Video
       </span>
-      <span className="text-xs type-muted">{over ? 'Drop it here to upload.' : help}</span>
+      {over ? <span className="text-xs type-muted">Drop it here to upload.</span> : null}
     </button>
   );
 }

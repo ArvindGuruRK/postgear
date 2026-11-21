@@ -1,6 +1,5 @@
 import { fixtureClipSummary } from '../library/clip-list-fixtures';
 import {
-  AI_NOTE,
   asksFirst,
   findAgainSentence,
   findClipsBlock,
@@ -101,9 +100,9 @@ describe('the confirm', () => {
 });
 
 describe('the notes', () => {
-  it('always says what the AI does, then no sound and nothing found when they apply', () => {
-    expect(findClipsNotes({ noSound: false, run: null }, false)).toEqual([AI_NOTE]);
-    expect(findClipsNotes({ noSound: true, run: null }, false)).toEqual([AI_NOTE, NO_SOUND_NOTE]);
+  it('says no sound and nothing found when they apply, and nothing otherwise', () => {
+    expect(findClipsNotes({ noSound: false, run: null }, false)).toEqual([]);
+    expect(findClipsNotes({ noSound: true, run: null }, false)).toEqual([NO_SOUND_NOTE]);
     const empty = {
       ...run('DONE', 0),
       id: 'r',
@@ -114,12 +113,9 @@ describe('the notes', () => {
       createdAt: '',
       finishedAt: null,
     };
-    expect(findClipsNotes({ noSound: false, run: empty }, false)).toEqual([
-      AI_NOTE,
-      NOTHING_FOUND_NOTE,
-    ]);
+    expect(findClipsNotes({ noSound: false, run: empty }, false)).toEqual([NOTHING_FOUND_NOTE]);
     // Not while a new run is on.
-    expect(findClipsNotes({ noSound: false, run: empty }, true)).toEqual([AI_NOTE]);
+    expect(findClipsNotes({ noSound: false, run: empty }, true)).toEqual([]);
   });
 
   it('names the tracks used once a run found clips', () => {

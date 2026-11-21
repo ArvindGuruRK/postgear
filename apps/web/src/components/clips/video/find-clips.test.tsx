@@ -6,7 +6,7 @@ import { cancelClipJob, startHighlights } from '@/lib/clips-api';
 import type { ClipJobView, ClipSummary, HighlightRunView, HighlightsView } from '@/types/clips';
 import { fixtureClipSummary } from '../library/clip-list-fixtures';
 import { FindClips } from './find-clips';
-import { AI_NOTE, HIGHLIGHTS_FAILED, NO_SOUND_NOTE, NOTHING_FOUND_NOTE } from './find-clips-model';
+import { HIGHLIGHTS_FAILED, NO_SOUND_NOTE, NOTHING_FOUND_NOTE } from './find-clips-model';
 
 jest.mock('next/link', () => ({
   __esModule: true,
@@ -120,7 +120,7 @@ function renderFind(highlights: Partial<HighlightsView> = {}, clips: readonly Cl
 const findButton = () => screen.getByRole('button', { name: /Find Clips \(3 AI Minutes\)/ });
 
 describe('FindClips', () => {
-  it('shows the price, the minutes left and the AI note; a first run starts without asking', async () => {
+  it('shows the price, and the minutes left; a first run starts without asking', async () => {
     start.mockResolvedValue({
       run: run('QUEUED'),
       job: job('job-1', 'QUEUED'),
@@ -129,7 +129,6 @@ describe('FindClips', () => {
     renderFind();
     expect(findButton()).toBeEnabled();
     expect(screen.getByTestId('clips-ai-minutes')).toHaveTextContent('120 of 300 AI minutes left');
-    expect(screen.getByText(AI_NOTE)).toBeInTheDocument();
 
     fireEvent.click(findButton());
     await waitFor(() => expect(start).toHaveBeenCalledWith(VIDEO));

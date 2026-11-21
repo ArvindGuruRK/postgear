@@ -161,7 +161,7 @@ export function AddChannelDialog({
         <form onSubmit={submit} className="flex flex-col gap-5">
           <DialogHeader>
             <DialogTitle>Add A Channel</DialogTitle>
-            <DialogDescription>{ONLY_PUBLIC_LINE}</DialogDescription>
+            <DialogDescription className="sr-only">{ONLY_PUBLIC_LINE}</DialogDescription>
           </DialogHeader>
 
           {shown.length > 1 ? (

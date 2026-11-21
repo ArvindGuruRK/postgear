@@ -34,18 +34,16 @@ import {
   setFitCrop,
 } from '@postgear/video-engine';
 import { useId } from 'react';
-import { GroupLabel, NOTE } from '@/components/studio/panel-ui';
+import { GroupLabel } from '@/components/studio/panel-ui';
 import type { SavedLayoutView } from '@/types/clips';
 import { LayoutDrawing } from './layout-drawing';
 import {
-  CUSTOM_SENTENCE,
   chosenLayout,
   FIT_CROP_CHOICES,
   LAYOUT_SHAPES,
   layoutChoices,
   layoutShapeName,
   presetDrawing,
-  SHAPE_READBACK,
 } from './layouts-model';
 import { SavedLayouts } from './saved-layouts';
 
@@ -112,9 +110,6 @@ export function LayoutsPanel({
             drawing: <ShapeDrawing ratio={shape} />,
           }))}
         />
-        <p className={NOTE} data-testid="clip-shape-readback">
-          {SHAPE_READBACK[ratio]}
-        </p>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -132,11 +127,6 @@ export function LayoutsPanel({
             };
           })}
         />
-        {kind === 'custom' ? (
-          <p className={NOTE} data-testid="clip-layout-custom">
-            {CUSTOM_SENTENCE}
-          </p>
-        ) : null}
         {kind === 'blurred' ? (
           <div className="flex flex-col gap-2" data-testid="clip-crop-ratio">
             <GroupLabel id={fitId}>Crop Ratio</GroupLabel>

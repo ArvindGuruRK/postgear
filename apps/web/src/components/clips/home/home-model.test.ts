@@ -14,13 +14,11 @@ import {
   preflightClipUpload,
   preflightLength,
   refusalExtras,
-  STORAGE_HELP,
   stageLabel,
   storageBreakdown,
   storageMeterView,
   storageOverSentence,
   UPLOAD_NOT_VIDEO,
-  uploadHelpLine,
   uploadTypeOf,
   videoMetaLine,
 } from './home-model';
@@ -64,7 +62,7 @@ describe('storageMeterView', () => {
     expect(view.percent).toBe(17);
     expect(view.warning).toBe(false);
     expect(view.full).toBe(false);
-    expect(view.lines).toEqual([STORAGE_HELP, 'Import minutes this month: 120 of 900 left.']);
+    expect(view.lines).toEqual(['Import minutes this month: 120 of 900 left.']);
   });
 
   it('turns to the warning from 80%', () => {
@@ -103,7 +101,7 @@ describe('storageMeterView', () => {
         aiMinutes: null,
       },
     } as never);
-    expect(storageMeterView(status).lines[1]).toBe('Unlimited import minutes this month.');
+    expect(storageMeterView(status).lines[0]).toBe('Unlimited import minutes this month.');
   });
 });
 
@@ -229,11 +227,6 @@ describe('preflightClipUpload', () => {
       preflightClipUpload({ name: 'a.mp4', type: 'video/mp4', size: 9 * GB }, null),
     ).toBeNull();
   });
-
-  it('describes the cap in the help line', () => {
-    expect(uploadHelpLine(status)).toBe('MP4, MOV, MKV or WebM, up to 2 GB');
-    expect(uploadHelpLine(null)).toBe('MP4, MOV, MKV or WebM');
-  });
 });
 
 describe('preflightLength', () => {
@@ -326,7 +319,9 @@ describe('Module 19: keeping, size and the plan', () => {
       text: 'Removed in 3 days',
       soon: true,
     });
-    expect(keptUntilView(new Date(NOW + 0.5 * DAY).toISOString(), NOW)?.text).toBe('Removed in 1 day');
+    expect(keptUntilView(new Date(NOW + 0.5 * DAY).toISOString(), NOW)?.text).toBe(
+      'Removed in 1 day',
+    );
     expect(keptUntilView(new Date(NOW - DAY).toISOString(), NOW)?.text).toBe('Removed today');
     expect(keptUntilView(null, NOW)).toBeNull();
     expect(keptUntilView('not a date', NOW)).toBeNull();
@@ -346,7 +341,10 @@ describe('Module 19: keeping, size and the plan', () => {
   it('breaks the space down by kind', () => {
     const status = {
       ...storageAt(0, 3_000_000_000),
-      usage: { storageBytes: 0, byKind: { videos: 3_200_000_000, downloads: 120_000_000, library: 4_000_000 } },
+      usage: {
+        storageBytes: 0,
+        byKind: { videos: 3_200_000_000, downloads: 120_000_000, library: 4_000_000 },
+      },
     };
     expect(storageBreakdown(status).map((row) => `${row.label}: ${row.text}`)).toEqual([
       'Videos: 3.2 GB',

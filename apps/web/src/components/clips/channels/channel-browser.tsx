@@ -287,9 +287,7 @@ export function ChannelBrowser({
           />
         ) : (
           <p className="m-0 font-sans text-sm text-ink type-muted">
-            {platform
-              ? `No ${PLATFORM_NAMES[platform]} channels yet. Add one to see its videos.`
-              : null}
+            {platform ? `No ${PLATFORM_NAMES[platform]} channels yet.` : null}
           </p>
         )}
       </div>

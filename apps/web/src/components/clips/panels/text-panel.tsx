@@ -50,7 +50,6 @@ import { WhenItShows } from './when-it-shows';
 
 /** What the panel says when an emoji is left out of a text. */
 export const EMOJI_SENTENCE = 'Emoji are stickers. Add one from Elements.';
-const NOTHING_SELECTED = 'Select a text on the clip or its bar on the timeline to change it.';
 
 /** The fades the panel offers, in and out alike. */
 export const TEXT_FADES = { none: 0, short: 200, long: 500 } as const;
@@ -217,11 +216,6 @@ export function TextPanel({
             drawing: <StyleDrawing style={preset.style} />,
           }))}
         />
-        {item ? null : (
-          <p className={NOTE} data-testid="clip-text-none">
-            {NOTHING_SELECTED}
-          </p>
-        )}
       </div>
 
       {item ? (

@@ -35,14 +35,10 @@ export const EFFECT_CARDS = [
 ] as const;
 export type EffectCard = (typeof EFFECT_CARDS)[number]['value'];
 
-export const ZOOM_DOT_NOTE = 'Drag the dot on the clip to choose where it zooms.';
 export const ZOOM_PICK_NOTE = 'Select a zoom on the timeline to change it.';
 export const ZOOM_GONE_NOTE = 'The clip no longer shows the moment this zoom is on.';
 export const SPEED_PICK_NOTE = 'Select a part of the video on the timeline.';
-export const SPEED_SPLIT_NOTE = 'To change a few seconds only, split the clip first.';
 export const SPEED_ROUGH_NOTE = 'Very slow sound may sound rough.';
-export const LOOK_MATCH_NOTE =
-  'The editor shows a close match. The export may look slightly different.';
 
 export const ZOOM_LIMIT_SENTENCE = `A clip can have at most ${MAX_ZOOMS} zooms.`;
 export const ZOOM_ROOM_SENTENCE = 'There is already a zoom here. Move the playhead first.';

@@ -14,9 +14,10 @@
  *   YouTube open the saved channels of that platform in a dialog, and
  *   `?tab=streams` opens it for every platform.
  *
- * The actions row carries the storage meter and the AI minutes chip on the
- * right (Clips never shows AI credits), and on the left the Simulated sticker
- * on the home, or Back and the list's name on a list. When the video tools
+ * The actions row carries the storage meter on the right (2026-11-20: no
+ * Simulated sticker and no AI minutes chip on the home; the chip lives on a
+ * video's Find Clips panel), and on the left Back and the list's name on a
+ * list. When the video tools
  * are not running, one warning says so and every way in is off; looking at
  * videos still works.
  *
@@ -24,14 +25,13 @@
  * (`useOpenWhenReady`).
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
-import { Alert, Badge, Button, EmptyState, MotionIcon, PageActions, toast } from '@postgear/ui';
+import { Alert, Button, EmptyState, MotionIcon, PageActions, toast } from '@postgear/ui';
 import type { ClipPlatformId } from '@postgear/video-engine';
 import { Lock, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActionLink } from '@/components/home/home-actions';
-import { ApiError } from '@/lib/api';
-import { createWholeClip, downloadOriginal, importSample } from '@/lib/clips-api';
+import { createWholeClip, downloadOriginal } from '@/lib/clips-api';
 import type {
   ClipImportOutcome,
   ClipProbe,
@@ -42,7 +42,7 @@ import type {
 import { BrowseChannelsDialog, LinkCardDialog } from './channels/channel-dialogs';
 import { useChannels } from './channels/use-channels';
 import { CLIPS_TAB_NAMES, type ClipsTab, DEFAULT_CLIPS_TAB } from './clips-model';
-import { AiMinutesChip, StorageMeter } from './home/clips-meters';
+import { StorageMeter } from './home/clips-meters';
 import { ComingUp } from './home/coming-up';
 import { CreateTab } from './home/create-tab';
 import { DOWNLOAD_EXISTS, DOWNLOAD_STARTED, DownloadsTab } from './home/downloads-tab';
@@ -51,7 +51,6 @@ import {
   clipsInPlan,
   storageOverSentence,
   UPLOAD_ACCEPT,
-  uploadHelpLine,
 } from './home/home-model';
 import { ALREADY_HERE } from './home/link-card';
 import { useDownloads } from './home/use-downloads';
@@ -71,8 +70,6 @@ type ClipsView = Exclude<ClipsTab, 'streams'>;
 
 export const TOOLS_DOWN_SENTENCE =
   'Video tools are not running right now. You can look at your videos, but nothing new can be brought in.';
-export const SAMPLE_ALREADY_HERE = 'You already have the sample video.';
-const SAMPLE_UNREACHABLE = 'We could not reach Clips. Check your connection and try again.';
 
 export function videoHref(orgId: string, videoId: string): string {
   return `/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(videoId)}`;
@@ -125,7 +122,6 @@ export function ClipsView({
   const moved = useRef(false);
   const [focusRights, setFocusRights] = useState(false);
   const [streamCard, setStreamCard] = useState<{ url: string; probe: ClipProbe } | null>(null);
-  const [sampleBusy, setSampleBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const toolsOk = status?.tools.state === 'ok';
@@ -234,22 +230,6 @@ export function ClipsView({
     [orgId, probe, refreshStatus, router, videos, openings.follow, setTab],
   );
 
-  const onSample = async () => {
-    if (sampleBusy || disabled) return;
-    setSampleBusy(true);
-    try {
-      const outcome = await importSample();
-      onImported(outcome, outcome.message ?? SAMPLE_ALREADY_HERE);
-    } catch (cause) {
-      toast({
-        title: cause instanceof ApiError && cause.status !== 0 ? cause.message : SAMPLE_UNREACHABLE,
-        variant: 'warning',
-      });
-    } finally {
-      setSampleBusy(false);
-    }
-  };
-
   const openFilePicker = () => {
     if (!disabled) fileInput.current?.click();
   };
@@ -296,7 +276,7 @@ export function ClipsView({
     <div className="flex flex-col gap-5">
       <div ref={top} className="flex flex-wrap items-center justify-between gap-3">
         {tab === 'create' ? (
-          <div>{status?.simulation ? <Badge variant="secondary">Simulated</Badge> : null}</div>
+          <div />
         ) : (
           <div className="flex min-w-0 items-center gap-3">
             <Button
@@ -320,7 +300,6 @@ export function ClipsView({
         )}
         <PageActions>
           {status ? <StorageMeter status={status} onSeeWhatUsesSpace={seeWhatUsesSpace} /> : null}
-          <AiMinutesChip orgId={orgId} fallback={status?.meters.aiMinutes ?? null} />
         </PageActions>
       </div>
 
@@ -368,9 +347,6 @@ export function ClipsView({
           probe={probe}
           disabled={disabled}
           focusRights={focusRights}
-          sampleAvailable={status?.sample?.available ?? false}
-          sampleBusy={sampleBusy}
-          uploadHelp={uploadHelpLine(status)}
           uploads={uploads}
           openings={openings}
           videos={videos}
@@ -381,7 +357,6 @@ export function ClipsView({
           onUpload={openFilePicker}
           onDropFiles={addFiles}
           onBrowse={platforms.length > 0 ? (only) => setBrowse({ open: true, only }) : undefined}
-          onSample={() => void onSample()}
           onAllVideos={() => setTab('videos')}
           onAllDownloads={() => setTab('downloads')}
           onDownloadsSettled={refreshStatus}

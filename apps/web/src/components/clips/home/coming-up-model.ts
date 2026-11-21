@@ -7,8 +7,7 @@ import { dayKey } from '@/components/calendar/calendar-math';
 
 export const COMING_UP_TITLE = 'Coming Up';
 export const COMING_UP_SUB = 'Posts with your clips in the next 14 days.';
-export const COMING_UP_EMPTY =
-  'Nothing scheduled yet. Send a clip to the composer and it will show up here.';
+export const COMING_UP_EMPTY = 'Nothing scheduled yet.';
 export const COMING_UP_FAILED = 'Coming Up did not load. Check your connection and try again.';
 
 /** "Fri 20 Nov, 6:00 pm": when a waiting post goes out; empty for a bad date. */

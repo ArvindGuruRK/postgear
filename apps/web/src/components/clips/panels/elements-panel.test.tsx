@@ -24,7 +24,6 @@ import {
 import {
   FAVOURITES_EMPTY,
   MISSING_FILE,
-  NOTHING_SELECTED,
   REMOVED_STICKER,
   type StickerFileInfo,
   UPLOAD_GONE,
@@ -184,7 +183,7 @@ function renderPanel(props: Partial<ElementsPanelProps> = {}) {
 const lastSearch = () => search.mock.calls.at(-1)?.[0];
 
 describe('the library tabs', () => {
-  it('opens on Stickers: still pictures, the chips with counts, the Follow Badge tile, and the note', async () => {
+  it('opens on Stickers: still pictures, the chips with counts, the Follow Badge tile and Credits', async () => {
     renderPanel();
     expect(await screen.findByRole('button', { name: 'Add Gold Star' })).toBeInTheDocument();
     expect(lastSearch()).toMatchObject({ q: '', kind: 'static', favourites: false, pageSize: 24 });
@@ -195,7 +194,6 @@ describe('the library tabs', () => {
       'false',
     );
     expect(screen.getByRole('button', { name: 'Follow Badge' })).toBeInTheDocument();
-    expect(screen.getByTestId('clip-elements-none')).toHaveTextContent(NOTHING_SELECTED);
     expect(screen.getByRole('link', { name: 'Credits' })).toHaveAttribute('href', '/credits/clips');
   });
 

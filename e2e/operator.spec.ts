@@ -3,6 +3,7 @@ import {
   API_URL,
   DEMO_EMAIL,
   DEMO_ORG,
+  entitlements,
   getJson,
   MEMBER_EMAIL,
   prisma,
@@ -16,7 +17,7 @@ import { pickDate } from './helpers/date-picker';
 /**
  * The operator screen (Sprint 12, Module 19; Module 20 section 3): a plan
  * value edited with a reason reaches a Free workspace's Clips page and the
- * Change Log; an override changes one workspace's chip and goes away again;
+ * Change Log; an override changes one workspace's AI minutes and goes away again;
  * a member who is not an operator gets the 404 page.
  *
  * The demo user is the operator (`isSuperAdmin`). One sign-in for it and one
@@ -205,13 +206,12 @@ test('1. A Free plan value edited with a reason reaches the Free workspace and t
   await expect(row).toContainText('Free');
 });
 
-test('2. An override changes the workspace chip; removed, the plan value returns', async () => {
-  const chip = freePage.getByTestId('clips-ai-minutes');
-  let planLimit = 0;
-  await onFreeClipsPage(async () => {
-    await expect(chip).toContainText('AI minutes left', { timeout: 5_000 });
-    planLimit = Number(/of ([\d,]+) AI/.exec(await chip.innerText())?.[1]?.replace(/,/g, ''));
-  });
+test('2. An override changes the workspace AI minutes; removed, the plan value returns', async () => {
+  // The Clips home no longer carries the AI minutes chip (2026-11-20), so the
+  // Free workspace's limit is read from its plan snapshot, the chip's source.
+  const freeAiLimit = async () =>
+    (await entitlements(free.request)).meters[AI_KEY]?.limit ?? Number.NaN;
+  const planLimit = await freeAiLimit();
   expect(planLimit).toBeGreaterThan(0);
   const overrideLimit = planLimit + 15;
 
@@ -249,14 +249,7 @@ test('2. An override changes the workspace chip; removed, the plan value returns
   await expect(page.getByText('The override is live for this workspace.')).toBeVisible();
   await expect(aiRow).toContainText('Override');
 
-  await onFreeClipsPage(async () => {
-    await expect(chip).toContainText(
-      `of ${overrideLimit.toLocaleString('en-GB')} AI minutes left`,
-      {
-        timeout: 5_000,
-      },
-    );
-  });
+  await expect.poll(freeAiLimit, { timeout: 45_000 }).toBe(overrideLimit);
 
   const overrideRow = page
     .getByRole('region', { name: 'Overrides' })
@@ -273,11 +266,7 @@ test('2. An override changes the workspace chip; removed, the plan value returns
   ).toBeVisible();
   await expect(aiRow).toContainText('Plan');
 
-  await onFreeClipsPage(async () => {
-    await expect(chip).toContainText(`of ${planLimit.toLocaleString('en-GB')} AI minutes left`, {
-      timeout: 5_000,
-    });
-  });
+  await expect.poll(freeAiLimit, { timeout: 45_000 }).toBe(planLimit);
 });
 
 test('3. A member who is not an operator gets the 404 page at /operator', async ({ browser }) => {

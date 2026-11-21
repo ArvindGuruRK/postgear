@@ -7,17 +7,16 @@
  */
 import {
   type ClipPlatformId,
-  linkRefForListedItem,
   type ListKind,
   type ListPeriod,
   type ListSort,
+  linkRefForListedItem,
   MAX_LIST_ITEMS,
   PLATFORM_LIST_KINDS,
 } from '@postgear/video-engine';
 import type { ClipChannelView, ClipStreamItem } from '@/types/clips';
 
-export const CONNECT_SENTENCE =
-  'Add the name of a Twitch, YouTube or Kick channel. We list its public videos and clips so you can import one with a click.';
+export const CONNECT_SENTENCE = 'No channels yet.';
 export const ONLY_PUBLIC_LINE =
   'Only public videos are listed. Nothing is downloaded until you import one.';
 export const EMPTY_CHANNEL = 'This channel has no public videos yet.';

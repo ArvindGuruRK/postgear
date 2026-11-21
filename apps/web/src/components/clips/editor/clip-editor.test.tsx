@@ -260,11 +260,8 @@ describe('ClipEditor frame', () => {
     expect(screen.getByTestId('clip-panel-export')).toHaveTextContent('Export Clip');
   });
 
-  it('says what each tab is for, and folds the panel away and back', () => {
+  it('folds the panel away and back', () => {
     renderEditor();
-    expect(screen.getByTestId('clip-editor-panel')).toHaveAccessibleDescription(
-      "Pick the clip's shape and how the video fills it.",
-    );
     fireEvent.click(screen.getByTestId('clip-panel-hide'));
     expect(screen.queryByTestId('clip-editor-panel')).toBeNull();
     // Show Panel in the head row brings it back on the same tab.
@@ -544,7 +541,7 @@ describe('effects in the editor', () => {
     expect(lastDocument().segments.map((segment) => segment.speed)).toEqual([1, 1]);
   });
 
-  it('a look, its strength and the fades go on the whole clip; Preview Export opens Export', () => {
+  it('a look, its strength and the fades go on the whole clip', () => {
     renderEditor();
     fireEvent.click(screen.getByTestId('clip-tab-effects'));
     fireEvent.click(within(panel()).getByRole('button', { name: /^Looks/ }));
@@ -552,8 +549,6 @@ describe('effects in the editor', () => {
     expect(lastDocument().looks).toEqual({ colour: 'black_white', strength: 1, vignette: 0 });
     fireEvent.click(screen.getByRole('switch', { name: 'Fade Out' }));
     expect(lastDocument().fades).toEqual({ inMs: 0, outMs: 1_000 });
-    fireEvent.click(screen.getByRole('button', { name: 'Preview Export' }));
-    expect(panelTitle()).toHaveTextContent('Export');
   });
 });
 

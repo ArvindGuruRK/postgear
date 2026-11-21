@@ -57,16 +57,6 @@ export const EDITOR_TAB_NAMES: Readonly<Record<EditorTab, string>> = Object.free
   export: 'Export',
 });
 
-/** One sentence under each panel's name: what the tab is for (2026-11-19). */
-export const EDITOR_TAB_LINES: Readonly<Record<EditorTab, string>> = Object.freeze({
-  layouts: "Pick the clip's shape and how the video fills it.",
-  elements: 'Add stickers, GIFs and a follow badge on top of the clip.',
-  text: 'Put words on the clip in one of three styles.',
-  effects: 'Zoom in, change the speed, the colour and the fades.',
-  audio: "Set the video's volume and add music or sound effects.",
-  export: 'Choose the quality, then make the video file.',
-});
-
 export const DEFAULT_EDITOR_TAB: EditorTab = 'layouts';
 
 /** The tab before or after `tab` (Back and Next at the panel's foot), or null at either end. */

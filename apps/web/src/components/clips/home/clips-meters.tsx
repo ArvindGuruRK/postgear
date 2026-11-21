@@ -9,18 +9,20 @@ import {
   Progress,
   TooltipHint,
 } from '@postgear/ui';
-import { HardDrive, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 /**
- * The two gauges in the Clips actions row (Sprint 12, Module 06; blueprint
- * section 2): how much video space the workspace uses, and how many AI
- * minutes are left this month.
+ * Two Clips gauges (Sprint 12, Module 06; blueprint section 2): how much
+ * video space the workspace uses, and how many AI minutes are left this month.
  *
- * - `StorageMeter`: a small bar with "12.4 GB of 50 GB". The limit is the
- *   one the API resolved for this workspace (`status.storage.limitBytes`),
- *   so an operator's edit shows on the next status read. The warning colour
- *   starts at 80%; the bar's own danger colour takes over at 90%.
- * - `AiMinutesChip`: "38 of 300 AI minutes left", read from the plan
+ * - `StorageMeter`, in the Clips actions row: one large bar with "12.4 GB of
+ *   50 GB used" inside it (2026-11-20: no heading or size line above it). The
+ *   limit is the one the API resolved for this workspace
+ *   (`status.storage.limitBytes`), so an operator's edit shows on the next
+ *   status read. The warning colour starts at 80%; the bar's own danger
+ *   colour takes over at 90%.
+ * - `AiMinutesChip`, on a video's Find Clips panel only (taken off the Clips
+ *   home 2026-11-20): "38 of 300 AI minutes left", read from the plan
  *   snapshot (`GET /entitlements/me`, meter `clips.ai_minutes_per_month`),
  *   falling back to the status route's copy until the snapshot arrives. It
  *   never mentions credits: those are for text and image AI elsewhere.
@@ -39,6 +41,11 @@ export const AI_MINUTES_METER = 'clips.ai_minutes_per_month';
 
 const CHIP =
   'inline-flex items-center gap-1.5 rounded-full border-2 border-outline bg-clip-padding px-2.5 py-1 font-sans text-xs font-bold tabular-nums outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing';
+
+/** The words inside the bar: "127 MB of 50 GB used" (the unlimited text already ends in "used"). */
+function storageLabel(text: string): string {
+  return text.endsWith(' used') ? text : `${text} used`;
+}
 
 function TooltipLines({ lines }: { lines: readonly string[] }) {
   return (
@@ -75,29 +82,17 @@ export function StorageMeter({
           data-warning={view.warning || undefined}
           aria-label={`Video space: ${view.text}. Show what uses it.`}
           className={cn(
-            'flex w-56 cursor-pointer flex-col gap-1.5 rounded-md text-left outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
+            'flex w-80 cursor-pointer rounded-full text-left outline-none focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing',
             className,
           )}
         >
-          <span className="flex w-full items-center justify-between gap-2 font-sans text-xs text-ink">
-            <span className="inline-flex items-center gap-1.5 font-bold">
-              <HardDrive className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
-              Video Space
-            </span>
-            <span
-              className={cn('tabular-nums', view.full ? 'font-bold text-dangerInk' : 'muted-tone')}
-            >
-              {view.text}
-            </span>
-          </span>
-          {view.percent !== null ? (
-            <Progress
-              value={view.percent}
-              tone={view.percent >= 90 ? 'danger' : tone}
-              size="sm"
-              aria-hidden="true"
-            />
-          ) : null}
+          <Progress
+            value={view.percent ?? 0}
+            tone={view.percent !== null && view.percent >= 90 ? 'danger' : tone}
+            size="lg"
+            label={<span className="tabular-nums">{storageLabel(view.text)}</span>}
+            aria-hidden="true"
+          />
         </button>
       </PopoverTrigger>
       <PopoverContent

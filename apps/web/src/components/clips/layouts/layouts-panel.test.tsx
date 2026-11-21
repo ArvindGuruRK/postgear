@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import { ApiError } from '@/lib/api';
 import type { SavedLayoutView } from '@/types/clips';
-import { CUSTOM_SENTENCE, firstCropOf, SAVED_LAYOUTS_FAILED } from './layouts-model';
+import { firstCropOf, SAVED_LAYOUTS_FAILED } from './layouts-model';
 import { type LayoutEdit, LayoutsPanel } from './layouts-panel';
 
 jest.mock('@/lib/clips-api', () => ({
@@ -118,9 +118,6 @@ describe('LayoutsPanel: shape and layouts', () => {
     );
     // Each tile carries a drawing of its own layout.
     expect(document.querySelectorAll('[data-layout-drawing]').length).toBe(7);
-    expect(screen.getByTestId('clip-shape-readback')).toHaveTextContent(
-      'Vertical 9:16, for TikTok, Shorts and Reels.',
-    );
   });
 
   it('applies a layout as one step, and says it', async () => {
@@ -145,7 +142,6 @@ describe('LayoutsPanel: shape and layouts', () => {
     // Split is not offered there, so the clip falls back to Blurred.
     expect(state.doc.layout.kind).toBe('blurred');
     expect(tiles().map((t) => t.textContent)).toEqual(['Fullscreen', 'Blurred']);
-    expect(screen.getByTestId('clip-shape-readback')).toHaveTextContent('Horizontal 16:9');
     await waitFor(() =>
       expect(api.listLayouts).toHaveBeenLastCalledWith('16:9', expect.anything()),
     );
@@ -172,13 +168,12 @@ describe('LayoutsPanel: shape and layouts', () => {
     await screen.findByText(/No saved layouts/);
   });
 
-  it('says when the layout is custom, and marks no tile', async () => {
+  it('marks no tile when the layout is custom', async () => {
     const custom: ClipDocument = {
       ...applyLayout(clip(), 'split', VIDEO_SIZE),
     };
     custom.layout = { ...custom.layout, kind: 'custom', base: 'solid' };
     renderPanel(custom);
-    expect(screen.getByTestId('clip-layout-custom')).toHaveTextContent(CUSTOM_SENTENCE);
     for (const tile of tiles()) expect(tile).toHaveAttribute('aria-pressed', 'false');
     await screen.findByText(/No saved layouts/);
   });

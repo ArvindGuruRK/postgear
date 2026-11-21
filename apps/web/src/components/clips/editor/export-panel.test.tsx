@@ -12,7 +12,6 @@ import {
 } from '@/lib/clips-api';
 import type { ClipExportView, ClipJobView, ClipPreviewView, ClipSharpState } from '@/types/clips';
 import {
-  CLOSE_IS_FINE,
   EXPORT_FAILED_SENTENCE,
   EXPORT_UNSAVED_SENTENCE,
   goneItems,
@@ -220,7 +219,6 @@ describe('starting an export', () => {
     const progress = await screen.findByTestId('clip-export-progress');
     expect(progress).toHaveTextContent('Drawing the frames');
     expect(progress).toHaveTextContent('About 3 minutes left');
-    expect(progress).toHaveTextContent(CLOSE_IS_FINE);
     cancel.mockResolvedValue(undefined as never);
     fireEvent.click(within(progress).getByRole('button', { name: 'Cancel Export' }));
     await waitFor(() => expect(cancel).toHaveBeenCalledWith('e1'));

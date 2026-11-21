@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { LATER_PANEL_SENTENCE } from './clip-editor-model';
-import { EDITOR_TAB_LINES, EDITOR_TAB_NAMES, type EditorTab, stepTab } from './editor-state';
+import { EDITOR_TAB_NAMES, type EditorTab, stepTab } from './editor-state';
 
 /** The placeholder's mark: the rail's picture, still (decorative). */
 const PLACEHOLDER_ICONS: Readonly<Record<EditorTab, LucideIcon>> = {
@@ -67,12 +67,10 @@ export function EditorPanel({
   const back = stepTab(tab, -1);
   const next = stepTab(tab, 1);
   const headingId = panelHeadingId(tab);
-  const lineId = `${headingId}-line`;
 
   return (
     <section
       aria-labelledby={headingId}
-      aria-describedby={lineId}
       data-testid="clip-editor-panel"
       className="flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-outline bg-chrome shadow-surfaceMd 2xl:w-96"
     >
@@ -81,9 +79,6 @@ export function EditorPanel({
           <h2 id={headingId} className="m-0 font-sans text-lg text-ink type-heading">
             {EDITOR_TAB_NAMES[tab]}
           </h2>
-          <p id={lineId} className="m-0 font-sans text-sm text-ink type-muted">
-            {EDITOR_TAB_LINES[tab]}
-          </p>
         </div>
         {onHide ? (
           <TooltipHint label="Hide Panel" side="bottom">

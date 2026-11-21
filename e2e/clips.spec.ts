@@ -13,11 +13,9 @@ import {
   type ClipsRun,
   cleanUpClipsRun,
   createClipApi,
-  createFreeWorkspace,
   DEMO_EMAIL,
   DEMO_ORG,
   deleteWorkspace,
-  demoUserId,
   frameDifference,
   getJson,
   getVideo,
@@ -40,7 +38,7 @@ import {
 } from './helpers/clips';
 
 /**
- * Sprint 12 Clips, end to end (Module 20 section 3): the eighteen journeys,
+ * Sprint 12 Clips, end to end (Module 20 section 3): the journeys,
  * numbered as the module document lists them, on the simulation only (the
  * guide's section 5p links, the local sample files, the recorded fixtures).
  * Nothing is published or scheduled: test 11 opens the composer on the
@@ -48,8 +46,7 @@ import {
  *
  * One sign-in for the whole file (the API runs with the normal login
  * throttle): the demo user's session is copied into a second context that
- * works in the Free workspace (`seed-second-org`) and, for Try A Sample, a
- * third that works in a throwaway Free workspace made in Postgres.
+ * works in the Free workspace (`seed-second-org`).
  *
  * Serial on purpose: the tests share one upload, one clip and its single
  * 720p export (the only full render the file makes, plus one Preview Export).
@@ -68,7 +65,6 @@ let context: BrowserContext;
 let page: Page;
 let second: BrowserContext;
 let pageB: Page;
-let third: BrowserContext | null = null;
 const run: ClipsRun = newClipsRun();
 
 /** What the tests hand to each other. */
@@ -82,7 +78,6 @@ const shared = {
   exportMediaId: '',
   exportName: '',
   exportUrl: '',
-  sampleOrg: '',
 };
 
 /** Ten minute simulation streams, the guide's Twitch sample first. */
@@ -222,7 +217,6 @@ test.afterAll(async () => {
     [DEMO_ORG]: context.request,
     [SECOND_ORG]: second.request,
   };
-  if (third && shared.sampleOrg) requests[shared.sampleOrg] = third.request;
 
   // Anything the run uploaded under its own name, even when a test stopped early.
   const strays = await prisma.clipVideo.findMany({
@@ -242,7 +236,6 @@ test.afterAll(async () => {
   console.log(`[clips cleanup] ${JSON.stringify(left)}`);
   if (problems.length > 0) console.log(`[clips cleanup] problems: ${problems.join('; ')}`);
 
-  await third?.close();
   await second.close();
   await context.close();
 
@@ -403,13 +396,13 @@ test('5. The video page plays, marks with I and O, and creates a clip', async ()
 });
 
 test('6. Find Clips shows its price, its steps, scored clips and a flag; the AI chip drops by it', async () => {
-  await page.goto(clipsHome());
-  const chip = page.getByTestId('clips-ai-minutes');
+  // The AI minutes chip sits under Find Clips on the video page (it left the Clips home 2026-11-20).
+  const videoPage = `/${DEMO_ORG}/clips/video/${shared.uploadVideoId}`;
+  await page.goto(videoPage);
+  const find = page.getByTestId('find-clips');
+  const chip = find.getByTestId('clips-ai-minutes');
   await expect(chip).toContainText('AI minutes left', { timeout: 30_000 });
   const before = parseAiChip(await chip.innerText());
-
-  await page.goto(`/${DEMO_ORG}/clips/video/${shared.uploadVideoId}`);
-  const find = page.getByTestId('find-clips');
   const button = find.getByRole('button', { name: /^Find Clips \(\d+ AI Minutes?\)$/ });
   await expect(button).toBeVisible({ timeout: 30_000 });
   const price = Number(/\((\d+) AI/.exec(await button.innerText())?.[1]);
@@ -433,9 +426,9 @@ test('6. Find Clips shows its price, its steps, scored clips and a flag; the AI 
   await expect(found.getByTestId('video-clip-score').first()).toHaveText(/\d/);
   await expect(page.getByTestId('timeline-ai-flag').first()).toBeVisible();
 
-  await page.goto(clipsHome());
+  await page.goto(videoPage);
   await expect
-    .poll(async () => parseAiChip(await page.getByTestId('clips-ai-minutes').innerText()).left, {
+    .poll(async () => parseAiChip(await chip.innerText()).left, {
       timeout: 30_000,
     })
     .toBe(before.left - price);
@@ -1028,52 +1021,6 @@ test('17. Preview Export renders low resolution and plays; it agrees with the 72
   // The footer's Close (the corner X is named Close too).
   await dialog.getByRole('button', { name: 'Close', exact: true }).first().click();
   await expect(dialog).toBeHidden();
-});
-
-test('18. Try A Sample imports with no tick; pressed again it says the video is already there', async ({
-  browser,
-}) => {
-  // A fresh Free workspace for the demo user: both seeded workspaces already have the sample.
-  const orgId = await createFreeWorkspace(await demoUserId(), `E2E Clips Sample ${RUN}`);
-  run.workspaces.push(orgId);
-  shared.sampleOrg = orgId;
-  third = await browser.newContext({
-    viewport: VIEWPORT,
-    storageState: await context.storageState(),
-  });
-  await switchOrg(third.request, orgId);
-  const pageC = await third.newPage();
-
-  await pageC.goto(clipsHome(orgId));
-  await linkBox(pageC);
-  // Try A Sample is the quiet line under the entry card, not one of its buttons.
-  const sample = pageC.getByRole('button', { name: 'Try A Sample', exact: true });
-  const first = answer(pageC, 'POST', '/clips/videos');
-  await sample.click();
-  const response = await first;
-  expect(response.status(), await response.text()).toBe(201);
-  expect(((await response.json()) as { existing: boolean }).existing).toBe(false);
-  expect(response.request().postDataJSON()).toEqual({ sample: true });
-  const { video } = (await response.json()) as { video: { id: string } };
-  run.videos.push({ org: orgId, id: video.id });
-  // The home stays until the sample is ready, then opens where it belongs.
-  await expect(pageC.getByTestId('clips-opening-row')).toBeVisible();
-  await expect(pageC).toHaveURL(new RegExp(`/${orgId}/clips/(video|edit)/`), { timeout: 90_000 });
-  if (pageC.url().includes('/clips/edit/')) {
-    run.clips.push({ org: orgId, id: new URL(pageC.url()).pathname.split('/').pop() ?? '' });
-  }
-
-  await pageC.goto(clipsHome(orgId));
-  await linkBox(pageC);
-  const again = answer(pageC, 'POST', '/clips/videos');
-  await pageC.getByRole('button', { name: 'Try A Sample', exact: true }).click();
-  const secondAnswer = await again;
-  expect(secondAnswer.status()).toBe(200);
-  expect(((await secondAnswer.json()) as { existing: boolean }).existing).toBe(true);
-  await expect(pageC.getByText(SENTENCES.sampleAlreadyHere, { exact: true })).toBeVisible();
-  await expect(pageC).toHaveURL(new RegExp(`/${orgId}/clips/video/${video.id}`), {
-    timeout: 30_000,
-  });
 });
 
 function escapeRegExp(text: string): string {

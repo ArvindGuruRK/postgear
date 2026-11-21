@@ -43,7 +43,7 @@ export function BrowseChannelsDialog({
       <DialogContent className="flex max-h-[min(860px,calc(100vh-4rem))] max-w-4xl flex-col gap-5 overflow-hidden">
         <DialogHeader>
           <DialogTitle>{only ? `Browse ${PLATFORM_NAMES[only]}` : 'Browse Channels'}</DialogTitle>
-          <DialogDescription>{ONLY_PUBLIC_LINE}</DialogDescription>
+          <DialogDescription className="sr-only">{ONLY_PUBLIC_LINE}</DialogDescription>
         </DialogHeader>
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
           {open ? (

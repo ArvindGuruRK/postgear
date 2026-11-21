@@ -12,13 +12,7 @@ import { useState } from 'react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import type { EditorSelection } from '../editor/editor-state';
 import { PlaybackStore } from '../editor/playback';
-import {
-  LOOK_MATCH_NOTE,
-  SPEED_PICK_NOTE,
-  SPEED_ROUGH_NOTE,
-  SPEED_SPLIT_NOTE,
-  ZOOM_DOT_NOTE,
-} from './effects-model';
+import { SPEED_PICK_NOTE, SPEED_ROUGH_NOTE } from './effects-model';
 import { EffectsPanel } from './effects-panel';
 
 const VIDEO = '3f2a9c1e-0000-4000-8000-000000000003';
@@ -58,7 +52,6 @@ interface Spy {
   speed: Array<[string, number]>;
   looks: Array<[object, string | undefined]>;
   fades: object[];
-  exported: number;
 }
 
 /** The panel over a document, applying each change as the editor does. */
@@ -106,9 +99,6 @@ function Harness({ selection, spy }: { selection: EditorSelection; spy: Spy }) {
           spy.fades.push(change);
           setDoc((current) => ({ ...current, fades: { ...current.fades, ...change } }));
         }}
-        onPreviewExport={() => {
-          spy.exported += 1;
-        }}
       />
       <output data-testid="doc">{JSON.stringify(doc)}</output>
     </TooltipProvider>
@@ -124,7 +114,6 @@ function setup(selection: EditorSelection = null) {
     speed: [],
     looks: [],
     fades: [],
-    exported: 0,
   };
   const view = render(<Harness selection={selection} spy={spy} />);
   const doc = (): ClipDocument => JSON.parse(screen.getByTestId('doc').textContent ?? '{}');
@@ -163,7 +152,6 @@ describe('EffectsPanel cards', () => {
           speed: [],
           looks: [],
           fades: [],
-          exported: 0,
         }}
       />,
     );
@@ -185,7 +173,6 @@ describe('the Zoom card', () => {
     const { spy, doc } = setup({ kind: 'zoom', id: 'z1' });
     const zone = screen.getByTestId('clip-selected-zoom');
     expect(within(zone).getByText('1.5x')).toBeInTheDocument();
-    expect(within(zone).getByText(ZOOM_DOT_NOTE)).toBeInTheDocument();
 
     const amount = screen.getByRole('slider', { name: 'Amount' });
     expect(amount).toHaveAttribute('aria-valuetext', '1.5x');
@@ -220,7 +207,6 @@ describe('the Speed Control card', () => {
     const segmentId = clip().segments[0]?.id ?? '';
     const { spy } = setup({ kind: 'segment', id: segmentId });
     expect(screen.getByTestId('clip-speed-length')).toHaveTextContent('This part is 30.0 s long.');
-    expect(screen.getByText(SPEED_SPLIT_NOTE)).toBeInTheDocument();
     expect(screen.queryByText(SPEED_ROUGH_NOTE)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '2x' }));
@@ -290,13 +276,5 @@ describe('the Looks card', () => {
     expect(doc().fades).toEqual({ inMs: 2_000, outMs: 1_000 });
     fireEvent.click(screen.getByRole('switch', { name: 'Fade In' }));
     expect(doc().fades).toEqual({ inMs: 0, outMs: 1_000 });
-  });
-
-  it('says the editor is a close match, with Preview Export one press away', () => {
-    const { spy, card } = setup();
-    fireEvent.click(card('Looks'));
-    expect(screen.getByText(LOOK_MATCH_NOTE, { exact: false })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview Export' }));
-    expect(spy.exported).toBe(1);
   });
 });

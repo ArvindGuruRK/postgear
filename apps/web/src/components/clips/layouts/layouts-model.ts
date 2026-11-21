@@ -45,14 +45,6 @@ export function layoutShapeName(ratio: Ratio): string {
   return RATIO_LABELS[ratio];
 }
 
-/** The line under the shape switch, naming the shape in full and what it is for. */
-export const SHAPE_READBACK: Readonly<Record<Ratio, string>> = Object.freeze({
-  '9:16': 'Vertical 9:16, for TikTok, Shorts and Reels.',
-  '16:9': 'Horizontal 16:9, for YouTube.',
-  '1:1': 'Square 1:1, for feeds.',
-  '4:5': 'Portrait 4:5, for Instagram and Facebook feeds.',
-});
-
 /** The layouts a shape offers, with their names: seven, or two for Horizontal. */
 export function layoutChoices(ratio: Ratio): Array<{ kind: PresetKind; label: string }> {
   return layoutsFor(ratio).map((kind) => ({ kind, label: PRESET_LABELS[kind] }));
@@ -65,8 +57,6 @@ export const FIT_CROP_CHOICES: ReadonlyArray<{ value: FitCrop; label: string }> 
   { value: '1:1', label: '1:1' },
 ];
 
-/** The line under the tiles once the crops no longer follow a preset. */
-export const CUSTOM_SENTENCE = 'Custom layout, arranged by hand. Pick a layout to start again.';
 /** Add Crop's reason when the layout is full. */
 export const CROP_LIMIT_SENTENCE = `A layout can have at most ${MAX_AREAS} crops.`;
 /** Remove's reason on the last crop. */

@@ -51,14 +51,10 @@ export const STICKERS_PAGE = 24;
 export const SEARCH_PLACEHOLDER = 'Enter your search';
 export const FAVOURITES_EMPTY = 'No favourites yet. Star a sticker to keep it here.';
 export const UPLOADS_EMPTY = 'No stickers of your own yet. Upload a PNG, GIF or WebP.';
-export const UPLOAD_NOTE = 'PNG, GIF or WebP, up to 8 MB. Only your workspace sees them.';
-export const LIBRARY_NOTE = 'Our library is free-to-use art, so it has no film or meme clips.';
 export const REMOVED_STICKER = 'This sticker was removed from the library.';
 export const UPLOAD_GONE = 'This sticker was deleted from your workspace.';
 export const LOAD_FAILED = 'We could not load the stickers. Try again in a moment.';
 export const CHECKING = 'Checking';
-export const NOTHING_SELECTED =
-  'Pick a sticker to add it at the playhead, or select one on the clip to change it.';
 export const TOO_MANY_STICKERS = `A clip holds up to ${MAX_STICKERS} stickers. Remove one to add another.`;
 
 /** The sentence for a search that found nothing. */

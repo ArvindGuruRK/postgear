@@ -25,7 +25,7 @@ import {
 } from '../library/clip-actions';
 import { HAND_MADE_GROUP, orderClips, reasonLabels, scoreText } from './find-clips-model';
 
-export const NO_CLIPS_YET = 'No clips yet. Mark a part with I and O, then press Create Clip.';
+export const NO_CLIPS_YET = 'No clips yet.';
 
 export function clipFacts(clip: Pick<ClipSummary, 'durationMs' | 'ratio'>): string {
   return `${formatClipLength(clip.durationMs)}, ${clip.ratio}`;

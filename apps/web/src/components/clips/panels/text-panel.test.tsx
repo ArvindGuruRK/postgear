@@ -68,7 +68,6 @@ function setup(initial: TextItem | null = newText(), extra: Partial<TextPanelPro
 describe('TextPanel', () => {
   it('with nothing selected, Add Text and a style tile each add a text', () => {
     const { spy } = setup(null);
-    expect(screen.getByTestId('clip-text-none')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
     fireEvent.click(screen.getByRole('button', { name: 'Plain' }));
     expect(spy.added).toEqual(['bold-outline', 'plain']);

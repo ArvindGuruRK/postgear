@@ -42,7 +42,6 @@ export const SENTENCES = {
     'We can only read YouTube, Twitch and Kick links for now. You can upload the file instead.',
   rights: 'This video is mine, or I have permission to use it.',
   alreadyHere: 'You already have this video.',
-  sampleAlreadyHere: 'You already have the sample video.',
   biggerScreen: 'Clips is made for a bigger screen. Open it on a laptop or desktop.',
   outOfDate: 'You changed this clip after the last export.',
   oneChannel: 'Your plan allows 1 channel. Remove one to add another.',

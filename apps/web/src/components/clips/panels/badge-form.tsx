@@ -143,7 +143,7 @@ export function BadgeFormDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Add Follow Badge</DialogTitle>
-          <DialogDescription>{BADGE_FORM_SENTENCE}</DialogDescription>
+          <DialogDescription className="sr-only">{BADGE_FORM_SENTENCE}</DialogDescription>
         </DialogHeader>
         <form
           className="mt-5 flex flex-col gap-4"

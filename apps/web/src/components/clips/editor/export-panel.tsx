@@ -72,7 +72,6 @@ import type { ClipExportView, ClipPreviewView, ClipSharpState } from '@/types/cl
 import { isTerminalJob } from '../clip-job-model';
 import { type ClipJobState, useClipJob } from '../use-clip-job';
 import {
-  CLOSE_IS_FINE,
   changedSince,
   EXPORT_FAILED_SENTENCE,
   EXPORT_UNREACHABLE_SENTENCE,
@@ -448,7 +447,6 @@ export function ExportPanel({
           <MotionIcon icon={PlayIcon} className="h-4 w-4" />
           Preview Export
         </Button>
-        <p className={NOTE}>{PREVIEW_LINE}</p>
       </div>
 
       {state.problem ? (
@@ -466,7 +464,6 @@ export function ExportPanel({
           </div>
           <Progress value={live.progress} aria-label={live.stageLabel} />
           {timeLeft(live.etaSeconds) ? <p className={NOTE}>{timeLeft(live.etaSeconds)}</p> : null}
-          <p className={NOTE}>{CLOSE_IS_FINE}</p>
           <Button
             variant="secondary"
             size="sm"
@@ -655,7 +652,9 @@ function PreviewDialog({
       <DialogContent className="max-w-xl" data-testid="clip-preview-dialog">
         <DialogHeader>
           <DialogTitle>Preview Export</DialogTitle>
-          <DialogDescription>{ready ? PREVIEW_SMALLER : PREVIEW_LINE}</DialogDescription>
+          <DialogDescription className="sr-only">
+            {ready ? PREVIEW_SMALLER : PREVIEW_LINE}
+          </DialogDescription>
         </DialogHeader>
 
         {preview.problem ? (

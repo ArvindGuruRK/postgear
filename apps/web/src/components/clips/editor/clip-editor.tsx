@@ -1553,7 +1553,6 @@ export function ClipEditor({
         onSpeed={speedPart}
         onLooks={editLooks}
         onFades={editFades}
-        onPreviewExport={() => setTab('export')}
       />
     ) : state.tab === 'text' ? (
       <TextPanel

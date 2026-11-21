@@ -35,13 +35,7 @@ import {
 import type { SoundUploadView } from '@postgear/video-engine';
 import { FileAudio, TriangleAlert } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { NOTE } from '@/components/studio/panel-ui';
-import {
-  DELETE_SOUND_SENTENCE,
-  lengthLabel,
-  SOUND_UPLOAD_NOTE,
-  SOUND_UPLOADS_EMPTY,
-} from './audio-model';
+import { DELETE_SOUND_SENTENCE, lengthLabel, SOUND_UPLOADS_EMPTY } from './audio-model';
 import { CHECKING } from './elements-model';
 import { PreviewButton, SoundShape } from './sound-rows';
 import type { SoundPreview, SoundUploads } from './use-sound-library';
@@ -81,7 +75,6 @@ export function UploadedSounds({
         <MotionIcon icon={UploadIcon} className="h-4 w-4" />
         Upload A Sound
       </Button>
-      <p className={NOTE}>{SOUND_UPLOAD_NOTE}</p>
 
       {uploads.error ? (
         <Alert variant="danger" className="items-center" data-testid="clip-sound-refused">

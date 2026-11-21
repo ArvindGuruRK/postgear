@@ -7,7 +7,7 @@ import type { Channel } from '@/types/channel';
 import type { ClipJobView } from '@/types/clips';
 import { SendClipDialog, type SendClipDialogProps, type SendExportRun } from './send-dialog';
 import { SEND_PROVIDERS, sendChannel, sendExport, sendJob } from './send-fixtures';
-import { SEND_HELP, SEND_NO_CHANNELS, SEND_OUTDATED } from './send-model';
+import { SEND_NO_CHANNELS, SEND_OUTDATED } from './send-model';
 
 jest.mock('next/link', () => ({
   __esModule: true,
@@ -122,7 +122,6 @@ describe('SendClipDialog', () => {
   it('lists every channel, greys the ones the clip does not fit with the reason, and sends the ticked ones', async () => {
     const { onSent } = show();
     await screen.findAllByTestId('clip-send-channel');
-    expect(screen.getByText(SEND_HELP)).toBeVisible();
 
     const linkedIn = row('Acme On LinkedIn');
     expect(linkedIn).toHaveAttribute('data-disabled', 'true');

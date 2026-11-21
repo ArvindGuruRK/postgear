@@ -57,14 +57,11 @@ import type { PlaybackStore } from '../editor/playback';
 import {
   AUDIO_TABS,
   type AudioTab,
-  LEVEL_NOTE,
   MIXED_VOLUME,
-  MUSIC_NOTE,
   meterPercent,
   meterWarns,
   REMOVED_SOUND,
   SOUND_FAVOURITES_EMPTY,
-  SOUND_NOTHING_SELECTED,
   SOUND_UPLOAD_GONE,
   type SoundFileInfo,
   volumePercent,
@@ -163,11 +160,7 @@ export function AudioPanel({
           onAnchor={onAnchor}
           onRemove={onRemove}
         />
-      ) : (
-        <p className={NOTE} data-testid="clip-audio-none">
-          {SOUND_NOTHING_SELECTED}
-        </p>
-      )}
+      ) : null}
 
       <div className="flex flex-col gap-3">
         {/* Tiles, not a tab bar (2026-11-19): four names in a quarter of the panel each did
@@ -194,7 +187,6 @@ export function AudioPanel({
       ) : null}
 
       <div className="flex flex-col gap-1 border-t-2 border-outline pt-3">
-        <p className={NOTE}>{LEVEL_NOTE}</p>
         <Link
           href="/credits/clips"
           target="_blank"
@@ -418,8 +410,6 @@ function SoundBrowser({
           {search.loadingMore ? 'Loading' : 'Show More'}
         </Button>
       ) : null}
-
-      {tab === 'music' ? <p className={NOTE}>{MUSIC_NOTE}</p> : null}
     </div>
   );
 }

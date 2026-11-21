@@ -22,7 +22,9 @@ export function EditorShortcutsSheet({
       <DialogContent className="max-w-lg" data-testid="clip-shortcuts-sheet">
         <DialogHeader>
           <DialogTitle>Keyboard Shortcuts</DialogTitle>
-          <DialogDescription>Shortcuts never fire while you type in a field.</DialogDescription>
+          <DialogDescription className="sr-only">
+            Shortcuts never fire while you type in a field.
+          </DialogDescription>
         </DialogHeader>
         <div className="mt-2 flex flex-col gap-4">
           {CLIP_SHORTCUT_GROUPS.map((group) => (

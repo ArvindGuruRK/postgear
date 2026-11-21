@@ -33,14 +33,10 @@ function renderBox(overrides: Partial<React.ComponentProps<typeof LinkBox>> = {}
     probe: idleProbe(),
     disabled: false,
     focusRights: false,
-    sampleAvailable: true,
-    sampleBusy: false,
-    uploadHelp: 'MP4, MOV, MKV or WebM, up to 2 GB',
     onImported: jest.fn(),
     onUpload: jest.fn(),
     onDropFiles: jest.fn(),
     onBrowse: jest.fn(),
-    onSample: jest.fn(),
     ...overrides,
   };
   render(<LinkBox {...props} />);
@@ -78,10 +74,8 @@ describe('the entry card', () => {
     expect(props.onUpload).toHaveBeenCalledTimes(1);
     fireEvent.click(within(card).getByRole('button', { name: 'Browse Kick' }));
     expect(props.onBrowse).toHaveBeenCalledWith('kick');
-    // Try A Sample is a quiet line under the card, not one of its buttons.
-    expect(within(card).queryByRole('button', { name: 'Try A Sample' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Try A Sample' }));
-    expect(props.onSample).toHaveBeenCalledTimes(1);
+    // Try A Sample is gone (2026-11-20).
+    expect(screen.queryByRole('button', { name: 'Try A Sample' })).toBeNull();
   });
 
   it('says what to paste when Find Clips is pressed with an empty field, and reads a link', () => {
@@ -117,7 +111,6 @@ describe('the entry card', () => {
     renderBox({ disabled: true });
     expect(screen.getByRole('button', { name: 'Find Clips' })).toBeDisabled();
     expect(screen.getByTestId('clips-upload-area')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Try A Sample' })).toBeDisabled();
   });
 });
 

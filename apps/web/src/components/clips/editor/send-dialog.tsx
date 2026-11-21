@@ -65,10 +65,8 @@ import {
   factsOf,
   SEND_CHANNELS_FAILED,
   SEND_FAILED,
-  SEND_HELP,
   SEND_NO_CHANNELS,
   SEND_OUTDATED,
-  SEND_OUTDATED_LINE,
   SEND_PICK_ONE,
   SEND_TITLE,
   sentExport,
@@ -374,7 +372,6 @@ function SendClipContent({ orgId, clip, outdated, exportRun, onSent }: SendClipD
                   onChange={(event) => setCaption(event.target.value)}
                   data-testid="clip-send-caption"
                 />
-                <p className="m-0 font-sans text-sm text-ink type-muted">{SEND_HELP}</p>
               </section>
             )}
           </>
@@ -570,17 +567,14 @@ function ExportStep({
           </Button>
         </div>
       ) : (
-        <>
-          <p className="m-0 font-sans text-sm text-ink">{SEND_OUTDATED_LINE}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={onExport} disabled={!canExport} data-testid="clip-send-export-again">
-              Export Again
-            </Button>
-            <Button variant="secondary" onClick={onOld} data-testid="clip-send-old">
-              Send The Old Version
-            </Button>
-          </div>
-        </>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onExport} disabled={!canExport} data-testid="clip-send-export-again">
+            Export Again
+          </Button>
+          <Button variant="secondary" onClick={onOld} data-testid="clip-send-old">
+            Send The Old Version
+          </Button>
+        </div>
       )}
     </section>
   );

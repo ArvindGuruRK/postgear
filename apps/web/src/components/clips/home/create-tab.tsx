@@ -42,9 +42,6 @@ export function CreateTab({
   probe,
   disabled,
   focusRights,
-  sampleAvailable,
-  sampleBusy,
-  uploadHelp,
   uploads,
   openings,
   videos,
@@ -57,7 +54,6 @@ export function CreateTab({
   onUpload,
   onDropFiles,
   onBrowse,
-  onSample,
   onAllVideos,
   onAllDownloads,
   onDownloadsSettled,
@@ -67,9 +63,6 @@ export function CreateTab({
   probe: LinkProbe;
   disabled: boolean;
   focusRights: boolean;
-  sampleAvailable: boolean;
-  sampleBusy: boolean;
-  uploadHelp: string;
   uploads: VideoUploads;
   /** Videos that open by themselves once ready. */
   openings: OpenWhenReady;
@@ -86,7 +79,6 @@ export function CreateTab({
   onUpload: () => void;
   onDropFiles: (files: File[]) => void;
   onBrowse?: (platform: ClipPlatformId) => void;
-  onSample: () => void;
   onAllVideos: () => void;
   onAllDownloads: () => void;
   onDownloadsSettled: () => void;
@@ -111,15 +103,11 @@ export function CreateTab({
         probe={probe}
         disabled={disabled}
         focusRights={focusRights}
-        sampleAvailable={sampleAvailable}
-        sampleBusy={sampleBusy}
-        uploadHelp={uploadHelp}
         onImported={onImported}
         onDownloaded={onDownloaded}
         onUpload={onUpload}
         onDropFiles={onDropFiles}
         onBrowse={onBrowse}
-        onSample={onSample}
       >
         {uploadRows.length + openings.openings.length > 0 ? (
           <ul className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Uploads">

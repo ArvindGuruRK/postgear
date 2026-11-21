@@ -45,17 +45,11 @@ export function kindOfAudioTab(tab: AudioTab): SoundKind | undefined {
 export const SOUNDS_PAGE = 24;
 
 export const SOUND_FAVOURITES_EMPTY = 'No favourites yet. Star a sound to keep it here.';
-export const MUSIC_NOTE = 'The music shelf is small: loops and short tracks, not songs.';
-export const LEVEL_NOTE = 'Exports are evened out so they are never too quiet or distorted.';
 export const REMOVED_SOUND = 'This sound was removed from the library.';
 export const SOUND_UPLOAD_GONE = 'This sound was deleted from your workspace.';
 export const SOUNDS_LOAD_FAILED = 'We could not load the sounds. Try again in a moment.';
 export const SOUND_UPLOADS_EMPTY =
   'No sounds of your own yet. Upload an MP3, WAV, M4A or AAC file.';
-export const SOUND_UPLOAD_NOTE =
-  'MP3, WAV, M4A or AAC, up to 20 MB and 10 minutes. Only your workspace sees them.';
-export const SOUND_NOTHING_SELECTED =
-  'Pick a sound to add it at the playhead, or select one on the timeline to change it.';
 export const TOO_MANY_SOUNDS = `A clip holds up to ${MAX_SOUNDS} sounds. Remove one to add another.`;
 export const DELETE_SOUND_SENTENCE =
   'It leaves your workspace for good. A clip that still uses it has to drop it first.';

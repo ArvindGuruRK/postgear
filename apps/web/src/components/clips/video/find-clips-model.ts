@@ -12,9 +12,6 @@ import { HIGHLIGHT_REASON_LABELS, type HighlightReason } from '@postgear/video-e
 import type { ClipSummary, HighlightRunView, HighlightsView } from '@/types/clips';
 import { formatDayMonth } from '../home/home-model';
 
-/** Always under the button: what this version of the AI does and does not do. */
-export const AI_NOTE =
-  'AI in this version listens and watches for action. It does not understand speech yet.';
 export const NO_SOUND_NOTE = 'This video has no sound, so we looked at the picture only.';
 export const NOTHING_FOUND_NOTE =
   'We did not find any stand-out moments. You can still mark clips by hand.';
@@ -72,7 +69,7 @@ export function findClipsNotes(
   highlights: Pick<HighlightsView, 'noSound' | 'run'>,
   running: boolean,
 ): string[] {
-  const notes = [AI_NOTE];
+  const notes: string[] = [];
   if (highlights.noSound) notes.push(NO_SOUND_NOTE);
   if (!running && highlights.run?.status === 'DONE' && highlights.run.found === 0)
     notes.push(NOTHING_FOUND_NOTE);

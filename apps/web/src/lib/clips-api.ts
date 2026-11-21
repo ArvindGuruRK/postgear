@@ -204,14 +204,6 @@ export function importVideo(url: string, rightsConfirmed: boolean): Promise<Clip
   return importClipVideo(url, rightsConfirmed);
 }
 
-/**
- * Brings in the sample video the server names (Try A Sample). Every limit and
- * the import minutes still apply; `existing: true` the second time.
- */
-export function importSample(): Promise<ClipImportOutcome & { message?: string }> {
-  return api('/clips/videos', { method: 'POST', body: { sample: true } });
-}
-
 /** One page of videos, newest first by default. */
 export function listVideos(
   options: { cursor?: string | null; sort?: ClipVideoSort; signal?: AbortSignal } = {},

@@ -8,11 +8,10 @@
  *   it. The selected zoom's Amount, Ease, From and For, and Remove Zoom; its
  *   focus is the dot on the clip (`zoom-focus-dot.tsx`).
  * - **Speed Control**: the selected part's speed (six keys in two rows), its
- *   new length, and the notes about splitting first and about very slow sound.
+ *   new length, and a note when very slow sound may sound rough.
  * - **Looks**: one look for the whole clip, each tile drawn on the picture
  *   at the playhead with the look's own colour matrix (the one the export
- *   uses); Strength, Vignette, Fade In and Fade Out; and the sentence that
- *   the editor is a close match, with Preview Export beside it.
+ *   uses); Strength, Vignette, Fade In and Fade Out.
  *
  * Like the other tabs, the panel never edits the document itself: each
  * change goes to the editor as one undo step, and a slider passes a coalesce
@@ -74,16 +73,13 @@ import {
   FADE_OPTIONS,
   fadeChoice,
   fadeOf,
-  LOOK_MATCH_NOTE,
   SPEED_OPTIONS,
   SPEED_PICK_NOTE,
   SPEED_ROUGH_NOTE,
-  SPEED_SPLIT_NOTE,
   sampleTile,
   soundsRough,
   speedLengthLine,
   speedOf,
-  ZOOM_DOT_NOTE,
   ZOOM_GONE_NOTE,
   ZOOM_PICK_NOTE,
   zoomTiming,
@@ -113,8 +109,6 @@ export interface EffectsPanelProps {
   onSpeed: (segmentId: string, speed: Speed) => void;
   onLooks: (change: Partial<Looks>, coalesceKey?: string) => void;
   onFades: (change: Partial<Fades>) => void;
-  /** Opens the Export tab. */
-  onPreviewExport: () => void;
 }
 
 const CARD_ICONS: Readonly<Record<EffectCard, LucideIcon>> = {
@@ -143,7 +137,6 @@ export function EffectsPanel({
   onSpeed,
   onLooks,
   onFades,
-  onPreviewExport,
 }: EffectsPanelProps) {
   const [open, setOpen] = useState<string[]>(() => {
     const card = cardFor(selection);
@@ -186,7 +179,6 @@ export function EffectsPanel({
         filmstrip={filmstrip}
         onLooks={onLooks}
         onFades={onFades}
-        onPreviewExport={onPreviewExport}
       />
     ),
   };
@@ -330,8 +322,6 @@ function ZoomControls({
             <p className={NOTE}>{ZOOM_GONE_NOTE}</p>
           )}
 
-          {timing ? <p className={NOTE}>{ZOOM_DOT_NOTE}</p> : null}
-
           <Button variant="danger" className="w-full" onClick={() => onRemoveZoom(zoom.id)}>
             Remove Zoom
           </Button>
@@ -377,7 +367,6 @@ function SpeedControls({
       <p className="m-0 font-sans text-sm tabular-nums text-ink" data-testid="clip-speed-length">
         {speedLengthLine(segment)}
       </p>
-      <p className={NOTE}>{SPEED_SPLIT_NOTE}</p>
       {soundsRough(segment.speed) ? <p className={NOTE}>{SPEED_ROUGH_NOTE}</p> : null}
     </div>
   );
@@ -403,14 +392,12 @@ function LookControls({
   filmstrip,
   onLooks,
   onFades,
-  onPreviewExport,
 }: {
   document: ClipDocument;
   playback: PlaybackStore;
   filmstrip: ClipFilmstrip | null;
   onLooks: EffectsPanelProps['onLooks'];
   onFades: EffectsPanelProps['onFades'];
-  onPreviewExport: () => void;
 }) {
   const lookId = useId();
   const [prefix] = useState(() => {
@@ -475,16 +462,6 @@ function LookControls({
           options={options}
           className="[&_button]:px-2 [&_button]:py-2"
         />
-        <p className={NOTE}>
-          {LOOK_MATCH_NOTE}{' '}
-          <button
-            type="button"
-            onClick={onPreviewExport}
-            className="font-sans text-sm text-ink underline underline-offset-2 type-ui outline-none hover:text-actionPrimary focus-visible:outline-solid focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-focusRing"
-          >
-            Preview Export
-          </button>
-        </p>
       </div>
 
       {looks.colour !== 'none' ? (
