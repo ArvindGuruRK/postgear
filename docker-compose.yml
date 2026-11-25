@@ -28,7 +28,9 @@ services:
       - redis_data:/data
 
   minio:
-    image: minio/minio
+    # MinIO's own `minio/minio` image can no longer be pulled. This is the
+    # community fork published by Pigsty, pinned to one release.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: postgear_minio
     ports:
       - "9000:9000"
