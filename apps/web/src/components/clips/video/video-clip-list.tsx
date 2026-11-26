@@ -24,6 +24,7 @@ import {
   RenameField,
 } from '../library/clip-actions';
 import { HAND_MADE_GROUP, orderClips, reasonLabels, scoreText } from './find-clips-model';
+import { isAiOrigin } from '@/types/clips';
 
 export const NO_CLIPS_YET = 'No clips yet.';
 
@@ -119,7 +120,7 @@ function ClipRow({
   onStartRename: () => void;
   onRenameDone: () => void;
 }) {
-  const isAi = clip.origin === 'AI_SIGNALS';
+  const isAi = isAiOrigin(clip.origin);
   const score = isAi ? scoreText(clip.score) : null;
   const reasons = isAi ? reasonLabels(clip.reasons ?? []) : [];
 

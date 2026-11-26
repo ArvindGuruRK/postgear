@@ -16,6 +16,7 @@
  * the person.
  */
 import { normaliseRunError, providerError } from '../model/resilience';
+import { pickMoments, writeTitles } from './moments';
 import { truncateAtSentence } from '../prompts/content';
 import {
   buildHashtagPrompt,
@@ -251,5 +252,7 @@ export function createSnippetWriter(model: ModelClient): SnippetWriter {
     rewrite: (request, options) => rewriteInVoice(model, request, options),
     research: (request, options) => researchCompetitor(model, request, options),
     translate: (request, options) => translateLines(model, request, options),
+    pickMoments: (request, options) => pickMoments(model, request, options),
+    writeTitles: (request, options) => writeTitles(model, request, options),
   };
 }

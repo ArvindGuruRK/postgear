@@ -480,6 +480,12 @@ export const CLIP_INTERNAL_ROUTES = {
   chargeImport: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/charge-import`,
   /** Reverse every charge made for this job, in full. Never refused; safe to repeat. */
   reverseCharges: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/reverse`,
+  /**
+   * Sprint 13, Module 05: a Find Clips run with a setup reads its transcript
+   * for moments. The API holds the model client and its keys, so it reads,
+   * picks, fits and titles; the worker blends the answer with the signals.
+   */
+  pickMoments: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/pick-moments`,
   /** A finished export becomes a Media row, the clip is marked exported, the notification written. */
   finishExport: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/finish-export`,
   /**
@@ -559,6 +565,29 @@ export interface ClipChargeImportAnswer {
 
 export interface ClipReverseBody {
   organizationId: string;
+}
+
+/** One moment the picker found, fitted to a sentence at each end. Video time. Never the words. */
+export interface ClipPickedMoment {
+  fromMs: number;
+  toMs: number;
+  fromRow: number;
+  toRow: number;
+  parts: { hook: number; standsAlone: number; payoff: number; clarity: number; shareable: number };
+  /** The five parts added, 0 to 100. */
+  score: number;
+  funny: boolean;
+  matchesRequest: boolean;
+  /** At most eight words, or null when the model gave none. */
+  title: string | null;
+}
+
+export interface ClipPickMomentsAnswer {
+  moments: ClipPickedMoment[];
+  /** No words were heard in the stretch: the run uses the signals alone (the reading charge was given back). */
+  noSpeech: boolean;
+  /** The person asked for something. */
+  asked: boolean;
 }
 
 export interface ClipReverseAnswer {

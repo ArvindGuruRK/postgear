@@ -11,6 +11,7 @@ import { refusalMessage } from '@postgear/entitlements';
 import { HIGHLIGHT_REASON_LABELS, type HighlightReason } from '@postgear/video-engine';
 import type { ClipSummary, HighlightRunView, HighlightsView } from '@/types/clips';
 import { formatDayMonth } from '../home/home-model';
+import { isAiOrigin } from '@/types/clips';
 
 export const NO_SOUND_NOTE = 'This video has no sound, so we looked at the picture only.';
 export const NOTHING_FOUND_NOTE =
@@ -29,6 +30,12 @@ export interface AiMinutesMeter {
 }
 
 /** "Find Clips (15 AI Minutes)"; one minute reads "(1 AI Minute)". */
+/** Quick Find: Sprint 12's one-press run on sound, picture and chat, at its own price. */
+export function quickFindLabel(price: number): string {
+  const minutes = Math.max(1, Math.ceil(price));
+  return `Quick Find (${minutes} AI ${minutes === 1 ? 'Minute' : 'Minutes'})`;
+}
+
 export function findClipsLabel(price: number): string {
   const minutes = Math.max(1, Math.ceil(price));
   return `Find Clips (${minutes} AI ${minutes === 1 ? 'Minute' : 'Minutes'})`;
@@ -61,7 +68,7 @@ export function asksFirst(
   highlights: Pick<HighlightsView, 'run'>,
   clips: readonly ClipSummary[],
 ): boolean {
-  return highlights.run?.status === 'DONE' || clips.some((clip) => clip.origin === 'AI_SIGNALS');
+  return highlights.run?.status === 'DONE' || clips.some((clip) => isAiOrigin(clip.origin));
 }
 
 /** The notes under the button, in order (Module 16 section 5). */
@@ -71,10 +78,24 @@ export function findClipsNotes(
 ): string[] {
   const notes: string[] = [];
   if (highlights.noSound) notes.push(NO_SOUND_NOTE);
-  if (!running && highlights.run?.status === 'DONE' && highlights.run.found === 0)
-    notes.push(NOTHING_FOUND_NOTE);
+  const run = highlights.run;
+  if (!running && run?.status === 'DONE' && run.found === 0) notes.push(NOTHING_FOUND_NOTE);
+  // Sprint 13, Module 05: what a run with a setup did.
+  if (!running && run?.status === 'DONE' && run.ai) {
+    if (run.ai.noSpeech) notes.push(NO_SPEECH_NOTE);
+    else if (run.ai.read) notes.push(LISTENED_NOTE);
+    if (run.ai.asked && run.ai.matched === 0 && run.found > 0) notes.push(NOTHING_MATCHED_NOTE);
+  }
   return notes;
 }
+
+/** Sprint 13, Module 05: the run listened and read. */
+export const LISTENED_NOTE = 'AI listened to what was said and looked at sound and picture.';
+/** No speech in the stretch: the clips come from the signals alone. */
+export const NO_SPEECH_NOTE =
+  'We could not hear any speech, so these clips come from sound and picture only.';
+export const NOTHING_MATCHED_NOTE =
+  'Nothing matched what you asked for. Here are the best moments we found instead.';
 
 /** "How this was found: Sound, picture and chat", once a run has finished with clips. */
 export function foundByLine(
@@ -111,8 +132,8 @@ export function orderClips(clips: readonly ClipSummary[]): {
   manual: ClipSummary[];
 } {
   const ai = clips
-    .filter((clip) => clip.origin === 'AI_SIGNALS')
+    .filter((clip) => isAiOrigin(clip.origin))
     .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || b.createdAt.localeCompare(a.createdAt));
-  const manual = clips.filter((clip) => clip.origin !== 'AI_SIGNALS');
+  const manual = clips.filter((clip) => !isAiOrigin(clip.origin));
   return { ai, manual };
 }

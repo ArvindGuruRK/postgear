@@ -80,6 +80,20 @@ export {
   translateLines,
 } from './agents/snippets';
 export {
+  cleanTitle,
+  MOMENT_CONCURRENCY,
+  pickMoments,
+  writeTitles,
+} from './agents/moments';
+export {
+  buildMomentPrompt,
+  buildTitlePrompt,
+  momentPicksSchema,
+  momentTitlesSchema,
+  PICKS_PER_WINDOW,
+  TITLE_MAX_WORDS,
+} from './prompts/moments';
+export {
   buildTranslatePrompt,
   TRANSLATE_MAX_LINE_CHARS,
   TRANSLATE_MAX_LINES,

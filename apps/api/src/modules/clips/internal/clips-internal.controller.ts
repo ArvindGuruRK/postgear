@@ -13,6 +13,7 @@ import type {
   ClipChargeImportAnswer,
   ClipFinishExportAnswer,
   ClipFinishSaveDownloadAnswer,
+  ClipPickMomentsAnswer,
   ClipReconcileAnswer,
   ClipSweepAnswer,
   ClipReverseAnswer,
@@ -21,6 +22,7 @@ import type {
 import { Public } from '../../../common/decorators/public.decorator';
 import { ZodBody } from '../../../common/pipes/zod-validation.pipe';
 import { InternalTokenGuard } from '../../automations/gateway/internal-token.guard';
+import { ClipMomentsService } from '../highlights/clip-moments.service';
 import { ClipSweepService } from '../retention/clip-sweep.service';
 import { ClipReconcileService } from './clip-reconcile.service';
 import {
@@ -47,7 +49,18 @@ export class ClipsInternalController {
     private readonly internal: ClipsInternalService,
     private readonly reconciler: ClipReconcileService,
     private readonly sweeper: ClipSweepService,
+    private readonly moments: ClipMomentsService,
   ) {}
+
+  /** Sprint 13, Module 05: a Find Clips run with a setup reads its transcript for moments. */
+  @Post('jobs/:jobId/pick-moments')
+  @HttpCode(HttpStatus.OK)
+  pickMoments(
+    @Param('jobId') jobId: string,
+    @Body(new ZodBody(orgOnlySchema, 'internal/clips/pick-moments')) body: OrgOnlyBody,
+  ): Promise<ClipPickMomentsAnswer> {
+    return this.moments.pick(jobId, body.organizationId);
+  }
 
   @Post('jobs/:jobId/charge-import')
   @HttpCode(HttpStatus.OK)

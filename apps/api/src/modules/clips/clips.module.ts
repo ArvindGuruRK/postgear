@@ -22,6 +22,7 @@
  * them. `clips-routes.spec.ts` holds this in place.
  */
 import { Module } from '@nestjs/common';
+import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipItemModule } from './clip/clip-item.module';
@@ -34,6 +35,7 @@ import { ClipHighlightsController } from './highlights/clip-highlights.controlle
 import { ClipHighlightsService } from './highlights/clip-highlights.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipSweepService } from './retention/clip-sweep.service';
+import { ClipMomentsService } from './highlights/clip-moments.service';
 import { ClipsInternalController } from './internal/clips-internal.controller';
 import { ClipsInternalService } from './internal/clips-internal.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
@@ -53,6 +55,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
 @Module({
   imports: [
     ClipsCoreModule,
+    // Sprint 13, Module 05: the moment picker's model client.
+    AiModule,
     ClipLinksModule,
     ClipChannelsModule,
     NotificationsModule,
@@ -83,6 +87,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     ClipsStatusService,
     ClipVideosService,
     ClipHighlightsService,
+    // Sprint 13, Module 05: reading a transcript for moments (the internal pick route).
+    ClipMomentsService,
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,

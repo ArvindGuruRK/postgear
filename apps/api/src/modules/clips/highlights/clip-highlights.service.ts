@@ -16,6 +16,14 @@
  *    that left READY meanwhile is a 409 `video_not_ready` (404 when deleted).
  * 4. The workflow is started; 202 `{ run, job, meter }`.
  *
+ * Sprint 13, Module 05: with a **setup** (Clip Setup) the run also listens
+ * and reads. The total is checked against what is left before anything is
+ * charged; then the run's own steps are charged under its job
+ * (`clips.ai:read:<jobId>`, and `clips.ai:signals:<jobId>` only when the run
+ * does not listen), and listening goes through Module 02's `ensure`, which
+ * starts (or joins) a TRANSCRIBE job charged under that job's own key. The
+ * worker waits for it at the `listening` stage.
+ *
  * Whatever happens before the rows land, the charge is given back
  * (`reverseAllFor`), so a double click charges once. A failed or cancelled
  * run is given back by the worker's bookkeeping (or by the cancel and the
@@ -25,12 +33,17 @@
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ClipJobKind, ClipJobStatus, type Prisma } from '@postgear/db';
+import { refusalMessage } from '@postgear/entitlements';
 import {
+  type ClipSetup,
+  type SetupPrice,
   SIGNALS_ENGINE_VERSION,
   SIGNALS_TUNING,
   SIGNALS_TUNING_VALUES,
+  setupPrice,
 } from '@postgear/video-engine';
-import type { MeterState } from '../../entitlements/entitlement-resolver';
+import { EntitlementRefusedException } from '../../entitlements/entitlement-refused.exception';
+import { EntitlementResolver, type MeterState } from '../../entitlements/entitlement-resolver';
 import { UsageService } from '../../entitlements/usage.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { isUuid } from '../clips.ids';
@@ -40,6 +53,7 @@ import { type ClipJobView, toJobView } from '../jobs/clip-job-view';
 import { ClipJobsRepository, OPEN_JOB_STATUSES } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import {
   type HighlightRunView,
@@ -60,6 +74,20 @@ export interface MeterView {
   used: number;
   remaining: number | null;
   limit: number | null;
+  cycleEnd: string;
+}
+
+/** The run's own reading charge (Sprint 13, Module 05). */
+export function readChargeKey(jobId: string): string {
+  return `clips.ai:read:${jobId}`;
+}
+
+/** `POST /clips/videos/:videoId/setup/price`. */
+export interface SetupPriceView extends SetupPrice {
+  /** What is left this month, or null for no limit. */
+  remaining: number | null;
+  limit: number | null;
+  /** When the month's AI minutes come back. */
   cycleEnd: string;
 }
 
@@ -88,7 +116,37 @@ export class ClipHighlightsService {
     private readonly jobsRepository: ClipJobsRepository,
     private readonly limits: ClipLimitsGuard,
     private readonly usage: UsageService,
+    private readonly resolver: EntitlementResolver,
+    private readonly transcripts: ClipTranscriptsService,
   ) {}
+
+  /** The setup's stretch held inside the video (422 when nothing of 3 seconds is left). */
+  private setupRange(setup: ClipSetup, durationMs: number): { fromMs: number; toMs: number } {
+    const range = { fromMs: setup.range.fromMs, toMs: Math.min(setup.range.toMs, durationMs) };
+    if (range.toMs - range.fromMs < 3_000) {
+      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'clip_range_invalid');
+    }
+    return range;
+  }
+
+  /** The price lines of a setup (no charge), with what is left this month. */
+  async price(orgId: string, videoId: string, setup: ClipSetup): Promise<SetupPriceView> {
+    const video = await this.requireVideo(orgId, videoId);
+    if (video.status !== 'READY' || video.durationMs === null) throw notReady();
+    const range = this.setupRange(setup, video.durationMs);
+    const listen = await this.transcripts.quote(orgId, video.id, {
+      fromMs: range.fromMs,
+      toMs: range.toMs,
+      language: setup.language,
+    });
+    const meter = await this.resolver.meter(orgId, AI_MINUTES_METER);
+    return {
+      ...setupPrice({ ...setup, range }, listen.price),
+      remaining: meter.remaining,
+      limit: meter.limit,
+      cycleEnd: meter.cycleEnd.toISOString(),
+    };
+  }
 
   /** `GET /clips/videos/:videoId/highlights`: the price and the latest run. */
   async latest(orgId: string, videoId: string): Promise<HighlightsView> {
@@ -97,11 +155,17 @@ export class ClipHighlightsService {
   }
 
   /** `POST /clips/videos/:videoId/highlights`: see the file comment. */
-  async start(orgId: string, userId: string, videoId: string): Promise<StartHighlightsOutcome> {
+  async start(
+    orgId: string,
+    userId: string,
+    videoId: string,
+    setup?: ClipSetup,
+  ): Promise<StartHighlightsOutcome> {
     await this.limits.assertEnabled(orgId);
     const video = await this.requireVideo(orgId, videoId);
     if (video.status !== 'READY' || video.durationMs === null) throw notReady();
     if ((await this.openRuns(orgId, video.id)) > 0) throw running();
+    if (setup) return this.startWithSetup(orgId, userId, video, setup);
 
     const price = highlightsPrice(video.durationMs);
     const jobId = this.jobs.newJobId();
@@ -186,6 +250,162 @@ export class ClipHighlightsService {
         // Refused, lost the race, or the rows never landed: nothing ran, so nothing is kept.
         await this.usage.reverseAllFor(orgId, jobId);
       }
+    }
+  }
+
+  /**
+   * A run with a setup (Module 05): the total checked first, the run's own
+   * steps charged under its job, listening through `ensure`, then the rows.
+   */
+  private async startWithSetup(
+    orgId: string,
+    userId: string,
+    video: Awaited<ReturnType<ClipHighlightsService['requireVideo']>>,
+    setup: ClipSetup,
+  ): Promise<StartHighlightsOutcome> {
+    const durationMs = video.durationMs as number;
+    const range = this.setupRange(setup, durationMs);
+    const chosen: ClipSetup = { ...setup, range };
+    const listen = await this.transcripts.quote(orgId, video.id, {
+      fromMs: range.fromMs,
+      toMs: range.toMs,
+      language: setup.language,
+    });
+    const price = setupPrice(chosen, listen.price);
+    const line = (step: string) => price.lines.find((one) => one.step === step)?.aiMinutes ?? 0;
+
+    // Nothing is charged unless the whole run fits what is left.
+    const meter = await this.resolver.meter(orgId, AI_MINUTES_METER);
+    if (meter.remaining !== null && meter.remaining < price.total) {
+      throw new EntitlementRefusedException(
+        'clips_ai_minutes_used',
+        refusalMessage('clips_ai_minutes_used', {
+          n: meter.remaining,
+          need: price.total,
+          date: meter.cycleEnd,
+        }),
+        {
+          limit: meter.limit,
+          used: meter.used,
+          needed: price.total,
+          remaining: meter.remaining,
+        },
+      );
+    }
+
+    const jobId = this.jobs.newJobId();
+    const runId = randomUUID();
+    const jobRow = await this.jobs.build({
+      id: jobId,
+      orgId,
+      userId,
+      kind: 'HIGHLIGHTS',
+      videoId: video.id,
+      highlightRunId: runId,
+      input: { videoId: video.id, runId },
+    });
+
+    let written = false;
+    try {
+      const read = await this.usage.consume(orgId, AI_MINUTES_METER, line('read'), {
+        idempotencyKey: readChargeKey(jobId),
+        refId: jobId,
+        meta: { step: 'read', videoId: video.id },
+      });
+      let state = read.state;
+      let signalsEntry: string | null = null;
+      if (line('signals') > 0) {
+        const signals = await this.usage.consume(orgId, AI_MINUTES_METER, line('signals'), {
+          idempotencyKey: signalsChargeKey(jobId),
+          refId: jobId,
+          meta: { step: 'signals', videoId: video.id },
+        });
+        signalsEntry = signals.entryId;
+        state = signals.state;
+      }
+
+      // Listening: Module 02's door (its own job and key). Covered: nothing to wait for.
+      let listenJobId: string | null = null;
+      if (listen.price > 0) {
+        const outcome = await this.transcripts.ensure(orgId, userId, video.id, {
+          fromMs: range.fromMs,
+          toMs: range.toMs,
+          language: setup.language,
+        });
+        if (!outcome.covered) {
+          listenJobId = outcome.job.id;
+          if ('meter' in outcome && outcome.meter) {
+            state = {
+              ...state,
+              used: outcome.meter.used,
+              remaining: outcome.meter.remaining,
+            };
+          }
+        }
+      }
+
+      const outcome = await serializable(async (tx) => {
+        const open = await tx.clipJob.count({
+          where: {
+            organizationId: orgId,
+            videoId: video.id,
+            kind: ClipJobKind.HIGHLIGHTS,
+            status: { in: [...OPEN_JOB_STATUSES] },
+          },
+        });
+        if (open > 0) return { kind: 'running' as const };
+        const live = await this.videos.findLive(orgId, video.id, tx);
+        if (!live) return { kind: 'gone' as const };
+        if (live.status !== 'READY') return { kind: 'not_ready' as const };
+
+        const run = await tx.clipHighlightRun.create({
+          data: {
+            id: runId,
+            organizationId: orgId,
+            videoId: video.id,
+            status: ClipJobStatus.QUEUED,
+            engineVersion: SIGNALS_ENGINE_VERSION,
+            params: {
+              tuning: SIGNALS_TUNING,
+              maxClips: SIGNALS_TUNING_VALUES.maxClips,
+              setup: chosen,
+              listenJobId,
+              charges: { read: read.entryId, signals: signalsEntry },
+            } as unknown as Prisma.InputJsonValue,
+            aiMinutesCharged: price.total,
+            usageEntryId: read.entryId,
+            createdById: userId,
+          },
+        });
+        const job = await this.jobsRepository.create(jobRow, tx);
+        return { kind: 'created' as const, run, job };
+      });
+      if (outcome.kind === 'running') throw running();
+      if (outcome.kind === 'gone') throw videoNotFound();
+      if (outcome.kind === 'not_ready') throw notReady();
+      written = true;
+
+      await this.jobs.start(outcome.job);
+      const job = (await this.jobsRepository.find(orgId, outcome.job.id)) ?? outcome.job;
+      this.logger.log(
+        JSON.stringify({
+          event: 'clips.highlights.started',
+          orgId,
+          videoId: video.id,
+          runId,
+          jobId,
+          aiMinutes: price.total,
+          listens: listenJobId !== null,
+          genre: setup.genre,
+        }),
+      );
+      return {
+        run: toHighlightRunView(outcome.run, job),
+        job: toJobView(job),
+        meter: toMeterView({ ...state, cycleEnd: meter.cycleEnd, cycleStart: meter.cycleStart }),
+      };
+    } finally {
+      if (!written) await this.usage.reverseAllFor(orgId, jobId);
     }
   }
 

@@ -9,7 +9,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { gunzipSignalsFile, gzipSignalsFile, type SignalProducers } from '@postgear/media-tools';
-import { decodeSignalsFile, type SignalsFile, type SignalTrack } from '@postgear/video-engine';
+import type { ClipPickedMoment } from '@postgear/scheduling';
+import {
+  decodeSignalsFile,
+  defaultClipSetup,
+  type SignalsFile,
+  type SignalTrack,
+} from '@postgear/video-engine';
 import { ClipStepError, classifyClipError } from '../failures';
 import { highlightsSignalsKey } from '../keys';
 import type { AssetRow } from '../rows';
@@ -30,6 +36,7 @@ import {
   highlightTitle,
   runHighlights,
   SLOW_MARKER,
+  readRunSetup,
 } from './highlights.run';
 
 const RUN_ID = 'cccccccc-dddd-4eee-8fff-000000000000';
@@ -190,6 +197,143 @@ afterEach(async () => {
   jest.restoreAllMocks();
   await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true })));
   dirs = [];
+});
+
+describe('runHighlights with a setup (Sprint 13, Module 05)', () => {
+  const LISTEN_JOB = '99999999-aaaa-4bbb-8ccc-000000000001';
+  const HEARD = '99999999-aaaa-4bbb-8ccc-000000000002';
+  function setupParams(overrides: Record<string, unknown> = {}) {
+    return {
+      setup: { ...defaultClipSetup(DURATION_MS), ratio: '1:1', ...overrides },
+      listenJobId: null,
+      charges: { read: 'entry-1', signals: null },
+    };
+  }
+  const moment = (
+    fromMs: number,
+    toMs: number,
+    extra: Partial<ClipPickedMoment> = {},
+  ): ClipPickedMoment => ({
+    fromMs,
+    toMs,
+    fromRow: 1,
+    toRow: 3,
+    parts: { hook: 16, standsAlone: 16, payoff: 12, clarity: 15, shareable: 10 },
+    score: 69,
+    funny: false,
+    matchesRequest: false,
+    title: 'The tunnel jump',
+    ...extra,
+  });
+
+  it('reads the transcript after listening and makes titled transcript clips in the chosen shape', async () => {
+    const { make, rows } = await setup();
+    rows.jobs.set(LISTEN_JOB, jobRow({ id: LISTEN_JOB, kind: 'TRANSCRIBE', status: 'RUNNING' }));
+    const finish = jest.spyOn(rows, 'finishHighlights');
+    const sleeps: number[] = [];
+    const pickMoments = jest.fn(async () => ({
+      moments: [moment(30_000, 62_000, { matchesRequest: true })],
+      noSpeech: false,
+      asked: true,
+    }));
+    const base = make();
+    const outcome = await runHighlights(
+      make({
+        run: {
+          ...base.run,
+          params: { ...setupParams({ request: 'tunnel' }), listenJobId: LISTEN_JOB },
+        },
+        internal: { pickMoments },
+        sleep: async (ms) => {
+          sleeps.push(ms);
+          // The listening job ends while the run waits for it.
+          rows.jobs.set(LISTEN_JOB, jobRow({ id: LISTEN_JOB, kind: 'TRANSCRIBE', status: 'DONE' }));
+        },
+      }),
+    );
+    expect(outcome.finished).toBe(true);
+    expect(sleeps.length).toBeGreaterThan(0);
+    expect(pickMoments).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG });
+    const made = [...rows.clips.values()].filter((clip) => clip.origin === 'AI_TRANSCRIPT');
+    expect(made).toHaveLength(1);
+    expect(made[0]?.title).toBe('The tunnel jump');
+    expect((made[0]?.document as { canvas: { ratio: string } } | undefined)?.canvas.ratio).toBe(
+      '1:1',
+    );
+    expect(made[0]?.reasons?.[0]).toBe('matches_request');
+    expect(rangeOf(made[0] ?? {})).toEqual({ fromMs: 30_000, toMs: 62_000 });
+    expect(finish.mock.calls[0]?.[0].output).toMatchObject({
+      ai: { read: true, noSpeech: false, asked: true, matched: 1 },
+    });
+  });
+
+  it('skips listening when it was all listened to already', async () => {
+    const { make, rows } = await setup();
+    const lookups = jest.spyOn(rows, 'job');
+    const base = make();
+    await runHighlights(
+      make({
+        run: { ...base.run, params: setupParams() },
+        internal: { pickMoments: async () => ({ moments: [], noSpeech: false, asked: false }) },
+      }),
+    );
+    expect(lookups).not.toHaveBeenCalledWith(ORG, LISTEN_JOB);
+  });
+
+  it('falls back to the signals alone when no speech was heard, and says so', async () => {
+    const { make, rows } = await setup();
+    const finish = jest.spyOn(rows, 'finishHighlights');
+    const base = make();
+    await runHighlights(
+      make({
+        run: { ...base.run, params: setupParams() },
+        internal: { pickMoments: async () => ({ moments: [], noSpeech: true, asked: false }) },
+      }),
+    );
+    expect(finish.mock.calls[0]?.[0].output).toMatchObject({ ai: { read: false, noSpeech: true } });
+  });
+
+  it('puts captions on the new clips when the setup asks and the video was listened to', async () => {
+    const { make, rows } = await setup();
+    rows.assets.push({
+      ...asset('TRANSCRIPT', `clips/${ORG}/${VIDEO_ID}/transcript.json.gz`, HEARD),
+      meta: {
+        language: 'en',
+        model: 'simulation',
+        source: 'listened',
+        covered: [{ fromMs: 0, toMs: DURATION_MS }],
+        words: 10,
+        fixes: [],
+      },
+    } as AssetRow);
+    const base = make();
+    await runHighlights(
+      make({
+        run: { ...base.run, params: setupParams({ captions: { on: true, styleId: 'marker' } }) },
+        internal: {
+          pickMoments: async () => ({
+            moments: [moment(30_000, 62_000)],
+            noSpeech: false,
+            asked: false,
+          }),
+        },
+      }),
+    );
+    const made = [...rows.clips.values()].find((clip) => clip.origin === 'AI_TRANSCRIPT');
+    const tracks =
+      (made?.document as { tracks: Array<Record<string, unknown>> } | undefined)?.tracks ?? [];
+    expect(tracks.find((track) => track.kind === 'captions')).toMatchObject({
+      transcriptAssetId: HEARD,
+      styleId: 'marker',
+      language: 'en',
+    });
+  });
+
+  it('reads a run with no setup as Sprint 12 did (Quick Find)', () => {
+    expect(readRunSetup(undefined)).toBeNull();
+    expect(readRunSetup({ tuning: 'signals-v1' })).toBeNull();
+    expect(readRunSetup(setupParams())?.setup.ratio).toBe('1:1');
+  });
 });
 
 describe('runHighlights', () => {

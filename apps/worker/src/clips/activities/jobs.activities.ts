@@ -303,6 +303,7 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             now,
             simulated: deps.providers.simulated,
             sleep: options.sleep,
+            internal: deps.internal,
           });
           return { status: outcome.finished ? 'done' : 'closed' };
         });

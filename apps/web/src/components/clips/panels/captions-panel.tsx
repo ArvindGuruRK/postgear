@@ -170,7 +170,7 @@ function LabelledSlider({
   );
 }
 
-function LanguageSelect({
+export function LanguageSelect({
   value,
   onChange,
   labelledBy,

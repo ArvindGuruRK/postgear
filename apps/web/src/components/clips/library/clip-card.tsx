@@ -29,6 +29,7 @@ import {
   ClipMenu,
   RenameField,
 } from './clip-actions';
+import { isAiOrigin } from '@/types/clips';
 
 /** "9:16" to 0.5625; anything unreadable is 9:16, the default shape. */
 export function ratioValue(ratio: string): number {
@@ -167,7 +168,7 @@ export function ClipCard({
 }) {
   const [renaming, setRenaming] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const isAi = clip.origin === 'AI_SIGNALS';
+  const isAi = isAiOrigin(clip.origin);
   const score = isAi ? scoreText(clip.score) : null;
   const firstReason = isAi ? (reasonLabels(clip.reasons ?? [])[0] ?? null) : null;
 

@@ -13,6 +13,7 @@ import type {
   CaptionsFileOutcome,
   ClipWordsView,
   ListenOutcome,
+  SetupPriceView,
   TranslateCaptionsOutcome,
   VideoTranscriptView,
   ClipChannelPreview,
@@ -65,6 +66,7 @@ import type {
   StickerFileView,
   StickerKind,
   StickerUploadView,
+  ClipSetup,
 } from '@postgear/video-engine';
 import { api, uploadFile } from './api';
 
@@ -237,8 +239,27 @@ export function getVideo(
  * run (202). 402 `clips_ai_minutes_used` when too few are left, 409
  * `highlights_running` while a run is on, 409 `video_not_ready`.
  */
-export function startHighlights(videoId: string): Promise<HighlightsStarted> {
-  return api<HighlightsStarted>(`${videoPath(videoId)}/highlights`, { method: 'POST' });
+export function startHighlights(
+  videoId: string,
+  setup?: ClipSetup,
+): Promise<HighlightsStarted> {
+  return api<HighlightsStarted>(`${videoPath(videoId)}/highlights`, {
+    method: 'POST',
+    ...(setup ? { body: { setup } } : {}),
+  });
+}
+
+/** Sprint 13, Module 05: what a Clip Setup costs, line by line, and what is left. Never a charge. */
+export function priceClipSetup(
+  videoId: string,
+  setup: ClipSetup,
+  options: { signal?: AbortSignal } = {},
+): Promise<SetupPriceView> {
+  return api<SetupPriceView>(`${videoPath(videoId)}/setup/price`, {
+    method: 'POST',
+    body: { setup },
+    signal: options.signal,
+  });
 }
 
 /** The price, the sound note and the latest Find Clips run of a video. */

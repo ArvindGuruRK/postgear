@@ -1,6 +1,6 @@
 # Module 05: Clip Setup And Highlights V2
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done (2026-11-26) | Size: L (one full session)
 > **Depends on**: [Module 02](module-02-transcription.md)
 > **Stories**: CA-3.1, CA-3.2, CA-3.4 (new: Genre)
 > **Next**: [Module 06](module-06-visual-moments.md), [Module 10](module-10-recipes-and-brand-kit.md)
@@ -77,14 +77,14 @@ Per blueprint section 2. A framed page inside `ClipsDesktopOnly`:
 
 ## Tasks
 
-- [ ] `highlights/`: rows, windows, candidates, score, fit, dedupe, blend, reasons, genre, setup and its price in AI minutes, with tests.
-- [ ] `ai-engine`: the moment picker, the title writer, their simulated answers.
-- [ ] The price route; the extended highlights route with its `consume` and `reverse` calls; `AI_TRANSCRIPT`; the internal pick route.
-- [ ] `clipHighlightsWorkflow`: `listening`, `reading`, `scoring` with fit, dedupe and blend; the fallback.
-- [ ] The Clip Setup page and form; the video page's button, Quick Find, results.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: open setup on the stream sample, type a request, change the range and length, see the price change, run, see titled clips. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `highlights/`: rows, windows, candidates, score, fit, dedupe, blend, reasons, genre, setup and its price in AI minutes, with tests.
+- [x] `ai-engine`: the moment picker, the title writer, their simulated answers.
+- [x] The price route; the extended highlights route with its `consume` and `reverse` calls; `AI_TRANSCRIPT`; the internal pick route.
+- [x] `clipHighlightsWorkflow`: `listening`, `reading`, `scoring` with fit, dedupe and blend; the fallback.
+- [x] The Clip Setup page and form; the video page's button, Quick Find, results.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: open setup on the stream sample, type a request, change the range and length, see the price change, run, see titled clips. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

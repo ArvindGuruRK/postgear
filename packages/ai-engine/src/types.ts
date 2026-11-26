@@ -262,6 +262,44 @@ export interface TranslateResult {
   lines: string[];
 }
 
+/** Clips AI, Module 05: one window of transcript rows to pick moments from. */
+export interface MomentPickRequest {
+  /** Overlapping windows of numbered rows (sentences). */
+  windows: ReadonlyArray<ReadonlyArray<{ n: number; text: string }>>;
+  request: string;
+  /** The genre's name ("Gaming") and its note for the picker ('' for Auto). */
+  genre: string;
+  genreNote: string;
+  /** "20 to 75 seconds". */
+  lengthHint: string;
+  /** The transcript's language name ("English"). */
+  language: string;
+  concurrency?: number;
+  windowTimeoutMs?: number;
+}
+
+/** A pick as the model answered it: row numbers and five parts, still to be checked. */
+export interface RawMomentPick {
+  fromRow: number;
+  toRow: number;
+  parts: { hook: number; standsAlone: number; payoff: number; clarity: number; shareable: number };
+  funny: boolean;
+  matchesRequest: boolean;
+}
+
+export interface MomentPickResult {
+  picks: RawMomentPick[];
+  windows: number;
+  /** Windows that failed and were skipped. */
+  failed: number;
+}
+
+export interface TitleRequest {
+  /** Each moment's words. */
+  moments: readonly string[];
+  language: string;
+}
+
 /** The snippet jobs bound to one model client. Rejects with an {@link AiProviderError}. */
 export interface SnippetWriter {
   hashtags(request: HashtagRequest, options?: { signal?: AbortSignal }): Promise<HashtagResult>;
@@ -272,7 +310,17 @@ export interface SnippetWriter {
     options?: { signal?: AbortSignal },
   ): Promise<CompetitorResearchResult>;
   /** Sprint 13 Clips AI: Translate Captions. */
-  translate(request: TranslateRequest, options?: { signal?: AbortSignal }): Promise<TranslateResult>;
+  translate(
+    request: TranslateRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<TranslateResult>;
+  /** Sprint 13 Clips AI: the moment picker (Find Clips with a setup). */
+  pickMoments(
+    request: MomentPickRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<MomentPickResult>;
+  /** Sprint 13 Clips AI: one title of at most eight words per moment ('' when none). */
+  writeTitles(request: TitleRequest, options?: { signal?: AbortSignal }): Promise<string[]>;
 }
 
 // ---------------------------------------------------------------------------

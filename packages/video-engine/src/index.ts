@@ -9,6 +9,7 @@
  * - `captions/`: Sprint 13: caption styles, mapping words onto the clip, paging,
  *   the SRT and VTT reader.
  * - `cleanup/`: Sprint 13: cutting a clip by its words, pauses and filler words.
+ * - `highlights/`: Sprint 13: Clip Setup and the transcript moment picker's pure parts.
  * - `document/`: the clip document schema, its upgrade chain and the creator.
  * - `effects/`: the looks and the vignette, as numbers both drawings read.
  * - `time/`: the time map between the video's clock and the clip's, the pure
@@ -32,6 +33,7 @@ export * from './downloads';
 export * from './effects';
 export * from './errors';
 export * from './export';
+export * from './highlights';
 export {
   clampRect,
   FULL_RECT,

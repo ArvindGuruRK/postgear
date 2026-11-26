@@ -18,6 +18,7 @@ import {
 } from '@postgear/db';
 import {
   aiMinutesCost,
+  highlightsOutputSchema,
   isSignalTrackName,
   type SignalTrackName,
   tracksSentence,
@@ -41,6 +42,12 @@ export interface HighlightRunView {
   aiMinutes: number;
   /** A failed or cancelled run had its AI minutes given back. */
   refunded: boolean;
+  /**
+   * Sprint 13, Module 05: a run with a setup, once it ended: whether it read
+   * the transcript, heard no speech, was asked for something, and how many
+   * clips matched. Null for Sprint 12's run (Quick Find) and before the end.
+   */
+  ai: { read: boolean; noSpeech: boolean; asked: boolean; matched: number } | null;
   createdAt: string;
   finishedAt: string | null;
 }
@@ -80,9 +87,15 @@ export function toHighlightRunView(run: ClipHighlightRun, job: ClipJob | null): 
     foundBy: status === 'DONE' && tracks.length > 0 ? tracksSentence(tracks) : null,
     aiMinutes: run.aiMinutesCharged,
     refunded: status === 'FAILED' || status === 'CANCELLED',
+    ai: aiOf(job),
     createdAt: run.createdAt.toISOString(),
     finishedAt: run.finishedAt?.toISOString() ?? null,
   };
+}
+
+function aiOf(job: ClipJob | null): HighlightRunView['ai'] {
+  const parsed = highlightsOutputSchema.safeParse(job?.output);
+  return parsed.success && parsed.data.ai ? parsed.data.ai : null;
 }
 
 /** The newest run of a video and its job. */

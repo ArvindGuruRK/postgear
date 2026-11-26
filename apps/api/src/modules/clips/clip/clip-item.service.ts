@@ -249,7 +249,7 @@ export class ClipItemService {
     ]);
 
     let sharp: SharpState = source?.kind === 'segment' ? 'ready' : open > 0 ? 'fetching' : 'gone';
-    if (sharp === 'gone' && clip.origin === 'AI_SIGNALS' && live.status === 'READY') {
+    if (sharp === 'gone' && (clip.origin === 'AI_SIGNALS' || clip.origin === 'AI_TRANSCRIPT') && live.status === 'READY') {
       // Module 16: an AI clip is made without its sharp range; the first open fetches it.
       if (await this.firstOpenSegment(orgId, clip, live, view.document, assets)) sharp = 'fetching';
     }

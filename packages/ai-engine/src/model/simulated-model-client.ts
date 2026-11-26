@@ -796,16 +796,133 @@ function simulateRewrite(user: string): { rewrite: string } {
  * line always answers the same words, as many as it had.
  */
 const TRANSLATION_WORDS: Record<string, readonly string[]> = {
-  ta: ['நண்பர்களே', 'இந்த', 'விளையாட்டு', 'மிகவும்', 'அருமை', 'இன்று', 'நாம்', 'பார்க்கலாம்', 'நன்றி', 'வணக்கம்', 'புதிய', 'காணொளி'],
+  ta: [
+    'நண்பர்களே',
+    'இந்த',
+    'விளையாட்டு',
+    'மிகவும்',
+    'அருமை',
+    'இன்று',
+    'நாம்',
+    'பார்க்கலாம்',
+    'நன்றி',
+    'வணக்கம்',
+    'புதிய',
+    'காணொளி',
+  ],
   hi: ['नमस्ते', 'दोस्तों', 'यह', 'खेल', 'शानदार', 'है', 'आज', 'हम', 'देखेंगे', 'धन्यवाद', 'नया', 'वीडियो'],
-  mr: ['नमस्कार', 'मित्रांनो', 'हा', 'खेळ', 'छान', 'आहे', 'आज', 'आपण', 'पाहूया', 'धन्यवाद', 'नवीन', 'व्हिडिओ'],
-  es: ['hola', 'amigos', 'este', 'juego', 'es', 'genial', 'hoy', 'vamos', 'a', 'ver', 'gracias', 'nuevo'],
-  fr: ['bonjour', 'les', 'amis', 'ce', 'jeu', 'est', 'super', 'aujourd\u2019hui', 'on', 'regarde', 'merci', 'nouveau'],
-  de: ['hallo', 'Freunde', 'dieses', 'Spiel', 'ist', 'toll', 'heute', 'schauen', 'wir', 'danke', 'neues', 'Video'],
-  pt: ['olá', 'amigos', 'este', 'jogo', 'é', 'incrível', 'hoje', 'vamos', 'ver', 'obrigado', 'novo', 'vídeo'],
-  it: ['ciao', 'amici', 'questo', 'gioco', 'è', 'fantastico', 'oggi', 'vediamo', 'grazie', 'nuovo', 'video', 'insieme'],
-  nl: ['hallo', 'vrienden', 'dit', 'spel', 'is', 'geweldig', 'vandaag', 'kijken', 'we', 'bedankt', 'nieuwe', 'video'],
-  en: ['hello', 'friends', 'this', 'game', 'is', 'great', 'today', 'we', 'watch', 'thanks', 'new', 'video'],
+  mr: [
+    'नमस्कार',
+    'मित्रांनो',
+    'हा',
+    'खेळ',
+    'छान',
+    'आहे',
+    'आज',
+    'आपण',
+    'पाहूया',
+    'धन्यवाद',
+    'नवीन',
+    'व्हिडिओ',
+  ],
+  es: [
+    'hola',
+    'amigos',
+    'este',
+    'juego',
+    'es',
+    'genial',
+    'hoy',
+    'vamos',
+    'a',
+    'ver',
+    'gracias',
+    'nuevo',
+  ],
+  fr: [
+    'bonjour',
+    'les',
+    'amis',
+    'ce',
+    'jeu',
+    'est',
+    'super',
+    'aujourd\u2019hui',
+    'on',
+    'regarde',
+    'merci',
+    'nouveau',
+  ],
+  de: [
+    'hallo',
+    'Freunde',
+    'dieses',
+    'Spiel',
+    'ist',
+    'toll',
+    'heute',
+    'schauen',
+    'wir',
+    'danke',
+    'neues',
+    'Video',
+  ],
+  pt: [
+    'olá',
+    'amigos',
+    'este',
+    'jogo',
+    'é',
+    'incrível',
+    'hoje',
+    'vamos',
+    'ver',
+    'obrigado',
+    'novo',
+    'vídeo',
+  ],
+  it: [
+    'ciao',
+    'amici',
+    'questo',
+    'gioco',
+    'è',
+    'fantastico',
+    'oggi',
+    'vediamo',
+    'grazie',
+    'nuovo',
+    'video',
+    'insieme',
+  ],
+  nl: [
+    'hallo',
+    'vrienden',
+    'dit',
+    'spel',
+    'is',
+    'geweldig',
+    'vandaag',
+    'kijken',
+    'we',
+    'bedankt',
+    'nieuwe',
+    'video',
+  ],
+  en: [
+    'hello',
+    'friends',
+    'this',
+    'game',
+    'is',
+    'great',
+    'today',
+    'we',
+    'watch',
+    'thanks',
+    'new',
+    'video',
+  ],
 };
 
 function simulateTranslations(user: string): { translations: string[] } {
@@ -832,6 +949,109 @@ function simulateTranslations(user: string): { translations: string[] } {
       const close = /[.!?]$/.test(line) ? (code === 'hi' || code === 'mr' ? '\u0964' : '.') : '';
       const text = words.join(' ');
       return text.length > 0 ? text.charAt(0).toUpperCase() + text.slice(1) + close : line;
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Find Clips with a setup (Sprint 13 Clips AI, Module 05)
+// ---------------------------------------------------------------------------
+
+const REQUEST_STOP_WORDS = new Set([
+  'about',
+  'that',
+  'this',
+  'with',
+  'from',
+  'what',
+  'when',
+  'where',
+  'some',
+  'moments',
+  'moment',
+  'clips',
+  'clip',
+  'parts',
+]);
+
+function numberedLines(body: string): Array<{ n: number; text: string }> {
+  const out: Array<{ n: number; text: string }> = [];
+  for (const line of body.split('\n')) {
+    const match = /^\s*(\d+)\.\s*(.*)$/.exec(line);
+    if (match) out.push({ n: Number(match[1]), text: (match[2] ?? '').trim() });
+  }
+  return out;
+}
+
+/**
+ * Moments picked the same way every run: the rows that say the request's
+ * words first, then the rows the genre and the words hash highest, each
+ * with the two rows after it. Five parts from the same hash. Gaming and
+ * Podcast seed differently, so they pick (and order) differently.
+ * `[simulate:pick-bad-row]` in a row answers a row number that does not exist.
+ */
+function simulatePicks(user: string) {
+  const genre = (readField(user, 'Genre') ?? 'Auto').toLowerCase();
+  const request = (readField(user, 'Request') ?? 'None').toLowerCase();
+  const wanted =
+    request === 'none'
+      ? []
+      : request
+          .split(/[^\p{L}\p{N}]+/u)
+          .filter((word) => word.length >= 4 && !REQUEST_STOP_WORDS.has(word));
+  const rows = numberedLines(readBlock(user, 'Transcript') ?? '');
+  if (rows.length === 0) return { picks: [] };
+  const last = rows[rows.length - 1]?.n ?? 0;
+  const matches = (text: string) => wanted.some((word) => text.toLowerCase().includes(word));
+  const ranked = [...rows].sort((a, b) => {
+    const am = matches(a.text) ? 1 : 0;
+    const bm = matches(b.text) ? 1 : 0;
+    if (am !== bm) return bm - am;
+    return (hashText(`${genre}:${b.text}`) % 997) - (hashText(`${genre}:${a.text}`) % 997);
+  });
+  const picks: Array<Record<string, unknown>> = [];
+  const taken = new Set<number>();
+  for (const row of ranked) {
+    if (picks.length >= 3) break;
+    const toRow = Math.min(last, row.n + 2);
+    let free = true;
+    for (let n = row.n; n <= toRow; n += 1) if (taken.has(n)) free = false;
+    if (!free) continue;
+    for (let n = row.n; n <= toRow; n += 1) taken.add(n);
+    const seed = hashText(`${genre}:${row.text}`);
+    const span = rows
+      .filter((other) => other.n >= row.n && other.n <= toRow)
+      .map((other) => other.text)
+      .join(' ');
+    picks.push({
+      fromRow: row.n,
+      toRow: /\[simulate:pick-bad-row\]/i.test(span) ? 9_999 : toRow,
+      hook: 8 + (seed % 13),
+      standsAlone: 8 + ((seed >> 4) % 13),
+      payoff: 8 + ((seed >> 8) % 13),
+      clarity: 10 + ((seed >> 12) % 11),
+      shareable: 6 + ((seed >> 16) % 15),
+      funny: /\b(ha|haha|lol|funny|joke)\b/i.test(span),
+      matchesRequest: wanted.length > 0 && matches(span),
+    });
+  }
+  return { picks };
+}
+
+/** The first words of each moment, as a title (at most six words, a capital first). */
+function simulateTitles(user: string) {
+  const moments = numberedLines(readBlock(user, 'Moments') ?? '');
+  return {
+    titles: moments.map((moment) => {
+      const words = moment.text
+        .replace(/[.,!?;:]+/g, ' ')
+        .split(/\s+/)
+        .filter((word) => word.length > 0)
+        .slice(0, 6)
+        .join(' ');
+      return words.length > 0
+        ? words.charAt(0).toUpperCase() + words.slice(1)
+        : 'A moment from the video';
     }),
   };
 }
@@ -891,7 +1111,11 @@ function simulateCompetitorResearch(user: string): {
     places.set(where, (places.get(where) ?? 0) + 1);
     const time = Date.parse(day);
     if (!Number.isNaN(time)) days.push(time);
-    const words = rest.join(' | ').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+    const words =
+      rest
+        .join(' | ')
+        .toLowerCase()
+        .match(/[\p{L}\p{N}]+/gu) ?? [];
     for (const word of new Set(words)) {
       if (word.length < 4 || RESEARCH_STOPWORDS.has(word) || /^\d+$/.test(word)) continue;
       tally.set(word, (tally.get(word) ?? 0) + 1);
@@ -938,6 +1162,12 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   }
   if (keys.includes('translations')) {
     return simulateTranslations(user);
+  }
+  if (keys.includes('picks')) {
+    return simulatePicks(user);
+  }
+  if (keys.includes('titles')) {
+    return simulateTitles(user);
   }
   if (keys.includes('openings') && keys.includes('themes')) {
     return simulateCompetitorResearch(user);

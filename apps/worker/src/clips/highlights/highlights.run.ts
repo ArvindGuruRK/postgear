@@ -5,8 +5,10 @@
  * | ---------- | -------- | ------------ |
  * | `loudness` | 0-30     | The video's stored tracks are read; loudness is measured from the analysis sound unless a current one is stored |
  * | `scenes`   | 30-75    | Scene changes from the light copy's keyframes, unless stored |
- * | `chat`     | 75-90    | A Twitch past stream's chat, when a chat source is bound, unless stored |
- * | `scoring`  | 90-100   | `findHighlights`, the new tracks stored, then one transaction: the run DONE, old unopened AI clips out, new clips in |
+ * | `chat`     | 75-80    | A Twitch past stream's chat, when a chat source is bound, unless stored |
+ * | `listening`| 80-86    | Sprint 13, a run with a setup: waits for its listening job (Module 02), when the stretch was not listened to yet |
+ * | `reading`  | 86-90    | Sprint 13: the API reads the transcript for moments (`pickMoments`) |
+ * | `scoring`  | 90-100   | `findHighlights`, and with a setup the moments blended with the signals of the chosen stretch; the new tracks stored, then one transaction: the run DONE, old unopened AI clips out, new clips in |
  *
  * Rules:
  * - A track already stored for the video at its current version is reused,
@@ -30,9 +32,22 @@ import {
   type SignalProducers,
 } from '@postgear/media-tools';
 import { type PrivateStorage, StorageNotFoundError } from '@postgear/storage';
+import type { ClipPickedMoment } from '@postgear/scheduling';
 import {
+  type BlendedClip,
+  blendWithSignals,
+  builtInCaptionStyle,
+  type ClipSetup,
+  captionLookSchema,
+  clipSetupSchema,
+  createCaptionsTrack,
   createClipDocument,
+  DEFAULT_CAPTION_STYLE,
   findHighlights,
+  genreTuning,
+  readTranscriptAssetMeta,
+  type TitledCandidate,
+  withCaptionsTrack,
   type HighlightRange,
   type HighlightsInput,
   highlightsOutputSchema,
@@ -47,6 +62,7 @@ import {
 } from '@postgear/video-engine';
 import { ClipStepError } from '../failures';
 import { deleteQuietly } from '../import/import.steps';
+import type { ClipInternalClient } from '../internal-client';
 import type { JobProgress } from '../job-progress';
 import { highlightsSignalsKey } from '../keys';
 import type {
@@ -75,7 +91,10 @@ export interface HighlightsRun {
   signal: AbortSignal;
   producers: SignalProducers;
   privateStorage: Pick<PrivateStorage, 'getToFile' | 'putFile' | 'delete'>;
-  rows: Pick<ClipRows, 'videoAssets' | 'finishHighlights'>;
+  rows: Pick<ClipRows, 'videoAssets' | 'finishHighlights'> &
+    Partial<Pick<ClipRows, 'job' | 'captionStyle'>>;
+  /** Sprint 13, Module 05: the API's moment picker (a run with a setup). */
+  internal?: Pick<ClipInternalClient, 'pickMoments'>;
   progress: Pick<JobProgress, 'report' | 'flush'>;
   heartbeat(): void;
   now(): Date;
@@ -224,6 +243,118 @@ export function highlightClips(
   });
 }
 
+/** Sprint 13, Module 05: the run's setup, or null for Sprint 12's run (Quick Find). */
+export function readRunSetup(
+  params: unknown,
+): { setup: ClipSetup; listenJobId: string | null } | null {
+  if (!params || typeof params !== 'object') return null;
+  const value = params as Record<string, unknown>;
+  const setup = clipSetupSchema.safeParse(value.setup);
+  if (!setup.success) return null;
+  return {
+    setup: setup.data,
+    listenJobId: typeof value.listenJobId === 'string' ? value.listenJobId : null,
+  };
+}
+
+/** How often the listening job is looked at, and the longest the run waits for it. */
+export const LISTEN_POLL_MS = 2_000;
+const TERMINAL = new Set(['DONE', 'FAILED', 'CANCELLED']);
+
+/** The listening job's end (any end: no words simply means the signals alone). */
+async function waitForListening(run: HighlightsRun, listenJobId: string): Promise<void> {
+  if (!run.rows.job) return;
+  let progress = 80;
+  for (;;) {
+    throwIfCancelled(run.signal);
+    const job = await run.rows.job(run.organizationId, listenJobId);
+    if (!job || TERMINAL.has(job.status)) return;
+    run.heartbeat();
+    progress = Math.min(85, progress + 0.25);
+    await run.progress.report({ stage: 'listening', progress: Math.floor(progress) });
+    await (run.sleep ?? defaultSleep)(LISTEN_POLL_MS, run.signal);
+  }
+}
+
+/** The moments as the blend takes them. */
+function asCandidates(moments: readonly ClipPickedMoment[]): TitledCandidate[] {
+  return moments.map((moment) => ({ ...moment, title: moment.title }));
+}
+
+/**
+ * The captions track for a new clip, when the setup asks for captions and
+ * the video has a transcript in its language: a built-in style's look, or
+ * the workspace's own style read from its row (the default look otherwise).
+ */
+async function captionsFor(
+  run: HighlightsRun,
+  setup: ClipSetup,
+): Promise<ReturnType<typeof createCaptionsTrack> | null> {
+  if (!setup.captions.on) return null;
+  const assets = await run.rows.videoAssets(run.organizationId, run.video.id);
+  const transcripts = assets
+    .filter((row) => row.kind === 'TRANSCRIPT')
+    .map((row) => ({ row, meta: readTranscriptAssetMeta(row.meta) }))
+    .filter((item) => item.meta !== null && item.meta.source === 'listened');
+  const found =
+    setup.language === 'auto'
+      ? transcripts[0]
+      : transcripts.find((item) => item.meta?.language === setup.language);
+  if (!found?.meta) return null;
+  let styleId = setup.captions.styleId;
+  let look = builtInCaptionStyle(styleId)?.look ?? null;
+  if (!look && run.rows.captionStyle) {
+    const own = await run.rows.captionStyle(run.organizationId, styleId);
+    const parsed = own ? captionLookSchema.safeParse(own.look) : null;
+    look = parsed?.success ? parsed.data : null;
+  }
+  if (!look) {
+    styleId = DEFAULT_CAPTION_STYLE;
+    look = builtInCaptionStyle(DEFAULT_CAPTION_STYLE)?.look ?? null;
+  }
+  if (!look) return null;
+  return createCaptionsTrack({
+    transcriptAssetId: found.row.id,
+    language: found.meta.language,
+    styleId,
+    look,
+  });
+}
+
+/** The clips of a run with a setup: its shape, its captions, the AI's titles. */
+export function setupClips(
+  video: Pick<VideoRow, 'id' | 'title'>,
+  link: Pick<VideoLinkRow, 'width' | 'height'>,
+  blended: readonly BlendedClip[],
+  setup: ClipSetup,
+  captions: ReturnType<typeof createCaptionsTrack> | null,
+): NewHighlightClip[] {
+  return blended.map((clip, index) => {
+    const base = createClipDocument({
+      videoId: video.id,
+      fromMs: clip.fromMs,
+      toMs: clip.toMs,
+      ratio: setup.ratio,
+      fps: 30,
+      ...(link.width && link.height ? { sourceAspect: link.width / link.height } : {}),
+    });
+    const document = captions ? withCaptionsTrack(base, captions) : base;
+    return {
+      id: randomUUID(),
+      title: clip.title?.trim()
+        ? clip.title.trim().slice(0, MAX_TITLE)
+        : highlightTitle(video.title, index + 1),
+      range: { fromMs: clip.fromMs, toMs: clip.toMs },
+      document: document as unknown as Record<string, unknown>,
+      ratio: document.canvas.ratio,
+      durationMs: outputDuration(document),
+      score: clip.score,
+      reasons: [...clip.reasons],
+      origin: clip.origin,
+    };
+  });
+}
+
 export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutcome> {
   const { video, signal } = run;
   const durationMs = video.durationMs ?? 0;
@@ -328,6 +459,24 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
   throwIfCancelled(signal);
   timings.chat = clock() - started;
 
+  // --- listening and reading (Sprint 13, a run with a setup) ------------------------------
+  const chosen = readRunSetup(run.run.params);
+  let picked: { moments: ClipPickedMoment[]; noSpeech: boolean; asked: boolean } | null = null;
+  if (chosen) {
+    started = clock();
+    await run.progress.report({ stage: 'listening', progress: 80 });
+    if (chosen.listenJobId) await waitForListening(run, chosen.listenJobId);
+    timings.listening = clock() - started;
+
+    started = clock();
+    await run.progress.report({ stage: 'reading', progress: 86 });
+    if (!run.internal) throw new ClipStepError('highlights_failed', { retryable: false });
+    picked = await run.internal.pickMoments(run.jobId, { organizationId: run.organizationId });
+    run.heartbeat();
+    throwIfCancelled(signal);
+    timings.reading = clock() - started;
+  }
+
   // --- scoring ---------------------------------------------------------------------
   started = clock();
   await run.progress.report({ stage: 'scoring', progress: 90 });
@@ -348,7 +497,36 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
   }
 
   const result = findHighlights(tracks, { durationMs });
-  const clips = highlightClips(video, run.link, result.ranges);
+  let clips: NewHighlightClip[];
+  let ai: { read: boolean; noSpeech: boolean; asked: boolean; matched: number } | undefined;
+  if (chosen && picked) {
+    const { range } = chosen.setup;
+    // Only the signal moments inside the chosen stretch take part.
+    const inside = result.ranges.filter((one) => {
+      const middle = (one.fromMs + one.toMs) / 2;
+      return middle >= range.fromMs && middle < range.toMs;
+    });
+    const blended = blendWithSignals(
+      asCandidates(picked.moments),
+      inside,
+      genreTuning(chosen.setup.genre),
+    );
+    clips = setupClips(
+      video,
+      run.link,
+      blended,
+      chosen.setup,
+      await captionsFor(run, chosen.setup),
+    );
+    ai = {
+      read: !picked.noSpeech,
+      noSpeech: picked.noSpeech,
+      asked: picked.asked,
+      matched: blended.filter((clip) => clip.matchesRequest).length,
+    };
+  } else {
+    clips = highlightClips(video, run.link, result.ranges);
+  }
   throwIfCancelled(signal);
 
   // The new tracks join the stored ones; nothing to write when all were reused.
@@ -376,7 +554,11 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
   }
   await run.progress.report({ stage: 'scoring', progress: 97 });
 
-  const output = highlightsOutputSchema.parse({ found: clips.length, used: result.used });
+  const output = highlightsOutputSchema.parse({
+    found: clips.length,
+    used: result.used,
+    ...(ai ? { ai } : {}),
+  });
   let finished: Awaited<ReturnType<ClipRows['finishHighlights']>>;
   try {
     finished = await run.rows.finishHighlights({

@@ -37,6 +37,8 @@ import { ClipsModule } from './clips.module';
 import { ClipsCoreModule } from './clips-core.module';
 import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
 import { ClipDownloadsService } from './downloads/clip-downloads.service';
+import { ClipHighlightsService } from './highlights/clip-highlights.service';
+import { ClipMomentsService } from './highlights/clip-moments.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
 import { ClipJobsRepository } from './jobs/clip-jobs.repository';
@@ -56,7 +58,7 @@ import { ClipTranscriptsService } from './transcripts/clip-transcripts.service';
 import { ClipCaptionStylesRepository } from './captions/clip-caption-styles.repository';
 import { ClipCaptionStylesService } from './captions/clip-caption-styles.service';
 import { ClipCaptionsService } from './captions/clip-captions.service';
-import { builtInCaptionStyle } from '@postgear/video-engine';
+import { builtInCaptionStyle, defaultClipSetup } from '@postgear/video-engine';
 import { AiModule } from '../ai/ai.module';
 import { AI_ENGINE } from '../ai/engine/engine.types';
 import { CLIP_LINK_PROBER } from './links/clip-links.types';
@@ -310,6 +312,19 @@ describe('Clips routes', () => {
       .useValue({})
       .overrideProvider(ClipReconcileService)
       .useValue({ reconcile })
+      // Sprint 13, Module 05: Clip Setup's price, the run with a setup, the internal pick.
+      .overrideProvider(ClipHighlightsService)
+      .useValue({
+        start: async (_org: string, _user: string, videoId: string, setup?: unknown) => ({
+          reached: 'highlights',
+          videoId,
+          setup: setup ?? null,
+        }),
+        price: async (_org: string, videoId: string) => ({ reached: 'setup-price', videoId }),
+        latest: async () => ({ reached: 'highlights-latest' }),
+      })
+      .overrideProvider(ClipMomentsService)
+      .useValue({ pick: async (jobId: string, org: string) => ({ reached: 'pick', jobId, org }) })
       .compile();
 
     app = moduleRef.createNestApplication({ logger: false });
@@ -705,5 +720,56 @@ describe('Clips routes', () => {
       .set('X-PostGear-Internal', TOKEN)
       .send({ everything: true })
       .expect(400);
+  });
+
+  it('starts Find Clips with or without a setup, and prices a setup, refusing what it does not know', async () => {
+    const server = app.getHttpServer();
+    const video = '66666666-6666-4666-8666-666666666666';
+    const setup = defaultClipSetup(600_000);
+    // No body: Sprint 12's one-press run (Quick Find).
+    expect(
+      (await request(server).post(`/clips/videos/${video}/highlights`).expect(202)).body,
+    ).toEqual({
+      reached: 'highlights',
+      videoId: video,
+      setup: null,
+    });
+    const withSetup = await request(server)
+      .post(`/clips/videos/${video}/highlights`)
+      .send({ setup: { ...setup, genre: 'gaming' } })
+      .expect(202);
+    expect(withSetup.body.setup).toMatchObject({ genre: 'gaming' });
+    await request(server)
+      .post(`/clips/videos/${video}/highlights`)
+      .send({ setup: { ...setup, action: true } })
+      .expect(400);
+    await request(server)
+      .post(`/clips/videos/${video}/highlights`)
+      .send({ setup, extra: 1 })
+      .expect(400);
+    expect(
+      (await request(server).post(`/clips/videos/${video}/setup/price`).send({ setup }).expect(200))
+        .body,
+    ).toEqual({ reached: 'setup-price', videoId: video });
+    await request(server).post(`/clips/videos/${video}/setup/price`).send({}).expect(400);
+    await request(server)
+      .post(`/clips/videos/${video}/setup/price`)
+      .send({ setup: { ...setup, request: 'x'.repeat(301) } })
+      .expect(400);
+  });
+
+  it('reads a transcript for moments only with the worker token', async () => {
+    const server = app.getHttpServer();
+    const job = '77777777-7777-4777-8777-777777777777';
+    await request(server)
+      .post(`/internal/clips/jobs/${job}/pick-moments`)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(401);
+    const answer = await request(server)
+      .post(`/internal/clips/jobs/${job}/pick-moments`)
+      .set('X-PostGear-Internal', TOKEN)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(200);
+    expect(answer.body).toEqual({ reached: 'pick', jobId: job, org: 'seed-demo-org' });
   });
 });

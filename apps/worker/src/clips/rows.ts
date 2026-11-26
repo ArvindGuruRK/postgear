@@ -121,6 +121,8 @@ export interface HighlightRunRow {
   videoId: string;
   status: keyof typeof ClipJobStatus;
   createdById: string | null;
+  /** Sprint 13, Module 05: the run's choices (a setup) as stored; read with `readRunSetup`. */
+  params?: unknown;
 }
 
 /** Where a video came from, for the chat step (Module 16). */
@@ -144,6 +146,8 @@ export interface NewHighlightClip {
   durationMs: number;
   score: number;
   reasons: string[];
+  /** Sprint 13, Module 05: picked from the transcript; Sprint 12's signals otherwise. */
+  origin?: 'AI_SIGNALS' | 'AI_TRANSCRIPT';
 }
 
 export interface FinishHighlightsArgs {
@@ -286,12 +290,15 @@ export interface ClipRows {
   finishTranscribe(args: FinishTranscribeArgs): Promise<FinishTranscribeResult>;
 }
 
+/** The clips a Find Clips run makes (Sprint 13 adds the transcript's). */
+const AI_ORIGINS = [ClipOrigin.AI_SIGNALS, ClipOrigin.AI_TRANSCRIPT];
+
 /** Unopened AI clips: what a new run may replace (Module 16 section 4). */
 export function replaceableAiClips(organizationId: string, videoId: string): Prisma.ClipWhereInput {
   return {
     organizationId,
     videoId,
-    origin: ClipOrigin.AI_SIGNALS,
+    origin: { in: AI_ORIGINS },
     status: ClipStatus.NEW,
     lastExportedRevision: null,
     posts: { none: {} },
@@ -655,7 +662,14 @@ export const prismaClipRows: ClipRows = {
   async highlightRun(organizationId, runId) {
     return prisma.clipHighlightRun.findFirst({
       where: { id: runId, organizationId },
-      select: { id: true, organizationId: true, videoId: true, status: true, createdById: true },
+      select: {
+        id: true,
+        organizationId: true,
+        videoId: true,
+        status: true,
+        createdById: true,
+        params: true,
+      },
     });
   },
 
@@ -713,7 +727,7 @@ export const prismaClipRows: ClipRows = {
           where: {
             organizationId: args.organizationId,
             videoId: args.videoId,
-            origin: ClipOrigin.AI_SIGNALS,
+            origin: { in: AI_ORIGINS },
           },
           select: { document: true },
         });
@@ -729,7 +743,7 @@ export const prismaClipRows: ClipRows = {
               videoId: args.videoId,
               title: clip.title,
               status: ClipStatus.NEW,
-              origin: ClipOrigin.AI_SIGNALS,
+              origin: clip.origin === 'AI_TRANSCRIPT' ? ClipOrigin.AI_TRANSCRIPT : ClipOrigin.AI_SIGNALS,
               score: clip.score,
               reasons: clip.reasons,
               highlightRunId: args.runId,

@@ -378,6 +378,20 @@ export const highlightsOutputSchema = z
     found: z.number().int().min(0),
     /** Module 16: the tracks the scorer used, in registry order. */
     used: z.array(z.string().min(1).max(32)).max(16).optional(),
+    /**
+     * Sprint 13, Module 05: a run with a setup, what it did (never a word):
+     * whether it read the transcript, heard no speech, was asked for
+     * something, and how many clips matched what was asked.
+     */
+    ai: z
+      .object({
+        read: z.boolean(),
+        noSpeech: z.boolean(),
+        asked: z.boolean(),
+        matched: z.number().int().min(0),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

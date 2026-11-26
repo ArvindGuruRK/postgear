@@ -23,6 +23,7 @@ import {
   ClipMenu,
   RenameField,
 } from './clip-actions';
+import { isAiOrigin } from '@/types/clips';
 
 export function ClipsTable({
   clips,
@@ -76,7 +77,7 @@ export function ClipsTable({
             <TableCell className="tabular-nums">{formatClipLength(clip.durationMs)}</TableCell>
             <TableCell className="tabular-nums">{clip.ratio}</TableCell>
             <TableCell className="tabular-nums" data-testid="clip-row-score">
-              {clip.origin === 'AI_SIGNALS' ? (scoreText(clip.score) ?? '') : ''}
+              {isAiOrigin(clip.origin) ? (scoreText(clip.score) ?? '') : ''}
             </TableCell>
             <TableCell>
               <Badge variant={CLIP_STATE_BADGE[clip.state]}>{CLIP_STATE_NAMES[clip.state]}</Badge>

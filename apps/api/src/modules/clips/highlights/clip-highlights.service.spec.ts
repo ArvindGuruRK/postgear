@@ -8,7 +8,12 @@
 import { HttpException } from '@nestjs/common';
 import type { ClipHighlightRun, ClipJob } from '@postgear/db';
 import { refusalMessage } from '@postgear/entitlements';
-import { SIGNALS_ENGINE_VERSION, SIGNALS_TUNING } from '@postgear/video-engine';
+import {
+  aiMinutesCost,
+  defaultClipSetup,
+  SIGNALS_ENGINE_VERSION,
+  SIGNALS_TUNING,
+} from '@postgear/video-engine';
 import { EntitlementRefusedException } from '../../entitlements/entitlement-refused.exception';
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import type { UsageService } from '../../entitlements/usage.service';
@@ -19,8 +24,9 @@ import { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { emptyTables, type FakeClipDb, type FakeTables, fakeClipDb } from '../testing/fake-clip-db';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
+import type { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
-import { ClipHighlightsService, signalsChargeKey } from './clip-highlights.service';
+import { ClipHighlightsService, readChargeKey, signalsChargeKey } from './clip-highlights.service';
 import { highlightsPrice, runStatus, toHighlightRunView } from './clip-highlights.view';
 
 let mockDb: FakeClipDb;
@@ -112,7 +118,16 @@ function fakeLedger(limit: number) {
 }
 
 let idCount = 0;
-function setup(options: { tables?: FakeTables; limit?: number; startOk?: boolean } = {}) {
+function setup(
+  options: {
+    tables?: FakeTables;
+    limit?: number;
+    startOk?: boolean;
+    /** What listening to the setup's stretch would cost (0: already listened to). */
+    listenPrice?: number;
+    ensure?: jest.Mock;
+  } = {},
+) {
   const tables = options.tables ?? seed();
   mockDb = fakeClipDb(tables);
   const ledger = fakeLedger(options.limit ?? 30);
@@ -134,14 +149,40 @@ function setup(options: { tables?: FakeTables; limit?: number; startOk?: boolean
     return `88888888-8888-4888-8888-${String(idCount).padStart(12, '0')}`;
   });
   const limits = { assertEnabled: jest.fn(async () => undefined) };
+  const limit = options.limit ?? 30;
+  const meterResolver = {
+    meter: jest.fn(async () => ({
+      used: ledger.used(),
+      limit,
+      remaining: limit - ledger.used(),
+      cycleStart: new Date('2026-11-01T00:00:00.000Z'),
+      cycleEnd: CYCLE_END,
+    })),
+  };
+  const listenPrice = options.listenPrice ?? 0;
+  const transcripts = {
+    quote: jest.fn(async () => ({ price: listenPrice, ms: 0, covered: listenPrice === 0 })),
+    ensure:
+      options.ensure ??
+      jest.fn(async (org: string, _user: string, _video: string, _request: unknown) => {
+        // The listening job charges under its own key, as Module 02 does.
+        await ledger.usage.consume(org, 'clips.ai_minutes_per_month', listenPrice, {
+          idempotencyKey: 'clips.ai:listen:listen-job',
+          refId: 'listen-job',
+        });
+        return { covered: false, job: { id: 'listen-job' }, price: listenPrice, joined: false };
+      }),
+  };
   const service = new ClipHighlightsService(
     new ClipVideosRepository(),
     jobs,
     jobsRepository,
     limits as unknown as ClipLimitsGuard,
     ledger.usage as unknown as UsageService,
+    meterResolver as unknown as EntitlementResolver,
+    transcripts as unknown as ClipTranscriptsService,
   );
-  return { service, tables, ledger, jobs, scheduling, limits };
+  return { service, tables, ledger, jobs, scheduling, limits, transcripts };
 }
 
 function seed(): FakeTables {
@@ -325,6 +366,86 @@ describe('POST /clips/videos/:videoId/highlights', () => {
       expect((await refusal(service.latest(org, id))).status).toBe(404);
     }
     expect(ledger.usage.consume).not.toHaveBeenCalled();
+  });
+});
+
+describe('Find Clips with a setup (Sprint 13, Module 05)', () => {
+  const duration = () => videoRow({ status: 'READY' }).durationMs as number;
+  const setupOf = (overrides = {}) => ({ ...defaultClipSetup(duration()), ...overrides });
+
+  it('prices each step and never charges for a price', async () => {
+    const { service, ledger } = setup({ listenPrice: 3 });
+    const price = await service.price(TEST_ORG, VIDEO, setupOf());
+    expect(price.lines).toEqual([
+      { step: 'listen', aiMinutes: 3 },
+      { step: 'read', aiMinutes: aiMinutesCost('read', duration()) },
+      { step: 'signals', aiMinutes: 0 },
+    ]);
+    expect(price.total).toBe(3 + aiMinutesCost('read', duration()));
+    expect(price.remaining).toBe(30);
+    expect(ledger.entries).toEqual([]);
+  });
+
+  it('charges reading under the run, listening under its own job, and keeps the setup on the run', async () => {
+    const { service, ledger, tables, transcripts } = setup({ listenPrice: 3 });
+    const started = await service.start(TEST_ORG, TEST_USER, VIDEO, setupOf({ genre: 'gaming' }));
+    const jobId = started.job.id;
+    expect(ledger.entries.map((entry) => [entry.key, entry.units])).toEqual([
+      [readChargeKey(jobId), aiMinutesCost('read', duration())],
+      ['clips.ai:listen:listen-job', 3],
+    ]);
+    expect(transcripts.ensure).toHaveBeenCalledWith(TEST_ORG, TEST_USER, VIDEO, {
+      fromMs: 0,
+      toMs: duration(),
+      language: 'auto',
+    });
+    const run = tables.runs?.[0] as unknown as { params: Record<string, unknown> };
+    expect(run.params).toMatchObject({
+      listenJobId: 'listen-job',
+      setup: { genre: 'gaming' },
+      charges: { read: 'entry-1', signals: null },
+    });
+  });
+
+  it('charges sound and picture too when nothing needs listening, and starts no listening', async () => {
+    const { service, ledger, transcripts } = setup({ listenPrice: 0 });
+    const started = await service.start(TEST_ORG, TEST_USER, VIDEO, setupOf());
+    expect(ledger.entries.map((entry) => entry.key)).toEqual([
+      readChargeKey(started.job.id),
+      signalsChargeKey(started.job.id),
+    ]);
+    expect(transcripts.ensure).not.toHaveBeenCalled();
+  });
+
+  it('refuses before any charge when the whole run does not fit what is left', async () => {
+    const { service, ledger } = setup({ listenPrice: 12, limit: 10 });
+    const refused = await refusal(service.start(TEST_ORG, TEST_USER, VIDEO, setupOf()));
+    expect(refused?.status).toBe(402);
+    expect(refused?.body).toMatchObject({ code: 'clips_ai_minutes_used' });
+    expect(ledger.entries).toEqual([]);
+  });
+
+  it('gives the reading charge back when listening is refused', async () => {
+    const ensure = jest.fn(async () => {
+      throw new EntitlementRefusedException('clips_ai_minutes_used', 'No minutes.', {});
+    });
+    const { service, ledger } = setup({ listenPrice: 3, ensure });
+    await expect(service.start(TEST_ORG, TEST_USER, VIDEO, setupOf())).rejects.toBeInstanceOf(
+      EntitlementRefusedException,
+    );
+    expect(ledger.used()).toBe(0);
+  });
+
+  it('keeps the setup inside the video', async () => {
+    const { service } = setup();
+    const refused = await refusal(
+      service.price(
+        TEST_ORG,
+        VIDEO,
+        setupOf({ range: { fromMs: duration() - 1_000, toMs: duration() + 60_000 } }),
+      ),
+    );
+    expect(refused?.status).toBe(422);
   });
 });
 

@@ -35,7 +35,7 @@ import { storedRange, withoutKept } from '../highlights/kept';
 /** A clip as the fake keeps it (Module 16 reads origin, status and the replace rule). */
 export interface FakeClip extends ClipRow {
   organizationId: string;
-  origin?: 'MANUAL' | 'AI_SIGNALS';
+  origin?: 'MANUAL' | 'AI_SIGNALS' | 'AI_TRANSCRIPT';
   status?: 'NEW' | 'DRAFT' | 'HIDDEN';
   exported?: boolean;
   sent?: boolean;
@@ -244,7 +244,7 @@ export class FakeRows implements ClipRows {
       const replaceable =
         clip.organizationId === args.organizationId &&
         clip.videoId === args.videoId &&
-        clip.origin === 'AI_SIGNALS' &&
+        (clip.origin === 'AI_SIGNALS' || clip.origin === 'AI_TRANSCRIPT') &&
         clip.status === 'NEW' &&
         !clip.exported &&
         !clip.sent;
@@ -258,7 +258,7 @@ export class FakeRows implements ClipRows {
         (clip) =>
           clip.organizationId === args.organizationId &&
           clip.videoId === args.videoId &&
-          clip.origin === 'AI_SIGNALS',
+          (clip.origin === 'AI_SIGNALS' || clip.origin === 'AI_TRANSCRIPT'),
       )
       .map((clip) => storedRange(clip.document));
     const fresh = withoutKept(args.clips, kept);
@@ -268,7 +268,7 @@ export class FakeRows implements ClipRows {
         organizationId: args.organizationId,
         videoId: args.videoId,
         title: clip.title,
-        origin: 'AI_SIGNALS',
+        origin: clip.origin ?? 'AI_SIGNALS',
         status: 'NEW',
         score: clip.score,
         reasons: clip.reasons,

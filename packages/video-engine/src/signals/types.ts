@@ -47,6 +47,12 @@ export const HIGHLIGHT_REASONS = [
   'silence_then_noise',
   'fast_cuts',
   'replayed',
+  // Sprint 13, Module 05: what the transcript moment picker saw.
+  'matches_request',
+  'strong_opening',
+  'complete_thought',
+  'clear_payoff',
+  'funny_exchange',
 ] as const;
 export type HighlightReason = (typeof HIGHLIGHT_REASONS)[number];
 
@@ -59,6 +65,11 @@ export const HIGHLIGHT_REASON_LABELS: Readonly<Record<HighlightReason, string>> 
   silence_then_noise: 'Sudden silence then noise',
   fast_cuts: 'Fast cuts',
   replayed: 'Viewers replayed this',
+  matches_request: 'Matches what you asked for',
+  strong_opening: 'Strong opening line',
+  complete_thought: 'Complete thought',
+  clear_payoff: 'Clear payoff',
+  funny_exchange: 'Funny exchange',
 });
 
 export function isHighlightReason(value: unknown): value is HighlightReason {

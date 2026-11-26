@@ -19,6 +19,7 @@
  * - **Notes** in `type-muted`: the AI note always, the no-sound note, and
  *   the nothing-found note.
  */
+import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   Alert,
@@ -31,10 +32,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  buttonVariants,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   MotionIcon,
   Progress,
   toast,
 } from '@postgear/ui';
+import Link from 'next/link';
 import { TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActionLink } from '@/components/home/home-actions';
@@ -51,8 +59,8 @@ import {
   asksFirst,
   findAgainSentence,
   findClipsBlock,
-  findClipsLabel,
   findClipsNotes,
+  quickFindLabel,
   HIGHLIGHTS_CANCELLED,
   HIGHLIGHTS_FAILED,
 } from './find-clips-model';
@@ -165,15 +173,39 @@ export function FindClips({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          <Button
-            variant="highlight"
-            className="w-full"
-            disabled={block !== null || starting}
-            onClick={request}
-          >
-            <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
-            {starting ? 'Starting' : findClipsLabel(price)}
-          </Button>
+          {/* Sprint 13: Find Clips opens Clip Setup; Quick Find keeps Sprint 12's one press. */}
+          <div className="flex items-stretch gap-2">
+            <Link
+              href={`/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(videoId)}/setup`}
+              className={cn(buttonVariants({ variant: 'highlight' }), 'flex-1')}
+              data-testid="find-clips-setup"
+            >
+              <MotionIcon icon={SparklesIcon} className="h-4 w-4" />
+              Find Clips
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="secondary"
+                  aria-label="More Ways To Find Clips"
+                  className="px-3"
+                  disabled={starting}
+                  data-testid="find-clips-more"
+                >
+                  <MotionIcon icon={ChevronDownIcon} className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={block !== null || starting}
+                  onSelect={request}
+                  data-testid="find-clips-quick"
+                >
+                  {starting ? 'Starting' : quickFindLabel(price)}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <AiMinutesChipView meter={meter} orgId={orgId} className="self-start" />
         </div>
       )}

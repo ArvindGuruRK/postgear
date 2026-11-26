@@ -70,6 +70,7 @@ import {
   type MarkedRange,
   moveMark,
 } from './video-page-model';
+import { isAiOrigin } from '@/types/clips';
 
 const LABEL_PX = TIMELINE_LABEL_WIDTH_PX;
 /** The Video row is `tall` (56 px), Sound the default (40 px); 2 px border each side. */
@@ -416,7 +417,7 @@ export function SourceTimeline({
                 )}
                 {onPlayClip
                   ? clips.map((clip) =>
-                      clip.range && clip.origin === 'AI_SIGNALS' ? (
+                      clip.range && isAiOrigin(clip.origin) ? (
                         <TooltipHint key={`flag-${clip.id}`} label={`Play ${clip.title}`}>
                           <button
                             type="button"

@@ -21,6 +21,7 @@ import {
   type ClipFinishExportAnswer,
   type ClipFinishExportBody,
   type ClipFinishSaveDownloadAnswer,
+  type ClipPickMomentsAnswer,
   type ClipFinishSaveDownloadBody,
   type ClipReconcileAnswer,
   type ClipReverseAnswer,
@@ -37,6 +38,8 @@ type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 export interface ClipInternalClient {
   chargeImport(jobId: string, body: ClipChargeImportBody): Promise<ClipChargeImportAnswer>;
   reverseCharges(jobId: string, body: ClipReverseBody): Promise<ClipReverseAnswer>;
+  /** Sprint 13, Module 05: the run's transcript read for moments (the API holds the model). */
+  pickMoments(jobId: string, body: ClipReverseBody): Promise<ClipPickMomentsAnswer>;
   finishExport(jobId: string, body: ClipFinishExportBody): Promise<ClipFinishExportAnswer>;
   /** Module 18: Save To Media's copy becomes a Media row. */
   finishSaveDownload(
@@ -111,9 +114,9 @@ export function createClipInternalClient(config: ClipInternalClientConfig): Clip
   return {
     chargeImport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.chargeImport(jobId), body),
     reverseCharges: (jobId, body) => call(CLIP_INTERNAL_ROUTES.reverseCharges(jobId), body),
+    pickMoments: (jobId, body) => call(CLIP_INTERNAL_ROUTES.pickMoments(jobId), body),
     finishExport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishExport(jobId), body),
-    finishSaveDownload: (jobId, body) =>
-      call(CLIP_INTERNAL_ROUTES.finishSaveDownload(jobId), body),
+    finishSaveDownload: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishSaveDownload(jobId), body),
     async settled(jobId, body) {
       try {
         return await call<ClipSettledAnswer>(CLIP_INTERNAL_ROUTES.settled(jobId), body);

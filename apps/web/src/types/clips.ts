@@ -161,7 +161,12 @@ export interface ClipImportOutcome {
 }
 
 export type ClipStatusName = 'NEW' | 'DRAFT' | 'HIDDEN';
-export type ClipOriginName = 'MANUAL' | 'AI_SIGNALS';
+export type ClipOriginName = 'MANUAL' | 'AI_SIGNALS' | 'AI_TRANSCRIPT' | 'AUTO_EDIT';
+
+/** A clip a Find Clips run made (from signals, or from the transcript since Sprint 13). */
+export function isAiOrigin(origin: ClipOriginName | string | null | undefined): boolean {
+  return origin === 'AI_SIGNALS' || origin === 'AI_TRANSCRIPT';
+}
 
 /** One clip with its document (`GET /clips/:clipId`, `POST /clips`). */
 export interface ClipView {
@@ -438,8 +443,21 @@ export interface HighlightRunView {
   aiMinutes: number;
   /** A failed or cancelled run had its AI minutes given back. */
   refunded: boolean;
+  /** Sprint 13, Module 05: what a run with a setup did; null for Quick Find and before the end. */
+  ai?: { read: boolean; noSpeech: boolean; asked: boolean; matched: number } | null;
   createdAt: string;
   finishedAt: string | null;
+}
+
+/** `POST /clips/videos/:videoId/setup/price`: the price of a Clip Setup, line by line. */
+export interface SetupPriceView {
+  lines: Array<{ step: 'listen' | 'read' | 'signals' | 'action'; aiMinutes: number }>;
+  total: number;
+  rangeMs: number;
+  /** What is left this month, or null for no limit. */
+  remaining: number | null;
+  limit: number | null;
+  cycleEnd: string;
 }
 
 /** Find Clips on the video page: the price, whether the video has sound, the latest run. */

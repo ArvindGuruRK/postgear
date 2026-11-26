@@ -117,7 +117,16 @@ function renderFind(highlights: Partial<HighlightsView> = {}, clips: readonly Cl
   return { onSettled, ...utils };
 }
 
-const findButton = () => screen.getByRole('button', { name: /Find Clips \(3 AI Minutes\)/ });
+/** Quick Find (Sprint 12's one-press run) sits in the menu beside Find Clips since Sprint 13. */
+const findButton = () => {
+  if (!screen.queryByTestId('find-clips-quick')) {
+    fireEvent.keyDown(screen.getByTestId('find-clips-more'), { key: 'Enter' });
+  }
+  const item = screen.getByTestId('find-clips-quick');
+  expect(item).toHaveTextContent('Quick Find (3 AI Minutes)');
+  return item;
+};
+const isOff = (item: HTMLElement) => item.hasAttribute('data-disabled');
 
 describe('FindClips', () => {
   it('shows the price, and the minutes left; a first run starts without asking', async () => {
@@ -127,7 +136,12 @@ describe('FindClips', () => {
       meter: { used: 183, remaining: 117, limit: 300, cycleEnd: '2026-12-01T00:00:00.000Z' },
     });
     renderFind();
-    expect(findButton()).toBeEnabled();
+    // Find Clips opens Clip Setup (Sprint 13).
+    expect(screen.getByTestId('find-clips-setup')).toHaveAttribute(
+      'href',
+      `/seed-demo-org/clips/video/${VIDEO}/setup`,
+    );
+    expect(isOff(findButton())).toBe(false);
     expect(screen.getByTestId('clips-ai-minutes')).toHaveTextContent('120 of 300 AI minutes left');
 
     fireEvent.click(findButton());
@@ -163,7 +177,6 @@ describe('FindClips', () => {
   it('is off with the sentence and See Plans when the minutes are short', () => {
     mockPlan.meter = { limit: 300, remaining: 2, cycleEnd: '2026-12-01T00:00:00.000Z', used: 298 };
     renderFind();
-    expect(findButton()).toBeDisabled();
     const alert = screen.getByTestId('find-clips-blocked');
     expect(alert).toHaveTextContent(
       'This needs 3 AI minutes and you have 2 left. They come back on 1 December, or you can upgrade the plan.',
@@ -172,6 +185,8 @@ describe('FindClips', () => {
       'href',
       '/seed-demo-org/settings/billing',
     );
+    // Quick Find in the menu is off too.
+    expect(isOff(findButton())).toBe(true);
   });
 
   it('says so when none are left', () => {
@@ -260,6 +275,23 @@ describe('FindClips', () => {
     fireEvent.click(findButton());
     await waitFor(() => expect(onSettled).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('find-clips-problem')).not.toBeInTheDocument();
+  });
+
+  it('says what a run with a setup did: listened, no speech, or nothing matched the request', () => {
+    const done = (ai: NonNullable<ReturnType<typeof run>['ai']>, found = 3) => ({
+      ...run('DONE'),
+      found,
+      ai,
+    });
+    renderFind({ run: done({ read: true, noSpeech: false, asked: true, matched: 0 }) });
+    expect(
+      screen.getByText('AI listened to what was said and looked at sound and picture.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Nothing matched what you asked for. Here are the best moments we found instead.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('notes no sound, and nothing found', () => {

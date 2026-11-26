@@ -1263,6 +1263,21 @@ A Jest test and a pytest test fail when either file is stale, and both sides par
 
 `npx jest --config packages/media-tools/jest.config.js cuts-parity` (with `FFMPEG_PATH` and `FFPROBE_PATH` from `.env`, Docker up) proves on the real FFmpeg that twenty cuts export frame-exact and never click.
 
+**Clip Setup and Find Clips with AI (Module 05).** On the 10 minute stream sample's video page:
+
+| Do this | What you should see |
+|---|---|
+| Press **Find Clips** | Clip Setup opens: Spoken Language, Genre, the Range slider, What should we look for?, Clip Length, Shape, Captions, and the Summary with one price line per step and the total on the button, for example "Find Clips (8 AI Minutes)". Nothing is charged |
+| Drag the range to half | The price drops (about half); Listening reads "free" for any part already listened to, and Sound And Picture is free whenever the run listens |
+| Type "the tunnel jump", pick Gaming, 30 To 60 Seconds, Vertical, press **Find Clips** | Back on the video page the run's steps show in words (sound, picture, chat, then "Listening to what is said" and "Reading for the best moments" when it listens), then titled clips with a score and reasons; the one about the tunnel jump is first with "Matches what you asked for", and the note reads "AI listened to what was said and looked at sound and picture." |
+| Open a clip | Vertical, 30 to 60 seconds, starting on a sentence; with Captions on in the setup it opens captioned in the style picked |
+| Clip Setup again on the same stretch | Listening reads "free" |
+| A request nothing in the video matches | The note "Nothing matched what you asked for. Here are the best moments we found instead." |
+| The menu beside Find Clips, **Quick Find** | Sprint 12's one-press run at its own price ("Quick Find (3 AI Minutes)") |
+| A month with too few AI minutes left | The button is off and the card says how many the run needs and how many are left, with **See Plans** |
+
+Under simulation the moment picker answers from the transcript, the request and the genre, so Gaming and Podcast pick differently and the same setup gives the same clips every time; titles are the moment's first words.
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash
