@@ -47,6 +47,20 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate --schema packages/db/prisma/schema.prisma
 
+      # Sprint 13: apps/media is Python, checked by the same `npm run validate`
+      # (Ruff, mypy, pytest through its package.json). uv installs the pinned
+      # Python and the locked packages; `--locked` fails on a stale uv.lock.
+      # Base and dev groups only: no model library is ever installed in CI.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/media/uv.lock
+
+      - name: Install the media service's Python packages
+        working-directory: apps/media
+        run: uv sync --locked
+
       # turbo run lint typecheck test, across every workspace.
       - name: Validate
         run: npm run validate

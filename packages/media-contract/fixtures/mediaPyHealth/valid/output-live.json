@@ -1,0 +1,14 @@
+{
+  "contractVersion": 1,
+  "serviceVersion": "0.1.0",
+  "pythonVersion": "3.13.18",
+  "simulation": false,
+  "taskQueue": "postgear-media-py",
+  "bindings": {
+    "transcriber": { "state": "live", "name": "faster-whisper" },
+    "faces": { "state": "off", "name": "mediapipe" },
+    "motion": { "state": "live", "name": "opencv" },
+    "stills": { "state": "live", "name": "opencv" }
+  },
+  "modelsPresent": true
+}

@@ -16,7 +16,7 @@ import type { RunTool } from '../run/types';
 import { audioArgs, normaliseArgs, normaliseFps, remuxArgs } from './ffmpeg.args';
 import { fileBytes, hasContent, moveFile, removeDirQuietly, unlinkQuietly } from './files';
 import { createFfmpegProgressHandler, createSpanReporter } from './progress';
-import { sampleDurationMs, sampleFileName } from './samples';
+import { isOwnSample, type SampleName, sampleDurationMs, sampleFileName } from './samples';
 import { resolveSimulationLink, type SimulationAnswer } from './simulation';
 import {
   type Downloader,
@@ -194,12 +194,16 @@ class FixtureDownloader implements Downloader {
     return { probe: mapProbeJson(answer.probeJson, link), answer };
   }
 
-  private async samplePath(answer: { sample: 'talk' | 'stream' }): Promise<string> {
+  private async samplePath(answer: { sample: SampleName }): Promise<string> {
     const file = path.join(this.options.samplesDir, sampleFileName(answer.sample));
     if (!(await hasContent(file))) {
       throw new DownloaderError('tool_failed', {
         retryable: false,
-        cause: new Error('The sample videos are missing: run npm run clips:samples.'),
+        cause: new Error(
+          isOwnSample(answer.sample)
+            ? `The ${answer.sample} sample is a video you supply: put it where fixtures/samples/plan.json says and run npm run clips:samples.`
+            : 'The sample videos are missing: run npm run clips:samples.',
+        ),
       });
     }
     return file;
@@ -208,7 +212,7 @@ class FixtureDownloader implements Downloader {
   /** The whole sample is copied; a shorter video (a clip, a short) is the sample's opening, remuxed. */
   private async takeFromSample(
     sample: string,
-    answer: { sample: 'talk' | 'stream'; takeMs: number },
+    answer: { sample: SampleName; takeMs: number },
     outFile: string,
     signal: AbortSignal,
   ): Promise<void> {

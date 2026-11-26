@@ -19,6 +19,7 @@
     "@postgear/ai-engine": "*",
     "@postgear/automation": "*",
     "@postgear/db": "*",
+    "@postgear/media-contract": "*",
     "@postgear/media-tools": "*",
     "@postgear/scheduling": "*",
     "@postgear/seo-engine": "*",

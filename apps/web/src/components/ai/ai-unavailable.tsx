@@ -27,10 +27,12 @@ export function AiUnavailable() {
         <li className={cn(INSET, 'flex gap-3 p-4')}>
           <AiSticker icon={KeyRound} tone="primary" />
           <span className="flex min-w-0 flex-col gap-1">
-            <code className="font-sans text-sm font-bold text-ink">OPENAI_API_KEY</code>
+            <code className="font-sans text-sm font-bold text-ink">
+              OPENAI_API_KEY or OPENROUTER_API_KEY
+            </code>
             <span className="font-sans text-sm text-ink type-muted">
               A real key: posts, research (with <code>TAVILY_API_KEY</code>) and images, paid per
-              call.
+              call. OpenRouter writes text only; images need the OpenAI key.
             </span>
           </span>
         </li>

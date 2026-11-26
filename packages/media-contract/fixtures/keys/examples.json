@@ -1,0 +1,23 @@
+{
+  "valid": [
+    "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/analysis-audio-0123456789abcdef0123456789abcdef.m4a",
+    "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/transcript-0123456789abcdef0123456789abcdef.json.gz",
+    "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/face-tracks-0123456789abcdef0123456789abcdef.json.gz",
+    "clips/9b2e6c1a-0d4f-4a8b-9c7e-1f2a3b4c5d6e/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/proxy-0123456789abcdef0123456789abcdef.mp4",
+    "clips/seed-demo-org/exports/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/render.mp4",
+    "clips/seed-demo-org/proofs/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/still_0001.jpg",
+    "clips/seed-demo-org/library/0123456789abcdef0123456789abcdef.png"
+  ],
+  "invalid": [
+    "/clips/seed-demo-org/library/0123456789abcdef0123456789abcdef.png",
+    "clips/seed-demo-org/../other/library/0123456789abcdef0123456789abcdef.png",
+    "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/proxy-0123.mp4",
+    "clips/Seed-Demo-Org/library/0123456789abcdef0123456789abcdef.png",
+    "clips/seed-demo-org/library/0123456789abcdef0123456789abcdef.html",
+    "clips/seed-demo-org/exports/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/../render.mp4",
+    "clips\\seed-demo-org\\library\\0123456789abcdef0123456789abcdef.png",
+    "uploads/2026/11/file.mp4",
+    "clips/seed-demo-org/2F1C8A3E-4B5D-4E6F-8A9B-0C1D2E3F4A5B/proxy-0123456789abcdef0123456789abcdef.mp4",
+    ""
+  ]
+}

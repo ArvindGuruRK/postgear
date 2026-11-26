@@ -28,7 +28,7 @@ import type {
   SnippetWriter,
 } from '@postgear/ai-engine';
 
-export type AiMode = 'openai' | 'simulation' | 'unconfigured';
+export type AiMode = 'openai' | 'openrouter' | 'simulation' | 'unconfigured';
 
 /** `GET /ai/status`. */
 export interface AiStatus {

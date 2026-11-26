@@ -1,0 +1,8 @@
+{
+  "contractVersion": 1,
+  "serviceVersion": "0.1.0",
+  "pythonVersion": "3.13.18",
+  "simulation": true,
+  "taskQueue": "postgear-media-py",
+  "modelsPresent": false
+}

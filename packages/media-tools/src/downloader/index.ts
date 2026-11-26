@@ -37,6 +37,12 @@ export {
 } from './progress';
 export {
   defaultSamplesDir,
+  GENERATED_SAMPLES,
+  type GeneratedSampleName,
+  isOwnSample,
+  OWN_SAMPLES,
+  type OwnSampleName,
+  SAMPLE_NAMES,
   SAMPLES_FOLDER,
   type SampleChat,
   sampleChat,
@@ -44,7 +50,9 @@ export {
   sampleFileName,
   type SampleName,
   type SamplePlan,
+  type SampleSpec,
   samplePlan,
+  sampleSpec,
 } from './samples';
 export { resolveSimulationLink, type SimulationAnswer, simulationLinks } from './simulation';
 export * from './types';

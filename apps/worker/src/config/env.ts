@@ -187,6 +187,13 @@ const envSchema = z
      * platform is ever contacted. Refused in production.
      */
     CLIPS_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // Sprint 13: the Python media service. `MEDIA_SIMULATION` answers every
+    // Python step from recorded files (no model); unset, it follows
+    // CLIPS_SIMULATION. Refused in production. `MEDIA_URL` is the service's
+    // health address, `MEDIA_INTERNAL_TOKEN` the header it checks.
+    MEDIA_SIMULATION: blankAsUnset(z.enum(['true', 'false']).optional()),
+    MEDIA_URL: blankAsUnset(z.string().url().default('http://localhost:8100')),
+    MEDIA_INTERNAL_TOKEN: blankAsUnset(z.string().min(32).optional()),
     // The same list as the API's: a paused platform is never fetched from.
     CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
     // The operator's library ingest refuses to start unless this is true.
@@ -272,6 +279,15 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['WEBHOOK_ALLOW_PRIVATE_URLS'],
         message: 'WEBHOOK_ALLOW_PRIVATE_URLS cannot be enabled in production',
+      });
+    }
+
+    const mediaSimulation = env.MEDIA_SIMULATION ?? env.CLIPS_SIMULATION;
+    if (mediaSimulation === 'true' && env.NODE_ENV === 'production') {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MEDIA_SIMULATION'],
+        message: 'MEDIA_SIMULATION cannot be enabled in production',
       });
     }
 

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "background": "#000000"
+  },
+  "sources": [
+    {
+      "id": "src",
+      "videoId": "6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_fast",
+      "source": "src",
+      "sourceIn": 2000,
+      "sourceOut": 10000,
+      "speed": 2,
+      "volume": 1
+    },
+    {
+      "id": "seg_slow",
+      "source": "src",
+      "sourceIn": 12000,
+      "sourceOut": 14000,
+      "speed": 0.5,
+      "volume": 1
+    }
+  ],
+  "layout": {
+    "kind": "split",
+    "areas": [
+      {
+        "id": "main",
+        "name": "Camera",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 0.375
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0,
+              "y": 0.6,
+              "w": 0.3375000000000001,
+              "h": 0.4
+            }
+          }
+        ],
+        "fit": "cover"
+      },
+      {
+        "id": "area_c1ab5c24b05a379f",
+        "name": "Content",
+        "frame": {
+          "x": 0,
+          "y": 0.375,
+          "w": 1,
+          "h": 0.625
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0.24687499999999996,
+              "y": 0,
+              "w": 0.5062500000000001,
+              "h": 1
+            }
+          }
+        ],
+        "fit": "cover"
+      }
+    ]
+  },
+  "zooms": [],
+  "looks": {
+    "colour": "none",
+    "strength": 0,
+    "vignette": 0
+  },
+  "fades": {
+    "inMs": 0,
+    "outMs": 0
+  },
+  "tracks": []
+}

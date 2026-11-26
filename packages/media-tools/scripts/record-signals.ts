@@ -17,7 +17,12 @@ import {
   SIGNALS_FILE_FORMAT,
   type SignalTrack,
 } from '@postgear/video-engine';
-import { defaultSamplesDir, type SampleName, samplePlan } from '../src/downloader/samples';
+import {
+  defaultSamplesDir,
+  type SampleName,
+  samplePlan,
+  sampleSpec,
+} from '../src/downloader/samples';
 import { extractAnalysisAudio } from '../src/ffmpeg/import';
 import { toolPaths } from '../src/run/paths';
 import { createRunTool } from '../src/run/runner';
@@ -53,7 +58,7 @@ async function talkReplayed(durationMs: number): Promise<SignalTrack | null> {
 
 async function record(name: SampleName): Promise<void> {
   const plan = samplePlan();
-  const sample = plan[name];
+  const sample = sampleSpec(name);
   const durationMs = Math.round(sample.durationSec * 1000);
   const file = path.join(defaultSamplesDir(__dirname), sample.file);
   const runTool = createRunTool(toolPaths(process.env));

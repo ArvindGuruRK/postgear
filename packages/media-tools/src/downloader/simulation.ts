@@ -17,7 +17,7 @@ import twitchStream from '../../fixtures/ytdlp/probe-twitch-stream.json';
 import youtubeTalk from '../../fixtures/ytdlp/probe-youtube-talk.json';
 import linksJson from '../../fixtures/simulation/links.json';
 import { findSimulatedItem, type SimulatedItem } from '../channels/simulation-fixture';
-import { type SampleName, sampleDurationMs } from './samples';
+import { SAMPLE_NAMES, type SampleName, sampleDurationMs } from './samples';
 
 /** The recorded probes, by the name the links file uses. */
 const PROBES: Readonly<Record<string, unknown>> = Object.freeze({
@@ -47,7 +47,7 @@ const linkEntrySchema = z.object({
   externalId: z.string().min(1),
   url: z.string().url(),
   probe: z.string().optional(),
-  sample: z.enum(['talk', 'stream']).optional(),
+  sample: z.enum(SAMPLE_NAMES).optional(),
   stderr: z.string().optional(),
   overrides: z.record(z.unknown()).optional(),
   fetchErrors: fetchErrorsSchema.optional(),

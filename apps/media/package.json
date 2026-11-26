@@ -1,0 +1,19 @@
+{
+  "name": "@postgear/media",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Python media service (FastAPI and a Temporal worker on postgear-media-py). Scripts call uv.",
+  "scripts": {
+    "dev": "node scripts/run-uv.js --optional run --env-file ../../.env uvicorn postgear_media.main:app --reload --reload-dir src --host 127.0.0.1 --port 8100",
+    "start": "node scripts/run-uv.js run --no-dev python -m postgear_media.worker",
+    "lint": "node scripts/run-uv.js run ruff check . && node scripts/run-uv.js run ruff format --check .",
+    "lint:fix": "node scripts/run-uv.js run ruff check --fix . && node scripts/run-uv.js run ruff format .",
+    "typecheck": "node scripts/run-uv.js run mypy",
+    "test": "node scripts/run-uv.js run pytest",
+    "contract:generate": "node scripts/run-uv.js run python -m postgear_media.contract.generate",
+    "clean": "rm -rf .venv .mypy_cache .ruff_cache .pytest_cache"
+  },
+  "dependencies": {
+    "@postgear/media-contract": "*"
+  }
+}

@@ -28,8 +28,38 @@ export const MEDIA_QUICK_TASK_QUEUE = 'postgear-media-quick';
 /** Activity slots for the quick helpers: each is a short yt-dlp or ffprobe call. */
 export const MEDIA_QUICK_CONCURRENCY = 8;
 export const RENDER_TASK_QUEUE = 'postgear-render';
-/** Reserved for Sprint 13's Python service. Nothing polls it yet. */
+/**
+ * Sprint 13: the Python media service (`apps/media`) polls this queue. It
+ * serves activities only; the workflows stay here in TypeScript and call them
+ * by name through `apps/worker/src/clips/media-py.ts`.
+ */
 export const MEDIA_PY_TASK_QUEUE = 'postgear-media-py';
+/** Reserved for an always-on graphics card worker (decision D13-11). Nothing polls it. */
+export const MEDIA_GPU_TASK_QUEUE = 'postgear-media-gpu';
+
+/**
+ * How long a workflow lets each Python activity run, as data, so the stub
+ * and its tests read one table. `heartbeatMs` null means the activity is too
+ * short to heartbeat (it cannot be cancelled midway, and need not be).
+ * `scheduleToCloseMs` caps the wait for a Python worker to pick it up too,
+ * so a stopped service answers fast instead of queueing for ever.
+ */
+export interface MediaPyTiming {
+  startToCloseMs: number;
+  scheduleToCloseMs: number;
+  heartbeatMs: number | null;
+  maximumAttempts: number;
+}
+
+export const MEDIA_PY_TIMINGS = Object.freeze({
+  // A health check is instant; four seconds with no Python worker means "off".
+  mediaPyHealth: Object.freeze({
+    startToCloseMs: 4_000,
+    scheduleToCloseMs: 4_000,
+    heartbeatMs: null,
+    maximumAttempts: 1,
+  }),
+} satisfies Record<string, MediaPyTiming>);
 
 /** The roles a worker process can take, and the queue each serves. */
 export const WORKER_ROLES = ['publishing', 'media', 'render'] as const;
@@ -298,7 +328,9 @@ export function clipExportReadyLine(clipTitle: string): string {
 
 /** Module 19: the line under "A video will be removed soon". */
 export function clipVideoExpiringLine(videoTitle: string): string {
-  return capLine(`${quotedName(videoTitle, 'Your video')} will be removed in 3 days. Open it to keep it longer.`);
+  return capLine(
+    `${quotedName(videoTitle, 'Your video')} will be removed in 3 days. Open it to keep it longer.`,
+  );
 }
 
 /** Module 19: the line under "A video was removed" when nobody opened it for `days` days. */
@@ -366,6 +398,22 @@ export interface ClipRuntimeReport {
   checks: ClipToolCheck[];
   /** ISO time of the check. */
   checkedAt: string;
+  /**
+   * Sprint 13: the Python media service, asked through Temporal
+   * (`mediaPyHealth` on `postgear-media-py`). Absent from a Sprint 12 worker;
+   * `ok: false` when it did not answer in time.
+   */
+  mediaPy?: ClipMediaPyReport;
+}
+
+/** The Python service as the runtime check saw it. */
+export interface ClipMediaPyReport {
+  ok: boolean;
+  simulation: boolean | null;
+  contractVersion: number | null;
+  serviceVersion: string | null;
+  /** Binding name to its state (`simulation`, `live`, `off`). */
+  bindings: Record<string, string>;
 }
 
 /** The runtime check's workflow id: one per minute, so concurrent pages share it. */

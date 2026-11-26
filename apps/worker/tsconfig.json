@@ -24,7 +24,10 @@
       "@postgear/social-core": ["packages/social-core/src"],
       "@postgear/seo-engine": ["packages/seo-engine/src"],
       "@postgear/ai-engine": ["packages/ai-engine/src"],
-      "@postgear/automation": ["packages/automation/src"]
+      "@postgear/automation": ["packages/automation/src"],
+      // Sprint 13: the pure names of the Python contract, without its Zod shapes
+      // (workflow code imports this door; the package root is types only there).
+      "@postgear/media-contract/names": ["packages/media-contract/src/names.ts"]
     }
   },
   "include": ["src/**/*.ts"],

@@ -20,7 +20,7 @@ const RESET_DATE = new Intl.DateTimeFormat('en', {
 
 export const AI_MESSAGES = {
   NOT_CONFIGURED:
-    'AI features are not set up on this PostGear instance. Set OPENAI_API_KEY, or AI_SIMULATION="true" for local development.',
+    'AI features are not set up on this PostGear instance. Set OPENAI_API_KEY or OPENROUTER_API_KEY, or AI_SIMULATION="true" for local development.',
   CHANNEL_UNAVAILABLE:
     'One of the selected channels is not connected to this workspace. Choose another and try again.',
   WORKSPACE_NOT_FOUND: 'Workspace not found',
@@ -28,7 +28,7 @@ export const AI_MESSAGES = {
   outOfCredits: (resetsAt: Date): string =>
     `You've used this cycle's AI credits. They refresh on ${RESET_DATE.format(resetsAt)}.`,
   INVALID_KEY:
-    'The AI provider rejected this instance’s API key. Ask whoever runs PostGear to check OPENAI_API_KEY.',
+    'The AI provider rejected this instance’s API key. Ask whoever runs PostGear to check OPENAI_API_KEY or OPENROUTER_API_KEY.',
   RATE_LIMITED: 'The AI provider is busy right now. Wait a moment and try again.',
   UNAVAILABLE: 'The AI provider could not be reached. Try again in a minute.',
   TIMEOUT: 'The AI provider took too long to answer. Try again.',

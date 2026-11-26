@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "background": "#000000"
+  },
+  "sources": [
+    {
+      "id": "src",
+      "videoId": "6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_a",
+      "source": "src",
+      "sourceIn": 2000,
+      "sourceOut": 10000,
+      "speed": 1,
+      "volume": 1
+    }
+  ],
+  "layout": {
+    "kind": "fullscreen",
+    "areas": [
+      {
+        "id": "main",
+        "name": "Video",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0.341796875,
+              "y": 0,
+              "w": 0.31640625,
+              "h": 1
+            }
+          }
+        ],
+        "fit": "cover"
+      }
+    ]
+  },
+  "zooms": [],
+  "looks": {
+    "colour": "none",
+    "strength": 0,
+    "vignette": 0
+  },
+  "fades": {
+    "inMs": 400,
+    "outMs": 600
+  },
+  "tracks": [
+    {
+      "id": "trk_text",
+      "kind": "overlay",
+      "items": [
+        {
+          "id": "txt_title",
+          "type": "text",
+          "start": 500,
+          "duration": 5000,
+          "anchor": "moment",
+          "text": "A Version One Clip",
+          "style": {
+            "font": "Montserrat",
+            "size": 76,
+            "weight": 800,
+            "italic": false,
+            "colour": "#FFFFFF",
+            "align": "center",
+            "outline": {
+              "colour": "#111111",
+              "width": 5
+            },
+            "background": null,
+            "shadow": false,
+            "uppercase": false
+          },
+          "transform": {
+            "x": 0.5,
+            "y": 0.22,
+            "scale": 1,
+            "rotation": 0,
+            "opacity": 1
+          },
+          "widthPx": 864,
+          "fadeInMs": 200,
+          "fadeOutMs": 200
+        },
+        {
+          "id": "txt_label",
+          "type": "text",
+          "start": 0,
+          "duration": 8000,
+          "anchor": "clip",
+          "text": "On A Box",
+          "style": {
+            "font": "Inter",
+            "size": 56,
+            "weight": 700,
+            "italic": false,
+            "colour": "#111111",
+            "align": "center",
+            "outline": null,
+            "background": {
+              "colour": "#FFFFFF",
+              "opacity": 1,
+              "radius": 0,
+              "pad": 18
+            },
+            "shadow": false,
+            "uppercase": false
+          },
+          "transform": {
+            "x": 0.5,
+            "y": 0.86,
+            "scale": 1,
+            "rotation": -4,
+            "opacity": 0.9
+          },
+          "widthPx": 600,
+          "fadeInMs": 0,
+          "fadeOutMs": 0
+        }
+      ]
+    }
+  ]
+}

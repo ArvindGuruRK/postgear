@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "background": "#000000"
+  },
+  "sources": [
+    {
+      "id": "src",
+      "videoId": "6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_a",
+      "source": "src",
+      "sourceIn": 4000,
+      "sourceOut": 12000,
+      "speed": 1,
+      "volume": 1
+    }
+  ],
+  "layout": {
+    "kind": "blurred",
+    "areas": [
+      {
+        "id": "main",
+        "name": "Video",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0,
+              "y": 0,
+              "w": 1,
+              "h": 1
+            }
+          }
+        ],
+        "fit": "contain"
+      }
+    ],
+    "fitCrop": "original"
+  },
+  "zooms": [
+    {
+      "id": "zm_1",
+      "source": "src",
+      "from": 6000,
+      "to": 9000,
+      "scale": 1.8,
+      "focus": {
+        "x": 0.35,
+        "y": 0.4
+      },
+      "ease": 400
+    }
+  ],
+  "looks": {
+    "colour": "vintage",
+    "strength": 0.8,
+    "vignette": 0.5
+  },
+  "fades": {
+    "inMs": 0,
+    "outMs": 0
+  },
+  "tracks": []
+}

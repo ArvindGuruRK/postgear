@@ -8,6 +8,8 @@
  * `/clips` routes are added here as their modules land.
  */
 import type {
+  AiCostKind,
+  AiCostRate,
   ClipDocument,
   ClipError,
   DownloadMedia,
@@ -292,6 +294,18 @@ export interface ClipsStatus {
   overLimit?: boolean;
   /** Module 06: whether Try A Sample has a video to bring in (absent on an older API: read as false). */
   sample?: { available: boolean };
+  /**
+   * Sprint 13: the AI layer. `service: 'off'` (or absent, on an older API)
+   * disables every AI button and never Sprint 12's tools; `prices` are the AI
+   * Minutes rates the API charges by.
+   */
+  ai?: ClipsAiStatus;
+}
+
+/** `GET /clips/status`'s `ai` part (Sprint 13). */
+export interface ClipsAiStatus {
+  service: 'ok' | 'off';
+  prices: Record<AiCostKind, AiCostRate>;
 }
 
 // --- Module 06: links, videos, uploads, channels --------------------------------

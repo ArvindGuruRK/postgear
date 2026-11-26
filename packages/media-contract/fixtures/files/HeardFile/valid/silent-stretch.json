@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "language": "en",
+  "model": "simulation",
+  "ranges": [{ "fromMs": 0, "toMs": 1500 }],
+  "words": [],
+  "speech": { "sampleRateHz": 2, "values": [0, 0, 0] }
+}

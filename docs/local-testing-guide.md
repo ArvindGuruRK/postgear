@@ -1172,6 +1172,57 @@ npm test --workspace=@postgear/web -- clips
 npm run test:e2e -- e2e/clips.spec.ts e2e/operator.spec.ts   # needs dev:api:e2e, a seeded database and the worker, section 3a
 ```
 
+### 5q. Clips AI (Sprint 13)
+
+Clips AI adds a second service: **`apps/media`**, a small Python program that does the sound and picture work (speech to text, faces, motion). The TypeScript worker still decides the order of every step; Python only answers. Locally it runs in simulation, so **no AI model is ever downloaded** and nothing is paid for.
+
+**What to install.** [uv](https://docs.astral.sh/uv/) (it installs the right Python, 3.13, by itself). Then, once:
+
+```bash
+uv --version                     # any recent version
+cd apps/media && uv sync         # base and dev packages: all simulation, lint, types and tests need
+# uv sync --group ml             # the model libraries, only for a real run you have agreed to
+```
+
+**The `.env` block** (explained in `.env.example`, block "CLIPS AI"):
+
+```
+MEDIA_SIMULATION="true"          # unset, it follows CLIPS_SIMULATION
+MEDIA_URL="http://localhost:8100"
+MEDIA_INTERNAL_TOKEN="<64 hex characters>"   # npm run generate:keys prints one
+```
+
+`npm run dev` now starts four things: the API, the worker, the web app and the Python service. Its log says `worker.serving queue=postgear-media-py`. Without uv it prints one line and steps aside: Clips works as before and every AI button shows as off. `npm run dev:media` starts it alone.
+
+**Check it by hand.**
+
+1. Open <http://localhost:8100/health>: `{"status":"ok"}`.
+2. Open the Clips page and look at `GET /clips/status` in the network tab: `ai.service` is `ok`.
+3. Stop the Python service and reload within about 10 seconds: `ai.service` is `off`, and the Clips page and the editor work as before.
+
+**The shared contract.** Every shape that crosses between Node and Python is written once, in `packages/media-contract`. After changing one:
+
+```bash
+npm run contract:export          # writes packages/media-contract/schema/contract.json
+npm run contract:python          # regenerates apps/media/src/postgear_media/contract/generated.py
+```
+
+A Jest test and a pytest test fail when either file is stale, and both sides parse the same fixture files.
+
+**The AI model for text** (reading a transcript for moments, titles, still pictures) is the existing AI engine. Locally `AI_SIMULATION="true"` answers from recorded files. For a real run set `OPENAI_API_KEY`, or `OPENROUTER_API_KEY` to use any OpenRouter model (then `AI_MODEL` is OpenRouter's `vendor/model` id; with both keys, `AI_PROVIDER` picks).
+
+**Your own sample video.** `npm run clips:samples` also copies `out/Verideck_60s_3D.mp4` (or the file named in `CLIPS_OWN_SAMPLE`) into the samples folder as the `verideck` sample, a real 60 second video for testing every Clips screen. Its simulation link is `https://www.youtube.com/watch?v=simverideck`. The file itself is never committed.
+
+Automated checks:
+
+```bash
+npm run test --workspace=@postgear/media             # pytest
+npm run lint --workspace=@postgear/media             # Ruff
+npm run typecheck --workspace=@postgear/media        # mypy, strict
+npm test --workspace=@postgear/media-contract        # the contract: drift, fixtures, keys
+MEDIA_PY_LIVE_TEST=1 npx jest --config apps/worker/jest.config.js media-py.live   # a TypeScript workflow calls Python (needs Docker and dev:media)
+```
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 

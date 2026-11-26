@@ -1,0 +1,422 @@
+{
+  "$defs": {
+    "Binding": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "simulation",
+            "live",
+            "off"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "name"
+      ],
+      "type": "object"
+    },
+    "HeardFile": {
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "pattern": "^[a-z]{2,3}$",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/TimeRange"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "speech": {
+          "additionalProperties": false,
+          "properties": {
+            "sampleRateHz": {
+              "const": 2,
+              "type": "number"
+            },
+            "values": {
+              "items": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxItems": 172800,
+              "type": "array"
+            }
+          },
+          "required": [
+            "sampleRateHz",
+            "values"
+          ],
+          "type": "object"
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        },
+        "words": {
+          "items": {
+            "$ref": "#/$defs/HeardWord"
+          },
+          "maxItems": 400000,
+          "type": "array"
+        }
+      },
+      "required": [
+        "version",
+        "language",
+        "model",
+        "ranges",
+        "words",
+        "speech"
+      ],
+      "title": "HeardFile",
+      "type": "object"
+    },
+    "HeardWord": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sure": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "text": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "text",
+        "sure"
+      ],
+      "type": "object"
+    },
+    "LanguageChoice": {
+      "pattern": "^(?:auto|[a-z]{2,3})$",
+      "type": "string"
+    },
+    "MediaPyHealthInput": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "title": "MediaPyHealthInput",
+      "type": "object"
+    },
+    "MediaPyHealthOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "bindings": {
+          "additionalProperties": false,
+          "properties": {
+            "faces": {
+              "$ref": "#/$defs/Binding"
+            },
+            "motion": {
+              "$ref": "#/$defs/Binding"
+            },
+            "stills": {
+              "$ref": "#/$defs/Binding"
+            },
+            "transcriber": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "transcriber",
+            "faces",
+            "motion",
+            "stills"
+          ],
+          "type": "object"
+        },
+        "contractVersion": {
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "modelsPresent": {
+          "type": "boolean"
+        },
+        "pythonVersion": {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        "serviceVersion": {
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        },
+        "simulation": {
+          "type": "boolean"
+        },
+        "taskQueue": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "serviceVersion",
+        "pythonVersion",
+        "simulation",
+        "taskQueue",
+        "bindings",
+        "modelsPresent"
+      ],
+      "title": "MediaPyHealthOutput",
+      "type": "object"
+    },
+    "MediaPyTranscribeInput": {
+      "additionalProperties": false,
+      "properties": {
+        "audioKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "durationMs": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jobId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "language": {
+          "$ref": "#/$defs/LanguageChoice"
+        },
+        "orgId": {
+          "$ref": "#/$defs/OrgId"
+        },
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/TimeRange"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "simulation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SimulationHint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        },
+        "videoId": {
+          "$ref": "#/$defs/Uuid"
+        }
+      },
+      "required": [
+        "version",
+        "jobId",
+        "orgId",
+        "videoId",
+        "audioKey",
+        "durationMs",
+        "ranges",
+        "language",
+        "simulation"
+      ],
+      "title": "MediaPyTranscribeInput",
+      "type": "object"
+    },
+    "MediaPyTranscribeOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "heardKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "language": {
+          "pattern": "^[a-z]{2,3}$",
+          "type": "string"
+        },
+        "languageProbability": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "noSpeech": {
+          "type": "boolean"
+        },
+        "secondsListened": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "wordCount": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "heardKey",
+        "language",
+        "languageProbability",
+        "model",
+        "secondsListened",
+        "wordCount",
+        "noSpeech"
+      ],
+      "title": "MediaPyTranscribeOutput",
+      "type": "object"
+    },
+    "OrgId": {
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
+      "type": "string"
+    },
+    "SimulationHint": {
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "anyOf": [
+            {
+              "enum": [
+                "fail",
+                "no-speech",
+                "slow"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sample",
+        "force"
+      ],
+      "type": "object"
+    },
+    "StorageKey": {
+      "description": "A private Clips storage key, never a path",
+      "maxLength": 512,
+      "pattern": "^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+      "type": "string"
+    },
+    "TimeRange": {
+      "additionalProperties": false,
+      "description": "A stretch of the video, in its own milliseconds",
+      "properties": {
+        "fromMs": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "toMs": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fromMs",
+        "toMs"
+      ],
+      "type": "object"
+    },
+    "Uuid": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    }
+  },
+  "$id": "https://postgear.local/media-contract.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Generated from packages/media-contract. Contract version 1. Do not edit.",
+  "properties": {
+    "file_HeardFile": {
+      "$ref": "#/$defs/HeardFile"
+    },
+    "mediaPyHealth_input": {
+      "$ref": "#/$defs/MediaPyHealthInput"
+    },
+    "mediaPyHealth_output": {
+      "$ref": "#/$defs/MediaPyHealthOutput"
+    },
+    "mediaPyTranscribe_input": {
+      "$ref": "#/$defs/MediaPyTranscribeInput"
+    },
+    "mediaPyTranscribe_output": {
+      "$ref": "#/$defs/MediaPyTranscribeOutput"
+    }
+  },
+  "title": "MediaContract",
+  "type": "object"
+}

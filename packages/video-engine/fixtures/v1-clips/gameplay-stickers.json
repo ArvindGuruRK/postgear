@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "ratio": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "background": "#000000"
+  },
+  "sources": [
+    {
+      "id": "src",
+      "videoId": "6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_a",
+      "source": "src",
+      "sourceIn": 8000,
+      "sourceOut": 16000,
+      "speed": 1,
+      "volume": 1
+    }
+  ],
+  "layout": {
+    "kind": "gameplay",
+    "areas": [
+      {
+        "id": "main",
+        "name": "Game",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0.341796875,
+              "y": 0,
+              "w": 0.31640625,
+              "h": 1
+            }
+          }
+        ],
+        "fit": "cover"
+      },
+      {
+        "id": "area_129b1e8a6c772cfe",
+        "name": "Camera",
+        "frame": {
+          "x": 0.04,
+          "y": 0.03,
+          "w": 0.36,
+          "h": 0.2025
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0,
+              "y": 0.6,
+              "w": 0.225,
+              "h": 0.4
+            }
+          }
+        ],
+        "fit": "cover",
+        "radius": 36
+      }
+    ]
+  },
+  "zooms": [],
+  "looks": {
+    "colour": "none",
+    "strength": 0,
+    "vignette": 0
+  },
+  "fades": {
+    "inMs": 0,
+    "outMs": 0
+  },
+  "tracks": [
+    {
+      "id": "trk_over",
+      "kind": "overlay",
+      "items": [
+        {
+          "id": "stk_own",
+          "type": "sticker",
+          "start": 1000,
+          "duration": 4000,
+          "anchor": "moment",
+          "ref": {
+            "asset": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+          },
+          "transform": {
+            "x": 0.25,
+            "y": 0.3,
+            "scale": 1.2,
+            "rotation": 15,
+            "opacity": 1
+          },
+          "flipX": true,
+          "widthPx": 270,
+          "heightPx": 270,
+          "loop": true
+        },
+        {
+          "id": "stk_badge",
+          "type": "sticker",
+          "start": 0,
+          "duration": 8000,
+          "anchor": "clip",
+          "ref": {
+            "badge": "twitch",
+            "name": "simstreamer"
+          },
+          "transform": {
+            "x": 0.5,
+            "y": 0.82,
+            "scale": 1,
+            "rotation": 0,
+            "opacity": 1
+          },
+          "flipX": false,
+          "widthPx": 420,
+          "heightPx": 140,
+          "loop": true
+        }
+      ]
+    }
+  ]
+}

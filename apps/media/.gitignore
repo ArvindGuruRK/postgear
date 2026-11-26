@@ -1,0 +1,11 @@
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# A developer's own sample: what is said in their own video (recorded by
+# simulation/record.py). Kept out of the repository like the video itself;
+# without the file the simulated listener answers stand-in speech.
+src/postgear_media/simulation/transcripts/verideck.json

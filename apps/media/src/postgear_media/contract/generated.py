@@ -1,0 +1,218 @@
+# Do not edit: generated from packages/media-contract/schema/contract.json
+# by `npm run contract:python`. Change the Zod shapes, then regenerate.
+
+from __future__ import annotations
+
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, RootModel
+
+
+class Binding(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    name: Annotated[str, Field(max_length=64, min_length=1)]
+    state: Literal["simulation", "live", "off"]
+
+
+class Values(RootModel[float]):
+    root: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class Speech(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    sample_rate_hz: Annotated[Literal[2], Field(alias="sampleRateHz")]
+    values: Annotated[list[Values | None], Field(max_length=172800)]
+
+
+class HeardWord(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    end: Annotated[int, Field(ge=0, le=86400000)]
+    start: Annotated[int, Field(ge=0, le=86400000)]
+    sure: Annotated[float, Field(ge=0.0, le=1.0)]
+    text: Annotated[str, Field(max_length=80, min_length=1)]
+
+
+class MediaPyHealthInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    version: Literal[1]
+
+
+class Bindings(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    faces: Binding
+    motion: Binding
+    stills: Binding
+    transcriber: Binding
+
+
+class MediaPyHealthOutput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    bindings: Bindings
+    contract_version: Annotated[
+        int, Field(alias="contractVersion", ge=1, le=9007199254740991)
+    ]
+    models_present: Annotated[bool, Field(alias="modelsPresent")]
+    python_version: Annotated[
+        str, Field(alias="pythonVersion", max_length=32, min_length=1)
+    ]
+    service_version: Annotated[
+        str, Field(alias="serviceVersion", max_length=32, min_length=1)
+    ]
+    simulation: bool
+    task_queue: Annotated[str, Field(alias="taskQueue", max_length=64, min_length=1)]
+
+
+class LanguageProbability(RootModel[float]):
+    root: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class Sample(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[a-z0-9-]{1,32}$")]
+
+
+class SimulationHint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    force: Literal["fail", "no-speech", "slow"] | None
+    sample: Sample | None
+
+
+class TimeRange(BaseModel):
+    """
+    A stretch of the video, in its own milliseconds
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    from_ms: Annotated[int, Field(alias="fromMs", ge=0, le=86400000)]
+    to_ms: Annotated[int, Field(alias="toMs", ge=0, le=86400000)]
+
+
+class HeardFile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    language: Annotated[str, Field(pattern="^[a-z]{2,3}$")]
+    model: Annotated[str, Field(max_length=80, min_length=1)]
+    ranges: Annotated[list[TimeRange], Field(max_length=64, min_length=1)]
+    speech: Speech
+    version: Literal[1]
+    words: Annotated[list[HeardWord], Field(max_length=400000)]
+
+
+class MediaPyTranscribeInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    audio_key: Annotated[
+        str,
+        Field(
+            alias="audioKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    duration_ms: Annotated[int, Field(alias="durationMs", ge=0, le=86400000)]
+    job_id: Annotated[
+        str,
+        Field(
+            alias="jobId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+    language: Annotated[str, Field(pattern="^(?:auto|[a-z]{2,3})$")]
+    org_id: Annotated[
+        str,
+        Field(
+            alias="orgId",
+            max_length=64,
+            pattern="^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
+        ),
+    ]
+    ranges: Annotated[list[TimeRange], Field(max_length=64, min_length=1)]
+    simulation: SimulationHint | None
+    version: Literal[1]
+    video_id: Annotated[
+        str,
+        Field(
+            alias="videoId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+
+
+class MediaPyTranscribeOutput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    heard_key: Annotated[
+        str,
+        Field(
+            alias="heardKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    language: Annotated[str, Field(pattern="^[a-z]{2,3}$")]
+    language_probability: Annotated[
+        LanguageProbability | None, Field(alias="languageProbability")
+    ]
+    model: Annotated[str, Field(max_length=80, min_length=1)]
+    no_speech: Annotated[bool, Field(alias="noSpeech")]
+    seconds_listened: Annotated[float, Field(alias="secondsListened", ge=0.0)]
+    word_count: Annotated[int, Field(alias="wordCount", ge=0, le=9007199254740991)]
+
+
+class MediaContract(BaseModel):
+    """
+    Generated from packages/media-contract. Contract version 1. Do not edit.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    file_heard_file: Annotated[HeardFile | None, Field(alias="file_HeardFile")] = None
+    media_py_health_input: Annotated[
+        MediaPyHealthInput | None, Field(alias="mediaPyHealth_input")
+    ] = None
+    media_py_health_output: Annotated[
+        MediaPyHealthOutput | None, Field(alias="mediaPyHealth_output")
+    ] = None
+    media_py_transcribe_input: Annotated[
+        MediaPyTranscribeInput | None, Field(alias="mediaPyTranscribe_input")
+    ] = None
+    media_py_transcribe_output: Annotated[
+        MediaPyTranscribeOutput | None, Field(alias="mediaPyTranscribe_output")
+    ] = None

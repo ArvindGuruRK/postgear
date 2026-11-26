@@ -211,6 +211,14 @@ const envSchema = z
     // as `""` rather than leaving them unset, so a blank is read as "use the
     // default" here, or a fresh clone would fail to boot on the model name.
     OPENAI_API_KEY: z.string().optional(),
+    // OpenRouter: one key for many models through OpenAI's chat API (text
+    // only; images stay on OpenAI). `AI_PROVIDER` picks when both keys are
+    // set; unset means OpenAI when its key is set, else OpenRouter.
+    OPENROUTER_API_KEY: z.string().optional(),
+    AI_PROVIDER: blankAsUnset(z.enum(['openai', 'openrouter']).optional()),
+    // Optional OpenRouter app attribution (`HTTP-Referer`, `X-Title`); unset sends neither.
+    OPENROUTER_APP_URL: blankAsUnset(z.string().url().optional()),
+    OPENROUTER_APP_NAME: blankAsUnset(z.string().min(1).max(64).optional()),
     TAVILY_API_KEY: z.string().optional(),
     AI_MODEL: blankAsUnset(z.string().min(1).default('gpt-4.1-mini')),
     AI_IMAGE_MODEL: blankAsUnset(z.string().min(1).default('dall-e-3')),
@@ -385,6 +393,13 @@ const envSchema = z
     // downloader and the channel lists to fixtures (no platform is ever
     // contacted); refused in production below.
     CLIPS_SIMULATION: blankAsUnset(z.enum(['true', 'false']).default('false')),
+    // Sprint 13: the Python media service. `MEDIA_SIMULATION` answers every
+    // Python step from recorded files (no model); unset, it follows
+    // CLIPS_SIMULATION. Refused in production. `MEDIA_URL` is the service's
+    // health address, `MEDIA_INTERNAL_TOKEN` the header it checks.
+    MEDIA_SIMULATION: blankAsUnset(z.enum(['true', 'false']).optional()),
+    MEDIA_URL: blankAsUnset(z.string().url().default('http://localhost:8100')),
+    MEDIA_INTERNAL_TOKEN: blankAsUnset(z.string().min(32).optional()),
     // Which platforms may be imported from and browsed. YouTube is switched on
     // in production only after the legal read (D12-15): one value to change.
     CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
@@ -539,6 +554,25 @@ const envSchema = z
         message: 'DISCOVER_SIMULATION cannot be "true" when NODE_ENV=production',
       });
     }
+    if (
+      env.NODE_ENV === 'production' &&
+      (env.MEDIA_SIMULATION ?? env.CLIPS_SIMULATION) === 'true'
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MEDIA_SIMULATION'],
+        message: 'MEDIA_SIMULATION cannot be "true" when NODE_ENV=production',
+      });
+    }
+
+    if (env.NODE_ENV === 'production' && !env.MEDIA_INTERNAL_TOKEN) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MEDIA_INTERNAL_TOKEN'],
+        message: 'MEDIA_INTERNAL_TOKEN is required when NODE_ENV=production',
+      });
+    }
+
     if (env.NODE_ENV === 'production' && env.CLIPS_SIMULATION === 'true') {
       context.addIssue({
         code: z.ZodIssueCode.custom,

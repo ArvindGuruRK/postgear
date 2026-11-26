@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "ratio": "1:1",
+    "width": 1080,
+    "height": 1080,
+    "fps": 30,
+    "background": "#101018"
+  },
+  "sources": [
+    {
+      "id": "src",
+      "videoId": "6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg_a",
+      "source": "src",
+      "sourceIn": 1000,
+      "sourceOut": 5000,
+      "speed": 1,
+      "volume": 1
+    },
+    {
+      "id": "seg_b",
+      "source": "src",
+      "sourceIn": 15000,
+      "sourceOut": 19000,
+      "speed": 1,
+      "volume": 1
+    }
+  ],
+  "layout": {
+    "kind": "fullscreen",
+    "areas": [
+      {
+        "id": "main",
+        "name": "Video",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1
+        },
+        "crop": [
+          {
+            "at": 0,
+            "rect": {
+              "x": 0.21875,
+              "y": 0,
+              "w": 0.5625,
+              "h": 1
+            }
+          }
+        ],
+        "fit": "cover"
+      }
+    ]
+  },
+  "zooms": [],
+  "looks": {
+    "colour": "black_white",
+    "strength": 1,
+    "vignette": 0
+  },
+  "fades": {
+    "inMs": 0,
+    "outMs": 0
+  },
+  "tracks": [
+    {
+      "id": "trk_sound",
+      "kind": "audio",
+      "items": [
+        {
+          "id": "snd_fx",
+          "type": "sfx",
+          "start": 2000,
+          "duration": 2000,
+          "anchor": "clip",
+          "ref": {
+            "asset": "1b2c3d4e-5f60-4b7c-9d8e-0f1a2b3c4d5e"
+          },
+          "offsetMs": 0,
+          "volume": 0.8,
+          "fadeInMs": 100,
+          "fadeOutMs": 400,
+          "duck": false
+        }
+      ]
+    }
+  ]
+}

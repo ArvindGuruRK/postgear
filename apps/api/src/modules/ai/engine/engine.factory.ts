@@ -31,6 +31,7 @@ import {
   createCopilotAgent,
   createOpenAiImageGenerator,
   createOpenAiModelClient,
+  createOpenRouterModelClient,
   createSimulatedModelClient,
   createSimulatedResearch,
   createTavilyResearch,
@@ -81,6 +82,10 @@ export function createAiEngine(deps: EngineFactoryDeps): AiEngine {
   const resolved = resolveAiConfig({
     AI_SIMULATION: deps.config.get('AI_SIMULATION', { infer: true }),
     OPENAI_API_KEY: deps.config.get('OPENAI_API_KEY', { infer: true }),
+    OPENROUTER_API_KEY: deps.config.get('OPENROUTER_API_KEY', { infer: true }),
+    AI_PROVIDER: deps.config.get('AI_PROVIDER', { infer: true }),
+    OPENROUTER_APP_URL: deps.config.get('OPENROUTER_APP_URL', { infer: true }),
+    OPENROUTER_APP_NAME: deps.config.get('OPENROUTER_APP_NAME', { infer: true }),
     TAVILY_API_KEY: deps.config.get('TAVILY_API_KEY', { infer: true }),
     AI_MODEL: deps.config.get('AI_MODEL', { infer: true }),
     AI_IMAGE_MODEL: deps.config.get('AI_IMAGE_MODEL', { infer: true }),
@@ -126,9 +131,34 @@ export function createAiEngine(deps: EngineFactoryDeps): AiEngine {
       }
       break;
     }
+    case 'openrouter': {
+      // `resolved.openRouterKey` is non-null in this mode by construction.
+      providers = {
+        mode: 'openrouter',
+        model: createOpenRouterModelClient({
+          apiKey: resolved.openRouterKey ?? '',
+          model: resolved.model,
+          appUrl: resolved.openRouterApp.url,
+          appName: resolved.openRouterApp.name,
+        }),
+        research: resolved.tavilyKey
+          ? withResearchCache(
+              createTavilyResearch({ apiKey: resolved.tavilyKey }),
+              deps.redis,
+              RESEARCH_CACHE_TTL_SECONDS,
+            )
+          : null,
+        // OpenRouter has no images endpoint: images only with an OpenAI key too.
+        images: resolved.imagesKey
+          ? createOpenAiImageGenerator({ apiKey: resolved.imagesKey, model: resolved.imageModel })
+          : null,
+      };
+      logger.log(`AI text runs through OpenRouter (${providers.model?.name ?? 'no model'}).`);
+      break;
+    }
     case 'unconfigured':
       logger.warn(
-        'Neither OPENAI_API_KEY nor AI_SIMULATION=true is set, so AI features are off. ' +
+        'None of OPENAI_API_KEY, OPENROUTER_API_KEY or AI_SIMULATION=true is set, so AI features are off. ' +
           'The /ai routes answer 503 until one of them is.',
       );
       providers = { mode: 'unconfigured', model: null, research: null, images: null };

@@ -30,6 +30,8 @@
       "@postgear/storage": ["packages/storage/src"],
       "@postgear/media-tools": ["packages/media-tools/src"],
       "@postgear/media-tools/listing": ["packages/media-tools/src/listing.ts"],
+      "@postgear/media-contract": ["packages/media-contract/src"],
+      "@postgear/media-contract/names": ["packages/media-contract/src/names.ts"],
       "@postgear/ai-engine": ["packages/ai-engine/src"],
       "@postgear/email": ["packages/email/src"],
       "@postgear/ui": ["packages/ui/src"],

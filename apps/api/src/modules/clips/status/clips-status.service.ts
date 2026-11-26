@@ -33,7 +33,12 @@ import {
   clipRuntimeCheckWorkflowId,
   MEDIA_QUICK_TASK_QUEUE,
 } from '@postgear/scheduling';
-import type { ClipPlatformId } from '@postgear/video-engine';
+import {
+  AI_COST_RATES,
+  type AiCostKind,
+  type AiCostRate,
+  type ClipPlatformId,
+} from '@postgear/video-engine';
 import type { Env } from '../../../config/env';
 import { EntitlementResolver, type MeterState } from '../../entitlements/entitlement-resolver';
 import { SchedulingService } from '../../scheduling/scheduling.service';
@@ -41,6 +46,7 @@ import { CLIPS_MESSAGES } from '../clips.messages';
 import { gigabytesToBytes } from '../clips.units';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipSampleLink } from '../videos/clip-sample';
+import { type AiServiceState, MediaServiceProbe } from './media-service.probe';
 
 const ANSWER_CACHE_MS = 60_000;
 const OFFLINE_CACHE_MS = 15_000;
@@ -98,6 +104,19 @@ export interface ClipsStatus {
   overLimit: boolean;
   /** Module 06: whether Try A Sample has a video to import here. */
   sample: { available: boolean };
+  /**
+   * Sprint 13: the AI layer. `service` is the Python media service (`off`
+   * disables every AI button, never Sprint 12's tools); `prices` are the AI
+   * Minutes rates from `video-engine/src/pricing.ts`, so a label and a charge
+   * can never disagree. Later modules add what each AI feature can do here.
+   */
+  ai: ClipsAiStatus;
+}
+
+/** `GET /clips/status`'s `ai` part. */
+export interface ClipsAiStatus {
+  service: AiServiceState;
+  prices: Record<AiCostKind, AiCostRate>;
 }
 
 /** Module 19: what the video space holds. */
@@ -126,6 +145,7 @@ export class ClipsStatusService {
     private readonly limits: ClipLimitsGuard,
     config: ConfigService<Env, true>,
     private readonly sample: ClipSampleLink,
+    private readonly mediaService: MediaServiceProbe,
   ) {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
@@ -133,12 +153,13 @@ export class ClipsStatusService {
 
   async status(orgId: string): Promise<ClipsStatus> {
     const now = new Date();
-    const [tools, byKind, values, importMinutes, aiMinutes] = await Promise.all([
+    const [tools, byKind, values, importMinutes, aiMinutes, aiService] = await Promise.all([
       this.tools(),
       this.limits.storageByKind(orgId),
       this.resolver.getMany(orgId, CLIPS_STATUS_LIMIT_KEYS, now),
       this.resolver.meter(orgId, IMPORT_MINUTES, now),
       this.resolver.meter(orgId, AI_MINUTES, now),
+      this.mediaService.state(),
     ]);
     const limits = Object.fromEntries(
       CLIPS_STATUS_LIMIT_KEYS.map((key) => [key, values[key]]),
@@ -156,6 +177,7 @@ export class ClipsStatusService {
       usage: { storageBytes: usedBytes, byKind },
       overLimit: limitBytes !== null && usedBytes > limitBytes,
       sample: { available: this.sample.url !== null },
+      ai: { service: aiService, prices: AI_COST_RATES },
     };
   }
 

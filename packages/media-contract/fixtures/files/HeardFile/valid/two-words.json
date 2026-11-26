@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "language": "en",
+  "model": "simulation",
+  "ranges": [{ "fromMs": 60000, "toMs": 90000 }],
+  "words": [
+    { "start": 60200, "end": 60540, "text": "Hello", "sure": 0.98 },
+    { "start": 60600, "end": 61010, "text": "there.", "sure": 0.52 }
+  ],
+  "speech": { "sampleRateHz": 2, "values": [null, null, 0.68, 1, 0.02] }
+}

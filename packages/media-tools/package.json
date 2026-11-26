@@ -20,6 +20,7 @@
     "clean": "rm -rf dist .turbo node_modules",
     "doctor": "ts-node --project tsconfig.scripts.json scripts/doctor.ts",
     "samples": "ts-node --project tsconfig.scripts.json scripts/make-samples.ts",
+    "regression": "ts-node --project tsconfig.scripts.json scripts/regression-set.ts",
     "benchmark": "ts-node --project tsconfig.scripts.json scripts/benchmark.ts",
     "stills": "ts-node --project tsconfig.scripts.json scripts/stills.ts",
     "fonts:build": "ts-node --project tsconfig.scripts.json scripts/fonts-build.ts",

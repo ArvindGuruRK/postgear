@@ -1,0 +1,10 @@
+{
+  "heardKey": "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/heard-0123456789abcdef0123456789abcdef.json.gz",
+  "language": "en",
+  "languageProbability": null,
+  "model": "simulation",
+  "secondsListened": 30,
+  "wordCount": 2,
+  "noSpeech": false,
+  "words": [{ "start": 0, "end": 300, "text": "hello", "sure": 1 }]
+}

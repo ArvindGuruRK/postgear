@@ -24,6 +24,11 @@
 
 # Installed and generated
 **/node_modules
+**/.venv
+**/__pycache__
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
 **/dist
 **/build
 **/out

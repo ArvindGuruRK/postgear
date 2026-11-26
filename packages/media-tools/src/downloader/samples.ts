@@ -1,10 +1,17 @@
 /**
- * The two generated sample videos the simulation fetches from, what is in
- * them, and the recorded chat for the stream sample.
+ * The sample videos the simulation fetches from, what is in them, and the
+ * recorded chat for the stream sample.
  *
- * The videos themselves are made by `npm run clips:samples` into a
- * git-ignored folder; the plan and the chat are committed fixtures, so
- * Module 16 can predict the highlights without generating anything.
+ * - **Generated** (`talk`, `stream`, and Sprint 13's `two-speakers`): made by
+ *   `npm run clips:samples` from FFmpeg's own test sources into a git-ignored
+ *   folder. The plan and the chat are committed fixtures, so the highlights,
+ *   the speaker turns and the recorded answers are predictable without
+ *   generating anything.
+ * - **Own** (`verideck`): a real video a developer supplies, for testing every
+ *   Clips screen on real pictures and sound. `npm run clips:samples` copies it
+ *   from the first path in its `sources` that exists (or from the file its
+ *   `envVar` names). It is never generated and never committed; when it is
+ *   missing, its simulation link answers "run npm run clips:samples".
  */
 import { existsSync } from 'node:fs';
 import * as path from 'node:path';
@@ -12,9 +19,43 @@ import { z } from 'zod';
 import planJson from '../../fixtures/samples/plan.json';
 import chatJson from '../../fixtures/samples/stream-chat.json';
 
-export type SampleName = 'talk' | 'stream';
+/** The samples FFmpeg generates. */
+export const GENERATED_SAMPLES = ['talk', 'stream', 'two-speakers'] as const;
+export type GeneratedSampleName = (typeof GENERATED_SAMPLES)[number];
+
+/** Real videos a developer supplies (copied, never generated, never committed). */
+export const OWN_SAMPLES = ['verideck'] as const;
+export type OwnSampleName = (typeof OWN_SAMPLES)[number];
+
+export const SAMPLE_NAMES = [...GENERATED_SAMPLES, ...OWN_SAMPLES] as const;
+export type SampleName = (typeof SAMPLE_NAMES)[number];
 
 const spanSchema = z.object({ startSec: z.number().nonnegative(), endSec: z.number().positive() });
+
+const speakerSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  toneHz: z.number().positive(),
+  /** FFmpeg colour, `0xRRGGBB`. */
+  colour: z.string().regex(/^0x[0-9a-fA-F]{6}$/),
+  /** The face marker's centre and size, fractions of the picture. */
+  centreX: z.number().min(0).max(1),
+  centreY: z.number().min(0).max(1),
+  faceWidth: z.number().positive().max(1),
+  faceHeight: z.number().positive().max(1),
+});
+
+const ownSampleSchema = z.object({
+  file: z.string(),
+  durationSec: z.number().positive(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  title: z.string().min(1),
+  /** Repo-relative paths tried in order by `npm run clips:samples`. */
+  sources: z.array(z.string().min(1)).min(1),
+  /** An environment variable that may name the file instead. */
+  envVar: z.string().min(1),
+});
 
 const samplePlanSchema = z.object({
   version: z.number().int(),
@@ -50,6 +91,19 @@ const samplePlanSchema = z.object({
       baselineEverySec: z.number().positive(),
     }),
   }),
+  /** Sprint 13: two face-like markers taking turns, one tone per speaker. */
+  twoSpeakers: z.object({
+    file: z.string(),
+    durationSec: z.number().positive(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    fps: z.number().int().positive(),
+    bedToneHz: z.number().positive(),
+    speakers: z.array(speakerSchema).length(2),
+    turns: z.array(spanSchema.extend({ speaker: z.string().min(1) })).min(2),
+  }),
+  /** Sprint 13: real videos a developer supplies. */
+  own: z.object({ verideck: ownSampleSchema }),
 });
 
 /** What `npm run clips:samples` makes and where each moment is. Seconds of the sample. */
@@ -81,14 +135,42 @@ export function sampleChat(): SampleChat {
   return chatCache;
 }
 
+/** What every sample has, whichever kind it is. */
+export interface SampleSpec {
+  file: string;
+  durationSec: number;
+  width: number;
+  height: number;
+}
+
+/** One sample's file, length and size from the plan. */
+export function sampleSpec(name: SampleName): SampleSpec {
+  const plan = samplePlan();
+  switch (name) {
+    case 'talk':
+      return plan.talk;
+    case 'stream':
+      return plan.stream;
+    case 'two-speakers':
+      return plan.twoSpeakers;
+    case 'verideck':
+      return plan.own.verideck;
+  }
+}
+
+/** True for a real video a developer supplies (it may be missing on a fresh machine). */
+export function isOwnSample(name: SampleName): name is OwnSampleName {
+  return (OWN_SAMPLES as readonly string[]).includes(name);
+}
+
 /** The file name of a sample inside the samples folder. */
 export function sampleFileName(name: SampleName): string {
-  return samplePlan()[name].file;
+  return sampleSpec(name).file;
 }
 
 /** A sample's length in ms. */
 export function sampleDurationMs(name: SampleName): number {
-  return Math.round(samplePlan()[name].durationSec * 1000);
+  return Math.round(sampleSpec(name).durationSec * 1000);
 }
 
 /** The folder `npm run clips:samples` writes to: `packages/media-tools/samples`. */

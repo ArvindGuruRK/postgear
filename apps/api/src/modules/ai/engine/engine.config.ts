@@ -16,8 +16,16 @@
  * ## Precedence
  *
  * `AI_SIMULATION=true` wins over any key: a developer who turns simulation on
- * wants no bill, even with a real key in the same file. Then a real OpenAI
- * key means `openai`; otherwise `unconfigured`, which the UI explains.
+ * wants no bill, even with a real key in the same file. Then the provider:
+ * `AI_PROVIDER` when it names one whose key is set; otherwise a real OpenAI
+ * key means `openai` and a real OpenRouter key alone means `openrouter`;
+ * otherwise `unconfigured`, which the UI explains.
+ *
+ * ## OpenRouter
+ *
+ * OpenRouter serves text models only through this engine. Images (hero
+ * images, the copilot's `generate_image`) stay on OpenAI: in `openrouter` mode
+ * they are on only when an OpenAI key is also set (`imagesKey`).
  */
 import type { Env } from '../../../config/env';
 import type { AiMode } from './engine.types';
@@ -36,6 +44,12 @@ export interface ResolvedAiConfig {
   mode: AiMode;
   /** Present only in `openai` mode. */
   openAiKey: string | null;
+  /** Present only in `openrouter` mode. */
+  openRouterKey: string | null;
+  /** The key images are made with: OpenAI's, in either live mode, when it is set. */
+  imagesKey: string | null;
+  /** OpenRouter's optional attribution, only in `openrouter` mode. */
+  openRouterApp: { url?: string; name?: string };
   /** Present only in `openai` mode with a usable Tavily key. */
   tavilyKey: string | null;
   model: string;
@@ -47,47 +61,70 @@ export interface ResolvedAiConfig {
 export type AiEnv = Pick<
   Env,
   'AI_SIMULATION' | 'OPENAI_API_KEY' | 'TAVILY_API_KEY' | 'AI_MODEL' | 'AI_IMAGE_MODEL'
->;
+> &
+  Partial<
+    Pick<Env, 'OPENROUTER_API_KEY' | 'AI_PROVIDER' | 'OPENROUTER_APP_URL' | 'OPENROUTER_APP_NAME'>
+  >;
 
 export function resolveAiConfig(env: AiEnv): ResolvedAiConfig {
   const warnings: string[] = [];
   const openAiKey = usableKey('OPENAI_API_KEY', env.OPENAI_API_KEY, warnings);
+  const openRouterKey = usableKey('OPENROUTER_API_KEY', env.OPENROUTER_API_KEY, warnings);
   const tavilyKey = usableKey('TAVILY_API_KEY', env.TAVILY_API_KEY, warnings);
-
-  if (env.AI_SIMULATION === 'true') {
-    return {
-      mode: 'simulation',
-      openAiKey: null,
-      tavilyKey: null,
-      model: env.AI_MODEL,
-      imageModel: env.AI_IMAGE_MODEL,
-      warnings,
-    };
-  }
-
-  if (!openAiKey) {
-    if (tavilyKey) {
-      warnings.push('TAVILY_API_KEY is set but OPENAI_API_KEY is not, and research needs a model.');
-    }
-
-    return {
-      mode: 'unconfigured',
-      openAiKey: null,
-      tavilyKey: null,
-      model: env.AI_MODEL,
-      imageModel: env.AI_IMAGE_MODEL,
-      warnings,
-    };
-  }
-
-  return {
-    mode: 'openai',
-    openAiKey,
-    tavilyKey,
+  const none = {
+    openAiKey: null,
+    openRouterKey: null,
+    imagesKey: null,
+    tavilyKey: null,
+    openRouterApp: {},
     model: env.AI_MODEL,
     imageModel: env.AI_IMAGE_MODEL,
-    warnings,
   };
+
+  if (env.AI_SIMULATION === 'true') {
+    return { mode: 'simulation', ...none, warnings };
+  }
+
+  let provider: 'openai' | 'openrouter' | null = null;
+  if (env.AI_PROVIDER === 'openrouter' && openRouterKey) provider = 'openrouter';
+  else if (env.AI_PROVIDER === 'openai' && openAiKey) provider = 'openai';
+  else {
+    if (env.AI_PROVIDER) {
+      warnings.push(
+        `AI_PROVIDER is ${env.AI_PROVIDER} but its key is not set, so the other key is used if there is one.`,
+      );
+    }
+    provider = openAiKey ? 'openai' : openRouterKey ? 'openrouter' : null;
+  }
+
+  if (!provider) {
+    if (tavilyKey) {
+      warnings.push(
+        'TAVILY_API_KEY is set but neither OPENAI_API_KEY nor OPENROUTER_API_KEY is, and research needs a model.',
+      );
+    }
+    return { mode: 'unconfigured', ...none, warnings };
+  }
+
+  if (provider === 'openrouter') {
+    if (!openAiKey) {
+      warnings.push('OpenRouter makes text only: images are off until OPENAI_API_KEY is set.');
+    }
+    return {
+      mode: 'openrouter',
+      ...none,
+      openRouterKey,
+      imagesKey: openAiKey,
+      tavilyKey,
+      openRouterApp: {
+        ...(env.OPENROUTER_APP_URL ? { url: env.OPENROUTER_APP_URL } : {}),
+        ...(env.OPENROUTER_APP_NAME ? { name: env.OPENROUTER_APP_NAME } : {}),
+      },
+      warnings,
+    };
+  }
+
+  return { mode: 'openai', ...none, openAiKey, imagesKey: openAiKey, tavilyKey, warnings };
 }
 
 /** A key worth sending: set, non-blank, and not a placeholder. */

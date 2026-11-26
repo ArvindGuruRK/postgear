@@ -33,7 +33,9 @@
       "@postgear/entitlements": ["packages/entitlements/src"],
       "@postgear/discover-engine": ["packages/discover-engine/src"],
       "@postgear/design-engine": ["packages/design-engine/src"],
-      "@postgear/email": ["packages/email/src"]
+      "@postgear/email": ["packages/email/src"],
+      "@postgear/media-contract": ["packages/media-contract/src"],
+      "@postgear/media-contract/names": ["packages/media-contract/src/names.ts"]
     }
   },
   "include": ["../../../apps/worker/src/**/*.ts"],

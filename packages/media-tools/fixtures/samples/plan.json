@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "note": "What `npm run clips:samples` generates. Every moment is fixed here so Module 16's highlights on the stream sample are predictable. Times are seconds of the sample. The counter is centred so a centred 9:16 crop keeps it.",
+  "version": 2,
+  "note": "What `npm run clips:samples` generates. Every moment is fixed here so Module 16's highlights on the stream sample are predictable. Times are seconds of the sample. The counter is centred so a centred 9:16 crop keeps it. Version 2 (Sprint 13) adds twoSpeakers (generated: two face-like markers taking turns, one tone per speaker, silences between some turns) and own (real videos a developer supplies: copied, never generated, never committed).",
   "talk": {
     "file": "talk.mp4",
     "durationSec": 180,
@@ -55,6 +55,48 @@
       "burstLengthSec": 15,
       "burstPerSecond": 3,
       "baselineEverySec": 3
+    }
+  },
+  "twoSpeakers": {
+    "file": "two-speakers.mp4",
+    "durationSec": 240,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "bedToneHz": 110,
+    "speakers": [
+      { "id": "left", "name": "Speaker One", "toneHz": 220, "colour": "0x3b82f6", "centreX": 0.27, "centreY": 0.47, "faceWidth": 0.2, "faceHeight": 0.44 },
+      { "id": "right", "name": "Speaker Two", "toneHz": 440, "colour": "0xf97316", "centreX": 0.73, "centreY": 0.47, "faceWidth": 0.2, "faceHeight": 0.44 }
+    ],
+    "turns": [
+      { "speaker": "left", "startSec": 2, "endSec": 13.5 },
+      { "speaker": "right", "startSec": 15, "endSec": 26.5 },
+      { "speaker": "left", "startSec": 28, "endSec": 39 },
+      { "speaker": "right", "startSec": 40.5, "endSec": 49 },
+      { "speaker": "left", "startSec": 55, "endSec": 69 },
+      { "speaker": "right", "startSec": 70.5, "endSec": 84 },
+      { "speaker": "left", "startSec": 85.5, "endSec": 96 },
+      { "speaker": "right", "startSec": 97.5, "endSec": 110 },
+      { "speaker": "left", "startSec": 116, "endSec": 129 },
+      { "speaker": "right", "startSec": 130.5, "endSec": 142 },
+      { "speaker": "left", "startSec": 143.5, "endSec": 154 },
+      { "speaker": "right", "startSec": 155.5, "endSec": 168.5 },
+      { "speaker": "left", "startSec": 170, "endSec": 181 },
+      { "speaker": "right", "startSec": 187, "endSec": 199 },
+      { "speaker": "left", "startSec": 200.5, "endSec": 212 },
+      { "speaker": "right", "startSec": 213.5, "endSec": 225 },
+      { "speaker": "left", "startSec": 226.5, "endSec": 237 }
+    ]
+  },
+  "own": {
+    "verideck": {
+      "file": "verideck.mp4",
+      "durationSec": 60,
+      "width": 1920,
+      "height": 1080,
+      "title": "Verideck: A 60 Second Product Film",
+      "sources": ["out/Verideck_60s_3D.mp4"],
+      "envVar": "CLIPS_OWN_SAMPLE"
     }
   }
 }

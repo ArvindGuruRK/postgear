@@ -152,7 +152,7 @@ export interface AiCredits {
   };
 }
 
-export type AiMode = 'openai' | 'simulation' | 'unconfigured';
+export type AiMode = 'openai' | 'openrouter' | 'simulation' | 'unconfigured';
 
 /** `GET /ai/status`. */
 export interface AiStatus {

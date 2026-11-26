@@ -1,6 +1,6 @@
 # Module 01: Media Service Foundations
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done with gaps (2026-11-26) | Size: L (one full session)
 > **Depends on**: Sprint 12, built and through its exit gate (first module; creates the branch)
 > **Stories**: foundations for every story
 > **Next**: [Module 02](module-02-transcription.md) (Transcription), [Module 07](module-07-face-detection-and-detect-camera.md) (Face Detection)
@@ -92,15 +92,15 @@ apps/media/
 
 ## Tasks
 
-- [ ] Refresh the Sprint 13 documents against the built Sprint 12; the Decision Log row.
-- [ ] The regression set in `packages/video-engine/fixtures/v1-clips/`.
-- [ ] Branch `sprint-13-clips-ai`; note it in the README.
-- [ ] `packages/media-contract`: `mediaPyHealth`, export, generation, shared fixtures, the freshness test.
-- [ ] `apps/media`: project files, settings, logging, storage, scratch, the provider factory, `main.py`, `worker.py`, the health activity.
-- [ ] The TypeScript stub, the runtime check, `ai.service`, env flags in the API and the worker.
-- [ ] Turborepo scripts, the missing-uv message, CI, the testing guide.
-- [ ] The `two-speakers` sample; `Dockerfile.media` built once.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Refresh the Sprint 13 documents against the built Sprint 12; the Decision Log row.
+- [x] The regression set in `packages/video-engine/fixtures/v1-clips/`.
+- [x] Branch `sprint-13-clips-ai`; note it in the README.
+- [x] `packages/media-contract`: `mediaPyHealth`, export, generation, shared fixtures, the freshness test.
+- [x] `apps/media`: project files, settings, logging, storage, scratch, the provider factory, `main.py`, `worker.py`, the health activity.
+- [x] The TypeScript stub, the runtime check, `ai.service`, env flags in the API and the worker.
+- [x] Turborepo scripts, the missing-uv message, CI, the testing guide.
+- [x] The `two-speakers` sample; `Dockerfile.media` built once.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

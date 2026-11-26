@@ -1,8 +1,10 @@
 {
   "version": 1,
-  "note": "CLIPS_SIMULATION links. Each answers from a recorded probe (with field overrides) or a recorded yt-dlp error line, and fetches from a generated sample video. Ids are made up and belong to nobody.",
+  "note": "CLIPS_SIMULATION links. Each answers from a recorded probe (with field overrides) or a recorded yt-dlp error line, and fetches from a sample video (generated, or the developer's own verideck sample). Ids are made up and belong to nobody.",
   "links": [
     { "platform": "youtube", "externalId": "simtalk0001", "url": "https://www.youtube.com/watch?v=simtalk0001", "probe": "youtube-talk", "sample": "talk" },
+    { "platform": "youtube", "externalId": "simverideck", "url": "https://www.youtube.com/watch?v=simverideck", "probe": "youtube-talk", "sample": "verideck", "overrides": { "id": "simverideck", "webpage_url": "https://www.youtube.com/watch?v=simverideck", "title": "Verideck: A 60 Second Product Film", "duration": 60, "thumbnail": "https://img.sim.invalid/vi/simverideck/maxresdefault.jpg", "heatmap": null } },
+    { "platform": "youtube", "externalId": "simtwospkr1", "url": "https://www.youtube.com/watch?v=simtwospkr1", "probe": "youtube-talk", "sample": "two-speakers", "overrides": { "id": "simtwospkr1", "webpage_url": "https://www.youtube.com/watch?v=simtwospkr1", "title": "PostGear Sample: Two Speakers Taking Turns", "duration": 240, "thumbnail": "https://img.sim.invalid/vi/simtwospkr1/maxresdefault.jpg", "heatmap": null } },
     { "platform": "youtube", "externalId": "simprivate1", "url": "https://www.youtube.com/watch?v=simprivate1", "stderr": "ERROR: [youtube] simprivate1: Private video. Sign in if you've been granted access to this video" },
     { "platform": "youtube", "externalId": "simlivenow1", "url": "https://www.youtube.com/watch?v=simlivenow1", "probe": "youtube-talk", "sample": "talk", "overrides": { "id": "simlivenow1", "title": "PostGear Sample: Live Right Now", "duration": null, "is_live": true, "live_status": "is_live", "heatmap": null } },
     { "platform": "youtube", "externalId": "simmissing1", "url": "https://www.youtube.com/watch?v=simmissing1", "stderr": "ERROR: [youtube] simmissing1: Video unavailable. This video is no longer available because the YouTube account associated with this video has been terminated." },

@@ -34,6 +34,13 @@ import {
   createOpenAiModelClient as buildOpenAiModelClient,
   type OpenAiModelClientOptions,
 } from './model/openai-model-client';
+import {
+  createOpenRouterModelClient as buildOpenRouterModelClient,
+  OPENROUTER_BASE_URL,
+  type OpenRouterModelClientOptions,
+  openRouterHeaders,
+  openRouterModelId,
+} from './model/openrouter-model-client';
 import { createSimulatedModelClient as buildSimulatedModelClient } from './model/simulated-model-client';
 import {
   createOpenAiImageGenerator as buildOpenAiImageGenerator,
@@ -100,6 +107,8 @@ export { researchCacheKey } from './tools/tavily-search.tool';
 export * from './types';
 
 export type OpenAiModelOptions = OpenAiModelClientOptions;
+export type OpenRouterModelOptions = OpenRouterModelClientOptions;
+export { OPENROUTER_BASE_URL, openRouterHeaders, openRouterModelId };
 export type OpenAiImageOptions = OpenAiImageGeneratorOptions;
 export type TavilyOptions = TavilyResearchOptions;
 
@@ -118,6 +127,11 @@ export function createSeoAdvisor(deps: SeoAdvisorDeps): SeoAdvisor {
 
 export function createOpenAiModelClient(options: OpenAiModelOptions): ModelClient {
   return buildOpenAiModelClient(options);
+}
+
+/** Any model through OpenRouter's OpenAI-compatible API (text only). */
+export function createOpenRouterModelClient(options: OpenRouterModelOptions): ModelClient {
+  return buildOpenRouterModelClient(options);
 }
 
 /** Deterministic, key-free model for local development and tests. */

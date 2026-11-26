@@ -204,7 +204,8 @@ export function AnalyzeForm({
         {!status.ai ? (
           <Alert>
             AI advice is off in this setup, so recommendations are rule-based, written from the
-            checks alone. Set <code className="font-bold">OPENAI_API_KEY</code> or{' '}
+            checks alone. Set <code className="font-bold">OPENAI_API_KEY</code>,{' '}
+            <code className="font-bold">OPENROUTER_API_KEY</code> or{' '}
             <code className="font-bold">AI_SIMULATION="true"</code> on the API for model-written
             advice.
           </Alert>

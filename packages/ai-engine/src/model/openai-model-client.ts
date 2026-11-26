@@ -36,6 +36,15 @@ export interface OpenAiModelClientOptions {
   model: string;
   /** Per-call deadline. Default 60 000 ms. */
   timeoutMs?: number;
+  /**
+   * Another server that speaks OpenAI's chat API (OpenRouter). Unset means
+   * OpenAI itself. The key is sent only to this address.
+   */
+  baseURL?: string;
+  /** Extra headers on every call (OpenRouter's optional app attribution). */
+  defaultHeaders?: Record<string, string>;
+  /** The prefix of `name` (`openai`, `openrouter`). Default `openai`. */
+  provider?: string;
 }
 
 export const DEFAULT_MODEL_TIMEOUT_MS = 60_000;
@@ -47,11 +56,19 @@ export function createOpenAiModelClient(options: OpenAiModelClientOptions): Mode
     model: options.model,
     timeout: timeoutMs,
     maxRetries: 0,
+    ...(options.baseURL || options.defaultHeaders
+      ? {
+          configuration: {
+            ...(options.baseURL ? { baseURL: options.baseURL } : {}),
+            ...(options.defaultHeaders ? { defaultHeaders: options.defaultHeaders } : {}),
+          },
+        }
+      : {}),
   };
   const model = new ChatOpenAI({ ...base, temperature: 0.7 });
 
   return {
-    name: `openai:${options.model}`,
+    name: `${options.provider ?? 'openai'}:${options.model}`,
 
     async structured<T>(params: {
       schema: z.ZodType<T>;

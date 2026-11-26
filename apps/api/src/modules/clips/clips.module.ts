@@ -43,6 +43,7 @@ import { ClipLibraryModule } from './library/clip-library.module';
 import { ClipLinksModule } from './links/clip-links.module';
 import { ClipsStatusController } from './status/clips-status.controller';
 import { ClipsStatusService } from './status/clips-status.service';
+import { MediaServiceProbe } from './status/media-service.probe';
 import { ClipSampleLink } from './videos/clip-sample';
 import { ClipUploadsService } from './videos/clip-uploads.service';
 import { ClipVideosController } from './videos/clip-videos.controller';
@@ -75,6 +76,7 @@ import { ClipVideosService } from './videos/clip-videos.service';
   providers: [
     ClipJobEventsService,
     ClipsStatusService,
+    MediaServiceProbe,
     ClipVideosService,
     ClipHighlightsService,
     ClipUploadsService,
