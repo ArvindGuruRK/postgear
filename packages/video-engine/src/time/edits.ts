@@ -108,8 +108,11 @@ export function isSpeed(value: number): value is Speed {
   return (SPEEDS as readonly number[]).includes(value);
 }
 
-/** Checks the result of an edit, then puts every item back in its place. */
-function finish(
+/**
+ * Checks the result of an edit, then puts every item back in its place.
+ * Exported for the other edits that move video (Sprint 13's cuts by words).
+ */
+export function finishEdit(
   before: ClipDocument,
   segments: Segment[],
   needsMoreVideo?: NeedsMoreVideo,
@@ -210,7 +213,7 @@ export function trimSegment(doc: ClipDocument, input: TrimInput): EditResult {
     }
   }
 
-  return finish(doc, segments, needsMoreVideo);
+  return finishEdit(doc, segments, needsMoreVideo);
 }
 
 /**
@@ -250,7 +253,8 @@ function splitPoint(segment: Segment, offset: number, length: number): number | 
   return null;
 }
 
-function unusedId(doc: ClipDocument, prefix: string): string {
+/** An id no part of `doc` has yet. */
+export function unusedId(doc: Pick<ClipDocument, 'segments'>, prefix: string): string {
   const taken = new Set<string>(doc.segments.map((s) => s.id));
   let id = newId(prefix);
   while (taken.has(id)) {
@@ -300,7 +304,7 @@ export function splitAt(doc: ClipDocument, outputMs: number): EditResult {
     { ...segment, sourceOut: cut },
     { ...segment, id: unusedId(doc, 'seg'), sourceIn: cut },
   );
-  return finish(doc, segments);
+  return finishEdit(doc, segments);
 }
 
 /** Removes one part; the rest close up. The last part cannot be removed. */
@@ -312,7 +316,7 @@ export function removeSegment(doc: ClipDocument, segmentId: string): EditResult 
   if (doc.segments.length <= 1) {
     return refuse('last_segment');
   }
-  return finish(
+  return finishEdit(
     doc,
     doc.segments.filter((_, i) => i !== index),
   );
@@ -330,7 +334,7 @@ export function setSpeed(doc: ClipDocument, segmentId: string, speed: number): E
   }
   const segments = doc.segments.slice();
   segments[index] = { ...segment, speed };
-  return finish(doc, segments);
+  return finishEdit(doc, segments);
 }
 
 // --- Putting items back --------------------------------------------------

@@ -630,6 +630,30 @@ export interface ClipWordsView {
   price: number;
 }
 
+/**
+ * `POST /clips/videos/:videoId/transcript` (Module 02, used from Module 04):
+ * listening started (or joined), or every moment was listened to already.
+ */
+export type ListenOutcome =
+  | { covered: true; language: string | null; price: 0 }
+  | {
+      covered: false;
+      job: ClipJobView;
+      /** AI minutes charged (0 when it joined a running job). */
+      price: number;
+      joined: boolean;
+      ranges: Array<{ fromMs: number; toMs: number }>;
+    };
+
+/** `GET /clips/videos/:videoId/transcript`: the words of a stretch, fixes applied. */
+export interface VideoTranscriptView {
+  transcript: TranscriptView | null;
+  /** Every moment of the stretch has words or was heard as silence. */
+  complete: boolean;
+  /** What listening to the rest would cost, in AI minutes. */
+  price: number;
+}
+
 /** `POST /clips/:clipId/captions`: listening started (or was already running), or the track. */
 export type AddCaptionsOutcome =
   | {

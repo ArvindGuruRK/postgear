@@ -122,6 +122,13 @@ export interface AudioLayer {
    * false and the engine sets the element's volume (at most 1).
    */
   videoGain?(el: HTMLVideoElement, gain: number): boolean;
+  /**
+   * Sprint 13, Module 04: a cut. The element that takes over after a join
+   * of two stretches that do not follow each other starts silent and rises
+   * to `gain` over `CUT_FADE_MS`, as the export's 15 ms `afade` does, so
+   * the preview does not click there either. True when the layer did it.
+   */
+  cutFadeIn?(el: HTMLVideoElement, gain: number): boolean;
 }
 
 /** The animation frame clock, injectable so tests can step it. */

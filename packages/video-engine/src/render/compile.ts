@@ -95,7 +95,48 @@ function segmentPicture(segment: PlanSegment, source: string, plan: RenderPlan):
   return layoutGraph(segment, source, plan, { trim, timing });
 }
 
-function segmentSound(segment: PlanSegment, source: string | null): string {
+/**
+ * Sprint 13, Module 04: the fade at a cut. A join of two segments that do
+ * not follow each other in the file (a cut out of the middle, or another
+ * video) gets a 15 ms fade out before it and a 15 ms fade in after it, so it
+ * never clicks (research 09 sections 6 and 11: the largest step at an
+ * unfaded join was 25 times the tone's own; faded, it was normal). The
+ * clip's own start and end get none here (the clip's fades are separate),
+ * and a piece too short for two whole fades fades over a third of itself.
+ * A join inside one run (a speed change) is continuous and is left alone.
+ */
+export const CUT_FADE_MS = 15;
+
+export interface CutFades {
+  inMs: number;
+  outMs: number;
+}
+
+/** The fades each segment's sound gets at its cuts, by segment place. */
+export function cutFades(plan: Pick<RenderPlan, 'segments'>): CutFades[] {
+  const { segments } = plan;
+  return segments.map((segment, k) => {
+    const length = segment.outEndMs - segment.outStartMs;
+    const fade = Math.min(CUT_FADE_MS, length / 3);
+    const previous = segments[k - 1];
+    const next = segments[k + 1];
+    return {
+      inMs: previous && previous.inputIndex !== segment.inputIndex ? fade : 0,
+      outMs: next && next.inputIndex !== segment.inputIndex ? fade : 0,
+    };
+  });
+}
+
+/** Fade lengths go into the graph in whole microseconds (`1.5` ms is `0.0015`). */
+function fadeSeconds(ms: number): string {
+  return formatNumber(Math.round(ms * 1000) / 1_000_000);
+}
+
+function segmentSound(
+  segment: PlanSegment,
+  source: string | null,
+  fades: CutFades = { inMs: 0, outMs: 0 },
+): string {
   const n = segment.index;
   if (source === null) {
     const seconds = msToSeconds(segment.outEndMs - segment.outStartMs);
@@ -109,6 +150,11 @@ function segmentSound(segment: PlanSegment, source: string | null): string {
     parts.push(`volume=${formatNumber(segment.volume)}`);
   }
   parts.push(...atempoChain(segment.speed), AUDIO_FORMAT);
+  if (fades.inMs > 0) parts.push(`afade=t=in:st=0:d=${fadeSeconds(fades.inMs)}`);
+  if (fades.outMs > 0) {
+    const length = segment.outEndMs - segment.outStartMs;
+    parts.push(`afade=t=out:st=${fadeSeconds(length - fades.outMs)}:d=${fadeSeconds(fades.outMs)}`);
+  }
   return `${source}${parts.join(',')}[a${n}]`;
 }
 
@@ -183,7 +229,9 @@ function mixLines(plan: RenderPlan, from: string): string[] {
 function extraInputs(plan: RenderPlan, inputs: CompiledInput[]): void {
   for (const sticker of plan.stickers ?? []) {
     if (sticker.inputIndex !== inputs.length) {
-      throw new Error(`Sticker ${sticker.id} reads input ${sticker.inputIndex}, not ${inputs.length}`);
+      throw new Error(
+        `Sticker ${sticker.id} reads input ${sticker.inputIndex}, not ${inputs.length}`,
+      );
     }
     inputs.push({ file: sticker.file, seekMs: null, options: [] });
   }
@@ -222,7 +270,10 @@ export function compileMeasure(plan: RenderPlan): CompiledFfmpeg | null {
   for (const input of plan.inputs) {
     const count = input.segmentCount;
     if (!input.hasAudio) {
-      audio.set(input.index, Array.from({ length: Math.max(1, count) }, () => null));
+      audio.set(
+        input.index,
+        Array.from({ length: Math.max(1, count) }, () => null),
+      );
     } else if (count <= 1) {
       audio.set(input.index, [`[${input.index}:a]`]);
     } else {
@@ -232,11 +283,12 @@ export function compileMeasure(plan: RenderPlan): CompiledFfmpeg | null {
     }
   }
   const used = new Map<number, number>();
-  for (const segment of plan.segments) {
+  const fades = cutFades(plan);
+  plan.segments.forEach((segment, place) => {
     const k = used.get(segment.inputIndex) ?? 0;
     used.set(segment.inputIndex, k + 1);
-    lines.push(segmentSound(segment, audio.get(segment.inputIndex)?.[k] ?? null));
-  }
+    lines.push(segmentSound(segment, audio.get(segment.inputIndex)?.[k] ?? null, fades[place]));
+  });
   const pairs = plan.segments.map((s) => `[a${s.index}]`).join('');
   lines.push(`${pairs}concat=n=${plan.segments.length}:v=0:a=1[ac]`);
   lines.push(...mixLines(plan, '[ac]'));
@@ -288,7 +340,9 @@ export function stickerChain(sticker: PlanSticker, fps: number): string {
   }
   if (sticker.opacity < 1) parts.push(`colorchannelmixer=aa=${formatNumber(sticker.opacity)}`);
   if (sticker.animated) {
-    parts.push(`setpts=N/(${formatNumber(sticker.fps ?? fps)}*TB)+${msToSeconds(sticker.startMs)}/TB`);
+    parts.push(
+      `setpts=N/(${formatNumber(sticker.fps ?? fps)}*TB)+${msToSeconds(sticker.startMs)}/TB`,
+    );
   } else {
     parts.push('loop=loop=-1:size=1:start=0', `setpts=N/(${fps}*TB)`);
   }
@@ -348,7 +402,8 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
   }
 
   const used = new Map<number, number>();
-  for (const segment of plan.segments) {
+  const fades = cutFades(plan);
+  for (const [place, segment] of plan.segments.entries()) {
     const list = sources.get(segment.inputIndex);
     const k = used.get(segment.inputIndex) ?? 0;
     const source = list?.[k];
@@ -359,7 +414,7 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
     }
     used.set(segment.inputIndex, k + 1);
     lines.push(...segmentPicture(segment, source.video, plan));
-    lines.push(segmentSound(segment, source.audio));
+    lines.push(segmentSound(segment, source.audio, fades[place]));
   }
 
   const pairs = plan.segments.map((s) => `[v${s.index}][a${s.index}]`).join('');

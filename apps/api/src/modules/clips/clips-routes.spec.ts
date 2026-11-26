@@ -193,7 +193,11 @@ describe('Clips routes', () => {
           reached: 'captions-add',
           clipId,
         }),
-        words: async (_org: string, clipId: string) => ({ reached: 'words', clipId }),
+        words: async (_org: string, clipId: string, source: string) => ({
+          reached: 'words',
+          clipId,
+          source,
+        }),
         fromFile: async (
           _org: string,
           clipId: string,
@@ -403,7 +407,13 @@ describe('Clips routes', () => {
     expect((await request(server).get(`/clips/${CLIP_ID}/words`).expect(200)).body).toEqual({
       reached: 'words',
       clipId: CLIP_ID,
+      source: 'captions',
     });
+    expect(
+      (await request(server).get(`/clips/${CLIP_ID}/words?source=spoken`).expect(200)).body,
+    ).toMatchObject({ source: 'spoken' });
+    await request(server).get(`/clips/${CLIP_ID}/words?source=translated`).expect(400);
+    await request(server).get(`/clips/${CLIP_ID}/words?from=1`).expect(400);
 
     const uploaded = await request(server)
       .post(`/clips/${CLIP_ID}/captions/from-file`)

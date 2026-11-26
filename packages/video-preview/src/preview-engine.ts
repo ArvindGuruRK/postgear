@@ -852,6 +852,8 @@ export class PreviewEngine {
     this.holdingFor = null;
     this.clockMs = next.outStart;
     this.startFront('handover');
+    // A handover is always a cut (a continuing part plays on in `advance`): no click there.
+    this.audio.cutFadeIn?.(this.slots[this.front].el, Math.max(0, next.volume));
     old.el.pause();
     this.redraw('handover');
     this.prepareBack(nextHandover(this.parts, next.index));

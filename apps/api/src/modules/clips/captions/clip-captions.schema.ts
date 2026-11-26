@@ -22,3 +22,14 @@ export const translateCaptionsSchema = z
   .object({ language: z.string().regex(/^[a-z]{2,3}$/, 'A language is a short code') })
   .strict();
 export type TranslateCaptionsInput = z.infer<typeof translateCaptionsSchema>;
+
+/**
+ * `GET /clips/:clipId/words` (Module 04 adds `source`): `captions` (the
+ * default) answers the words the clip's captions show, which may be a file
+ * or a translation; `spoken` always answers the video's own listened words,
+ * the only ones whose times are real, which the Transcript pane cuts by.
+ */
+export const clipWordsQuerySchema = z
+  .object({ source: z.enum(['captions', 'spoken']).optional() })
+  .strict();
+export type ClipWordsQuery = z.infer<typeof clipWordsQuerySchema>;

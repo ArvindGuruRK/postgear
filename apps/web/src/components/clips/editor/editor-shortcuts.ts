@@ -26,6 +26,7 @@ export type ClipShortcutCommand =
   | 'fit'
   | 'escape'
   | 'edit'
+  | 'transcript'
   | 'shortcuts';
 
 export interface ClipShortcutPress {
@@ -72,6 +73,8 @@ export function clipShortcutFor(press: ClipShortcutPress): ClipShortcutCommand |
       return 'end';
     case 's':
       return 'split';
+    case 't':
+      return 'transcript';
     case 'Delete':
     case 'Backspace':
       return 'delete';
@@ -157,6 +160,7 @@ export const CLIP_SHORTCUT_GROUPS: readonly ClipShortcutGroup[] = [
     name: 'Editing',
     rows: [
       { keys: ['S'], label: 'Split at the playhead' },
+      { keys: ['T'], label: 'Open or close the transcript' },
       { keys: ['Delete', 'Backspace'], label: 'Remove the selected part, item or zoom' },
       { keys: ['Ctrl+D'], label: 'Duplicate the selected item' },
       { keys: ['Enter'], label: 'Type into the selected text' },

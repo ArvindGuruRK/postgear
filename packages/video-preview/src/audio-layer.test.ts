@@ -120,7 +120,16 @@ function state(sounds: SoundState[], at = 0): FrameState {
 }
 
 function sound(overrides: Partial<SoundState> = {}): SoundState {
-  return { id: 'fx', trackId: 'au', type: 'sfx', refKey: 'library:a', loop: false, gain: 0.5, fileMs: 0, ...overrides };
+  return {
+    id: 'fx',
+    trackId: 'au',
+    type: 'sfx',
+    refKey: 'library:a',
+    loop: false,
+    gain: 0.5,
+    fileMs: 0,
+    ...overrides,
+  };
 }
 
 async function flush() {
@@ -170,7 +179,11 @@ describe('WebAudioLayer', () => {
     expect(ctx.sources).toHaveLength(0);
     layer.wake();
     expect(ctx.state).toBe('running');
-    layer.update(state([sound({ fileMs: 500 })]), { reason: 'play', playing: true, scrubbing: false });
+    layer.update(state([sound({ fileMs: 500 })]), {
+      reason: 'play',
+      playing: true,
+      scrubbing: false,
+    });
     expect(ctx.sources).toHaveLength(1);
     expect(ctx.sources[0]?.started).toEqual([[0, 0.5, 1.5]]);
   });
@@ -178,7 +191,17 @@ describe('WebAudioLayer', () => {
   it('starts music looped and an effect for what is left of its file, each at its gain', () => {
     layer.wake();
     layer.update(
-      state([sound({ fileMs: 500 }), sound({ id: 'bed', type: 'music', refKey: 'asset:b', loop: true, fileMs: 9_000, gain: 0.2 })]),
+      state([
+        sound({ fileMs: 500 }),
+        sound({
+          id: 'bed',
+          type: 'music',
+          refKey: 'asset:b',
+          loop: true,
+          fileMs: 9_000,
+          gain: 0.2,
+        }),
+      ]),
       { reason: 'seek', playing: true, scrubbing: false },
     );
     const [fx, bed] = ctx.sources;
@@ -191,14 +214,26 @@ describe('WebAudioLayer', () => {
 
   it('keeps a sound in step, ramps its gain, and starts it again when it drifts', () => {
     layer.wake();
-    layer.update(state([sound({ fileMs: 0 })]), { reason: 'play', playing: true, scrubbing: false });
+    layer.update(state([sound({ fileMs: 0 })]), {
+      reason: 'play',
+      playing: true,
+      scrubbing: false,
+    });
     ctx.currentTime = 0.5;
-    layer.update(state([sound({ fileMs: 500, gain: 0.25 })], 500), { reason: 'frame', playing: true, scrubbing: false });
+    layer.update(state([sound({ fileMs: 500, gain: 0.25 })], 500), {
+      reason: 'frame',
+      playing: true,
+      scrubbing: false,
+    });
     expect(ctx.sources).toHaveLength(1);
     const gain = ctx.sources[0]?.connected[0] as FakeGain;
     expect(gain.gain.events.at(-1)).toEqual(['ramp', 0.25, 0.53]);
     ctx.currentTime = 1;
-    layer.update(state([sound({ fileMs: 1_000 - DRIFT_RESTART_MS - 20 })], 1_000), { reason: 'frame', playing: true, scrubbing: false });
+    layer.update(state([sound({ fileMs: 1_000 - DRIFT_RESTART_MS - 20 })], 1_000), {
+      reason: 'frame',
+      playing: true,
+      scrubbing: false,
+    });
     expect(ctx.sources).toHaveLength(2);
     expect(ctx.sources[0]?.stopped).toBe(true);
   });
@@ -206,7 +241,11 @@ describe('WebAudioLayer', () => {
   it('starts every sound again on a seek or a hand-over, and stops them all on silence', () => {
     layer.wake();
     layer.update(state([sound()]), { reason: 'play', playing: true, scrubbing: false });
-    layer.update(state([sound({ fileMs: 300 })]), { reason: 'handover', playing: true, scrubbing: false });
+    layer.update(state([sound({ fileMs: 300 })]), {
+      reason: 'handover',
+      playing: true,
+      scrubbing: false,
+    });
     expect(ctx.sources).toHaveLength(2);
     expect(ctx.sources[0]?.stopped).toBe(true);
     layer.silence();
@@ -226,6 +265,23 @@ describe('WebAudioLayer', () => {
     expect(ctx.routed).toEqual([corsVideo]);
     expect(layer.videoGain(corsVideo, 1.5)).toBe(true);
     expect(layer.videoGain(plainVideo, 1.5)).toBe(false);
+  });
+
+  it('starts the element after a cut silent and raises it over 15 ms', () => {
+    const video = { crossOrigin: 'anonymous', volume: 1 } as unknown as HTMLVideoElement;
+    layer.attachVideos([video]);
+    expect(layer.cutFadeIn(video, 0.8)).toBe(false);
+    layer.wake();
+    ctx.currentTime = 4;
+    expect(layer.cutFadeIn(video, 0.8)).toBe(true);
+    const gain = (layer as unknown as { routed: Map<unknown, { gain: FakeGain }> }).routed.get(
+      video,
+    )?.gain.gain;
+    expect(gain?.events.slice(-3)).toEqual([
+      ['cancel', 0, 4],
+      ['set', 0, 4],
+      ['ramp', 0.8, 4.015],
+    ]);
   });
 
   it('reads the meter from the mix', () => {

@@ -205,10 +205,17 @@ export class ClipCaptionsService {
     };
   }
 
-  /** `GET /clips/:clipId/words`. */
-  async words(orgId: string, clipId: string): Promise<WordsOutcome> {
+  /**
+   * `GET /clips/:clipId/words`. `spoken` (Module 04, the Transcript pane)
+   * reads the video's own listened transcript whatever the captions show.
+   */
+  async words(
+    orgId: string,
+    clipId: string,
+    source: 'captions' | 'spoken' = 'captions',
+  ): Promise<WordsOutcome> {
     const context = await this.context(orgId, clipId);
-    const track = captionsTrackOf(context.document);
+    const track = source === 'captions' ? captionsTrackOf(context.document) : null;
     const row = track
       ? await this.transcripts.assetRow(orgId, context.video.id, track.transcriptAssetId)
       : await this.transcripts.transcriptRow(orgId, context.video.id, 'auto');

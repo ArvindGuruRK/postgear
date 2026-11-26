@@ -19,7 +19,7 @@ export const CLIP_MAX_MS = 1_800_000;
 /** A part of the video in the clip is at least this long, so a split never leaves a sliver. */
 export const SEGMENT_MIN_MS = 200;
 
-export const MAX_SEGMENTS = 50;
+export const MAX_SEGMENTS = 150;
 
 /** Text, stickers and sounds together, across every track. */
 export const MAX_ITEMS = 100;

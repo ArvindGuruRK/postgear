@@ -2,6 +2,7 @@ import {
   type AudioItem,
   type ClipDocument,
   createClipDocument,
+  MAX_SEGMENTS,
   MAX_SOUNDS,
   MAX_STICKERS,
   outputDuration,
@@ -316,8 +317,9 @@ describe('split and remove', () => {
   });
 
   it('refuses a split past the parts limit', () => {
+    // A 30 s clip holds the most parts at the shortest part (200 ms each).
     let doc = clip();
-    for (let at = 500; doc.segments.length < 50; at += 500) {
+    for (let at = 200; doc.segments.length < MAX_SEGMENTS; at += 200) {
       const next = splitAtPlayhead(doc, at);
       if (next.ok) doc = next.doc;
     }

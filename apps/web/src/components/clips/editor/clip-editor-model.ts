@@ -98,6 +98,28 @@ export function writeDockHeight(value: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// The Transcript pane (Sprint 13, Module 04): whether it was open, per browser
+// ---------------------------------------------------------------------------
+
+const TRANSCRIPT_STORAGE_KEY = 'postgear.clips.transcriptOpen';
+
+export function readTranscriptOpen(): boolean {
+  try {
+    return window.localStorage.getItem(TRANSCRIPT_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeTranscriptOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(TRANSCRIPT_STORAGE_KEY, open ? '1' : '0');
+  } catch {
+    // A blocked storage only means the choice is not remembered.
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The stage's scale
 // ---------------------------------------------------------------------------
 

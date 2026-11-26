@@ -128,6 +128,9 @@ import { TriangleAlert } from 'lucide-react';
 import { captionBars, lookOf } from '../panels/captions-model';
 import { CaptionsPanel } from '../panels/captions-panel';
 import { useCaptions } from '../panels/use-captions';
+import type { ApplyCut } from '../transcript/cleanup-tools';
+import { TranscriptPane } from '../transcript/transcript-pane';
+import { cutRefusalSentence } from '../transcript/transcript-model';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -205,8 +208,10 @@ import {
   LEAVE_TITLE,
   NO_PREVIEW_SENTENCE,
   RELOAD_FAILED_SENTENCE,
+  readTranscriptOpen,
   SHARP_GONE_SENTENCE,
   videoSizeOf,
+  writeTranscriptOpen,
 } from './clip-editor-model';
 import { clipFontFamily } from './clip-fonts';
 import { EditorPanel, panelHeadingId } from './editor-panel';
@@ -260,7 +265,9 @@ function useApplePlatform(): boolean {
 
 /** Keys that belong to the focused control (a button's Space, a slider's arrows), not the transport. */
 const OWN_KEYS =
-  'button, a[href], [role="slider"], [role="tab"], [role="separator"], [role="menuitem"], [role="option"], [role="radio"], [role="checkbox"]';
+  'button, a[href], [role="slider"], [role="tab"], [role="separator"], [role="menuitem"], [role="option"], [role="radio"], [role="checkbox"], [role="listbox"]';
+/** The Transcript pane's words (Module 04): Delete there cuts words, never a timeline part. */
+const TRANSCRIPT_KEYS = '[data-transcript-pane]';
 
 /** Renews the signed address this long before it runs out. */
 const RENEW_EARLY_MS = 5 * 60_000;
@@ -673,11 +680,35 @@ export function ClipEditor({
   latest.current = { document, selection: state.selection };
 
   // The panel can be folded away for room (2026-11-19); opening any tab opens it again.
-  const [panelOpen, setPanelOpen] = useState(true);
-  const setTab = useCallback((tab: EditorTab) => {
-    setPanelOpen(true);
-    dispatch({ type: 'tab', tab });
+  const [panelOpen, setPanelOpenState] = useState(true);
+  // Sprint 13, Module 04: the Transcript pane. At most three columns at 1366 px: opening it
+  // folds the panel to its rail, and opening the panel closes it (blueprint section 13).
+  const [transcriptOpen, setTranscriptOpenState] = useState(false);
+  useEffect(() => {
+    if (readTranscriptOpen()) {
+      setTranscriptOpenState(true);
+      setPanelOpenState(false);
+    }
   }, []);
+  const setTranscriptOpen = useCallback((open: boolean) => {
+    setTranscriptOpenState(open);
+    writeTranscriptOpen(open);
+    if (open) setPanelOpenState(false);
+  }, []);
+  const setPanelOpen = useCallback((open: boolean) => {
+    setPanelOpenState(open);
+    if (open) {
+      setTranscriptOpenState(false);
+      writeTranscriptOpen(false);
+    }
+  }, []);
+  const setTab = useCallback(
+    (tab: EditorTab) => {
+      setPanelOpen(true);
+      dispatch({ type: 'tab', tab });
+    },
+    [setPanelOpen],
+  );
 
   const select = useCallback((selection: EditorSelection) => {
     dispatch({ type: 'select', selection });
@@ -761,6 +792,34 @@ export function ClipEditor({
     const { document: doc } = latest.current;
     commit(doc, withoutCaptions(doc));
   }, [commit]);
+
+  // ---- Cutting by words (Sprint 13, Module 04) ------------------------------------------
+  // The Transcript pane's cuts, run on the latest document: one undo step each, the result
+  // in a toast with Undo, a refusal in the timeline's notice line.
+  const applyCut = useCallback<ApplyCut>(
+    (make, describe) => {
+      const { document: doc } = latest.current;
+      const result = make(doc);
+      if (!result.ok) {
+        setNotice(cutRefusalSentence(result.code));
+        return false;
+      }
+      commit(doc, result.doc);
+      const sentence = describe(doc, result.doc);
+      if (sentence) {
+        toast({
+          title: sentence,
+          action: (
+            <ToastAction altText="Undo" onClick={() => dispatch({ type: 'undo' })}>
+              Undo
+            </ToastAction>
+          ),
+        });
+      }
+      return true;
+    },
+    [commit],
+  );
   const [safeAreaShown, setSafeAreaShown] = useState(false);
   const safeArea = useMemo(
     () => safeAreaGuide(shownDocument.canvas.ratio),
@@ -1314,14 +1373,26 @@ export function ClipEditor({
   // ---- Shortcuts ------------------------------------------------------------------------
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const toggleTranscript = useCallback(
+    () => setTranscriptOpen(!transcriptOpen),
+    [setTranscriptOpen, transcriptOpen],
+  );
   const commands = useRef({
     splitHere,
     removeSelected,
     duplicateSelected,
     nudgeSelected,
     startTyping,
+    toggleTranscript,
   });
-  commands.current = { splitHere, removeSelected, duplicateSelected, nudgeSelected, startTyping };
+  commands.current = {
+    splitHere,
+    removeSelected,
+    duplicateSelected,
+    nudgeSelected,
+    startTyping,
+    toggleTranscript,
+  };
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -1348,6 +1419,8 @@ export function ClipEditor({
       if (!command) return;
       // A focused button, slider or tab keeps its own Space and arrows.
       if (CONTROL_OWNED.has(command) && target?.closest(OWN_KEYS)) return;
+      // Delete inside the Transcript pane cuts words there, never a part of the timeline.
+      if (command === 'delete' && target?.closest(TRANSCRIPT_KEYS)) return;
 
       switch (command) {
         case 'toggle':
@@ -1399,6 +1472,9 @@ export function ClipEditor({
           commands.current.startTyping(selection.id);
           break;
         }
+        case 'transcript':
+          commands.current.toggleTranscript();
+          break;
         case 'shortcuts':
           setShortcutsOpen(true);
           break;
@@ -1676,6 +1752,23 @@ export function ClipEditor({
           {panelBody}
         </EditorPanel>
       ) : null}
+      {transcriptOpen ? (
+        <TranscriptPane
+          orgId={orgId}
+          clipId={clipId}
+          videoId={detail.video?.id ?? null}
+          videoDurationMs={videoDurationMs}
+          document={shownDocument}
+          playback={playback}
+          captionsTrack={captionsTrack}
+          waveform={detail.waveform}
+          aiOn={captions.ai ? captions.ai.captions === true : null}
+          onApply={applyCut}
+          onEditCaptions={(change) => editCaptions(change)}
+          onNotice={setNotice}
+          onClose={() => setTranscriptOpen(false)}
+        />
+      ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
         <EditorTopBar
           backHref={back.href}
@@ -1689,6 +1782,8 @@ export function ClipEditor({
           onUndo={() => dispatch({ type: 'undo' })}
           onRedo={() => dispatch({ type: 'redo' })}
           onShowPanel={panelOpen ? undefined : () => setPanelOpen(true)}
+          transcriptOpen={transcriptOpen}
+          onTranscript={toggleTranscript}
           onExport={() => setTab('export')}
           exportProgress={exporting.running ? (exporting.job.job?.progress ?? 0) : null}
         />

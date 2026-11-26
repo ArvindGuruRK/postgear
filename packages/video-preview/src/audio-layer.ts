@@ -31,7 +31,7 @@
  * The preview does no loudness correction: it sums the gains, so the balance
  * matches the export and the overall level does not (the Audio tab says so).
  */
-import type { FrameState, SoundState } from '@postgear/video-engine';
+import { CUT_FADE_MS, type FrameState, type SoundState } from '@postgear/video-engine';
 import { gainRamp, peakOf, soundDriftMs, soundStart, DRIFT_RESTART_MS } from './audio-model';
 import type { AudioLayer, LayerUpdate } from './types';
 
@@ -163,6 +163,19 @@ export class WebAudioLayer implements AudioLayer {
     const routed = this.routed.get(el);
     if (!routed || !this.ctx) return false;
     this.ramp(routed.gain, gain);
+    return true;
+  }
+
+  /** See `AudioLayer.cutFadeIn`: silent at once, then a straight rise over `CUT_FADE_MS`. */
+  cutFadeIn(el: HTMLVideoElement, gain: number): boolean {
+    const routed = this.routed.get(el);
+    const ctx = this.ctx;
+    if (!routed || !ctx) return false;
+    const now = ctx.currentTime;
+    const target = Number.isFinite(gain) ? Math.max(0, gain) : 0;
+    routed.gain.gain.cancelScheduledValues(now);
+    routed.gain.gain.setValueAtTime(0, now);
+    routed.gain.gain.linearRampToValueAtTime(target, now + CUT_FADE_MS / 1000);
     return true;
   }
 

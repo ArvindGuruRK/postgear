@@ -31,6 +31,9 @@ jest.mock('@/lib/clips-api', () => ({
     limit: 30,
   })),
   getClipWords: jest.fn(async () => ({ transcript: null, ranges: [], missing: false, price: 2 })),
+  // Sprint 13, Module 04: the Transcript pane's calls.
+  listenToVideo: jest.fn(),
+  fixTranscriptWords: jest.fn(),
   getClipsStatus: jest.fn(async () => ({
     ai: {
       service: 'ok',
@@ -829,5 +832,123 @@ describe('captions in the editor', () => {
     // Undo once more takes the captions off again.
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(shownTranscript()).toEqual([]);
+  });
+});
+
+describe('the Transcript pane in the editor', () => {
+  // jsdom has no PointerEvent: without one, fireEvent drops `button` and `shiftKey`.
+  beforeAll(() => {
+    if (!('PointerEvent' in window)) {
+      class PointerEventStub extends MouseEvent {
+        pointerId = 0;
+      }
+      Object.defineProperty(window, 'PointerEvent', {
+        configurable: true,
+        value: PointerEventStub,
+      });
+    }
+  });
+  const api = jest.requireMock('@/lib/clips-api') as { getClipWords: jest.Mock };
+  const HEARD = '3f2a9c1e-0000-4000-8000-0000000000b1';
+  // "So this is it. Thanks." from 11 s of the video; the clip is 10 s to 40 s.
+  const SPOKEN = ['So', 'this', 'is', 'it.', 'Thanks.'].map((text, i) => ({
+    i,
+    start: 11_000 + i * 500,
+    end: 11_400 + i * 500,
+    text,
+    sure: 1,
+  }));
+
+  beforeEach(() => {
+    // Whether the pane was open is remembered per browser; each test starts closed.
+    window.localStorage.clear();
+    api.getClipWords.mockImplementation(async (_clipId: string, options?: { source?: string }) =>
+      options?.source === 'spoken'
+        ? {
+            transcript: {
+              id: HEARD,
+              language: 'en',
+              model: 'test',
+              source: 'listened',
+              words: SPOKEN,
+              covered: [{ fromMs: 0, toMs: 70_000 }],
+              fixes: 0,
+              fileName: null,
+            },
+            ranges: [{ fromMs: 10_000, toMs: 40_000 }],
+            missing: false,
+            price: 0,
+          }
+        : { transcript: null, ranges: [], missing: false, price: 2 },
+    );
+  });
+
+  afterAll(() => window.localStorage.clear());
+
+  it('opens where it was left: open after a reload when it was open', async () => {
+    window.localStorage.setItem('postgear.clips.transcriptOpen', '1');
+    renderEditor();
+    expect(await screen.findByTestId('clip-transcript-pane')).toBeInTheDocument();
+    expect(screen.queryByTestId('clip-editor-panel')).toBeNull();
+  });
+
+  it('T opens it and folds the panel; T again closes it; Show Panel closes it too', async () => {
+    renderEditor();
+    expect(screen.getByTestId('clip-editor-panel')).toBeInTheDocument();
+    key({ key: 't' });
+    expect(await screen.findByTestId('clip-transcript-pane')).toBeInTheDocument();
+    expect(screen.queryByTestId('clip-editor-panel')).toBeNull();
+    expect(screen.getByTestId('clip-transcript-toggle')).toHaveAttribute('aria-pressed', 'true');
+    key({ key: 't' });
+    expect(screen.queryByTestId('clip-transcript-pane')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('clip-transcript-toggle'));
+    expect(screen.getByTestId('clip-transcript-pane')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('clip-panel-show'));
+    expect(screen.queryByTestId('clip-transcript-pane')).toBeNull();
+    expect(screen.getByTestId('clip-editor-panel')).toBeInTheDocument();
+  });
+
+  it('cuts deleted words from the clip as one step, and one Undo brings them back', async () => {
+    renderEditor();
+    key({ key: 't' });
+    const text = await screen.findByTestId('transcript-text');
+    const word = (i: number) => text.querySelector(`[data-word-id="${i}"]`) as HTMLElement;
+    fireEvent.pointerDown(word(1), { button: 0 });
+    fireEvent.pointerDown(word(2), { button: 0, shiftKey: true });
+    fireEvent.pointerUp(window);
+    fireEvent.keyDown(text, { key: 'Delete' });
+    // "this is" goes, cut between "So" and "it." on the canvas's frames.
+    expect(lastDocument().segments.map((s) => [s.sourceIn, s.sourceOut])).toEqual([
+      [10_000, 11_467],
+      [12_467, 40_000],
+    ]);
+    expect(word(1)).toHaveAttribute('data-state', 'removed');
+    // The delete stayed in the pane: no timeline part was removed as well.
+    expect(lastDocument().segments).toHaveLength(2);
+
+    fireEvent.keyDown(window, { key: 'z', code: 'KeyZ', ctrlKey: true });
+    expect(lastDocument().segments.map((s) => [s.sourceIn, s.sourceOut])).toEqual([
+      [10_000, 40_000],
+    ]);
+    expect(word(1)).toHaveAttribute('data-state', 'normal');
+  });
+
+  it('refuses a cut that would leave under 3 seconds, with its sentence', async () => {
+    const short = createClipDocument({
+      videoId: '3f2a9c1e-0000-4000-8000-000000000001',
+      fromMs: 10_500,
+      toMs: 14_000,
+      ratio: '9:16',
+    });
+    renderEditor({ ...short, meta: { shapeChosen: true } });
+    key({ key: 't' });
+    const text = await screen.findByTestId('transcript-text');
+    const word = (i: number) => text.querySelector(`[data-word-id="${i}"]`) as HTMLElement;
+    fireEvent.pointerDown(word(0), { button: 0 });
+    fireEvent.pointerDown(word(4), { button: 0, shiftKey: true });
+    fireEvent.pointerUp(window);
+    fireEvent.keyDown(text, { key: 'Delete' });
+    expect(await screen.findByText('A clip needs at least 3 seconds.')).toBeInTheDocument();
   });
 });

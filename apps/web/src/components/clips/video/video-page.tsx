@@ -37,6 +37,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui';
 import { ActionLink } from '@/components/home/home-actions';
 import { createClip, createWholeClip, getVideo } from '@/lib/clips-api';
+import { TranscriptSheet } from './transcript-sheet';
 import type { ClipSummary, ClipVideoDetail, ClipView } from '@/types/clips';
 import { PLATFORM_LABELS } from '../home/home-model';
 import { EDIT_WHOLE_TOO_LONG, VideoCard } from '../home/video-card';
@@ -161,6 +162,24 @@ export function VideoPage({
   });
 
   const check = checkRange(mark);
+
+  /** Makes a clip of a stretch: from the marked range, or from words in the transcript sheet. */
+  const createRange = useCallback(
+    async (range: { fromMs: number; toMs: number }) => {
+      const { clip } = await createClip(video.id, range.fromMs, range.toMs);
+      setClips((current) => [summaryOf(clip, range), ...current]);
+      setSelectedId(clip.id);
+      toast({
+        title: 'Clip created.',
+        action: (
+          <ToastAction altText="Edit" onClick={() => router.push(clipEditHref(orgId, clip.id))}>
+            Edit
+          </ToastAction>
+        ),
+      });
+    },
+    [orgId, router, video.id],
+  );
 
   const create = useCallback(async () => {
     const range = checkRange(mark);
@@ -288,21 +307,36 @@ export function VideoPage({
         ) : null}
       </div>
       {video.status === 'READY' ? (
-        <TooltipHint
-          label={EDIT_WHOLE_TOO_LONG}
-          hidden={!tooLongForWhole}
-          disabled={tooLongForWhole}
-        >
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={tooLongForWhole || wholeBusy}
-            onClick={() => void editWhole()}
+        <div className="flex shrink-0 items-center gap-2">
+          <TranscriptSheet
+            orgId={orgId}
+            videoId={video.id}
+            durationMs={durationMs}
+            onSeek={(ms) => store.seek(ms)}
+            onCreateClip={async (range) => {
+              try {
+                await createRange(range);
+              } catch (cause) {
+                toast({ title: clipErrorSentence(cause), variant: 'warning' });
+              }
+            }}
+          />
+          <TooltipHint
+            label={EDIT_WHOLE_TOO_LONG}
+            hidden={!tooLongForWhole}
+            disabled={tooLongForWhole}
           >
-            <MotionIcon icon={ScissorsIcon} className="h-4 w-4" />
-            {wholeBusy ? 'Making The Clip' : 'Edit Whole Video'}
-          </Button>
-        </TooltipHint>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={tooLongForWhole || wholeBusy}
+              onClick={() => void editWhole()}
+            >
+              <MotionIcon icon={ScissorsIcon} className="h-4 w-4" />
+              {wholeBusy ? 'Making The Clip' : 'Edit Whole Video'}
+            </Button>
+          </TooltipHint>
+        </div>
       ) : null}
     </PageActions>
   );

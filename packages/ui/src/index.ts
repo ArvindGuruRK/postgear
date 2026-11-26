@@ -84,6 +84,7 @@ export * from './components/time-ruler';
 export * from './components/timeline';
 // Sprint 12 (Clips): the timeline and player pieces, kept together.
 export * from './components/playhead';
+export * from './components/transcript-text';
 export * from './components/timeline-bar';
 export * from './components/timeline-row';
 export * from './components/video-player-bar';

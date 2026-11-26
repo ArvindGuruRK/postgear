@@ -1,7 +1,16 @@
 import type { ClipDocument } from '../document/schema';
 import { EXPORT_QUALITIES } from '../quality';
 import { assColour, assTime, buildAss, escapeAssText } from './ass';
-import { atempoChain, compileFfmpeg, ffmpegColour, formatNumber, setptsFor } from './compile';
+import {
+  atempoChain,
+  CUT_FADE_MS,
+  compileFfmpeg,
+  compileMeasure,
+  cutFades,
+  ffmpegColour,
+  formatNumber,
+  setptsFor,
+} from './compile';
 import { isRenderCompileError, jobErrorCodeFor, RenderCompileError } from './errors';
 import {
   assFontSize,
@@ -163,6 +172,46 @@ describe('compileFfmpeg: inputs, sound and the base', () => {
     expect(compiled.filterComplexScript).toContain('[0:v]trim=start=0.000:end=5.000');
     expect(compiled.filterComplexScript).toContain('[1:v]trim=start=1.000:end=6.000');
     expect(compiled.filterComplexScript).not.toContain('split');
+  });
+
+  it('fades the sound 15 ms each side of a cut, never at the clip ends', () => {
+    const doc = testDocument([
+      testSegment('a', 0, 5_000),
+      testSegment('b', 40_000, 45_000),
+      testSegment('c', 50_000, 52_000),
+    ]);
+    const plan = buildRenderPlan(doc, testContext());
+    expect(cutFades(plan)).toEqual([
+      { inMs: 0, outMs: CUT_FADE_MS },
+      { inMs: CUT_FADE_MS, outMs: CUT_FADE_MS },
+      { inMs: CUT_FADE_MS, outMs: 0 },
+    ]);
+    const graph = compileFfmpeg(plan).filterComplexScript;
+    expect(graph).toContain('afade=t=out:st=4.985:d=0.015[a0]');
+    expect(graph).toContain('afade=t=in:st=0:d=0.015,afade=t=out:st=4.985:d=0.015[a1]');
+    expect(graph).toMatch(/afade=t=in:st=0:d=0\.015\[a2\]/);
+    // The measuring pass hears the same joins as the export.
+    expect(compileMeasure(plan)?.filterComplexScript).toContain('afade=t=in:st=0:d=0.015[a2]');
+  });
+
+  it('leaves a speed change inside one stretch unfaded, it is not a cut', () => {
+    const doc = testDocument([testSegment('a', 0, 5_000), testSegment('b', 5_000, 9_000, 2)]);
+    const plan = buildRenderPlan(doc, testContext());
+    expect(cutFades(plan)).toEqual([
+      { inMs: 0, outMs: 0 },
+      { inMs: 0, outMs: 0 },
+    ]);
+    expect(compileFfmpeg(plan).filterComplexScript).not.toContain('afade');
+  });
+
+  it('fades a piece too short for two whole fades over a third of itself', () => {
+    // A part is at least 200 ms in a document; the rule still holds for any plan.
+    const piece = (inputIndex: number, outStartMs: number, outEndMs: number) =>
+      ({ inputIndex, outStartMs, outEndMs }) as Parameters<typeof cutFades>[0]['segments'][number];
+    const fades = cutFades({
+      segments: [piece(0, 0, 3_000), piece(1, 3_000, 3_030), piece(2, 3_030, 6_000)],
+    });
+    expect(fades[1]).toEqual({ inMs: 10, outMs: 10 });
   });
 
   it('chains atempo for a quarter speed segment', () => {
@@ -374,7 +423,10 @@ describe('refusals', () => {
 
   it('checks a text font, plans the text, stickers and sounds, and refuses captions', () => {
     const text = withTexts(twoSegmentDoc(), [
-      testText('t', { anchor: 'clip', style: { ...testText('t').style, font: 'Anton', weight: 400 } }),
+      testText('t', {
+        anchor: 'clip',
+        style: { ...testText('t').style, font: 'Anton', weight: 400 },
+      }),
     ]);
     expectCode(() => buildRenderPlan(text, testContext()), 'font_missing');
     const unknown = withTexts(twoSegmentDoc(), [
@@ -410,7 +462,19 @@ describe('refusals', () => {
     // A sticker whose file was not handed in (removed from the library) is refused; with it, it is planned.
     expectCode(() => buildRenderPlan(sticker, testContext()), 'sticker_missing');
     const withFile = testContext();
-    withFile.assets = { ...withFile.assets, stickers: { [`asset:${TEST_ASSET_ID}`]: { file: 'sticker-0.png', animated: false, width: 512, height: 512, fps: null, frames: null } } };
+    withFile.assets = {
+      ...withFile.assets,
+      stickers: {
+        [`asset:${TEST_ASSET_ID}`]: {
+          file: 'sticker-0.png',
+          animated: false,
+          width: 512,
+          height: 512,
+          fps: null,
+          frames: null,
+        },
+      },
+    };
     expect(buildRenderPlan(sticker, withFile).stickers).toHaveLength(1);
 
     const sound = twoSegmentDoc();
@@ -438,7 +502,10 @@ describe('refusals', () => {
     // A sound whose file was not handed in is refused (`sound_missing`); with it, it is planned.
     expectCode(() => buildRenderPlan(sound, testContext()), 'sound_missing');
     const withSound = testContext();
-    withSound.assets = { ...withSound.assets, sounds: { [`asset:${TEST_ASSET_ID}`]: { file: 'sound-0.m4a', durationMs: 4_000 } } };
+    withSound.assets = {
+      ...withSound.assets,
+      sounds: { [`asset:${TEST_ASSET_ID}`]: { file: 'sound-0.m4a', durationMs: 4_000 } },
+    };
     expect(buildRenderPlan(sound, withSound).sounds).toHaveLength(1);
 
     const captions = twoSegmentDoc();
@@ -582,7 +649,11 @@ describe('small pieces', () => {
       winDescent: 434,
       fallback: false,
     };
-    const manifest = parseFontManifest({ version: 2, fonts: [arial], coverage: { arial: [[32, 126]] } });
+    const manifest = parseFontManifest({
+      version: 2,
+      fonts: [arial],
+      coverage: { arial: [[32, 126]] },
+    });
     expect(checkFonts(manifest, ['arial', 'Anton', 'anton'])).toEqual(['Anton']);
     expect(checkFonts(null, ['Sora'])).toEqual(['Sora']);
     expect(checkFonts(emptyFontManifest(), [])).toEqual([]);

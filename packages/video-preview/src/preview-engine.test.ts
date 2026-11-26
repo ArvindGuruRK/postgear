@@ -179,6 +179,21 @@ describe('PreviewEngine: the hand-over', () => {
     expect(engine.getSnapshot()).toMatchObject({ playing: false, currentMs: 5000 });
   });
 
+  it('fades the sound in at a cut, never inside one stretch', () => {
+    const cutFadeIn = jest.fn(() => true);
+    const audioLayer = { update: jest.fn(), silence: jest.fn(), destroy: jest.fn(), cutFadeIn };
+    const cut = setup([part('a', 10_000, 12_000), part('b', 40_000, 42_000)], { audioLayer });
+    cut.engine.play();
+    cut.v0.presentFrame(12_000);
+    expect(cutFadeIn).toHaveBeenCalledWith(cut.v1.el, 1);
+
+    cutFadeIn.mockClear();
+    const through = setup([part('a', 10_000, 12_000), part('b', 12_000, 14_000)], { audioLayer });
+    through.engine.play();
+    through.v0.presentFrame(12_500);
+    expect(cutFadeIn).not.toHaveBeenCalled();
+  });
+
   it('does not swap between contiguous parts: one element plays through', () => {
     const { engine, v0, log } = setup([part('a', 10_000, 12_000), part('b', 12_000, 14_000)]);
     // Nothing to wait on: the back element is never asked to seek.
@@ -464,7 +479,10 @@ describe('PreviewEngine: the fallback clock', () => {
 
 describe('PreviewEngine: drawing', () => {
   it('turns the sound down and up with the clip fade, frame by frame', () => {
-    const doc = { ...clipOf([part('a', 10_000, 14_000, 1, 0.8)]), fades: { inMs: 1_000, outMs: 1_000 } };
+    const doc = {
+      ...clipOf([part('a', 10_000, 14_000, 1, 0.8)]),
+      fades: { inMs: 1_000, outMs: 1_000 },
+    };
     const { engine, v0 } = setup(doc);
     engine.attach(document.createElement('div'));
     engine.play();
@@ -484,7 +502,16 @@ describe('PreviewEngine: drawing', () => {
 
     const stage = container.querySelector('[data-preview-stage]');
     expect(stage).not.toBeNull();
-    for (const layer of ['frame', 'looks', 'zoom', 'base', 'areas', 'vignette', 'overlays', 'media']) {
+    for (const layer of [
+      'frame',
+      'looks',
+      'zoom',
+      'base',
+      'areas',
+      'vignette',
+      'overlays',
+      'media',
+    ]) {
       expect(container.querySelector(`[data-preview-layer="${layer}"]`)).not.toBeNull();
     }
     // The videos live in the stage, invisible, never display: none.

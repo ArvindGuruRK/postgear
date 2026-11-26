@@ -445,6 +445,10 @@ describe('the words of a clip', () => {
     const after = await service.words(TEST_ORG, CLIP);
     expect(after.transcript?.id).toBe(supplied.track.transcriptAssetId);
     expect(after.transcript?.words.map((word) => word.text)).toEqual(['My', 'own', 'words']);
+    // Module 04: the Transcript pane always reads the words as spoken, whatever the captions show.
+    const spoken = await service.words(TEST_ORG, CLIP, 'spoken');
+    expect(spoken.transcript?.id).toBe(HEARD_ID);
+    expect(spoken.missing).toBe(false);
   });
 
   it('says so when the captions name a transcript that is gone', async () => {

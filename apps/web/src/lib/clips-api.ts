@@ -12,7 +12,9 @@ import type {
   CaptionStyleView,
   CaptionsFileOutcome,
   ClipWordsView,
+  ListenOutcome,
   TranslateCaptionsOutcome,
+  VideoTranscriptView,
   ClipChannelPreview,
   ClipDocument,
   ClipChannelView,
@@ -807,12 +809,55 @@ export function addCaptions(
   return api(`${clipPath(clipId)}/captions`, { method: 'POST', body });
 }
 
-/** The words of the clip's captions (or of its video, when it has none yet). */
+/**
+ * The words of the clip's captions (or of its video, when it has none yet).
+ * `source: 'spoken'` (Module 04, the Transcript pane) always reads the
+ * video's own listened words, never a file or a translation.
+ */
 export function getClipWords(
   clipId: string,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; source?: 'captions' | 'spoken' } = {},
 ): Promise<ClipWordsView> {
-  return api(`${clipPath(clipId)}/words`, { signal: options.signal });
+  const query = options.source === 'spoken' ? '?source=spoken' : '';
+  return api(`${clipPath(clipId)}/words${query}`, { signal: options.signal });
+}
+
+// --- Sprint 13, Module 04: a video's transcript ---------------------------------------
+
+const transcriptPath = (videoId: string) =>
+  `/clips/videos/${encodeURIComponent(videoId)}/transcript`;
+
+/**
+ * Listens to a stretch of a video (the whole video without one). Charged in
+ * AI minutes only for what was not listened to yet; 402 with one sentence
+ * when the month's minutes are used.
+ */
+export function listenToVideo(
+  videoId: string,
+  body: { fromMs?: number; toMs?: number; language?: string } = {},
+): Promise<ListenOutcome> {
+  return api(transcriptPath(videoId), { method: 'POST', body });
+}
+
+/** The words of a stretch of a video (the whole video without one), and what the rest costs. */
+export function getVideoTranscript(
+  videoId: string,
+  range: { fromMs?: number; toMs?: number } = {},
+  options: { signal?: AbortSignal } = {},
+): Promise<VideoTranscriptView> {
+  const query = new URLSearchParams();
+  if (range.fromMs !== undefined) query.set('fromMs', String(range.fromMs));
+  if (range.toMs !== undefined) query.set('toMs', String(range.toMs));
+  const suffix = query.size > 0 ? `?${query.toString()}` : '';
+  return api(`${transcriptPath(videoId)}${suffix}`, { signal: options.signal });
+}
+
+/** Fixes words of a video by their index, for every clip of it. */
+export function fixTranscriptWords(
+  videoId: string,
+  fixes: Array<{ index: number; text: string }>,
+): Promise<{ changed: number; fixes: number }> {
+  return api(`${transcriptPath(videoId)}/words`, { method: 'PATCH', body: { fixes } });
 }
 
 /** An SRT or VTT file as the clip's captions. Free; 413 or 422 with one sentence. */

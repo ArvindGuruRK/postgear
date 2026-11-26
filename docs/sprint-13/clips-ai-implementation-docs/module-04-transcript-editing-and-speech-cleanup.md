@@ -1,6 +1,6 @@
 # Module 04: Transcript Editing And Speech Cleanup
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done (2026-11-26) | Size: L (one full session)
 > **Depends on**: [Module 03](module-03-captions.md)
 > **Stories**: CA-2.1, CA-2.2, CA-2.3
 > **Next**: [Module 09](module-09-ai-effects.md) (AI Effects)
@@ -74,15 +74,15 @@ At the foot of the pane, two secondary buttons, each opening a popover first:
 
 ## Tasks
 
-- [ ] `cleanup/`: `removeSourceRange`, `healSegments`, `cutForWords`, `findSilences`, `findFillers`, `removedWords`, with tests.
-- [ ] The 15 ms `afade` at cuts and the per-run `-ss` inputs in `compileFfmpeg`; the matching gain ramps in `PreviewEngine`; frame alignment check for many parts.
-- [ ] `TranscriptText` with a playground demo.
-- [ ] `TranscriptPane`: load, follow, seek, fix, delete, Restore, panel collapse, Listen To This Clip.
-- [ ] Remove Silences and Remove Filler Words with their popovers and toasts.
-- [ ] The video page's sheet: find, seek, Create Clip from text, Listen.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: open the pane, delete a sentence, remove silences, undo, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `cleanup/`: `removeSourceRange`, `healSegments`, `cutForWords`, `findSilences`, `findFillers`, `removedWords`, with tests.
+- [x] The 15 ms `afade` at cuts and the per-run `-ss` inputs in `compileFfmpeg`; the matching gain ramps in `PreviewEngine`; frame alignment check for many parts.
+- [x] `TranscriptText` with a playground demo.
+- [x] `TranscriptPane`: load, follow, seek, fix, delete, Restore, panel collapse, Listen To This Clip.
+- [x] Remove Silences and Remove Filler Words with their popovers and toasts.
+- [x] The video page's sheet: find, seek, Create Clip from text, Listen.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: open the pane, delete a sentence, remove silences, undo, export. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

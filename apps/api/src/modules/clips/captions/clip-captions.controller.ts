@@ -12,7 +12,9 @@
  *   and optional `language`, `styleId`): 201 `{ track, transcript, skipped,
  *   note }`. Free. 413 `captions_file_too_big`, 422
  *   `captions_file_unreadable` or `captions_file_outside`.
- * - `GET /clips/:clipId/words`: `{ transcript, ranges, missing }`.
+ * - `GET /clips/:clipId/words?source=captions|spoken`: `{ transcript, ranges,
+ *   missing, price }`. `spoken` (Module 04) always answers the video's own
+ *   listened words, never a file or a translation.
  * - `POST /clips/:clipId/captions/translate` `{ language }`: 201
  *   `{ track, transcript, price, reused, meter? }`. 402, 409 `captions_first`
  *   or `captions_missing`, 422 `translate_same_language`, 502
@@ -33,6 +35,7 @@ import {
   Param,
   PayloadTooLargeException,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseFilters,
@@ -50,14 +53,16 @@ import {
   CurrentUser,
 } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
-import { ZodBody } from '../../../common/pipes/zod-validation.pipe';
+import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
 import { ClipStart } from '../limits/clips-create.guard';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 import {
   type AddCaptionsInput,
   addCaptionsSchema,
   type CaptionsFileFields,
+  type ClipWordsQuery,
   captionsFileFieldsSchema,
+  clipWordsQuerySchema,
   type TranslateCaptionsInput,
   translateCaptionsSchema,
 } from './clip-captions.schema';
@@ -121,8 +126,12 @@ export class ClipCaptionsController {
   }
 
   @Get(':clipId/words')
-  words(@CurrentOrg() org: ActiveOrg, @Param('clipId') clipId: string) {
-    return this.captions.words(org.id, clipId);
+  words(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('clipId') clipId: string,
+    @Query(new ZodQuery(clipWordsQuerySchema, 'clips/words')) query: ClipWordsQuery,
+  ) {
+    return this.captions.words(org.id, clipId, query.source ?? 'captions');
   }
 
   @Post(':clipId/captions/translate')

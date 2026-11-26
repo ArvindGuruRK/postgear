@@ -16,6 +16,7 @@ import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import { RedoIcon } from '@animateicons/react/lucide/redo-icon';
+import { ScrollTextIcon } from '@animateicons/react/lucide/scroll-text-icon';
 import { UndoIcon } from '@animateicons/react/lucide/undo-icon';
 import { Button, buttonVariants, cn, MotionIcon, Spinner, TooltipHint } from '@postgear/ui';
 import { Check, CloudOff, RefreshCw, TriangleAlert } from 'lucide-react';
@@ -41,6 +42,8 @@ export function EditorTopBar({
   onUndo,
   onRedo,
   onShowPanel,
+  transcriptOpen,
+  onTranscript,
   onExport,
   exportProgress = null,
 }: {
@@ -58,6 +61,9 @@ export function EditorTopBar({
   onRedo: () => void;
   /** Present while the panel is folded away: opens it again. */
   onShowPanel?: () => void;
+  /** Sprint 13, Module 04: the Transcript pane is open; pressing the button (or T) toggles it. */
+  transcriptOpen?: boolean;
+  onTranscript?: () => void;
   onExport: () => void;
   /** 0 to 100 while an export runs (a small ring in the Export button); null otherwise. */
   exportProgress?: number | null;
@@ -96,6 +102,24 @@ export function EditorTopBar({
       </div>
 
       <div className="flex items-center gap-2">
+        {onTranscript ? (
+          <TooltipHint
+            label={transcriptOpen ? 'Close Transcript' : 'Open Transcript'}
+            side="bottom"
+            shortcut={['T']}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-pressed={transcriptOpen === true}
+              onClick={onTranscript}
+              data-testid="clip-transcript-toggle"
+            >
+              <MotionIcon icon={ScrollTextIcon} className="h-4 w-4" />
+              Transcript
+            </Button>
+          </TooltipHint>
+        ) : null}
         <div className="flex items-center gap-1">
           <TooltipHint label="Undo" side="bottom" disabled={!canUndo} shortcut={[mod, 'Z']}>
             <Button

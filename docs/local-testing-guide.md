@@ -1244,6 +1244,25 @@ A Jest test and a pytest test fail when either file is stale, and both sides par
 | **Preview Export**, then **Export Clip** | The file has the same pages at the same moments as the editor |
 | Stop the Python service, reload | The tab says captions are not available right now; captions already on the clip still draw and export, and the file upload still works |
 
+**Transcript editing (Module 04).** Open a clip of the 10 minute stream sample in the editor and press **T** (or **Transcript** in the top bar).
+
+| Do this | What you should see |
+|---|---|
+| Press **T** | The Transcript pane opens beside the stage and the panel folds to its rail; **T** again closes it; opening the panel closes it too. It opens again where you left it after a reload |
+| Play the clip | The word being said is marked and the pane follows it (scroll the pane yourself and it stops following until you play again) |
+| Click a word far down | The playhead jumps to it |
+| Drag across a sentence (or Shift and the arrows), press **Delete** | The words are struck through, the clip is shorter, the captions close up, and a toast says "Cut 6 words. The clip is 4.2 seconds shorter." with **Undo** |
+| Hover the struck-through words | **Restore** puts them back; one Undo also does |
+| Select almost all of a short clip, press **Delete** | "A clip needs at least 3 seconds." and nothing changes |
+| **Remove Silences** | The popover says how many pauses and how long they add up to before anything changes; the slider changes the count. On the generated samples it finds none and says the pauses have sound under them (their sound is a steady test tone); try a recording of yourself talking to see pauses go |
+| **Remove Filler Words** | Each filler with a count and a tick; untick one, **Remove**: one undo step and a toast |
+| Double-click a word, type, **Save** | The word changes (the captions' own edit when the clip has captions of these words, else for the whole video); **Replace Everywhere** changes it wherever it was heard |
+| A clip only partly listened to (the talk sample around its silent block) | **Listen To This Clip (2 AI Minutes)** with the minutes chip; the words appear when it finishes |
+| **Preview Export** and listen at the cuts | No click at any cut (each cut fades the sound 15 ms each side) |
+| Video page, **Transcript** | A sheet with the words; **Ctrl+F** finds ("1 of 42"), Enter steps and the player jumps; select some words and **Create Clip**; a stretch not heard yet shows **Listen** with its price |
+
+`npx jest --config packages/media-tools/jest.config.js cuts-parity` (with `FFMPEG_PATH` and `FFPROBE_PATH` from `.env`, Docker up) proves on the real FFmpeg that twenty cuts export frame-exact and never click.
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash
