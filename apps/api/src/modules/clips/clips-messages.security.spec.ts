@@ -169,6 +169,17 @@ describe('Clips security: Messages', () => {
         height: 720,
         fps: 30,
       },
+      TRANSCRIBE: {
+        transcriptAssetId: '44444444-4444-4444-8444-444444444444',
+        language: 'en',
+        wordCount: 284,
+        noSpeech: false,
+        secondsListened: 120,
+        model: 'simulation',
+      },
+      FACES: { assetId: '44444444-4444-4444-8444-444444444444', people: 2 },
+      TRANSLATE: { transcriptAssetId: '44444444-4444-4444-8444-444444444444', wordCount: 80 },
+      SPEECH: { assetId: '44444444-4444-4444-8444-444444444444', durationMs: 4_000 },
     };
 
     it.each(Object.keys(OUTPUTS) as ClipJob['kind'][])(

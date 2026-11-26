@@ -21,6 +21,8 @@ import type {
   FinishHighlightsResult,
   FinishImportArgs,
   FinishSegmentArgs,
+  FinishTranscribeArgs,
+  FinishTranscribeResult,
   HighlightRunRow,
   JobRow,
   NewAsset,
@@ -316,6 +318,33 @@ export class FakeRows implements ClipRows {
       createdAt: args.now,
     });
     return true;
+  }
+
+  /** Sprint 13, Module 02: the DONE listening jobs' outputs, by job id. */
+  transcribed = new Map<string, unknown>();
+
+  async finishTranscribe(args: FinishTranscribeArgs): Promise<FinishTranscribeResult> {
+    if (!this.closeIfOpen(args.jobId, 'DONE')) return { finished: false, replacedKeys: [] };
+    this.transcribed.set(args.jobId, args.output);
+    const gone = this.assets.filter(
+      (row) =>
+        row.kind === 'TRANSCRIPT' && (row.id === args.jobId || row.id === args.replaceAssetId),
+    );
+    this.assets = this.assets.filter((row) => !gone.includes(row));
+    this.assets.push({
+      id: args.asset.id ?? `asset-${this.nextId++}`,
+      kind: args.asset.kind,
+      key: args.asset.key,
+      bytes: args.asset.bytes,
+      videoId: args.asset.videoId,
+      clipId: args.asset.clipId ?? null,
+      meta: args.asset.meta,
+      createdAt: args.now,
+    });
+    return {
+      finished: true,
+      replacedKeys: gone.map((row) => row.key).filter((key) => key !== args.asset.key),
+    };
   }
 
   async downloadRow(organizationId: string, jobId: string) {

@@ -17,6 +17,8 @@ export {
   clipRenderWorkflow,
   clipSaveDownloadWorkflow,
   clipSegmentWorkflow,
+  // Sprint 13, Module 02: listening.
+  clipTranscribeWorkflow,
 } from './clips/job.workflows';
 export { clipListChannelWorkflow, clipProbeWorkflow } from './clips/query.workflows';
 export { clipRuntimeCheckWorkflow } from './clips/runtime-check.workflow';

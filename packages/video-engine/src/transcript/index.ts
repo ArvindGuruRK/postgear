@@ -3,6 +3,7 @@
  * the stretches listened to, joining new stretches in, word fixes that
  * survive a re-listen, and sentences worked out from the words. Pure.
  */
+export * from './asset';
 export * from './covered';
 export * from './file';
 export * from './fixes';

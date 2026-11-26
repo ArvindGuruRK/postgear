@@ -355,6 +355,12 @@ export function fakeClipDb(tables: FakeTables) {
         tables.assets = tables.assets.filter((asset) => !matches(asset as unknown as Row, where));
         return { count: before - tables.assets.length };
       }),
+      // Sprint 13: a transcript row's meta is rewritten when a word is fixed.
+      updateMany: jest.fn(async ({ where, data }: { where: unknown; data: object }) => {
+        const found = tables.assets.filter((row) => matches(row as unknown as Row, where));
+        for (const row of found) Object.assign(row, data);
+        return { count: found.length };
+      }),
     },
     clipJob: {
       ...table(() => tables.jobs as unknown as Row[]),

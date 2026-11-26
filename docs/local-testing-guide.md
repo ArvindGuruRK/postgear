@@ -1200,6 +1200,21 @@ MEDIA_INTERNAL_TOKEN="<64 hex characters>"   # npm run generate:keys prints one
 2. Open the Clips page and look at `GET /clips/status` in the network tab: `ai.service` is `ok`.
 3. Stop the Python service and reload within about 10 seconds: `ai.service` is `off`, and the Clips page and the editor work as before.
 
+**Listening (Module 02).** With everything running, as the demo admin (the session cookie from the browser, or `curl` with a cookie jar):
+
+| Call | What you should see |
+|---|---|
+| `POST /clips/videos/<stream sample id>/transcript` `{ "fromMs": 60000, "toMs": 180000 }` | 202, `price: 2`, a job at "Listening to what is said", then DONE; the AI minutes meter went up by 2 |
+| `GET /clips/videos/<id>/transcript?fromMs=60000&toMs=180000` | The words of that stretch, each with a start and an end inside it |
+| The same `POST` again | 200 `{ "covered": true }`: no job, no charge |
+| `POST` with `0` to `240000` | Only the two new minutes are listened to and charged |
+| `PATCH /clips/videos/<id>/transcript/words` `{ "fixes": [{ "index": 0, "text": "Fixed" }] }` | The `GET` reads the fixed word from then on |
+| The 3 minute talk sample, `120000` to `150000` | DONE with `noSpeech`, and the 2 AI minutes come back |
+| `https://www.twitch.tv/videos/900000012` (title holds `[simulate:listen-fail]`) | The job fails with "We could not finish listening to this video. Your AI minutes were given back." |
+| `https://www.twitch.tv/videos/900000013` (`[simulate:listen-slow]`) | Listening holds for about 10 seconds, long enough to press Cancel |
+
+A video with no recorded transcript (any upload) gets stand-in speech under simulation: plain test sentences at a steady pace, so captions can be tried on any file. An upload whose name holds `verideck` reads the Verideck sample's recorded words. `npm run clips:listen-benchmark -- --wav <16 kHz mono wav> --model small --model-root .cache/media-models` times real listening (it needs the `ml` group, and downloads the model the first time).
+
 **The shared contract.** Every shape that crosses between Node and Python is written once, in `packages/media-contract`. After changing one:
 
 ```bash

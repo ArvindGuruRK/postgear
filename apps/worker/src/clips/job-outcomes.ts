@@ -40,7 +40,13 @@ import { downloadFailureCode } from './download/download.run';
 import { ClipStepError } from './failures';
 import type { ClipInternalClient } from './internal-client';
 import { storedJobError } from './job-progress';
-import { allImportKeys, exportMediaKeys, highlightsSignalsKey, segmentKey } from './keys';
+import {
+  allImportKeys,
+  exportMediaKeys,
+  heardFileKey,
+  highlightsSignalsKey,
+  segmentKey,
+} from './keys';
 import { exportFailedNotification, videoFailedNotification } from './notifications';
 import type { ClipRows, JobRow } from './rows';
 
@@ -217,6 +223,19 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
         now,
       );
 
+    // Sprint 13: an AI step that failed keeps nothing and gives its AI minutes back.
+    case 'TRANSCRIBE':
+    case 'FACES':
+    case 'TRANSLATE':
+    case 'SPEECH':
+      return closeAiStep(
+        deps,
+        job,
+        'FAILED',
+        storedJobError(aiFailureCode(job.kind, failure.code)),
+        now,
+      );
+
     default:
       return deps.rows.closeJob({
         jobId: job.id,
@@ -292,6 +311,12 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
     case 'DOWNLOAD':
       return closeDownload(deps, job, 'CANCELLED', error, now);
 
+    case 'TRANSCRIBE':
+    case 'FACES':
+    case 'TRANSLATE':
+    case 'SPEECH':
+      return closeAiStep(deps, job, 'CANCELLED', error, now);
+
     default:
       return deps.rows.closeJob({
         jobId: job.id,
@@ -355,6 +380,63 @@ async function closeHighlights(
     status,
     error,
     highlightRunId: input?.runId ?? null,
+    now,
+  });
+  await reverse(deps, job);
+  return closed;
+}
+
+/** The sentence's code for a failed AI step: its own code when it has one, else the kind's. */
+const AI_STEP_FAILURES: Readonly<Record<string, string>> = Object.freeze({
+  TRANSCRIBE: 'transcribe_failed',
+  FACES: 'faces_failed',
+  TRANSLATE: 'translate_failed',
+  SPEECH: 'voice_failed',
+});
+
+/** Codes an AI step may end with as they are (each has its own sentence). */
+const AI_STEP_OWN_CODES = new Set([
+  'no_speech',
+  'language_unsupported',
+  'captions_off',
+  'no_faces',
+  'voice_off',
+  'timed_out',
+  'cancelled',
+]);
+
+export function aiFailureCode(kind: string, code: string): string {
+  if (AI_STEP_OWN_CODES.has(code)) return code;
+  return AI_STEP_FAILURES[kind] ?? 'tool_failed';
+}
+
+/**
+ * An AI step that ended badly (Sprint 13): the job closed and every AI minute
+ * it was charged given back (`rev:<entryId>`, through the API, so a job that
+ * fails twice cannot give back twice). Nothing was stored: a step writes its
+ * file and its row only as it finishes, and the Python side's heard file sits
+ * at a key made from the job id, removed here.
+ */
+async function closeAiStep(
+  deps: OutcomeDeps,
+  job: JobRow,
+  status: 'FAILED' | 'CANCELLED',
+  error: { code: string; message: string },
+  now: Date,
+): Promise<boolean> {
+  const org = job.organizationId;
+  if (job.kind === 'TRANSCRIBE' && job.videoId) {
+    await deleteKeys(
+      (key) => deps.privateStorage.delete(key),
+      [heardFileKey(org, job.videoId, job.id)],
+      job.id,
+    );
+  }
+  const closed = await deps.rows.closeJob({
+    jobId: job.id,
+    organizationId: org,
+    status,
+    error,
     now,
   });
   await reverse(deps, job);

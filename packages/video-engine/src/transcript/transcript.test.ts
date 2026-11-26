@@ -22,11 +22,15 @@ import {
   roundOutward,
   sameWordCount,
   sentenceAt,
+  readTranscriptAssetMeta,
   sentences,
+  silencesIn,
+  speechValues,
   type Transcript,
   TRANSCRIPT_LANGUAGES,
   TranscriptFileError,
   TranscriptTooLongError,
+  transcriptAssetMeta,
   upsertFix,
   type WordFix,
   wordAt,
@@ -499,5 +503,55 @@ describe('languages', () => {
     expect(isTranscriptLanguage('auto')).toBe(false);
     expect(languageName('ta')).toBe('Tamil');
     expect(languageName('zz')).toBe('ZZ');
+  });
+});
+
+describe('the asset meta and the speech curve', () => {
+  it('keeps the fixes and the covered stretches beside the file', () => {
+    const transcript = listened(['Hello', 'there.'], 60, 120);
+    const meta = transcriptAssetMeta(transcript, [{ at: 60_000, text: 'Hallo' }], 'episode.srt');
+    expect(meta).toEqual({
+      language: 'en',
+      model: 'simulation',
+      source: 'listened',
+      covered: [{ fromMs: 60_000, toMs: 120_000 }],
+      words: 2,
+      fixes: [{ at: 60_000, text: 'Hallo' }],
+      fileName: 'episode.srt',
+    });
+    expect(readTranscriptAssetMeta(meta)).toEqual(meta);
+    expect(readTranscriptAssetMeta({ ...meta, extra: true })).toBeNull();
+    expect(readTranscriptAssetMeta(null)).toBeNull();
+  });
+
+  it('is two values a second, null where nothing was listened to', () => {
+    const transcript = mergeTranscript(emptyTranscript('en', 'simulation'), {
+      ranges: [{ fromMs: 1_000, toMs: 3_000 }],
+      words: [
+        { start: 1_000, end: 1_500, text: 'a', sure: 1 },
+        { start: 1_500, end: 1_750, text: 'b', sure: 0.5 },
+      ],
+    });
+    expect(speechValues(transcript, 4_000)).toEqual([null, null, 1, 0.25, 0, 0, null, null]);
+  });
+
+  it('finds the silences between words inside what was listened to', () => {
+    const transcript = mergeTranscript(emptyTranscript('en', 'simulation'), {
+      ranges: [{ fromMs: 0, toMs: 20_000 }],
+      words: [
+        { start: 2_000, end: 2_400, text: 'a', sure: 1 },
+        { start: 2_600, end: 3_000, text: 'b', sure: 1 },
+        { start: 9_000, end: 9_400, text: 'c', sure: 1 },
+      ],
+    });
+    expect(silencesIn(transcript, { fromMs: 0, toMs: 20_000 }, 1_500)).toEqual([
+      { fromMs: 0, toMs: 2_000 },
+      { fromMs: 3_000, toMs: 9_000 },
+      { fromMs: 9_400, toMs: 20_000 },
+    ]);
+    expect(silencesIn(transcript, { fromMs: 2_000, toMs: 9_400 }, 1_500)).toEqual([
+      { fromMs: 3_000, toMs: 9_000 },
+    ]);
+    expect(silencesIn(transcript, { fromMs: 30_000, toMs: 40_000 }, 500)).toEqual([]);
   });
 });

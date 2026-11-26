@@ -173,6 +173,25 @@ export interface FinishHighlightsResult {
   covered: number;
 }
 
+/** Sprint 13, Module 02: a listening job DONE and the video's transcript row swapped, in one go. */
+export interface FinishTranscribeArgs {
+  jobId: string;
+  organizationId: string;
+  videoId: string;
+  /** The TRANSCRIPT row this one replaces (the same language), or null for the first. */
+  replaceAssetId: string | null;
+  asset: NewAsset;
+  output: Record<string, unknown>;
+  now: Date;
+}
+
+export interface FinishTranscribeResult {
+  /** False when the job was closed meanwhile: nothing was written. */
+  finished: boolean;
+  /** The storage keys of the files this one replaced (to delete after). */
+  replacedKeys: string[];
+}
+
 /** Module 18: a prepared download, its job DONE and its DOWNLOAD asset row in one go. */
 export interface FinishDownloadArgs {
   jobId: string;
@@ -258,6 +277,8 @@ export interface ClipRows {
    * replaced. Nothing is written when the job was closed meanwhile.
    */
   finishHighlights(args: FinishHighlightsArgs): Promise<FinishHighlightsResult>;
+  /** Sprint 13, Module 02: closes a listening job and swaps the transcript row; false when closed meanwhile. */
+  finishTranscribe(args: FinishTranscribeArgs): Promise<FinishTranscribeResult>;
 }
 
 /** Unopened AI clips: what a new run may replace (Module 16 section 4). */
@@ -525,6 +546,55 @@ export const prismaClipRows: ClipRows = {
       return true;
     } catch (error) {
       if (error instanceof RowClosed) return false;
+      throw error;
+    }
+  },
+
+  async finishTranscribe(args) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const job = await tx.clipJob.updateMany({
+          where: {
+            id: args.jobId,
+            organizationId: args.organizationId,
+            kind: ClipJobKind.TRANSCRIBE,
+            status: { in: OPEN },
+          },
+          data: {
+            status: ClipJobStatus.DONE,
+            progress: 100,
+            finishedAt: args.now,
+            output: args.output as Prisma.InputJsonValue,
+          },
+        });
+        if (job.count === 0) throw new RowClosed();
+        // A retry that already wrote its own row replaces it too (same id, same key).
+        const old = await tx.clipAsset.findMany({
+          where: {
+            organizationId: args.organizationId,
+            videoId: args.videoId,
+            kind: ClipAssetKind.TRANSCRIPT,
+            id: { in: [args.jobId, ...(args.replaceAssetId ? [args.replaceAssetId] : [])] },
+          },
+          select: { id: true, key: true },
+        });
+        if (old.length > 0) {
+          await tx.clipAsset.deleteMany({
+            where: { organizationId: args.organizationId, id: { in: old.map((row) => row.id) } },
+          });
+        }
+        await tx.clipAsset.create({ data: toAssetCreate(args.organizationId, args.asset) });
+        await tx.clipVideo.updateMany({
+          where: { id: args.videoId, organizationId: args.organizationId, deletedAt: null },
+          data: { lastUsedAt: args.now },
+        });
+        return {
+          finished: true,
+          replacedKeys: old.map((row) => row.key).filter((key) => key !== args.asset.key),
+        };
+      });
+    } catch (error) {
+      if (error instanceof RowClosed) return { finished: false, replacedKeys: [] };
       throw error;
     }
   },

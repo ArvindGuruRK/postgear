@@ -115,3 +115,17 @@ export function exportMediaKeys(
   }
   return keys;
 }
+
+/**
+ * Sprint 13, Module 02: the heard file the Python service writes for a
+ * listening job (the words and the speech curve of the asked stretches). The
+ * Python side builds the same key from the job id (`services/transcribe.py`).
+ */
+export function heardFileKey(orgId: string, videoId: string, jobId: string): string {
+  return jobVideoFileKey(orgId, videoId, 'heard', jobId, 'json.gz');
+}
+
+/** The video's transcript file as one listening job wrote it (the newest replaces the last). */
+export function transcriptFileKey(orgId: string, videoId: string, jobId: string): string {
+  return jobVideoFileKey(orgId, videoId, 'transcript', jobId, 'json.gz');
+}

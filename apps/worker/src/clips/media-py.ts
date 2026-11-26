@@ -46,3 +46,26 @@ export function mediaPyOptions(timing: MediaPyTiming): ActivityOptions {
 export const { mediaPyHealth } = proxyActivities<Pick<MediaPyActivities, 'mediaPyHealth'>>(
   mediaPyOptions(MEDIA_PY_TIMINGS.mediaPyHealth),
 );
+
+/**
+ * A long Python activity called from inside a clip job (`mediaPyTranscribe`
+ * and later ones): its timing row, held inside `budgetMs`, what is left of
+ * the job's own limit less the bookkeeping reserve (`workBudgetMs`). So a
+ * slow listen is stopped by its own timeout while the workflow still has time
+ * to book the failure and give the AI minutes back, never cut off by Temporal.
+ * Call it when the step starts, not at load time.
+ */
+export function mediaPyWork<K extends keyof MediaPyActivities>(
+  name: K,
+  timing: MediaPyTiming,
+  budgetMs: number,
+): MediaPyActivities[K] {
+  const options = mediaPyOptions({
+    ...timing,
+    startToCloseMs: Math.min(timing.startToCloseMs, budgetMs),
+    scheduleToCloseMs: Math.min(timing.scheduleToCloseMs, budgetMs),
+  });
+  // One proxy for every Python activity; only the named one is handed back.
+  const all = proxyActivities<MediaPyActivities>(options) as unknown as MediaPyActivities;
+  return all[name];
+}

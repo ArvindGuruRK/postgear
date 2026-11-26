@@ -44,6 +44,9 @@ import { ClipLinksModule } from './links/clip-links.module';
 import { ClipsStatusController } from './status/clips-status.controller';
 import { ClipsStatusService } from './status/clips-status.service';
 import { MediaServiceProbe } from './status/media-service.probe';
+import { ClipTranscriptStore } from './transcripts/clip-transcript-store';
+import { ClipTranscriptsController } from './transcripts/clip-transcripts.controller';
+import { ClipTranscriptsService } from './transcripts/clip-transcripts.service';
 import { ClipSampleLink } from './videos/clip-sample';
 import { ClipUploadsService } from './videos/clip-uploads.service';
 import { ClipVideosController } from './videos/clip-videos.controller';
@@ -67,6 +70,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     ClipVideosController,
     // Module 16: `/clips/videos/:videoId/highlights`.
     ClipHighlightsController,
+    // Sprint 13, Module 02: `/clips/videos/:videoId/transcript`.
+    ClipTranscriptsController,
     ClipJobsController,
     ClipFilesController,
     // Module 18: `/clips/downloads`, a word route, so before `ClipItemModule`.
@@ -79,6 +84,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     MediaServiceProbe,
     ClipVideosService,
     ClipHighlightsService,
+    ClipTranscriptStore,
+    ClipTranscriptsService,
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,

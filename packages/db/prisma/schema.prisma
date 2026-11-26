@@ -1820,6 +1820,10 @@ enum ClipStatus {
 enum ClipOrigin {
   MANUAL
   AI_SIGNALS
+  // Sprint 13: picked by reading the transcript (Module 05), and one whole
+  // video made into one edited clip by a recipe (Module 10).
+  AI_TRANSCRIPT
+  AUTO_EDIT
 }
 
 enum ClipAssetKind {
@@ -1835,6 +1839,11 @@ enum ClipAssetKind {
   AUDIO
   DOWNLOAD
   PROOF
+  // Sprint 13: a video's speech as words with times (one per video and
+  // language; `meta` holds the language, the covered ranges and the word
+  // fixes), and where faces are in a stretch (boxes only, never who).
+  TRANSCRIPT
+  FACE_TRACKS
 }
 
 enum ClipJobKind {
@@ -1843,6 +1852,12 @@ enum ClipJobKind {
   HIGHLIGHTS
   RENDER
   DOWNLOAD
+  // Sprint 13: listening (speech to text), finding faces, translating
+  // captions and making a voice from text.
+  TRANSCRIBE
+  FACES
+  TRANSLATE
+  SPEECH
 }
 
 enum ClipJobStatus {

@@ -59,6 +59,16 @@ export const MEDIA_PY_TIMINGS = Object.freeze({
     heartbeatMs: null,
     maximumAttempts: 1,
   }),
+  // Listening: as long as the job itself may take, less the bookkeeping
+  // reserve; a heartbeat between chunks (a chunk is under a minute of work on
+  // the hosted lane and a few minutes on a processor). Two attempts: finished
+  // chunks are kept on the box, so the second starts where the first stopped.
+  mediaPyTranscribe: Object.freeze({
+    startToCloseMs: 6 * 60 * 60_000 + 40 * 60_000,
+    scheduleToCloseMs: 6 * 60 * 60_000 + 45 * 60_000,
+    heartbeatMs: 10 * 60_000,
+    maximumAttempts: 2,
+  }),
 } satisfies Record<string, MediaPyTiming>);
 
 /** The roles a worker process can take, and the queue each serves. */
@@ -72,6 +82,12 @@ export const CLIP_SEGMENT_WORKFLOW = 'clipSegmentWorkflow';
 export const CLIP_HIGHLIGHTS_WORKFLOW = 'clipHighlightsWorkflow';
 export const CLIP_RENDER_WORKFLOW = 'clipRenderWorkflow';
 export const CLIP_DOWNLOAD_WORKFLOW = 'clipDownloadWorkflow';
+// Sprint 13 (Clips AI). Each runs on `postgear-media` and calls the Python
+// service on `postgear-media-py` where it needs sound or picture work.
+export const CLIP_TRANSCRIBE_WORKFLOW = 'clipTranscribeWorkflow';
+export const CLIP_FACES_WORKFLOW = 'clipFacesWorkflow';
+export const CLIP_TRANSLATE_WORKFLOW = 'clipTranslateWorkflow';
+export const CLIP_SPEECH_WORKFLOW = 'clipSpeechWorkflow';
 
 // --- Waiting-caller helpers (no row: the API waits for the answer) -------------
 
@@ -99,7 +115,16 @@ export const CLIP_SOUND_CHECK_WORKFLOW = 'clipSoundCheckWorkflow';
 export const CLIP_SOUND_CHECK_TIMEOUT_MS = 180_000;
 
 /** The job kinds, as the `ClipJobKind` enum spells them. */
-export type ClipJobKindName = 'IMPORT' | 'SEGMENT' | 'HIGHLIGHTS' | 'RENDER' | 'DOWNLOAD';
+export type ClipJobKindName =
+  | 'IMPORT'
+  | 'SEGMENT'
+  | 'HIGHLIGHTS'
+  | 'RENDER'
+  | 'DOWNLOAD'
+  | 'TRANSCRIBE'
+  | 'FACES'
+  | 'TRANSLATE'
+  | 'SPEECH';
 
 /** Which workflow runs a job of each kind. */
 export const CLIP_JOB_WORKFLOWS: Readonly<Record<ClipJobKindName, string>> = Object.freeze({
@@ -108,6 +133,10 @@ export const CLIP_JOB_WORKFLOWS: Readonly<Record<ClipJobKindName, string>> = Obj
   HIGHLIGHTS: CLIP_HIGHLIGHTS_WORKFLOW,
   RENDER: CLIP_RENDER_WORKFLOW,
   DOWNLOAD: CLIP_DOWNLOAD_WORKFLOW,
+  TRANSCRIBE: CLIP_TRANSCRIBE_WORKFLOW,
+  FACES: CLIP_FACES_WORKFLOW,
+  TRANSLATE: CLIP_TRANSLATE_WORKFLOW,
+  SPEECH: CLIP_SPEECH_WORKFLOW,
 });
 
 /** Which queue each kind runs on. */
@@ -117,6 +146,10 @@ export const CLIP_JOB_QUEUES: Readonly<Record<ClipJobKindName, string>> = Object
   HIGHLIGHTS: MEDIA_TASK_QUEUE,
   RENDER: RENDER_TASK_QUEUE,
   DOWNLOAD: MEDIA_TASK_QUEUE,
+  TRANSCRIBE: MEDIA_TASK_QUEUE,
+  FACES: MEDIA_TASK_QUEUE,
+  TRANSLATE: MEDIA_TASK_QUEUE,
+  SPEECH: MEDIA_TASK_QUEUE,
 });
 
 export function clipJobWorkflowId(jobId: string): string {
@@ -180,6 +213,12 @@ export const CLIP_JOB_TIMEOUTS_MS: Readonly<Record<ClipJobKindName, number>> = O
   // about 71 minutes, so the limit leaves room above that.
   RENDER: 2 * 60 * 60_000,
   DOWNLOAD: 2 * 60 * 60_000,
+  // Listening on a processor can run slower than real time on a long video:
+  // six hours of sound is given seven. The hosted lane finishes in minutes.
+  TRANSCRIBE: 7 * 60 * 60_000,
+  FACES: 60 * 60_000,
+  TRANSLATE: 30 * 60_000,
+  SPEECH: 30 * 60_000,
 });
 
 /** Long activities heartbeat at least this often; a dead worker is noticed within it. */
@@ -234,6 +273,10 @@ export const CLIP_NON_RETRYABLE: readonly string[] = [
   'sound_unusable',
   'sound_too_long',
   'cancelled',
+  // Sprint 13: nothing a second listen would change.
+  'no_speech',
+  'language_unsupported',
+  'captions_off',
 ];
 
 /** The three priorities a job can carry, copied from `clips.queue_priority` at creation. */

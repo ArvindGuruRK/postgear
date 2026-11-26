@@ -857,3 +857,20 @@ Resist renaming inherited fields. `Integration` for "channel" and
 `token`/`refreshToken` will keep reading oddly, but renaming a live schema's
 fields is real migration risk for cosmetic gain. Add a clarifying comment in
 `schema.prisma` instead.
+
+## Sprint 13 additions (Clips AI)
+
+Additive only so far: new enum values, no new table and no new column (`20261126120000_sprint13_clips_ai_enums`).
+
+| Enum | New values | Meaning |
+|---|---|---|
+| `ClipJobKind` | `TRANSCRIBE`, `FACES`, `TRANSLATE`, `SPEECH` | Listening (speech to text), finding faces, translating captions, a voice from text. Each is a `ClipJob` row and one workflow on `postgear-media`, which calls the Python service on `postgear-media-py` where it needs sound or picture work |
+| `ClipAssetKind` | `TRANSCRIPT`, `FACE_TRACKS` | A video's speech as words with times, and where faces are in a stretch (boxes only, never who) |
+| `ClipOrigin` | `AI_TRANSCRIPT`, `AUTO_EDIT` | A clip picked by reading the transcript, and a whole video made into one edited clip by a recipe |
+
+Notes:
+
+- **A transcript is a file, not rows.** One `ClipAsset` of kind `TRANSCRIPT` per video and language. The file (gzipped JSON in the private space) holds the words; the row's `meta` holds what the API needs without opening it: `language`, `model`, `source` (`listened`, `supplied` or `translated`), the `covered` stretches, the word count and the **word fixes**. Fixes live in `meta` so they survive the file being rewritten by a later listen. The shape is `transcriptAssetMetaSchema` in `packages/video-engine/src/transcript/asset.ts`.
+- **The row is swapped, not updated in place.** A listening job writes a new file at a key made from its own id, and in one transaction marks itself DONE, deletes the old `TRANSCRIPT` row of that language and creates the new one (its id is the job's id). The old file is deleted after.
+- **Deleting a video deletes its transcript and face files**: they are `ClipAsset` rows with `videoId`, so Sprint 12's removal and storage counting already cover them.
+- **Speech text is never in a row.** Not in `ClipJob.input`, `output` or `error`, and not in a notification.

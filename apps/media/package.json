@@ -11,7 +11,9 @@
     "typecheck": "node scripts/run-uv.js run mypy",
     "test": "node scripts/run-uv.js run pytest",
     "contract:generate": "node scripts/run-uv.js run python -m postgear_media.contract.generate",
-    "clean": "rm -rf .venv .mypy_cache .ruff_cache .pytest_cache"
+    "clean": "rm -rf .venv .mypy_cache .ruff_cache .pytest_cache",
+    "listen-benchmark": "node scripts/run-uv.js run --group ml python -m postgear_media.simulation.benchmark",
+    "transcripts:build": "node scripts/run-uv.js run python -m postgear_media.simulation.build_transcripts"
   },
   "dependencies": {
     "@postgear/media-contract": "*"

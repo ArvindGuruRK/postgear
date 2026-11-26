@@ -33,6 +33,23 @@ export const CLIP_ERROR_MESSAGES = {
   highlights_running: 'We are already looking for clips in this video.',
   highlights_failed: 'We could not finish looking for clips. Your AI minutes were given back.',
   video_not_ready: 'This video is still coming in. Wait for it to be ready.',
+  // Sprint 13 (Clips AI).
+  transcribe_running: 'We are already listening to this part of the video.',
+  transcribe_failed:
+    'We could not finish listening to this video. Your AI minutes were given back.',
+  no_speech: 'We could not hear any speech in this video.',
+  language_unsupported: 'We cannot make captions in this language yet. Pick another language.',
+  captions_off: 'Captions are not available right now. Everything else still works.',
+  transcript_missing: 'This part of the video has not been listened to yet.',
+  transcript_range_invalid: 'Pick a part of the video that starts before it ends.',
+  captions_file_unreadable:
+    'We could not read this captions file. Check that it is an SRT or VTT file.',
+  captions_file_too_big: 'This captions file is too big. Use a file under 2 MB.',
+  captions_file_outside: 'The times in this captions file fall outside this clip.',
+  faces_failed: 'We could not finish looking for faces. Try again.',
+  translate_failed:
+    'We could not finish translating the captions. Your AI minutes were given back.',
+  voice_failed: 'We could not make the voice. Your AI minutes were given back.',
   video_removed: 'This video was removed after a request from its owner.',
   format_gone: 'This quality is no longer offered for this video. Pick another.',
   downloads_busy: 'Three downloads are already being prepared. Wait for one to finish.',
@@ -144,6 +161,9 @@ export const NON_RETRYABLE_CLIP_CODES: readonly string[] = [
   'sound_unusable',
   'sound_too_long',
   'cancelled',
+  'no_speech',
+  'language_unsupported',
+  'captions_off',
 ];
 
 /** The error a job row and a view carry. */

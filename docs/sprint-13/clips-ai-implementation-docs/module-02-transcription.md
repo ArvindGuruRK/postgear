@@ -1,6 +1,6 @@
 # Module 02: Transcription
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done with gaps (2026-11-26) | Size: L (one full session)
 > **Depends on**: [Module 01](module-01-media-service-foundations.md)
 > **Stories**: CA-1.1 (server side), CA-10.1; foundations for CA-1.x, CA-2.x, CA-3.x
 > **Next**: [Module 03](module-03-captions.md), [Module 05](module-05-clip-setup-and-highlights-v2.md)
@@ -68,14 +68,14 @@ After this module any stretch of a video can be turned into text with a time for
 
 ## Tasks
 
-- [ ] `transcript/`: types, covered ranges, merge, fixes, windows, sentences, with tests.
-- [ ] `mediaPyTranscribe` in the contract with fixtures; the generated model.
-- [ ] `services/transcribe.py` and the three providers; recorded transcripts for the three samples.
-- [ ] Enum values (`prisma-change`); `ClipTranscriptsService.ensure`; `clipTranscribeWorkflow`.
-- [ ] The three routes; `ai.captions` and the price in the status.
-- [ ] `aiMinutesCost('listen', ms)` in `pricing.ts`; the `UsageService.consume` charge and the `reverse` paths (failure, no speech); the 402 `clips_ai_minutes_used`.
-- [ ] The benchmark script; its table in the Progress notes (only with Arvind's OK).
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `transcript/`: types, covered ranges, merge, fixes, windows, sentences, with tests.
+- [x] `mediaPyTranscribe` in the contract with fixtures; the generated model.
+- [x] `services/transcribe.py` and the three providers; recorded transcripts for the three samples.
+- [x] Enum values (`prisma-change`); `ClipTranscriptsService.ensure`; `clipTranscribeWorkflow`.
+- [x] The three routes; `ai.captions` and the price in the status.
+- [x] `aiMinutesCost('listen', ms)` in `pricing.ts`; the `UsageService.consume` charge and the `reverse` paths (failure, no speech); the 402 `clips_ai_minutes_used`.
+- [x] The benchmark script; its table in the Progress notes (only with Arvind's OK).
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

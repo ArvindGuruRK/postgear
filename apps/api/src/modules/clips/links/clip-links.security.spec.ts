@@ -211,7 +211,14 @@ describe('the thumbnail route', () => {
           !/(clip-thumbnails\.service|channel-list\.cache|clip-links\.controller)\.ts$/.test(file),
       )
       .map((file) => path.relative(CLIPS_SRC, file).split(path.sep).join('/'));
-    expect(callers).toEqual([]);
+    // Sprint 13: the media service probe is the one other caller. It asks only our own
+    // configured `MEDIA_URL` for `/ready`, never an address a person gave, and follows no redirect.
+    expect(callers).toEqual(['status/media-service.probe.ts']);
+    const probe = readFileSync(path.join(CLIPS_SRC, 'status', 'media-service.probe.ts'), 'utf8');
+    expect(probe).toContain("new URL('/ready', base)");
+    expect(probe).toContain("redirect: 'error'");
+    expect(probe.match(/this\.fetcher\(/g)).toHaveLength(1);
+    expect(probe).toContain('this.fetcher(this.readyUrl,');
     const helper = readFileSync(
       path.join(CLIPS_SRC, 'channels', 'listers', 'lister-http.ts'),
       'utf8',

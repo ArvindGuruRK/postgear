@@ -306,6 +306,10 @@ export interface ClipsStatus {
 export interface ClipsAiStatus {
   service: 'ok' | 'off';
   prices: Record<AiCostKind, AiCostRate>;
+  /** Listening, and so captions, can run right now. */
+  captions?: boolean;
+  /** The spoken languages on offer ("Detect Automatically" is the page's own first choice). */
+  languages?: Array<{ code: string; name: string; highlight: 'word' | 'page' }>;
 }
 
 // --- Module 06: links, videos, uploads, channels --------------------------------

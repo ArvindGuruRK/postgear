@@ -15,7 +15,18 @@ import { clipDocumentSchema } from './document/schema';
 import { CLIP_PLATFORMS, LINK_KINDS } from './links/types';
 import { EXPORT_QUALITIES } from './quality';
 
-export const CLIP_JOB_KINDS = ['IMPORT', 'SEGMENT', 'HIGHLIGHTS', 'RENDER', 'DOWNLOAD'] as const;
+export const CLIP_JOB_KINDS = [
+  'IMPORT',
+  'SEGMENT',
+  'HIGHLIGHTS',
+  'RENDER',
+  'DOWNLOAD',
+  // Sprint 13 (Clips AI).
+  'TRANSCRIBE',
+  'FACES',
+  'TRANSLATE',
+  'SPEECH',
+] as const;
 export type ClipJobKind = (typeof CLIP_JOB_KINDS)[number];
 
 export const CLIP_JOB_STATUSES = ['QUEUED', 'RUNNING', 'DONE', 'FAILED', 'CANCELLED'] as const;
@@ -34,9 +45,14 @@ export function priorityRank(priority: string): number {
 export const CLIP_JOB_STAGES = {
   IMPORT: ['fetching', 'preparing'],
   SEGMENT: ['fetching'],
-  HIGHLIGHTS: ['loudness', 'scenes', 'chat', 'scoring'],
+  // Sprint 13 adds `listening`, `reading` and `watching` to a run that asks for them.
+  HIGHLIGHTS: ['loudness', 'scenes', 'chat', 'listening', 'reading', 'watching', 'scoring'],
   RENDER: ['fetching', 'rendering', 'finishing'],
   DOWNLOAD: ['fetching'],
+  TRANSCRIBE: ['listening'],
+  FACES: ['faces'],
+  TRANSLATE: ['translating'],
+  SPEECH: ['voice'],
 } as const satisfies Record<ClipJobKind, readonly string[]>;
 
 export type ClipJobStage = (typeof CLIP_JOB_STAGES)[ClipJobKind][number];
@@ -49,10 +65,17 @@ const STAGE_LABELS: Record<ClipJobKind, Record<string, string>> = {
     loudness: 'Listening for loud moments',
     scenes: 'Looking for scene changes',
     chat: 'Reading the chat',
+    listening: 'Listening to what is said',
+    reading: 'Reading for the best moments',
+    watching: 'Watching for action',
     scoring: 'Picking the best moments',
   },
   RENDER: { fetching: 'Getting the sharp video', rendering: 'Rendering', finishing: 'Finishing' },
   DOWNLOAD: { fetching: 'Getting your file' },
+  TRANSCRIBE: { listening: 'Listening to what is said' },
+  FACES: { faces: 'Finding faces' },
+  TRANSLATE: { translating: 'Translating the captions' },
+  SPEECH: { voice: 'Making the voice' },
 };
 
 export const WAITING_LABEL = 'Waiting for its turn';
@@ -243,14 +266,81 @@ export const downloadInputSchema = z
   })
   .strict();
 
+// --- Sprint 13 (Clips AI) inputs ----------------------------------------------
+
+/** A stretch of the video, whole milliseconds. */
+export const msRangeSchema = z
+  .object({ fromMs: wholeMs, toMs: wholeMs })
+  .strict()
+  .refine((range) => range.fromMs < range.toMs, 'A range must end after it starts');
+
+/** `auto`, or an ISO 639-1 code (which codes are offered: `TRANSCRIPT_LANGUAGES`). */
+export const languageChoiceSchema = z.string().regex(/^(?:auto|[a-z]{2,3})$/);
+const languageCodeSchema = z.string().regex(/^[a-z]{2,3}$/);
+
+/** The most stretches one listening job takes (the gaps of one request). */
+export const MAX_LISTEN_RANGES = 64;
+
+/**
+ * Listening (Module 02). The API worked out which stretches are still
+ * missing, priced them and charged before the row was written, so the worker
+ * only listens: `aiMinutes` is what was charged, kept for the give-back note.
+ */
+export const transcribeInputSchema = z
+  .object({
+    videoId: uuid,
+    language: languageChoiceSchema,
+    /** In order, never overlapping, already rounded to listening blocks. */
+    ranges: z.array(msRangeSchema).min(1).max(MAX_LISTEN_RANGES),
+    aiMinutes: z.number().int().min(0),
+  })
+  .strict();
+
+/** Finding faces in a clip's stretch of its video (Module 07). Free. */
+export const facesInputSchema = z
+  .object({ videoId: uuid, clipId: uuid.nullable(), fromMs: wholeMs, toMs: wholeMs })
+  .strict()
+  .refine((input) => input.fromMs < input.toMs, 'A range must end after it starts');
+
+/** Translating a clip's captions into another language (Module 03). */
+export const translateInputSchema = z
+  .object({
+    videoId: uuid,
+    clipId: uuid,
+    fromLanguage: languageCodeSchema,
+    toLanguage: languageCodeSchema,
+    fromMs: wholeMs,
+    toMs: wholeMs,
+    aiMinutes: z.number().int().min(0),
+  })
+  .strict()
+  .refine((input) => input.fromMs < input.toMs, 'A range must end after it starts');
+
+/** A voice from text (Module 09), behind `CLIPS_TTS`. */
+export const speechInputSchema = z
+  .object({
+    text: z.string().min(1).max(5_000),
+    voiceId: z.string().min(1).max(64),
+    aiMinutes: z.number().int().min(0),
+  })
+  .strict();
+
 export const CLIP_JOB_INPUT_SCHEMAS = {
   IMPORT: importInputSchema,
   SEGMENT: segmentInputSchema,
   HIGHLIGHTS: highlightsInputSchema,
   RENDER: renderInputSchema,
   DOWNLOAD: downloadInputSchema,
+  TRANSCRIBE: transcribeInputSchema,
+  FACES: facesInputSchema,
+  TRANSLATE: translateInputSchema,
+  SPEECH: speechInputSchema,
 } as const;
 
+export type TranscribeInput = z.infer<typeof transcribeInputSchema>;
+export type FacesInput = z.infer<typeof facesInputSchema>;
+export type TranslateInput = z.infer<typeof translateInputSchema>;
+export type SpeechInput = z.infer<typeof speechInputSchema>;
 export type ImportInput = z.infer<typeof importInputSchema>;
 export type SegmentInput = z.infer<typeof segmentInputSchema>;
 export type HighlightsInput = z.infer<typeof highlightsInputSchema>;
@@ -263,6 +353,10 @@ export interface ClipJobInputs {
   HIGHLIGHTS: HighlightsInput;
   RENDER: RenderInput;
   DOWNLOAD: DownloadInput;
+  TRANSCRIBE: TranscribeInput;
+  FACES: FacesInput;
+  TRANSLATE: TranslateInput;
+  SPEECH: SpeechInput;
 }
 
 // --- Outputs ------------------------------------------------------------------
@@ -353,14 +447,51 @@ export const downloadOutputSchema = z
   })
   .strict();
 
+/**
+ * A finished listening job (Module 02). `noSpeech` means nothing was heard in
+ * the asked stretches: they are recorded as covered and the charge is given
+ * back. Never a word of what was said.
+ */
+export const transcribeOutputSchema = z
+  .object({
+    transcriptAssetId: uuid.nullable(),
+    language: languageCodeSchema,
+    wordCount: z.number().int().min(0),
+    noSpeech: z.boolean(),
+    secondsListened: z.number().min(0),
+    /** What listened, such as `faster-whisper:small` or `simulation`. */
+    model: z.string().min(1).max(80),
+  })
+  .strict();
+
+export const facesOutputSchema = z
+  .object({ assetId: uuid.nullable(), people: z.number().int().min(0) })
+  .strict();
+
+export const translateOutputSchema = z
+  .object({ transcriptAssetId: uuid.nullable(), wordCount: z.number().int().min(0) })
+  .strict();
+
+export const speechOutputSchema = z
+  .object({ assetId: uuid.nullable(), durationMs: wholeMs })
+  .strict();
+
 export const CLIP_JOB_OUTPUT_SCHEMAS = {
   IMPORT: importOutputSchema,
   SEGMENT: segmentOutputSchema,
   HIGHLIGHTS: highlightsOutputSchema,
   RENDER: renderOutputSchema,
   DOWNLOAD: downloadOutputSchema,
+  TRANSCRIBE: transcribeOutputSchema,
+  FACES: facesOutputSchema,
+  TRANSLATE: translateOutputSchema,
+  SPEECH: speechOutputSchema,
 } as const;
 
+export type TranscribeOutput = z.infer<typeof transcribeOutputSchema>;
+export type FacesOutput = z.infer<typeof facesOutputSchema>;
+export type TranslateOutput = z.infer<typeof translateOutputSchema>;
+export type SpeechOutput = z.infer<typeof speechOutputSchema>;
 export type ImportOutput = z.infer<typeof importOutputSchema>;
 export type SegmentOutput = z.infer<typeof segmentOutputSchema>;
 export type RenderOutput = z.infer<typeof renderOutputSchema>;

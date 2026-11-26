@@ -37,6 +37,7 @@ import {
   runFfmpeg,
   withScratch,
 } from '@postgear/media-tools';
+import type { MediaPyTranscribeInput, MediaPyTranscribeOutput } from '@postgear/media-contract';
 import type { ClipJobWorkflowInput } from '@postgear/scheduling';
 import { downloadOutputSchema } from '@postgear/video-engine';
 import { runClipActivity } from '../activity-kit';
@@ -55,11 +56,17 @@ import { type ClipRows, prismaClipRows } from '../rows';
 import { runSegment } from '../segment/segment.run';
 import { prismaSoundFileRows, type SoundFileRows } from '../sounds/rows';
 import { prismaStickerFileRows, type StickerFileRows } from '../stickers/rows';
+import { finishTranscribe, prepareTranscribe } from '../transcribe/transcribe.run';
 
 /** What a work activity answers. `closed`: the job was closed by someone else; nothing was kept. */
 export interface ClipWorkResult {
   status: 'done' | 'closed';
 }
+
+/** Sprint 13: what `clipTranscribePrepare` hands the workflow: the Python activity's input, or closed. */
+export type TranscribePrepared =
+  | { status: 'closed' }
+  | { status: 'ready'; payload: MediaPyTranscribeInput };
 
 export interface RenderWaitState {
   /** The job is no longer open: the workflow ends quietly. */
@@ -197,6 +204,62 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             now,
           });
           return { status: outcome.stored ? 'done' : 'closed' };
+        });
+      });
+    },
+
+    /**
+     * Sprint 13, Module 02: a listening job's first step. Moves the job to
+     * RUNNING ("Listening to what is said") and builds the one JSON object the
+     * Python service takes. Short: it only reads rows.
+     */
+    async clipTranscribePrepare(ref: ClipJobWorkflowInput): Promise<TranscribePrepared> {
+      return runClipActivity('clipTranscribePrepare', ref.jobId, async () => {
+        const { job, input } = await openJob(rows, ref, 'TRANSCRIBE');
+        const progress = jobProgress(job.id, { kind: 'TRANSCRIBE' });
+        if (!(await start(progress))) return { status: 'closed' };
+        const payload = await prepareTranscribe({
+          jobId: job.id,
+          organizationId: job.organizationId,
+          input,
+          rows,
+          privateStorage: deps.privateStorage,
+          progress,
+          simulated: deps.providers.simulated,
+          now,
+        });
+        return { status: 'ready', payload };
+      });
+    },
+
+    /**
+     * Sprint 13, Module 02: a listening job's last step. Merges what Python
+     * heard into the video's transcript, swaps the stored file with the job's
+     * DONE, and gives the AI minutes back when nothing was heard.
+     */
+    async clipTranscribeFinish(
+      ref: ClipJobWorkflowInput & { heard: MediaPyTranscribeOutput },
+    ): Promise<ClipWorkResult> {
+      return runClipActivity('clipTranscribeFinish', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'TRANSCRIBE');
+        const progress = jobProgress(job.id, { kind: 'TRANSCRIBE' });
+        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+          const outcome = await finishTranscribe(
+            {
+              jobId: job.id,
+              organizationId: job.organizationId,
+              input,
+              rows,
+              privateStorage: deps.privateStorage,
+              progress,
+              simulated: deps.providers.simulated,
+              now,
+            },
+            ref.heard,
+            dir,
+            deps.internal,
+          );
+          return { status: outcome.finished ? 'done' : 'closed' };
         });
       });
     },

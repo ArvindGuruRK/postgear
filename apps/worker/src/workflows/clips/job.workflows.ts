@@ -29,10 +29,12 @@ import {
   CLIP_SAVE_DOWNLOAD_ATTEMPT_MS,
   CLIP_SAVE_DOWNLOAD_WORK_MS,
   type ClipJobWorkflowInput,
+  MEDIA_PY_TIMINGS,
 } from '@postgear/scheduling';
 import { log, proxyActivities, sleep } from '@temporalio/workflow';
 import type { ClipActivities } from '../../clips/activities';
-import { type ClipJobOutcome, runClipJob, workActivities } from './clip-job';
+import { mediaPyWork } from '../../clips/media-py';
+import { type ClipJobOutcome, runClipJob, workActivities, workBudgetMs } from './clip-job';
 
 /** How often the export looks again at a running sharp range. */
 export const RENDER_SEGMENT_POLL_MS = 10_000;
@@ -54,6 +56,26 @@ export async function clipSegmentWorkflow(input: ClipJobWorkflowInput): Promise<
 
 export async function clipHighlightsWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
   return runClipJob(input, 'HIGHLIGHTS', () => workActivities('HIGHLIGHTS').clipHighlights(input));
+}
+
+/**
+ * Sprint 13, Module 02: listening (`postgear-media`). Three steps: prepare
+ * (rows, here), `mediaPyTranscribe` (the Python service, on
+ * `postgear-media-py`), finish (merge and store, here). A failure or a cancel
+ * of any step is booked by `runClipJob`, which gives the AI minutes back.
+ */
+export async function clipTranscribeWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
+  return runClipJob(input, 'TRANSCRIBE', async () => {
+    const prepared = await look.clipTranscribePrepare(input);
+    if (prepared.status === 'closed') return { status: 'closed' };
+    const listen = mediaPyWork(
+      'mediaPyTranscribe',
+      MEDIA_PY_TIMINGS.mediaPyTranscribe,
+      workBudgetMs('TRANSCRIBE'),
+    );
+    const heard = await listen(prepared.payload);
+    return workActivities('TRANSCRIBE').clipTranscribeFinish({ ...input, heard });
+  });
 }
 
 export async function clipDownloadWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {

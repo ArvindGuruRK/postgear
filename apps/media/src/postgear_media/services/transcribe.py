@@ -20,7 +20,6 @@ again.
 from __future__ import annotations
 
 import gzip
-import hashlib
 import json
 import shutil
 from collections.abc import Callable
@@ -71,9 +70,15 @@ def bad_input(message: str) -> ApplicationError:
 
 
 def heard_key(org_id: str, video_id: str, job_id: str) -> str:
-    """The heard file's key: the same for every attempt of one job."""
-    digest = hashlib.sha256(f"{job_id}:heard".encode()).hexdigest()[:32]
-    return assert_valid_clip_key(f"clips/{org_id}/{video_id}/heard-{digest}.json.gz")
+    """The heard file's key: the same for every attempt of one job.
+
+    The worker's own convention for a job's files (`apps/worker/src/clips/keys.ts`):
+    the 32 hex characters are the job id without its dashes, so the failure
+    and cancel bookkeeping know the key without being told.
+    """
+    return assert_valid_clip_key(
+        f"clips/{org_id}/{video_id}/heard-{job_id.replace('-', '').lower()}.json.gz",
+    )
 
 
 def checked_ranges(payload: MediaPyTranscribeInput, audio_ms: int) -> list[tuple[int, int]]:

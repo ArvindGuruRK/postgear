@@ -29,6 +29,7 @@
     "clips:doctor": "npm run doctor --workspace=@postgear/media-tools --",
     "clips:samples": "npm run samples --workspace=@postgear/media-tools --",
     "clips:regression": "npm run regression --workspace=@postgear/media-tools --",
+    "clips:listen-benchmark": "npm run listen-benchmark --workspace=@postgear/media --",
     "clips:signals:record": "npm run signals:record --workspace=@postgear/media-tools --",
     "clips:benchmark": "npm run benchmark --workspace=@postgear/media-tools --",
     "clips:stills": "npm run stills --workspace=@postgear/media-tools --",

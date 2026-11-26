@@ -105,6 +105,23 @@ function resultOf(kind: ClipJobKind, raw: unknown): ClipJobView['result'] {
       const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['DOWNLOAD']>;
       return { bytes: value.bytes, fileName: value.fileName };
     }
+    // Sprint 13. Numbers and flags only: never a word of what was said, never a key.
+    case 'TRANSCRIBE': {
+      const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['TRANSCRIBE']>;
+      return { language: value.language, wordCount: value.wordCount, noSpeech: value.noSpeech };
+    }
+    case 'FACES': {
+      const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['FACES']>;
+      return { people: value.people };
+    }
+    case 'TRANSLATE': {
+      const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['TRANSLATE']>;
+      return { wordCount: value.wordCount };
+    }
+    case 'SPEECH': {
+      const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['SPEECH']>;
+      return { durationMs: value.durationMs };
+    }
   }
 }
 

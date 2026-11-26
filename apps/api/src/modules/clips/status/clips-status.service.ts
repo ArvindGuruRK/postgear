@@ -38,6 +38,7 @@ import {
   type AiCostKind,
   type AiCostRate,
   type ClipPlatformId,
+  TRANSCRIPT_LANGUAGES,
 } from '@postgear/video-engine';
 import type { Env } from '../../../config/env';
 import { EntitlementResolver, type MeterState } from '../../entitlements/entitlement-resolver';
@@ -117,6 +118,10 @@ export interface ClipsStatus {
 export interface ClipsAiStatus {
   service: AiServiceState;
   prices: Record<AiCostKind, AiCostRate>;
+  /** Module 02: listening (and so captions) can run right now. False disables the AI buttons only. */
+  captions: boolean;
+  /** Module 02: the spoken languages on offer, for the Spoken Language select ("auto" is always first). */
+  languages: Array<{ code: string; name: string; highlight: 'word' | 'page' }>;
 }
 
 /** Module 19: what the video space holds. */
@@ -177,7 +182,16 @@ export class ClipsStatusService {
       usage: { storageBytes: usedBytes, byKind },
       overLimit: limitBytes !== null && usedBytes > limitBytes,
       sample: { available: this.sample.url !== null },
-      ai: { service: aiService, prices: AI_COST_RATES },
+      ai: {
+        service: aiService,
+        prices: AI_COST_RATES,
+        captions: aiService === 'ok',
+        languages: TRANSCRIPT_LANGUAGES.map((language) => ({
+          code: language.code,
+          name: language.name,
+          highlight: language.highlight,
+        })),
+      },
     };
   }
 

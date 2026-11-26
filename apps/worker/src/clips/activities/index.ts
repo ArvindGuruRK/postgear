@@ -15,7 +15,7 @@ import { createRuntimeActivities } from './runtime.activities';
 import { createSoundActivities } from './sound.activities';
 import { createStickerActivities } from './sticker.activities';
 
-export type { ClipWorkResult, RenderWaitState } from './jobs.activities';
+export type { ClipWorkResult, RenderWaitState, TranscribePrepared } from './jobs.activities';
 export type { MediaVideoFactsOutcome } from './media-facts.activities';
 
 export function createClipActivities(deps: ClipActivityDeps, options: ClipJobActivityOptions = {}) {
