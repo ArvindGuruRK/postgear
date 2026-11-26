@@ -12,6 +12,8 @@ import { AiModule } from '../../ai/ai.module';
 import { ClipCaptionStylesModule } from '../captions/clip-caption-styles.module';
 import { ClipCaptionsController } from '../captions/clip-captions.controller';
 import { ClipCaptionsService } from '../captions/clip-captions.service';
+import { ClipFacesController } from '../faces/clip-faces.controller';
+import { ClipFacesService } from '../faces/clip-faces.service';
 import { ClipsCoreModule } from '../clips-core.module';
 import { ClipEditsService } from './clip-edits.service';
 import { ClipExportsService } from './clip-exports.service';
@@ -33,8 +35,8 @@ import { ClipsListService } from './clips-list.service';
     ClipCaptionStylesModule,
     AiModule,
   ],
-  // `ClipCaptionsController` first: its routes are all deeper than `/clips/:clipId`.
-  controllers: [ClipCaptionsController, ClipItemController],
+  // `ClipCaptionsController` and `ClipFacesController` first: their routes are all deeper than `/clips/:clipId`.
+  controllers: [ClipCaptionsController, ClipFacesController, ClipItemController],
   providers: [
     ClipItemService,
     ClipEditsService,
@@ -42,6 +44,7 @@ import { ClipsListService } from './clips-list.service';
     ClipExportsService,
     ClipSendService,
     ClipCaptionsService,
+    ClipFacesService,
   ],
   exports: [ClipItemService],
 })

@@ -1,6 +1,6 @@
 # Module 07: Face Detection And Detect Camera
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done, except the real wide-shot check (2026-11-26) | Size: L (one full session)
 > **Depends on**: [Module 01](module-01-media-service-foundations.md)
 > **Stories**: CA-4.1; foundations for CA-4.2
 > **Next**: [Module 08](module-08-auto-reframe.md) (Auto-Reframe)
@@ -71,12 +71,13 @@ Tests: a corner camera is found; a full-frame talking head is not a face camera;
 
 ## Tasks
 
-- [ ] `mediaPyDetectFaces` in the contract with fixtures; `services/faces.py`; recorded boxes for the samples; the schema-is-boxes-only test.
-- [ ] `reframe/people.ts` and `reframe/facecam.ts` with tests.
-- [ ] Enum values; the faces routes; `clipFacesWorkflow`; the deletion test.
-- [ ] Detect Camera in the Layouts tab; faces for Split clips made by a setup.
-- [ ] The wide-shot real check (with Arvind's OK) and its note.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `mediaPyDetectFaces` in the contract with fixtures; `services/faces.py`; recorded boxes for the samples; the schema-is-boxes-only test.
+- [x] `reframe/people.ts` and `reframe/facecam.ts` with tests.
+- [x] Enum values (already added by Module 01); the faces routes; `clipFacesWorkflow`; the deletion test.
+- [x] Detect Camera in the Layouts tab.
+- [ ] Faces for Split clips made by a setup: **deferred** (Decision Log, 2026-11-26): Module 05's setup has no layout choice, so AI clips open with no Camera area to frame. It lands where setup gains layouts and reuses `faceCameraCrop`.
+- [ ] The wide-shot real check (with Arvind's OK) and its note. **Not run**: it needs Arvind's OK to install the `ml` group (`mediapipe`, OpenCV) and to place `blaze_face_short_range.tflite` in `MEDIA_MODEL_DIR`, plus a wide two-person video he may use. Nothing was downloaded. What to look for when it runs: faces far from the camera missed (the reference project's report), whether MediaPipe needs the contrib headless OpenCV build, and whether `sounddevice` imports without PortAudio in the slim image.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

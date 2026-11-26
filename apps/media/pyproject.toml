@@ -34,6 +34,9 @@ ml = [
   # (research 02, section 6.1); the headless one needs no system graphics.
   "opencv-python-headless>=4.10,<6",
   "numpy>=2.2,<3",
+  # Module 07: the face detector (Tasks API, short-range BlazeFace). Its model
+  # file is never fetched by code: it lives in MEDIA_MODEL_DIR (Module 15).
+  "mediapipe>=1.2.3,<1.3",
 ]
 
 [build-system]
@@ -45,6 +48,10 @@ packages = ["src/postgear_media"]
 
 [tool.uv]
 default-groups = ["dev"]
+# One OpenCV build only (research 02, section 6.1): MediaPipe asks for the
+# desktop contrib build, which would install a second `cv2` over the headless
+# one. The real face check decides whether the contrib headless build is needed.
+exclude-dependencies = ["opencv-contrib-python", "opencv-python"]
 
 [tool.ruff]
 line-length = 100

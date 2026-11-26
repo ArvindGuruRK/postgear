@@ -49,6 +49,7 @@ export const CLIP_ERROR_MESSAGES = {
   captions_missing:
     "We could not find this clip's captions. Remove the captions and add them again.",
   faces_failed: 'We could not finish looking for faces. Try again.',
+  faces_off: 'Finding faces is not available right now. Drag the box yourself.',
   captions_first: 'Add captions to this clip first, then translate them.',
   translate_same_language: 'These captions are already in that language. Pick another one.',
   translate_off: 'Translating is not available right now. Everything else still works.',

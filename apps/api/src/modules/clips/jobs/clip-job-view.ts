@@ -112,7 +112,7 @@ function resultOf(kind: ClipJobKind, raw: unknown): ClipJobView['result'] {
     }
     case 'FACES': {
       const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['FACES']>;
-      return { people: value.people };
+      return { found: value.found, sampled: value.sampled };
     }
     case 'TRANSLATE': {
       const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['TRANSLATE']>;

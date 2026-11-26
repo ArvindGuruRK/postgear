@@ -21,6 +21,7 @@ import type {
   FinishHighlightsResult,
   FinishImportArgs,
   FinishSegmentArgs,
+  FinishFacesArgs,
   FinishTranscribeArgs,
   FinishTranscribeResult,
   HighlightRunRow,
@@ -338,6 +339,7 @@ export class FakeRows implements ClipRows {
 
   /** Sprint 13, Module 02: the DONE listening jobs' outputs, by job id. */
   transcribed = new Map<string, unknown>();
+  faced = new Map<string, unknown>();
 
   async finishTranscribe(args: FinishTranscribeArgs): Promise<FinishTranscribeResult> {
     if (!this.closeIfOpen(args.jobId, 'DONE')) return { finished: false, replacedKeys: [] };
@@ -361,6 +363,23 @@ export class FakeRows implements ClipRows {
       finished: true,
       replacedKeys: gone.map((row) => row.key).filter((key) => key !== args.asset.key),
     };
+  }
+
+  async finishFaces(args: FinishFacesArgs): Promise<boolean> {
+    if (!this.closeIfOpen(args.jobId, 'DONE')) return false;
+    this.faced.set(args.jobId, args.output);
+    this.assets = this.assets.filter((row) => row.id !== args.jobId);
+    this.assets.push({
+      id: args.asset.id ?? `asset-${this.nextId++}`,
+      kind: args.asset.kind,
+      key: args.asset.key,
+      bytes: args.asset.bytes,
+      videoId: args.asset.videoId,
+      clipId: args.asset.clipId ?? null,
+      meta: args.asset.meta,
+      createdAt: args.now,
+    });
+    return true;
   }
 
   async downloadRow(organizationId: string, jobId: string) {

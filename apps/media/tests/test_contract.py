@@ -18,12 +18,17 @@ MODELS: dict[str, tuple[type[BaseModel], type[BaseModel]]] = {
     "mediaPyTranscribe": (generated.MediaPyTranscribeInput, generated.MediaPyTranscribeOutput),
     "mediaPyMotion": (generated.MediaPyMotionInput, generated.MediaPyMotionOutput),
     "mediaPyStills": (generated.MediaPyStillsInput, generated.MediaPyStillsOutput),
+    "mediaPyDetectFaces": (
+        generated.MediaPyDetectFacesInput,
+        generated.MediaPyDetectFacesOutput,
+    ),
 }
 
 #: Stored files both sides read and write, by the shape's name.
 FILE_MODELS: dict[str, type[BaseModel]] = {
     "HeardFile": generated.HeardFile,
     "MotionFile": generated.MotionFile,
+    "FaceTracksFile": generated.FaceTracksFile,
 }
 
 

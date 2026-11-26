@@ -119,6 +119,37 @@ describe('the stored file shapes', () => {
   }
 });
 
+describe('the face file holds boxes and times only', () => {
+  // Every key the face file may ever carry, at every level. A new field (a
+  // landmark, a likeness, a crop, a name) must fail here first, and be argued
+  // for in the Decision Log before this list changes.
+  const schema = JSON.parse(contractSchemaText()) as {
+    $defs: Record<string, { properties?: Record<string, unknown> }>;
+  };
+  const keysOf = (name: string) => Object.keys(schema.$defs[name]?.properties ?? {}).sort();
+
+  it('the file: a version, the rate and the pictures', () => {
+    expect(keysOf('FaceTracksFile')).toEqual(['frames', 'sampleFps', 'version']);
+  });
+
+  it('a picture: its time and its boxes', () => {
+    expect(keysOf('FacePicture')).toEqual(['boxes', 't']);
+  });
+
+  it('a box: where it is and how sure the detector was', () => {
+    expect(keysOf('FaceBox')).toEqual(['h', 'score', 'w', 'x', 'y']);
+  });
+
+  it('the activity answers a key and counts, never the boxes', () => {
+    expect(keysOf('MediaPyDetectFacesOutput')).toEqual([
+      'facesKey',
+      'found',
+      'producer',
+      'sampled',
+    ]);
+  });
+});
+
 describe('storage keys', () => {
   const examples = readJson(join(FIXTURES, 'keys', 'examples.json')) as {
     valid: string[];

@@ -153,6 +153,14 @@ export function heardFileKey(orgId: string, videoId: string, jobId: string): str
   return jobVideoFileKey(orgId, videoId, 'heard', jobId, 'json.gz');
 }
 
+/**
+ * Sprint 13, Module 07: the face file a FACES job's Python step writes. It is
+ * kept where it lands, as the video's `FACE_TRACKS` asset (no copy).
+ */
+export function facesFileKey(orgId: string, videoId: string, jobId: string): string {
+  return jobVideoFileKey(orgId, videoId, 'faces', jobId, 'json.gz');
+}
+
 /** The video's transcript file as one listening job wrote it (the newest replaces the last). */
 export function transcriptFileKey(orgId: string, videoId: string, jobId: string): string {
   return jobVideoFileKey(orgId, videoId, 'transcript', jobId, 'json.gz');

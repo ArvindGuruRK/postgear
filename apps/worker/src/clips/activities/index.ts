@@ -17,6 +17,7 @@ import { createStickerActivities } from './sticker.activities';
 
 export type {
   ClipWorkResult,
+  FacesPrepared,
   HighlightsLook,
   HighlightsStep,
   RenderWaitState,

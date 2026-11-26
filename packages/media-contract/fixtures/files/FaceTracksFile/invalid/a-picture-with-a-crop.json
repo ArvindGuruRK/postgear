@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "sampleFps": 5,
+  "frames": [
+    {
+      "t": 0,
+      "boxes": [],
+      "image": "aGVsbG8="
+    }
+  ]
+}

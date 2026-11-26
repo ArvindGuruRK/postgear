@@ -17,6 +17,50 @@ class Binding(BaseModel):
     state: Literal["simulation", "live", "off"]
 
 
+class FaceBox(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    h: Annotated[float, Field(ge=0.0, le=1.0)]
+    score: Annotated[float, Field(ge=0.0, le=1.0)]
+    w: Annotated[float, Field(ge=0.0, le=1.0)]
+    x: Annotated[float, Field(ge=0.0, le=1.0)]
+    y: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class FacePicture(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    boxes: Annotated[list[FaceBox], Field(max_length=8)]
+    t: Annotated[int, Field(ge=0, le=86400000)]
+
+
+class FaceTracksFile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    frames: Annotated[list[FacePicture], Field(max_length=54000)]
+    sample_fps: Annotated[Literal[5], Field(alias="sampleFps")]
+    version: Literal[1]
+
+
+class Sample(RootModel[str]):
+    root: Annotated[str, Field(pattern="^[a-z0-9-]{1,32}$")]
+
+
+class FacesSimulationHint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    force: Literal["fail", "slow"] | None
+    sample: Sample | None
+
+
 class Values(RootModel[float]):
     root: Annotated[float, Field(ge=0.0, le=1.0)]
 
@@ -92,10 +136,6 @@ class Values1(RootModel[float]):
     root: Annotated[float, Field(ge=0.0, le=255.0)]
 
 
-class Sample(RootModel[str]):
-    root: Annotated[str, Field(pattern="^[a-z0-9-]{1,32}$")]
-
-
 class SimulationHint(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -151,6 +191,73 @@ class HeardFile(BaseModel):
     speech: Speech
     version: Literal[1]
     words: Annotated[list[HeardWord], Field(max_length=400000)]
+
+
+class MediaPyDetectFacesInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    duration_ms: Annotated[int, Field(alias="durationMs", ge=0, le=86400000)]
+    job_id: Annotated[
+        str,
+        Field(
+            alias="jobId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+    max_width: Annotated[Literal[640], Field(alias="maxWidth")]
+    org_id: Annotated[
+        str,
+        Field(
+            alias="orgId",
+            max_length=64,
+            pattern="^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
+        ),
+    ]
+    proxy_key: Annotated[
+        str,
+        Field(
+            alias="proxyKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    ranges: Annotated[list[TimeRange], Field(max_length=16, min_length=1)]
+    sample_fps: Annotated[Literal[5], Field(alias="sampleFps")]
+    simulation: FacesSimulationHint | None
+    version: Literal[1]
+    video_id: Annotated[
+        str,
+        Field(
+            alias="videoId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+
+
+class MediaPyDetectFacesOutput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    faces_key: Annotated[
+        str,
+        Field(
+            alias="facesKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    found: Annotated[int, Field(ge=0, le=9007199254740991)]
+    producer: Annotated[str, Field(max_length=80, min_length=1)]
+    sampled: Annotated[int, Field(ge=0, le=9007199254740991)]
 
 
 class MediaPyMotionInput(BaseModel):
@@ -365,10 +472,19 @@ class MediaContract(BaseModel):
         extra="forbid",
         populate_by_name=True,
     )
+    file_face_tracks_file: Annotated[
+        FaceTracksFile | None, Field(alias="file_FaceTracksFile")
+    ] = None
     file_heard_file: Annotated[HeardFile | None, Field(alias="file_HeardFile")] = None
     file_motion_file: Annotated[MotionFile | None, Field(alias="file_MotionFile")] = (
         None
     )
+    media_py_detect_faces_input: Annotated[
+        MediaPyDetectFacesInput | None, Field(alias="mediaPyDetectFaces_input")
+    ] = None
+    media_py_detect_faces_output: Annotated[
+        MediaPyDetectFacesOutput | None, Field(alias="mediaPyDetectFaces_output")
+    ] = None
     media_py_health_input: Annotated[
         MediaPyHealthInput | None, Field(alias="mediaPyHealth_input")
     ] = None

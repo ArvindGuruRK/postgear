@@ -160,6 +160,7 @@ import type { ClipDetail } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { CropStage } from '../layouts/crop-stage';
 import { LAST_CROP_SENTENCE } from '../layouts/layouts-model';
+import { cameraAreaOf } from '../layouts/detect-camera-model';
 import { type LayoutEdit, LayoutsPanel } from '../layouts/layouts-panel';
 import {
   layerFiles,
@@ -886,7 +887,12 @@ export function ClipEditor({
         return;
       }
       if (next === doc) return;
-      const added = options?.selectArea === 'last' ? next.layout.areas.at(-1) : undefined;
+      const added =
+        options?.selectArea === 'last'
+          ? next.layout.areas.at(-1)
+          : options?.selectArea === 'camera'
+            ? (cameraAreaOf(next) ?? undefined)
+            : undefined;
       commit(doc, next, added ? { select: { kind: 'area', id: added.id } } : {});
       setAnnouncement(spoken);
     },
@@ -1645,9 +1651,11 @@ export function ClipEditor({
       />
     ) : state.tab === 'layouts' ? (
       <LayoutsPanel
+        clipId={clipId}
         document={document}
         videoSize={videoSize}
         labelledBy={panelHeadingId('layouts')}
+        facesAvailable={captions.ai?.faces === true}
         onEdit={editLayout}
       />
     ) : state.tab === 'elements' ? (

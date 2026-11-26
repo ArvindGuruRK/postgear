@@ -285,6 +285,26 @@ describe('removeVideo', () => {
     },
   );
 
+  it('takes the face files with the video: their rows go and their keys sit under its prefix (Sprint 13, Module 07)', async () => {
+    seed();
+    const facesKey = `clips/${ORG}/${VIDEO}/faces-${'d'.repeat(32)}.json.gz`;
+    db.assets.push({
+      id: 'asset-faces',
+      organizationId: ORG,
+      videoId: VIDEO,
+      kind: 'FACE_TRACKS',
+      key: facesKey,
+    } as (typeof db.assets)[number]);
+    const { service, storage } = build();
+
+    await service.removeVideo(ORG, VIDEO, 'deleted', NOW);
+
+    expect(db.assets.map((asset) => asset.id)).toEqual(['asset-other']);
+    const prefix = `clips/${ORG}/${VIDEO}/`;
+    expect(storage.deletePrefix).toHaveBeenCalledWith(prefix);
+    expect(facesKey.startsWith(prefix)).toBe(true);
+  });
+
   it('answers null the second time and for another workspace', async () => {
     seed();
     const { service, storage } = build();

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "sampleFps": 5,
+  "frames": [
+    {
+      "t": 0,
+      "boxes": []
+    },
+    {
+      "t": 200,
+      "boxes": []
+    }
+  ]
+}

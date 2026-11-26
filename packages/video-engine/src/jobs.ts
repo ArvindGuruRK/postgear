@@ -482,8 +482,15 @@ export const transcribeOutputSchema = z
   })
   .strict();
 
+/** Finding faces: the face file kept (shared by every clip of the stretch) and two counts, never a box. */
 export const facesOutputSchema = z
-  .object({ assetId: uuid.nullable(), people: z.number().int().min(0) })
+  .object({
+    assetId: uuid.nullable(),
+    /** Boxes in the whole stretch (0: no face anywhere; the job is still DONE). */
+    found: z.number().int().min(0),
+    /** Pictures looked at. */
+    sampled: z.number().int().min(0),
+  })
   .strict();
 
 export const translateOutputSchema = z

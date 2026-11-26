@@ -3,6 +3,7 @@ import {
   allImportKeys,
   allWatchKeys,
   exportMediaKeys,
+  facesFileKey,
   highlightsSignalsKey,
   jobHex,
   segmentKey,
@@ -282,4 +283,27 @@ describe('highlights bookkeeping (Module 16)', () => {
     expect(rows.runs.get(RUN_ID)?.status).toBe('DONE');
     expect(reverseCharges).not.toHaveBeenCalled();
   });
+});
+
+describe('faces bookkeeping (Sprint 13, Module 07)', () => {
+  const facesInput = { videoId: VIDEO_ID, clipId: CLIP_ID, fromMs: 1_000, toMs: 61_000 };
+
+  it.each([
+    [
+      'failed',
+      (deps: OutcomeDeps) =>
+        failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'faces_failed' }),
+    ],
+    ['cancelled', (deps: OutcomeDeps) => cancelJob(deps, { jobId: JOB_ID, organizationId: ORG })],
+  ])(
+    'a %s faces job deletes the face file Python may have written, and nothing else',
+    async (_, close) => {
+      const { deps, rows, privateStorage } = setup(
+        jobRow({ kind: 'FACES', clipId: CLIP_ID, input: facesInput }),
+      );
+      expect(await close(deps)).toBe(true);
+      expect(privateStorage.deleted).toEqual([facesFileKey(ORG, VIDEO_ID, JOB_ID)]);
+      expect(rows.notifications).toHaveLength(0);
+    },
+  );
 });

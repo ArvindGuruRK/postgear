@@ -9,6 +9,7 @@
  */
 import { z } from 'zod/v4';
 import { MEDIA_CONTRACT_VERSION, MEDIA_PY_ACTIVITY_NAMES } from './names';
+import { faceTracksFile, mediaPyDetectFacesInput, mediaPyDetectFacesOutput } from './shapes/faces';
 import { mediaPyHealthInput, mediaPyHealthOutput } from './shapes/health';
 import { heardFile, mediaPyTranscribeInput, mediaPyTranscribeOutput } from './shapes/transcribe';
 import {
@@ -34,6 +35,10 @@ export const MEDIA_PY_CONTRACT = {
     input: mediaPyTranscribeInput,
     output: mediaPyTranscribeOutput,
   },
+  [MEDIA_PY_ACTIVITY_NAMES.detectFaces]: {
+    input: mediaPyDetectFacesInput,
+    output: mediaPyDetectFacesOutput,
+  },
   [MEDIA_PY_ACTIVITY_NAMES.motion]: { input: mediaPyMotionInput, output: mediaPyMotionOutput },
   [MEDIA_PY_ACTIVITY_NAMES.stills]: { input: mediaPyStillsInput, output: mediaPyStillsOutput },
 } as const satisfies Record<string, ActivityShapes>;
@@ -46,6 +51,7 @@ export const MEDIA_PY_CONTRACT = {
 export const MEDIA_FILE_SHAPES = {
   HeardFile: heardFile,
   MotionFile: motionFile,
+  FaceTracksFile: faceTracksFile,
 } as const satisfies Record<string, z.ZodType>;
 
 export type MediaFileName = keyof typeof MEDIA_FILE_SHAPES;
@@ -125,9 +131,12 @@ export function buildContractSchema(): JsonObject {
     }
   }
 
-  for (const [fileName, schema] of Object.entries(MEDIA_FILE_SHAPES) as Array<[string, z.ZodType]>) {
+  for (const [fileName, schema] of Object.entries(MEDIA_FILE_SHAPES) as Array<
+    [string, z.ZodType]
+  >) {
     const name = shapeName(schema);
-    if (name !== fileName) throw new Error(`The file shape ${fileName} must carry its name as its id`);
+    if (name !== fileName)
+      throw new Error(`The file shape ${fileName} must carry its name as its id`);
     const json = z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'output' }) as JsonObject;
     const nested = isObject(json.$defs) ? json.$defs : {};
     const { $defs: _defs, ...root } = json;

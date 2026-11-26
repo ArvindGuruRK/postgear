@@ -1293,6 +1293,21 @@ Under simulation the moment picker answers from the transcript, the request and 
 
 With `CLIPS_ACTION_VISION` off (the default) no picture ever leaves the system: the stills are not even cut. Under simulation the motion values are recorded per sample (the stream has a cut spike plus action after it and three quiet bursts; the talk samples are calm), and the stills are one test pattern, never a real frame.
 
+**Detect Camera (Module 07).** Free (no AI minutes). Needs the Python worker (`MEDIA_SIMULATION=true`) as well as the Node worker. Under simulation the face boxes are recorded per sample: the stream has one small still face in the bottom right corner (the picture itself draws no marker there, the recorded boxes stand in for a face camera), `two-speakers` has its two face markers, and the talk sample and any upload have no face.
+
+| Do this | What you should see |
+|---|---|
+| Open a Vertical clip of the stream sample, **Layouts**, pick **Split** | A **Detect Camera** button under the layout tiles (none on Fullscreen or Blurred) |
+| Press **Detect Camera** | A violet bar with "Finding faces" for a moment, then the Camera box jumps to the bottom right corner of the video, touching the edges, and is selected |
+| Press Ctrl+Z | The Camera box goes back where it was, in one step |
+| Make a second clip from the same minutes and press **Detect Camera** there | It answers at once: the face file is reused and no new job shows in the jobs list |
+| Do the same on a clip of the talk sample | "We could not find a face camera. Drag the box yourself." and nothing moves |
+| Rename the video to hold `[simulate:faces-fail]` (new clip, new stretch), press it | "We could not finish looking for faces. Try again." and nothing moves |
+| Rename it to hold `[simulate:faces-slow]` | "Finding faces" holds about 10 seconds |
+| Delete a video that has a face file | Its folder in `postgear-clips` (MinIO, or `apps/api/uploads-private` locally) is gone, `faces-*.json.gz` with it |
+
+The face file (`faces-<job>.json.gz`) holds boxes and times only: no landmarks, no picture of a face, never who. The real detector (MediaPipe, short-range model) is wired but never runs here: its model file is not downloaded by any code.
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

@@ -12,6 +12,8 @@ export { automationRunWorkflow } from './automation-run.workflow';
 // Sprint 12: Clips (on the media, media-quick and render queues).
 export {
   clipDownloadWorkflow,
+  // Sprint 13, Module 07: finding faces.
+  clipFacesWorkflow,
   clipHighlightsWorkflow,
   clipImportWorkflow,
   clipRenderWorkflow,

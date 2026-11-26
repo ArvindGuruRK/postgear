@@ -134,6 +134,26 @@ export async function clipTranscribeWorkflow(input: ClipJobWorkflowInput): Promi
   });
 }
 
+/**
+ * Sprint 13, Module 07: finding faces (`postgear-media`). Free. Three steps:
+ * prepare (here), `mediaPyDetectFaces` (Python), finish (keep the face file
+ * as the video's asset, here). A failure or a cancel of any step is booked by
+ * `runClipJob`, whose bookkeeping deletes a face file Python already wrote.
+ */
+export async function clipFacesWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
+  return runClipJob(input, 'FACES', async () => {
+    const prepared = await look.clipFacesPrepare(input);
+    if (prepared.status === 'closed') return { status: 'closed' };
+    const detect = mediaPyWork(
+      'mediaPyDetectFaces',
+      MEDIA_PY_TIMINGS.mediaPyDetectFaces,
+      workBudgetMs('FACES'),
+    );
+    const found = await detect(prepared.payload);
+    return workActivities('FACES').clipFacesFinish({ ...input, found });
+  });
+}
+
 export async function clipDownloadWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
   return runClipJob(input, 'DOWNLOAD', () => workActivities('DOWNLOAD').clipDownload(input));
 }

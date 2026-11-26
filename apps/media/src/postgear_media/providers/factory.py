@@ -22,6 +22,7 @@ from temporalio.exceptions import ApplicationError
 
 from postgear_media.core.settings import Settings
 from postgear_media.providers.transcribe.base import Transcriber
+from postgear_media.providers.vision.mediapipe_faces import face_model_path
 
 BindingState = Literal["simulation", "live", "off"]
 
@@ -65,6 +66,13 @@ def _transcriber(settings: Settings) -> BindingInfo:
     return BindingInfo("off", "faster-whisper")
 
 
+def _faces(settings: Settings) -> BindingInfo:
+    """Live only with the library and its model file on this box (never downloaded here)."""
+    model = face_model_path(settings.model_root)
+    live = _installed("mediapipe") and _installed("cv2") and model.is_file()
+    return BindingInfo("live" if live else "off", "mediapipe")
+
+
 def build_provider_table(settings: Settings) -> ProviderTable:
     """The bindings this process will use."""
     if settings.simulation:
@@ -79,7 +87,7 @@ def build_provider_table(settings: Settings) -> ProviderTable:
     has_cv = _installed("cv2")
     return ProviderTable(
         transcriber=_transcriber(settings),
-        faces=BindingInfo("live" if _installed("mediapipe") else "off", "mediapipe"),
+        faces=_faces(settings),
         motion=BindingInfo("live" if has_cv else "off", "opencv"),
         stills=BindingInfo("live" if has_cv else "off", "opencv"),
         models_present=_models_present(settings),

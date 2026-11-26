@@ -14,11 +14,11 @@ import type {
   CaptionsTrack,
   ClipDocument,
   ClipError,
-  DownloadMedia,
-  ClipLayout,
   ClipJobKind,
   ClipJobStatus,
+  ClipLayout,
   ClipPlatformId,
+  DownloadMedia,
   ExportQuality,
   FilmstripMeta,
   LinkInfo,
@@ -33,13 +33,13 @@ import type {
 } from '@postgear/video-engine';
 
 export type {
-  ClipLayout,
   ClipCanvas,
   ClipDocument,
   ClipErrorCode,
   ClipJobKind,
   ClipJobStage,
   ClipJobStatus,
+  ClipLayout,
   ClipPlatformId,
   ExportQuality,
   FilmstripMeta,
@@ -322,7 +322,24 @@ export interface ClipsAiStatus {
   action?: boolean;
   /** Module 06: Look For Action also shows a few stills to the AI model. */
   actionVision?: boolean;
+  /** Module 07: Detect Camera can find faces right now (free). */
+  faces?: boolean;
 }
+
+/** Module 07: `POST /clips/:clipId/faces`. */
+export type ClipFacesEnsure =
+  | { status: 'ready'; reused: true }
+  | { status: 'running'; job: ClipJobView; joined: boolean };
+
+/** Module 07: `GET /clips/:clipId/faces`. The address reads the face file once, at once. */
+export type ClipFacesRead =
+  | {
+      status: 'ready';
+      url: string;
+      meta: { fromMs: number; toMs: number; sampleFps: number; found: number; producer: string };
+    }
+  | { status: 'running'; job: ClipJobView }
+  | { status: 'none' };
 
 // --- Module 06: links, videos, uploads, channels --------------------------------
 

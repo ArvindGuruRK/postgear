@@ -38,6 +38,8 @@ import {
   withScratch,
 } from '@postgear/media-tools';
 import type {
+  MediaPyDetectFacesInput,
+  MediaPyDetectFacesOutput,
   MediaPyMotionInput,
   MediaPyStillsInput,
   MediaPyTranscribeInput,
@@ -49,6 +51,7 @@ import { type ActivityRun, runClipActivity } from '../activity-kit';
 import type { ClipActivityDeps } from '../deps';
 import { type DownloadTools, runDownload } from '../download/download.run';
 import { runSaveDownload, saveDownloadFailed } from '../download/save-download.run';
+import { finishFaces, prepareFaces } from '../faces/faces.run';
 import { ClipStepError } from '../failures';
 import {
   gatherHighlights,
@@ -78,6 +81,11 @@ export interface ClipWorkResult {
 export type TranscribePrepared =
   | { status: 'closed' }
   | { status: 'ready'; payload: MediaPyTranscribeInput };
+
+/** Module 07: what `clipFacesPrepare` hands the workflow: the Python activity's input, or closed. */
+export type FacesPrepared =
+  | { status: 'closed' }
+  | { status: 'ready'; payload: MediaPyDetectFacesInput };
 
 /**
  * Module 06: a Find Clips run's first step. `watch`: the run asks to Look For
@@ -339,6 +347,53 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             deps.internal,
           );
           return { status: outcome.finished ? 'done' : 'closed' };
+        });
+      });
+    },
+
+    /** Sprint 13, Module 07: a faces job's first step (RUNNING at "Finding faces", the Python input). */
+    async clipFacesPrepare(ref: ClipJobWorkflowInput): Promise<FacesPrepared> {
+      return runClipActivity('clipFacesPrepare', ref.jobId, async () => {
+        const { job, input } = await openJob(rows, ref, 'FACES');
+        const progress = jobProgress(job.id, { kind: 'FACES' });
+        if (!(await start(progress))) return { status: 'closed' };
+        const payload = await prepareFaces({
+          jobId: job.id,
+          organizationId: job.organizationId,
+          input,
+          rows,
+          privateStorage: deps.privateStorage,
+          progress,
+          simulated: deps.providers.simulated,
+          now,
+        });
+        return { status: 'ready', payload };
+      });
+    },
+
+    /** Sprint 13, Module 07: a faces job's last step: check the file, keep it, DONE. */
+    async clipFacesFinish(
+      ref: ClipJobWorkflowInput & { found: MediaPyDetectFacesOutput },
+    ): Promise<ClipWorkResult> {
+      return runClipActivity('clipFacesFinish', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'FACES');
+        const progress = jobProgress(job.id, { kind: 'FACES' });
+        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+          const finished = await finishFaces(
+            {
+              jobId: job.id,
+              organizationId: job.organizationId,
+              input,
+              rows,
+              privateStorage: deps.privateStorage,
+              progress,
+              simulated: deps.providers.simulated,
+              now,
+            },
+            ref.found,
+            dir,
+          );
+          return { status: finished ? 'done' : 'closed' };
         });
       });
     },

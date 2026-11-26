@@ -13,6 +13,8 @@
  *   made from the layout's own data. Horizontal offers Fullscreen and
  *   Blurred only. A quiet line says when the layout is Custom.
  * - **Crop Ratio** (Blurred only): Original, 4:3, 1:1, as tiles too.
+ * - **Detect Camera** (Sprint 13, Module 07): under the tiles when the
+ *   layout has a Camera area (`detect-camera.tsx`).
  * - **My Layouts**: the workspace's saved layouts for this shape.
  *
  * Every choice is one undo step and goes through the store's `apply`, which
@@ -36,6 +38,7 @@ import {
 import { useId } from 'react';
 import { GroupLabel } from '@/components/studio/panel-ui';
 import type { SavedLayoutView } from '@/types/clips';
+import { DetectCamera } from './detect-camera';
 import { LayoutDrawing } from './layout-drawing';
 import {
   chosenLayout,
@@ -55,19 +58,24 @@ import { SavedLayouts } from './saved-layouts';
 export type LayoutEdit = (
   change: (doc: ClipDocument) => ClipDocument,
   spoken: string,
-  options?: { selectArea?: 'last' },
+  options?: { selectArea?: 'last' | 'camera' },
 ) => void;
 
 export function LayoutsPanel({
+  clipId,
   document,
   videoSize,
   labelledBy,
+  facesAvailable,
   onEdit,
 }: {
+  clipId: string;
   document: ClipDocument;
   videoSize: CanvasSize;
   /** The panel heading's id, which names the layout tiles. */
   labelledBy: string;
+  /** Module 07: `ai.faces` from the status (Detect Camera is off without the media service). */
+  facesAvailable: boolean;
   /** One undo step: the change, and the sentence a screen reader hears after it. */
   onEdit: LayoutEdit;
 }) {
@@ -138,6 +146,13 @@ export function LayoutsPanel({
             />
           </div>
         ) : null}
+        <DetectCamera
+          clipId={clipId}
+          document={document}
+          videoSize={videoSize}
+          available={facesAvailable}
+          onEdit={onEdit}
+        />
       </div>
 
       <SavedLayouts ratio={ratio} layout={document.layout} onApply={applySaved} />

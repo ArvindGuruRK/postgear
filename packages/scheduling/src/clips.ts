@@ -78,6 +78,15 @@ export const MEDIA_PY_TIMINGS = Object.freeze({
     heartbeatMs: 5 * 60_000,
     maximumAttempts: 2,
   }),
+  // Module 07: faces at five small pictures a second over one clip's stretch
+  // (a minute or two, plus handles): seconds on a processor, a few minutes for
+  // a long stretch. A heartbeat every few seconds of video. Two attempts.
+  mediaPyDetectFaces: Object.freeze({
+    startToCloseMs: 40 * 60_000,
+    scheduleToCloseMs: 45 * 60_000,
+    heartbeatMs: 2 * 60_000,
+    maximumAttempts: 2,
+  }),
   // At most 48 stills, each one seek and one picture.
   mediaPyStills: Object.freeze({
     startToCloseMs: 10 * 60_000,

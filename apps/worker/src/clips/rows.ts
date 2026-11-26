@@ -198,6 +198,16 @@ export interface FinishTranscribeResult {
   replacedKeys: string[];
 }
 
+/** Sprint 13, Module 07: a FACES job DONE and its face file kept as a FACE_TRACKS asset, in one go. */
+export interface FinishFacesArgs {
+  jobId: string;
+  organizationId: string;
+  videoId: string;
+  asset: NewAsset;
+  output: Record<string, unknown>;
+  now: Date;
+}
+
 /** Module 18: a prepared download, its job DONE and its DOWNLOAD asset row in one go. */
 export interface FinishDownloadArgs {
   jobId: string;
@@ -290,6 +300,8 @@ export interface ClipRows {
   ): Promise<{ id: string; name: string; look: unknown } | null>;
   /** Sprint 13, Module 02: closes a listening job and swaps the transcript row; false when closed meanwhile. */
   finishTranscribe(args: FinishTranscribeArgs): Promise<FinishTranscribeResult>;
+  /** False when the job was closed meanwhile: nothing was written. */
+  finishFaces(args: FinishFacesArgs): Promise<boolean>;
 }
 
 /** The clips a Find Clips run makes (Sprint 13 adds the transcript's). */
@@ -620,6 +632,37 @@ export const prismaClipRows: ClipRows = {
       });
     } catch (error) {
       if (error instanceof RowClosed) return { finished: false, replacedKeys: [] };
+      throw error;
+    }
+  },
+
+  async finishFaces(args) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const job = await tx.clipJob.updateMany({
+          where: {
+            id: args.jobId,
+            organizationId: args.organizationId,
+            kind: ClipJobKind.FACES,
+            status: { in: OPEN },
+          },
+          data: {
+            status: ClipJobStatus.DONE,
+            progress: 100,
+            finishedAt: args.now,
+            output: args.output as Prisma.InputJsonValue,
+          },
+        });
+        if (job.count === 0) throw new RowClosed();
+        // A retry that already wrote its row replaces it (same id, same key).
+        await tx.clipAsset.deleteMany({
+          where: { organizationId: args.organizationId, id: args.jobId },
+        });
+        await tx.clipAsset.create({ data: toAssetCreate(args.organizationId, args.asset) });
+        return true;
+      });
+    } catch (error) {
+      if (error instanceof RowClosed) return false;
       throw error;
     }
   },

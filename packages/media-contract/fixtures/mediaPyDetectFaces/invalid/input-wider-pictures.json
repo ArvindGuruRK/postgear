@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "jobId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "orgId": "seed-demo-org",
+  "videoId": "2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b",
+  "proxyKey": "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/proxy-0123456789abcdef0123456789abcdef.mp4",
+  "durationMs": 240000,
+  "ranges": [
+    {
+      "fromMs": 10000,
+      "toMs": 72000
+    }
+  ],
+  "sampleFps": 5,
+  "maxWidth": 1280,
+  "simulation": {
+    "sample": "two-speakers",
+    "force": null
+  }
+}

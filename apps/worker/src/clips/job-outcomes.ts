@@ -43,6 +43,7 @@ import { storedJobError } from './job-progress';
 import {
   allImportKeys,
   exportMediaKeys,
+  facesFileKey,
   heardFileKey,
   allWatchKeys,
   highlightsSignalsKey,
@@ -431,6 +432,14 @@ async function closeAiStep(
     await deleteKeys(
       (key) => deps.privateStorage.delete(key),
       [heardFileKey(org, job.videoId, job.id)],
+      job.id,
+    );
+  }
+  if (job.kind === 'FACES' && job.videoId) {
+    // Module 07: a face file Python wrote before the job closed is never kept.
+    await deleteKeys(
+      (key) => deps.privateStorage.delete(key),
+      [facesFileKey(org, job.videoId, job.id)],
       job.id,
     );
   }

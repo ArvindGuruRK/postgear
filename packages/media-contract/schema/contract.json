@@ -23,6 +23,128 @@
       ],
       "type": "object"
     },
+    "FaceBox": {
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "w": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "x": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "y": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h",
+        "score"
+      ],
+      "type": "object"
+    },
+    "FacePicture": {
+      "additionalProperties": false,
+      "properties": {
+        "boxes": {
+          "items": {
+            "$ref": "#/$defs/FaceBox"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "t": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "t",
+        "boxes"
+      ],
+      "type": "object"
+    },
+    "FaceTracksFile": {
+      "additionalProperties": false,
+      "properties": {
+        "frames": {
+          "items": {
+            "$ref": "#/$defs/FacePicture"
+          },
+          "maxItems": 54000,
+          "type": "array"
+        },
+        "sampleFps": {
+          "const": 5,
+          "type": "number"
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "sampleFps",
+        "frames"
+      ],
+      "title": "FaceTracksFile",
+      "type": "object"
+    },
+    "FacesSimulationHint": {
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "anyOf": [
+            {
+              "enum": [
+                "fail",
+                "slow"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sample",
+        "force"
+      ],
+      "type": "object"
+    },
     "HeardFile": {
       "additionalProperties": false,
       "properties": {
@@ -131,6 +253,103 @@
     "LanguageChoice": {
       "pattern": "^(?:auto|[a-z]{2,3})$",
       "type": "string"
+    },
+    "MediaPyDetectFacesInput": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jobId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "maxWidth": {
+          "const": 640,
+          "type": "number"
+        },
+        "orgId": {
+          "$ref": "#/$defs/OrgId"
+        },
+        "proxyKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/TimeRange"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array"
+        },
+        "sampleFps": {
+          "const": 5,
+          "type": "number"
+        },
+        "simulation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FacesSimulationHint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        },
+        "videoId": {
+          "$ref": "#/$defs/Uuid"
+        }
+      },
+      "required": [
+        "version",
+        "jobId",
+        "orgId",
+        "videoId",
+        "proxyKey",
+        "durationMs",
+        "ranges",
+        "sampleFps",
+        "maxWidth",
+        "simulation"
+      ],
+      "title": "MediaPyDetectFacesInput",
+      "type": "object"
+    },
+    "MediaPyDetectFacesOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "facesKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "found": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "producer": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sampled": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "facesKey",
+        "sampled",
+        "found",
+        "producer"
+      ],
+      "title": "MediaPyDetectFacesOutput",
+      "type": "object"
     },
     "MediaPyHealthInput": {
       "additionalProperties": false,
@@ -655,11 +874,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Generated from packages/media-contract. Contract version 1. Do not edit.",
   "properties": {
+    "file_FaceTracksFile": {
+      "$ref": "#/$defs/FaceTracksFile"
+    },
     "file_HeardFile": {
       "$ref": "#/$defs/HeardFile"
     },
     "file_MotionFile": {
       "$ref": "#/$defs/MotionFile"
+    },
+    "mediaPyDetectFaces_input": {
+      "$ref": "#/$defs/MediaPyDetectFacesInput"
+    },
+    "mediaPyDetectFaces_output": {
+      "$ref": "#/$defs/MediaPyDetectFacesOutput"
     },
     "mediaPyHealth_input": {
       "$ref": "#/$defs/MediaPyHealthInput"

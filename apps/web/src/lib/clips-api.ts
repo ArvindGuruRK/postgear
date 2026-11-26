@@ -6,54 +6,10 @@
  *
  * Later modules add their calls here (videos, uploads, clips, exports).
  */
-import type {
-  AddCaptionsOutcome,
-  CaptionStylesView,
-  CaptionStyleView,
-  CaptionsFileOutcome,
-  ClipWordsView,
-  ListenOutcome,
-  SetupPriceView,
-  TranslateCaptionsOutcome,
-  VideoTranscriptView,
-  ClipChannelPreview,
-  ClipDocument,
-  ClipChannelView,
-  ClipDetail,
-  ClipExportView,
-  ClipImportOutcome,
-  ClipJobView,
-  ClipLayout,
-  ClipListPage,
-  ComingUpView,
-  ClipListSort,
-  ClipPlatformId,
-  ClipPreviewView,
-  ClipProbe,
-  ClipStreamsPage,
-  ClipSharpState,
-  ClipSource,
-  ClipsStatus,
-  ClipStatusFilter,
-  ClipUploadStarted,
-  ClipVideoDetail,
-  ClipVideoPage,
-  HighlightsStarted,
-  HighlightsView,
-  ClipVideoSort,
-  ClipVideoView,
-  ClipView,
-  DownloadStarted,
-  DownloadView,
-  ExportQuality,
-  ListKind,
-  ListPeriod,
-  ListSort,
-  Ratio,
-  SavedLayoutView,
-} from '@/types/clips';
+
 import type {
   CaptionLook,
+  ClipSetup,
   LibraryCategoryCount,
   LibrarySearchPage,
   LibrarySoundPage,
@@ -66,8 +22,55 @@ import type {
   StickerFileView,
   StickerKind,
   StickerUploadView,
-  ClipSetup,
 } from '@postgear/video-engine';
+import type {
+  AddCaptionsOutcome,
+  CaptionStylesView,
+  CaptionStyleView,
+  CaptionsFileOutcome,
+  ClipChannelPreview,
+  ClipChannelView,
+  ClipDetail,
+  ClipDocument,
+  ClipExportView,
+  ClipFacesEnsure,
+  ClipFacesRead,
+  ClipImportOutcome,
+  ClipJobView,
+  ClipLayout,
+  ClipListPage,
+  ClipListSort,
+  ClipPlatformId,
+  ClipPreviewView,
+  ClipProbe,
+  ClipSharpState,
+  ClipSource,
+  ClipStatusFilter,
+  ClipStreamsPage,
+  ClipsStatus,
+  ClipUploadStarted,
+  ClipVideoDetail,
+  ClipVideoPage,
+  ClipVideoSort,
+  ClipVideoView,
+  ClipView,
+  ClipWordsView,
+  ComingUpView,
+  DownloadStarted,
+  DownloadView,
+  ExportQuality,
+  HighlightsStarted,
+  HighlightsView,
+  ListenOutcome,
+  ListKind,
+  ListPeriod,
+  ListSort,
+  Ratio,
+  SavedLayoutView,
+  SetupPriceView,
+  TranslateCaptionsOutcome,
+  VideoTranscriptView,
+} from '@/types/clips';
 import { api, uploadFile } from './api';
 
 const jobPath = (jobId: string) => `/clips/jobs/${encodeURIComponent(jobId)}`;
@@ -239,10 +242,7 @@ export function getVideo(
  * run (202). 402 `clips_ai_minutes_used` when too few are left, 409
  * `highlights_running` while a run is on, 409 `video_not_ready`.
  */
-export function startHighlights(
-  videoId: string,
-  setup?: ClipSetup,
-): Promise<HighlightsStarted> {
+export function startHighlights(videoId: string, setup?: ClipSetup): Promise<HighlightsStarted> {
   return api<HighlightsStarted>(`${videoPath(videoId)}/highlights`, {
     method: 'POST',
     ...(setup ? { body: { setup } } : {}),
@@ -945,4 +945,17 @@ export async function updateCaptionStyle(
 
 export function deleteCaptionStyle(styleId: string): Promise<{ message: string }> {
   return api(`/clips/caption-styles/${encodeURIComponent(styleId)}`, { method: 'DELETE' });
+}
+
+/** Module 07: finds faces in the clip's stretch (free), or answers that a face file covers it. */
+export function ensureClipFaces(clipId: string): Promise<ClipFacesEnsure> {
+  return api<ClipFacesEnsure>(`${clipPath(clipId)}/faces`, { method: 'POST' });
+}
+
+/** Module 07: the face file's address when it is ready, or whether a job is still looking. */
+export function readClipFaces(
+  clipId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<ClipFacesRead> {
+  return api<ClipFacesRead>(`${clipPath(clipId)}/faces`, { signal: options.signal });
 }

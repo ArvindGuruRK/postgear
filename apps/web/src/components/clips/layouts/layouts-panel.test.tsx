@@ -81,9 +81,11 @@ function renderPanel(initial: ClipDocument = clip()) {
       <>
         <h2 id="panel-heading">Layouts</h2>
         <LayoutsPanel
+          clipId="55555555-5555-4555-8555-555555555555"
           document={doc}
           videoSize={VIDEO_SIZE}
           labelledBy="panel-heading"
+          facesAvailable
           onEdit={edit}
         />
       </>

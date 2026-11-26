@@ -126,6 +126,8 @@ export interface ClipsAiStatus {
   action: boolean;
   /** Module 06: Look For Action also shows stills to the AI model (`CLIPS_ACTION_VISION`). */
   actionVision: boolean;
+  /** Module 07: Detect Camera can find faces right now (free; the media service is on). */
+  faces: boolean;
 }
 
 /** Module 19: what the video space holds. */
@@ -199,6 +201,7 @@ export class ClipsStatusService {
         })),
         action: aiService === 'ok',
         actionVision: this.actionVision,
+        faces: aiService === 'ok',
       },
     };
   }
