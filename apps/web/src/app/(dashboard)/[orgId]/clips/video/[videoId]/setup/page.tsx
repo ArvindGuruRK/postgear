@@ -50,6 +50,7 @@ export default async function ClipSetupRoute({
           available: status?.ai?.action ?? false,
           vision: status?.ai?.actionVision ?? false,
         }}
+        faces={status?.ai?.faces ?? false}
       />
     </ClipsDesktopOnly>
   );

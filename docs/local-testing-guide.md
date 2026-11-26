@@ -1306,6 +1306,21 @@ With `CLIPS_ACTION_VISION` off (the default) no picture ever leaves the system: 
 | Rename it to hold `[simulate:faces-slow]` | "Finding faces" holds about 10 seconds |
 | Delete a video that has a face file | Its folder in `postgear-clips` (MinIO, or `apps/api/uploads-private` locally) is gone, `faces-*.json.gz` with it |
 
+**Follow The Speaker (Module 08).** Free (no AI minutes). Needs the Python service and the Node worker, like Detect Camera. Import the `two-speakers` sample (`https://www.youtube.com/watch?v=simtwospkr1`, a local copy under simulation): its recorded boxes are two faces that take turns (the speaker's box moves while they talk) and the left speaker is gone from 60 to 63 s. Speech comes from the transcript, so a clip that was never listened to follows the largest face. If you run a stand-alone `python -m postgear_media.worker` beside `npm run dev:media`, restart it after any change under `apps/media` (it does not reload; the one inside the service does).
+
+| Do this | What you should see |
+|---|---|
+| Video page, **Find Clips**, Vertical, switch on **Follow The Speaker**, run | The card says "Free" and the total does not change; each clip made is marked to follow, and the top three get face files during the run (FACES jobs in the jobs list) |
+| Open one of those clips (answer the shape question if asked) | Following is on by itself: in **Layouts** the switch is on, the Video pane shows a dashed frame you cannot drag with "The frame follows the speaker. Turn it off to move it yourself.", and a **Speaker** strip sits under the Video row (one colour per person) |
+| Play across a turn (the clip from about 59 s has one at 70.5 s) | The tall frame cuts to the other face within half a second, it does not slide |
+| Click the hatched stretch on the strip (1 to 3 s into that clip) | "We lost the speaker for 3 seconds here." and **Fix By Hand** |
+| **Fix By Hand**, drag the box, **Done** | The stretch is drawn plain with a hand mark; **Clear Fix** removes it; each is one Ctrl+Z |
+| Switch on **Show Both** | Split: two stacked frames, Top and Bottom, one per person; Ctrl+Z goes back to one frame with your fix |
+| Pick a layout tile while following | Following turns off first and the tile applies to your own boxes, one undo step |
+| Switch **Follow The Speaker** off | "Your own layout is back." and the boxes you had; Ctrl+Z follows again |
+| **Export**, **Preview Export**, then a 720p export | The frame moves in the file as in the editor (stills at 0.5 s, 2 s and 15 s show left speaker, your fix, right speaker) |
+| A clip of the talk sample | "We could not find anyone to follow in this clip." and the switch stays off |
+
 The face file (`faces-<job>.json.gz`) holds boxes and times only: no landmarks, no picture of a face, never who. The real detector (MediaPipe, short-range model) is wired but never runs here: its model file is not downloaded by any code.
 
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.

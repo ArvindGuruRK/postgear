@@ -35,6 +35,19 @@ import { ClipStepError } from './failures';
 
 export const INTERNAL_CALL_TIMEOUT_MS = 30_000;
 
+export interface ClipFollowSpeakerBody {
+  organizationId: string;
+}
+
+/** Counts only, never a clip's words or boxes. */
+export interface ClipFollowSpeakerAnswer {
+  /** False when the run's setup did not ask to follow. */
+  follow: boolean;
+  marked: number;
+  faces: { ready: number; running: number; failed: number };
+  facesOff: boolean;
+}
+
 type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
 export interface ClipInternalClient {
@@ -44,6 +57,8 @@ export interface ClipInternalClient {
   pickMoments(jobId: string, body: ClipReverseBody): Promise<ClipPickMomentsAnswer>;
   /** Module 06: Look For Action's check on stills (a run with the vision check on). */
   checkStills(jobId: string, body: ClipCheckStillsBody): Promise<ClipCheckStillsAnswer>;
+  /** Module 08: Follow The Speaker for the run's clips (marks, faces for the best three). */
+  followSpeaker(jobId: string, body: ClipFollowSpeakerBody): Promise<ClipFollowSpeakerAnswer>;
   finishExport(jobId: string, body: ClipFinishExportBody): Promise<ClipFinishExportAnswer>;
   /** Module 18: Save To Media's copy becomes a Media row. */
   finishSaveDownload(
@@ -120,6 +135,7 @@ export function createClipInternalClient(config: ClipInternalClientConfig): Clip
     reverseCharges: (jobId, body) => call(CLIP_INTERNAL_ROUTES.reverseCharges(jobId), body),
     pickMoments: (jobId, body) => call(CLIP_INTERNAL_ROUTES.pickMoments(jobId), body),
     checkStills: (jobId, body) => call(CLIP_INTERNAL_ROUTES.checkStills(jobId), body),
+    followSpeaker: (jobId, body) => call(CLIP_INTERNAL_ROUTES.followSpeaker(jobId), body),
     finishExport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishExport(jobId), body),
     finishSaveDownload: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishSaveDownload(jobId), body),
     async settled(jobId, body) {

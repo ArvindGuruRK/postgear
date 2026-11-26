@@ -168,6 +168,14 @@ export function isAiOrigin(origin: ClipOriginName | string | null | undefined): 
   return origin === 'AI_SIGNALS' || origin === 'AI_TRANSCRIPT';
 }
 
+/** What a clip view carries of `Clip.meta` (Sprint 13). */
+export interface ClipMetaView {
+  /** Module 06: what AI saw on screen (one sentence). */
+  seen?: string;
+  /** Module 08: the editor follows the speaker the first time the clip opens. */
+  followOnOpen?: 'speaker';
+}
+
 /** One clip with its document (`GET /clips/:clipId`, `POST /clips`). */
 export interface ClipView {
   id: string;
@@ -188,6 +196,11 @@ export interface ClipView {
   exportedMediaId: string | null;
   /** Null only when a stored document no longer reads (the page then says so). */
   document: ClipDocument | null;
+  /**
+   * Sprint 13: `Clip.meta`'s known keys (Module 06 `seen`, Module 08
+   * `followOnOpen`), or null. Absent on an older API.
+   */
+  meta?: ClipMetaView | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -337,6 +350,18 @@ export type ClipFacesRead =
       status: 'ready';
       url: string;
       meta: { fromMs: number; toMs: number; sampleFps: number; found: number; producer: string };
+      /**
+       * Module 08: scene cuts inside `meta.fromMs..meta.toMs`, video ms, sorted.
+       * Absent on an older API: read as [].
+       */
+      sceneCutsMs?: number[];
+      /**
+       * Module 08: where someone talks, video ms, sorted and merged; null when
+       * that stretch was never listened to. Ranges only. Absent: read as null.
+       */
+      speech?: Array<{ from: number; to: number }> | null;
+      /** The face file's asset id, when the API sends it (Follow The Speaker records it). */
+      assetId?: string;
     }
   | { status: 'running'; job: ClipJobView }
   | { status: 'none' };

@@ -22,7 +22,7 @@ export const RENDER_COMPILE_CODES = [
   'font_missing',
   /** A layout with nothing to draw (every preset and Custom layout renders since Module 10). */
   'layout_unsupported',
-  /** A crop that moves over time (Sprint 13's speaker tracking). */
+  /** A crop whose size changes over time (a crop that only moves renders since Module 08). */
   'crop_keyframes_unsupported',
   /** Zooms: no longer refused since Module 13 renders them; kept so older logs still read. */
   'zoom_unsupported',

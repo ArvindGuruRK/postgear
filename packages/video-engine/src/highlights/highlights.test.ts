@@ -282,12 +282,35 @@ describe('Clip Setup', () => {
   it('holds later modules switches off and refuses unknown keys', () => {
     const setup = defaultClipSetup(600_000);
     expect(clipSetupSchema.safeParse({ ...setup, action: true }).success).toBe(true);
-    expect(clipSetupSchema.safeParse({ ...setup, follow: true }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, silences: true }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, hookTitle: true }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, extra: 1 }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, genre: 'sports' }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, range: { fromMs: 0, toMs: 2_000 } }).success).toBe(
       false,
     );
+  });
+
+  it('takes Follow The Speaker on a vertical, portrait or square shape, never a wide one', () => {
+    const setup = defaultClipSetup(600_000);
+    expect(setup.follow).toBe(false);
+    for (const ratio of ['9:16', '4:5', '1:1'] as const) {
+      expect(clipSetupSchema.safeParse({ ...setup, ratio, follow: true }).success).toBe(true);
+    }
+    const wide = clipSetupSchema.safeParse({ ...setup, ratio: '16:9', follow: true });
+    expect(wide.success).toBe(false);
+    expect(wide.error?.issues[0]?.path).toEqual(['follow']);
+    // Off is fine on any shape.
+    expect(clipSetupSchema.safeParse({ ...setup, ratio: '16:9', follow: false }).success).toBe(
+      true,
+    );
+    expect(clipSetupSchema.safeParse({ ...setup, follow: 'yes' }).success).toBe(false);
+  });
+
+  it('Follow The Speaker is free: the price does not change', () => {
+    const setup = defaultClipSetup(600_000);
+    const following = { ...setup, follow: true };
+    expect(setupPrice(following, 4)).toEqual(setupPrice(setup, 4));
   });
 
   it('prices each step from the same rates the charge uses', () => {

@@ -12,9 +12,10 @@
  * starts the run and goes back to the video page, which follows its progress.
  *
  * Look For Action (Module 06) shows its price before it is switched on, and
- * says so when stills are shown to AI. Switches later modules own (Follow The
- * Speaker, Remove Silences, Hook Title, recipes, brand kits) are not shown
- * until they exist.
+ * says so when stills are shown to AI. Follow The Speaker (Module 08) is free,
+ * shown for Vertical and Square only, and off while faces cannot be found.
+ * Switches later modules own (Remove Silences, Hook Title, recipes, brand
+ * kits) are not shown until they exist.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
@@ -37,6 +38,7 @@ import {
 } from '@postgear/ui';
 import {
   CAPTION_STYLES,
+  canFollow,
   type ClipLength,
   defaultClipSetup,
   formatClipLength,
@@ -62,6 +64,8 @@ import {
   ACTION_HELP,
   ACTION_VISION_NOTE,
   actionPriceLabel,
+  FOLLOW_HELP,
+  FOLLOW_OFF_NOTE,
   LENGTH_OPTIONS,
   PAY_FOR_LOOKING,
   priceLines,
@@ -84,11 +88,14 @@ export function SetupForm({
   orgId,
   detail,
   action = { available: false, vision: false },
+  faces = false,
 }: {
   orgId: string;
   detail: ClipVideoDetail;
   /** Module 06: Look For Action can run right now; `vision`: it also shows stills to AI. */
   action?: { available: boolean; vision: boolean };
+  /** Module 08: faces can be found right now (`ai.faces` in the clips status), so Follow The Speaker can run. */
+  faces?: boolean;
 }) {
   const router = useRouter();
   const { video } = detail;
@@ -107,6 +114,7 @@ export function SetupForm({
     shape: useId(),
     captions: useId(),
     action: useId(),
+    follow: useId(),
     style: useId(),
     summary: useId(),
     look: useId(),
@@ -354,6 +362,31 @@ export function SetupForm({
               <p className={NOTE}>
                 {ACTION_HELP}
                 {action.vision ? ` ${ACTION_VISION_NOTE}` : ''}
+              </p>
+            </AnalyticsPanel>
+          ) : null}
+
+          {canFollow(setup.ratio) ? (
+            <AnalyticsPanel
+              className="flex flex-col gap-4 p-4"
+              data-testid="clip-setup-follow-card"
+            >
+              <div className="flex items-center gap-3">
+                <Toggle
+                  id={ids.follow}
+                  checked={setup.follow}
+                  disabled={!faces}
+                  onCheckedChange={(on) => dispatch({ type: 'follow', on })}
+                  data-testid="clip-setup-follow"
+                />
+                <label htmlFor={ids.follow} className={`${LABEL} flex-1`}>
+                  Follow The Speaker
+                </label>
+                <span className="type-label text-xs text-ink type-muted">Free</span>
+              </div>
+              <p className={NOTE}>
+                {FOLLOW_HELP}
+                {faces ? '' : ` ${FOLLOW_OFF_NOTE}`}
               </p>
             </AnalyticsPanel>
           ) : null}

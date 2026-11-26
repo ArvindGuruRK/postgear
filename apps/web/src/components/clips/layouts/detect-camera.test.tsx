@@ -8,7 +8,9 @@ import {
   applyLayout,
   type ClipDocument,
   createClipDocument,
+  enableFollow,
   type FacePictureInput,
+  isFollowing,
 } from '@postgear/video-engine';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
@@ -166,6 +168,28 @@ describe('<DetectCamera />', () => {
     release();
     await waitFor(() => expect(state.steps).toBe(1));
     expect(screen.queryByText(FINDING_FACES)).toBeNull();
+  });
+
+  it('turns Follow The Speaker off first, in the same undo step (Module 08)', async () => {
+    const own = splitClip();
+    const followed = enableFollow(own, {
+      mode: 'speaker',
+      faceAssetId: '66666666-6666-4666-8666-666666666666',
+      paths: [
+        [
+          { at: 10_000, rect: { x: 0.1, y: 0, w: 0.5, h: 0.6 } },
+          { at: 40_000, rect: { x: 0.4, y: 0, w: 0.5, h: 0.6 } },
+        ],
+      ],
+    });
+    const state = renderButton(followed, deps(frames(CORNER)));
+    fireEvent.click(screen.getByTestId('clip-detect-camera-button'));
+    await waitFor(() => expect(state.steps).toBe(1));
+    expect(isFollowing(state.doc)).toBe(false);
+    // The rest is the person's own layout: only the Camera box moved.
+    const content = (doc: ClipDocument) => doc.layout.areas.find((a) => a.name === 'Content');
+    expect(content(state.doc)).toEqual(content(own));
+    expect(cameraAreaOf(state.doc)?.crop).not.toEqual(cameraAreaOf(own)?.crop);
   });
 
   it('warns and changes nothing when there is no face camera', async () => {

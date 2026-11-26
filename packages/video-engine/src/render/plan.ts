@@ -10,11 +10,12 @@
  * preview and the parity tests share one definition.
  *
  * What this version can render: every layout (one to four areas, cover or
- * contain, rounded corners, a solid or blurred base) with constant crops,
+ * contain, rounded corners, a solid or blurred base) with constant crops or
+ * crops that move at a fixed size (Sprint 13, Module 08: `crop-path.ts`),
  * any mix of speeds, segment volumes, text (Module 11), stickers and the
  * Follow Badge (Module 12), zooms, the look and the vignette (Module 13),
  * sound effects and music (Module 14), the clip's fades and the plan's mark.
- * Anything else (a moving crop, captions) is refused with a typed
+ * Anything else (a crop whose size changes) is refused with a typed
  * `RenderCompileError`; a render never draws something other than the
  * document.
  *
@@ -39,7 +40,8 @@ import {
   textFontFiles,
   textFontNames,
 } from './text-plan';
-import { cropIsConstant, effectiveFades, frameState, type SourcePicture } from './frame-state';
+import { cropSizeIsConstant, type PlanCropPath, planCropPath } from './crop-path';
+import { effectiveFades, frameState, type SourcePicture } from './frame-state';
 import { type EncodeSpec, encodeSpecFor, evenPosition, evenSize, outputSizeFor } from './specs';
 import type { PlanZoom } from './zoom';
 
@@ -143,6 +145,12 @@ export interface PlanArea {
   y: number;
   /** Rounded corners in output pixels (whole, at most half the short side); 0 for square. */
   radius: number;
+  /**
+   * Only when the crop moves during the segment (Module 08): its keys in the
+   * run input's clock. `crop` is then its place at the segment's start and
+   * its size for the whole segment.
+   */
+  path?: PlanCropPath;
 }
 
 /** How one segment's picture is drawn on the output. */
@@ -272,17 +280,19 @@ function toPixels(
 
 /** Refuses what this version cannot draw, before any pixel is worked out. */
 function refuseUnsupported(doc: ClipDocument): void {
-  // Every layout renders (Module 10). A crop that moves over time needs the
-  // `sendcmd` file of cookbook section 3, which Sprint 13 writes; until then
-  // it is refused rather than drawn still.
+  // Every layout renders (Module 10), and a crop that moves renders through
+  // its `sendcmd` file (Module 08). A crop whose size changes would need the
+  // output of `crop` to change size mid-stream, so it is refused rather than
+  // drawn at one size.
   for (const area of doc.layout.areas) {
-    if (!cropIsConstant(area.crop)) {
+    if (!cropSizeIsConstant(area.crop)) {
       throw new RenderCompileError(
         'crop_keyframes_unsupported',
-        'A moving crop is not rendered yet',
+        'A crop whose size changes is not rendered',
         {
           areaId: area.id,
           keyframes: area.crop.length,
+          reason: 'size changes',
         },
       );
     }
@@ -417,21 +427,37 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     if (state.areas.length === 0) {
       throw new RenderCompileError('layout_unsupported', 'The layout has no area');
     }
-    const areas: PlanArea[] = state.areas.map((area) => {
+    const canvasAspect = doc.canvas.width / doc.canvas.height;
+    const areas: PlanArea[] = state.areas.map((area, areaIndex) => {
       const width = Math.min(size.width, evenSize(area.content.w * size.width));
       const height = Math.min(size.height, evenSize(area.content.h * size.height));
       const radius = Math.max(
         0,
         Math.min(Math.round(area.radius * size.scale), Math.floor(Math.min(width, height) / 2)),
       );
+      const crop = toPixels(area.visibleCrop, asset.width, asset.height);
+      // A crop that moves inside this segment: its keys in this run's clock (Module 08).
+      const path = planCropPath({
+        area: doc.layout.areas[areaIndex] as ClipDocument['layout']['areas'][number],
+        areaIndex,
+        segmentIndex: entry.index,
+        sourceIn: segment.sourceIn,
+        sourceOut: segment.sourceOut,
+        clockOffsetMs: asset.sourceOffsetMs + seekMs,
+        sourceWidth: asset.width,
+        sourceHeight: asset.height,
+        canvasAspect,
+        size: crop,
+      });
       return {
         id: area.id,
-        crop: toPixels(area.visibleCrop, asset.width, asset.height),
+        crop,
         width,
         height,
         x: Math.min(size.width - width, evenPosition(area.content.x * size.width)),
         y: Math.min(size.height - height, evenPosition(area.content.y * size.height)),
         radius,
+        ...(path ? { path } : {}),
       };
     });
     const first = areas[0] as PlanArea;

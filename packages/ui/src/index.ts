@@ -87,6 +87,8 @@ export * from './components/playhead';
 export * from './components/transcript-text';
 export * from './components/timeline-bar';
 export * from './components/timeline-row';
+// Sprint 13 Module 08: who the frame follows, under the Video row.
+export * from './components/speaker-strip';
 export * from './components/video-player-bar';
 // Sprint 12 Module 11: the canvas frame and the colour picker.
 export * from './components/color-picker';

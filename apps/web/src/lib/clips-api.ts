@@ -952,10 +952,15 @@ export function ensureClipFaces(clipId: string): Promise<ClipFacesEnsure> {
   return api<ClipFacesEnsure>(`${clipPath(clipId)}/faces`, { method: 'POST' });
 }
 
-/** Module 07: the face file's address when it is ready, or whether a job is still looking. */
+/**
+ * Module 07: the face file's address when it is ready, or whether a job is
+ * still looking. `follow` (Module 08, Follow The Speaker) also asks for the
+ * scene cuts and speech stretches; without it they come back `[]` and `null`.
+ */
 export function readClipFaces(
   clipId: string,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; follow?: boolean } = {},
 ): Promise<ClipFacesRead> {
-  return api<ClipFacesRead>(`${clipPath(clipId)}/faces`, { signal: options.signal });
+  const query = options.follow ? '?follow=1' : '';
+  return api<ClipFacesRead>(`${clipPath(clipId)}/faces${query}`, { signal: options.signal });
 }

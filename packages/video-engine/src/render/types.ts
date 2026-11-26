@@ -21,6 +21,12 @@ export interface CompiledFfmpeg {
   filterComplexScript: string;
   /** ASS subtitle files the graph names, written beside it. */
   assFiles: Array<{ name: string; content: string }>;
+  /**
+   * The `sendcmd` command files of moving crops (Module 08), written beside
+   * the graph under the plain names it reads (`crop-s<segment>-a<area>.txt`).
+   * Empty when every crop holds still.
+   */
+  commandFiles: Array<{ name: string; content: string }>;
   /** Everything after the inputs and the graph: maps, codecs, rate, `-t`. Never the output name. */
   outputArgs: string[];
   /** The output's exact length, for progress. */

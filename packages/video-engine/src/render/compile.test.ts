@@ -382,14 +382,14 @@ describe('refusals', () => {
     expect(buildRenderPlan(rounded, testContext()).segments[0]?.picture.areas[0]?.radius).toBe(36);
   });
 
-  it('refuses a moving crop on any area, and no longer refuses a zoom or a look (Module 13)', () => {
+  it('refuses a crop whose size changes, renders one that moves (Module 08), and no longer refuses a zoom or a look (Module 13)', () => {
     const second = twoSegmentDoc();
     const base = second.layout.areas[0];
     if (!base) throw new Error('no area');
     second.layout.areas.push({
       ...base,
       id: 'second',
-      crop: [...base.crop, { at: 15_000, rect: { x: 0.1, y: 0, w: 0.31640625, h: 1 } }],
+      crop: [...base.crop, { at: 15_000, rect: { x: 0.1, y: 0, w: 0.25, h: 1 } }],
     });
     expectCode(() => buildRenderPlan(second, testContext()), 'crop_keyframes_unsupported');
 
@@ -398,7 +398,9 @@ describe('refusals', () => {
       at: 15_000,
       rect: { x: 0.1, y: 0, w: 0.31640625, h: 1 },
     });
-    expectCode(() => buildRenderPlan(moving, testContext()), 'crop_keyframes_unsupported');
+    const movingPlan = buildRenderPlan(moving, testContext());
+    expect(movingPlan.segments[0]?.picture.areas[0]?.path?.file).toBe('crop-s0-a0.txt');
+    expect(compileFfmpeg(movingPlan).commandFiles).toHaveLength(1);
 
     const zoomed = twoSegmentDoc();
     zoomed.zooms = [

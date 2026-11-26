@@ -189,26 +189,48 @@ export const followOverrideSchema = z
   .refine((o) => o.from < o.to, 'A hand fix must end after it starts');
 
 /**
+ * The parts of a layout every layout has. `layoutSchema` adds `follow`; a
+ * followed layout keeps the layout it replaced as `follow.saved` in this
+ * shape (no `follow` of its own, so a saved layout is never a followed one).
+ */
+const layoutFields = {
+  kind: z.enum(LAYOUT_KINDS),
+  fitCrop: z.enum(FIT_CROPS).optional(),
+  base: z.enum(LAYOUT_BASES).optional(),
+  areas: z.array(areaSchema).min(1).max(MAX_AREAS),
+};
+
+/** A layout as it was before Follow The Speaker (Module 08): what switching it off gives back. */
+export const savedLayoutSchema = z.object(layoutFields).strict();
+
+/**
  * Version 2: Follow The Speaker (Module 08). The crops it works out are
  * written as keyframes in `areas[].crop`, which `areaCropAt` already reads;
- * this records that they came from following, from which face file, and the
- * stretches a person fixed by hand, so switching it off can give back the
- * person's own boxes.
+ * this records that they came from following, from which face file, the
+ * stretches a person fixed by hand (mode `speaker` only), the person picked
+ * when there were many faces (`personId`, optional), and `saved`, the
+ * layout as it was before, so switching it off gives back the person's own
+ * boxes exactly.
  */
 export const followSchema = z
   .object({
     mode: z.enum(['speaker', 'both']),
     faceAssetId: uuidSchema,
     overrides: z.array(followOverrideSchema).max(MAX_FOLLOW_OVERRIDES),
+    /**
+     * Who was picked to follow when there were many faces, as an anchor the
+     * editor resolves to the nearest face (`person@<ms>:<cx>,<cy>`, not a
+     * `linkPeople` id: those follow first-seen order and change with the
+     * pictures read). Absent when the speaker is chosen.
+     */
+    personId: z.string().min(1).max(40).optional(),
+    saved: savedLayoutSchema,
   })
   .strict();
 
 export const layoutSchema = z
   .object({
-    kind: z.enum(LAYOUT_KINDS),
-    fitCrop: z.enum(FIT_CROPS).optional(),
-    base: z.enum(LAYOUT_BASES).optional(),
-    areas: z.array(areaSchema).min(1).max(MAX_AREAS),
+    ...layoutFields,
     follow: followSchema.optional(),
   })
   .strict();
@@ -699,6 +721,7 @@ export type CaptionEdit = z.infer<typeof captionEditSchema>;
 export type Bleep = z.infer<typeof bleepSchema>;
 export type LayoutFollow = z.infer<typeof followSchema>;
 export type FollowOverride = z.infer<typeof followOverrideSchema>;
+export type SavedLayout = z.infer<typeof savedLayoutSchema>;
 export type Track = z.infer<typeof trackSchema>;
 export type OverlayItem = TextItem | StickerItem;
 export type TimedItem = TextItem | StickerItem | AudioItem;

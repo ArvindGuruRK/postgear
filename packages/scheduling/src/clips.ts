@@ -518,6 +518,13 @@ export const CLIP_INTERNAL_ROUTES = {
    * started with the vision switch on.
    */
   checkStills: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/check-stills`,
+  /**
+   * Sprint 13, Module 08: a Find Clips run made with Follow The Speaker. The
+   * API marks the run's clips to follow on first open and asks for faces for
+   * the top few (free). The worker calls it once after writing the clips; a
+   * failure never fails the run.
+   */
+  followSpeaker: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/follow-speaker`,
   /** A finished export becomes a Media row, the clip is marked exported, the notification written. */
   finishExport: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/finish-export`,
   /**

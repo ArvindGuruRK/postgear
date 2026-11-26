@@ -25,6 +25,7 @@ function compiled(overrides: Partial<CompiledFfmpeg> = {}): CompiledFfmpeg {
     filterComplexScript:
       '[0:v]trim=start=0:end=20,setpts=PTS-STARTPTS,fps=30,setsar=1,format=yuv420p[v]',
     assFiles: [{ name: 'captions.ass', content: '[Script Info]\nScriptType: v4.00+\n' }],
+    commandFiles: [],
     outputArgs: ['-map', '[v]', '-t', '20.000', '-c:v', 'libx264'],
     durationMs: 20_000,
     fonts: null,
@@ -169,8 +170,18 @@ describe('renderClip with a fake FFmpeg', () => {
       `[Parsed_ass_0 @ 000001] fontselect: (PGF f04607 800, 800, 0) -> ${name}, 0, ${name}`;
     expect(unexpectedFont(chose('PGF-f04607-800'), expected)).toBeNull();
     expect(unexpectedFont(chose('ArialMT'), expected)).toBe('ArialMT');
-    expect(unexpectedFont('[Parsed_ass_0 @ 1] fontselect: failed to find any fallback with glyph 0x4E2D for font: (PGF f04607 800, 800, 0)', expected)).toBe('none');
-    expect(unexpectedFont('[Parsed_ass_0 @ 1] Added subtitle file: captions.ass (3 styles, 3 events)', expected)).toBeNull();
+    expect(
+      unexpectedFont(
+        '[Parsed_ass_0 @ 1] fontselect: failed to find any fallback with glyph 0x4E2D for font: (PGF f04607 800, 800, 0)',
+        expected,
+      ),
+    ).toBe('none');
+    expect(
+      unexpectedFont(
+        '[Parsed_ass_0 @ 1] Added subtitle file: captions.ass (3 styles, 3 events)',
+        expected,
+      ),
+    ).toBeNull();
   });
 
   describe('a render with text', () => {
@@ -403,6 +414,7 @@ describe('renderClip with the real FFmpeg', () => {
         `[ac]apad=whole_dur=${end}[a]`,
       ].join('\n'),
       assFiles: [],
+      commandFiles: [],
       fonts: null,
       outputArgs: [
         '-map',

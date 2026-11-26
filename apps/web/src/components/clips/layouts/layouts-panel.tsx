@@ -15,6 +15,10 @@
  * - **Crop Ratio** (Blurred only): Original, 4:3, 1:1, as tiles too.
  * - **Detect Camera** (Sprint 13, Module 07): under the tiles when the
  *   layout has a Camera area (`detect-camera.tsx`).
+ * - **Follow The Speaker** (Sprint 13, Module 08): under it, for Vertical,
+ *   Portrait and Square clips (`follow-speaker.tsx`). While it is on, any
+ *   layout change here turns it off first, in the same undo step, so the
+ *   person's own layout (`follow.saved`) is what the change starts from.
  * - **My Layouts**: the workspace's saved layouts for this shape.
  *
  * Every choice is one undo step and goes through the store's `apply`, which
@@ -39,6 +43,8 @@ import { useId } from 'react';
 import { GroupLabel } from '@/components/studio/panel-ui';
 import type { SavedLayoutView } from '@/types/clips';
 import { DetectCamera } from './detect-camera';
+import { FollowSpeaker, type GrabPicture } from './follow-speaker';
+import { unfollowFirst } from './follow-model';
 import { LayoutDrawing } from './layout-drawing';
 import {
   chosenLayout,
@@ -49,6 +55,7 @@ import {
   presetDrawing,
 } from './layouts-model';
 import { SavedLayouts } from './saved-layouts';
+import type { FollowSpeakerController } from './use-follow-speaker';
 
 /**
  * One layout change as one undo step: the change, the sentence a screen
@@ -68,6 +75,8 @@ export function LayoutsPanel({
   labelledBy,
   facesAvailable,
   onEdit,
+  follow,
+  grabPicture,
 }: {
   clipId: string;
   document: ClipDocument;
@@ -78,6 +87,10 @@ export function LayoutsPanel({
   facesAvailable: boolean;
   /** One undo step: the change, and the sentence a screen reader hears after it. */
   onEdit: LayoutEdit;
+  /** Module 08: Follow The Speaker's state (the editor holds it); left out, the row is not shown. */
+  follow?: FollowSpeakerController;
+  /** Module 08: the editor's video, for the many-faces picker's thumbnails. */
+  grabPicture?: GrabPicture;
 }) {
   const shapeId = useId();
   const fitId = useId();
@@ -87,19 +100,25 @@ export function LayoutsPanel({
 
   const chooseShape = (next: Ratio) =>
     onEdit(
-      (doc) => setCanvasRatio(doc, next, videoSize),
+      unfollowFirst((doc) => setCanvasRatio(doc, next, videoSize)),
       `Shape changed to ${layoutShapeName(next)}.`,
     );
   const chooseLayout = (next: PresetKind) =>
-    onEdit((doc) => applyLayout(doc, next, videoSize), `${PRESET_LABELS[next]} layout.`);
+    onEdit(
+      unfollowFirst((doc) => applyLayout(doc, next, videoSize)),
+      `${PRESET_LABELS[next]} layout.`,
+    );
   const chooseFit = (next: FitCrop) =>
     onEdit(
-      (doc) => setFitCrop(doc, next, videoSize),
+      unfollowFirst((doc) => setFitCrop(doc, next, videoSize)),
       `Crop ratio ${next === 'original' ? 'Original' : next}.`,
     );
   const applySaved = (saved: SavedLayoutView) => {
     if (saved.ratio !== ratio) return;
-    onEdit((doc) => applySavedLayout(doc, saved.layout, videoSize), `${saved.name} applied.`);
+    onEdit(
+      unfollowFirst((doc) => applySavedLayout(doc, saved.layout, videoSize)),
+      `${saved.name} applied.`,
+    );
   };
 
   return (
@@ -153,9 +172,15 @@ export function LayoutsPanel({
           available={facesAvailable}
           onEdit={onEdit}
         />
+        {follow ? <FollowSpeaker follow={follow} grabPicture={grabPicture} /> : null}
       </div>
 
-      <SavedLayouts ratio={ratio} layout={document.layout} onApply={applySaved} />
+      {/* Save Layout keeps the person's own layout, never a followed one. */}
+      <SavedLayouts
+        ratio={ratio}
+        layout={document.layout.follow?.saved ?? document.layout}
+        onApply={applySaved}
+      />
     </div>
   );
 }

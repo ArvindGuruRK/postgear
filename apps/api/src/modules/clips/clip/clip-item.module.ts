@@ -14,6 +14,7 @@ import { ClipCaptionsController } from '../captions/clip-captions.controller';
 import { ClipCaptionsService } from '../captions/clip-captions.service';
 import { ClipFacesController } from '../faces/clip-faces.controller';
 import { ClipFacesService } from '../faces/clip-faces.service';
+import { ClipFollowService } from '../faces/clip-follow.service';
 import { ClipsCoreModule } from '../clips-core.module';
 import { ClipEditsService } from './clip-edits.service';
 import { ClipExportsService } from './clip-exports.service';
@@ -45,7 +46,9 @@ import { ClipsListService } from './clips-list.service';
     ClipSendService,
     ClipCaptionsService,
     ClipFacesService,
+    ClipFollowService,
   ],
-  exports: [ClipItemService],
+  // Module 08: the internal follow route (in `ClipsModule`) marks a run's clips and asks faces.
+  exports: [ClipItemService, ClipFollowService],
 })
 export class ClipItemModule {}

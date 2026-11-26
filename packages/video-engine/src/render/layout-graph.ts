@@ -17,7 +17,7 @@
  *   segment's own picture so its frames carry the video's timestamps (a
  *   `color` source would start at 0 while the trimmed video starts later).
  * - **Areas**. `crop` first and `scale` second, so the scaled picture stays
- *   small; `setsar=1`. A contain area is already sized and placed by the plan
+ *   small; `setsar=1`. A moving crop reads its `sendcmd` file just before it. A contain area is already sized and placed by the plan
  *   (centred inside its frame), so it is drawn like a cover one.
  * - **Rounded corners**. The area is made `yuv420p`, an anti-aliased alpha
  *   mask is drawn once with `geq` on a short grey `color` source, looped
@@ -30,6 +30,7 @@
  * A single square-cornered area keeps Module 05's exact text (a `pad` on a
  * colour, or the Blurred `split`), so those renders did not change.
  */
+import { movingCropFilter } from './crop-path';
 import { cropFilter, ffmpegColour } from './filter-text';
 import type { PlanArea, PlanSegment, RenderPlan } from './plan';
 
@@ -41,9 +42,14 @@ export interface SegmentChain {
   timing: string;
 }
 
-/** `crop`, then `scale` to the area's output size. */
+/**
+ * `crop`, then `scale` to the area's output size. A crop that moves during
+ * the segment (Module 08) is its `sendcmd` file and the named `crop`
+ * (`crop-path.ts`); a still one keeps the plain text.
+ */
 function areaScale(area: PlanArea): string {
-  return `${cropFilter(area.crop)},scale=${area.width}:${area.height}:flags=bicubic`;
+  const crop = area.path ? movingCropFilter(area.crop, area.path) : cropFilter(area.crop);
+  return `${crop},scale=${area.width}:${area.height}:flags=bicubic`;
 }
 
 /**

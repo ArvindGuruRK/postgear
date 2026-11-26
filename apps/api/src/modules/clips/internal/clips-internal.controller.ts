@@ -23,6 +23,7 @@ import type {
 import { Public } from '../../../common/decorators/public.decorator';
 import { ZodBody } from '../../../common/pipes/zod-validation.pipe';
 import { InternalTokenGuard } from '../../automations/gateway/internal-token.guard';
+import { ClipFollowService, type FollowSpeakerAnswer } from '../faces/clip-follow.service';
 import { ClipMomentsService } from '../highlights/clip-moments.service';
 import { ClipStillsService } from '../highlights/clip-stills.service';
 import { ClipSweepService } from '../retention/clip-sweep.service';
@@ -57,6 +58,7 @@ export class ClipsInternalController {
     private readonly sweeper: ClipSweepService,
     private readonly moments: ClipMomentsService,
     private readonly stills: ClipStillsService,
+    private readonly follow: ClipFollowService,
   ) {}
 
   /** Sprint 13, Module 05: a Find Clips run with a setup reads its transcript for moments. */
@@ -77,6 +79,20 @@ export class ClipsInternalController {
     @Body(new ZodBody(checkStillsSchema, 'internal/clips/check-stills')) body: CheckStillsBody,
   ): Promise<ClipCheckStillsAnswer> {
     return this.stills.check(jobId, body);
+  }
+
+  /**
+   * Module 08: a Find Clips run made with Follow The Speaker marks its clips
+   * to follow on first open and asks faces for the best three (free). The
+   * run's own setup decides; a run without it answers `follow: false`.
+   */
+  @Post('jobs/:jobId/follow-speaker')
+  @HttpCode(HttpStatus.OK)
+  followSpeaker(
+    @Param('jobId') jobId: string,
+    @Body(new ZodBody(orgOnlySchema, 'internal/clips/follow-speaker')) body: OrgOnlyBody,
+  ): Promise<FollowSpeakerAnswer> {
+    return this.follow.forRun(jobId, body.organizationId);
   }
 
   @Post('jobs/:jobId/charge-import')

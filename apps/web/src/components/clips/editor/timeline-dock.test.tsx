@@ -173,9 +173,15 @@ describe('TimelineDock rows', () => {
   it('draws a sound bar with its shape and name, only as far as an effect plays', () => {
     const doc = clip();
     const whoosh = {
-      ...defaultSoundItem(doc, 1_000, { library: 'sound', id: '5c0e8a52-0000-4000-8000-0000000000a1' }, 'sfx', {
-        durationMs: 2_000,
-      }),
+      ...defaultSoundItem(
+        doc,
+        1_000,
+        { library: 'sound', id: '5c0e8a52-0000-4000-8000-0000000000a1' },
+        'sfx',
+        {
+          durationMs: 2_000,
+        },
+      ),
       id: 'snd_a',
     };
     const soundShape = jest.fn(() => ({ peaks: [10, 200, 90], fill: 0.5, name: 'Quick Whoosh' }));
@@ -559,5 +565,55 @@ describe('the tools row', () => {
     fireEvent.change(field, { target: { value: '9:00' } });
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(playback.seekMs).toHaveBeenLastCalledWith(30_000);
+  });
+});
+
+describe('the Speaker strip (Module 08)', () => {
+  const stretch = (
+    key: string,
+    kind: 'person' | 'lost' | 'fixed',
+    fromMs: number,
+    toMs: number,
+    person: number | null,
+  ) => ({
+    key,
+    kind,
+    person,
+    fromMs,
+    toMs,
+    source: { from: fromMs + 10_000, to: toMs + 10_000 },
+    label:
+      kind === 'person' ? `Person ${(person ?? 0) + 1}` : 'We lost the speaker for 4 seconds here.',
+  });
+
+  it('is not shown when not following', () => {
+    setup();
+    expect(screen.queryByTestId('clip-speaker-strip')).toBeNull();
+  });
+
+  it('draws the people and hatches the lost stretch under the Video row, and selects it', () => {
+    const onSelect = jest.fn();
+    setup({
+      speaker: {
+        stretches: [
+          stretch('a', 'person', 0, 10_000, 0),
+          stretch('b', 'person', 10_000, 20_000, 1),
+          stretch('c', 'lost', 20_000, 24_000, null),
+        ],
+        selectedKey: null,
+        onSelect,
+      },
+    });
+    const strip = screen.getByTestId('clip-speaker-strip');
+    const people = within(strip).getAllByRole('img');
+    expect(people.map((p) => p.getAttribute('aria-label'))).toEqual(['Person 1', 'Person 2']);
+    expect(people[1]).toHaveStyle({ left: `${10_000 * SCALE}px` });
+    const lost = within(strip).getByRole('button', { name: /lost the speaker/ });
+    expect(lost).toHaveClass('bg-stripes');
+    fireEvent.click(lost);
+    expect(onSelect).toHaveBeenCalledWith('c');
+    // It sits right under the Video row.
+    const rows = screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'));
+    expect(rows.indexOf('Speaker')).toBe(rows.indexOf('Video') + 1);
   });
 });

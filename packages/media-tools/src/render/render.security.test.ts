@@ -2,8 +2,9 @@
  * Security sweep, "Render" (Sprint 12, Module 20 section 1), the executor half.
  *
  * What must hold: FFmpeg reads only files the plan names inside its own
- * scratch folder; the graph and every ASS file are written there as files
- * and passed by name, never built into an argument; every input carries a
+ * scratch folder; the graph, every ASS file and every crop command file
+ * are written there as files and passed by name, never built into an
+ * argument; every input carries a
  * protocol allowlist; nothing is written outside the folder. A plan that
  * breaks any of this is refused before FFmpeg starts.
  *
@@ -44,6 +45,7 @@ function compiled(overrides: Partial<CompiledFfmpeg> = {}): CompiledFfmpeg {
     inputs: [{ file: 'sharp.mp4', seekMs: 2_000, options: [] }],
     filterComplexScript: '[0:v]ass=filename=captions.ass:fontsdir=fonts,format=yuv420p[v]',
     assFiles: [{ name: 'captions.ass', content: '[Script Info]\nScriptType: v4.00+\n' }],
+    commandFiles: [],
     outputArgs: ['-map', '[v]', '-t', '2.000', '-c:v', 'libx264'],
     durationMs: 2_000,
     fonts: null,
@@ -169,6 +171,47 @@ describe('the render executor', () => {
       expect(error.code).toBe('tool_failed');
     }
     expect(existsSync(path.join(root, 'escape.ass'))).toBe(false);
+  });
+
+  it("writes the moving crops' command files beside the graph (Module 08)", async () => {
+    const seen: Array<{ args: readonly string[]; options: RunToolOptions }> = [];
+    const content = "1.000-2.000 crop@s0a0 x '10+5*(t-1.000)';\n2.000 crop@s0a0 x '15';\n";
+    await renderClip({
+      runTool: recordingFfmpeg(seen),
+      scratchDir: scratch,
+      compiled: compiled({
+        filterComplexScript:
+          '[0:v]sendcmd=f=crop-s0-a0.txt,crop@s0a0=w=64:h=64:x=10:y=0:exact=1,format=yuv420p[v]',
+        commandFiles: [{ name: 'crop-s0-a0.txt', content }],
+      }),
+      outFile: 'render.mp4',
+    });
+    expect(await readFile(path.join(scratch, 'crop-s0-a0.txt'), 'utf8')).toBe(content);
+    // The command file is passed by name inside the graph, never as an argument.
+    expect((seen[0]?.args ?? []).some((arg) => arg.includes('crop-s0-a0'))).toBe(false);
+  });
+
+  it('refuses a command file whose name is a path or clashes, and writes nothing outside the folder', async () => {
+    for (const files of [
+      [{ name: '../escape.txt', content: 'x' }],
+      [{ name: 'sub/crop-s0-a0.txt', content: 'x' }],
+      [{ name: '.hidden.txt', content: 'x' }],
+      [{ name: 'graph.txt', content: 'x' }],
+      [{ name: '-x.txt', content: 'x' }],
+      [{ name: path.join(outside, 'escape.txt'), content: 'x' }],
+      [{ name: 'captions.ass', content: 'x' }],
+      [
+        { name: 'crop-s0-a0.txt', content: 'x' },
+        { name: 'crop-s0-a0.txt', content: 'y' },
+      ],
+    ]) {
+      const error = await refusal(compiled({ commandFiles: files }));
+      expect(error.code).toBe('tool_failed');
+    }
+    expect(existsSync(path.join(root, 'escape.txt'))).toBe(false);
+    expect(existsSync(path.join(outside, 'escape.txt'))).toBe(false);
+    // Nothing was written before the names were checked: not even the graph.
+    expect(existsSync(path.join(scratch, 'graph.txt'))).toBe(false);
   });
 
   it('refuses an output outside the scratch folder', async () => {

@@ -2,8 +2,9 @@
  * The render executor: runs one compiled plan through FFmpeg (Module 05).
  *
  * The compiler (`@postgear/video-engine`) is pure and hands over strings;
- * this is the Node half. It writes the graph and the ASS files into the
- * job's scratch folder, runs FFmpeg there with the graph passed by file,
+ * this is the Node half. It writes the graph, the ASS files and the moving
+ * crops' `sendcmd` files into the job's scratch folder, runs FFmpeg there
+ * with the graph passed by file,
  * and writes to `<name>.part` so a killed run never leaves a file that looks
  * finished (a killed MP4 has no index and no player can open it). The part
  * file is renamed only after `progress=end` and exit code 0.
@@ -241,14 +242,27 @@ function insideScratch(scratchDir: string, outFile: string): string {
 /** A plain file name: no folders, nothing hidden, nothing that reads as an option. */
 const PLAIN_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/;
 
-/** Writes `graph.txt` and the ASS files into the scratch folder (also used by the loudness measure). */
-export async function writeRenderFiles(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
-  await writeFile(path.join(scratchDir, GRAPH_FILE), compiled.filterComplexScript, 'utf8');
-  for (const ass of compiled.assFiles) {
-    if (!PLAIN_NAME.test(ass.name) || ass.name === GRAPH_FILE) {
+/**
+ * Writes `graph.txt`, the ASS files and the moving crops' command files
+ * (Module 08) into the scratch folder (also used by the loudness measure).
+ * Every name is checked before anything is written: a plain file name, not
+ * the graph's, and no two the same.
+ */
+export async function writeRenderFiles(
+  scratchDir: string,
+  compiled: CompiledFfmpeg,
+): Promise<void> {
+  const files = [...compiled.assFiles, ...(compiled.commandFiles ?? [])];
+  const names = new Set<string>();
+  for (const file of files) {
+    if (!PLAIN_NAME.test(file.name) || file.name === GRAPH_FILE || names.has(file.name)) {
       throw new RenderError('tool_failed');
     }
-    await writeFile(path.join(scratchDir, ass.name), ass.content, 'utf8');
+    names.add(file.name);
+  }
+  await writeFile(path.join(scratchDir, GRAPH_FILE), compiled.filterComplexScript, 'utf8');
+  for (const file of files) {
+    await writeFile(path.join(scratchDir, file.name), file.content, 'utf8');
   }
 }
 
@@ -259,7 +273,10 @@ export async function writeRenderFiles(scratchDir: string, compiled: CompiledFfm
  * no absolute path, protocol or dash-led name ever reaches `-i`, even if the
  * plan's own check were bypassed (security sweep, Module 20).
  */
-export async function assertInputsPresent(scratchDir: string, compiled: CompiledFfmpeg): Promise<void> {
+export async function assertInputsPresent(
+  scratchDir: string,
+  compiled: CompiledFfmpeg,
+): Promise<void> {
   for (const input of compiled.inputs) {
     if (!isSafeRelativeName(input.file)) {
       throw new RenderError('tool_failed');

@@ -43,6 +43,12 @@
  *   its own on add, the rest are looked up once (`GET /clips/stickers/files`)
  *   and a removed one is remembered as missing. The preview draws from that
  *   map; the handles move, scale and turn stickers like texts.
+ * - **Follow The Speaker** (Sprint 13, Module 08): its state is held here
+ *   (`useFollowSpeaker`), since the Layouts tab, the Video pane and the
+ *   timeline's Speaker strip all read it, and a clip made with the setup's
+ *   switch (`meta.followOnOpen`) follows on its first open, once, after the
+ *   shape question. A crop removed while following turns it off first, in
+ *   the same undo step.
  * - **Sound** (Module 14): the Audio tab adds library and uploaded sounds at
  *   the playhead and sets Video Volume. Sound files are known the same way
  *   (`soundFilesKnown`, `GET /clips/sounds/files`) and handed to the
@@ -76,6 +82,7 @@ import {
   defaultSoundItem,
   defaultStickerItem,
   defaultTextItem,
+  disableFollow,
   documentRange,
   duplicateItem,
   type Fades,
@@ -159,6 +166,7 @@ import { registerLeaveGuard } from '@/lib/leave-guard';
 import type { ClipDetail } from '@/types/clips';
 import { isTerminalJob } from '../clip-job-model';
 import { CropStage } from '../layouts/crop-stage';
+import { useFollowSpeaker } from '../layouts/use-follow-speaker';
 import { LAST_CROP_SENTENCE } from '../layouts/layouts-model';
 import { cameraAreaOf } from '../layouts/detect-camera-model';
 import { type LayoutEdit, LayoutsPanel } from '../layouts/layouts-panel';
@@ -844,8 +852,10 @@ export function ClipEditor({
   const removeSelected = useCallback(() => {
     const { document: doc, selection } = latest.current;
     if (selection?.kind === 'area') {
-      const next = removeArea(doc, selection.id, videoSize);
-      if (next === doc) {
+      // While following, the crop is removed from the person's own layout (following goes off).
+      const own = disableFollow(doc);
+      const next = removeArea(own, selection.id, videoSize);
+      if (next === own) {
         setNotice(LAST_CROP_SENTENCE);
         setAnnouncement(LAST_CROP_SENTENCE);
         return;
@@ -898,6 +908,24 @@ export function ClipEditor({
     },
     [commit],
   );
+
+  // ---- Follow The Speaker (Sprint 13, Module 08) -------------------------------------------
+  const facesAvailable = captions.ai?.faces === true;
+  const follow = useFollowSpeaker({
+    clipId,
+    document,
+    videoSize,
+    available: facesAvailable,
+    onEdit: editLayout,
+    followOnOpen: initial.clip.meta?.followOnOpen === 'speaker' && !shapeOpen,
+    onReveal: () => setTab('layouts'),
+    onSeek: (ms) => playback.seekMs(ms),
+  });
+  // The front video, for the many-faces picker's thumbnails (drawn in the browser, never uploaded).
+  const grabPicture = useCallback(() => {
+    const video = engine?.videos[0] ?? null;
+    return video && video.readyState >= 2 ? video : null;
+  }, [engine]);
 
   const duplicateSelected = useCallback((): boolean => {
     const { document: doc, selection } = latest.current;
@@ -1655,8 +1683,10 @@ export function ClipEditor({
         document={document}
         videoSize={videoSize}
         labelledBy={panelHeadingId('layouts')}
-        facesAvailable={captions.ai?.faces === true}
+        facesAvailable={facesAvailable}
         onEdit={editLayout}
+        follow={follow}
+        grabPicture={grabPicture}
       />
     ) : state.tab === 'elements' ? (
       <ElementsPanel
@@ -1851,6 +1881,11 @@ export function ClipEditor({
               onDraft={setDraft}
               onEdit={editLayout}
               onAnnounce={setAnnouncement}
+              follow={{
+                fixing: follow.fixing,
+                onFixDone: follow.finishFix,
+                onFixCancel: follow.cancelFix,
+              }}
             />
           ) : null}
           <section
@@ -1917,6 +1952,15 @@ export function ClipEditor({
           stickerPicture={stickerPicture}
           soundShape={soundShape}
           captionBars={captionRow}
+          speaker={
+            follow.following
+              ? {
+                  stretches: follow.stretches,
+                  selectedKey: follow.selected?.key ?? null,
+                  onSelect: follow.select,
+                }
+              : null
+          }
           onCaptions={(ms) => {
             playback.seekMs(ms);
             setTab('captions');

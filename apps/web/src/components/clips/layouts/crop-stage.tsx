@@ -26,6 +26,12 @@
  *   An undo that lands mid-drag cancels the drag.
  * - Pointer movement is divided by the size the video is drawn at, so a box
  *   follows the hand at any pane size.
+ * - **Follow The Speaker** (Sprint 13, Module 08): while it is on, the boxes
+ *   give way to the followed frames as outlines that move with playback
+ *   (no handles, no tag menu, nothing to drag), with a line saying why. Fix
+ *   By Hand brings back one box, for that stretch only: drag it (or the
+ *   arrows), then Done writes the fix. Add Crop turns following off first,
+ *   in the same undo step.
  */
 import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { CropIcon } from '@animateicons/react/lucide/crop-icon';
@@ -46,6 +52,8 @@ import {
   AREA_NAME_MAX,
   addArea,
   areaCropAt,
+  disableFollow,
+  isFollowing,
   type CanvasSize,
   type ClipDocument,
   type LayoutArea,
@@ -96,8 +104,10 @@ import {
   type SnapLines,
   sameCrop,
 } from './layouts-model';
+import { FIX_NOTE, FOLLOWING_NOTE } from './follow-model';
 import type { LayoutEdit } from './layouts-panel';
 import { NameDialog } from './name-dialog';
+import type { FollowFixing } from './use-follow-speaker';
 
 /** Room around the drawn video for the handles and tags, in px. */
 const PANE_PADDING_PX = 16;
@@ -114,6 +124,14 @@ const HANDLE_PLACE: Readonly<Record<CropHandle, { left: number; top: number; cur
   sw: { left: 0, top: 1, cursor: 'cursor-nesw-resize' },
   w: { left: 0, top: 0.5, cursor: 'cursor-ew-resize' },
 };
+
+/** Module 08: what the Video pane needs of Follow The Speaker. */
+export interface CropStageFollow {
+  /** The stretch being fixed by hand, or null. */
+  fixing: FollowFixing | null;
+  onFixDone: (rect: Rect) => void;
+  onFixCancel: () => void;
+}
 
 export type CropCommit = (
   start: ClipDocument,
@@ -168,6 +186,7 @@ export function CropStage({
   onDraft,
   onEdit,
   onAnnounce,
+  follow,
 }: {
   engine: PreviewEngine | null;
   playback: PlaybackStore;
@@ -184,6 +203,8 @@ export function CropStage({
   onDraft: (draft: { doc: ClipDocument; seekMs: number | null } | null) => void;
   onEdit: LayoutEdit;
   onAnnounce: (sentence: string) => void;
+  /** Module 08: Follow The Speaker's hand fix; left out, nothing to fix. */
+  follow?: CropStageFollow | null;
 }) {
   const labelId = useId();
   const switchId = useId();
@@ -393,12 +414,21 @@ export function CropStage({
   const full = document.layout.areas.length >= MAX_AREAS;
   const [renaming, setRenaming] = useState<LayoutArea | null>(null);
 
+  // While following, a change to the boxes turns it off first, in the same undo step.
   const addCrop = () =>
-    onEdit((doc) => addArea(doc, videoSize, nextCropName(doc.layout.areas)), 'Crop added.', {
-      selectArea: 'last',
-    });
+    onEdit(
+      (doc) => {
+        const own = disableFollow(doc);
+        return addArea(own, videoSize, nextCropName(own.layout.areas));
+      },
+      'Crop added.',
+      { selectArea: 'last' },
+    );
   const removeCrop = (area: LayoutArea) =>
-    onEdit((doc) => removeArea(doc, area.id, videoSize), `${cropName(area)} removed.`);
+    onEdit(
+      (doc) => removeArea(disableFollow(doc), area.id, videoSize),
+      `${cropName(area)} removed.`,
+    );
   const renameCrop = async (draft: string): Promise<string | null> => {
     const target = renaming;
     if (!target) return null;
@@ -411,6 +441,14 @@ export function CropStage({
   };
 
   const selectedArea = selection?.kind === 'area' ? selection.id : null;
+  const following = isFollowing(shown);
+  const fixing = following ? (follow?.fixing ?? null) : null;
+  const [fixRect, setFixRect] = useState<Rect | null>(null);
+  const fixKey = fixing ? `${fixing.areaId}:${fixing.source.from}:${fixing.source.to}` : '';
+  // A new stretch to fix starts from its own box.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key names the stretch; its rect is read once per stretch
+  useEffect(() => setFixRect(fixing ? { ...fixing.rect } : null), [fixKey]);
+  const shownFix = fixing ? (fixRect ?? fixing.rect) : null;
 
   return (
     <section
@@ -446,10 +484,17 @@ export function CropStage({
             {hasVideo ? (
               <CropDim
                 pane={size}
-                holes={areas.map((area) => {
-                  const rect = cropOf(area);
-                  return { rect, radius: cropBoxRadius(area, rect, size, shown.canvas.width) };
-                })}
+                holes={
+                  shownFix
+                    ? [{ rect: shownFix, radius: 0 }]
+                    : areas.map((area) => {
+                        const rect = cropOf(area);
+                        return {
+                          rect,
+                          radius: cropBoxRadius(area, rect, size, shown.canvas.width),
+                        };
+                      })
+                }
               />
             ) : (
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
@@ -458,24 +503,47 @@ export function CropStage({
               </div>
             )}
 
-            {areas.map((area, index) => (
-              <CropBox
-                key={area.id}
-                area={area}
-                index={index}
-                rect={cropOf(area)}
+            {following && shownFix ? (
+              <FixBox
+                rect={shownFix}
                 pane={size}
-                canvasWidth={shown.canvas.width}
-                selected={selectedArea === area.id}
-                dragging={dragging === area.id}
-                removable={document.layout.areas.length > 1}
-                onPointerDown={(event, mode) => beginDrag(event, area, mode)}
-                onKeyDown={(event) => onBoxKey(event, area)}
-                onFocus={() => selectedArea !== area.id && onSelect({ kind: 'area', id: area.id })}
-                onRename={() => setRenaming(area)}
-                onRemove={() => removeCrop(area)}
+                onChange={setFixRect}
+                onDone={() => follow?.onFixDone(shownFix)}
               />
-            ))}
+            ) : null}
+            {following && !shownFix
+              ? areas.map((area, index) => (
+                  <FollowFrame
+                    key={area.id}
+                    area={area}
+                    index={index}
+                    rect={cropOf(area)}
+                    radius={cropBoxRadius(area, cropOf(area), size, shown.canvas.width)}
+                  />
+                ))
+              : null}
+            {following
+              ? null
+              : areas.map((area, index) => (
+                  <CropBox
+                    key={area.id}
+                    area={area}
+                    index={index}
+                    rect={cropOf(area)}
+                    pane={size}
+                    canvasWidth={shown.canvas.width}
+                    selected={selectedArea === area.id}
+                    dragging={dragging === area.id}
+                    removable={document.layout.areas.length > 1}
+                    onPointerDown={(event, mode) => beginDrag(event, area, mode)}
+                    onKeyDown={(event) => onBoxKey(event, area)}
+                    onFocus={() =>
+                      selectedArea !== area.id && onSelect({ kind: 'area', id: area.id })
+                    }
+                    onRename={() => setRenaming(area)}
+                    onRemove={() => removeCrop(area)}
+                  />
+                ))}
 
             {guides.x.map((x) => (
               <span
@@ -499,21 +567,50 @@ export function CropStage({
         </div>
       </div>
 
+      {following ? (
+        <p
+          className="m-0 shrink-0 font-sans text-sm text-ink type-muted"
+          data-testid={fixing ? 'clip-follow-fix-note' : 'clip-follow-note'}
+        >
+          {fixing ? FIX_NOTE : FOLLOWING_NOTE}
+        </p>
+      ) : null}
       <div className="flex shrink-0 items-center justify-between gap-3">
-        <TooltipHint label={CROP_LIMIT_SENTENCE} hidden={!full}>
-          <span className="inline-flex">
+        {fixing && shownFix ? (
+          <div className="flex items-center gap-2">
             <Button
               variant="secondary"
               size="sm"
-              disabled={full}
-              onClick={addCrop}
-              data-testid="clip-add-crop"
+              onClick={() => follow?.onFixDone(shownFix)}
+              data-testid="clip-follow-fix-done"
             >
-              <MotionIcon icon={CropIcon} className="h-4 w-4" />
-              Add Crop
+              Done
             </Button>
-          </span>
-        </TooltipHint>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => follow?.onFixCancel()}
+              data-testid="clip-follow-fix-cancel"
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <TooltipHint label={CROP_LIMIT_SENTENCE} hidden={!full}>
+            <span className="inline-flex">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={full}
+                onClick={addCrop}
+                data-testid="clip-add-crop"
+              >
+                <MotionIcon icon={CropIcon} className="h-4 w-4" />
+                Add Crop
+              </Button>
+            </span>
+          </TooltipHint>
+        )}
         <div className="flex items-center gap-2">
           <label htmlFor={switchId} className="font-sans text-sm text-ink">
             Snap crops to guides
@@ -712,5 +809,128 @@ function CropBox({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * A followed area's frame while Follow The Speaker is on (Module 08): its
+ * outline in the area's colour, moving with playback, and its name. Nothing
+ * to press or drag: the frame follows the speaker.
+ */
+function FollowFrame({
+  area,
+  index,
+  rect,
+  radius,
+}: {
+  area: LayoutArea;
+  index: number;
+  rect: Rect;
+  radius: number;
+}) {
+  const tone = AREA_TONE_CLASSES[areaTone(index)];
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="clip-follow-frame"
+      data-area-id={area.id}
+      className={cn(
+        'pointer-events-none absolute border-2 border-dashed shadow-[0_0_0_1px_rgb(0_0_0/0.6)]',
+        tone.border,
+      )}
+      style={{
+        left: `${rect.x * 100}%`,
+        top: `${rect.y * 100}%`,
+        width: `${rect.w * 100}%`,
+        height: `${rect.h * 100}%`,
+        borderRadius: radius > 0 ? radius : undefined,
+      }}
+    >
+      <span
+        className={cn(
+          'absolute top-1.5 left-1.5 inline-flex h-6 max-w-[calc(100%-0.75rem)] items-center rounded px-1.5 type-ui text-xs',
+          tone.fill,
+          tone.on,
+        )}
+      >
+        <span className="min-w-0 truncate">{area.name}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Fix By Hand's box (Module 08): the followed frame for one stretch, moved
+ * by dragging its body or with the arrows (Shift: further). Its size is the
+ * path's, so there are no handles. Enter or Done writes the fix.
+ */
+function FixBox({
+  rect,
+  pane,
+  onChange,
+  onDone,
+}: {
+  rect: Rect;
+  pane: PaneSize;
+  onChange: (rect: Rect) => void;
+  onDone: () => void;
+}) {
+  const stop = useRef<(() => void) | null>(null);
+  useEffect(() => () => stop.current?.(), []);
+
+  const begin = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || pane.width <= 0 || pane.height <= 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const start = { ...rect };
+    const x0 = event.clientX;
+    const y0 = event.clientY;
+    const onMove = (e: PointerEvent) =>
+      onChange(moveCrop(start, (e.clientX - x0) / pane.width, (e.clientY - y0) / pane.height).rect);
+    const end = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      stop.current = null;
+    };
+    stop.current?.();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    stop.current = end;
+  };
+
+  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onDone();
+      return;
+    }
+    const next = nudgeCrop(rect, event.key, event.shiftKey);
+    if (!next) return;
+    event.preventDefault();
+    onChange(next);
+  };
+
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a box dragged over the video cannot be a <button>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="Hand fix frame. Drag it or use the arrow keys, then press Enter."
+      data-testid="clip-follow-fix-box"
+      onPointerDown={begin}
+      onKeyDown={onKey}
+      className={cn(
+        'absolute z-10 cursor-grab touch-none border-2 border-actionPrimary bg-actionPrimary/15 shadow-[0_0_0_1px_rgb(0_0_0/0.6)] outline-none',
+        'focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-focusRing',
+      )}
+      style={{
+        left: `${rect.x * 100}%`,
+        top: `${rect.y * 100}%`,
+        width: `${rect.w * 100}%`,
+        height: `${rect.h * 100}%`,
+      }}
+    />
   );
 }

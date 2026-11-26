@@ -2,6 +2,7 @@ export * from './ass';
 export * from './caption-ass';
 export * from './caption-plan';
 export * from './compile';
+export * from './crop-path';
 export * from './errors';
 export * from './fonts';
 export * from './fonts-manifest';

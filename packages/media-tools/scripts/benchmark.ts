@@ -27,7 +27,7 @@
  *                                     (needs `npm run clips:fonts:build`)
  */
 
-import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
@@ -38,14 +38,19 @@ import {
   copyTextStyle,
   type ExportQuality,
   ffmpegArgsFor,
-  GRAPH_FILE,
   isExportQuality,
   layoutsFor,
   type PresetKind,
   type TextItem,
   textStylePreset,
 } from '@postgear/video-engine';
-import { copyFontsInto, defaultFontsDir, type FontsFolder, loadFontsFolder } from '../src/render/fonts-folder';
+import { writeRenderFiles } from '../src/render/execute';
+import {
+  copyFontsInto,
+  defaultFontsDir,
+  type FontsFolder,
+  loadFontsFolder,
+} from '../src/render/fonts-folder';
 import { toolPaths } from '../src/run/paths';
 import { createRunTool } from '../src/run/runner';
 import { withScratch } from '../src/run/scratch';
@@ -118,7 +123,12 @@ function readOptions(argv: readonly string[]): Options {
 
 /** The text-heavy overlay: a four-line outlined paragraph, a shadowed title and a boxed label, all clip long. */
 function heavyText(seconds: number): TextItem[] {
-  const item = (id: string, styleId: 'bold-outline' | 'plain' | 'on-a-box', text: string, y: number): TextItem => ({
+  const item = (
+    id: string,
+    styleId: 'bold-outline' | 'plain' | 'on-a-box',
+    text: string,
+    y: number,
+  ): TextItem => ({
     id,
     type: 'text',
     start: 0,
@@ -178,7 +188,9 @@ function benchmarkDocument(layout: Layout, seconds: number, text: boolean): Clip
     tracks: [],
   };
   const laidOut = applyLayout(base, layout, { width: 1920, height: 1080 });
-  return text ? { ...laidOut, tracks: [{ id: 'trk_text', kind: 'overlay', items: heavyText(seconds) }] } : laidOut;
+  return text
+    ? { ...laidOut, tracks: [{ id: 'trk_text', kind: 'overlay', items: heavyText(seconds) }] }
+    : laidOut;
 }
 
 async function makeSource(runTool: RunTool, dir: string, seconds: number): Promise<number> {
@@ -252,14 +264,13 @@ async function renderOnce(
     },
   });
   const compiled = compileFfmpeg(plan);
-  await writeFile(path.join(dir, GRAPH_FILE), compiled.filterComplexScript, 'utf8');
-  for (const file of compiled.assFiles) {
-    await writeFile(path.join(dir, file.name), file.content, 'utf8');
-  }
+  await writeRenderFiles(dir, compiled);
   if (fonts && compiled.fonts) {
     const missing = await copyFontsInto(fonts, compiled.fonts.files, dir, compiled.fonts.dir);
     if (missing.length > 0) {
-      throw new Error(`The fonts folder lacks ${missing.join(', ')}: run npm run clips:fonts:build`);
+      throw new Error(
+        `The fonts folder lacks ${missing.join(', ')}: run npm run clips:fonts:build`,
+      );
     }
   }
 

@@ -3,10 +3,12 @@
  * their price in AI minutes. Pure.
  *
  * The setup travels in the request, is checked here, and is kept on the run
- * (`ClipHighlightRun.params.setup`). Switches later modules own (Follow The
- * Speaker, Look For Action, Remove Silences, Hook Title, a recipe, a brand
- * kit) are in the shape now and held off: the module that builds each one
- * opens it, so no later change renames anything.
+ * (`ClipHighlightRun.params.setup`). Switches later modules own (Remove
+ * Silences, Hook Title, a recipe, a brand kit) are in the shape now and held
+ * off: the module that builds each one opens it, so no later change renames
+ * anything. Look For Action is Module 06's; Follow The Speaker is Module
+ * 08's: free (no line in the price), and refused on a wide shape, where
+ * there is nothing to follow inside the picture.
  *
  * The price is one line per step, from the same `aiMinutesCost` the charge
  * uses. Listening is quoted by the transcript (only what was not listened
@@ -19,6 +21,7 @@ import { DEFAULT_CAPTION_STYLE } from '../captions/styles';
 import { CLIP_MIN_MS } from '../document/limits';
 import { aiMinutesCost } from '../pricing';
 import { CLIP_LENGTHS } from './fit';
+import { canFollow } from './follow';
 import { GENRES } from './genre';
 
 /** The most a request may say. */
@@ -47,14 +50,20 @@ export const clipSetupSchema = z
       .strict(),
     /** Module 06: Look For Action. */
     action: z.boolean(),
+    /** Module 08: Follow The Speaker (free; vertical, portrait or square only). */
+    follow: z.boolean(),
     // Owned by later modules; held off until each is built.
-    follow: z.literal(false),
     silences: z.literal(false),
     hookTitle: z.literal(false),
     recipeId: z.null(),
     brandKitId: z.null(),
   })
-  .strict();
+  .strict()
+  // Refused rather than ignored: a stored setup never says it followed what it could not.
+  .refine((setup) => !setup.follow || canFollow(setup.ratio), {
+    message: 'Follow The Speaker needs a vertical or square shape',
+    path: ['follow'],
+  });
 
 export type ClipSetup = z.infer<typeof clipSetupSchema>;
 

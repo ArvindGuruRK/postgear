@@ -14,7 +14,8 @@
  *   the speed when not 1x, hatched where we do not hold the video sharp),
  *   the video's own sound under it, then Overlay, Zoom and Sound, with a
  *   second row of a kind when two of its bars overlap. Empty rows stay,
- *   slim, so people learn where things go.
+ *   slim, so people learn where things go. While Follow The Speaker is on
+ *   (Sprint 13, Module 08), a thin Speaker strip sits under the Video row.
  * - Editing: drag a part's end to trim it, an item's body to move it, an
  *   item's end to resize it. Each drag works from the document as it was
  *   when it began (the engine's gesture reducers), shows the result live
@@ -36,6 +37,7 @@ import {
   Kbd,
   MotionIcon,
   Playhead,
+  SpeakerStrip,
   TIMELINE_LABEL_WIDTH_PX,
   type TimelineTone,
   TimelineBar,
@@ -88,6 +90,7 @@ import {
 } from 'react';
 import { ResizeHandle } from '@/components/workflows/panel/resize-handle';
 import type { ClipFilmstrip, ClipWaveform } from '@/types/clips';
+import type { SpeakerStretchModel } from '../layouts/follow-model';
 import { Filmstrip } from '../timeline/filmstrip';
 import {
   edgeFrameMs,
@@ -193,6 +196,15 @@ export interface TimelineDockProps {
   soundShape?: (
     itemId: string,
   ) => { peaks: readonly number[]; fill: number; name: string | null } | null;
+  /**
+   * Module 08: Follow The Speaker's strip under the Video row (clip ms), or
+   * null when not following. Pressing a lost or fixed stretch selects it.
+   */
+  speaker?: {
+    stretches: readonly SpeakerStretchModel[];
+    selectedKey: string | null;
+    onSelect: (key: string) => void;
+  } | null;
 }
 
 export function TimelineDock(props: TimelineDockProps) {
@@ -452,6 +464,7 @@ function EditingTimeline({
   soundShape,
   captionBars,
   onCaptions,
+  speaker,
 }: TimelineDockProps & { snapping: boolean; onDragNeedsMore: (needs: boolean) => void }) {
   const scroller = useRef<HTMLDivElement | null>(null);
   const origin = useRef<HTMLDivElement | null>(null);
@@ -935,6 +948,23 @@ function EditingTimeline({
               );
             })}
           </TimelineRow>
+          {speaker && speaker.stretches.length > 0 ? (
+            <SpeakerStrip
+              className="bg-chrome"
+              data-testid="clip-speaker-strip"
+              widthPx={contentPx}
+              onSelect={speaker.onSelect}
+              stretches={speaker.stretches.map((stretch) => ({
+                key: stretch.key,
+                kind: stretch.kind,
+                person: stretch.person,
+                leftPx: xOf(stretch.fromMs),
+                widthPx: xOf(stretch.toMs - stretch.fromMs),
+                label: stretch.label,
+                selected: stretch.key === speaker.selectedKey,
+              }))}
+            />
+          ) : null}
           <TimelineRow
             label="Video Sound"
             slim

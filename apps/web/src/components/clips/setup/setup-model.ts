@@ -10,6 +10,7 @@ import { refusalMessage } from '@postgear/entitlements';
 import {
   aiMinutesCost,
   CLIP_LENGTH_LABELS,
+  canFollow,
   type ClipLength,
   type ClipSetup,
   formatClipLength,
@@ -62,7 +63,8 @@ export type SetupAction =
   | { type: 'language'; language: string }
   | { type: 'captions'; on: boolean }
   | { type: 'captionStyle'; styleId: string }
-  | { type: 'action'; on: boolean };
+  | { type: 'action'; on: boolean }
+  | { type: 'follow'; on: boolean };
 
 export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
   switch (action.type) {
@@ -75,7 +77,8 @@ export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
     case 'length':
       return { ...setup, length: action.length };
     case 'ratio':
-      return { ...setup, ratio: action.ratio };
+      // Module 08: a wide shape cannot follow the speaker (the API refuses the pair).
+      return { ...setup, ratio: action.ratio, follow: setup.follow && canFollow(action.ratio) };
     case 'language':
       return { ...setup, language: action.language };
     case 'captions':
@@ -84,6 +87,8 @@ export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
       return { ...setup, captions: { ...setup.captions, styleId: action.styleId } };
     case 'action':
       return { ...setup, action: action.on };
+    case 'follow':
+      return { ...setup, follow: action.on && canFollow(setup.ratio) };
   }
 }
 
@@ -91,6 +96,10 @@ export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
 export const ACTION_HELP =
   'Finds sudden action in the picture. It does not know the rules of your game.';
 export const ACTION_VISION_NOTE = 'We also look at a few still pictures of each burst.';
+
+/** Module 08: Follow The Speaker's help line, and why it is off when faces cannot be found. */
+export const FOLLOW_HELP = 'The frame stays on whoever is talking.';
+export const FOLLOW_OFF_NOTE = 'Finding faces is not available right now.';
 
 /** "+3 AI Minutes": what Look For Action adds for the chosen stretch, before it is switched on. */
 export function actionPriceLabel(setup: Pick<ClipSetup, 'range'>): string {
@@ -147,6 +156,7 @@ export function summaryLines(setup: ClipSetup, styleName: string | null): string
   ];
   if (setup.captions.on) lines.push(`Captions: ${styleName ?? 'On'}`);
   if (setup.action) lines.push('Looking for action');
+  if (setup.follow) lines.push('Following the speaker');
   if (setup.genre !== 'auto') lines.push(`Genre: ${GENRE_LABELS[setup.genre]}`);
   return lines;
 }

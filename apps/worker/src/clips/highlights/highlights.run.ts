@@ -17,6 +17,10 @@
  *   the run goes on with the tracks it has. Only when every producer that
  *   ran failed and nothing is left does the run fail (and give its minutes
  *   back); a run that simply finds nothing is a success.
+ * - Module 08: a run whose setup has Follow The Speaker on tells the API
+ *   once its clips are written (`followSpeaker`): the API marks them to
+ *   follow on first open and asks faces for the best three. Free, and a
+ *   failure there never fails the run (logged with ids and counts).
  * - Under `CLIPS_SIMULATION`, `[simulate:highlights-fail]` in the video's
  *   title fails the scoring step, and `[simulate:highlights-slow]` holds it
  *   for 30 seconds (so Cancel can be tried); both are ignored otherwise.
@@ -38,6 +42,7 @@ import {
   type BlendedClip,
   blendWithSignals,
   builtInCaptionStyle,
+  canFollow,
   type ClipSetup,
   captionLookSchema,
   clipSetupSchema,
@@ -96,7 +101,7 @@ export interface HighlightsRun {
     Partial<Pick<ClipRows, 'job' | 'captionStyle'>>;
   /** Sprint 13, Module 05: the API's moment picker (a run with a setup); Module 06: the still check. */
   internal?: Pick<ClipInternalClient, 'pickMoments'> &
-    Partial<Pick<ClipInternalClient, 'checkStills' | 'reverseCharges'>>;
+    Partial<Pick<ClipInternalClient, 'checkStills' | 'reverseCharges' | 'followSpeaker'>>;
   progress: Pick<JobProgress, 'report' | 'flush'>;
   heartbeat(): void;
   now(): Date;
@@ -387,6 +392,45 @@ export function setupClips(
 }
 
 /**
+ * Module 08: Follow The Speaker for the clips just written. The API reads the
+ * run's setup again and decides; this only says the clips are there. Tried
+ * twice on a hiccup; any failure is logged (ids and counts) and swallowed,
+ * so the run that found the clips never fails over it.
+ */
+export async function followSpeakerQuietly(run: HighlightsRun): Promise<void> {
+  if (!run.internal?.followSpeaker) return;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const answer = await run.internal.followSpeaker(run.jobId, {
+        organizationId: run.organizationId,
+      });
+      console.log(
+        JSON.stringify({
+          event: 'clips.highlights.follow',
+          jobId: run.jobId,
+          follow: answer.follow,
+          marked: answer.marked,
+          ...answer.faces,
+          facesOff: answer.facesOff,
+        }),
+      );
+      return;
+    } catch (error) {
+      const retryable = error instanceof ClipStepError && error.retryable;
+      if (retryable && attempt < 2 && !run.signal.aborted) continue;
+      console.warn(
+        JSON.stringify({
+          event: 'clips.highlights.follow_failed',
+          jobId: run.jobId,
+          code: error instanceof ClipStepError ? error.code : 'unknown',
+        }),
+      );
+      return;
+    }
+  }
+}
+
+/**
  * A whole run in one step: gather, then score. A run whose setup asks to
  * Look For Action stops after gathering instead (Module 06): the caller
  * keeps what was gathered in the run's state file and goes on to watch.
@@ -668,6 +712,10 @@ export async function scoreHighlights(
   await deleteQuietly(run.privateStorage, finished.replacedKeys);
   timings.scoring = clock() - started;
   if (action) timings.actions = action.candidates.length;
+  // Module 08: free, and never a reason to fail the run.
+  if (chosen?.setup.follow && canFollow(chosen.setup.ratio) && clips.length > 0) {
+    await followSpeakerQuietly(run);
+  }
 
   console.log(
     JSON.stringify({

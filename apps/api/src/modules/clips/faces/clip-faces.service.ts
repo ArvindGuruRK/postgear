@@ -9,23 +9,40 @@
  *   a FACES job is written and started (`running`).
  * - `read` (`GET /clips/:clipId/faces`): a short signed address for the
  *   covering face file and its `meta`, or `{ status: 'running' | 'none' }`.
+ *   Module 08 adds what Follow The Speaker needs beside the boxes, both in
+ *   video ms inside the face file's stretch, only when asked (`follow`;
+ *   Detect Camera does not need them, so it gets `[]` and `null` without
+ *   reading the SIGNALS file or the transcript): `sceneCutsMs` (the video's
+ *   SIGNALS scene track, at Sprint 12's cut level; [] without one) and
+ *   `speech` (where someone talks, from the spoken transcript's word times,
+ *   gaps under `SPEECH_JOIN_GAP_MS` joined; null where nothing was listened to). Ranges
+ *   only: the words never leave this service. Either one that cannot be read
+ *   is answered empty (no cuts, or null speech), never as a failed read.
  *
  * Face files belong to the video (assets under its key prefix), so a second
  * clip of the same stretch reads the same file and Sprint 12's `removeVideo`
  * deletes them with the video. The file holds boxes and times only; the
  * browser turns them into people. Logs carry ids and counts, never a box.
  */
+import { promisify } from 'node:util';
+import { gunzip } from 'node:zlib';
 import { HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type ClipAsset, type ClipJob, ClipAssetKind, ClipJobKind, prisma } from '@postgear/db';
 import type { PrivateStorage } from '@postgear/storage';
 import {
   clipSourceRanges,
+  decodeSignalsFile,
   type FaceTracksAssetMeta,
   faceFileCovers,
   facesInputSchema,
   HANDLE_MS,
+  LANGUAGE_AUTO,
   readFaceTracksAssetMeta,
+  reusableTrack,
+  type SpeechSpan,
   safeParseClipDocument,
+  sceneCutsMs,
+  speechSpansIn,
 } from '@postgear/video-engine';
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
 import { ClipItemService } from '../clip/clip-item.service';
@@ -37,7 +54,14 @@ import { ClipJobsRepository, OPEN_JOB_STATUSES } from '../jobs/clip-jobs.reposit
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { MediaServiceProbe } from '../status/media-service.probe';
+import { ClipTranscriptStore } from '../transcripts/clip-transcript-store';
+import { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
+
+const gunzipAsync = promisify(gunzip);
+/** A stored SIGNALS file larger than this is not read (a day of video is far under; Sprint 12's cap). */
+const SIGNALS_MAX_GZ_BYTES = 8 * 1024 * 1024;
+const SIGNALS_MAX_JSON_BYTES = 64 * 1024 * 1024;
 
 /** How long the face file's read address works: the editor reads it once, at once. */
 export const FACES_URL_SECONDS = 10 * 60;
@@ -49,8 +73,18 @@ export interface FacesStretch {
 
 export interface FacesReady {
   status: 'ready';
+  /** Module 08: the FACE_TRACKS asset's id, which a followed layout records as `faceAssetId`. */
+  assetId: string;
   url: string;
   meta: FaceTracksAssetMeta;
+  /** Module 08: scene cuts inside `meta.fromMs..meta.toMs`, video ms, sorted; [] with no scene track. */
+  sceneCutsMs: number[];
+  /**
+   * Module 08: where someone talks, video ms, sorted, merged (gaps under `SPEECH_JOIN_GAP_MS`
+   * joined), inside `meta.fromMs..meta.toMs`; null when that stretch was never
+   * listened to. Ranges only, never words.
+   */
+  speech: SpeechSpan[] | null;
 }
 
 export type FacesEnsureOutcome =
@@ -74,6 +108,9 @@ export class ClipFacesService {
     private readonly limits: ClipLimitsGuard,
     private readonly mediaService: MediaServiceProbe,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
+    // Module 08: the speech stretches beside the boxes.
+    private readonly transcripts: ClipTranscriptsService,
+    private readonly transcriptStore: ClipTranscriptStore,
   ) {}
 
   /** `POST /clips/:clipId/faces`: see the file comment. */
@@ -130,13 +167,23 @@ export class ClipFacesService {
   }
 
   /** `GET /clips/:clipId/faces`: see the file comment. */
-  async read(orgId: string, clipId: string): Promise<FacesReadOutcome> {
-    const { videoId, stretch } = await this.context(orgId, clipId);
+  async read(
+    orgId: string,
+    clipId: string,
+    options: { follow?: boolean } = {},
+  ): Promise<FacesReadOutcome> {
+    const { videoId, durationMs, stretch } = await this.context(orgId, clipId);
     const asset = await this.coveringAsset(orgId, videoId, stretch);
     if (asset) {
       const meta = readFaceTracksAssetMeta(asset.meta) as FaceTracksAssetMeta;
       const url = await this.storage.signedUrl(asset.key, { expiresInSeconds: FACES_URL_SECONDS });
-      return { status: 'ready', url, meta };
+      const [cuts, speech] = options.follow
+        ? await Promise.all([
+            this.sceneCuts(orgId, videoId, durationMs, meta),
+            this.speech(orgId, videoId, meta),
+          ])
+        : ([[], null] as [number[], SpeechSpan[] | null]);
+      return { status: 'ready', assetId: asset.id, url, meta, sceneCutsMs: cuts, speech };
     }
     const running = await this.coveringJob(orgId, videoId, stretch);
     return running ? { status: 'running', job: toJobView(running) } : { status: 'none' };
@@ -146,7 +193,7 @@ export class ClipFacesService {
   private async context(
     orgId: string,
     clipId: string,
-  ): Promise<{ clip: { id: string }; videoId: string; stretch: FacesStretch }> {
+  ): Promise<{ clip: { id: string }; videoId: string; durationMs: number; stretch: FacesStretch }> {
     const clip = await this.items.requireClip(orgId, clipId);
     const video = await this.videos.findLive(orgId, clip.videoId);
     if (!video) throw clipNotFound();
@@ -162,7 +209,87 @@ export class ClipFacesService {
     }
     const fromMs = Math.max(0, Math.min(...ranges.map((r) => r.fromMs)) - HANDLE_MS);
     const toMs = Math.min(duration, Math.max(...ranges.map((r) => r.toMs)) + HANDLE_MS);
-    return { clip, videoId: video.id, stretch: { fromMs, toMs } };
+    return { clip, videoId: video.id, durationMs: duration, stretch: { fromMs, toMs } };
+  }
+
+  /**
+   * The scene cuts inside the face file's stretch, from the video's newest
+   * SIGNALS file (its scene track at the current version, measured on this
+   * length). [] when there is none or it does not read.
+   */
+  private async sceneCuts(
+    orgId: string,
+    videoId: string,
+    durationMs: number,
+    meta: FaceTracksAssetMeta,
+  ): Promise<number[]> {
+    try {
+      const asset = await prisma.clipAsset.findFirst({
+        where: { organizationId: orgId, videoId, kind: ClipAssetKind.SIGNALS },
+        orderBy: { createdAt: 'desc' },
+        select: { key: true },
+      });
+      if (!asset) return [];
+      const opened = await this.storage.getStream(asset.key);
+      if (!opened) return [];
+      if (opened.totalBytes > SIGNALS_MAX_GZ_BYTES) {
+        opened.body.destroy();
+        return [];
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of opened.body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+      }
+      const json = await gunzipAsync(Buffer.concat(chunks), {
+        maxOutputLength: SIGNALS_MAX_JSON_BYTES,
+      });
+      const scene = reusableTrack(decodeSignalsFile(json.toString('utf8')), 'scene', durationMs);
+      return sceneCutsMs(scene, meta.fromMs, meta.toMs);
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.faces.scene_unreadable',
+          orgId,
+          videoId,
+          reason: error instanceof Error ? error.name : 'unknown',
+        }),
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Where someone talks inside the face file's stretch, from the video's
+   * first spoken transcript (never a translation). A file the person supplied
+   * covers the whole stretch, as it does for the words. Null when there is
+   * none, it does not read, or nothing in the stretch was listened to.
+   */
+  private async speech(
+    orgId: string,
+    videoId: string,
+    meta: FaceTracksAssetMeta,
+  ): Promise<SpeechSpan[] | null> {
+    try {
+      const row = await this.transcripts.transcriptRow(orgId, videoId, LANGUAGE_AUTO);
+      if (!row) return null;
+      const transcript = await this.transcriptStore.read(row.key);
+      if (!transcript) return null;
+      const covered =
+        row.meta.source === 'listened'
+          ? transcript.covered
+          : [{ fromMs: meta.fromMs, toMs: meta.toMs }];
+      return speechSpansIn({ words: transcript.words, covered }, meta.fromMs, meta.toMs);
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.faces.speech_unreadable',
+          orgId,
+          videoId,
+          reason: error instanceof Error ? error.name : 'unknown',
+        }),
+      );
+      return null;
+    }
   }
 
   /** The newest face file of the video that covers the stretch. */

@@ -14,6 +14,8 @@
  *   Any save bumps the revision. A save without a document (a rename, a
  *   hide) keeps an export that drew the old revision current, since the
  *   picture did not change. A NEW clip that is saved becomes DRAFT.
+ *   Module 08: a document save also takes away `meta.followOnOpen` (the
+ *   editor's first-open Follow The Speaker), keeping the other keys.
  * - **Open** (`POST /clips/:clipId/open`): the editor calls it when it opens
  *   a clip, so a NEW clip moves to Drafts. Idempotent, no revision bump: a
  *   status that only says "somebody looked" must not make a save conflict.
@@ -56,6 +58,7 @@ import {
   toClipView,
   videoNotFound,
 } from './clip-item.service';
+import { followsOnOpen, withoutFollowOnOpen } from './clip-meta';
 import { scheduledClipIds } from './clip-state';
 import { storedDocumentRange } from './sharp-source';
 
@@ -108,6 +111,9 @@ export class ClipEditsService {
         data.document = document as unknown as Prisma.InputJsonValue;
         data.ratio = document.canvas.ratio;
         data.durationMs = outputDuration(document);
+        // Module 08: the first document save ends Follow The Speaker's first-open mark,
+        // so a person who turned it off is never overridden on the next open.
+        if (followsOnOpen(clip.meta)) data.meta = withoutFollowOnOpen(clip.meta);
       } else if (clip.lastExportedRevision === clip.revision) {
         // A rename or a hide: the export still shows exactly this clip.
         data.lastExportedRevision = clip.revision + 1;

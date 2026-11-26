@@ -10,7 +10,8 @@
  * The graph, in order (cookbook sections 1, 2, 7, 9 and 13):
  * 1. Per segment, picture: `trim` in the input's own time, then the layout
  *    graph (`layout-graph.ts`: the base, one crop and scale per area in
- *    source pixels, before `setpts` so crops stay in source time, rounded
+ *    source pixels, before `setpts` so crops stay in source time, a moving
+ *    crop as its `sendcmd` file (`crop-path.ts`, Module 08), rounded
  *    masks, every overlay `format=yuv420 shortest=1`), then
  *    `setpts=(PTS-STARTPTS)/S`, `fps`, `setsar=1`.
  * 2. Per segment, sound: `atrim`, `asetpts`, the segment's volume, the
@@ -37,6 +38,7 @@
  */
 
 import { ASS_FILE, buildAss } from './ass';
+import { type CompiledCommandFile, cropCommandText } from './crop-path';
 import { FONTS_DIR } from './fonts';
 import { ffmpegColour, formatNumber } from './filter-text';
 import { layoutGraph } from './layout-graph';
@@ -304,6 +306,7 @@ export function compileMeasure(plan: RenderPlan): CompiledFfmpeg | null {
     inputs,
     filterComplexScript: `${lines.join(';\n')}\n`,
     assFiles: [],
+    commandFiles: [],
     outputArgs: ['-map', '[aout]', '-f', 'null'],
     durationMs: plan.output.durationMs,
     fonts: null,
@@ -499,6 +502,7 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
     inputs,
     filterComplexScript: `${lines.join(';\n')}\n`,
     assFiles,
+    commandFiles: cropCommandFiles(plan),
     outputArgs: outputArgsFor(plan),
     durationMs,
     fonts:
@@ -506,6 +510,30 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
         ? { dir: plan.fonts.dir ?? FONTS_DIR, files: plan.fonts.files, psNames: plan.fonts.psNames }
         : null,
   };
+}
+
+/** A command file's name: `crop-s<segment>-a<area>.txt`, nothing else. */
+const COMMAND_FILE = /^crop-s\d+-a\d+\.txt$/;
+
+/**
+ * The `sendcmd` files of the plan's moving crops (Module 08), in segment and
+ * area order: one per segment per area whose crop moves in it.
+ */
+export function cropCommandFiles(plan: Pick<RenderPlan, 'segments'>): CompiledCommandFile[] {
+  const files: CompiledCommandFile[] = [];
+  const names = new Set<string>();
+  for (const segment of plan.segments) {
+    for (const area of segment.picture.areas) {
+      if (!area.path) continue;
+      const name = area.path.file;
+      if (!COMMAND_FILE.test(name) || names.has(name)) {
+        throw new Error(`A crop command file must have its own plain name, not ${name}`);
+      }
+      names.add(name);
+      files.push({ name, content: cropCommandText(area.path) });
+    }
+  }
+  return files;
 }
 
 /**

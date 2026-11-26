@@ -9,6 +9,8 @@ import {
   ACTION_HELP,
   ACTION_VISION_NOTE,
   actionPriceLabel,
+  FOLLOW_HELP,
+  FOLLOW_OFF_NOTE,
   minutesLabel,
   priceLines,
   setupButtonLabel,
@@ -46,12 +48,12 @@ function price(total: number, remaining: number | null = 300): SetupPriceView {
   };
 }
 
-function renderForm(action?: { available: boolean; vision: boolean }) {
+function renderForm(action?: { available: boolean; vision: boolean }, faces?: boolean) {
   const video = { ...fixtureVideo(), durationMs: 600_000, status: 'READY' };
   const detail = { video } as unknown as ClipVideoDetail;
   render(
     <TooltipProvider>
-      <SetupForm orgId="org-1" detail={detail} action={action} />
+      <SetupForm orgId="org-1" detail={detail} action={action} faces={faces} />
     </TooltipProvider>,
   );
   return video;
@@ -146,6 +148,58 @@ describe('Look For Action (Module 06)', () => {
     await settle();
     expect(screen.getByText(ACTION_HELP)).toBeTruthy();
     expect(screen.queryByText(new RegExp(ACTION_VISION_NOTE))).toBeNull();
+  });
+});
+
+describe('Follow The Speaker (Module 08)', () => {
+  it('turns on only for a shape that can follow, and a wide shape turns it off', () => {
+    const start = defaultClipSetup(600_000);
+    const on = setupReducer(start, { type: 'follow', on: true });
+    expect(on.follow).toBe(true);
+    expect(summaryLines(on, null)).toContain('Following the speaker');
+    const wide = setupReducer(on, { type: 'ratio', ratio: '16:9' });
+    expect(wide.follow).toBe(false);
+    expect(setupReducer(wide, { type: 'follow', on: true }).follow).toBe(false);
+    // Back to a tall shape it stays off until switched on again.
+    expect(setupReducer(wide, { type: 'ratio', ratio: '1:1' }).follow).toBe(false);
+  });
+
+  it('is free: the card says so and sends the switch with the price', async () => {
+    renderForm(undefined, true);
+    await settle();
+    const card = screen.getByTestId('clip-setup-follow-card');
+    expect(card).toHaveTextContent('Follow The Speaker');
+    expect(card).toHaveTextContent('Free');
+    expect(screen.getByText(FOLLOW_HELP)).toBeTruthy();
+    expect(screen.getByTestId('clip-setup-follow')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('clip-setup-follow'));
+    await settle();
+    expect(api.priceClipSetup).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ follow: true, ratio: '9:16' }),
+      expect.anything(),
+    );
+  });
+
+  it('is off, and says why, when faces cannot be found', async () => {
+    renderForm(undefined, false);
+    await settle();
+    expect(screen.getByTestId('clip-setup-follow')).toBeDisabled();
+    expect(screen.getByText(`${FOLLOW_HELP} ${FOLLOW_OFF_NOTE}`)).toBeTruthy();
+  });
+
+  it('is hidden for the Horizontal shape, and the switch goes off with it', async () => {
+    renderForm(undefined, true);
+    await settle();
+    fireEvent.click(screen.getByTestId('clip-setup-follow'));
+    fireEvent.click(screen.getByText('Horizontal'));
+    await settle();
+    expect(screen.queryByTestId('clip-setup-follow-card')).toBeNull();
+    expect(api.priceClipSetup).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ follow: false, ratio: '16:9' }),
+      expect.anything(),
+    );
   });
 });
 

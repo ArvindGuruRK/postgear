@@ -2,12 +2,22 @@
  * Faces in a clip's stretch (Sprint 13, Module 07) against an in-memory
  * database: a covering face file is reused with no job, a covering job is
  * joined, otherwise one free FACES job starts; the read answers a short
- * address; tenancy; the service off; and no charge anywhere.
+ * address; tenancy; the service off; and no charge anywhere. Module 08: the
+ * ready read carries the scene cuts and the speech stretches of the face
+ * file's range (ranges only), and answers empty ones when it cannot read them.
  */
+import { Readable } from 'node:stream';
+import { gzipSync } from 'node:zlib';
 import { HttpException, NotFoundException } from '@nestjs/common';
 import type { Clip, ClipAsset } from '@postgear/db';
 import type { PrivateStorage } from '@postgear/storage';
-import { createClipDocument, HANDLE_MS } from '@postgear/video-engine';
+import {
+  createClipDocument,
+  encodeSignalsFile,
+  HANDLE_MS,
+  SIGNALS_FILE_FORMAT,
+  type Transcript,
+} from '@postgear/video-engine';
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import type { UsageService } from '../../entitlements/usage.service';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
@@ -16,6 +26,8 @@ import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { MediaServiceProbe } from '../status/media-service.probe';
+import type { ClipTranscriptStore } from '../transcripts/clip-transcript-store';
+import type { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import {
   assetRow,
   clipRow,
@@ -26,6 +38,7 @@ import {
 } from '../testing/fake-clip-db';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
+import { facesReadQuerySchema } from './clip-faces.controller';
 import { ClipFacesService, FACES_URL_SECONDS } from './clip-faces.service';
 
 let mockDb: FakeClipDb;
@@ -75,8 +88,70 @@ function seed(extra: (tables: FakeTables) => void = () => undefined): FakeTables
   return tables;
 }
 
+const SIGNALS_KEY = `clips/${TEST_ORG}/${VIDEO}/signals-${'e'.repeat(32)}.json.gz`;
+const TRANSCRIPT_KEY = `clips/${TEST_ORG}/${VIDEO}/transcript-${'f'.repeat(32)}.json.gz`;
+
+/** A scene track (two a second over the 600 s video) with cuts at 10 s, 70 s (held a second) and 80 s. */
+function signalsBytes(durationMs = 600_000): Buffer {
+  const values: Array<number | null> = new Array(1200).fill(0);
+  values[20] = 30;
+  values[140] = 45;
+  values[141] = 45;
+  values[160] = 12;
+  return gzipSync(
+    Buffer.from(
+      encodeSignalsFile({
+        format: SIGNALS_FILE_FORMAT,
+        durationMs,
+        tracks: [
+          { name: 'scene', version: 1, sampleRateHz: 2, startSec: 0, unit: 'scene_score', values },
+        ],
+      }),
+      'utf8',
+    ),
+  );
+}
+
+function signalsAsset() {
+  return assetRow({
+    id: '99999999-9999-4999-8999-999999999999',
+    organizationId: TEST_ORG,
+    videoId: VIDEO,
+    kind: 'SIGNALS',
+    key: SIGNALS_KEY,
+    meta: { durationMs: 600_000, tracks: [{ name: 'scene', version: 1 }] },
+  } as Partial<ClipAsset>);
+}
+
+function heard(covered = [{ fromMs: 0, toMs: 600_000 }]): Transcript {
+  const word = (i: number, start: number, end: number) => ({
+    i,
+    start,
+    end,
+    text: 'secret',
+    sure: 0.9,
+  });
+  return {
+    version: 1,
+    language: 'en',
+    model: 'simulated',
+    source: 'listened',
+    covered,
+    words: [word(0, 61_000, 61_500), word(1, 61_700, 62_000), word(2, 75_000, 76_000)],
+    nextIndex: 3,
+  } as unknown as Transcript;
+}
+
 let idCount = 0;
-function setup(options: { tables?: FakeTables; service?: 'ok' | 'off' } = {}) {
+function setup(
+  options: {
+    tables?: FakeTables;
+    service?: 'ok' | 'off';
+    transcript?: Transcript | null;
+    source?: 'listened' | 'supplied';
+    signals?: Buffer | null;
+  } = {},
+) {
   const tables = options.tables ?? seed();
   mockDb = fakeClipDb(tables);
   const jobsRepository = new ClipJobsRepository();
@@ -102,6 +177,25 @@ function setup(options: { tables?: FakeTables; service?: 'ok' | 'off' } = {}) {
   };
   const storage = {
     signedUrl: jest.fn(async (key: string) => `http://localhost:3001/clips/files/${key}?sig=x`),
+    getStream: jest.fn(async (key: string) => {
+      const bytes = key === SIGNALS_KEY ? (options.signals ?? null) : null;
+      return bytes ? { body: Readable.from([bytes]), totalBytes: bytes.length } : null;
+    }),
+  };
+  const transcript = options.transcript ?? null;
+  const transcripts = {
+    transcriptRow: jest.fn(async (orgId: string) =>
+      transcript && orgId === TEST_ORG
+        ? {
+            id: 'tr-1',
+            key: TRANSCRIPT_KEY,
+            meta: { source: options.source ?? 'listened', fixes: [] },
+          }
+        : null,
+    ),
+  };
+  const transcriptStore = {
+    read: jest.fn(async (key: string) => (key === TRANSCRIPT_KEY ? transcript : null)),
   };
   const service = new ClipFacesService(
     items as unknown as ClipItemService,
@@ -111,8 +205,10 @@ function setup(options: { tables?: FakeTables; service?: 'ok' | 'off' } = {}) {
     { assertEnabled: jest.fn(async () => undefined) } as unknown as ClipLimitsGuard,
     { state: jest.fn(async () => options.service ?? 'ok') } as unknown as MediaServiceProbe,
     storage as unknown as PrivateStorage,
+    transcripts as unknown as ClipTranscriptsService,
+    transcriptStore as unknown as ClipTranscriptStore,
   );
-  return { service, tables, scheduling, storage, usage };
+  return { service, tables, scheduling, storage, usage, transcripts };
 }
 
 async function refusal(promise: Promise<unknown>) {
@@ -187,8 +283,12 @@ describe('ClipFacesService.read', () => {
     const outcome = await service.read(TEST_ORG, CLIP);
     expect(outcome).toEqual({
       status: 'ready',
+      assetId: '77777777-7777-4777-8777-777777777777',
       url: expect.stringContaining(FACES_KEY),
       meta: { fromMs: 0, toMs: 120_000, sampleFps: 5, found: 120, producer: 'simulation' },
+      // No SIGNALS file and no transcript: no cuts, and speech never listened to.
+      sceneCutsMs: [],
+      speech: null,
     });
     expect(storage.signedUrl).toHaveBeenCalledWith(FACES_KEY, {
       expiresInSeconds: FACES_URL_SECONDS,
@@ -208,6 +308,95 @@ describe('ClipFacesService.read', () => {
       }),
     );
     expect((await service.read(TEST_ORG, CLIP)).status).toBe('running');
+  });
+
+  it('Module 08: the scene cuts and the speech stretches inside the face file range', async () => {
+    const tables = seed((t) => t.assets.push(faceAsset(30_000, 120_000), signalsAsset()));
+    const { service, transcripts } = setup({
+      tables,
+      signals: signalsBytes(),
+      transcript: heard(),
+    });
+    const outcome = await service.read(TEST_ORG, CLIP, { follow: true });
+    expect(outcome).toMatchObject({
+      status: 'ready',
+      // 10 s is before the range; the cut held over two samples is one cut.
+      sceneCutsMs: [70_000, 80_000],
+      // 200 ms apart: one stretch; ranges only.
+      speech: [
+        { from: 61_000, to: 62_000 },
+        { from: 75_000, to: 76_000 },
+      ],
+    });
+    expect(JSON.stringify(outcome)).not.toContain('secret');
+    // The video's own spoken transcript, never a translation.
+    expect(transcripts.transcriptRow).toHaveBeenCalledWith(TEST_ORG, VIDEO, 'auto');
+  });
+
+  it('Module 08: speech is null where the range was never listened to, [] where nobody spoke', async () => {
+    const tables = seed((t) => t.assets.push(faceAsset(30_000, 120_000)));
+    const elsewhere = setup({ tables, transcript: heard([{ fromMs: 0, toMs: 30_000 }]) });
+    expect(await elsewhere.service.read(TEST_ORG, CLIP, { follow: true })).toMatchObject({
+      speech: null,
+    });
+    const quiet = setup({
+      tables,
+      transcript: { ...heard(), words: [] } as Transcript,
+    });
+    expect(await quiet.service.read(TEST_ORG, CLIP, { follow: true })).toMatchObject({
+      speech: [],
+    });
+    // A file the person supplied covers the whole range, as it does for the words.
+    const supplied = setup({
+      tables,
+      source: 'supplied',
+      transcript: heard([]),
+    });
+    expect(
+      (await supplied.service.read(TEST_ORG, CLIP, { follow: true })) as { speech: unknown },
+    ).toMatchObject({
+      speech: [
+        { from: 61_000, to: 62_000 },
+        { from: 75_000, to: 76_000 },
+      ],
+    });
+  });
+
+  it('Module 08: a SIGNALS file that does not read, or of another length, gives no cuts', async () => {
+    const tables = seed((t) => t.assets.push(faceAsset(30_000, 120_000), signalsAsset()));
+    const broken = setup({ tables, signals: Buffer.from('not gzip') });
+    expect(await broken.service.read(TEST_ORG, CLIP, { follow: true })).toMatchObject({
+      status: 'ready',
+      sceneCutsMs: [],
+    });
+    const stale = setup({ tables, signals: signalsBytes(300_000) });
+    expect(await stale.service.read(TEST_ORG, CLIP, { follow: true })).toMatchObject({
+      sceneCutsMs: [],
+    });
+  });
+
+  it('Module 08: without follow (Detect Camera) reads neither the SIGNALS file nor the transcript', async () => {
+    const tables = seed((t) => t.assets.push(faceAsset(30_000, 120_000), signalsAsset()));
+    const { service, transcripts, storage } = setup({
+      tables,
+      signals: signalsBytes(),
+      transcript: heard(),
+    });
+    expect(await service.read(TEST_ORG, CLIP)).toMatchObject({
+      status: 'ready',
+      sceneCutsMs: [],
+      speech: null,
+    });
+    expect(transcripts.transcriptRow).not.toHaveBeenCalled();
+    // The SIGNALS file is never fetched.
+    expect(storage.getStream).not.toHaveBeenCalled();
+  });
+
+  it('Module 08: the query takes follow=1 or 0 and nothing else', () => {
+    expect(facesReadQuerySchema.parse({ follow: '1' })).toEqual({ follow: '1' });
+    expect(facesReadQuerySchema.parse({})).toEqual({});
+    expect(facesReadQuerySchema.safeParse({ follow: 'yes' }).success).toBe(false);
+    expect(facesReadQuerySchema.safeParse({ other: '1' }).success).toBe(false);
   });
 
   it("never signs another workspace's file", async () => {

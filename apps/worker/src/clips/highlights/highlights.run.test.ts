@@ -329,6 +329,91 @@ describe('runHighlights with a setup (Sprint 13, Module 05)', () => {
     });
   });
 
+  describe('Follow The Speaker (Module 08)', () => {
+    const picked = async () => ({
+      moments: [moment(30_000, 62_000), moment(120_000, 150_000)],
+      noSpeech: false,
+      asked: false,
+    });
+    const answer = {
+      follow: true,
+      marked: 2,
+      faces: { ready: 0, running: 2, failed: 0 },
+      facesOff: false,
+    };
+
+    it('tells the API once the clips are written, when the setup follows', async () => {
+      const { make, rows } = await setup();
+      const finish = jest.spyOn(rows, 'finishHighlights');
+      const followSpeaker = jest.fn(async () => answer);
+      const base = make();
+      const outcome = await runHighlights(
+        make({
+          run: { ...base.run, params: setupParams({ follow: true }) },
+          internal: { pickMoments: picked, followSpeaker },
+        }),
+      );
+      expect(outcome.finished).toBe(true);
+      expect(finish).toHaveBeenCalledTimes(1);
+      expect(followSpeaker).toHaveBeenCalledTimes(1);
+      expect(followSpeaker).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG });
+      // Only after the clips are written.
+      expect(finish.mock.invocationCallOrder[0]).toBeLessThan(
+        followSpeaker.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('never asks when the setup does not follow, or for a run with no setup', async () => {
+      const { make } = await setup();
+      const followSpeaker = jest.fn(async () => answer);
+      const base = make();
+      await runHighlights(
+        make({
+          run: { ...base.run, params: setupParams() },
+          internal: { pickMoments: picked, followSpeaker },
+        }),
+      );
+      await runHighlights(make({ internal: { pickMoments: picked, followSpeaker } }));
+      expect(followSpeaker).not.toHaveBeenCalled();
+    });
+
+    it('a failure is silent: the run still finishes, tried twice on a hiccup, once when refused', async () => {
+      const { make } = await setup();
+      const hiccup = jest.fn(async () => {
+        throw new ClipStepError('tool_failed', { retryable: true });
+      });
+      const base = make();
+      const params = setupParams({ follow: true });
+      const outcome = await runHighlights(
+        make({
+          run: { ...base.run, params },
+          internal: { pickMoments: picked, followSpeaker: hiccup },
+        }),
+      );
+      expect(outcome.finished).toBe(true);
+      expect(hiccup).toHaveBeenCalledTimes(2);
+
+      const refused = jest.fn(async () => {
+        throw new ClipStepError('tool_failed', { retryable: false });
+      });
+      const again = await setup({ jobId: '11111111-aaaa-4bbb-8ccc-000000000009' });
+      const second = again.make();
+      expect(
+        (
+          await runHighlights(
+            again.make({
+              run: { ...second.run, params },
+              internal: { pickMoments: picked, followSpeaker: refused },
+            }),
+          )
+        ).finished,
+      ).toBe(true);
+      expect(refused).toHaveBeenCalledTimes(1);
+      const warned = (console.warn as jest.Mock).mock.calls.map((call) => String(call[0]));
+      expect(warned.some((line) => line.includes('clips.highlights.follow_failed'))).toBe(true);
+    });
+  });
+
   it('reads a run with no setup as Sprint 12 did (Quick Find)', () => {
     expect(readRunSetup(undefined)).toBeNull();
     expect(readRunSetup({ tuning: 'signals-v1' })).toBeNull();

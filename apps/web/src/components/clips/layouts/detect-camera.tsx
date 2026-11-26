@@ -17,6 +17,7 @@ import { Alert, Button, Progress } from '@postgear/ui';
 import {
   type CanvasSize,
   type ClipDocument,
+  disableFollow,
   type FacePictureInput,
   setAreaCrop,
 } from '@postgear/video-engine';
@@ -116,11 +117,14 @@ export function DetectCamera({
 
       // The sums run on the document as it is now: the user may have edited meanwhile.
       let moved = false;
+      // While following the speaker, the Camera box is moved in the person's own layout:
+      // following goes off in the same undo step (Module 08), so `follow.saved` is never stale.
       onEdit(
-        (doc) => {
+        (current) => {
+          const doc = disableFollow(current);
           const camera = cameraAreaOf(doc);
           const crop = camera ? faceCameraCrop(doc, camera, frames, videoSize) : null;
-          if (!camera || !crop) return doc;
+          if (!camera || !crop) return current;
           moved = true;
           return setAreaCrop(doc, camera.id, crop, videoSize);
         },

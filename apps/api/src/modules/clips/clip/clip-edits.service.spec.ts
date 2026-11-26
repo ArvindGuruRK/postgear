@@ -6,6 +6,7 @@
  * delete keeping a sharp file another clip still uses, and tenancy.
  */
 import { HttpException } from '@nestjs/common';
+import { Prisma } from '@postgear/db';
 import type { PrivateStorage } from '@postgear/storage';
 import {
   type ClipDocument,
@@ -218,6 +219,40 @@ describe('ClipEditsService.patch', () => {
       status: 413,
       body: { code: 'clip_document_too_large' },
     });
+  });
+
+  it('Module 08: the first document save takes the follow-on-open mark away, keeping seen', async () => {
+    const tables = seed();
+    const clip = tables.clips[0];
+    if (clip) clip.meta = { seen: 'A car flips over.', followOnOpen: 'speaker' };
+    const { service } = setup(tables);
+    // A rename is not a document save: the mark stays for the first open.
+    const renamed = await service.patch(TEST_ORG, CLIP, { revision: 1, title: 'Renamed' });
+    expect(renamed.clip.meta).toEqual({ seen: 'A car flips over.', followOnOpen: 'speaker' });
+    const saved = await service.patch(TEST_ORG, CLIP, { revision: 2, document: doc() });
+    expect(saved.clip.meta).toEqual({ seen: 'A car flips over.' });
+    expect(tables.clips[0]?.meta).toEqual({ seen: 'A car flips over.' });
+  });
+
+  it('Module 08: with only the mark, the save leaves no meta at all', async () => {
+    const tables = seed();
+    const clip = tables.clips[0];
+    if (clip) clip.meta = { followOnOpen: 'speaker' };
+    const { service } = setup(tables);
+    const saved = await service.patch(TEST_ORG, CLIP, { revision: 1, document: doc() });
+    expect(saved.clip.meta).toBeNull();
+    expect(tables.clips[0]?.meta).toBe(Prisma.DbNull);
+  });
+
+  it('Module 08: a refused save keeps the mark', async () => {
+    const tables = seed();
+    const clip = tables.clips[0];
+    if (clip) clip.meta = { followOnOpen: 'speaker' };
+    const { service } = setup(tables);
+    await refusal(
+      service.patch(TEST_ORG, CLIP, { revision: 1, document: doc(0, 5_000, OTHER_VIDEO) }),
+    );
+    expect(tables.clips[0]?.meta).toEqual({ followOnOpen: 'speaker' });
   });
 
   it('moves a NEW clip to DRAFT on any save, and lets the client hide and unhide', async () => {

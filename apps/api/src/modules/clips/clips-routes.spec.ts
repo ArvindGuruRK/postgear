@@ -38,6 +38,7 @@ import { ClipsCoreModule } from './clips-core.module';
 import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
 import { ClipDownloadsService } from './downloads/clip-downloads.service';
 import { ClipHighlightsService } from './highlights/clip-highlights.service';
+import { ClipFollowService } from './faces/clip-follow.service';
 import { ClipMomentsService } from './highlights/clip-moments.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
@@ -325,6 +326,11 @@ describe('Clips routes', () => {
       })
       .overrideProvider(ClipMomentsService)
       .useValue({ pick: async (jobId: string, org: string) => ({ reached: 'pick', jobId, org }) })
+      // Module 08: a run's clips marked to follow, faces for the best three.
+      .overrideProvider(ClipFollowService)
+      .useValue({
+        forRun: async (jobId: string, org: string) => ({ reached: 'follow', jobId, org }),
+      })
       .compile();
 
     app = moduleRef.createNestApplication({ logger: false });
@@ -739,10 +745,22 @@ describe('Clips routes', () => {
       .send({ setup: { ...setup, genre: 'gaming' } })
       .expect(202);
     expect(withSetup.body.setup).toMatchObject({ genre: 'gaming' });
+    // Module 08: Follow The Speaker is a real switch, on a vertical or square shape only.
+    expect(
+      (
+        await request(server)
+          .post(`/clips/videos/${video}/highlights`)
+          .send({ setup: { ...setup, follow: true } })
+          .expect(202)
+      ).body.setup,
+    ).toMatchObject({ follow: true });
     await request(server)
       .post(`/clips/videos/${video}/highlights`)
-      // Module 06 made Look For Action a real switch; Follow The Speaker is still held off.
-      .send({ setup: { ...setup, follow: true } })
+      .send({ setup: { ...setup, ratio: '16:9', follow: true } })
+      .expect(400);
+    await request(server)
+      .post(`/clips/videos/${video}/highlights`)
+      .send({ setup: { ...setup, silences: true } })
       .expect(400);
     await request(server)
       .post(`/clips/videos/${video}/highlights`)
@@ -772,5 +790,25 @@ describe('Clips routes', () => {
       .send({ organizationId: 'seed-demo-org' })
       .expect(200);
     expect(answer.body).toEqual({ reached: 'pick', jobId: job, org: 'seed-demo-org' });
+  });
+
+  it('marks a run to follow the speaker only with the worker token', async () => {
+    const server = app.getHttpServer();
+    const job = '77777777-7777-4777-8777-777777777777';
+    await request(server)
+      .post(`/internal/clips/jobs/${job}/follow-speaker`)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(401);
+    await request(server)
+      .post(`/internal/clips/jobs/${job}/follow-speaker`)
+      .set('X-PostGear-Internal', TOKEN)
+      .send({ organizationId: 'seed-demo-org', clipIds: ['x'] })
+      .expect(400);
+    const answer = await request(server)
+      .post(`/internal/clips/jobs/${job}/follow-speaker`)
+      .set('X-PostGear-Internal', TOKEN)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(200);
+    expect(answer.body).toEqual({ reached: 'follow', jobId: job, org: 'seed-demo-org' });
   });
 });

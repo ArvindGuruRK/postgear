@@ -74,6 +74,7 @@ import {
   MAX_CLIP_TITLE_LENGTH,
   type MoreVideoInput,
 } from './clip-item.schema';
+import { type ClipMetaView, clipMetaView } from './clip-meta';
 import { type ClipState, clipStateOf, scheduledClipIds } from './clip-state';
 import { documentRange, sharpSourceFor } from './sharp-source';
 
@@ -109,6 +110,11 @@ export interface ClipView {
   exportedMediaId: string | null;
   /** The clip document (video ids only, never a storage key); null if it cannot be read. */
   document: ClipDocument | null;
+  /**
+   * Sprint 13: `Clip.meta`'s known keys (`seen`, Module 06; `followOnOpen:
+   * 'speaker'`, Module 08), or null when there are none.
+   */
+  meta: ClipMetaView | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -249,7 +255,11 @@ export class ClipItemService {
     ]);
 
     let sharp: SharpState = source?.kind === 'segment' ? 'ready' : open > 0 ? 'fetching' : 'gone';
-    if (sharp === 'gone' && (clip.origin === 'AI_SIGNALS' || clip.origin === 'AI_TRANSCRIPT') && live.status === 'READY') {
+    if (
+      sharp === 'gone' &&
+      (clip.origin === 'AI_SIGNALS' || clip.origin === 'AI_TRANSCRIPT') &&
+      live.status === 'READY'
+    ) {
       // Module 16: an AI clip is made without its sharp range; the first open fetches it.
       if (await this.firstOpenSegment(orgId, clip, live, view.document, assets)) sharp = 'fetching';
     }
@@ -498,6 +508,7 @@ export function toClipView(clip: Clip, scheduled = false): ClipView {
     lastExportedRevision: clip.lastExportedRevision,
     exportedMediaId: clip.exportedMediaId,
     document: parsed.ok ? parsed.doc : null,
+    meta: clipMetaView(clip.meta),
     createdAt: clip.createdAt.toISOString(),
     updatedAt: clip.updatedAt.toISOString(),
   };

@@ -238,6 +238,37 @@ def test_simulated_two_speakers_shows_both_markers_from_the_plan(tmp_path: Path)
     assert out.producer == "simulation"
 
 
+def test_simulated_two_speakers_talk_in_the_plans_turns_and_one_is_lost_for_a_while() -> None:
+    plan = json.loads(PLAN.read_text())["twoSpeakers"]
+    ids = [s["id"] for s in plan["speakers"]]
+    turns = [(ids.index(t["speaker"]), t["startSec"], t["endSec"]) for t in plan["turns"]]
+    assert list(simulated_faces.TWO_SPEAKERS_TURNS) == turns
+
+    def heights(from_s: float, to_s: float, centre_x: float) -> list[float]:
+        out = []
+        for t in range(int(from_s * 1000), int(to_s * 1000), 200):
+            out += [
+                f.h
+                for f in simulated_faces.recorded_faces("two-speakers", t)
+                if round(f.x + f.w / 2, 2) == centre_x
+            ]
+        return out
+
+    # 15 to 26.5 s is the right marker's turn: its box height moves, the left one's stays.
+    talking = heights(15.2, 26.4, 0.73)
+    listening = heights(15.2, 26.4, 0.27)
+    assert len(set(talking)) > 5
+    assert set(listening) == {0.44}
+    assert all(abs(h - 0.44) <= 0.44 * simulated_faces.MOUTH_MOVE + 1e-9 for h in talking)
+
+    who, lost_from, lost_to = simulated_faces.LOST_SPEAKER
+    assert lost_to - lost_from >= 2_500
+    assert any(who == w and s * 1000 < lost_from and lost_to < e * 1000 for w, s, e in turns)
+    for t in range(lost_from, lost_to, 200):
+        boxes = simulated_faces.recorded_faces("two-speakers", t)
+        assert all(round(b.x + b.w / 2, 2) != 0.27 for b in boxes)
+
+
 def test_simulated_stream_has_a_still_small_face_in_the_corner(tmp_path: Path) -> None:
     deps, _ = make_deps(tmp_path, simulated=True)
     out = detect_faces(payload([(30_000, 90_000)], durationMs=600_000, **sim("stream")), deps)

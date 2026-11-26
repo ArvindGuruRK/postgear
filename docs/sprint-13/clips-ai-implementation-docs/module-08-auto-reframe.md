@@ -1,6 +1,6 @@
 # Module 08: Auto-Reframe
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done (2026-11-27) | Size: L (one full session)
 > **Depends on**: [Module 07](module-07-face-detection-and-detect-camera.md)
 > **Stories**: CA-4.2
 > **Next**: [Module 09](module-09-ai-effects.md), [Module 10](module-10-recipes-and-brand-kit.md)
@@ -91,14 +91,15 @@ Per blueprint section 6:
 
 ## Tasks
 
-- [ ] `reframe/speaker.ts`, `reframe/path.ts`, `reframe/tuning.ts`, with tests.
-- [ ] `enableFollow`, `disableFollow`, overrides in the document.
-- [ ] The Layouts controls: the switch, Show Both, the picker, the none-found line.
-- [ ] `SpeakerStrip`, Fix By Hand.
-- [ ] The setup switch end to end.
-- [ ] The `sendcmd` crop command file in `compileFfmpeg` with its 480-key test; stills for a moving crop; the `two-speakers` timing check; title-case test green.
-- [ ] Playwright once under simulation on the `two-speakers` sample: turn it on, play, Show Both, fix a lost stretch, turn it off, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `reframe/speaker.ts`, `reframe/path.ts`, `reframe/tuning.ts`, with tests.
+- [x] `enableFollow`, `disableFollow`, overrides in the document (`reframe/follow.ts`; `follow.saved` and `follow.personId` added to the reserved shape).
+- [x] The Layouts controls: the switch, Show Both, the picker, the none-found line.
+- [x] `SpeakerStrip`, Fix By Hand.
+- [x] The setup switch end to end (clips marked `followOnOpen`, faces asked for the top three during the run, the path worked out in the editor on first open: see the Decision Log).
+- [x] The `sendcmd` crop command file in `compileFfmpeg` with its 480-key test; stills for a moving crop; the `two-speakers` timing check; title-case test green.
+- [x] Playwright once under simulation on the `two-speakers` sample: Clip Setup with the switch, follow on first open, the strip, a lost stretch fixed by hand, Show Both, off and Undo, Preview Export, a 720p export with stills. Screenshots `screenshots/s13-m08-*`. Trimming was checked by the engine tests (keyframes in source time), not by dragging in the browser.
+- [x] `verify-change`; update the Progress table and the Decision Log.
+- [ ] A real podcast or stream (the real-test plan): needs a real face model (Module 07's real check) and Arvind's video. The thresholds in `reframe/tuning.ts` are tuned once from his marks.
 
 ## Tests
 
