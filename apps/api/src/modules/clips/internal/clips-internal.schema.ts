@@ -5,6 +5,7 @@
  * is refused, so a drift between the two processes shows up as a 400 and a
  * loud log line on the worker, never as a guess.
  */
+import { CLIP_STILL_BURSTS_MAX, CLIP_STILLS_PER_BURST } from '@postgear/scheduling';
 import { z } from 'zod';
 
 /** A workspace id: a UUID, or a seeded slug such as `seed-demo-org`. */
@@ -22,8 +23,38 @@ export const chargeImportSchema = z
   .strict();
 export type ChargeImportBody = z.infer<typeof chargeImportSchema>;
 
+/** Module 06: Look For Action's still check, a few bursts of four stills each. */
+export const checkStillsSchema = z
+  .object({
+    organizationId,
+    bursts: z
+      .array(
+        z
+          .object({
+            stillKeys: z.array(z.string().min(1).max(512)).min(1).max(CLIP_STILLS_PER_BURST),
+            momentSec: z
+              .number()
+              .min(0)
+              .max(MAX_VIDEO_MS / 1000),
+            spanSec: z.number().min(0).max(60),
+            withSound: z.boolean(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(CLIP_STILL_BURSTS_MAX),
+  })
+  .strict();
+export type CheckStillsBody = z.infer<typeof checkStillsSchema>;
+
 export const orgOnlySchema = z.object({ organizationId }).strict();
 export type OrgOnlyBody = z.infer<typeof orgOnlySchema>;
+
+/** Every charge of the job, or (Module 06) only Look For Action's. */
+export const reverseSchema = z
+  .object({ organizationId, step: z.enum(['action']).optional() })
+  .strict();
+export type ReverseBody = z.infer<typeof reverseSchema>;
 
 export const finishExportSchema = z
   .object({

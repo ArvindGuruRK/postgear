@@ -884,3 +884,7 @@ A workspace's own caption styles. The six built-in styles are code in `packages/
 - **A clip names a style by id, with no foreign key**: the id lives inside the clip document (`styleId`), which also names built-in styles by their slug. Deleting a style a clip still uses is allowed; that clip draws and exports in the default style.
 - **A clip's own transcripts carry `clipId`.** A supplied captions file and a translation are `ClipAsset` rows of kind `TRANSCRIPT` with the `clipId` set; the video's listened transcript keeps `clipId: null`. No new column: `ClipAsset.clipId` already existed. `meta` gained `fileName`, `origin` (the transcript a translation was made from) and `inputHash` (what makes the same translation request free the second time).
 
+
+### `Clip.meta` (Module 06, `20261126200000_sprint13_clip_meta`)
+
+Nullable JSON for small facts about how AI found a clip, kept apart from the reason codes. Today only `{ seen }`: Look For Action's still check, one sentence of at most 15 words about what is on screen, written only when the run started with `CLIPS_ACTION_VISION` on. Additive, no backfill. The API reads `seen` into the clip summary (trimmed, at most 200 characters); it is never logged.

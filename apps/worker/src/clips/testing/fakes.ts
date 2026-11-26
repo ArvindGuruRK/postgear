@@ -41,6 +41,8 @@ export interface FakeClip extends ClipRow {
   sent?: boolean;
   score?: number | null;
   reasons?: string[];
+  /** Module 06: what the still check saw. */
+  meta?: { seen: string };
   highlightRunId?: string | null;
   document?: unknown;
   createdAt?: Date;
@@ -272,6 +274,7 @@ export class FakeRows implements ClipRows {
         status: 'NEW',
         score: clip.score,
         reasons: clip.reasons,
+        ...(clip.seen ? { meta: { seen: clip.seen } } : {}),
         highlightRunId: args.runId,
         document: clip.document,
         createdAt: new Date(args.now.getTime() - index),

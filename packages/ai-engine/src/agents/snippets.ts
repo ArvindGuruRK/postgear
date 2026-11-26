@@ -17,6 +17,7 @@
  */
 import { normaliseRunError, providerError } from '../model/resilience';
 import { pickMoments, writeTitles } from './moments';
+import { checkStills } from './still-checker';
 import { truncateAtSentence } from '../prompts/content';
 import {
   buildHashtagPrompt,
@@ -254,5 +255,6 @@ export function createSnippetWriter(model: ModelClient): SnippetWriter {
     translate: (request, options) => translateLines(model, request, options),
     pickMoments: (request, options) => pickMoments(model, request, options),
     writeTitles: (request, options) => writeTitles(model, request, options),
+    checkStills: (request, options) => checkStills(model, request, options),
   };
 }

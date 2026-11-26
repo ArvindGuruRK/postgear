@@ -148,6 +148,8 @@ export interface NewHighlightClip {
   reasons: string[];
   /** Sprint 13, Module 05: picked from the transcript; Sprint 12's signals otherwise. */
   origin?: 'AI_SIGNALS' | 'AI_TRANSCRIPT';
+  /** Module 06: what the still check saw (one sentence), when it looked. */
+  seen?: string | null;
 }
 
 export interface FinishHighlightsArgs {
@@ -743,9 +745,11 @@ export const prismaClipRows: ClipRows = {
               videoId: args.videoId,
               title: clip.title,
               status: ClipStatus.NEW,
-              origin: clip.origin === 'AI_TRANSCRIPT' ? ClipOrigin.AI_TRANSCRIPT : ClipOrigin.AI_SIGNALS,
+              origin:
+                clip.origin === 'AI_TRANSCRIPT' ? ClipOrigin.AI_TRANSCRIPT : ClipOrigin.AI_SIGNALS,
               score: clip.score,
               reasons: clip.reasons,
+              ...(clip.seen ? { meta: { seen: clip.seen } } : {}),
               highlightRunId: args.runId,
               document: clip.document as Prisma.InputJsonValue,
               revision: 1,

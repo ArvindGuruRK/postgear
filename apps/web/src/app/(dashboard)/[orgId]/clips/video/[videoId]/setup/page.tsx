@@ -11,7 +11,7 @@ import { SetupForm } from '@/components/clips/setup/setup-form';
 import { ClipsWorkspaceWaiting } from '@/components/clips/workspace-waiting';
 import { ApiError, serverApi } from '@/lib/api';
 import { getActiveOrgId, getSessionCookieHeader } from '@/lib/session';
-import type { ClipVideoDetail } from '@/types/clips';
+import type { ClipsStatus, ClipVideoDetail } from '@/types/clips';
 
 export const metadata: Metadata = { title: 'Clip Setup' };
 
@@ -26,17 +26,31 @@ export default async function ClipSetupRoute({
       </ClipsDesktopOnly>
     );
   }
-  const detail = await serverApi<ClipVideoDetail>(`/clips/videos/${encodeURIComponent(videoId)}`, {
-    cookie,
-  }).catch((cause: unknown) => {
-    if (cause instanceof ApiError && (cause.status === 404 || cause.status === 400)) return null;
-    throw cause;
-  });
+  const [detail, status] = await Promise.all([
+    serverApi<ClipVideoDetail>(`/clips/videos/${encodeURIComponent(videoId)}`, {
+      cookie,
+    }).catch((cause: unknown) => {
+      if (cause instanceof ApiError && (cause.status === 404 || cause.status === 400)) return null;
+      throw cause;
+    }),
+    // Module 06: whether Look For Action can run, and whether it shows stills to AI.
+    serverApi<{ status: ClipsStatus }>('/clips/status', { cookie })
+      .then((answer) => answer.status)
+      .catch(() => null),
+  ]);
   if (detail?.video.status !== 'READY') notFound();
 
   return (
     <ClipsDesktopOnly>
-      <SetupForm key={videoId} orgId={orgId} detail={detail} />
+      <SetupForm
+        key={videoId}
+        orgId={orgId}
+        detail={detail}
+        action={{
+          available: status?.ai?.action ?? false,
+          vision: status?.ai?.actionVision ?? false,
+        }}
+      />
     </ClipsDesktopOnly>
   );
 }

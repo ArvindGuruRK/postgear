@@ -158,6 +158,11 @@ function ClipRow({
           {reasons.join(', ')}
         </p>
       ) : null}
+      {isAi && clip.seen ? (
+        <p className="m-0 font-sans text-xs text-ink type-muted" data-testid="video-clip-seen">
+          {clip.seen}
+        </p>
+      ) : null}
       <div className="flex items-center gap-1.5">
         <span className="shrink-0 whitespace-nowrap font-sans text-xs text-ink tabular-nums type-muted">
           {clipFacts(clip)}

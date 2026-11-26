@@ -18,6 +18,8 @@ import {
   CLIP_INTERNAL_ROUTES,
   type ClipChargeImportAnswer,
   type ClipChargeImportBody,
+  type ClipCheckStillsAnswer,
+  type ClipCheckStillsBody,
   type ClipFinishExportAnswer,
   type ClipFinishExportBody,
   type ClipFinishSaveDownloadAnswer,
@@ -40,6 +42,8 @@ export interface ClipInternalClient {
   reverseCharges(jobId: string, body: ClipReverseBody): Promise<ClipReverseAnswer>;
   /** Sprint 13, Module 05: the run's transcript read for moments (the API holds the model). */
   pickMoments(jobId: string, body: ClipReverseBody): Promise<ClipPickMomentsAnswer>;
+  /** Module 06: Look For Action's check on stills (a run with the vision check on). */
+  checkStills(jobId: string, body: ClipCheckStillsBody): Promise<ClipCheckStillsAnswer>;
   finishExport(jobId: string, body: ClipFinishExportBody): Promise<ClipFinishExportAnswer>;
   /** Module 18: Save To Media's copy becomes a Media row. */
   finishSaveDownload(
@@ -115,6 +119,7 @@ export function createClipInternalClient(config: ClipInternalClientConfig): Clip
     chargeImport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.chargeImport(jobId), body),
     reverseCharges: (jobId, body) => call(CLIP_INTERNAL_ROUTES.reverseCharges(jobId), body),
     pickMoments: (jobId, body) => call(CLIP_INTERNAL_ROUTES.pickMoments(jobId), body),
+    checkStills: (jobId, body) => call(CLIP_INTERNAL_ROUTES.checkStills(jobId), body),
     finishExport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishExport(jobId), body),
     finishSaveDownload: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishSaveDownload(jobId), body),
     async settled(jobId, body) {

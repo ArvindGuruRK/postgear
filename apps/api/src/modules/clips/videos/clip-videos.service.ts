@@ -107,6 +107,8 @@ export interface ClipSummaryView {
   score: number | null;
   /** Module 16: why an AI clip was picked, as reason codes (best first, up to three). */
   reasons: HighlightReason[];
+  /** Module 06: what AI saw on screen (one sentence), when Look For Action looked at stills. */
+  seen: string | null;
   revision: number;
   /** The last export drew this very revision. */
   exported: boolean;
@@ -569,6 +571,13 @@ function cleanText(value: string, max: number): string {
   return stripControlChars(value).replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+/** Module 06: the still check's sentence kept on the clip, or null. */
+function seenOf(meta: unknown): string | null {
+  if (!meta || typeof meta !== 'object') return null;
+  const seen = (meta as { seen?: unknown }).seen;
+  return typeof seen === 'string' && seen.trim() ? seen.trim().slice(0, 200) : null;
+}
+
 /**
  * A clip's summary; `scheduled` says whether one of its post groups still has
  * a post waiting, `exportProgress` how far its open export is (Module 15).
@@ -589,6 +598,7 @@ export function toClipSummary(
     durationMs: row.durationMs,
     score: row.score,
     reasons: row.reasons.filter(isHighlightReason),
+    seen: seenOf(row.meta),
     revision: row.revision,
     exported: row.lastExportedRevision !== null && row.lastExportedRevision === row.revision,
     exportedMediaId: row.exportedMediaId,

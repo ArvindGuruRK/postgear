@@ -1278,6 +1278,21 @@ A Jest test and a pytest test fail when either file is stale, and both sides par
 
 Under simulation the moment picker answers from the transcript, the request and the genre, so Gaming and Podcast pick differently and the same setup gives the same clips every time; titles are the moment's first words.
 
+**Look For Action (Module 06).** Needs the Python worker (`MEDIA_SIMULATION=true`) as well as the Node worker. On the same stream sample:
+
+| Do this | What you should see |
+|---|---|
+| Open Clip Setup | A **Look For Action** card with its price beside it before it is on ("+5 AI Minutes" for the whole 10 minutes) and "Finds sudden action in the picture. It does not know the rules of your game." |
+| Turn it on | A "Looking For Action" line joins the Summary and the total rises by that much; the Summary lists "Looking for action" |
+| Press **Find Clips** | The steps include "Watching for action"; some clips carry "Sudden movement on screen" among their reasons; the note reads "AI listened to what was said and watched for action." |
+| Set `CLIPS_ACTION_VISION="true"` in `.env`, restart the API, run again | The card adds "We also look at a few still pictures of each burst."; clips the stills check found something in read "Something unexpected happens" and carry one sentence under their reasons about what is on screen (under simulation a fixed sentence per moment, picked from the burst's time; bursts with no sound rise are "nothing notable" and dropped) |
+| Look in the private bucket under the video's folder (MinIO console, `postgear-clips`) | No `still-*`, `motion-*` or `watch-state-*` file is left after any run, finished, failed or cancelled |
+| Rename the video to hold `[simulate:action-fail]`, run again | The run still finishes, without action clips; the Looking For Action minutes come back (the meter shows it) |
+| Rename it to hold `[simulate:action-slow]` | The motion step holds about 10 seconds, long enough to press Cancel; nothing is kept and every AI minute comes back |
+| Rename it to hold `[simulate:stills-fail]` (vision on) | The run finishes; the action clips keep "Sudden movement on screen" with no sentence |
+
+With `CLIPS_ACTION_VISION` off (the default) no picture ever leaves the system: the stills are not even cut. Under simulation the motion values are recorded per sample (the stream has a cut spike plus action after it and three quiet bursts; the talk samples are calm), and the stills are one test pattern, never a real frame.
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

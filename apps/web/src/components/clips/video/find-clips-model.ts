@@ -83,7 +83,7 @@ export function findClipsNotes(
   // Sprint 13, Module 05: what a run with a setup did.
   if (!running && run?.status === 'DONE' && run.ai) {
     if (run.ai.noSpeech) notes.push(NO_SPEECH_NOTE);
-    else if (run.ai.read) notes.push(LISTENED_NOTE);
+    else if (run.ai.read) notes.push(run.ai.watched ? WATCHED_NOTE : LISTENED_NOTE);
     if (run.ai.asked && run.ai.matched === 0 && run.found > 0) notes.push(NOTHING_MATCHED_NOTE);
   }
   return notes;
@@ -91,6 +91,8 @@ export function findClipsNotes(
 
 /** Sprint 13, Module 05: the run listened and read. */
 export const LISTENED_NOTE = 'AI listened to what was said and looked at sound and picture.';
+/** Module 06: the run listened, read, and watched for action. */
+export const WATCHED_NOTE = 'AI listened to what was said and watched for action.';
 /** No speech in the stretch: the clips come from the signals alone. */
 export const NO_SPEECH_NOTE =
   'We could not hear any speech, so these clips come from sound and picture only.';

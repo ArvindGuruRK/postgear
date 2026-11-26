@@ -39,6 +39,7 @@ import { MediaService } from '../../media/media.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { isUuid } from '../clips.ids';
 import { CLIPS_MESSAGES } from '../clips.messages';
+import { readSetupParams } from '../highlights/clip-moments.service';
 import { serializable } from '../clips.tx';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
@@ -49,6 +50,7 @@ import type {
   FinishExportBody,
   FinishSaveDownloadBody,
   OrgOnlyBody,
+  ReverseBody,
 } from './clips-internal.schema';
 
 const OPEN: readonly ClipJobStatus[] = [ClipJobStatus.QUEUED, ClipJobStatus.RUNNING];
@@ -82,9 +84,31 @@ export class ClipsInternalService {
     return { charged: true, units };
   }
 
-  async reverseCharges(jobId: string, body: OrgOnlyBody): Promise<ClipReverseAnswer> {
+  async reverseCharges(jobId: string, body: ReverseBody): Promise<ClipReverseAnswer> {
     if (!isUuid(jobId)) throw jobNotFound();
+    if (body.step === 'action') return { reversed: await this.reverseAction(jobId, body) };
     return { reversed: await this.usage.reverseAllFor(body.organizationId, jobId) };
+  }
+
+  /**
+   * Module 06: Look For Action's charge only, when its motion measure failed
+   * and the run went on without it. The entry is read from the run (never
+   * from the worker), so only this job's own action charge can be given back.
+   */
+  private async reverseAction(jobId: string, body: ReverseBody): Promise<number> {
+    const job = await prisma.clipJob.findFirst({
+      where: { id: jobId, organizationId: body.organizationId, kind: ClipJobKind.HIGHLIGHTS },
+      select: { highlightRunId: true },
+    });
+    if (!job?.highlightRunId) throw jobNotFound();
+    const run = await prisma.clipHighlightRun.findFirst({
+      where: { id: job.highlightRunId, organizationId: body.organizationId },
+      select: { params: true },
+    });
+    const entry = run ? readSetupParams(run.params)?.charges.action : null;
+    if (!entry) return 0;
+    const reversed = await this.usage.reverse(body.organizationId, entry);
+    return reversed.duplicate ? 0 : 1;
   }
 
   async settled(jobId: string, body: OrgOnlyBody): Promise<ClipSettledAnswer> {

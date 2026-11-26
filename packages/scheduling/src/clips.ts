@@ -69,6 +69,22 @@ export const MEDIA_PY_TIMINGS = Object.freeze({
     heartbeatMs: 10 * 60_000,
     maximumAttempts: 2,
   }),
+  // Module 06: the picture measure decodes two small frames a second; an hour
+  // of a stretch is a few minutes on a processor. A heartbeat every stretch
+  // and every few hundred frames. Two attempts.
+  mediaPyMotion: Object.freeze({
+    startToCloseMs: 2 * 60 * 60_000,
+    scheduleToCloseMs: 2 * 60 * 60_000 + 5 * 60_000,
+    heartbeatMs: 5 * 60_000,
+    maximumAttempts: 2,
+  }),
+  // At most 48 stills, each one seek and one picture.
+  mediaPyStills: Object.freeze({
+    startToCloseMs: 10 * 60_000,
+    scheduleToCloseMs: 12 * 60_000,
+    heartbeatMs: 2 * 60_000,
+    maximumAttempts: 2,
+  }),
 } satisfies Record<string, MediaPyTiming>);
 
 /** The roles a worker process can take, and the queue each serves. */
@@ -486,6 +502,13 @@ export const CLIP_INTERNAL_ROUTES = {
    * picks, fits and titles; the worker blends the answer with the signals.
    */
   pickMoments: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/pick-moments`,
+  /**
+   * Sprint 13, Module 06: Look For Action's check on stills. The worker names
+   * the stills (keys of this job only); the API reads them, asks the model
+   * closed questions and answers one verdict a burst. Only on a run that
+   * started with the vision switch on.
+   */
+  checkStills: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/check-stills`,
   /** A finished export becomes a Media row, the clip is marked exported, the notification written. */
   finishExport: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/finish-export`,
   /**
@@ -565,6 +588,11 @@ export interface ClipChargeImportAnswer {
 
 export interface ClipReverseBody {
   organizationId: string;
+  /**
+   * Module 06: give back only this step's charge (Look For Action when its
+   * motion measure failed and the run went on without it). Absent: every charge.
+   */
+  step?: 'action';
 }
 
 /** One moment the picker found, fitted to a sentence at each end. Video time. Never the words. */
@@ -589,6 +617,37 @@ export interface ClipPickMomentsAnswer {
   /** The person asked for something. */
   asked: boolean;
 }
+
+/** One burst for the still check: its four stills (this job's keys) and two facts. */
+export interface ClipStillBurst {
+  stillKeys: string[];
+  /** Where its peak is, seconds into the video. */
+  momentSec: number;
+  spanSec: number;
+  withSound: boolean;
+}
+
+export interface ClipCheckStillsBody {
+  organizationId: string;
+  bursts: ClipStillBurst[];
+}
+
+/** What the check saw in one burst; null when its call failed (the burst counts as unchecked). */
+export interface ClipStillVerdict {
+  notable: boolean;
+  kind: 'crash_or_fall' | 'win_or_score' | 'surprise' | 'visual_gag' | 'nothing';
+  sure: number;
+  /** One sentence of at most 15 words; empty when not notable. */
+  line: string;
+}
+
+export interface ClipCheckStillsAnswer {
+  verdicts: Array<ClipStillVerdict | null>;
+}
+
+/** The most bursts one run shows the still checker, and stills a burst. */
+export const CLIP_STILL_BURSTS_MAX = 12;
+export const CLIP_STILLS_PER_BURST = 4;
 
 export interface ClipReverseAnswer {
   /** Entries reversed by this call (0 when already reversed or never charged). */

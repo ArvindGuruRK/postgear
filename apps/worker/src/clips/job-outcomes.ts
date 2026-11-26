@@ -44,6 +44,7 @@ import {
   allImportKeys,
   exportMediaKeys,
   heardFileKey,
+  allWatchKeys,
   highlightsSignalsKey,
   segmentKey,
 } from './keys';
@@ -370,7 +371,8 @@ async function closeHighlights(
   if (videoId) {
     await deleteKeys(
       (key) => deps.privateStorage.delete(key),
-      [highlightsSignalsKey(org, videoId, job.id)],
+      // Module 06: the motion file, the state file and every still go too.
+      [highlightsSignalsKey(org, videoId, job.id), ...allWatchKeys(org, videoId, job.id)],
       job.id,
     );
   }

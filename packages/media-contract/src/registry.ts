@@ -11,6 +11,13 @@ import { z } from 'zod/v4';
 import { MEDIA_CONTRACT_VERSION, MEDIA_PY_ACTIVITY_NAMES } from './names';
 import { mediaPyHealthInput, mediaPyHealthOutput } from './shapes/health';
 import { heardFile, mediaPyTranscribeInput, mediaPyTranscribeOutput } from './shapes/transcribe';
+import {
+  mediaPyMotionInput,
+  mediaPyMotionOutput,
+  mediaPyStillsInput,
+  mediaPyStillsOutput,
+  motionFile,
+} from './shapes/visual';
 
 export interface ActivityShapes {
   input: z.ZodType;
@@ -27,6 +34,8 @@ export const MEDIA_PY_CONTRACT = {
     input: mediaPyTranscribeInput,
     output: mediaPyTranscribeOutput,
   },
+  [MEDIA_PY_ACTIVITY_NAMES.motion]: { input: mediaPyMotionInput, output: mediaPyMotionOutput },
+  [MEDIA_PY_ACTIVITY_NAMES.stills]: { input: mediaPyStillsInput, output: mediaPyStillsOutput },
 } as const satisfies Record<string, ActivityShapes>;
 
 /**
@@ -36,6 +45,7 @@ export const MEDIA_PY_CONTRACT = {
  */
 export const MEDIA_FILE_SHAPES = {
   HeardFile: heardFile,
+  MotionFile: motionFile,
 } as const satisfies Record<string, z.ZodType>;
 
 export type MediaFileName = keyof typeof MEDIA_FILE_SHAPES;

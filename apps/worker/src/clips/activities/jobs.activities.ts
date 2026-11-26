@@ -37,15 +37,26 @@ import {
   runFfmpeg,
   withScratch,
 } from '@postgear/media-tools';
-import type { MediaPyTranscribeInput, MediaPyTranscribeOutput } from '@postgear/media-contract';
+import type {
+  MediaPyMotionInput,
+  MediaPyStillsInput,
+  MediaPyTranscribeInput,
+  MediaPyTranscribeOutput,
+} from '@postgear/media-contract';
 import type { ClipJobWorkflowInput } from '@postgear/scheduling';
 import { downloadOutputSchema } from '@postgear/video-engine';
-import { runClipActivity } from '../activity-kit';
+import { type ActivityRun, runClipActivity } from '../activity-kit';
 import type { ClipActivityDeps } from '../deps';
 import { type DownloadTools, runDownload } from '../download/download.run';
 import { runSaveDownload, saveDownloadFailed } from '../download/save-download.run';
 import { ClipStepError } from '../failures';
-import { type HighlightsRun, runHighlights } from '../highlights/highlights.run';
+import {
+  gatherHighlights,
+  type HighlightsRun,
+  readRunSetup,
+  runHighlights,
+} from '../highlights/highlights.run';
+import { finishWatching, lookForAction, startWatching } from '../highlights/watch';
 import { deleteQuietly, runImport } from '../import/import.steps';
 import { type ImportTools, mediaImportTools } from '../import/import.tools';
 import { cancelJob, failJob, type JobFailure, openJob } from '../job-outcomes';
@@ -67,6 +78,20 @@ export interface ClipWorkResult {
 export type TranscribePrepared =
   | { status: 'closed' }
   | { status: 'ready'; payload: MediaPyTranscribeInput };
+
+/**
+ * Module 06: a Find Clips run's first step. `watch`: the run asks to Look For
+ * Action, and this is the motion measure's input (null: the stored motion
+ * track covers the stretch, or there is nothing to measure).
+ */
+export type HighlightsStep =
+  | ClipWorkResult
+  | { status: 'watch'; motion: MediaPyMotionInput | null };
+
+/** Module 06: the look step's answer: the stills to cut, if any. */
+export type HighlightsLook =
+  | { status: 'closed'; stills: null }
+  | { status: 'look'; stills: MediaPyStillsInput | null };
 
 export interface RenderWaitState {
   /** The job is no longer open: the workflow ends quietly. */
@@ -135,6 +160,60 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
     internal: deps.internal,
     now,
   };
+
+  /**
+   * A highlights run's rows, checked. `first`: the run's first step, which
+   * moves the job and the run to RUNNING (null when it was closed meanwhile).
+   * A later step answers null when the job is no longer open.
+   */
+  async function openHighlights(ref: ClipJobWorkflowInput, first: boolean) {
+    const { job, input } = await openJob(rows, ref, 'HIGHLIGHTS');
+    const run = await rows.highlightRun(job.organizationId, input.runId);
+    if (!run || run.videoId !== input.videoId) {
+      throw new ClipStepError('highlights_failed', { retryable: false });
+    }
+    const progress = jobProgress(job.id, { kind: 'HIGHLIGHTS' });
+    if (first) {
+      if (!(await start(progress))) return null;
+      await rows.markRunRunning(job.organizationId, run.id);
+    } else if (job.status !== 'RUNNING' && job.status !== 'QUEUED') {
+      return null;
+    }
+    const [video, link] = await Promise.all([
+      rows.video(job.organizationId, input.videoId),
+      rows.videoLink(job.organizationId, input.videoId),
+    ]);
+    if (!video || video.deletedAt || video.status !== 'READY' || !link) {
+      throw new ClipStepError('highlights_failed', { retryable: false });
+    }
+    return { job, input, run, video, link, progress };
+  }
+
+  function highlightsRun(
+    opened: NonNullable<Awaited<ReturnType<typeof openHighlights>>>,
+    dir: string,
+    activity: ActivityRun,
+  ): HighlightsRun {
+    return {
+      jobId: opened.job.id,
+      organizationId: opened.job.organizationId,
+      input: opened.input,
+      run: opened.run,
+      video: opened.video,
+      link: opened.link,
+      dir,
+      signal: activity.signal,
+      producers: deps.providers.signalProducers,
+      privateStorage: deps.privateStorage,
+      rows,
+      progress: opened.progress,
+      heartbeat: activity.heartbeat,
+      now,
+      simulated: deps.providers.simulated,
+      sleep: options.sleep,
+      internal: deps.internal,
+    };
+  }
 
   return {
     async clipImport(ref: ClipJobWorkflowInput): Promise<ClipWorkResult> {
@@ -264,47 +343,58 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
       });
     },
 
-    async clipHighlights(ref: ClipJobWorkflowInput): Promise<ClipWorkResult> {
+    /**
+     * A Find Clips run's first (or only) step. With Look For Action (Module
+     * 06) it stops after gathering and answers the motion measure's input;
+     * the workflow goes on with `mediaPyMotion`, `clipHighlightsLook`,
+     * `mediaPyStills` and `clipHighlightsFinish`.
+     */
+    async clipHighlights(ref: ClipJobWorkflowInput): Promise<HighlightsStep> {
       return runClipActivity('clipHighlights', ref.jobId, async (activity) => {
-        const { job, input } = await openJob(rows, ref, 'HIGHLIGHTS');
-        const run = await rows.highlightRun(job.organizationId, input.runId);
-        if (!run || run.videoId !== input.videoId) {
-          throw new ClipStepError('highlights_failed', { retryable: false });
-        }
-        const progress = jobProgress(job.id, { kind: 'HIGHLIGHTS' });
-        if (!(await start(progress))) return { status: 'closed' };
-        await rows.markRunRunning(job.organizationId, run.id);
-
-        const [video, link] = await Promise.all([
-          rows.video(job.organizationId, input.videoId),
-          rows.videoLink(job.organizationId, input.videoId),
-        ]);
-        if (!video || video.deletedAt || video.status !== 'READY' || !link) {
-          throw new ClipStepError('highlights_failed', { retryable: false });
-        }
-
-        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+        const opened = await openHighlights(ref, true);
+        if (!opened) return { status: 'closed' };
+        return withScratch(deps.scratchRoot, activity.scratchId(opened.job.id), async (dir) => {
           // The light copy and the analysis sound come down; a few hundred MB is plenty.
           await assertFreeDisk(dir, 512 * 1024 * 1024);
-          const outcome = await runHighlights({
-            jobId: job.id,
-            organizationId: job.organizationId,
-            input,
-            run,
-            video,
-            link,
-            dir,
-            signal: activity.signal,
-            producers: deps.providers.signalProducers,
-            privateStorage: deps.privateStorage,
-            rows,
-            progress,
-            heartbeat: activity.heartbeat,
-            now,
-            simulated: deps.providers.simulated,
-            sleep: options.sleep,
-            internal: deps.internal,
+          const run = highlightsRun(opened, dir, activity);
+          const chosen = readRunSetup(opened.run.params);
+          if (chosen?.setup.action) {
+            const gathered = await gatherHighlights(run);
+            const watch = await startWatching(run, gathered, chosen.setup);
+            return { status: 'watch', motion: watch.motion };
+          }
+          const outcome = await runHighlights(run);
+          return { status: outcome.finished ? 'done' : 'closed' };
+        });
+      });
+    },
+
+    /** Module 06, step 3: the bursts, and the stills to cut when the vision check is on. */
+    async clipHighlightsLook(
+      ref: ClipJobWorkflowInput & { motionKey: string | null; motionFailed: boolean },
+    ): Promise<HighlightsLook> {
+      return runClipActivity('clipHighlightsLook', ref.jobId, async (activity) => {
+        const opened = await openHighlights(ref, false);
+        if (!opened) return { status: 'closed', stills: null };
+        return withScratch(deps.scratchRoot, activity.scratchId(opened.job.id), async (dir) => {
+          const look = await lookForAction(highlightsRun(opened, dir, activity), {
+            motionKey: ref.motionKey,
+            motionFailed: ref.motionFailed,
           });
+          return { status: 'look', stills: look.stills };
+        });
+      });
+    },
+
+    /** Module 06, step 5: the still check, the scoring, and the watch files deleted. */
+    async clipHighlightsFinish(
+      ref: ClipJobWorkflowInput & { stillKeys: string[] | null },
+    ): Promise<ClipWorkResult> {
+      return runClipActivity('clipHighlightsFinish', ref.jobId, async (activity) => {
+        const opened = await openHighlights(ref, false);
+        if (!opened) return { status: 'closed' };
+        return withScratch(deps.scratchRoot, activity.scratchId(opened.job.id), async (dir) => {
+          const outcome = await finishWatching(highlightsRun(opened, dir, activity), ref.stillKeys);
           return { status: outcome.finished ? 'done' : 'closed' };
         });
       });

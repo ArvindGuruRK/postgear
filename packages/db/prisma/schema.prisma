@@ -1948,6 +1948,10 @@ model Clip {
   /// 0 to 100, AI clips only.
   score                   Int?
   reasons                 String[]     @default([])
+  /// Sprint 13, Module 06: small facts about how AI found the clip, kept apart
+  /// from the short reason codes. `{ seen }`: the still checker's one sentence
+  /// about what is on screen (Look For Action with the vision check on).
+  meta                    Json?
   highlightRunId          String?
   /// The ClipDocument (packages/video-engine).
   document                Json

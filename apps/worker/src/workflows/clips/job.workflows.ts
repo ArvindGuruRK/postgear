@@ -31,7 +31,7 @@ import {
   type ClipJobWorkflowInput,
   MEDIA_PY_TIMINGS,
 } from '@postgear/scheduling';
-import { log, proxyActivities, sleep } from '@temporalio/workflow';
+import { isCancellation, log, proxyActivities, sleep } from '@temporalio/workflow';
 import type { ClipActivities } from '../../clips/activities';
 import { mediaPyWork } from '../../clips/media-py';
 import { type ClipJobOutcome, runClipJob, workActivities, workBudgetMs } from './clip-job';
@@ -54,8 +54,64 @@ export async function clipSegmentWorkflow(input: ClipJobWorkflowInput): Promise<
   return runClipJob(input, 'SEGMENT', () => workActivities('SEGMENT').clipSegment(input));
 }
 
+/**
+ * Find Clips. Sprint 12's run (and a setup without Look For Action) is one
+ * `clipHighlights` step. With Look For Action (Sprint 13, Module 06) the
+ * first step stops after gathering, and the workflow goes on: the motion
+ * measure (`mediaPyMotion`, Python), the look (bursts, and which stills to
+ * cut), the stills (`mediaPyStills`, Python, only with the vision check on),
+ * then the finish (the still check, scoring, files deleted).
+ *
+ * A failed motion measure is not a failed run: it goes on without action and
+ * the finish gives that step's minutes back. Failed stills leave the bursts
+ * unchecked. A cancel anywhere is a cancel; `runClipJob` books it and the
+ * bookkeeping deletes every watch file.
+ */
 export async function clipHighlightsWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
-  return runClipJob(input, 'HIGHLIGHTS', () => workActivities('HIGHLIGHTS').clipHighlights(input));
+  return runClipJob(input, 'HIGHLIGHTS', async () => {
+    const first = await workActivities('HIGHLIGHTS').clipHighlights(input);
+    if (first.status !== 'watch') return first;
+
+    let motionKey: string | null = null;
+    let motionFailed = false;
+    if (first.motion) {
+      try {
+        const measure = mediaPyWork(
+          'mediaPyMotion',
+          MEDIA_PY_TIMINGS.mediaPyMotion,
+          workBudgetMs('HIGHLIGHTS'),
+        );
+        motionKey = (await measure(first.motion)).trackKey;
+      } catch (error) {
+        if (isCancellation(error)) throw error;
+        log.warn('clip motion measure failed', { jobId: input.jobId, error: String(error) });
+        motionFailed = true;
+      }
+    }
+
+    const look = await workActivities('HIGHLIGHTS').clipHighlightsLook({
+      ...input,
+      motionKey,
+      motionFailed,
+    });
+    if (look.status === 'closed') return { status: 'closed' };
+
+    let stillKeys: string[] | null = null;
+    if (look.stills) {
+      try {
+        const cut = mediaPyWork(
+          'mediaPyStills',
+          MEDIA_PY_TIMINGS.mediaPyStills,
+          workBudgetMs('HIGHLIGHTS'),
+        );
+        stillKeys = (await cut(look.stills)).keys;
+      } catch (error) {
+        if (isCancellation(error)) throw error;
+        log.warn('clip stills failed', { jobId: input.jobId, error: String(error) });
+      }
+    }
+    return workActivities('HIGHLIGHTS').clipHighlightsFinish({ ...input, stillKeys });
+  });
 }
 
 /**

@@ -389,6 +389,10 @@ export const highlightsOutputSchema = z
         noSpeech: z.boolean(),
         asked: z.boolean(),
         matched: z.number().int().min(0),
+        /** Module 06: Look For Action ran (its motion measure worked). */
+        watched: z.boolean().optional(),
+        /** Module 06: clips that action found or helped. */
+        actions: z.number().int().min(0).optional(),
       })
       .strict()
       .optional(),

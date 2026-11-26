@@ -20,7 +20,7 @@ import {
   ToolMessage,
 } from '@langchain/core/messages';
 import type { z } from 'zod';
-import type { ModelMessage, ModelToolCall } from '../types';
+import type { ModelImage, ModelMessage, ModelToolCall } from '../types';
 import { providerError, throwIfAborted } from './resilience';
 
 export function toLangChainMessages(messages: ModelMessage[]): BaseMessage[] {
@@ -111,6 +111,8 @@ export function formatZodIssues(error: z.ZodError): string {
 export interface StructuredAsk {
   system: string;
   user: string;
+  /** Pictures sent with the user text, unchanged on the repair attempt. */
+  images?: readonly ModelImage[];
 }
 
 /**
@@ -124,13 +126,16 @@ export async function structuredWithRepair<T>(params: {
   schema: z.ZodType<T>;
   system: string;
   user: string;
+  images?: readonly ModelImage[];
   signal?: AbortSignal;
   ask: (prompt: StructuredAsk) => Promise<unknown>;
 }): Promise<T> {
   throwIfAborted(params.signal);
+  const images = params.images && params.images.length > 0 ? { images: params.images } : {};
   const first = await attempt(params.schema, params.ask, {
     system: params.system,
     user: params.user,
+    ...images,
   });
   if (first.ok) return first.value;
 
@@ -144,7 +149,11 @@ export async function structuredWithRepair<T>(params: {
     'Answer again and match the requested structure exactly.',
     '>>>',
   ].join('\n');
-  const second = await attempt(params.schema, params.ask, { system: params.system, user: repair });
+  const second = await attempt(params.schema, params.ask, {
+    system: params.system,
+    user: repair,
+    ...images,
+  });
   if (second.ok) return second.value;
 
   throw providerError('bad_output', { message: second.problem, cause: second.cause });
@@ -184,4 +193,24 @@ function isParseFailure(error: unknown): boolean {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The user turn with pictures, in OpenAI's chat shape (text first, then each
+ * picture as a data address at low detail). Used only when a call carries
+ * images; the plain string stays the default everywhere else.
+ */
+export function userContentWithImages(
+  text: string,
+  images: readonly ModelImage[],
+): Array<
+  { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string; detail: 'low' } }
+> {
+  return [
+    { type: 'text', text },
+    ...images.map((image) => ({
+      type: 'image_url' as const,
+      image_url: { url: `data:${image.mimeType};base64,${image.base64}`, detail: 'low' as const },
+    })),
+  ];
 }

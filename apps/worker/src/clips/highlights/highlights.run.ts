@@ -32,8 +32,9 @@ import {
   type SignalProducers,
 } from '@postgear/media-tools';
 import { type PrivateStorage, StorageNotFoundError } from '@postgear/storage';
-import type { ClipPickedMoment } from '@postgear/scheduling';
+import type { ClipPickedMoment, ClipPickMomentsAnswer } from '@postgear/scheduling';
 import {
+  type ActionCandidate,
   type BlendedClip,
   blendWithSignals,
   builtInCaptionStyle,
@@ -93,8 +94,9 @@ export interface HighlightsRun {
   privateStorage: Pick<PrivateStorage, 'getToFile' | 'putFile' | 'delete'>;
   rows: Pick<ClipRows, 'videoAssets' | 'finishHighlights'> &
     Partial<Pick<ClipRows, 'job' | 'captionStyle'>>;
-  /** Sprint 13, Module 05: the API's moment picker (a run with a setup). */
-  internal?: Pick<ClipInternalClient, 'pickMoments'>;
+  /** Sprint 13, Module 05: the API's moment picker (a run with a setup); Module 06: the still check. */
+  internal?: Pick<ClipInternalClient, 'pickMoments'> &
+    Partial<Pick<ClipInternalClient, 'checkStills' | 'reverseCharges'>>;
   progress: Pick<JobProgress, 'report' | 'flush'>;
   heartbeat(): void;
   now(): Date;
@@ -115,6 +117,29 @@ export interface HighlightsOutcome {
   timings: Record<string, number>;
 }
 
+/**
+ * What the first step of a run gathered, before scoring: every track it will
+ * score with, the ones it measured (to store), and the moments the API read.
+ * Module 06 keeps it in the run's state file while Look For Action watches.
+ */
+export interface Gathered {
+  tracks: SignalTrack[];
+  measured: SignalTrack[];
+  ran: number;
+  failures: number;
+  picked: ClipPickMomentsAnswer | null;
+  timings: Record<string, number>;
+}
+
+/** Module 06: Look For Action's part of the scoring. */
+export interface ActionPart {
+  candidates: ActionCandidate[];
+  /** The motion track to store with the others (measured or merged this run). */
+  motion: SignalTrack | null;
+  /** The motion measure ran (or was stored): the note says AI watched for action. */
+  watched: boolean;
+}
+
 function throwIfCancelled(signal: AbortSignal): void {
   if (signal.aborted) throw new ClipStepError('cancelled', { retryable: false });
 }
@@ -126,7 +151,10 @@ function throwIfCancelled(signal: AbortSignal): void {
  * be tried again: going on without the file would write a new one without
  * the stored tracks no producer can measure again (the heat map).
  */
-async function storedSignals(run: HighlightsRun, assets: AssetRow[]): Promise<SignalsFile | null> {
+export async function storedSignals(
+  run: HighlightsRun,
+  assets: AssetRow[],
+): Promise<SignalsFile | null> {
   const asset = assets.filter((row) => row.kind === 'SIGNALS').at(-1);
   if (!asset) return null;
   const file = path.join(run.dir, 'signals-stored.json.gz');
@@ -246,7 +274,7 @@ export function highlightClips(
 /** Sprint 13, Module 05: the run's setup, or null for Sprint 12's run (Quick Find). */
 export function readRunSetup(
   params: unknown,
-): { setup: ClipSetup; listenJobId: string | null } | null {
+): { setup: ClipSetup; listenJobId: string | null; actionVision: boolean } | null {
   if (!params || typeof params !== 'object') return null;
   const value = params as Record<string, unknown>;
   const setup = clipSetupSchema.safeParse(value.setup);
@@ -254,6 +282,8 @@ export function readRunSetup(
   return {
     setup: setup.data,
     listenJobId: typeof value.listenJobId === 'string' ? value.listenJobId : null,
+    // Module 06: decided by the API when the run started, never by the worker.
+    actionVision: setup.data.action && value.actionVision === true,
   };
 }
 
@@ -351,11 +381,23 @@ export function setupClips(
       score: clip.score,
       reasons: [...clip.reasons],
       origin: clip.origin,
+      seen: clip.seen,
     };
   });
 }
 
+/**
+ * A whole run in one step: gather, then score. A run whose setup asks to
+ * Look For Action stops after gathering instead (Module 06): the caller
+ * keeps what was gathered in the run's state file and goes on to watch.
+ */
 export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutcome> {
+  const gathered = await gatherHighlights(run);
+  return scoreHighlights(run, gathered, null);
+}
+
+/** The stages before scoring: tracks measured or reused, listening, reading. */
+export async function gatherHighlights(run: HighlightsRun): Promise<Gathered> {
   const { video, signal } = run;
   const durationMs = video.durationMs ?? 0;
   if (durationMs <= 0) throw new ClipStepError('highlights_failed', { retryable: false });
@@ -461,7 +503,7 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
 
   // --- listening and reading (Sprint 13, a run with a setup) ------------------------------
   const chosen = readRunSetup(run.run.params);
-  let picked: { moments: ClipPickedMoment[]; noSpeech: boolean; asked: boolean } | null = null;
+  let picked: ClipPickMomentsAnswer | null = null;
   if (chosen) {
     started = clock();
     await run.progress.report({ stage: 'listening', progress: 80 });
@@ -476,9 +518,30 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
     throwIfCancelled(signal);
     timings.reading = clock() - started;
   }
+  return { tracks, measured, ran, failures, picked, timings };
+}
+
+/**
+ * Scoring: `findHighlights`, the moments blended with the signals (and, with
+ * Look For Action, the bursts), the new tracks stored, then one transaction.
+ */
+export async function scoreHighlights(
+  run: HighlightsRun,
+  gathered: Gathered,
+  action: ActionPart | null,
+): Promise<HighlightsOutcome> {
+  const { video, signal } = run;
+  const durationMs = video.durationMs ?? 0;
+  if (durationMs <= 0) throw new ClipStepError('highlights_failed', { retryable: false });
+  const clock = () => run.now().getTime();
+  const { tracks, ran, failures, picked, timings } = gathered;
+  const measured = action?.motion ? [...gathered.measured, action.motion] : gathered.measured;
+  const chosen = readRunSetup(run.run.params);
+  const assets = await run.rows.videoAssets(run.organizationId, video.id);
+  const stored = measured.length > 0 ? await storedSignals(run, assets) : null;
 
   // --- scoring ---------------------------------------------------------------------
-  started = clock();
+  const started = clock();
   await run.progress.report({ stage: 'scoring', progress: 90 });
   if (run.simulated && video.title.includes(SLOW_MARKER)) {
     const until = clock() + SLOW_HOLD_MS;
@@ -498,7 +561,16 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
 
   const result = findHighlights(tracks, { durationMs });
   let clips: NewHighlightClip[];
-  let ai: { read: boolean; noSpeech: boolean; asked: boolean; matched: number } | undefined;
+  let ai:
+    | {
+        read: boolean;
+        noSpeech: boolean;
+        asked: boolean;
+        matched: number;
+        watched?: boolean;
+        actions?: number;
+      }
+    | undefined;
   if (chosen && picked) {
     const { range } = chosen.setup;
     // Only the signal moments inside the chosen stretch take part.
@@ -510,6 +582,8 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
       asCandidates(picked.moments),
       inside,
       genreTuning(chosen.setup.genre),
+      undefined,
+      action?.candidates ?? [],
     );
     clips = setupClips(
       video,
@@ -523,6 +597,16 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
       noSpeech: picked.noSpeech,
       asked: picked.asked,
       matched: blended.filter((clip) => clip.matchesRequest).length,
+      ...(action
+        ? {
+            watched: action.watched,
+            actions: blended.filter((clip) =>
+              clip.reasons.some(
+                (reason) => reason === 'sudden_movement' || reason === 'something_unexpected',
+              ),
+            ).length,
+          }
+        : {}),
     };
   } else {
     clips = highlightClips(video, run.link, result.ranges);
@@ -583,6 +667,7 @@ export async function runHighlights(run: HighlightsRun): Promise<HighlightsOutco
   }
   await deleteQuietly(run.privateStorage, finished.replacedKeys);
   timings.scoring = clock() - started;
+  if (action) timings.actions = action.candidates.length;
 
   console.log(
     JSON.stringify({

@@ -60,6 +60,8 @@ export const CLIP_SUMMARY_SELECT = {
   durationMs: true,
   score: true,
   reasons: true,
+  // Module 06: `{ seen }`, the still check's one sentence.
+  meta: true,
   revision: true,
   lastExportedRevision: true,
   exportedMediaId: true,

@@ -318,6 +318,10 @@ export interface ClipsAiStatus {
   captions?: boolean;
   /** The spoken languages on offer ("Detect Automatically" is the page's own first choice). */
   languages?: Array<{ code: string; name: string; highlight: 'word' | 'page' }>;
+  /** Module 06: Look For Action can run right now. */
+  action?: boolean;
+  /** Module 06: Look For Action also shows a few stills to the AI model. */
+  actionVision?: boolean;
 }
 
 // --- Module 06: links, videos, uploads, channels --------------------------------
@@ -373,6 +377,8 @@ export interface ClipSummary {
   range: { fromMs: number; toMs: number } | null;
   /** Why Find Clips picked it (`HIGHLIGHT_REASONS` codes, strongest first); empty for a hand-made clip. */
   reasons: string[];
+  /** Module 06: what AI saw on screen (one sentence); absent or null when it did not look. */
+  seen?: string | null;
   /**
    * Module 17: the live posts it went out in, newest first, for the card's
    * View Post. Sent by the Clips list and the video page; absent elsewhere.
@@ -444,7 +450,15 @@ export interface HighlightRunView {
   /** A failed or cancelled run had its AI minutes given back. */
   refunded: boolean;
   /** Sprint 13, Module 05: what a run with a setup did; null for Quick Find and before the end. */
-  ai?: { read: boolean; noSpeech: boolean; asked: boolean; matched: number } | null;
+  ai?: {
+    read: boolean;
+    noSpeech: boolean;
+    asked: boolean;
+    matched: number;
+    /** Module 06: Look For Action ran, and the clips action found or helped. */
+    watched?: boolean;
+    actions?: number;
+  } | null;
   createdAt: string;
   finishedAt: string | null;
 }

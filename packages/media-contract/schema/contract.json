@@ -212,6 +212,174 @@
       "title": "MediaPyHealthOutput",
       "type": "object"
     },
+    "MediaPyMotionInput": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jobId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "orgId": {
+          "$ref": "#/$defs/OrgId"
+        },
+        "proxyKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/TimeRange"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "sampleFps": {
+          "const": 2,
+          "type": "number"
+        },
+        "simulation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VisualSimulationHint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        },
+        "videoId": {
+          "$ref": "#/$defs/Uuid"
+        }
+      },
+      "required": [
+        "version",
+        "jobId",
+        "orgId",
+        "videoId",
+        "proxyKey",
+        "durationMs",
+        "ranges",
+        "sampleFps",
+        "simulation"
+      ],
+      "title": "MediaPyMotionInput",
+      "type": "object"
+    },
+    "MediaPyMotionOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "producer": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sampled": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "trackKey": {
+          "$ref": "#/$defs/StorageKey"
+        }
+      },
+      "required": [
+        "trackKey",
+        "sampled",
+        "producer"
+      ],
+      "title": "MediaPyMotionOutput",
+      "type": "object"
+    },
+    "MediaPyStillsInput": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "maximum": 86400000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jobId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "momentsMs": {
+          "items": {
+            "maximum": 86400000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 48,
+          "minItems": 1,
+          "type": "array"
+        },
+        "orgId": {
+          "$ref": "#/$defs/OrgId"
+        },
+        "proxyKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "simulation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VisualSimulationHint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        },
+        "videoId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "width": {
+          "maximum": 1280,
+          "minimum": 160,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "jobId",
+        "orgId",
+        "videoId",
+        "proxyKey",
+        "durationMs",
+        "momentsMs",
+        "width",
+        "simulation"
+      ],
+      "title": "MediaPyStillsInput",
+      "type": "object"
+    },
+    "MediaPyStillsOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "items": {
+            "$ref": "#/$defs/StorageKey"
+          },
+          "maxItems": 48,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "title": "MediaPyStillsOutput",
+      "type": "object"
+    },
     "MediaPyTranscribeInput": {
       "additionalProperties": false,
       "properties": {
@@ -324,6 +492,57 @@
       "title": "MediaPyTranscribeOutput",
       "type": "object"
     },
+    "MotionFile": {
+      "additionalProperties": false,
+      "properties": {
+        "producer": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "ranges": {
+          "items": {
+            "$ref": "#/$defs/TimeRange"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "sampleRateHz": {
+          "const": 2,
+          "type": "number"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "maximum": 255,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 172800,
+          "type": "array"
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "producer",
+        "ranges",
+        "sampleRateHz",
+        "values"
+      ],
+      "title": "MotionFile",
+      "type": "object"
+    },
     "OrgId": {
       "maxLength": 64,
       "pattern": "^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
@@ -395,6 +614,41 @@
     "Uuid": {
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
       "type": "string"
+    },
+    "VisualSimulationHint": {
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "anyOf": [
+            {
+              "enum": [
+                "fail",
+                "slow"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sample",
+        "force"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://postgear.local/media-contract.json",
@@ -404,11 +658,26 @@
     "file_HeardFile": {
       "$ref": "#/$defs/HeardFile"
     },
+    "file_MotionFile": {
+      "$ref": "#/$defs/MotionFile"
+    },
     "mediaPyHealth_input": {
       "$ref": "#/$defs/MediaPyHealthInput"
     },
     "mediaPyHealth_output": {
       "$ref": "#/$defs/MediaPyHealthOutput"
+    },
+    "mediaPyMotion_input": {
+      "$ref": "#/$defs/MediaPyMotionInput"
+    },
+    "mediaPyMotion_output": {
+      "$ref": "#/$defs/MediaPyMotionOutput"
+    },
+    "mediaPyStills_input": {
+      "$ref": "#/$defs/MediaPyStillsInput"
+    },
+    "mediaPyStills_output": {
+      "$ref": "#/$defs/MediaPyStillsOutput"
     },
     "mediaPyTranscribe_input": {
       "$ref": "#/$defs/MediaPyTranscribeInput"

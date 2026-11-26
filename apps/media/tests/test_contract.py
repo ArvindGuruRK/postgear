@@ -16,11 +16,14 @@ from tests.conftest import FIXTURES, read_json
 MODELS: dict[str, tuple[type[BaseModel], type[BaseModel]]] = {
     "mediaPyHealth": (generated.MediaPyHealthInput, generated.MediaPyHealthOutput),
     "mediaPyTranscribe": (generated.MediaPyTranscribeInput, generated.MediaPyTranscribeOutput),
+    "mediaPyMotion": (generated.MediaPyMotionInput, generated.MediaPyMotionOutput),
+    "mediaPyStills": (generated.MediaPyStillsInput, generated.MediaPyStillsOutput),
 }
 
 #: Stored files both sides read and write, by the shape's name.
 FILE_MODELS: dict[str, type[BaseModel]] = {
     "HeardFile": generated.HeardFile,
+    "MotionFile": generated.MotionFile,
 }
 
 

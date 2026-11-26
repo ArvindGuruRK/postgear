@@ -2,6 +2,7 @@ import { aiMinutesCost } from '../pricing';
 import type { HighlightRange } from '../signals/types';
 import type { Transcript, TranscriptWord } from '../transcript/types';
 import {
+  type ActionCandidate,
   blendWithSignals,
   CLIP_AIR_MS,
   cleanParts,
@@ -213,6 +214,53 @@ describe('genre and blending', () => {
     expect(blended.map((clip) => clip.origin)).toEqual(['AI_SIGNALS', 'AI_TRANSCRIPT']);
   });
 
+  it('blends bursts of movement as a third input', () => {
+    const speech = titled(9, 12);
+    const burstInside: ActionCandidate = {
+      fromMs: speech.fromMs - 5_000,
+      toMs: speech.toMs,
+      peakMs: speech.fromMs + 2_000,
+      score: 80,
+      reason: 'something_unexpected',
+      seen: 'A car flips over a ramp.',
+    };
+    const alone: ActionCandidate = {
+      fromMs: 300_000,
+      toMs: 318_000,
+      peakMs: 308_000,
+      score: 70,
+      reason: 'sudden_movement',
+      seen: null,
+    };
+    const weak: ActionCandidate = {
+      ...alone,
+      fromMs: 400_000,
+      toMs: 418_000,
+      peakMs: 408_000,
+      score: 20,
+    };
+    const without = blendWithSignals([speech], [], genreTuning('auto'));
+    const blended = blendWithSignals([speech], [], genreTuning('auto'), 20, [
+      burstInside,
+      alone,
+      weak,
+    ]);
+    // Inside a transcript pick: its reason and sentence join that clip, and it scores a little higher.
+    const home = blended.find((clip) => clip.origin === 'AI_TRANSCRIPT');
+    expect(home?.reasons[0]).toBe('something_unexpected');
+    expect(home?.seen).toBe('A car flips over a ramp.');
+    expect(home?.score).toBe((without[0]?.score ?? 0) + 8);
+    // Alone and strong enough: its own clip; too weak alone: dropped.
+    const own = blended.filter((clip) => clip.origin === 'AI_SIGNALS');
+    expect(own).toHaveLength(1);
+    expect(own[0]).toMatchObject({
+      fromMs: 300_000,
+      reasons: ['sudden_movement'],
+      seen: null,
+      title: null,
+    });
+  });
+
   it('puts a moment that matches the request first, and drops near-duplicates', () => {
     const asked = titled(20, 23, { matchesRequest: true, parts: cleanParts({ hook: 5 }) });
     const better = titled(2, 5);
@@ -233,7 +281,8 @@ describe('Clip Setup', () => {
 
   it('holds later modules switches off and refuses unknown keys', () => {
     const setup = defaultClipSetup(600_000);
-    expect(clipSetupSchema.safeParse({ ...setup, action: true }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, action: true }).success).toBe(true);
+    expect(clipSetupSchema.safeParse({ ...setup, follow: true }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, extra: 1 }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, genre: 'sports' }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, range: { fromMs: 0, toMs: 2_000 } }).success).toBe(
@@ -260,6 +309,17 @@ describe('Clip Setup', () => {
     // Half the stretch costs less to read.
     const half = setupPrice({ ...setup, range: { fromMs: 0, toMs: 300_000 } }, 0);
     expect(half.total).toBeLessThan(covered.total);
+  });
+
+  it('adds Looking For Action at half an AI minute a minute of the stretch', () => {
+    const setup = { ...defaultClipSetup(600_000), action: true };
+    const price = setupPrice(setup, 0);
+    expect(price.lines.at(-1)).toEqual({ step: 'action', aiMinutes: 5 });
+    expect(price.total).toBe(setupPrice({ ...setup, action: false }, 0).total + 5);
+    // A short stretch still costs its minimum of one.
+    expect(
+      setupPrice({ ...setup, range: { fromMs: 0, toMs: 10_000 } }, 0).lines.at(-1)?.aiMinutes,
+    ).toBe(1);
   });
 
   it('cleans a request to one bounded line', () => {

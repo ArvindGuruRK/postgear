@@ -1,6 +1,6 @@
 # Module 03: Captions
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session, may need a second)
+> **Sprint 13, Clips AI** | Status: Done with gaps (2026-11-26) | Size: L (one full session, may need a second)
 > **Depends on**: [Module 02](module-02-transcription.md)
 > **Stories**: CA-1.1, CA-1.2, CA-1.3, CA-1.4, CA-1.5, CA-1.6, CA-1.7 (new: Upload SRT)
 > **Next**: [Module 04](module-04-transcript-editing-and-speech-cleanup.md), [Module 10](module-10-recipes-and-brand-kit.md), [Module 11](module-11-montage-and-batch-export.md)

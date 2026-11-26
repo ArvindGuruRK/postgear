@@ -10,8 +10,13 @@
  *   clip, so a loud moment with no words is not lost.
  * - Near-duplicates go: a clip that overlaps a better one by more than a
  *   quarter of the shorter of the two is dropped.
+ * - Module 06, Look For Action: a burst of movement is a third input. A burst
+ *   whose peak falls inside a clip adds its reason (and what the still
+ *   checker saw) to that clip and lifts its score a little; a burst alone
+ *   becomes its own clip (`AI_SIGNALS`) from `MOTION_TUNING.keepFrom` up.
  */
 import type { HighlightRange } from '../signals/types';
+import { MOTION_TUNING } from '../signals/motion';
 import { type MomentCandidate, momentReasons, PART_MAX, SCORE_PARTS } from './candidates';
 import type { GenreTuning } from './genre';
 
@@ -33,7 +38,25 @@ export interface BlendedClip {
   origin: 'AI_TRANSCRIPT' | 'AI_SIGNALS';
   title: string | null;
   matchesRequest: boolean;
+  /** Module 06: what the still checker saw, one sentence; null when nothing was checked. */
+  seen: string | null;
 }
+
+/** A burst of movement as the blend takes it: its clip window, its score, its reason. */
+export interface ActionCandidate {
+  /** The clip a burst alone would become (`actionWindow`). */
+  fromMs: number;
+  toMs: number;
+  peakMs: number;
+  /** 0 to 100, already weighted (lower when nothing looked at the stills). */
+  score: number;
+  reason: 'sudden_movement' | 'something_unexpected';
+  /** The still checker's sentence, or null. */
+  seen: string | null;
+}
+
+/** Points (of 100) a clip gains at most when a burst of movement is inside it. */
+export const ACTION_BONUS = 10;
 
 function overlapMs(
   a: { fromMs: number; toMs: number },
@@ -88,6 +111,7 @@ export function blendWithSignals(
   signals: readonly HighlightRange[],
   tuning: GenreTuning,
   max: number = MAX_BLENDED_CLIPS,
+  actions: readonly ActionCandidate[] = [],
 ): BlendedClip[] {
   const used = new Set<HighlightRange>();
   const clips: BlendedClip[] = candidates.map((candidate) => {
@@ -107,6 +131,7 @@ export function blendWithSignals(
       origin: 'AI_TRANSCRIPT',
       title: candidate.title,
       matchesRequest: candidate.matchesRequest,
+      seen: null,
     };
   });
   for (const signal of signals) {
@@ -119,6 +144,29 @@ export function blendWithSignals(
       origin: 'AI_SIGNALS',
       title: null,
       matchesRequest: false,
+      seen: null,
+    });
+  }
+  for (const action of [...actions].sort((a, b) => b.score - a.score)) {
+    const home = clips
+      .filter((clip) => action.peakMs >= clip.fromMs && action.peakMs < clip.toMs)
+      .sort(byRank)[0];
+    if (home) {
+      home.reasons = [...new Set([action.reason, ...home.reasons])].slice(0, 4);
+      home.score = Math.min(100, home.score + Math.round((ACTION_BONUS * action.score) / 100));
+      home.seen ??= action.seen;
+      continue;
+    }
+    if (action.score < MOTION_TUNING.keepFrom) continue;
+    clips.push({
+      fromMs: action.fromMs,
+      toMs: action.toMs,
+      score: action.score,
+      reasons: [action.reason],
+      origin: 'AI_SIGNALS',
+      title: null,
+      matchesRequest: false,
+      seen: action.seen,
     });
   }
   return dedupeByOverlap(clips, byRank).slice(0, Math.max(0, max));

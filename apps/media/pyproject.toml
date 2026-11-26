@@ -30,6 +30,10 @@ dev = [
 # No PyTorch: faster-whisper runs on CTranslate2 and decodes sound with PyAV.
 ml = [
   "faster-whisper>=1.2.1,<2",
+  # Module 06: the picture decoder and the motion measure. One OpenCV build only
+  # (research 02, section 6.1); the headless one needs no system graphics.
+  "opencv-python-headless>=4.10,<6",
+  "numpy>=2.2,<3",
 ]
 
 [build-system]
@@ -62,6 +66,10 @@ plugins = ["pydantic.mypy"]
 mypy_path = "src"
 packages = ["postgear_media", "tests"]
 exclude = ["build/"]
+
+[[tool.mypy.overrides]]
+module = ["cv2", "cv2.*", "mediapipe", "mediapipe.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["postgear_media.contract.generated"]

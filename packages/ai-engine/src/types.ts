@@ -300,6 +300,31 @@ export interface TitleRequest {
   language: string;
 }
 
+/** Clips AI, Module 06: one burst of movement to check, as four stills and two facts. */
+export interface StillCheckBurst {
+  images: readonly ModelImage[];
+  /** Where the peak is, seconds into the video. */
+  momentSec: number;
+  spanSec: number;
+  withSound: boolean;
+}
+
+export interface StillCheckRequest {
+  bursts: readonly StillCheckBurst[];
+  concurrency?: number;
+  timeoutMs?: number;
+}
+
+/** What the still checker answered for one burst; null when its call failed. */
+export interface StillVerdict {
+  /** A clear sudden event the model is sure enough of. */
+  notable: boolean;
+  kind: 'crash_or_fall' | 'win_or_score' | 'surprise' | 'visual_gag' | 'nothing';
+  sure: number;
+  /** One sentence of at most 15 words, cleaned; empty when nothing notable. */
+  line: string;
+}
+
 /** The snippet jobs bound to one model client. Rejects with an {@link AiProviderError}. */
 export interface SnippetWriter {
   hashtags(request: HashtagRequest, options?: { signal?: AbortSignal }): Promise<HashtagResult>;
@@ -321,6 +346,11 @@ export interface SnippetWriter {
   ): Promise<MomentPickResult>;
   /** Sprint 13 Clips AI: one title of at most eight words per moment ('' when none). */
   writeTitles(request: TitleRequest, options?: { signal?: AbortSignal }): Promise<string[]>;
+  /** Sprint 13 Clips AI, Module 06: what four stills of each burst show (null for a failed call). */
+  checkStills(
+    request: StillCheckRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<Array<StillVerdict | null>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -523,6 +553,16 @@ export type ModelChunk =
  * implementation is responsible for timeouts, retries and turning provider
  * errors into {@link AiProviderError}.
  */
+/**
+ * A picture sent with a structured call (Sprint 13 Clips AI, Module 06: the
+ * check on stills). Bytes as base64, never an address: the provider is never
+ * asked to fetch anything. Never logged.
+ */
+export interface ModelImage {
+  mimeType: 'image/jpeg' | 'image/png';
+  base64: string;
+}
+
 export interface ModelClient {
   /** "openai:gpt-4.1-mini", "simulation": reported by `/ai/status`. */
   readonly name: string;
@@ -530,6 +570,8 @@ export interface ModelClient {
     schema: z.ZodType<T>;
     system: string;
     user: string;
+    /** Pictures to look at with the user text (a model that sees pictures only). */
+    images?: readonly ModelImage[];
     signal?: AbortSignal;
   }): Promise<T>;
   chat(params: {

@@ -16,7 +16,14 @@ export type SignalTrackName = (typeof SIGNAL_TRACKS)[number];
 export type TrackName = SignalTrackName | (typeof RESERVED_SIGNAL_TRACKS)[number];
 
 /** What a track's numbers measure. */
-export const TRACK_UNITS = ['lufs', 'scene_score', 'messages_per_second', 'share'] as const;
+export const TRACK_UNITS = [
+  'lufs',
+  'scene_score',
+  'messages_per_second',
+  'share',
+  // Sprint 13, Module 06: the motion track, mean absolute difference of grey pictures, 0 to 255.
+  'grey_levels',
+] as const;
 export type TrackUnit = (typeof TRACK_UNITS)[number];
 
 export interface SignalTrack {
@@ -53,6 +60,9 @@ export const HIGHLIGHT_REASONS = [
   'complete_thought',
   'clear_payoff',
   'funny_exchange',
+  // Sprint 13, Module 06: what Look For Action saw.
+  'sudden_movement',
+  'something_unexpected',
 ] as const;
 export type HighlightReason = (typeof HIGHLIGHT_REASONS)[number];
 
@@ -70,6 +80,8 @@ export const HIGHLIGHT_REASON_LABELS: Readonly<Record<HighlightReason, string>> 
   complete_thought: 'Complete thought',
   clear_payoff: 'Clear payoff',
   funny_exchange: 'Funny exchange',
+  sudden_movement: 'Sudden movement on screen',
+  something_unexpected: 'Something unexpected happens',
 });
 
 export function isHighlightReason(value: unknown): value is HighlightReason {

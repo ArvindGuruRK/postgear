@@ -1,6 +1,6 @@
 # Module 06: Visual Moments
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: M (one session)
+> **Sprint 13, Clips AI** | Status: Done (2026-11-26) | Size: M (one session)
 > **Depends on**: [Module 05](module-05-clip-setup-and-highlights-v2.md)
 > **Stories**: CA-3.3
 > **Next**: [Module 07](module-07-face-detection-and-detect-camera.md)
@@ -64,12 +64,12 @@ After this module Clip Setup has **Look For Action**. When it is on, the run als
 
 ## Tasks
 
-- [ ] `mediaPyMotion` and `mediaPyStills` in the contract with fixtures; the Python services; simulated tracks.
-- [ ] `motion` in the registry; `motionBursts`; tuning.
-- [ ] The still checker agent, its simulated answers, the internal route.
-- [ ] The `watching` stage; the three-way blend; `Clip.meta.seen`.
-- [ ] The setup switch, price, help; the results' extra line.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `mediaPyMotion` and `mediaPyStills` in the contract with fixtures; the Python services; simulated tracks.
+- [x] `motion` in the registry; `motionBursts`; tuning.
+- [x] The still checker agent, its simulated answers, the internal route.
+- [x] The `watching` stage; the three-way blend; `Clip.meta.seen`.
+- [x] The setup switch, price, help; the results' extra line.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

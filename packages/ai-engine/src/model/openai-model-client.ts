@@ -19,15 +19,16 @@
  * One moderate `temperature` serves every stage: the classify stage's `z.enum`
  * schema constrains it at the provider, so a lower setting would buy nothing.
  */
-import type { AIMessageChunk } from '@langchain/core/messages';
+import { type AIMessageChunk, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import type { z } from 'zod';
-import type { ModelChunk, ModelClient, ModelMessage, ModelToolSpec } from '../types';
+import type { ModelChunk, ModelClient, ModelImage, ModelMessage, ModelToolSpec } from '../types';
 import {
   structuredWithRepair,
   textOfContent,
   toLangChainMessages,
   toModelToolCalls,
+  userContentWithImages,
 } from './model-client';
 import { abortError, classifyError, throwIfAborted, withDeadline, withRetry } from './resilience';
 
@@ -74,6 +75,7 @@ export function createOpenAiModelClient(options: OpenAiModelClientOptions): Mode
       schema: z.ZodType<T>;
       system: string;
       user: string;
+      images?: readonly ModelImage[];
       signal?: AbortSignal;
     }): Promise<T> {
       // The schema is Zod; LangChain accepts it directly and the provider
@@ -86,6 +88,7 @@ export function createOpenAiModelClient(options: OpenAiModelClientOptions): Mode
         schema: params.schema,
         system: params.system,
         user: params.user,
+        ...(params.images ? { images: params.images } : {}),
         signal: params.signal,
         ask: (prompt) =>
           withRetry(
@@ -93,10 +96,17 @@ export function createOpenAiModelClient(options: OpenAiModelClientOptions): Mode
               withDeadline(
                 (signal) =>
                   runnable.invoke(
-                    toLangChainMessages([
-                      { role: 'system', content: prompt.system },
-                      { role: 'user', content: prompt.user },
-                    ]),
+                    prompt.images && prompt.images.length > 0
+                      ? [
+                          new SystemMessage(prompt.system),
+                          new HumanMessage({
+                            content: userContentWithImages(prompt.user, prompt.images),
+                          }),
+                        ]
+                      : toLangChainMessages([
+                          { role: 'system', content: prompt.system },
+                          { role: 'user', content: prompt.user },
+                        ]),
                     { signal },
                   ),
                 { timeoutMs, signal: params.signal },

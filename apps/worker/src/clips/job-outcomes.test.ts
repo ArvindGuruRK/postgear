@@ -1,5 +1,12 @@
 import { cancelJob, failJob, type OutcomeDeps, openJob } from './job-outcomes';
-import { allImportKeys, exportMediaKeys, highlightsSignalsKey, segmentKey } from './keys';
+import {
+  allImportKeys,
+  allWatchKeys,
+  exportMediaKeys,
+  highlightsSignalsKey,
+  jobHex,
+  segmentKey,
+} from './keys';
 import {
   CLIP_ID,
   FakePrivateStorage,
@@ -233,8 +240,15 @@ describe('highlights bookkeeping (Module 16)', () => {
     const { deps, rows, privateStorage, reverseCharges } = highlightsSetup();
     await failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'tool_failed' });
 
-    expect(privateStorage.deleted).toEqual([highlightsSignalsKey(ORG, VIDEO_ID, JOB_ID)]);
+    expect(privateStorage.deleted).toEqual([
+      highlightsSignalsKey(ORG, VIDEO_ID, JOB_ID),
+      ...allWatchKeys(ORG, VIDEO_ID, JOB_ID),
+    ]);
     expect(privateStorage.objects.has(OLD_SIGNALS)).toBe(true);
+    // Module 06: every still, the motion file and the state file of the run go too.
+    expect(privateStorage.deleted).toContain(
+      `clips/${ORG}/${VIDEO_ID}/still-47-${jobHex(JOB_ID)}.jpg`,
+    );
     expect(rows.jobs.get(JOB_ID)?.status).toBe('FAILED');
     expect(rows.runs.get(RUN_ID)?.status).toBe('FAILED');
     expect(rows.closed[0]?.error).toEqual({

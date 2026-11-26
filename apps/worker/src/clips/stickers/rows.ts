@@ -4,7 +4,7 @@
  * shared, so they are read by id alone and only ACTIVE or HIDDEN ones count
  * (a HIDDEN sticker left search, but clips that use it keep working).
  */
-import { Prisma, prisma } from '@postgear/db';
+import { type Prisma, prisma } from '@postgear/db';
 import type { StickerAssetRow, StickerCheckRows } from './check';
 
 /** A library sticker's file and facts, as an export needs them. */

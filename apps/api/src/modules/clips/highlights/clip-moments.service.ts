@@ -53,7 +53,9 @@ export interface SetupRunParams {
   /** The listening job, when the stretch was not all listened to yet. */
   listenJobId: string | null;
   /** Ledger entries of this run's own charges, by step. */
-  charges: { read: string | null; signals: string | null };
+  charges: { read: string | null; signals: string | null; action: string | null };
+  /** Module 06: Look For Action shows stills to the AI model on this run. */
+  actionVision: boolean;
 }
 
 export function readSetupParams(params: unknown): SetupRunParams | null {
@@ -68,7 +70,9 @@ export function readSetupParams(params: unknown): SetupRunParams | null {
     charges: {
       read: typeof charges.read === 'string' ? charges.read : null,
       signals: typeof charges.signals === 'string' ? charges.signals : null,
+      action: typeof charges.action === 'string' ? charges.action : null,
     },
+    actionVision: value.actionVision === true,
   };
 }
 

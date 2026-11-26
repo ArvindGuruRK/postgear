@@ -741,7 +741,8 @@ describe('Clips routes', () => {
     expect(withSetup.body.setup).toMatchObject({ genre: 'gaming' });
     await request(server)
       .post(`/clips/videos/${video}/highlights`)
-      .send({ setup: { ...setup, action: true } })
+      // Module 06 made Look For Action a real switch; Follow The Speaker is still held off.
+      .send({ setup: { ...setup, follow: true } })
       .expect(400);
     await request(server)
       .post(`/clips/videos/${video}/highlights`)

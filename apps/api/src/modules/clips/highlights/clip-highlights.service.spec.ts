@@ -26,7 +26,12 @@ import { emptyTables, type FakeClipDb, type FakeTables, fakeClipDb } from '../te
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import type { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
-import { ClipHighlightsService, readChargeKey, signalsChargeKey } from './clip-highlights.service';
+import {
+  actionChargeKey,
+  ClipHighlightsService,
+  readChargeKey,
+  signalsChargeKey,
+} from './clip-highlights.service';
 import { highlightsPrice, runStatus, toHighlightRunView } from './clip-highlights.view';
 
 let mockDb: FakeClipDb;
@@ -126,6 +131,8 @@ function setup(
     /** What listening to the setup's stretch would cost (0: already listened to). */
     listenPrice?: number;
     ensure?: jest.Mock;
+    /** Module 06: `CLIPS_ACTION_VISION`. */
+    vision?: boolean;
   } = {},
 ) {
   const tables = options.tables ?? seed();
@@ -181,6 +188,7 @@ function setup(
     ledger.usage as unknown as UsageService,
     meterResolver as unknown as EntitlementResolver,
     transcripts as unknown as ClipTranscriptsService,
+    { get: jest.fn(() => (options.vision ? 'true' : 'false')) } as never,
   );
   return { service, tables, ledger, jobs, scheduling, limits, transcripts };
 }
@@ -433,6 +441,40 @@ describe('Find Clips with a setup (Sprint 13, Module 05)', () => {
     await expect(service.start(TEST_ORG, TEST_USER, VIDEO, setupOf())).rejects.toBeInstanceOf(
       EntitlementRefusedException,
     );
+    expect(ledger.used()).toBe(0);
+  });
+
+  it('Look For Action: charged once under its own key, the vision switch kept on the run', async () => {
+    const { service, ledger, tables } = setup({ listenPrice: 0, vision: true });
+    const chosen = setupOf({ action: true });
+    const price = await service.price(TEST_ORG, VIDEO, chosen);
+    const action = price.lines.find((line) => line.step === 'action')?.aiMinutes;
+    expect(action).toBe(aiMinutesCost('action', duration()));
+    const started = await service.start(TEST_ORG, TEST_USER, VIDEO, chosen);
+    const charged = ledger.entries.filter((entry) => entry.key === actionChargeKey(started.job.id));
+    expect(charged.map((entry) => entry.units)).toEqual([action]);
+    expect(ledger.used()).toBe(price.total);
+    const run = tables.runs?.[0] as unknown as { params: Record<string, unknown> };
+    expect(run.params).toMatchObject({ actionVision: true, setup: { action: true } });
+    expect((run.params.charges as Record<string, unknown>).action).toEqual(expect.any(String));
+  });
+
+  it('Look For Action off: no action charge and no vision, whatever the switch', async () => {
+    const { service, ledger, tables } = setup({ listenPrice: 0, vision: true });
+    const started = await service.start(TEST_ORG, TEST_USER, VIDEO, setupOf());
+    expect(ledger.entries.map((entry) => entry.key)).not.toContain(actionChargeKey(started.job.id));
+    const run = tables.runs?.[0] as unknown as { params: Record<string, unknown> };
+    expect(run.params).toMatchObject({ actionVision: false, charges: { action: null } });
+  });
+
+  it('gives the action charge back with the rest when listening is refused', async () => {
+    const ensure = jest.fn(async () => {
+      throw new EntitlementRefusedException('clips_ai_minutes_used', 'No minutes.', {});
+    });
+    const { service, ledger } = setup({ listenPrice: 3, ensure });
+    await expect(
+      service.start(TEST_ORG, TEST_USER, VIDEO, setupOf({ action: true })),
+    ).rejects.toBeInstanceOf(EntitlementRefusedException);
     expect(ledger.used()).toBe(0);
   });
 

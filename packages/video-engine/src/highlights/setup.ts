@@ -45,9 +45,10 @@ export const clipSetupSchema = z
     captions: z
       .object({ on: z.boolean(), styleId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/i) })
       .strict(),
+    /** Module 06: Look For Action. */
+    action: z.boolean(),
     // Owned by later modules; held off until each is built.
     follow: z.literal(false),
-    action: z.literal(false),
     silences: z.literal(false),
     hookTitle: z.literal(false),
     recipeId: z.null(),

@@ -11,8 +11,10 @@
  * the card says how many are needed and how many are left. **Find Clips**
  * starts the run and goes back to the video page, which follows its progress.
  *
- * Switches later modules own (Follow The Speaker, Look For Action, Remove
- * Silences, Hook Title, recipes, brand kits) are not shown until they exist.
+ * Look For Action (Module 06) shows its price before it is switched on, and
+ * says so when stills are shown to AI. Switches later modules own (Follow The
+ * Speaker, Remove Silences, Hook Title, recipes, brand kits) are not shown
+ * until they exist.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
@@ -57,6 +59,9 @@ import {
   GENRE_HELP,
   GENRE_OPTIONS,
   HONEST_LINE,
+  ACTION_HELP,
+  ACTION_VISION_NOTE,
+  actionPriceLabel,
   LENGTH_OPTIONS,
   PAY_FOR_LOOKING,
   priceLines,
@@ -75,7 +80,16 @@ const LABEL = 'font-sans text-sm font-bold text-ink';
 /** The price is asked for again this long after the last change. */
 const PRICE_DELAY_MS = 300;
 
-export function SetupForm({ orgId, detail }: { orgId: string; detail: ClipVideoDetail }) {
+export function SetupForm({
+  orgId,
+  detail,
+  action = { available: false, vision: false },
+}: {
+  orgId: string;
+  detail: ClipVideoDetail;
+  /** Module 06: Look For Action can run right now; `vision`: it also shows stills to AI. */
+  action?: { available: boolean; vision: boolean };
+}) {
   const router = useRouter();
   const { video } = detail;
   const durationMs = video.durationMs ?? 0;
@@ -92,6 +106,7 @@ export function SetupForm({ orgId, detail }: { orgId: string; detail: ClipVideoD
     length: useId(),
     shape: useId(),
     captions: useId(),
+    action: useId(),
     style: useId(),
     summary: useId(),
     look: useId(),
@@ -319,6 +334,29 @@ export function SetupForm({ orgId, detail }: { orgId: string; detail: ClipVideoD
               Every clip opens with captions of what is said, in the style picked.
             </p>
           </AnalyticsPanel>
+
+          {action.available ? (
+            <AnalyticsPanel className="flex flex-col gap-4 p-4">
+              <div className="flex items-center gap-3">
+                <Toggle
+                  id={ids.action}
+                  checked={setup.action}
+                  onCheckedChange={(on) => dispatch({ type: 'action', on })}
+                  data-testid="clip-setup-action"
+                />
+                <label htmlFor={ids.action} className={`${LABEL} flex-1`}>
+                  Look For Action
+                </label>
+                <span className="font-sans text-xs font-bold text-ink type-muted">
+                  {actionPriceLabel(setup)}
+                </span>
+              </div>
+              <p className={NOTE}>
+                {ACTION_HELP}
+                {action.vision ? ` ${ACTION_VISION_NOTE}` : ''}
+              </p>
+            </AnalyticsPanel>
+          ) : null}
         </div>
 
         <AnalyticsPanel

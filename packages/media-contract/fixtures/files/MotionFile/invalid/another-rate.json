@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "producer": "opencv",
+  "ranges": [
+    {
+      "fromMs": 0,
+      "toMs": 1000
+    }
+  ],
+  "sampleRateHz": 4,
+  "values": [
+    1,
+    1,
+    1,
+    1
+  ]
+}

@@ -400,6 +400,9 @@ const envSchema = z
     MEDIA_SIMULATION: blankAsUnset(z.enum(['true', 'false']).optional()),
     MEDIA_URL: blankAsUnset(z.string().url().default('http://localhost:8100')),
     MEDIA_INTERNAL_TOKEN: blankAsUnset(z.string().min(32).optional()),
+    // Module 06: Look For Action also shows stills of each burst to the AI
+    // model. Off by default (D13-07); a run keeps the value it started with.
+    CLIPS_ACTION_VISION: blankAsUnset(z.enum(['true', 'false']).default('false')),
     // Which platforms may be imported from and browsed. YouTube is switched on
     // in production only after the legal read (D12-15): one value to change.
     CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),

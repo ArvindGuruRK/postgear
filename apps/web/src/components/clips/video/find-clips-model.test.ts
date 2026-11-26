@@ -6,11 +6,13 @@ import {
   findClipsLabel,
   findClipsNotes,
   foundByLine,
+  LISTENED_NOTE,
   NO_SOUND_NOTE,
   NOTHING_FOUND_NOTE,
   orderClips,
   reasonLabels,
   scoreText,
+  WATCHED_NOTE,
 } from './find-clips-model';
 
 const CYCLE_END = '2026-12-01T00:00:00.000Z';
@@ -116,6 +118,26 @@ describe('the notes', () => {
     expect(findClipsNotes({ noSound: false, run: empty }, false)).toEqual([NOTHING_FOUND_NOTE]);
     // Not while a new run is on.
     expect(findClipsNotes({ noSound: false, run: empty }, true)).toEqual([]);
+  });
+
+  it('says AI watched for action when Look For Action ran (Module 06)', () => {
+    const base = {
+      ...run('DONE', 3),
+      id: 'r',
+      jobId: 'j',
+      tracks: [],
+      aiMinutes: 3,
+      refunded: false,
+      createdAt: '',
+      finishedAt: null,
+    };
+    const ai = { read: true, noSpeech: false, asked: false, matched: 0 };
+    expect(findClipsNotes({ noSound: false, run: { ...base, ai } }, false)).toEqual([
+      LISTENED_NOTE,
+    ]);
+    expect(
+      findClipsNotes({ noSound: false, run: { ...base, ai: { ...ai, watched: true } } }, false),
+    ).toEqual([WATCHED_NOTE]);
   });
 
   it('names the tracks used once a run found clips', () => {

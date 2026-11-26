@@ -78,6 +78,34 @@ export function highlightsSignalsKey(orgId: string, videoId: string, jobId: stri
   return jobVideoFileKey(orgId, videoId, 'signals', jobId, 'json.gz');
 }
 
+/** The most stills one run cuts (12 bursts of four), as the media contract allows. */
+export const WATCH_STILLS_MAX = 48;
+
+/**
+ * Module 06, Look For Action: the files a highlights run writes between its
+ * steps. The motion file and the stills come from the Python service (same
+ * job-derived shape); the state file carries the run's gathered tracks and
+ * moments from one step to the next, so no speech or AI answer ever rides in
+ * a workflow payload. All of them go when the run ends, whatever happened.
+ */
+export const watchKeys = {
+  motion: (orgId: string, videoId: string, jobId: string) =>
+    jobVideoFileKey(orgId, videoId, 'motion', jobId, 'json.gz'),
+  state: (orgId: string, videoId: string, jobId: string) =>
+    jobVideoFileKey(orgId, videoId, 'watch-state', jobId, 'json.gz'),
+  still: (orgId: string, videoId: string, jobId: string, index: number) =>
+    jobVideoFileKey(orgId, videoId, `still-${index}`, jobId, 'jpg'),
+};
+
+/** Every key the watch step could have written: what any end of the run deletes. */
+export function allWatchKeys(orgId: string, videoId: string, jobId: string): string[] {
+  const keys = [watchKeys.motion(orgId, videoId, jobId), watchKeys.state(orgId, videoId, jobId)];
+  for (let index = 0; index < WATCH_STILLS_MAX; index += 1) {
+    keys.push(watchKeys.still(orgId, videoId, jobId, index));
+  }
+  return keys;
+}
+
 /**
  * Every key an import job could have written: what a failed or cancelled
  * attempt deletes (deleting a key that was never written succeeds).

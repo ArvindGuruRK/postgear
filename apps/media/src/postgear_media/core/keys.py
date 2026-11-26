@@ -81,3 +81,23 @@ def video_file_key(org_id: str, video_id: str, kind: str, ext: str) -> str:
     return assert_valid_clip_key(
         f"clips/{org_id}/{video_id}/{segment}-{secrets.token_hex(16)}.{ext}"
     )
+
+
+def job_file_key(org_id: str, video_id: str, kind: str, job_id: str, ext: str = "json.gz") -> str:
+    """A job's own file, the same for every attempt: `clips/<org>/<video>/<kind>-<job hex>.<ext>`.
+
+    The worker's convention (`apps/worker/src/clips/keys.ts`): the 32 hex
+    characters are the job id without its dashes, so the Node side can name
+    (and remove) every file a job made without being told.
+    """
+    if not _UUID.match(job_id):
+        raise InvalidKeyError("A job file needs a lowercase UUID for the job")
+    if len(org_id) > 64 or not _ORG.match(org_id):
+        raise InvalidKeyError("A private key needs a workspace id of lowercase letters and dashes")
+    if not _UUID.match(video_id):
+        raise InvalidKeyError("A private key needs a lowercase UUID for the video")
+    if not _KIND.match(kind) or ext not in EXTENSIONS:
+        raise InvalidKeyError("A job file needs a short kind and an allowed extension")
+    return assert_valid_clip_key(
+        f"clips/{org_id}/{video_id}/{kind}-{job_id.replace('-', '')}.{ext}"
+    )

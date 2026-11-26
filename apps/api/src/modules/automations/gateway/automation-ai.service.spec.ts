@@ -168,6 +168,7 @@ function setup(
     translate: jest.fn(),
     pickMoments: jest.fn(),
     writeTitles: jest.fn(),
+    checkStills: jest.fn(),
     ...options.snippets,
   };
   const engine = {

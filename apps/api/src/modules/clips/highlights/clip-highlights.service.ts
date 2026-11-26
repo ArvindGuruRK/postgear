@@ -31,7 +31,8 @@
  * charge: the price was for looking.
  */
 import { randomUUID } from 'node:crypto';
-import { HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ClipJobKind, ClipJobStatus, type Prisma } from '@postgear/db';
 import { refusalMessage } from '@postgear/entitlements';
 import {
@@ -42,6 +43,7 @@ import {
   SIGNALS_TUNING_VALUES,
   setupPrice,
 } from '@postgear/video-engine';
+import type { Env } from '../../../config/env';
 import { EntitlementRefusedException } from '../../entitlements/entitlement-refused.exception';
 import { EntitlementResolver, type MeterState } from '../../entitlements/entitlement-resolver';
 import { UsageService } from '../../entitlements/usage.service';
@@ -75,6 +77,11 @@ export interface MeterView {
   remaining: number | null;
   limit: number | null;
   cycleEnd: string;
+}
+
+/** Look For Action's charge (Sprint 13, Module 06). */
+export function actionChargeKey(jobId: string): string {
+  return `clips.ai:action:${jobId}`;
 }
 
 /** The run's own reading charge (Sprint 13, Module 05). */
@@ -118,7 +125,13 @@ export class ClipHighlightsService {
     private readonly usage: UsageService,
     private readonly resolver: EntitlementResolver,
     private readonly transcripts: ClipTranscriptsService,
+    @Optional() private readonly config?: ConfigService<Env, true>,
   ) {}
+
+  /** Module 06: whether a run starting now shows stills to the AI model (kept on the run). */
+  private actionVision(): boolean {
+    return this.config?.get('CLIPS_ACTION_VISION', { infer: true }) === 'true';
+  }
 
   /** The setup's stretch held inside the video (422 when nothing of 3 seconds is left). */
   private setupRange(setup: ClipSetup, durationMs: number): { fromMs: number; toMs: number } {
@@ -323,6 +336,17 @@ export class ClipHighlightsService {
         signalsEntry = signals.entryId;
         state = signals.state;
       }
+      // Module 06: Look For Action, the same price with the still check on or off.
+      let actionEntry: string | null = null;
+      if (chosen.action && line('action') > 0) {
+        const action = await this.usage.consume(orgId, AI_MINUTES_METER, line('action'), {
+          idempotencyKey: actionChargeKey(jobId),
+          refId: jobId,
+          meta: { step: 'action', videoId: video.id },
+        });
+        actionEntry = action.entryId;
+        state = action.state;
+      }
 
       // Listening: Module 02's door (its own job and key). Covered: nothing to wait for.
       let listenJobId: string | null = null;
@@ -370,7 +394,9 @@ export class ClipHighlightsService {
               maxClips: SIGNALS_TUNING_VALUES.maxClips,
               setup: chosen,
               listenJobId,
-              charges: { read: read.entryId, signals: signalsEntry },
+              charges: { read: read.entryId, signals: signalsEntry, action: actionEntry },
+              // Module 06: decided once, when the run starts.
+              actionVision: chosen.action && this.actionVision(),
             } as unknown as Prisma.InputJsonValue,
             aiMinutesCharged: price.total,
             usageEntryId: read.entryId,
@@ -397,6 +423,7 @@ export class ClipHighlightsService {
           aiMinutes: price.total,
           listens: listenJobId !== null,
           genre: setup.genre,
+          action: chosen.action,
         }),
       );
       return {

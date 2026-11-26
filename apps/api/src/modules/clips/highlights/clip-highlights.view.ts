@@ -47,7 +47,15 @@ export interface HighlightRunView {
    * the transcript, heard no speech, was asked for something, and how many
    * clips matched. Null for Sprint 12's run (Quick Find) and before the end.
    */
-  ai: { read: boolean; noSpeech: boolean; asked: boolean; matched: number } | null;
+  ai: {
+    read: boolean;
+    noSpeech: boolean;
+    asked: boolean;
+    matched: number;
+    /** Module 06: Look For Action ran, and the clips action found or helped. */
+    watched?: boolean;
+    actions?: number;
+  } | null;
   createdAt: string;
   finishedAt: string | null;
 }

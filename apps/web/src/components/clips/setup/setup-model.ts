@@ -8,6 +8,7 @@
  */
 import { refusalMessage } from '@postgear/entitlements';
 import {
+  aiMinutesCost,
   CLIP_LENGTH_LABELS,
   type ClipLength,
   type ClipSetup,
@@ -60,7 +61,8 @@ export type SetupAction =
   | { type: 'ratio'; ratio: Ratio }
   | { type: 'language'; language: string }
   | { type: 'captions'; on: boolean }
-  | { type: 'captionStyle'; styleId: string };
+  | { type: 'captionStyle'; styleId: string }
+  | { type: 'action'; on: boolean };
 
 export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
   switch (action.type) {
@@ -80,7 +82,20 @@ export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
       return { ...setup, captions: { ...setup.captions, on: action.on } };
     case 'captionStyle':
       return { ...setup, captions: { ...setup.captions, styleId: action.styleId } };
+    case 'action':
+      return { ...setup, action: action.on };
   }
+}
+
+/** Module 06: Look For Action's help line, and the one added when stills are shown to AI. */
+export const ACTION_HELP =
+  'Finds sudden action in the picture. It does not know the rules of your game.';
+export const ACTION_VISION_NOTE = 'We also look at a few still pictures of each burst.';
+
+/** "+3 AI Minutes": what Look For Action adds for the chosen stretch, before it is switched on. */
+export function actionPriceLabel(setup: Pick<ClipSetup, 'range'>): string {
+  const minutes = aiMinutesCost('action', Math.max(0, setup.range.toMs - setup.range.fromMs));
+  return `+${minutesLabel(minutes)}`;
 }
 
 /** "12 AI Minutes" on a button; "1 AI Minute". */
@@ -131,6 +146,7 @@ export function summaryLines(setup: ClipSetup, styleName: string | null): string
     `${ratio}, ${setup.length === 'auto' ? 'any length' : length}`,
   ];
   if (setup.captions.on) lines.push(`Captions: ${styleName ?? 'On'}`);
+  if (setup.action) lines.push('Looking for action');
   if (setup.genre !== 'auto') lines.push(`Genre: ${GENRE_LABELS[setup.genre]}`);
   return lines;
 }

@@ -177,6 +177,23 @@ describe('AI picks (Module 16)', () => {
     expect(within(hand).queryByTestId('video-clip-score')).toBeNull();
   });
 
+  it('shows what AI saw on screen under an action pick, and nothing on the others (Module 06)', () => {
+    renderList([
+      { ...pick('action', 80, ['something_unexpected']), seen: 'A shape flips over and crashes.' },
+      pick('plain', 60, ['loud']),
+    ]);
+    const aiRows = within(screen.getByRole('list', { name: 'Clips found by AI' })).getAllByTestId(
+      'video-clip-row',
+    );
+    expect(within(aiRows[0] as HTMLElement).getByTestId('video-clip-reasons')).toHaveTextContent(
+      'Something unexpected happens',
+    );
+    expect(within(aiRows[0] as HTMLElement).getByTestId('video-clip-seen')).toHaveTextContent(
+      'A shape flips over and crashes.',
+    );
+    expect(within(aiRows[1] as HTMLElement).queryByTestId('video-clip-seen')).toBeNull();
+  });
+
   it('hides a poor pick from its menu', async () => {
     const top = pick('top', 90, ['loud']);
     const props = renderList([top]);

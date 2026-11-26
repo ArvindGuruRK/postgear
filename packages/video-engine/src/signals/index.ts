@@ -4,6 +4,7 @@
  * needs is here.
  */
 export * from './file';
+export * from './motion';
 export {
   clipCap,
   type FindHighlightsOptions,

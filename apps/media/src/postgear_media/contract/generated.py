@@ -80,8 +80,16 @@ class MediaPyHealthOutput(BaseModel):
     task_queue: Annotated[str, Field(alias="taskQueue", max_length=64, min_length=1)]
 
 
+class MomentsM(RootModel[int]):
+    root: Annotated[int, Field(ge=0, le=86400000)]
+
+
 class LanguageProbability(RootModel[float]):
     root: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class Values1(RootModel[float]):
+    root: Annotated[float, Field(ge=0.0, le=255.0)]
 
 
 class Sample(RootModel[str]):
@@ -97,6 +105,19 @@ class SimulationHint(BaseModel):
     sample: Sample | None
 
 
+class StorageKey(RootModel[str]):
+    root: Annotated[
+        str,
+        Field(
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+
+
 class TimeRange(BaseModel):
     """
     A stretch of the video, in its own milliseconds
@@ -110,6 +131,15 @@ class TimeRange(BaseModel):
     to_ms: Annotated[int, Field(alias="toMs", ge=0, le=86400000)]
 
 
+class VisualSimulationHint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    force: Literal["fail", "slow"] | None
+    sample: Sample | None
+
+
 class HeardFile(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -121,6 +151,126 @@ class HeardFile(BaseModel):
     speech: Speech
     version: Literal[1]
     words: Annotated[list[HeardWord], Field(max_length=400000)]
+
+
+class MediaPyMotionInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    duration_ms: Annotated[int, Field(alias="durationMs", ge=0, le=86400000)]
+    job_id: Annotated[
+        str,
+        Field(
+            alias="jobId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+    org_id: Annotated[
+        str,
+        Field(
+            alias="orgId",
+            max_length=64,
+            pattern="^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
+        ),
+    ]
+    proxy_key: Annotated[
+        str,
+        Field(
+            alias="proxyKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    ranges: Annotated[list[TimeRange], Field(max_length=64, min_length=1)]
+    sample_fps: Annotated[Literal[2], Field(alias="sampleFps")]
+    simulation: VisualSimulationHint | None
+    version: Literal[1]
+    video_id: Annotated[
+        str,
+        Field(
+            alias="videoId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+
+
+class MediaPyMotionOutput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    producer: Annotated[str, Field(max_length=80, min_length=1)]
+    sampled: Annotated[int, Field(ge=0, le=9007199254740991)]
+    track_key: Annotated[
+        str,
+        Field(
+            alias="trackKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+
+
+class MediaPyStillsInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    duration_ms: Annotated[int, Field(alias="durationMs", ge=0, le=86400000)]
+    job_id: Annotated[
+        str,
+        Field(
+            alias="jobId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+    moments_ms: Annotated[
+        list[MomentsM], Field(alias="momentsMs", max_length=48, min_length=1)
+    ]
+    org_id: Annotated[
+        str,
+        Field(
+            alias="orgId",
+            max_length=64,
+            pattern="^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
+        ),
+    ]
+    proxy_key: Annotated[
+        str,
+        Field(
+            alias="proxyKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    simulation: VisualSimulationHint | None
+    version: Literal[1]
+    video_id: Annotated[
+        str,
+        Field(
+            alias="videoId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+    width: Annotated[int, Field(ge=160, le=1280)]
+
+
+class MediaPyStillsOutput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    keys: Annotated[list[StorageKey], Field(max_length=48, min_length=1)]
 
 
 class MediaPyTranscribeInput(BaseModel):
@@ -194,6 +344,18 @@ class MediaPyTranscribeOutput(BaseModel):
     word_count: Annotated[int, Field(alias="wordCount", ge=0, le=9007199254740991)]
 
 
+class MotionFile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    producer: Annotated[str, Field(max_length=80, min_length=1)]
+    ranges: Annotated[list[TimeRange], Field(max_length=64, min_length=1)]
+    sample_rate_hz: Annotated[Literal[2], Field(alias="sampleRateHz")]
+    values: Annotated[list[Values1 | None], Field(max_length=172800)]
+    version: Literal[1]
+
+
 class MediaContract(BaseModel):
     """
     Generated from packages/media-contract. Contract version 1. Do not edit.
@@ -204,11 +366,26 @@ class MediaContract(BaseModel):
         populate_by_name=True,
     )
     file_heard_file: Annotated[HeardFile | None, Field(alias="file_HeardFile")] = None
+    file_motion_file: Annotated[MotionFile | None, Field(alias="file_MotionFile")] = (
+        None
+    )
     media_py_health_input: Annotated[
         MediaPyHealthInput | None, Field(alias="mediaPyHealth_input")
     ] = None
     media_py_health_output: Annotated[
         MediaPyHealthOutput | None, Field(alias="mediaPyHealth_output")
+    ] = None
+    media_py_motion_input: Annotated[
+        MediaPyMotionInput | None, Field(alias="mediaPyMotion_input")
+    ] = None
+    media_py_motion_output: Annotated[
+        MediaPyMotionOutput | None, Field(alias="mediaPyMotion_output")
+    ] = None
+    media_py_stills_input: Annotated[
+        MediaPyStillsInput | None, Field(alias="mediaPyStills_input")
+    ] = None
+    media_py_stills_output: Annotated[
+        MediaPyStillsOutput | None, Field(alias="mediaPyStills_output")
     ] = None
     media_py_transcribe_input: Annotated[
         MediaPyTranscribeInput | None, Field(alias="mediaPyTranscribe_input")

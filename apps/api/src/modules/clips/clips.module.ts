@@ -36,6 +36,7 @@ import { ClipHighlightsService } from './highlights/clip-highlights.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipSweepService } from './retention/clip-sweep.service';
 import { ClipMomentsService } from './highlights/clip-moments.service';
+import { ClipStillsService } from './highlights/clip-stills.service';
 import { ClipsInternalController } from './internal/clips-internal.controller';
 import { ClipsInternalService } from './internal/clips-internal.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
@@ -89,6 +90,7 @@ import { ClipVideosService } from './videos/clip-videos.service';
     ClipHighlightsService,
     // Sprint 13, Module 05: reading a transcript for moments (the internal pick route).
     ClipMomentsService,
+    ClipStillsService,
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,

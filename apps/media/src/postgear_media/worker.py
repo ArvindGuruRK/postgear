@@ -22,6 +22,7 @@ from temporalio.worker import Worker
 
 from postgear_media.activities.health import media_py_health
 from postgear_media.activities.transcribe import media_py_transcribe
+from postgear_media.activities.visual import media_py_motion, media_py_stills
 from postgear_media.core.logging import configure_logging, get_logger
 from postgear_media.core.scratch import sweep_old
 from postgear_media.core.settings import MEDIA_PY_TASK_QUEUE, Settings, get_settings
@@ -29,7 +30,12 @@ from postgear_media.core.settings import MEDIA_PY_TASK_QUEUE, Settings, get_sett
 log = get_logger("worker")
 
 #: Every activity this service serves. A module adds its function here.
-ACTIVITIES: Sequence[Callable[..., Any]] = (media_py_health, media_py_transcribe)
+ACTIVITIES: Sequence[Callable[..., Any]] = (
+    media_py_health,
+    media_py_transcribe,
+    media_py_motion,
+    media_py_stills,
+)
 
 
 async def connect(settings: Settings) -> Client:

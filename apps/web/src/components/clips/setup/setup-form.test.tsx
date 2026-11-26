@@ -6,6 +6,9 @@ import type { ClipVideoDetail, SetupPriceView } from '@/types/clips';
 import { fixtureVideo } from '../clips-fixtures';
 import { SetupForm } from './setup-form';
 import {
+  ACTION_HELP,
+  ACTION_VISION_NOTE,
+  actionPriceLabel,
   minutesLabel,
   priceLines,
   setupButtonLabel,
@@ -43,12 +46,12 @@ function price(total: number, remaining: number | null = 300): SetupPriceView {
   };
 }
 
-function renderForm() {
+function renderForm(action?: { available: boolean; vision: boolean }) {
   const video = { ...fixtureVideo(), durationMs: 600_000, status: 'READY' };
   const detail = { video } as unknown as ClipVideoDetail;
   render(
     <TooltipProvider>
-      <SetupForm orgId="org-1" detail={detail} />
+      <SetupForm orgId="org-1" detail={detail} action={action} />
     </TooltipProvider>,
   );
   return video;
@@ -106,6 +109,43 @@ describe('the setup model', () => {
       'Captions: Bold Pop',
       'Genre: Gaming',
     ]);
+  });
+});
+
+describe('Look For Action (Module 06)', () => {
+  it('shows its price before it is switched on and turns it on in the setup', () => {
+    const start = defaultClipSetup(600_000);
+    expect(actionPriceLabel(start)).toBe('+5 AI Minutes');
+    const on = setupReducer(start, { type: 'action', on: true });
+    expect(on.action).toBe(true);
+    expect(summaryLines(on, null)).toContain('Looking for action');
+  });
+
+  it('is hidden when it cannot run, and says so when stills go to AI', async () => {
+    renderForm();
+    await settle();
+    expect(screen.queryByTestId('clip-setup-action')).toBeNull();
+  });
+
+  it('sends the switch with the price, and adds the still sentence only with vision on', async () => {
+    renderForm({ available: true, vision: true });
+    await settle();
+    expect(screen.getByText('+5 AI Minutes')).toBeTruthy();
+    expect(screen.getByText(`${ACTION_HELP} ${ACTION_VISION_NOTE}`)).toBeTruthy();
+    fireEvent.click(screen.getByTestId('clip-setup-action'));
+    await settle();
+    expect(api.priceClipSetup).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ action: true }),
+      expect.anything(),
+    );
+  });
+
+  it('leaves the still sentence out with vision off', async () => {
+    renderForm({ available: true, vision: false });
+    await settle();
+    expect(screen.getByText(ACTION_HELP)).toBeTruthy();
+    expect(screen.queryByText(new RegExp(ACTION_VISION_NOTE))).toBeNull();
   });
 });
 

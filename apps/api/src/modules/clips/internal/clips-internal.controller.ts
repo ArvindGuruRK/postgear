@@ -11,6 +11,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import type {
   ClipChargeImportAnswer,
+  ClipCheckStillsAnswer,
   ClipFinishExportAnswer,
   ClipFinishSaveDownloadAnswer,
   ClipPickMomentsAnswer,
@@ -23,11 +24,14 @@ import { Public } from '../../../common/decorators/public.decorator';
 import { ZodBody } from '../../../common/pipes/zod-validation.pipe';
 import { InternalTokenGuard } from '../../automations/gateway/internal-token.guard';
 import { ClipMomentsService } from '../highlights/clip-moments.service';
+import { ClipStillsService } from '../highlights/clip-stills.service';
 import { ClipSweepService } from '../retention/clip-sweep.service';
 import { ClipReconcileService } from './clip-reconcile.service';
 import {
   type ChargeImportBody,
+  type CheckStillsBody,
   chargeImportSchema,
+  checkStillsSchema,
   type FinishExportBody,
   type FinishSaveDownloadBody,
   finishExportSchema,
@@ -35,7 +39,9 @@ import {
   type OrgOnlyBody,
   orgOnlySchema,
   type ReconcileBody,
+  type ReverseBody,
   reconcileSchema,
+  reverseSchema,
   type SweepBody,
   sweepSchema,
 } from './clips-internal.schema';
@@ -50,6 +56,7 @@ export class ClipsInternalController {
     private readonly reconciler: ClipReconcileService,
     private readonly sweeper: ClipSweepService,
     private readonly moments: ClipMomentsService,
+    private readonly stills: ClipStillsService,
   ) {}
 
   /** Sprint 13, Module 05: a Find Clips run with a setup reads its transcript for moments. */
@@ -60,6 +67,16 @@ export class ClipsInternalController {
     @Body(new ZodBody(orgOnlySchema, 'internal/clips/pick-moments')) body: OrgOnlyBody,
   ): Promise<ClipPickMomentsAnswer> {
     return this.moments.pick(jobId, body.organizationId);
+  }
+
+  /** Module 06: Look For Action's check on stills (a run started with the vision check on). */
+  @Post('jobs/:jobId/check-stills')
+  @HttpCode(HttpStatus.OK)
+  checkStills(
+    @Param('jobId') jobId: string,
+    @Body(new ZodBody(checkStillsSchema, 'internal/clips/check-stills')) body: CheckStillsBody,
+  ): Promise<ClipCheckStillsAnswer> {
+    return this.stills.check(jobId, body);
   }
 
   @Post('jobs/:jobId/charge-import')
@@ -75,7 +92,7 @@ export class ClipsInternalController {
   @HttpCode(HttpStatus.OK)
   reverse(
     @Param('jobId') jobId: string,
-    @Body(new ZodBody(orgOnlySchema, 'internal/clips/reverse')) body: OrgOnlyBody,
+    @Body(new ZodBody(reverseSchema, 'internal/clips/reverse')) body: ReverseBody,
   ): Promise<ClipReverseAnswer> {
     return this.internal.reverseCharges(jobId, body);
   }

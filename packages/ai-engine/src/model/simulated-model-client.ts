@@ -1145,6 +1145,54 @@ function simulateCompetitorResearch(user: string): {
   return { themes, rhythm, openings };
 }
 
+/**
+ * The check on stills, simulated (Clips AI, Module 06). The stills are always
+ * the same test pattern under simulation, so the answer comes from the
+ * prompt's facts: a burst the sound rose with is a notable event (its kind
+ * and sentence picked by its moment, the same every run); a burst in silence
+ * is "nothing notable", so the drop path is seen too. Never a real picture.
+ */
+const STILL_LINES: Readonly<
+  Record<'crash_or_fall' | 'win_or_score' | 'surprise' | 'visual_gag', readonly string[]>
+> = Object.freeze({
+  crash_or_fall: [
+    'Something on screen flips over and crashes.',
+    'A shape tumbles off the edge and falls.',
+  ],
+  win_or_score: [
+    'A bright burst fills the screen like a win.',
+    'A big flash marks a score on screen.',
+  ],
+  surprise: [
+    'The whole picture changes in a sudden rush.',
+    'Shapes burst across the screen all at once.',
+  ],
+  visual_gag: [
+    'A pattern wobbles and folds in on itself.',
+    'Colours spin and stretch in a silly way.',
+  ],
+});
+
+function simulateStillVerdict(user: string): {
+  isMoment: boolean;
+  kind: string;
+  sure: number;
+  line: string;
+} {
+  const rose = /rose with the movement/.test(readField(user, 'Sound') ?? '');
+  if (!rose) return { isMoment: false, kind: 'nothing', sure: 0.7, line: '' };
+  const kinds = Object.keys(STILL_LINES) as Array<keyof typeof STILL_LINES>;
+  const seed = hashText(readField(user, 'Moment') ?? user);
+  const kind = kinds[seed % kinds.length] as keyof typeof STILL_LINES;
+  const lines = STILL_LINES[kind];
+  return {
+    isMoment: true,
+    kind,
+    sure: 0.8,
+    line: lines[Math.floor(seed / kinds.length) % lines.length] as string,
+  };
+}
+
 function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   const keys = schemaKeys(schema);
   const brief = readBlock(user, 'Brief') ?? user;
@@ -1165,6 +1213,9 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   }
   if (keys.includes('picks')) {
     return simulatePicks(user);
+  }
+  if (keys.includes('isMoment')) {
+    return simulateStillVerdict(user);
   }
   if (keys.includes('titles')) {
     return simulateTitles(user);
@@ -1547,6 +1598,8 @@ export function createSimulatedModelClient(): ModelClient {
       schema: z.ZodType<T>;
       system: string;
       user: string;
+      /** Never looked at: the simulated checker answers from the prompt's facts. */
+      images?: readonly unknown[];
       signal?: AbortSignal;
     }): Promise<T> {
       throwIfAborted(params.signal);

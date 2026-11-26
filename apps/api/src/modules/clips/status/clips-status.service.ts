@@ -122,6 +122,10 @@ export interface ClipsAiStatus {
   captions: boolean;
   /** Module 02: the spoken languages on offer, for the Spoken Language select ("auto" is always first). */
   languages: Array<{ code: string; name: string; highlight: 'word' | 'page' }>;
+  /** Module 06: Look For Action can run right now (the picture measure is on the media service). */
+  action: boolean;
+  /** Module 06: Look For Action also shows stills to the AI model (`CLIPS_ACTION_VISION`). */
+  actionVision: boolean;
 }
 
 /** Module 19: what the video space holds. */
@@ -143,6 +147,7 @@ export class ClipsStatusService {
   private inFlight: Promise<ClipsToolsState> | null = null;
   private readonly simulation: boolean;
   private readonly platforms: ClipPlatformId[];
+  private readonly actionVision: boolean;
 
   constructor(
     private readonly scheduling: SchedulingService,
@@ -154,6 +159,7 @@ export class ClipsStatusService {
   ) {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
+    this.actionVision = config.get('CLIPS_ACTION_VISION', { infer: true }) === 'true';
   }
 
   async status(orgId: string): Promise<ClipsStatus> {
@@ -191,6 +197,8 @@ export class ClipsStatusService {
           name: language.name,
           highlight: language.highlight,
         })),
+        action: aiService === 'ok',
+        actionVision: this.actionVision,
       },
     };
   }
