@@ -176,6 +176,13 @@ export interface TimelineDockProps {
   onSplit: () => void;
   onRemove: () => void;
   onAnnounce: (words: string) => void;
+  /**
+   * Sprint 13: the clip's caption pages as a read-only row (null for a clip
+   * without captions). Pressing one jumps there and opens the Captions tab,
+   * where captions are edited: they follow the words, so they have no handles.
+   */
+  captionBars?: ReadonlyArray<{ key: string; startMs: number; endMs: number; text: string }> | null;
+  onCaptions?: (ms: number) => void;
   /** A sticker bar's tiny picture (Module 12), by item id; null for none. */
   stickerPicture?: (itemId: string) => string | null;
   /**
@@ -443,6 +450,8 @@ function EditingTimeline({
   onDragNeedsMore,
   stickerPicture,
   soundShape,
+  captionBars,
+  onCaptions,
 }: TimelineDockProps & { snapping: boolean; onDragNeedsMore: (needs: boolean) => void }) {
   const scroller = useRef<HTMLDivElement | null>(null);
   const origin = useRef<HTMLDivElement | null>(null);
@@ -972,7 +981,11 @@ function EditingTimeline({
                   leftPx={xOf(bar.startMs)}
                   widthPx={Math.max(6, xOf(bar.endMs - bar.startMs))}
                   selected={isSelected(bar.selection)}
-                  picture={bar.selection.kind === 'item' ? (stickerPicture?.(bar.selection.id) ?? null) : null}
+                  picture={
+                    bar.selection.kind === 'item'
+                      ? (stickerPicture?.(bar.selection.id) ?? null)
+                      : null
+                  }
                   shape={
                     bar.selection.kind === 'item' && row.kind === 'sound'
                       ? (soundShape?.(bar.selection.id) ?? null)
@@ -1009,6 +1022,35 @@ function EditingTimeline({
               ))}
             </TimelineRow>
           ))}
+          {captionBars ? (
+            <TimelineRow
+              label="Captions"
+              slim={captionBars.length === 0}
+              widthPx={contentPx}
+              className="bg-chrome"
+              data-testid="clip-row-captions"
+              onTrackPointerDown={pressTrack}
+            >
+              {captionBars.map((bar) => (
+                <button
+                  key={bar.key}
+                  type="button"
+                  title={bar.text}
+                  aria-label={`Captions, ${bar.text}`}
+                  data-testid="clip-caption-bar"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={() => onCaptions?.(bar.startMs)}
+                  className="absolute inset-y-1 cursor-pointer overflow-hidden truncate rounded-sm border-2 border-outline bg-secondary px-1 text-left font-sans text-[11px] font-bold text-ink"
+                  style={{
+                    left: xOf(bar.startMs),
+                    width: Math.max(4, xOf(bar.endMs - bar.startMs) - 1),
+                  }}
+                >
+                  {bar.text}
+                </button>
+              ))}
+            </TimelineRow>
+          ) : null}
         </div>
         <div
           className="pointer-events-none absolute inset-y-0"

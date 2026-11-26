@@ -174,6 +174,7 @@ export function createClipDocument(input: CreateClipDocumentInput): ClipDocument
     looks: { colour: 'none', strength: 1, vignette: 0 },
     fades: { inMs: 0, outMs: 0 },
     tracks: [],
+    bleeps: [],
   };
 
   // The video id and anything else the caller gave are checked by the same

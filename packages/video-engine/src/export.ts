@@ -161,9 +161,31 @@ export function documentFingerprint(doc: ClipDocument): string {
   return fingerprintOf(doc, 'v2');
 }
 
+/**
+ * What of a document the fingerprint is taken of. `meta` and `recipeId` are
+ * never drawn, so they never count. A clip that uses nothing version 2 added
+ * (no captions, no bleeps, no hook, no following) is fingerprinted in its
+ * version 1 form, so every export made before the document moved to version 2
+ * still matches its clip: opening an old clip never makes it look changed.
+ */
+function fingerprintView(doc: ClipDocument): Record<string, unknown> {
+  const {
+    meta: _meta,
+    recipeId: _recipeId,
+    ...drawn
+  } = doc as ClipDocument & { meta?: unknown; recipeId?: unknown };
+  const usesVersion2 =
+    drawn.bleeps.length > 0 ||
+    drawn.tracks.some((track) => track.kind === 'captions') ||
+    drawn.segments.some((segment) => segment.role !== undefined) ||
+    drawn.layout.follow !== undefined;
+  if (usesVersion2) return drawn;
+  const { bleeps: _bleeps, ...legacy } = drawn;
+  return { ...legacy, schemaVersion: 1 };
+}
+
 function fingerprintOf(doc: ClipDocument, version: 'v1' | 'v2'): string {
-  const { meta: _meta, ...drawn } = doc as ClipDocument & { meta?: unknown };
-  const text = canonical(drawn, version === 'v2');
+  const text = canonical(fingerprintView(doc), version === 'v2');
   const lane = (seed: number) => cyrb53(text, seed).toString(16).padStart(14, '0');
   return `${version}-${lane(1)}${lane(2)}`;
 }

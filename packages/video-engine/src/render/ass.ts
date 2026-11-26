@@ -8,6 +8,7 @@
  * times in `H:MM:SS.CC`.
  */
 import { TEXT_SHADOW } from '../document/text';
+import { CAPTION_LAYER, captionDialogues, captionStyleFields } from './caption-ass';
 import type { RenderPlan } from './plan';
 import type { PlanShape, PlanText, PlanTextRun } from './text-plan';
 
@@ -327,11 +328,21 @@ function shapeStyle(fontName: string): string {
  */
 export function buildAss(plan: RenderPlan): AssFile[] {
   const shapes = plan.shapes ?? [];
-  if (plan.texts.length === 0 && shapes.length === 0) {
+  const captions = plan.captions ?? null;
+  if (plan.texts.length === 0 && shapes.length === 0 && !captions) {
     return [];
   }
   const styles = new Map<string, string>();
   const lines: Array<{ layer: number; order: number; line: string }> = [];
+  if (captions) {
+    // Captions first and lowest: a text or badge a person placed is drawn over them.
+    const fields = captionStyleFields(captions);
+    const name = `S${styles.size + 1}`;
+    styles.set(fields, name);
+    for (const line of captionDialogues(captions, name, plan.canvas.width)) {
+      lines.push({ layer: CAPTION_LAYER, order: lines.length, line });
+    }
+  }
   const ordered = [...plan.texts].sort((a, b) => a.layer - b.layer);
   for (const text of ordered) {
     const fields = styleFields(text);

@@ -7,6 +7,12 @@
  * Later modules add their calls here (videos, uploads, clips, exports).
  */
 import type {
+  AddCaptionsOutcome,
+  CaptionStylesView,
+  CaptionStyleView,
+  CaptionsFileOutcome,
+  ClipWordsView,
+  TranslateCaptionsOutcome,
   ClipChannelPreview,
   ClipDocument,
   ClipChannelView,
@@ -44,6 +50,7 @@ import type {
   SavedLayoutView,
 } from '@/types/clips';
 import type {
+  CaptionLook,
   LibraryCategoryCount,
   LibrarySearchPage,
   LibrarySoundPage,
@@ -763,9 +770,12 @@ export async function saveDownloadFile(jobId: string): Promise<void> {
 
 /** Save To Media: 422 `media_too_big` with the sizes in its sentence over Media's video limit. */
 export async function saveDownloadToMedia(jobId: string): Promise<DownloadView> {
-  const { download } = await api<{ download: DownloadView }>(`${downloadPath(jobId)}/save-to-media`, {
-    method: 'POST',
-  });
+  const { download } = await api<{ download: DownloadView }>(
+    `${downloadPath(jobId)}/save-to-media`,
+    {
+      method: 'POST',
+    },
+  );
   return download;
 }
 
@@ -781,4 +791,92 @@ export async function downloadOriginal(videoId: string): Promise<string> {
     { method: 'POST' },
   );
   return url;
+}
+
+// --- Sprint 13, Module 03: captions ---------------------------------------------------
+
+/**
+ * Adds captions to a clip. Not listened to yet: `covered: false` with the
+ * listening job (ask again when it ends, which is free). Listened to: the
+ * captions `track` for the editor to put in the document, and the words.
+ */
+export function addCaptions(
+  clipId: string,
+  body: { styleId?: string; language?: string } = {},
+): Promise<AddCaptionsOutcome> {
+  return api(`${clipPath(clipId)}/captions`, { method: 'POST', body });
+}
+
+/** The words of the clip's captions (or of its video, when it has none yet). */
+export function getClipWords(
+  clipId: string,
+  options: { signal?: AbortSignal } = {},
+): Promise<ClipWordsView> {
+  return api(`${clipPath(clipId)}/words`, { signal: options.signal });
+}
+
+/** An SRT or VTT file as the clip's captions. Free; 413 or 422 with one sentence. */
+export function uploadCaptionsFile(
+  clipId: string,
+  file: File,
+  fields: { styleId?: string; language?: string } = {},
+): Promise<CaptionsFileOutcome> {
+  const sent: Record<string, string> = {};
+  if (fields.styleId) sent.styleId = fields.styleId;
+  if (fields.language) sent.language = fields.language;
+  return uploadFile(`${clipPath(clipId)}/captions/from-file`, file, undefined, sent);
+}
+
+/** Translates the clip's captions. Charged in AI minutes; a failure gives them back. */
+export function translateCaptions(
+  clipId: string,
+  language: string,
+): Promise<TranslateCaptionsOutcome> {
+  return api(`${clipPath(clipId)}/captions/translate`, { method: 'POST', body: { language } });
+}
+
+/** Fixes a word everywhere it was heard in the video ("Replace Everywhere"). */
+export function replaceTranscriptWord(
+  videoId: string,
+  from: string,
+  to: string,
+  language?: string,
+): Promise<{ changed: number; fixes: number }> {
+  return api(`/clips/videos/${encodeURIComponent(videoId)}/transcript/words`, {
+    method: 'PATCH',
+    body: { replace: { from, to }, ...(language ? { language } : {}) },
+  });
+}
+
+export function listCaptionStyles(
+  options: { signal?: AbortSignal } = {},
+): Promise<CaptionStylesView> {
+  return api('/clips/caption-styles', { signal: options.signal });
+}
+
+/** 409 `caption_style_limit` at 30 a workspace. */
+export async function createCaptionStyle(input: {
+  name: string;
+  look: CaptionLook;
+}): Promise<CaptionStyleView> {
+  const { style } = await api<{ style: CaptionStyleView }>('/clips/caption-styles', {
+    method: 'POST',
+    body: input,
+  });
+  return style;
+}
+
+export async function updateCaptionStyle(
+  styleId: string,
+  change: { name?: string; look?: CaptionLook },
+): Promise<CaptionStyleView> {
+  const { style } = await api<{ style: CaptionStyleView }>(
+    `/clips/caption-styles/${encodeURIComponent(styleId)}`,
+    { method: 'PATCH', body: change },
+  );
+  return style;
+}
+
+export function deleteCaptionStyle(styleId: string): Promise<{ message: string }> {
+  return api(`/clips/caption-styles/${encodeURIComponent(styleId)}`, { method: 'DELETE' });
 }

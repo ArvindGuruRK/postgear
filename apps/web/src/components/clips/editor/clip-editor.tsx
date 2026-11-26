@@ -114,9 +114,20 @@ import {
   WATERMARK_OPACITY,
   WATERMARK_WIDTH_FRACTION,
   type Zoom,
+  aiMinutesCost,
+  type CaptionsTrack,
+  captionLayout,
+  captionsTrackOf,
+  safeAreaGuide,
+  updateCaptionsTrack,
+  withCaptionsTrack,
+  withoutCaptions,
 } from '@postgear/video-engine';
 import { DomOverlayLayer, usePreviewEngine, WebAudioLayer } from '@postgear/video-preview';
 import { TriangleAlert } from 'lucide-react';
+import { captionBars, lookOf } from '../panels/captions-model';
+import { CaptionsPanel } from '../panels/captions-panel';
+import { useCaptions } from '../panels/use-captions';
 import { useRouter } from 'next/navigation';
 import {
   useCallback,
@@ -698,6 +709,62 @@ export function ClipEditor({
       });
     },
     [],
+  );
+
+  // ---- Captions (Sprint 13, Module 03) ---------------------------------------------------
+  // The words arrive from the API; the track goes into the document here, as one undo step.
+  const captionsTrack = useMemo(() => captionsTrackOf(shownDocument), [shownDocument]);
+  const putCaptionsTrack = useCallback(
+    (track: CaptionsTrack) => {
+      const { document: doc } = latest.current;
+      commit(doc, withCaptionsTrack(doc, track));
+      dispatch({ type: 'tab', tab: 'captions' });
+    },
+    [commit],
+  );
+  const captions = useCaptions({
+    clipId,
+    videoId: detail.video?.id ?? null,
+    transcriptId: captionsTrack?.transcriptAssetId ?? null,
+    onTrack: putCaptionsTrack,
+  });
+  const captionsTranscript = captions.transcript;
+  const captionStyles = captions.styles;
+  // The same layout the export's writer reads: the pages on screen are the pages in the file.
+  const captionsLayout = useMemo(() => {
+    if (!captionsTrack || !captionsTranscript) return null;
+    return captionLayout({
+      doc: shownDocument,
+      track: captionsTrack,
+      look: lookOf(captionsTrack.styleId, captionStyles),
+      transcript: captionsTranscript,
+      // Only words that were listened to have a real time each.
+      wordTimed: captionsTranscript.source === 'listened',
+    });
+  }, [shownDocument, captionsTrack, captionsTranscript, captionStyles]);
+  useEffect(() => {
+    overlayLayer.setCaptions(captionsLayout);
+  }, [overlayLayer, captionsLayout]);
+  const captionRow = useMemo(
+    () => (captionsLayout ? captionBars(captionsLayout) : null),
+    [captionsLayout],
+  );
+  const editCaptions = useCallback(
+    (change: (track: CaptionsTrack) => CaptionsTrack, coalesceKey?: string) => {
+      const { document: doc } = latest.current;
+      const next = updateCaptionsTrack(doc, change);
+      commit(doc, next, { coalesceKey });
+    },
+    [commit],
+  );
+  const removeCaptions = useCallback(() => {
+    const { document: doc } = latest.current;
+    commit(doc, withoutCaptions(doc));
+  }, [commit]);
+  const [safeAreaShown, setSafeAreaShown] = useState(false);
+  const safeArea = useMemo(
+    () => safeAreaGuide(shownDocument.canvas.ratio),
+    [shownDocument.canvas.ratio],
   );
 
   const splitHere = useCallback(() => {
@@ -1539,6 +1606,21 @@ export function ClipEditor({
         onAnchor={anchorText}
         onRemove={removeSelected}
       />
+    ) : state.tab === 'captions' ? (
+      <CaptionsPanel
+        track={captionsTrack}
+        layout={captionsLayout}
+        captions={captions}
+        translatePrice={aiMinutesCost('translate', outputDuration(document))}
+        recent={recentColours}
+        onRecent={(hex) => setRecentColours((current) => pushRecent(current, hex))}
+        safeArea={safeAreaShown}
+        onSafeArea={safeArea ? setSafeAreaShown : null}
+        onEdit={editCaptions}
+        onRemove={removeCaptions}
+        onSeek={(ms) => playback.seekMs(ms)}
+        onNotice={setNotice}
+      />
     ) : state.tab === 'effects' ? (
       <EffectsPanel
         document={document}
@@ -1701,6 +1783,9 @@ export function ClipEditor({
                 onEmoji={noteEmoji}
               />
               {exporting.mark ? <StageMark canvas={shownDocument.canvas} /> : null}
+              {safeAreaShown && safeArea && state.tab === 'captions' ? (
+                <SafeAreaOverlay covered={safeArea.covered} />
+              ) : null}
             </Stage>
           </section>
         </div>
@@ -1728,6 +1813,11 @@ export function ClipEditor({
           onAnnounce={setAnnouncement}
           stickerPicture={stickerPicture}
           soundShape={soundShape}
+          captionBars={captionRow}
+          onCaptions={(ms) => {
+            playback.seekMs(ms);
+            setTab('captions');
+          }}
         />
       </div>
 
@@ -1796,6 +1886,40 @@ export function ClipEditor({
  * draws it (`WATERMARK_*` in the render plan: a width fraction of the canvas,
  * the same margin from the right and the bottom), so the preview matches.
  */
+/**
+ * The Safe Area Guide (Sprint 13): the strips where TikTok, Reels and Shorts
+ * draw their own buttons and text, hatched over the stage while the Captions
+ * tab is open. An aid in the editor only: never in an export.
+ */
+function SafeAreaOverlay({
+  covered,
+}: {
+  covered: ReadonlyArray<{ x: number; y: number; w: number; h: number }>;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="clip-safe-area"
+      className="pointer-events-none absolute inset-0"
+    >
+      {covered.map((strip) => (
+        <span
+          key={`${strip.x}-${strip.y}`}
+          className="absolute border border-dashed border-white/70"
+          style={{
+            left: `${strip.x * 100}%`,
+            top: `${strip.y * 100}%`,
+            width: `${strip.w * 100}%`,
+            height: `${strip.h * 100}%`,
+            background:
+              'repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0 8px, rgba(0, 0, 0, 0.15) 8px 16px)',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function StageMark({ canvas }: { canvas: { width: number; height: number } }) {
   const margin = WATERMARK_MARGIN_FRACTION * 100;
   return (

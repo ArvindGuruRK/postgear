@@ -90,3 +90,19 @@ export const VOLUME_MAX = 2;
 
 /** Zoom never goes past four times. */
 export const ZOOM_MAX = 4;
+
+// --- Version 2 (Sprint 13) ----------------------------------------------------
+
+/** A caption's size on the 1080 short side: readable at the small end, a shout at the large. */
+export const CAPTION_SIZE_MIN = 24;
+export const CAPTION_SIZE_MAX = 220;
+/** The most words a caption page may be asked to hold ("A Line" asks for 7). */
+export const CAPTION_MAX_WORDS = 12;
+/** The longest one caption word may be after an edit, punctuation included. */
+export const CAPTION_WORD_MAX = 80;
+/** The most words of one clip a person may change or hide (a 30 minute clip holds about 5,000). */
+export const MAX_CAPTION_EDITS = 2_000;
+/** The most bleeps and mutes one clip keeps. */
+export const MAX_BLEEPS = 300;
+/** The most stretches of a followed clip a person may fix by hand. */
+export const MAX_FOLLOW_OVERRIDES = 100;

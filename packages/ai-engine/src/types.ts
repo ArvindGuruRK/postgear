@@ -247,6 +247,21 @@ export interface CompetitorResearchResult {
   openings: string[];
 }
 
+/** Sprint 13 Clips AI: caption lines to translate, one sentence a line. */
+export interface TranslateRequest {
+  /** Language names a person reads ("English", "Tamil"). */
+  from: string;
+  to: string;
+  /** The target's short code ("ta"). */
+  toCode: string;
+  lines: readonly string[];
+}
+
+export interface TranslateResult {
+  /** One line for each line asked, in the same order. */
+  lines: string[];
+}
+
 /** The snippet jobs bound to one model client. Rejects with an {@link AiProviderError}. */
 export interface SnippetWriter {
   hashtags(request: HashtagRequest, options?: { signal?: AbortSignal }): Promise<HashtagResult>;
@@ -256,6 +271,8 @@ export interface SnippetWriter {
     request: CompetitorResearchRequest,
     options?: { signal?: AbortSignal },
   ): Promise<CompetitorResearchResult>;
+  /** Sprint 13 Clips AI: Translate Captions. */
+  translate(request: TranslateRequest, options?: { signal?: AbortSignal }): Promise<TranslateResult>;
 }
 
 // ---------------------------------------------------------------------------

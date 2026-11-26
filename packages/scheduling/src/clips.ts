@@ -277,6 +277,7 @@ export const CLIP_NON_RETRYABLE: readonly string[] = [
   'no_speech',
   'language_unsupported',
   'captions_off',
+  'captions_missing',
 ];
 
 /** The three priorities a job can carry, copied from `clips.queue_priority` at creation. */

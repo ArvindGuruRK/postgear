@@ -348,6 +348,8 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             rows,
             stickerRows: options.stickerRows ?? prismaStickerFileRows,
             soundRows: options.soundRows ?? prismaSoundFileRows,
+            // Sprint 13: a clip's captions come from the workspace's own transcript and style rows.
+            captionRows: rows,
             progress,
             fonts: deps.fonts,
             watermark: deps.watermark ?? null,

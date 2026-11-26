@@ -442,8 +442,21 @@ describe('refusals', () => {
     expect(buildRenderPlan(sound, withSound).sounds).toHaveLength(1);
 
     const captions = twoSegmentDoc();
-    captions.tracks = [{ id: 'cc', kind: 'captions', transcriptAssetId: TEST_ASSET_ID, style: {} }];
-    expectCode(() => buildRenderPlan(captions, testContext()), 'captions_unsupported');
+    captions.tracks = [
+      {
+        id: 'cc',
+        kind: 'captions',
+        transcriptAssetId: TEST_ASSET_ID,
+        language: 'en',
+        styleId: 'bold-pop',
+        position: { x: 0.5, y: 0.72 },
+        sizePx: 84,
+        maxWords: 3,
+        edits: {},
+      },
+    ];
+    // Captions whose words were not handed in are refused, never drawn empty.
+    expectCode(() => buildRenderPlan(captions, testContext()), 'captions_missing');
 
     // Empty tracks are fine.
     const empty = twoSegmentDoc();

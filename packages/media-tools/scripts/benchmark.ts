@@ -146,7 +146,8 @@ function heavyText(seconds: number): TextItem[] {
 /** The benchmark clip: one segment, Vertical, with the real preset of `layout` for a 16:9 video. */
 function benchmarkDocument(layout: Layout, seconds: number, text: boolean): ClipDocument {
   const base: ClipDocument = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    bleeps: [],
     canvas: { ratio: '9:16', width: 1080, height: 1920, fps: 30, background: '#000000' },
     sources: [{ id: 'src', videoId: '6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4' }],
     segments: [

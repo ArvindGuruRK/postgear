@@ -64,6 +64,7 @@ import type { ClipInternalClient } from '../internal-client';
 import type { JobProgress } from '../job-progress';
 import { exportMediaKeys } from '../keys';
 import type { ClipRows, JobRow } from '../rows';
+import { type CaptionRows, fetchCaptions } from '../captions/files';
 import { fetchSoundFiles } from '../sounds/files';
 import type { SoundFileRows } from '../sounds/rows';
 import { fetchStickerFiles } from '../stickers/files';
@@ -113,6 +114,8 @@ export interface RenderRun {
   stickerRows: StickerFileRows;
   /** The library rows and upload assets a clip's sounds come from (Module 14). */
   soundRows?: SoundFileRows;
+  /** Sprint 13: the workspace's transcript and caption style rows a clip's captions come from. */
+  captionRows?: CaptionRows;
   progress: Pick<JobProgress, 'report' | 'flush' | 'done'>;
   /** The fonts folder (null when it was never built): text in the clip then fails `font_missing`. */
   fonts: FontsFolder | null;
@@ -141,7 +144,9 @@ const RENDER_FAIL = /\[simulate[: ]render-fail\]/i;
 const PREVIEW_FAIL = /\[simulate[: ]preview-fail\]/i;
 
 /** The forced failure for this render, or null (always null outside simulation). */
-export function forcedRenderFailure(run: Pick<RenderRun, 'input' | 'simulated'>): ClipStepError | null {
+export function forcedRenderFailure(
+  run: Pick<RenderRun, 'input' | 'simulated'>,
+): ClipStepError | null {
   if (run.simulated !== true) return null;
   if (run.input.proof) {
     return PREVIEW_FAIL.test(run.input.name)
@@ -252,6 +257,20 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
     : {};
   run.heartbeat();
 
+  // Sprint 13: the clip's captions (the transcript's words and the style), looked up inside the
+  // workspace. Without the rows a clip with captions stops at the plan with `captions_missing`.
+  const captions = run.captionRows
+    ? await fetchCaptions(
+        { rows: run.captionRows, privateStorage: run.privateStorage },
+        org,
+        input.videoId,
+        input.document,
+        dir,
+        signal,
+      )
+    : undefined;
+  run.heartbeat();
+
   // The mark, when the plan asks for it: copied in under its plain name, with its real size.
   const watermark =
     input.watermark && run.watermark ? await copyWatermarkInto(run.watermark, dir) : null;
@@ -265,8 +284,13 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
       sources,
       stickers,
       sounds,
-      fonts: run.fonts && families.length > 0 ? { dir: FONTS_DIR, manifest: run.fonts.manifest } : null,
+      // Captions draw with fonts too, so the folder is handed in for them as well.
+      fonts:
+        run.fonts && (families.length > 0 || captions !== undefined)
+          ? { dir: FONTS_DIR, manifest: run.fonts.manifest }
+          : null,
       watermark,
+      captions: captions ?? null,
     },
   });
   // Only the twins this clip uses go into the job's fonts folder: libass sees nothing else to pick.

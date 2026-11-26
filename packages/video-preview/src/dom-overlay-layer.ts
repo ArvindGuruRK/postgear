@@ -37,6 +37,7 @@
 import {
   type BadgeLayout,
   badgeLayout,
+  type CaptionLayout,
   displayText,
   FONT_MANIFEST,
   type FontManifest,
@@ -58,6 +59,7 @@ import {
   type StickerFramesLoader,
   type StickerPicture,
 } from './sticker-nodes';
+import { CaptionsNode } from './captions-node';
 import type { LayerUpdate, OverlayLayer } from './types';
 
 export interface DomOverlayLayerOptions {
@@ -187,6 +189,9 @@ export class DomOverlayLayer implements OverlayLayer {
   /** Decoded moving pictures by address: null when this browser cannot decode one. */
   private readonly frames = new Map<string, StickerFrames | null>();
   private readonly loadingFrames = new Set<string>();
+  /** Sprint 13: the clip's captions, laid out by the engine; null when it has none. */
+  private captions: CaptionLayout | null = null;
+  private captionsNode: CaptionsNode | null = null;
 
   constructor(options: DomOverlayLayerOptions = {}) {
     this.manifest = options.manifest ?? FONT_MANIFEST;
@@ -230,6 +235,17 @@ export class DomOverlayLayer implements OverlayLayer {
     if (this.lastState) this.draw(this.lastState, true);
   }
 
+  /**
+   * The clip's captions as the engine laid them out (`captionLayout`), or
+   * null for none. The same pages the export draws: the layer only looks up
+   * the page of each moment.
+   */
+  setCaptions(layout: CaptionLayout | null): void {
+    if (this.captions === layout) return;
+    this.captions = layout;
+    if (this.lastState) this.draw(this.lastState, true);
+  }
+
   update(state: FrameState, _update: LayerUpdate): void {
     this.lastState = state;
     this.draw(state, false);
@@ -243,6 +259,8 @@ export class DomOverlayLayer implements OverlayLayer {
     for (const node of this.badgeNodes.values()) node.remove();
     this.badgeNodes.clear();
     this.badgeMemos.clear();
+    this.captionsNode?.remove();
+    this.captionsNode = null;
     for (const frames of this.frames.values()) frames?.close();
     this.frames.clear();
     this.loadingFrames.clear();
@@ -289,7 +307,9 @@ export class DomOverlayLayer implements OverlayLayer {
       (overlay) => overlay.item.type === 'sticker' && !('badge' in overlay.item.ref),
     ).length;
     let pictureOrder = 0;
-    // Texts and badges in track order, as the ASS layers are.
+    this.drawCaptions(state, box);
+    // Texts and badges in track order, as the ASS layers are. The captions block shares the
+    // lowest of their levels and comes first in the box, so every text is drawn over it.
     let order = 0;
     const placeText = (node: TextNode) => {
       const z = String(order);
@@ -335,14 +355,7 @@ export class DomOverlayLayer implements OverlayLayer {
         const key = stickerRefKey(item.ref);
         const picture = (key && this.pictures.get(key)) || null;
         const frames = picture?.animated ? this.framesFor(picture.fileUrl) : null;
-        node.update(
-          overlay,
-          picture,
-          frames,
-          overlay.opacity,
-          this.canvas,
-          force,
-        );
+        node.update(overlay, picture, frames, overlay.opacity, this.canvas, force);
         // Under every text, bottom first.
         const z = String(pictureOrder - pictureCount);
         if (node.box.style.zIndex !== z) node.box.style.zIndex = z;
@@ -486,6 +499,24 @@ export class DomOverlayLayer implements OverlayLayer {
       else node.words.style.setProperty(name, value);
     }
     node.words.textContent = displayText(item);
+  }
+
+  /** The captions block: made when the clip has captions, gone when it has none. */
+  private drawCaptions(state: FrameState, box: HTMLDivElement): void {
+    const layout = this.captions;
+    if (!layout) {
+      this.captionsNode?.remove();
+      this.captionsNode = null;
+      return;
+    }
+    if (!this.captionsNode) {
+      this.captionsNode = new CaptionsNode(box.ownerDocument, box, this.manifest, this.fontFamily);
+    }
+    const { look } = layout;
+    const weight = resolveTextFont(this.manifest, look.font, look.weight)?.weight ?? look.weight;
+    const fontKey = `${weight} ${look.italic ? 'italic' : 'normal'} ${look.font}`;
+    const ready = this.ensureFont(fontKey, look.font, weight, look.italic);
+    this.captionsNode.update(layout, state.outputMs, ready);
   }
 
   /** True when the face is ready to draw; otherwise starts loading it and redraws when it lands. */

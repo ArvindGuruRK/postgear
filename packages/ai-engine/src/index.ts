@@ -77,7 +77,14 @@ export {
   hashtagCount,
   researchCompetitor,
   rewriteInVoice,
+  translateLines,
 } from './agents/snippets';
+export {
+  buildTranslatePrompt,
+  TRANSLATE_MAX_LINE_CHARS,
+  TRANSLATE_MAX_LINES,
+  translateLinesSchema,
+} from './prompts/translate';
 export {
   classifyError,
   isRetryableKind,

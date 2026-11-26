@@ -28,12 +28,19 @@ import { CANVAS_FPS, CANVASES, RATIOS } from '../canvas';
 import { hasEmoji } from './emoji';
 import {
   BADGE_NAME_MAX,
+  CAPTION_MAX_WORDS,
+  CAPTION_SIZE_MAX,
+  CAPTION_SIZE_MIN,
+  CAPTION_WORD_MAX,
   CLIP_MAX_MS,
   CLIP_MIN_MS,
   FADE_MAX_MS,
   ITEM_MIN_MS,
   MAX_AREAS,
+  MAX_BLEEPS,
+  MAX_CAPTION_EDITS,
   MAX_CROP_KEYFRAMES,
+  MAX_FOLLOW_OVERRIDES,
   MAX_ITEMS,
   MAX_SEGMENTS,
   MAX_SOUNDS,
@@ -123,6 +130,12 @@ export const segmentSchema = z
     sourceOut: msSchema,
     speed: speedSchema,
     volume: z.number().min(0).max(VOLUME_MAX),
+    /**
+     * Version 2: `hook` marks a part played first as the clip's opening (a
+     * stretch of the video that also plays later, Module 09). Absent for an
+     * ordinary part. A hook is a part like any other to the time map.
+     */
+    role: z.literal('hook').optional(),
   })
   .strict()
   .refine((s) => s.sourceIn < s.sourceOut, 'A part must end after it starts');
@@ -169,12 +182,34 @@ export const areaSchema = z
 export const LAYOUT_BASES = ['solid', 'blurred'] as const;
 export type LayoutBase = (typeof LAYOUT_BASES)[number];
 
+/** Fix By Hand: a crop that replaces the followed frame for one stretch, in SOURCE time. */
+export const followOverrideSchema = z
+  .object({ from: msSchema, to: msSchema, rect: rectSchema })
+  .strict()
+  .refine((o) => o.from < o.to, 'A hand fix must end after it starts');
+
+/**
+ * Version 2: Follow The Speaker (Module 08). The crops it works out are
+ * written as keyframes in `areas[].crop`, which `areaCropAt` already reads;
+ * this records that they came from following, from which face file, and the
+ * stretches a person fixed by hand, so switching it off can give back the
+ * person's own boxes.
+ */
+export const followSchema = z
+  .object({
+    mode: z.enum(['speaker', 'both']),
+    faceAssetId: uuidSchema,
+    overrides: z.array(followOverrideSchema).max(MAX_FOLLOW_OVERRIDES),
+  })
+  .strict();
+
 export const layoutSchema = z
   .object({
     kind: z.enum(LAYOUT_KINDS),
     fitCrop: z.enum(FIT_CROPS).optional(),
     base: z.enum(LAYOUT_BASES).optional(),
     areas: z.array(areaSchema).min(1).max(MAX_AREAS),
+    follow: followSchema.optional(),
   })
   .strict();
 
@@ -385,15 +420,73 @@ export const audioTrackSchema = z
   .object({ id: idSchema, kind: z.literal('audio'), items: z.array(audioItemSchema) })
   .strict();
 
-/** Reserved for Sprint 13: parses, so its documents stay valid here; nothing in Sprint 12 writes one. */
+/** How a caption's words are cased when drawn (ASS has no case attribute: the writer does it). */
+export const CAPTION_CASES = ['as_spoken', 'upper', 'lower'] as const;
+export type CaptionCase = (typeof CAPTION_CASES)[number];
+
+/** A change to one word that belongs to this clip only (a video-wide fix lives in the transcript). */
+export const captionEditSchema = z
+  .object({
+    /** What this word says in this clip. */
+    text: z
+      .string()
+      .min(1)
+      .max(CAPTION_WORD_MAX)
+      .refine((text) => text.trim().length > 0, 'A word needs at least one letter')
+      .optional(),
+    /** The word is not shown in this clip (it is still spoken). */
+    hidden: z.boolean().optional(),
+  })
+  .strict();
+
+/**
+ * Version 2: captions (Sprint 13, Module 03). **No time is stored here.** The
+ * words and their times live in the transcript file (`transcriptAssetId`), in
+ * the video's own time; everything shown is mapped onto the clip through the
+ * segment list (`captions/map.ts`), so a trim, a split, a removed part, a
+ * speed change or a hook clip keeps every caption on its word.
+ *
+ * - `styleId`: a built-in style's id, or a workspace's own `ClipCaptionStyle`.
+ * - `position`: the centre of the caption block, a fraction of the canvas.
+ * - `sizePx`: the text's size on the 1080 short side.
+ * - `maxWords`: words on a page at once (the pager may show fewer).
+ * - `edits`: this clip's own changes, keyed by the word's stable index.
+ * - `letterCase`, `markColour`: set only when they differ from the style's own.
+ */
 export const captionsTrackSchema = z
   .object({
     id: idSchema,
     kind: z.literal('captions'),
     transcriptAssetId: uuidSchema,
-    style: z.record(z.unknown()),
+    language: z.string().regex(/^[a-z]{2,3}$/, 'A language is a short code'),
+    styleId: idSchema,
+    position: pointSchema,
+    sizePx: z.number().min(CAPTION_SIZE_MIN).max(CAPTION_SIZE_MAX),
+    maxWords: z.number().int().min(1).max(CAPTION_MAX_WORDS),
+    edits: z
+      .record(z.string().regex(/^(?:0|[1-9]\d{0,8})$/, 'A word index is a whole number'), captionEditSchema)
+      .refine((edits) => Object.keys(edits).length <= MAX_CAPTION_EDITS, {
+        message: `A clip keeps up to ${MAX_CAPTION_EDITS} caption changes`,
+      }),
+    letterCase: z.enum(CAPTION_CASES).optional(),
+    markColour: hexColour.optional(),
   })
   .strict();
+
+/**
+ * Version 2: a word bleeped or muted (Module 09), in SOURCE time like crops,
+ * so it stays on its word through every edit.
+ */
+export const bleepSchema = z
+  .object({
+    id: idSchema,
+    source: idSchema,
+    from: msSchema,
+    to: msSchema,
+    mode: z.enum(['bleep', 'mute']),
+  })
+  .strict()
+  .refine((b) => b.from < b.to, 'A bleep must end after it starts');
 
 export const trackSchema = z.discriminatedUnion('kind', [
   overlayTrackSchema,
@@ -414,7 +507,12 @@ export const documentMetaSchema = z
   })
   .strict();
 
-export const CURRENT_SCHEMA_VERSION = 1 as const;
+/**
+ * Version 2 (Sprint 13) adds captions, bleeps, a part's `hook` role, Follow
+ * The Speaker and `recipeId`. It changes nothing a version 1 clip relies on:
+ * every version 1 document is a valid version 2 document after `upgrade()`.
+ */
+export const CURRENT_SCHEMA_VERSION = 2 as const;
 
 /** Output length of one part, rounded once. `time/time-map.ts` builds on this. */
 export function segmentOutputMs(segment: {
@@ -436,6 +534,10 @@ const documentShape = z
     looks: looksSchema,
     fades: fadesSchema,
     tracks: z.array(trackSchema).max(MAX_TRACKS),
+    /** Version 2: words bleeped or muted, in SOURCE time. Empty for most clips. */
+    bleeps: z.array(bleepSchema).max(MAX_BLEEPS),
+    /** Version 2: the recipe this clip was made with (a starter's id or a workspace recipe). Never drawn. */
+    recipeId: idSchema.optional(),
     meta: documentMetaSchema.optional(),
   })
   .strict();
@@ -496,6 +598,25 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
   doc.layout.areas.forEach((area, i) => {
     claim(area.id, ['layout', 'areas', i, 'id']);
   });
+
+  doc.bleeps.forEach((bleep, i) => {
+    claim(bleep.id, ['bleeps', i, 'id']);
+    if (!sourceIds.has(bleep.source)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['bleeps', i, 'source'],
+        message: 'A bleep points at a video the clip does not have',
+      });
+    }
+  });
+
+  if (doc.tracks.filter((track) => track.kind === 'captions').length > 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['tracks'],
+      message: 'A clip has one set of captions',
+    });
+  }
 
   doc.zooms.forEach((zoom, i) => {
     claim(zoom.id, ['zooms', i, 'id']);
@@ -574,6 +695,10 @@ export type AudioItem = z.infer<typeof audioItemSchema>;
 export type OverlayTrack = z.infer<typeof overlayTrackSchema>;
 export type AudioTrack = z.infer<typeof audioTrackSchema>;
 export type CaptionsTrack = z.infer<typeof captionsTrackSchema>;
+export type CaptionEdit = z.infer<typeof captionEditSchema>;
+export type Bleep = z.infer<typeof bleepSchema>;
+export type LayoutFollow = z.infer<typeof followSchema>;
+export type FollowOverride = z.infer<typeof followOverrideSchema>;
 export type Track = z.infer<typeof trackSchema>;
 export type OverlayItem = TextItem | StickerItem;
 export type TimedItem = TextItem | StickerItem | AudioItem;

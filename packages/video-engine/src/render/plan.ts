@@ -26,6 +26,7 @@ import { type ExportQuality, isExportQuality } from '../quality';
 import { outputDuration, placeSegments } from '../time/time-map';
 import { zoomWindows } from '../time/zooms';
 import { RenderCompileError } from './errors';
+import { type PlanCaptions, planCaptions, type RenderCaptionsAsset } from './caption-plan';
 import { checkFonts, type FontManifest, fontsNeeded } from './fonts';
 import { type PlanLook, planLook } from './looks';
 import { type PlanSound, planSounds, type RenderSoundAsset } from './sound-plan';
@@ -81,6 +82,12 @@ export interface RenderAssets {
   stickers?: Readonly<Record<string, RenderStickerAsset>> | null;
   /** Sound files (`.m4a`), keyed by `soundRefKey` (`library:<id>`, `asset:<id>`). */
   sounds?: Readonly<Record<string, RenderSoundAsset>> | null;
+  /**
+   * Sprint 13: the words and the style of the clip's captions, resolved by the
+   * prepare step (nothing is fetched during a render). Needed exactly when the
+   * document has a captions track.
+   */
+  captions?: RenderCaptionsAsset | null;
 }
 
 /** What the render job knows besides the document (copied from the job input and the fetched files). */
@@ -202,6 +209,8 @@ export interface RenderPlan {
   texts: PlanText[];
   /** The Follow Badges' shapes, in canvas pixels, drawn in the same ASS file as the text. */
   shapes: PlanShape[];
+  /** Sprint 13: the clip's captions as pages and font runs, or null when it has none. */
+  captions: PlanCaptions | null;
   fonts: {
     dir: string | null;
     families: string[];
@@ -263,14 +272,6 @@ function toPixels(
 
 /** Refuses what this version cannot draw, before any pixel is worked out. */
 function refuseUnsupported(doc: ClipDocument): void {
-  for (const track of doc.tracks) {
-    if (track.kind === 'captions') {
-      throw new RenderCompileError('captions_unsupported', 'Captions are not rendered yet', {
-        trackId: track.id,
-      });
-    }
-  }
-
   // Every layout renders (Module 10). A crop that moves over time needs the
   // `sendcmd` file of cookbook section 3, which Sprint 13 writes; until then
   // it is refused rather than drawn still.
@@ -343,6 +344,10 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
   // Text and badges: every number in canvas pixels, the font resolved against the manifest the render has.
   const texts = planTexts(doc, fontsAsset?.manifest ?? null);
   const shapes = planShapes(doc);
+  // Captions: the same canvas pixels, their fonts resolved the same way (Sprint 13).
+  const planned = planCaptions(doc, ctx.assets.captions, fontsAsset?.manifest ?? null);
+  // Captions with nothing to show (every word cut or hidden) draw nothing and need no font.
+  const captions = planned && planned.layout.pages.length > 0 ? planned : null;
 
   const spec = encodeSpecFor(ctx.quality, ctx.proof);
   const size = outputSizeFor(doc.canvas, spec);
@@ -533,11 +538,21 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     sounds,
     texts,
     shapes,
+    captions,
     fonts: {
       dir: fontsAsset ? fontsAsset.dir : null,
-      families,
-      files: fontsAsset && texts.length > 0 ? textFontFiles(texts, fontsAsset.manifest) : [],
-      psNames: textFontNames(texts),
+      families: captions
+        ? [...new Set([...families, captions.layout.look.font])].sort((a, b) =>
+            a.localeCompare(b, 'en'),
+          )
+        : families,
+      files: [
+        ...new Set([
+          ...(fontsAsset && texts.length > 0 ? textFontFiles(texts, fontsAsset.manifest) : []),
+          ...(captions?.files ?? []),
+        ]),
+      ].sort(),
+      psNames: [...new Set([...textFontNames(texts), ...(captions?.psNames ?? [])])].sort(),
     },
   };
 }

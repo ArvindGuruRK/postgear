@@ -786,6 +786,57 @@ function simulateRewrite(user: string): { rewrite: string } {
 }
 
 // ---------------------------------------------------------------------------
+// Translate Captions (Sprint 13 Clips AI, Module 03)
+// ---------------------------------------------------------------------------
+
+/**
+ * Stand-in words for each language, in its own script, so a simulated
+ * translation exercises the real path: Tamil and Hindi letters that must
+ * join, another font, a page-level highlight. Not a translation: the same
+ * line always answers the same words, as many as it had.
+ */
+const TRANSLATION_WORDS: Record<string, readonly string[]> = {
+  ta: ['நண்பர்களே', 'இந்த', 'விளையாட்டு', 'மிகவும்', 'அருமை', 'இன்று', 'நாம்', 'பார்க்கலாம்', 'நன்றி', 'வணக்கம்', 'புதிய', 'காணொளி'],
+  hi: ['नमस्ते', 'दोस्तों', 'यह', 'खेल', 'शानदार', 'है', 'आज', 'हम', 'देखेंगे', 'धन्यवाद', 'नया', 'वीडियो'],
+  mr: ['नमस्कार', 'मित्रांनो', 'हा', 'खेळ', 'छान', 'आहे', 'आज', 'आपण', 'पाहूया', 'धन्यवाद', 'नवीन', 'व्हिडिओ'],
+  es: ['hola', 'amigos', 'este', 'juego', 'es', 'genial', 'hoy', 'vamos', 'a', 'ver', 'gracias', 'nuevo'],
+  fr: ['bonjour', 'les', 'amis', 'ce', 'jeu', 'est', 'super', 'aujourd\u2019hui', 'on', 'regarde', 'merci', 'nouveau'],
+  de: ['hallo', 'Freunde', 'dieses', 'Spiel', 'ist', 'toll', 'heute', 'schauen', 'wir', 'danke', 'neues', 'Video'],
+  pt: ['olá', 'amigos', 'este', 'jogo', 'é', 'incrível', 'hoje', 'vamos', 'ver', 'obrigado', 'novo', 'vídeo'],
+  it: ['ciao', 'amici', 'questo', 'gioco', 'è', 'fantastico', 'oggi', 'vediamo', 'grazie', 'nuovo', 'video', 'insieme'],
+  nl: ['hallo', 'vrienden', 'dit', 'spel', 'is', 'geweldig', 'vandaag', 'kijken', 'we', 'bedankt', 'nieuwe', 'video'],
+  en: ['hello', 'friends', 'this', 'game', 'is', 'great', 'today', 'we', 'watch', 'thanks', 'new', 'video'],
+};
+
+function simulateTranslations(user: string): { translations: string[] } {
+  const code = readField(user, 'To code') ?? 'en';
+  const bank = TRANSLATION_WORDS[code] ?? TRANSLATION_WORDS.en;
+  const body = readBlock(user, 'Captions') ?? '';
+  const lines = body
+    .split('\n')
+    .map((line) => line.replace(/^\s*\d+\.\s*/, '').trim())
+    .filter((line) => line.length > 0);
+  // `[simulate:translate-short]` in a line answers one line too few, twice: the count guard.
+  if (/\[simulate:translate-short\]/i.test(body)) {
+    return { translations: lines.slice(1).map(() => bank[0] as string) };
+  }
+  return {
+    translations: lines.map((line) => {
+      const tokens = line.split(/\s+/).filter((token) => token.length > 0);
+      const seed = hashText(`${code}:${line}`);
+      const words = tokens.map((token, index) => {
+        // Numbers, @mentions and hashtags stay as they are, as the prompt asks.
+        if (/^[@#\d]/.test(token)) return token;
+        return bank[(seed + index * 7) % bank.length] as string;
+      });
+      const close = /[.!?]$/.test(line) ? (code === 'hi' || code === 'mr' ? '\u0964' : '.') : '';
+      const text = words.join(' ');
+      return text.length > 0 ? text.charAt(0).toUpperCase() + text.slice(1) + close : line;
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Research This Competitor (Sprint 11 Module 10)
 // ---------------------------------------------------------------------------
 
@@ -884,6 +935,9 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   }
   if (keys.includes('rewrite')) {
     return simulateRewrite(user);
+  }
+  if (keys.includes('translations')) {
+    return simulateTranslations(user);
   }
   if (keys.includes('openings') && keys.includes('themes')) {
     return simulateCompetitorResearch(user);

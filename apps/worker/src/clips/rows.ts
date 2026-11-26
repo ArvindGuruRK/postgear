@@ -277,6 +277,11 @@ export interface ClipRows {
    * replaced. Nothing is written when the job was closed meanwhile.
    */
   finishHighlights(args: FinishHighlightsArgs): Promise<FinishHighlightsResult>;
+  /** Sprint 13, Module 03: one of the workspace's own caption styles, or null. */
+  captionStyle(
+    organizationId: string,
+    styleId: string,
+  ): Promise<{ id: string; name: string; look: unknown } | null>;
   /** Sprint 13, Module 02: closes a listening job and swaps the transcript row; false when closed meanwhile. */
   finishTranscribe(args: FinishTranscribeArgs): Promise<FinishTranscribeResult>;
 }
@@ -548,6 +553,17 @@ export const prismaClipRows: ClipRows = {
       if (error instanceof RowClosed) return false;
       throw error;
     }
+  },
+
+  async captionStyle(organizationId, styleId) {
+    // A style id comes from a person's document: only a UUID of this workspace is ever looked up.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(styleId)) {
+      return null;
+    }
+    return prisma.clipCaptionStyle.findFirst({
+      where: { id: styleId, organizationId },
+      select: { id: true, name: true, look: true },
+    });
   },
 
   async finishTranscribe(args) {

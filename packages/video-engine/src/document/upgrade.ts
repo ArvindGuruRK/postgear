@@ -53,12 +53,29 @@ export class ClipDocumentError extends Error {
 type UpgradeStep = (document: Record<string, unknown>) => Record<string, unknown>;
 
 /**
+ * 1 to 2 (Sprint 13): adds the empty `bleeps` list and nothing else a
+ * version 1 clip can see. A version 1 document could carry a `captions`
+ * track in a reserved shape that nothing ever wrote or drew; one is left out,
+ * because version 2's captions point at a transcript file in a different way.
+ */
+function v1ToV2(document: Record<string, unknown>): Record<string, unknown> {
+  const tracks = Array.isArray(document.tracks)
+    ? document.tracks.filter((track) => !(isRecord(track) && track.kind === 'captions'))
+    : document.tracks;
+  return {
+    ...document,
+    schemaVersion: 2,
+    tracks,
+    bleeps: Array.isArray(document.bleeps) ? document.bleeps : [],
+  };
+}
+
+/**
  * One entry per version N, taking the stored shape at N and returning the
  * shape at N + 1. A step is written against the stored shape, never against
- * today's types, and once released it never changes. Empty while the schema
- * is at version 1.
+ * today's types, and once released it never changes.
  */
-const UPGRADE_STEPS: Readonly<Record<number, UpgradeStep>> = Object.freeze({});
+const UPGRADE_STEPS: Readonly<Record<number, UpgradeStep>> = Object.freeze({ 1: v1ToV2 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -10,6 +10,8 @@
 import type {
   AiCostKind,
   AiCostRate,
+  CaptionLook,
+  CaptionsTrack,
   ClipDocument,
   ClipError,
   DownloadMedia,
@@ -26,6 +28,7 @@ import type {
   ListPeriod,
   ListSort,
   Ratio,
+  TranscriptWord,
   WaveformMeta,
 } from '@postgear/video-engine';
 
@@ -598,4 +601,74 @@ export interface SavedLayoutView {
   layout: ClipLayout;
   createdAt: string;
   updatedAt: string;
+}
+
+// --- Sprint 13, Module 03: captions ----------------------------------------------
+
+/** A transcript's words for a stretch of a video, as the API answers them. */
+export interface TranscriptView {
+  /** The transcript's id: what a captions track points at. */
+  id: string;
+  language: string;
+  model: string;
+  source: 'listened' | 'supplied' | 'translated';
+  words: TranscriptWord[];
+  covered: Array<{ fromMs: number; toMs: number }>;
+  /** How many word fixes the video has. */
+  fixes: number;
+  /** A supplied file's name, when the words came from one. */
+  fileName: string | null;
+}
+
+/** `GET /clips/:clipId/words`. */
+export interface ClipWordsView {
+  transcript: TranscriptView | null;
+  ranges: Array<{ fromMs: number; toMs: number }>;
+  /** The clip's captions name a transcript that is gone. */
+  missing: boolean;
+  /** What Add Captions costs right now, in AI minutes (0 when already listened to). */
+  price: number;
+}
+
+/** `POST /clips/:clipId/captions`: listening started (or was already running), or the track. */
+export type AddCaptionsOutcome =
+  | {
+      covered: false;
+      job: ClipJobView;
+      /** AI minutes charged for this request (0 when it joined a running job). */
+      price: number;
+      joined: boolean;
+    }
+  | { covered: true; track: CaptionsTrack; transcript: TranscriptView };
+
+/** `POST /clips/:clipId/captions/from-file`. */
+export interface CaptionsFileOutcome {
+  track: CaptionsTrack;
+  transcript: TranscriptView;
+  skipped: number;
+  note: string | null;
+}
+
+/** `POST /clips/:clipId/captions/translate`. */
+export interface TranslateCaptionsOutcome {
+  track: CaptionsTrack;
+  transcript: TranscriptView;
+  price: number;
+  reused: boolean;
+}
+
+export interface CaptionStyleView {
+  id: string;
+  name: string;
+  hint: string;
+  builtIn: boolean;
+  look: CaptionLook;
+}
+
+/** `GET /clips/caption-styles`. */
+export interface CaptionStylesView {
+  styles: CaptionStyleView[];
+  defaultStyleId: string;
+  own: number;
+  limit: number;
 }

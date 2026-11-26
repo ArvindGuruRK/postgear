@@ -31,6 +31,7 @@ import { type Clip, ClipAssetKind, ClipStatus, type Prisma, prisma } from '@post
 import type { PrivateStorage } from '@postgear/storage';
 import {
   type ClipDocument,
+  captionsTrackOf,
   documentRange,
   fingerprintMatches,
   outputDuration,
@@ -39,6 +40,7 @@ import {
   safeParseClipDocument,
 } from '@postgear/video-engine';
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
+import { ClipCaptionsService } from '../captions/clip-captions.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { serializable } from '../clips.tx';
@@ -72,6 +74,8 @@ export class ClipEditsService {
     private readonly videos: ClipVideosRepository,
     private readonly limits: ClipLimitsGuard,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
+    // Sprint 13: a deleted clip's own transcripts (a supplied file, a translation) go with it.
+    private readonly captions: ClipCaptionsService,
   ) {}
 
   /** `{ clip }` with the new revision. 404, 409 `clip_changed_elsewhere`, 413, 422. */
@@ -100,6 +104,7 @@ export class ClipEditsService {
           select: { durationMs: true },
         });
         this.assertDocumentFits(clipId, clip, document, video?.durationMs ?? null);
+        await this.assertCaptionsBelong(tx, orgId, clip, document);
         data.document = document as unknown as Prisma.InputJsonValue;
         data.ratio = document.canvas.ratio;
         data.durationMs = outputDuration(document);
@@ -211,6 +216,10 @@ export class ClipEditsService {
       return !meta || !stillUsed.some((r) => meta.fromMs <= r.fromMs && meta.toMs >= r.toMs);
     });
 
+    // Before the clip goes: its row's `clipId` would otherwise fall to null, and a clip's own
+    // transcript would then pass for the whole video's.
+    const transcriptKeys = await this.captions.releaseClip(orgId, clip);
+
     await prisma.$transaction([
       prisma.clipAsset.deleteMany({
         where: { organizationId: orgId, id: { in: doomed.map((segment) => segment.id) } },
@@ -218,7 +227,11 @@ export class ClipEditsService {
       prisma.clip.deleteMany({ where: { id: clip.id, organizationId: orgId } }),
     ]);
 
-    for (const segment of doomed) {
+    const files = [
+      ...doomed.map((segment) => ({ id: segment.id, key: segment.key })),
+      ...transcriptKeys.map((key) => ({ id: 'transcript', key })),
+    ];
+    for (const segment of files) {
       try {
         await this.storage.delete(segment.key);
       } catch (error) {
@@ -294,6 +307,46 @@ export class ClipEditsService {
       throw invalidDocument();
     }
   }
+
+  /**
+   * Sprint 13: a captions track carries a transcript id a person's document
+   * supplied. It is accepted only when it is a transcript of THIS clip's
+   * video in THIS workspace, so a saved clip can never point an export at
+   * another workspace's words (the worker checks again when it renders).
+   */
+  private async assertCaptionsBelong(
+    tx: Prisma.TransactionClient,
+    orgId: string,
+    clip: Pick<Clip, 'id' | 'videoId'>,
+    document: ClipDocument,
+  ): Promise<void> {
+    const transcriptId = captionsTranscriptOf(document);
+    if (transcriptId === null) return;
+    const found = await tx.clipAsset.findFirst({
+      where: {
+        id: transcriptId,
+        organizationId: orgId,
+        videoId: clip.videoId,
+        kind: ClipAssetKind.TRANSCRIPT,
+      },
+      select: { id: true },
+    });
+    if (!found) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.clip.document_refused',
+          clipId: clip.id,
+          reason: 'foreign_transcript',
+        }),
+      );
+      throw invalidDocument();
+    }
+  }
+}
+
+/** The id of a document's captions transcript, when it has captions. */
+function captionsTranscriptOf(document: ClipDocument): string | null {
+  return captionsTrackOf(document)?.transcriptAssetId ?? null;
 }
 
 /** "Team Talk (1:23) (Copy)", like a duplicated design, capped at the title limit. */

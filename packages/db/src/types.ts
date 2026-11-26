@@ -30,6 +30,7 @@ export type {
   ClipFavourite,
   ClipHighlightRun,
   ClipJob,
+  ClipCaptionStyle,
   ClipLayoutPreset,
   ClipLibraryDeny,
   ClipLibraryMiss,

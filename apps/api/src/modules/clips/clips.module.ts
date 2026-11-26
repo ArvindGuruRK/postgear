@@ -38,15 +38,13 @@ import { ClipsInternalController } from './internal/clips-internal.controller';
 import { ClipsInternalService } from './internal/clips-internal.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
 import { ClipJobsController } from './jobs/clip-jobs.controller';
+import { ClipCaptionStylesModule } from './captions/clip-caption-styles.module';
 import { ClipLayoutsModule } from './layouts/clip-layouts.module';
 import { ClipLibraryModule } from './library/clip-library.module';
 import { ClipLinksModule } from './links/clip-links.module';
 import { ClipsStatusController } from './status/clips-status.controller';
 import { ClipsStatusService } from './status/clips-status.service';
-import { MediaServiceProbe } from './status/media-service.probe';
-import { ClipTranscriptStore } from './transcripts/clip-transcript-store';
 import { ClipTranscriptsController } from './transcripts/clip-transcripts.controller';
-import { ClipTranscriptsService } from './transcripts/clip-transcripts.service';
 import { ClipSampleLink } from './videos/clip-sample';
 import { ClipUploadsService } from './videos/clip-uploads.service';
 import { ClipVideosController } from './videos/clip-videos.controller';
@@ -62,6 +60,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     ClipLayoutsModule,
     // Module 12: `/clips/library` and `/clips/stickers`, word routes, so before `ClipItemModule`.
     ClipLibraryModule,
+    // Sprint 13: `/clips/caption-styles`, a word route, so before `ClipItemModule`.
+    ClipCaptionStylesModule,
     // Keep LAST: its `GET /clips/:clipId` must be registered after every other `/clips/<word>` route.
     ClipItemModule,
   ],
@@ -81,11 +81,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
   providers: [
     ClipJobEventsService,
     ClipsStatusService,
-    MediaServiceProbe,
     ClipVideosService,
     ClipHighlightsService,
-    ClipTranscriptStore,
-    ClipTranscriptsService,
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,

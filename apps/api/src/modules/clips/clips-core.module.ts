@@ -16,6 +16,9 @@ import { ClipJobsRepository } from './jobs/clip-jobs.repository';
 import { ClipJobsService } from './jobs/clip-jobs.service';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
 import { ClipRetentionService } from './retention/clip-retention.service';
+import { MediaServiceProbe } from './status/media-service.probe';
+import { ClipTranscriptStore } from './transcripts/clip-transcript-store';
+import { ClipTranscriptsService } from './transcripts/clip-transcripts.service';
 import { ClipPlaybackService } from './videos/clip-playback.service';
 import { ClipVideosRepository } from './videos/clip-videos.repository';
 
@@ -29,6 +32,10 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     ClipVideosRepository,
     // Module 19: touchVideo and removeVideo, shared by videos, clips, the sweep and the operator.
     ClipRetentionService,
+    // Sprint 13: listening and the words, shared by the transcript routes and a clip's captions.
+    MediaServiceProbe,
+    ClipTranscriptStore,
+    ClipTranscriptsService,
   ],
   exports: [
     EntitlementsModule,
@@ -40,6 +47,9 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     ClipPlaybackService,
     ClipVideosRepository,
     ClipRetentionService,
+    MediaServiceProbe,
+    ClipTranscriptStore,
+    ClipTranscriptsService,
   ],
 })
 export class ClipsCoreModule {}

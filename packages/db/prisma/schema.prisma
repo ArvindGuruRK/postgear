@@ -78,6 +78,7 @@ model Organization {
   clipJobs                 ClipJob[]
   clipPosts                ClipPost[]
   clipLayoutPresets        ClipLayoutPreset[]
+  clipCaptionStyles        ClipCaptionStyle[]
   clipFavourites           ClipFavourite[]
   clipChannels             ClipChannel[]
 
@@ -2057,6 +2058,22 @@ model ClipLayoutPreset {
   name           String
   ratio          String
   layout         Json
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+/// Sprint 13: a workspace's own caption style ("Create A Style"). `look` is
+/// validated by the engine's `captionLookSchema` (font, colours, outline or
+/// box, how the spoken word is marked). At most 30 a workspace.
+model ClipCaptionStyle {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  look           Json
   createdById    String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

@@ -36,15 +36,32 @@ function fakeClient() {
 
 const KINDS = Object.keys(CLIP_JOB_TIMEOUTS_MS) as ClipJobKindName[];
 const SIX_HOURS = 6 * 60 * 60_000;
+/**
+ * Listening is the one kind allowed past six hours (Module 02): six hours of
+ * sound heard on a processor can take longer than six hours. It still has a
+ * hard limit, and only one hour more.
+ */
+const LONGER: Partial<Record<ClipJobKindName, number>> = { TRANSCRIBE: 7 * 60 * 60_000 };
 
 describe('a clip job has a hard time limit from the contract', () => {
-  it('names a finite limit of at most six hours for every kind', () => {
-    expect([...KINDS].sort()).toEqual(['DOWNLOAD', 'HIGHLIGHTS', 'IMPORT', 'RENDER', 'SEGMENT']);
+  it('names a finite limit of at most six hours for every kind but listening, which has seven', () => {
+    // Sprint 13 adds listening, faces, translating and voice.
+    expect([...KINDS].sort()).toEqual([
+      'DOWNLOAD',
+      'FACES',
+      'HIGHLIGHTS',
+      'IMPORT',
+      'RENDER',
+      'SEGMENT',
+      'SPEECH',
+      'TRANSCRIBE',
+      'TRANSLATE',
+    ]);
     for (const kind of KINDS) {
       const limit = CLIP_JOB_TIMEOUTS_MS[kind];
       expect(Number.isFinite(limit)).toBe(true);
       expect(limit).toBeGreaterThan(0);
-      expect(limit).toBeLessThanOrEqual(SIX_HOURS);
+      expect(limit).toBeLessThanOrEqual(LONGER[kind] ?? SIX_HOURS);
     }
     expect(CLIP_SAVE_DOWNLOAD_TIMEOUT_MS).toBeLessThanOrEqual(SIX_HOURS);
   });

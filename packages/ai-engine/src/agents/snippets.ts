@@ -32,6 +32,12 @@ import {
   RESEARCH_MAX_THEMES,
 } from '../prompts/competitor-research';
 import { buildRewritePrompt, rewriteSchema } from '../prompts/rewrite';
+import {
+  buildTranslatePrompt,
+  TRANSLATE_MAX_LINE_CHARS,
+  TRANSLATE_MAX_LINES,
+  translateLinesSchema,
+} from '../prompts/translate';
 import type {
   CompetitorResearchRequest,
   CompetitorResearchResult,
@@ -41,6 +47,8 @@ import type {
   RewriteRequest,
   RewriteResult,
   SnippetWriter,
+  TranslateRequest,
+  TranslateResult,
 } from '../types';
 
 interface CallOptions {
@@ -190,11 +198,58 @@ export async function researchCompetitor(
   return { themes, rhythm, openings };
 }
 
+/**
+ * Caption lines in another language (Sprint 13 Clips AI, Module 03): one line
+ * back for each line in, in order. A model that answers a different number
+ * of lines is asked once more; a second miss is `bad_output`, since a line
+ * out of step would put words under the wrong moment of the video.
+ */
+export async function translateLines(
+  model: ModelClient,
+  request: TranslateRequest,
+  options: CallOptions = {},
+): Promise<TranslateResult> {
+  const lines = request.lines.map((line) => oneLine(line, TRANSLATE_MAX_LINE_CHARS));
+  if (lines.length === 0) return { lines: [] };
+  if (lines.length > TRANSLATE_MAX_LINES) {
+    throw providerError('bad_output', { message: 'Too many lines to translate at once.' });
+  }
+  const prompt = buildTranslatePrompt({
+    from: request.from,
+    to: request.to,
+    toCode: request.toCode,
+    lines,
+  });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let raw: string[];
+    try {
+      ({ translations: raw } = await model.structured({
+        schema: translateLinesSchema,
+        ...prompt,
+        signal: options.signal,
+      }));
+    } catch (error) {
+      throw normaliseRunError(error, options.signal);
+    }
+    const translated = raw.map((line) =>
+      oneLine(line.replace(/^\s*\d+[.)]\s+/, ''), TRANSLATE_MAX_LINE_CHARS),
+    );
+    if (translated.length === lines.length && translated.every((line) => line.length > 0)) {
+      return { lines: translated };
+    }
+  }
+  throw providerError('bad_output', {
+    message: 'The model did not answer one line for each caption line.',
+  });
+}
+
 /** Every snippet job bound to one model client, for the API's engine. */
 export function createSnippetWriter(model: ModelClient): SnippetWriter {
   return {
     hashtags: (request, options) => generateHashtags(model, request, options),
     rewrite: (request, options) => rewriteInVoice(model, request, options),
     research: (request, options) => researchCompetitor(model, request, options),
+    translate: (request, options) => translateLines(model, request, options),
   };
 }

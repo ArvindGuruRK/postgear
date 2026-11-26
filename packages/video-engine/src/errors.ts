@@ -46,7 +46,13 @@ export const CLIP_ERROR_MESSAGES = {
     'We could not read this captions file. Check that it is an SRT or VTT file.',
   captions_file_too_big: 'This captions file is too big. Use a file under 2 MB.',
   captions_file_outside: 'The times in this captions file fall outside this clip.',
+  captions_missing:
+    "We could not find this clip's captions. Remove the captions and add them again.",
   faces_failed: 'We could not finish looking for faces. Try again.',
+  captions_first: 'Add captions to this clip first, then translate them.',
+  translate_same_language: 'These captions are already in that language. Pick another one.',
+  translate_off: 'Translating is not available right now. Everything else still works.',
+  caption_style_not_found: 'We could not find that caption style. Pick another style.',
   translate_failed:
     'We could not finish translating the captions. Your AI minutes were given back.',
   voice_failed: 'We could not make the voice. Your AI minutes were given back.',
@@ -164,6 +170,7 @@ export const NON_RETRYABLE_CLIP_CODES: readonly string[] = [
   'no_speech',
   'language_unsupported',
   'captions_off',
+  'captions_missing',
 ];
 
 /** The error a job row and a view carry. */

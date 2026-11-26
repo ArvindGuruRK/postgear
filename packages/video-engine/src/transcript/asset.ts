@@ -28,6 +28,13 @@ export const transcriptAssetMetaSchema = z
       .max(MAX_WORD_FIXES),
     /** The supplied file's name, for "From your file: episode14.srt". */
     fileName: z.string().min(1).max(200).optional(),
+    /** A translation: the transcript row it was made from. */
+    origin: z.string().uuid().optional(),
+    /** A translation: a hash of the language and the sentences it translated, to answer the same request once. */
+    inputHash: z
+      .string()
+      .regex(/^[0-9a-f]{32}$/)
+      .optional(),
   })
   .strict();
 

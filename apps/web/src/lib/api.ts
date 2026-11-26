@@ -211,10 +211,14 @@ export function uploadFile<T>(
   path: string,
   file: File,
   onProgress?: (fraction: number) => void,
+  /** Short text fields sent beside the file (a language, a style). */
+  fields?: Readonly<Record<string, string>>,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
     const form = new FormData();
+    // Fields first: a server reading the stream has them before the file's bytes.
+    for (const [name, value] of Object.entries(fields ?? {})) form.append(name, value);
     form.append('file', file);
 
     request.open('POST', `${BROWSER_API_URL}${path}`);

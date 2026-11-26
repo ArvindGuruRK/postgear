@@ -23,6 +23,31 @@ jest.mock('@/components/navigation/workspace-provider', () => ({
 }));
 jest.mock('@/lib/clips-api', () => ({
   openClip: jest.fn(async () => ({})),
+  // Sprint 13: the Captions tab's reads. No captions, nothing listened to, the AI layer on.
+  listCaptionStyles: jest.fn(async () => ({
+    styles: [],
+    defaultStyleId: 'bold-pop',
+    own: 0,
+    limit: 30,
+  })),
+  getClipWords: jest.fn(async () => ({ transcript: null, ranges: [], missing: false, price: 2 })),
+  getClipsStatus: jest.fn(async () => ({
+    ai: {
+      service: 'ok',
+      prices: {},
+      captions: true,
+      languages: [{ code: 'en', name: 'English', highlight: 'word' }],
+    },
+  })),
+  addCaptions: jest.fn(),
+  uploadCaptionsFile: jest.fn(),
+  translateCaptions: jest.fn(),
+  replaceTranscriptWord: jest.fn(),
+  createCaptionStyle: jest.fn(),
+  updateCaptionStyle: jest.fn(),
+  deleteCaptionStyle: jest.fn(),
+  getClipJob: jest.fn(),
+  clipJobEventsPath: jest.fn((jobId: string) => `/clips/jobs/${jobId}/events`),
   searchSounds: jest.fn(async () => ({
     items: [],
     page: 1,
@@ -255,6 +280,11 @@ describe('ClipEditor frame', () => {
     fireEvent.click(screen.getByTestId('clip-panel-back'));
     expect(panelTitle()).toHaveTextContent('Layouts');
     for (let i = 0; i < 5; i += 1) fireEvent.click(screen.getByTestId('clip-panel-next'));
+    // Sprint 13: Captions is the tab before Export, and it offers captions with their price.
+    expect(panelTitle()).toHaveTextContent('Captions');
+    expect(screen.getByTestId('clip-captions-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('clip-panel-next')).toHaveTextContent('Export');
+    fireEvent.click(screen.getByTestId('clip-panel-next'));
     expect(panelTitle()).toHaveTextContent('Export');
     expect(screen.queryByTestId('clip-panel-next')).toBeNull();
     expect(screen.getByTestId('clip-panel-export')).toHaveTextContent('Export Clip');
@@ -701,5 +731,103 @@ describe('stickers in the editor', () => {
     expect(firstSticker().transform.x).toBeCloseTo(x - 10 / 1080, 6);
     fireEvent.click(screen.getByRole('button', { name: 'Remove Sticker' }));
     expect(stickers()).toHaveLength(0);
+  });
+});
+
+describe('captions in the editor', () => {
+  const api = jest.requireMock('@/lib/clips-api') as {
+    addCaptions: jest.Mock;
+    translateCaptions: jest.Mock;
+    getClipsStatus: jest.Mock;
+  };
+  const SAID = '3f2a9c1e-0000-4000-8000-0000000000a1';
+  const HINDI = '3f2a9c1e-0000-4000-8000-0000000000a2';
+
+  function transcript(id: string, language: string, texts: string[], source: string) {
+    return {
+      id,
+      language,
+      model: 'test',
+      source,
+      words: texts.map((text, i) => ({
+        i,
+        start: 11_000 + i * 400,
+        end: 11_300 + i * 400,
+        text,
+        sure: 1,
+      })),
+      covered: [{ fromMs: 10_000, toMs: 40_000 }],
+      fixes: 0,
+      fileName: null,
+    };
+  }
+  function track(transcriptAssetId: string, language: string) {
+    return {
+      id: 'captions',
+      kind: 'captions',
+      transcriptAssetId,
+      language,
+      styleId: 'bold-pop',
+      position: { x: 0.5, y: 0.75 },
+      sizePx: 72,
+      maxWords: 3,
+      edits: {},
+    };
+  }
+  const shownTranscript = () =>
+    lastDocument().tracks.flatMap((entry) =>
+      entry.kind === 'captions' ? [entry.transcriptAssetId] : [],
+    );
+  const words = () => screen.getAllByTestId('clip-caption-word').map((word) => word.textContent);
+
+  beforeEach(() => {
+    api.getClipsStatus.mockResolvedValue({
+      ai: {
+        service: 'ok',
+        prices: {},
+        captions: true,
+        languages: [
+          { code: 'en', name: 'English', highlight: 'word' },
+          { code: 'hi', name: 'Hindi', highlight: 'page' },
+        ],
+      },
+    });
+    api.addCaptions.mockResolvedValue({
+      covered: true,
+      track: track(SAID, 'en'),
+      transcript: transcript(SAID, 'en', ['Hello', 'there', 'friend'], 'listened'),
+    });
+    api.translateCaptions.mockResolvedValue({
+      track: track(HINDI, 'hi'),
+      transcript: transcript(HINDI, 'hi', ['Namaste', 'dost'], 'translated'),
+    });
+  });
+
+  it('Undo after a translation shows the words as said again, and Redo the translation', async () => {
+    renderEditor();
+    fireEvent.click(screen.getByTestId('clip-tab-captions'));
+    fireEvent.click(await screen.findByTestId('clip-captions-add'));
+    await screen.findAllByTestId('clip-caption-word');
+    expect(shownTranscript()).toEqual([SAID]);
+    expect(words()).toEqual(['HELLO', 'THERE', 'FRIEND']);
+
+    fireEvent.click(await screen.findByTestId('clip-captions-translate'));
+    await screen.findByText('NAMASTE');
+    expect(shownTranscript()).toEqual([HINDI]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(shownTranscript()).toEqual([SAID]);
+    expect(words()).toEqual(['HELLO', 'THERE', 'FRIEND']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
+    expect(shownTranscript()).toEqual([HINDI]);
+    expect(words()).toEqual(['NAMASTE', 'DOST']);
+
+    // The keyboard does the same, from wherever the focus is in the panel.
+    key({ key: 'z', metaKey: true }, screen.getByTestId('clip-captions-translate'));
+    expect(shownTranscript()).toEqual([SAID]);
+    // Undo once more takes the captions off again.
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(shownTranscript()).toEqual([]);
   });
 });

@@ -7,10 +7,11 @@
  * (`RAIL_FRAME`, `TILE`): the open tab takes the primary fill and the small
  * shadow, a tile under the pointer takes the outline, labels are 10 px.
  *
- * Six tabs in order, then Keyboard Shortcuts pinned to the bottom, where the
+ * Seven tabs in order (Captions since Sprint 13), then Keyboard Shortcuts pinned to the bottom, where the
  * app rail keeps Settings. The open tab is `aria-pressed`.
  */
 import { AudioLinesIcon } from '@animateicons/react/lucide/audio-lines-icon';
+import { CaptionsIcon } from '@animateicons/react/lucide/captions-icon';
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { KeyboardIcon } from '@animateicons/react/lucide/keyboard-icon';
 import { LayoutDashboardIcon } from '@animateicons/react/lucide/layout-dashboard-icon';
@@ -28,6 +29,7 @@ export const TAB_ICONS: Readonly<Record<EditorTab, AnimatedIcon>> = {
   text: TypeIcon,
   effects: WandSparklesIcon,
   audio: AudioLinesIcon,
+  captions: CaptionsIcon,
   export: DownloadIcon,
 };
 

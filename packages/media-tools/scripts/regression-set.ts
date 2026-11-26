@@ -99,7 +99,8 @@ function base(ratio: '9:16' | '1:1', segments: ClipDocument['segments']): ClipDo
       : { ratio, width: 1080, height: 1080, fps: 30 as const, background: '#101018' };
   const cropWidth = ratio === '9:16' ? 0.31640625 : 0.5625;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    bleeps: [],
     canvas,
     sources: [{ id: 'src', videoId: VIDEO_ID }],
     segments,
@@ -546,8 +547,11 @@ async function main(argv: readonly string[]): Promise<number> {
       const file = path.join(dir, `${name}.json`);
       // A document already saved is the fixture: it is never rewritten, only its record is.
       if (await exists(file)) continue;
-      clipDocumentSchema.parse(doc);
-      await writeFile(file, `${JSON.stringify(doc, null, 2)}\n`, 'utf8');
+      // Stored in the version 1 form a Sprint 12 clip has: no `bleeps`, schema version 1.
+      const { bleeps: _bleeps, ...rest } = doc;
+      const versionOne = { ...rest, schemaVersion: 1 };
+      clipDocumentSchema.parse(upgrade(versionOne));
+      await writeFile(file, `${JSON.stringify(versionOne, null, 2)}\n`, 'utf8');
     }
   }
 

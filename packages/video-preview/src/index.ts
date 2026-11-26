@@ -65,3 +65,16 @@ export {
   type UsePreviewEngineOptions,
   usePreviewEngine,
 } from './use-preview-engine';
+export {
+  type CaptionCss,
+  CaptionsNode,
+  captionCss,
+  captionEntrance,
+  captionWordPaints,
+  ENTRANCE_FADE_MS,
+  ENTRANCE_POP_MS,
+  ENTRANCE_POP_SCALE,
+  POP_MS,
+  POP_SCALE,
+  type WordPaint,
+} from './captions-node';

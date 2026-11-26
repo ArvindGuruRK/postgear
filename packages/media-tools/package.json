@@ -27,7 +27,8 @@
     "stickers:draw": "ts-node --project tsconfig.scripts.json scripts/stickers-draw.ts",
     "sounds:make": "ts-node --project tsconfig.scripts.json scripts/sounds-make.ts",
     "watermark:make": "ts-node --project tsconfig.scripts.json scripts/watermark-make.ts",
-    "signals:record": "ts-node --project tsconfig.scripts.json scripts/record-signals.ts"
+    "signals:record": "ts-node --project tsconfig.scripts.json scripts/record-signals.ts",
+    "captions:stills": "ts-node --project tsconfig.scripts.json scripts/caption-stills.ts"
   },
   "dependencies": {
     "@postgear/video-engine": "*",

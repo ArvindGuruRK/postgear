@@ -138,8 +138,10 @@ describe('fingerprintMatches', () => {
 
   it('still reads a fingerprint stored before numbers were rounded (v1)', () => {
     const one = doc();
-    // The v1 value of this very document, as Module 15 stored it.
-    const stored = legacyFingerprint(one);
+    // The v1 value of this very document, as Module 15 stored it: taken of the
+    // version 1 form (before `bleeps` and schema version 2 existed).
+    const { bleeps: _bleeps, ...versionOne } = one;
+    const stored = legacyFingerprint({ ...versionOne, schemaVersion: 1 } as never);
     expect(stored).toMatch(/^v1-[0-9a-f]{28}$/);
     expect(fingerprintMatches(one, stored)).toBe(true);
     expect(fingerprintMatches(doc('1:1'), stored)).toBe(false);

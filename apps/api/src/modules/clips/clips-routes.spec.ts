@@ -50,6 +50,15 @@ import { STICKER_PROVIDER } from './library/sticker-provider';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
 import { ClipsCreateGuard } from './limits/clips-create.guard';
 import { ClipLinksModule } from './links/clip-links.module';
+import { MediaServiceProbe } from './status/media-service.probe';
+import { ClipTranscriptStore } from './transcripts/clip-transcript-store';
+import { ClipTranscriptsService } from './transcripts/clip-transcripts.service';
+import { ClipCaptionStylesRepository } from './captions/clip-caption-styles.repository';
+import { ClipCaptionStylesService } from './captions/clip-caption-styles.service';
+import { ClipCaptionsService } from './captions/clip-captions.service';
+import { builtInCaptionStyle } from '@postgear/video-engine';
+import { AiModule } from '../ai/ai.module';
+import { AI_ENGINE } from '../ai/engine/engine.types';
 import { CLIP_LINK_PROBER } from './links/clip-links.types';
 import { ClipRetentionService } from './retention/clip-retention.service';
 import { ClipsStatusService } from './status/clips-status.service';
@@ -81,6 +90,10 @@ const SHARED = [
   MediaService,
   // Global in the app (RedisModule); the Module 19 sweep takes it.
   RedisService,
+  // Sprint 13: listening and the words live in the core module.
+  MediaServiceProbe,
+  ClipTranscriptStore,
+  ClipTranscriptsService,
 ];
 
 @Module({
@@ -134,6 +147,13 @@ class FakePostsModule {}
 })
 class FakeWorkspaceChannelsModule {}
 
+/** Sprint 13: a clip's captions translate through the AI engine. */
+@Module({
+  providers: [{ provide: AI_ENGINE, useValue: {} }],
+  exports: [AI_ENGINE],
+})
+class FakeAiModule {}
+
 describe('Clips routes', () => {
   let app: INestApplication;
   const reconcile = jest.fn(async () => ({ started: 0, failed: 0 }));
@@ -155,6 +175,48 @@ describe('Clips routes', () => {
       .useModule(FakePostsModule)
       .overrideModule(ChannelsModule)
       .useModule(FakeWorkspaceChannelsModule)
+      .overrideModule(AiModule)
+      .useModule(FakeAiModule)
+      .overrideProvider(ClipCaptionStylesRepository)
+      .useValue({})
+      .overrideProvider(ClipCaptionStylesService)
+      .useValue({
+        list: async () => ({ reached: 'caption-styles' }),
+        create: async () => ({ reached: 'caption-style-create' }),
+        update: async (_org: string, id: string) => ({ reached: 'caption-style-update', id }),
+        remove: async (_org: string, id: string) => ({ reached: 'caption-style-delete', id }),
+      })
+      .overrideProvider(ClipCaptionsService)
+      .useValue({
+        add: async (_org: string, _user: string, clipId: string, body: { styleId?: string }) => ({
+          covered: body.styleId !== 'karaoke',
+          reached: 'captions-add',
+          clipId,
+        }),
+        words: async (_org: string, clipId: string) => ({ reached: 'words', clipId }),
+        fromFile: async (
+          _org: string,
+          clipId: string,
+          file: { originalname: string; size: number } | undefined,
+          fields: { language?: string },
+        ) => ({
+          reached: 'captions-file',
+          clipId,
+          name: file?.originalname ?? null,
+          size: file?.size ?? 0,
+          language: fields.language ?? null,
+        }),
+        translate: async (
+          _org: string,
+          _user: string,
+          clipId: string,
+          body: { language: string },
+        ) => ({
+          reached: 'captions-translate',
+          clipId,
+          language: body.language,
+        }),
+      })
       .overrideProvider(ClipSendService)
       .useValue({
         send: async (_org: string, clipId: string, body: { channelIds: string[] }) => ({
@@ -291,6 +353,95 @@ describe('Clips routes', () => {
       .delete(`/clips/layouts/${CLIP_ID}`)
       .expect(200);
     expect(removed.body).toEqual({ reached: 'layout-delete', id: CLIP_ID });
+  });
+
+  it('sends /clips/caption-styles to the styles controller, not the clip controller', async () => {
+    const server = app.getHttpServer();
+    expect((await request(server).get('/clips/caption-styles').expect(200)).body).toEqual({
+      reached: 'caption-styles',
+    });
+    const look = builtInCaptionStyle('clean')?.look;
+    expect(
+      (await request(server).post('/clips/caption-styles').send({ name: 'Mine', look }).expect(201))
+        .body,
+    ).toEqual({ reached: 'caption-style-create' });
+    expect(
+      (
+        await request(server)
+          .patch(`/clips/caption-styles/${CLIP_ID}`)
+          .send({ name: 'Renamed' })
+          .expect(200)
+      ).body,
+    ).toEqual({ reached: 'caption-style-update', id: CLIP_ID });
+    expect(
+      (await request(server).delete(`/clips/caption-styles/${CLIP_ID}`).expect(200)).body,
+    ).toEqual({ reached: 'caption-style-delete', id: CLIP_ID });
+    // A body the schema does not describe never reaches the service.
+    await request(server).post('/clips/caption-styles').send({ name: 'Mine' }).expect(400);
+    await request(server)
+      .post('/clips/caption-styles')
+      .send({ name: 'Mine', look: { ...look, box: { colour: '#000000', pad: 4 } } })
+      .expect(400);
+    await request(server).patch(`/clips/caption-styles/${CLIP_ID}`).send({}).expect(400);
+  });
+
+  it("sends a clip's captions routes to the captions controller", async () => {
+    const server = app.getHttpServer();
+    // 200 once the words are there, 202 while the clip is being listened to.
+    const covered = await request(server).post(`/clips/${CLIP_ID}/captions`).send({}).expect(200);
+    expect(covered.body).toEqual({ covered: true, reached: 'captions-add', clipId: CLIP_ID });
+    await request(server)
+      .post(`/clips/${CLIP_ID}/captions`)
+      .send({ styleId: 'karaoke' })
+      .expect(202);
+    await request(server).post(`/clips/${CLIP_ID}/captions`).send({ everything: true }).expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/captions`)
+      .send({ language: 'English' })
+      .expect(400);
+
+    expect((await request(server).get(`/clips/${CLIP_ID}/words`).expect(200)).body).toEqual({
+      reached: 'words',
+      clipId: CLIP_ID,
+    });
+
+    const uploaded = await request(server)
+      .post(`/clips/${CLIP_ID}/captions/from-file`)
+      .field('language', 'ta')
+      .attach('file', Buffer.from('1\n00:00:01,000 --> 00:00:02,000\nHello\n'), 'episode.srt')
+      .expect(201);
+    expect(uploaded.body).toEqual({
+      reached: 'captions-file',
+      clipId: CLIP_ID,
+      name: 'episode.srt',
+      size: 38,
+      language: 'ta',
+    });
+
+    expect(
+      (
+        await request(server)
+          .post(`/clips/${CLIP_ID}/captions/translate`)
+          .send({ language: 'hi' })
+          .expect(201)
+      ).body,
+    ).toEqual({ reached: 'captions-translate', clipId: CLIP_ID, language: 'hi' });
+    await request(server).post(`/clips/${CLIP_ID}/captions/translate`).send({}).expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/captions/translate`)
+      .send({ language: 'auto' })
+      .expect(400);
+  });
+
+  it('answers a captions file over 2 MB with our sentence, before the service sees it', async () => {
+    const response = await request(app.getHttpServer())
+      .post(`/clips/${CLIP_ID}/captions/from-file`)
+      .attach('file', Buffer.alloc(2 * 1024 * 1024 + 10, 0x61), 'huge.srt')
+      .expect(413);
+    expect(response.body).toMatchObject({
+      code: 'captions_file_too_big',
+      error: 'This captions file is too big. Use a file under 2 MB.',
+    });
   });
 
   it('sends /clips/library and /clips/stickers to their own controllers, not the clip controller', async () => {

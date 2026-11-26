@@ -19,6 +19,7 @@ import type {
   ClipAsset,
   ClipHighlightRun,
   ClipJob,
+  ClipCaptionStyle,
   ClipLayoutPreset,
   ClipPost,
   ClipVideo,
@@ -70,6 +71,8 @@ export interface FakeTables {
   assets: ClipAsset[];
   jobs: ClipJob[];
   layouts: ClipLayoutPreset[];
+  /** Optional: Sprint 13's caption styles. */
+  captionStyles?: ClipCaptionStyle[];
   /** Optional: only the export specs seed Media rows. */
   media?: FakeMedia[];
   /** Optional: Module 16's highlight runs. */
@@ -355,6 +358,20 @@ export function fakeClipDb(tables: FakeTables) {
         tables.assets = tables.assets.filter((asset) => !matches(asset as unknown as Row, where));
         return { count: before - tables.assets.length };
       }),
+      // Sprint 13: a clip's own transcript (a supplied file, a translation) is written by the API.
+      create: jest.fn(async ({ data }: { data: Partial<ClipAsset> }) => {
+        const count = tables.assets.length + 1;
+        const row = {
+          id: `aaaaaaaa-0000-4000-8000-${String(count).padStart(12, '0')}`,
+          clipId: null,
+          mimeType: null,
+          meta: null,
+          createdAt: new Date(Date.UTC(2026, 10, 2, 0, 0, count)),
+          ...data,
+        } as ClipAsset;
+        tables.assets.push(row);
+        return row;
+      }),
       // Sprint 13: a transcript row's meta is rewritten when a word is fixed.
       updateMany: jest.fn(async ({ where, data }: { where: unknown; data: object }) => {
         const found = tables.assets.filter((row) => matches(row as unknown as Row, where));
@@ -398,6 +415,37 @@ export function fakeClipDb(tables: FakeTables) {
         return { count: found.length };
       }),
     },
+    // Sprint 13: a workspace's own caption styles.
+    clipCaptionStyle: (() => {
+      const rows = () => {
+        tables.captionStyles ??= [];
+        return tables.captionStyles as unknown as Row[];
+      };
+      return {
+        ...table(rows),
+        create: jest.fn(async ({ data }: { data: Row }) => {
+          const row = {
+            id: `00000000-0000-4000-8000-${String(rows().length + 1).padStart(12, '0')}`,
+            createdById: null,
+            createdAt: new Date(Date.UTC(2026, 10, 1, 0, 0, rows().length)),
+            updatedAt: now(),
+            ...data,
+          } as Row;
+          rows().push(row);
+          return row;
+        }),
+        updateMany: jest.fn(async ({ where, data }: { where: unknown; data: object }) => {
+          const found = rows().filter((row) => matches(row, where));
+          for (const row of found) Object.assign(row, data, { updatedAt: now() });
+          return { count: found.length };
+        }),
+        deleteMany: jest.fn(async ({ where }: { where: unknown }) => {
+          const before = rows().length;
+          tables.captionStyles = rows().filter((row) => !matches(row, where)) as never;
+          return { count: before - (tables.captionStyles as unknown[]).length };
+        }),
+      };
+    })(),
     clipLayoutPreset: {
       ...table(() => tables.layouts as unknown as Row[]),
       create: jest.fn(async ({ data }: { data: Partial<ClipLayoutPreset> }) => {

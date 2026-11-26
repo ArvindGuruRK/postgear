@@ -88,6 +88,12 @@ export interface TranscriptRequest {
   fromMs?: number;
   toMs?: number;
   language?: string;
+  /**
+   * Several stretches at once (a clip made of separate parts), instead of
+   * `fromMs` and `toMs`. What lies between them is left alone: nobody pays
+   * to listen to the part of the video a clip cut out.
+   */
+  ranges?: readonly MsRange[];
 }
 
 export interface MeterView {
@@ -113,6 +119,8 @@ export type EnsureOutcome =
     };
 
 export interface TranscriptView {
+  /** The transcript row's id: what a captions track points at. */
+  id: string;
   language: string;
   model: string;
   source: TranscriptAssetMeta['source'];
@@ -140,7 +148,7 @@ interface TranscriptRow {
   meta: TranscriptAssetMeta;
 }
 
-function toMeterView(state: MeterState): MeterView {
+export function toMeterView(state: MeterState): MeterView {
   return {
     used: state.used,
     remaining: state.remaining,
@@ -198,7 +206,7 @@ export class ClipTranscriptsService {
     await this.limits.assertEnabled(orgId);
     const video = await this.requireReadyVideo(orgId, videoId);
     const language = this.languageOf(request);
-    const wanted = this.wantedRange(video, request);
+    const wanted = this.wantedRanges(video, request);
 
     const existing = await this.transcriptRow(orgId, video.id, language);
     const missing = this.missingFor(existing, wanted, video.durationMs as number);
@@ -317,7 +325,7 @@ export class ClipTranscriptsService {
   ): Promise<{ price: number; ms: number; covered: boolean }> {
     const video = await this.requireReadyVideo(orgId, videoId);
     const language = this.languageOf(request);
-    const wanted = this.wantedRange(video, request);
+    const wanted = this.wantedRanges(video, request);
     const existing = await this.transcriptRow(orgId, video.id, language);
     const missing = this.missingFor(existing, wanted, video.durationMs as number);
     return { price: listenPrice(missing), ms: rangesMs(missing), covered: missing.length === 0 };
@@ -331,27 +339,52 @@ export class ClipTranscriptsService {
   ): Promise<ReadOutcome> {
     const video = await this.requireReadyVideo(orgId, videoId);
     const language = this.languageOf(request);
-    const wanted = this.wantedRange(video, request);
+    const wanted = this.wantedRanges(video, request);
     const row = await this.transcriptRow(orgId, video.id, language);
     const missing = this.missingFor(row, wanted, video.durationMs as number);
     if (!row) return { transcript: null, complete: false, price: listenPrice(missing) };
 
+    const transcript = await this.viewOf(row, wanted);
+    if (!transcript) return { transcript: null, complete: false, price: listenPrice(missing) };
+    return { transcript, complete: missing.length === 0, price: listenPrice(missing) };
+  }
+
+  /**
+   * One transcript row's words inside `wanted`, fixes applied; null when its
+   * file is gone or does not read. `wanted` is already inside the video.
+   */
+  async viewOf(row: TranscriptRow, wanted: readonly MsRange[]): Promise<TranscriptView | null> {
     const stored = await this.store.read(row.key);
-    if (!stored) return { transcript: null, complete: false, price: listenPrice(missing) };
+    if (!stored) return null;
     const transcript = applyFixes(stored, row.meta.fixes);
     return {
-      transcript: {
-        language: transcript.language,
-        model: transcript.model,
-        source: row.meta.source,
-        words: wordsInRange(transcript, wanted.fromMs, wanted.toMs),
-        covered: row.meta.source === 'supplied' ? [wanted] : clipRanges(transcript.covered, wanted),
-        fixes: row.meta.fixes.length,
-        fileName: row.meta.fileName ?? null,
-      },
-      complete: missing.length === 0,
-      price: listenPrice(missing),
+      id: row.id,
+      language: transcript.language,
+      model: transcript.model,
+      source: row.meta.source,
+      words: wanted.flatMap((range) => wordsInRange(transcript, range.fromMs, range.toMs)),
+      covered:
+        row.meta.source === 'listened'
+          ? wanted.flatMap((range) => clipRanges(transcript.covered, range))
+          : [...wanted],
+      fixes: row.meta.fixes.length,
+      fileName: row.meta.fileName ?? null,
     };
+  }
+
+  /**
+   * One transcript row of a video by its id, whoever it belongs to inside the
+   * video (the video's own, a clip's supplied file, a clip's translation).
+   * Always inside the workspace: an id from elsewhere is null.
+   */
+  async assetRow(orgId: string, videoId: string, assetId: string): Promise<TranscriptRow | null> {
+    if (!isUuid(assetId)) return null;
+    const row = await prisma.clipAsset.findFirst({
+      where: { id: assetId, organizationId: orgId, videoId, kind: ClipAssetKind.TRANSCRIPT },
+      select: { id: true, key: true, meta: true },
+    });
+    const meta = row ? readTranscriptAssetMeta(row.meta) : null;
+    return row && meta ? { id: row.id, key: row.key, meta } : null;
   }
 
   /**
@@ -431,7 +464,9 @@ export class ClipTranscriptsService {
     tx: ClipsTx = prisma,
   ): Promise<TranscriptRow | null> {
     const rows = await tx.clipAsset.findMany({
-      where: { organizationId: orgId, videoId, kind: ClipAssetKind.TRANSCRIPT },
+      // `clipId: null`: a file supplied for one clip, or one clip's translation, belongs to
+      // that clip and never stands in for the video's own transcript.
+      where: { organizationId: orgId, videoId, clipId: null, kind: ClipAssetKind.TRANSCRIPT },
       orderBy: { createdAt: 'asc' },
       select: { id: true, key: true, meta: true },
     });
@@ -445,9 +480,14 @@ export class ClipTranscriptsService {
   }
 
   /** A supplied file covers everything it could (it is the person's own words); else the gaps. */
-  private missingFor(row: TranscriptRow | null, wanted: MsRange, durationMs: number): MsRange[] {
+  private missingFor(
+    row: TranscriptRow | null,
+    wanted: readonly MsRange[],
+    durationMs: number,
+  ): MsRange[] {
     if (row?.meta.source === 'supplied' || row?.meta.source === 'translated') return [];
-    return capRanges(rangesToListen(row?.meta.covered ?? [], wanted, durationMs));
+    const covered = row?.meta.covered ?? [];
+    return capRanges(wanted.flatMap((range) => rangesToListen(covered, range, durationMs)));
   }
 
   /** An open listening job of this video whose stretches overlap `ranges`. */
@@ -481,15 +521,24 @@ export class ClipTranscriptsService {
     return language;
   }
 
-  /** The asked stretch held inside the video; the whole video when none was asked. */
-  private wantedRange(video: ClipVideo, request: TranscriptRequest): MsRange {
+  /** The asked stretches held inside the video, merged; the whole video when none was asked. */
+  private wantedRanges(video: ClipVideo, request: TranscriptRequest): MsRange[] {
     const duration = video.durationMs as number;
-    const fromMs = Math.min(request.fromMs ?? 0, duration);
-    const toMs = Math.min(request.toMs ?? duration, duration);
-    if (toMs <= fromMs) {
+    const asked: readonly MsRange[] = request.ranges ?? [
+      { fromMs: request.fromMs ?? 0, toMs: request.toMs ?? duration },
+    ];
+    const held = mergeRanges(
+      asked
+        .map((range) => ({
+          fromMs: Math.min(Math.max(0, range.fromMs), duration),
+          toMs: Math.min(Math.max(0, range.toMs), duration),
+        }))
+        .filter((range) => range.toMs > range.fromMs),
+    );
+    if (held.length === 0) {
       throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'transcript_range_invalid');
     }
-    return { fromMs, toMs };
+    return held;
   }
 
   /** A live, READY video of the workspace with a known length; a plain 404 for another's. */

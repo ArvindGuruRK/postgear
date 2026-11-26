@@ -165,6 +165,7 @@ function setup(
     })),
     rewrite: jest.fn(async () => ({ text: 'We bake every morning.', shortened: false })),
     research: jest.fn(),
+    translate: jest.fn(),
     ...options.snippets,
   };
   const engine = {

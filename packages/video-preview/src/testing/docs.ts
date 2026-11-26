@@ -29,7 +29,8 @@ export function clipOf(
   options: { kind?: ClipDocument['layout']['kind']; areas?: LayoutArea[] } = {},
 ): ClipDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    bleeps: [],
     canvas: { ratio: '9:16', width: 1080, height: 1920, fps: 30, background: '#000000' },
     sources: [{ id: 'src', videoId: TEST_VIDEO_ID }],
     segments,

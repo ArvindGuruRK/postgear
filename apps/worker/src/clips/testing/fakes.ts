@@ -320,6 +320,19 @@ export class FakeRows implements ClipRows {
     return true;
   }
 
+  /** Sprint 13, Module 03: the workspace's own caption styles. */
+  captionStyles = new Map<
+    string,
+    { id: string; name: string; look: unknown; organizationId: string }
+  >();
+
+  async captionStyle(organizationId: string, styleId: string) {
+    const style = this.captionStyles.get(styleId);
+    return style && style.organizationId === organizationId
+      ? { id: style.id, name: style.name, look: style.look }
+      : null;
+  }
+
   /** Sprint 13, Module 02: the DONE listening jobs' outputs, by job id. */
   transcribed = new Map<string, unknown>();
 

@@ -45,7 +45,15 @@ import {
 // Tabs
 // ---------------------------------------------------------------------------
 
-export const EDITOR_TABS = ['layouts', 'elements', 'text', 'effects', 'audio', 'export'] as const;
+export const EDITOR_TABS = [
+  'layouts',
+  'elements',
+  'text',
+  'effects',
+  'audio',
+  'captions',
+  'export',
+] as const;
 export type EditorTab = (typeof EDITOR_TABS)[number];
 
 export const EDITOR_TAB_NAMES: Readonly<Record<EditorTab, string>> = Object.freeze({
@@ -54,6 +62,7 @@ export const EDITOR_TAB_NAMES: Readonly<Record<EditorTab, string>> = Object.free
   text: 'Text',
   effects: 'Effects',
   audio: 'Audio',
+  captions: 'Captions',
   export: 'Export',
 });
 

@@ -874,3 +874,13 @@ Notes:
 - **The row is swapped, not updated in place.** A listening job writes a new file at a key made from its own id, and in one transaction marks itself DONE, deletes the old `TRANSCRIPT` row of that language and creates the new one (its id is the job's id). The old file is deleted after.
 - **Deleting a video deletes its transcript and face files**: they are `ClipAsset` rows with `videoId`, so Sprint 12's removal and storage counting already cover them.
 - **Speech text is never in a row.** Not in `ClipJob.input`, `output` or `error`, and not in a notification.
+
+### `ClipCaptionStyle` (Module 03, `20261126150000_sprint13_clip_caption_styles`)
+
+A workspace's own caption styles. The six built-in styles are code in `packages/video-engine` (`CAPTION_STYLES`) and are never rows.
+
+- **`look` is JSON checked by the engine's caption look schema** on every write and every read: the font, colours, outline or box, the spoken word's mark, the letter case, the size and words at once. A row that no longer parses is left out of the list instead of breaking it.
+- **A fixed number per workspace** (30), counted in the service. It is a guard against a runaway list, not a plan value.
+- **A clip names a style by id, with no foreign key**: the id lives inside the clip document (`styleId`), which also names built-in styles by their slug. Deleting a style a clip still uses is allowed; that clip draws and exports in the default style.
+- **A clip's own transcripts carry `clipId`.** A supplied captions file and a translation are `ClipAsset` rows of kind `TRANSCRIPT` with the `clipId` set; the video's listened transcript keeps `clipId: null`. No new column: `ClipAsset.clipId` already existed. `meta` gained `fileName`, `origin` (the transcript a translation was made from) and `inputHash` (what makes the same translation request free the second time).
+

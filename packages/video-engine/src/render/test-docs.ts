@@ -3,7 +3,14 @@
  * test and scripts). Not exported from the package index: `createClipDocument`
  * is the real way to make one.
  */
-import type { ClipDocument, OverlayItem, Segment, StickerItem, TextItem } from '../document/schema';
+import {
+  type ClipDocument,
+  CURRENT_SCHEMA_VERSION,
+  type OverlayItem,
+  type Segment,
+  type StickerItem,
+  type TextItem,
+} from '../document/schema';
 import { copyTextStyle, textStylePreset } from '../document/text';
 import type { Rect } from '../geometry';
 import { FONT_MANIFEST } from './fonts-manifest';
@@ -37,7 +44,7 @@ export function testDocument(
   options: { crop?: Rect; fadeInMs?: number; fadeOutMs?: number } = {},
 ): ClipDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     canvas: { ratio: '9:16', width: 1080, height: 1920, fps: 30, background: '#000000' },
     sources: [{ id: 'src', videoId: TEST_VIDEO_ID }],
     segments,
@@ -57,6 +64,7 @@ export function testDocument(
     looks: { colour: 'none', strength: 0, vignette: 0 },
     fades: { inMs: options.fadeInMs ?? 0, outMs: options.fadeOutMs ?? 0 },
     tracks: [],
+    bleeps: [],
   };
 }
 

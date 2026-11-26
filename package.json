@@ -33,6 +33,7 @@
     "clips:signals:record": "npm run signals:record --workspace=@postgear/media-tools --",
     "clips:benchmark": "npm run benchmark --workspace=@postgear/media-tools --",
     "clips:stills": "npm run stills --workspace=@postgear/media-tools --",
+    "clips:captions:stills": "npm run captions:stills --workspace=@postgear/media-tools --",
     "clips:fonts:build": "npm run fonts:build --workspace=@postgear/media-tools --",
     "clips:stickers:draw": "npm run stickers:draw --workspace=@postgear/media-tools --",
     "clips:sounds:make": "npm run sounds:make --workspace=@postgear/media-tools --",

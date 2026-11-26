@@ -36,8 +36,10 @@ export const RENDER_COMPILE_CODES = [
   'sounds_unsupported',
   /** A sound file the clip plays was not handed in (removed from the library, or a deleted upload). */
   'sound_missing',
-  /** Captions (Sprint 13). */
+  /** Kept for older logs: captions render since Sprint 13. */
   'captions_unsupported',
+  /** A clip has captions but their words (the transcript) were not handed in. */
+  'captions_missing',
 ] as const;
 
 export type RenderCompileCode = (typeof RENDER_COMPILE_CODES)[number];
@@ -81,7 +83,14 @@ export function isRenderCompileError(error: unknown): error is RenderCompileErro
  */
 export function jobErrorCodeFor(
   code: RenderCompileCode,
-): 'font_missing' | 'sticker_missing' | 'sound_missing' | 'export_failed' {
-  if (code === 'font_missing' || code === 'sticker_missing' || code === 'sound_missing') return code;
+): 'font_missing' | 'sticker_missing' | 'sound_missing' | 'captions_missing' | 'export_failed' {
+  if (
+    code === 'font_missing' ||
+    code === 'sticker_missing' ||
+    code === 'sound_missing' ||
+    code === 'captions_missing'
+  ) {
+    return code;
+  }
   return 'export_failed';
 }

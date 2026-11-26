@@ -43,6 +43,11 @@ export const CLIPS_MESSAGES = {
   CLIP_DOCUMENT_TOO_LARGE:
     'This clip has grown too large to save. Remove some items and try again.',
   CLIP_DELETED: 'Clip deleted.',
+  /** Sprint 13: lines of a captions file that fall outside the clip. */
+  CAPTION_LINES_SKIPPED: (count: number) =>
+    count === 1
+      ? 'We skipped 1 line that was outside this clip.'
+      : `We skipped ${count} lines that were outside this clip.`,
   MORE_VIDEO_THROTTLED: 'We are already getting more of the video. Try again in a few seconds.',
   /** Module 19: the global ceiling on waiting jobs (503 `clips_busy`). */
   BUSY: 'Clips is very busy right now. Try again in a few minutes.',

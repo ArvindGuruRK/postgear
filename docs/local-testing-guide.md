@@ -1228,6 +1228,32 @@ A Jest test and a pytest test fail when either file is stale, and both sides par
 
 **Your own sample video.** `npm run clips:samples` also copies `out/Verideck_60s_3D.mp4` (or the file named in `CLIPS_OWN_SAMPLE`) into the samples folder as the `verideck` sample, a real 60 second video for testing every Clips screen. Its simulation link is `https://www.youtube.com/watch?v=simverideck`. The file itself is never committed.
 
+**Captions (Module 03).** Open any clip in the editor (the 10 minute stream sample has recorded speech) and press **Captions** in the rail.
+
+| Do this | What you should see |
+|---|---|
+| Press **Add Captions** | On a stretch already listened to it is free and the words appear at once; else the button shows its price in AI minutes, a listening bar runs, then the words appear |
+| Press a style tile (Bold Pop, Marker, Karaoke, Clean, Boxed, Typewriter) | The page on the clip changes look; one Undo puts the old style back |
+| Move Size and Words At Once, pick Letters, change the colour | The clip follows; each is one undo step |
+| Turn on **Safe Area Guide** | Three striped strips where the apps put their own buttons |
+| Press a word in the list, type a new one, **Save** | The word is bold in the list and changed on the clip, for this clip only; **Replace Everywhere** changes it wherever it was heard in the video |
+| **Hide Word** | The word is struck through in the list and gone from the clip |
+| **Create A Style**, name it, **Save Style** | A new tile of your own; other clips in the workspace can pick it |
+| **Translate** to Tamil or Hindi | 1 AI minute for a short clip; the words change language and are marked by page; the same request again is free; Undo shows the words as said |
+| Upload an `.srt` or `.vtt` file with the file button | No AI minutes used; lines outside the clip are skipped with one sentence; a file with no lines is refused |
+| **Preview Export**, then **Export Clip** | The file has the same pages at the same moments as the editor |
+| Stop the Python service, reload | The tab says captions are not available right now; captions already on the clip still draw and export, and the file upload still works |
+
+Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
+
+```bash
+npm run clips:regression                              # every version 1 clip still exports as recorded (real FFmpeg)
+npm run clips:captions:stills -- --out caption-stills # one still per style in English, Tamil and Hindi, to look at
+npx jest --config packages/media-tools/jest.config.js caption-parity   # pixel checks on the real FFmpeg
+```
+
+On a machine with no FFmpeg of its own, point `FFMPEG_PATH` and `FFPROBE_PATH` at `infra/docker/worker/bin/ffmpeg` and `ffprobe` first.
+
 Automated checks:
 
 ```bash

@@ -9,7 +9,9 @@ import { HttpException } from '@nestjs/common';
 import type { PrivateStorage } from '@postgear/storage';
 import {
   type ClipDocument,
+  createCaptionsTrack,
   createClipDocument,
+  withCaptionsTrack,
   documentFingerprint,
   parseClipDocument,
 } from '@postgear/video-engine';
@@ -27,6 +29,7 @@ import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { ClipEditsService, copyTitle, MAX_DOCUMENT_BYTES } from './clip-edits.service';
 import { patchClipSchema } from './clip-item.schema';
+import { ClipCaptionsService } from '../captions/clip-captions.service';
 import { ClipItemService } from './clip-item.service';
 
 let mockDb: FakeClipDb;
@@ -79,6 +82,8 @@ function setup(tables = seed()) {
     new ClipVideosRepository(),
     limits as unknown as ClipLimitsGuard,
     storage as unknown as PrivateStorage,
+    // Only `releaseClip` is used, and it reads the fake database alone.
+    Object.create(ClipCaptionsService.prototype) as ClipCaptionsService,
   );
   return { service, tables, jobs, storage, limits };
 }
@@ -155,6 +160,55 @@ describe('ClipEditsService.patch', () => {
     expect(past).toMatchObject({ status: 422, body: { code: 'clip_document_invalid' } });
   });
 
+  it("saves captions only when they name a transcript of this clip's video in this workspace", async () => {
+    const tables = seed();
+    const transcriptOf = (id: string, organizationId: string, videoId: string) =>
+      assetRow({
+        id,
+        organizationId,
+        videoId,
+        kind: 'TRANSCRIPT',
+        key: `clips/${organizationId}/${videoId}/transcript-${id.slice(0, 8).repeat(4)}.json.gz`,
+      } as never);
+    const MINE = '70000000-0000-4000-8000-000000000001';
+    const THEIRS = '70000000-0000-4000-8000-000000000002';
+    const OTHER_VIDEOS = '70000000-0000-4000-8000-000000000003';
+    tables.assets.push(
+      transcriptOf(MINE, TEST_ORG, VIDEO),
+      transcriptOf(THEIRS, 'seed-second-org', VIDEO),
+      transcriptOf(OTHER_VIDEOS, TEST_ORG, OTHER_VIDEO),
+    );
+    const { service } = setup(tables);
+    const withCaptions = (transcriptAssetId: string) =>
+      withCaptionsTrack(
+        doc(),
+        createCaptionsTrack({
+          transcriptAssetId,
+          language: 'en',
+          styleId: 'bold-pop',
+          look: { sizePx: 86, maxWords: 3 },
+        }),
+      );
+
+    for (const id of [THEIRS, OTHER_VIDEOS, '70000000-0000-4000-8000-00000000ffff']) {
+      const refused = await refusal(
+        service.patch(TEST_ORG, CLIP, { revision: 1, document: withCaptions(id) }),
+      );
+      expect(refused).toMatchObject({ status: 422, body: { code: 'clip_document_invalid' } });
+    }
+    expect(tables.clips[0]?.revision).toBe(1);
+
+    const saved = await service.patch(TEST_ORG, CLIP, {
+      revision: 1,
+      document: withCaptions(MINE),
+    });
+    expect(saved.clip.revision).toBe(2);
+    expect(saved.clip.document?.tracks[0]).toMatchObject({
+      kind: 'captions',
+      transcriptAssetId: MINE,
+    });
+  });
+
   it('refuses a document over the size cap with 413 before reading it', async () => {
     const { service } = setup();
     const huge = { ...doc(), padding: 'x'.repeat(MAX_DOCUMENT_BYTES) };
@@ -204,7 +258,10 @@ describe('ClipEditsService.patch', () => {
       clip.lastExportedFingerprint = documentFingerprint(parseClipDocument(exported));
     }
     const { service } = setup(tables);
-    const edited = await service.patch(TEST_ORG, CLIP, { revision: 1, document: doc(60_000, 70_000) });
+    const edited = await service.patch(TEST_ORG, CLIP, {
+      revision: 1,
+      document: doc(60_000, 70_000),
+    });
     expect(edited.clip).toMatchObject({ revision: 2, exported: false });
     // The undo: the very document that was exported, saved as revision 3.
     const undone = await service.patch(TEST_ORG, CLIP, { revision: 2, document: exported });

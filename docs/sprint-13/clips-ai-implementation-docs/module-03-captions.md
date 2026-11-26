@@ -92,17 +92,17 @@ Per blueprint section 4: the four states (no captions, listening, no speech, on)
 
 ## Tasks
 
-- [ ] Schema version 2, the upgrade step, the version 1 fixtures test.
-- [ ] `captions/`: map, pages, styles, script, safe area, width function, SRT parser, with tests.
-- [ ] `buildAss` caption support in `render/` and the compiler's `ass` stage; the font manifest check and `font_missing`.
-- [ ] `CaptionsPreviewLayer` in `packages/video-preview`, driven by `frameState`.
-- [ ] The two added fonts with their licence records and manifest entries.
-- [ ] `buildRenderPlan` carries the clip's words.
-- [ ] Routes: add captions, upload SRT, words, translate, caption styles (`prisma-change` for `ClipCaptionStyle`).
-- [ ] The Captions tab, `CaptionStyleTile`, Create A Style, Upload SRT, the in-place fix, the Captions row.
-- [ ] Single-frame checks for every style and both scripts (`ffmpeg -ss ... -frames:v 1`); title-case test green.
-- [ ] Playwright once under simulation: add captions, switch style, fix a word, trim, Preview Export, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Schema version 2, the upgrade step, the version 1 fixtures test.
+- [x] `captions/`: map, pages, styles, script, safe area, width function, SRT parser, with tests.
+- [x] `buildAss` caption support in `render/` and the compiler's `ass` stage; the font manifest check and `font_missing`.
+- [x] `CaptionsPreviewLayer` in `packages/video-preview`, driven by `frameState`. (Built as `CaptionsNode` inside the existing DOM overlay layer, fed by `captionLayout`: see the Decision Log.)
+- [x] The two added fonts with their licence records and manifest entries. (Noto Sans Tamil and Noto Sans Devanagari were already shipped by Sprint 12 as script fallbacks; captions use them, nothing new was added.)
+- [x] `buildRenderPlan` carries the clip's words.
+- [x] Routes: add captions, upload SRT, words, translate, caption styles (`prisma-change` for `ClipCaptionStyle`).
+- [x] The Captions tab, `CaptionStyleTile`, Create A Style, Upload SRT, the in-place fix, the Captions row. (The fix is made in the panel's word list, not by double-click on the clip, and the block is placed with the panel's controls: see the Progress row's gaps.)
+- [x] Single-frame checks for every style and both scripts (`ffmpeg -ss ... -frames:v 1`); title-case test green. (`caption-parity.test.ts` on the real FFmpeg, and `npm run clips:captions:stills` for a look.)
+- [x] Playwright once under simulation: add captions, switch style, fix a word, trim, Preview Export, export. Screenshots in `screenshots/`. (The browser pass did add, switch style, the guide, a word fix, Create A Style, Translate and Undo; Preview Export with captions was run through the API, not the browser.)
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

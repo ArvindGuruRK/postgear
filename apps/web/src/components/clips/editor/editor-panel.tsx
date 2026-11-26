@@ -20,6 +20,7 @@ import { PanelLeftCloseIcon } from '@animateicons/react/lucide/panel-left-close-
 import { Button, EmptyState, MotionIcon, TooltipHint } from '@postgear/ui';
 import {
   AudioLines,
+  Captions,
   Download,
   LayoutDashboard,
   type LucideIcon,
@@ -38,6 +39,7 @@ const PLACEHOLDER_ICONS: Readonly<Record<EditorTab, LucideIcon>> = {
   text: Type,
   effects: WandSparkles,
   audio: AudioLines,
+  captions: Captions,
   export: Download,
 };
 

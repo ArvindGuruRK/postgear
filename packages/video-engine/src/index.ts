@@ -6,6 +6,8 @@
  * `@postgear/*` package (a test enforces it), so the browser preview, the
  * API, the worker and workflow code all import the identical rules.
  *
+ * - `captions/`: Sprint 13: caption styles, mapping words onto the clip, paging,
+ *   the SRT and VTT reader.
  * - `document/`: the clip document schema, its upgrade chain and the creator.
  * - `effects/`: the looks and the vignette, as numbers both drawings read.
  * - `time/`: the time map between the video's clock and the clip's, the pure
@@ -22,6 +24,7 @@
 
 export * from './assets';
 export * from './canvas';
+export * from './captions';
 export * from './document';
 export * from './downloads';
 export * from './effects';

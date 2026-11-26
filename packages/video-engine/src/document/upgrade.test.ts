@@ -98,7 +98,7 @@ describe('parseClipDocument', () => {
       ok: false,
       issues: ['This is not a clip document.'],
     });
-    const newer = safeParseClipDocument({ ...created(), schemaVersion: 2 });
+    const newer = safeParseClipDocument({ ...created(), schemaVersion: CURRENT_SCHEMA_VERSION + 1 });
     expect(newer.ok).toBe(false);
     const good = safeParseClipDocument(created());
     expect(good.ok).toBe(true);

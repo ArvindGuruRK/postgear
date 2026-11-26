@@ -225,9 +225,12 @@ describe('helpers', () => {
   it('walks the tabs with Back and Next, stopping at the ends', () => {
     expect(stepTab('layouts', -1)).toBeNull();
     expect(stepTab('layouts', 1)).toBe('elements');
-    expect(stepTab('audio', 1)).toBe('export');
+    // Sprint 13: Captions sits between Audio and Export.
+    expect(stepTab('audio', 1)).toBe('captions');
+    expect(stepTab('captions', 1)).toBe('export');
+    expect(stepTab('export', -1)).toBe('captions');
     expect(stepTab('export', 1)).toBeNull();
-    expect(EDITOR_TABS).toHaveLength(6);
+    expect(EDITOR_TABS).toHaveLength(7);
   });
 
   it('cleans a name and keeps it under the limit', () => {

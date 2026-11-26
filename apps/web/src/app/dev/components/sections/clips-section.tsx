@@ -32,6 +32,7 @@ import {
 import { type PointerEvent, useMemo, useState } from 'react';
 import { Row, Section, Spec } from '../shared';
 import { ClipsCanvasSpecimens } from './clips-canvas-specimens';
+import { ClipsCaptionSpecimens } from './clips-caption-specimens';
 import { ClipsHomeSpecimens } from './clips-home-specimens';
 
 /** A 42 second clip at 16 px a second, 30 frames a second. */
@@ -258,6 +259,8 @@ export function ClipsSection() {
       </Row>
 
       <ClipsCanvasSpecimens />
+
+      <ClipsCaptionSpecimens />
 
       <ClipsHomeSpecimens />
     </Section>

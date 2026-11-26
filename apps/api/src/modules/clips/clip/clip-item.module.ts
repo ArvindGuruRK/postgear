@@ -8,6 +8,10 @@
 import { Module } from '@nestjs/common';
 import { ChannelsModule } from '../../channels/channels.module';
 import { PostsModule } from '../../posts/posts.module';
+import { AiModule } from '../../ai/ai.module';
+import { ClipCaptionStylesModule } from '../captions/clip-caption-styles.module';
+import { ClipCaptionsController } from '../captions/clip-captions.controller';
+import { ClipCaptionsService } from '../captions/clip-captions.service';
 import { ClipsCoreModule } from '../clips-core.module';
 import { ClipEditsService } from './clip-edits.service';
 import { ClipExportsService } from './clip-exports.service';
@@ -20,14 +24,24 @@ import { ClipsListService } from './clips-list.service';
 @Module({
   // Module 17: Send To Composer drafts through the posts module, checks the
   // channels through the channels module, and reads the clip posts.
-  imports: [ClipsCoreModule, ChannelsModule, PostsModule, ClipPostsModule],
-  controllers: [ClipItemController],
+  // Sprint 13: a clip's captions read the caption styles and translate through the AI engine.
+  imports: [
+    ClipsCoreModule,
+    ChannelsModule,
+    PostsModule,
+    ClipPostsModule,
+    ClipCaptionStylesModule,
+    AiModule,
+  ],
+  // `ClipCaptionsController` first: its routes are all deeper than `/clips/:clipId`.
+  controllers: [ClipCaptionsController, ClipItemController],
   providers: [
     ClipItemService,
     ClipEditsService,
     ClipsListService,
     ClipExportsService,
     ClipSendService,
+    ClipCaptionsService,
   ],
   exports: [ClipItemService],
 })

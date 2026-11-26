@@ -1,4 +1,6 @@
 export * from './ass';
+export * from './caption-ass';
+export * from './caption-plan';
 export * from './compile';
 export * from './errors';
 export * from './fonts';

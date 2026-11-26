@@ -18,6 +18,8 @@ const production = {
   AUTOMATION_INTERNAL_TOKEN: 'b'.repeat(64),
   // Sprint 12: Clips' signed file addresses.
   CLIPS_URL_SECRET: 'c'.repeat(32),
+  // Sprint 13: the header the Python media service checks.
+  MEDIA_INTERNAL_TOKEN: 'd'.repeat(64),
 };
 
 /** A complete production mail setup, with placeholder values. */
