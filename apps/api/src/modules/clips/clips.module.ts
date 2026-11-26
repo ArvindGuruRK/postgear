@@ -52,6 +52,7 @@ import { ClipSampleLink } from './videos/clip-sample';
 import { ClipUploadsService } from './videos/clip-uploads.service';
 import { ClipVideosController } from './videos/clip-videos.controller';
 import { ClipVideosService } from './videos/clip-videos.service';
+import { ClipWordListModule } from './word-list/clip-word-list.module';
 
 @Module({
   imports: [
@@ -67,6 +68,8 @@ import { ClipVideosService } from './videos/clip-videos.service';
     ClipLibraryModule,
     // Sprint 13: `/clips/caption-styles`, a word route, so before `ClipItemModule`.
     ClipCaptionStylesModule,
+    // Sprint 13, Module 09: `/clips/word-list`, a word route, so before `ClipItemModule`.
+    ClipWordListModule,
     // Keep LAST: its `GET /clips/:clipId` must be registered after every other `/clips/<word>` route.
     ClipItemModule,
   ],

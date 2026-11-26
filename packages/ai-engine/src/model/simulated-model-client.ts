@@ -1057,6 +1057,155 @@ function simulateTitles(user: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Add Hook Title (Clips AI, Module 09)
+// ---------------------------------------------------------------------------
+
+/** English openings for a simulated hook title; `{a}` and `{b}` are the clip's most said words. */
+const HOOK_TITLE_TEMPLATES = [
+  'Wait until you hear about {a}',
+  'What nobody tells you about {a}',
+  'The real story of {a}',
+  'Here is the thing about {a}',
+  'Why {a} and {b} go together',
+  'This is how {a} works',
+  'Everyone gets {a} wrong',
+  'The {a} moment you missed',
+];
+
+/** The words said most (four letters or more, not filler), first said first on a tie. */
+function mostSaid(text: string): string[] {
+  const counts = new Map<string, { n: number; first: number }>();
+  text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .forEach((word, at) => {
+      if (word.length < 4 || RESEARCH_STOPWORDS.has(word)) return;
+      const seen = counts.get(word);
+      if (seen) seen.n += 1;
+      else counts.set(word, { n: 1, first: at });
+    });
+  return [...counts.entries()]
+    .sort((x, y) => y[1].n - x[1].n || x[1].first - y[1].first)
+    .map(([word]) => word);
+}
+
+/** The first `count` words from word `from` of the text, a capital first. */
+function openingWords(words: readonly string[], from: number, count: number): string {
+  const line = words.slice(from, from + count).join(' ');
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
+/** Words a simulated title never ends on: it would read as cut off ("Two things about the"). */
+const WEAK_LAST_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'as',
+  'at',
+  'but',
+  'by',
+  'for',
+  'from',
+  'i',
+  'in',
+  'is',
+  'my',
+  'of',
+  'on',
+  'or',
+  'our',
+  'so',
+  'that',
+  'the',
+  'to',
+  'was',
+  'we',
+  'with',
+  'you',
+  'your',
+]);
+
+/** The words of a stretch of speech, punctuation taken out. */
+function wordsOf(text: string): string[] {
+  return text
+    .replace(/[.,!?;:"\u0964\u0965]+/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+}
+
+/** The spoken sentences, in order (a full stop, question or exclamation mark, or a danda ends one). */
+function spokenSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?\u0964\u0965])\s+/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => wordsOf(sentence).length > 0);
+}
+
+/**
+ * A title from one sentence: all of it when it has at most seven words,
+ * otherwise its words up to the first comma that leaves three or more, or
+ * its first six, never ending on a small word ("the", "and"). Never runs
+ * into the next sentence.
+ */
+function sentenceTitle(sentence: string): string {
+  const words = wordsOf(sentence);
+  if (words.length <= 7) return openingWords(words, 0, words.length);
+  const clauses = sentence.split(/[,;:]\s*/u);
+  const clause = wordsOf(clauses[0] ?? '');
+  let cut = clause.length >= 3 && clause.length <= 7 ? clause : words.slice(0, 6);
+  while (cut.length > 2 && WEAK_LAST_WORDS.has((cut[cut.length - 1] ?? '').toLowerCase())) {
+    cut = cut.slice(0, -1);
+  }
+  return openingWords(cut, 0, cut.length);
+}
+
+/**
+ * Three hook titles that follow the clip's words, the same every run for the
+ * same words and attempt: the first spoken sentence (on a Try Again, a later
+ * one), then (in English) two different openings from the template bank
+ * around the most said words, picked by a hash of the words and moved on by
+ * the attempt; in another language, the words at a third and two thirds of
+ * the way through instead (moved on by the attempt), since the bank is
+ * English.
+ */
+function simulateHookTitles(user: string): { hookTitles: string[] } {
+  const text = readBlock(user, 'Words') ?? '';
+  const words = wordsOf(text);
+  if (words.length === 0) return { hookTitles: [] };
+  const attempt = Math.max(0, Math.floor(Number(readField(user, 'Attempt') ?? 0) || 0));
+  const sentences = spokenSentences(text);
+  const first = sentenceTitle(sentences[attempt % Math.max(1, sentences.length)] ?? text);
+  const language = (readField(user, 'Language') ?? 'English').toLowerCase();
+  if (language !== 'english') {
+    const third = Math.floor(words.length / 3);
+    const at = (from: number) => (from + attempt * 2) % words.length;
+    return {
+      hookTitles: [
+        first,
+        openingWords(words, at(third), 5),
+        openingWords(words, at(Math.min(words.length - 1, third * 2)), 5),
+      ],
+    };
+  }
+  const said = mostSaid(text);
+  const a = said[0] ?? 'this';
+  const b = said[1] ?? a;
+  const seed = hashText(text);
+  const n = HOOK_TITLE_TEMPLATES.length;
+  // Two steps an attempt: the pair is never the same as the attempt before.
+  const i = (seed + attempt * 2) % n;
+  const j = (i + 1 + ((seed >>> 8) % (n - 1))) % n;
+  const withWords = (template: string) => template.replace('{a}', a).replace('{b}', b);
+  return {
+    hookTitles: [
+      first,
+      withWords(HOOK_TITLE_TEMPLATES[i] as string),
+      withWords(HOOK_TITLE_TEMPLATES[j] as string),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Research This Competitor (Sprint 11 Module 10)
 // ---------------------------------------------------------------------------
 
@@ -1216,6 +1365,9 @@ function simulateStructured(schema: z.ZodTypeAny, user: string): unknown {
   }
   if (keys.includes('isMoment')) {
     return simulateStillVerdict(user);
+  }
+  if (keys.includes('hookTitles')) {
+    return simulateHookTitles(user);
   }
   if (keys.includes('titles')) {
     return simulateTitles(user);

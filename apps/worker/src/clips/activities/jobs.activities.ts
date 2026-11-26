@@ -26,6 +26,7 @@
 import * as path from 'node:path';
 import {
   assertFreeDisk,
+  convertUploadedSound,
   makePoster,
   measureFileLoudness,
   measureLoudness,
@@ -41,6 +42,8 @@ import type {
   MediaPyDetectFacesInput,
   MediaPyDetectFacesOutput,
   MediaPyMotionInput,
+  MediaPySpeakInput,
+  MediaPySpeakOutput,
   MediaPyStillsInput,
   MediaPyTranscribeInput,
   MediaPyTranscribeOutput,
@@ -69,6 +72,7 @@ import { type RenderTools, runRender } from '../render/render.run';
 import { type ClipRows, prismaClipRows } from '../rows';
 import { runSegment } from '../segment/segment.run';
 import { prismaSoundFileRows, type SoundFileRows } from '../sounds/rows';
+import { type ConvertSound, finishSpeech, prepareSpeech } from '../speech/speech.run';
 import { prismaStickerFileRows, type StickerFileRows } from '../stickers/rows';
 import { finishTranscribe, prepareTranscribe } from '../transcribe/transcribe.run';
 
@@ -86,6 +90,9 @@ export type TranscribePrepared =
 export type FacesPrepared =
   | { status: 'closed' }
   | { status: 'ready'; payload: MediaPyDetectFacesInput };
+
+/** Module 09: what `clipSpeechPrepare` hands the workflow: the Python activity's input, or closed. */
+export type SpeechPrepared = { status: 'closed' } | { status: 'ready'; payload: MediaPySpeakInput };
 
 /**
  * Module 06: a Find Clips run's first step. `watch`: the run asks to Look For
@@ -120,6 +127,8 @@ export interface ClipJobActivityOptions {
   renderTools?: RenderTools;
   /** Module 18: the probes and the MP3 conversion (tests pass their own). */
   downloadTools?: DownloadTools;
+  /** Module 09: a made voice to the editor's `.m4a` with its peaks (tests pass their own). */
+  convertSound?: ConvertSound;
   now?: () => Date;
 }
 
@@ -161,6 +170,8 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
       });
     },
   };
+  const convertSound: ConvertSound =
+    options.convertSound ?? ((opts) => convertUploadedSound({ ...opts, runTool: deps.runTool }));
   const outcomeDeps = {
     rows,
     privateStorage: deps.privateStorage,
@@ -392,6 +403,58 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             },
             ref.found,
             dir,
+          );
+          return { status: finished ? 'done' : 'closed' };
+        });
+      });
+    },
+
+    /**
+     * Sprint 13, Module 09: a voice job's first step. RUNNING at "Making the
+     * voice", the line stored as the job's text file, the Python input built.
+     */
+    async clipSpeechPrepare(ref: ClipJobWorkflowInput): Promise<SpeechPrepared> {
+      return runClipActivity('clipSpeechPrepare', ref.jobId, async () => {
+        const { job, input } = await openJob(rows, ref, 'SPEECH');
+        const progress = jobProgress(job.id, { kind: 'SPEECH' });
+        if (!(await start(progress))) return { status: 'closed' };
+        const payload = await prepareSpeech({
+          jobId: job.id,
+          organizationId: job.organizationId,
+          input,
+          rows,
+          privateStorage: deps.privateStorage,
+          progress,
+          simulated: deps.providers.simulated,
+          now,
+        });
+        return { status: 'ready', payload };
+      });
+    },
+
+    /** Sprint 13, Module 09: a voice job's last step: the WAV made the workspace's own sound, DONE. */
+    async clipSpeechFinish(
+      ref: ClipJobWorkflowInput & { spoken: MediaPySpeakOutput },
+    ): Promise<ClipWorkResult> {
+      return runClipActivity('clipSpeechFinish', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'SPEECH');
+        const progress = jobProgress(job.id, { kind: 'SPEECH' });
+        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+          const finished = await finishSpeech(
+            {
+              jobId: job.id,
+              organizationId: job.organizationId,
+              input,
+              rows,
+              privateStorage: deps.privateStorage,
+              progress,
+              simulated: deps.providers.simulated,
+              now,
+            },
+            ref.spoken,
+            dir,
+            convertSound,
+            activity.signal,
           );
           return { status: finished ? 'done' : 'closed' };
         });

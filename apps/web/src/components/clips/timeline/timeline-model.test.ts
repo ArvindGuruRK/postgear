@@ -6,6 +6,7 @@ import {
   MAX_SOUNDS,
   MAX_STICKERS,
   outputDuration,
+  setHook,
   type StickerItem,
   type TextItem,
   type Zoom,
@@ -15,6 +16,7 @@ import { TOO_MANY_STICKERS } from '../panels/elements-model';
 import {
   addRefusalSentence,
   edgeFrameMs,
+  hookPartLabel,
   ITEM_LIMIT_SENTENCE,
   itemLabel,
   LAST_PART_SENTENCE,
@@ -242,8 +244,12 @@ describe('timelineRows', () => {
 describe('zoom bars', () => {
   it('scales by the part speed, leaves out what was cut, and gives each side of a cut its own bar', () => {
     const doc = clip();
-    const fast = { ...doc, segments: [{ ...doc.segments[0], sourceIn: 10_000, sourceOut: 20_000, speed: 2 as const }] };
-    const bars = (d: ClipDocument) => timelineRows(d).find((row) => row.kind === 'zoom')?.bars ?? [];
+    const fast = {
+      ...doc,
+      segments: [{ ...doc.segments[0], sourceIn: 10_000, sourceOut: 20_000, speed: 2 as const }],
+    };
+    const bars = (d: ClipDocument) =>
+      timelineRows(d).find((row) => row.kind === 'zoom')?.bars ?? [];
     expect(bars({ ...fast, zooms: [zoom('z1', 14_000, 30_000, fast)] })).toEqual([
       expect.objectContaining({ startMs: 2_000, endMs: 5_000 }),
     ]);
@@ -448,5 +454,42 @@ describe('the snapping switch', () => {
     });
     expect(readSnapping()).toBe(true);
     spy.mockRestore();
+  });
+});
+
+describe('the hook (Module 09)', () => {
+  const plain = createClipDocument({
+    videoId: '3f2a9c1e-0000-4000-8000-0000000000aa',
+    fromMs: 0,
+    toMs: 20_000,
+    ratio: '9:16',
+  });
+  const hooked = setHook(plain, { fromOutputMs: 2_000, toOutputMs: 4_000 });
+  const hookId = hooked.segments[0]?.id ?? '';
+  const mainId = hooked.segments[1]?.id ?? '';
+
+  it('removes the whole hook when one of its parts is deleted, and names it', () => {
+    expect(removeSelection(hooked, { kind: 'segment', id: hookId })).toEqual({
+      ok: true,
+      doc: plain,
+    });
+    expect(hookPartLabel(0, 2_000)).toBe('Hook, from 0 seconds, 2 seconds long');
+  });
+
+  it('keeps the main clip from losing its last part beside a hook', () => {
+    expect(removeProblem(hooked, { kind: 'segment', id: mainId })).toBe(LAST_PART_SENTENCE);
+    expect(removeProblem(hooked, { kind: 'segment', id: hookId })).toBeNull();
+  });
+
+  it('refuses to delete the main clip last part beside a hook, and never leaves no part', () => {
+    expect(removeSelection(hooked, { kind: 'segment', id: mainId })).toEqual({
+      ok: false,
+      sentence: LAST_PART_SENTENCE,
+    });
+    const onlyHook = { ...hooked, segments: hooked.segments.filter((s) => s.role === 'hook') };
+    expect(removeSelection(onlyHook, { kind: 'segment', id: hookId })).toEqual({
+      ok: false,
+      sentence: LAST_PART_SENTENCE,
+    });
   });
 });

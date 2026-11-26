@@ -10,7 +10,12 @@
  *
  * A word cut by a part's edge is kept only when more than half of it is
  * inside, so a trim never leaves a sliver of a word on screen.
+ *
+ * A word under a bleep (Module 09) is shown masked, its first letter and
+ * stars ("f***"), so the ASS writer and the preview, which both read these
+ * words, never draw it. The transcript is not changed.
  */
+import { bleepCoversWord, maskBleepedWord } from '../cleanup/bleeps';
 import type { CaptionsTrack, ClipDocument } from '../document/schema';
 import { placeSegments } from '../time/time-map';
 import type { Transcript, TranscriptWord } from '../transcript/types';
@@ -30,6 +35,8 @@ export interface CaptionWord {
   segmentIndex: number;
   /** The word's own start in the video, for jumping and for fixes. */
   sourceStart: number;
+  /** Set when a bleep covers the word: `text` is then masked ("f***"). */
+  bleeped?: true;
 }
 
 /** The first word whose end is after `ms` (words are sorted by start, and do not overlap much). */
@@ -48,16 +55,18 @@ function firstEndingAfter(words: readonly TranscriptWord[], ms: number): number 
  * The clip's captions as words on the clip's clock, in play order. `transcript`
  * is read with the video's word fixes already applied (`applyFixes`); the
  * track's own `edits` go on top. A hidden word is left out. A source other
- * than the transcript's own video never gets its words (`sourceId`).
+ * than the transcript's own video never gets its words (`sourceId`). A word
+ * that bleeps of its part's video cover is masked.
  */
 export function captionWords(
-  doc: Pick<ClipDocument, 'segments'>,
+  doc: Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'bleeps'>>,
   track: Pick<CaptionsTrack, 'edits'>,
   transcript: Pick<Transcript, 'words'>,
   options: { sourceId?: string } = {},
 ): CaptionWord[] {
   const out: CaptionWord[] = [];
   const { words } = transcript;
+  const bleeps = doc.bleeps ?? [];
   for (const placed of placeSegments(doc)) {
     const { segment } = placed;
     if (options.sourceId !== undefined && segment.source !== options.sourceId) continue;
@@ -81,15 +90,17 @@ export function captionWords(
         Math.max(start + 1, placed.outStart + Math.round((to - segment.sourceIn) / segment.speed)),
       );
       if (start >= placed.outEnd) continue;
+      const bleeped = bleeps.length > 0 && bleepCoversWord(bleeps, segment.source, word);
       out.push({
         i: word.i,
         start,
         end,
-        text,
+        text: bleeped ? maskBleepedWord(text) : text,
         sure: edit?.text !== undefined ? 1 : word.sure,
         segmentId: segment.id,
         segmentIndex: placed.index,
         sourceStart: word.start,
+        ...(bleeped ? { bleeped: true as const } : {}),
       });
     }
   }

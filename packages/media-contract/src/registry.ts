@@ -11,6 +11,7 @@ import { z } from 'zod/v4';
 import { MEDIA_CONTRACT_VERSION, MEDIA_PY_ACTIVITY_NAMES } from './names';
 import { faceTracksFile, mediaPyDetectFacesInput, mediaPyDetectFacesOutput } from './shapes/faces';
 import { mediaPyHealthInput, mediaPyHealthOutput } from './shapes/health';
+import { mediaPySpeakInput, mediaPySpeakOutput, speechTextFile } from './shapes/speech';
 import { heardFile, mediaPyTranscribeInput, mediaPyTranscribeOutput } from './shapes/transcribe';
 import {
   mediaPyMotionInput,
@@ -41,6 +42,8 @@ export const MEDIA_PY_CONTRACT = {
   },
   [MEDIA_PY_ACTIVITY_NAMES.motion]: { input: mediaPyMotionInput, output: mediaPyMotionOutput },
   [MEDIA_PY_ACTIVITY_NAMES.stills]: { input: mediaPyStillsInput, output: mediaPyStillsOutput },
+  // Module 09: a typed line made into a voice (simulated binding only).
+  [MEDIA_PY_ACTIVITY_NAMES.speak]: { input: mediaPySpeakInput, output: mediaPySpeakOutput },
 } as const satisfies Record<string, ActivityShapes>;
 
 /**
@@ -52,6 +55,7 @@ export const MEDIA_FILE_SHAPES = {
   HeardFile: heardFile,
   MotionFile: motionFile,
   FaceTracksFile: faceTracksFile,
+  SpeechTextFile: speechTextFile,
 } as const satisfies Record<string, z.ZodType>;
 
 export type MediaFileName = keyof typeof MEDIA_FILE_SHAPES;

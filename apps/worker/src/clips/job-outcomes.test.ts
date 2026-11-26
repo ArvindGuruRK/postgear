@@ -7,6 +7,7 @@ import {
   highlightsSignalsKey,
   jobHex,
   segmentKey,
+  speechKeys,
 } from './keys';
 import {
   CLIP_ID,
@@ -306,4 +307,47 @@ describe('faces bookkeeping (Sprint 13, Module 07)', () => {
       expect(rows.notifications).toHaveLength(0);
     },
   );
+});
+
+describe('voice bookkeeping (Sprint 13, Module 09)', () => {
+  const speechInput = { text: 'Hello there', voiceId: 'sim-river', aiMinutes: 1 };
+
+  it.each([
+    [
+      'failed',
+      (deps: OutcomeDeps) =>
+        failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'tool_failed' }),
+    ],
+    ['cancelled', (deps: OutcomeDeps) => cancelJob(deps, { jobId: JOB_ID, organizationId: ORG })],
+  ])('a %s voice job removes its three files and gives the AI minutes back', async (_, close) => {
+    const { deps, rows, privateStorage, reverseCharges } = setup(
+      jobRow({ kind: 'SPEECH', videoId: null, clipId: CLIP_ID, input: speechInput }),
+    );
+    expect(await close(deps)).toBe(true);
+    const keys = speechKeys(ORG, JOB_ID);
+    expect(privateStorage.deleted).toEqual([keys.text, keys.wav, keys.sound]);
+    expect(reverseCharges).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG });
+    expect(rows.notifications).toHaveLength(0);
+  });
+
+  it('a failed voice job reads "We could not make the voice"', async () => {
+    const { deps, rows } = setup(
+      jobRow({ kind: 'SPEECH', videoId: null, clipId: CLIP_ID, input: speechInput }),
+    );
+    await failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'tool_failed' });
+    expect(rows.jobs.get(JOB_ID)?.status).toBe('FAILED');
+    expect(rows.closed[0]?.error).toEqual({
+      code: 'voice_failed',
+      message: 'We could not make the voice. Your AI minutes were given back.',
+    });
+  });
+
+  it('a voice job that already finished is never touched (its sound and charge stay)', async () => {
+    const { deps, privateStorage, reverseCharges } = setup(
+      jobRow({ kind: 'SPEECH', status: 'DONE', videoId: null, input: speechInput }),
+    );
+    expect(await cancelJob(deps, { jobId: JOB_ID, organizationId: ORG })).toBe(false);
+    expect(privateStorage.deleted).toEqual([]);
+    expect(reverseCharges).not.toHaveBeenCalled();
+  });
 });

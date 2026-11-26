@@ -430,18 +430,37 @@ function fitInside<T extends TimedItem>(item: T, start: number, total: number): 
   return { ...item, start: from, duration };
 }
 
+/** A text made by Add Hook Title: adding or removing a hook clip never moves it. */
+function isHookTitle(item: TimedItem): boolean {
+  return item.type === 'text' && item.hookTitle === true;
+}
+
 function placeItem<T extends TimedItem>(
   item: T,
   before: ClipDocument,
   after: ClipDocument,
   total: number,
+  clipShiftMs: number,
 ): T {
   // Whole Clip: an item on the clip's clock that covered the clip still does.
   if (item.anchor === 'clip' && item.start === 0 && item.duration === outputDuration(before)) {
     return item.duration === total ? item : ({ ...item, duration: total } as T);
   }
-  const start = item.anchor === 'moment' ? momentStart(before, after, item.start) : item.start;
+  let start = item.start;
+  if (clipShiftMs !== 0 && isHookTitle(item)) start = item.start;
+  else if (item.anchor === 'moment') start = momentStart(before, after, item.start);
+  else start = item.start + clipShiftMs;
   return fitInside(item, start, total);
+}
+
+export interface ReplaceItemsOptions {
+  /**
+   * Moves every `clip` item by this much (a hook clip added, or removed:
+   * Module 09), except Whole Clip ones, which stay whole. Hook titles (texts
+   * made by Add Hook Title, either anchor) do not move at all when this is
+   * set: they stay over the hook. 0 by default: `clip` items stay.
+   */
+  clipShiftMs?: number;
 }
 
 /**
@@ -452,14 +471,25 @@ function placeItem<T extends TimedItem>(
  * unless the end forces them shorter. Returns `after` with its tracks
  * re-placed; captions tracks are left as they are.
  */
-export function replaceItems(before: ClipDocument, after: ClipDocument): ClipDocument {
+export function replaceItems(
+  before: ClipDocument,
+  after: ClipDocument,
+  options: ReplaceItemsOptions = {},
+): ClipDocument {
   const total = outputDuration(after);
+  const shift = options.clipShiftMs ?? 0;
   const tracks = after.tracks.map((track): Track => {
     if (track.kind === 'overlay') {
-      return { ...track, items: track.items.map((item) => placeItem(item, before, after, total)) };
+      return {
+        ...track,
+        items: track.items.map((item) => placeItem(item, before, after, total, shift)),
+      };
     }
     if (track.kind === 'audio') {
-      return { ...track, items: track.items.map((item) => placeItem(item, before, after, total)) };
+      return {
+        ...track,
+        items: track.items.map((item) => placeItem(item, before, after, total, shift)),
+      };
     }
     return track;
   });

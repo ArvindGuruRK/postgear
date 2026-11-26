@@ -128,6 +128,11 @@ export interface ClipsAiStatus {
   actionVision: boolean;
   /** Module 07: Detect Camera can find faces right now (free; the media service is on). */
   faces: boolean;
+  /**
+   * Module 09: Text To Speech can make a voice right now (`CLIPS_TTS` on and
+   * the media service up). False hides the Effects tab's voice row.
+   */
+  voice: boolean;
 }
 
 /** Module 19: what the video space holds. */
@@ -150,6 +155,7 @@ export class ClipsStatusService {
   private readonly simulation: boolean;
   private readonly platforms: ClipPlatformId[];
   private readonly actionVision: boolean;
+  private readonly tts: boolean;
 
   constructor(
     private readonly scheduling: SchedulingService,
@@ -162,6 +168,7 @@ export class ClipsStatusService {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
     this.actionVision = config.get('CLIPS_ACTION_VISION', { infer: true }) === 'true';
+    this.tts = config.get('CLIPS_TTS', { infer: true }) === 'true';
   }
 
   async status(orgId: string): Promise<ClipsStatus> {
@@ -202,6 +209,7 @@ export class ClipsStatusService {
         action: aiService === 'ok',
         actionVision: this.actionVision,
         faces: aiService === 'ok',
+        voice: this.tts && aiService === 'ok',
       },
     };
   }

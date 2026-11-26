@@ -32,6 +32,7 @@
  */
 import { ScissorsIcon } from '@animateicons/react/lucide/scissors-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
+import { XIcon } from '@animateicons/react/lucide/x-icon';
 import {
   Button,
   Kbd,
@@ -66,6 +67,7 @@ import {
   outputDuration,
   pxPerMs as pxPerMsFor,
   placeSegments,
+  removeHook,
   rulerTicks,
   type SourceRange,
   scrollToShow,
@@ -94,6 +96,8 @@ import type { SpeakerStretchModel } from '../layouts/follow-model';
 import { Filmstrip } from '../timeline/filmstrip';
 import {
   edgeFrameMs,
+  hookPartLabel,
+  isHookPart,
   itemLabel,
   nudgeItem,
   partHatch,
@@ -205,6 +209,11 @@ export interface TimelineDockProps {
     selectedKey: string | null;
     onSelect: (key: string) => void;
   } | null;
+  /**
+   * Module 09: the hook's own delete on its bar. Left out, the dock removes
+   * it itself (`removeHook`, one undo step).
+   */
+  onRemoveHook?: () => void;
 }
 
 export function TimelineDock(props: TimelineDockProps) {
@@ -465,6 +474,7 @@ function EditingTimeline({
   captionBars,
   onCaptions,
   speaker,
+  onRemoveHook,
 }: TimelineDockProps & { snapping: boolean; onDragNeedsMore: (needs: boolean) => void }) {
   const scroller = useRef<HTMLDivElement | null>(null);
   const origin = useRef<HTMLDivElement | null>(null);
@@ -910,7 +920,12 @@ function EditingTimeline({
               const speed = segment.speed;
               const hatch = partHatch(segment, outEnd - outStart, held);
               const bar = { kind: 'segment', id: segment.id } as const;
-              const label = partLabel(index, outStart, outEnd, speed);
+              const hook = isHookPart(segment);
+              const label = hook
+                ? hookPartLabel(outStart, outEnd)
+                : partLabel(index, outStart, outEnd, speed);
+              // The hook's delete sits at the end of its last part.
+              const lastHook = hook && !parts[index + 1]?.segment.role;
               return (
                 <div key={segment.id} className="contents">
                   {visible ? (
@@ -929,6 +944,7 @@ function EditingTimeline({
                     aria-label={label}
                     data-testid="clip-part"
                     data-part-index={index}
+                    data-hook={hook ? '' : undefined}
                     leftPx={xOf(start)}
                     widthPx={Math.max(6, xOf(end - start))}
                     tone="primary"
@@ -937,13 +953,39 @@ function EditingTimeline({
                     hatchUntilPx={hatch.untilMs === undefined ? undefined : xOf(hatch.untilMs)}
                     hatchFromPx={hatch.fromMs === undefined ? undefined : xOf(hatch.fromMs)}
                     onBodyPointerDown={pressPart(bar, outStart, outEnd, label)}
+                    resizable={!hook}
                     onStartGripPointerDown={beginTrim(segment.id, 'start')}
                     onEndGripPointerDown={beginTrim(segment.id, 'end')}
                     onKeyDown={barKeys(bar)}
                     onFocus={focusBar(bar, label)}
                   >
+                    {hook ? (
+                      <TimelineBarChip data-testid="clip-hook-label">Hook</TimelineBarChip>
+                    ) : null}
                     {speed !== 1 ? <TimelineBarChip>{`${speed}x`}</TimelineBarChip> : null}
                   </TimelineBar>
+                  {lastHook && visible ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Remove Hook"
+                      title="Remove Hook"
+                      className="absolute top-1 z-20 h-6 w-6 -translate-x-full px-0"
+                      style={{ left: xOf(end) - 4 }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={() => {
+                        if (onRemoveHook) {
+                          onRemoveHook();
+                          return;
+                        }
+                        onCommit(document, removeHook(document), { select: null });
+                        onAnnounce('Hook removed.');
+                      }}
+                      data-testid="clip-hook-delete"
+                    >
+                      <MotionIcon icon={XIcon} className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : null}
                 </div>
               );
             })}

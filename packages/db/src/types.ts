@@ -41,6 +41,8 @@ export type {
   ClipSticker,
   ClipStorageNotice,
   ClipVideo,
+  // Sprint 13, Module 09: the workspace's own words to bleep.
+  ClipWordList,
   Comments,
   Competitor,
   CompetitorView,

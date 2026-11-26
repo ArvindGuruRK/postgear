@@ -120,7 +120,8 @@ function resultOf(kind: ClipJobKind, raw: unknown): ClipJobView['result'] {
     }
     case 'SPEECH': {
       const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['SPEECH']>;
-      return { durationMs: value.durationMs };
+      // Module 09: the made voice's sound id, which the editor adds as `{ asset: assetId }`.
+      return { assetId: value.assetId, durationMs: value.durationMs };
     }
   }
 }

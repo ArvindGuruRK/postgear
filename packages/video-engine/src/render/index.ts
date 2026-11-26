@@ -1,4 +1,5 @@
 export * from './ass';
+export * from './bleep-plan';
 export * from './caption-ass';
 export * from './caption-plan';
 export * from './compile';

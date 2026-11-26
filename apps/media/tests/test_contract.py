@@ -22,6 +22,7 @@ MODELS: dict[str, tuple[type[BaseModel], type[BaseModel]]] = {
         generated.MediaPyDetectFacesInput,
         generated.MediaPyDetectFacesOutput,
     ),
+    "mediaPySpeak": (generated.MediaPySpeakInput, generated.MediaPySpeakOutput),
 }
 
 #: Stored files both sides read and write, by the shape's name.
@@ -29,6 +30,7 @@ FILE_MODELS: dict[str, type[BaseModel]] = {
     "HeardFile": generated.HeardFile,
     "MotionFile": generated.MotionFile,
     "FaceTracksFile": generated.FaceTracksFile,
+    "SpeechTextFile": generated.SpeechTextFile,
 }
 
 
@@ -46,7 +48,11 @@ def _model(activity: str, path: Path) -> type[BaseModel]:
 
 
 def test_every_contract_activity_has_models_and_fixtures() -> None:
-    folders = {p.name for p in FIXTURES.iterdir() if p.is_dir() and p.name not in {"keys", "files"}}
+    folders = {
+        p.name
+        for p in FIXTURES.iterdir()
+        if p.is_dir() and p.name not in {"keys", "files", "voices"}
+    }
     assert folders == set(MODELS)
     assert {p.name for p in (FIXTURES / "files").iterdir() if p.is_dir()} == set(FILE_MODELS)
     for activity in MODELS:

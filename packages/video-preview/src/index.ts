@@ -25,6 +25,20 @@ export {
   soundDriftMs,
   soundStart,
 } from './audio-model';
+export {
+  applyParamEvents,
+  BLEEP_RAMP_MS,
+  BLEEP_TONE_GAIN,
+  BLEEP_TONE_HZ,
+  type BleepPlan,
+  type BleepRange,
+  type BleepWindow,
+  bleepGateAt,
+  bleepPlan,
+  bleepWindows,
+  type ParamEvent,
+  type TonePlan,
+} from './bleep-schedule';
 export { previewError } from './errors';
 export { EmptyOverlayLayer, SilentAudioLayer } from './layers';
 export {

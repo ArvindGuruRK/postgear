@@ -54,6 +54,10 @@
  *   (`soundFilesKnown`, `GET /clips/sounds/files`) and handed to the
  *   preview's `WebAudioLayer`, which plays them beside the picture; the
  *   videos carry `crossOrigin` so their own sound can go up to 200%.
+ * - **AI effects** (Sprint 13, Module 09): the Effects tab's Bleep Bad Words,
+ *   Add Hook Title, Add Hook Clip and Text To Speech hand their changes to
+ *   `editAi`: one undo step each, said in a toast with Undo. The timeline's
+ *   hook delete goes the same way.
  */
 import {
   Alert,
@@ -93,6 +97,7 @@ import {
   MAX_SOUNDS,
   outputDuration,
   removeArea,
+  removeHook,
   removeItem,
   removeSound,
   removeZoom,
@@ -187,6 +192,8 @@ import {
   speedSentence,
   ZOOM_ROOM_SENTENCE,
 } from '../panels/effects-model';
+import { HOOK_REMOVED } from '../panels/ai-effects-model';
+import type { AiEffectsInput } from '../panels/ai-effects-deps';
 import { EffectsPanel } from '../panels/effects-panel';
 import {
   fileInfoOf,
@@ -1282,6 +1289,55 @@ export function ClipEditor({
     [commit],
   );
 
+  // ---- AI effects (Sprint 13, Module 09) ---------------------------------------------------
+
+  /** An AI row's change on the latest document: one undo step, said in a toast with Undo. */
+  const editAi = useCallback(
+    (change: (doc: ClipDocument) => ClipDocument, sentence: string): boolean => {
+      const { document: doc } = latest.current;
+      const next = change(doc);
+      if (next === doc) return false;
+      commit(doc, next);
+      setAnnouncement(sentence);
+      toast({
+        title: sentence,
+        action: (
+          <ToastAction altText="Undo" onClick={() => dispatch({ type: 'undo' })}>
+            Undo
+          </ToastAction>
+        ),
+      });
+      return true;
+    },
+    [commit],
+  );
+  const removeHookNow = useCallback(() => {
+    editAi(removeHook, HOOK_REMOVED);
+  }, [editAi]);
+  const flushRevision = autosave.flushRevision;
+  const aiEffects = useMemo<AiEffectsInput>(
+    () => ({
+      orgId,
+      clipId,
+      videoId: detail.video?.id ?? null,
+      videoDurationMs,
+      waveform: detail.waveform,
+      status: captions.ai,
+      onEdit: editAi,
+      flushRevision,
+    }),
+    [
+      orgId,
+      clipId,
+      detail.video?.id,
+      videoDurationMs,
+      detail.waveform,
+      captions.ai,
+      editAi,
+      flushRevision,
+    ],
+  );
+
   /** A change to the selected text from the Text tab. */
   const editText = useCallback<TextEdit>(
     (change, coalesceKey) => {
@@ -1749,6 +1805,7 @@ export function ClipEditor({
         onSpeed={speedPart}
         onLooks={editLooks}
         onFades={editFades}
+        ai={aiEffects}
       />
     ) : state.tab === 'text' ? (
       <TextPanel
@@ -1965,6 +2022,7 @@ export function ClipEditor({
             playback.seekMs(ms);
             setTab('captions');
           }}
+          onRemoveHook={removeHookNow}
         />
       </div>
 

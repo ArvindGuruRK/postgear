@@ -517,6 +517,81 @@
       "title": "MediaPyMotionOutput",
       "type": "object"
     },
+    "MediaPySpeakInput": {
+      "additionalProperties": false,
+      "properties": {
+        "jobId": {
+          "$ref": "#/$defs/Uuid"
+        },
+        "orgId": {
+          "$ref": "#/$defs/OrgId"
+        },
+        "outKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "simulation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpeakSimulationHint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "textKey": {
+          "$ref": "#/$defs/StorageKey"
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        },
+        "voiceId": {
+          "$ref": "#/$defs/VoiceId"
+        }
+      },
+      "required": [
+        "version",
+        "jobId",
+        "orgId",
+        "textKey",
+        "voiceId",
+        "outKey",
+        "simulation"
+      ],
+      "title": "MediaPySpeakInput",
+      "type": "object"
+    },
+    "MediaPySpeakOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "durationMs": {
+          "maximum": 600000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "producer": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sampleRate": {
+          "const": 24000,
+          "type": "number"
+        },
+        "soundKey": {
+          "$ref": "#/$defs/StorageKey"
+        }
+      },
+      "required": [
+        "soundKey",
+        "durationMs",
+        "sampleRate",
+        "producer"
+      ],
+      "title": "MediaPySpeakOutput",
+      "type": "object"
+    },
     "MediaPyStillsInput": {
       "additionalProperties": false,
       "properties": {
@@ -803,6 +878,49 @@
       ],
       "type": "object"
     },
+    "SpeakSimulationHint": {
+      "additionalProperties": false,
+      "properties": {
+        "force": {
+          "anyOf": [
+            {
+              "enum": [
+                "fail",
+                "slow"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "force"
+      ],
+      "type": "object"
+    },
+    "SpeechTextFile": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "version",
+        "text"
+      ],
+      "title": "SpeechTextFile",
+      "type": "object"
+    },
     "StorageKey": {
       "description": "A private Clips storage key, never a path",
       "maxLength": 512,
@@ -868,6 +986,11 @@
         "force"
       ],
       "type": "object"
+    },
+    "VoiceId": {
+      "maxLength": 32,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,3}$",
+      "type": "string"
     }
   },
   "$id": "https://postgear.local/media-contract.json",
@@ -882,6 +1005,9 @@
     },
     "file_MotionFile": {
       "$ref": "#/$defs/MotionFile"
+    },
+    "file_SpeechTextFile": {
+      "$ref": "#/$defs/SpeechTextFile"
     },
     "mediaPyDetectFaces_input": {
       "$ref": "#/$defs/MediaPyDetectFacesInput"
@@ -900,6 +1026,12 @@
     },
     "mediaPyMotion_output": {
       "$ref": "#/$defs/MediaPyMotionOutput"
+    },
+    "mediaPySpeak_input": {
+      "$ref": "#/$defs/MediaPySpeakInput"
+    },
+    "mediaPySpeak_output": {
+      "$ref": "#/$defs/MediaPySpeakOutput"
     },
     "mediaPyStills_input": {
       "$ref": "#/$defs/MediaPyStillsInput"

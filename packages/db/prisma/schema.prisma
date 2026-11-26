@@ -79,6 +79,7 @@ model Organization {
   clipPosts                ClipPost[]
   clipLayoutPresets        ClipLayoutPreset[]
   clipCaptionStyles        ClipCaptionStyle[]
+  clipWordList             ClipWordList?
   clipFavourites           ClipFavourite[]
   clipChannels             ClipChannel[]
 
@@ -2084,6 +2085,22 @@ model ClipCaptionStyle {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+/// Sprint 13, Module 09: the workspace's own words for Bleep Bad Words, on top
+/// of the built-in list of the clip's language. One row per workspace, made on
+/// the first save. `words` is already clean: trimmed, lower-case, no repeats,
+/// each 1 to 40 characters, at most 200 (the API holds those rules).
+/// `updatedById` is a plain id, not a relation, like `createdById` above: a
+/// member who leaves must not take the list with them.
+model ClipWordList {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  words          String[]     @default([])
+  updatedById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================================

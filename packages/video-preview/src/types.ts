@@ -5,6 +5,7 @@
  * sounds).
  */
 import type { FrameState } from '@postgear/video-engine';
+import type { BleepRange } from './bleep-schedule';
 
 /** The light copy to play: a signed address that stops working at `expiresAt`. */
 export interface PreviewSource {
@@ -129,6 +130,15 @@ export interface AudioLayer {
    * the preview does not click there either. True when the layer did it.
    */
   cutFadeIn?(el: HTMLVideoElement, gain: number): boolean;
+  /**
+   * Sprint 13, Module 09: the clip's bleeps in output ms, on every document
+   * change. A layer that takes them mutes the video's own sound inside each
+   * (on the elements it carries) and plays the tone inside bleep-mode ones,
+   * planned from the playhead each non-`frame` update names and stopped by
+   * `silence()`. Without it, the engine mutes the element itself frame by
+   * frame and there is no tone.
+   */
+  setBleeps?(ranges: readonly BleepRange[]): void;
 }
 
 /** The animation frame clock, injectable so tests can step it. */

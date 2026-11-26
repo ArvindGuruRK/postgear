@@ -13,6 +13,11 @@
  *   at the playhead with the look's own colour matrix (the one the export
  *   uses); Strength, Vignette, Fade In and Fade Out.
  *
+ * - **The AI rows** (Sprint 13, Module 09): Bleep Bad Words, Add Hook Title,
+ *   Add Hook Clip and, while the API offers it, Text To Speech, in the same
+ *   cards (`bleep-row.tsx`, `hook-rows.tsx`, `voice-row.tsx`). They show when
+ *   the editor hands the panel `ai`.
+ *
  * Like the other tabs, the panel never edits the document itself: each
  * change goes to the editor as one undo step, and a slider passes a coalesce
  * key so its whole drag is one step. A card opens by itself when a zoom or a
@@ -48,7 +53,16 @@ import {
   type Zoom,
   zoomEaseName,
 } from '@postgear/video-engine';
-import { Gauge, type LucideIcon, Palette, ZoomIn } from 'lucide-react';
+import {
+  AudioLines,
+  Clapperboard,
+  Gauge,
+  Heading,
+  type LucideIcon,
+  Palette,
+  VolumeX,
+  ZoomIn,
+} from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -60,6 +74,11 @@ import {
 } from 'react';
 import { GroupLabel, NOTE, PercentSlider, Segmented } from '@/components/studio/panel-ui';
 import type { ClipFilmstrip } from '@/types/clips';
+import { AI_EFFECT_CARDS, type AiEffectCard } from './ai-effects-model';
+import { type AiEffectsInput, DEFAULT_AI_EFFECTS_DEPS, useSpokenWords } from './ai-effects-deps';
+import { BleepRow } from './bleep-row';
+import { HookClipRow, HookTitleRow } from './hook-rows';
+import { VoiceRow } from './voice-row';
 import type { EditorSelection } from '../editor/editor-state';
 import type { PlaybackStore } from '../editor/playback';
 import { forgetSheetWaiter, prepareCanvas, sheetImage } from '../timeline/timeline-media';
@@ -109,12 +128,18 @@ export interface EffectsPanelProps {
   onSpeed: (segmentId: string, speed: Speed) => void;
   onLooks: (change: Partial<Looks>, coalesceKey?: string) => void;
   onFades: (change: Partial<Fades>) => void;
+  /** Sprint 13, Module 09: the AI rows' needs; left out, the rows do not show. */
+  ai?: AiEffectsInput | null;
 }
 
-const CARD_ICONS: Readonly<Record<EffectCard, LucideIcon>> = {
+const CARD_ICONS: Readonly<Record<EffectCard | AiEffectCard, LucideIcon>> = {
   zoom: ZoomIn,
   speed: Gauge,
   looks: Palette,
+  bleep: VolumeX,
+  'hook-title': Heading,
+  'hook-clip': Clapperboard,
+  voice: AudioLines,
 };
 
 /** The card a selection opens, if any. */
@@ -137,6 +162,7 @@ export function EffectsPanel({
   onSpeed,
   onLooks,
   onFades,
+  ai = null,
 }: EffectsPanelProps) {
   const [open, setOpen] = useState<string[]>(() => {
     const card = cardFor(selection);
@@ -159,7 +185,21 @@ export function EffectsPanel({
       ? (document.segments.find((s) => s.id === selection.id) ?? null)
       : null;
 
-  const bodies: Record<EffectCard, ReactNode> = {
+  const aiDeps = ai?.deps ?? DEFAULT_AI_EFFECTS_DEPS;
+  const spoken = useSpokenWords(
+    ai?.clipId ?? '',
+    ai !== null && (open.includes('bleep') || open.includes('hook-clip')),
+    aiDeps,
+  );
+  const aiCards = ai
+    ? AI_EFFECT_CARDS.filter((card) => card.value !== 'voice' || ai.status?.voice === true)
+    : [];
+  const cards: ReadonlyArray<{ value: EffectCard | AiEffectCard; name: string; line: string }> = [
+    ...EFFECT_CARDS,
+    ...aiCards,
+  ];
+
+  const bodies: Record<EffectCard | AiEffectCard, ReactNode> = {
     zoom: (
       <ZoomControls
         document={document}
@@ -181,6 +221,20 @@ export function EffectsPanel({
         onFades={onFades}
       />
     ),
+    bleep: ai ? (
+      <BleepRow input={ai} deps={aiDeps} document={document} playback={playback} spoken={spoken} />
+    ) : null,
+    'hook-title': ai ? <HookTitleRow input={ai} deps={aiDeps} document={document} /> : null,
+    'hook-clip': ai ? (
+      <HookClipRow
+        input={ai}
+        document={document}
+        playback={playback}
+        spoken={spoken}
+        waveform={ai.waveform}
+      />
+    ) : null,
+    voice: ai ? <VoiceRow input={ai} deps={aiDeps} playback={playback} /> : null,
   };
 
   return (
@@ -191,7 +245,7 @@ export function EffectsPanel({
         onValueChange={setOpen}
         className="flex flex-col gap-3"
       >
-        {EFFECT_CARDS.map((card) => {
+        {cards.map((card) => {
           const Icon = CARD_ICONS[card.value];
           return (
             <AccordionItem

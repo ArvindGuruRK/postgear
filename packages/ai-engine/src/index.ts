@@ -86,6 +86,21 @@ export {
   writeTitles,
 } from './agents/moments';
 export {
+  cleanHookTitle,
+  distinctHookTitles,
+  HOOK_TITLE_TIMEOUT_MS,
+  hookText,
+  writeHookTitles,
+} from './agents/hook-titles';
+export {
+  buildHookTitlePrompt,
+  HOOK_TEXT_MAX_CHARS,
+  HOOK_TITLE_COUNT,
+  HOOK_TITLE_MAX_CHARS,
+  HOOK_TITLE_MAX_WORDS,
+  hookTitlesSchema,
+} from './prompts/hook-titles';
+export {
   checkStills,
   cleanStillLine,
   judgeStillAnswer,

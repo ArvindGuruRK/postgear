@@ -29,6 +29,11 @@
  *   re-sought otherwise; the playhead moves to the new end when the clip got
  *   shorter than it. A new address (signed addresses expire) loads at the
  *   current moment and carries on.
+ * - **Bleeps** (Sprint 13, Module 09): on every document change the engine
+ *   hands the clip's bleeps in output ms to the audio layer, which mutes the
+ *   video's own sound inside each and plays the 1 kHz tone inside bleep-mode
+ *   ones on its context clock. A video the layer does not carry is muted
+ *   frame by frame through its own volume instead (coarser, no tone).
  * - **Nothing is thrown into React.** A video that cannot load or decode, a
  *   missing or expired address, a draw that fails: each is an `error` on the
  *   snapshot.
@@ -42,12 +47,14 @@
 import {
   type ClipDocument,
   type FrameState,
+  bleepRanges,
   frameState,
   frameToMs,
   msToFrame,
   outputDuration,
   type SourcePicture,
 } from '@postgear/video-engine';
+import { type BleepRange, bleepGateAt } from './bleep-schedule';
 import { isExpired, mediaErrorOf, previewError } from './errors';
 import { EmptyOverlayLayer, SilentAudioLayer } from './layers';
 import {
@@ -168,6 +175,8 @@ export class PreviewEngine {
   private doc: ClipDocument | null = null;
   private parts: PreviewPart[] = [];
   private durationMs = 0;
+  /** The clip's bleeps in output ms. */
+  private bleeps: BleepRange[] = [];
   private source: PreviewSource | null = null;
 
   private readonly slots: [Slot, Slot];
@@ -323,6 +332,7 @@ export class PreviewEngine {
     this.doc = doc;
     this.parts = previewParts(doc);
     this.durationMs = outputDuration(doc);
+    this.setBleeps(doc);
     if (this.clockMs > this.durationMs) {
       this.clockMs = this.durationMs;
     }
@@ -654,6 +664,9 @@ export class PreviewEngine {
     this.stopClock();
     const frontSlot = this.slots[this.front];
     if (!frontSlot.el.paused) frontSlot.el.pause();
+    // The picture stops while it seeks, so the sound does too: no tone is
+    // left sounding on the old plan. `seeked` starts everything again in place.
+    if (this.wantPlaying) this.audio.silence();
     this.holdingFor = null;
     this.playingIndex = part.index;
     this.seekPending = true;
@@ -689,13 +702,17 @@ export class PreviewEngine {
    * through the audio layer when it carries the video's sound (up to 200%),
    * else the element's own volume (at most 100%).
    */
-  private applyGain(slot: Slot, gain: number): void {
+  private applyGain(slot: Slot, gain: number, outputMs: number): void {
     const safe = Math.max(0, Number.isFinite(gain) ? gain : 0);
-    if (this.audio.videoGain?.(slot.el, safe)) {
+    // A layer that takes the bleeps gates the sound it carries itself; any
+    // other way, the gate is applied here, frame by frame.
+    const gate = this.bleeps.length > 0 ? bleepGateAt(this.bleeps, outputMs) : 1;
+    const layerGates = typeof this.audio.setBleeps === 'function';
+    if (this.audio.videoGain?.(slot.el, layerGates ? safe : safe * gate)) {
       if (slot.el.volume !== 1) slot.el.volume = 1;
       return;
     }
-    const volume = Math.min(1, safe);
+    const volume = Math.min(1, safe * gate);
     if (Math.abs(slot.el.volume - volume) > 0.001) slot.el.volume = volume;
   }
 
@@ -919,7 +936,7 @@ export class PreviewEngine {
       return false;
     }
     // The video's sound follows the clip's fade frame by frame, as the export's `afade` does.
-    this.applyGain(frontSlot, state.videoGain);
+    this.applyGain(frontSlot, state.videoGain, at);
     let drew = false;
     if (this.stage) {
       try {
@@ -941,6 +958,20 @@ export class PreviewEngine {
       this.drawMsTotal += this.now() - started;
     }
     return drew;
+  }
+
+  /** The bleeps of `doc` in output ms, to the audio layer too. */
+  private setBleeps(doc: ClipDocument): void {
+    try {
+      this.bleeps = bleepRanges(doc);
+    } catch {
+      this.bleeps = [];
+    }
+    try {
+      this.audio.setBleeps?.(this.bleeps);
+    } catch {
+      // A layer's own failure never stops the picture.
+    }
   }
 
   private sourcePictures(el: HTMLVideoElement): Record<string, SourcePicture> {

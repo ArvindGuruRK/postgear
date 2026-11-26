@@ -44,6 +44,7 @@ exports[`the version 1 clip blurred-zoom compiles to the same render and draws t
       },
       "kind": "blurred",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -124,6 +125,7 @@ exports[`the version 1 clip blurred-zoom compiles to the same render and draws t
       },
       "kind": "blurred",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -204,6 +206,7 @@ exports[`the version 1 clip blurred-zoom compiles to the same render and draws t
       },
       "kind": "blurred",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -284,6 +287,7 @@ exports[`the version 1 clip blurred-zoom compiles to the same render and draws t
       },
       "kind": "blurred",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -364,6 +368,7 @@ exports[`the version 1 clip blurred-zoom compiles to the same render and draws t
       },
       "kind": "blurred",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -512,6 +517,7 @@ exports[`the version 1 clip fullscreen-text compiles to the same render and draw
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -688,6 +694,7 @@ exports[`the version 1 clip fullscreen-text compiles to the same render and draw
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -864,6 +871,7 @@ exports[`the version 1 clip fullscreen-text compiles to the same render and draw
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -1040,6 +1048,7 @@ exports[`the version 1 clip fullscreen-text compiles to the same render and draw
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -1167,6 +1176,7 @@ exports[`the version 1 clip fullscreen-text compiles to the same render and draw
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -1426,6 +1436,7 @@ exports[`the version 1 clip gameplay-stickers compiles to the same render and dr
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -1570,6 +1581,7 @@ exports[`the version 1 clip gameplay-stickers compiles to the same render and dr
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -1751,6 +1763,7 @@ exports[`the version 1 clip gameplay-stickers compiles to the same render and dr
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -1932,6 +1945,7 @@ exports[`the version 1 clip gameplay-stickers compiles to the same render and dr
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2076,6 +2090,7 @@ exports[`the version 1 clip gameplay-stickers compiles to the same render and dr
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2339,6 +2354,7 @@ exports[`the version 1 clip split-speeds compiles to the same render and draws t
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2444,6 +2460,7 @@ exports[`the version 1 clip split-speeds compiles to the same render and draws t
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2549,6 +2566,7 @@ exports[`the version 1 clip split-speeds compiles to the same render and draws t
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2654,6 +2672,7 @@ exports[`the version 1 clip split-speeds compiles to the same render and draws t
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2759,6 +2778,7 @@ exports[`the version 1 clip split-speeds compiles to the same render and draws t
       "colour": "#000000",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#000000",
       "height": 1920,
@@ -2917,6 +2937,7 @@ exports[`the version 1 clip square-sound compiles to the same render and draws t
       "colour": "#101018",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#101018",
       "height": 1080,
@@ -2992,6 +3013,7 @@ exports[`the version 1 clip square-sound compiles to the same render and draws t
       "colour": "#101018",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#101018",
       "height": 1080,
@@ -3077,6 +3099,7 @@ exports[`the version 1 clip square-sound compiles to the same render and draws t
       "colour": "#101018",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#101018",
       "height": 1080,
@@ -3152,6 +3175,7 @@ exports[`the version 1 clip square-sound compiles to the same render and draws t
       "colour": "#101018",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#101018",
       "height": 1080,
@@ -3227,6 +3251,7 @@ exports[`the version 1 clip square-sound compiles to the same render and draws t
       "colour": "#101018",
       "kind": "colour",
     },
+    "bleeps": [],
     "canvas": {
       "background": "#101018",
       "height": 1080,

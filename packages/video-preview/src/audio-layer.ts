@@ -23,6 +23,13 @@
  *   its own volume, at most 100%.
  * - An `AnalyserNode` on the mix feeds the level meter (`level()`): a hint,
  *   not a measurement.
+ * - Bleeps (Sprint 13, Module 09): the routed videos' sound passes one more
+ *   `GainNode`, the bleep gate, which closes inside every bleep with 5 ms
+ *   ramps; a 1 kHz `OscillatorNode` at 0.35 plays inside each bleep-mode
+ *   one. Both are scheduled on the context's clock from the playhead
+ *   (`bleep-schedule.ts`), again on every seek, Play, hand-over, document
+ *   change and drift, and stopped by `silence()`. Music and sound items do
+ *   not pass the gate, as in the export.
  *
  * `destroy()` lets go of the live context and the routed videos only: the
  * decoded files belong to no context, so an engine made again around the
@@ -33,6 +40,7 @@
  */
 import { CUT_FADE_MS, type FrameState, type SoundState } from '@postgear/video-engine';
 import { gainRamp, peakOf, soundDriftMs, soundStart, DRIFT_RESTART_MS } from './audio-model';
+import { applyParamEvents, BLEEP_TONE_HZ, type BleepRange, bleepPlan } from './bleep-schedule';
 import type { AudioLayer, LayerUpdate } from './types';
 
 /** One playing sound. */
@@ -49,6 +57,12 @@ interface Playing {
 /** A video element routed through the graph. */
 interface RoutedVideo {
   source: MediaElementAudioSourceNode;
+  gain: GainNode;
+}
+
+/** One scheduled bleep tone. */
+interface Tone {
+  oscillator: OscillatorNode;
   gain: GainNode;
 }
 
@@ -96,6 +110,12 @@ export class WebAudioLayer implements AudioLayer {
   private readonly playing = new Map<string, Playing>();
   private readonly routed = new Map<HTMLVideoElement, RoutedVideo>();
   private elements: HTMLVideoElement[] = [];
+  /** The video's own sound passes this on its way to the mix: closed inside a bleep. */
+  private bleepGate: GainNode | null = null;
+  private bleeps: readonly BleepRange[] = [];
+  private readonly tones = new Set<Tone>();
+  /** The playhead the bleeps were last planned from, and the context time it was heard at. */
+  private bleepAnchor: { atS: number; outputMs: number } | null = null;
   private readonly createContext: () => AudioContext | null;
   private readonly decode: (bytes: ArrayBuffer) => Promise<AudioBuffer>;
   private readonly fetchBytes: (url: string) => Promise<ArrayBuffer>;
@@ -147,6 +167,8 @@ export class WebAudioLayer implements AudioLayer {
       this.analyser.fftSize = 2048;
       this.master.connect(this.analyser);
       this.analyser.connect(made.destination);
+      this.bleepGate = made.createGain();
+      this.bleepGate.connect(this.master);
       this.routeVideos();
     }
     if (this.ctx.state === 'suspended') {
@@ -179,11 +201,26 @@ export class WebAudioLayer implements AudioLayer {
     return true;
   }
 
+  /**
+   * The clip's bleeps in output ms (`bleepRanges(doc)`), on each document
+   * change. While playing they are planned again at once from where the
+   * playhead is now; otherwise on the next Play.
+   */
+  setBleeps(ranges: readonly BleepRange[]): void {
+    this.bleeps = ranges.map((range) => ({ ...range }));
+    const ctx = this.ctx;
+    const anchor = this.bleepAnchor;
+    if (!ctx || !anchor || ctx.state === 'closed') return;
+    const now = ctx.currentTime;
+    this.planBleeps(anchor.outputMs + (now - anchor.atS) * 1000, now);
+  }
+
   update(state: FrameState, update: LayerUpdate): void {
     const ctx = this.ctx;
     if (!ctx || !this.master || ctx.state === 'closed') return;
     const now = ctx.currentTime;
     const restart = update.reason !== 'frame';
+    this.followBleeps(state.outputMs, now, restart);
     const wanted = new Map<string, SoundState>(state.sounds.map((sound) => [sound.id, sound]));
 
     for (const [id, playing] of this.playing) {
@@ -218,9 +255,10 @@ export class WebAudioLayer implements AudioLayer {
     }
   }
 
-  /** Playback stopped: every sound stops (the video's routing stays). */
+  /** Playback stopped: every sound and bleep tone stops, the gate opens (the video's routing stays). */
   silence(): void {
     for (const id of [...this.playing.keys()]) this.stop(id);
+    this.stopBleeps();
   }
 
   /** The mix's loudest sample just now (0 when silent or before the first Play). */
@@ -236,6 +274,8 @@ export class WebAudioLayer implements AudioLayer {
   /** The engine is gone: the context closes and the videos let go; the decoded files stay. */
   destroy(): void {
     this.silence();
+    this.bleepGate?.disconnect();
+    this.bleepGate = null;
     for (const routed of this.routed.values()) {
       routed.source.disconnect();
       routed.gain.disconnect();
@@ -262,7 +302,7 @@ export class WebAudioLayer implements AudioLayer {
         const gain = ctx.createGain();
         gain.gain.value = Math.min(1, el.volume);
         source.connect(gain);
-        gain.connect(this.master);
+        gain.connect(this.bleepGate ?? this.master);
         this.routed.set(el, { source, gain });
       } catch {
         // Already routed by another graph, or refused: it keeps its own volume.
@@ -328,6 +368,78 @@ export class WebAudioLayer implements AudioLayer {
     }
     playing.source.disconnect();
     playing.gain.disconnect();
+  }
+
+  /**
+   * Plans the bleeps from `outputMs` at a jump (`restart`), when nothing is
+   * planned yet, or when the picture's clock slipped more than
+   * `DRIFT_RESTART_MS` from the context's since the last plan.
+   */
+  private followBleeps(outputMs: number, now: number, restart: boolean): void {
+    const anchor = this.bleepAnchor;
+    if (!restart && anchor) {
+      const expected = anchor.outputMs + (now - anchor.atS) * 1000;
+      if (Math.abs(expected - outputMs) <= DRIFT_RESTART_MS) return;
+    }
+    this.planBleeps(outputMs, now);
+  }
+
+  private planBleeps(outputMs: number, now: number): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    this.stopTones();
+    const plan = bleepPlan(this.bleeps, outputMs, now);
+    if (this.bleepGate) applyParamEvents(this.bleepGate.gain, plan.gate, now);
+    for (const planned of plan.tones) {
+      const oscillator = ctx.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = BLEEP_TONE_HZ;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      applyParamEvents(gain.gain, planned.gain, now);
+      oscillator.connect(gain);
+      gain.connect(master);
+      const tone: Tone = { oscillator, gain };
+      oscillator.onended = () => {
+        if (this.tones.delete(tone)) {
+          oscillator.disconnect();
+          gain.disconnect();
+        }
+      };
+      oscillator.start(planned.startS);
+      oscillator.stop(planned.stopS);
+      this.tones.add(tone);
+    }
+    this.bleepAnchor = { atS: now, outputMs };
+  }
+
+  private stopTones(): void {
+    for (const tone of this.tones) {
+      tone.oscillator.onended = null;
+      try {
+        tone.oscillator.stop();
+      } catch {
+        // Already ended.
+      }
+      tone.oscillator.disconnect();
+      tone.gain.disconnect();
+    }
+    this.tones.clear();
+  }
+
+  /** No tone left playing or waiting, and the gate open with nothing scheduled on it. */
+  private stopBleeps(): void {
+    this.stopTones();
+    this.bleepAnchor = null;
+    const ctx = this.ctx;
+    if (ctx && this.bleepGate && ctx.state !== 'closed') {
+      applyParamEvents(
+        this.bleepGate.gain,
+        [{ kind: 'set', value: 1, atS: ctx.currentTime }],
+        ctx.currentTime,
+      );
+    }
   }
 
   private ramp(node: GainNode, target: number): void {

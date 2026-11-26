@@ -48,6 +48,7 @@ import {
   allWatchKeys,
   highlightsSignalsKey,
   segmentKey,
+  speechKeys,
 } from './keys';
 import { exportFailedNotification, videoFailedNotification } from './notifications';
 import type { ClipRows, JobRow } from './rows';
@@ -440,6 +441,15 @@ async function closeAiStep(
     await deleteKeys(
       (key) => deps.privateStorage.delete(key),
       [facesFileKey(org, job.videoId, job.id)],
+      job.id,
+    );
+  }
+  if (job.kind === 'SPEECH') {
+    // Module 09: the line, the WAV and a made `.m4a` whose row never landed all go.
+    const keys = speechKeys(org, job.id);
+    await deleteKeys(
+      (key) => deps.privateStorage.delete(key),
+      [keys.text, keys.wav, keys.sound],
       job.id,
     );
   }

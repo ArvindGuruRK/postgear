@@ -10,7 +10,11 @@ import { outputDuration } from '../time/time-map';
 import { ITEM_MIN_MS } from './limits';
 import type { ClipDocument, TextItem, TextStyle } from './schema';
 
-export const TEXT_STYLE_IDS = ['bold-outline', 'on-a-box', 'plain'] as const;
+/** The three hook title looks (Module 09): large, high contrast, for the top third. */
+export const HOOK_STYLE_IDS = ['hook-bold', 'hook-box', 'hook-pop'] as const;
+export type HookStyleId = (typeof HOOK_STYLE_IDS)[number];
+
+export const TEXT_STYLE_IDS = ['bold-outline', 'on-a-box', 'plain', ...HOOK_STYLE_IDS] as const;
 export type TextStyleId = (typeof TEXT_STYLE_IDS)[number];
 
 export interface TextStylePreset {
@@ -18,6 +22,8 @@ export interface TextStylePreset {
   /** Title Case, as the tile shows it. */
   name: string;
   style: TextStyle;
+  /** A hook title look (Add Hook Title offers these; Add Text may leave them out). */
+  hook?: true;
 }
 
 /**
@@ -74,7 +80,64 @@ export const TEXT_STYLES: readonly TextStylePreset[] = Object.freeze([
       uppercase: false,
     },
   },
+  // Hook title looks (Module 09), PostGear's own: every font is one the render ships.
+  {
+    id: 'hook-bold',
+    name: 'Hook Bold',
+    hook: true,
+    style: {
+      font: 'Anton',
+      size: 112,
+      weight: 400,
+      italic: false,
+      colour: '#FFFFFF',
+      align: 'center',
+      outline: { colour: '#000000', width: 8 },
+      background: null,
+      shadow: false,
+      uppercase: true,
+    },
+  },
+  {
+    id: 'hook-box',
+    name: 'Hook Box',
+    hook: true,
+    style: {
+      font: 'Montserrat',
+      size: 84,
+      weight: 900,
+      italic: false,
+      colour: '#111111',
+      align: 'center',
+      outline: null,
+      background: { colour: '#FFD43B', opacity: 1, radius: 0, pad: 26 },
+      shadow: false,
+      uppercase: false,
+    },
+  },
+  {
+    id: 'hook-pop',
+    name: 'Hook Pop',
+    hook: true,
+    style: {
+      font: 'Luckiest Guy',
+      size: 104,
+      weight: 400,
+      italic: false,
+      colour: '#FFE14D',
+      align: 'center',
+      outline: { colour: '#111111', width: 7 },
+      background: null,
+      shadow: true,
+      uppercase: false,
+    },
+  },
 ]);
+
+/** The hook title looks, in the order Add Hook Title shows them. */
+export const HOOK_TEXT_STYLES: readonly TextStylePreset[] = Object.freeze(
+  TEXT_STYLES.filter((preset) => preset.hook === true),
+);
 
 export function textStylePreset(id: TextStyleId): TextStylePreset {
   return TEXT_STYLES.find((preset) => preset.id === id) ?? (TEXT_STYLES[0] as TextStylePreset);

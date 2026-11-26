@@ -16,6 +16,7 @@
  * the person.
  */
 import { normaliseRunError, providerError } from '../model/resilience';
+import { writeHookTitles } from './hook-titles';
 import { pickMoments, writeTitles } from './moments';
 import { checkStills } from './still-checker';
 import { truncateAtSentence } from '../prompts/content';
@@ -256,5 +257,6 @@ export function createSnippetWriter(model: ModelClient): SnippetWriter {
     pickMoments: (request, options) => pickMoments(model, request, options),
     writeTitles: (request, options) => writeTitles(model, request, options),
     checkStills: (request, options) => checkStills(model, request, options),
+    writeHookTitles: (request, options) => writeHookTitles(model, request, options),
   };
 }

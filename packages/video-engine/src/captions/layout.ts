@@ -86,7 +86,8 @@ export interface CaptionLayout {
 }
 
 export interface CaptionLayoutInput {
-  doc: Pick<ClipDocument, 'segments' | 'canvas'>;
+  /** `bleeps` too, when the clip has them: a bleeped word is drawn masked ("f***"). */
+  doc: Pick<ClipDocument, 'segments' | 'canvas'> & Partial<Pick<ClipDocument, 'bleeps'>>;
   track: CaptionsTrack;
   /** The style's look, already resolved (`resolveStyle`). */
   look: CaptionLook;

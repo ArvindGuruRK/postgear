@@ -361,6 +361,11 @@ export const textItemSchema = z
     /** The text's own fade in and out, from and to transparent (0 for none). */
     fadeInMs: z.number().int().min(0).max(TEXT_FADE_MAX_MS),
     fadeOutMs: z.number().int().min(0).max(TEXT_FADE_MAX_MS),
+    /**
+     * Version 2: made by Add Hook Title (Module 09). It stays at 0, over the
+     * hook clip, when a hook is added or removed; otherwise an ordinary text.
+     */
+    hookTitle: z.literal(true).optional(),
   })
   .strict();
 

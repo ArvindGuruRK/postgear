@@ -46,6 +46,8 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     clipHighlightsFinish: jest.fn().mockResolvedValue({ status: 'done' }),
     clipFacesPrepare: jest.fn().mockResolvedValue({ status: 'closed' }),
     clipFacesFinish: jest.fn().mockResolvedValue({ status: 'done' }),
+    clipSpeechPrepare: jest.fn().mockResolvedValue({ status: 'closed' }),
+    clipSpeechFinish: jest.fn().mockResolvedValue({ status: 'done' }),
     clipTranscribePrepare: jest.fn().mockResolvedValue({ status: 'closed' }),
     clipTranscribeFinish: jest.fn().mockResolvedValue({ status: 'done' }),
     clipRenderWaitState: jest.fn().mockResolvedValue({ closed: false, segmentRunning: false }),

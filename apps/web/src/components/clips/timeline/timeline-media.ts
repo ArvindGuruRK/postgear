@@ -72,12 +72,40 @@ export function forgetSheetWaiter(url: string, onReady: () => void) {
 
 const peaksCache = new Map<string, Promise<Uint8Array | null>>();
 
+/**
+ * The peaks in a waveform file. The import stores them as a JSON array of
+ * numbers (`peaksToJson` in the worker); a file of raw bytes is read as is.
+ * Reading the JSON's characters as peaks drew an even band and made every
+ * second look equally loud.
+ */
+export function peaksFromFile(buffer: ArrayBuffer): Uint8Array {
+  const bytes = new Uint8Array(buffer);
+  let first = 0;
+  while (first < bytes.length && /\s/.test(String.fromCharCode(bytes[first] ?? 0))) first += 1;
+  if (bytes[first] !== 0x5b) return bytes;
+  try {
+    // The JSON is digits, commas and brackets only: plain ASCII, read in chunks.
+    let text = '';
+    for (let at = 0; at < bytes.length; at += 8_192) {
+      text += String.fromCharCode(...bytes.subarray(at, at + 8_192));
+    }
+    const parsed: unknown = JSON.parse(text);
+    if (!Array.isArray(parsed)) return bytes;
+    return Uint8Array.from(parsed, (value) =>
+      typeof value === 'number' && Number.isFinite(value) ? value : 0,
+    );
+  } catch {
+    // Raw bytes that happen to start with "[" (a peak of 91).
+    return bytes;
+  }
+}
+
 function loadPeaks(url: string): Promise<Uint8Array | null> {
   const known = peaksCache.get(url);
   if (known) return known;
   const loading = fetch(url, { credentials: 'omit' })
     .then((response) => (response.ok ? response.arrayBuffer() : null))
-    .then((buffer) => (buffer ? new Uint8Array(buffer) : null))
+    .then((buffer) => (buffer ? peaksFromFile(buffer) : null))
     .catch(() => null);
   remember(peaksCache, url, loading, MAX_PEAKS);
   // A failure is not kept: the next address (a refreshed one) may work.

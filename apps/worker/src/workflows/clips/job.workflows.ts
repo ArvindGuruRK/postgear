@@ -12,6 +12,8 @@
  *   most `RENDER_SEGMENT_WAIT_MS`; after that it renders from whatever is
  *   there, the light copy at worst), then one `clipRender` activity.
  *
+ * - `clipSpeechWorkflow` (`postgear-media`, Sprint 13 Module 09): prepare,
+ *   `mediaPySpeak` (Python), finish; see the function.
  * - `clipDownloadWorkflow` (`postgear-media`, Module 18): one `clipDownload`
  *   activity; a failure or a cancel empties its folder and gives back both
  *   charges in the bookkeeping.
@@ -151,6 +153,28 @@ export async function clipFacesWorkflow(input: ClipJobWorkflowInput): Promise<Cl
     );
     const found = await detect(prepared.payload);
     return workActivities('FACES').clipFacesFinish({ ...input, found });
+  });
+}
+
+/**
+ * Sprint 13, Module 09: Text To Speech (`postgear-media`), behind
+ * `CLIPS_TTS`. Three steps: prepare (the line stored as the job's text file,
+ * here), `mediaPySpeak` (Python: the WAV), finish (the editor's `.m4a` kept
+ * as the workspace's own sound, here). A failure or a cancel of any step is
+ * booked by `runClipJob`, whose bookkeeping removes the job's three files
+ * and gives the AI minutes back.
+ */
+export async function clipSpeechWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
+  return runClipJob(input, 'SPEECH', async () => {
+    const prepared = await look.clipSpeechPrepare(input);
+    if (prepared.status === 'closed') return { status: 'closed' };
+    const speak = mediaPyWork(
+      'mediaPySpeak',
+      MEDIA_PY_TIMINGS.mediaPySpeak,
+      workBudgetMs('SPEECH'),
+    );
+    const spoken = await speak(prepared.payload);
+    return workActivities('SPEECH').clipSpeechFinish({ ...input, spoken });
   });
 }
 

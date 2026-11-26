@@ -101,3 +101,20 @@ def job_file_key(org_id: str, video_id: str, kind: str, job_id: str, ext: str = 
     return assert_valid_clip_key(
         f"clips/{org_id}/{video_id}/{kind}-{job_id.replace('-', '')}.{ext}"
     )
+
+
+def library_job_key(org_id: str, job_id: str, ext: str) -> str:
+    """A job's own file in the workspace library: `clips/<org>/library/<job hex>.<ext>`.
+
+    Module 09: a made voice belongs to the workspace, not to a video, so its
+    files (the speech text file, the WAV, and the Node side's `.m4a`) sit in
+    the library space, named from the job id the same way `job_file_key` is,
+    so the Node side can name (and remove) every one of them unasked.
+    """
+    if not _UUID.match(job_id):
+        raise InvalidKeyError("A job file needs a lowercase UUID for the job")
+    if len(org_id) > 64 or not _ORG.match(org_id):
+        raise InvalidKeyError("A private key needs a workspace id of lowercase letters and dashes")
+    if ext not in EXTENSIONS:
+        raise InvalidKeyError("A job file needs an allowed extension")
+    return assert_valid_clip_key(f"clips/{org_id}/library/{job_id.replace('-', '')}.{ext}")

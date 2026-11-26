@@ -16,7 +16,11 @@
  *
  * How each mark is drawn, beside its ASS pattern (`render/caption-ass.ts`):
  * - `colour`: the spoken word takes the mark colour; with `pop` it starts at
- *   116 % and settles to 100 % in 90 ms (`\fscx116\t(0,90,...)`).
+ *   116 % and settles to 100 % in 90 ms (`\fscx116\t(0,90,...)`). libass
+ *   scales the word's advance too, so the line widens and its neighbours
+ *   move aside; the preview grows the word's `font-size` for the same reason
+ *   (a CSS `transform` would leave its layout box at 100 % and draw the word
+ *   over the spaces either side, most visibly when paused on a word's start).
  * - `box`: a box of the mark colour behind the spoken word (`\3a` on one
  *   word of a `BorderStyle 3` line).
  * - `fill`: every word up to the spoken one has the mark colour (`\k`).
@@ -115,7 +119,12 @@ export interface WordPaint {
   /** A box that grows around the word without moving its neighbours. */
   boxShadow: string;
   visibility: '' | 'hidden';
-  transform: string;
+  /**
+   * The pop, as a font size in ems of the line ("1.160em"). It changes the
+   * word's layout box, as `\fscx`/`\fscy` change its advance in libass, so
+   * the spaces either side stay whole.
+   */
+  fontSize: string;
 }
 
 const PLAIN: WordPaint = Object.freeze({
@@ -123,7 +132,7 @@ const PLAIN: WordPaint = Object.freeze({
   background: '',
   boxShadow: '',
   visibility: '',
-  transform: '',
+  fontSize: '',
 });
 
 /** Each word of the page at a clip moment. Pure: the layer writes exactly this. */
@@ -138,14 +147,14 @@ export function captionWordPaints(
     if (mark === 'none') return PLAIN;
     if (mark === 'colour') {
       if (position !== active) return PLAIN;
-      let transform = '';
+      let fontSize = '';
       if (look.mark.pop) {
         const since = Math.max(0, outputMs - (page.marks[active] as number));
         const left = 1 - Math.min(1, since / POP_MS);
         const scale = 1 + (POP_SCALE - 1) * left;
-        transform = scale > 1.0005 ? `scale(${scale.toFixed(3)})` : '';
+        fontSize = scale > 1.0005 ? `${scale.toFixed(3)}em` : '';
       }
-      return { ...PLAIN, color: look.mark.colour, transform };
+      return { ...PLAIN, color: look.mark.colour, fontSize };
     }
     if (mark === 'box') {
       if (position !== active) return PLAIN;
@@ -255,7 +264,7 @@ export class CaptionsNode {
       if (before?.background !== paint.background) el.style.background = paint.background;
       if (before?.boxShadow !== paint.boxShadow) el.style.boxShadow = paint.boxShadow;
       if (before?.visibility !== paint.visibility) el.style.visibility = paint.visibility;
-      if (before?.transform !== paint.transform) el.style.transform = paint.transform;
+      if (before?.fontSize !== paint.fontSize) el.style.fontSize = paint.fontSize;
     });
     this.painted = paints;
 
@@ -296,7 +305,6 @@ export class CaptionsNode {
         const word = this.doc.createElement('span');
         word.dataset.captionWord = String(position);
         word.style.display = 'inline-block';
-        word.style.transformOrigin = '50% 60%';
         word.textContent = displayWord(
           (page.words[position] as CaptionPage['words'][number]).text,
           layout.look.letterCase,

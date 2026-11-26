@@ -21,6 +21,7 @@ export type {
   HighlightsLook,
   HighlightsStep,
   RenderWaitState,
+  SpeechPrepared,
   TranscribePrepared,
 } from './jobs.activities';
 export type { MediaVideoFactsOutcome } from './media-facts.activities';

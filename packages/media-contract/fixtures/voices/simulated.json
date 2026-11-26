@@ -1,0 +1,26 @@
+{
+  "voices": [
+    {
+      "id": "sim-river",
+      "name": "River",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "sim-meadow",
+      "name": "Meadow",
+      "languages": [
+        "en",
+        "hi"
+      ]
+    },
+    {
+      "id": "sim-stone",
+      "name": "Stone",
+      "languages": [
+        "en"
+      ]
+    }
+  ]
+}

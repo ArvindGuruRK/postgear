@@ -24,6 +24,7 @@ import {
   MAX_ITEMS,
   MAX_SEGMENTS,
   placeSegments,
+  removeHook,
   removeItem,
   removeSegment,
   SEGMENT_MIN_MS,
@@ -79,6 +80,16 @@ export function partLabel(index: number, outStart: number, outEnd: number, speed
   ];
   if (speed !== 1) words.push(`${speed}x speed`);
   return words.join(', ');
+}
+
+/** A hook part's spoken name (Module 09): "Hook, from 0 seconds, 2.5 seconds long". */
+export function hookPartLabel(outStart: number, outEnd: number): string {
+  return `Hook, from ${spokenTime(outStart)}, ${spokenTime(outEnd - outStart)} long`;
+}
+
+/** Whether a part is the clip's hook (Module 09: played first, removed whole). */
+export function isHookPart(segment: Pick<Segment, 'role'>): boolean {
+  return segment.role === 'hook';
 }
 
 /** What an item is called on its bar: the text itself, or its kind. */
@@ -327,6 +338,16 @@ export function removeSelection(
   if (!selection) return null;
   switch (selection.kind) {
     case 'segment': {
+      // A hook part goes with the whole hook: every item back where it was.
+      const part = doc.segments.find((segment) => segment.id === selection.id);
+      if (part && isHookPart(part)) {
+        const next = removeHook(doc);
+        return next === doc ? { ok: false, sentence: LAST_PART_SENTENCE } : { ok: true, doc: next };
+      }
+      // The main clip keeps a part of its own: a clip that is only its hook is no clip.
+      if (part && doc.segments.filter((segment) => !isHookPart(segment)).length <= 1) {
+        return { ok: false, sentence: LAST_PART_SENTENCE };
+      }
       const result = removeSegment(doc, selection.id);
       if (result.ok) return { ok: true, doc: result.doc };
       return result.code === 'last_segment' ? { ok: false, sentence: LAST_PART_SENTENCE } : null;
@@ -347,6 +368,12 @@ export function removeSelection(
 /** Why the selection cannot be removed right now (the delete button's tooltip), or null. */
 export function removeProblem(doc: ClipDocument, selection: EditorSelection): string | null {
   if (selection?.kind === 'segment' && doc.segments.length <= 1) return LAST_PART_SENTENCE;
+  if (selection?.kind === 'segment') {
+    // The main clip's last part, when the clip also has a hook.
+    const part = doc.segments.find((segment) => segment.id === selection.id);
+    const main = doc.segments.filter((segment) => !isHookPart(segment));
+    if (part && !isHookPart(part) && main.length <= 1) return LAST_PART_SENTENCE;
+  }
   return null;
 }
 

@@ -165,3 +165,22 @@ export function facesFileKey(orgId: string, videoId: string, jobId: string): str
 export function transcriptFileKey(orgId: string, videoId: string, jobId: string): string {
   return jobVideoFileKey(orgId, videoId, 'transcript', jobId, 'json.gz');
 }
+
+/**
+ * Sprint 13, Module 09: a SPEECH job's files, all in the workspace's library
+ * space (a made voice belongs to the workspace, not to a video), named from
+ * the job id so the failure and cancel bookkeeping can remove each one:
+ * - `text`: the speech text file the Python step reads (the line never rides
+ *   in a Temporal payload);
+ * - `wav`: what the Python step writes (`services/speech.py` builds the same key);
+ * - `sound`: the editor's AAC `.m4a`, kept as the workspace's own sound.
+ */
+export function speechKeys(
+  orgId: string,
+  jobId: string,
+): { text: string; wav: string; sound: string } {
+  const base = `clips/${orgId}/library/${jobHex(jobId)}`;
+  const keys = { text: `${base}.json`, wav: `${base}.wav`, sound: `${base}.m4a` };
+  for (const key of Object.values(keys)) assertValidClipKey(key);
+  return keys;
+}

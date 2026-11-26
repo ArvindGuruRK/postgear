@@ -21,6 +21,7 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from postgear_media.activities.health import media_py_health
+from postgear_media.activities.speech import media_py_speak
 from postgear_media.activities.transcribe import media_py_transcribe
 from postgear_media.activities.visual import (
     media_py_detect_faces,
@@ -40,6 +41,7 @@ ACTIVITIES: Sequence[Callable[..., Any]] = (
     media_py_motion,
     media_py_stills,
     media_py_detect_faces,
+    media_py_speak,
 )
 
 

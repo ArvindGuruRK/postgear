@@ -68,8 +68,11 @@ import { usePeaks } from '../timeline/timeline-media';
 import { useClipJob } from '../use-clip-job';
 import { type ApplyCut, CleanupTools } from './cleanup-tools';
 import {
+  clipSpan,
   cutToast,
+  LISTEN_HANDLE_MS,
   LISTEN_HELP,
+  listenRange,
   manyUnsure,
   NO_WORDS_NOTE,
   PARTLY_HEARD_NOTE,
@@ -82,8 +85,6 @@ import {
 const NOTE = 'm-0 font-sans text-xs text-ink type-muted';
 const ACTION_FAILED = 'That did not work. Check your connection and try again.';
 const LISTENING = 'Listening to what is said';
-/** Listening reaches this far past the clip's ends, so a small trim outward needs no new listen. */
-const LISTEN_HANDLE_MS = 30_000;
 
 export interface TranscriptPaneProps {
   orgId: string;
@@ -146,14 +147,8 @@ export function TranscriptPane({
   const [follow, setFollow] = useState(true);
 
   // The words, once (and again after a listen, a fix, or a trim past what was read).
-  const span = useMemo(() => {
-    const parts = document.segments.filter((segment) => segment.source === sourceId);
-    if (parts.length === 0) return null;
-    return {
-      fromMs: Math.min(...parts.map((part) => part.sourceIn)),
-      toMs: Math.max(...parts.map((part) => part.sourceOut)),
-    };
-  }, [document.segments, sourceId]);
+  const segments = document.segments;
+  const span = useMemo(() => clipSpan({ segments }, sourceId), [segments, sourceId]);
   const outsideRead =
     transcript !== null &&
     span !== null &&
@@ -203,13 +198,7 @@ export function TranscriptPane({
     setBusy(true);
     setProblem(null);
     try {
-      const outcome = await listenToVideo(videoId, {
-        fromMs: Math.max(0, span.fromMs - LISTEN_HANDLE_MS),
-        toMs: Math.min(
-          videoDurationMs > 0 ? videoDurationMs : span.toMs,
-          span.toMs + LISTEN_HANDLE_MS,
-        ),
-      });
+      const outcome = await listenToVideo(videoId, listenRange(span, videoDurationMs));
       if (outcome.covered) setReload((value) => value + 1);
       else setJobId(outcome.job.id);
     } catch (cause) {

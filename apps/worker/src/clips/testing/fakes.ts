@@ -7,6 +7,7 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
+import type { Readable } from 'node:stream';
 import type { Downloader, MediaFacts } from '@postgear/media-tools';
 import { type PrivateStorage, StorageNotFoundError } from '@postgear/storage';
 import type { ImportTools } from '../import/import.tools';
@@ -22,6 +23,7 @@ import type {
   FinishImportArgs,
   FinishSegmentArgs,
   FinishFacesArgs,
+  FinishSpeechArgs,
   FinishTranscribeArgs,
   FinishTranscribeResult,
   HighlightRunRow,
@@ -382,6 +384,26 @@ export class FakeRows implements ClipRows {
     return true;
   }
 
+  /** Module 09: the DONE voice jobs' outputs, by job id. */
+  spoken = new Map<string, unknown>();
+
+  async finishSpeech(args: FinishSpeechArgs): Promise<boolean> {
+    if (!this.closeIfOpen(args.jobId, 'DONE')) return false;
+    this.spoken.set(args.jobId, args.output);
+    this.assets = this.assets.filter((row) => row.id !== args.jobId);
+    this.assets.push({
+      id: args.asset.id ?? `asset-${this.nextId++}`,
+      kind: args.asset.kind,
+      key: args.asset.key,
+      bytes: args.asset.bytes,
+      videoId: args.asset.videoId,
+      clipId: args.asset.clipId ?? null,
+      meta: args.asset.meta,
+      createdAt: args.now,
+    });
+    return true;
+  }
+
   async downloadRow(organizationId: string, jobId: string) {
     const job = this.jobs.get(jobId);
     if (!job || job.organizationId !== organizationId || job.kind !== 'DOWNLOAD') return null;
@@ -420,7 +442,7 @@ export class FakeRows implements ClipRows {
 
 /** The private space in memory. `failPutAt` makes the Nth `putFile` (1-based) throw. */
 export class FakePrivateStorage
-  implements Pick<PrivateStorage, 'putFile' | 'getToFile' | 'delete' | 'deletePrefix'>
+  implements Pick<PrivateStorage, 'put' | 'putFile' | 'getToFile' | 'delete' | 'deletePrefix'>
 {
   objects = new Map<string, Buffer>();
   deleted: string[] = [];
@@ -428,6 +450,14 @@ export class FakePrivateStorage
   failPutAt: number | null = null;
   onPut: ((key: string) => void) | null = null;
 
+  async put(key: string, body: Buffer | Readable) {
+    this.puts += 1;
+    if (this.failPutAt === this.puts) throw new Error('storage unavailable');
+    if (!Buffer.isBuffer(body)) throw new Error('the fake takes buffers only');
+    this.objects.set(key, body);
+    this.onPut?.(key);
+    return { key, bytes: body.length };
+  }
   async putFile(key: string, filePath: string) {
     this.puts += 1;
     if (this.failPutAt === this.puts) throw new Error('storage unavailable');

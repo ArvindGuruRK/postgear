@@ -41,6 +41,7 @@ import type {
 import { soundGainAt, soundLoops, soundRefKey } from '../document/sound';
 import { FULL_RECT, fitRect, type Point, type Rect, rectAspect } from '../geometry';
 import { layoutBase } from '../layout/base';
+import { type BleepRange, bleepsAt } from './bleep-plan';
 import { textFadeAt } from './text-plan';
 import { frameToMs, outputDuration, segmentAt, toSource } from '../time/time-map';
 import { zoomAt } from '../time/zooms';
@@ -172,6 +173,12 @@ export interface FrameState {
   overlays: OverlayState[];
   /** Sounds playing, in track order. */
   sounds: SoundState[];
+  /**
+   * Sprint 13, Module 09: the bleeps and mutes sounding now (`bleepRanges`
+   * entries with `fromMs <= outputMs < toMs`). The video's own sound is
+   * muted inside each one; a bleep-mode one also plays the 1 kHz tone.
+   */
+  bleeps: BleepRange[];
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -294,7 +301,11 @@ export function fadeAt(t: number, durationMs: number, inMs: number, outMs: numbe
 }
 
 /** One text's or sticker's state at clip time `t` (the plan reads a sticker's numbers from here). */
-export function overlayState(item: TextItem | StickerItem, trackId: string, t: number): OverlayState {
+export function overlayState(
+  item: TextItem | StickerItem,
+  trackId: string,
+  t: number,
+): OverlayState {
   const localMs = t - item.start;
   const fade = item.type === 'text' ? textFadeAt(item, localMs) : 1;
   return {
@@ -381,7 +392,11 @@ export function frameState(
   // Read at the unrounded moment, as the export's `perspective` does: mid-ease a whole millisecond
   // moves the picture by a sixth of a pixel.
   const now = zoomAt(doc, exact);
-  const zoom: ZoomState = { scale: now.scale, focus: { x: now.focus.x, y: now.focus.y }, zoomId: now.zoomId };
+  const zoom: ZoomState = {
+    scale: now.scale,
+    focus: { x: now.focus.x, y: now.focus.y },
+    zoomId: now.zoomId,
+  };
 
   const fadeOpacity = fadeAt(t, durationMs, doc.fades.inMs, doc.fades.outMs);
 
@@ -441,5 +456,6 @@ export function frameState(
     videoGain: segment.volume * fadeOpacity,
     overlays,
     sounds,
+    bleeps: bleepsAt(doc, t),
   };
 }

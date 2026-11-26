@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "jobId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "orgId": "seed-demo-org",
+  "textKey": "clips/seed-demo-org/library/7c9e6679742540de944be07fc1f90ae7.json",
+  "voiceId": "sim-river",
+  "outKey": "clips/seed-demo-org/library/7c9e6679742540de944be07fc1f90ae7.wav",
+  "simulation": {
+    "force": null
+  },
+  "text": "Hello there"
+}

@@ -316,10 +316,10 @@ export const translateInputSchema = z
   .strict()
   .refine((input) => input.fromMs < input.toMs, 'A range must end after it starts');
 
-/** A voice from text (Module 09), behind `CLIPS_TTS`. */
+/** A voice from text (Module 09), behind `CLIPS_TTS`; the route takes at most 500 characters. */
 export const speechInputSchema = z
   .object({
-    text: z.string().min(1).max(5_000),
+    text: z.string().min(1).max(500),
     voiceId: z.string().min(1).max(64),
     aiMinutes: z.number().int().min(0),
   })

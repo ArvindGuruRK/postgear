@@ -22,6 +22,7 @@ export const MEDIA_PY_ACTIVITY_NAMES = {
   detectFaces: 'mediaPyDetectFaces',
   motion: 'mediaPyMotion',
   stills: 'mediaPyStills',
+  speak: 'mediaPySpeak',
 } as const;
 
 export type MediaPyActivityName =

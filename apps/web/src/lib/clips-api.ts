@@ -54,6 +54,7 @@ import type {
   ClipVideoSort,
   ClipVideoView,
   ClipView,
+  ClipVoicesView,
   ClipWordsView,
   ComingUpView,
   DownloadStarted,
@@ -65,6 +66,7 @@ import type {
   ListKind,
   ListPeriod,
   ListSort,
+  MakeVoiceOutcome,
   Ratio,
   SavedLayoutView,
   SetupPriceView,
@@ -963,4 +965,58 @@ export function readClipFaces(
 ): Promise<ClipFacesRead> {
   const query = options.follow ? '?follow=1' : '';
   return api<ClipFacesRead>(`${clipPath(clipId)}/faces${query}`, { signal: options.signal });
+}
+
+// --- Sprint 13, Module 09: AI effects ---------------------------------------------------
+
+/** The workspace's own bleep words (My Words), lower case. */
+export async function getWordList(options: { signal?: AbortSignal } = {}): Promise<string[]> {
+  const { words } = await api<{ words: string[] }>('/clips/word-list', { signal: options.signal });
+  return words;
+}
+
+/**
+ * Replaces the workspace's own bleep words. 422 `word_list_word_too_long`,
+ * `word_list_one_word` or `word_list_full`, each with a sentence.
+ */
+export async function saveWordList(words: readonly string[]): Promise<string[]> {
+  const saved = await api<{ words: string[] }>('/clips/word-list', {
+    method: 'PUT',
+    body: { words: [...words] },
+  });
+  return saved.words;
+}
+
+/** The highest `attempt` the hook titles route takes. */
+export const HOOK_TITLES_MAX_ATTEMPT = 50;
+
+/**
+ * Three hook titles written from the clip's words; `attempt` counts the Try
+ * Agains (0 first), each answering three new titles. Free; 422
+ * `hook_titles_no_words`, 429 `hook_titles_throttled`, 502
+ * `hook_titles_failed`, 503 `hook_titles_off`, each with a sentence.
+ */
+export async function suggestHookTitles(clipId: string, attempt = 0): Promise<string[]> {
+  const { titles } = await api<{ titles: string[] }>(`${clipPath(clipId)}/hook-titles`, {
+    method: 'POST',
+    body: { attempt: Math.min(HOOK_TITLES_MAX_ATTEMPT, Math.max(0, Math.floor(attempt))) },
+  });
+  return titles;
+}
+
+/** The voices Text To Speech offers, and whether it can run now. */
+export function listVoices(options: { signal?: AbortSignal } = {}): Promise<ClipVoicesView> {
+  return api('/clips/voices', { signal: options.signal });
+}
+
+/**
+ * Makes a voice from a line (charged in AI minutes; the same line and voice
+ * again is one charge). 503 `voice_off`, 422 `voice_language`, 402
+ * `clips_ai_minutes_used`, each with a sentence.
+ */
+export function makeVoice(
+  clipId: string,
+  body: { text: string; voiceId: string; revision: number },
+): Promise<MakeVoiceOutcome> {
+  return api(`${clipPath(clipId)}/voice`, { method: 'POST', body });
 }

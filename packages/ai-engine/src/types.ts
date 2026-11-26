@@ -300,6 +300,24 @@ export interface TitleRequest {
   language: string;
 }
 
+/** Clips AI, Module 09 (Add Hook Title): the words a clip plays, and their language. */
+export interface HookTitleRequest {
+  /** The clip's spoken words; cut to 1,500 characters of whole sentences before sending. */
+  text: string;
+  /** The language's name ("English"), never a code. */
+  language: string;
+  /**
+   * Which ask this is for the same clip: 0 the first, 1 and up each Try
+   * Again, so the answer is three new titles (default 0).
+   */
+  attempt?: number;
+}
+
+/** Three different hook titles, each at most seven words, cleaned. */
+export interface HookTitleResult {
+  titles: [string, string, string];
+}
+
 /** Clips AI, Module 06: one burst of movement to check, as four stills and two facts. */
 export interface StillCheckBurst {
   images: readonly ModelImage[];
@@ -351,6 +369,11 @@ export interface SnippetWriter {
     request: StillCheckRequest,
     options?: { signal?: AbortSignal },
   ): Promise<Array<StillVerdict | null>>;
+  /** Sprint 13 Clips AI, Module 09: three hook titles from a clip's words (`bad_output` when fewer). */
+  writeHookTitles(
+    request: HookTitleRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<HookTitleResult>;
 }
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,10 @@ The scripts are written to give every later feature something real to find:
 - sentences that stand on their own (the moment picker, hook titles);
 - filler words (um, you know, like, basically) and pauses of two seconds and
   more (Remove Filler Words, Remove Silences);
-- a few mild bad words (Bleep Bad Words);
+- a few mild bad words (Bleep Bad Words: a workspace adds them to My Words)
+  and, in the talk, two strong ones the default English list bleeps
+  ("bullshit" at 15.5 s, "shitty" at 100.6 s; each replaced a word of the
+  same length, so no other word moved);
 - words the listener was unsure of, marked with a leading `~`;
 - a silent 30 second block in the talk (the no-speech path);
 - a stretch of Tamil in the stream (the Tamil font and whole-word highlight);
@@ -35,7 +38,7 @@ Line = tuple[float, str]
 TALK: list[Line] = [
     (2.0, "Okay, so today I want to talk about the hardest decision I ever made."),
     (8.2, "Two years ago I quit my job with no plan at all."),
-    (13.4, "Um, everybody told me it was a ~terrible idea."),
+    (13.4, "Um, everybody told me it was a ~bullshit idea."),
     (17.6, "My manager said I would be back in six months."),
     (22.0, "My parents, you know, they did not talk to me for a week."),
     (30.2, "And honestly? I was terrified!"),
@@ -51,7 +54,7 @@ TALK: list[Line] = [
     (83.6, "Tip number two: tell people what you are doing, out loud."),
     (89.4, "My first three clients came from one honest post."),
     (95.2, "One post! That is all it took!"),
-    (99.0, "Tip number three is the boring one: track your money every single week."),
+    (99.0, "Tip number three is the shitty one: track your money every single week."),
     (106.4, "Um, I did not, and I almost ran out in month four."),
     (112.0, "That was the scariest damn week of my life."),
     (152.0, "So, would I do it again?"),

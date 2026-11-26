@@ -68,6 +68,11 @@ import { ClipsStatusService } from './status/clips-status.service';
 import { ClipPlaybackService } from './videos/clip-playback.service';
 import { ClipVideosRepository } from './videos/clip-videos.repository';
 import { ClipVideosService } from './videos/clip-videos.service';
+import { ClipHookTitlesService } from './hook-titles/clip-hook-titles.service';
+import { ClipVoiceRepository } from './voice/clip-voice.repository';
+import { ClipVoiceService } from './voice/clip-voice.service';
+import { ClipWordListRepository } from './word-list/clip-word-list.repository';
+import { ClipWordListService } from './word-list/clip-word-list.service';
 
 const TOKEN = 'test-internal-token';
 const CLIP_ID = '55555555-5555-4555-8555-555555555555';
@@ -330,6 +335,34 @@ describe('Clips routes', () => {
       .overrideProvider(ClipFollowService)
       .useValue({
         forRun: async (jobId: string, org: string) => ({ reached: 'follow', jobId, org }),
+      })
+      // Sprint 13, Module 09: Text To Speech (H2).
+      .overrideProvider(ClipVoiceRepository)
+      .useValue({})
+      .overrideProvider(ClipVoiceService)
+      .useValue({
+        voices: async () => ({ reached: 'voices' }),
+        make: async (_org: string, _user: string, clipId: string, body: { voiceId: string }) => ({
+          reached: 'voice',
+          clipId,
+          voiceId: body.voiceId,
+        }),
+      })
+      // Sprint 13, Module 09: the word list and the hook titles (H1).
+      .overrideProvider(ClipWordListRepository)
+      .useValue({})
+      .overrideProvider(ClipWordListService)
+      .useValue({
+        read: async () => ({ reached: 'word-list' }),
+        replace: async () => ({ reached: 'word-list-put' }),
+      })
+      .overrideProvider(ClipHookTitlesService)
+      .useValue({
+        suggest: async (_org: string, _user: string, clipId: string, attempt: number) => ({
+          reached: 'hook-titles',
+          clipId,
+          attempt,
+        }),
       })
       .compile();
 
@@ -702,6 +735,75 @@ describe('Clips routes', () => {
       .post('/clips/downloads')
       .send({ url: '', formatId: 'h720', rightsConfirmed: true })
       .expect(400);
+  });
+
+  // --- Sprint 13, Module 09: Text To Speech (H2) ------------------------------------
+
+  it('sends /clips/voices to the voice controller, not the clip controller', async () => {
+    const response = await request(app.getHttpServer()).get('/clips/voices').expect(200);
+    expect(response.body).toEqual({ reached: 'voices' });
+  });
+
+  it("sends a clip's voice route to the voice controller, refusing a body it does not describe", async () => {
+    const server = app.getHttpServer();
+    const body = { text: 'Wait for it.', voiceId: 'sim-river', revision: 3 };
+    expect(
+      (await request(server).post(`/clips/${CLIP_ID}/voice`).send(body).expect(202)).body,
+    ).toEqual({ reached: 'voice', clipId: CLIP_ID, voiceId: 'sim-river' });
+    await request(server)
+      .post(`/clips/${CLIP_ID}/voice`)
+      .send({ ...body, voiceId: 'af_heart' })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/voice`)
+      .send({ ...body, text: 'x'.repeat(501) })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/voice`)
+      .send({ ...body, text: '   ' })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/voice`)
+      .send({ ...body, revision: 0 })
+      .expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/voice`)
+      .send({ ...body, speed: 2 })
+      .expect(400);
+  });
+
+  // --- Sprint 13, Module 09: the word list and the hook titles (H1) --------------------
+
+  it('sends /clips/word-list to the word list controller, not the clip controller', async () => {
+    const server = app.getHttpServer();
+    expect((await request(server).get('/clips/word-list').expect(200)).body).toEqual({
+      reached: 'word-list',
+    });
+    expect(
+      (
+        await request(server)
+          .put('/clips/word-list')
+          .send({ words: ['heck'] })
+          .expect(200)
+      ).body,
+    ).toEqual({ reached: 'word-list-put' });
+    await request(server)
+      .put('/clips/word-list')
+      .send({ words: ['heck'], extra: true })
+      .expect(400);
+  });
+
+  it("sends a clip's hook titles route to the hook titles controller", async () => {
+    const server = app.getHttpServer();
+    expect(
+      (await request(server).post(`/clips/${CLIP_ID}/hook-titles`).send({}).expect(200)).body,
+    ).toEqual({ reached: 'hook-titles', clipId: CLIP_ID, attempt: 0 });
+    expect(
+      (await request(server).post(`/clips/${CLIP_ID}/hook-titles`).send({ attempt: 1 }).expect(200))
+        .body,
+    ).toEqual({ reached: 'hook-titles', clipId: CLIP_ID, attempt: 1 });
+    await request(server).post(`/clips/${CLIP_ID}/hook-titles`).send({ text: 'x' }).expect(400);
+    await request(server).post(`/clips/${CLIP_ID}/hook-titles`).send({ attempt: 51 }).expect(400);
   });
 
   it('refuses an internal call without the worker token', async () => {

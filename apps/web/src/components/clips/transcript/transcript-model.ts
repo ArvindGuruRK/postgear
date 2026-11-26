@@ -41,6 +41,36 @@ export const RESTORE_UNDO_SENTENCE = 'Use Undo to bring this back.';
 export const PARTLY_HEARD_NOTE = 'Part of this clip has not been listened to yet.';
 export const LISTEN_HELP = 'Listen to this clip to see what is said and edit it by its words.';
 
+/** Listening reaches this far past the clip's ends, so a small trim outward needs no new listen. */
+export const LISTEN_HANDLE_MS = 30_000;
+
+/**
+ * The clip's stretch of its main video (its first part's source), from its
+ * earliest to its latest moment, or null for a clip with no part of it.
+ */
+export function clipSpan(
+  doc: Pick<ClipDocument, 'segments'>,
+  sourceId: string | null,
+): { fromMs: number; toMs: number } | null {
+  const parts = doc.segments.filter((segment) => segment.source === sourceId);
+  if (parts.length === 0) return null;
+  return {
+    fromMs: Math.min(...parts.map((part) => part.sourceIn)),
+    toMs: Math.max(...parts.map((part) => part.sourceOut)),
+  };
+}
+
+/** What Listen To This Clip asks for: the clip's stretch with its handles, inside the video. */
+export function listenRange(
+  span: { fromMs: number; toMs: number },
+  videoDurationMs: number,
+): { fromMs: number; toMs: number } {
+  return {
+    fromMs: Math.max(0, span.fromMs - LISTEN_HANDLE_MS),
+    toMs: Math.min(videoDurationMs > 0 ? videoDurationMs : span.toMs, span.toMs + LISTEN_HANDLE_MS),
+  };
+}
+
 function endsSentence(text: string): boolean {
   return /[.!?…]["')\]]*$/.test(text.trim());
 }

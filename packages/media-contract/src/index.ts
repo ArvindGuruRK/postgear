@@ -15,5 +15,6 @@ export * from './registry';
 export * from './shapes/common';
 export * from './shapes/faces';
 export * from './shapes/health';
+export * from './shapes/speech';
 export * from './shapes/transcribe';
 export * from './shapes/visual';

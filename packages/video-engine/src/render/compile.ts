@@ -24,7 +24,14 @@
  *    each an overlay of its own input (scaled, flipped, turned with
  *    transparent corners, made see-through, shifted to start at its item);
  *    the text (one `ass` filter); the mark; the fades.
- * 4. The sound (Module 14, cookbook section 8): with sound effects or music,
+ * 4. The bleeps (Sprint 13, Module 09, research 09 section 5): on the joined
+ *    video sound, so `t` is output time and every speed change is behind
+ *    it, an `aeval` gate mutes each range with 5 ms ramps and one
+ *    `aevalsrc` 1 kHz tone is mixed in for the bleep-mode ones
+ *    (`bleep-plan.ts`). Only the video's own sound: the music and the sound
+ *    effects are added after it, so a bleep never mutes them. No bleeps, no
+ *    filter: the graph is what it was before Module 09.
+ * 5. The sound (Module 14, cookbook section 8): with sound effects or music,
  *    a silent `anullsrc` base of the clip's exact length, the video's own
  *    sound and one chain per sound go into `amix` (`normalize=0`, so every
  *    gain stays as set; `duration=first`, so the base fixes the length).
@@ -38,6 +45,7 @@
  */
 
 import { ASS_FILE, buildAss } from './ass';
+import { bleepMuteFilter, bleepSets, bleepToneSource } from './bleep-plan';
 import { type CompiledCommandFile, cropCommandText } from './crop-path';
 import { FONTS_DIR } from './fonts';
 import { ffmpegColour, formatNumber } from './filter-text';
@@ -227,6 +235,35 @@ function mixLines(plan: RenderPlan, from: string): string[] {
   return lines;
 }
 
+/**
+ * The bleeps on the joined video sound `from` (research 09 section 5):
+ * every range muted by the `aeval` gate, the bleep-mode ones' tone from one
+ * `aevalsrc` mixed in with `amix=inputs=2:normalize=0:duration=first`
+ * (the gated sound first, so it fixes the length), then the fixed format
+ * the rest of the sound graph expects. No bleeps: no lines and `from` as it
+ * was, so the graph text is unchanged.
+ */
+export function bleepLines(
+  plan: Pick<RenderPlan, 'bleeps' | 'output'>,
+  from: string,
+): { lines: string[]; label: string } {
+  const bleeps = plan.bleeps ?? [];
+  const { mutes, tones } = bleepSets(bleeps, plan.output.durationMs);
+  if (mutes.length === 0) return { lines: [], label: from };
+  const label = '[ableep]';
+  if (tones.length === 0) {
+    return { lines: [`${from}${bleepMuteFilter(mutes)},${AUDIO_FORMAT}${label}`], label };
+  }
+  return {
+    lines: [
+      `${from}${bleepMuteFilter(mutes)}[bmute]`,
+      `${bleepToneSource(tones, plan.output.durationMs)}[btone]`,
+      `[bmute][btone]amix=inputs=2:normalize=0:duration=first,${AUDIO_FORMAT}${label}`,
+    ],
+    label,
+  };
+}
+
 /** The inputs after the video's: stickers, the mark, then the sounds, each checked against its index. */
 function extraInputs(plan: RenderPlan, inputs: CompiledInput[]): void {
   for (const sticker of plan.stickers ?? []) {
@@ -293,7 +330,10 @@ export function compileMeasure(plan: RenderPlan): CompiledFfmpeg | null {
   });
   const pairs = plan.segments.map((s) => `[a${s.index}]`).join('');
   lines.push(`${pairs}concat=n=${plan.segments.length}:v=0:a=1[ac]`);
-  lines.push(...mixLines(plan, '[ac]'));
+  // The measure hears what the render plays: the bleeps on the video's sound, then the mix.
+  const bleeped = bleepLines(plan, '[ac]');
+  lines.push(...bleeped.lines);
+  lines.push(...mixLines(plan, bleeped.label));
   lines.push(`[am]${loudnormMeasureFilter()}[aout]`);
 
   const inputs: CompiledInput[] = plan.inputs.map((input) => ({
@@ -477,7 +517,10 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
     lines.push(`${picture}${chain([...pictureFilters, ...fadeFilters])}[vout]`);
   }
 
-  // The sound: the mix (when there are sound items), the clip's fades, the loudness correction, the pad.
+  // The sound: the bleeps on the video's own sound, the mix (when there are sound items), the
+  // clip's fades, the loudness correction, the pad.
+  const bleeped = bleepLines(plan, '[ac]');
+  lines.push(...bleeped.lines);
   const pad = `apad=whole_dur=${msToSeconds(durationMs)}`;
   const correct = options.loudness?.apply
     ? `${loudnormApplyFilter(options.loudness.measured)},${AUDIO_FORMAT},`
@@ -485,9 +528,9 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
   if ((plan.sounds ?? []).length === 0 && !correct) {
     const fades = soundFades(plan);
     const audioTail = fades.length > 0 ? `${fades.join(',')},` : '';
-    lines.push(`[ac]${audioTail}${pad}[aout]`);
+    lines.push(`${bleeped.label}${audioTail}${pad}[aout]`);
   } else {
-    lines.push(...mixLines(plan, '[ac]'));
+    lines.push(...mixLines(plan, bleeped.label));
     lines.push(`[am]${correct}${pad}[aout]`);
   }
 

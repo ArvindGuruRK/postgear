@@ -888,3 +888,11 @@ A workspace's own caption styles. The six built-in styles are code in `packages/
 ### `Clip.meta` (Module 06, `20261126200000_sprint13_clip_meta`)
 
 Nullable JSON for small facts about how AI found a clip, kept apart from the reason codes. Today only `{ seen }`: Look For Action's still check, one sentence of at most 15 words about what is on screen, written only when the run started with `CLIPS_ACTION_VISION` on. Additive, no backfill. The API reads `seen` into the clip summary (trimmed, at most 200 characters); it is never logged.
+
+### `ClipWordList` (Module 09, `20261127120000_sprint13_clip_word_list`)
+
+A workspace's own words for Bleep Bad Words, added to the built-in list of the clip's language (code in `packages/video-engine/src/cleanup/word-lists/`, never rows). One row per workspace (`organizationId` unique, cascade with the workspace), made on the first `PUT /clips/word-list`; no row reads as an empty list.
+
+- **`words` is stored clean**: trimmed, lower-case, composed (NFC), no repeats, each 1 to 40 characters with no space, at most 200. The API's `normaliseWordList` holds these rules (`apps/api/src/modules/clips/word-list/clip-word-list.schema.ts`); they are a guard, not a plan value.
+- **Replaced whole** on every save, never merged. `updatedById` is a plain id like `ClipCaptionStyle.createdById`, so a member leaving keeps the list.
+- **The words are never logged**: the save event carries the workspace, the user and a count.

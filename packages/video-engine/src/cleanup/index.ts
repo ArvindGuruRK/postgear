@@ -3,7 +3,10 @@
  * pauses and its filler words. Every tool here produces stretches of the
  * video to remove, and `removeSourceRanges` turns them into a longer segment
  * list. No new structure in the document. Pure.
+ *
+ * Module 09 adds Bleep Bad Words (`bleeps.ts`, lists in `word-lists/`).
  */
+export * from './bleeps';
 export * from './cut-range';
 export * from './fillers';
 export * from './removed';

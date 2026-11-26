@@ -12,7 +12,9 @@ import {
   createCaptionsTrack,
   createClipDocument,
   FONT_MANIFEST,
+  findBleepWords,
   frameState,
+  setBleeps,
   type Transcript,
   withCaptionsTrack,
 } from '@postgear/video-engine';
@@ -46,7 +48,7 @@ function spoken(texts: string[], language = 'en'): Transcript {
 function laidOut(
   styleId: string,
   texts: string[],
-  options: { wordTimed?: boolean; language?: string } = {},
+  options: { wordTimed?: boolean; language?: string; bleep?: boolean } = {},
 ) {
   const chosen = look(styleId);
   const track = createCaptionsTrack({
@@ -55,15 +57,23 @@ function laidOut(
     styleId,
     look: chosen,
   });
-  const doc = withCaptionsTrack(
+  const transcript = spoken(texts, options.language);
+  let doc = withCaptionsTrack(
     createClipDocument({ videoId: VIDEO, fromMs: 0, toMs: 10_000, ratio: '9:16' }),
     track,
   );
+  if (options.bleep) {
+    const found = findBleepWords(
+      transcript.words.map((w) => ({ index: w.i, text: w.text, start: w.start, end: w.end })),
+      { language: options.language ?? 'en', workspace: [] },
+    );
+    doc = setBleeps(doc, found, 'bleep', doc.sources[0]?.id as string);
+  }
   const layout = captionLayout({
     doc,
     track,
     look: chosen,
-    transcript: spoken(texts, options.language),
+    transcript,
     wordTimed: options.wordTimed ?? true,
   });
   return { doc, layout };
@@ -135,9 +145,11 @@ describe('captionWordPaints', () => {
     const { layout } = laidOut('bold-pop', ['So', 'today', 'we']);
     const start = at(layout, 1_400);
     expect(start.map((paint) => paint.color)).toEqual(['', '#FFE600', '']);
-    expect(start[1]?.transform).toBe('scale(1.160)');
-    expect(at(layout, 1_445)[1]?.transform).toBe('scale(1.080)');
-    expect(at(layout, 1_490)[1]?.transform).toBe('');
+    // A font size, like libass's \fscx\fscy: the word's box grows, so its neighbours move aside.
+    expect(start[1]?.fontSize).toBe('1.160em');
+    expect(at(layout, 1_445)[1]?.fontSize).toBe('1.080em');
+    expect(at(layout, 1_490)[1]?.fontSize).toBe('');
+    expect(start.map((paint) => paint.fontSize)).toEqual(['', '1.160em', '']);
     // The mark stays on the last word until the page leaves.
     expect(at(layout, 2_150).map((paint) => paint.color)).toEqual(['', '', '#FFE600']);
   });
@@ -158,7 +170,7 @@ describe('captionWordPaints', () => {
 
   it('marks nothing when the page is the unit: Tamil, or times that are not real', () => {
     const tamil = laidOut('bold-pop', ['நண்பர்களே,', 'இந்த'], { language: 'ta' }).layout;
-    expect(at(tamil, 1_450).every((paint) => paint.color === '' && paint.transform === '')).toBe(
+    expect(at(tamil, 1_450).every((paint) => paint.color === '' && paint.fontSize === '')).toBe(
       true,
     );
     const supplied = laidOut('karaoke', ['So', 'today'], { wordTimed: false }).layout;
@@ -223,6 +235,27 @@ describe('captions in the overlay layer', () => {
     layer.update(frameState(doc, 1_850), UPDATE);
     expect(words()).toEqual(first);
     expect(words().map((word) => word.style.color)).toEqual(['', '', 'rgb(255, 230, 0)']);
+  });
+
+  it('keeps the spaces round a bleeped word paused on its start, where its pop is largest', () => {
+    const { layer, block, words } = mounted();
+    const { doc, layout } = laidOut('bold-pop', ['A', 'bullshit', 'idea.'], { bleep: true });
+    layer.setCaptions(layout);
+    // Paused exactly on the masked word's start (the Bleep Words list seeks there).
+    layer.update(frameState(doc, 1_400), UPDATE);
+    expect(words().map((word) => word.textContent)).toEqual(['A', 'B*******', 'IDEA.']);
+    const popped = words()[1] as HTMLElement;
+    expect(popped.style.color).toBe('rgb(255, 230, 0)');
+    // The pop grows the word's own box (so the line widens, as in libass), never a
+    // transform that would draw it over the spaces either side.
+    expect(popped.style.fontSize).toBe('1.160em');
+    expect(words().every((word) => word.style.transform === '')).toBe(true);
+    // One plain space between each pair of words, and nothing else.
+    const run = block()?.querySelector(':scope > div > span');
+    expect(run?.textContent).toBe('A B******* IDEA.');
+    // Settled 90 ms later.
+    layer.update(frameState(doc, 1_490), UPDATE);
+    expect(popped.style.fontSize).toBe('');
   });
 
   it('sits under every text and takes its block away when the clip loses its captions', () => {

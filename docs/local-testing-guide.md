@@ -1323,6 +1323,26 @@ With `CLIPS_ACTION_VISION` off (the default) no picture ever leaves the system: 
 
 The face file (`faces-<job>.json.gz`) holds boxes and times only: no landmarks, no picture of a face, never who. The real detector (MediaPipe, short-range model) is wired but never runs here: its model file is not downloaded by any code.
 
+**AI Effects (Module 09).** Four new cards at the bottom of the editor's **Effects** tab. Bleep Bad Words and Add Hook Clip are free, Add Hook Title is free (at most 10 asks a minute per workspace), Text To Speech costs AI minutes and is hidden unless `CLIPS_TTS=true` is set for the API (default off; restart the API after changing it). Text To Speech also needs the Python service and the Node worker. The `talk` sample's recording has two planted words for this: "bullshit" at 15.5 s and "shitty" at 100.6 s of the video. A talk transcript made before this module still has the old words there, so make a fresh clip over a stretch that was never listened to (for example 5 s to 40 s) and listen to it.
+
+| Do this | What you should see |
+|---|---|
+| A clip of the talk sample from 5 s to 40 s, **Effects**, open **Bleep Bad Words** | "Part of this clip has not been listened to yet." and **Listen To This Clip** with its price; after it, a **Bleep Words** switch |
+| Switch on **Bleep Words** | "bullshit" at 0:10 is listed and ticked, **Bleep** is picked; "Bad words bleeped." with Undo |
+| Click the word (not the box) | The playhead jumps to it; with captions on, the caption shows "b*******" (first letter and stars); the transcript keeps the word |
+| Play over it | A short 1 kHz tone replaces the word, with no click at its edges |
+| Pick **Mute**, then untick the word | Silence instead of the tone; unticking says "Word no longer bleeped." and the word plays again; each is one Ctrl+Z |
+| **My Words**, type a word that is in the clip, **Save** | It joins the list and is bleeped at once; a word with a space or over 40 letters is refused with a sentence |
+| Open **Add Hook Title** | Three titles made from the clip's own words; **Try Again** gives three others |
+| Pick a title, pick a look (Hook Bold, Hook Box, Hook Pop), **Add** | A large line in the top third for the first 3 seconds, an ordinary text item you can move and edit; adding again changes its words and look ("Hook title changed.") |
+| Open **Add Hook Clip** | A small strip of the clip's sound with a 2.5 s range on its loudest moment; **Preview** plays the range, then the clip from its start |
+| **Add** | The clip grows by the hook's length, the first bar on the timeline says **Hook** with its own delete, captions show on the hook, and the hook title stays at 0 |
+| Delete the hook (the bar's delete or **Remove Hook**) | The clip is exactly as before; Ctrl+Z brings the hook back |
+| With `CLIPS_TTS=true`: **Text To Speech**, type a line, pick a voice, **Make The Voice (1 AI Minute)** | A SPEECH job runs; the voice (a simulated beep pattern as long as the line) lands on the sound row at the playhead and shows in your uploaded sounds as "AI Voice"; the same line and voice again costs nothing |
+| **Export**, **Preview Export**, then a 720p export | The tone (or silence) sits on the word in the file, the captions show the stars, the hook plays first |
+
+The word lists are PostGear's own short lists (strong swear words in English and Hindi, none yet for Tamil); mild words go in My Words. No speech text, title or voice line is written to any log. The real voice (Kokoro) is not built: its phonemiser (espeak-ng) is GPL and would load inside our process, so it waits for a licence decision (Module 17); the simulated voice is the only one.
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

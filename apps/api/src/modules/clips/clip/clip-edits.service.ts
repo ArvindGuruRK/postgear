@@ -44,6 +44,7 @@ import {
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
 import { ClipCaptionsService } from '../captions/clip-captions.service';
 import { ClipErrorException } from '../clip-error.exception';
+import { documentUsesAiVoice } from './clip-ai-voice';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { serializable } from '../clips.tx';
 import { OPEN_JOB_STATUSES } from '../jobs/clip-jobs.repository';
@@ -177,7 +178,9 @@ export class ClipEditsService {
         createdById: userId,
       },
     });
-    return { clip: toClipView(copy) };
+    const view = toClipView(copy);
+    view.usesAiVoice = await documentUsesAiVoice(orgId, view.document);
+    return { clip: view };
   }
 
   /** Deletes a clip and its sharp files. `{ message }`. */
@@ -266,7 +269,9 @@ export class ClipEditsService {
 
   private async view(orgId: string, clip: Clip): Promise<ClipView> {
     const scheduled = await scheduledClipIds(orgId, [clip.id]);
-    return toClipView(clip, scheduled.has(clip.id));
+    const view = toClipView(clip, scheduled.has(clip.id));
+    view.usesAiVoice = await documentUsesAiVoice(orgId, view.document);
+    return view;
   }
 
   /** The body's document, read by the engine: 413 when too large, 422 when it does not read. */

@@ -145,6 +145,23 @@ class SimulationHint(BaseModel):
     sample: Sample | None
 
 
+class SpeakSimulationHint(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    force: Literal["fail", "slow"] | None
+
+
+class SpeechTextFile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    text: Annotated[str, Field(max_length=500, min_length=1)]
+    version: Literal[1]
+
+
 class StorageKey(RootModel[str]):
     root: Annotated[
         str,
@@ -325,6 +342,81 @@ class MediaPyMotionOutput(BaseModel):
     """
 
 
+class MediaPySpeakInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    job_id: Annotated[
+        str,
+        Field(
+            alias="jobId",
+            pattern="^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        ),
+    ]
+    org_id: Annotated[
+        str,
+        Field(
+            alias="orgId",
+            max_length=64,
+            pattern="^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
+        ),
+    ]
+    out_key: Annotated[
+        str,
+        Field(
+            alias="outKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    simulation: SpeakSimulationHint | None
+    text_key: Annotated[
+        str,
+        Field(
+            alias="textKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+    version: Literal[1]
+    voice_id: Annotated[
+        str,
+        Field(
+            alias="voiceId",
+            max_length=32,
+            pattern="^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,3}$",
+        ),
+    ]
+
+
+class MediaPySpeakOutput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    duration_ms: Annotated[int, Field(alias="durationMs", ge=1, le=600000)]
+    producer: Annotated[str, Field(max_length=80, min_length=1)]
+    sample_rate: Annotated[Literal[24000], Field(alias="sampleRate")]
+    sound_key: Annotated[
+        str,
+        Field(
+            alias="soundKey",
+            max_length=512,
+            pattern="^clips\\/[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}\\/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z][a-z0-9]*(?:-[a-z0-9]+){0,4}-[0-9a-f]{32}|(?:exports|proofs|downloads)\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\/[a-z0-9]+(?:[-_][a-z0-9]+){0,7}|library\\/[0-9a-f]{32})\\.(?:mp4|webm|mkv|mov|m4a|mp3|wav|ogg|opus|aac|jpg|png|apng|gif|webp|json|json\\.gz|ass|vtt)$",
+        ),
+    ]
+    """
+    A private Clips storage key, never a path
+    """
+
+
 class MediaPyStillsInput(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -479,6 +571,9 @@ class MediaContract(BaseModel):
     file_motion_file: Annotated[MotionFile | None, Field(alias="file_MotionFile")] = (
         None
     )
+    file_speech_text_file: Annotated[
+        SpeechTextFile | None, Field(alias="file_SpeechTextFile")
+    ] = None
     media_py_detect_faces_input: Annotated[
         MediaPyDetectFacesInput | None, Field(alias="mediaPyDetectFaces_input")
     ] = None
@@ -496,6 +591,12 @@ class MediaContract(BaseModel):
     ] = None
     media_py_motion_output: Annotated[
         MediaPyMotionOutput | None, Field(alias="mediaPyMotion_output")
+    ] = None
+    media_py_speak_input: Annotated[
+        MediaPySpeakInput | None, Field(alias="mediaPySpeak_input")
+    ] = None
+    media_py_speak_output: Annotated[
+        MediaPySpeakOutput | None, Field(alias="mediaPySpeak_output")
     ] = None
     media_py_stills_input: Annotated[
         MediaPyStillsInput | None, Field(alias="mediaPyStills_input")

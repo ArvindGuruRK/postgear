@@ -106,8 +106,8 @@ function fadeOf(item: TextItem): FadeChoice {
   return 'none';
 }
 
-/** A ready style's small specimen on its tile. */
-function StyleDrawing({ style }: { style: TextStyle }) {
+/** A ready style's small specimen on its tile (Add Hook Title draws its looks with it too). */
+export function StyleDrawing({ style }: { style: TextStyle }) {
   const stroke = style.outline
     ? `${Math.max(1, style.outline.width / 2.5)}px ${style.outline.colour}`
     : undefined;
@@ -210,7 +210,8 @@ export function TextPanel({
             if (item) onEdit((current) => applyTextStyle(current, next));
             else onAdd(next);
           }}
-          options={TEXT_STYLES.map((preset) => ({
+          // The hook title looks belong to Add Hook Title (Effects tab), not to Add Text.
+          options={TEXT_STYLES.filter((preset) => !preset.hook).map((preset) => ({
             value: preset.id,
             label: preset.name,
             drawing: <StyleDrawing style={preset.style} />,

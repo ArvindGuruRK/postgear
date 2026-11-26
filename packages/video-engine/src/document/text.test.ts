@@ -93,8 +93,20 @@ describe('the text item schema', () => {
 });
 
 describe('ready text styles', () => {
-  it('has three named styles, each a valid text', () => {
-    expect(TEXT_STYLES.map((preset) => preset.name)).toEqual(['Bold Outline', 'On A Box', 'Plain']);
+  it('has three named styles and three hook looks, each a valid text', () => {
+    expect(TEXT_STYLES.map((preset) => preset.name)).toEqual([
+      'Bold Outline',
+      'On A Box',
+      'Plain',
+      'Hook Bold',
+      'Hook Box',
+      'Hook Pop',
+    ]);
+    expect(TEXT_STYLES.filter((preset) => preset.hook).map((preset) => preset.id)).toEqual([
+      'hook-bold',
+      'hook-box',
+      'hook-pop',
+    ]);
     expect(textStylePreset('on-a-box').style.background).not.toBeNull();
     expect(textStylePreset('bold-outline').style.outline).not.toBeNull();
     expect(textStylePreset('plain').style.shadow).toBe(true);

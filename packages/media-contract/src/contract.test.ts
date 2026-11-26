@@ -15,6 +15,7 @@ import {
   MEDIA_PY_ACTIVITY_NAMES,
   MEDIA_PY_CONTRACT,
   storageKey,
+  voiceId,
 } from './index';
 
 const ROOT = join(__dirname, '..');
@@ -67,7 +68,9 @@ describe('no optional keys', () => {
 
 describe('the shared fixtures', () => {
   it('has a valid and an invalid folder for every activity, and nothing else', () => {
-    const folders = readdirSync(FIXTURES).filter((name) => name !== 'keys' && name !== 'files');
+    const folders = readdirSync(FIXTURES).filter(
+      (name) => name !== 'keys' && name !== 'files' && name !== 'voices',
+    );
     expect(folders.sort()).toEqual([...activities].sort());
     for (const activity of activities) {
       expect(files(join(FIXTURES, activity, 'valid')).length).toBeGreaterThan(0);
@@ -147,6 +150,68 @@ describe('the face file holds boxes and times only', () => {
       'producer',
       'sampled',
     ]);
+  });
+});
+
+describe('the speech payloads carry no text (Module 09)', () => {
+  const schema = JSON.parse(contractSchemaText()) as {
+    $defs: Record<string, { properties?: Record<string, unknown> }>;
+  };
+  const keysOf = (name: string) => Object.keys(schema.$defs[name]?.properties ?? {}).sort();
+
+  it('the input names the text file by key, never the line', () => {
+    expect(keysOf('MediaPySpeakInput')).toEqual([
+      'jobId',
+      'orgId',
+      'outKey',
+      'simulation',
+      'textKey',
+      'version',
+      'voiceId',
+    ]);
+  });
+
+  it('the answer is a key and facts about the sound', () => {
+    expect(keysOf('MediaPySpeakOutput')).toEqual([
+      'durationMs',
+      'producer',
+      'sampleRate',
+      'soundKey',
+    ]);
+  });
+
+  it('the text file holds the line and its version only', () => {
+    expect(keysOf('SpeechTextFile')).toEqual(['text', 'version']);
+  });
+
+  it('every key a speech job uses is a valid library key', () => {
+    const input = readJson(join(FIXTURES, 'mediaPySpeak', 'valid', 'input-simulated.json')) as {
+      textKey: string;
+      outKey: string;
+    };
+    expect(isValidClipKey(input.textKey)).toBe(true);
+    expect(isValidClipKey(input.outKey)).toBe(true);
+    expect(isValidClipKey(input.outKey.replace(/\.wav$/, '.m4a'))).toBe(true);
+  });
+});
+
+describe('the simulated voices fixture (read by the API and by pytest)', () => {
+  const fixture = readJson(join(FIXTURES, 'voices', 'simulated.json')) as {
+    voices: Array<{ id: string; name: string; languages: string[] }>;
+  };
+
+  it('lists voices whose ids are valid voice ids, no two alike', () => {
+    const ids = fixture.voices.map((voice) => voice.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(voiceId.safeParse(id).success).toBe(true);
+  });
+
+  it('gives every voice a name and at least one language', () => {
+    for (const voice of fixture.voices) {
+      expect(voice.name.length).toBeGreaterThan(0);
+      expect(voice.languages.length).toBeGreaterThan(0);
+      for (const language of voice.languages) expect(['en', 'hi', 'ta']).toContain(language);
+    }
   });
 });
 

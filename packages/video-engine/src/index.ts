@@ -8,10 +8,12 @@
  *
  * - `captions/`: Sprint 13: caption styles, mapping words onto the clip, paging,
  *   the SRT and VTT reader.
- * - `cleanup/`: Sprint 13: cutting a clip by its words, pauses and filler words.
+ * - `cleanup/`: Sprint 13: cutting a clip by its words, pauses and filler words;
+ *   Bleep Bad Words (Module 09).
  * - `highlights/`: Sprint 13: Clip Setup and the transcript moment picker's pure parts.
  * - `document/`: the clip document schema, its upgrade chain and the creator.
- * - `effects/`: the looks and the vignette, as numbers both drawings read.
+ * - `effects/`: the looks and the vignette, as numbers both drawings read; the
+ *   hook clip and the hook title (Module 09).
  * - `time/`: the time map between the video's clock and the clip's, the pure
  *   edits (trim, split, remove, speed, duplicate and remove an item) and the
  *   time formatters.

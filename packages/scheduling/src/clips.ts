@@ -94,6 +94,15 @@ export const MEDIA_PY_TIMINGS = Object.freeze({
     heartbeatMs: 2 * 60_000,
     maximumAttempts: 2,
   }),
+  // Module 09: one typed line (at most 500 characters, about half a minute of
+  // voice) made into a WAV. Instant under simulation; a local voice on a
+  // processor is well under a minute. A heartbeat before and after the work.
+  mediaPySpeak: Object.freeze({
+    startToCloseMs: 5 * 60_000,
+    scheduleToCloseMs: 6 * 60_000,
+    heartbeatMs: 2 * 60_000,
+    maximumAttempts: 2,
+  }),
 } satisfies Record<string, MediaPyTiming>);
 
 /** The roles a worker process can take, and the queue each serves. */

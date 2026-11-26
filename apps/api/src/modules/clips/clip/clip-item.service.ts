@@ -56,6 +56,7 @@ import {
 import { stripControlChars } from '../../../common/sanitize';
 import { RedisService } from '../../redis/redis.service';
 import { ClipErrorException } from '../clip-error.exception';
+import { documentUsesAiVoice } from './clip-ai-voice';
 import { isUuid } from '../clips.ids';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { serializable } from '../clips.tx';
@@ -115,6 +116,12 @@ export interface ClipView {
    * 'speaker'`, Module 08), or null when there are none.
    */
   meta: ClipMetaView | null;
+  /**
+   * Module 09: a sound item plays a voice Text To Speech made (`madeByAi`).
+   * Worked out where one clip is answered (the editor's read, a save, a
+   * copy); false on a new clip.
+   */
+  usesAiVoice: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -225,6 +232,7 @@ export class ClipItemService {
     ]);
     const live = video && video.deletedAt === null && video.status !== 'REMOVED' ? video : null;
     const view = toClipView(clip, scheduled.has(clip.id));
+    view.usesAiVoice = await documentUsesAiVoice(orgId, view.document);
     // Module 19: opening a clip in the editor counts as using its video.
     if (live) await this.retention.touchVideo(orgId, live.id);
 
@@ -490,7 +498,7 @@ function segmentRangeOf(input: unknown): SourceRange | null {
 }
 
 /** A clip as the browser sees it; `scheduled` says whether one of its post groups still has a post waiting. */
-export function toClipView(clip: Clip, scheduled = false): ClipView {
+export function toClipView(clip: Clip, scheduled = false, usesAiVoice = false): ClipView {
   const parsed = safeParseClipDocument(clip.document);
   return {
     id: clip.id,
@@ -509,6 +517,7 @@ export function toClipView(clip: Clip, scheduled = false): ClipView {
     exportedMediaId: clip.exportedMediaId,
     document: parsed.ok ? parsed.doc : null,
     meta: clipMetaView(clip.meta),
+    usesAiVoice,
     createdAt: clip.createdAt.toISOString(),
     updatedAt: clip.updatedAt.toISOString(),
   };

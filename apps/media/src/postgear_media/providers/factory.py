@@ -21,6 +21,7 @@ from typing import Literal
 from temporalio.exceptions import ApplicationError
 
 from postgear_media.core.settings import Settings
+from postgear_media.providers.speech.base import Speaker
 from postgear_media.providers.transcribe.base import Transcriber
 from postgear_media.providers.vision.mediapipe_faces import face_model_path
 
@@ -150,3 +151,23 @@ def reset_transcribers() -> None:
     """Forgets the built listeners (tests)."""
     with _transcribers_lock:
         _transcribers.clear()
+
+
+def get_speaker(settings: Settings) -> Speaker:
+    """The speaker this process uses (Module 09).
+
+    Only the simulated binding exists. Outside simulation there is no speaker:
+    the real one (Kokoro through `kokoro-onnx`) is parked by the licence
+    decision and, if ever built, runs as its own program (see
+    `providers/speech/base.py`). So a real run fails at once with a plain,
+    non-retryable `MEDIA_BINDING_OFF` instead of retrying.
+    """
+    if settings.simulation:
+        from postgear_media.providers.speech.simulated import SimulatedSpeaker  # noqa: PLC0415
+
+        return SimulatedSpeaker()
+    raise ApplicationError(
+        "No voice can speak on this service: the real voice is parked",
+        type="MEDIA_BINDING_OFF",
+        non_retryable=True,
+    )

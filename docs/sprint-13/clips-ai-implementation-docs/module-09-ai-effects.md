@@ -68,14 +68,14 @@ After this module the Effects tab has four AI rows. **Bleep Bad Words** finds sw
 
 ## Tasks
 
-- [ ] Word lists with licence records; `ClipWordList` and its routes; `findBleepWords`; `setBleeps`.
-- [ ] The bleep gate and tone in `compileFfmpeg` (output time, 5 ms ramps), the Web Audio bleeps in `PreviewEngine`, caption masking.
-- [ ] The Bleep row with My Words.
-- [ ] The hook title route, the three hook text looks (drawn by `buildAss`), the row.
-- [ ] `setHook`, `removeHook`, `suggestHook`; the row and the timeline label.
-- [ ] The text-to-speech licence-chain check in the Decision Log (D13-06); then the Kokoro provider, route, job and row, or the item parked in Module 17.
-- [ ] Title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Word lists with licence records; `ClipWordList` and its routes; `findBleepWords`; `setBleeps`. (The lists are PostGear's own, with a README in `cleanup/word-lists/`; the LDNOOBW lists wait for a fetch Arvind allows.)
+- [x] The bleep gate and tone in `compileFfmpeg` (output time, 5 ms ramps), the Web Audio bleeps in `PreviewEngine`, caption masking.
+- [x] The Bleep row with My Words.
+- [x] The hook title route, the three hook text looks (drawn by `buildAss`), the row.
+- [x] `setHook`, `removeHook`, `suggestHook`; the row and the timeline label.
+- [x] The text-to-speech licence-chain check in the Decision Log (D13-06); then the Kokoro provider, route, job and row, or the item parked in Module 17. (The chain fails in-process because espeak-ng is GPL: the real Kokoro binding is parked for Module 17; the route, the SPEECH job, the row and a simulated voice are built behind `CLIPS_TTS`.)
+- [x] Title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

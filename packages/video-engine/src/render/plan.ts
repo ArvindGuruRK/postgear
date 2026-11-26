@@ -26,6 +26,7 @@ import { type ClipDocument, clipDocumentSchema, type Segment } from '../document
 import { type ExportQuality, isExportQuality } from '../quality';
 import { outputDuration, placeSegments } from '../time/time-map';
 import { zoomWindows } from '../time/zooms';
+import { type BleepRange, bleepRanges } from './bleep-plan';
 import { RenderCompileError } from './errors';
 import { type PlanCaptions, planCaptions, type RenderCaptionsAsset } from './caption-plan';
 import { checkFonts, type FontManifest, fontsNeeded } from './fonts';
@@ -213,6 +214,12 @@ export interface RenderPlan {
   stickers: PlanSticker[];
   /** Sound effects and music, in track order (Module 14), mixed over the video's own sound. */
   sounds: PlanSound[];
+  /**
+   * Sprint 13, Module 09: the bleeps and mutes on the clip's clock
+   * (`bleepRanges`), applied to the video's own sound after the join and
+   * before the music and sound effects. Empty for most clips.
+   */
+  bleeps: BleepRange[];
   /** Text items and the Follow Badges' lines, bottom first, in canvas pixels (Module 11). */
   texts: PlanText[];
   /** The Follow Badges' shapes, in canvas pixels, drawn in the same ASS file as the text. */
@@ -304,7 +311,20 @@ function roundTo(value: number, places: number): number {
   return Math.round(value * factor) / factor;
 }
 
-/** Two segments play one after the other from the same stretch of the same video. */
+/**
+ * Two segments play one after the other from the same stretch of the same
+ * video, so they share one input (a run).
+ *
+ * A hook part (Sprint 13, Module 09: `role: 'hook'`, played first, repeating
+ * a stretch of the main part) is a run of its own: its own input, seeked to
+ * just before the hook. Research 09 section 7 reads the hook and the main
+ * part from one input through `split`, which renders the right frames, but
+ * `split` then holds every decoded frame of the main part from its start to
+ * the hook's end while the hook plays (a 3 s hook at 50 s of a 60 s 1080p
+ * part: 1.5 GB of memory against 250 MB with two inputs, and slower, on
+ * FFmpeg 9.0.2). A second seeked input decodes only the hook's few seconds
+ * twice. The join after the hook is a cut, so `cutFades` fades it.
+ */
 function continues(prev: Segment | undefined, next: Segment): boolean {
   return prev !== undefined && prev.source === next.source && prev.sourceOut === next.sourceIn;
 }
@@ -562,6 +582,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     canvas: { width: doc.canvas.width, height: doc.canvas.height },
     stickers,
     sounds,
+    bleeps: bleepRanges(doc),
     texts,
     shapes,
     captions,

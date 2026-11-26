@@ -71,6 +71,13 @@ def test_every_script_has_fillers_unsure_words_and_a_bad_word_to_find() -> None:
         assert any(text in {"damn", "hell", "crap"} for text in texts)
 
 
+def test_the_talk_has_two_planted_bleep_words() -> None:
+    record = recorded("talk")
+    assert record is not None
+    planted = [(w.start, w.end, w.text) for w in record.words if w.text in {"bullshit", "shitty"}]
+    assert planted == [(15_511, 15_989, "bullshit"), (100_551, 100_920, "shitty")]
+
+
 def test_the_stream_has_a_stretch_of_tamil() -> None:
     record = recorded("stream")
     assert record is not None

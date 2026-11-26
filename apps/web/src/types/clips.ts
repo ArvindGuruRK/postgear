@@ -201,6 +201,8 @@ export interface ClipView {
    * `followOnOpen`), or null. Absent on an older API.
    */
   meta?: ClipMetaView | null;
+  /** Module 09: a sound in the document was made by Text To Speech (absent on an older API). */
+  usesAiVoice?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -337,6 +339,32 @@ export interface ClipsAiStatus {
   actionVision?: boolean;
   /** Module 07: Detect Camera can find faces right now (free). */
   faces?: boolean;
+  /** Module 09: Text To Speech is switched on (`CLIPS_TTS`) and can run right now. */
+  voice?: boolean;
+}
+
+/** Module 09: one voice `GET /clips/voices` offers. */
+export interface ClipVoiceView {
+  id: string;
+  name: string;
+  /** The spoken-language codes the voice reads. */
+  languages: string[];
+  /** A short sample to play, or null when there is none. */
+  sampleUrl: string | null;
+}
+
+/** Module 09: `GET /clips/voices`. */
+export interface ClipVoicesView {
+  enabled: boolean;
+  voices: ClipVoiceView[];
+}
+
+/** Module 09: `POST /clips/:clipId/voice` (202). The job's `result` carries `assetId` and `durationMs` once done. */
+export interface MakeVoiceOutcome {
+  job: ClipJobView;
+  /** AI minutes charged (0 when the same line and voice were made already). */
+  price: number;
+  reused: boolean;
 }
 
 /** Module 07: `POST /clips/:clipId/faces`. */

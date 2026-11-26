@@ -19,6 +19,8 @@ export {
   clipRenderWorkflow,
   clipSaveDownloadWorkflow,
   clipSegmentWorkflow,
+  // Sprint 13, Module 09: a typed line made into a voice.
+  clipSpeechWorkflow,
   // Sprint 13, Module 02: listening.
   clipTranscribeWorkflow,
 } from './clips/job.workflows';

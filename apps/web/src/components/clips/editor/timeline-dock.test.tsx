@@ -6,6 +6,7 @@ import {
   dragTrimEnd,
   dragTrimStart,
   pxPerMs,
+  setHook,
   type TextItem,
   zoomBounds,
 } from '@postgear/video-engine';
@@ -615,5 +616,41 @@ describe('the Speaker strip (Module 08)', () => {
     // It sits right under the Video row.
     const rows = screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'));
     expect(rows.indexOf('Speaker')).toBe(rows.indexOf('Video') + 1);
+  });
+});
+
+describe('the hook (Module 09)', () => {
+  const hooked = () => setHook(clip(), { fromOutputMs: 4_000, toOutputMs: 6_500 });
+
+  it('labels the hook bar and gives it its own delete', () => {
+    const onRemoveHook = jest.fn();
+    setup({ document: hooked(), onRemoveHook });
+    const parts = screen.getAllByTestId('clip-part');
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toHaveAttribute('data-hook');
+    expect(parts[0]).toHaveAccessibleName('Hook, from 0 seconds, 2.5 seconds long');
+    expect(within(parts[0] as HTMLElement).getByTestId('clip-hook-label')).toHaveTextContent(
+      'Hook',
+    );
+    expect(parts[1]).not.toHaveAttribute('data-hook');
+    expect(screen.getAllByTestId('clip-hook-label')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Hook' }));
+    expect(onRemoveHook).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes the hook itself, as one step, when the editor does not', () => {
+    const doc = hooked();
+    const { props } = setup({ document: doc });
+    fireEvent.click(screen.getByTestId('clip-hook-delete'));
+    const [[start, next]] = commits(props);
+    expect(start).toBe(doc);
+    expect(next.segments).toHaveLength(1);
+    expect(next.segments[0]?.role).toBeUndefined();
+  });
+
+  it('shows no hook label on a clip without one', () => {
+    setup();
+    expect(screen.queryByTestId('clip-hook-label')).toBeNull();
+    expect(screen.queryByTestId('clip-hook-delete')).toBeNull();
   });
 });

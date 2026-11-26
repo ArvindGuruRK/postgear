@@ -66,6 +66,14 @@ function setup(initial: TextItem | null = newText(), extra: Partial<TextPanelPro
 }
 
 describe('TextPanel', () => {
+  it('keeps its three style tiles: the hook looks belong to Add Hook Title', () => {
+    setup(null);
+    for (const name of ['Bold Outline', 'On A Box', 'Plain']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole('button', { name: /^Hook / })).toBeNull();
+  });
+
   it('with nothing selected, Add Text and a style tile each add a text', () => {
     const { spy } = setup(null);
     fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
