@@ -17,7 +17,8 @@
  * 2. Per segment, sound: `atrim`, `asetpts`, the segment's volume, the
  *    `atempo` chain (0.5 to 100 per filter), `aresample=48000` and a fixed
  *    stereo format; silence from `anullsrc` when the file has no sound.
- * 3. `concat`, then `fps` and `format=yuv420p`; one `perspective` per zoom
+ * 3. `concat` (Module 11: with Fade joins, `xfade` and `acrossfade` chained
+ *    over groups of parts, `joinLines`), then `fps` and `format=yuv420p`; one `perspective` per zoom
  *    window and the look's colour filters and vignette (Module 13, `zoom.ts`
  *    and `looks.ts`), so every area zooms and tints as one picture and no
  *    overlay is touched; the stickers (Module 12),
@@ -107,8 +108,12 @@ interface SegmentSources {
  * and the output rate; `format=yuv420p` then makes every input of `concat`
  * (and of Module 11's `xfade`) the same. A clip of one video keeps its text.
  */
-export function joinsOtherVideos(plan: Pick<RenderPlan, 'inputs' | 'cards'>): boolean {
+export function joinsOtherVideos(
+  plan: Pick<RenderPlan, 'inputs' | 'cards'> & Partial<Pick<RenderPlan, 'segments'>>,
+): boolean {
   if (plan.cards) return true;
+  // Module 11: `xfade` needs both sides in one pixel format too.
+  if ((plan.segments ?? []).some((segment) => (segment.overlapMs ?? 0) > 0)) return true;
   const first = plan.inputs[0]?.sourceId;
   return plan.inputs.some((input) => input.sourceId !== first);
 }
@@ -146,9 +151,12 @@ export function cutFades(plan: Pick<RenderPlan, 'segments'>): CutFades[] {
     const fade = Math.min(CUT_FADE_MS, length / 3);
     const previous = segments[k - 1];
     const next = segments[k + 1];
+    // Module 11: a Fade join is mixed by `acrossfade`, so neither side fades on its own there.
+    const fadesIn = (segment.overlapMs ?? 0) > 0;
+    const fadesOut = (next?.overlapMs ?? 0) > 0;
     return {
-      inMs: previous && previous.inputIndex !== segment.inputIndex ? fade : 0,
-      outMs: next && next.inputIndex !== segment.inputIndex ? fade : 0,
+      inMs: previous && previous.inputIndex !== segment.inputIndex && !fadesIn ? fade : 0,
+      outMs: next && next.inputIndex !== segment.inputIndex && !fadesOut ? fade : 0,
     };
   });
 }
@@ -281,6 +289,78 @@ export function bleepLines(
   };
 }
 
+/**
+ * Module 11 (research 09 section 8): how the parts join, ending in `[vc]`
+ * (with `video`) and `[ac]`.
+ *
+ * - Cuts only: one `concat` of every part, the text it always was.
+ * - With Fade joins: the parts between two fades are a group (one part as
+ *   it is, several joined by `concat`), and each group is mixed into what
+ *   came before with `xfade=transition=fade` for the picture and
+ *   `acrossfade` (triangular curves) for the sound, chained in order.
+ *   `xfade`'s offset is in the output of the join before it, so it is
+ *   computed, never written by hand: the length so far (the earlier groups'
+ *   lengths less the earlier overlaps) less this overlap, which is where
+ *   the time map starts the group's first part (`outStartMs`). Every chain
+ *   ends in the output size, SAR 1, the output rate and `yuv420p`
+ *   (`joinsOtherVideos`), and every sound in 48 kHz stereo, as both filters
+ *   need.
+ */
+export function joinLines(
+  plan: Pick<RenderPlan, 'segments'>,
+  options: { video: boolean },
+): string[] {
+  const { segments } = plan;
+  const video = options.video;
+  const pair = (s: PlanSegment) => `${video ? `[v${s.index}]` : ''}[a${s.index}]`;
+  const concat = (parts: PlanSegment[], out: string) =>
+    `${parts.map(pair).join('')}concat=n=${parts.length}:v=${video ? 1 : 0}:a=1${out}`;
+
+  if (!segments.some((segment) => (segment.overlapMs ?? 0) > 0)) {
+    return [concat(segments, video ? '[vc][ac]' : '[ac]')];
+  }
+
+  // The groups: a new one starts at every part with an overlap.
+  const groups: PlanSegment[][] = [];
+  for (const segment of segments) {
+    const current = groups[groups.length - 1];
+    if (!current || (segment.overlapMs ?? 0) > 0) groups.push([segment]);
+    else current.push(segment);
+  }
+
+  const lines: string[] = [];
+  const labels = groups.map((group, g) => {
+    const first = group[0] as PlanSegment;
+    if (group.length === 1) return { v: `[v${first.index}]`, a: `[a${first.index}]` };
+    const out = { v: `[vg${g}]`, a: `[ag${g}]` };
+    lines.push(concat(group, `${video ? out.v : ''}${out.a}`));
+    return out;
+  });
+
+  const lengthOf = (group: PlanSegment[]) =>
+    group.reduce((sum, s) => sum + (s.outEndMs - s.outStartMs), 0);
+  let so = labels[0] as { v: string; a: string };
+  let lengthMs = lengthOf(groups[0] as PlanSegment[]);
+  for (let g = 1; g < groups.length; g += 1) {
+    const group = groups[g] as PlanSegment[];
+    const overlap = (group[0] as PlanSegment).overlapMs ?? 0;
+    const offsetMs = lengthMs - overlap;
+    const last = g === groups.length - 1;
+    const out = last ? { v: '[vc]', a: '[ac]' } : { v: `[vx${g}]`, a: `[ax${g}]` };
+    const next = labels[g] as { v: string; a: string };
+    const seconds = msToSeconds(overlap);
+    if (video) {
+      lines.push(
+        `${so.v}${next.v}xfade=transition=fade:duration=${seconds}:offset=${msToSeconds(offsetMs)}${out.v}`,
+      );
+    }
+    lines.push(`${so.a}${next.a}acrossfade=d=${seconds}:c1=tri:c2=tri${out.a}`);
+    so = out;
+    lengthMs = offsetMs + lengthOf(group);
+  }
+  return lines;
+}
+
 /** The inputs after the video's: stickers, the mark, then the sounds, each checked against its index. */
 function extraInputs(plan: RenderPlan, inputs: CompiledInput[]): void {
   for (const sticker of plan.stickers ?? []) {
@@ -355,8 +435,7 @@ export function compileMeasure(plan: RenderPlan): CompiledFfmpeg | null {
     used.set(segment.inputIndex, k + 1);
     lines.push(segmentSound(segment, audio.get(segment.inputIndex)?.[k] ?? null, fades[place]));
   });
-  const pairs = plan.segments.map((s) => `[a${s.index}]`).join('');
-  lines.push(`${pairs}concat=n=${plan.segments.length}:v=0:a=1[ac]`);
+  lines.push(...joinLines(plan, { video: false }));
   // The measure hears what the render plays: the bleeps on the video's sound, then the mix.
   const bleeped = bleepLines(plan, '[ac]');
   lines.push(...bleeped.lines);
@@ -492,8 +571,7 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
     lines.push(segmentSound(segment, source.audio, fades[place]));
   }
 
-  const pairs = plan.segments.map((s) => `[v${s.index}][a${s.index}]`).join('');
-  lines.push(`${pairs}concat=n=${plan.segments.length}:v=1:a=1[vc][ac]`);
+  lines.push(...joinLines(plan, { video: true }));
 
   // Picture after the join: one more fps, yuv420p, then the mark, then the fades.
   const fadeFilters: string[] = [];

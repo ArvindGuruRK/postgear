@@ -11,7 +11,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ClipEditor } from '@/components/clips/editor/clip-editor';
 import { EDITOR_TABS, type EditorTab } from '@/components/clips/editor/editor-state';
-import { ClipUnreadable } from '@/components/clips/editor/clip-unreadable';
+import {
+  ClipUnreadable,
+  MONTAGE_VIDEO_REMOVED_CODE,
+  MONTAGE_VIDEO_REMOVED_SENTENCE,
+} from '@/components/clips/editor/clip-unreadable';
 import { ClipsDesktopOnly } from '@/components/clips/desktop-only';
 import { ClipsWorkspaceWaiting } from '@/components/clips/workspace-waiting';
 import { ApiError, serverApi } from '@/lib/api';
@@ -50,9 +54,25 @@ export default async function ClipEditRoute({
   }).catch((cause: unknown) => {
     // A malformed id (400) or a clip that is not here (404) is the same page.
     if (cause instanceof ApiError && (cause.status === 404 || cause.status === 400)) return null;
+    // Module 11: a montage one of whose videos was removed cannot be opened.
+    if (cause instanceof ApiError && cause.code === MONTAGE_VIDEO_REMOVED_CODE) {
+      return 'video_removed' as const;
+    }
     throw cause;
   });
   if (!detail) notFound();
+  if (detail === 'video_removed') {
+    return (
+      <ClipsDesktopOnly>
+        <ClipUnreadable
+          orgId={orgId}
+          videoId={null}
+          clipId={clipId}
+          sentence={MONTAGE_VIDEO_REMOVED_SENTENCE}
+        />
+      </ClipsDesktopOnly>
+    );
+  }
 
   const document = detail.clip.document;
 

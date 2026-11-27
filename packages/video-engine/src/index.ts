@@ -20,6 +20,7 @@
  * - `timeline/`: the timeline's maths: scale and zoom, the ruler, what is
  *   visible, snapping and the drag reducers.
  * - `links/`: what a pasted link is, channel handles, canonical links.
+ * - `montage/`: Sprint 13 (Module 11): stitching clips into a montage, its parts and per-part layouts.
  * - `render/`: `frameState` (the one definition of what is on screen),
  *   `buildRenderPlan`, `compileFfmpeg` and `buildAss`.
  * - `recipes/`: Sprint 13 (Module 10): recipes, the five starters, applying one.
@@ -56,6 +57,7 @@ export * from './layout';
 export * from './reframe';
 export * from './library';
 export * from './links';
+export * from './montage';
 export * from './pricing';
 export * from './quality';
 export * from './recipes';

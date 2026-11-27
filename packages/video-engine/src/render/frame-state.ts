@@ -44,7 +44,7 @@ import { layoutBase } from '../layout/base';
 import { type BleepRange, bleepsAt } from './bleep-plan';
 import { textFadeAt } from './text-plan';
 import { type RenderedMoment, renderedMoment } from '../time/cards';
-import { frameToMs, outputDuration, segmentAt, toSource } from '../time/time-map';
+import { frameToMs, joinAt, outputDuration, segmentAt, toSource } from '../time/time-map';
 import { zoomAt } from '../time/zooms';
 
 /** What the caller knows about a source's picture (from the file it plays or renders). */
@@ -180,6 +180,15 @@ export interface FrameState {
    * muted inside each one; a bleep-mode one also plays the 1 kHz tone.
    */
   bleeps: BleepRange[];
+  /**
+   * Sprint 13, Module 11: the Fade join being played, or null on a cut and
+   * away from any join. Inside the overlap both parts are on screen: the
+   * export mixes them with `xfade`, the preview with a quick mix; `progress`
+   * goes 0 (all `fromSegment`) to 1 (all `toSegment`), read at the exact
+   * moment. `segment` and `areas` are the one `segmentAt` answers (the
+   * outgoing part until the overlap's middle).
+   */
+  join: { fromSegment: string; toSegment: string; progress: number } | null;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -460,7 +469,16 @@ export function frameState(
     overlays,
     sounds,
     bleeps: bleepsAt(doc, t),
+    join: joinState(doc, exact),
   };
+}
+
+/** The Fade join at `exact` in `frameState`'s shape (Module 11). */
+function joinState(doc: ClipDocument, exact: number): FrameState['join'] {
+  const now = joinAt(doc, exact);
+  return now
+    ? { fromSegment: now.fromSegment, toSegment: now.toSegment, progress: now.progress }
+    : null;
 }
 
 /** What the rendered file shows at a moment: a card, or the clip (Module 10). */

@@ -1367,6 +1367,32 @@ The word lists are PostGear's own short lists (strong swear words in English and
 
 A recipe holds settings only (no words, no pictures). Starters have fixed ids (`starter-...`) and no database row. A brand kit's intro or outro plays its own video's light copy, so it is never "more of the video" for the clip. Cards (the closing card) sit outside the clip's own time: the stored clip length includes them, the editor's preview does not draw them, Preview Export does.
 
+**Montage And Batch Export (Module 11).** The Clips tab gains tick boxes and a bulk bar. Restart the API and the Node worker after pulling this module (a migration adds the `MONTAGE` clip type; run `npm run migrate:deploy --workspace=packages/db` and `npm run db:generate` first). `CLIPS_RENDER_SLOTS` (default 2) is how many exports run at once across all workspaces.
+
+| Do this | What you should see |
+|---|---|
+| Clips tab, hover a card | A tick box top left; once one is ticked they all show |
+| Tick one, Shift-click a third | The two and the one between are ticked; the bar says "3 Selected" with Export All, Create Montage, Hide, Delete |
+| **Export All**, pick 720p, **Export** | The list: one clip "Rendering", the others "Waiting for its turn" (one export per workspace at a time) |
+| Close the dialog | An "Exporting 3 Clips" chip in the page's top row; it reopens the list and survives a reload |
+| Wait for the end | The bell has ONE notice, "3 clips are ready." (no notice per clip); a failed one reads "2 clips are ready, 1 could not be exported." |
+| Export All with a quality the plan does not allow | That clip says which quality it will use instead; a clip already exported at that quality says so and makes no job |
+| Tick two clips of different shapes, **Create Montage** | The list (drag or the arrow buttons to order, the length of each and the total), Between Clips (Cut, Fade), an optional title, Shape, "Changes you make to these clips later will not change the montage." |
+| Pick a shape, Fade, a title, **Create** | The editor opens on one clip: the timeline shows each original clip's name at its first part and a mark at each fade; the total is 0.3 s shorter per fade |
+| Play across a join | The picture mixes for 0.3 s; captions hand over at the middle |
+| Pick a part of the second clip, **Layouts**, Blurred | Only that clip's parts change ("These layouts change ..."); Ctrl+Z puts it back |
+| **Captions** tab on a montage | "A montage keeps the captions of its clips. Change them in a clip, then make the montage again." (style, size and place still work) |
+| Export the montage at 720p | The file opens with the title card (2 s), then the clips; at a fade both pictures show mixed; it is 0.3 s shorter per fade |
+| Tick two clips, **Hide**; on Hidden tick them, **Unhide** | They move to Hidden and back |
+| Tick two clips, **Delete** | "Delete 2 Clips?" in red; exported files stay in Media |
+| Remove a video a montage plays (Module 19's removal) | An unexported montage goes with it; an exported one stays exported but cannot be opened: "One of the videos in this montage was removed." |
+
+A montage is a snapshot: it copies the clips' parts, layouts, text, sounds, bleeps and captions when it is made. Preview Export never waits in the queue.
+
+```bash
+npx jest --config packages/media-tools/jest.config.js montage-parity   # cut and fade montages on the real FFmpeg
+```
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

@@ -15,8 +15,16 @@
  * over the last minute), with the workspace's typical length for the kind as
  * the prior before there is a pace. It closes after 30 minutes; the client
  * reconnects and picks up from the row.
+ *
+ * Sprint 13, Module 11: `streamMany` follows several jobs at once (an Export
+ * All batch) with ONE read per poll for all of them. The same events and
+ * payloads, one per job change (the view's `id` says which job): `progress`
+ * while it changes, then that job's `done`, `failed` or `cancelled`. The
+ * stream stays open until every job has sent its last event (a job that is
+ * gone, or another workspace's, is dropped silently), then closes.
  */
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import type { ClipJob } from '@postgear/db';
 import type { ProgressSample } from '@postgear/video-engine';
 import type { SseStream } from '../../../common/sse';
 import { CLIPS_MESSAGES } from '../clips.messages';
@@ -116,6 +124,93 @@ export class ClipJobEventsService {
       stream.send('error', { message: CLIPS_MESSAGES.STREAM_STOPPED });
     }
   }
+
+  /**
+   * Module 11: polls several jobs of the workspace until each has ended, 30
+   * minutes pass, or the client leaves. Never throws.
+   */
+  async streamMany(orgId: string, jobIds: readonly string[], stream: SseStream): Promise<void> {
+    const deadline = this.clock.now() + JOB_EVENTS_MAX_MS;
+    const watched = new Map<string, Watched>(
+      [...new Set(jobIds)].map((id) => [id, { samples: [], last: '', ended: false }]),
+    );
+    const priors = new Map<ClipJob['kind'], number | null>();
+
+    try {
+      while (!stream.closed) {
+        const open = [...watched].filter(([, state]) => !state.ended).map(([id]) => id);
+        if (open.length === 0) return;
+        const rows = new Map(
+          (await this.repository.findMany(orgId, open)).map((job) => [job.id, job]),
+        );
+
+        for (const id of open) {
+          const state = watched.get(id) as Watched;
+          const job = rows.get(id);
+          if (!job) {
+            state.ended = true;
+            continue;
+          }
+
+          if (job.status === 'RUNNING') {
+            const now = this.clock.now();
+            const previous = state.samples[state.samples.length - 1];
+            if (!previous || previous.progress !== job.progress) {
+              state.samples.push({ at: now, progress: job.progress });
+            }
+            while (
+              state.samples.length > 1 &&
+              (state.samples[0] as ProgressSample).at < now - SAMPLE_KEEP_MS
+            ) {
+              state.samples.shift();
+            }
+            if (!priors.has(job.kind)) {
+              priors.set(job.kind, median(await this.repository.recentDurations(orgId, job.kind)));
+            }
+          }
+
+          const view = toJobView(job, {
+            samples: state.samples,
+            priorSeconds: priors.get(job.kind) ?? null,
+          });
+
+          if (TERMINAL_JOB_STATUSES.has(job.status)) {
+            stream.send(
+              job.status === 'DONE' ? 'done' : job.status === 'FAILED' ? 'failed' : 'cancelled',
+              view,
+            );
+            state.ended = true;
+            continue;
+          }
+
+          const fingerprint = `${view.status}|${view.stage}|${view.progress}|${view.etaSeconds}`;
+          if (fingerprint !== state.last) {
+            stream.send('progress', view);
+            state.last = fingerprint;
+          }
+        }
+
+        if ([...watched.values()].every((state) => state.ended)) return;
+        if (this.clock.now() >= deadline) return;
+        await this.clock.sleep(JOB_EVENTS_POLL_MS, stream.signal);
+      }
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.job_events.failed',
+          jobs: watched.size,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      stream.send('error', { message: CLIPS_MESSAGES.STREAM_STOPPED });
+    }
+  }
+}
+
+interface Watched {
+  samples: ProgressSample[];
+  last: string;
+  ended: boolean;
 }
 
 function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {

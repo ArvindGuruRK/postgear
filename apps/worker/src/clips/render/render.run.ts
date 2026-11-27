@@ -42,6 +42,7 @@ import {
 import {
   buildRenderPlan,
   checkFonts,
+  pickSourceFiles,
   compileFfmpeg,
   compileMeasure,
   decideLoudness,
@@ -63,13 +64,13 @@ import { ClipStepError } from '../failures';
 import type { ClipInternalClient } from '../internal-client';
 import type { JobProgress } from '../job-progress';
 import { exportMediaKeys } from '../keys';
-import type { ClipRows, JobRow } from '../rows';
-import { type CaptionRows, fetchCaptions } from '../captions/files';
+import type { AssetRow, ClipRows, JobRow } from '../rows';
+import { type CaptionRows, fetchCaptionsTracks } from '../captions/files';
 import { fetchSoundFiles } from '../sounds/files';
 import type { SoundFileRows } from '../sounds/rows';
 import { fetchStickerFiles } from '../stickers/files';
 import type { StickerFileRows } from '../stickers/rows';
-import { pickRenderSource, rangesBySource } from './render-source';
+import { rangesBySource } from './render-source';
 
 export interface RenderTools {
   probe(file: string, options: { cwd: string; signal: AbortSignal }): Promise<MediaFacts>;
@@ -190,25 +191,38 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
     throw new ClipStepError('font_missing');
   }
 
-  const ranges = rangesBySource(input.document);
-  const sources: Record<string, RenderSourceAsset> = {};
-  let index = 0;
-  for (const [sourceId, range] of ranges) {
+  // Every video the document plays must still be there; its assets are read inside the workspace.
+  const assetsByVideo = new Map<string, AssetRow[]>();
+  for (const sourceId of rangesBySource(input.document).keys()) {
     const source = input.document.sources.find((candidate) => candidate.id === sourceId);
     if (!source) throw exportFailed();
+    if (assetsByVideo.has(source.videoId)) continue;
     const video = await run.rows.video(org, source.videoId);
     if (!video || video.deletedAt) throw exportFailed();
-
-    // The newest light copy, as the API's choice takes it (rows come oldest first).
-    const proxy = (await run.rows.videoAssets(org, video.id))
-      .filter((asset) => asset.kind === 'PROXY')
-      .at(-1);
-    const segments = (await run.rows.segmentAssets(org, input.clipId)).filter(
-      (asset) => asset.videoId === video.id,
+    // Every clip's sharp ranges of this video and its light copies, as the API's choice reads them.
+    const assets = (await run.rows.videoAssets(org, video.id)).filter(
+      (asset) => asset.kind === 'SEGMENT' || asset.kind === 'PROXY',
     );
-    const picked = pickRenderSource(range, segments, proxy ?? null);
+    assetsByVideo.set(source.videoId, assets);
+  }
+  // The one rule (`pickSourceFiles`): a file per source, or per part of a montage that no single
+  // sharp range covers.
+  const picks = pickSourceFiles(input.document, (videoId) => assetsByVideo.get(videoId) ?? []);
+  const wanted = new Set(
+    picks.flatMap((entry) =>
+      entry.parts ? entry.parts.map((part) => part.picked?.asset.id) : [entry.picked?.asset.id],
+    ),
+  );
+  const sources: Record<string, RenderSourceAsset> = {};
+  const segmentSources: Record<string, RenderSourceAsset> = {};
+  const fetchedFiles = new Map<string, RenderSourceAsset>();
+  let index = 0;
+  const fetchFile = async (
+    picked: { asset: AssetRow; sourceOffsetMs: number } | null,
+  ): Promise<RenderSourceAsset> => {
     if (!picked) throw exportFailed();
-
+    const known = fetchedFiles.get(picked.asset.id);
+    if (known) return known;
     const file = `source-${index}.mp4`;
     const target = path.join(dir, file);
     try {
@@ -218,7 +232,7 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
       throw error;
     }
     const facts = await run.tools.probe(target, { cwd: dir, signal });
-    sources[sourceId] = {
+    const asset: RenderSourceAsset = {
       file,
       sourceOffsetMs: picked.sourceOffsetMs,
       durationMs: facts.durationMs,
@@ -227,12 +241,21 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
       fps: facts.fps,
       hasAudio: facts.hasAudio,
     };
+    fetchedFiles.set(picked.asset.id, asset);
     index += 1;
     run.heartbeat();
     await run.progress.report({
       stage: 'fetching',
-      progress: mapPercent((index / Math.max(1, ranges.size)) * 100, 0, 10),
+      progress: mapPercent((index / Math.max(1, wanted.size)) * 100, 0, 10),
     });
+    return asset;
+  };
+  for (const entry of picks) {
+    if (entry.parts) {
+      for (const part of entry.parts) segmentSources[part.segmentId] = await fetchFile(part.picked);
+    } else {
+      sources[entry.sourceId] = await fetchFile(entry.picked);
+    }
   }
 
   // A sticker that is not there is left out, and the plan stops with `sticker_missing`.
@@ -259,8 +282,9 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
 
   // Sprint 13: the clip's captions (the transcript's words and the style), looked up inside the
   // workspace. Without the rows a clip with captions stops at the plan with `captions_missing`.
-  const captions = run.captionRows
-    ? await fetchCaptions(
+  // A montage (Module 11) has one captions track per video: each one's words are fetched.
+  const fetched = run.captionRows
+    ? await fetchCaptionsTracks(
         { rows: run.captionRows, privateStorage: run.privateStorage },
         org,
         input.videoId,
@@ -268,7 +292,8 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
         dir,
         signal,
       )
-    : undefined;
+    : {};
+  const captions = fetched.captions;
   run.heartbeat();
 
   // The mark, when the plan asks for it: copied in under its plain name, with its real size.
@@ -291,6 +316,8 @@ export async function renderPrepare(run: RenderRun): Promise<RenderPlan> {
           : null,
       watermark,
       captions: captions ?? null,
+      ...(Object.keys(segmentSources).length > 0 ? { segmentSources } : {}),
+      ...(fetched.captionsByTrack ? { captionsByTrack: fetched.captionsByTrack } : {}),
     },
   });
   // Only the twins this clip uses go into the job's fonts folder: libass sees nothing else to pick.

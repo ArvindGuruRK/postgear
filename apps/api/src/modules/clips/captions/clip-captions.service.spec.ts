@@ -813,3 +813,31 @@ describe('deleting a clip with transcripts of its own', () => {
     );
   });
 });
+
+// Sprint 13, Module 11: a montage's captions are made from its clips, a track per video.
+describe('a montage', () => {
+  it('is refused cleanly by every captions route, before anything is read or charged', async () => {
+    const { service, tables, ensure, ledger } = setup();
+    const clip = tables.clips[0];
+    if (!clip) throw new Error('no clip');
+    Object.assign(clip, { origin: 'MONTAGE', meta: { videoIds: [] } });
+    const expected = {
+      status: 422,
+      body: {
+        code: 'montage_captions_fixed',
+        message:
+          'A montage keeps the captions of its clips. Change them in a clip, then make the montage again.',
+      },
+    };
+    expect(await refusal(service.words(TEST_ORG, clip.id))).toEqual(expected);
+    expect(await refusal(service.add(TEST_ORG, TEST_USER, clip.id, {} as never))).toEqual(expected);
+    expect(
+      await refusal(service.translate(TEST_ORG, TEST_USER, clip.id, { language: 'hi' })),
+    ).toEqual(expected);
+    expect(
+      await refusal(service.fromFile(TEST_ORG, clip.id, file(srt([])), { language: 'en' })),
+    ).toEqual(expected);
+    expect(ensure).not.toHaveBeenCalled();
+    expect(ledger.entries).toEqual([]);
+  });
+});

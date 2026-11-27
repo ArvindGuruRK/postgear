@@ -20,7 +20,11 @@
  *   not a clip), and the download's `output.media` says `saved`. One
  *   serializable transaction, so a retried call answers the same row; a call
  *   for a download that is not saving (deleted, or never asked) is a 409.
- * - **settled**: a job ended; start the workspace's waiting imports.
+ * - **settled**: a job ended; start the workspace's waiting imports and
+ *   the exports the fair render queue allows (Sprint 13, Module 11), and,
+ *   for an export of a batch, write the batch's one notice when it was the
+ *   last to end. An export of a batch rings no bell of its own at
+ *   finish-export: the batch notice counts it.
  * - **auto-edit** and **apply-recipe** (Sprint 13, Module 10): an AUTO_EDIT
  *   job's clip, and a Find Clips run's recipe on its clips, both made by
  *   `ClipRecipeApplierService`.
@@ -54,6 +58,7 @@ import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipRecipeApplierService } from '../recipes/clip-recipe-applier.service';
+import { batchIdOf, ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
 import { exportReadyNotice } from './clip-notices';
 import type {
   ChargeImportBody,
@@ -78,6 +83,8 @@ export class ClipsInternalService {
     private readonly notifications: NotificationsService,
     // Sprint 13, Module 10: Auto-Edit's clip and a run's recipe (optional only for older specs).
     @Optional() private readonly recipes?: ClipRecipeApplierService,
+    // Sprint 13, Module 11: Export All's one notice (optional only for older specs).
+    @Optional() private readonly batchNotices?: ClipBatchNoticeService,
   ) {}
 
   /**
@@ -162,9 +169,11 @@ export class ClipsInternalService {
   }
 
   async settled(jobId: string, body: OrgOnlyBody): Promise<ClipSettledAnswer> {
-    await this.requireJob(body.organizationId, jobId);
+    const job = await this.requireJob(body.organizationId, jobId);
     const started = await this.jobs.startWaiting(body.organizationId);
-    return { started: started.length };
+    const renders = await this.jobs.startRendersQuietly(body.organizationId);
+    await this.batchNotices?.settleJob(job);
+    return { started: started.length + renders.length };
   }
 
   async finishExport(jobId: string, body: FinishExportBody): Promise<ClipFinishExportAnswer> {
@@ -235,10 +244,11 @@ export class ClipsInternalService {
         where: { id: body.clipId, organizationId: orgId },
         select: { id: true, title: true },
       });
-      return { mediaId: media.id, created: true as const, clip };
+      // Module 11: an export of a batch is counted in the batch's one notice instead.
+      return { mediaId: media.id, created: true as const, clip, batched: batchIdOf(job) !== null };
     });
 
-    if (outcome.created && outcome.clip) {
+    if (outcome.created && outcome.clip && !outcome.batched) {
       await this.notifications
         .notify(exportReadyNotice(orgId, outcome.clip, outcome.mediaId))
         .catch((error: unknown) =>

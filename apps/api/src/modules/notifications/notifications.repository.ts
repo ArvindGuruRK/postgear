@@ -14,7 +14,13 @@
  * "never send twice" guarantee, and it needs no lock.
  */
 import { Injectable } from '@nestjs/common';
-import { type Prisma, prisma, NotificationEmailStatus, Role } from '@postgear/db';
+import {
+  type Prisma,
+  type PrismaTransactionClient,
+  prisma,
+  NotificationEmailStatus,
+  Role,
+} from '@postgear/db';
 import type { EmailAudience } from './notifications.types';
 
 /** The columns the feed, the stream and the dispatcher read. */
@@ -116,8 +122,12 @@ export class NotificationsRepository {
     return cursor.lastReadAt;
   }
 
-  async create(input: CreateNotificationInput): Promise<NotificationRecord> {
-    return prisma.notifications.create({
+  /** Inside `tx` when the row must land with other writes (Clips' batch notice, Sprint 13). */
+  async create(
+    input: CreateNotificationInput,
+    tx: PrismaTransactionClient = prisma,
+  ): Promise<NotificationRecord> {
+    return tx.notifications.create({
       data: {
         organizationId: input.organizationId,
         type: input.type,

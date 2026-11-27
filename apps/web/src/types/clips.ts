@@ -161,7 +161,8 @@ export interface ClipImportOutcome {
 }
 
 export type ClipStatusName = 'NEW' | 'DRAFT' | 'HIDDEN';
-export type ClipOriginName = 'MANUAL' | 'AI_SIGNALS' | 'AI_TRANSCRIPT' | 'AUTO_EDIT';
+/** Module 11 adds `MONTAGE`: a clip stitched from several clips (`POST /clips/montages`). */
+export type ClipOriginName = 'MANUAL' | 'AI_SIGNALS' | 'AI_TRANSCRIPT' | 'AUTO_EDIT' | 'MONTAGE';
 
 /** A clip a Find Clips run made (from signals, or from the transcript since Sprint 13). */
 export function isAiOrigin(origin: ClipOriginName | string | null | undefined): boolean {
@@ -176,6 +177,8 @@ export interface ClipMetaView {
   followOnOpen?: 'speaker';
   /** Module 10: the editor runs Detect Camera quietly the first time the clip opens. */
   cameraOnOpen?: boolean;
+  /** Module 11: every video a montage plays besides `videoId`. */
+  videoIds?: string[];
 }
 
 /** One clip with its document (`GET /clips/:clipId`, `POST /clips`). */
@@ -700,6 +703,11 @@ export interface ClipListItem extends ClipSummary {
   platform: ClipVideoPlatform;
   poster: ClipPoster | null;
   preview: ClipPreview | null;
+  /**
+   * Module 11: the recipe the clip wears (`document.recipeId`), so Export All
+   * can preselect a shared recipe's quality. Absent on an older API.
+   */
+  recipeId?: string | null;
 }
 
 export interface ClipListPage {

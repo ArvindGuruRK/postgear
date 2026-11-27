@@ -106,3 +106,20 @@ export const MAX_CAPTION_EDITS = 2_000;
 export const MAX_BLEEPS = 300;
 /** The most stretches of a followed clip a person may fix by hand. */
 export const MAX_FOLLOW_OVERRIDES = 100;
+
+// --- Montage (Sprint 13, Module 11) ------------------------------------------
+
+/** A montage stitches from 2 to 15 clips. */
+export const MONTAGE_MIN_CLIPS = 2;
+export const MONTAGE_MAX_CLIPS = 15;
+/** A montage lasts at most 20 minutes (its joins' overlaps taken off). */
+export const MONTAGE_MAX_MS = 1_200_000;
+/**
+ * The videos one document may play: 15 montage clips each from its own
+ * video, plus a brand intro and outro.
+ */
+export const MAX_SOURCES = 20;
+/** A Fade join mixes the two sides for this long, so each join shortens the clip by it. */
+export const JOIN_FADE_MS = 300;
+/** A montage part's name as the timeline shows it (a clip title's own cap). */
+export const MONTAGE_PART_TITLE_MAX = 200;

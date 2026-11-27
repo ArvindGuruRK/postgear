@@ -22,6 +22,15 @@
  *   waiting imports, highest priority first, then the oldest; it runs when a
  *   job is made, when any job ends (the worker's `settled` call) and in the
  *   reconcile. The claim is serializable, so two callers never overfill.
+ * - **Exports wait their turn too** (Sprint 13, Module 11, the fair render
+ *   queue; it replaces Sprint 12's plan of a few renders per workspace at
+ *   once). An export (RENDER, not a proof) is made QUEUED and started by
+ *   `startWaitingRenders`: one export running per workspace, at most
+ *   `CLIPS_RENDER_SLOTS` across every workspace, the highest priority
+ *   first and equal priorities taking turns (`claimWaitingRenders`). It runs
+ *   when an export is made, when any job ends and in the reconcile. A
+ *   Preview Export skips the queue: it is small, always `low`, and the
+ *   editor waits on it, so it is started at once and holds no slot.
  * - **An Auto-Edit takes its listening with it** (Sprint 13, Module 10).
  *   Cancelling an AUTO_EDIT job also cancels the listen job it started
  *   (`listenStarted`) while that one is still open, through the listen job's
@@ -36,7 +45,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { type ClipJob, ClipJobKind, type Prisma } from '@postgear/db';
 import { clipKeys, type PrivateStorage } from '@postgear/storage';
 import {
@@ -53,6 +64,7 @@ import { ClipErrorException } from '../clip-error.exception';
 import { isUuid } from '../clips.ids';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import type { ClipsTx } from '../clips.tx';
+import { ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
 import { type ClipJobView, median, TERMINAL_JOB_STATUSES, toJobView } from './clip-job-view';
 import { ClipJobsRepository, type NewClipJob } from './clip-jobs.repository';
 
@@ -75,9 +87,20 @@ export interface CreateClipJob<K extends ClipJobKind> {
   priority?: JobPriority;
 }
 
+/** Exports running (or handed to Temporal) at once across every workspace, unless configured. */
+export const DEFAULT_RENDER_SLOTS = 2;
+
+/** A job the fair render queue starts: a RENDER that is not a Preview Export. */
+export function isQueuedRender(job: Pick<ClipJob, 'kind'> & { input?: unknown }): boolean {
+  if (job.kind !== ClipJobKind.RENDER) return false;
+  const input = job.input;
+  return !(input && typeof input === 'object' && (input as { proof?: unknown }).proof === true);
+}
+
 @Injectable()
 export class ClipJobsService {
   private readonly logger = new Logger(ClipJobsService.name);
+  private readonly renderSlots: number;
 
   constructor(
     private readonly repository: ClipJobsRepository,
@@ -85,7 +108,14 @@ export class ClipJobsService {
     private readonly resolver: EntitlementResolver,
     private readonly usage: UsageService,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
-  ) {}
+    // Module 11: the render slots, and the batch notice when a cancel closes a batch's last job.
+    @Optional() config?: ConfigService,
+    @Optional() private readonly batchNotices?: ClipBatchNoticeService,
+  ) {
+    const slots = Number(config?.get('CLIPS_RENDER_SLOTS') ?? DEFAULT_RENDER_SLOTS);
+    this.renderSlots =
+      Number.isFinite(slots) && slots >= 1 ? Math.floor(slots) : DEFAULT_RENDER_SLOTS;
+  }
 
   /** A job id, made before the charge that names it. */
   newJobId(): string {
@@ -136,12 +166,21 @@ export class ClipJobsService {
 
   /**
    * Starts the job's workflow. An IMPORT goes through the workspace's cap
-   * (`startWaiting`), so it may stay QUEUED behind others; any other kind is
-   * started at once. False means it stays QUEUED for later.
+   * (`startWaiting`) and an export through the fair render queue
+   * (`startWaitingRenders`), so either may stay QUEUED behind others; any
+   * other kind, a Preview Export included, is started at once. False means
+   * it stays QUEUED for later. The queue's claim never fails the request
+   * that made the job: a busy database leaves it QUEUED for the next pass.
    */
-  async start(job: Pick<ClipJob, 'id' | 'organizationId' | 'kind'>): Promise<boolean> {
+  async start(
+    job: Pick<ClipJob, 'id' | 'organizationId' | 'kind'> & { input?: unknown },
+  ): Promise<boolean> {
     if (job.kind === ClipJobKind.IMPORT) {
       const started = await this.startWaiting(job.organizationId);
+      return started.includes(job.id);
+    }
+    if (isQueuedRender(job)) {
+      const started = await this.startRendersQuietly(job.organizationId);
       return started.includes(job.id);
     }
     return this.dispatch(job);
@@ -178,6 +217,39 @@ export class ClipJobsService {
       break;
     }
     return started;
+  }
+
+  /**
+   * Module 11: starts the exports the fair render queue allows now, across
+   * every workspace (see `claimWaitingRenders`). Answers the ids started. A
+   * start Temporal refuses gives its claim back and stops the pass (the
+   * reconcile tries again).
+   */
+  async startWaitingRenders(): Promise<string[]> {
+    const claimed = await this.repository.claimWaitingRenders(this.renderSlots, new Date());
+    const started: string[] = [];
+    for (let index = 0; index < claimed.length; index += 1) {
+      const job = claimed[index] as (typeof claimed)[number];
+      if (await this.dispatch(job)) {
+        started.push(job.id);
+        continue;
+      }
+      for (const rest of claimed.slice(index)) {
+        await this.repository.releaseClaim(rest.organizationId, rest.id);
+      }
+      break;
+    }
+    return started;
+  }
+
+  /** `startWaitingRenders` that logs instead of throwing (callers that must not fail). */
+  async startRendersQuietly(orgId: string): Promise<string[]> {
+    try {
+      return await this.startWaitingRenders();
+    } catch (error) {
+      this.logStartFailure(orgId, error);
+      return [];
+    }
   }
 
   /**
@@ -236,6 +308,12 @@ export class ClipJobsService {
           await this.startWaiting(orgId).catch((error: unknown) =>
             this.logStartFailure(orgId, error),
           );
+        }
+        if (job.kind === ClipJobKind.RENDER) {
+          // Module 11: a waiting export left the queue (the next one may start),
+          // and it may have been the last open job of its batch.
+          await this.startRendersQuietly(orgId);
+          await this.batchNotices?.settleJob(job);
         }
       }
     }

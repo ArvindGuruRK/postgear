@@ -100,6 +100,11 @@ import type { CaptionsState } from './use-captions';
 export type CaptionsEdit = (
   change: (track: CaptionsTrack) => CaptionsTrack,
   coalesceKey?: string,
+  /**
+   * Module 11: the one track a word edit is for (word indexes belong to a
+   * transcript). Left out, the change reaches every track of a montage.
+   */
+  trackId?: string,
 ) => void;
 
 export interface CaptionsPanelProps {
@@ -120,7 +125,16 @@ export interface CaptionsPanelProps {
   onRemove: () => void;
   onSeek: (ms: number) => void;
   onNotice: (words: string) => void;
+  /**
+   * Module 11: a montage keeps the captions of its clips. Add, file and
+   * Translate are off (the API refuses them); its style, size and place
+   * still change through the document.
+   */
+  montage?: boolean;
 }
+
+export const MONTAGE_CAPTIONS_FIXED =
+  'A montage keeps the captions of its clips. Change them in a clip, then make the montage again.';
 
 /** The built-in styles as the API lists them, for before the list has loaded. */
 const BUILT_IN: readonly CaptionStyleView[] = CAPTION_STYLES.map((style) => ({
@@ -246,6 +260,7 @@ export function CaptionsPanel({
   onRemove,
   onSeek,
   onNotice,
+  montage = false,
 }: CaptionsPanelProps) {
   const stylesId = useId();
   const languageId = useId();
@@ -327,7 +342,20 @@ export function CaptionsPanel({
     </>
   );
 
+  const montageLine = (
+    <p className="m-0 font-sans text-sm text-ink type-muted" data-testid="clip-captions-montage">
+      {MONTAGE_CAPTIONS_FIXED}
+    </p>
+  );
+
   // ---- No captions yet ---------------------------------------------------------------
+  if (!track && montage) {
+    return (
+      <div className="flex flex-col gap-6 pt-1" data-testid="clip-captions-panel">
+        {montageLine}
+      </div>
+    );
+  }
   if (!track) {
     return (
       <div className="flex flex-col gap-6 pt-1" data-testid="clip-captions-panel">
@@ -411,7 +439,7 @@ export function CaptionsPanel({
       onNotice(CAPTION_EDITS_FULL);
       return;
     }
-    edit((current) => withWordEdit(current, word, change(word)) ?? current);
+    onEdit((current) => withWordEdit(current, word, change(word)) ?? current, undefined, track.id);
   };
 
   return (
@@ -552,7 +580,9 @@ export function CaptionsPanel({
         )}
       </PanelSection>
 
-      {others.length > 0 ? (
+      {montage ? montageLine : null}
+
+      {others.length > 0 && !montage ? (
         <PanelSection title="Translate" headingId={translateId}>
           <LanguageSelect
             value={translateTo}
@@ -585,7 +615,7 @@ export function CaptionsPanel({
       ) : null}
 
       <div className="flex flex-col gap-2 border-t-2 border-outline pt-4">
-        {fileButton}
+        {montage ? null : fileButton}
         <Button variant="danger" className="w-full" disabled={working} onClick={onRemove}>
           Remove Captions
         </Button>

@@ -17,7 +17,7 @@ import {
   transcriptAssetMeta,
 } from '@postgear/video-engine';
 import { FakePrivateStorage, FakeRows, ORG, VIDEO_ID } from '../testing/fakes';
-import { fetchCaptions } from './files';
+import { fetchCaptions, fetchCaptionsTracks } from './files';
 
 const TRANSCRIPT_ID = '33333333-4444-4555-8666-777777777777';
 const STYLE_ID = '44444444-5555-4666-8777-888888888888';
@@ -218,5 +218,95 @@ describe('fetchCaptions', () => {
     const doc = document();
     doc.sources = [...doc.sources, { id: 'two', videoId: OTHER_VIDEO }];
     expect((await fetchCaptions(deps, ORG, VIDEO_ID, doc, dir))?.sourceId).toBe('src');
+  });
+});
+
+describe('fetchCaptionsTracks (Module 11: a montage of two videos)', () => {
+  const OTHER_TRANSCRIPT = '55555555-6666-4777-8888-999999999999';
+  const OTHER_KEY = `clips/${ORG}/${OTHER_VIDEO}/transcript-${'e'.repeat(32)}.json.gz`;
+  const said = mergeTranscript(emptyTranscript('en', 'simulation'), {
+    ranges: [{ fromMs: 0, toMs: 30_000 }],
+    words: [{ start: 2_000, end: 2_400, text: 'Other', sure: 0.8 }],
+  });
+
+  /** Two videos, one captions track each, the second with its own (ignored) style. */
+  function montageDoc(otherTranscript = OTHER_TRANSCRIPT): ClipDocument {
+    const doc = document();
+    const first = doc.tracks[0] as Extract<ClipDocument['tracks'][number], { kind: 'captions' }>;
+    doc.sources = [...doc.sources, { id: 'two', videoId: OTHER_VIDEO }];
+    doc.segments = [
+      ...doc.segments,
+      { id: 'seg2', source: 'two', sourceIn: 0, sourceOut: 5_000, speed: 1, volume: 1 },
+    ];
+    doc.tracks = [
+      { ...first, source: 'src' },
+      { ...first, id: 'cc2', source: 'two', transcriptAssetId: otherTranscript, styleId: 'clean' },
+    ];
+    return doc;
+  }
+
+  function montageSetup(otherVideo = OTHER_VIDEO) {
+    const base = setup();
+    base.storage.objects.set(OTHER_KEY, gzipSync(Buffer.from(encodeTranscript(said))));
+    base.rows.assets.push({
+      id: OTHER_TRANSCRIPT,
+      kind: 'TRANSCRIPT',
+      key: OTHER_KEY,
+      bytes: 1,
+      videoId: otherVideo,
+      clipId: null,
+      meta: { ...transcriptAssetMeta(said, []), source: 'supplied' },
+      createdAt: new Date(),
+    });
+    return base;
+  }
+
+  it("reads each track's transcript among its own video's assets, in the first track's look", async () => {
+    const { deps, rows } = montageSetup();
+    const asked: Array<[string, string]> = [];
+    const original = rows.videoAssets.bind(rows);
+    rows.videoAssets = async (org: string, videoId: string) => {
+      asked.push([org, videoId]);
+      return original(org, videoId);
+    };
+    const fetched = await fetchCaptionsTracks(deps, ORG, VIDEO_ID, montageDoc(), dir);
+    expect(asked).toEqual([
+      [ORG, VIDEO_ID],
+      [ORG, OTHER_VIDEO],
+    ]);
+    expect(Object.keys(fetched.captionsByTrack ?? {})).toEqual(['cc', 'cc2']);
+    expect(fetched.captions).toBe(fetched.captionsByTrack?.cc);
+    const second = fetched.captionsByTrack?.cc2;
+    expect(second?.transcript.words.map((word) => word.text)).toEqual(['Other']);
+    expect(second?.sourceId).toBe('two');
+    expect(second?.wordTimed).toBe(false);
+    // Drawn in the first track's style, not its own.
+    expect(second?.look).toEqual(builtInCaptionStyle('bold-pop')?.look);
+    expect(fetched.captionsByTrack?.cc?.sourceId).toBe('src');
+  });
+
+  it("stops with captions_missing when a track's transcript is another video's", async () => {
+    // The second transcript is stored on the first video, not the one its track names.
+    const { deps } = montageSetup(VIDEO_ID);
+    await expect(fetchCaptionsTracks(deps, ORG, VIDEO_ID, montageDoc(), dir)).rejects.toMatchObject(
+      { code: 'captions_missing', retryable: false },
+    );
+  });
+
+  it("never reads another workspace's transcripts for any track", async () => {
+    const { deps, rows } = montageSetup();
+    const original = rows.videoAssets.bind(rows);
+    rows.videoAssets = async (org: string, videoId: string) =>
+      org === ORG ? original(org, videoId) : [];
+    await expect(
+      fetchCaptionsTracks(deps, 'other-org', VIDEO_ID, montageDoc(), dir),
+    ).rejects.toMatchObject({ code: 'captions_missing' });
+  });
+
+  it('keeps one track as it was: no list by track', async () => {
+    const { deps } = setup();
+    const fetched = await fetchCaptionsTracks(deps, ORG, VIDEO_ID, document(), dir);
+    expect(fetched.captionsByTrack).toBeUndefined();
+    expect(fetched.captions?.transcript.words).toHaveLength(2);
   });
 });

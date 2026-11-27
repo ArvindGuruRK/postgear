@@ -22,6 +22,9 @@
  *   layout change here turns it off first, in the same undo step, so the
  *   person's own layout (`follow.saved`) is what the change starts from.
  * - **My Layouts**: the workspace's saved layouts for this shape.
+ * - Module 11, a montage: the layouts frame one original clip at a time (the
+ *   part picked on the timeline); a line names it. The editor hands this
+ *   panel that part's layout as the document's.
  *
  * Every choice is one undo step and goes through the store's `apply`, which
  * checks the result against the document schema, so a refused change never
@@ -42,7 +45,7 @@ import {
   setFitCrop,
 } from '@postgear/video-engine';
 import { useId } from 'react';
-import { GroupLabel } from '@/components/studio/panel-ui';
+import { GroupLabel, NOTE } from '@/components/studio/panel-ui';
 import type { SavedLayoutView } from '@/types/clips';
 import { BrandKitSection } from './brand-kit-section';
 import { DetectCamera } from './detect-camera';
@@ -80,6 +83,8 @@ export function LayoutsPanel({
   onEdit,
   follow,
   grabPicture,
+  partName = null,
+  sourceSizes,
 }: {
   clipId: string;
   document: ClipDocument;
@@ -94,6 +99,10 @@ export function LayoutsPanel({
   follow?: FollowSpeakerController;
   /** Module 08: the editor's video, for the many-faces picker's thumbnails. */
   grabPicture?: GrabPicture;
+  /** Module 11: on a montage, the original clip the layouts change now. */
+  partName?: string | null;
+  /** Module 11: each other video's picture size by source id, so a new shape refits every part. */
+  sourceSizes?: Readonly<Record<string, CanvasSize>>;
 }) {
   const shapeId = useId();
   const fitId = useId();
@@ -103,7 +112,7 @@ export function LayoutsPanel({
 
   const chooseShape = (next: Ratio) =>
     onEdit(
-      unfollowFirst((doc) => setCanvasRatio(doc, next, videoSize)),
+      unfollowFirst((doc) => setCanvasRatio(doc, next, videoSize, { sourceSizes })),
       `Shape changed to ${layoutShapeName(next)}.`,
     );
   const chooseLayout = (next: PresetKind) =>
@@ -145,6 +154,11 @@ export function LayoutsPanel({
       </div>
 
       <div className="flex flex-col gap-3">
+        {partName ? (
+          <p className={NOTE} data-testid="clip-layout-part">
+            {montagePartSentence(partName)}
+          </p>
+        ) : null}
         <ChoiceTiles<PresetKind | 'custom'>
           labelledBy={labelledBy}
           columns={3}
@@ -188,6 +202,11 @@ export function LayoutsPanel({
       />
     </div>
   );
+}
+
+/** Which original clip of a montage the layouts change now. */
+export function montagePartSentence(name: string): string {
+  return `These layouts change ${name}. Pick another part on the timeline to change it.`;
 }
 
 /** The outline of a shape, 32 px on its long side (decorative: the tile names it). */

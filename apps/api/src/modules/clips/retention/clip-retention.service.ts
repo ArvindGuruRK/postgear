@@ -14,18 +14,24 @@
  *   are kept but marked `removedAt` (their Media rows are not touched). The
  *   row stays: it holds the rights record. Then its private files go. A
  *   removal never gives import minutes back.
+ * - **Montages** (Sprint 13, Module 11): a montage is a clip of EVERY video
+ *   it plays (`videoId` and `meta.videoIds`), so removing any of them
+ *   deletes the montage when it was never exported and marks it `removedAt`
+ *   when it was (its Media file stays), and stops its open jobs, exactly as
+ *   for the video's own clips (`clipsPlayingVideo`).
  *
  * A person's delete keeps `status` as it was, so an import that failed and
  * was deleted still reads as such in the rights record; every list already
  * hides a row with `deletedAt`.
  */
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ClipVideoStatus, type Prisma, prisma } from '@postgear/db';
+import { ClipOrigin, ClipVideoStatus, type Prisma, prisma } from '@postgear/db';
 import { clipKeys, type PrivateStorage } from '@postgear/storage';
 import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
 import { OPEN_JOB_STATUSES } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
+import { clipsPlayingVideo } from '../montages/montage-videos';
 import { expiryFrom, needsTouch, nextExpiry, retentionDaysOf } from './clip-retention.rules';
 
 /** Why a video went: stored in `ClipVideo.removedReason`. */
@@ -135,33 +141,56 @@ export class ClipRetentionService {
           ...(reason === 'deleted' ? {} : { status: ClipVideoStatus.REMOVED }),
         } satisfies Prisma.ClipVideoUpdateManyMutationInput,
       });
-      if (marked.count === 0) return false;
+      if (marked.count === 0) return null;
       await tx.clipAsset.deleteMany({ where: { organizationId: orgId, videoId } });
-      await tx.clip.deleteMany({
-        where: { organizationId: orgId, videoId, lastExportedRevision: null },
+      const ofVideo = clipsPlayingVideo(orgId, videoId);
+      // Module 11: a montage that goes takes the files of its own it holds on its OTHER
+      // videos (a translation of their captions), which the prefix below does not reach.
+      // Left behind, their rows would fall to `clipId: null` and pass for a video's own.
+      const goingMontages = await tx.clip.findMany({
+        where: { ...ofVideo, origin: ClipOrigin.MONTAGE, lastExportedRevision: null },
+        select: { id: true },
       });
+      const montageFiles =
+        goingMontages.length > 0
+          ? await tx.clipAsset.findMany({
+              where: {
+                organizationId: orgId,
+                clipId: { in: goingMontages.map((clip) => clip.id) },
+              },
+              select: { id: true, key: true },
+            })
+          : [];
+      if (montageFiles.length > 0) {
+        await tx.clipAsset.deleteMany({
+          where: { organizationId: orgId, id: { in: montageFiles.map((file) => file.id) } },
+        });
+      }
+      await tx.clip.deleteMany({ where: { ...ofVideo, lastExportedRevision: null } });
       await tx.clip.updateMany({
-        where: { organizationId: orgId, videoId, removedAt: null },
+        where: { ...ofVideo, removedAt: null },
         data: { removedAt: now },
       });
-      return true;
+      return { montageKeys: montageFiles.map((file) => file.key) };
     });
     if (!removed) return null;
 
     await this.deleteFiles(orgId, videoId);
+    for (const key of removed.montageKeys) await this.deleteFile(key);
     this.logger.log(JSON.stringify({ event: 'clips.video.removed', videoId, reason }));
     return video;
   }
 
   /**
-   * Stops every open job of the video and of its clips (imports, sharp
-   * ranges, exports, Find Clips). A job that already ended or a Temporal
-   * that is away is logged: its workflow then finds the video gone.
+   * Stops every open job of the video and of its clips, montages that play
+   * it included (imports, sharp ranges, exports, Find Clips). A job that
+   * already ended or a Temporal that is away is logged: its workflow then
+   * finds the video gone.
    */
   private async stopOpenJobs(orgId: string, videoId: string): Promise<void> {
     const clipIds = (
       await prisma.clip.findMany({
-        where: { organizationId: orgId, videoId },
+        where: clipsPlayingVideo(orgId, videoId),
         select: { id: true },
       })
     ).map((clip) => clip.id);
@@ -185,6 +214,20 @@ export class ClipRetentionService {
           }),
         );
       }
+    }
+  }
+
+  /** One file, best effort, as `deleteFiles`. */
+  private async deleteFile(key: string): Promise<void> {
+    try {
+      await this.storage.delete(key);
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.video.file_left',
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
     }
   }
 

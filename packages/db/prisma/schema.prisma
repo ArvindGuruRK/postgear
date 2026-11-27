@@ -1842,6 +1842,9 @@ enum ClipOrigin {
   // video made into one edited clip by a recipe (Module 10).
   AI_TRANSCRIPT
   AUTO_EDIT
+  // Module 11: stitched from 2 to 15 other clips, a snapshot. `videoId` is
+  // the first clip's video; `meta.videoIds` lists every other video it plays.
+  MONTAGE
 }
 
 enum ClipAssetKind {

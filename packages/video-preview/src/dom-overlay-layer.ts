@@ -189,9 +189,13 @@ export class DomOverlayLayer implements OverlayLayer {
   /** Decoded moving pictures by address: null when this browser cannot decode one. */
   private readonly frames = new Map<string, StickerFrames | null>();
   private readonly loadingFrames = new Set<string>();
-  /** Sprint 13: the clip's captions, laid out by the engine; null when it has none. */
-  private captions: CaptionLayout | null = null;
-  private captionsNode: CaptionsNode | null = null;
+  /**
+   * Sprint 13: the clip's captions, laid out by the engine, one layout per
+   * captions track (a montage has one per video, Module 11); empty for none.
+   */
+  private captions: readonly CaptionLayout[] = [];
+  private captionsInput: CaptionLayout | readonly CaptionLayout[] | null = null;
+  private captionsNodes: CaptionsNode[] = [];
 
   constructor(options: DomOverlayLayerOptions = {}) {
     this.manifest = options.manifest ?? FONT_MANIFEST;
@@ -238,11 +242,15 @@ export class DomOverlayLayer implements OverlayLayer {
   /**
    * The clip's captions as the engine laid them out (`captionLayout`), or
    * null for none. The same pages the export draws: the layer only looks up
-   * the page of each moment.
+   * the page of each moment. A montage (Module 11) passes one layout per
+   * captions track (`captionsTracksOf`), each laid out with its own
+   * transcript; the same list again (by identity) changes nothing.
    */
-  setCaptions(layout: CaptionLayout | null): void {
-    if (this.captions === layout) return;
-    this.captions = layout;
+  setCaptions(layout: CaptionLayout | readonly CaptionLayout[] | null): void {
+    if (this.captionsInput === layout) return;
+    this.captionsInput = layout;
+    this.captions =
+      layout === null ? [] : Array.isArray(layout) ? [...layout] : [layout as CaptionLayout];
     if (this.lastState) this.draw(this.lastState, true);
   }
 
@@ -259,8 +267,8 @@ export class DomOverlayLayer implements OverlayLayer {
     for (const node of this.badgeNodes.values()) node.remove();
     this.badgeNodes.clear();
     this.badgeMemos.clear();
-    this.captionsNode?.remove();
-    this.captionsNode = null;
+    for (const node of this.captionsNodes) node.remove();
+    this.captionsNodes = [];
     for (const frames of this.frames.values()) frames?.close();
     this.frames.clear();
     this.loadingFrames.clear();
@@ -501,22 +509,29 @@ export class DomOverlayLayer implements OverlayLayer {
     node.words.textContent = displayText(item);
   }
 
-  /** The captions block: made when the clip has captions, gone when it has none. */
+  /**
+   * The captions blocks, one per layout: made when the clip has captions,
+   * gone when it has none. A montage's tracks play on different parts, so
+   * at most one shows at a time, except inside a Fade join, where both
+   * sides' words show as they do in the export.
+   */
   private drawCaptions(state: FrameState, box: HTMLDivElement): void {
-    const layout = this.captions;
-    if (!layout) {
-      this.captionsNode?.remove();
-      this.captionsNode = null;
-      return;
+    const layouts = this.captions;
+    while (this.captionsNodes.length > layouts.length) {
+      this.captionsNodes.pop()?.remove();
     }
-    if (!this.captionsNode) {
-      this.captionsNode = new CaptionsNode(box.ownerDocument, box, this.manifest, this.fontFamily);
-    }
-    const { look } = layout;
-    const weight = resolveTextFont(this.manifest, look.font, look.weight)?.weight ?? look.weight;
-    const fontKey = `${weight} ${look.italic ? 'italic' : 'normal'} ${look.font}`;
-    const ready = this.ensureFont(fontKey, look.font, weight, look.italic);
-    this.captionsNode.update(layout, state.outputMs, ready);
+    layouts.forEach((layout, i) => {
+      let node = this.captionsNodes[i];
+      if (!node) {
+        node = new CaptionsNode(box.ownerDocument, box, this.manifest, this.fontFamily);
+        this.captionsNodes[i] = node;
+      }
+      const { look } = layout;
+      const weight = resolveTextFont(this.manifest, look.font, look.weight)?.weight ?? look.weight;
+      const fontKey = `${weight} ${look.italic ? 'italic' : 'normal'} ${look.font}`;
+      const ready = this.ensureFont(fontKey, look.font, weight, look.italic);
+      node.update(layout, state.outputMs, ready);
+    });
   }
 
   /** True when the face is ready to draw; otherwise starts loading it and redraws when it lands. */

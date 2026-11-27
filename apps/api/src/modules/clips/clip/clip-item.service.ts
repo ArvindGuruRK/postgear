@@ -21,7 +21,10 @@
  *   pictures and sound. An AI clip (Module 16) is made with no sharp range;
  *   its first read starts the SEGMENT job (`firstOpenSegment`). Module 10
  *   adds `extraSources`: the light copy of every other video the document
- *   plays (a brand kit's intro or outro).
+ *   plays (a brand kit's intro or outro; Module 11, a montage's videos).
+ *   Module 11: a montage whose videos include a removed one is 422
+ *   `montage_video_removed`; a montage's `sharp` is judged per source on its
+ *   own video, and it has no `held` (that is one stretch of one video).
  * - **More video** (Module 09 section 3): a trim past the sharp range asks
  *   for a wider one. Nothing is fetched when a sharp range or an open job
  *   already covers it, or when the platform copy is gone; otherwise a
@@ -86,7 +89,8 @@ import {
 } from './clip-item.schema';
 import { type ClipMetaView, clipMetaView } from './clip-meta';
 import { type ClipState, clipStateOf, scheduledClipIds } from './clip-state';
-import { documentRange, sharpSourceFor } from './sharp-source';
+import { assertMontageVideosLive, isMontage, touchVideosOfClip } from '../montages/montage-videos';
+import { allSourcesSharp, documentRange, sharpSourceFor, sharpSourcesFor } from './sharp-source';
 
 /** New clips are vertical, the shape short video lives in; the editor changes it. */
 const NEW_CLIP_RATIO = '9:16' as const;
@@ -308,6 +312,8 @@ export class ClipItemService {
 
   async get(orgId: string, clipId: string): Promise<ClipDetail> {
     const clip = await this.requireClip(orgId, clipId);
+    // Module 11: a montage whose videos include a removed one cannot be opened.
+    await assertMontageVideosLive(prisma, orgId, clip);
     const [video, scheduled] = await Promise.all([
       prisma.clipVideo.findFirst({ where: { id: clip.videoId, organizationId: orgId } }),
       scheduledClipIds(orgId, [clip.id]),
@@ -315,8 +321,8 @@ export class ClipItemService {
     const live = video && video.deletedAt === null && video.status !== 'REMOVED' ? video : null;
     const view = toClipView(clip, scheduled.has(clip.id));
     view.usesAiVoice = await documentUsesAiVoice(orgId, view.document);
-    // Module 19: opening a clip in the editor counts as using its video.
-    if (live) await this.retention.touchVideo(orgId, live.id);
+    // Module 19: opening a clip in the editor counts as using its video (a montage: each of them).
+    if (live) await touchVideosOfClip(this.retention, orgId, clip);
 
     if (!live || !view.document) {
       return {
@@ -330,6 +336,17 @@ export class ClipItemService {
     }
 
     const assets = await this.videos.assetsOf(orgId, live.id);
+    if (isMontage(clip)) {
+      const [media, sharp, extraSources] = await Promise.all([
+        live.status === 'READY'
+          ? signVideoMedia(assets, (key) => this.playback.address(key))
+          : Promise.resolve(NO_VIDEO_MEDIA),
+        this.montageSharpness(orgId, clip, view.document, live.id, assets),
+        this.extraSources(orgId, clip, view.document),
+      ]);
+      // No `held`: it is one stretch of one video, and a montage's parts are many videos'.
+      return { clip: view, video: toVideoView(live), ...media, sharp, held: null, extraSources };
+    }
     const source = sharpSourceFor(view.document, assets);
     const [media, open, extraSources] = await Promise.all([
       live.status === 'READY'
@@ -357,6 +374,53 @@ export class ClipItemService {
     }
     const held = heldRange(documentRange(view.document), assets);
     return { clip: view, video: toVideoView(live), ...media, sharp, held, extraSources };
+  }
+
+  /**
+   * Module 11: a montage is sharp when every one of its sources reads a
+   * covering SEGMENT of its own video (the worker reads one file per
+   * source); `fetching` while a SEGMENT job of the montage, or of a video
+   * whose part is not covered yet, is still open; else `gone` (those parts
+   * export from the light copy).
+   */
+  private async montageSharpness(
+    orgId: string,
+    clip: Clip,
+    document: ClipDocument,
+    firstVideoId: string,
+    firstAssets: Awaited<ReturnType<ClipVideosRepository['assetsOf']>>,
+  ): Promise<SharpState> {
+    const videoIds = [
+      ...new Set(
+        document.sources.map((source) => source.videoId).filter((id) => id !== firstVideoId),
+      ),
+    ];
+    const rows =
+      videoIds.length > 0
+        ? await prisma.clipAsset.findMany({
+            where: { organizationId: orgId, videoId: { in: videoIds } },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          })
+        : [];
+    const byVideo = new Map<string, typeof rows>([[firstVideoId, firstAssets]]);
+    for (const row of rows) {
+      if (!row.videoId) continue;
+      byVideo.set(row.videoId, [...(byVideo.get(row.videoId) ?? []), row]);
+    }
+    const sources = sharpSourcesFor(document, (videoId) => byVideo.get(videoId) ?? []);
+    if (allSourcesSharp(sources)) return 'ready';
+    const soft = [
+      ...new Set(sources.filter((entry) => !entry.sharp).map((entry) => entry.videoId)),
+    ];
+    const open = await prisma.clipJob.count({
+      where: {
+        organizationId: orgId,
+        kind: ClipJobKind.SEGMENT,
+        status: { in: [...OPEN_JOB_STATUSES] },
+        OR: [{ clipId: clip.id }, { videoId: { in: soft } }],
+      },
+    });
+    return open > 0 ? 'fetching' : 'gone';
   }
 
   /**

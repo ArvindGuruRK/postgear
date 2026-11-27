@@ -7,7 +7,7 @@
 import { HttpException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { ClipJob, ClipVideo } from '@postgear/db';
-import { createClipDocument, HANDLE_MS } from '@postgear/video-engine';
+import { createClipDocument, createMontage, HANDLE_MS } from '@postgear/video-engine';
 import { RedisService } from '../../redis/redis.service';
 import { ClipErrorException } from '../clip-error.exception';
 import type { ClipJobsRepository, NewClipJob } from '../jobs/clip-jobs.repository';
@@ -366,6 +366,119 @@ describe('ClipItemService.get', () => {
       proxy: { width: 1080, height: 1920, fps: 30 },
     });
     expect(JSON.stringify(detail)).not.toContain('k/foreign');
+  });
+
+  // Sprint 13, Module 11: a montage of clips from two videos.
+  describe('of a montage', () => {
+    const SECOND = '99999999-9999-4999-8999-00000000000b';
+    function montageTables(): FakeTables {
+      const tables = seed();
+      tables.videos.push(videoRow({ id: SECOND, status: 'READY', durationMs: 60_000 }));
+      const made = createMontage(
+        [
+          {
+            id: '55555555-5555-4555-8555-000000000001',
+            title: 'One',
+            document: createClipDocument({
+              videoId: VIDEO,
+              fromMs: 60_000,
+              toMs: 90_000,
+              ratio: '9:16',
+            }),
+          },
+          {
+            id: '55555555-5555-4555-8555-000000000002',
+            title: 'Two',
+            document: createClipDocument({
+              videoId: SECOND,
+              fromMs: 5_000,
+              toMs: 25_000,
+              ratio: '9:16',
+            }),
+          },
+        ],
+        { transition: 'fade' },
+      );
+      if (!made.ok) throw new Error(made.code);
+      tables.clips[0] = clipRow({
+        id: CLIP,
+        videoId: VIDEO,
+        origin: 'MONTAGE',
+        meta: { videoIds: [SECOND] },
+        document: made.document,
+      });
+      tables.assets.push(
+        assetRow({ id: 'p0', kind: 'PROXY', key: 'k/main', meta: { width: 1280, height: 720 } }),
+        assetRow({ id: 'p1', videoId: SECOND, kind: 'PROXY', key: 'k/second' }),
+        assetRow({
+          id: 's0',
+          kind: 'SEGMENT',
+          key: 'k/seg-main',
+          meta: { fromMs: 50_000, toMs: 100_000, height: 1080, fps: 30 },
+        }),
+      );
+      return tables;
+    }
+
+    it('plays every montage video in the editor, judges sharpness per video and holds no stretch', async () => {
+      const tables = montageTables();
+      const { service, retention } = setup(tables);
+
+      const detail = await service.get(TEST_ORG, CLIP);
+      expect(detail.clip).toMatchObject({ origin: 'MONTAGE', meta: { videoIds: [SECOND] } });
+      const second = Object.entries(detail.extraSources).map(([, media]) => media.videoId);
+      expect(second).toEqual([SECOND]);
+      expect(detail.playback?.url).toBe('https://signed/k/main');
+      // The second video has only its light copy: that part exports soft.
+      expect(detail.sharp).toBe('gone');
+      expect(detail.held).toBeNull();
+      expect(retention.touchVideo.mock.calls.map((call) => (call as unknown[])[1])).toEqual([
+        VIDEO,
+        SECOND,
+      ]);
+
+      tables.assets.push(
+        assetRow({
+          id: 's1',
+          videoId: SECOND,
+          kind: 'SEGMENT',
+          key: 'k/seg-second',
+          meta: { fromMs: 0, toMs: 30_000, height: 1080, fps: 30 },
+        }),
+      );
+      expect((await setup(tables).service.get(TEST_ORG, CLIP)).sharp).toBe('ready');
+    });
+
+    it('answers fetching while a sharp range of a soft video is still coming', async () => {
+      const tables = montageTables();
+      tables.jobs.push(
+        jobRow({
+          id: '77777777-7777-4777-8777-000000000009',
+          kind: 'SEGMENT',
+          status: 'RUNNING',
+          videoId: SECOND,
+          clipId: '55555555-5555-4555-8555-000000000002',
+        }),
+      );
+      expect((await setup(tables).service.get(TEST_ORG, CLIP)).sharp).toBe('fetching');
+    });
+
+    it('cannot be opened once one of its videos was removed: 422 montage_video_removed', async () => {
+      const tables = montageTables();
+      const second = tables.videos.find((video) => video.id === SECOND);
+      if (!second) throw new Error('no video');
+      second.status = 'REMOVED';
+      second.deletedAt = new Date();
+      const { service, retention } = setup(tables);
+      expect(await refusal(service.get(TEST_ORG, CLIP))).toEqual({
+        status: 422,
+        body: {
+          code: 'montage_video_removed',
+          message: 'One of the videos in this montage was removed.',
+        },
+      });
+      expect(retention.touchVideo).not.toHaveBeenCalled();
+    });
   });
 
   it('answers no extra sources for a clip of one video', async () => {

@@ -19,13 +19,21 @@
  * - `GET /clips/:clipId/previews/latest` is the newest proof, with a signed
  *   address (one hour) while its file is kept (24 hours after it finished).
  *
+ * Sprint 13, Module 11: an export is made QUEUED and started by the fair
+ * render queue (`ClipJobsService.startWaitingRenders`), one export at a time
+ * per workspace; a preview skips the queue. Export All
+ * (`exports/clip-batch-exports.service.ts`) freezes each clip with the same
+ * `freezeClipForExport` and the same plan values.
+ *
  * Every route answers 404 for another workspace's clip before anything else.
+ * Module 11: a montage whose videos include a removed one is 422
+ * `montage_video_removed` on every export route (`assertMontageVideosLive`).
  * An export or preview checks every video the document plays (Module 10: a
  * brand intro or outro is another video): each must be the workspace's,
  * live and READY, or it is refused as the clip's own video would be.
  */
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { type ClipJob, ClipJobKind, prisma } from '@postgear/db';
+import { type Clip, type ClipJob, ClipJobKind, prisma } from '@postgear/db';
 import type { PrivateStorage, StorageBackend } from '@postgear/storage';
 import {
   allowedQualities,
@@ -50,6 +58,7 @@ import { type ClipJobView, toJobView } from '../jobs/clip-job-view';
 import { ClipJobsRepository, OPEN_JOB_STATUSES } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { assertMontageVideosLive, touchVideosOfClip } from '../montages/montage-videos';
 import { ClipRetentionService } from '../retention/clip-retention.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import type { ExportClipInput, PreviewClipInput } from './clip-item.schema';
@@ -66,7 +75,7 @@ export const PREVIEW_URL_SECONDS = 60 * 60;
 const PREVIEW_QUALITY: ExportQuality = '720p';
 
 /** The plan values an export reads, once. */
-const EXPORT_PLAN_KEYS = [
+export const EXPORT_PLAN_KEYS = [
   'clips.export_max_quality',
   'clips.export_watermark',
   'clips.queue_priority',
@@ -122,12 +131,12 @@ function inputOf(job: Pick<ClipJob, 'input'>): StoredRenderInput {
   return job.input && typeof job.input === 'object' ? (job.input as StoredRenderInput) : {};
 }
 
-function fingerprintOf(job: Pick<ClipJob, 'input'>): string | null {
+export function fingerprintOf(job: Pick<ClipJob, 'input'>): string | null {
   const value = inputOf(job).fingerprint;
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-function qualityOf(job: Pick<ClipJob, 'input'>): ExportQuality {
+export function qualityOf(job: Pick<ClipJob, 'input'>): ExportQuality {
   const value = inputOf(job).quality;
   return (EXPORT_QUALITIES as readonly unknown[]).includes(value)
     ? (value as ExportQuality)
@@ -139,7 +148,7 @@ function outputOf(job: Pick<ClipJob, 'output'>) {
   return parsed.success ? parsed.data : null;
 }
 
-function priorityOf(value: unknown): JobPriority {
+export function priorityOf(value: unknown): JobPriority {
   return (JOB_PRIORITIES as readonly unknown[]).includes(value) ? (value as JobPriority) : 'normal';
 }
 
@@ -176,7 +185,7 @@ export class ClipExportsService {
       );
     }
 
-    const job = await serializable(async (tx) => {
+    const made = await serializable(async (tx) => {
       const { clip, video, doc } = await this.readClip(tx, orgId, clipId, body.revision);
       const running = await tx.clipJob.count({
         where: {
@@ -209,11 +218,12 @@ export class ClipExportsService {
           fingerprint: documentFingerprint(doc),
         },
       });
-      return this.jobsRepository.create(row, tx);
+      return { job: await this.jobsRepository.create(row, tx), clip };
     });
+    const { job } = made;
 
-    // Module 19: an export counts as using the clip's video.
-    if (job.videoId) await this.retention.touchVideo(orgId, job.videoId);
+    // Module 19: an export counts as using the clip's video (a montage's: every one it plays).
+    await touchVideosOfClip(this.retention, orgId, made.clip);
     await this.jobs.start(job);
     const fresh = (await this.jobsRepository.find(orgId, job.id)) ?? job;
     return { job: toJobView(fresh) };
@@ -375,51 +385,8 @@ export class ClipExportsService {
   }
 
   /** The clip, its READY video and its document, read inside the transaction. */
-  private async readClip(
-    tx: ClipsTx,
-    orgId: string,
-    clipId: string,
-    revision: number | undefined,
-  ): Promise<{
-    clip: { id: string; revision: number; title: string };
-    video: { id: string };
-    doc: ClipDocument;
-  }> {
-    const clip = await tx.clip.findFirst({ where: { id: clipId, organizationId: orgId } });
-    if (!clip) throw clipNotFound();
-    if (revision !== undefined && revision !== clip.revision) {
-      throw new ClipErrorException(HttpStatus.CONFLICT, 'clip_changed_elsewhere', {
-        details: { revision: clip.revision },
-      });
-    }
-    const video = await this.videos.findLive(orgId, clip.videoId, tx);
-    if (!video) throw videoNotFound();
-    if (video.status !== 'READY') {
-      throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
-    }
-    const parsed = safeParseClipDocument(clip.document);
-    if (!parsed.ok) {
-      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'tool_failed', {
-        message: CLIPS_MESSAGES.CLIP_UNREADABLE,
-      });
-    }
-    // Module 10: every other video the clip plays (a brand intro or outro, Module 11's montage)
-    // is frozen with it and must be live and READY too; a removed one fails like the clip's own.
-    const others = [
-      ...new Set(
-        parsed.doc.sources
-          .map((source) => source.videoId)
-          .filter((videoId) => videoId !== video.id),
-      ),
-    ];
-    for (const videoId of others) {
-      const other = await this.videos.findLive(orgId, videoId, tx);
-      if (!other) throw videoNotFound();
-      if (other.status !== 'READY') {
-        throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
-      }
-    }
-    return { clip, video, doc: parsed.doc };
+  private readClip(tx: ClipsTx, orgId: string, clipId: string, revision: number | undefined) {
+    return freezeClipForExport(tx, this.videos, orgId, clipId, revision);
   }
 
   /** A one hour read address for the preview's file, or null when it cannot be made. */
@@ -436,4 +403,64 @@ export class ClipExportsService {
       return null;
     }
   }
+}
+
+/** What an export freezes of a clip. */
+export interface FrozenClip {
+  clip: Pick<Clip, 'id' | 'revision' | 'title' | 'origin' | 'videoId' | 'meta'>;
+  video: { id: string };
+  doc: ClipDocument;
+}
+
+/**
+ * The clip, its READY video and its document, read inside the export's
+ * transaction (the single export, Preview Export and Export All). 404 for
+ * another workspace's clip or a gone video, 409 `clip_changed_elsewhere`
+ * for a stale revision, 409 `video_not_ready`, 422 for a document that no
+ * longer reads. Every other video the document plays must be live and READY
+ * too.
+ */
+export async function freezeClipForExport(
+  tx: ClipsTx,
+  videos: ClipVideosRepository,
+  orgId: string,
+  clipId: string,
+  revision: number | undefined,
+): Promise<FrozenClip> {
+  const clip = await tx.clip.findFirst({ where: { id: clipId, organizationId: orgId } });
+  if (!clip) throw clipNotFound();
+  if (revision !== undefined && revision !== clip.revision) {
+    throw new ClipErrorException(HttpStatus.CONFLICT, 'clip_changed_elsewhere', {
+      details: { revision: clip.revision },
+    });
+  }
+  // Module 11 (builder D's rule): a montage whose videos include a removed one is 422
+  // `montage_video_removed`, checked before its first video so the sentence names the montage.
+  await assertMontageVideosLive(tx, orgId, clip);
+  const video = await videos.findLive(orgId, clip.videoId, tx);
+  if (!video) throw videoNotFound();
+  if (video.status !== 'READY') {
+    throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
+  }
+  const parsed = safeParseClipDocument(clip.document);
+  if (!parsed.ok) {
+    throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'tool_failed', {
+      message: CLIPS_MESSAGES.CLIP_UNREADABLE,
+    });
+  }
+  // Module 10: every other video the clip plays (a brand intro or outro, Module 11's montage)
+  // is frozen with it and must be live and READY too; a removed one fails like the clip's own.
+  const others = [
+    ...new Set(
+      parsed.doc.sources.map((source) => source.videoId).filter((videoId) => videoId !== video.id),
+    ),
+  ];
+  for (const videoId of others) {
+    const other = await videos.findLive(orgId, videoId, tx);
+    if (!other) throw videoNotFound();
+    if (other.status !== 'READY') {
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
+    }
+  }
+  return { clip, video, doc: parsed.doc };
 }

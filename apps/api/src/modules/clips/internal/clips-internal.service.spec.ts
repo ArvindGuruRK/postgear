@@ -10,6 +10,7 @@ import type { UsageService } from '../../entitlements/usage.service';
 import type { MediaService } from '../../media/media.service';
 import type { NotificationsService } from '../../notifications/notifications.service';
 import type { ClipWorkflowState, SchedulingService } from '../../scheduling/scheduling.service';
+import type { ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
 import type { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
@@ -21,6 +22,7 @@ import { ClipsInternalService } from './clips-internal.service';
 const JOB_ID = '33333333-3333-4333-8333-333333333333';
 const CLIP_ID = '55555555-5555-4555-8555-555555555555';
 const MEDIA_ID = '66666666-6666-4666-8666-666666666666';
+const BATCH_ID = '12121212-1212-4121-8121-121212121212';
 
 const db = {
   jobs: [] as ClipJob[],
@@ -123,6 +125,8 @@ function deps() {
   const jobs = {
     startWaiting: jest.fn(async () => ['started-1']),
     restart: jest.fn(async () => true),
+    // Sprint 13, Module 11: the fair render queue.
+    startRendersQuietly: jest.fn(async (): Promise<string[]> => []),
   };
   const jobsRepository = {
     find: jest.fn(
@@ -174,6 +178,10 @@ function deps() {
     ),
     applyToRun: jest.fn(async () => ({ applied: 2, skipped: 0 })),
   };
+  const batchNotices = {
+    settleJob: jest.fn(async () => false),
+    sweep: jest.fn(async () => 0),
+  };
 
   const internal = new ClipsInternalService(
     jobs as unknown as ClipJobsService,
@@ -183,6 +191,7 @@ function deps() {
     media as unknown as MediaService,
     notifications as unknown as NotificationsService,
     applier as unknown as ClipRecipeApplierService,
+    batchNotices as unknown as ClipBatchNoticeService,
   );
   const reconciler = new ClipReconcileService(
     jobs as unknown as ClipJobsService,
@@ -191,6 +200,7 @@ function deps() {
     usage as unknown as UsageService,
     notifications as unknown as NotificationsService,
     storage as unknown as PrivateStorage,
+    batchNotices as unknown as ClipBatchNoticeService,
   );
   return {
     internal,
@@ -204,6 +214,7 @@ function deps() {
     scheduling,
     storage,
     applier,
+    batchNotices,
   };
 }
 
@@ -321,6 +332,14 @@ describe('ClipsInternalService.finishExport', () => {
     );
   });
 
+  it("rings no clip bell for an export of a batch: the batch's one notice counts it (Module 11)", async () => {
+    const { internal, media, notifications } = deps();
+    renderJob({ input: { clipId: CLIP_ID, revision: 3, proof: false, batchId: BATCH_ID } });
+    await expect(internal.finishExport(JOB_ID, FINISH)).resolves.toEqual({ mediaId: MEDIA_ID });
+    expect(media.saveRendered).toHaveBeenCalledTimes(1);
+    expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
   it('refuses a call that names another revision or a preview', async () => {
     const { internal, media } = deps();
     renderJob({ input: { clipId: CLIP_ID, revision: 2, proof: false } });
@@ -354,6 +373,29 @@ describe('ClipsInternalService.finishExport', () => {
     renderJob();
     await internal.finishExport(JOB_ID, FINISH);
     expect(db.clips[0]).toEqual(expect.objectContaining({ lastExportedFingerprint: null }));
+  });
+});
+
+describe('ClipsInternalService.settled', () => {
+  it('starts waiting imports and exports, and settles the batch of the job that ended (Module 11)', async () => {
+    const { internal, jobs, batchNotices } = deps();
+    db.jobs.push(
+      jobRow({
+        id: JOB_ID,
+        kind: 'RENDER',
+        status: 'DONE',
+        clipId: CLIP_ID,
+        input: { proof: false, batchId: BATCH_ID },
+      }),
+    );
+    jobs.startRendersQuietly.mockResolvedValue(['next-export']);
+
+    await expect(internal.settled(JOB_ID, { organizationId: TEST_ORG })).resolves.toEqual({
+      started: 2,
+    });
+    expect(jobs.startWaiting).toHaveBeenCalledWith(TEST_ORG);
+    expect(jobs.startRendersQuietly).toHaveBeenCalledWith(TEST_ORG);
+    expect(batchNotices.settleJob).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
   });
 });
 
@@ -584,9 +626,17 @@ describe('ClipReconcileService', () => {
     expect(jobsRepository.failOpen).not.toHaveBeenCalled();
   });
 
-  it('starts again a render whose start was lost, and queues waiting imports', async () => {
+  it('starts again a preview whose start was lost, and queues waiting imports', async () => {
     const { reconciler, scheduling, jobs } = deps();
-    db.jobs.push(jobRow({ id: JOB_ID, kind: 'RENDER', status: 'QUEUED', clipId: CLIP_ID }));
+    db.jobs.push(
+      jobRow({
+        id: JOB_ID,
+        kind: 'RENDER',
+        status: 'QUEUED',
+        clipId: CLIP_ID,
+        input: { proof: true },
+      }),
+    );
     db.jobs.push(
       jobRow({ id: 'waiting-import', kind: 'IMPORT', status: 'QUEUED', startedAt: null }),
     );
@@ -596,6 +646,60 @@ describe('ClipReconcileService', () => {
     expect(jobs.restart).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
     expect(jobs.startWaiting).toHaveBeenCalledWith(TEST_ORG);
     expect(answer.started).toBe(2);
+  });
+
+  it('leaves a waiting export to the render queue, and gives a lost claim back (Module 11)', async () => {
+    const { reconciler, scheduling, jobs, jobsRepository, batchNotices } = deps();
+    const NOW = new Date('2026-11-27T12:00:00.000Z');
+    db.jobs.push(
+      jobRow({
+        id: 'waiting-export',
+        kind: 'RENDER',
+        status: 'QUEUED',
+        startedAt: null,
+        input: { proof: false },
+      }),
+    );
+    db.jobs.push(
+      jobRow({
+        id: 'claimed-export',
+        kind: 'RENDER',
+        status: 'QUEUED',
+        startedAt: NOW,
+        input: { proof: false },
+      }),
+    );
+    scheduling.describeClipJob.mockResolvedValue('notFound');
+    jobs.startRendersQuietly.mockResolvedValue(['claimed-export']);
+    jobs.startWaiting.mockResolvedValue([]);
+
+    const answer = await reconciler.reconcile(NOW);
+    // The waiting one was never looked up in Temporal: it has not had its turn yet.
+    expect(scheduling.describeClipJob).toHaveBeenCalledTimes(1);
+    expect(scheduling.describeClipJob).toHaveBeenCalledWith('claimed-export');
+    expect(jobsRepository.releaseClaim).toHaveBeenCalledWith(TEST_ORG, 'claimed-export');
+    expect(jobs.restart).not.toHaveBeenCalled();
+    expect(jobs.startRendersQuietly).toHaveBeenCalledTimes(1);
+    expect(batchNotices.sweep).toHaveBeenCalledWith(NOW);
+    expect(answer.started).toBe(1);
+  });
+
+  it("fails a lost export of a batch without the clip's own bell, and settles the batch (Module 11)", async () => {
+    const { reconciler, scheduling, notifications, batchNotices } = deps();
+    db.jobs.push(
+      jobRow({
+        id: JOB_ID,
+        kind: 'RENDER',
+        status: 'RUNNING',
+        clipId: CLIP_ID,
+        input: { proof: false, batchId: BATCH_ID },
+      }),
+    );
+    scheduling.describeClipJob.mockResolvedValue('closed');
+
+    expect((await reconciler.reconcile()).failed).toBe(1);
+    expect(notifications.notify).not.toHaveBeenCalled();
+    expect(batchNotices.settleJob).toHaveBeenCalledWith(expect.objectContaining({ id: JOB_ID }));
   });
 
   it('names the failure by kind', () => {

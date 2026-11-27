@@ -8,7 +8,16 @@
  * design system's `Table` (no shadow); the page owns paging, so this is not
  * the self-paging `DataTable`.
  */
-import { Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@postgear/ui';
+import {
+  Badge,
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@postgear/ui';
 import { formatClipLength } from '@postgear/video-engine';
 import { useState } from 'react';
 import type { ClipListItem } from '@/types/clips';
@@ -24,22 +33,38 @@ import {
   RenameField,
 } from './clip-actions';
 import { isAiOrigin } from '@/types/clips';
+import { ClipTick } from './clip-tick';
+import type { ClipSelection } from './use-clip-selection';
 
 export function ClipsTable({
   clips,
   orgId,
   actions,
+  selection,
 }: {
   clips: readonly ClipListItem[];
   orgId: string;
   actions: ClipActions;
+  /** Module 11: the tick boxes (a first column, with one in the header for the whole page). */
+  selection?: ClipSelection;
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
+  const all = selection !== undefined && clips.length > 0 && selection.count === clips.length;
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          {selection ? (
+            <TableHead className="w-10">
+              <Checkbox
+                aria-label="Select every clip on the page"
+                data-testid="clip-tick-all"
+                checked={all ? true : selection.count > 0 ? 'indeterminate' : false}
+                onCheckedChange={() => selection.toggleAll()}
+              />
+            </TableHead>
+          ) : null}
           <TableHead>Name</TableHead>
           <TableHead>Platform</TableHead>
           <TableHead>Length</TableHead>
@@ -54,7 +79,21 @@ export function ClipsTable({
       </TableHeader>
       <TableBody>
         {clips.map((clip) => (
-          <TableRow key={clip.id} data-testid="clip-row" data-state={clip.state}>
+          <TableRow
+            key={clip.id}
+            data-testid="clip-row"
+            data-state={clip.state}
+            data-ticked={selection?.isTicked(clip.id) ? '' : undefined}
+          >
+            {selection ? (
+              <TableCell className="w-10">
+                <ClipTick
+                  title={clip.title}
+                  ticked={selection.isTicked(clip.id)}
+                  onToggle={(range) => selection.toggle(clip.id, range)}
+                />
+              </TableCell>
+            ) : null}
             <TableCell className="max-w-80">
               {renaming === clip.id ? (
                 <RenameField
@@ -80,7 +119,14 @@ export function ClipsTable({
               {isAiOrigin(clip.origin) ? (scoreText(clip.score) ?? '') : ''}
             </TableCell>
             <TableCell>
-              <Badge variant={CLIP_STATE_BADGE[clip.state]}>{CLIP_STATE_NAMES[clip.state]}</Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant={CLIP_STATE_BADGE[clip.state]}>{CLIP_STATE_NAMES[clip.state]}</Badge>
+                {clip.origin === 'MONTAGE' ? (
+                  <Badge variant="outline" data-testid="clip-montage-badge">
+                    Montage
+                  </Badge>
+                ) : null}
+              </div>
             </TableCell>
             <TableCell className="whitespace-nowrap">{formatShortDate(clip.createdAt)}</TableCell>
             <TableCell>

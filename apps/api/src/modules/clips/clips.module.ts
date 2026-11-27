@@ -34,6 +34,8 @@ import { ClipsCoreModule } from './clips-core.module';
 import { ClipDownloadsController } from './downloads/clip-downloads.controller';
 import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
 import { ClipDownloadsService } from './downloads/clip-downloads.service';
+import { ClipBatchExportsController } from './exports/clip-batch-exports.controller';
+import { ClipBatchExportsService } from './exports/clip-batch-exports.service';
 import { ClipFilesController } from './files/clip-files.controller';
 import { ClipHighlightsController } from './highlights/clip-highlights.controller';
 import { ClipHighlightsService } from './highlights/clip-highlights.service';
@@ -97,6 +99,8 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     // Module 18: `/clips/downloads`, a word route, so before `ClipItemModule`.
     ClipDownloadsController,
     ClipsInternalController,
+    // Sprint 13, Module 11: Export All under `/clips/exports`, a word route, so before `ClipItemModule`.
+    ClipBatchExportsController,
   ],
   providers: [
     ClipJobEventsService,
@@ -117,6 +121,8 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     ClipSampleLink,
     ClipDownloadsRepository,
     ClipDownloadsService,
+    // Sprint 13, Module 11: Export All.
+    ClipBatchExportsService,
   ],
   // Nothing outside Clips needs its providers; a later module imports `ClipsCoreModule` itself.
 })

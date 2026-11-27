@@ -18,6 +18,7 @@ import { Film } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { ClipListItem, ClipPoster, ClipPreview } from '@/types/clips';
 import { ExportRing } from '../export-ring';
+import { ClipTick, tickPlacement } from './clip-tick';
 import { PrimaryLink } from '../button-link';
 import { PLATFORM_LABELS } from '../home/home-model';
 import { reasonLabels, scoreText } from '../video/find-clips-model';
@@ -155,15 +156,25 @@ export function ClipPosterBox({
   );
 }
 
+/** Module 11: a card's tick box on the Clips tab (Recent Clips has none). */
+export interface ClipCardTick {
+  ticked: boolean;
+  /** Any clip on the page is ticked: every tick box shows. */
+  anyTicked: boolean;
+  onToggle: (range: boolean) => void;
+}
+
 export function ClipCard({
   clip,
   orgId,
   actions,
+  tick,
   className,
 }: {
   clip: ClipListItem;
   orgId: string;
   actions: ClipActions;
+  tick?: ClipCardTick;
   className?: string;
 }) {
   const [renaming, setRenaming] = useState(false);
@@ -177,8 +188,9 @@ export function ClipCard({
       data-testid="clip-card"
       data-state={clip.state}
       className={cn(
-        'flex min-w-0 animate-fadeIn flex-col overflow-hidden rounded-card border-2 border-outline bg-secondary shadow-surfaceSm motion-reduce:animate-none',
+        'group flex min-w-0 animate-fadeIn flex-col overflow-hidden rounded-card border-2 border-outline bg-secondary shadow-surfaceSm motion-reduce:animate-none',
         clip.state === 'hidden' && 'border-dashed',
+        tick?.ticked && 'ring-2 ring-actionPrimary',
         className,
       )}
       onPointerEnter={(event) => {
@@ -190,6 +202,14 @@ export function ClipCard({
         <div className="flex h-50 items-center justify-center" style={{ containerType: 'size' }}>
           <ClipPosterBox clip={clip} previewing={previewing} />
         </div>
+        {tick ? (
+          <ClipTick
+            title={clip.title}
+            ticked={tick.ticked}
+            onToggle={tick.onToggle}
+            className={tickPlacement(tick.anyTicked, tick.ticked)}
+          />
+        ) : null}
         {clip.exportProgress !== null ? (
           <span
             role="img"
@@ -224,6 +244,11 @@ export function ClipCard({
           <span className="font-sans text-xs text-ink tabular-nums type-muted">
             {clipFacts(clip)}
           </span>
+          {clip.origin === 'MONTAGE' ? (
+            <Badge variant="outline" data-testid="clip-montage-badge">
+              Montage
+            </Badge>
+          ) : null}
           <Badge variant={CLIP_STATE_BADGE[clip.state]}>{CLIP_STATE_NAMES[clip.state]}</Badge>
         </div>
         {firstReason ? (

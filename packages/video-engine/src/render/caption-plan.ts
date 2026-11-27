@@ -12,10 +12,12 @@ import {
   type CaptionLayout,
   captionLayout,
   captionsTrackOf,
+  captionsTracksOf,
   displayWord,
+  inFirstCaptionsLook,
 } from '../captions';
 import type { CaptionLook } from '../captions/styles';
-import type { ClipDocument } from '../document/schema';
+import type { CaptionsTrack, ClipDocument } from '../document/schema';
 import type { Transcript } from '../transcript/types';
 import { RenderCompileError } from './errors';
 import {
@@ -104,6 +106,67 @@ export function planCaptions(
 ): PlanCaptions | null {
   const track = captionsTrackOf(doc);
   if (!track) return null;
+  return planTrackCaptions(doc, track, asset, manifest);
+}
+
+/** The words a render needs for every captions track (Module 11: a montage has one per video). */
+export interface RenderCaptionsAssets {
+  /** The only track's words, or the first track's when `captionsByTrack` lacks it. */
+  captions?: RenderCaptionsAsset | null;
+  /** Keyed by the captions track's id: each track's own transcript, for a document with several. */
+  captionsByTrack?: Readonly<Record<string, RenderCaptionsAsset>> | null;
+}
+
+/**
+ * Every captions track as a plan, in track order (Module 11). One track is
+ * `planCaptions` exactly. Several (a montage of clips from several videos,
+ * each track naming its `source`) are each drawn with the FIRST track's
+ * style, place, size, words per page, letter case and mark colour (and the
+ * first track's resolved look), over their own transcript, their own word
+ * edits and only their own video's parts, so the montage reads as one set
+ * of captions. Every track's words must be handed in (`captions_missing`).
+ */
+export function planCaptionsTracks(
+  doc: ClipDocument,
+  assets: RenderCaptionsAssets,
+  manifest: FontManifest | null,
+): PlanCaptions[] {
+  const tracks = captionsTracksOf(doc);
+  const first = tracks[0];
+  if (!first) return [];
+  if (tracks.length === 1) {
+    const asset = assets.captionsByTrack?.[first.id] ?? assets.captions;
+    // A lone track that names its video shows that video's words only, whatever the asset says.
+    const words =
+      asset && first.source !== undefined ? { ...asset, sourceId: first.source } : asset;
+    return [planTrackCaptions(doc, first, words, manifest)];
+  }
+  const firstAsset = assets.captionsByTrack?.[first.id] ?? assets.captions ?? null;
+  return tracks.map((track) => {
+    const asset = track === first ? firstAsset : (assets.captionsByTrack?.[track.id] ?? null);
+    if (!asset || !firstAsset) {
+      throw new RenderCompileError('captions_missing', "The captions' words were not handed in", {
+        trackId: track.id,
+      });
+    }
+    // The first track's style, size, place, words a page, case and mark colour (`captions/map.ts`).
+    const drawn = inFirstCaptionsLook(doc, track);
+    const words: RenderCaptionsAsset = {
+      transcript: asset.transcript,
+      look: firstAsset.look,
+      wordTimed: asset.wordTimed,
+      ...(track.source !== undefined ? { sourceId: track.source } : {}),
+    };
+    return planTrackCaptions(doc, drawn, words, manifest);
+  });
+}
+
+function planTrackCaptions(
+  doc: ClipDocument,
+  track: CaptionsTrack,
+  asset: RenderCaptionsAsset | null | undefined,
+  manifest: FontManifest | null,
+): PlanCaptions {
   if (!asset) {
     throw new RenderCompileError('captions_missing', "The captions' words were not handed in", {
       trackId: track.id,
@@ -141,14 +204,18 @@ export function planCaptions(
     }),
   );
   if (missing.length > 0) {
-    throw new RenderCompileError('font_missing', 'No installed font can draw a letter of the captions', {
-      families: family,
-      // Code points, never the text itself.
-      letters: missing
-        .slice(0, 8)
-        .map((char) => `U+${(char.codePointAt(0) as number).toString(16).toUpperCase()}`)
-        .join(' '),
-    });
+    throw new RenderCompileError(
+      'font_missing',
+      'No installed font can draw a letter of the captions',
+      {
+        families: family,
+        // Code points, never the text itself.
+        letters: missing
+          .slice(0, 8)
+          .map((char) => `U+${(char.codePointAt(0) as number).toString(16).toUpperCase()}`)
+          .join(' '),
+      },
+    );
   }
 
   return {

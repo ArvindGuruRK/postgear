@@ -45,6 +45,7 @@ import {
   MAX_ITEMS,
   MAX_SEGMENTS,
   MAX_SOUNDS,
+  MAX_SOURCES,
   MAX_STICKERS,
   MAX_TRACKS,
   MAX_ZOOMS,
@@ -58,6 +59,10 @@ import {
   TEXT_WIDTH_MIN,
   VOLUME_MAX,
   ZOOM_MAX,
+  JOIN_FADE_MS,
+  MONTAGE_MAX_CLIPS,
+  MONTAGE_MIN_CLIPS,
+  MONTAGE_PART_TITLE_MAX,
 } from './limits';
 
 /** Short ids made by the editor (`seg_3f9a`), or UUIDs. Never free text. */
@@ -187,39 +192,6 @@ const layoutFields = {
 export const savedLayoutSchema = z.object(layoutFields).strict();
 
 /**
- * The roles a part can play (version 2). Absent for an ordinary part.
- *
- * - `hook` (Module 09): a stretch of the video played first as the clip's
- *   opening (it also plays later). A part like any other to the time map.
- * - `intro`, `outro` (Module 10): a brand kit's own short video, played
- *   before or after the clip. Captions and bleeps skip them; they carry a
- *   `layoutOverride` (their own video, cover-fitted), since the clip's
- *   layout frames another video.
- */
-export const SEGMENT_ROLES = ['hook', 'intro', 'outro'] as const;
-export type SegmentRole = (typeof SEGMENT_ROLES)[number];
-
-export const segmentSchema = z
-  .object({
-    id: idSchema,
-    source: idSchema,
-    sourceIn: msSchema,
-    sourceOut: msSchema,
-    speed: speedSchema,
-    volume: z.number().min(0).max(VOLUME_MAX),
-    role: z.enum(SEGMENT_ROLES).optional(),
-    /**
-     * Version 2 (Module 10, used by Module 11's montage): this part's own
-     * layout, in place of the document's. Its crops are keyed in the part's
-     * own source time like the document's. Never followed (`follow` is not
-     * part of the shape).
-     */
-    layoutOverride: savedLayoutSchema.optional(),
-  })
-  .strict()
-  .refine((s) => s.sourceIn < s.sourceOut, 'A part must end after it starts');
-
-/**
  * Version 2: Follow The Speaker (Module 08). The crops it works out are
  * written as keyframes in `areas[].crop`, which `areaCropAt` already reads;
  * this records that they came from following, from which face file, the
@@ -250,6 +222,40 @@ export const layoutSchema = z
     follow: followSchema.optional(),
   })
   .strict();
+
+/**
+ * The roles a part can play (version 2). Absent for an ordinary part.
+ *
+ * - `hook` (Module 09): a stretch of the video played first as the clip's
+ *   opening (it also plays later). A part like any other to the time map.
+ * - `intro`, `outro` (Module 10): a brand kit's own short video, played
+ *   before or after the clip. Captions and bleeps skip them; they carry a
+ *   `layoutOverride` (their own video, cover-fitted), since the clip's
+ *   layout frames another video.
+ */
+export const SEGMENT_ROLES = ['hook', 'intro', 'outro'] as const;
+export type SegmentRole = (typeof SEGMENT_ROLES)[number];
+
+export const segmentSchema = z
+  .object({
+    id: idSchema,
+    source: idSchema,
+    sourceIn: msSchema,
+    sourceOut: msSchema,
+    speed: speedSchema,
+    volume: z.number().min(0).max(VOLUME_MAX),
+    role: z.enum(SEGMENT_ROLES).optional(),
+    /**
+     * Version 2 (Module 10, widened by Module 11's montage): this part's own
+     * layout, in place of the document's. Its crops are keyed in the part's
+     * own source time like the document's. The full layout shape: a montage
+     * part carries its original clip's layout, which may be followed (its
+     * crops then move, and `follow` keeps what switching it off gives back).
+     */
+    layoutOverride: layoutSchema.optional(),
+  })
+  .strict()
+  .refine((s) => s.sourceIn < s.sourceOut, 'A part must end after it starts');
 
 export const zoomSchema = z
   .object({
@@ -404,8 +410,8 @@ export const stickerRefSchema = z.union([
         .string()
         .max(BADGE_NAME_MAX)
         .refine((name) => name.trim().length > 0, 'A Follow Badge needs a name')
-        // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
         .refine(
+          // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
           (name) => !/[\u0000-\u001f\u007f]/.test(name),
           'A Follow Badge name is one plain line',
         )
@@ -509,6 +515,13 @@ export const captionsTrackSchema = z
     id: idSchema,
     kind: z.literal('captions'),
     transcriptAssetId: uuidSchema,
+    /**
+     * Module 11: the source (video) these captions are for. Absent on a clip
+     * with one captions track (they follow every main part); required on each
+     * track once a document has more than one (a montage of clips from
+     * several videos: one captions track per source transcript).
+     */
+    source: idSchema.optional(),
     language: z.string().regex(/^[a-z]{2,3}$/, 'A language is a short code'),
     styleId: idSchema,
     position: pointSchema,
@@ -570,6 +583,29 @@ export const documentMetaSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * Module 11: a montage's original clips, in order, each with the part it
+     * starts at (the timeline's divider and name). A snapshot: renaming or
+     * editing the original clip changes nothing here. A part named here that
+     * an edit removed simply loses its divider.
+     */
+    montage: z
+      .object({
+        parts: z
+          .array(
+            z
+              .object({
+                clipId: idSchema,
+                title: z.string().max(MONTAGE_PART_TITLE_MAX),
+                firstSegment: idSchema,
+              })
+              .strict(),
+          )
+          .min(MONTAGE_MIN_CLIPS)
+          .max(MONTAGE_MAX_CLIPS),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -617,6 +653,21 @@ export const cardsSchema = z
   .strict();
 
 /**
+ * Version 2 (Module 11): how two parts meet. A Cut needs nothing; a Fade is
+ * a picture and sound mix of `JOIN_FADE_MS` at the start of `beforeSegment`.
+ * The two sides overlap, so every fade shortens the clip by its length and
+ * moves everything after it earlier (`time/time-map.ts`, `joinOverlapMs`).
+ * A join naming a part that is gone, or the first part, does nothing.
+ */
+export const joinSchema = z
+  .object({
+    beforeSegment: idSchema,
+    kind: z.literal('fade'),
+    ms: z.literal(JOIN_FADE_MS),
+  })
+  .strict();
+
+/**
  * Version 2 (Sprint 13) adds captions, bleeps, a part's `hook` role, Follow
  * The Speaker and `recipeId`. It changes nothing a version 1 clip relies on:
  * every version 1 document is a valid version 2 document after `upgrade()`.
@@ -632,11 +683,32 @@ export function segmentOutputMs(segment: {
   return Math.round((segment.sourceOut - segment.sourceIn) / segment.speed);
 }
 
+/**
+ * Module 11: how much each part overlaps the one before it (0 for a cut,
+ * the first part and a join naming a gone part). A fade never takes more
+ * than half of either side, so two fades around a short part never meet and
+ * FFmpeg's `xfade` always has enough picture. The time map, the compiler's
+ * `xfade` offsets and the preview all read this one list.
+ */
+export function joinOverlaps(doc: {
+  segments: ReadonlyArray<{ id: string; sourceIn: number; sourceOut: number; speed: number }>;
+  joins?: ReadonlyArray<{ beforeSegment: string; ms: number }> | undefined;
+}): number[] {
+  const wanted = new Map((doc.joins ?? []).map((join) => [join.beforeSegment, join.ms]));
+  return doc.segments.map((segment, i) => {
+    const ms = wanted.get(segment.id);
+    const previous = doc.segments[i - 1];
+    if (ms === undefined || i === 0 || !previous) return 0;
+    const half = Math.floor(Math.min(segmentOutputMs(previous), segmentOutputMs(segment)) / 2);
+    return Math.max(0, Math.min(ms, half));
+  });
+}
+
 const documentShape = z
   .object({
     schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
     canvas: canvasSchema,
-    sources: z.array(sourceSchema).min(1).max(8),
+    sources: z.array(sourceSchema).min(1).max(MAX_SOURCES),
     segments: z.array(segmentSchema).min(1).max(MAX_SEGMENTS),
     layout: layoutSchema,
     zooms: z.array(zoomSchema).max(MAX_ZOOMS),
@@ -654,6 +726,8 @@ const documentShape = z
     brandKitId: idSchema.optional(),
     /** Version 2 (Module 10): scenes drawn before and after the clip (see `cardSchema`). */
     cards: cardsSchema.optional(),
+    /** Version 2 (Module 11): Fade joins between parts (a montage's Between Clips). Empty or absent: cuts. */
+    joins: z.array(joinSchema).max(MAX_SEGMENTS).optional(),
     meta: documentMetaSchema.optional(),
   })
   .strict();
@@ -737,6 +811,9 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
     });
   }
 
+  // Module 11: Fade joins overlap their two sides, so the clip is shorter by each.
+  total -= joinOverlaps(doc).reduce((sum, ms) => sum + ms, 0);
+
   if (total < CLIP_MIN_MS || total > CLIP_MAX_MS) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -760,13 +837,40 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
     }
   });
 
-  if (doc.tracks.filter((track) => track.kind === 'captions').length > 1) {
+  // One set of captions, or (Module 11, a montage) one per source, each naming its own.
+  const captionTracks = doc.tracks.filter((track) => track.kind === 'captions');
+  if (captionTracks.length > 1) {
+    const named = captionTracks.map((track) => track.source);
+    if (
+      named.some((source) => source === undefined || !sourceIds.has(source)) ||
+      new Set(named).size !== named.length
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['tracks'],
+        message: 'A clip has one set of captions for each of its videos',
+      });
+    }
+  } else if (captionTracks[0]?.source !== undefined && !sourceIds.has(captionTracks[0].source)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['tracks'],
-      message: 'A clip has one set of captions',
+      message: 'Captions point at a video the clip does not have',
     });
   }
+
+  const joined = new Set<string>();
+  (doc.joins ?? []).forEach((join, i) => {
+    // A join naming a part that is gone does nothing (`joinOverlaps`); twice on one part is refused.
+    if (joined.has(join.beforeSegment)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['joins', i, 'beforeSegment'],
+        message: 'A part has one join before it',
+      });
+    }
+    joined.add(join.beforeSegment);
+  });
 
   doc.zooms.forEach((zoom, i) => {
     claim(zoom.id, ['zooms', i, 'id']);
@@ -856,4 +960,5 @@ export type TimedItem = TextItem | StickerItem | AudioItem;
 export type ClipDocumentMeta = z.infer<typeof documentMetaSchema>;
 export type ClipCard = z.infer<typeof cardSchema>;
 export type ClipCards = z.infer<typeof cardsSchema>;
+export type ClipJoin = z.infer<typeof joinSchema>;
 export type ClipDocument = z.infer<typeof clipDocumentSchema>;

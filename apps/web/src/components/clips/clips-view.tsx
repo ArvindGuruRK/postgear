@@ -64,6 +64,7 @@ import { ClipsTab as ClipsLibraryTab } from './library/clips-tab';
 import { RecentClips } from './library/recent-clips';
 import { kitHref } from './kit/kit-model';
 import { useClipsList } from './library/use-clips-list';
+import { useExportAll } from './library/use-export-all';
 import { useClipsStatus } from './use-clips-status';
 import { clipEditHref } from './video/video-clip-list';
 
@@ -197,6 +198,8 @@ export function ClipsView({
 
   // The Clips tab's list is asked for while the tab is open, and again on each return.
   const clipsList = useClipsList({ enabled: tab === 'clips' });
+  // Module 11: Export All's dialog and the chip that opens it again (the list's rings move after a start).
+  const exportAll = useExportAll({ orgId, onStarted: clipsList.refresh });
   // Downloads (Module 18): the home shows the newest few, so they are asked for at once.
   const downloads = useDownloads(true);
 
@@ -301,6 +304,7 @@ export function ClipsView({
           </div>
         )}
         <PageActions>
+          {exportAll.chip}
           {status ? <StorageMeter status={status} onSeeWhatUsesSpace={seeWhatUsesSpace} /> : null}
           {/* Module 10: the workspace's recipes and its brand kits for clips. */}
           <ActionLink href={kitHref(orgId)} data-testid="clips-kit-link">
@@ -390,7 +394,12 @@ export function ClipsView({
       ) : null}
 
       {tab === 'clips' ? (
-        <ClipsLibraryTab orgId={orgId} list={clipsList} onVideos={() => setTab('videos')} />
+        <ClipsLibraryTab
+          orgId={orgId}
+          list={clipsList}
+          onVideos={() => setTab('videos')}
+          onExportAll={exportAll.start}
+        />
       ) : null}
 
       {tab === 'downloads' ? (
@@ -407,6 +416,7 @@ export function ClipsView({
         channelsState={channels}
         onProbed={showFromChannel}
       />
+      {exportAll.dialog}
       <LinkCardDialog
         shown={streamCard}
         onClose={() => setStreamCard(null)}

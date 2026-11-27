@@ -30,7 +30,7 @@ import { zoomWindows } from '../time/zooms';
 import { type BleepRange, bleepRanges } from './bleep-plan';
 import { cardsOf, type PlanCards, planCards } from './card-plan';
 import { RenderCompileError } from './errors';
-import { type PlanCaptions, planCaptions, type RenderCaptionsAsset } from './caption-plan';
+import { type PlanCaptions, planCaptionsTracks, type RenderCaptionsAsset } from './caption-plan';
 import { checkFonts, type FontManifest, fontsNeeded } from './fonts';
 import { type PlanLook, planLook } from './looks';
 import { type PlanSound, planSounds, type RenderSoundAsset } from './sound-plan';
@@ -93,6 +93,19 @@ export interface RenderAssets {
    * document has a captions track.
    */
   captions?: RenderCaptionsAsset | null;
+  /**
+   * Module 11: each captions track's words, keyed by the track's id, for a
+   * document with several (a montage: one per video). A track missing here
+   * reads `captions` when it is the first.
+   */
+  captionsByTrack?: Readonly<Record<string, RenderCaptionsAsset>> | null;
+  /**
+   * Module 11: a part's own file, keyed by the part's id, in place of its
+   * source's (`pickSourceFiles` picked it per part: a montage playing two
+   * clips of one video that no single sharp range covers). Absent for every
+   * other clip.
+   */
+  segmentSources?: Readonly<Record<string, RenderSourceAsset>> | null;
 }
 
 /** What the render job knows besides the document (copied from the job input and the fetched files). */
@@ -177,6 +190,13 @@ export interface PlanSegment {
   /** Where the segment sits in the clip, whole ms (`outEndMs` exclusive). */
   outStartMs: number;
   outEndMs: number;
+  /**
+   * Module 11: how long this part overlaps the one before it (a Fade join,
+   * `joinOverlaps`), whole ms. Present only when above 0, so a clip of cuts
+   * plans as it always did. The compiler mixes the two with `xfade` and
+   * `acrossfade` over this long.
+   */
+  overlapMs?: number;
   picture: PlanPicture;
 }
 
@@ -228,6 +248,11 @@ export interface RenderPlan {
   shapes: PlanShape[];
   /** Sprint 13: the clip's captions as pages and font runs, or null when it has none. */
   captions: PlanCaptions | null;
+  /**
+   * Module 11: the other captions tracks of a montage (one per video), drawn
+   * in the same style into the same ASS file. Absent unless there are some.
+   */
+  moreCaptions?: PlanCaptions[];
   /**
    * Module 10: the cards drawn before and after the clip. Absent for a clip
    * with none, so its plan is what it was. With cards, `output.durationMs`
@@ -389,9 +414,12 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
   const texts = planTexts(doc, fontsAsset?.manifest ?? null);
   const shapes = planShapes(doc);
   // Captions: the same canvas pixels, their fonts resolved the same way (Sprint 13).
-  const planned = planCaptions(doc, ctx.assets.captions, fontsAsset?.manifest ?? null);
   // Captions with nothing to show (every word cut or hidden) draw nothing and need no font.
-  const captions = planned && planned.layout.pages.length > 0 ? planned : null;
+  const shown = planCaptionsTracks(doc, ctx.assets, fontsAsset?.manifest ?? null).filter(
+    (planned) => planned.layout.pages.length > 0,
+  );
+  const captions = shown[0] ?? null;
+  const moreCaptions = shown.slice(1);
 
   const spec = encodeSpecFor(ctx.quality, ctx.proof);
   const size = outputSizeFor(doc.canvas, spec);
@@ -399,8 +427,11 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
 
   // Every source the segments name must be handed in and usable.
   const pictures: Record<string, SourcePicture> = {};
+  const ownFiles = ctx.assets.segmentSources ?? {};
+  const assetOf = (segment: Segment): RenderSourceAsset | undefined =>
+    ownFiles[segment.id] ?? ctx.assets.sources[segment.source];
   for (const segment of doc.segments) {
-    const asset = ctx.assets.sources[segment.source];
+    const asset = assetOf(segment);
     if (!asset) {
       throw new RenderCompileError(
         'input_missing',
@@ -411,18 +442,27 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       );
     }
     checkSourceAsset(segment.source, asset);
-    pictures[segment.source] = { width: asset.width, height: asset.height, fps: asset.fps };
+    if (!ownFiles[segment.id]) {
+      pictures[segment.source] = { width: asset.width, height: asset.height, fps: asset.fps };
+    }
   }
 
   const inputs: PlanInput[] = [];
   const segments: PlanSegment[] = [];
   const placed = placeSegments(doc);
+  // Module 11: each part's picture is read at its own first moment. With Fade joins a part's
+  // start lies inside the overlap, where the time map answers the part before it, so the
+  // picture is read from the same document without its joins (every part then starts on its
+  // own), which changes which part answers and nothing else about it.
+  const joined = placed.some((entry) => entry.overlapMs > 0);
+  const pictureDoc: ClipDocument = joined ? { ...doc, joins: [] } : doc;
+  const pictureStarts = joined ? placeSegments(pictureDoc) : placed;
   let previous: Segment | undefined;
   let current: PlanInput | null = null;
 
   for (const entry of placed) {
     const segment = entry.segment;
-    const asset = ctx.assets.sources[segment.source] as RenderSourceAsset;
+    const asset = assetOf(segment) as RenderSourceAsset;
     const fileIn = segment.sourceIn - asset.sourceOffsetMs;
     const fileOut = segment.sourceOut - asset.sourceOffsetMs;
     // One source frame of slack at the end: a probed length can be a frame short of the video's.
@@ -441,7 +481,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       );
     }
 
-    if (!current || !continues(previous, segment)) {
+    if (!current || !continues(previous, segment) || current.file !== asset.file) {
       const seek = fileIn - SEEK_PREROLL_MS;
       current = {
         index: inputs.length,
@@ -457,7 +497,15 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     const seekMs = current.seekMs ?? 0;
 
     // The picture, from the one definition of what is on screen.
-    const state = frameState(doc, entry.outStart, { sources: pictures });
+    const pictureAt = (pictureStarts[entry.index] as (typeof placed)[number]).outStart;
+    // A part read from its own file (Module 11) is measured against that file.
+    const facts = ownFiles[segment.id]
+      ? {
+          ...pictures,
+          [segment.source]: { width: asset.width, height: asset.height, fps: asset.fps },
+        }
+      : pictures;
+    const state = frameState(pictureDoc, pictureAt, { sources: facts });
     if (state.areas.length === 0) {
       throw new RenderCompileError('layout_unsupported', 'The layout has no area');
     }
@@ -523,6 +571,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       volume: segment.volume,
       outStartMs: entry.outStart,
       outEndMs: entry.outEnd,
+      ...(entry.overlapMs > 0 ? { overlapMs: entry.overlapMs } : {}),
       picture: { base, areas, fillsOutput },
     });
     previous = segment;
@@ -628,7 +677,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       files: [
         ...new Set([
           ...(fontsAsset && texts.length > 0 ? textFontFiles(texts, fontsAsset.manifest) : []),
-          ...(captions?.files ?? []),
+          ...shown.flatMap((planned) => planned.files),
           ...(fontsAsset && cardTexts.length > 0
             ? textFontFiles(cardTexts, fontsAsset.manifest)
             : []),
@@ -637,11 +686,12 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       psNames: [
         ...new Set([
           ...textFontNames(texts),
-          ...(captions?.psNames ?? []),
+          ...shown.flatMap((planned) => planned.psNames),
           ...textFontNames(cardTexts),
         ]),
       ].sort(),
     },
     ...(cards ? { cards } : {}),
+    ...(moreCaptions.length > 0 ? { moreCaptions } : {}),
   };
 }

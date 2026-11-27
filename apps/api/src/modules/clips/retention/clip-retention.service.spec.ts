@@ -2,7 +2,8 @@
  * `touchVideo` and `removeVideo` (Module 19 section 1) against a small fake
  * database: the date moves at most once a day and with the plan's days;
  * a removal keeps the row and the exported clips (marked), deletes the rest
- * and the files, stops open jobs, and is safe to call twice.
+ * and the files, stops open jobs, and is safe to call twice. Module 11: a
+ * montage goes (or is marked, when exported) with any of its videos.
  */
 import type { PrivateStorage } from '@postgear/storage';
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
@@ -34,12 +35,21 @@ interface ClipRow {
   videoId: string;
   lastExportedRevision: number | null;
   removedAt: Date | null;
+  /** Module 11: a montage names its other videos in `meta.videoIds`. */
+  origin?: string;
+  meta?: unknown;
 }
 
 const db = {
   videos: [] as VideoRow[],
   clips: [] as ClipRow[],
-  assets: [] as Array<{ id: string; organizationId: string; videoId: string }>,
+  assets: [] as Array<{
+    id: string;
+    organizationId: string;
+    videoId: string;
+    clipId?: string | null;
+    key?: string;
+  }>,
   jobs: [] as Array<{
     id: string;
     organizationId: string;
@@ -51,9 +61,25 @@ const db = {
 
 function pick<T extends object>(row: T, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, value]) => {
+    // Module 11: a video's clips include the montages that play it (`clipsPlayingVideo`).
+    if (key === 'OR') {
+      return (value as Record<string, unknown>[]).some((part) => pick(row, part));
+    }
     const actual = (row as Record<string, unknown>)[key];
     if (value instanceof Date)
       return actual instanceof Date && actual.getTime() === value.getTime();
+    if (value && typeof value === 'object' && 'path' in value) {
+      const { path, array_contains: wanted } = value as {
+        path: string[];
+        array_contains: unknown[];
+      };
+      let found: unknown = actual;
+      for (const step of path) found = (found as Record<string, unknown> | null)?.[step];
+      return Array.isArray(found) && wanted.every((item) => found.includes(item));
+    }
+    if (value && typeof value === 'object' && 'in' in value) {
+      return (value as { in: unknown[] }).in.includes(actual);
+    }
     return actual === value;
   });
 }
@@ -73,10 +99,8 @@ const fakePrisma = {
     ),
   },
   clip: {
-    findMany: jest.fn(async ({ where }: { where: { organizationId: string; videoId: string } }) =>
-      db.clips.filter(
-        (clip) => clip.organizationId === where.organizationId && clip.videoId === where.videoId,
-      ),
+    findMany: jest.fn(async ({ where }: { where: Record<string, unknown> }) =>
+      db.clips.filter((clip) => pick(clip, where)),
     ),
     deleteMany: jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
       const before = db.clips.length;
@@ -92,6 +116,9 @@ const fakePrisma = {
     ),
   },
   clipAsset: {
+    findMany: jest.fn(async ({ where }: { where: Record<string, unknown> }) =>
+      db.assets.filter((asset) => pick(asset, where)),
+    ),
     deleteMany: jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
       const before = db.assets.length;
       db.assets = db.assets.filter((asset) => !pick(asset, where));
@@ -155,7 +182,7 @@ function video(overrides: Partial<VideoRow> = {}): VideoRow {
 function build(retentionDays: unknown = 7) {
   const resolver = { get: jest.fn(async () => retentionDays) };
   const jobs = { cancel: jest.fn(async () => ({})) };
-  const storage = { deletePrefix: jest.fn(async () => 1) };
+  const storage = { deletePrefix: jest.fn(async () => 1), delete: jest.fn(async () => undefined) };
   const service = new ClipRetentionService(
     resolver as unknown as EntitlementResolver,
     jobs as unknown as ClipJobsService,
@@ -314,6 +341,83 @@ describe('removeVideo', () => {
     expect(await service.removeVideo(ORG, VIDEO, 'expired', NOW)).toBeNull();
     expect(await service.removeVideo('other-org', VIDEO, 'expired', NOW)).toBeNull();
     expect(storage.deletePrefix).not.toHaveBeenCalled();
+  });
+
+  // Sprint 13, Module 11: a montage is a clip of every video it plays.
+  describe('with montages', () => {
+    const OTHER = '22222222-2222-4222-8222-222222222222';
+    function montage(id: string, videoId: string, exported: boolean): ClipRow {
+      return {
+        id,
+        organizationId: ORG,
+        videoId,
+        lastExportedRevision: exported ? 2 : null,
+        removedAt: null,
+        origin: 'MONTAGE',
+        meta: { videoIds: [videoId === VIDEO ? OTHER : VIDEO] },
+      };
+    }
+
+    it('deletes an unexported montage and marks an exported one, whichever of its videos goes', async () => {
+      db.videos.push(video());
+      db.clips.push(
+        montage('montage-first', VIDEO, false),
+        montage('montage-other', OTHER, false),
+        montage('montage-exported', OTHER, true),
+        { ...montage('montage-elsewhere', OTHER, false), meta: { videoIds: [] } },
+        {
+          ...montage('montage-foreign', OTHER, false),
+          organizationId: 'other-org',
+        },
+      );
+      db.jobs.push({
+        id: 'job-montage-export',
+        organizationId: ORG,
+        videoId: OTHER,
+        clipId: 'montage-other',
+        status: 'QUEUED',
+      });
+      const { service, jobs } = build();
+
+      await service.removeVideo(ORG, VIDEO, 'deleted', NOW);
+
+      expect(db.clips.map((clip) => [clip.id, clip.removedAt])).toEqual([
+        ['montage-exported', NOW],
+        ['montage-elsewhere', null],
+        ['montage-foreign', null],
+      ]);
+      // The montage's own export is stopped like any clip's of the video.
+      expect(jobs.cancel).toHaveBeenCalledWith(ORG, 'job-montage-export');
+    });
+
+    it("takes a deleted montage's own files on its other videos with it", async () => {
+      db.videos.push(video());
+      db.clips.push(montage('montage-other', OTHER, false), montage('montage-kept', OTHER, true));
+      db.assets.push(
+        {
+          id: 'asset-translation',
+          organizationId: ORG,
+          videoId: OTHER,
+          clipId: 'montage-other',
+          key: `clips/${ORG}/${OTHER}/translation.json.gz`,
+        },
+        {
+          id: 'asset-kept',
+          organizationId: ORG,
+          videoId: OTHER,
+          clipId: 'montage-kept',
+          key: `clips/${ORG}/${OTHER}/kept.json.gz`,
+        },
+        { id: 'asset-video', organizationId: ORG, videoId: OTHER, clipId: null, key: 'k' },
+      );
+      const { service, storage } = build();
+
+      await service.removeVideo(ORG, VIDEO, 'expired', NOW);
+
+      expect(db.assets.map((asset) => asset.id)).toEqual(['asset-kept', 'asset-video']);
+      expect(storage.delete).toHaveBeenCalledWith(`clips/${ORG}/${OTHER}/translation.json.gz`);
+      expect(storage.delete).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('still removes when a job cannot be stopped or storage is away', async () => {

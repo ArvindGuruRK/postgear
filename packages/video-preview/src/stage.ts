@@ -9,6 +9,7 @@
  *       zoom wrapper   the zoom: one CSS `scale` about the focus point
  *         base         the canvas colour, or the blurred copy of the video
  *         areas        one <canvas> per layout area
+         mix          a Fade join's other picture (Module 11), hidden otherwise
  *     vignette         a black radial gradient over the looked picture
  *     overlays         text and stickers (Modules 11 and 12)
  *   svg                the look's filter definition (no size)
@@ -39,10 +40,20 @@
  *   slight darkening: the export's `gblur=sigma=3` on a tenth-size copy,
  *   approximated (Preview Export shows the exact one). The blur is set in
  *   CSS pixels from the stage's width, kept by a `ResizeObserver`.
+ * - **A Fade join** (Module 11's montage) is a quick mix: inside the
+ *   overlap the other side's picture is drawn on one half-size canvas over
+ *   the areas (its background colour, then its areas, square corners), at
+ *   the join's share as its CSS opacity. An approximation: Preview Export
+ *   shows the export's exact `xfade`.
  * - **The videos stay in the document** (never `display: none`), so the
  *   browser keeps decoding them and keeps calling their frame callbacks.
  */
-import { type AreaState, type FrameState, lookSvgValues, vignetteCss } from '@postgear/video-engine';
+import {
+  type AreaState,
+  type FrameState,
+  lookSvgValues,
+  vignetteCss,
+} from '@postgear/video-engine';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -106,6 +117,30 @@ function drawCrop(
   return true;
 }
 
+/** Draws a fraction of the video into the rectangle `into` (a fraction of the canvas) of a canvas. */
+function drawCropAt(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  crop: { x: number; y: number; w: number; h: number },
+  into: { x: number; y: number; w: number; h: number },
+  width: number,
+  height: number,
+): boolean {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  const sx = clamp(crop.x * vw, 0, vw);
+  const sy = clamp(crop.y * vh, 0, vh);
+  const sw = Math.min(crop.w * vw, vw - sx);
+  const sh = Math.min(crop.h * vh, vh - sy);
+  const dw = into.w * width;
+  const dh = into.h * height;
+  if (!(sw >= 1 && sh >= 1 && dw > 0 && dh > 0)) {
+    return false;
+  }
+  context.drawImage(video, sx, sy, sw, sh, into.x * width, into.y * height, dw, dh);
+  return true;
+}
+
 export class PreviewStage {
   readonly root: HTMLDivElement;
   /** The clip's fade: one opacity over the picture, the vignette and the overlays. */
@@ -127,6 +162,10 @@ export class PreviewStage {
   private blurContext: CanvasRenderingContext2D | null | undefined;
   private readonly areasHost: HTMLDivElement;
   private readonly areas = new Map<string, AreaCanvas>();
+  /** A Fade join's other picture (Module 11): one canvas over the areas, hidden outside a join. */
+  readonly mixCanvas: HTMLCanvasElement;
+  private mixContext: CanvasRenderingContext2D | null | undefined;
+  private mixShown = false;
   private resizeObserver: ResizeObserver | null = null;
   private stageWidth = 0;
   private blurKey = '';
@@ -174,6 +213,16 @@ export class PreviewStage {
     this.areasHost.dataset.previewLayer = 'areas';
     fill(this.areasHost);
 
+    this.mixCanvas = ownerDocument.createElement('canvas');
+    this.mixCanvas.dataset.previewLayer = 'mix';
+    this.mixCanvas.style.position = 'absolute';
+    this.mixCanvas.style.left = '0';
+    this.mixCanvas.style.top = '0';
+    this.mixCanvas.style.width = '100%';
+    this.mixCanvas.style.height = '100%';
+    this.mixCanvas.style.display = 'none';
+    this.mixCanvas.style.pointerEvents = 'none';
+
     this.overlayHost = make();
     this.overlayHost.dataset.previewLayer = 'overlays';
     fill(this.overlayHost);
@@ -214,12 +263,15 @@ export class PreviewStage {
     filter.setAttribute('y', '0');
     filter.setAttribute('width', '1');
     filter.setAttribute('height', '1');
-    this.lookMatrix = ownerDocument.createElementNS(SVG_NS, 'feColorMatrix') as SVGFEColorMatrixElement;
+    this.lookMatrix = ownerDocument.createElementNS(
+      SVG_NS,
+      'feColorMatrix',
+    ) as SVGFEColorMatrixElement;
     this.lookMatrix.setAttribute('type', 'matrix');
     filter.appendChild(this.lookMatrix);
     svg.appendChild(filter);
 
-    this.zoom.append(this.base, this.areasHost);
+    this.zoom.append(this.base, this.areasHost, this.mixCanvas);
     this.looks.append(this.zoom);
     this.frame.append(this.looks, this.vignette, this.overlayHost);
     this.root.append(this.frame, svg, this.mediaHost);
@@ -298,6 +350,59 @@ export class PreviewStage {
       }
     }
     return drew;
+  }
+
+  /**
+   * A Fade join's other side (Module 11): `state`'s picture from `video`,
+   * drawn over the areas at `opacity` (0 to 1). Drawn at half the clip's
+   * size, its background a flat colour (a Blurred base is drawn unblurred
+   * and dimmed), its corners square: the quick mix the editor needs while
+   * it plays. Returns whether it drew.
+   */
+  renderMix(state: FrameState, video: HTMLVideoElement, opacity: number): boolean {
+    const share = clamp(Number.isFinite(opacity) ? opacity : 0, 0, 1);
+    if (share <= 0 || !(video.videoWidth > 0 && video.videoHeight > 0) || video.readyState < 2) {
+      this.clearMix();
+      return false;
+    }
+    const width = Math.max(2, Math.round(state.canvas.width / 2));
+    const height = Math.max(2, Math.round(state.canvas.height / 2));
+    if (this.mixCanvas.width !== width) this.mixCanvas.width = width;
+    if (this.mixCanvas.height !== height) this.mixCanvas.height = height;
+    if (this.mixContext === undefined) {
+      this.mixContext = contextOf(this.mixCanvas);
+    }
+    const context = this.mixContext;
+    if (!context) return false;
+    context.fillStyle = state.canvas.background;
+    context.fillRect(0, 0, width, height);
+    if (state.background.kind === 'blurred') {
+      drawCropAt(context, video, state.background.crop, { x: 0, y: 0, w: 1, h: 1 }, width, height);
+      context.fillStyle = 'rgba(0, 0, 0, 0.15)';
+      context.fillRect(0, 0, width, height);
+    }
+    for (const area of state.areas) {
+      drawCropAt(context, video, area.visibleCrop, area.content, width, height);
+    }
+    const value = share.toFixed(3);
+    if (this.mixCanvas.style.opacity !== value) this.mixCanvas.style.opacity = value;
+    if (!this.mixShown) {
+      this.mixCanvas.style.display = 'block';
+      this.mixShown = true;
+    }
+    return true;
+  }
+
+  /** Hides a Fade join's other picture. */
+  clearMix(): void {
+    if (!this.mixShown) return;
+    this.mixCanvas.style.display = 'none';
+    this.mixShown = false;
+  }
+
+  /** Whether a Fade join's other picture is showing (tests). */
+  get mixing(): boolean {
+    return this.mixShown;
   }
 
   /**

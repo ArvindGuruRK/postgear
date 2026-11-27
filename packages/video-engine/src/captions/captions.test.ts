@@ -71,11 +71,35 @@ function spoken(texts: string[], fromSec: number): Transcript {
   });
 }
 
-const TEN = spoken(['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'], 10);
+const TEN = spoken(
+  ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'],
+  10,
+);
 const texts = (words: Array<{ text: string }>) => words.map((word) => word.text);
-const look = (id = 'bold-pop'): CaptionLook => (builtInCaptionStyle(id) as { look: CaptionLook }).look;
+const look = (id = 'bold-pop'): CaptionLook =>
+  (builtInCaptionStyle(id) as { look: CaptionLook }).look;
 
 describe('captionWords: the transcript on the clip clock', () => {
+  it('hands the words over at the middle of a Fade, so two pages never overlap (Module 11)', () => {
+    // a plays 0 to 2300; b starts 300 ms early (2000) for the fade; the picture hands over at 2150.
+    const faded = {
+      ...doc([seg('a', 12_000, 14_300), seg('b', 16_000, 19_000)]),
+      joins: [{ beforeSegment: 'b', kind: 'fade' as const, ms: 300 as const }],
+    };
+    const words = captionWords(faded, track(), TEN);
+    const four = words.find((word) => word.text === 'four');
+    const six = words.find((word) => word.text === 'six');
+    expect(four).toMatchObject({ start: 2000, end: 2150, segmentId: 'a' });
+    expect(six).toMatchObject({ start: 2150, end: 2400, segmentId: 'b' });
+    // Without the join nothing moves: b starts where a ends.
+    const cut = captionWords(
+      doc([seg('a', 12_000, 14_300), seg('b', 16_000, 19_000)]),
+      track(),
+      TEN,
+    );
+    expect(cut.find((word) => word.text === 'six')).toMatchObject({ start: 2300, end: 2700 });
+  });
+
   it('maps each word through its part: the clip starts at 0 whatever the video moment', () => {
     const words = captionWords(doc([seg('a', 12_000, 16_000)]), track(), TEN);
     expect(words.map((w) => [w.text, w.start, w.end])).toEqual([
@@ -97,7 +121,11 @@ describe('captionWords: the transcript on the clip clock', () => {
   });
 
   it('follows a split and a removed middle: the cut words are gone, the rest close up', () => {
-    const words = captionWords(doc([seg('a', 10_000, 13_000), seg('b', 16_000, 19_000)]), track(), TEN);
+    const words = captionWords(
+      doc([seg('a', 10_000, 13_000), seg('b', 16_000, 19_000)]),
+      track(),
+      TEN,
+    );
     expect(words.map((w) => [w.text, w.start, w.segmentIndex])).toEqual([
       ['zero', 0, 0],
       ['one', 1_000, 0],
@@ -119,7 +147,11 @@ describe('captionWords: the transcript on the clip clock', () => {
   });
 
   it('shows a stretch that plays twice (a hook clip) twice, because the loop is over parts', () => {
-    const words = captionWords(doc([seg('hook', 14_000, 16_000), seg('a', 10_000, 16_000)]), track(), TEN);
+    const words = captionWords(
+      doc([seg('hook', 14_000, 16_000), seg('a', 10_000, 16_000)]),
+      track(),
+      TEN,
+    );
     expect(texts(words)).toEqual(['four', 'five', 'zero', 'one', 'two', 'three', 'four', 'five']);
     expect(words.filter((w) => w.text === 'four').map((w) => w.start)).toEqual([0, 6_000]);
   });
@@ -154,7 +186,11 @@ describe('captionWords: the transcript on the clip clock', () => {
   });
 
   it('answers the video stretches a clip plays, merged', () => {
-    expect(clipSourceRanges(doc([seg('a', 10_000, 13_000), seg('b', 12_000, 19_000), seg('c', 30_000, 31_000)]))).toEqual([
+    expect(
+      clipSourceRanges(
+        doc([seg('a', 10_000, 13_000), seg('b', 12_000, 19_000), seg('c', 30_000, 31_000)]),
+      ),
+    ).toEqual([
       { fromMs: 10_000, toMs: 19_000 },
       { fromMs: 30_000, toMs: 31_000 },
     ]);
@@ -162,13 +198,19 @@ describe('captionWords: the transcript on the clip clock', () => {
 
   it('finds the captions track of a document', () => {
     expect(captionsTrackOf({ tracks: [] })).toBeNull();
-    expect(captionsTrackOf({ tracks: [{ id: 'ov', kind: 'overlay', items: [] }, track()] })?.id).toBe('cc');
+    expect(
+      captionsTrackOf({ tracks: [{ id: 'ov', kind: 'overlay', items: [] }, track()] })?.id,
+    ).toBe('cc');
   });
 });
 
 describe('captionPages', () => {
   const measure = (text: string) => text.length * 40;
-  const paged = (transcript: Transcript, segments: Segment[], options: Partial<Parameters<typeof captionPages>[1]> = {}) =>
+  const paged = (
+    transcript: Transcript,
+    segments: Segment[],
+    options: Partial<Parameters<typeof captionPages>[1]> = {},
+  ) =>
     captionPages(captionWords(doc(segments), track(), transcript), {
       maxWords: 3,
       lineWidth: 900,
@@ -215,7 +257,11 @@ describe('captionPages', () => {
 
   it('starts a new page when one more word would not fit on two lines', () => {
     const long = spoken(['extraordinary', 'unbelievable', 'magnificent', 'spectacular'], 0);
-    const pages = paged(long, [seg('a', 0, 4_000)], { maxWords: 6, lineWidth: 560, maxGapMs: 5_000 });
+    const pages = paged(long, [seg('a', 0, 4_000)], {
+      maxWords: 6,
+      lineWidth: 560,
+      maxGapMs: 5_000,
+    });
     expect(pages.map((page) => texts(page.words))).toEqual([
       ['extraordinary', 'unbelievable'],
       ['magnificent', 'spectacular'],
@@ -295,16 +341,35 @@ describe('styles', () => {
 
   it('refuses a look ASS cannot draw', () => {
     const base = look('clean');
-    expect(captionLookSchema.safeParse({ ...base, box: { colour: '#000000', opacity: 1, pad: 8 } }).success).toBe(false);
-    expect(captionLookSchema.safeParse({ ...look('marker'), outline: { colour: '#000000', width: 4 } }).success).toBe(false);
-    expect(captionLookSchema.safeParse({ ...base, mark: { kind: 'fill', colour: '#FF0000', pop: true } }).success).toBe(false);
+    expect(
+      captionLookSchema.safeParse({ ...base, box: { colour: '#000000', opacity: 1, pad: 8 } })
+        .success,
+    ).toBe(false);
+    expect(
+      captionLookSchema.safeParse({ ...look('marker'), outline: { colour: '#000000', width: 4 } })
+        .success,
+    ).toBe(false);
+    expect(
+      captionLookSchema.safeParse({ ...base, mark: { kind: 'fill', colour: '#FF0000', pop: true } })
+        .success,
+    ).toBe(false);
     expect(captionLookSchema.safeParse({ ...base, extra: 1 }).success).toBe(false);
   });
 
   it("puts the track's own size, case and mark colour over the style", () => {
-    const merged = trackLook(track({ sizePx: 120, letterCase: 'lower', markColour: '#00FF00' }), look());
-    expect(merged).toMatchObject({ sizePx: 120, letterCase: 'lower', mark: { colour: '#00FF00', kind: 'colour' } });
-    expect(trackLook(track(), look())).toMatchObject({ letterCase: 'upper', mark: { colour: '#FFE600' } });
+    const merged = trackLook(
+      track({ sizePx: 120, letterCase: 'lower', markColour: '#00FF00' }),
+      look(),
+    );
+    expect(merged).toMatchObject({
+      sizePx: 120,
+      letterCase: 'lower',
+      mark: { colour: '#00FF00', kind: 'colour' },
+    });
+    expect(trackLook(track(), look())).toMatchObject({
+      letterCase: 'upper',
+      mark: { colour: '#FFE600' },
+    });
   });
 });
 
@@ -341,7 +406,10 @@ describe('the width estimate', () => {
   it('grows with the text, the size and the outline', () => {
     expect(textWidth('', style)).toBe(0);
     expect(textWidth('hello there', style)).toBeGreaterThan(textWidth('hello', style));
-    expect(textWidth('hello', { ...style, sizePx: 160 })).toBeCloseTo(textWidth('hello', style) * 2, 5);
+    expect(textWidth('hello', { ...style, sizePx: 160 })).toBeCloseTo(
+      textWidth('hello', style) * 2,
+      5,
+    );
     expect(textWidth('hello', { ...style, backingPx: 9 })).toBe(textWidth('hello', style) + 18);
   });
 
@@ -397,7 +465,10 @@ describe('captionLayout', () => {
       sizePx: 86,
       backingPx: 9,
     });
-    const dragged = captionGeometry(track({ position: { x: 0.02, y: 0.1 } }), look(), { width: 1080, height: 1920 });
+    const dragged = captionGeometry(track({ position: { x: 0.02, y: 0.1 } }), look(), {
+      width: 1080,
+      height: 1920,
+    });
     expect(dragged.boxLeft).toBe(0);
     expect(dragged.cx).toBeCloseTo(464.5);
   });
@@ -418,7 +489,10 @@ describe('captionLayout', () => {
   });
 
   it('leaves out a word that is only emoji and pages the rest', () => {
-    const result = layout({ transcript: spoken(['wow', '🔥', 'nice'], 10), track: track({ maxWords: 6 }) });
+    const result = layout({
+      transcript: spoken(['wow', '🔥', 'nice'], 10),
+      track: track({ maxWords: 6 }),
+    });
     expect(texts(result.words)).toEqual(['wow', 'nice']);
   });
 });
@@ -473,7 +547,13 @@ describe('Upload SRT: the captions file reader', () => {
 
   it('puts cues in order and never lets one run into the next', () => {
     const out = parseSubtitleCues(
-      ['00:00:05,000 --> 00:00:09,000', 'second', '', '00:00:01,000 --> 00:00:07,000', 'first'].join('\n'),
+      [
+        '00:00:05,000 --> 00:00:09,000',
+        'second',
+        '',
+        '00:00:01,000 --> 00:00:07,000',
+        'first',
+      ].join('\n'),
     );
     expect(out.cues).toEqual([
       { start: 1_000, end: 5_000, text: 'first' },
@@ -484,7 +564,11 @@ describe('Upload SRT: the captions file reader', () => {
   it.each([
     ['an empty file', '   \n', 'empty'],
     ['a file with no cue', 'just some notes\n\nand more', 'no_cues'],
-    ['cues with no text or backwards times', '00:00:02,000 --> 00:00:01,000\nbackwards\n\n00:00:03,000 --> 00:00:04,000\n', 'no_cues'],
+    [
+      'cues with no text or backwards times',
+      '00:00:02,000 --> 00:00:01,000\nbackwards\n\n00:00:03,000 --> 00:00:04,000\n',
+      'no_cues',
+    ],
     ['a file that is too big', 'a'.repeat(2 * 1024 * 1024 + 1), 'too_big'],
   ])('refuses %s without echoing it', (_name, input, reason) => {
     try {
@@ -502,7 +586,9 @@ describe('Upload SRT: the captions file reader', () => {
     expect(texts(words)).toEqual(['I', 'am', 'extraordinary']);
     expect(words[0]?.start).toBe(1_000);
     expect(words.at(-1)?.end).toBe(3_000);
-    expect((words[2]?.end ?? 0) - (words[2]?.start ?? 0)).toBeGreaterThan((words[0]?.end ?? 0) - (words[0]?.start ?? 0));
+    expect((words[2]?.end ?? 0) - (words[2]?.start ?? 0)).toBeGreaterThan(
+      (words[0]?.end ?? 0) - (words[0]?.start ?? 0),
+    );
     for (let index = 1; index < words.length; index += 1) {
       expect(words[index]?.start).toBe(words[index - 1]?.end);
     }
@@ -522,7 +608,16 @@ describe('Upload SRT: the captions file reader', () => {
       language: 'en',
       covered: [{ fromMs: 0, toMs: 60_000 }],
     });
-    expect(texts(transcript.words)).toEqual(['Hello', 'there,', 'friend.', 'Second', 'line', 'on', 'two', 'rows']);
+    expect(texts(transcript.words)).toEqual([
+      'Hello',
+      'there,',
+      'friend.',
+      'Second',
+      'line',
+      'on',
+      'two',
+      'rows',
+    ]);
     expect(transcript.words.map((word) => word.i)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(transcript.nextIndex).toBe(8);
     expect(transcript.words.every((word) => word.sure === 1)).toBe(true);

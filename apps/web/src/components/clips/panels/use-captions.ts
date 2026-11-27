@@ -93,8 +93,14 @@ export function useCaptions(input: {
   transcriptId: string | null;
   /** New words arrived: put this track in the document. */
   onTrack: (track: CaptionsTrack) => void;
+  /**
+   * Module 11: a montage keeps its clips' captions; the words routes refuse
+   * it, so they are not asked (the editor reads each video's words itself).
+   */
+  montage?: boolean;
 }): CaptionsState {
   const { clipId, videoId, transcriptId, onTrack } = input;
+  const montage = input.montage === true;
   const [held, setHeld] = useState<ReadonlyMap<string, TranscriptView>>(new Map());
   const [loading, setLoading] = useState(false);
   const [missing, setMissing] = useState(false);
@@ -142,7 +148,7 @@ export function useCaptions(input: {
   useEffect(() => {
     // `reload` only asks to look again (after Replace Everywhere).
     void reload;
-    if (known) return;
+    if (known || montage) return;
     const abort = new AbortController();
     let timer: ReturnType<typeof setTimeout> | null = null;
     let tries = 0;
@@ -174,7 +180,7 @@ export function useCaptions(input: {
       abort.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [clipId, transcriptId, known, keep, reload]);
+  }, [clipId, transcriptId, known, keep, reload, montage]);
 
   const run = useCallback(
     async <T>(kind: NonNullable<CaptionsBusy>, work: () => Promise<T>): Promise<T | null> => {

@@ -12,11 +12,15 @@
  *   Gameplay layout with a Camera area. The editor runs Detect Camera the
  *   first time the clip opens; the first document save ends it like the
  *   follow mark (`withoutFollowOnOpen` takes both away).
+ * - `videoIds` (Module 11): a montage's other videos, besides `videoId`
+ *   (`montages/montage-videos.ts` reads it for the removal rules). A save
+ *   keeps it.
  *
  * Only these keys reach a view, each checked; anything else stored is kept
  * as it is but never shown.
  */
 import { Prisma } from '@postgear/db';
+import { metaVideoIds } from '../montages/montage-videos';
 
 export const FOLLOW_ON_OPEN = 'speaker' as const;
 
@@ -28,6 +32,8 @@ export interface ClipMetaView {
   followOnOpen?: typeof FOLLOW_ON_OPEN;
   /** Module 10: the editor finds the camera box when the clip first opens. */
   cameraOnOpen?: true;
+  /** Module 11: a montage's other videos, besides the clip's `videoId`. */
+  videoIds?: string[];
 }
 
 function record(raw: unknown): Record<string, unknown> | null {
@@ -45,6 +51,8 @@ export function clipMetaView(raw: unknown): ClipMetaView | null {
     view.seen = value.seen.trim().slice(0, 200);
   if (value.followOnOpen === FOLLOW_ON_OPEN) view.followOnOpen = FOLLOW_ON_OPEN;
   if (value.cameraOnOpen === true) view.cameraOnOpen = true;
+  const videoIds = metaVideoIds(value);
+  if (videoIds.length > 0) view.videoIds = videoIds;
   return Object.keys(view).length > 0 ? view : null;
 }
 

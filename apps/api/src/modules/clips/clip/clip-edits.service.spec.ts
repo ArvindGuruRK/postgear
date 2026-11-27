@@ -12,6 +12,7 @@ import {
   type ClipDocument,
   createCaptionsTrack,
   createClipDocument,
+  createMontage,
   withCaptionsTrack,
   documentFingerprint,
   parseClipDocument,
@@ -552,5 +553,81 @@ describe('ClipEditsService.remove', () => {
     expect(await refusal(service.remove(OTHER_ORG, CLIP))).toMatchObject({ status: 404 });
     expect(tables.clips).toHaveLength(2);
     expect(jobs.cancel).not.toHaveBeenCalled();
+  });
+});
+
+// Sprint 13, Module 11: a montage plays several videos, with one captions track per video.
+describe('a montage', () => {
+  const MINE = '70000000-0000-4000-8000-000000000001';
+  const OTHERS = '70000000-0000-4000-8000-000000000002';
+  const captioned = (videoId: string, fromMs: number, toMs: number, transcriptAssetId: string) =>
+    withCaptionsTrack(
+      doc(fromMs, toMs, videoId),
+      createCaptionsTrack({
+        transcriptAssetId,
+        language: 'en',
+        styleId: 'bold-pop',
+        look: { sizePx: 86, maxWords: 3 },
+      }),
+    );
+
+  function montageTables() {
+    const tables = seed();
+    tables.videos.push(videoRow({ id: OTHER_VIDEO, status: 'READY', externalId: '900000002' }));
+    const made = createMontage(
+      [
+        { id: CLIP, title: 'One', document: captioned(VIDEO, 60_000, 90_000, MINE) },
+        { id: SECOND, title: 'Two', document: captioned(OTHER_VIDEO, 5_000, 25_000, OTHERS) },
+      ],
+      { transition: 'fade' },
+    );
+    if (!made.ok) throw new Error(made.code);
+    tables.clips[0] = clipRow({
+      id: CLIP,
+      videoId: VIDEO,
+      origin: 'MONTAGE',
+      meta: { videoIds: [OTHER_VIDEO] },
+      document: made.document,
+    });
+    const transcript = (id: string, videoId: string) =>
+      assetRow({ id, videoId, kind: 'TRANSCRIPT', key: `k/${id}` } as never);
+    tables.assets.push(transcript(MINE, VIDEO), transcript(OTHERS, OTHER_VIDEO));
+    return { tables, document: made.document };
+  }
+
+  it('saves with a captions track per video, each naming a transcript of its own video', async () => {
+    const { tables, document } = montageTables();
+    expect(document.tracks.filter((track) => track.kind === 'captions')).toHaveLength(2);
+    const { service } = setup(tables);
+
+    const saved = await service.patch(TEST_ORG, CLIP, { revision: 1, document });
+    expect(saved.clip).toMatchObject({ revision: 2, origin: 'MONTAGE', durationMs: 49_700 });
+    // The save keeps the montage's other videos.
+    expect(tables.clips[0]?.meta).toEqual({ videoIds: [OTHER_VIDEO] });
+
+    // Swapping the two transcripts points each track at the other video's words: refused.
+    const swapped = parseClipDocument(JSON.parse(JSON.stringify(document)));
+    for (const track of swapped.tracks) {
+      if (track.kind === 'captions') {
+        track.transcriptAssetId = track.transcriptAssetId === MINE ? OTHERS : MINE;
+      }
+    }
+    expect(
+      await refusal(service.patch(TEST_ORG, CLIP, { revision: 2, document: swapped })),
+    ).toMatchObject({ status: 422, body: { code: 'clip_document_invalid' } });
+  });
+
+  it('is copied as a montage of the same videos, and not at all once one is removed', async () => {
+    const { tables } = montageTables();
+    const { service } = setup(tables);
+    const copy = await service.duplicate(TEST_ORG, TEST_USER, CLIP);
+    expect(copy.clip).toMatchObject({ origin: 'MONTAGE', meta: { videoIds: [OTHER_VIDEO] } });
+
+    const other = tables.videos.find((video) => video.id === OTHER_VIDEO);
+    if (other) Object.assign(other, { status: 'REMOVED', deletedAt: new Date() });
+    expect(await refusal(service.duplicate(TEST_ORG, TEST_USER, CLIP))).toMatchObject({
+      status: 422,
+      body: { code: 'montage_video_removed' },
+    });
   });
 });

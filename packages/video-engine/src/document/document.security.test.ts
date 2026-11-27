@@ -19,7 +19,15 @@ import {
   testText,
   withItems,
 } from '../render/test-docs';
-import { MAX_ITEMS, MAX_SEGMENTS, MAX_SOUNDS, MAX_STICKERS, MAX_TRACKS, MAX_ZOOMS } from './limits';
+import {
+  MAX_ITEMS,
+  MAX_SEGMENTS,
+  MAX_SOUNDS,
+  MAX_SOURCES,
+  MAX_STICKERS,
+  MAX_TRACKS,
+  MAX_ZOOMS,
+} from './limits';
 import type { AudioItem, ClipDocument } from './schema';
 import { safeParseClipDocument } from './upgrade';
 
@@ -149,7 +157,7 @@ describe('Clips security: Documents (schema)', () => {
       );
     });
 
-    it('refuses more than eight sources', () => {
+    it(`refuses more than ${MAX_SOURCES} sources (a montage's videos)`, () => {
       capped(
         (count) => ({
           ...base(),
@@ -158,7 +166,7 @@ describe('Clips security: Documents (schema)', () => {
             videoId: TEST_VIDEO_ID,
           })),
         }),
-        8,
+        MAX_SOURCES,
       );
     });
 

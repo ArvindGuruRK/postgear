@@ -1,6 +1,6 @@
 # Module 11: Montage And Batch Export
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done | Size: L (one full session)
 > **Depends on**: [Module 03](module-03-captions.md) (document version 2); Sprint 12
 > **Stories**: CA-7.1, CA-7.2
 > **Next**: [Module 12](module-12-more-sources-and-platforms.md)
@@ -77,15 +77,17 @@ After this module people work on many clips at once. Ticking clips in the Clips 
 
 ## Tasks
 
-- [ ] Tick boxes, `BulkActionBar`, bulk hide and delete.
-- [ ] `POST /clips/exports`, the fair scheduler reading `clips.queue_priority`, the batch notice, the batch events stream, the dialog, list and chip.
-- [ ] `montage/`: `createMontage`, `layoutOverride`, `joins` and the fade overlap in the time map, several captions tracks, the title card, limits, with tests.
-- [ ] `POST /clips/montages`, `MONTAGE` origin, `meta.videoIds`, removal rules.
-- [ ] Several sources in `sharpSourceFor` and the render's prepare step; per-segment chains, `concat` and the `xfade` plus `acrossfade` Fade join in `compileFfmpeg`.
-- [ ] The montage dialog; the editor's dividers and badge.
-- [ ] Title-case test green.
-- [ ] Playwright once under simulation: tick three clips, Export All, see one notice; tick two clips from two videos, Create Montage with Fade, export. Screenshots in `screenshots/`.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] Tick boxes, `BulkActionBar`, bulk hide and delete.
+- [x] `POST /clips/exports`, the fair scheduler reading `clips.queue_priority`, the batch notice, the batch events stream, the dialog, list and chip.
+- [x] `montage/`: `createMontage`, `layoutOverride`, `joins` and the fade overlap in the time map, several captions tracks, the title card, limits, with tests.
+- [x] `POST /clips/montages`, `MONTAGE` origin, `meta.videoIds`, removal rules.
+- [x] Several sources in `sharpSourceFor` and the render's prepare step; per-segment chains, `concat` and the `xfade` plus `acrossfade` Fade join in `compileFfmpeg`.
+- [x] The montage dialog; the editor's dividers and badge.
+- [x] Title-case test green.
+- [x] Playwright once under simulation: tick three clips, Export All, see one notice; tick two clips from two videos, Create Montage with Fade, export. Screenshots in `screenshots/`.
+- [x] `verify-change`; update the Progress table and the Decision Log.
+- [x] Review fixes: edits move a Fade join and a montage divider to the clip's new first part; the reconcile window leaves waiting exports out; the fair queue ages (no starving); the batch sweep is ordered and skips all-cancelled batches; a montage's videos are read up to `MAX_SOURCES`.
+- [ ] Known limits, logged: two clips of one video share a source, so a zoom of one may also fire in the other where their ranges overlap; the editor's Fade mix shows only while playing, at half size (Preview Export is exact); the captions routes refuse a montage (change captions in a clip, then make the montage again).
 
 ## Tests
 

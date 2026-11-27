@@ -390,12 +390,17 @@ function mainAss(plan: RenderPlan): AssFile | null {
   }
   const styles = new Map<string, string>();
   const lines: Array<{ layer: number; order: number; line: string }> = [];
-  if (captions) {
+  // Module 11: a montage's other captions tracks go into the same file, after the first.
+  const allCaptions = captions ? [captions, ...(plan.moreCaptions ?? [])] : [];
+  for (const set of allCaptions) {
     // Captions first and lowest: a text or badge a person placed is drawn over them.
-    const fields = captionStyleFields(captions);
-    const name = `S${styles.size + 1}`;
-    styles.set(fields, name);
-    for (const line of captionDialogues(captions, name, plan.canvas.width)) {
+    const fields = captionStyleFields(set);
+    let name = styles.get(fields);
+    if (!name) {
+      name = `S${styles.size + 1}`;
+      styles.set(fields, name);
+    }
+    for (const line of captionDialogues(set, name, plan.canvas.width)) {
       lines.push({ layer: CAPTION_LAYER, order: lines.length, line });
     }
   }

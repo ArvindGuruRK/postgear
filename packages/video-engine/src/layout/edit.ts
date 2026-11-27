@@ -406,6 +406,13 @@ export function setFitCrop(
   return withLayout(doc, { ...doc.layout, fitCrop, areas });
 }
 
+/** A part framed its own way that a shape change refits (not a brand intro or outro). */
+function hasOwnLayout(segment: ClipDocument['segments'][number]): boolean {
+  return (
+    segment.layoutOverride !== undefined && segment.role !== 'intro' && segment.role !== 'outro'
+  );
+}
+
 /** Overlay items keep their place as a fraction of the canvas, pulled inside it. */
 function clampItems(tracks: readonly Track[]): Track[] {
   return tracks.map((track) => {
@@ -433,19 +440,34 @@ function clampItems(tracks: readonly Track[]): Track[] {
  * the new shape does not offer (Split on Horizontal) falls back to Blurred.
  * Overlay items keep their relative place, pulled inside the canvas. Going
  * back to the first shape gives the first layout again.
+ *
+ * A part's own layout (Module 11: each part of a montage carries its clip's)
+ * is changed by the same rules, with its own video's size from
+ * `options.sourceSizes` (by source id) when given. A brand intro's or
+ * outro's layout covers its whole video and fits any shape as it is.
  */
 export function setCanvasRatio(
   doc: ClipDocument,
   ratio: Ratio,
   videoSize: VideoSize,
+  options: { sourceSizes?: Readonly<Record<string, VideoSize>> } = {},
 ): ClipDocument {
   if (doc.canvas.ratio === ratio) {
     return doc;
   }
   const size = CANVASES[ratio];
+  const segments = doc.segments.some(hasOwnLayout)
+    ? doc.segments.map((segment) => {
+        if (!hasOwnLayout(segment) || !segment.layoutOverride) return segment;
+        const own = { ...doc, layout: segment.layoutOverride, segments: [], tracks: [] };
+        const sized = options.sourceSizes?.[segment.source] ?? videoSize;
+        return { ...segment, layoutOverride: setCanvasRatio(own, ratio, sized).layout };
+      })
+    : doc.segments;
   const reshaped: ClipDocument = {
     ...doc,
     canvas: { ...doc.canvas, ratio, width: size.width, height: size.height },
+    segments,
     tracks: clampItems(doc.tracks),
   };
 

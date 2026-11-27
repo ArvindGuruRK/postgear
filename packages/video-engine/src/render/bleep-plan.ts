@@ -57,12 +57,23 @@ export const BLEEP_RAMP_MS = 5;
 export const BLEEP_TONE_HZ = 1_000;
 export const BLEEP_TONE_GAIN = 0.35;
 
-type BleepDocument = Pick<ClipDocument, 'segments' | 'bleeps'>;
+/** Module 11: `joins` too, when the clip has Fade joins (each moves the parts after it earlier). */
+type BleepDocument = Pick<ClipDocument, 'segments' | 'bleeps'> &
+  Partial<Pick<ClipDocument, 'joins'>>;
 
-/** The answer for one bleep list and one segment list (documents are replaced, never changed). */
+/**
+ * The answer for one bleep list, one segment list and one join list
+ * (documents are replaced, never changed). The joins are part of the key: a
+ * copy of a document without its joins (the render plan reads each part's
+ * picture that way) must never hand its times to the real one.
+ */
 const cache = new WeakMap<
   readonly Bleep[],
-  { segments: ClipDocument['segments']; ranges: readonly BleepRange[] }
+  {
+    segments: ClipDocument['segments'];
+    joins: ClipDocument['joins'];
+    ranges: readonly BleepRange[];
+  }
 >();
 
 function computeRanges(doc: BleepDocument): BleepRange[] {
@@ -96,9 +107,9 @@ function computeRanges(doc: BleepDocument): BleepRange[] {
 function cachedRanges(doc: BleepDocument): readonly BleepRange[] {
   if (doc.bleeps.length === 0) return [];
   const hit = cache.get(doc.bleeps);
-  if (hit && hit.segments === doc.segments) return hit.ranges;
+  if (hit && hit.segments === doc.segments && hit.joins === doc.joins) return hit.ranges;
   const ranges = computeRanges(doc);
-  cache.set(doc.bleeps, { segments: doc.segments, ranges });
+  cache.set(doc.bleeps, { segments: doc.segments, joins: doc.joins, ranges });
   return ranges;
 }
 

@@ -30,7 +30,6 @@ import {
   Alert,
   Button,
   buttonVariants,
-  type ChoiceTileOption,
   ChoiceTiles,
   Dialog,
   DialogContent,
@@ -49,7 +48,6 @@ import {
   EXPORT_QUALITIES,
   type ExportQuality,
   formatBytes,
-  QUALITY_HELP,
   QUALITY_LABELS,
   qualityAllowed,
   qualityLockedSentence,
@@ -58,7 +56,7 @@ import { TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { NOTE, PanelSection } from '@/components/studio/panel-ui';
-import { PremiumLockDialog, PremiumLockMark } from '@/components/studio/premium-lock';
+import { PremiumLockDialog } from '@/components/studio/premium-lock';
 import { ApiError, downloadFile } from '@/lib/api';
 import {
   cancelClipJob,
@@ -92,6 +90,7 @@ import {
   summaryLine,
   timeLeft,
 } from './export-model';
+import { qualityTileOptions } from './quality-tiles';
 
 export {
   EXPORT_FAILED_SENTENCE,
@@ -382,16 +381,7 @@ export function ExportPanel({
   const stale = done ? changedSince(document, done.fingerprint) : false;
   const history = state.exports.filter((row) => row.job.status === 'DONE' && row.media !== null);
 
-  const options: ChoiceTileOption<ExportQuality>[] = EXPORT_QUALITIES.map((quality) => {
-    const locked = state.ceiling !== null && !qualityAllowed(quality, state.ceiling);
-    return {
-      value: quality,
-      label: QUALITY_LABELS[quality],
-      line: QUALITY_HELP[quality],
-      corner: locked ? <PremiumLockMark className="h-5 w-5" /> : undefined,
-      spokenLabel: locked ? `${QUALITY_LABELS[quality]}, locked` : undefined,
-    };
-  });
+  const options = qualityTileOptions(state.ceiling);
 
   const choose = (quality: ExportQuality) => {
     const lockedByPlan = state.planCeiling !== null && !qualityAllowed(quality, state.planCeiling);

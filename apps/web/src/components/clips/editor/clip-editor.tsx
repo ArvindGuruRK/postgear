@@ -135,6 +135,7 @@ import {
   type CaptionsTrack,
   captionLayout,
   captionsTrackOf,
+  captionsTracksOf,
   safeAreaGuide,
   updateCaptionsTrack,
   withCaptionsTrack,
@@ -278,6 +279,15 @@ import { type DockControls, TransportBar } from './transport-bar';
 import { useCameraOnOpen } from './use-camera-on-open';
 import { useClipAutosave } from './use-clip-autosave';
 import { useEditorRecipes } from './use-editor-recipes';
+import { montageCaptionLayouts, useMontageTranscripts } from './montage-captions';
+import {
+  applyToPart,
+  fromPartView,
+  isMontage,
+  layoutPartOf,
+  partClipTitle,
+  partView,
+} from './montage-layout';
 
 const subscribeNever = () => () => undefined;
 
@@ -710,6 +720,35 @@ export function ClipEditor({
   const latest = useRef({ document, selection: state.selection });
   latest.current = { document, selection: state.selection };
 
+  // ---- Montage (Sprint 13, Module 11) -----------------------------------------------------
+  // The Layout tools act on the part last picked on the timeline (its original clip's
+  // parts), the first part until one is picked. Null outside a montage.
+  const montage = isMontage(document);
+  const [pickedPart, setPickedPart] = useState<string | null>(null);
+  useEffect(() => {
+    if (state.selection?.kind === 'segment') setPickedPart(state.selection.id);
+  }, [state.selection]);
+  const layoutPart = montage ? layoutPartOf(document, pickedPart) : null;
+  const layoutPartRef = useRef(layoutPart);
+  layoutPartRef.current = layoutPart;
+  const layoutDocument = useMemo(() => partView(document, layoutPart), [document, layoutPart]);
+  const shownLayoutDocument = useMemo(
+    () => partView(shownDocument, layoutPart),
+    [shownDocument, layoutPart],
+  );
+  const layoutPartName = layoutPart ? partClipTitle(document, layoutPart) : null;
+  // A new shape refits every part of a montage to its own video's picture size.
+  const sourceSizes = useMemo(() => {
+    const sizes: Record<string, { width: number; height: number }> = {};
+    for (const [sourceId, media] of Object.entries(detail.extraSources ?? {})) {
+      if (media.proxy) sizes[sourceId] = { width: media.proxy.width, height: media.proxy.height };
+    }
+    return sizes;
+  }, [detail.extraSources]);
+  // The filmstrip and waveform are of the clip's own video; a montage's other videos show none.
+  const ownSourceId =
+    document.sources.find((one) => one.videoId === initial.clip.videoId)?.id ?? null;
+
   // The panel can be folded away for room (2026-11-19); opening any tab opens it again.
   const [panelOpen, setPanelOpenState] = useState(true);
   // Sprint 13, Module 04: the Transcript pane. At most three columns at 1366 px: opening it
@@ -789,12 +828,18 @@ export function ClipEditor({
     videoId: detail.video?.id ?? null,
     transcriptId: captionsTrack?.transcriptAssetId ?? null,
     onTrack: putCaptionsTrack,
+    // Module 11: a montage keeps its clips' captions; their words are read per video below.
+    montage,
   });
   const captionsTranscript = captions.transcript;
   const captionStyles = captions.styles;
+  // Module 11: a montage has a captions track per video, each with its own words, all drawn
+  // in the first track's look. An ordinary clip reads its one track's words from `useCaptions`.
+  const captionsTracks = useMemo(() => captionsTracksOf(shownDocument), [shownDocument]);
+  const trackTranscripts = useMontageTranscripts(shownDocument, captionsTracks, { all: montage });
   // The same layout the export's writer reads: the pages on screen are the pages in the file.
-  const captionsLayout = useMemo(() => {
-    if (!captionsTrack || !captionsTranscript) return null;
+  const ownCaptionsLayout = useMemo(() => {
+    if (montage || !captionsTrack || !captionsTranscript) return null;
     return captionLayout({
       doc: shownDocument,
       track: captionsTrack,
@@ -803,18 +848,47 @@ export function ClipEditor({
       // Only words that were listened to have a real time each.
       wordTimed: captionsTranscript.source === 'listened',
     });
-  }, [shownDocument, captionsTrack, captionsTranscript, captionStyles]);
+  }, [montage, shownDocument, captionsTrack, captionsTranscript, captionStyles]);
+  const trackLayouts = useMemo(() => {
+    if (!captionsTrack || (!montage && captionsTracks.length < 2)) return null;
+    return montageCaptionLayouts({
+      doc: shownDocument,
+      tracks: captionsTracks,
+      first: montage ? null : ownCaptionsLayout,
+      look: lookOf(captionsTrack.styleId, captionStyles),
+      transcripts: trackTranscripts,
+    });
+  }, [
+    montage,
+    captionsTracks,
+    captionsTrack,
+    ownCaptionsLayout,
+    shownDocument,
+    captionStyles,
+    trackTranscripts,
+  ]);
+  // The first track's layout: what the Captions tab shows.
+  const captionsLayout = trackLayouts
+    ? (trackLayouts.find((one) => one.trackId === captionsTrack?.id)?.layout ?? null)
+    : ownCaptionsLayout;
   useEffect(() => {
-    overlayLayer.setCaptions(captionsLayout);
-  }, [overlayLayer, captionsLayout]);
-  const captionRow = useMemo(
-    () => (captionsLayout ? captionBars(captionsLayout) : null),
-    [captionsLayout],
-  );
+    overlayLayer.setCaptions(trackLayouts ? trackLayouts.map((one) => one.layout) : captionsLayout);
+  }, [overlayLayer, trackLayouts, captionsLayout]);
+  const captionRow = useMemo(() => {
+    if (trackLayouts) {
+      // Keyed by track too: each track numbers its own pages.
+      const bars = trackLayouts.flatMap((one) =>
+        captionBars(one.layout).map((bar) => ({ ...bar, key: `${one.trackId}-${bar.key}` })),
+      );
+      return bars.length > 0 ? bars.sort((a, b) => a.startMs - b.startMs) : null;
+    }
+    return captionsLayout ? captionBars(captionsLayout) : null;
+  }, [trackLayouts, captionsLayout]);
   const editCaptions = useCallback(
-    (change: (track: CaptionsTrack) => CaptionsTrack, coalesceKey?: string) => {
+    (change: (track: CaptionsTrack) => CaptionsTrack, coalesceKey?: string, trackId?: string) => {
       const { document: doc } = latest.current;
-      const next = updateCaptionsTrack(doc, change);
+      // A word edit names its track; a style, size or place reaches every track (Module 11).
+      const next = updateCaptionsTrack(doc, change, { trackId });
       commit(doc, next, { coalesceKey });
     },
     [commit],
@@ -875,8 +949,10 @@ export function ClipEditor({
     const { document: doc, selection } = latest.current;
     if (selection?.kind === 'area') {
       // While following, the crop is removed from the person's own layout (following goes off).
-      const own = disableFollow(doc);
-      const next = removeArea(own, selection.id, videoSize);
+      // On a montage it is the picked part's crop.
+      const part = layoutPartRef.current;
+      const own = applyToPart(doc, part, disableFollow);
+      const next = applyToPart(own, part, (view) => removeArea(view, selection.id, videoSize));
       if (next === own) {
         setNotice(LAST_CROP_SENTENCE);
         setAnnouncement(LAST_CROP_SENTENCE);
@@ -909,9 +985,10 @@ export function ClipEditor({
   const editLayout = useCallback<LayoutEdit>(
     (change, spoken, options) => {
       const doc = latest.current.document;
+      const part = layoutPartRef.current;
       let next: ClipDocument;
       try {
-        next = change(doc);
+        next = applyToPart(doc, part, change);
       } catch (cause) {
         console.warn(
           `Clip editor: a layout change was dropped (${cause instanceof Error ? cause.message : 'unknown'}).`,
@@ -919,16 +996,48 @@ export function ClipEditor({
         return;
       }
       if (next === doc) return;
+      // On a montage the new crop is in the part's own layout.
+      const seen = partView(next, part);
       const added =
         options?.selectArea === 'last'
-          ? next.layout.areas.at(-1)
+          ? seen.layout.areas.at(-1)
           : options?.selectArea === 'camera'
-            ? (cameraAreaOf(next) ?? undefined)
+            ? (cameraAreaOf(seen) ?? undefined)
             : undefined;
       commit(doc, next, added ? { select: { kind: 'area', id: added.id } } : {});
       setAnnouncement(spoken);
     },
     [commit],
+  );
+
+  // Module 11: the crop boxes edit the part view; their drags land on the document.
+  const commitPartView = useCallback(
+    (
+      start: ClipDocument,
+      next: ClipDocument,
+      options?: { select?: EditorSelection; coalesceKey?: string },
+    ) => {
+      const part = layoutPartRef.current;
+      if (!part) {
+        commit(start, next, options);
+        return;
+      }
+      const doc = latest.current.document;
+      commit(doc, fromPartView(doc, part, next), options);
+    },
+    [commit],
+  );
+  const draftPartView = useCallback(
+    (shown: { doc: ClipDocument; seekMs: number | null } | null) =>
+      setDraft(
+        shown
+          ? {
+              doc: fromPartView(latest.current.document, layoutPartRef.current, shown.doc),
+              seekMs: shown.seekMs,
+            }
+          : null,
+      ),
+    [],
   );
 
   // ---- Follow The Speaker (Sprint 13, Module 08) -------------------------------------------
@@ -1494,7 +1603,7 @@ export function ClipEditor({
   );
   const removeProblem = state.selection
     ? state.selection.kind === 'area'
-      ? document.layout.areas.length > 1
+      ? layoutDocument.layout.areas.length > 1
         ? null
         : LAST_CROP_SENTENCE
       : removeProblemOf(document, state.selection)
@@ -1776,13 +1885,16 @@ export function ClipEditor({
     ) : state.tab === 'layouts' ? (
       <LayoutsPanel
         clipId={clipId}
-        document={document}
+        document={layoutDocument}
         videoSize={videoSize}
         labelledBy={panelHeadingId('layouts')}
         facesAvailable={facesAvailable}
         onEdit={editLayout}
-        follow={follow}
+        // Module 11: Follow The Speaker frames one clip; a montage keeps each clip's own framing.
+        follow={montage ? undefined : follow}
         grabPicture={grabPicture}
+        partName={layoutPartName}
+        sourceSizes={montage ? sourceSizes : undefined}
       />
     ) : state.tab === 'elements' ? (
       <ElementsPanel
@@ -1830,6 +1942,7 @@ export function ClipEditor({
         onRemove={removeCaptions}
         onSeek={(ms) => playback.seekMs(ms)}
         onNotice={setNotice}
+        montage={montage}
       />
     ) : state.tab === 'effects' ? (
       <EffectsPanel
@@ -1899,7 +2012,7 @@ export function ClipEditor({
           waveform={detail.waveform}
           aiOn={captions.ai ? captions.ai.captions === true : null}
           onApply={applyCut}
-          onEditCaptions={(change) => editCaptions(change)}
+          onEditCaptions={(change) => editCaptions(change, undefined, captionsTrack?.id)}
           onNotice={setNotice}
           onClose={() => setTranscriptOpen(false)}
         />
@@ -1970,14 +2083,14 @@ export function ClipEditor({
             <CropStage
               engine={engine}
               playback={playback}
-              document={document}
-              shown={shownDocument}
+              document={layoutDocument}
+              shown={shownLayoutDocument}
               videoSize={videoSize}
               hasVideo={detail.playback !== null}
               selection={state.selection}
               onSelect={select}
-              onCommit={commit}
-              onDraft={setDraft}
+              onCommit={commitPartView}
+              onDraft={draftPartView}
               onEdit={editLayout}
               onAnnounce={setAnnouncement}
               follow={{
@@ -2029,6 +2142,7 @@ export function ClipEditor({
         <TransportBar playback={playback} dock={dock} disabled={!detail.playback} />
         <TimelineDock
           document={document}
+          filmstripSource={montage ? ownSourceId : null}
           selection={state.selection}
           playback={playback}
           filmstrip={detail.filmstrip}

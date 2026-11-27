@@ -16,6 +16,9 @@
  *   second row of a kind when two of its bars overlap. Empty rows stay,
  *   slim, so people learn where things go. While Follow The Speaker is on
  *   (Sprint 13, Module 08), a thin Speaker strip sits under the Video row.
+ *   On a montage (Module 11) the Video row shows a thin divider and the
+ *   original clip's name at each clip's first part, and a small mark where
+ *   a Fade join overlaps two parts.
  * - Editing: drag a part's end to trim it, an item's body to move it, an
  *   item's end to resize it. Each drag works from the document as it was
  *   when it began (the engine's gesture reducers), shows the result live
@@ -63,6 +66,7 @@ import {
   findItem,
   formatTimecode,
   type GestureResult,
+  montageParts,
   msToPx,
   outputDuration,
   pxPerMs as pxPerMsFor,
@@ -216,6 +220,12 @@ export interface TimelineDockProps {
    * it itself (`removeHook`, one undo step).
    */
   onRemoveHook?: () => void;
+  /**
+   * Module 11: the source the filmstrip and waveform are of (the clip's own
+   * video). A part of another video (a montage's) shows none. Left out, every
+   * part shows them.
+   */
+  filmstripSource?: string | null;
 }
 
 export function TimelineDock(props: TimelineDockProps) {
@@ -477,6 +487,7 @@ function EditingTimeline({
   onCaptions,
   speaker,
   onRemoveHook,
+  filmstripSource = null,
 }: TimelineDockProps & { snapping: boolean; onDragNeedsMore: (needs: boolean) => void }) {
   const scroller = useRef<HTMLDivElement | null>(null);
   const origin = useRef<HTMLDivElement | null>(null);
@@ -491,6 +502,12 @@ function EditingTimeline({
   const shown = drag ? drag.result.doc : document;
   const parts = useMemo(() => placeSegments(shown), [shown]);
   const rows = useMemo(() => timelineRows(shown), [shown]);
+  // Module 11: a montage's original clips, by the part each starts at.
+  const montageStarts = useMemo(
+    () => new Map(montageParts(shown).map((part) => [part.firstSegment, part.title])),
+    [shown],
+  );
+  const ownVideo = (source: string) => filmstripSource === null || source === filmstripSource;
   const durationMs = parts.length > 0 ? parts[parts.length - 1].outEnd : 0;
   // While dragging, the scale holds still: the clip's length is the one the drag began on.
   const layoutMs = drag ? outputDuration(drag.startDoc) : durationMs;
@@ -932,9 +949,11 @@ function EditingTimeline({
                   : partLabel(index, outStart, outEnd, speed);
               // The hook's delete sits at the end of its last part.
               const lastHook = hook && parts[index + 1]?.segment.role !== 'hook';
+              const clipName = montageStarts.get(segment.id) ?? null;
+              const overlapMs = parts[index]?.overlapMs ?? 0;
               return (
                 <div key={segment.id} className="contents">
-                  {visible && !brand ? (
+                  {visible && !brand && ownVideo(segment.source) ? (
                     <Filmstrip
                       strip={filmstrip}
                       fromMs={segment.sourceIn + (from - start) * speed}
@@ -946,8 +965,25 @@ function EditingTimeline({
                       style={{ left: xOf(from) + 2 }}
                     />
                   ) : null}
+                  {clipName !== null && index > 0 ? (
+                    <div
+                      aria-hidden="true"
+                      data-testid="clip-montage-divider"
+                      className="pointer-events-none absolute -top-1 -bottom-1 z-10 w-0.5 -translate-x-1/2 bg-ink"
+                      style={{ left: xOf(start) }}
+                    />
+                  ) : null}
+                  {overlapMs > 0 ? (
+                    <div
+                      aria-hidden="true"
+                      title="Fade"
+                      data-testid="clip-join-fade"
+                      className="pointer-events-none absolute bottom-0.5 z-10 h-2 rounded-sm border-2 border-outline bg-actionAccent"
+                      style={{ left: xOf(start), width: Math.max(6, xOf(overlapMs)) }}
+                    />
+                  ) : null}
                   <TimelineBar
-                    aria-label={label}
+                    aria-label={clipName ? `${clipName}, ${label}` : label}
                     data-testid="clip-part"
                     data-part-index={index}
                     data-hook={hook ? '' : undefined}
@@ -968,6 +1004,15 @@ function EditingTimeline({
                   >
                     {hook ? (
                       <TimelineBarChip data-testid="clip-hook-label">Hook</TimelineBarChip>
+                    ) : null}
+                    {clipName ? (
+                      <TimelineBarChip
+                        data-testid="clip-montage-part-name"
+                        className="max-w-48 truncate"
+                        title={clipName}
+                      >
+                        {clipName}
+                      </TimelineBarChip>
                     ) : null}
                     {brand ? (
                       <TimelineBarChip data-testid="clip-brand-part-label">{brand}</TimelineBarChip>
@@ -1030,7 +1075,7 @@ function EditingTimeline({
               const from = Math.max(start, visibleFrom);
               const to = Math.min(outEnd + shift, visibleTo);
               // The waveform is the clip's own video: an intro or outro has none drawn here.
-              if (!(to > from) || brandPartName(segment)) return null;
+              if (!(to > from) || brandPartName(segment) || !ownVideo(segment.source)) return null;
               return (
                 <Waveform
                   key={segment.id}

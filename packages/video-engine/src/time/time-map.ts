@@ -13,14 +13,21 @@
  * outputDuration`) belongs to the last segment, so the playhead parked at the
  * end still has a picture.
  *
+ * Joins (Module 11): a Fade join overlaps a part with the one before it by
+ * `joinOverlaps(doc)[i]` ms, so part `i` starts that much before part
+ * `i - 1` ends and the clip is that much shorter. Inside an overlap both
+ * parts are on screen (the compiler mixes them with `xfade`); `segmentAt`
+ * answers the outgoing part until the overlap's middle, then the incoming
+ * one. With no joins every number below is what it always was.
+ *
  * Rounding: at speeds below 1, one output millisecond spans less than one
  * source millisecond, so `toOutput(toSource(t))` can land up to
  * `ceil(1 / speed)` ms away from `t`. At speed 1 and above it is exact.
  */
-import { type ClipDocument, type Segment, segmentOutputMs } from '../document/schema';
+import { type ClipDocument, joinOverlaps, type Segment, segmentOutputMs } from '../document/schema';
 
 /** The only part of a document the time map reads, so half-built drafts work too. */
-export type TimedDocument = Pick<ClipDocument, 'segments'>;
+export type TimedDocument = Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'joins'>>;
 
 /** A segment with its place in the clip. */
 export interface PlacedSegment {
@@ -30,6 +37,8 @@ export interface PlacedSegment {
   outStart: number;
   /** Where it ends in the clip, in ms (exclusive). */
   outEnd: number;
+  /** Module 11: how long it overlaps the part before it (a Fade join), 0 for a cut. */
+  overlapMs: number;
 }
 
 /** Where an output moment comes from in the video. */
@@ -42,20 +51,26 @@ export interface SourceMoment {
 /** Every segment with its start and end in the clip, in play order. */
 export function placeSegments(doc: TimedDocument): PlacedSegment[] {
   const placed: PlacedSegment[] = [];
+  const overlaps = joinOverlaps(doc);
   let cursor = 0;
   doc.segments.forEach((segment, index) => {
     const length = segmentOutputMs(segment);
-    placed.push({ segment, index, outStart: cursor, outEnd: cursor + length });
-    cursor += length;
+    const overlapMs = overlaps[index] ?? 0;
+    const outStart = cursor - overlapMs;
+    placed.push({ segment, index, outStart, outEnd: outStart + length, overlapMs });
+    cursor = outStart + length;
   });
   return placed;
 }
 
-/** The clip's length in ms: the sum of its segments' output lengths. */
+/** The clip's length in ms: the sum of its segments' output lengths, less each Fade join's overlap. */
 export function outputDuration(doc: TimedDocument): number {
   let total = 0;
   for (const segment of doc.segments) {
     total += segmentOutputMs(segment);
+  }
+  for (const overlap of joinOverlaps(doc)) {
+    total -= overlap;
   }
   return total;
 }
@@ -73,13 +88,60 @@ export function segmentAt(doc: TimedDocument, outputMs: number): PlacedSegment |
   if (!last || outputMs > last.outEnd) {
     return null;
   }
-  for (const entry of placed) {
+  for (let i = 0; i < placed.length; i += 1) {
+    const entry = placed[i] as PlacedSegment;
     if (outputMs >= entry.outStart && outputMs < entry.outEnd) {
+      // Inside a fade the outgoing part answers until the overlap's middle.
+      const next = placed[i + 1];
+      if (next && next.overlapMs > 0 && outputMs >= next.outStart + next.overlapMs / 2) {
+        return next;
+      }
       return entry;
     }
   }
   // Exactly the clip's end.
   return last;
+}
+
+/** A Fade join being played: the two parts on screen and how far the mix is. */
+export interface JoinNow {
+  /** The outgoing part (the one before the join). */
+  fromSegment: string;
+  /** The incoming part (the join's `beforeSegment`). */
+  toSegment: string;
+  fromIndex: number;
+  toIndex: number;
+  /** 0 at the overlap's start (all outgoing) to 1 at its end (all incoming). */
+  progress: number;
+}
+
+/**
+ * The Fade join playing at `outputMs` (Module 11), or null on a cut or away
+ * from any join. Inside an overlap `[incoming.outStart, outgoing.outEnd)`
+ * both parts are on screen; `progress` is linear in output time, as
+ * FFmpeg's `xfade=transition=fade` mixes. `outputMs` may be fractional.
+ */
+export function joinAt(doc: TimedDocument, outputMs: number): JoinNow | null {
+  if (!Number.isFinite(outputMs) || !doc.joins || doc.joins.length === 0) {
+    return null;
+  }
+  const placed = placeSegments(doc);
+  for (let i = 1; i < placed.length; i += 1) {
+    const entry = placed[i] as PlacedSegment;
+    if (entry.overlapMs <= 0) continue;
+    const end = entry.outStart + entry.overlapMs;
+    if (outputMs >= entry.outStart && outputMs < end) {
+      const previous = placed[i - 1] as PlacedSegment;
+      return {
+        fromSegment: previous.segment.id,
+        toSegment: entry.segment.id,
+        fromIndex: previous.index,
+        toIndex: entry.index,
+        progress: Math.min(1, Math.max(0, (outputMs - entry.outStart) / entry.overlapMs)),
+      };
+    }
+  }
+  return null;
 }
 
 /** The video moment shown at `outputMs`, or null outside the clip. */

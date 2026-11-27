@@ -426,6 +426,11 @@ const envSchema = z
     // refused with "Clips is very busy right now" (503 clips_busy). A safety
     // cap for the media boxes, not a plan value.
     CLIPS_QUEUE_CEILING: blankAsUnset(z.coerce.number().int().min(1).max(100_000).default(500)),
+    // Sprint 13, Module 11: exports running (or handed to the render workers) at
+    // once across every workspace; each workspace has at most one, and the
+    // fair queue picks the next by `clips.queue_priority`, then by turns.
+    // Match it to the render workers' total slots (RENDER_CONCURRENCY each).
+    CLIPS_RENDER_SLOTS: blankAsUnset(z.coerce.number().int().min(1).max(64).default(2)),
     // In production only these addresses count as platform operators (the
     // entitlement screens, the library, removal). Ignored in development.
     OPERATOR_EMAILS: blankAsUnset(commaList(z.string().trim().toLowerCase().email()).default('')),

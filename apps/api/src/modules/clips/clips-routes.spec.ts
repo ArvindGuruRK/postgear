@@ -28,6 +28,7 @@ import { PostsService } from '../posts/posts.service';
 import { RedisService } from '../redis/redis.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
 import { ClipChannelsModule } from './channels/clip-channels.module';
+import { ClipBulkService } from './clip/clip-bulk.service';
 import { ClipEditsService } from './clip/clip-edits.service';
 import { ClipExportsService } from './clip/clip-exports.service';
 import { ClipItemService } from './clip/clip-item.service';
@@ -37,9 +38,11 @@ import { ClipsModule } from './clips.module';
 import { ClipsCoreModule } from './clips-core.module';
 import { ClipDownloadsRepository } from './downloads/clip-downloads.repository';
 import { ClipDownloadsService } from './downloads/clip-downloads.service';
+import { ClipBatchExportsService } from './exports/clip-batch-exports.service';
 import { ClipHighlightsService } from './highlights/clip-highlights.service';
 import { ClipFollowService } from './faces/clip-follow.service';
 import { ClipMomentsService } from './highlights/clip-moments.service';
+import { ClipMontagesService } from './montages/clip-montages.service';
 import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
 import { ClipJobsRepository } from './jobs/clip-jobs.repository';
@@ -289,6 +292,36 @@ describe('Clips routes', () => {
           reached: 'preview-latest',
           clipId,
         }),
+      })
+      // Sprint 13, Module 11: Export All and its batches.
+      .overrideProvider(ClipBatchExportsService)
+      .useValue({
+        start: async (_org: string, _user: string, body: { clipIds: string[] }) => ({
+          reached: 'batch-export',
+          clips: body.clipIds.length,
+        }),
+        open: async () => ({ reached: 'batches-open' }),
+        view: async (_org: string, batchId: string) => ({ reached: 'batch', batchId }),
+      })
+      // Sprint 13, Module 11: bulk Hide, Unhide and Delete, and Create Montage.
+      .overrideProvider(ClipBulkService)
+      .useValue({
+        patch: async (_org: string, body: { clipIds: string[]; status: string }) => ({
+          reached: 'bulk-patch',
+          clips: body.clipIds.length,
+          status: body.status,
+        }),
+        remove: async (_org: string, body: { clipIds: string[] }) => ({
+          reached: 'bulk-delete',
+          clips: body.clipIds.length,
+        }),
+      })
+      .overrideProvider(ClipMontagesService)
+      .useValue({
+        create: async (_org: string, _user: string, body: { clipIds: string[]; ratio?: string }) =>
+          body.ratio === undefined && body.clipIds.length === 3
+            ? { kind: 'shapes_differ', ratios: ['9:16', '16:9'] }
+            : { kind: 'created', clip: { reached: 'montage', clips: body.clipIds.length } },
       })
       .overrideProvider(ClipLayoutsService)
       .useValue({
@@ -640,6 +673,120 @@ describe('Clips routes', () => {
     expect(removed.body).toEqual({ reached: 'delete', clipId: CLIP_ID });
   });
 
+  it('sends PATCH and DELETE /clips/bulk to the bulk service, not the clip id routes (Module 11)', async () => {
+    const server = app.getHttpServer();
+    const other = '55555555-5555-4555-8555-000000000002';
+    expect(
+      (
+        await request(server)
+          .patch('/clips/bulk')
+          .send({ clipIds: [CLIP_ID, other], status: 'HIDDEN' })
+          .expect(200)
+      ).body,
+    ).toEqual({ reached: 'bulk-patch', clips: 2, status: 'HIDDEN' });
+    expect(
+      (
+        await request(server)
+          .delete('/clips/bulk')
+          .send({ clipIds: [CLIP_ID] })
+          .expect(200)
+      ).body,
+    ).toEqual({ reached: 'bulk-delete', clips: 1 });
+    // A clip id still reaches the clip routes.
+    expect(
+      (
+        await request(server)
+          .patch(`/clips/${CLIP_ID}`)
+          .send({ revision: 1, title: 'X' })
+          .expect(200)
+      ).body,
+    ).toEqual({ reached: 'patch', clipId: CLIP_ID });
+  });
+
+  it('refuses a bulk body it does not describe (Module 11)', async () => {
+    const server = app.getHttpServer();
+    const ids = (n: number) =>
+      Array.from({ length: n }, (_, i) => `55555555-5555-4555-8555-${String(i).padStart(12, '0')}`);
+    await request(server)
+      .patch('/clips/bulk')
+      .send({ clipIds: [CLIP_ID] })
+      .expect(400);
+    await request(server)
+      .patch('/clips/bulk')
+      .send({ clipIds: [CLIP_ID], status: 'NEW' })
+      .expect(400);
+    await request(server)
+      .patch('/clips/bulk')
+      .send({ clipIds: ids(51), status: 'HIDDEN' })
+      .expect(400);
+    await request(server)
+      .patch('/clips/bulk')
+      .send({ clipIds: [CLIP_ID], status: 'HIDDEN', revision: 1 })
+      .expect(400);
+    await request(server).delete('/clips/bulk').send({ clipIds: [] }).expect(400);
+    await request(server)
+      .delete('/clips/bulk')
+      .send({ clipIds: ids(51) })
+      .expect(400);
+    await request(server)
+      .delete('/clips/bulk')
+      .send({ clipIds: [CLIP_ID, CLIP_ID] })
+      .expect(400);
+    await request(server).delete('/clips/bulk').expect(400);
+  });
+
+  it('sends POST /clips/montages to Create Montage, with the shapes when they differ (Module 11)', async () => {
+    const server = app.getHttpServer();
+    const ids = (n: number) =>
+      Array.from({ length: n }, (_, i) => `55555555-5555-4555-8555-${String(i).padStart(12, '0')}`);
+    expect(
+      (
+        await request(server)
+          .post('/clips/montages')
+          .send({ clipIds: ids(2), transition: 'fade', titleCard: 'Best Of' })
+          .expect(201)
+      ).body,
+    ).toEqual({ clip: { reached: 'montage', clips: 2 } });
+    expect(
+      (
+        await request(server)
+          .post('/clips/montages')
+          .send({ clipIds: ids(3), transition: 'cut' })
+          .expect(422)
+      ).body,
+    ).toEqual({
+      error: 'These clips have different shapes. Pick one shape for the montage.',
+      statusCode: 422,
+      code: 'montage_shapes_differ',
+      ratios: ['9:16', '16:9'],
+    });
+    await request(server)
+      .post('/clips/montages')
+      .send({ clipIds: ids(3), ratio: '9:16', transition: 'cut' })
+      .expect(201);
+    // Bodies it does not describe never reach the service.
+    await request(server)
+      .post('/clips/montages')
+      .send({ clipIds: ids(2) })
+      .expect(400);
+    await request(server)
+      .post('/clips/montages')
+      .send({ clipIds: ids(2), transition: 'wipe' })
+      .expect(400);
+    await request(server)
+      .post('/clips/montages')
+      .send({ clipIds: ids(2), transition: 'cut', ratio: '2:1' })
+      .expect(400);
+    await request(server)
+      .post('/clips/montages')
+      .send({ clipIds: [CLIP_ID, CLIP_ID], transition: 'cut' })
+      .expect(400);
+    await request(server)
+      .post('/clips/montages')
+      .send({ clipIds: ids(2), transition: 'cut', layout: 'split' })
+      .expect(400);
+  });
+
   it('sends /clips/coming-up to Coming Up, not the clip controller, and a send to the sender (Module 17)', async () => {
     const server = app.getHttpServer();
     expect((await request(server).get('/clips/coming-up').expect(200)).body).toEqual({
@@ -729,6 +876,56 @@ describe('Clips routes', () => {
       .expect(400);
     await request(server).post(`/clips/${CLIP_ID}/previews`).send({ quality: '720p' }).expect(400);
     await request(server).post(`/clips/${CLIP_ID}/previews`).send({ revision: 'two' }).expect(400);
+  });
+
+  it('sends /clips/exports and its batches to Export All, not the clip controller (Module 11)', async () => {
+    const server = app.getHttpServer();
+    const batch = '12121212-1212-4121-8121-121212121212';
+    expect(
+      (
+        await request(server)
+          .post('/clips/exports')
+          .send({ clipIds: [CLIP_ID], quality: '1080p' })
+          .expect(202)
+      ).body,
+    ).toEqual({ reached: 'batch-export', clips: 1 });
+    expect((await request(server).get('/clips/exports/batches?open=1').expect(200)).body).toEqual({
+      reached: 'batches-open',
+    });
+    expect((await request(server).get(`/clips/exports/batches/${batch}`).expect(200)).body).toEqual(
+      { reached: 'batch', batchId: batch },
+    );
+    // A clip's own export history is still the clip controller's.
+    expect((await request(server).get(`/clips/${CLIP_ID}/exports`).expect(200)).body).toEqual({
+      reached: 'export-history',
+      clipId: CLIP_ID,
+    });
+  });
+
+  it('refuses an Export All body or query it does not describe (Module 11)', async () => {
+    const server = app.getHttpServer();
+    await request(server).post('/clips/exports').send({ clipIds: [], quality: '720p' }).expect(400);
+    await request(server)
+      .post('/clips/exports')
+      .send({ clipIds: [CLIP_ID, CLIP_ID], quality: '720p' })
+      .expect(400);
+    await request(server)
+      .post('/clips/exports')
+      .send({ clipIds: Array.from({ length: 31 }, () => CLIP_ID), quality: '720p' })
+      .expect(400);
+    await request(server)
+      .post('/clips/exports')
+      .send({ clipIds: ['x'], quality: '720p' })
+      .expect(400);
+    await request(server)
+      .post('/clips/exports')
+      .send({ clipIds: [CLIP_ID], quality: '4k' })
+      .expect(400);
+    await request(server)
+      .post('/clips/exports')
+      .send({ clipIds: [CLIP_ID], quality: '720p', proof: true })
+      .expect(400);
+    await request(server).get('/clips/exports/batches?open=yes').expect(400);
   });
 
   it('sends /clips/downloads to the downloads controller, not the clip controller (Module 18)', async () => {

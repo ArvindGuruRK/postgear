@@ -9,7 +9,8 @@
  * path is SQL NULL: never equal), `AND`, `OR`, `NOT`, and on clips the
  * relations `video` (one) and `posts` (`some` and `none`); Module 17 adds
  * `gte`, `lte` and `contains` (case-insensitive), `ClipPost` writes, and a
- * post's channel (`integration`). A filter it does not know throws, so a
+ * post's channel (`integration`); Module 11 adds a JSON path's
+ * `array_contains`. A filter it does not know throws, so a
  * spec can never pass by ignoring part of a query.
  *
  * Test-only: nothing outside a `*.spec.ts` imports this file.
@@ -141,6 +142,11 @@ function matchesScalar(row: Row, actual: unknown, filter: unknown): boolean {
       const a = actual instanceof Date ? actual.getTime() : (actual as number);
       const b = operand instanceof Date ? operand.getTime() : (operand as number);
       if (op === 'gte' ? a < b : a > b) return false;
+    } else if (op === 'array_contains') {
+      // Module 11: a JSON list holds every value asked for (`meta.videoIds`).
+      if (!Array.isArray(actual)) return false;
+      const wanted = Array.isArray(operand) ? operand : [operand];
+      if (!wanted.every((item) => actual.some((value) => same(value, item)))) return false;
     } else if (op === 'contains') {
       if (typeof actual !== 'string') return false;
       if (!actual.toLowerCase().includes(String(operand).toLowerCase())) return false;
@@ -164,6 +170,9 @@ export function matches(row: Row, where: unknown, relations: Relations = noRelat
       if (parts.some((part) => matches(row, part, relations))) return false;
     } else if (key in row) {
       if (!matchesScalar(row, row[key], value)) return false;
+    } else if (isPlainObject(value) && 'path' in value) {
+      // A JSON column a seeded row leaves out (`clipRow` has no `meta`) is SQL NULL.
+      if (!matchesScalar(row, null, value)) return false;
     } else {
       const related = relations(row, key);
       if (Array.isArray(related)) {

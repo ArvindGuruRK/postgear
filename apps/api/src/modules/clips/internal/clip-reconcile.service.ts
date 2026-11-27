@@ -15,10 +15,17 @@
  *   emptied (both its charges come back with the rest).
  * - **Temporal unreachable**: the pass stops and changes nothing more, so a
  *   network blip never fails healthy jobs.
+ * - **Exports** (Sprint 13, Module 11, the fair render queue): an export
+ *   that never held a slot is waiting for its turn and is left to
+ *   `startWaitingRenders` at the end of the pass; one that held a slot but
+ *   never started gives the slot back and queues again, as an IMPORT does.
+ *   A failed export of a batch rings no bell of its own; the batch's one
+ *   notice is written when it was the last to end, and recent batches are
+ *   settled again in case a `settled` call was lost.
  *
  * Answers `{ started, failed }`.
  */
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   type ClipJob,
   ClipJobKind,
@@ -35,7 +42,8 @@ import { PRIVATE_STORAGE } from '../../media/storage/storage.interface';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { SchedulingService } from '../../scheduling/scheduling.service';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
-import { ClipJobsService } from '../jobs/clip-jobs.service';
+import { ClipJobsService, isQueuedRender } from '../jobs/clip-jobs.service';
+import { batchIdOf, ClipBatchNoticeService } from '../exports/clip-batch-notice.service';
 import { exportFailedNotice, videoFailedNotice } from './clip-notices';
 
 /** Jobs looked at per pass, per list: keeps one pass well inside its activity timeout. */
@@ -72,6 +80,8 @@ export class ClipReconcileService {
     private readonly usage: UsageService,
     private readonly notifications: NotificationsService,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
+    // Module 11: Export All's one notice (optional only for older specs).
+    @Optional() private readonly batchNotices?: ClipBatchNoticeService,
   ) {}
 
   async reconcile(now = new Date()): Promise<ClipReconcileAnswer> {
@@ -86,6 +96,8 @@ export class ClipReconcileService {
         orgs.add(job.organizationId);
         continue;
       }
+      // Module 11: an export waiting for its turn is the render queue's, below.
+      if (isQueuedRender(job) && job.startedAt === null) continue;
       const state = await this.scheduling.describeClipJob(job.id);
       if (state === 'unavailable') {
         reachable = false;
@@ -97,8 +109,8 @@ export class ClipReconcileService {
         orgs.add(job.organizationId);
         continue;
       }
-      // Never started: an IMPORT queues again for its slot, the rest start now.
-      if (job.kind === ClipJobKind.IMPORT) {
+      // Never started: an IMPORT or an export queues again for its slot, the rest start now.
+      if (job.kind === ClipJobKind.IMPORT || isQueuedRender(job)) {
         await this.repository.releaseClaim(job.organizationId, job.id);
         orgs.add(job.organizationId);
         continue;
@@ -137,6 +149,21 @@ export class ClipReconcileService {
             }),
           );
         }
+      }
+      // Module 11: the fair render queue looks across every workspace at once.
+      started += (await this.jobs.startRendersQuietly('reconcile')).length;
+    }
+
+    if (this.batchNotices) {
+      try {
+        await this.batchNotices.sweep(now);
+      } catch (error) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'clips.reconcile.batch_sweep_failed',
+            reason: error instanceof Error ? error.message : String(error),
+          }),
+        );
       }
     }
 
@@ -191,13 +218,21 @@ export class ClipReconcileService {
       }
     }
 
-    if (job.kind === ClipJobKind.RENDER && lostJobCode(job) === 'export_failed' && job.clipId) {
+    const batched = batchIdOf(job) !== null;
+    if (
+      job.kind === ClipJobKind.RENDER &&
+      lostJobCode(job) === 'export_failed' &&
+      job.clipId &&
+      !batched
+    ) {
       const clip = await prisma.clip.findFirst({
         where: { id: job.clipId, organizationId: job.organizationId },
         select: { id: true, title: true },
       });
       if (clip) await this.notify(exportFailedNotice(job.organizationId, clip), job.id);
     }
+    // Module 11: a batch's export is counted in its one notice instead.
+    if (batched) await this.batchNotices?.settleJob(job);
 
     this.logger.warn(
       JSON.stringify({

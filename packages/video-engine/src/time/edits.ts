@@ -122,7 +122,7 @@ export function finishEdit(
       return refuse('segment_too_short');
     }
   }
-  const after: ClipDocument = { ...before, segments };
+  const after: ClipDocument = { ...before, segments, ...keptJoinsAndParts(before, segments) };
   const total = outputDuration(after);
   if (total < CLIP_MIN_MS) {
     return refuse('clip_too_short');
@@ -132,6 +132,70 @@ export function finishEdit(
   }
   const doc = replaceItems(before, after);
   return needsMoreVideo ? { ok: true, doc, needsMoreVideo } : { ok: true, doc };
+}
+
+/**
+ * Module 11: a Fade join and a montage divider name the part that starts an
+ * original clip. When an edit removes that part, both move to the part that
+ * now follows the last surviving part before it (the clip's new first part);
+ * a join that would land on the first part or on a part that already has one
+ * is dropped, and a divider that would land on another divider's part stays
+ * as it was (`montageParts` skips a part that is gone).
+ */
+function keptJoinsAndParts(
+  before: ClipDocument,
+  segments: readonly Segment[],
+): Partial<Pick<ClipDocument, 'joins' | 'meta'>> {
+  const joins = before.joins;
+  const parts = before.meta?.montage?.parts;
+  if ((!joins || joins.length === 0) && !parts) return {};
+  const alive = new Set(segments.map((segment) => segment.id));
+  const index = new Map(segments.map((segment, i) => [segment.id, i]));
+  /** The part that now stands where `id` stood, or null. */
+  const standIn = (id: string): string | null => {
+    if (alive.has(id)) return id;
+    const at = before.segments.findIndex((segment) => segment.id === id);
+    if (at < 0) return null;
+    let previous = -1;
+    for (let i = at - 1; i >= 0; i -= 1) {
+      const kept = index.get((before.segments[i] as Segment).id);
+      if (kept !== undefined) {
+        previous = kept;
+        break;
+      }
+    }
+    return segments[previous + 1]?.id ?? null;
+  };
+
+  const out: Partial<Pick<ClipDocument, 'joins' | 'meta'>> = {};
+  if (joins) {
+    const taken = new Set<string>();
+    const moved = [];
+    for (const join of joins) {
+      const id = standIn(join.beforeSegment);
+      if (id === null || id === segments[0]?.id || taken.has(id)) continue;
+      taken.add(id);
+      moved.push({ ...join, beforeSegment: id });
+    }
+    out.joins = moved;
+  }
+  if (parts && before.meta?.montage) {
+    const firsts = new Set(parts.map((part) => part.firstSegment).filter((id) => alive.has(id)));
+    out.meta = {
+      ...before.meta,
+      montage: {
+        ...before.meta.montage,
+        parts: parts.map((part) => {
+          if (alive.has(part.firstSegment)) return part;
+          const id = standIn(part.firstSegment);
+          if (id === null || firsts.has(id)) return part;
+          firsts.add(id);
+          return { ...part, firstSegment: id };
+        }),
+      },
+    };
+  }
+  return out;
 }
 
 /**

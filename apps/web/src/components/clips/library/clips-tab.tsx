@@ -11,6 +11,9 @@
  * - Newest or Oldest, and a List or Grid switch whose choice is remembered
  *   in this browser (a blocked storage never breaks the page).
  * - Both views share the filters, the counts, the menu and Show More.
+ * - Module 11: a tick box on each clip (Shift-click ticks a range) and, once
+ *   any is ticked, the bulk bar (Export All, Create Montage, Hide, Delete).
+ *   The ticks are page state: a filter change clears them.
  *
  * The UI never says "source": the module's Source filter is called Platform.
  */
@@ -30,7 +33,7 @@ import {
   Skeleton,
 } from '@postgear/ui';
 import { Clapperboard } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   ClipListItem,
   ClipListSort,
@@ -41,7 +44,10 @@ import type {
 import { PLATFORM_LABELS } from '../home/home-model';
 import { type ClipActions, clipActions } from './clip-actions';
 import { ClipCard } from './clip-card';
+import { ClipsBulkBar } from './clips-bulk-bar';
 import { ClipsTable } from './clips-table';
+import { MontageDialog } from './montage-dialog';
+import { useClipSelection } from './use-clip-selection';
 import { type ClipsView, readClipsView, writeClipsView } from './clips-view-memory';
 import { useClipSender } from './use-clip-sender';
 import type { ClipsListState } from './use-clips-list';
@@ -131,14 +137,32 @@ export function ClipsTab({
   orgId,
   list,
   onVideos,
+  onExportAll,
 }: {
   orgId: string;
   list: ClipsListState;
   onVideos: () => void;
+  /** Module 11: opens Export All on the ticked clips (the page holds the dialog and its chip). */
+  onExportAll?: (clips: ClipListItem[]) => void;
 }) {
   const [view, setView] = useState<ClipsView>('grid');
   // Read after the first paint: the server never knows the browser's choice.
   useEffect(() => setView(readClipsView()), []);
+
+  const order = useMemo(() => list.clips.map((clip) => clip.id), [list.clips]);
+  const selection = useClipSelection(
+    order,
+    `${list.status}|${[...list.sources].sort().join(',')}|${list.sort}`,
+  );
+  const selected = useMemo(() => {
+    const ticked = new Set(selection.ids);
+    return list.clips.filter((clip) => ticked.has(clip.id));
+  }, [list.clips, selection.ids]);
+  // The montage dialog works on the clips ticked when it opened.
+  const [montage, setMontage] = useState<{ open: boolean; clips: ClipListItem[] }>({
+    open: false,
+    clips: [],
+  });
 
   const sender = useClipSender(orgId);
   const actions = listClipActions(list, sender.open);
@@ -256,11 +280,21 @@ export function ClipsTab({
           aria-label="Clips"
         >
           {list.clips.map((clip) => (
-            <ClipCard key={clip.id} clip={clip} orgId={orgId} actions={actions} />
+            <ClipCard
+              key={clip.id}
+              clip={clip}
+              orgId={orgId}
+              actions={actions}
+              tick={{
+                ticked: selection.isTicked(clip.id),
+                anyTicked: selection.count > 0,
+                onToggle: (range) => selection.toggle(clip.id, range),
+              }}
+            />
           ))}
         </ul>
       ) : (
-        <ClipsTable clips={list.clips} orgId={orgId} actions={actions} />
+        <ClipsTable clips={list.clips} orgId={orgId} actions={actions} selection={selection} />
       )}
 
       {list.hasMore && list.clips.length > 0 ? (
@@ -270,6 +304,26 @@ export function ClipsTab({
           </Button>
         </div>
       ) : null}
+      <ClipsBulkBar
+        selected={selected}
+        onClear={selection.clear}
+        onExportAll={() => {
+          onExportAll?.(selected);
+          selection.clear();
+        }}
+        onCreateMontage={() => setMontage({ open: true, clips: selected })}
+        onChanged={list.refresh}
+        onDeleted={(clipIds) => {
+          for (const clipId of clipIds) list.drop(clipId);
+        }}
+      />
+      <MontageDialog
+        orgId={orgId}
+        open={montage.open}
+        clips={montage.clips}
+        onOpenChange={(open) => setMontage((current) => ({ ...current, open }))}
+        onCreated={selection.clear}
+      />
       {sender.dialog}
     </div>
   );

@@ -91,6 +91,29 @@ export const patchClipSchema = z
   );
 export type PatchClipInput = z.infer<typeof patchClipSchema>;
 
+/** Module 11: the most clips one bulk Hide, Unhide or Delete acts on. */
+export const BULK_MAX_CLIPS = 50;
+
+const bulkClipIds = z
+  .array(z.string().uuid())
+  .min(1)
+  .max(BULK_MAX_CLIPS)
+  .refine((ids) => new Set(ids).size === ids.length, 'A clip is listed twice');
+
+/**
+ * `PATCH /clips/bulk` (Module 11): Hide and Unhide on many clips, with the
+ * same status field the single PATCH takes. No revision: a status says
+ * nothing about the picture, so it never needs to win a save race.
+ */
+export const bulkPatchClipsSchema = z
+  .object({ clipIds: bulkClipIds, status: z.enum(['DRAFT', 'HIDDEN']) })
+  .strict();
+export type BulkPatchClipsInput = z.infer<typeof bulkPatchClipsSchema>;
+
+/** `DELETE /clips/bulk` (Module 11). */
+export const bulkDeleteClipsSchema = z.object({ clipIds: bulkClipIds }).strict();
+export type BulkDeleteClipsInput = z.infer<typeof bulkDeleteClipsSchema>;
+
 export const moreVideoSchema = z
   .object({ fromMs: ms, toMs: ms })
   .strict()

@@ -7,12 +7,20 @@
  * file the worker reads can never disagree. The answer carries the key for
  * the API's own use (signing, the worker's input); it is never sent to a
  * browser.
+ *
+ * Module 11: a montage plays several videos, and the worker reads one file
+ * per source (`rangesBySource`), so "will it be sharp" is answered per
+ * source: each source's own range against its own video's files
+ * (`sharpSourcesFor`). For a clip of one video that is the single answer
+ * `sharpSourceFor` has always given.
  */
 import type { ClipAsset } from '@postgear/db';
 import {
   type ClipDocument,
   documentRange as engineDocumentRange,
   pickSharpSource,
+  pickSourceFiles,
+  rangesBySource,
   type SourceRange,
   safeParseClipDocument,
 } from '@postgear/video-engine';
@@ -46,6 +54,22 @@ export function storedDocumentRange(stored: unknown): SourceRange | null {
   return parsed.ok ? documentRange(parsed.doc) : null;
 }
 
+/**
+ * The ranges a stored document plays on one video, one per source of that
+ * video (a montage can play two clips of the same video as two sources).
+ * Brand intro and outro parts left out, as in `documentRange`. Empty when the
+ * document does not read or does not play the video.
+ */
+export function storedRangesOnVideo(stored: unknown, videoId: string): SourceRange[] {
+  const parsed = safeParseClipDocument(stored);
+  if (!parsed.ok) return [];
+  const onVideo = new Set(
+    parsed.doc.sources.filter((source) => source.videoId === videoId).map((source) => source.id),
+  );
+  const own = mainSegments(parsed.doc).segments.filter((segment) => onVideo.has(segment.source));
+  return [...rangesBySource({ segments: own }).values()];
+}
+
 export interface SharpSource {
   kind: 'segment' | 'proxy';
   assetId: string;
@@ -75,4 +99,57 @@ export function sharpSourceFor(
     sourceOffsetMs: picked.sourceOffsetMs,
     height: picked.height,
   };
+}
+
+type AssetFields = Pick<ClipAsset, 'id' | 'kind' | 'key' | 'meta' | 'createdAt'>;
+
+/** One source's answer (Module 11): its video, the range it plays, the file an export reads. */
+export interface SourceSharpness {
+  sourceId: string;
+  videoId: string;
+  range: SourceRange;
+  /** Null when its video has neither a covering SEGMENT nor a light copy. */
+  source: SharpSource | null;
+  /**
+   * True when the export reads only sharp files for this source: the whole
+   * range from one SEGMENT, or (a montage) every part from a SEGMENT that
+   * covers it. The engine's `pickSourceFiles`, the rule the worker reads.
+   */
+  sharp: boolean;
+}
+
+/**
+ * Per source of the document's main parts (brand intro and outro left out,
+ * as everywhere here): the range that source plays, judged against the files
+ * of that source's own video. `assetsOf` answers a video's assets (an empty
+ * list for a video it does not know).
+ */
+export function sharpSourcesFor(
+  doc: Pick<ClipDocument, 'segments' | 'sources'> & Partial<Pick<ClipDocument, 'meta'>>,
+  assetsOf: (videoId: string) => readonly AssetFields[],
+): SourceSharpness[] {
+  const files = pickSourceFiles(
+    { segments: mainSegments(doc).segments, sources: doc.sources, meta: doc.meta },
+    assetsOf,
+  );
+  return files.map(({ sourceId, videoId, range, picked, sharp }) => ({
+    sourceId,
+    videoId,
+    range,
+    sharp,
+    source: picked
+      ? {
+          kind: picked.sharp ? 'segment' : 'proxy',
+          assetId: picked.asset.id,
+          key: picked.asset.key,
+          sourceOffsetMs: picked.sourceOffsetMs,
+          height: picked.height,
+        }
+      : null,
+  }));
+}
+
+/** True when every main source of the document reads a covering SEGMENT (an export will be sharp). */
+export function allSourcesSharp(sources: readonly SourceSharpness[]): boolean {
+  return sources.length > 0 && sources.every((entry) => entry.sharp);
 }

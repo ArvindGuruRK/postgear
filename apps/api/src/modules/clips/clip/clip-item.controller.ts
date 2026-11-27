@@ -5,7 +5,9 @@
  * Module 15 adds `GET /clips/:clipId/exports`, `POST /clips/:clipId/previews`
  * and `GET /clips/:clipId/previews/latest` (`ClipExportsService`); Module 17
  * adds `GET /clips/coming-up` (declared before `:clipId`, see below) and
- * `POST /clips/:clipId/send` (`ClipSendService`).
+ * `POST /clips/:clipId/send` (`ClipSendService`); Sprint 13, Module 11 adds
+ * `PATCH` and `DELETE /clips/bulk` (`ClipBulkService`, declared before the
+ * `:clipId` routes of the same method).
  *
  * ## Route order matters here
  *
@@ -45,9 +47,14 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
 import { ClipStart } from '../limits/clips-create.guard';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
+import { ClipBulkService } from './clip-bulk.service';
 import { ClipEditsService } from './clip-edits.service';
 import { ClipExportsService } from './clip-exports.service';
 import {
+  type BulkDeleteClipsInput,
+  type BulkPatchClipsInput,
+  bulkDeleteClipsSchema,
+  bulkPatchClipsSchema,
   type CreateClipInput,
   createClipSchema,
   type ExportClipInput,
@@ -78,6 +85,7 @@ export class ClipItemController {
     private readonly library: ClipsListService,
     private readonly exports: ClipExportsService,
     private readonly sender: ClipSendService,
+    private readonly bulk: ClipBulkService,
   ) {}
 
   /** `{ clips, counts, page, pageSize, total }`. */
@@ -114,7 +122,33 @@ export class ClipItemController {
     return this.library.comingUp(org.id);
   }
 
-  /** `{ clip, video, playback, sharp, proxy, filmstrip, waveform }`. */
+  /**
+   * Module 11: Hide or Unhide many clips. `{ updated }`; 404 `clip_not_found`
+   * (nothing changed) when any id is not a clip of this workspace. Declared
+   * before `PATCH /clips/:clipId`, so Express matches this word first.
+   */
+  @Patch('bulk')
+  bulkPatch(
+    @CurrentOrg() org: ActiveOrg,
+    @Body(new ZodBody(bulkPatchClipsSchema, 'clips/bulk-patch')) body: BulkPatchClipsInput,
+  ) {
+    return this.bulk.patch(org.id, body);
+  }
+
+  /** Module 11: delete many clips. `{ deleted }`; 404 `clip_not_found` (nothing deleted). */
+  @Delete('bulk')
+  @HttpCode(HttpStatus.OK)
+  bulkRemove(
+    @CurrentOrg() org: ActiveOrg,
+    @Body(new ZodBody(bulkDeleteClipsSchema, 'clips/bulk-delete')) body: BulkDeleteClipsInput,
+  ) {
+    return this.bulk.remove(org.id, body);
+  }
+
+  /**
+   * `{ clip, video, playback, sharp, proxy, filmstrip, waveform }`; 422
+   * `montage_video_removed` for a montage whose videos include a removed one.
+   */
   @Get(':clipId')
   get(@CurrentOrg() org: ActiveOrg, @Param('clipId') clipId: string) {
     return this.clips.get(org.id, clipId);

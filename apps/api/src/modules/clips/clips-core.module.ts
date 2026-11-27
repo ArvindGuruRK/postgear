@@ -11,7 +11,9 @@
 import { Module } from '@nestjs/common';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { MediaModule } from '../media/media.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { ClipBatchNoticeService } from './exports/clip-batch-notice.service';
 import { ClipJobsRepository } from './jobs/clip-jobs.repository';
 import { ClipJobsService } from './jobs/clip-jobs.service';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
@@ -24,7 +26,8 @@ import { ClipPlaybackService } from './videos/clip-playback.service';
 import { ClipVideosRepository } from './videos/clip-videos.repository';
 
 @Module({
-  imports: [EntitlementsModule, SchedulingModule, MediaModule],
+  // Sprint 13, Module 11: `NotificationsModule` for Export All's one notice (no imports of its own).
+  imports: [EntitlementsModule, SchedulingModule, MediaModule, NotificationsModule],
   providers: [
     ClipJobsRepository,
     ClipJobsService,
@@ -38,6 +41,8 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     MediaVoices,
     ClipTranscriptStore,
     ClipTranscriptsService,
+    // Sprint 13, Module 11: the batch notice, written when a batch's last export ends.
+    ClipBatchNoticeService,
   ],
   exports: [
     EntitlementsModule,
@@ -53,6 +58,7 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     MediaVoices,
     ClipTranscriptStore,
     ClipTranscriptsService,
+    ClipBatchNoticeService,
   ],
 })
 export class ClipsCoreModule {}

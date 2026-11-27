@@ -19,14 +19,11 @@
  * and the stream registry drops the repeat.
  */
 import { Injectable } from '@nestjs/common';
-import { NotificationEmailStatus, type Prisma } from '@postgear/db';
+import { NotificationEmailStatus, type Prisma, type PrismaTransactionClient } from '@postgear/db';
 import type { StreamSink } from './notifications.stream';
 import { NotificationStreamRegistry } from './notifications.stream';
 import type { ListNotificationsQuery } from './dto/notifications.schema';
-import {
-  type NotificationRecord,
-  NotificationsRepository,
-} from './notifications.repository';
+import { type NotificationRecord, NotificationsRepository } from './notifications.repository';
 import {
   AUDIENCE_BY_TYPE,
   DEFAULT_TITLES,
@@ -81,7 +78,11 @@ export class NotificationsService {
     private readonly streams: NotificationStreamRegistry,
   ) {}
 
-  async list(userId: string, orgId: string, query: ListNotificationsQuery): Promise<NotificationsPage> {
+  async list(
+    userId: string,
+    orgId: string,
+    query: ListNotificationsQuery,
+  ): Promise<NotificationsPage> {
     const before = query.before ? new Date(query.before) : undefined;
     const [state, rows] = await Promise.all([
       this.readState(userId, orgId),
@@ -101,7 +102,11 @@ export class NotificationsService {
     return this.repository.countNewerThan(orgId, state.since);
   }
 
-  async readAll(userId: string, orgId: string, now = new Date()): Promise<{ unread: 0; lastReadAt: string }> {
+  async readAll(
+    userId: string,
+    orgId: string,
+    now = new Date(),
+  ): Promise<{ unread: 0; lastReadAt: string }> {
     const lastReadAt = await this.repository.upsertCursor(userId, orgId, now);
     return { unread: 0, lastReadAt: lastReadAt.toISOString() };
   }
@@ -117,10 +122,23 @@ export class NotificationsService {
 
   /** Writes a row and pushes it to the workspace's open streams. */
   async notify(input: NotifyInput): Promise<NotificationRecord> {
+    const row = await this.write(input);
+    this.announce(row);
+    return row;
+  }
+
+  /**
+   * Writes a row without pushing it, inside `tx` when it must land with
+   * other writes (Clips writes its batch notice in the serializable
+   * transaction that decides it, so it is written exactly once). Call
+   * `announce` after the transaction commits; the dispatcher's poll would
+   * push it anyway.
+   */
+  async write(input: NotifyInput, tx?: PrismaTransactionClient): Promise<NotificationRecord> {
     const audience = AUDIENCE_BY_TYPE[input.type];
     const email = (input.email ?? true) && audience !== 'none';
 
-    const row = await this.repository.create({
+    const data = {
       organizationId: input.organizationId,
       type: input.type,
       title: input.title ?? DEFAULT_TITLES[input.type],
@@ -128,11 +146,13 @@ export class NotificationsService {
       link: input.link ?? null,
       meta: input.meta ? (input.meta as Prisma.InputJsonValue) : null,
       emailStatus: email ? NotificationEmailStatus.PENDING : NotificationEmailStatus.NONE,
-    });
+    };
+    return tx ? this.repository.create(data, tx) : this.repository.create(data);
+  }
 
+  /** Pushes a written row to the workspace's open streams. */
+  announce(row: NotificationRecord): void {
     this.streams.push(row.organizationId, row);
-
-    return row;
   }
 
   /** The cursor, or the membership date, or the beginning of time. */

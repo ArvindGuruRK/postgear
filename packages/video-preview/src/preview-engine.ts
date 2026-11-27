@@ -39,6 +39,15 @@
  *   fades in there). A part whose video has no address, or an expired or
  *   failed one, reports its error when the playhead reaches it; seeking to
  *   a playable part, or a fresh address, clears it.
+ * - **Fade joins** (Sprint 13, Module 11's montage): the two parts of a
+ *   Fade overlap. The hand-over is made at the overlap's start, and the old
+ *   front element keeps playing through the overlap (the "mix" element)
+ *   while the new one plays the incoming part; the stage draws the
+ *   incoming picture over the outgoing one at the join's progress and the
+ *   two sounds cross, a quick approximation of the export's `xfade` and
+ *   `acrossfade` (Preview Export shows the exact join). Paused, sought or
+ *   scrubbed inside an overlap, one picture shows: the part `segmentAt`
+ *   answers.
  * - **Bleeps** (Sprint 13, Module 09): on every document change the engine
  *   hands the clip's bleeps in output ms to the audio layer, which mutes the
  *   video's own sound inside each and plays the 1 kHz tone inside bleep-mode
@@ -57,6 +66,7 @@
 import {
   type ClipDocument,
   type FrameState,
+  type Segment,
   bleepRanges,
   frameState,
   frameToMs,
@@ -68,6 +78,7 @@ import { type BleepRange, bleepGateAt } from './bleep-schedule';
 import { isExpired, mediaErrorOf, previewError } from './errors';
 import { EmptyOverlayLayer, SilentAudioLayer } from './layers';
 import {
+  handoverMs,
   nextHandover,
   outputAt,
   type PreviewPart,
@@ -208,6 +219,13 @@ export class PreviewEngine {
 
   private readonly slots: [Slot, Slot];
   private front: 0 | 1 = 0;
+  /**
+   * Module 11: inside a Fade overlap while playing, the element still
+   * playing the outgoing part (the back one) and until when (clip ms).
+   */
+  private mix: { slot: Slot; part: PreviewPart; untilMs: number } | null = null;
+  /** One-part views of the document, by part id, for drawing the other side of a Fade. */
+  private sideDocs = new Map<string, ClipDocument>();
   private stage: PreviewStage | null = null;
   private readonly overlay: OverlayLayer;
   private readonly audio: AudioLayer;
@@ -357,6 +375,8 @@ export class PreviewEngine {
   /** Plays this document from now on. Safe at any time, playing or not. */
   setDocument(doc: ClipDocument): void {
     if (this.destroyed) return;
+    this.stopMix(false);
+    this.sideDocs.clear();
     const previous = this.parts[this.playingIndex] ?? null;
     const first = this.doc === null;
     this.doc = doc;
@@ -438,6 +458,7 @@ export class PreviewEngine {
     }
     this.source = source;
     this.partErrorSource = null;
+    this.stopMix(false);
     this.stopClock();
     this.audio.silence();
     this.ready = false;
@@ -525,6 +546,7 @@ export class PreviewEngine {
     ) {
       // The video under the playhead changed: load it again in place, as a
       // new main address does.
+      this.stopMix(false);
       this.stopClock();
       this.audio.silence();
       this.ready = false;
@@ -596,6 +618,7 @@ export class PreviewEngine {
     this.wantPlaying = false;
     this.stalled = false;
     this.stopClock();
+    this.stopMix(true);
     const frontSlot = this.slots[this.front];
     frontSlot.el.pause();
     this.audio.silence();
@@ -683,6 +706,7 @@ export class PreviewEngine {
   /** Removes every listener, element, frame callback and layer. The engine does nothing after. */
   destroy(): void {
     if (this.destroyed) return;
+    this.mix = null;
     this.stopClock();
     if (this.scrubFrame !== null) {
       this.frames.cancel(this.scrubFrame);
@@ -846,6 +870,7 @@ export class PreviewEngine {
       this.partErrorSource = null;
     }
     this.stopClock();
+    this.stopMix(false);
     const frontSlot = this.slots[this.front];
     if (!frontSlot.el.paused) frontSlot.el.pause();
     // The picture stops while it seeks, so the sound does too: no tone is
@@ -861,6 +886,8 @@ export class PreviewEngine {
 
   /** The back element waits on the start of part `index` (or on nothing). */
   private prepareBack(index: number | null): void {
+    // The back element is still playing the outgoing side of a Fade: placed when the mix ends.
+    if (this.mix) return;
     const back = this.backSlot();
     if (index === null) {
       // No join ahead. Whatever the back element holds stays, so a seek
@@ -1018,7 +1045,11 @@ export class PreviewEngine {
       this.applySound(frontSlot, part);
     }
     this.playingIndex = index;
-    if (sourceMs >= part.sourceOut - JOIN_EPSILON_MS) {
+    // A Fade join hands over where the overlap starts, before the part's own end.
+    const handAt = handoverMs(this.parts, part);
+    const handSourceMs =
+      handAt < part.outEnd ? part.sourceIn + (handAt - part.outStart) * part.speed : part.sourceOut;
+    if (sourceMs >= handSourceMs - JOIN_EPSILON_MS) {
       const next = this.parts[index + 1];
       if (next) {
         this.join(next);
@@ -1028,12 +1059,17 @@ export class PreviewEngine {
       return;
     }
     this.clockMs = outputAt(part, sourceMs);
+    if (this.mix && this.clockMs >= this.mix.untilMs - JOIN_EPSILON_MS) {
+      this.stopMix(true);
+    }
     this.redraw('frame');
     this.publish();
   }
 
   /** At a join: hand over to the back element if it is ready, or hold the last frame. */
   private join(next: PreviewPart): void {
+    // A Fade's mix still holding the back element ends here: the join needs it.
+    if (this.mix) this.stopMix(false);
     const problem = this.problemOf(next);
     if (problem) {
       this.holdingFor = null;
@@ -1058,22 +1094,49 @@ export class PreviewEngine {
   /** The back element (ready on `next`) becomes the front one; the old front pauses and waits on the join after. */
   private handover(next: PreviewPart): void {
     const old = this.slots[this.front];
+    const outgoing = this.parts[next.index - 1];
+    // A Fade (Module 11): the old element plays on through the overlap, mixed in by the stage.
+    const fading = next.overlapMs > 0 && outgoing !== undefined && !old.el.paused;
+    this.stopMix(false);
     this.stopClock();
     // The old front played on past its seek: it no longer holds any part's start.
     old.partKey = null;
     old.targetMs = null;
-    old.ready = false;
+    if (!fading) old.ready = false;
     this.front = this.front === 0 ? 1 : 0;
     this.playingIndex = next.index;
     this.holdingFor = null;
     this.clockMs = next.outStart;
+    if (fading) {
+      this.mix = { slot: old, part: outgoing, untilMs: next.outStart + next.overlapMs };
+    }
     this.startFront('handover');
-    // A handover is always a cut (a continuing part plays on in `advance`): no click there.
-    this.audio.cutFadeIn?.(this.slots[this.front].el, Math.max(0, next.volume));
-    old.el.pause();
+    if (!fading) {
+      // A cut (a continuing part plays on in `advance`): no click there.
+      this.audio.cutFadeIn?.(this.slots[this.front].el, Math.max(0, next.volume));
+      old.el.pause();
+    }
     this.redraw('handover');
     this.prepareBack(nextHandover(this.parts, next.index));
     this.publish();
+  }
+
+  /**
+   * Ends a Fade's mix: the outgoing element pauses, the stage drops its
+   * picture, and (when `prepare`) the back element waits on the next join.
+   */
+  private stopMix(prepare: boolean): void {
+    const mix = this.mix;
+    if (!mix) return;
+    this.mix = null;
+    mix.slot.ready = false;
+    mix.slot.partKey = null;
+    mix.slot.targetMs = null;
+    if (!mix.slot.el.paused) mix.slot.el.pause();
+    this.stage?.clearMix();
+    if (prepare && this.parts.length > 0) {
+      this.prepareBack(nextHandover(this.parts, this.playingIndex));
+    }
   }
 
   /** The clip's end: stop with its last frame on screen. */
@@ -1081,6 +1144,7 @@ export class PreviewEngine {
     this.wantPlaying = false;
     this.stalled = false;
     this.stopClock();
+    this.stopMix(false);
     this.slots[this.front].el.pause();
     this.audio.silence();
     this.clockMs = this.durationMs;
@@ -1127,26 +1191,45 @@ export class PreviewEngine {
     const frontSlot = this.slots[this.front];
     const at = reason === 'seek' ? frontSlot.targetOutputMs : this.clockMs;
     const started = this.measure ? this.now() : 0;
+    // Inside a Fade's mix the outgoing part answers until the overlap's middle (`segmentAt`),
+    // and it plays on the mix element, not the front one.
+    const mix = this.mix;
+    const mixPrimary = mix !== null && (partAt(this.parts, at)?.index ?? -1) === mix.part.index;
+    const primarySlot = mix && mixPrimary ? mix.slot : frontSlot;
     let state: FrameState;
     try {
-      state = frameState(this.doc, at, { sources: this.sourcePictures(frontSlot) });
+      state = frameState(this.doc, at, { sources: this.sourcePictures(primarySlot) });
     } catch {
       this.setError(previewError('draw'));
       return false;
     }
-    // The video's sound follows the clip's fade frame by frame, as the export's `afade` does.
-    this.applyGain(frontSlot, state.videoGain, at);
+    const join = mix ? state.join : null;
+    if (mix && join) {
+      // The sounds cross as the pictures do (the export's `acrossfade`).
+      const incoming = this.parts[this.playingIndex];
+      const fade = state.fadeOpacity;
+      this.applyGain(frontSlot, (incoming?.volume ?? 1) * fade * join.progress, at);
+      this.applyGain(mix.slot, mix.part.volume * fade * (1 - join.progress), at);
+    } else {
+      // The video's sound follows the clip's fade frame by frame, as the export's `afade` does.
+      this.applyGain(frontSlot, state.videoGain, at);
+    }
     let drew = false;
     if (this.stage) {
       try {
         // Until its seek is done the element holds some other moment's
         // frame: lay the areas out, but leave the last picture.
-        drew = this.stage.render(state, frontSlot.el, frontSlot.ready);
+        drew = this.stage.render(
+          state,
+          primarySlot.el,
+          primarySlot === frontSlot ? frontSlot.ready : true,
+        );
       } catch {
         // A frame the browser would not hand over (still decoding): the last
         // picture stays, and the next frame tries again.
         drew = false;
       }
+      this.drawMix(mix, join, mixPrimary, at);
     }
     this.updateLayersWith(state, reason);
     if (frontSlot.ready) {
@@ -1157,6 +1240,58 @@ export class PreviewEngine {
       this.drawMsTotal += this.now() - started;
     }
     return drew;
+  }
+
+  /**
+   * The other side of a Fade over the picture: the incoming part over the
+   * outgoing one, at the join's progress (Module 11). Nothing outside a mix.
+   */
+  private drawMix(
+    mix: PreviewEngine['mix'],
+    join: FrameState['join'],
+    mixPrimary: boolean,
+    at: number,
+  ): void {
+    const stage = this.stage;
+    if (!stage) return;
+    if (!mix || !join) {
+      stage.clearMix();
+      return;
+    }
+    // The side `frameState` did not draw: the incoming one before the middle, else the outgoing one.
+    const part = mixPrimary ? this.parts[this.playingIndex] : mix.part;
+    const slot = mixPrimary ? this.slots[this.front] : mix.slot;
+    if (!part) {
+      stage.clearMix();
+      return;
+    }
+    try {
+      const side = frameState(this.sideDocOf(part), at - part.outStart, {
+        sources: this.sourcePictures(slot),
+      });
+      stage.renderMix(side, slot.el, mixPrimary ? join.progress : 1 - join.progress);
+    } catch {
+      stage.clearMix();
+    }
+  }
+
+  /** The document as just `part`, from its own 0: its picture without the time map's joins. */
+  private sideDocOf(part: PreviewPart): ClipDocument {
+    const known = this.sideDocs.get(part.id);
+    if (known) return known;
+    const doc = this.doc as ClipDocument;
+    const segment = doc.segments[part.index] as Segment;
+    const view: ClipDocument = {
+      ...doc,
+      segments: [segment],
+      joins: [],
+      zooms: [],
+      tracks: [],
+      bleeps: [],
+      fades: { inMs: 0, outMs: 0 },
+    };
+    this.sideDocs.set(part.id, view);
+    return view;
   }
 
   /** The bleeps of `doc` in output ms, to the audio layer too. */
@@ -1231,6 +1366,7 @@ export class PreviewEngine {
     this.seekPending = false;
     this.holdingFor = null;
     this.stopClock();
+    this.stopMix(false);
     this.audio.silence();
     for (const slot of this.slots) {
       if (!slot.el.paused) slot.el.pause();
@@ -1330,6 +1466,8 @@ export class PreviewEngine {
   private onExtraError(slot: Slot, sourceId: string): void {
     const error = mediaErrorOf(slot.el.error, this.extras[sourceId] ?? null, Date.now());
     if (!error) return;
+    // The outgoing side of a Fade failed: the incoming part plays on alone.
+    if (this.mix?.slot === slot) this.stopMix(false);
     if (slot.url !== null) this.failures.set(sourceId, { url: slot.url, error });
     const waitedFor = this.holdingFor !== null && this.holdingFor === slot.partKey;
     if (this.isFront(slot) || waitedFor) {

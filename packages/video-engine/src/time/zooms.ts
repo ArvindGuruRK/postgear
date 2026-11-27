@@ -72,30 +72,42 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Stands for "no joins" in the cache (a WeakMap needs an object key). */
+const NO_JOINS: NonNullable<ClipDocument['joins']> = [];
+
 const windowCache = new WeakMap<
   ClipDocument['zooms'],
-  WeakMap<ClipDocument['segments'], ZoomWindow[]>
+  WeakMap<ClipDocument['segments'], WeakMap<NonNullable<ClipDocument['joins']>, ZoomWindow[]>>
 >();
+
+type ZoomDocument = Pick<ClipDocument, 'zooms' | 'segments'> & Partial<Pick<ClipDocument, 'joins'>>;
 
 /**
  * Every zoom's windows in the clip, ordered by start. Cached per document
- * (by its `zooms` and `segments` arrays, which edits always replace), so the
- * preview can ask on every frame.
+ * (by its `zooms`, `segments` and `joins` arrays, which edits always
+ * replace), so the preview can ask on every frame. A Fade join (Module 11)
+ * moves every later window earlier, so pass the whole document.
  */
-export function zoomWindows(doc: Pick<ClipDocument, 'zooms' | 'segments'>): ZoomWindow[] {
+export function zoomWindows(doc: ZoomDocument): ZoomWindow[] {
+  const joins = doc.joins ?? NO_JOINS;
   let bySegments = windowCache.get(doc.zooms);
-  const cached = bySegments?.get(doc.segments);
+  let byJoins = bySegments?.get(doc.segments);
+  const cached = byJoins?.get(joins);
   if (cached) return cached;
   const windows = computeZoomWindows(doc);
   if (!bySegments) {
     bySegments = new WeakMap();
     windowCache.set(doc.zooms, bySegments);
   }
-  bySegments.set(doc.segments, windows);
+  if (!byJoins) {
+    byJoins = new WeakMap();
+    bySegments.set(doc.segments, byJoins);
+  }
+  byJoins.set(joins, windows);
   return windows;
 }
 
-function computeZoomWindows(doc: Pick<ClipDocument, 'zooms' | 'segments'>): ZoomWindow[] {
+function computeZoomWindows(doc: ZoomDocument): ZoomWindow[] {
   if (doc.zooms.length === 0) return [];
   const placed = placeSegments(doc);
   const windows: ZoomWindow[] = [];
@@ -167,7 +179,7 @@ export function zoomScaleIn(
 }
 
 /** How far in the clip is zoomed at `outputMs`, and about which point. */
-export function zoomAt(doc: Pick<ClipDocument, 'zooms' | 'segments'>, outputMs: number): ZoomNow {
+export function zoomAt(doc: ZoomDocument, outputMs: number): ZoomNow {
   let best: ZoomNow = NO_ZOOM;
   for (const window of zoomWindows(doc)) {
     if (window.startMs > outputMs) break;
@@ -188,10 +200,7 @@ export function zoomedPoint(point: Point, zoom: Pick<ZoomNow, 'scale' | 'focus'>
 }
 
 /** The windows of one zoom (empty when its moment was cut out). */
-export function windowsOfZoom(
-  doc: Pick<ClipDocument, 'zooms' | 'segments'>,
-  zoomId: string,
-): ZoomWindow[] {
+export function windowsOfZoom(doc: ZoomDocument, zoomId: string): ZoomWindow[] {
   return zoomWindows(doc).filter((window) => window.zoomId === zoomId);
 }
 
@@ -400,7 +409,7 @@ export function setZoomRange(
 
 /** The video moment a clip moment shows, reading a part's end as its own end (not the next part's start). */
 export function sourceAtOutput(
-  doc: Pick<ClipDocument, 'segments'>,
+  doc: Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'joins'>>,
   outputMs: number,
   side: 'start' | 'end',
 ): { sourceId: string; sourceMs: number } | null {

@@ -25,15 +25,21 @@
  * - **Delete**: its open jobs are cancelled (best effort), its SEGMENT files
  *   go (rows in the transaction, files after, best effort) unless another
  *   clip of the same video still relies on one, and the row goes with its
- *   `ClipPost` rows. An exported `Media` row is left alone.
+ *   `ClipPost` rows. An exported `Media` row is left alone. Module 11: the
+ *   bulk delete goes through the same `removeClips`, and a montage that plays
+ *   the video counts as a clip that relies on its SEGMENTs.
+ * - **Montages** (Module 11): a save checks every captions track against
+ *   the video of its own source (a montage has one per source); a copy keeps
+ *   `meta.videoIds`, and a montage whose videos include a removed one is not
+ *   copied (422 `montage_video_removed`).
  */
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { type Clip, ClipAssetKind, ClipStatus, type Prisma, prisma } from '@postgear/db';
 import type { PrivateStorage } from '@postgear/storage';
 import {
+  type CaptionsTrack,
   type ClipDocument,
-  captionsTrackOf,
   fingerprintMatches,
   renderedDuration,
   parseClipDocument,
@@ -60,7 +66,13 @@ import {
 } from './clip-item.service';
 import { hasOpenMarks, withoutFollowOnOpen } from './clip-meta';
 import { scheduledClipIds } from './clip-state';
-import { storedDocumentRange } from './sharp-source';
+import {
+  assertMontageVideosLive,
+  isMontage,
+  metaVideoIds,
+  montagesPlayingVideo,
+} from '../montages/montage-videos';
+import { storedRangesOnVideo } from './sharp-source';
 
 /** The largest document a save takes, in bytes of JSON. Under the 1 MB body limit, so it is reachable. */
 export const MAX_DOCUMENT_BYTES = 900_000;
@@ -161,6 +173,9 @@ export class ClipEditsService {
       });
     }
 
+    // Module 11: a montage's copy plays the same videos, so they must all still be there.
+    await assertMontageVideosLive(prisma, orgId, clip);
+
     const copy = await prisma.clip.create({
       data: {
         id: randomUUID(),
@@ -176,6 +191,8 @@ export class ClipEditsService {
         ratio: parsed.doc.canvas.ratio,
         durationMs: renderedDuration(parsed.doc),
         createdById: userId,
+        // The copy is a montage of the same videos: the removal rules must find it too.
+        ...(isMontage(clip) ? { meta: { videoIds: metaVideoIds(clip.meta) } } : {}),
       },
     });
     const view = toClipView(copy);
@@ -186,10 +203,27 @@ export class ClipEditsService {
   /** Deletes a clip and its sharp files. `{ message }`. */
   async remove(orgId: string, clipId: string): Promise<{ message: string }> {
     const clip = await this.items.requireClip(orgId, clipId);
+    await this.removeClips(orgId, [clip]);
+    return { message: CLIPS_MESSAGES.CLIP_DELETED };
+  }
+
+  /**
+   * Deletes clips the caller already read from this workspace: the single
+   * delete, and (Module 11) the bulk one. Their open jobs are cancelled (best
+   * effort), their own transcripts go or pass to a clip that still shows
+   * them, and their SEGMENT rows and the clip rows go in one transaction;
+   * the files after it. A SEGMENT is kept when a clip that stays (a montage
+   * that plays its video among them) still relies on it. The transaction
+   * counts the rows it deletes: when one of the clips went meanwhile it is a
+   * 404 and nothing is deleted.
+   */
+  async removeClips(orgId: string, clips: readonly Clip[]): Promise<{ deleted: number }> {
+    if (clips.length === 0) return { deleted: 0 };
+    const ids = clips.map((clip) => clip.id);
 
     const open = await prisma.clipJob.findMany({
-      where: { organizationId: orgId, clipId: clip.id, status: { in: [...OPEN_JOB_STATUSES] } },
-      select: { id: true },
+      where: { organizationId: orgId, clipId: { in: ids }, status: { in: [...OPEN_JOB_STATUSES] } },
+      select: { id: true, clipId: true },
     });
     for (const job of open) {
       try {
@@ -199,7 +233,7 @@ export class ClipEditsService {
         this.logger.warn(
           JSON.stringify({
             event: 'clips.clip.delete_cancel_skipped',
-            clipId: clip.id,
+            clipId: job.clipId,
             jobId: job.id,
             reason: error instanceof Error ? error.name : 'unknown',
           }),
@@ -207,64 +241,95 @@ export class ClipEditsService {
       }
     }
 
-    const [segments, others] = await Promise.all([
-      prisma.clipAsset.findMany({
-        where: { organizationId: orgId, clipId: clip.id, kind: ClipAssetKind.SEGMENT },
-        select: { id: true, key: true, meta: true },
-      }),
-      prisma.clip.findMany({
-        where: { organizationId: orgId, videoId: clip.videoId, id: { not: clip.id } },
-        select: { document: true },
-      }),
-    ]);
-    const stillUsed = others
-      .map((other) => storedDocumentRange(other.document))
-      .filter((range): range is NonNullable<typeof range> => range !== null);
-    const doomed = segments.filter((segment) => {
-      const meta = parseSegmentAssetMeta(segment.meta);
-      return !meta || !stillUsed.some((r) => meta.fromMs <= r.fromMs && meta.toMs >= r.toMs);
+    const doomed = await this.doomedSegments(orgId, clips);
+
+    // Before the clips go: a row's `clipId` would otherwise fall to null, and a clip's own
+    // transcript would then pass for the whole video's.
+    const transcriptKeys: string[] = [];
+    for (const clip of clips) {
+      transcriptKeys.push(...(await this.captions.releaseClip(orgId, clip, ids)));
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.clipAsset.deleteMany({
+        where: { organizationId: orgId, id: { in: doomed.map((segment) => segment.id) } },
+      });
+      const gone = await tx.clip.deleteMany({
+        where: { id: { in: ids }, organizationId: orgId },
+      });
+      if (gone.count !== ids.length) throw clipNotFound();
     });
 
-    // Before the clip goes: its row's `clipId` would otherwise fall to null, and a clip's own
-    // transcript would then pass for the whole video's.
-    const transcriptKeys = await this.captions.releaseClip(orgId, clip);
-
-    await prisma.$transaction([
-      prisma.clipAsset.deleteMany({
-        where: { organizationId: orgId, id: { in: doomed.map((segment) => segment.id) } },
-      }),
-      prisma.clip.deleteMany({ where: { id: clip.id, organizationId: orgId } }),
-    ]);
-
     const files = [
-      ...doomed.map((segment) => ({ id: segment.id, key: segment.key })),
-      ...transcriptKeys.map((key) => ({ id: 'transcript', key })),
+      ...doomed.map((segment) => ({ id: segment.id, clipId: segment.clipId, key: segment.key })),
+      ...transcriptKeys.map((key) => ({ id: 'transcript', clipId: null, key })),
     ];
-    for (const segment of files) {
+    for (const file of files) {
       try {
-        await this.storage.delete(segment.key);
+        await this.storage.delete(file.key);
       } catch (error) {
         this.logger.warn(
           JSON.stringify({
             event: 'clips.clip.file_left',
-            clipId: clip.id,
-            assetId: segment.id,
+            clipId: file.clipId,
+            assetId: file.id,
             reason: error instanceof Error ? error.message : String(error),
           }),
         );
       }
     }
 
-    this.logger.log(
-      JSON.stringify({
-        event: 'clips.clip.deleted',
-        orgId,
-        clipId: clip.id,
-        segmentsDeleted: doomed.length,
-        jobsCancelled: open.length,
-      }),
+    for (const clip of clips) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'clips.clip.deleted',
+          orgId,
+          clipId: clip.id,
+          segmentsDeleted: doomed.filter((segment) => segment.clipId === clip.id).length,
+          jobsCancelled: open.filter((job) => job.clipId === clip.id).length,
+        }),
+      );
+    }
+    return { deleted: ids.length };
+  }
+
+  /**
+   * The SEGMENT rows of `clips` no clip that stays relies on: a staying clip
+   * of the same video (or, Module 11, a montage that plays it) whose range on
+   * that video the SEGMENT covers keeps it.
+   */
+  private async doomedSegments(orgId: string, clips: readonly Clip[]) {
+    const ids = clips.map((clip) => clip.id);
+    const segments = await prisma.clipAsset.findMany({
+      where: { organizationId: orgId, clipId: { in: ids }, kind: ClipAssetKind.SEGMENT },
+      select: { id: true, key: true, meta: true, videoId: true, clipId: true },
+    });
+    if (segments.length === 0) return [];
+    const ownVideo = new Map(clips.map((clip) => [clip.id, clip.videoId]));
+    const videoOf = (segment: { videoId: string | null; clipId: string | null }) =>
+      segment.videoId ?? (segment.clipId ? ownVideo.get(segment.clipId) : undefined) ?? null;
+    const videoIds = [...new Set(segments.map(videoOf).filter((id): id is string => id !== null))];
+
+    const others = await prisma.clip.findMany({
+      where: {
+        organizationId: orgId,
+        NOT: { id: { in: ids } },
+        OR: videoIds.flatMap((videoId) => [{ videoId }, montagesPlayingVideo(videoId)]),
+      },
+      select: { document: true },
+    });
+    const stillUsed = new Map(
+      videoIds.map((videoId) => [
+        videoId,
+        others.flatMap((other) => storedRangesOnVideo(other.document, videoId)),
+      ]),
     );
-    return { message: CLIPS_MESSAGES.CLIP_DELETED };
+    return segments.filter((segment) => {
+      const meta = parseSegmentAssetMeta(segment.meta);
+      const videoId = videoOf(segment);
+      const used = videoId ? (stillUsed.get(videoId) ?? []) : [];
+      return !meta || !used.some((r) => meta.fromMs <= r.fromMs && meta.toMs >= r.toMs);
+    });
   }
 
   private async view(orgId: string, clip: Clip): Promise<ClipView> {
@@ -344,6 +409,9 @@ export class ClipEditsService {
    * supplied. It is accepted only when it is a transcript of THIS clip's
    * video in THIS workspace, so a saved clip can never point an export at
    * another workspace's words (the worker checks again when it renders).
+   * Module 11: a montage has one captions track per source; each must name a
+   * transcript of its own source's video (a track without a source follows
+   * the clip's own video, as before).
    */
   private async assertCaptionsBelong(
     tx: Prisma.TransactionClient,
@@ -351,18 +419,22 @@ export class ClipEditsService {
     clip: Pick<Clip, 'id' | 'videoId'>,
     document: ClipDocument,
   ): Promise<void> {
-    const transcriptId = captionsTranscriptOf(document);
-    if (transcriptId === null) return;
-    const found = await tx.clipAsset.findFirst({
+    const sourceVideo = new Map(document.sources.map((source) => [source.id, source.videoId]));
+    const wanted = captionsTracksOf(document).map((track) => ({
+      id: track.transcriptAssetId,
+      videoId: (track.source ? sourceVideo.get(track.source) : undefined) ?? clip.videoId,
+    }));
+    if (wanted.length === 0) return;
+    const found = await tx.clipAsset.findMany({
       where: {
-        id: transcriptId,
+        id: { in: [...new Set(wanted.map((track) => track.id))] },
         organizationId: orgId,
-        videoId: clip.videoId,
         kind: ClipAssetKind.TRANSCRIPT,
       },
-      select: { id: true },
+      select: { id: true, videoId: true },
     });
-    if (!found) {
+    const videoOf = new Map(found.map((row) => [row.id, row.videoId]));
+    if (wanted.some((track) => videoOf.get(track.id) !== track.videoId)) {
       this.logger.warn(
         JSON.stringify({
           event: 'clips.clip.document_refused',
@@ -375,9 +447,9 @@ export class ClipEditsService {
   }
 }
 
-/** The id of a document's captions transcript, when it has captions. */
-function captionsTranscriptOf(document: ClipDocument): string | null {
-  return captionsTrackOf(document)?.transcriptAssetId ?? null;
+/** Every captions track of a document (one, or Module 11's one per source). */
+function captionsTracksOf(document: ClipDocument): CaptionsTrack[] {
+  return document.tracks.filter((track): track is CaptionsTrack => track.kind === 'captions');
 }
 
 /** "Team Talk (1:23) (Copy)", like a duplicated design, capped at the title limit. */

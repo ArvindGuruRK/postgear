@@ -14,6 +14,8 @@ import type { ClipDocument } from '../document/schema';
 import { outputDuration } from './time-map';
 
 type CardsDocument = Partial<Pick<ClipDocument, 'cards'>>;
+/** The clip's own clock reads its parts and their Fade joins (Module 11). */
+type ClipClock = Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'joins'>>;
 
 /** How long the opening card plays before the clip (0 without one). */
 export function openingCardMs(doc: CardsDocument): number {
@@ -31,7 +33,7 @@ export function cardsMs(doc: CardsDocument): number {
 }
 
 /** The rendered file's length: the clip's own length plus its cards. */
-export function renderedDuration(doc: Pick<ClipDocument, 'segments'> & CardsDocument): number {
+export function renderedDuration(doc: ClipClock & CardsDocument): number {
   return outputDuration(doc) + cardsMs(doc);
 }
 
@@ -45,10 +47,7 @@ export type RenderedMoment =
  * the file's start, after the end the file's end; a card's last moment
  * belongs to the card (half-open ranges, like segments, except the very end).
  */
-export function renderedMoment(
-  doc: Pick<ClipDocument, 'segments'> & CardsDocument,
-  renderedMs: number,
-): RenderedMoment {
+export function renderedMoment(doc: ClipClock & CardsDocument, renderedMs: number): RenderedMoment {
   const opening = openingCardMs(doc);
   const clip = outputDuration(doc);
   const closing = closingCardMs(doc);

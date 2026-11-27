@@ -119,6 +119,13 @@ export const CLIP_ERROR_MESSAGES = {
   tool_failed: 'Something went wrong on our side. Try again in a little while.',
   tools_offline: 'Video tools are not running right now. Try again in a minute.',
   clips_busy: 'Our video tools are busy. Try again in a minute.',
+  // Sprint 13, Module 11: montages (`createMontage`, `POST /clips/montages`).
+  montage_too_few: 'Pick at least 2 clips for a montage.',
+  montage_too_many: 'A montage holds up to 15 clips.',
+  montage_shapes_differ: 'These clips have different shapes. Pick one shape for the montage.',
+  montage_too_long: 'A montage lasts at most 20 minutes. Take out a clip or two.',
+  montage_too_many_parts: 'These clips have too many parts for one montage. Take out a clip.',
+  montage_video_removed: 'One of the videos in this montage was removed.',
   // Module 19: the per-person limit on the create routes (30 a minute).
   clips_throttled: 'You are going very quickly. Wait a minute, then try again.',
   // Module 19: a job that ran past its time from the contract.

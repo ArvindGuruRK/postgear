@@ -896,3 +896,11 @@ A workspace's own words for Bleep Bad Words, added to the built-in list of the c
 - **`words` is stored clean**: trimmed, lower-case, composed (NFC), no repeats, each 1 to 40 characters with no space, at most 200. The API's `normaliseWordList` holds these rules (`apps/api/src/modules/clips/word-list/clip-word-list.schema.ts`); they are a guard, not a plan value.
 - **Replaced whole** on every save, never merged. `updatedById` is a plain id like `ClipCaptionStyle.createdById`, so a member leaving keeps the list.
 - **The words are never logged**: the save event carries the workspace, the user and a count.
+
+### `ClipOrigin.MONTAGE` (Module 11, `20261127210000_sprint13_clip_origin_montage`)
+
+A clip stitched from 2 to 15 other clips (Create Montage). Additive: one enum value, no column.
+
+- **`videoId` is the first clip's video; `meta.videoIds` lists every OTHER video it plays** (each once, UUIDs only; a brand kit's intro or outro video is not listed, as for any branded clip). `apps/api/src/modules/clips/montages/montage-videos.ts` reads it and never trusts it.
+- **A montage is a clip of every video it plays** (Sprint 12 Module 19's removal rules): removing any of them deletes it when it was never exported, or marks it `removedAt` when it was (its `Media` file stays). The lookup is a JSON path filter (`meta -> videoIds @> [id]`), fine at the few montages a workspace holds; add an index only if it ever shows in a slow query.
+- **A snapshot**: the document is copied from the clips when it is made; later edits to them change nothing. It fetches no sharp range of its own: its parts read the ones its clips already hold.

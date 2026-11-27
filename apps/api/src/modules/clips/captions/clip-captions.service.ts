@@ -32,6 +32,9 @@
  *   charged once per attempt; any failure gives the minutes back. The same
  *   request twice is answered from the stored translation, free.
  *
+ * Module 11: a montage's captions are made from its clips (one track per
+ * video), so these four routes answer it 422 `montage_captions_fixed`.
+ *
  * Nothing here logs a word of speech: events carry ids and counts.
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -76,6 +79,8 @@ import { ClipItemService } from '../clip/clip-item.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { MONTAGE_MESSAGES } from '../montages/clip-montages.messages';
+import { isMontage, montagesPlayingVideo } from '../montages/montage-videos';
 import { ClipTranscriptStore, TRANSCRIPT_MIME } from '../transcripts/clip-transcript-store';
 import {
   AI_MINUTES_METER,
@@ -341,20 +346,35 @@ export class ClipCaptionsService {
    * A clip is being deleted: the transcripts of its own go with it, unless a
    * copy of the clip still shows one, which then becomes that copy's. Answers
    * the storage keys to delete once the rows are gone.
+   *
+   * Module 11: a montage that plays the transcript's video and shows it on
+   * any of its captions tracks is an heir too, and `goingToo` (the other
+   * clips of a bulk delete) are never heirs, since they go as well.
    */
-  async releaseClip(orgId: string, clip: Pick<Clip, 'id' | 'videoId'>): Promise<string[]> {
+  async releaseClip(
+    orgId: string,
+    clip: Pick<Clip, 'id' | 'videoId'>,
+    goingToo: readonly string[] = [],
+  ): Promise<string[]> {
     const own = await prisma.clipAsset.findMany({
       where: { organizationId: orgId, clipId: clip.id, kind: ClipAssetKind.TRANSCRIPT },
-      select: { id: true, key: true },
+      select: { id: true, key: true, videoId: true },
     });
     if (own.length === 0) return [];
+    const videoIds = [
+      ...new Set(own.map((asset) => asset.videoId ?? clip.videoId).concat(clip.videoId)),
+    ];
     const others = await prisma.clip.findMany({
-      where: { organizationId: orgId, videoId: clip.videoId, id: { not: clip.id } },
+      where: {
+        organizationId: orgId,
+        NOT: { id: { in: [...new Set([clip.id, ...goingToo])] } },
+        OR: videoIds.flatMap((videoId) => [{ videoId }, montagesPlayingVideo(videoId)]),
+      },
       select: { id: true, document: true },
     });
     const doomed: string[] = [];
     for (const asset of own) {
-      const heir = others.find((other) => shownTranscriptId(other.document) === asset.id);
+      const heir = others.find((other) => shownTranscriptIds(other.document).includes(asset.id));
       if (heir) {
         await prisma.clipAsset.updateMany({
           where: { id: asset.id, organizationId: orgId },
@@ -591,6 +611,13 @@ export class ClipCaptionsService {
   /** The clip, its live video and its document; 404 for another workspace's. */
   private async context(orgId: string, clipId: string): Promise<ClipContext> {
     const clip = await this.items.requireClip(orgId, clipId);
+    // Module 11: these routes read one video's words for one captions track; a montage has a
+    // track per video, made from its clips, so they refuse it cleanly rather than mix videos.
+    if (isMontage(clip)) {
+      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'montage_captions_fixed', {
+        message: MONTAGE_MESSAGES.CAPTIONS_FIXED,
+      });
+    }
     const video = await this.videos.findLive(orgId, clip.videoId);
     const parsed = safeParseClipDocument(clip.document);
     if (!video || video.durationMs === null || !parsed.ok) {
@@ -619,10 +646,13 @@ export class ClipCaptionsService {
   }
 }
 
-/** The transcript a stored document's captions show, or null. Never throws. */
-function shownTranscriptId(document: unknown): string | null {
+/** The transcripts a stored document's captions show (Module 11: one per source). Never throws. */
+function shownTranscriptIds(document: unknown): string[] {
   const parsed = safeParseClipDocument(document);
-  return parsed.ok ? (captionsTrackOf(parsed.doc)?.transcriptAssetId ?? null) : null;
+  if (!parsed.ok) return [];
+  return parsed.doc.tracks.flatMap((track) =>
+    track.kind === 'captions' ? [track.transcriptAssetId] : [],
+  );
 }
 
 function hasWordsIn(transcript: TranscriptView, ranges: readonly MsRange[]): boolean {

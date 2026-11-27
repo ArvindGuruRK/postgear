@@ -232,6 +232,11 @@ export const renderInputSchema = z
      * it differs. Absent on jobs made before Module 15.
      */
     fingerprint: z.string().min(1).max(64).optional(),
+    /**
+     * Sprint 13 Module 11, Export All: the batch this export belongs to. Its
+     * clip's own bell is skipped; one notice comes when the batch's last job ends.
+     */
+    batchId: uuid.optional(),
   })
   .strict();
 

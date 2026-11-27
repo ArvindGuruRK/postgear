@@ -63,21 +63,33 @@ function firstEndingAfter(words: readonly TranscriptWord[], ms: number): number 
  * The clip's captions as words on the clip's clock, in play order. `transcript`
  * is read with the video's word fixes already applied (`applyFixes`); the
  * track's own `edits` go on top. A hidden word is left out. A source other
- * than the transcript's own video never gets its words (`sourceId`). A word
- * that bleeps of its part's video cover is masked.
+ * than the transcript's own video never gets its words: `options.sourceId`,
+ * else the track's own `source` (Module 11: a montage has one captions track
+ * per video, each naming it). A word that bleeps of its part's video cover is
+ * masked. Pass the whole document (or keep its `joins`): a Fade join moves
+ * every later word earlier. Inside a fade each side keeps its words only up
+ * to the overlap's middle (the `segmentAt` rule), so two pages never draw
+ * over each other.
  */
 export function captionWords(
-  doc: Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'bleeps'>>,
-  track: Pick<CaptionsTrack, 'edits'>,
+  doc: Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'bleeps' | 'joins'>>,
+  track: Pick<CaptionsTrack, 'edits'> & Partial<Pick<CaptionsTrack, 'source'>>,
   transcript: Pick<Transcript, 'words'>,
   options: { sourceId?: string } = {},
 ): CaptionWord[] {
   const out: CaptionWord[] = [];
   const { words } = transcript;
   const bleeps = doc.bleeps ?? [];
-  for (const placed of placeSegments(doc)) {
+  const sourceId = options.sourceId ?? track.source;
+  const placedAll = placeSegments(doc);
+  // Module 11: where the picture hands over inside a Fade (`segmentAt`'s middle, in whole ms).
+  const handover = (entry: { outStart: number; overlapMs: number } | undefined): number | null =>
+    entry && entry.overlapMs > 0 ? Math.ceil(entry.outStart + entry.overlapMs / 2) : null;
+  for (const placed of placedAll) {
     const { segment } = placed;
-    if (options.sourceId !== undefined && segment.source !== options.sourceId) continue;
+    const shownFrom = handover(placed) ?? placed.outStart;
+    const shownTo = handover(placedAll[placed.index + 1]) ?? placed.outEnd;
+    if (sourceId !== undefined && segment.source !== sourceId) continue;
     // A brand intro or outro (Module 10) is another video: never captioned, whatever its source.
     if (isBrandPart(segment)) continue;
     for (let at = firstEndingAfter(words, segment.sourceIn); at < words.length; at += 1) {
@@ -96,12 +108,15 @@ export function captionWords(
 
       const from = Math.max(word.start, segment.sourceIn);
       const to = Math.min(word.end, segment.sourceOut);
-      const start = placed.outStart + Math.round((from - segment.sourceIn) / segment.speed);
+      const start = Math.max(
+        shownFrom,
+        placed.outStart + Math.round((from - segment.sourceIn) / segment.speed),
+      );
       const end = Math.min(
-        placed.outEnd,
+        shownTo,
         Math.max(start + 1, placed.outStart + Math.round((to - segment.sourceIn) / segment.speed)),
       );
-      if (start >= placed.outEnd) continue;
+      if (start >= shownTo || end <= start) continue;
       const bleeped = bleeps.length > 0 && bleepCoversWord(bleeps, segment.source, word);
       out.push({
         i: word.i,
@@ -138,12 +153,57 @@ export function clipSourceRanges(
   return merged;
 }
 
-/** The captions track of a document, or null. A clip has at most one. */
+/**
+ * The captions track of a document, or null: its first one. A clip has at
+ * most one, except a montage (Module 11), which has one per video; read
+ * those with `captionsTracksOf`. The first is the one whose style, size and
+ * place every track of a montage is drawn with.
+ */
 export function captionsTrackOf(doc: Pick<ClipDocument, 'tracks'>): CaptionsTrack | null {
   for (const track of doc.tracks) {
     if (track.kind === 'captions') return track;
   }
   return null;
+}
+
+/**
+ * Every captions track of a document, in track order (Module 11). One for an
+ * ordinary clip (or none); a montage of clips from several videos has one
+ * per video, each naming its `source`, so `captionWords` shows each
+ * transcript only on its own video's parts.
+ */
+export function captionsTracksOf(doc: Pick<ClipDocument, 'tracks'>): CaptionsTrack[] {
+  const out: CaptionsTrack[] = [];
+  for (const track of doc.tracks) {
+    if (track.kind === 'captions') out.push(track);
+  }
+  return out;
+}
+
+/**
+ * The look every captions track of a montage is drawn with: the first
+ * track's style, size, place, words a page, case and mark colour on `track`
+ * (its transcript, language, source and word edits kept). The first track
+ * itself comes back unchanged.
+ */
+export function inFirstCaptionsLook(
+  doc: Pick<ClipDocument, 'tracks'>,
+  track: CaptionsTrack,
+): CaptionsTrack {
+  const first = captionsTrackOf(doc);
+  if (!first || first === track) return track;
+  const next: CaptionsTrack = {
+    ...track,
+    styleId: first.styleId,
+    position: { ...first.position },
+    sizePx: first.sizePx,
+    maxWords: first.maxWords,
+  };
+  if (first.letterCase !== undefined) next.letterCase = first.letterCase;
+  else delete next.letterCase;
+  if (first.markColour !== undefined) next.markColour = first.markColour;
+  else delete next.markColour;
+  return next;
 }
 
 /**
@@ -153,7 +213,7 @@ export function captionsTrackOf(doc: Pick<ClipDocument, 'tracks'>): CaptionsTrac
  * after the clip ends belongs nowhere.
  */
 export function clipClockPlacer(
-  doc: Pick<ClipDocument, 'segments'>,
+  doc: Pick<ClipDocument, 'segments'> & Partial<Pick<ClipDocument, 'joins'>>,
 ): (cue: { start: number; end: number }) => { start: number; end: number } | null {
   const placed = placeSegments(doc);
   return (cue) => {

@@ -170,3 +170,86 @@ export function heldRange(
   }
   return best ? { fromMs: best.meta.fromMs, toMs: best.meta.toMs } : null;
 }
+
+/** One part's own file (Module 11): the part, and the file that covers it, or null. */
+export interface PartSource<A extends SourceAsset> {
+  segmentId: string;
+  picked: PickedSource<A> | null;
+}
+
+/** The files one source of a document is read from (`pickSourceFiles`). */
+export interface SourceFiles<A extends SourceAsset> {
+  sourceId: string;
+  videoId: string;
+  /** Every part of this source, earliest start to latest end. */
+  range: SourceRange;
+  /**
+   * The one file for the whole range (a covering SEGMENT, else the light
+   * copy), or null when the video has neither.
+   */
+  picked: PickedSource<A> | null;
+  /**
+   * Only for a montage whose source no single SEGMENT covers (two clips of
+   * one video, far apart): each part's own pick, a SEGMENT covering that
+   * part, else the light copy. Absent otherwise.
+   */
+  parts?: PartSource<A>[];
+  /** True when every part of this source is read from a SEGMENT (sharp). */
+  sharp: boolean;
+}
+
+/**
+ * Which files a render reads, per source of `doc` (Module 11), the one rule
+ * the API's "will it be sharp" and the worker's prepare step both call.
+ * `assetsOf(videoId)` answers every asset of a video inside the workspace
+ * (every clip's SEGMENTs and the light copies); a video it does not know
+ * answers an empty list.
+ *
+ * - Each source's whole range is picked with `pickSharpSource`, exactly as a
+ *   clip of one video always was.
+ * - A montage (`meta.montage`) may play two clips of one video as one
+ *   source, so its range spans both and a single SEGMENT rarely covers it:
+ *   when the whole range is not covered sharp, each part is picked on its
+ *   own (every part opens its own seeked input anyway), and the parts that a
+ *   SEGMENT covers read it.
+ *
+ * Pass the parts that matter: the API leaves out brand intro and outro parts.
+ */
+export function pickSourceFiles<A extends SourceAsset>(
+  doc: Pick<ClipDocument, 'segments' | 'sources'> & Partial<Pick<ClipDocument, 'meta'>>,
+  assetsOf: (videoId: string) => readonly A[],
+): SourceFiles<A>[] {
+  const montage = doc.meta?.montage !== undefined;
+  const videoOf = new Map(doc.sources.map((source) => [source.id, source.videoId]));
+  const out: SourceFiles<A>[] = [];
+  for (const [sourceId, range] of rangesBySource(doc)) {
+    const videoId = videoOf.get(sourceId);
+    if (!videoId) continue;
+    const assets = assetsOf(videoId);
+    const picked = pickSharpSource(range, assets);
+    if (picked?.sharp || !montage) {
+      out.push({ sourceId, videoId, range, picked, sharp: picked?.sharp === true });
+      continue;
+    }
+    const parts = doc.segments
+      .filter((segment) => segment.source === sourceId)
+      .map((segment) => ({
+        segmentId: segment.id,
+        picked: pickSharpSource({ fromMs: segment.sourceIn, toMs: segment.sourceOut }, assets),
+      }));
+    out.push({
+      sourceId,
+      videoId,
+      range,
+      picked,
+      parts,
+      sharp: parts.every((part) => part.picked?.sharp === true),
+    });
+  }
+  return out;
+}
+
+/** True when every source reads sharp files only (an export will be sharp). */
+export function sourceFilesSharp(files: readonly SourceFiles<SourceAsset>[]): boolean {
+  return files.length > 0 && files.every((entry) => entry.sharp);
+}

@@ -76,6 +76,8 @@ export interface ClipListItem extends ClipSummaryView {
    * Clip); null with no export, or once that file was deleted from Media.
    */
   exportedAt: string | null;
+  /** Module 11: the recipe the clip wears (`document.recipeId`), so Export All can preselect its quality. */
+  recipeId: string | null;
 }
 
 /** Module 17: one row of the Create tab's Coming Up panel. */
@@ -298,6 +300,7 @@ export class ClipsListService {
           poster,
           preview,
           posts: published.get(row.id) ?? [],
+          recipeId: recipeIdOf(row.document),
           exportedAt: row.exportedMediaId ? (exportedAt.get(row.exportedMediaId) ?? null) : null,
         };
       }),
@@ -334,4 +337,11 @@ async function previewFor(
   return address
     ? { url: address.url, fromMs: range.fromMs, toMs: range.toMs, expiresAt: address.expiresAt }
     : null;
+}
+
+/** The document's `recipeId` when it is a short id; anything else reads as none. */
+function recipeIdOf(document: unknown): string | null {
+  if (!document || typeof document !== 'object') return null;
+  const value = (document as { recipeId?: unknown }).recipeId;
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : null;
 }

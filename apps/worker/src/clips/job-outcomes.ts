@@ -10,8 +10,10 @@
  *
  * - **Failed**: delete what the job stored, the job FAILED with one sentence,
  *   for an import the video FAILED with the same `{ code, message }` and a
- *   `clip_video_failed` bell, for an export a `clip_export_failed` bell; an
- *   import's minutes are given back in full.
+ *   `clip_video_failed` bell, for an export a `clip_export_failed` bell
+ *   (not for a Preview Export, nor for an export of an Export All batch: the
+ *   API writes the batch's one notice when its last job ends); an import's
+ *   minutes are given back in full.
  * - **Cancelled**: delete what the job stored, the job CANCELLED; an import's
  *   video is soft deleted with every file under it, and its minutes given back.
  * - **Highlights** (Module 16), failed or cancelled: the signals file the run
@@ -54,7 +56,7 @@ import {
   segmentKey,
   speechKeys,
 } from './keys';
-import { exportFailedNotification, videoFailedNotification } from './notifications';
+import { exportFailedNotification, ringsOwnBell, videoFailedNotification } from './notifications';
 import type { ClipRows, JobRow } from './rows';
 
 /** Failures after which an upload's ORIGINAL is deleted too: no retry can use it. */
@@ -209,8 +211,9 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
       const input = inputOf(job, 'RENDER');
       await cleanupRender(deps, job, input);
       const clipId = job.clipId ?? input?.clipId ?? null;
-      // A Preview Export answers in its dialog; only a real export rings the bell.
-      const clip = clipId && !input?.proof ? await deps.rows.clip(org, clipId) : null;
+      // A Preview Export answers in its dialog; only a real export rings the bell, and an
+      // export of a batch (Sprint 13, Module 11) is counted in the batch's one notice instead.
+      const clip = clipId && ringsOwnBell(input) ? await deps.rows.clip(org, clipId) : null;
       return deps.rows.closeJob({
         jobId: job.id,
         organizationId: org,

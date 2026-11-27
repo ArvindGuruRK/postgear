@@ -21,6 +21,9 @@ import { ClipHookTitlesService } from '../hook-titles/clip-hook-titles.service';
 import { ClipVoiceController } from '../voice/clip-voice.controller';
 import { ClipVoiceRepository } from '../voice/clip-voice.repository';
 import { ClipVoiceService } from '../voice/clip-voice.service';
+import { ClipMontagesController } from '../montages/clip-montages.controller';
+import { ClipMontagesService } from '../montages/clip-montages.service';
+import { ClipBulkService } from './clip-bulk.service';
 import { ClipEditsService } from './clip-edits.service';
 import { ClipExportsService } from './clip-exports.service';
 import { ClipItemController } from './clip-item.controller';
@@ -49,6 +52,8 @@ import { ClipsListService } from './clips-list.service';
     ClipFacesController,
     ClipVoiceController,
     ClipHookTitlesController,
+    // Sprint 13, Module 11: `POST /clips/montages`, a word route, before `ClipItemController`.
+    ClipMontagesController,
     ClipItemController,
   ],
   providers: [
@@ -64,6 +69,9 @@ import { ClipsListService } from './clips-list.service';
     ClipVoiceRepository,
     ClipVoiceService,
     ClipHookTitlesService,
+    // Sprint 13, Module 11: bulk Hide, Unhide and Delete, and Create Montage.
+    ClipBulkService,
+    ClipMontagesService,
   ],
   // Module 08: the internal follow route (in `ClipsModule`) marks a run's clips and asks faces.
   // Module 10: the recipe applier makes clips and asks faces.

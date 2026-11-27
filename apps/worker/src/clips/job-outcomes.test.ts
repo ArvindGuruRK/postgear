@@ -1,4 +1,6 @@
+import { createClipDocument } from '@postgear/video-engine';
 import { cancelJob, failJob, type OutcomeDeps, openJob } from './job-outcomes';
+import { ringsOwnBell } from './notifications';
 import {
   allImportKeys,
   allWatchKeys,
@@ -204,6 +206,40 @@ describe('segment and render bookkeeping', () => {
         link: `/${ORG}/clips/edit/${CLIP_ID}?tab=export`,
       }),
     ]);
+  });
+
+  it("a failed export of an Export All batch closes without the clip's own bell (Sprint 13, Module 11)", async () => {
+    const batchId = '12121212-1212-4121-8121-121212121212';
+    const { deps, rows } = setup(
+      jobRow({
+        kind: 'RENDER',
+        clipId: CLIP_ID,
+        input: {
+          clipId: CLIP_ID,
+          videoId: VIDEO_ID,
+          revision: 1,
+          document: createClipDocument({
+            videoId: VIDEO_ID,
+            fromMs: 0,
+            toMs: 10_000,
+            ratio: '9:16',
+          }),
+          quality: '720p',
+          proof: false,
+          watermark: false,
+          name: 'Best Moment.mp4',
+          batchId,
+        },
+      }),
+    );
+    await failJob(deps, { jobId: JOB_ID, organizationId: ORG, code: 'export_failed' });
+    expect(rows.jobs.get(JOB_ID)?.status).toBe('FAILED');
+    expect(rows.notifications).toHaveLength(0);
+
+    expect(ringsOwnBell({ proof: false, batchId })).toBe(false);
+    expect(ringsOwnBell({ proof: true })).toBe(false);
+    expect(ringsOwnBell({ proof: false })).toBe(true);
+    expect(ringsOwnBell(null)).toBe(true);
   });
 
   it('a failed export of a clip deleted meanwhile still closes, with no bell', async () => {

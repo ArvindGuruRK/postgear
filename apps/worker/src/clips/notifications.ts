@@ -8,6 +8,11 @@
  * the name plus one of our own error sentences (never a tool's text).
  * `clip_export_ready` is written by the API's finish-export route instead,
  * next to the Media row it describes.
+ *
+ * Sprint 13, Module 11: an export of an Export All batch (`input.batchId`)
+ * rings no bell of its own, ready or failed. The API writes the batch's one
+ * notice ("6 clips are ready, 2 could not be exported.") when the batch's
+ * last job ends, from the `settled` call every job makes.
  */
 import {
   CLIP_NOTIFICATION_TITLES,
@@ -19,6 +24,16 @@ import {
 } from '@postgear/scheduling';
 
 export { CLIP_NOTIFICATION_TITLES };
+
+/**
+ * Whether a finished export rings its own bell: not a Preview Export (it
+ * answers in its dialog) and not an export of a batch (counted in the
+ * batch's one notice). A row whose input did not parse still rings.
+ */
+export function ringsOwnBell(input: { proof?: boolean; batchId?: string } | null): boolean {
+  if (!input) return true;
+  return input.proof !== true && !input.batchId;
+}
 
 /** What a `Notifications` row is created with. */
 export interface ClipNotificationRow {

@@ -1,6 +1,9 @@
 /**
  * `ClipJob` rows (Sprint 12, Module 02). Every read and write is scoped to
- * the workspace: an id from the URL is never enough on its own.
+ * the workspace: an id from the URL is never enough on its own. The two
+ * exceptions are the queue claims below (`claimWaitingRenders` and the
+ * reconcile's lists), which look across workspaces on purpose: turns are
+ * shared between them.
  */
 import { Injectable } from '@nestjs/common';
 import {
@@ -11,7 +14,7 @@ import {
   type Prisma,
   prisma,
 } from '@postgear/db';
-import { priorityRank } from '@postgear/video-engine';
+import { JOB_PRIORITIES, priorityRank } from '@postgear/video-engine';
 import { type ClipsTx, serializable } from '../clips.tx';
 
 /** The statuses a job can still change from. */
@@ -42,6 +45,12 @@ export class ClipJobsRepository {
 
   find(orgId: string, jobId: string): Promise<ClipJob | null> {
     return prisma.clipJob.findFirst({ where: { id: jobId, organizationId: orgId } });
+  }
+
+  /** Several jobs of the workspace (a batch's live stream, Module 11); ids of others are skipped. */
+  findMany(orgId: string, jobIds: readonly string[]): Promise<ClipJob[]> {
+    if (jobIds.length === 0) return Promise.resolve([]);
+    return prisma.clipJob.findMany({ where: { id: { in: [...jobIds] }, organizationId: orgId } });
   }
 
   /** QUEUED or RUNNING jobs of a kind for a video. */
@@ -175,6 +184,87 @@ export class ClipJobsRepository {
   }
 
   /**
+   * Claims the exports that may start now (Sprint 13, Module 11, the fair
+   * render queue). Every export is made QUEUED; this hands out the free
+   * render slots:
+   *
+   * - at most `slots` exports hold a slot across every workspace, and at
+   *   most ONE per workspace. A slot is held by a RUNNING export or by a
+   *   QUEUED one already handed to Temporal (`startedAt` set by this claim,
+   *   as `claimWaitingImports` does);
+   * - each waiting workspace offers its own next export (highest priority,
+   *   then the oldest: `pickNext`); across workspaces the highest `priority`
+   *   goes first (copied from `clips.queue_priority` when the job was made),
+   *   and equal priorities take turns: the workspace served longest ago (or
+   *   never) goes first, so a 30 clip batch never starves a later one.
+   *
+   * Preview Export (`proof: true`) is not queued here: it starts at once and
+   * holds no slot. Serializable, so two callers at once (a `settled` call and
+   * a new export) can never both fill the last slot or start two exports of
+   * one workspace: one is aborted, retried, and sees the other's claim.
+   */
+  claimWaitingRenders(slots: number, now: Date): Promise<ClaimedJob[]> {
+    return serializable(async (tx) => {
+      const busy = await tx.clipJob.findMany({
+        where: {
+          kind: ClipJobKind.RENDER,
+          input: { path: ['proof'], equals: false },
+          OR: [
+            { status: ClipJobStatus.RUNNING },
+            { status: ClipJobStatus.QUEUED, startedAt: { not: null } },
+          ],
+        },
+        select: { organizationId: true },
+        take: WAITING_SCAN_LIMIT,
+      });
+      const free = Math.max(0, Math.floor(slots) - busy.length);
+      if (free === 0) return [];
+      const busyOrgs = new Set(busy.map((row) => row.organizationId));
+
+      const waiting = await tx.clipJob.findMany({
+        where: {
+          kind: ClipJobKind.RENDER,
+          status: ClipJobStatus.QUEUED,
+          startedAt: null,
+          input: { path: ['proof'], equals: false },
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: WAITING_SCAN_LIMIT,
+        select: { id: true, organizationId: true, kind: true, priority: true, createdAt: true },
+      });
+      const candidates = waiting.filter((job) => !busyOrgs.has(job.organizationId));
+      if (candidates.length === 0) return [];
+
+      const lastServed = new Map<string, Date>();
+      for (const orgId of new Set(candidates.map((job) => job.organizationId))) {
+        const last = await tx.clipJob.findFirst({
+          where: {
+            organizationId: orgId,
+            kind: ClipJobKind.RENDER,
+            startedAt: { not: null },
+            input: { path: ['proof'], equals: false },
+          },
+          orderBy: [{ startedAt: 'desc' }],
+          select: { startedAt: true },
+        });
+        if (last?.startedAt) lastServed.set(orgId, last.startedAt);
+      }
+
+      const picked = pickFairRenders(candidates, lastServed, free, now);
+      if (picked.length === 0) return [];
+      await tx.clipJob.updateMany({
+        where: {
+          id: { in: picked.map((job) => job.id) },
+          status: ClipJobStatus.QUEUED,
+          startedAt: null,
+        },
+        data: { startedAt: now },
+      });
+      return picked.map(({ id, organizationId, kind }) => ({ id, organizationId, kind }));
+    });
+  }
+
+  /**
    * A cancelled import's video: soft deleted while still IMPORTING (the row
    * and its rights record stay), and its asset rows dropped with the files.
    */
@@ -225,7 +315,20 @@ export class ClipJobsRepository {
    */
   staleQueued(before: Date, take: number): Promise<ClipJob[]> {
     return prisma.clipJob.findMany({
-      where: { status: ClipJobStatus.QUEUED, createdAt: { lt: before } },
+      where: {
+        status: ClipJobStatus.QUEUED,
+        createdAt: { lt: before },
+        // Module 11: an export still waiting for its turn is the render queue's, not the
+        // reconcile's; left out here so a long batch never fills the window and hides a
+        // claimed export whose start was lost.
+        NOT: {
+          AND: [
+            { kind: ClipJobKind.RENDER },
+            { startedAt: null },
+            { NOT: { input: { path: ['proof'], equals: true } } },
+          ],
+        },
+      },
       orderBy: { createdAt: 'asc' },
       take,
     });
@@ -254,7 +357,11 @@ export class ClipJobsRepository {
   }
 }
 
-/** Waiting jobs looked at per claim: far more than any cap, so the priority order holds. */
+/**
+ * Waiting jobs looked at per claim: far more than any cap, so the priority
+ * order holds. The global `CLIPS_QUEUE_CEILING` (500 waiting jobs of every
+ * kind) keeps the waiting renders under it.
+ */
 const WAITING_SCAN_LIMIT = 500;
 
 export interface ClaimedJob {
@@ -278,3 +385,55 @@ export function pickNext<T extends { id: string; priority: string; createdAt: Da
     )
     .slice(0, count);
 }
+
+/**
+ * The fair render order (Module 11): one export per waiting workspace (its
+ * own next, by `pickNext`), then across workspaces the highest priority
+ * first and, among equals, the workspace served longest ago (never served
+ * counts as longest), then the oldest export. Answers at most `count`, never
+ * two of one workspace.
+ *
+ * No workspace starves: every `RENDER_AGING_MS` an export has waited counts
+ * as one priority step higher, up to the top one, so a low priority export
+ * that keeps being overtaken soon ranks with the highest and, never served
+ * lately, goes first.
+ */
+export function pickFairRenders<
+  T extends { id: string; organizationId: string; priority: string; createdAt: Date },
+>(
+  waiting: readonly T[],
+  lastServed: ReadonlyMap<string, Date>,
+  count: number,
+  now: Date = new Date(),
+): T[] {
+  if (count <= 0) return [];
+  const heads = new Map<string, T>();
+  for (const job of pickNext(waiting, waiting.length)) {
+    if (!heads.has(job.organizationId)) heads.set(job.organizationId, job);
+  }
+  const served = (job: T) =>
+    lastServed.get(job.organizationId)?.getTime() ?? Number.NEGATIVE_INFINITY;
+  return [...heads.values()]
+    .sort((a, b) => {
+      const rank = agedRank(b, now) - agedRank(a, now);
+      if (rank !== 0) return rank;
+      const x = served(a);
+      const y = served(b);
+      if (x !== y) return x < y ? -1 : 1;
+      return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+    })
+    .slice(0, count);
+}
+
+/** Module 11: an export waiting this long counts as one priority step higher (no starving). */
+export const RENDER_AGING_MS = 10 * 60_000;
+
+function agedRank(job: { priority: string; createdAt: Date }, now: Date): number {
+  const waited = Math.max(0, now.getTime() - job.createdAt.getTime());
+  return Math.min(
+    TOP_PRIORITY_RANK,
+    priorityRank(job.priority) + Math.floor(waited / RENDER_AGING_MS),
+  );
+}
+
+const TOP_PRIORITY_RANK = priorityRank(JOB_PRIORITIES[JOB_PRIORITIES.length - 1] as string);

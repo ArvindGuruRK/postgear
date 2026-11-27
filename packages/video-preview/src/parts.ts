@@ -14,6 +14,12 @@
  *   speed may change, which needs no seek.
  * - Any other join is a **hand-over**: the second `<video>` has already
  *   sought to the next part's start and takes over.
+ * - A **Fade** join (Module 11's montage) is always a hand-over, made at the
+ *   start of the overlap (`overlapMs` before the outgoing part ends): both
+ *   videos play through the overlap and the stage mixes the two pictures.
+ *   Inside an overlap the part "at" a moment follows the engine's
+ *   `segmentAt`: the outgoing one until the overlap's middle, then the
+ *   incoming one.
  *
  * Pure: numbers in, numbers out.
  */
@@ -32,8 +38,10 @@ export interface PreviewPart {
   /** Where it sits in the clip, in ms (`outEnd` exclusive). */
   outStart: number;
   outEnd: number;
-  /** Plays on from the part before it on the same element (same video, no gap). */
+  /** Plays on from the part before it on the same element (same video, no gap, no Fade). */
   continuesPrevious: boolean;
+  /** Module 11: how long it overlaps the part before it (a Fade join), 0 for a cut. */
+  overlapMs: number;
   /**
    * Names the part's video range and speed. A part whose key is unchanged
    * after an edit still maps media time to the same moments.
@@ -59,14 +67,20 @@ export function previewParts(doc: TimedDocument): PreviewPart[] {
       outEnd: entry.outEnd,
       continuesPrevious:
         previous !== undefined &&
+        entry.overlapMs === 0 &&
         previous.source === segment.source &&
         previous.sourceOut === segment.sourceIn,
+      overlapMs: entry.overlapMs,
       key: `${segment.id}|${segment.source}|${segment.sourceIn}|${segment.sourceOut}|${segment.speed}`,
     };
   });
 }
 
-/** The part playing at `outputMs`; the clip's very end belongs to the last part. */
+/**
+ * The part playing at `outputMs`; the clip's very end belongs to the last
+ * part. Inside a Fade overlap: the outgoing part until its middle, then the
+ * incoming one (the engine's `segmentAt`).
+ */
 export function partAt(parts: readonly PreviewPart[], outputMs: number): PreviewPart | null {
   const last = parts[parts.length - 1];
   if (!last || !Number.isFinite(outputMs)) {
@@ -75,12 +89,27 @@ export function partAt(parts: readonly PreviewPart[], outputMs: number): Preview
   if (outputMs <= 0) {
     return parts[0] ?? null;
   }
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; i += 1) {
+    const part = parts[i] as PreviewPart;
     if (outputMs < part.outEnd) {
+      const next = parts[i + 1];
+      if (next && next.overlapMs > 0 && outputMs >= next.outStart + next.overlapMs / 2) {
+        return next;
+      }
       return part;
     }
   }
   return last;
+}
+
+/**
+ * The clip moment the part after `part` takes over from `part` on the
+ * other element: its start for a Fade join (the overlap's start), else
+ * `part`'s end.
+ */
+export function handoverMs(parts: readonly PreviewPart[], part: PreviewPart): number {
+  const next = parts[part.index + 1];
+  return next && next.overlapMs > 0 ? next.outStart : part.outEnd;
 }
 
 /** The video moment at `outputMs` inside `part`, unrounded, held inside the part. */
