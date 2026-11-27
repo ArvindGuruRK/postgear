@@ -7,6 +7,8 @@
 | Document | Purpose |
 |---|---|
 | [`design-tokens.md`](design-tokens.md) | Full catalog of every token group that was imported: what it is, where it lives in the repo now, where it came from in Postiz, and what it's for. |
+| [`design-system-rules.md`](design-system-rules.md) | The enforceable rulebook for how components consume the tokens. |
+| [`motion-and-interaction-principles.md`](motion-and-interaction-principles.md) | When and why things move (pulse, grow, blur crossfade, rubber band, wipe, focus, dimming) plus Fitts's, Hick's and Doherty's laws, with a review checklist. Followed app-wide since 2026-11-27. |
 | [`rebrand-plan.md`](rebrand-plan.md) | How and when to actually change these tokens to PostGear's own brand colors, without a big-bang rewrite that breaks every component that consumes them. |
 
 ## Where the tokens actually live now
