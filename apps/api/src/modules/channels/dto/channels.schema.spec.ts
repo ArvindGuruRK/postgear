@@ -43,3 +43,34 @@ describe('reorderChannelsSchema', () => {
     expect(reorderChannelsSchema.safeParse({ ids: [''] }).success).toBe(false);
   });
 });
+
+describe('updateChannelSchema: posting slots (Sprint 13 Module 13)', () => {
+  const slot = (extra: Record<string, unknown>) => ({ postingTimes: [{ time: 540, ...extra }] });
+
+  it('defaults a bare time to every day with no window, and sorts the days', () => {
+    const parsed = updateChannelSchema.parse(slot({}));
+    expect(parsed.postingTimes).toEqual([
+      { time: 540, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+    ]);
+    expect(updateChannelSchema.parse(slot({ days: [4, 2] })).postingTimes?.[0]?.days).toEqual([
+      2, 4,
+    ]);
+  });
+
+  it('takes only windows of 0, 5, 15 or 30 minutes', () => {
+    for (const windowMinutes of [0, 5, 15, 30]) {
+      expect(updateChannelSchema.safeParse(slot({ windowMinutes })).success).toBe(true);
+    }
+    for (const windowMinutes of [1, 10, 60, -5]) {
+      expect(updateChannelSchema.safeParse(slot({ windowMinutes })).success).toBe(false);
+    }
+  });
+
+  it('takes 1 to 7 distinct weekdays, at least one, and nothing else', () => {
+    expect(updateChannelSchema.safeParse(slot({ days: [] })).success).toBe(false);
+    expect(updateChannelSchema.safeParse(slot({ days: [0] })).success).toBe(false);
+    expect(updateChannelSchema.safeParse(slot({ days: [8] })).success).toBe(false);
+    expect(updateChannelSchema.safeParse(slot({ days: [2, 2] })).success).toBe(false);
+    expect(updateChannelSchema.safeParse(slot({ label: 'x' })).success).toBe(false);
+  });
+});

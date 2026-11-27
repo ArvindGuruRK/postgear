@@ -37,6 +37,7 @@ function row(group: string, text: string, tags: string[] = []): PostRow {
     releaseURL: null,
     error: null,
     intervalInDays: null,
+    madeWithAi: false,
     createdAt: new Date('2026-10-01T00:00:00Z'),
     updatedAt: new Date('2026-10-01T00:00:00Z'),
     tags: tags.map((name, index) => ({ tag: { id: `tag_${index}`, name, color: 'teal' } })),

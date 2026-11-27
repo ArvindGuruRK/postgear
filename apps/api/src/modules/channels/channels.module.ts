@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BillingModule } from '../billing/billing.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { ChannelNextSlotService } from './channel-next-slot.service';
 import { ChannelOAuthService } from './channel-oauth.service';
 import { ChannelsController } from './channels.controller';
 import { ChannelsRepository } from './channels.repository';
@@ -23,7 +24,7 @@ import { ChannelsService } from './channels.service';
 @Module({
   imports: [SchedulingModule, BillingModule],
   controllers: [ChannelsController],
-  providers: [ChannelsService, ChannelsRepository, ChannelOAuthService],
+  providers: [ChannelsService, ChannelsRepository, ChannelOAuthService, ChannelNextSlotService],
   exports: [ChannelsService, ChannelsRepository],
 })
 export class ChannelsModule {}

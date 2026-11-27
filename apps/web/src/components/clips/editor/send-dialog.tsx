@@ -77,7 +77,16 @@ export interface SendClipTarget {
   title: string;
   durationMs: number;
   exportedMediaId: string | null;
+  /**
+   * Module 13: a sound in the clip was made by Text To Speech, so the draft
+   * starts marked Made With AI (the API decides; this only says why).
+   */
+  usesAiVoice?: boolean;
 }
+
+/** Module 13: the note beside the description when the clip has a made-up voice. */
+export const AI_VOICE_NOTE =
+  'This clip uses a made-up voice, so the post starts marked Made With AI. You can turn it off in the composer.';
 
 export interface SendClipDialogProps {
   open: boolean;
@@ -281,6 +290,11 @@ function SendClipContent({ orgId, clip, outdated, exportRun, onSent }: SendClipD
         <DialogDescription className="break-words">
           {`${clip.title} becomes a draft post with your caption. You schedule it in the composer.`}
         </DialogDescription>
+        {clip.usesAiVoice ? (
+          <p className="m-0 font-sans text-sm text-ink" data-testid="clip-send-ai-voice">
+            {AI_VOICE_NOTE}
+          </p>
+        ) : null}
       </DialogHeader>
 
       <div className="mt-5 flex flex-col gap-5">

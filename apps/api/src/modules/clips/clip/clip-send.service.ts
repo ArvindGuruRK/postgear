@@ -35,6 +35,7 @@ import {
   videoFit,
   videoFitSentence,
 } from '@postgear/social-core';
+import { safeParseClipDocument } from '@postgear/video-engine';
 import { securityLogger } from '../../../common/logging/security-logger';
 import { ChannelsService } from '../../channels/channels.service';
 import { createPostSchema, postDocumentSchema } from '../../posts/dto/posts.schema';
@@ -42,8 +43,9 @@ import { POST_MESSAGES } from '../../posts/posts.messages';
 import { PostsService } from '../../posts/posts.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { isUuid } from '../clips.ids';
-import { clipNotFound } from './clip-item.service';
+import { documentUsesAiVoice } from './clip-ai-voice';
 import type { SendClipInput } from './clip-item.schema';
+import { clipNotFound } from './clip-item.service';
 import { ClipPostsService } from './clip-posts.service';
 
 /** Where a sent clip's draft is parked: the top of the next hour, like Studio's. */
@@ -68,7 +70,13 @@ export class ClipSendService {
     if (!isUuid(clipId)) throw clipNotFound();
     const clip = await prisma.clip.findFirst({
       where: { id: clipId, organizationId: orgId },
-      select: { id: true, revision: true, lastExportedRevision: true, exportedMediaId: true },
+      select: {
+        id: true,
+        revision: true,
+        lastExportedRevision: true,
+        exportedMediaId: true,
+        document: true,
+      },
     });
     if (!clip) throw clipNotFound();
 
@@ -126,6 +134,11 @@ export class ClipSendService {
       });
     }
 
+    // Module 13 (D13-10): a clip with a made-up voice starts marked Made With
+    // AI; captions, cuts and layouts never do. The person may turn it off.
+    const parsed = safeParseClipDocument(clip.document);
+    const madeWithAi = await documentUsesAiVoice(orgId, parsed.ok ? parsed.doc : null);
+
     const post = await this.posts.create(
       orgId,
       createPostSchema.parse({
@@ -133,6 +146,7 @@ export class ClipSendService {
         publishDate: nextFullHour().toISOString(),
         shared: [{ content, media: [{ id: media.id }] }],
         channels: input.channelIds.map((channelId) => ({ channelId, customized: false })),
+        ...(madeWithAi ? { madeWithAi: true } : {}),
       }),
     );
     await this.clipPosts.syncForPost(orgId, post.group, [media.id]);

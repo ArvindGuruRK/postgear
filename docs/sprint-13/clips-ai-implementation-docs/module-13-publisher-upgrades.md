@@ -1,6 +1,6 @@
 # Module 13: Publisher Upgrades
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: L (one full session)
+> **Sprint 13, Clips AI** | Status: Done | Size: L (one full session)
 > **Depends on**: Sprint 12. No AI module is needed (the AI label reads `usesAiVoice` from Module 09 when it exists).
 > **Stories**: CA-9.1 (now posting slots, windows and weekdays), CA-9.2, CA-9.3 (new: random time of day)
 > **Next**: [Module 14](module-14-creator-tools-and-editor-seats.md) (Creator Tools And Editor Seats), then [Module 15](module-15-scale-cost-and-deploy.md)
@@ -83,14 +83,14 @@ interface PostingSlot {
 
 ## Tasks
 
-- [ ] Posting slots: the migration (default and `UPDATE`, no new table), `readPostingSlots`, the extended `postingTimes` schema and public API field, `jitteredTime`, `nextFreeSlot` with weekdays and windows, jitter applied where a slot is taken.
-- [ ] `GET /channels/next-slot`; Next Available in the composer.
-- [ ] The slots dialog (window select, weekday chips) and Shuffle Times (`suggestSlots`, the dialog).
-- [ ] Pick A Random Time in the schedule dialog (`randomTimeOfDay`).
-- [ ] `Post.madeWithAi`; provider `aiLabel` and mappings (confirm the reported fields first); the composer toggle, notes and suggestion; the public API field.
-- [ ] Title-case test green.
-- [ ] Playwright once (`PUBLISH_SIMULATION=true`): set a slot window and weekdays, Shuffle, Next Available on two posts (different minutes), Pick A Random Time, Made With AI on a video post to YouTube, publish, see the flag in the stand-in. Screenshots in `screenshots/`.
-- [ ] `verify-change` (it must include `social-core`'s and `automation`'s dependants); update the Progress table and the Decision Log.
+- [x] Posting slots: the migration (default and `UPDATE`, no new table), `readPostingSlots`, the extended `postingTimes` schema and public API field, `jitteredTime`, `nextFreeSlot` with weekdays and windows, jitter applied where a slot is taken. Done: migration `20261128120000_sprint13_posting_slots_and_made_with_ai` (a loop that skips unreadable rows), `findFreeSlot` and `placeInFreeSlot` beside `nextFreeSlot`; Add To Queue (the API gateway, seeded by run and step) places at a natural minute; the calendar's day rows and Reschedule's suggestions honour weekdays. The public API field was **not** added: `GET /v1/channels` has never carried posting times (kept out on purpose, Decision Log).
+- [x] `GET /channels/next-slot`; Next Available in the composer. A channel with no times answers `at: null`; the composer asks again on save with the same seed and moves the post if its slot was taken.
+- [x] The slots dialog (window select, weekday chips) and Shuffle Times (`suggestSlots`, the dialog).
+- [x] Pick A Random Time in the schedule dialog (`randomTimeOfDay`). The design system's `DateTimePicker` gained an optional `randomTime` panel under a second tab.
+- [x] `Post.madeWithAi`; provider `aiLabel` and mappings (confirm the reported fields first); the composer toggle, notes and suggestion; the public API field. YouTube and both Instagram providers send the label. TikTok and Pinterest stay `'none'`: confirming them means reading their developer pages, which this session may not fetch (real-test plan A-64). Facebook stays `'none'`: its provider posts a Page video through `/videos`, not a Reel. The suggestion is made by Send To Composer (the API marks the draft when the clip has a made-up voice) and explained in the clip's Send dialog.
+- [x] Title-case test green.
+- [x] Playwright once (`PUBLISH_SIMULATION=true`): set a slot window and weekdays, Shuffle, Next Available on two posts (different minutes), Pick A Random Time, Made With AI on a video post to YouTube, publish, see the flag in the stand-in. Screenshots in `screenshots/` (`s13-m13-*`). The demo workspace has no YouTube channel, so the Made With AI post went to Instagram (also a label field); the stand-in link ended `?ai=label`.
+- [x] `verify-change` (it must include `social-core`'s and `automation`'s dependants); update the Progress table and the Decision Log.
 
 ## Tests
 

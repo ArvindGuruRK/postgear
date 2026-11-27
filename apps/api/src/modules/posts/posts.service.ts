@@ -141,6 +141,8 @@ export interface PostDetail {
   tags: TagView[];
   /** Days between repeats; null when the post does not repeat (2026-10-19). */
   intervalInDays: number | null;
+  /** Sprint 13 Module 13: marked Made With AI (sent to the platforms with a label for it). */
+  madeWithAi: boolean;
 }
 
 export interface PostSummary {
@@ -153,6 +155,7 @@ export interface PostSummary {
   /** Live tags, in order; the calendar card takes the first one's colour. */
   tags: TagView[];
   intervalInDays: number | null;
+  madeWithAi: boolean;
   channels: Pick<
     PostChannelView,
     | 'channelId'
@@ -576,6 +579,7 @@ export class PostsService {
     state: 'DRAFT' | 'QUEUE';
     publishDate: Date;
     intervalInDays: number | null;
+    madeWithAi: boolean;
     tagIds: string[];
     channels: {
       integrationId: string;
@@ -654,6 +658,7 @@ export class PostsService {
       state: input.state,
       publishDate,
       intervalInDays: input.intervalInDays ?? null,
+      madeWithAi: input.madeWithAi === true,
       tagIds,
       publishNow,
       channels: targets.map((target) => ({
@@ -782,6 +787,7 @@ export class PostsService {
       channels,
       tags: tagsOf(rows),
       intervalInDays: rows[0].intervalInDays,
+      madeWithAi: rows[0].madeWithAi,
     };
   }
 
@@ -802,6 +808,7 @@ export class PostsService {
       parts: Math.max(...chains.map((entry) => entry.chain.length)),
       tags: tagsOf(rows),
       intervalInDays: rows[0].intervalInDays,
+      madeWithAi: rows[0].madeWithAi,
       channels: chains.map(({ integration, chain }) => ({
         channelId: integration.id,
         name: integration.name,

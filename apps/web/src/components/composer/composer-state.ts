@@ -95,6 +95,8 @@ export interface ComposerState {
   tags: Tag[];
   /** Days between repeats; null when the post publishes once. */
   intervalInDays: RepeatInterval | null;
+  /** Sprint 13 Module 13: the post is marked Made With AI. */
+  madeWithAi: boolean;
   /**
    * Each channel's platform options, by channel id: only the fields someone
    * set. See "Tags, repeat and platform settings" above.
@@ -119,7 +121,13 @@ export type ComposerAction =
   | { type: 'customize'; channelId: string }
   | { type: 'useShared'; channelId: string }
   | { type: 'setPublishAt'; value: string }
-  | { type: 'saved'; post: PostDetail; revision: number }
+  | {
+      type: 'saved';
+      post: PostDetail;
+      revision: number;
+      /** Module 13: the time the save actually used, when Next Available's slot moved. */
+      publishAt?: string;
+    }
   /**
    * Adds text to a part whose editor is not on screen, where there is no
    * cursor: it fills an empty part and is added as new paragraphs after
@@ -136,6 +144,7 @@ export type ComposerAction =
   | { type: 'tagChanged'; tag: Tag }
   | { type: 'tagDeleted'; tagId: string }
   | { type: 'setRepeat'; value: RepeatInterval | null }
+  | { type: 'setMadeWithAi'; value: boolean }
   /** `undefined` clears the field, so its default applies again. */
   | { type: 'setSetting'; channelId: string; key: string; value: unknown };
 
@@ -273,6 +282,7 @@ export function initialComposerState(options: {
       disconnected: [],
       tags: [],
       intervalInDays: null,
+      madeWithAi: false,
       settings: {},
       published: [],
     };
@@ -303,6 +313,7 @@ export function initialComposerState(options: {
     // Defaulted: a post read from an API older than these fields has none.
     tags: post.tags ?? [],
     intervalInDays: post.intervalInDays ?? null,
+    madeWithAi: post.madeWithAi === true,
     settings: Object.fromEntries(
       live
         .filter((channel) => channel.settings && Object.keys(channel.settings).length > 0)
@@ -480,6 +491,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
         updatedAt: action.post.updatedAt,
         savedState: action.post.state,
         savedRevision: action.revision,
+        ...(action.publishAt ? { publishAt: action.publishAt } : {}),
         disconnected: [],
         published: publishedLinks(action.post.channels),
         shared: state.shared.map((part) => ({ ...part, removedMedia: 0 })),
@@ -530,6 +542,11 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
       return state.tags.some((tag) => tag.id === action.tagId)
         ? { ...state, tags: state.tags.filter((tag) => tag.id !== action.tagId) }
         : state;
+
+    case 'setMadeWithAi':
+      return action.value === state.madeWithAi
+        ? state
+        : touch({ ...state, madeWithAi: action.value });
 
     case 'setRepeat':
       return action.value === state.intervalInDays
@@ -598,6 +615,8 @@ export interface SavePayload {
   tags?: string[];
   /** Null for none. */
   intervalInDays?: RepeatInterval | null;
+  /** Sprint 13 Module 13. */
+  madeWithAi?: boolean;
   /** "Post now" (after Postiz): queued for this moment and published at once. */
   publishNow?: true;
   expectedUpdatedAt?: string;
@@ -626,6 +645,7 @@ export function toSavePayload(
     }),
     tags: state.tags.map((tag) => tag.id),
     intervalInDays: state.intervalInDays,
+    madeWithAi: state.madeWithAi,
     // Only with QUEUE, as the API requires: a draft is never published.
     ...(options.publishNow && target === 'QUEUE' ? { publishNow: true as const } : {}),
     ...(state.updatedAt ? { expectedUpdatedAt: state.updatedAt } : {}),

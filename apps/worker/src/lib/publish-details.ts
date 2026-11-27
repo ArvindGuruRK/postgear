@@ -17,6 +17,8 @@ export interface ChainRow {
   content: string;
   image: string | null;
   settings: string | null;
+  /** Sprint 13 Module 13: the post is marked Made With AI (the same on every row of a group). */
+  madeWithAi?: boolean;
 }
 
 /** The columns of a `Media` row this module reads. */
@@ -165,6 +167,7 @@ export function buildPostDetails(
       return media ? [toMediaDescriptor(media, publicUrl)] : [];
     }),
     settings: parseProviderSettings(row.settings),
+    ...(row.madeWithAi === true ? { madeWithAi: true } : {}),
   }));
 }
 

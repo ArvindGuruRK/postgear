@@ -81,6 +81,7 @@ const TOTAL_VALUE_BACKFILL_DAYS = 3;
  * - **Up to twenty items**, images and video mixed freely.
  */
 export const THREADS_RULES: ProviderRules = {
+  aiLabel: 'none',
   maxLength: MAX_LENGTH,
   lengthMethod: 'threads',
   thread: 'replies',

@@ -137,6 +137,7 @@ export function toCreatePostInput(input: CreatePublicPostInput, now: Date): Crea
       },
     ],
     channels: input.channelIds.map((channelId) => ({ channelId, customized: false })),
+    ...(input.madeWithAi === true ? { madeWithAi: true } : {}),
   };
 }
 
@@ -151,6 +152,7 @@ export function toPublicPostSummary(summary: PostSummary): PublicPostSummary {
     publishAt: summary.publishDate.toISOString(),
     updatedAt: summary.updatedAt.toISOString(),
     preview: summary.preview,
+    madeWithAi: summary.madeWithAi,
     channels: summary.channels.map(toPublicChannel),
   };
 }
@@ -167,6 +169,7 @@ export function toPublicPost(detail: PostDetail): PublicPost {
     publishAt: detail.publishDate.toISOString(),
     updatedAt: detail.updatedAt.toISOString(),
     preview: truncate(parts[0]?.text ?? '', PREVIEW_LENGTH),
+    madeWithAi: detail.madeWithAi,
     channels: detail.channels.map(toPublicChannel),
     parts,
   };

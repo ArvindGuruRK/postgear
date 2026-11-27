@@ -27,6 +27,7 @@ import {
   Text,
 } from '@postgear/ui';
 import { useEffect, useMemo, useState } from 'react';
+import { slotTimesOn } from '@/components/channels/posting-slots-model';
 import { toLocalInputValue } from '@/components/composer/composer-state';
 import type { Channel } from '@/types/channel';
 import type { PostSummary } from '@/types/post';
@@ -78,7 +79,8 @@ export function RescheduleDialog({
     const minutes = new Set(
       channels
         .filter((channel) => ids.has(channel.id))
-        .flatMap((channel) => channel.postingTimes.map((slot) => slot.time)),
+        // Module 13: only the slots that run on the chosen day's weekday.
+        .flatMap((channel) => slotTimesOn(channel.postingTimes, chosen)),
     );
 
     return [...minutes]

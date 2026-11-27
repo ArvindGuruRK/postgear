@@ -184,6 +184,11 @@ export interface PostDetails {
   media?: MediaDescriptor[];
   /** Provider-specific options, validated by the provider itself. */
   settings?: Record<string, unknown>;
+  /**
+   * Sprint 13 Module 13: the post is marked Made With AI. A provider whose
+   * rules say `aiLabel: 'field'` sends its platform's label; the rest ignore it.
+   */
+  madeWithAi?: boolean;
 }
 
 export interface PostResponse {

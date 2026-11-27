@@ -467,6 +467,7 @@ type ChainRowRecord = {
   content: string;
   image: string | null;
   settings: string | null;
+  madeWithAi: boolean;
   state: State;
   releaseId: string | null;
   releaseURL: string | null;
@@ -494,6 +495,7 @@ const ROW_SELECT = {
   content: true,
   image: true,
   settings: true,
+  madeWithAi: true,
   state: true,
   releaseId: true,
   releaseURL: true,

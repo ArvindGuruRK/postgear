@@ -15,7 +15,7 @@ describe('toPublicChannel', () => {
       refreshNeeded: false,
       inBetweenSteps: false,
       tokenExpiration: new Date(),
-      postingTimes: [{ time: 120 }],
+      postingTimes: [{ time: 120, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
       additionalSettings: {},
       createdAt: new Date(),
       health: 'connected',

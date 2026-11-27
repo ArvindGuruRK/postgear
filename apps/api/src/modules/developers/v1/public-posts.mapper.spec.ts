@@ -171,6 +171,7 @@ describe('view mappers', () => {
       // the exact match below shows they stay out of the public shape.
       tags: [{ id: 'tag-1', name: 'Launch', color: 'teal' }],
       intervalInDays: 7,
+      madeWithAi: false,
     };
 
     expect(toPublicPostSummary(summary)).toEqual({
@@ -179,6 +180,7 @@ describe('view mappers', () => {
       publishAt: '2026-10-15T09:30:00.000Z',
       updatedAt: '2026-10-15T09:31:00.000Z',
       preview: 'Yesterday: the first post',
+      madeWithAi: false,
       channels: [
         {
           channelId: 'ch_li',
@@ -228,6 +230,7 @@ describe('view mappers', () => {
       ],
       tags: [],
       intervalInDays: null,
+      madeWithAi: false,
     };
 
     const post = toPublicPost(detail);
@@ -266,6 +269,7 @@ describe('view mappers', () => {
       channels: [],
       tags: [],
       intervalInDays: null,
+      madeWithAi: false,
     };
 
     const { preview } = toPublicPost(detail);

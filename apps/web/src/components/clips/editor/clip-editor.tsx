@@ -2213,6 +2213,7 @@ export function ClipEditor({
             title,
             durationMs: outputDuration(document),
             exportedMediaId: lastExport.media.id,
+            usesAiVoice: initial.clip.usesAiVoice === true,
           }}
           outdated={changedSince(document, lastExport.fingerprint)}
           exportRun={sendExportRun}

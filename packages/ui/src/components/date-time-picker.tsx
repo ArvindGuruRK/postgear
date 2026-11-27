@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react';
 import { cn } from '../lib/utils';
 import { Calendar, CalendarFooter, CalendarTrigger, calendarPopoverClasses } from './calendar';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs';
 import { TimeColumns, useTwelveHourClock } from './time-picker';
 
 /**
@@ -18,6 +19,9 @@ import { TimeColumns, useTwelveHourClock } from './time-picker';
  * - Everything is local time. Callers convert at their own edges.
  * - Below the `sm` breakpoint the time columns sit under the calendar, so the
  *   popover fits a phone.
+ * - With `randomTime` (Sprint 13 Module 13), the time side gains two tabs,
+ *   Choose A Time (the columns) and Pick A Random Time (the caller's panel,
+ *   given the chosen day and a way to set the value).
  */
 export interface DateTimePickerProps {
   value: Date | null;
@@ -38,6 +42,11 @@ export interface DateTimePickerProps {
   footnote?: ReactNode;
   /** Draws the trigger as an invalid field (a red border), e.g. a past time. */
   invalid?: boolean;
+  /**
+   * The Pick A Random Time panel (Sprint 13 Module 13): drawn under its own
+   * tab beside Choose A Time, with the chosen day and a setter.
+   */
+  randomTime?: (props: { day: Date; onPick: (value: Date) => void }) => ReactNode;
 }
 
 function startOfDay(date: Date): Date {
@@ -73,8 +82,10 @@ export function DateTimePicker({
   id,
   footnote,
   invalid = false,
+  randomTime,
 }: DateTimePickerProps) {
   const [open, setOpen] = useState(false);
+  const [timeTab, setTimeTab] = useState<'choose' | 'random'>('choose');
   const twelveHour = useTwelveHourClock();
   const [month, setMonth] = useState<Date>(() => value ?? new Date());
 
@@ -158,20 +169,45 @@ export function DateTimePicker({
               fill it absolutely so their long lists cannot set it instead.
               Width: three 48px keys plus scrollbars and gaps, or two. On a
               phone they sit under the calendar at a fixed height. */}
-          <div
-            className={cn(
-              'relative h-44 shrink-0 border-t-2 border-outline sm:h-auto sm:border-t-0 sm:border-s-2',
-              twelveHour ? 'sm:w-56' : 'sm:w-40',
-            )}
-          >
-            <TimeColumns
-              hours={current.getHours()}
-              minutes={current.getMinutes()}
-              twelveHour={twelveHour}
-              onChange={setTime}
-              open={open}
-            />
-          </div>
+          {randomTime ? (
+            <Tabs
+              value={timeTab}
+              onValueChange={(next) => setTimeTab(next === 'random' ? 'random' : 'choose')}
+              className="flex shrink-0 flex-col border-t-2 border-outline sm:w-[23rem] sm:border-t-0 sm:border-s-2"
+            >
+              <TabsList className="m-2 grid grid-cols-2">
+                <TabsTrigger value="choose">Choose A Time</TabsTrigger>
+                <TabsTrigger value="random">Pick A Random Time</TabsTrigger>
+              </TabsList>
+              <TabsContent value="choose" className="relative mt-0 h-44 sm:h-auto sm:flex-1">
+                <TimeColumns
+                  hours={current.getHours()}
+                  minutes={current.getMinutes()}
+                  twelveHour={twelveHour}
+                  onChange={setTime}
+                  open={open}
+                />
+              </TabsContent>
+              <TabsContent value="random" className="mt-0 px-3 pb-3">
+                {randomTime({ day: current, onPick: onValueChange })}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div
+              className={cn(
+                'relative h-44 shrink-0 border-t-2 border-outline sm:h-auto sm:border-t-0 sm:border-s-2',
+                twelveHour ? 'sm:w-56' : 'sm:w-40',
+              )}
+            >
+              <TimeColumns
+                hours={current.getHours()}
+                minutes={current.getMinutes()}
+                twelveHour={twelveHour}
+                onChange={setTime}
+                open={open}
+              />
+            </div>
+          )}
         </div>
         <CalendarFooter
           onToday={() => {

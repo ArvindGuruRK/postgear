@@ -15,6 +15,7 @@
  * - Nothing here logs or returns a connection's credentials except
  *   `loadConnection`, which the engine uses for one step and never stores.
  */
+import type { PostingSlot } from '@postgear/automation';
 import type {
   AutomationConnectionStatus,
   AutomationRunMode,
@@ -62,8 +63,11 @@ export interface ChannelRecord {
   name: string;
   /** `providerIdentifier`: 'instagram', 'linkedin-page', ... */
   provider: string;
-  /** Minutes since local midnight (`Integration.postingTimes`), parsed; [] when unreadable. */
-  postingTimes: number[];
+  /**
+   * The channel's posting slots (`Integration.postingTimes`; Module 13: a
+   * bare minute still means every day with no window); [] when unreadable.
+   */
+  postingTimes: (number | PostingSlot)[];
   disabled: boolean;
 }
 

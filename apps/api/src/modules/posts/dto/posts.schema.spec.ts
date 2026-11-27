@@ -305,3 +305,15 @@ describe('createPostSchema', () => {
     ).toBe(false);
   });
 });
+
+describe('madeWithAi (Sprint 13 Module 13)', () => {
+  it('is optional, a boolean, on create and update', () => {
+    expect(createPostSchema.safeParse(body({ madeWithAi: true })).success).toBe(true);
+    expect(createPostSchema.safeParse(body({ madeWithAi: 'yes' })).success).toBe(false);
+    expect(
+      updatePostSchema.safeParse(
+        body({ madeWithAi: false, expectedUpdatedAt: '2026-11-20T10:00:00.000Z' }),
+      ).success,
+    ).toBe(true);
+  });
+});

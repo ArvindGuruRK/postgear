@@ -62,6 +62,8 @@ const MAX_TITLE_LENGTH = 100;
  * The title is the first line of the post unless one is set explicitly.
  */
 export const YOUTUBE_RULES: ProviderRules = {
+  // Sprint 13 Module 13: `status.containsSyntheticMedia` on the upload.
+  aiLabel: 'field',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'none',
@@ -317,6 +319,8 @@ export class YouTubeProvider
       status: {
         privacyStatus: String(post.settings?.privacyStatus ?? 'public'),
         selfDeclaredMadeForKids: this.asBoolean(post.settings?.madeForKids),
+        // Sprint 13 Module 13: YouTube's altered or synthetic content label.
+        ...(post.madeWithAi === true ? { containsSyntheticMedia: true } : {}),
       },
     };
 

@@ -90,6 +90,7 @@ const IMAGE_PROCESSING_DELAY_MS = 10_000;
  * publish time. Later parts are comments, which carry text only.
  */
 export const LINKEDIN_RULES: ProviderRules = {
+  aiLabel: 'none',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'comments',

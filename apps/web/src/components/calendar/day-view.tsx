@@ -14,6 +14,7 @@
 import { cn } from '@postgear/ui';
 import { CalendarClock } from 'lucide-react';
 import { ChannelMark } from '@/components/channels/channel-mark';
+import { slotTimesOn } from '@/components/channels/posting-slots-model';
 import type { Channel } from '@/types/channel';
 import type { PostSummary } from '@/types/post';
 import type { CalendarHandlers } from './calendar-handlers';
@@ -48,7 +49,8 @@ export function DayView({
     .sort((a, b) => new Date(a.publishDate).getTime() - new Date(b.publishDate).getTime());
   const rows = dayRows(
     dayPosts,
-    channels.flatMap((channel) => channel.postingTimes.map((slot) => slot.time)),
+    // Module 13: only the slots that run on this weekday.
+    channels.flatMap((channel) => slotTimesOn(channel.postingTimes, day)),
   );
 
   return (
@@ -78,7 +80,7 @@ export function DayView({
                 (post) => minuteOfDay(new Date(post.publishDate)) === minutes,
               );
               const rowChannels = channels.filter((channel) =>
-                channel.postingTimes.some((slot) => slot.time === minutes),
+                slotTimesOn(channel.postingTimes, day).includes(minutes),
               );
               const label = minuteLabel(minutes);
 

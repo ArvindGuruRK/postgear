@@ -32,6 +32,8 @@ export interface PublicPostSummary {
   updatedAt: string;
   /** The first 160 characters of the first part. */
   preview: string;
+  /** Sprint 13 Module 13: marked Made With AI. */
+  madeWithAi: boolean;
   channels: PublicPostChannel[];
 }
 

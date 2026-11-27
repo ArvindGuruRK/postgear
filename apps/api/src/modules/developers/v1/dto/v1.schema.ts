@@ -58,6 +58,12 @@ export const createPublicPostSchema = z
       .max(MAX_MEDIA_PER_PART)
       .optional()
       .describe('Media library ids to attach to the post.'),
+    madeWithAi: z
+      .boolean()
+      .optional()
+      .describe(
+        'Marks the post as made with AI (a made-up voice or picture). Sent to the platforms that have a label for it: YouTube, Instagram and Facebook Reels. Defaults to false.',
+      ),
   })
   .strict();
 

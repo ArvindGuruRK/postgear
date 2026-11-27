@@ -58,6 +58,8 @@ const MAX_CAROUSEL_ITEMS = 10;
  * carry text only.
  */
 export const INSTAGRAM_RULES: ProviderRules = {
+  // Sprint 13 Module 13: `is_ai_generated` on the media container.
+  aiLabel: 'field',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'comments',
@@ -311,6 +313,8 @@ export class InstagramProvider
       caption: post.message,
       access_token: accessToken,
     };
+    // Sprint 13 Module 13: Instagram's AI label on the container.
+    if (post.madeWithAi === true) body.is_ai_generated = true;
 
     if (item.type === 'video') {
       body.media_type = 'REELS';
@@ -384,6 +388,7 @@ export class InstagramProvider
           children,
           caption: post.message,
           access_token: accessToken,
+          ...(post.madeWithAi === true ? { is_ai_generated: true } : {}),
         }),
       },
     );

@@ -10,8 +10,15 @@
  * Pure (no clock, no `Date` built from nothing): the caller passes `from`
  * and the queued times, so the API and the tests get the same answer.
  */
-import { civilFromDays, daysFromCivil, MS_PER_MINUTE } from '../time/calendar';
+import { civilFromDays, daysFromCivil, MS_PER_MINUTE, weekdayOfDays } from '../time/calendar';
 import { zonedTime, zonedToEpoch } from '../time/zone';
+import { jitteredTime } from './jitter';
+import {
+  DEFAULT_POSTING_SLOTS,
+  isoWeekdayOf,
+  type PostingSlot,
+  readPostingSlots,
+} from './posting-slots';
 
 /**
  * What a channel with no posting times falls back to: the same three times
@@ -32,8 +39,12 @@ export const SLOT_SEARCH_DAYS = 366;
 const MINUTES_PER_DAY = 24 * 60;
 
 export interface NextFreeSlotInput {
-  /** Minutes since local midnight, 0 to 1439; anything else is ignored. */
-  postingTimes: readonly number[];
+  /**
+   * The channel's posting slots (Module 13), or bare minutes since local
+   * midnight (a slot on every day with no window); anything unreadable is
+   * ignored.
+   */
+  postingTimes: readonly (number | PostingSlot)[];
   /** When posts are already queued on the channel (or channels). */
   taken: readonly (Date | number)[];
   /** Usually now. */
@@ -46,46 +57,76 @@ function epochOf(value: Date | number): number {
   return typeof value === 'number' ? value : value.getTime();
 }
 
-function cleanTimes(times: readonly number[]): number[] {
-  const valid = times.filter(
-    (time) => Number.isInteger(time) && time >= 0 && time < MINUTES_PER_DAY,
-  );
-  const list = valid.length > 0 ? valid : [...DEFAULT_POSTING_TIMES];
-  return [...new Set(list)].sort((a, b) => a - b);
+function cleanSlots(times: readonly (number | PostingSlot)[]): PostingSlot[] {
+  const slots = readPostingSlots(times);
+  return slots.length > 0 ? slots : DEFAULT_POSTING_SLOTS.map((slot) => ({ ...slot }));
+}
+
+export interface FreeSlot {
+  /** The slot's own time (epoch ms). */
+  slot: number;
+  windowMinutes: number;
 }
 
 /**
- * The first posting time later than `from` plus five minutes with no queued
- * post within a minute of it, as epoch milliseconds; `null` when none is free
- * within a year. An empty (or unreadable) list uses `DEFAULT_POSTING_TIMES`.
+ * The first slot later than `from` plus five minutes, on a weekday it runs
+ * on, with no queued post inside its window (or within a minute of it when
+ * it has none); `null` when none is free within a year. An empty (or
+ * unreadable) list uses the default slots.
  *
  * A time the clocks skip (01:30 when they go forward at 01:00) moves forward
  * by the gap; a time that happens twice (when they go back) is the first.
  */
-export function nextFreeSlot(input: NextFreeSlotInput): number | null {
+export function findFreeSlot(input: NextFreeSlotInput): FreeSlot | null {
   const earliest = epochOf(input.from) + SLOT_LEAD_MS;
   const taken = input.taken.map(epochOf).filter((time) => Number.isFinite(time));
-  const times = cleanTimes(input.postingTimes);
+  const slots = cleanSlots(input.postingTimes);
 
   // Start a day early: a zone far behind UTC can still be on the day before.
   const startDay = daysFromCivil(zonedTime(earliest, input.timeZone)) - 1;
 
   for (let offset = 0; offset <= SLOT_SEARCH_DAYS + 1; offset += 1) {
-    const date = civilFromDays(startDay + offset);
-    const candidates = times
-      .map((minutes) =>
-        zonedToEpoch(
-          { ...date, hour: Math.floor(minutes / 60), minute: minutes % 60, second: 0 },
+    const days = startDay + offset;
+    const date = civilFromDays(days);
+    const weekday = isoWeekdayOf(weekdayOfDays(days));
+    const candidates = slots
+      .filter((slot) => slot.days.includes(weekday))
+      .map((slot) => ({
+        slot: zonedToEpoch(
+          { ...date, hour: Math.floor(slot.time / 60), minute: slot.time % 60, second: 0 },
           input.timeZone,
         ),
-      )
-      .sort((a, b) => a - b);
+        windowMinutes: slot.windowMinutes,
+      }))
+      .sort((a, b) => a.slot - b.slot);
 
-    for (const slot of candidates) {
-      if (slot <= earliest) continue;
-      if (taken.some((time) => Math.abs(time - slot) <= SLOT_CLASH_MS)) continue;
-      return slot;
+    for (const candidate of candidates) {
+      if (candidate.slot <= earliest) continue;
+      const reach = candidate.windowMinutes * MS_PER_MINUTE + SLOT_CLASH_MS;
+      if (taken.some((time) => Math.abs(time - candidate.slot) <= reach)) continue;
+      return candidate;
     }
   }
   return null;
+}
+
+/** The first free slot's own time, as epoch milliseconds (see `findFreeSlot`). */
+export function nextFreeSlot(input: NextFreeSlotInput): number | null {
+  return findFreeSlot(input)?.slot ?? null;
+}
+
+/**
+ * Module 13: where a post placed in the next free slot goes out, as epoch
+ * ms: the slot's time moved to a natural minute inside its window
+ * (`jitteredTime`), never before `from` plus the lead time and never on
+ * another queued post's minute. `seed` is the post's id, or a fresh value
+ * for a post not saved yet.
+ */
+export function placeInFreeSlot(input: NextFreeSlotInput & { seed: string }): number | null {
+  const found = findFreeSlot(input);
+  if (!found) return null;
+  return jitteredTime(found.slot, found.windowMinutes, input.seed, {
+    taken: input.taken.map(epochOf),
+    notBefore: epochOf(input.from) + SLOT_LEAD_MS,
+  });
 }

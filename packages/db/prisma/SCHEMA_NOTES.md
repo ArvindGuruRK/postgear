@@ -904,3 +904,9 @@ A clip stitched from 2 to 15 other clips (Create Montage). Additive: one enum va
 - **`videoId` is the first clip's video; `meta.videoIds` lists every OTHER video it plays** (each once, UUIDs only; a brand kit's intro or outro video is not listed, as for any branded clip). `apps/api/src/modules/clips/montages/montage-videos.ts` reads it and never trusts it.
 - **A montage is a clip of every video it plays** (Sprint 12 Module 19's removal rules): removing any of them deletes it when it was never exported, or marks it `removedAt` when it was (its `Media` file stays). The lookup is a JSON path filter (`meta -> videoIds @> [id]`), fine at the few montages a workspace holds; add an index only if it ever shows in a slow query.
 - **A snapshot**: the document is copied from the clips when it is made; later edits to them change nothing. It fetches no sharp range of its own: its parts read the ones its clips already hold.
+
+### Posting slots and `Post.madeWithAi` (Module 13, `20261128120000_sprint13_posting_slots_and_made_with_ai`)
+
+- **`Integration.postingTimes` stays one JSON list stored as text**; each entry gained `windowMinutes` (0, 5, 15 or 30) and `days` (ISO weekdays, 1 Monday to 7 Sunday). No new table: about thirty readers already parse the list, and a slots table would add a join to each. The migration sets the new default and gives every existing entry a window of 0 and all seven days in one idempotent loop (an entry that already has a key keeps it; a row that is not a JSON list is left for the reader). `readPostingSlots` in `@postgear/automation` fills the same defaults for anything older it meets, so a bare `{ "time": 120 }` still means every day, exact.
+- **`Post.madeWithAi`** (Boolean, default false), written on every row of a group like `intervalInDays`. Providers with a label field send it (`ProviderRules.aiLabel`); the rest ignore it.
+

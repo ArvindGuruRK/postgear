@@ -230,6 +230,12 @@ const postBodyShape = {
    * "Post now"). Only with `QUEUE`: a draft is not published by anyone.
    */
   publishNow: z.boolean().optional(),
+  /**
+   * Sprint 13 Module 13: the post is marked Made With AI; the platforms with
+   * a label for it (YouTube, Instagram, Facebook Reels) get it. Absent is
+   * false, on an update too.
+   */
+  madeWithAi: z.boolean().optional(),
 };
 
 const publishNowNeedsQueue = (body: { state: 'DRAFT' | 'QUEUE'; publishNow?: boolean }) =>

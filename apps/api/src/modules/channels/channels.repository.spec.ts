@@ -503,7 +503,11 @@ describe('ChannelsRepository', () => {
       // what an unguarded JSON.parse in a controller does.
       const [channel] = await repository.listForOrg('org_1');
 
-      expect(channel.postingTimes).toEqual([{ time: 120 }, { time: 400 }, { time: 700 }]);
+      expect(channel.postingTimes).toEqual([
+        { time: 120, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+        { time: 400, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+        { time: 700, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+      ]);
       expect(channel.additionalSettings).toEqual({});
     });
 
@@ -514,7 +518,11 @@ describe('ChannelsRepository', () => {
 
       const [channel] = await repository.listForOrg('org_1');
 
-      expect(channel.postingTimes).toEqual([{ time: 540 }, { time: 1080 }]);
+      // Module 13: legacy entries read as every day with no window.
+      expect(channel.postingTimes).toEqual([
+        { time: 540, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+        { time: 1080, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] },
+      ]);
     });
 
     it('serializes posting times on write', async () => {
@@ -524,11 +532,11 @@ describe('ChannelsRepository', () => {
       await repository.updateSettings({
         orgId: 'org_1',
         id: 'ch_1',
-        postingTimes: [{ time: 540 }],
+        postingTimes: [{ time: 540, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
       });
 
       const { data } = prismaMock.integration.updateMany.mock.calls[0][0];
-      expect(data.postingTimes).toBe('[{"time":540}]');
+      expect(data.postingTimes).toBe('[{"time":540,"windowMinutes":0,"days":[1,2,3,4,5,6,7]}]');
     });
   });
 

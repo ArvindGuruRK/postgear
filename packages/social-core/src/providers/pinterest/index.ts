@@ -65,6 +65,8 @@ const MAX_TITLE_LENGTH = 100;
  * characters rather than failing, and the preview shows the cut.
  */
 export const PINTEREST_RULES: ProviderRules = {
+  // Sprint 13 Module 13: Pinterest's AI field is reported, not confirmed on its developer page.
+  aiLabel: 'none',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'none',

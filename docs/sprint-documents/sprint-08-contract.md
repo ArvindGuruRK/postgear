@@ -245,7 +245,7 @@ Auth on `/v1`: `Authorization: Bearer pg_…` (also `X-API-Key: pg_…`). `@ApiK
 | `GET /v1/channels` | `{ channels: [{ id, provider, providerName, name, profile, picture, health, disabled }] }` |
 | `GET /v1/posts?state=&page=` | `{ posts: PublicPostSummary[], page, pageCount, total }` (the queue, 20 per page) |
 | `GET /v1/posts/:id` | `{ post: PublicPost }` (`id` is the group) |
-| `POST /v1/posts` | `{ text: 1..70000, channelIds: 1..20 ids, publishAt?: iso, state?: 'draft'\|'queue' (default queue), mediaIds?: uuid[] }` → 201 `{ post }`; text becomes a document (blank line = paragraph, newline = hard break); queued posts must be in the future and pass every platform rule (422 with the rule's message) |
+| `POST /v1/posts` | `{ text: 1..70000, channelIds: 1..20 ids, publishAt?: iso, state?: 'draft'\|'queue' (default queue), mediaIds?: uuid[], madeWithAi?: boolean }` → 201 `{ post }`; text becomes a document (blank line = paragraph, newline = hard break); queued posts must be in the future and pass every platform rule (422 with the rule's message) |
 | `DELETE /v1/posts/:id` | `{ deleted: true }` |
 | `GET /v1/analytics/overview?range=7\|30\|90` | the same overview `GET /analytics/overview` returns |
 
@@ -321,3 +321,6 @@ Where it fires: the worker's `writePublished` / `markPublishFailed` create `Webh
 ## 8. Build order
 
 schema + plans + env + skeleton modules (coordinator) → billing ‖ notifications ‖ developers (three agents against this contract) → outbound webhooks → Swagger → throttling + Sentry + health → security pass → SDK → run the stack and exercise every DoD item → checklist.
+
+*Sprint 13 Module 13 (2026-11-28):* `POST /v1/posts` takes `madeWithAi?: boolean` (default false) and every post in a response carries `madeWithAi`. The platforms with a label for AI (YouTube `status.containsSyntheticMedia`, Instagram `is_ai_generated`, Facebook Reels `is_ai_generated`) receive it; the rest ignore it. `GET /v1/channels` still carries no posting times or slots (they stay out of the public channel on purpose).
+

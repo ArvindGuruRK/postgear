@@ -178,15 +178,49 @@ export {
 } from './plan/plan-next';
 // Connecting steps
 export { CONNECT_REASONS, type ConnectCheck, canConnect, type ProposedEdge } from './ports';
+// Posting slots, jitter, Shuffle Times and Pick A Random Time (Sprint 13, Module 13)
+export { hashSeed, jitteredTime, onFiveMinuteMark } from './queue/jitter';
 // Add To Queue's next free posting time (Module 10)
 export {
   DEFAULT_POSTING_TIMES,
+  type FreeSlot,
+  findFreeSlot,
   type NextFreeSlotInput,
   nextFreeSlot,
+  placeInFreeSlot,
   SLOT_CLASH_MS,
   SLOT_LEAD_MS,
   SLOT_SEARCH_DAYS,
 } from './queue/next-free-slot';
+export {
+  DEFAULT_POSTING_SLOTS,
+  ISO_WEEKDAYS,
+  isoWeekdayOf,
+  isPostingWindow,
+  MAX_POSTING_SLOTS,
+  POSTING_WINDOWS,
+  type PostingSlot,
+  type PostingWindow,
+  postingTimesOf,
+  readPostingSlots,
+} from './queue/posting-slots';
+export {
+  DAY_PART_RANGES,
+  DAY_PARTS,
+  type DayPart,
+  type RandomTimeInput,
+  randomTimeOfDay,
+} from './queue/random-time';
+export {
+  EXTRA_DAY_ORDER,
+  MAX_POSTS_PER_WEEK,
+  MIN_POSTS_PER_WEEK,
+  postsPerWeek,
+  SUGGEST_DAY_END,
+  SUGGEST_DAY_START,
+  SUGGESTED_WINDOW,
+  suggestSlots,
+} from './queue/suggest-slots';
 // Secrets: hiding them in run data, refusing them in a saved graph
 export {
   isSecretKey,

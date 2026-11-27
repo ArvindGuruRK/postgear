@@ -59,7 +59,7 @@ function channel(overrides: Partial<ChannelView>): ChannelView {
     refreshNeeded: false,
     inBetweenSteps: false,
     tokenExpiration: null,
-    postingTimes: [{ time: 9 * 60 }],
+    postingTimes: [{ time: 9 * 60, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
     additionalSettings: {},
     createdAt: new Date(),
     health: 'connected',
@@ -76,7 +76,7 @@ const CHANNELS: ChannelView[] = [
     providerIdentifier: 'linkedin',
     name: 'Acme Marketing',
     providerName: 'LinkedIn',
-    postingTimes: [{ time: 10 * 60 }],
+    postingTimes: [{ time: 10 * 60, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
   }),
   channel({
     id: 'ch_lp',
@@ -131,6 +131,7 @@ class MemoryPosts {
           releaseURL: null,
           error: null,
           intervalInDays: null,
+          madeWithAi: false,
           createdAt: new Date(),
           updatedAt: new Date(),
           tags:

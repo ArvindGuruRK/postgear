@@ -35,6 +35,21 @@ describe('SimulatedProvider', () => {
     expect(result.releaseURL).toContain('/linkedin/acct/');
   });
 
+  it('records the AI label only where the real provider has one (Module 13)', async () => {
+    const youtube = new SimulatedProvider('youtube', {
+      name: 'YouTube',
+      rules: { aiLabel: 'field' },
+    } as never);
+    const labelled = [{ id: 'row-1', message: 'Hi', media: [], madeWithAi: true }];
+    const [withLabel] = await youtube.post(channel, 't', labelled);
+    expect(withLabel.releaseURL).toMatch(/\?ai=label$/);
+    const [plain] = await youtube.post(channel, 't', post('Hi'));
+    expect(plain.releaseURL).not.toContain('ai=label');
+    const x = new SimulatedProvider('x', { name: 'X', rules: { aiLabel: 'none' } } as never);
+    const [none] = await x.post(channel, 't', labelled);
+    expect(none.releaseURL).not.toContain('ai=label');
+  });
+
   it('throws the requested error class', async () => {
     await expect(provider.post(channel, 't', post('[simulate:429]'))).rejects.toBeInstanceOf(
       RetryableError,

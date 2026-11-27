@@ -30,9 +30,16 @@ export type ChannelHealth =
   | 'expiring'
   | 'disabled';
 
+/**
+ * A posting slot (Sprint 13 Module 13): the API's `PostingSlot` from
+ * `@postgear/automation`. `time` is minutes since midnight (540 is 09:00),
+ * `windowMinutes` how far either way the post may go out (0, 5, 15 or 30),
+ * `days` the ISO weekdays it runs on (1 Monday to 7 Sunday).
+ */
 export interface PostingTime {
-  /** Minutes since midnight. 540 is 09:00. */
   time: number;
+  windowMinutes: number;
+  days: number[];
 }
 
 export interface Channel {

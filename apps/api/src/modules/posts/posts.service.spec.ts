@@ -198,6 +198,7 @@ describe('PostsService', () => {
       releaseURL: null,
       error: null,
       intervalInDays: null,
+      madeWithAi: false,
       createdAt: new Date('2026-09-14T10:00:00Z'),
       updatedAt: new Date('2026-09-14T10:00:00Z'),
       tags: [],

@@ -82,6 +82,7 @@ const MB = 1024 * 1024;
  * because each part is a real post replying to the one before.
  */
 export const X_RULES: ProviderRules = {
+  aiLabel: 'none',
   maxLength: STANDARD_MAX_LENGTH,
   lengthMethod: 'x-weighted',
   thread: 'replies',

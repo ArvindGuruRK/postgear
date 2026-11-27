@@ -113,7 +113,9 @@ import type { MediaItem } from '@/types/media';
 import type { PostDetail, PostPart } from '@/types/post';
 import { ViewPublishedPost, viewPublishedLabel } from '../posts/view-published-post';
 import { buildReport, queueBlockers, renderDraftParts } from './channel-report';
+import { AiLabelControl, postHasVideo } from './composer-ai-label';
 import { ComposerChannels } from './composer-channels';
+import { fetchNextSlot, NextAvailableButton, type SlotPick, slotText } from './composer-next-slot';
 import { RepeatControl } from './composer-repeat';
 import { SettingsBar, type SettingsBlock } from './composer-settings';
 import {
@@ -136,6 +138,7 @@ import { DraftsButton, DraftsSheet } from './drafts-sheet';
 import { insertParagraphs } from './editor-inserts';
 import { MediaPickerDialog } from './media-picker-dialog';
 import { PreviewPanel } from './preview-panel';
+import { RandomTimePanel } from './random-time-panel';
 import { ThreadEditor } from './thread-editor';
 
 interface ComposerProps {
@@ -233,6 +236,8 @@ export function Composer({
 
   /** Which action is in flight: a draft, the main button, or Post now. */
   const [saving, setSaving] = useState<'DRAFT' | 'QUEUE' | 'NOW' | null>(null);
+  // Module 13: what Next Available last set, checked again on save.
+  const [slotPick, setSlotPick] = useState<SlotPick | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Settings problems found before a save, by channel id and field key. */
   const [settingsErrors, setSettingsErrors] = useState<Record<string, Record<string, string>>>({});
@@ -452,7 +457,12 @@ export function Composer({
       const wasQueued = state.savedState === 'QUEUE';
 
       try {
-        const payload = toSavePayload(state, target, { publishNow });
+        // Module 13: a Next Available time is asked for again, with the same
+        // seed: a different answer means the slot was taken meanwhile.
+        const moved = target === 'QUEUE' && !publishNow ? await recheckSlot(slotPick, state) : null;
+        const payload = toSavePayload(moved ? { ...state, publishAt: moved } : state, target, {
+          publishNow,
+        });
         const { post } = state.group
           ? await api<{ post: PostDetail }>(`/posts/${state.group}`, {
               method: 'PUT',
@@ -460,7 +470,14 @@ export function Composer({
             })
           : await api<{ post: PostDetail }>('/posts', { method: 'POST', body: payload });
 
-        dispatch({ type: 'saved', post, revision });
+        dispatch({ type: 'saved', post, revision, ...(moved ? { publishAt: moved } : {}) });
+        if (moved) {
+          setSlotPick(null);
+          toast({
+            title: 'That slot was just taken',
+            description: `We moved your post to ${slotText(new Date(moved))}.`,
+          });
+        }
         announcePostsChanged();
 
         if (publishNow) {
@@ -537,6 +554,7 @@ export function Composer({
       onCreated,
       close,
       showSettingsOf,
+      slotPick,
     ],
   );
 
@@ -975,6 +993,17 @@ export function Composer({
             onChange={(value) => dispatch({ type: 'setRepeat', value })}
             disabled={locked}
           />
+          {postHasVideo(state.shared, state.custom) || state.madeWithAi ? (
+            <AiLabelControl
+              value={state.madeWithAi}
+              onChange={(value) => dispatch({ type: 'setMadeWithAi', value })}
+              platforms={selectedChannels.map((channel) => ({
+                name: providersById.get(channel.providerIdentifier)?.name ?? channel.providerName,
+                aiLabel: providersById.get(channel.providerIdentifier)?.rules.aiLabel,
+              }))}
+              disabled={locked}
+            />
+          ) : null}
           {settingsBlocks.length > 0 ? (
             <SettingsBar
               title={scopeChannel ? `${scopeChannel.name} Settings` : 'Settings'}
@@ -1024,10 +1053,23 @@ export function Composer({
             </button>
           ) : null}
 
+          <NextAvailableButton
+            channels={selectedChannels}
+            disabled={locked}
+            onPick={(at, seed) => {
+              const value = toLocalInputValue(at);
+              dispatch({ type: 'setPublishAt', value });
+              setSlotPick({ seed, channelIds: [...state.selected], value });
+            }}
+            onError={(message) => toast({ variant: 'danger', title: message })}
+          />
+
           <PublishAt
             value={state.publishAt}
             onChange={(value) => dispatch({ type: 'setPublishAt', value })}
             disabled={locked}
+            channelId={state.selected[0] ?? null}
+            group={state.group}
           />
 
           {/* Nothing to save until there is somewhere to post it: the main
@@ -1190,10 +1232,15 @@ function PublishAt({
   value,
   onChange,
   disabled,
+  channelId,
+  group,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
+  /** Module 13: the first chosen channel, for Pick A Random Time's day list. */
+  channelId: string | null;
+  group: string | null;
 }) {
   return (
     <DateTimePicker
@@ -1205,6 +1252,9 @@ function PublishAt({
       side="top"
       align="end"
       footnote={`Your local time, ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
+      randomTime={({ day, onPick }) => (
+        <RandomTimePanel day={day} onPick={onPick} channelId={channelId} group={group} />
+      )}
     />
   );
 }
@@ -1243,4 +1293,26 @@ function Confirm({
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+/**
+ * Module 13: asks Next Available again with the same seed when the post's
+ * time is still the one it gave (a new post only: a saved one already holds
+ * its slot). Returns the new local time when the slot was taken meanwhile,
+ * else null. A failed check keeps the time the person saw.
+ */
+async function recheckSlot(
+  pick: SlotPick | null,
+  state: { group: string | null; publishAt: string; selected: string[] },
+): Promise<string | null> {
+  if (!pick || state.group || pick.value !== state.publishAt) return null;
+  if (pick.channelIds.join() !== state.selected.join()) return null;
+  try {
+    const answer = await fetchNextSlot(pick.channelIds, pick.seed);
+    if (!answer.at) return null;
+    const value = toLocalInputValue(new Date(answer.at));
+    return value === pick.value ? null : value;
+  } catch {
+    return null;
+  }
 }

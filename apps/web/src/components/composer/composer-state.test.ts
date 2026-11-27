@@ -754,3 +754,30 @@ describe('buildReport', () => {
     ]);
   });
 });
+
+describe('Made With AI (Sprint 13 Module 13)', () => {
+  it('starts off, is set by its action, and is sent with the post', () => {
+    const state = fresh();
+    expect(state.madeWithAi).toBe(false);
+    const marked = composerReducer(state, { type: 'setMadeWithAi', value: true });
+    expect(marked.madeWithAi).toBe(true);
+    expect(toSavePayload(marked, 'QUEUE').madeWithAi).toBe(true);
+  });
+
+  it('keeps the time a save used when Next Available moved it', () => {
+    const state = fresh();
+    const post = {
+      group: 'g',
+      updatedAt: '2026-11-20T10:00:00.000Z',
+      state: 'QUEUE',
+      channels: [],
+    };
+    const saved = composerReducer(state, {
+      type: 'saved',
+      post: post as unknown as PostDetail,
+      revision: state.revision,
+      publishAt: '2026-11-21T09:52',
+    });
+    expect(saved.publishAt).toBe('2026-11-21T09:52');
+  });
+});

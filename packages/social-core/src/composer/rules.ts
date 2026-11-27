@@ -92,6 +92,13 @@ export interface TitleRules {
   forbiddenCharacters: string[];
 }
 
+/**
+ * Sprint 13 Module 13: whether the platform has a field that labels a post
+ * as made with AI, which PostGear fills from the post's Made With AI switch.
+ * `'none'`: the composer says "{Platform} has no label for AI".
+ */
+export type AiLabel = 'field' | 'none';
+
 export interface ProviderRules {
   /** Character limit for one part, measured with `lengthMethod`. */
   maxLength: number;
@@ -111,4 +118,6 @@ export interface ProviderRules {
    * require one. Absent where the platform has no title or truncates silently.
    */
   title?: TitleRules;
+  /** Sprint 13 Module 13: see `AiLabel`. */
+  aiLabel: AiLabel;
 }

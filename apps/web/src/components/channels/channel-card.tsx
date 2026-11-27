@@ -19,6 +19,7 @@ import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { Channel } from '@/types/channel';
 import { CHANNEL_HEALTH } from './channel-health';
 import { ChannelMenuContent, type ChannelMenuHandlers } from './channel-menu';
+import { weeklyLabel } from './posting-slots-model';
 
 interface ChannelCardProps {
   channel: Channel;
@@ -82,8 +83,7 @@ export function ChannelCard({ channel, orgId, canManage, handlers }: ChannelCard
             </Text>
           ) : (
             <Text size="sm" muted>
-              {channel.postingTimes.length} posting{' '}
-              {channel.postingTimes.length === 1 ? 'time' : 'times'} a day
+              {weeklyLabel(channel.postingTimes)}
             </Text>
           )}
 

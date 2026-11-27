@@ -20,6 +20,7 @@ function rules(
     lengthMethod: 'utf16',
     thread: 'replies',
     followUpMedia: true,
+    aiLabel: 'none',
     ...overrides,
     media: {
       required: false,

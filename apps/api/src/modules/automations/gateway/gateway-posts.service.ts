@@ -22,7 +22,7 @@
 import { createHash } from 'node:crypto';
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isValidTimeZone, nextFreeSlot, platformById } from '@postgear/automation';
+import { isValidTimeZone, placeInFreeSlot, platformById } from '@postgear/automation';
 import { State } from '@postgear/db';
 import { documentFromText, renderPlainText } from '@postgear/social-core';
 import type { Env } from '../../../config/env';
@@ -265,9 +265,10 @@ export class GatewayPostsService {
   }
 
   /**
-   * One time for every chosen channel: the earliest of their posting times
-   * (all of them together) with no queued post on any of them within a
-   * minute, read in the step's zone.
+   * One time for every chosen channel: the earliest of their posting slots
+   * (all of them together, on the weekdays each runs on) with no queued post
+   * inside its window, read in the step's zone, at a natural minute inside
+   * that window (Sprint 13 Module 13).
    */
   private async freeSlot(body: QueueBody): Promise<Date> {
     if (!isValidTimeZone(body.timeZone)) {
@@ -281,15 +282,21 @@ export class GatewayPostsService {
     const channels = (await this.channels.list(body.organizationId)).filter((channel) =>
       chosen.has(channel.id),
     );
-    const postingTimes = channels.flatMap((channel) =>
-      channel.postingTimes.map((entry) => entry.time),
-    );
+    // Module 13: the slots keep their windows and weekdays.
+    const postingTimes = channels.flatMap((channel) => channel.postingTimes);
     const taken = await this.posts.queuedTimes(
       body.organizationId,
       channels.map((channel) => channel.id),
       new Date(now - 60_000),
     );
-    const slot = nextFreeSlot({ postingTimes, taken, from: now, timeZone: body.timeZone });
+    // The run and step make the seed, so a replayed step lands on the same minute.
+    const slot = placeInFreeSlot({
+      postingTimes,
+      taken,
+      from: now,
+      timeZone: body.timeZone,
+      seed: automationGroupId(body.runId, body.nodeKey),
+    });
     if (slot === null) {
       throw new UnprocessableEntityException({
         message: POST_GATEWAY_MESSAGES.NO_FREE_SLOT,

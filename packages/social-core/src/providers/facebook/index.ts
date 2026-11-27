@@ -74,6 +74,9 @@ const PAGE_INSIGHTS: Record<string, ChannelMetricName> = {
  * handles comfortably. Later parts become comments, which carry text only.
  */
 export const FACEBOOK_RULES: ProviderRules = {
+  // Sprint 13 Module 13: the AI field is on the Reels finish call; this provider
+  // posts an ordinary Page video through `/videos`, so it has no label to fill.
+  aiLabel: 'none',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'comments',

@@ -24,6 +24,12 @@ export const providerParamSchema = z
 /** Minutes since local midnight, which is what `Integration.postingTimes` stores. */
 const MINUTES_PER_DAY = 24 * 60;
 
+/**
+ * One posting slot (Sprint 13 Module 13): its time, a window either side
+ * (0, 5, 15 or 30 minutes) and the ISO weekdays it runs on (1 Monday to 7
+ * Sunday, distinct, at least one). Both new fields are optional so an older
+ * client's `{ time }` still saves, as every day with no window.
+ */
 const postingTimeSchema = z
   .object({
     time: z
@@ -31,6 +37,17 @@ const postingTimeSchema = z
       .int()
       .min(0)
       .max(MINUTES_PER_DAY - 1),
+    windowMinutes: z
+      .union([z.literal(0), z.literal(5), z.literal(15), z.literal(30)])
+      .optional()
+      .default(0),
+    days: z
+      .array(z.number().int().min(1).max(7))
+      .min(1, 'Pick at least one day')
+      .max(7)
+      .refine((days) => new Set(days).size === days.length, 'Each day once')
+      .optional()
+      .transform((days) => (days ? [...days].sort((a, b) => a - b) : [1, 2, 3, 4, 5, 6, 7])),
   })
   .strict();
 
@@ -126,3 +143,31 @@ export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
 export type ReorderChannelsInput = z.infer<typeof reorderChannelsSchema>;
 export type SelectEntityInput = z.infer<typeof selectEntitySchema>;
 export type TestPostInput = z.infer<typeof testPostSchema>;
+
+/**
+ * `GET /channels/next-slot` (Sprint 13 Module 13): the chosen channels (the
+ * first one's slots are used for the post), the browser's IANA zone (the
+ * slots are read in it, as Add To Queue does), and an optional seed that
+ * picks the natural minute inside the slot's window.
+ */
+export const nextSlotQuerySchema = z
+  .object({
+    /** Comma separated channel ids; `channelIdsOf` splits them. */
+    channelIds: z
+      .string()
+      .max(2000)
+      .regex(/^[A-Za-z0-9_-]{1,64}(,[A-Za-z0-9_-]{1,64}){0,29}$/, 'Choose up to 30 channels'),
+    timeZone: z.string().min(1).max(64),
+    seed: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .optional(),
+  })
+  .strict();
+export type NextSlotQuery = z.infer<typeof nextSlotQuerySchema>;
+
+/** The chosen channel ids in order, each once. */
+export function channelIdsOf(query: NextSlotQuery): string[] {
+  return [...new Set(query.channelIds.split(','))];
+}
+

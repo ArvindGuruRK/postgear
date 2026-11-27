@@ -138,8 +138,9 @@ Also in this pass: `npm run validate` (Python included) and both e2e suites are 
 |---|---|---|---|
 | A-60 | Paste each V9 link | A card with the site's name; import one from each | 12 |
 | A-61 | Google Drive, if built: pick a file | It comes in as an upload | 12 |
-| A-62 | With `PUBLISH_SIMULATION="false"`: Next Available on two posts with a 15 minute window; publish one clip marked Made With AI to a YouTube channel you own | Different minutes near their slots; on YouTube the video shows the altered-content label | 13 |
+| A-62 | With `PUBLISH_SIMULATION="false"`: Next Available on two posts with a 15 minute window; publish one clip marked Made With AI to a YouTube channel you own (the demo workspace has none: connect yours first) | Different minutes near their slots; on YouTube the video shows the altered-content label; on Instagram the post shows its AI label | 13 |
 | A-63 | Set posting slots with weekday windows on one real channel (for example 9:00 on weekdays and 18:30 at weekends, plus or minus 15 minutes); use the random time picker and Shuffle Times; publish one post for real at the next slot | Posts land inside the right window on the right weekday, never on the same minute twice; the post goes out and shows on the platform | 13 |
+| A-64 | Read TikTok's and Pinterest's developer pages for an AI label field (left `'none'` in Module 13, reported but not confirmed) | If one is confirmed, set its `aiLabel` to `'field'`, map it in its publish call, add a test row | 13 |
 
 ### Fairness, Money And Privacy
 

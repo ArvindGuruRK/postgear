@@ -397,7 +397,9 @@ model Integration {
   updatedAt             DateTime?               @updatedAt
   inBetweenSteps        Boolean                 @default(false)
   refreshNeeded         Boolean                 @default(false)
-  postingTimes          String                  @default("[{\"time\":120}, {\"time\":400}, {\"time\":700}]")
+  /// Posting slots (Sprint 13 Module 13): a JSON list of `{ time, windowMinutes, days }`
+  /// (minutes since local midnight; 0, 5, 15 or 30; ISO weekdays). Read with `readPostingSlots`.
+  postingTimes          String                  @default("[{\"time\":120,\"windowMinutes\":0,\"days\":[1,2,3,4,5,6,7]},{\"time\":400,\"windowMinutes\":0,\"days\":[1,2,3,4,5,6,7]},{\"time\":700,\"windowMinutes\":0,\"days\":[1,2,3,4,5,6,7]}]")
   customInstanceDetails String?
   customerId            String?
   rootInternalId        String?
@@ -487,6 +489,9 @@ model Post {
   settings       String?
   image          String?
   creationMethod CreationMethod       @default(UNKNOWN)
+  /// Sprint 13 Module 13: the person marked this post Made With AI; providers with an
+  /// AI label field (YouTube, Instagram, Facebook Reels) send it.
+  madeWithAi     Boolean              @default(false)
   intervalInDays Int?
   error          String?
   createdAt      DateTime             @default(now())

@@ -57,6 +57,8 @@ const MAX_CAROUSEL_ITEMS = 20;
  * carry text only.
  */
 export const INSTAGRAM_STANDALONE_RULES: ProviderRules = {
+  // Sprint 13 Module 13: `is_ai_generated` on the media container.
+  aiLabel: 'field',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'comments',
@@ -261,8 +263,16 @@ export class InstagramStandaloneProvider
         ? await this.createContainer(account, accessToken, {
             ...this.mediaFields(media[0], 'single'),
             caption: post.message,
+            // Sprint 13 Module 13: Instagram's AI label on the container.
+            ...(post.madeWithAi === true ? { is_ai_generated: 'true' } : {}),
           })
-        : await this.createCarousel(account, accessToken, post.message, media);
+        : await this.createCarousel(
+            account,
+            accessToken,
+            post.message,
+            media,
+            post.madeWithAi === true,
+          );
 
     await this.waitForContainer(containerId, accessToken);
 
@@ -298,6 +308,7 @@ export class InstagramStandaloneProvider
     accessToken: string,
     caption: string,
     media: MediaDescriptor[],
+    madeWithAi = false,
   ): Promise<string> {
     const children: string[] = [];
 
@@ -319,6 +330,7 @@ export class InstagramStandaloneProvider
       media_type: 'CAROUSEL',
       children: children.join(','),
       caption,
+      ...(madeWithAi ? { is_ai_generated: 'true' } : {}),
     });
   }
 

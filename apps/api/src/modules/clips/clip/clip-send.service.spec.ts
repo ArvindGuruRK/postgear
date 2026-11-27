@@ -5,10 +5,12 @@
  * fit), the draft's shape, its `ClipPost` row, and tenancy.
  */
 import { HttpException } from '@nestjs/common';
-import { createClipDocument } from '@postgear/video-engine';
+import type { ClipAsset } from '@postgear/db';
+import { addSound, createClipDocument } from '@postgear/video-engine';
 import type { ChannelsService } from '../../channels/channels.service';
 import type { PostsService } from '../../posts/posts.service';
 import {
+  assetRow,
   clipRow,
   emptyTables,
   type FakeClipDb,
@@ -102,6 +104,47 @@ async function refusal(
 }
 
 describe('ClipSendService.send', () => {
+  it('marks the draft Made With AI only when the clip uses a made-up voice (Module 13)', async () => {
+    const plain = setup();
+    await plain.send({ channelIds: ['yt-1'], caption: 'Plain' });
+    const [, plainInput] = plain.create.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(plainInput).not.toHaveProperty('madeWithAi');
+
+    const VOICE = '88888888-8888-4888-8888-000000000001';
+    const tables = seed();
+    const clip = tables.clips[0];
+    if (!clip) throw new Error('no clip');
+    const doc = createClipDocument({ videoId: VIDEO, fromMs: 0, toMs: 40_000, ratio: '9:16' });
+    const added = addSound(doc, { asset: VOICE }, 'sfx', 1_000, { durationMs: 2_000 });
+    if (!added.ok) throw new Error(added.code);
+    clip.document = added.doc as unknown as typeof clip.document;
+    tables.assets.push(
+      assetRow({
+        id: VOICE,
+        videoId: null,
+        clipId: null,
+        kind: 'AUDIO',
+        meta: {
+          status: 'ready',
+          purpose: 'sound',
+          name: 'Voice',
+          durationMs: 2_000,
+          madeByAi: true,
+        },
+      } as Partial<ClipAsset>),
+    );
+    const voiced = setup(tables);
+    await voiced.send({ channelIds: ['yt-1'], caption: 'Voiced' });
+    const [, voicedInput] = voiced.create.mock.calls[0] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(voicedInput).toMatchObject({ madeWithAi: true });
+  });
+
   it('makes a draft with the clip on every chosen channel, parked at the next full hour, and links the clip', async () => {
     const { send, create, tables } = setup();
     const before = Date.now();

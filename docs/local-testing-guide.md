@@ -1440,6 +1440,29 @@ npx jest --config packages/video-engine/jest.config.js sites            # every 
 npx jest --config packages/media-tools/jest.config.js sites drive       # the probe and error mappers, args, Drive
 ```
 
+**Publisher Upgrades (Module 13).** Posting times became posting slots, the composer gained Next Available and Pick A Random Time, and a post with a video can be marked Made With AI. Run `npm run migrate:deploy --workspace=packages/db` and `npm run db:generate` (a migration adds a window and weekdays to every existing posting time, and `Post.madeWithAi`), then restart the API and the Node worker. Keep `PUBLISH_SIMULATION=true` (exported for the host worker too): nothing is posted for real.
+
+- **Posting slots.** Channels, a channel's menu, **Edit Posting Times** opens **Manage Posting Time Slots**: each row is a time, a window (Exact, Within 5, 15 or 30 Minutes) and seven weekday chips (the last one on stays on). **Add Another Time** adds a row. The card under the channel name says how many posts a week the slots make. Every existing channel reads as before (every day, exact).
+- **Shuffle Times.** In the same dialog: the slider asks how many posts a week (1 to 35, "21 a week"), the preview lists the suggested slots ("around 6:05 PM, Every day"), **Shuffle Again** gives another set, **Use These Times** fills the rows (still to be saved). 10 a week is one slot every day plus one on Tuesday, Wednesday and Thursday. **Back To Suggested Times** reopens it where you left it.
+- **Next Available.** In the composer footer, beside the date. It sets the time to the first chosen channel's next free slot, at a natural minute inside the slot's window (never on a five-minute mark), on a weekday the slot runs. Save one post, open a new one, press it again: the second gets the next slot, a different minute. A channel with no posting times leaves the button off with "Set posting times for this channel first." and an Open Channels link. If the slot is taken between the press and the save, the save moves the post and says "That slot was just taken".
+- **Pick A Random Time.** Open the date, the **Pick A Random Time** tab: Morning (6:00 to 11:59), Noon (12:00 to 13:59), Afternoon (14:00 to 17:59), Evening (18:00 to 21:59) each pick a random minute on the chosen day; pressing again gives another. "Scheduled On This Day" lists the first channel's posts that day, and a part already past today says so.
+- **Made With AI.** Attach a video and the footer shows **Made With AI**. Its switch carries the help line, and one line for each chosen platform with no label ("LinkedIn has no label for AI. Say it in your caption if you need to."). YouTube and both Instagrams have a label; X, LinkedIn, Threads, Facebook (its Page video, not a Reel), TikTok and Pinterest do not. A clip with a made-up voice sent to the composer starts with it on (the Send dialog says why). Post Now to Instagram with it on, then:
+
+```bash
+docker exec postgear_postgres psql -U postgres -d postgear_db -c "select \"madeWithAi\", \"releaseURL\" from \"Post\" where \"madeWithAi\" order by \"createdAt\" desc limit 3;"
+```
+
+The stand-in publisher ends the link with `?ai=label` where the real platform would get its label (YouTube `status.containsSyntheticMedia`, Instagram `is_ai_generated`).
+
+`GET /channels/next-slot?channelIds=a,b&timeZone=Europe/London&seed=x` answers the first channel's slot, each channel's own, and `windowMinutes`; a channel with no times answers `at: null`. `POST /v1/posts` takes `madeWithAi` too; `GET /v1/channels` still carries no posting times.
+
+```bash
+npx jest --config packages/automation/jest.config.js posting-slots      # slots, jitter, weekdays, Shuffle, random time
+npx jest --config apps/api/jest.config.js channel-next-slot channels.schema posts.schema
+npx jest --config packages/social-core/jest.config.js ai-label          # each provider's label field
+npx jest --config apps/web/jest.config.js posting-slots publisher-upgrades
+```
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

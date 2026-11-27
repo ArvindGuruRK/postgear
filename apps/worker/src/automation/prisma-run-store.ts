@@ -6,6 +6,7 @@
  * matches. `credentials` is decrypted in `loadConnection` only, for the one
  * step that needs it, and never selected anywhere else.
  */
+import { type PostingSlot, readPostingSlots } from '@postgear/automation';
 import {
   AutomationConnectionStatus,
   AutomationRunMode,
@@ -536,23 +537,11 @@ export class PrismaRunStore implements RunStore {
   }
 }
 
-/** `[{"time":120},...]` as minutes; anything unreadable is left out. */
-export function parsePostingTimes(raw: string | null): number[] {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((entry) =>
-        typeof entry === 'object' && entry !== null
-          ? (entry as { time?: unknown }).time
-          : undefined,
-      )
-      .filter(
-        (time): time is number =>
-          typeof time === 'number' && Number.isInteger(time) && time >= 0 && time < 1440,
-      );
-  } catch {
-    return [];
-  }
+/**
+ * The channel's posting slots (Sprint 13 Module 13: time, window, weekdays);
+ * a legacy `{ time }` reads as every day with no window; anything unreadable
+ * is left out.
+ */
+export function parsePostingTimes(raw: string | null): PostingSlot[] {
+  return readPostingSlots(raw ?? '');
 }

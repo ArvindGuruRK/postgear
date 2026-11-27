@@ -7,6 +7,7 @@
  * queries, even though `RolesGuard` has already checked membership: the same
  * defence-in-depth convention `org.service.ts` follows.
  */
+
 import {
   BadRequestException,
   ForbiddenException,
@@ -14,6 +15,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { PostingSlot } from '@postgear/automation';
 import { prisma } from '@postgear/db';
 import {
   type ChannelContext,
@@ -439,7 +441,7 @@ export class ChannelsService {
     orgId: string;
     id: string;
     name?: string;
-    postingTimes?: { time: number }[];
+    postingTimes?: PostingSlot[];
     color?: number;
     disabled?: boolean;
   }): Promise<ChannelSummary> {

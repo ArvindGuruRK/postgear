@@ -55,6 +55,8 @@ export interface PostRow {
   error: string | null;
   /** Days between repeats, or null (2026-10-19). Every row of a group holds the same value. */
   intervalInDays: number | null;
+  /** Sprint 13 Module 13: every row of a group holds the same value. */
+  madeWithAi: boolean;
   createdAt: Date;
   updatedAt: Date;
   /**
@@ -85,6 +87,8 @@ export interface GroupWrite {
   publishDate: Date;
   /** Written on every row of the group; null means no repeat. */
   intervalInDays: number | null;
+  /** Sprint 13 Module 13: written on every row of the group; absent is false. */
+  madeWithAi?: boolean;
   /** Live tag ids of this workspace, already checked, in display order. */
   tagIds: string[];
   /**
@@ -159,6 +163,7 @@ function rowSelect(orgId: string) {
     releaseURL: true,
     error: true,
     intervalInDays: true,
+    madeWithAi: true,
     createdAt: true,
     updatedAt: true,
     tags: {
@@ -756,6 +761,7 @@ export class PostsRepository {
         state: write.state,
         publishDate: write.publishDate,
         intervalInDays: write.intervalInDays,
+        madeWithAi: write.madeWithAi ?? false,
         parentPostId: previousId,
         // A save is a new version; whatever the worker recorded about the old
         // one (a failure, a retry in progress) no longer describes it.
@@ -776,6 +782,7 @@ export class PostsRepository {
             state: data.state,
             publishDate: data.publishDate,
             intervalInDays: data.intervalInDays,
+            madeWithAi: data.madeWithAi ?? false,
             group: write.group,
             creationMethod: write.creationMethod ?? 'WEB',
             organization: { connect: { id: write.orgId } },

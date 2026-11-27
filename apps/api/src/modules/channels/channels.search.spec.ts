@@ -28,7 +28,7 @@ function summary(overrides: Partial<ChannelSummary>): ChannelSummary {
     refreshNeeded: false,
     inBetweenSteps: false,
     tokenExpiration: null,
-    postingTimes: [{ time: 120 }],
+    postingTimes: [{ time: 120, windowMinutes: 0, days: [1, 2, 3, 4, 5, 6, 7] }],
     additionalSettings: {},
     createdAt: new Date('2026-10-01'),
     ...overrides,

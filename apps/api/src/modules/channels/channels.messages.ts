@@ -36,6 +36,10 @@ export const CHANNEL_MESSAGES = {
    */
   LIMIT_REACHED:
     'This workspace has reached its plan’s channel limit. Upgrade the plan to connect more channels.',
+  /** Module 13: Next Available got a zone the browser could not have sent. */
+  BAD_TIME_ZONE: 'We could not read your time zone. Reload the page and try again.',
+  /** Module 13: Next Available with no channel of this workspace chosen. */
+  NO_CHANNEL_FOR_SLOT: 'Choose a channel first.',
 } as const;
 
 /** The `?error=` codes the callback can redirect with, and their copy. */

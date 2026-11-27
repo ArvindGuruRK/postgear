@@ -26,6 +26,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import { DEFAULT_POSTING_SLOTS, type PostingSlot, readPostingSlots } from '@postgear/automation';
 import {
   decryptNullable,
   encrypt,
@@ -37,9 +38,6 @@ import {
   State,
 } from '@postgear/db';
 import { nextChannelColor } from './channel-colors';
-
-/** The default the schema itself declares, used when a stored value is unreadable. */
-const DEFAULT_POSTING_TIMES = [{ time: 120 }, { time: 400 }, { time: 700 }];
 
 /**
  * The workspace's channel order: the stored `position` (an admin's drag, or
@@ -65,7 +63,8 @@ export interface ChannelSummary {
   refreshNeeded: boolean;
   inBetweenSteps: boolean;
   tokenExpiration: Date | null;
-  postingTimes: { time: number }[];
+  /** Module 13: posting slots (time, window, weekdays), read with `readPostingSlots`. */
+  postingTimes: PostingSlot[];
   additionalSettings: Record<string, unknown>;
   createdAt: Date;
 }
@@ -515,7 +514,7 @@ export class ChannelsRepository {
     orgId: string;
     id: string;
     name?: string;
-    postingTimes?: { time: number }[];
+    postingTimes?: PostingSlot[];
     /** A palette slot, validated against `CHANNEL_COLOR_COUNT` by the schema. */
     color?: number;
     /** An admin's "Disable channel" / "Enable channel"; queued posts stay queued. */
@@ -651,31 +650,33 @@ export class ChannelsRepository {
    * entire channel-list endpoint with a 500, because the parse sits
    * unguarded in a controller.
    */
-  private parsePostingTimes(raw: string | null): { time: number }[] {
-    if (!raw) {
-      return DEFAULT_POSTING_TIMES;
-    }
+  /**
+   * Module 13: when queued posts sit on these channels from `from` on, for
+   * Next Available (the same rows Add To Queue counts: root posts in the
+   * queue, not deleted).
+   */
+  async queuedTimes(orgId: string, integrationIds: string[], from: Date): Promise<number[]> {
+    if (integrationIds.length === 0) return [];
+    const rows = await prisma.post.findMany({
+      where: {
+        organizationId: orgId,
+        integrationId: { in: integrationIds },
+        deletedAt: null,
+        parentPostId: null,
+        state: 'QUEUE',
+        publishDate: { gte: from },
+      },
+      orderBy: { publishDate: 'asc' },
+      select: { publishDate: true },
+      take: 2000,
+    });
+    return rows.map((row) => row.publishDate.getTime());
+  }
 
-    try {
-      const parsed: unknown = JSON.parse(raw);
-
-      if (!Array.isArray(parsed)) {
-        return DEFAULT_POSTING_TIMES;
-      }
-
-      const times = parsed
-        .filter(
-          (entry): entry is { time: number } =>
-            typeof entry === 'object' &&
-            entry !== null &&
-            typeof (entry as { time?: unknown }).time === 'number',
-        )
-        .map((entry) => ({ time: entry.time }));
-
-      return times.length > 0 ? times : DEFAULT_POSTING_TIMES;
-    } catch {
-      return DEFAULT_POSTING_TIMES;
-    }
+  private parsePostingTimes(raw: string | null): PostingSlot[] {
+    // Module 13: the one tolerant reader; a legacy entry reads as every day, exact.
+    const slots = readPostingSlots(raw ?? '');
+    return slots.length > 0 ? slots : DEFAULT_POSTING_SLOTS.map((slot) => ({ ...slot }));
   }
 
   private parseSettings(raw: string | null): Record<string, unknown> {

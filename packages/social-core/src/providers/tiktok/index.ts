@@ -45,6 +45,8 @@ const MAX_LENGTH = 2_200;
  * accepted and dropped.
  */
 export const TIKTOK_RULES: ProviderRules = {
+  // Sprint 13 Module 13: TikTok's AI field is reported, not confirmed on its developer page.
+  aiLabel: 'none',
   maxLength: MAX_LENGTH,
   lengthMethod: 'utf16',
   thread: 'none',

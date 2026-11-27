@@ -104,6 +104,8 @@ export interface PostDetail {
   tags: Tag[];
   /** Null when the post does not repeat. */
   intervalInDays: RepeatInterval | null;
+  /** Sprint 13 Module 13: marked Made With AI. Absent from an older API. */
+  madeWithAi?: boolean;
 }
 
 export interface PostSummaryChannel extends ChannelPublish {
@@ -127,6 +129,8 @@ export interface PostSummary {
   tags: Tag[];
   /** Null when the post does not repeat. */
   intervalInDays: RepeatInterval | null;
+  /** Sprint 13 Module 13: marked Made With AI. Absent from an older API. */
+  madeWithAi?: boolean;
 }
 
 /** One page of `GET /posts/queue`. */

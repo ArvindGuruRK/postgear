@@ -154,13 +154,17 @@ export class SimulatedProvider implements PublishingProvider {
     }
 
     const stamp = Date.now().toString(36);
+    // Sprint 13 Module 13: where the real provider would send its AI label,
+    // the stand-in records it in the link, so a hand check can see it.
+    const labels = this.real?.rules.aiLabel === 'field';
 
     return posts.map((post, index) => {
       const postId = `sim-${stamp}-${index}`;
+      const label = labels && post.madeWithAi === true ? '?ai=label' : '';
       return {
         id: post.id,
         postId,
-        releaseURL: `https://simulated.postgear.local/${this.identifier}/${channel.internalId}/${postId}`,
+        releaseURL: `https://simulated.postgear.local/${this.identifier}/${channel.internalId}/${postId}${label}`,
       };
     });
   }

@@ -44,11 +44,14 @@ import {
 } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { ZodBody } from '../../common/pipes/zod-validation.pipe';
+import { ZodBody, ZodQuery } from '../../common/pipes/zod-validation.pipe';
 import { ChannelLimitReachedError } from '../billing/entitlements.service';
+import { ChannelNextSlotService } from './channel-next-slot.service';
 import { CHANNEL_MESSAGES } from './channels.messages';
 import { ChannelsService } from './channels.service';
 import {
+  type NextSlotQuery,
+  nextSlotQuerySchema,
   providerParamSchema,
   type ReorderChannelsInput,
   reorderChannelsSchema,
@@ -66,6 +69,7 @@ export class ChannelsController {
 
   constructor(
     private readonly channels: ChannelsService,
+    private readonly nextSlots: ChannelNextSlotService,
     config: ConfigService,
   ) {
     this.webUrl = config.get<string>('WEB_URL', 'http://localhost:3000');
@@ -100,6 +104,19 @@ export class ChannelsController {
     ]);
 
     return { channels, limit };
+  }
+
+  /**
+   * Next Available (Sprint 13 Module 13): `?channelIds=a,b&timeZone=...&seed=...`.
+   * Any member may ask (it changes nothing). Declared before the `:id` routes.
+   */
+  @Get('next-slot')
+  @Roles(Role.ADMIN, Role.USER)
+  nextSlot(
+    @CurrentOrg() org: ActiveOrg,
+    @Query(new ZodQuery(nextSlotQuerySchema, 'channels/next-slot')) query: NextSlotQuery,
+  ) {
+    return this.nextSlots.nextSlot(org.id, query);
   }
 
   /**
