@@ -19,6 +19,11 @@ jest.mock('@/lib/clips-api', () => ({
   renameLayout: jest.fn(),
   deleteLayout: jest.fn(),
 }));
+// Module 10: the Brand Kit section on top reads the workspace's kits (none here).
+jest.mock('@/lib/clips-recipes-api', () => ({
+  listClipBrandKits: jest.fn(async () => ({ brandKits: [] })),
+  useClipBrandKit: jest.fn(),
+}));
 const toast = jest.fn();
 jest.mock('@postgear/ui', () => ({
   ...jest.requireActual('@postgear/ui'),

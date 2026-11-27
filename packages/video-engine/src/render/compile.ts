@@ -52,6 +52,7 @@ import { ffmpegColour, formatNumber } from './filter-text';
 import { layoutGraph } from './layout-graph';
 import { type LoudnessDecision, loudnormApplyFilter, loudnormMeasureFilter } from './loudness';
 import { lookFilters } from './looks';
+import { cardsOf, type PlanCard, planBodyMs } from './card-plan';
 import type { PlanSegment, RenderPlan } from './plan';
 import { type PlanSound, planHasSound } from './sound-plan';
 import type { PlanSticker } from './sticker-plan';
@@ -98,10 +99,25 @@ interface SegmentSources {
   audio: string | null;
 }
 
+/**
+ * Whether every segment's picture must end in the same pixel format before
+ * the join (Module 10): when the clip plays more than one video (a brand
+ * intro or outro, Module 11's montage) or has a card. Each chain already
+ * ends in the output size (the layout graph pads or scales to it), SAR 1
+ * and the output rate; `format=yuv420p` then makes every input of `concat`
+ * (and of Module 11's `xfade`) the same. A clip of one video keeps its text.
+ */
+export function joinsOtherVideos(plan: Pick<RenderPlan, 'inputs' | 'cards'>): boolean {
+  if (plan.cards) return true;
+  const first = plan.inputs[0]?.sourceId;
+  return plan.inputs.some((input) => input.sourceId !== first);
+}
+
 /** One segment's picture: the layout graph between its `trim` and its timing filters. */
 function segmentPicture(segment: PlanSegment, source: string, plan: RenderPlan): string[] {
   const trim = `trim=start=${msToSeconds(segment.trimStartMs)}:end=${msToSeconds(segment.trimEndMs)}`;
-  const timing = `${setptsFor(segment.speed)},fps=${plan.output.fps},setsar=1`;
+  const format = joinsOtherVideos(plan) ? ',format=yuv420p' : '';
+  const timing = `${setptsFor(segment.speed)},fps=${plan.output.fps},setsar=1${format}`;
   return layoutGraph(segment, source, plan, { trim, timing });
 }
 
@@ -204,7 +220,7 @@ function soundFades(plan: RenderPlan): string[] {
   const fades: string[] = [];
   if (plan.fades.inMs > 0) fades.push(`afade=t=in:st=0:d=${msToSeconds(plan.fades.inMs)}`);
   if (plan.fades.outMs > 0) {
-    const start = msToSeconds(plan.output.durationMs - plan.fades.outMs);
+    const start = msToSeconds(planBodyMs(plan) - plan.fades.outMs);
     fades.push(`afade=t=out:st=${start}:d=${msToSeconds(plan.fades.outMs)}`);
   }
   return fades;
@@ -222,7 +238,7 @@ function mixLines(plan: RenderPlan, from: string): string[] {
     return [`${from}${fades.length > 0 ? fades.join(',') : 'anull'}[am]`];
   }
   const lines = [
-    `anullsrc=r=48000:cl=stereo,atrim=duration=${msToSeconds(plan.output.durationMs)},asetpts=PTS-STARTPTS,${AUDIO_FORMAT}[abase]`,
+    `anullsrc=r=48000:cl=stereo,atrim=duration=${msToSeconds(planBodyMs(plan))},asetpts=PTS-STARTPTS,${AUDIO_FORMAT}[abase]`,
   ];
   const labels = sounds.map((_, k) => `[as${k}]`);
   sounds.forEach((sound, k) => {
@@ -244,11 +260,12 @@ function mixLines(plan: RenderPlan, from: string): string[] {
  * was, so the graph text is unchanged.
  */
 export function bleepLines(
-  plan: Pick<RenderPlan, 'bleeps' | 'output'>,
+  plan: Pick<RenderPlan, 'bleeps' | 'output' | 'cards'>,
   from: string,
 ): { lines: string[]; label: string } {
   const bleeps = plan.bleeps ?? [];
-  const { mutes, tones } = bleepSets(bleeps, plan.output.durationMs);
+  const bodyMs = planBodyMs(plan);
+  const { mutes, tones } = bleepSets(bleeps, bodyMs);
   if (mutes.length === 0) return { lines: [], label: from };
   const label = '[ableep]';
   if (tones.length === 0) {
@@ -257,7 +274,7 @@ export function bleepLines(
   return {
     lines: [
       `${from}${bleepMuteFilter(mutes)}[bmute]`,
-      `${bleepToneSource(tones, plan.output.durationMs)}[btone]`,
+      `${bleepToneSource(tones, bodyMs)}[btone]`,
       `[bmute][btone]amix=inputs=2:normalize=0:duration=first,${AUDIO_FORMAT}${label}`,
     ],
     label,
@@ -288,6 +305,16 @@ function extraInputs(plan: RenderPlan, inputs: CompiledInput[]): void {
     }
     const seek = !sound.wraps && sound.offsetMs > 0 ? sound.offsetMs : null;
     inputs.push({ file: sound.file, seekMs: seek, options: [] });
+  }
+  // Module 10: the cards' logos, opening first.
+  for (const card of cardsOf(plan.cards)) {
+    if (!card.logo) continue;
+    if (card.logo.inputIndex !== inputs.length) {
+      throw new Error(
+        `The ${card.place} card's logo reads input ${card.logo.inputIndex}, not ${inputs.length}`,
+      );
+    }
+    inputs.push({ file: card.logo.file, seekMs: null, options: [] });
   }
 }
 
@@ -348,7 +375,7 @@ export function compileMeasure(plan: RenderPlan): CompiledFfmpeg | null {
     assFiles: [],
     commandFiles: [],
     outputArgs: ['-map', '[aout]', '-f', 'null'],
-    durationMs: plan.output.durationMs,
+    durationMs: planBodyMs(plan),
     fonts: null,
     logLevel: 'info',
   };
@@ -416,7 +443,12 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
   if (plan.segments.length === 0) {
     throw new Error('A render plan needs at least one segment');
   }
-  const { fps, durationMs } = plan.output;
+  const { fps } = plan.output;
+  // The clip's own length: the fades, the mark and the pad are on it; the cards come after (Module 10).
+  const durationMs = planBodyMs(plan);
+  const cards = cardsOf(plan.cards);
+  const pictureOut = cards.length > 0 ? '[vbody]' : '[vout]';
+  const soundOut = cards.length > 0 ? '[abody]' : '[aout]';
   const lines: string[] = [];
 
   // Inputs shared by several segments are split once, so every label is used once.
@@ -499,7 +531,7 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
 
   // The text is burned in last on the picture, after stickers and looks, before the mark and the fades.
   const assFiles = buildAss(plan);
-  if (assFiles.length > 0) {
+  if (assFiles.some((file) => file.name === ASS_FILE)) {
     pictureFilters.push(`ass=filename=${ASS_FILE}:fontsdir=${plan.fonts.dir ?? FONTS_DIR}`);
   }
   const chain = (filters: string[]): string => (filters.length > 0 ? filters.join(',') : 'null');
@@ -512,9 +544,13 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
         `colorchannelmixer=aa=${formatNumber(mark.opacity)}[wm]`,
     );
     const tail = fadeFilters.length > 0 ? `,${fadeFilters.join(',')}` : '';
-    lines.push(`[vj][wm]overlay=x=${mark.x}:y=${mark.y}:format=yuv420:shortest=1${tail}[vout]`);
+    lines.push(
+      `[vj][wm]overlay=x=${mark.x}:y=${mark.y}:format=yuv420:shortest=1${tail}${bodyTrim(plan)}${pictureOut}`,
+    );
   } else {
-    lines.push(`${picture}${chain([...pictureFilters, ...fadeFilters])}[vout]`);
+    lines.push(
+      `${picture}${chain([...pictureFilters, ...fadeFilters])}${bodyTrim(plan)}${pictureOut}`,
+    );
   }
 
   // The sound: the bleeps on the video's own sound, the mix (when there are sound items), the
@@ -528,10 +564,22 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
   if ((plan.sounds ?? []).length === 0 && !correct) {
     const fades = soundFades(plan);
     const audioTail = fades.length > 0 ? `${fades.join(',')},` : '';
-    lines.push(`${bleeped.label}${audioTail}${pad}[aout]`);
+    lines.push(`${bleeped.label}${audioTail}${pad}${bodySoundTrim(plan)}${soundOut}`);
   } else {
     lines.push(...mixLines(plan, bleeped.label));
-    lines.push(`[am]${correct}${pad}[aout]`);
+    lines.push(`[am]${correct}${pad}${bodySoundTrim(plan)}${soundOut}`);
+  }
+
+  // Module 10: the cards, joined around the clip's finished picture and sound.
+  if (cards.length > 0) {
+    for (const card of cards) lines.push(...cardLines(card, plan));
+    const parts: string[] = [];
+    if (plan.cards?.opening)
+      parts.push(`${cardLabels('opening').video}${cardLabels('opening').audio}`);
+    parts.push('[vbody][abody]');
+    if (plan.cards?.closing)
+      parts.push(`${cardLabels('closing').video}${cardLabels('closing').audio}`);
+    lines.push(`${parts.join('')}concat=n=${parts.length}:v=1:a=1[vout][aout]`);
   }
 
   const inputs: CompiledInput[] = plan.inputs.map((input) => ({
@@ -547,12 +595,73 @@ export function compileFfmpeg(plan: RenderPlan, options: CompileOptions = {}): C
     assFiles,
     commandFiles: cropCommandFiles(plan),
     outputArgs: outputArgsFor(plan),
-    durationMs,
+    durationMs: plan.output.durationMs,
     fonts:
       assFiles.length > 0
         ? { dir: plan.fonts.dir ?? FONTS_DIR, files: plan.fonts.files, psNames: plan.fonts.psNames }
         : null,
   };
+}
+
+/**
+ * With cards the clip's picture and sound are cut to its exact length before
+ * the join (Module 10): `concat` starts the closing card where the longest
+ * stream of the clip ends, so a frame of slack would slip the card. The
+ * picture is held on its last frame first, in case it is a frame short.
+ * Without cards the output's `-t` cuts it, as before (empty text).
+ */
+function bodyTrim(plan: RenderPlan): string {
+  if (!plan.cards) return '';
+  const seconds = msToSeconds(planBodyMs(plan));
+  return `,tpad=stop=-1:stop_mode=clone,trim=end=${seconds},setpts=PTS-STARTPTS`;
+}
+
+function bodySoundTrim(plan: RenderPlan): string {
+  if (!plan.cards) return '';
+  return `,atrim=end=${msToSeconds(planBodyMs(plan))},asetpts=PTS-STARTPTS`;
+}
+
+/** The labels a card's picture and sound end in. */
+function cardLabels(place: PlanCard['place']): { video: string; audio: string } {
+  const k = place === 'opening' ? 'o' : 'c';
+  return { video: `[vk${k}]`, audio: `[ak${k}]` };
+}
+
+/**
+ * One card's picture and sound (research 09 section 8): a `color` source of
+ * the output size and rate for the card's length, the logo overlaid (a still
+ * drawn once and repeated, like a still sticker), the line drawn by `ass`
+ * from the card's own file, and silence of the same length in the sound's
+ * fixed format.
+ */
+export function cardLines(card: PlanCard, plan: Pick<RenderPlan, 'output' | 'fonts'>): string[] {
+  const { width, height, fps } = plan.output;
+  const k = card.place === 'opening' ? 'o' : 'c';
+  const labels = cardLabels(card.place);
+  const seconds = msToSeconds(card.durationMs);
+  const lines: string[] = [];
+  const base = `color=c=${ffmpegColour(card.background)}:s=${width}x${height}:r=${fps}:d=${seconds},format=yuv420p,setsar=1`;
+  const after: string[] = [];
+  if (card.assFile)
+    after.push(`ass=filename=${card.assFile}:fontsdir=${plan.fonts.dir ?? FONTS_DIR}`);
+  if (card.logo) {
+    const logo = card.logo;
+    lines.push(`${base}[k${k}b]`);
+    lines.push(
+      `[${logo.inputIndex}:v]format=rgba,scale=${logo.width}:${logo.height}:flags=bicubic,` +
+        `loop=loop=-1:size=1:start=0,setpts=N/(${fps}*TB)[k${k}l]`,
+    );
+    const tail = after.length > 0 ? `,${after.join(',')}` : '';
+    lines.push(
+      `[k${k}b][k${k}l]overlay=x=${logo.x}:y=${logo.y}:format=yuv420:shortest=1${tail}${labels.video}`,
+    );
+  } else {
+    lines.push(`${[base, ...after].join(',')}${labels.video}`);
+  }
+  lines.push(
+    `anullsrc=r=48000:cl=stereo,atrim=duration=${seconds},asetpts=PTS-STARTPTS,${AUDIO_FORMAT}${labels.audio}`,
+  );
+  return lines;
 }
 
 /** A command file's name: `crop-s<segment>-a<area>.txt`, nothing else. */

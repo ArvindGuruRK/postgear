@@ -7,7 +7,8 @@
  * of the whole video (up to 30 minutes) and opens it in one press.
  *
  * Layout (desktop only): the actions row (back to Videos, the title, the
- * platform and length, Edit Whole Video); then the player with its bar and
+ * platform and length, Auto-Edit Video (Sprint 13, Module 10:
+ * `auto-edit-dialog.tsx`), Edit Whole Video); then the player with its bar and
  * the timeline on the left, and on the right Find Clips (Module 16,
  * `find-clips.tsx`) over this video's clips, AI picks first, with "How this
  * was found" under them. Each AI pick has a small flag on the timeline that
@@ -19,6 +20,7 @@
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { ScissorsIcon } from '@animateicons/react/lucide/scissors-icon';
+import { WandSparklesIcon } from '@animateicons/react/lucide/wand-sparkles-icon';
 import {
   Alert,
   Badge,
@@ -37,6 +39,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui';
 import { ActionLink } from '@/components/home/home-actions';
 import { createClip, createWholeClip, getVideo } from '@/lib/clips-api';
+import { AutoEditDialog } from './auto-edit-dialog';
 import { TranscriptSheet } from './transcript-sheet';
 import type { ClipSummary, ClipVideoDetail, ClipView } from '@/types/clips';
 import { PLATFORM_LABELS } from '../home/home-model';
@@ -113,6 +116,7 @@ export function VideoPage({
   );
   const [creating, setCreating] = useState(false);
   const [wholeBusy, setWholeBusy] = useState(false);
+  const [autoEditOpen, setAutoEditOpen] = useState(false);
   const { video } = detail;
   const durationMs = video.durationMs ?? 0;
   const fps = detail.proxy?.fps ?? video.fps ?? 30;
@@ -321,6 +325,15 @@ export function VideoPage({
               }
             }}
           />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setAutoEditOpen(true)}
+            data-testid="clip-video-auto-edit"
+          >
+            <MotionIcon icon={WandSparklesIcon} className="h-4 w-4" />
+            Auto-Edit Video
+          </Button>
           <TooltipHint
             label={EDIT_WHOLE_TOO_LONG}
             hidden={!tooLongForWhole}
@@ -465,6 +478,12 @@ export function VideoPage({
         </AnalyticsPanel>
       </div>
       {sender.dialog}
+      <AutoEditDialog
+        orgId={orgId}
+        video={{ id: video.id, title: video.title, durationMs }}
+        open={autoEditOpen}
+        onOpenChange={setAutoEditOpen}
+      />
     </div>
   );
 }

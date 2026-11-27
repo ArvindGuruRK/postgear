@@ -53,6 +53,7 @@ function mocks(overrides: Partial<Mocks> = {}): Mocks {
     clipRenderWaitState: jest.fn().mockResolvedValue({ closed: false, segmentRunning: false }),
     clipRender: jest.fn().mockResolvedValue({ status: 'done' }),
     clipDownload: jest.fn().mockResolvedValue({ status: 'done' }),
+    clipAutoEdit: jest.fn().mockResolvedValue({ status: 'done' }),
     clipSaveDownload: jest.fn().mockResolvedValue({ mediaId: 'media-1' }),
     clipSaveDownloadFailed: jest.fn().mockResolvedValue(undefined),
     clipJobFailed: jest.fn().mockResolvedValue(true),

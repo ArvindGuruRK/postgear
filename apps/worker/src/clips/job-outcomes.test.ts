@@ -351,3 +351,39 @@ describe('voice bookkeeping (Sprint 13, Module 09)', () => {
     expect(reverseCharges).not.toHaveBeenCalled();
   });
 });
+
+describe('auto-edit bookkeeping (Sprint 13, Module 10)', () => {
+  const autoEditInput = {
+    videoId: VIDEO_ID,
+    clipId: CLIP_ID,
+    recipeId: 'starter-auto-edit-talking-video',
+    range: { fromMs: 0, toMs: 600_000 },
+    listenJobId: null,
+    listenStarted: false,
+  };
+  const autoEditJob = () => jobRow({ kind: 'AUTO_EDIT', clipId: CLIP_ID, input: autoEditInput });
+
+  it('a listen job that did not finish keeps its own sentence; anything else reads "We could not finish the edit"', async () => {
+    const listen = setup(autoEditJob());
+    await failJob(listen.deps, { jobId: JOB_ID, organizationId: ORG, code: 'transcribe_failed' });
+    expect(listen.rows.closed[0]?.error).toMatchObject({ code: 'transcribe_failed' });
+
+    const other = setup(autoEditJob());
+    await failJob(other.deps, { jobId: JOB_ID, organizationId: ORG, code: 'tool_failed' });
+    expect(other.rows.jobs.get(JOB_ID)?.status).toBe('FAILED');
+    expect(other.rows.closed[0]?.error).toEqual({
+      code: 'auto_edit_failed',
+      message:
+        'We could not finish the edit. Try again: what we heard is kept, so it costs nothing more.',
+    });
+    expect(other.privateStorage.deleted).toEqual([]);
+  });
+
+  it('a cancel closes the job as CANCELLED, deleting nothing', async () => {
+    const { deps, rows, privateStorage, reverseCharges } = setup(autoEditJob());
+    expect(await cancelJob(deps, { jobId: JOB_ID, organizationId: ORG })).toBe(true);
+    expect(rows.jobs.get(JOB_ID)?.status).toBe('CANCELLED');
+    expect(privateStorage.deleted).toEqual([]);
+    expect(reverseCharges).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG });
+  });
+});

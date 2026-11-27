@@ -17,6 +17,7 @@ import {
   estimateEtaSeconds,
   jobLabel,
   type ProgressSample,
+  type RecipeSkip,
 } from '@postgear/video-engine';
 import { z } from 'zod';
 
@@ -34,8 +35,11 @@ export interface ClipJobView {
   videoId: string | null;
   clipId: string | null;
   error: ClipError | null;
-  /** The finished job's result, per kind; never a storage key. */
-  result: Record<string, string | number | boolean | null> | null;
+  /**
+   * The finished job's result, per kind; never a storage key. Flat values,
+   * except an AUTO_EDIT's `skipped` (Module 10: the parts its recipe left out).
+   */
+  result: Record<string, string | number | boolean | null | RecipeSkip[]> | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -122,6 +126,15 @@ function resultOf(kind: ClipJobKind, raw: unknown): ClipJobView['result'] {
       const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['SPEECH']>;
       // Module 09: the made voice's sound id, which the editor adds as `{ asset: assetId }`.
       return { assetId: value.assetId, durationMs: value.durationMs };
+    }
+    case 'AUTO_EDIT': {
+      const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['AUTO_EDIT']>;
+      // Module 10: the clip to open, and what the recipe left out (part and reason, never words).
+      return {
+        clipId: value.clipId,
+        skipped: value.skipped.map((skip) => ({ part: skip.part, reason: skip.reason })),
+        noSpeech: value.noSpeech,
+      };
     }
   }
 }

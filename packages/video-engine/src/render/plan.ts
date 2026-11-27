@@ -24,9 +24,11 @@
  */
 import { type ClipDocument, clipDocumentSchema, type Segment } from '../document/schema';
 import { type ExportQuality, isExportQuality } from '../quality';
+import { cardsMs } from '../time/cards';
 import { outputDuration, placeSegments } from '../time/time-map';
 import { zoomWindows } from '../time/zooms';
 import { type BleepRange, bleepRanges } from './bleep-plan';
+import { cardsOf, type PlanCards, planCards } from './card-plan';
 import { RenderCompileError } from './errors';
 import { type PlanCaptions, planCaptions, type RenderCaptionsAsset } from './caption-plan';
 import { checkFonts, type FontManifest, fontsNeeded } from './fonts';
@@ -226,6 +228,14 @@ export interface RenderPlan {
   shapes: PlanShape[];
   /** Sprint 13: the clip's captions as pages and font runs, or null when it has none. */
   captions: PlanCaptions | null;
+  /**
+   * Module 10: the cards drawn before and after the clip. Absent for a clip
+   * with none, so its plan is what it was. With cards, `output.durationMs`
+   * is the whole file and `cards.bodyMs` the clip's own length, which the
+   * fades, the items, the captions, the bleeps and the sounds are on
+   * (`planBodyMs`).
+   */
+  cards?: PlanCards;
   fonts: {
     dir: string | null;
     families: string[];
@@ -290,8 +300,12 @@ function refuseUnsupported(doc: ClipDocument): void {
   // Every layout renders (Module 10), and a crop that moves renders through
   // its `sendcmd` file (Module 08). A crop whose size changes would need the
   // output of `crop` to change size mid-stream, so it is refused rather than
-  // drawn at one size.
-  for (const area of doc.layout.areas) {
+  // drawn at one size. A part's own layout (Module 10) is held to the same.
+  const areas = [
+    ...doc.layout.areas,
+    ...doc.segments.flatMap((segment) => segment.layoutOverride?.areas ?? []),
+  ];
+  for (const area of areas) {
     if (!cropSizeIsConstant(area.crop)) {
       throw new RenderCompileError(
         'crop_keyframes_unsupported',
@@ -448,6 +462,8 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       throw new RenderCompileError('layout_unsupported', 'The layout has no area');
     }
     const canvasAspect = doc.canvas.width / doc.canvas.height;
+    // A part's own layout (Module 10) in place of the clip's; `frameState` reads the same one.
+    const layout = segment.layoutOverride ?? doc.layout;
     const areas: PlanArea[] = state.areas.map((area, areaIndex) => {
       const width = Math.min(size.width, evenSize(area.content.w * size.width));
       const height = Math.min(size.height, evenSize(area.content.h * size.height));
@@ -458,7 +474,7 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
       const crop = toPixels(area.visibleCrop, asset.width, asset.height);
       // A crop that moves inside this segment: its keys in this run's clock (Module 08).
       const path = planCropPath({
-        area: doc.layout.areas[areaIndex] as ClipDocument['layout']['areas'][number],
+        area: layout.areas[areaIndex] as ClipDocument['layout']['areas'][number],
         areaIndex,
         segmentIndex: entry.index,
         sourceIn: segment.sourceIn,
@@ -555,6 +571,17 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     inputs.length + stickers.length + (watermark ? 1 : 0),
   );
 
+  // Cards (Module 10): their logos read the inputs after the sounds.
+  const cards = planCards(
+    doc,
+    ctx.assets.stickers ?? {},
+    fontsAsset?.manifest ?? null,
+    size,
+    durationMs,
+    inputs.length + stickers.length + (watermark ? 1 : 0) + sounds.length,
+  );
+  const cardTexts = cardsOf(cards).flatMap((card) => (card.text ? [card.text] : []));
+
   // Zooms: the windows frameState reads, the focus in output pixels.
   const zooms: PlanZoom[] = zoomWindows(doc).map((window) => ({
     id: window.zoomId,
@@ -571,7 +598,12 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
     quality: ctx.quality,
     proof: ctx.proof,
     encode: spec,
-    output: { width: size.width, height: size.height, fps: spec.fps, durationMs },
+    output: {
+      width: size.width,
+      height: size.height,
+      fps: spec.fps,
+      durationMs: cards ? durationMs + cardsMs(doc) : durationMs,
+    },
     scale: size.scale,
     inputs,
     segments,
@@ -597,9 +629,19 @@ export function buildRenderPlan(document: ClipDocument, ctx: RenderContext): Ren
         ...new Set([
           ...(fontsAsset && texts.length > 0 ? textFontFiles(texts, fontsAsset.manifest) : []),
           ...(captions?.files ?? []),
+          ...(fontsAsset && cardTexts.length > 0
+            ? textFontFiles(cardTexts, fontsAsset.manifest)
+            : []),
         ]),
       ].sort(),
-      psNames: [...new Set([...textFontNames(texts), ...(captions?.psNames ?? [])])].sort(),
+      psNames: [
+        ...new Set([
+          ...textFontNames(texts),
+          ...(captions?.psNames ?? []),
+          ...textFontNames(cardTexts),
+        ]),
+      ].sort(),
     },
+    ...(cards ? { cards } : {}),
   };
 }

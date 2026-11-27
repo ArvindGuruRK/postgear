@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { clipDocumentSchema } from './document/schema';
 import { CLIP_PLATFORMS, LINK_KINDS } from './links/types';
 import { EXPORT_QUALITIES } from './quality';
+import { isStarterRecipeId, type RecipeSkip } from './recipes/schema';
 
 export const CLIP_JOB_KINDS = [
   'IMPORT',
@@ -26,6 +27,8 @@ export const CLIP_JOB_KINDS = [
   'FACES',
   'TRANSLATE',
   'SPEECH',
+  // Module 10: Auto-Edit Video.
+  'AUTO_EDIT',
 ] as const;
 export type ClipJobKind = (typeof CLIP_JOB_KINDS)[number];
 
@@ -53,6 +56,7 @@ export const CLIP_JOB_STAGES = {
   FACES: ['faces'],
   TRANSLATE: ['translating'],
   SPEECH: ['voice'],
+  AUTO_EDIT: ['listening', 'applying'],
 } as const satisfies Record<ClipJobKind, readonly string[]>;
 
 export type ClipJobStage = (typeof CLIP_JOB_STAGES)[ClipJobKind][number];
@@ -76,6 +80,7 @@ const STAGE_LABELS: Record<ClipJobKind, Record<string, string>> = {
   FACES: { faces: 'Finding faces' },
   TRANSLATE: { translating: 'Translating the captions' },
   SPEECH: { voice: 'Making the voice' },
+  AUTO_EDIT: { listening: 'Listening to what is said', applying: 'Applying your recipe' },
 };
 
 export const WAITING_LABEL = 'Waiting for its turn';
@@ -325,6 +330,32 @@ export const speechInputSchema = z
   })
   .strict();
 
+/** A starter recipe's id, or the workspace's own recipe row id. */
+export const recipeIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine((id) => isStarterRecipeId(id) || uuid.safeParse(id).success, 'Not a recipe id');
+
+/**
+ * Auto-Edit Video (Module 10): one clip over `range` with the recipe applied.
+ * The API made `clipId` and, when the recipe needs words the video has not
+ * had listened to, started a TRANSCRIBE job (`listenJobId`, its own charge)
+ * that this job waits for. `listenStarted` is false when the listening was
+ * already running for another caller (it is not this job's to cancel).
+ * No charge of its own.
+ */
+export const autoEditInputSchema = z
+  .object({
+    videoId: uuid,
+    clipId: uuid,
+    recipeId: recipeIdSchema,
+    range: msRangeSchema,
+    listenJobId: uuid.nullable(),
+    listenStarted: z.boolean(),
+  })
+  .strict();
+
 export const CLIP_JOB_INPUT_SCHEMAS = {
   IMPORT: importInputSchema,
   SEGMENT: segmentInputSchema,
@@ -335,8 +366,10 @@ export const CLIP_JOB_INPUT_SCHEMAS = {
   FACES: facesInputSchema,
   TRANSLATE: translateInputSchema,
   SPEECH: speechInputSchema,
+  AUTO_EDIT: autoEditInputSchema,
 } as const;
 
+export type AutoEditInput = z.infer<typeof autoEditInputSchema>;
 export type TranscribeInput = z.infer<typeof transcribeInputSchema>;
 export type FacesInput = z.infer<typeof facesInputSchema>;
 export type TranslateInput = z.infer<typeof translateInputSchema>;
@@ -357,6 +390,7 @@ export interface ClipJobInputs {
   FACES: FacesInput;
   TRANSLATE: TranslateInput;
   SPEECH: SpeechInput;
+  AUTO_EDIT: AutoEditInput;
 }
 
 // --- Outputs ------------------------------------------------------------------
@@ -501,6 +535,46 @@ export const speechOutputSchema = z
   .object({ assetId: uuid.nullable(), durationMs: wholeMs })
   .strict();
 
+/** The parts and reasons of `RecipeSkip`, as data, so a job's output is checked like any other. */
+export const RECIPE_SKIP_PARTS = [
+  'layout',
+  'follow',
+  'captions',
+  'silences',
+  'fillers',
+  'bleep',
+  'hookTitle',
+] as const satisfies readonly RecipeSkip['part'][];
+export const RECIPE_SKIP_REASONS = [
+  'no_transcript',
+  'no_speech',
+  'not_offered',
+  'clip_too_short',
+  'nothing_found',
+  'no_faces',
+] as const satisfies readonly RecipeSkip['reason'][];
+
+// Both ways: a reason added to `RecipeSkip` and not here fails the build.
+type MissingSkipPart = Exclude<RecipeSkip['part'], (typeof RECIPE_SKIP_PARTS)[number]>;
+type MissingSkipReason = Exclude<RecipeSkip['reason'], (typeof RECIPE_SKIP_REASONS)[number]>;
+const skipTablesComplete: [MissingSkipPart, MissingSkipReason] extends [never, never]
+  ? true
+  : never = true;
+void skipTablesComplete;
+
+export const recipeSkipSchema = z
+  .object({ part: z.enum(RECIPE_SKIP_PARTS), reason: z.enum(RECIPE_SKIP_REASONS) })
+  .strict();
+
+/** A finished Auto-Edit: the clip made, the parts not applied, and whether anyone spoke. */
+export const autoEditOutputSchema = z
+  .object({
+    clipId: uuid,
+    skipped: z.array(recipeSkipSchema).max(32),
+    noSpeech: z.boolean(),
+  })
+  .strict();
+
 export const CLIP_JOB_OUTPUT_SCHEMAS = {
   IMPORT: importOutputSchema,
   SEGMENT: segmentOutputSchema,
@@ -511,7 +585,10 @@ export const CLIP_JOB_OUTPUT_SCHEMAS = {
   FACES: facesOutputSchema,
   TRANSLATE: translateOutputSchema,
   SPEECH: speechOutputSchema,
+  AUTO_EDIT: autoEditOutputSchema,
 } as const;
+
+export type AutoEditOutput = z.infer<typeof autoEditOutputSchema>;
 
 export type TranscribeOutput = z.infer<typeof transcribeOutputSchema>;
 export type FacesOutput = z.infer<typeof facesOutputSchema>;

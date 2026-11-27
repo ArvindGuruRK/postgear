@@ -25,6 +25,7 @@ import {
   upgrade,
 } from '@postgear/design-engine';
 import { z } from 'zod';
+import { clipBrandFields } from '../../clips/brand-kits/clip-brand-fields';
 import { collapseWhitespace, stripControlChars } from '../../../common/sanitize';
 import { MAX_SEARCH_LENGTH } from '../../../common/search-terms';
 import { MAX_CHANNELS_PER_POST } from '../../posts/dto/posts.schema';
@@ -281,7 +282,13 @@ export const brandKitBodySchema = z
   })
   .strict();
 
+/**
+ * Sprint 13, Module 10: an update also takes the kit's clip fields (the
+ * same shape and checks as `PATCH /clips/brand-kits/:id`); Studio's own
+ * screens never send them.
+ */
 export const updateBrandKitSchema = brandKitBodySchema
+  .extend(clipBrandFields)
   .partial()
   .strict()
   .refine((body) => Object.keys(body).length > 0, STUDIO_MESSAGES.NOTHING_TO_SAVE);

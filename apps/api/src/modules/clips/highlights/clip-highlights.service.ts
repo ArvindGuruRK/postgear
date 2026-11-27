@@ -57,6 +57,7 @@ import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipTranscriptsService } from '../transcripts/clip-transcripts.service';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
+import { assertSetupReferences } from '../recipes/setup-references';
 import {
   type HighlightRunView,
   type HighlightsView,
@@ -147,6 +148,8 @@ export class ClipHighlightsService {
     const video = await this.requireVideo(orgId, videoId);
     if (video.status !== 'READY' || video.durationMs === null) throw notReady();
     const range = this.setupRange(setup, video.durationMs);
+    // Module 10: the recipe and kit the setup names must be this workspace's.
+    await assertSetupReferences(orgId, setup);
     const listen = await this.transcripts.quote(orgId, video.id, {
       fromMs: range.fromMs,
       toMs: range.toMs,
@@ -278,6 +281,9 @@ export class ClipHighlightsService {
   ): Promise<StartHighlightsOutcome> {
     const durationMs = video.durationMs as number;
     const range = this.setupRange(setup, durationMs);
+    // Module 10: the recipe and kit the setup names must be this workspace's (the run keeps
+    // `recipeId` and `brandKitId` with the setup in its params, for `applyToRun`).
+    await assertSetupReferences(orgId, setup);
     const chosen: ClipSetup = { ...setup, range };
     const listen = await this.transcripts.quote(orgId, video.id, {
       fromMs: range.fromMs,

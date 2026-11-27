@@ -23,6 +23,10 @@
  *   platform's own reason or reads "We could not prepare this file. Try
  *   again."), and both charges (the day's download and the import minutes)
  *   are given back in full.
+ * - **Auto-Edit** (Sprint 13, Module 10), failed or cancelled: nothing was
+ *   stored and it has no charge of its own (the listening is the listen
+ *   job's, given back by that job). The job closes with `transcribe_failed`
+ *   when its listen job did not finish, else "We could not finish the edit".
  * - A job that is already DONE is never touched: a cancel that arrives after
  *   the finish loses, and the finished video stays.
  */
@@ -239,6 +243,15 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
         now,
       );
 
+    case 'AUTO_EDIT':
+      return closeAutoEdit(
+        deps,
+        job,
+        'FAILED',
+        storedJobError(autoEditFailureCode(failure.code)),
+        now,
+      );
+
     default:
       return deps.rows.closeJob({
         jobId: job.id,
@@ -319,6 +332,9 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
     case 'TRANSLATE':
     case 'SPEECH':
       return closeAiStep(deps, job, 'CANCELLED', error, now);
+
+    case 'AUTO_EDIT':
+      return closeAutoEdit(deps, job, 'CANCELLED', error, now);
 
     default:
       return deps.rows.closeJob({
@@ -456,6 +472,37 @@ async function closeAiStep(
   const closed = await deps.rows.closeJob({
     jobId: job.id,
     organizationId: org,
+    status,
+    error,
+    now,
+  });
+  await reverse(deps, job);
+  return closed;
+}
+
+/** Codes an Auto-Edit keeps as they are; anything else reads "We could not finish the edit". */
+const AUTO_EDIT_OWN_CODES = new Set(['transcribe_failed', 'timed_out', 'cancelled']);
+
+export function autoEditFailureCode(code: string): string {
+  return AUTO_EDIT_OWN_CODES.has(code) ? code : 'auto_edit_failed';
+}
+
+/**
+ * An Auto-Edit that ended badly (Module 10): nothing to delete (the API makes
+ * the clip in its last call, in one write), the job closed, and the reversal
+ * asked anyway (the job holds no charge, so it gives back nothing; kept so a
+ * later charge under this job is never forgotten).
+ */
+async function closeAutoEdit(
+  deps: OutcomeDeps,
+  job: JobRow,
+  status: 'FAILED' | 'CANCELLED',
+  error: { code: string; message: string },
+  now: Date,
+): Promise<boolean> {
+  const closed = await deps.rows.closeJob({
+    jobId: job.id,
+    organizationId: job.organizationId,
     status,
     error,
     now,

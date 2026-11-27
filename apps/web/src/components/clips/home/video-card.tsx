@@ -13,12 +13,14 @@
  *
  * A card that only holds buttons does not move on hover; its buttons do.
  * The menu holds Edit Whole Video (Module 07, when the page offers it),
- * Download Original (Module 18, an uploaded video only) and Delete Video,
- * whose confirm counts the clips that go with the video.
+ * Auto-Edit Video (Sprint 13, Module 10: a ready video, its dialog held by
+ * the card), Download Original (Module 18, an uploaded video only) and
+ * Delete Video, whose confirm counts the clips that go with the video.
  */
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
 import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertical-icon';
 import { ScissorsIcon } from '@animateicons/react/lucide/scissors-icon';
+import { WandSparklesIcon } from '@animateicons/react/lucide/wand-sparkles-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import {
   Alert,
@@ -51,6 +53,7 @@ import type { ClipJobView, ClipVideoCard } from '@/types/clips';
 import { PrimaryLink } from '../button-link';
 import { isTerminalJob } from '../clip-job-model';
 import { useClipJob } from '../use-clip-job';
+import { AutoEditDialog } from '../video/auto-edit-dialog';
 import {
   deleteVideoSentence,
   etaLabel,
@@ -105,6 +108,13 @@ export function VideoCard({
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
+  const [autoEditOpen, setAutoEditOpenState] = useState(false);
+  // Mounted on first use and kept, so a run started there still opens its clip once closed.
+  const [autoEditUsed, setAutoEditUsed] = useState(false);
+  const setAutoEditOpen = (open: boolean) => {
+    if (open) setAutoEditUsed(true);
+    setAutoEditOpenState(open);
+  };
 
   // The job ended while the card was open: ask for the row again (once).
   const settled = useRef(false);
@@ -144,6 +154,8 @@ export function VideoCard({
     actions.onDownloadOriginal !== undefined &&
     video.status === 'READY' &&
     video.platform === 'upload';
+  // The playground (no API) shows no Auto-Edit; every live card of a ready video does.
+  const canAutoEdit = follow && video.status === 'READY';
   const percent = Math.max(0, Math.min(100, Math.round(job?.progress ?? 0)));
   const eta = job?.status === 'RUNNING' ? etaLabel(job.etaSeconds) : null;
 
@@ -284,6 +296,18 @@ export function VideoCard({
                   <DropdownMenuSeparator />
                 </>
               ) : null}
+              {canAutoEdit ? (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => setAutoEditOpen(true)}
+                    data-testid="clips-video-auto-edit"
+                  >
+                    <MotionIcon icon={WandSparklesIcon} className="h-4 w-4" />
+                    Auto-Edit Video
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
               {canDownloadOriginal ? (
                 <>
                   <DropdownMenuItem
@@ -315,6 +339,14 @@ export function VideoCard({
         }}
         onDelete={actions.onDelete}
       />
+      {canAutoEdit && autoEditUsed ? (
+        <AutoEditDialog
+          orgId={orgId}
+          video={{ id: video.id, title: video.title, durationMs: video.durationMs ?? 0 }}
+          open={autoEditOpen}
+          onOpenChange={setAutoEditOpen}
+        />
+      ) : null}
     </li>
   );
 }

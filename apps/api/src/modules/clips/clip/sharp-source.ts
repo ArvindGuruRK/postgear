@@ -11,13 +11,34 @@
 import type { ClipAsset } from '@postgear/db';
 import {
   type ClipDocument,
-  documentRange,
+  documentRange as engineDocumentRange,
   pickSharpSource,
   type SourceRange,
   safeParseClipDocument,
 } from '@postgear/video-engine';
 
-export { documentRange };
+/**
+ * The parts that play the clip's own video (Module 10): a brand intro or
+ * outro plays another video, in that video's own time, so it never widens
+ * the clip's range on its video. A document whose every part is one keeps
+ * them all.
+ */
+export function mainSegments<T extends Pick<ClipDocument, 'segments'>>(
+  doc: T,
+): Pick<ClipDocument, 'segments'> {
+  const own = doc.segments.filter(
+    (segment) => segment.role !== 'intro' && segment.role !== 'outro',
+  );
+  return { segments: own.length > 0 ? own : doc.segments };
+}
+
+/**
+ * The range a document plays on the clip's own video: what its SEGMENT
+ * (sharp copy) must cover, its line on the video. Brand parts left out.
+ */
+export function documentRange(doc: Pick<ClipDocument, 'segments'>): SourceRange | null {
+  return engineDocumentRange(mainSegments(doc));
+}
 
 /** The range a stored document plays (Module 07, a clip's line on its video), or null if unreadable. */
 export function storedDocumentRange(stored: unknown): SourceRange | null {
@@ -37,7 +58,8 @@ export interface SharpSource {
 }
 
 /**
- * The SEGMENT asset covering every part of the clip, or the newest PROXY,
+ * The SEGMENT asset covering every part of the clip on its own video (brand
+ * intro and outro parts are another video's), or the newest PROXY,
  * or null when the video has neither (still importing, or deleted).
  */
 export function sharpSourceFor(

@@ -80,6 +80,7 @@ model Organization {
   clipLayoutPresets        ClipLayoutPreset[]
   clipCaptionStyles        ClipCaptionStyle[]
   clipWordList             ClipWordList?
+  clipRecipes              ClipRecipe[]
   clipFavourites           ClipFavourite[]
   clipChannels             ClipChannel[]
 
@@ -1096,6 +1097,21 @@ model BrandKit {
   /// points.
   ctaText        String?
   ctaUrl         String?
+  /// Sprint 13, Module 10: what the kit adds to a clip. Studio ignores them.
+  /// The logo's corner (`top-left`, `top-right`, `bottom-left`,
+  /// `bottom-right`) or null for no logo on clips.
+  clipLogoPosition   String?
+  /// A built-in caption style id or a `ClipCaptionStyle` id.
+  clipCaptionStyleId String?
+  /// The intro: an uploaded `ClipVideo` of at most 5 seconds.
+  clipIntroVideoId   String?
+  /// The outro as a video (at most 5 seconds), or, when null and
+  /// `clipOutroText` is set, a 2 second card of the kit's logo and colours.
+  clipOutroVideoId   String?
+  clipOutroText      String?
+  /// The kit's logo copied into the clips space as a sticker asset on first
+  /// use (a `ClipAsset` id), so a clip points at it like any own sticker.
+  clipLogoAssetId    String?
   source         BrandKitSource @default(MANUAL)
   createdById    String?
   createdAt      DateTime       @default(now())
@@ -1860,6 +1876,8 @@ enum ClipJobKind {
   FACES
   TRANSLATE
   SPEECH
+  // Module 10: Auto-Edit Video (wait for listening, then apply a recipe).
+  AUTO_EDIT
 }
 
 enum ClipJobStatus {
@@ -2079,6 +2097,25 @@ model ClipCaptionStyle {
   organizationId String
   name           String
   look           Json
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+/// Sprint 13, Module 10: a saved clip setup under a name, for the whole
+/// workspace. `settings` is the engine's `recipeSettingsSchema` (versioned,
+/// every field optional). The five starter recipes are code, not rows. At
+/// most 50 a workspace (the API holds the limit).
+model ClipRecipe {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  settings       Json
+  /// A Studio brand kit applied with the recipe; kept when the kit is deleted (applying then reports it missing).
+  brandKitId     String?
   createdById    String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

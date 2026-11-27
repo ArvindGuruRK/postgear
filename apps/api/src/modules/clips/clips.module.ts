@@ -24,6 +24,10 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ClipAutoEditController } from './auto-edit/clip-auto-edit.controller';
+import { ClipAutoEditRepository } from './auto-edit/clip-auto-edit.repository';
+import { ClipAutoEditService } from './auto-edit/clip-auto-edit.service';
+import { ClipBrandKitsModule } from './brand-kits/clip-brand-kits.module';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipItemModule } from './clip/clip-item.module';
 import { ClipsCoreModule } from './clips-core.module';
@@ -45,6 +49,7 @@ import { ClipCaptionStylesModule } from './captions/clip-caption-styles.module';
 import { ClipLayoutsModule } from './layouts/clip-layouts.module';
 import { ClipLibraryModule } from './library/clip-library.module';
 import { ClipLinksModule } from './links/clip-links.module';
+import { ClipRecipesModule } from './recipes/clip-recipes.module';
 import { ClipsStatusController } from './status/clips-status.controller';
 import { ClipsStatusService } from './status/clips-status.service';
 import { ClipTranscriptsController } from './transcripts/clip-transcripts.controller';
@@ -70,6 +75,11 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     ClipCaptionStylesModule,
     // Sprint 13, Module 09: `/clips/word-list`, a word route, so before `ClipItemModule`.
     ClipWordListModule,
+    // Sprint 13, Module 10: `/clips/brand-kits` and `/clips/recipes`, word routes. The recipes
+    // module imports `ClipItemModule` itself (its applier makes clips), so it must stay after
+    // every other word-route module and right before `ClipItemModule` (see its file comment).
+    ClipBrandKitsModule,
+    ClipRecipesModule,
     // Keep LAST: its `GET /clips/:clipId` must be registered after every other `/clips/<word>` route.
     ClipItemModule,
   ],
@@ -80,6 +90,8 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     ClipHighlightsController,
     // Sprint 13, Module 02: `/clips/videos/:videoId/transcript`.
     ClipTranscriptsController,
+    // Sprint 13, Module 10: `/clips/videos/:videoId/auto-edit` (and `/price`).
+    ClipAutoEditController,
     ClipJobsController,
     ClipFilesController,
     // Module 18: `/clips/downloads`, a word route, so before `ClipItemModule`.
@@ -94,6 +106,9 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     // Sprint 13, Module 05: reading a transcript for moments (the internal pick route).
     ClipMomentsService,
     ClipStillsService,
+    // Sprint 13, Module 10: Auto-Edit Video (its clip is made by `ClipRecipeApplierService`).
+    ClipAutoEditService,
+    ClipAutoEditRepository,
     ClipUploadsService,
     ClipsInternalService,
     ClipReconcileService,

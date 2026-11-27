@@ -1346,6 +1346,27 @@ The face file (`faces-<job>.json.gz`) holds boxes and times only: no landmarks, 
 
 The word lists are PostGear's own short lists (strong swear words in English and Hindi, none yet for Tamil); mild words go in My Words. No speech text, title or voice line is written to any log. The real voice is Kokoro, run as its own small program (`apps/media/voice-program`, GPL-3.0-or-later, because its phonemiser espeak-ng is GPL); the media service only calls it with a file in and a file out.
 
+**Recipes And Brand Kit (Module 10).** The Clips page has a **Recipes And Brand Kit** link. Recipes and brand kits are free; Auto-Edit Video costs AI minutes only for the part of the video not listened to yet. Restart the Node worker once after pulling this module (it adds `clipAutoEditWorkflow`).
+
+| Do this | What you should see |
+|---|---|
+| **Recipes And Brand Kit**, **Recipes** | Five **Starter Recipes** on top (Clean Up Recording, Auto-Edit Talking Video, Captions Only, Reframe, Social Edit), each with a **Built In** badge, its line and what it sets; only **Duplicate**, no Rename or Delete |
+| **Duplicate** a starter | "Clean Up Recording Copy" under **My Recipes** with **Rename** and **Delete Recipe**; the count reads "1 of 50 recipes" |
+| In a clip, set Vertical and Blurred, the editor's **...** menu, **Save As Recipe**, type a name | The dialog lists what it saves ("Shape: Vertical", "Layout: Blurred", "Export at 1080p"); **Save Recipe** adds it to My Recipes |
+| Another clip, **...**, **Apply A Recipe**, **Apply** on yours | "<name> applied." with **Undo**; Ctrl+Z takes the whole recipe back in one step |
+| A recipe whose caption style was deleted, applied | "This recipe's caption style was deleted. We used Clean instead." |
+| **Brand Kit** tab | One card per Studio brand kit: Logo On Video (a corner, greyed with a sentence when the kit has no logo), Caption Style, Intro (**Upload Video**, at most 5 s), Outro (**Card** with a closing line, or **Video**) |
+| Upload a 3 s video as the intro | "Getting your video ready", then its name, "3 seconds" and **Remove**; a video over 5 s is refused with a sentence |
+| In a clip, **Layouts**, **Brand Kit**, pick the kit | **Intro** and **Outro** switches; the timeline's first bar says **Intro** and plays the intro video; "The closing card shows in Preview Export." |
+| Switch **Intro** off | The Intro bar goes; one Ctrl+Z; the kit and the closing card stay |
+| **Clip Setup**: pick **Social Edit** and a brand kit, **Find Clips** | The summary reads the recipe back; every clip opens with captions, a hook title, the silences cut, the intro first and the closing card; a Split or Gameplay recipe moves the Camera box to the face on first open |
+| Change a control the recipe set (Horizontal) | **Save As Recipe** appears under the tiles, and the summary shows your change |
+| A video page, **Auto-Edit Video** | The recipe Select (Auto-Edit Talking Video first) and the price ("Auto-Edit Video (2 AI Minutes)", or "No AI minutes needed" when the video was listened to) |
+| Press it | "Listening to what is said", "Applying your recipe", "Your clip is ready.", then the editor opens on one clip of the whole video, cleaned and captioned; the same again needs no AI minutes |
+| **Auto-Edit Video** on "Listening Fails [simulate:listen-fail]" | The job fails with "We could not finish listening to this video. Your AI minutes were given back.", the sentence stays in the dialog, no clip is made, and the charge is reversed in the ledger |
+
+A recipe holds settings only (no words, no pictures). Starters have fixed ids (`starter-...`) and no database row. A brand kit's intro or outro plays its own video's light copy, so it is never "more of the video" for the clip. Cards (the closing card) sit outside the clip's own time: the stored clip length includes them, the editor's preview does not draw them, Preview Export does.
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

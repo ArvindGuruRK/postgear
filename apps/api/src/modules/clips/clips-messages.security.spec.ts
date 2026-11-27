@@ -180,6 +180,12 @@ describe('Clips security: Messages', () => {
       FACES: { assetId: '44444444-4444-4444-8444-444444444444', found: 2, sampled: 300 },
       TRANSLATE: { transcriptAssetId: '44444444-4444-4444-8444-444444444444', wordCount: 80 },
       SPEECH: { assetId: '44444444-4444-4444-8444-444444444444', durationMs: 4_000 },
+      // Module 10: the clip to open and what the recipe left out.
+      AUTO_EDIT: {
+        clipId: '44444444-4444-4444-8444-444444444444',
+        skipped: [{ part: 'captions', reason: 'no_speech' }],
+        noSpeech: true,
+      },
     };
 
     it.each(Object.keys(OUTPUTS) as ClipJob['kind'][])(

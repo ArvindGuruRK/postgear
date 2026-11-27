@@ -326,6 +326,9 @@ describe('TranscriptPane', () => {
     fireEvent.click(within(popover).getByTestId('clip-silences-remove'));
     expect(applied).toHaveLength(1);
     expect(applied[0]?.sentence).toBe('Removed 1 pause. The clip is 1.4 seconds shorter.');
+    // Module 10: the same change records the cleanup, with the slider's value.
+    const result = applied[0]?.result;
+    expect(result?.ok && result.doc.meta?.cleanup).toEqual({ silencesMinMs: 800 });
   });
 
   it('Remove Filler Words lists each one with a tick, and removes only the ticked', async () => {
@@ -340,6 +343,8 @@ describe('TranscriptPane', () => {
     fireEvent.click(tick);
     fireEvent.click(within(popover).getByTestId('clip-fillers-remove'));
     expect(applied[0]?.sentence).toBe('Removed 1 filler word. The clip is 0.3 seconds shorter.');
+    const result = applied[0]?.result;
+    expect(result?.ok && result.doc.meta?.cleanup).toEqual({ fillers: true });
   });
 
   it('says so when no filler word was found', async () => {

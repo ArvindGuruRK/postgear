@@ -92,6 +92,30 @@ export function isHookPart(segment: Pick<Segment, 'role'>): boolean {
   return segment.role === 'hook';
 }
 
+/**
+ * Whether a part is a brand kit's intro or outro (Module 10): another video,
+ * played before or after the clip. It is switched on and off in the Layouts
+ * tab, so the timeline does not trim, split or remove it.
+ */
+export function isBrandPart(segment: Pick<Segment, 'role'>): boolean {
+  return segment.role === 'intro' || segment.role === 'outro';
+}
+
+/** The chip on a brand part's bar: "Intro" or "Outro". */
+export function brandPartName(segment: Pick<Segment, 'role'>): 'Intro' | 'Outro' | null {
+  return segment.role === 'intro' ? 'Intro' : segment.role === 'outro' ? 'Outro' : null;
+}
+
+/** A brand part's spoken name (Module 10): "Intro, from 0 seconds, 3 seconds long". */
+export function brandPartLabel(name: 'Intro' | 'Outro', outStart: number, outEnd: number): string {
+  return `${name}, from ${spokenTime(outStart)}, ${spokenTime(outEnd - outStart)} long`;
+}
+
+/** An ordinary part: not a hook, an intro or an outro. */
+function isMainPart(segment: Pick<Segment, 'role'>): boolean {
+  return segment.role === undefined;
+}
+
 /** What an item is called on its bar: the text itself, or its kind. */
 export function itemName(item: TimedItem): string {
   switch (item.type) {
@@ -247,11 +271,12 @@ export function timelineRows(doc: ClipDocument): TimelineRowModel[] {
  * range: there is nothing to compare with, and nothing will be fetched.
  */
 export function partHatch(
-  segment: Pick<Segment, 'sourceIn' | 'sourceOut'> & { speed: number },
+  segment: Pick<Segment, 'sourceIn' | 'sourceOut'> & { speed: number; role?: Segment['role'] },
   lengthMs: number,
   held: SourceRange | null,
 ): { untilMs?: number; fromMs?: number } {
-  if (!held) return {};
+  // Module 10: a brand intro or outro plays another video's light copy, never this one's.
+  if (!held || isBrandPart({ role: segment.role })) return {};
   const hatch: { untilMs?: number; fromMs?: number } = {};
   if (segment.sourceIn < held.fromMs) {
     const edge = Math.min(held.fromMs, segment.sourceOut);
@@ -265,13 +290,23 @@ export function partHatch(
 }
 
 /**
+ * The range a clip plays on its own video (Module 10): its brand intro and
+ * outro left out, since they play other videos. The engine's whole range
+ * when every part is a brand part.
+ */
+export function mainDocumentRange(doc: Pick<ClipDocument, 'segments'>): SourceRange | null {
+  const own = doc.segments.filter((segment) => !isBrandPart(segment));
+  return documentRange({ segments: own.length > 0 ? own : doc.segments });
+}
+
+/**
  * The range More Video should fetch: the clip's whole range when any of it
  * lies outside what we hold (an export reads one stored stretch that covers
  * every part), else null.
  */
 export function missingRange(doc: ClipDocument, held: SourceRange | null): SourceRange | null {
   if (!held) return null;
-  const range = documentRange(doc);
+  const range = mainDocumentRange(doc);
   if (!range) return null;
   return range.fromMs < held.fromMs || range.toMs > held.toMs ? range : null;
 }
@@ -281,6 +316,8 @@ export function missingRange(doc: ClipDocument, held: SourceRange | null): Sourc
 // ---------------------------------------------------------------------------
 
 export const LAST_PART_SENTENCE = 'A clip needs at least one part.';
+export const BRAND_PART_SENTENCE =
+  'The intro and outro come from the brand kit. Switch them off in the Layouts tab.';
 export const SPLIT_EDGE_SENTENCE = `Move the playhead at least ${SEGMENT_MIN_MS / 1000} seconds inside a part to split it.`;
 export const SPLIT_LIMIT_SENTENCE = `A clip can have at most ${MAX_SEGMENTS} parts.`;
 export const SPLIT_FAILED_SENTENCE = 'This part cannot be split here.';
@@ -320,6 +357,11 @@ export function splitAtPlayhead(
   doc: ClipDocument,
   playheadMs: number,
 ): { ok: true; doc: ClipDocument } | { ok: false; sentence: string } {
+  // An intro or outro is the kit's own video: it is not cut.
+  const under = placeSegments(doc).find(
+    (placed) => playheadMs > placed.outStart && playheadMs < placed.outEnd,
+  );
+  if (under && isBrandPart(under.segment)) return { ok: false, sentence: BRAND_PART_SENTENCE };
   const result = splitAt(doc, playheadMs);
   return result.ok
     ? { ok: true, doc: result.doc }
@@ -344,8 +386,10 @@ export function removeSelection(
         const next = removeHook(doc);
         return next === doc ? { ok: false, sentence: LAST_PART_SENTENCE } : { ok: true, doc: next };
       }
+      // Module 10: the kit's intro and outro are switched off in the Layouts tab.
+      if (part && isBrandPart(part)) return { ok: false, sentence: BRAND_PART_SENTENCE };
       // The main clip keeps a part of its own: a clip that is only its hook is no clip.
-      if (part && doc.segments.filter((segment) => !isHookPart(segment)).length <= 1) {
+      if (part && doc.segments.filter(isMainPart).length <= 1) {
         return { ok: false, sentence: LAST_PART_SENTENCE };
       }
       const result = removeSegment(doc, selection.id);
@@ -371,8 +415,9 @@ export function removeProblem(doc: ClipDocument, selection: EditorSelection): st
   if (selection?.kind === 'segment') {
     // The main clip's last part, when the clip also has a hook.
     const part = doc.segments.find((segment) => segment.id === selection.id);
-    const main = doc.segments.filter((segment) => !isHookPart(segment));
-    if (part && !isHookPart(part) && main.length <= 1) return LAST_PART_SENTENCE;
+    if (part && isBrandPart(part)) return BRAND_PART_SENTENCE;
+    const main = doc.segments.filter(isMainPart);
+    if (part && isMainPart(part) && main.length <= 1) return LAST_PART_SENTENCE;
   }
   return null;
 }

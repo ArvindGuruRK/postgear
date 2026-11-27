@@ -12,7 +12,8 @@
  * - a hook part (`role: 'hook'`) that repeats a stretch plays the bleeps of
  *   that stretch too, as every part does,
  * - a part whose sound the person turned off (volume 0) has no voice to
- *   bleep, so it gets no bleep (no lone tone over a silent part).
+ *   bleep, so it gets no bleep (no lone tone over a silent part),
+ * - a brand intro or outro part (Module 10) is never bleeped.
  *
  * The compiler (`compile.ts`) writes them as research 09 section 5's gate on
  * the joined sound: `aeval` mutes every range with 5 ms ramps at both edges,
@@ -69,6 +70,8 @@ function computeRanges(doc: BleepDocument): BleepRange[] {
   for (const placed of placeSegments(doc)) {
     const { segment } = placed;
     if (segment.volume === 0) continue;
+    // A brand intro or outro (Module 10) is another video: it is never bleeped.
+    if (segment.role === 'intro' || segment.role === 'outro') continue;
     for (const bleep of doc.bleeps) {
       if (bleep.source !== segment.source) continue;
       const from = Math.max(bleep.from, segment.sourceIn);

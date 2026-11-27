@@ -10,6 +10,7 @@ import { HttpException } from '@nestjs/common';
 import type { ClipJob } from '@postgear/db';
 import type { PrivateStorage, StorageBackend } from '@postgear/storage';
 import {
+  applyBrandKit,
   createClipDocument,
   documentFingerprint,
   qualityLockedSentence,
@@ -534,5 +535,57 @@ describe('exportProgressOf (the card ring)', () => {
     const progress = await exportProgressOf(TEST_ORG, [CLIP, OTHER_CLIP]);
     expect([...progress.entries()]).toEqual([[CLIP, 0]]);
     expect((await exportProgressOf(TEST_ORG, [])).size).toBe(0);
+  });
+});
+
+describe('ClipExportsService with a brand intro from another video (Module 10)', () => {
+  const INTRO_VIDEO = '23232323-2323-4232-8232-232323232323';
+  const BRANDED = applyBrandKit(DOCUMENT, {
+    id: '1b2c3d4e-5f60-4718-9a2b-3c4d5e6f7081',
+    name: 'Acme',
+    logo: null,
+    logoPosition: null,
+    captionStyleId: null,
+    intro: { videoId: INTRO_VIDEO, durationMs: 3_000, width: 1280, height: 720 },
+    outro: null,
+  });
+
+  function brandedTables(intro: Partial<ReturnType<typeof videoRow>> | null) {
+    const tables = emptyTables();
+    tables.videos.push(videoRow({ status: 'READY' }));
+    if (intro) tables.videos.push(videoRow({ id: INTRO_VIDEO, externalId: '900000002', ...intro }));
+    tables.clips.push(clipRow({ id: CLIP, videoId: VIDEO, document: BRANDED, revision: 4 }));
+    return tables;
+  }
+
+  it('freezes the document with its intro when every video is live and ready', async () => {
+    const { service, tables } = setup(brandedTables({ status: 'READY' }));
+    await service.start(TEST_ORG, TEST_USER, CLIP, { quality: '720p' });
+    const input = newestJob(tables).input as { document: typeof BRANDED; videoId: string };
+    expect(input.videoId).toBe(VIDEO);
+    expect(input.document.sources.map((source) => source.videoId)).toEqual([VIDEO, INTRO_VIDEO]);
+  });
+
+  it('refuses an export and a preview whose intro video was removed, with the removed-video 404', async () => {
+    for (const intro of [null, { status: 'REMOVED' as const }, { deletedAt: NOW }]) {
+      const { service, tables } = setup(brandedTables(intro));
+      const exported = await refusal(service.start(TEST_ORG, TEST_USER, CLIP, { quality: '720p' }));
+      expect(exported.status).toBe(404);
+      expect(exported.body).toMatchObject({ code: 'video_not_found' });
+      const previewed = await refusal(service.startPreview(TEST_ORG, TEST_USER, CLIP, {}));
+      expect(previewed.body).toMatchObject({ code: 'video_not_found' });
+      expect(tables.jobs).toHaveLength(0);
+    }
+  });
+
+  it('refuses an intro video of another workspace, and one that is not ready yet', async () => {
+    const theirs = setup(brandedTables({ status: 'READY', organizationId: OTHER_ORG }));
+    expect(
+      (await refusal(theirs.service.start(TEST_ORG, TEST_USER, CLIP, { quality: '720p' }))).body,
+    ).toMatchObject({ code: 'video_not_found' });
+    const importing = setup(brandedTables({ status: 'IMPORTING' }));
+    expect(
+      (await refusal(importing.service.start(TEST_ORG, TEST_USER, CLIP, { quality: '720p' }))).body,
+    ).toMatchObject({ code: 'video_not_ready' });
   });
 });

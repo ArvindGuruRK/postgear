@@ -96,6 +96,8 @@ import type { SpeakerStretchModel } from '../layouts/follow-model';
 import { Filmstrip } from '../timeline/filmstrip';
 import {
   edgeFrameMs,
+  brandPartLabel,
+  brandPartName,
   hookPartLabel,
   isHookPart,
   itemLabel,
@@ -921,14 +923,18 @@ function EditingTimeline({
               const hatch = partHatch(segment, outEnd - outStart, held);
               const bar = { kind: 'segment', id: segment.id } as const;
               const hook = isHookPart(segment);
+              // Module 10: a brand kit's intro or outro, another video (no filmstrip of its own here).
+              const brand = brandPartName(segment);
               const label = hook
                 ? hookPartLabel(outStart, outEnd)
-                : partLabel(index, outStart, outEnd, speed);
+                : brand
+                  ? brandPartLabel(brand, outStart, outEnd)
+                  : partLabel(index, outStart, outEnd, speed);
               // The hook's delete sits at the end of its last part.
-              const lastHook = hook && !parts[index + 1]?.segment.role;
+              const lastHook = hook && parts[index + 1]?.segment.role !== 'hook';
               return (
                 <div key={segment.id} className="contents">
-                  {visible ? (
+                  {visible && !brand ? (
                     <Filmstrip
                       strip={filmstrip}
                       fromMs={segment.sourceIn + (from - start) * speed}
@@ -945,6 +951,7 @@ function EditingTimeline({
                     data-testid="clip-part"
                     data-part-index={index}
                     data-hook={hook ? '' : undefined}
+                    data-brand={brand ? brand.toLowerCase() : undefined}
                     leftPx={xOf(start)}
                     widthPx={Math.max(6, xOf(end - start))}
                     tone="primary"
@@ -953,7 +960,7 @@ function EditingTimeline({
                     hatchUntilPx={hatch.untilMs === undefined ? undefined : xOf(hatch.untilMs)}
                     hatchFromPx={hatch.fromMs === undefined ? undefined : xOf(hatch.fromMs)}
                     onBodyPointerDown={pressPart(bar, outStart, outEnd, label)}
-                    resizable={!hook}
+                    resizable={!hook && !brand}
                     onStartGripPointerDown={beginTrim(segment.id, 'start')}
                     onEndGripPointerDown={beginTrim(segment.id, 'end')}
                     onKeyDown={barKeys(bar)}
@@ -961,6 +968,9 @@ function EditingTimeline({
                   >
                     {hook ? (
                       <TimelineBarChip data-testid="clip-hook-label">Hook</TimelineBarChip>
+                    ) : null}
+                    {brand ? (
+                      <TimelineBarChip data-testid="clip-brand-part-label">{brand}</TimelineBarChip>
                     ) : null}
                     {speed !== 1 ? <TimelineBarChip>{`${speed}x`}</TimelineBarChip> : null}
                   </TimelineBar>
@@ -1019,7 +1029,8 @@ function EditingTimeline({
               const start = outStart + shift;
               const from = Math.max(start, visibleFrom);
               const to = Math.min(outEnd + shift, visibleTo);
-              if (!(to > from)) return null;
+              // The waveform is the clip's own video: an intro or outro has none drawn here.
+              if (!(to > from) || brandPartName(segment)) return null;
               return (
                 <Waveform
                   key={segment.id}

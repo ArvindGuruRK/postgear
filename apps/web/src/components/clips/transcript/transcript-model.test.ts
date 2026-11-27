@@ -16,6 +16,7 @@ import {
   spokenLength,
   spokenWordAt,
   transcriptParagraphs,
+  withCleanupNote,
   wordsSpan,
 } from './transcript-model';
 
@@ -113,5 +114,22 @@ describe('the Transcript pane model', () => {
   it('finds the span of a run of words', () => {
     expect(wordsSpan(SAID, [6, 7])).toEqual({ fromMs: 13_400, toMs: 13_800 });
     expect(wordsSpan(SAID, [99])).toBeNull();
+  });
+});
+
+describe('the cleanup note (Module 10)', () => {
+  it('records the cleanup on the cut document, keeping what was there, and leaves a refusal alone', () => {
+    const doc = createClipDocument({ videoId: VIDEO, fromMs: 10_000, toMs: 40_000, ratio: '9:16' });
+    const source = doc.segments[0]?.source ?? '';
+    const cut = removeSourceRange({ ...doc, meta: { shapeChosen: true } }, source, 15_000, 16_000);
+    const first = withCleanupNote(cut, { silencesMinMs: 900 });
+    expect(first.ok && first.doc.meta).toEqual({
+      shapeChosen: true,
+      cleanup: { silencesMinMs: 900 },
+    });
+    const both = first.ok ? withCleanupNote({ ...first }, { fillers: true }) : first;
+    expect(both.ok && both.doc.meta?.cleanup).toEqual({ silencesMinMs: 900, fillers: true });
+    const refused = { ok: false as const, code: 'too_short' as never };
+    expect(withCleanupNote(refused, { fillers: true })).toBe(refused);
   });
 });

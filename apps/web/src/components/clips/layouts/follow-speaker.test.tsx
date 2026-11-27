@@ -461,6 +461,27 @@ describe('following on first open', () => {
     expect(screen.queryByText(NO_ONE_TO_FOLLOW)).toBeNull();
   });
 
+  it('steps aside when the person changes the layout while the faces load (Module 10)', async () => {
+    let deliver: (file: FacePictureInput[]) => void = () => undefined;
+    const fakes = deps(null, {
+      loadFile: jest.fn(
+        () =>
+          new Promise<FacePictureInput[]>((resolve) => {
+            deliver = resolve;
+          }),
+      ),
+    });
+    const { state } = renderEditor(fakes, tallClip(), { followOnOpen: true });
+    await waitFor(() => expect(fakes.loadFile).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: /Blurred/ }));
+    await waitFor(() => expect(state.history).toHaveLength(1));
+    const chosen = state.doc;
+    await act(async () => deliver(onePersonWithGap()));
+    expect(state.history).toHaveLength(1);
+    expect(state.doc).toBe(chosen);
+    expect(isFollowing(state.doc)).toBe(false);
+  });
+
   it('waits until finding faces is available', async () => {
     const fakes = deps(onePersonWithGap());
     renderEditor(fakes, tallClip(), { followOnOpen: true, available: false });

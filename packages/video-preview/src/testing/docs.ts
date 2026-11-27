@@ -1,8 +1,11 @@
 /**
  * Small clip documents for the preview's tests (and the web app's playback
- * tests): a Vertical Fullscreen clip of the given parts, all from one video.
+ * tests): a Vertical Fullscreen clip of the given parts, from one video
+ * unless `sources` names more (Module 10's intro and outro, a montage).
  */
 import type { ClipDocument, LayoutArea, Segment } from '@postgear/video-engine';
+
+type SavedLayout = NonNullable<Segment['layoutOverride']>;
 
 export const TEST_VIDEO_ID = '6f1c2b8e-3d4a-4b5c-9d6e-7f8091a2b3c4';
 
@@ -24,15 +27,46 @@ export function part(
   return { id, source: 'src', sourceIn, sourceOut, speed, volume };
 }
 
+/** A part of another video (`source` is the document's source id), with any extra fields. */
+export function partFrom(
+  source: string,
+  id: string,
+  sourceIn: number,
+  sourceOut: number,
+  extra: Partial<Omit<Segment, 'id' | 'source' | 'sourceIn' | 'sourceOut'>> = {},
+): Segment {
+  return { id, source, sourceIn, sourceOut, speed: 1, volume: 1, ...extra };
+}
+
+/** A part's own layout (`segment.layoutOverride`): its whole video, cover-fitted to the canvas. */
+export function fullFrameOverride(areaId: string): SavedLayout {
+  return {
+    kind: 'fullscreen',
+    areas: [
+      {
+        id: areaId,
+        name: 'Video',
+        frame: { x: 0, y: 0, w: 1, h: 1 },
+        crop: [{ at: 0, rect: { x: 0, y: 0, w: 1, h: 1 } }],
+        fit: 'cover',
+      },
+    ],
+  };
+}
+
 export function clipOf(
   segments: Segment[],
-  options: { kind?: ClipDocument['layout']['kind']; areas?: LayoutArea[] } = {},
+  options: {
+    kind?: ClipDocument['layout']['kind'];
+    areas?: LayoutArea[];
+    sources?: ClipDocument['sources'];
+  } = {},
 ): ClipDocument {
   return {
     schemaVersion: 2,
     bleeps: [],
     canvas: { ratio: '9:16', width: 1080, height: 1920, fps: 30, background: '#000000' },
-    sources: [{ id: 'src', videoId: TEST_VIDEO_ID }],
+    sources: options.sources ?? [{ id: 'src', videoId: TEST_VIDEO_ID }],
     segments,
     layout: {
       kind: options.kind ?? 'fullscreen',

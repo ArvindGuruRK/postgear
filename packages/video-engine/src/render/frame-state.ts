@@ -43,6 +43,7 @@ import { FULL_RECT, fitRect, type Point, type Rect, rectAspect } from '../geomet
 import { layoutBase } from '../layout/base';
 import { type BleepRange, bleepsAt } from './bleep-plan';
 import { textFadeAt } from './text-plan';
+import { type RenderedMoment, renderedMoment } from '../time/cards';
 import { frameToMs, outputDuration, segmentAt, toSource } from '../time/time-map';
 import { zoomAt } from '../time/zooms';
 
@@ -367,7 +368,9 @@ export function frameState(
   const sourceAspect =
     facts && facts.width > 0 && facts.height > 0 ? facts.width / facts.height : null;
 
-  const areas: AreaState[] = doc.layout.areas.map((area) => {
+  // A part's own layout (Module 10: a brand intro or outro, Module 11's montage) replaces the clip's.
+  const layout = segment.layoutOverride ?? doc.layout;
+  const areas: AreaState[] = layout.areas.map((area) => {
     const crop = cropAt(area.crop, shownSourceMs);
     const { visibleCrop, content } = placeArea(area, crop, sourceAspect, canvasAspect);
     return {
@@ -384,7 +387,7 @@ export function frameState(
 
   // Blurred and Screen Share (and a Custom layout made from them) draw a blurred copy behind.
   const background: BackgroundState =
-    layoutBase(doc.layout) === 'blurred'
+    layoutBase(layout) === 'blurred'
       ? { kind: 'blurred', crop: blurredBaseCrop(sourceAspect, canvasAspect) }
       : { kind: 'colour', colour: doc.canvas.background };
 
@@ -435,7 +438,7 @@ export function frameState(
       height: doc.canvas.height,
       background: doc.canvas.background,
     },
-    layoutKind: doc.layout.kind,
+    layoutKind: layout.kind,
     segment: {
       id: segment.id,
       index: placed.index,
@@ -458,4 +461,37 @@ export function frameState(
     sounds,
     bleeps: bleepsAt(doc, t),
   };
+}
+
+/** What the rendered file shows at a moment: a card, or the clip (Module 10). */
+export interface RenderedFrameState {
+  /** The card playing, or null while the clip plays. */
+  card: 'opening' | 'closing' | null;
+  /** Milliseconds into that card, or null while the clip plays. */
+  cardMs: number | null;
+  /**
+   * The clip's state: at that clip moment, or, during a card, at the clip's
+   * edge next to it (its start for the opening card, its end for the closing
+   * one), so a caller always has the clip's canvas and sources.
+   */
+  state: FrameState;
+}
+
+/**
+ * `frameState` on the rendered file's clock: the opening card, then the
+ * clip (its own time, unchanged), then the closing card (`time/cards.ts`).
+ * For a clip with no cards it is `frameState(doc, renderedMs)`.
+ */
+export function renderedFrameState(
+  doc: ClipDocument,
+  renderedMs: number,
+  options: FrameStateOptions = {},
+): RenderedFrameState {
+  const moment: RenderedMoment = renderedMoment(doc, renderedMs);
+  if (moment.card === null) {
+    // The opening card's length is whole ms, so a fractional moment keeps its fraction.
+    return { card: null, cardMs: null, state: frameState(doc, moment.clipMs, options) };
+  }
+  const edge = moment.card === 'opening' ? 0 : outputDuration(doc);
+  return { card: moment.card, cardMs: moment.cardMs, state: frameState(doc, edge, options) };
 }

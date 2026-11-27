@@ -14,6 +14,8 @@
  *   MP3 for Audio Only, store it for 24 hours (`download/download.run.ts`).
  * - `clipSaveDownload` and `saveDownloadFailed` (`postgear-media`, Module 18):
  *   Save To Media on a finished download (`download/save-download.run.ts`).
+ * - `clipAutoEdit` (`postgear-media`, Sprint 13 Module 10): waits for the
+ *   listen job, then the API makes the clip (`auto-edit/auto-edit.run.ts`).
  *
  * Bookkeeping (run by the workflow after the work finally failed or was
  * cancelled, in a non-cancellable scope; see `job-outcomes.ts`):
@@ -51,6 +53,7 @@ import type {
 import type { ClipJobWorkflowInput } from '@postgear/scheduling';
 import { downloadOutputSchema } from '@postgear/video-engine';
 import { type ActivityRun, runClipActivity } from '../activity-kit';
+import { type AutoEditRun, runAutoEdit } from '../auto-edit/auto-edit.run';
 import type { ClipActivityDeps } from '../deps';
 import { type DownloadTools, runDownload } from '../download/download.run';
 import { runSaveDownload, saveDownloadFailed } from '../download/save-download.run';
@@ -119,6 +122,8 @@ export interface ClipJobActivityOptions {
   rows?: ClipRows;
   /** Module 16: tests shorten the slow marker's hold. */
   sleep?: HighlightsRun['sleep'];
+  /** Module 10: tests make Auto-Edit's wait for the listen job instant. */
+  autoEditSleep?: AutoEditRun['sleep'];
   /** The rows a clip's sticker files come from (tests pass their own). */
   stickerRows?: StickerFileRows;
   /** The rows a clip's sound files come from (tests pass their own). */
@@ -515,6 +520,33 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
           const outcome = await finishWatching(highlightsRun(opened, dir, activity), ref.stillKeys);
           return { status: outcome.finished ? 'done' : 'closed' };
         });
+      });
+    },
+
+    /**
+     * Sprint 13, Module 10: Auto-Edit Video, one activity. RUNNING, then
+     * `listening` (the listen job's end, heartbeating), then `applying` (the
+     * API makes the clip) and DONE with `{ clipId, skipped, noSpeech }`. A
+     * listen job that did not finish is `transcribe_failed`. No scratch
+     * folder: it touches no file.
+     */
+    async clipAutoEdit(ref: ClipJobWorkflowInput): Promise<ClipWorkResult> {
+      return runClipActivity('clipAutoEdit', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'AUTO_EDIT');
+        const progress = jobProgress(job.id, { kind: 'AUTO_EDIT' });
+        if (!(await start(progress))) return { status: 'closed' };
+        const outcome = await runAutoEdit({
+          jobId: job.id,
+          organizationId: job.organizationId,
+          input,
+          rows,
+          internal: deps.internal,
+          progress,
+          signal: activity.signal,
+          heartbeat: activity.heartbeat,
+          sleep: options.autoEditSleep,
+        });
+        return { status: outcome.finished ? 'done' : 'closed' };
       });
     },
 

@@ -273,6 +273,19 @@ describe('brand kit fonts, lock and call to action (Sprint 9b)', () => {
 });
 
 describe('updateBrandKitSchema', () => {
+  // Sprint 13, Module 10: the clip fields, with the clips kit page's rules.
+  it('takes the clip fields, and refuses a corner, a line or a video id it does not know', () => {
+    expect(
+      updateBrandKitSchema.parse({ clipLogoPosition: 'bottom-left', clipOutroText: '  Bye  ' }),
+    ).toEqual({ clipLogoPosition: 'bottom-left', clipOutroText: 'Bye' });
+    expect(updateBrandKitSchema.parse({ clipOutroText: '   ' })).toEqual({ clipOutroText: null });
+    expect(updateBrandKitSchema.safeParse({ clipLogoPosition: 'middle' }).success).toBe(false);
+    expect(updateBrandKitSchema.safeParse({ clipOutroText: 'a\nb' }).success).toBe(false);
+    expect(updateBrandKitSchema.safeParse({ clipOutroText: 'x'.repeat(81) }).success).toBe(false);
+    expect(updateBrandKitSchema.safeParse({ clipIntroVideoId: 'video-1' }).success).toBe(false);
+    expect(updateBrandKitSchema.safeParse({ clipLogoAssetId: null }).success).toBe(false);
+  });
+
   it('accepts one field, and says there is nothing to save for none', () => {
     expect(updateBrandKitSchema.parse({ logoMediaId: null })).toEqual({ logoMediaId: null });
     expect(messages(updateBrandKitSchema.safeParse({}))).toEqual([STUDIO_MESSAGES.NOTHING_TO_SAVE]);

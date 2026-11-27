@@ -66,6 +66,7 @@ import { ClipsListService } from './clips-list.service';
     ClipHookTitlesService,
   ],
   // Module 08: the internal follow route (in `ClipsModule`) marks a run's clips and asks faces.
-  exports: [ClipItemService, ClipFollowService],
+  // Module 10: the recipe applier makes clips and asks faces.
+  exports: [ClipItemService, ClipFollowService, ClipFacesService],
 })
 export class ClipItemModule {}

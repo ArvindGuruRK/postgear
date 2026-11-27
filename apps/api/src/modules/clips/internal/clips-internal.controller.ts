@@ -10,6 +10,8 @@
  */
 import { Body, Controller, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import type {
+  ClipApplyRecipeAnswer,
+  ClipAutoEditAnswer,
   ClipChargeImportAnswer,
   ClipCheckStillsAnswer,
   ClipFinishExportAnswer,
@@ -93,6 +95,34 @@ export class ClipsInternalController {
     @Body(new ZodBody(orgOnlySchema, 'internal/clips/follow-speaker')) body: OrgOnlyBody,
   ): Promise<FollowSpeakerAnswer> {
     return this.follow.forRun(jobId, body.organizationId);
+  }
+
+  /**
+   * Module 10 (`CLIP_INTERNAL_ROUTES.autoEdit`): an AUTO_EDIT job's last
+   * stage. The whole-video clip with the recipe applied, made once (a
+   * retried call answers the same clip); `{ clipId, skipped, noSpeech }`.
+   */
+  @Post('jobs/:jobId/auto-edit')
+  @HttpCode(HttpStatus.OK)
+  autoEdit(
+    @Param('jobId') jobId: string,
+    @Body(new ZodBody(orgOnlySchema, 'internal/clips/auto-edit')) body: OrgOnlyBody,
+  ): Promise<ClipAutoEditAnswer> {
+    return this.internal.autoEdit(jobId, body);
+  }
+
+  /**
+   * Module 10 (`CLIP_INTERNAL_ROUTES.applyRecipe`): a Find Clips run's recipe
+   * on its new clips, after `follow-speaker`; `{ applied, skipped }`. One
+   * clip that fails is skipped, never the call.
+   */
+  @Post('jobs/:jobId/apply-recipe')
+  @HttpCode(HttpStatus.OK)
+  applyRecipe(
+    @Param('jobId') jobId: string,
+    @Body(new ZodBody(orgOnlySchema, 'internal/clips/apply-recipe')) body: OrgOnlyBody,
+  ): Promise<ClipApplyRecipeAnswer> {
+    return this.internal.applyRecipe(jobId, body);
   }
 
   @Post('jobs/:jobId/charge-import')

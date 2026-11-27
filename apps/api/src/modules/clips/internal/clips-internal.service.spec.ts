@@ -13,6 +13,7 @@ import type { ClipWorkflowState, SchedulingService } from '../../scheduling/sche
 import type { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import type { ClipRecipeApplierService } from '../recipes/clip-recipe-applier.service';
 import { jobRow, TEST_ORG, videoRow } from '../testing/rows';
 import { ClipReconcileService, lostJobCode } from './clip-reconcile.service';
 import { ClipsInternalService } from './clips-internal.service';
@@ -163,6 +164,16 @@ function deps() {
     describeClipJob: jest.fn(async (): Promise<ClipWorkflowState> => 'running'),
   };
   const storage = { deletePrefix: jest.fn(async () => 1) };
+  const applier = {
+    createAutoEditClip: jest.fn(
+      async (_org: string, _user: string | null, input: { clipId: string }) => ({
+        clipId: input.clipId,
+        skipped: [],
+        noSpeech: false,
+      }),
+    ),
+    applyToRun: jest.fn(async () => ({ applied: 2, skipped: 0 })),
+  };
 
   const internal = new ClipsInternalService(
     jobs as unknown as ClipJobsService,
@@ -171,6 +182,7 @@ function deps() {
     usage as unknown as UsageService,
     media as unknown as MediaService,
     notifications as unknown as NotificationsService,
+    applier as unknown as ClipRecipeApplierService,
   );
   const reconciler = new ClipReconcileService(
     jobs as unknown as ClipJobsService,
@@ -191,6 +203,7 @@ function deps() {
     notifications,
     scheduling,
     storage,
+    applier,
   };
 }
 
@@ -400,7 +413,10 @@ describe('ClipsInternalService.finishSaveDownload (Module 18)', () => {
       }),
       fakePrisma,
     );
-    expect(db.jobs[0]?.output).toEqual({ ...OUTPUT, media: { status: 'saved', mediaId: MEDIA_ID } });
+    expect(db.jobs[0]?.output).toEqual({
+      ...OUTPUT,
+      media: { status: 'saved', mediaId: MEDIA_ID },
+    });
   });
 
   it('refuses a download that is not being saved (409), and another workspace or kind (404)', async () => {
@@ -418,11 +434,100 @@ describe('ClipsInternalService.finishSaveDownload (Module 18)', () => {
       NotFoundException,
     );
     db.jobs = [];
-    downloadJob({ status: 'saving', mediaId: null }, { output: { ...OUTPUT, ext: 'mp3', media: { status: 'saving', mediaId: null } } });
+    downloadJob(
+      { status: 'saving', mediaId: null },
+      { output: { ...OUTPUT, ext: 'mp3', media: { status: 'saving', mediaId: null } } },
+    );
     await expect(internal.finishSaveDownload(JOB_ID, SAVE)).rejects.toBeInstanceOf(
       NotFoundException,
     );
     expect(media.saveRendered).not.toHaveBeenCalled();
+  });
+});
+
+// Sprint 13, Module 10: the AUTO_EDIT job's clip, and a Find Clips run's recipe.
+describe('ClipsInternalService.autoEdit and applyRecipe', () => {
+  const VIDEO_ID = videoRow().id;
+  const AUTO_CLIP = '77777777-7777-4777-8777-777777777777';
+  function autoEditJob(overrides: Partial<ClipJob> = {}): ClipJob {
+    return jobRow({
+      id: JOB_ID,
+      kind: 'AUTO_EDIT',
+      status: 'RUNNING',
+      videoId: VIDEO_ID,
+      createdById: 'user-1',
+      input: {
+        videoId: VIDEO_ID,
+        clipId: AUTO_CLIP,
+        recipeId: 'starter-auto-edit-talking-video',
+        range: { fromMs: 0, toMs: 120_000 },
+        listenJobId: null,
+        listenStarted: false,
+      } as unknown as ClipJob['input'],
+      ...overrides,
+    });
+  }
+
+  it('makes the clip the job names, for the person who started it', async () => {
+    db.jobs.push(autoEditJob());
+    const { internal, applier } = deps();
+
+    expect(await internal.autoEdit(JOB_ID, { organizationId: TEST_ORG })).toEqual({
+      clipId: AUTO_CLIP,
+      skipped: [],
+      noSpeech: false,
+    });
+    expect(applier.createAutoEditClip).toHaveBeenCalledWith(TEST_ORG, 'user-1', {
+      clipId: AUTO_CLIP,
+      videoId: VIDEO_ID,
+      recipeId: 'starter-auto-edit-talking-video',
+      range: { fromMs: 0, toMs: 120_000 },
+    });
+  });
+
+  it("refuses another workspace's job, another kind of job, and a word, with 404", async () => {
+    db.jobs.push(autoEditJob({ organizationId: 'seed-second-org' }));
+    const { internal, applier } = deps();
+    await expect(internal.autoEdit(JOB_ID, { organizationId: TEST_ORG })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    db.jobs = [autoEditJob({ kind: 'RENDER' })];
+    await expect(internal.autoEdit(JOB_ID, { organizationId: TEST_ORG })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(internal.autoEdit('job', { organizationId: TEST_ORG })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(internal.applyRecipe('job', { organizationId: TEST_ORG })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(applier.createAutoEditClip).not.toHaveBeenCalled();
+  });
+
+  it('answers a finished job whose clip was made, and refuses one whose clip never was', async () => {
+    db.jobs.push(autoEditJob({ status: 'DONE' }));
+    const { internal, applier } = deps();
+    await expect(internal.autoEdit(JOB_ID, { organizationId: TEST_ORG })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    db.clips.push({
+      id: AUTO_CLIP,
+      organizationId: TEST_ORG,
+      title: 'Team Talk',
+      lastExportedRevision: null,
+      exportedMediaId: null,
+    });
+    expect((await internal.autoEdit(JOB_ID, { organizationId: TEST_ORG })).clipId).toBe(AUTO_CLIP);
+    expect(applier.createAutoEditClip).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands a run's recipe to the applier", async () => {
+    const { internal, applier } = deps();
+    expect(await internal.applyRecipe(JOB_ID, { organizationId: TEST_ORG })).toEqual({
+      applied: 2,
+      skipped: 0,
+    });
+    expect(applier.applyToRun).toHaveBeenCalledWith(TEST_ORG, JOB_ID);
   });
 });
 

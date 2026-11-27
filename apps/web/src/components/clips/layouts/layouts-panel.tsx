@@ -3,6 +3,8 @@
 /**
  * The Layouts tab (Module 10 section 4, blueprint section 8):
  *
+ * - **Brand Kit** (Sprint 13, Module 10): on top, the kit the clip wears and
+ *   a switch for its logo, intro and outro (`brand-kit-section.tsx`).
  * - **Shape**: Vertical, Horizontal, Square and Portrait (4:5) as
  *   `ChoiceTiles`, each a small drawing of the shape over its ratio (the
  *   names are the tooltips and what a screen reader hears; four names in
@@ -42,6 +44,7 @@ import {
 import { useId } from 'react';
 import { GroupLabel } from '@/components/studio/panel-ui';
 import type { SavedLayoutView } from '@/types/clips';
+import { BrandKitSection } from './brand-kit-section';
 import { DetectCamera } from './detect-camera';
 import { FollowSpeaker, type GrabPicture } from './follow-speaker';
 import { unfollowFirst } from './follow-model';
@@ -123,6 +126,8 @@ export function LayoutsPanel({
 
   return (
     <div className="flex flex-col gap-6 pt-1" data-testid="clip-layouts-panel">
+      <BrandKitSection document={document} onEdit={onEdit} />
+
       <div className="flex flex-col gap-2">
         <GroupLabel id={shapeId}>Shape</GroupLabel>
         <ChoiceTiles<Ratio>

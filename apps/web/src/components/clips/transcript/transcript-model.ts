@@ -11,7 +11,9 @@
 import type { TranscriptTextParagraph, TranscriptWordState } from '@postgear/ui';
 import {
   type ClipDocument,
+  type ClipDocumentMeta,
   type CutRefusalCode,
+  type CutResult,
   formatClipLength,
   MAX_SEGMENTS,
   type MsRange,
@@ -237,6 +239,20 @@ export function cleanupToast(kind: 'pauses' | 'fillers', count: number, savedMs:
       ? `${count} ${count === 1 ? 'pause' : 'pauses'}`
       : `${count} filler ${count === 1 ? 'word' : 'words'}`;
   return `Removed ${what}. The clip is ${spokenLength(savedMs)} shorter.`;
+}
+
+/** What a cleanup records on the clip (Module 10): Save As Recipe reads it back. */
+export type CleanupNote = NonNullable<ClipDocumentMeta['cleanup']>;
+
+/**
+ * A cleanup's cut with its note on the clip, in the same change (so the
+ * same undo step): Remove Silences records the shortest pause it removed,
+ * Remove Filler Words that fillers went. A refused cut stays refused.
+ */
+export function withCleanupNote(result: CutResult, note: CleanupNote): CutResult {
+  if (!result.ok) return result;
+  const cleanup: CleanupNote = { ...result.doc.meta?.cleanup, ...note };
+  return { ...result, doc: { ...result.doc, meta: { ...result.doc.meta, cleanup } } };
 }
 
 /** The toast after deleting words. */

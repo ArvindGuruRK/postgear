@@ -68,6 +68,13 @@ export interface BrandKitWrite {
   lockLook?: boolean;
   ctaText?: string | null;
   ctaUrl?: string | null;
+  /** Sprint 13, Module 10: the clip fields (checked by `checkClipBrandFields`) and the logo copy. */
+  clipLogoPosition?: string | null;
+  clipCaptionStyleId?: string | null;
+  clipIntroVideoId?: string | null;
+  clipOutroVideoId?: string | null;
+  clipOutroText?: string | null;
+  clipLogoAssetId?: string | null;
 }
 
 /** Everything a new kit is made of: a created one, or a duplicate of another. */
@@ -85,6 +92,15 @@ export interface BrandKitCreate {
   ctaText: string | null;
   ctaUrl: string | null;
   createdById: string | null;
+  /** Sprint 13, Module 10: a duplicate keeps the original's clip fields. */
+  clip?: {
+    clipLogoPosition: string | null;
+    clipCaptionStyleId: string | null;
+    clipIntroVideoId: string | null;
+    clipOutroVideoId: string | null;
+    clipOutroText: string | null;
+    clipLogoAssetId: string | null;
+  };
 }
 
 /** A share link's `lastViewedAt` is written at most this often. */
@@ -285,6 +301,7 @@ export class StudioRepository {
         ctaText: data.ctaText,
         ctaUrl: data.ctaUrl,
         createdById: data.createdById,
+        ...(data.clip ?? {}),
       },
     });
   }

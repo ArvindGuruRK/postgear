@@ -1,5 +1,7 @@
 import {
+  applyBrandKit,
   type AudioItem,
+  type ClipBrandKit,
   type ClipDocument,
   createClipDocument,
   MAX_SEGMENTS,
@@ -15,6 +17,9 @@ import { TOO_MANY_SOUNDS } from '../panels/audio-model';
 import { TOO_MANY_STICKERS } from '../panels/elements-model';
 import {
   addRefusalSentence,
+  BRAND_PART_SENTENCE,
+  brandPartLabel,
+  brandPartName,
   edgeFrameMs,
   hookPartLabel,
   ITEM_LIMIT_SENTENCE,
@@ -305,6 +310,30 @@ describe('partHatch and missingRange', () => {
     });
     expect(missingRange(doc, null)).toBeNull();
   });
+
+  it('Module 10: a brand intro plays another video, so it is never hatched nor fetched', () => {
+    const doc = clip();
+    const withIntro = {
+      ...doc,
+      sources: [...doc.sources, { id: 'src_brand_intro', videoId: doc.sources[0]?.videoId ?? '' }],
+      segments: [
+        {
+          id: 'seg_brand_intro',
+          source: 'src_brand_intro',
+          sourceIn: 0,
+          sourceOut: 3_000,
+          speed: 1 as const,
+          volume: 1,
+          role: 'intro' as const,
+        },
+        ...doc.segments,
+      ],
+    };
+    expect(missingRange(withIntro, { fromMs: 5_000, toMs: 45_000 })).toBeNull();
+    expect(
+      partHatch({ ...withIntro.segments[0], speed: 1 }, 3_000, { fromMs: 5_000, toMs: 45_000 }),
+    ).toEqual({});
+  });
 });
 
 describe('split and remove', () => {
@@ -491,5 +520,68 @@ describe('the hook (Module 09)', () => {
       ok: false,
       sentence: LAST_PART_SENTENCE,
     });
+  });
+});
+
+describe('the brand kit intro and outro (Module 10)', () => {
+  const kit: ClipBrandKit = {
+    id: '33333333-3333-4333-8333-333333333333',
+    name: 'Acme Kit',
+    logo: null,
+    logoPosition: null,
+    captionStyleId: null,
+    intro: {
+      videoId: '44444444-4444-4444-8444-444444444444',
+      durationMs: 3_000,
+      width: 1920,
+      height: 1080,
+    },
+    outro: {
+      kind: 'video',
+      video: {
+        videoId: '55555555-5555-4555-8555-555555555555',
+        durationMs: 4_000,
+        width: 1280,
+        height: 720,
+      },
+    },
+  };
+  const branded = applyBrandKit(clip(), kit);
+  const intro = branded.segments.find((segment) => segment.role === 'intro');
+  const outro = branded.segments.find((segment) => segment.role === 'outro');
+  const main = branded.segments.find((segment) => segment.role === undefined);
+
+  it('names the parts on their bars and to a screen reader', () => {
+    expect(intro && brandPartName(intro)).toBe('Intro');
+    expect(outro && brandPartName(outro)).toBe('Outro');
+    expect(main && brandPartName(main)).toBeNull();
+    expect(brandPartLabel('Intro', 0, 3_000)).toBe('Intro, from 0 seconds, 3 seconds long');
+  });
+
+  it('does not remove an intro or outro from the timeline, and says where to switch it off', () => {
+    for (const part of [intro, outro]) {
+      expect(removeSelection(branded, { kind: 'segment', id: part?.id ?? '' })).toEqual({
+        ok: false,
+        sentence: BRAND_PART_SENTENCE,
+      });
+      expect(removeProblem(branded, { kind: 'segment', id: part?.id ?? '' })).toBe(
+        BRAND_PART_SENTENCE,
+      );
+    }
+  });
+
+  it('keeps the main clip from losing its last part beside an intro and outro', () => {
+    expect(removeProblem(branded, { kind: 'segment', id: main?.id ?? '' })).toBe(
+      LAST_PART_SENTENCE,
+    );
+    expect(removeSelection(branded, { kind: 'segment', id: main?.id ?? '' })).toEqual({
+      ok: false,
+      sentence: LAST_PART_SENTENCE,
+    });
+  });
+
+  it('does not split the intro', () => {
+    expect(splitAtPlayhead(branded, 1_500)).toEqual({ ok: false, sentence: BRAND_PART_SENTENCE });
+    expect(splitAtPlayhead(branded, 3_000 + 15_000).ok).toBe(true);
   });
 });

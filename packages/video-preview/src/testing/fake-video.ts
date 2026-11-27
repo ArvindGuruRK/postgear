@@ -13,6 +13,9 @@
  *   `requestVideoFrameCallback` does; `advanceTo(mediaMs)` moves it without
  *   callbacks (for the animation frame fallback).
  * - `fail(code)` sets a `MediaError` and fires `error`.
+ * - With `loadOnSrc`, setting `src` starts loading as a browser does: the
+ *   element forgets its metadata (a seek then waits for `loadMetadata()`),
+ *   any error is cleared, and `v0:src <address>` goes into the log.
  *
  * Every call that matters to a test goes into a shared `log` (`v0:play`,
  * `v1:seek 40000`), so a test can check the order of a hand-over.
@@ -21,6 +24,8 @@
 export interface FakeVideoOptions {
   /** Whether it has `requestVideoFrameCallback` (Firefox before 132 does not). */
   frameCallback?: boolean;
+  /** Setting `src` resets the element and is logged (off by default: the older tests do not expect it). */
+  loadOnSrc?: boolean;
 }
 
 type FrameCallback = (
@@ -105,6 +110,20 @@ export class FakeVideo {
         this.isSeeking = false;
       },
     });
+    if (options.loadOnSrc === true) {
+      define('src', {
+        get: () => el.getAttribute('src') ?? '',
+        set: (value: string) => {
+          el.setAttribute('src', value);
+          this.state = 0;
+          this.isSeeking = false;
+          this.mediaError = null;
+          this.width = 0;
+          this.height = 0;
+          this.log.push(`${name}:src ${value}`);
+        },
+      });
+    }
     if (options.frameCallback !== false) {
       define('requestVideoFrameCallback', {
         value: (callback: FrameCallback) => {

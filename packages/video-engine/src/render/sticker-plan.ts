@@ -83,25 +83,44 @@ function checkAsset(item: StickerItem, key: string, asset: RenderStickerAsset): 
   if (!/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(asset.file) || asset.file.length > 120) {
     bad('the file must be a plain relative name');
   }
-  if (!(Number.isInteger(asset.width) && asset.width > 0 && Number.isInteger(asset.height) && asset.height > 0)) {
+  if (
+    !(
+      Number.isInteger(asset.width) &&
+      asset.width > 0 &&
+      Number.isInteger(asset.height) &&
+      asset.height > 0
+    )
+  ) {
     bad('bad picture size');
   }
   if (asset.animated) {
-    if (!(typeof asset.fps === 'number' && asset.fps > 0 && Number.isFinite(asset.fps))) bad('bad fps');
+    if (!(typeof asset.fps === 'number' && asset.fps > 0 && Number.isFinite(asset.fps)))
+      bad('bad fps');
     const frames = asset.frames;
-    if (!(typeof frames === 'number' && Number.isInteger(frames) && frames >= 1 && frames <= STICKER_FRAMES_MAX)) {
+    if (
+      !(
+        typeof frames === 'number' &&
+        Number.isInteger(frames) &&
+        frames >= 1 &&
+        frames <= STICKER_FRAMES_MAX
+      )
+    ) {
       bad('bad frame count');
     }
   }
 }
 
 /** One sticker file a clip uses, once each, in the order the clip first uses it. */
-export type StickerFileRef =
-  | { key: string; library: string }
-  | { key: string; asset: string };
+export type StickerFileRef = { key: string; library: string } | { key: string; asset: string };
 
-/** Every picture sticker's file the document uses (badges have none), each once. */
-export function stickerFilesNeeded(doc: Pick<ClipDocument, 'tracks'>): StickerFileRef[] {
+/**
+ * Every picture sticker's file the document uses (badges have none), each
+ * once, then the cards' logos (Module 10: the workspace's own sticker
+ * assets, fetched like any other).
+ */
+export function stickerFilesNeeded(
+  doc: Pick<ClipDocument, 'tracks'> & Partial<Pick<ClipDocument, 'cards'>>,
+): StickerFileRef[] {
   const seen = new Map<string, StickerFileRef>();
   for (const track of doc.tracks) {
     if (track.kind !== 'overlay') continue;
@@ -112,6 +131,12 @@ export function stickerFilesNeeded(doc: Pick<ClipDocument, 'tracks'>): StickerFi
       if ('library' in item.ref) seen.set(key, { key, library: item.ref.id });
       else if ('asset' in item.ref) seen.set(key, { key, asset: item.ref.asset });
     }
+  }
+  for (const card of [doc.cards?.opening, doc.cards?.closing]) {
+    const asset = card?.logo?.asset;
+    if (!asset) continue;
+    const key = stickerRefKey({ asset }) as string;
+    if (!seen.has(key)) seen.set(key, { key, asset });
   }
   return [...seen.values()];
 }
@@ -144,10 +169,14 @@ export function planStickers(
       const key = stickerRefKey(item.ref) as string;
       const asset = assets[key];
       if (!asset) {
-        throw new RenderCompileError('sticker_missing', 'A sticker file the clip uses was not handed in', {
-          itemId: item.id,
-          ref: key,
-        });
+        throw new RenderCompileError(
+          'sticker_missing',
+          'A sticker file the clip uses was not handed in',
+          {
+            itemId: item.id,
+            ref: key,
+          },
+        );
       }
       checkAsset(item, key, asset);
       const startMs = Math.max(0, item.start);
@@ -187,4 +216,3 @@ export function planStickers(
   }
   return stickers;
 }
-

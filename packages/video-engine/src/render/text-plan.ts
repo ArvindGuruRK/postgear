@@ -219,7 +219,7 @@ function runOf(entry: FontManifestEntry, text: string, sizePx: number): PlanText
 
 function planText(
   item: TextItem,
-  doc: ClipDocument,
+  doc: Pick<ClipDocument, 'canvas'>,
   manifest: FontManifest | null,
   layer: number,
 ): PlanText {
@@ -273,6 +273,19 @@ function planText(
     backing,
     shadow: style.shadow,
   };
+}
+
+/**
+ * One text item as the numbers its ASS line needs (Module 10's cards draw
+ * their line through it, on a canvas of `doc.canvas`'s size).
+ */
+export function planTextItem(
+  item: TextItem,
+  doc: Pick<ClipDocument, 'canvas'>,
+  manifest: FontManifest | null,
+  layer = 0,
+): PlanText {
+  return planText(item, doc, manifest, layer);
 }
 
 /** Every font file the texts use (the twins the worker copies into `fonts/`). */

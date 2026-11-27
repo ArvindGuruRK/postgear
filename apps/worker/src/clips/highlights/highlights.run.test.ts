@@ -414,6 +414,91 @@ describe('runHighlights with a setup (Sprint 13, Module 05)', () => {
     });
   });
 
+  describe('the recipe (Module 10)', () => {
+    const picked = async () => ({
+      moments: [moment(30_000, 62_000), moment(120_000, 150_000)],
+      noSpeech: false,
+      asked: false,
+    });
+
+    it.each([
+      ['a recipe', { recipeId: 'starter-social-edit' }],
+      ['silences', { silences: true }],
+      ['a hook title', { hookTitle: true }],
+      ['a brand kit', { brandKitId: '99999999-aaaa-4bbb-8ccc-000000000003' }],
+    ])('asks the API once, after the clips are written, for a setup with %s', async (_, extra) => {
+      const { make, rows } = await setup();
+      const finish = jest.spyOn(rows, 'finishHighlights');
+      const applyRecipe = jest.fn(async () => ({ applied: 2, skipped: 0 }));
+      const base = make();
+      const outcome = await runHighlights(
+        make({
+          run: { ...base.run, params: setupParams(extra) },
+          internal: { pickMoments: picked, applyRecipe },
+        }),
+      );
+      expect(outcome.finished).toBe(true);
+      expect(applyRecipe).toHaveBeenCalledTimes(1);
+      expect(applyRecipe).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG });
+      expect(finish.mock.invocationCallOrder[0]).toBeLessThan(
+        applyRecipe.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('comes right after Follow The Speaker', async () => {
+      const { make } = await setup();
+      const followSpeaker = jest.fn(async () => ({
+        follow: true,
+        marked: 2,
+        faces: { ready: 0, running: 2, failed: 0 },
+        facesOff: false,
+      }));
+      const applyRecipe = jest.fn(async () => ({ applied: 2, skipped: 0 }));
+      const base = make();
+      await runHighlights(
+        make({
+          run: { ...base.run, params: setupParams({ follow: true, silences: true }) },
+          internal: { pickMoments: picked, followSpeaker, applyRecipe },
+        }),
+      );
+      expect(followSpeaker.mock.invocationCallOrder[0]).toBeLessThan(
+        applyRecipe.mock.invocationCallOrder[0] ?? 0,
+      );
+    });
+
+    it('never asks for a plain setup, or a run with no setup', async () => {
+      const { make } = await setup();
+      const applyRecipe = jest.fn(async () => ({ applied: 0, skipped: 0 }));
+      const base = make();
+      await runHighlights(
+        make({
+          run: { ...base.run, params: setupParams() },
+          internal: { pickMoments: picked, applyRecipe },
+        }),
+      );
+      await runHighlights(make({ internal: { pickMoments: picked, applyRecipe } }));
+      expect(applyRecipe).not.toHaveBeenCalled();
+    });
+
+    it('a failure never fails the run: tried twice on a hiccup, logged with ids only', async () => {
+      const { make } = await setup();
+      const hiccup = jest.fn(async () => {
+        throw new ClipStepError('tool_failed', { retryable: true });
+      });
+      const base = make();
+      const outcome = await runHighlights(
+        make({
+          run: { ...base.run, params: setupParams({ recipeId: 'starter-reframe' }) },
+          internal: { pickMoments: picked, applyRecipe: hiccup },
+        }),
+      );
+      expect(outcome.finished).toBe(true);
+      expect(hiccup).toHaveBeenCalledTimes(2);
+      const warned = (console.warn as jest.Mock).mock.calls.map((call) => String(call[0]));
+      expect(warned.some((line) => line.includes('clips.highlights.recipe_failed'))).toBe(true);
+    });
+  });
+
   it('reads a run with no setup as Sprint 12 did (Quick Find)', () => {
     expect(readRunSetup(undefined)).toBeNull();
     expect(readRunSetup({ tuning: 'signals-v1' })).toBeNull();

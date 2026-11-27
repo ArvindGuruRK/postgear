@@ -21,6 +21,10 @@
  *   once its clips are written (`followSpeaker`): the API marks them to
  *   follow on first open and asks faces for the best three. Free, and a
  *   failure there never fails the run (logged with ids and counts).
+ * - Module 10: a run whose setup has a recipe, removes silences, adds hook
+ *   titles or names a brand kit tells the API once more, right after
+ *   (`applyRecipe`): the API applies them to the run's new clips. The same
+ *   rules: free, ids and counts in the logs, never a reason to fail the run.
  * - Under `CLIPS_SIMULATION`, `[simulate:highlights-fail]` in the video's
  *   title fails the scoring step, and `[simulate:highlights-slow]` holds it
  *   for 30 seconds (so Cancel can be tried); both are ignored otherwise.
@@ -101,7 +105,9 @@ export interface HighlightsRun {
     Partial<Pick<ClipRows, 'job' | 'captionStyle'>>;
   /** Sprint 13, Module 05: the API's moment picker (a run with a setup); Module 06: the still check. */
   internal?: Pick<ClipInternalClient, 'pickMoments'> &
-    Partial<Pick<ClipInternalClient, 'checkStills' | 'reverseCharges' | 'followSpeaker'>>;
+    Partial<
+      Pick<ClipInternalClient, 'checkStills' | 'reverseCharges' | 'followSpeaker' | 'applyRecipe'>
+    >;
   progress: Pick<JobProgress, 'report' | 'flush'>;
   heartbeat(): void;
   now(): Date;
@@ -430,6 +436,47 @@ export async function followSpeakerQuietly(run: HighlightsRun): Promise<void> {
   }
 }
 
+/** Module 10: whether a run's setup asks the API to apply anything to its clips. */
+export function setupAppliesRecipe(setup: ClipSetup): boolean {
+  return Boolean(setup.recipeId || setup.silences || setup.hookTitle || setup.brandKitId);
+}
+
+/**
+ * Module 10: the run's recipe (and silences, hook titles, brand kit) applied
+ * by the API to the clips just written. Tried twice on a hiccup; any failure
+ * is logged (ids and counts) and swallowed, so the run never fails over it.
+ */
+export async function applyRecipeQuietly(run: HighlightsRun): Promise<void> {
+  if (!run.internal?.applyRecipe) return;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const answer = await run.internal.applyRecipe(run.jobId, {
+        organizationId: run.organizationId,
+      });
+      console.log(
+        JSON.stringify({
+          event: 'clips.highlights.recipe',
+          jobId: run.jobId,
+          applied: answer.applied,
+          skipped: answer.skipped,
+        }),
+      );
+      return;
+    } catch (error) {
+      const retryable = error instanceof ClipStepError && error.retryable;
+      if (retryable && attempt < 2 && !run.signal.aborted) continue;
+      console.warn(
+        JSON.stringify({
+          event: 'clips.highlights.recipe_failed',
+          jobId: run.jobId,
+          code: error instanceof ClipStepError ? error.code : 'unknown',
+        }),
+      );
+      return;
+    }
+  }
+}
+
 /**
  * A whole run in one step: gather, then score. A run whose setup asks to
  * Look For Action stops after gathering instead (Module 06): the caller
@@ -715,6 +762,10 @@ export async function scoreHighlights(
   // Module 08: free, and never a reason to fail the run.
   if (chosen?.setup.follow && canFollow(chosen.setup.ratio) && clips.length > 0) {
     await followSpeakerQuietly(run);
+  }
+  // Module 10: free, and never a reason to fail the run.
+  if (chosen && setupAppliesRecipe(chosen.setup) && clips.length > 0) {
+    await applyRecipeQuietly(run);
   }
 
   console.log(

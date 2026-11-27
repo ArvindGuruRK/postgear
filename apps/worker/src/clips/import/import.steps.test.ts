@@ -102,6 +102,24 @@ describe('proxyHeightFor', () => {
 });
 
 describe('runImport', () => {
+  it('decodes keyframes only for an encoded light copy, never a remuxed one (one keyframe in a short intro)', async () => {
+    for (const mode of ['encode', 'remux'] as const) {
+      const { run } = setup(linkInput);
+      const seen: Array<boolean | undefined> = [];
+      const { normalise, derive } = run.tools;
+      run.tools = {
+        ...run.tools,
+        normalise: async (opts) => ({ ...(await normalise(opts)), mode }),
+        derive: async (opts) => {
+          seen.push(opts.keyframesOnly);
+          return derive(opts);
+        },
+      };
+      await runImport(run);
+      expect(seen).toEqual([mode === 'encode']);
+    }
+  });
+
   it('a link: fetch, inspect, normalise, derive, store, then one finishing transaction', async () => {
     const { run, rows, storage, calls, downloader, reports } = setup(linkInput);
 

@@ -14,6 +14,9 @@
  *
  * - `clipSpeechWorkflow` (`postgear-media`, Sprint 13 Module 09): prepare,
  *   `mediaPySpeak` (Python), finish; see the function.
+ * - `clipAutoEditWorkflow` (`postgear-media`, Sprint 13 Module 10): one
+ *   `clipAutoEdit` activity (wait for the listen job, then the API makes the
+ *   clip with the recipe applied).
  * - `clipDownloadWorkflow` (`postgear-media`, Module 18): one `clipDownload`
  *   activity; a failure or a cancel empties its folder and gives back both
  *   charges in the bookkeeping.
@@ -176,6 +179,20 @@ export async function clipSpeechWorkflow(input: ClipJobWorkflowInput): Promise<C
     const spoken = await speak(prepared.payload);
     return workActivities('SPEECH').clipSpeechFinish({ ...input, spoken });
   });
+}
+
+/**
+ * Sprint 13, Module 10: Auto-Edit Video (`postgear-media`). One activity:
+ * stage `listening` waits for the video's listen job (heartbeating; a listen
+ * job that failed or was cancelled fails this one with `transcribe_failed`,
+ * never retried, and no clip is made), then stage `applying` asks the API to
+ * make the whole-video clip with the recipe (idempotent on the job's
+ * `clipId`, so the second attempt is safe). No charge of its own; a cancel is
+ * booked by `runClipJob` like every clip job (the API cancels the listen job
+ * it started).
+ */
+export async function clipAutoEditWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
+  return runClipJob(input, 'AUTO_EDIT', () => workActivities('AUTO_EDIT').clipAutoEdit(input));
 }
 
 export async function clipDownloadWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {

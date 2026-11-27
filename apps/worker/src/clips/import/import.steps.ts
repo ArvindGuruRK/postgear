@@ -289,9 +289,11 @@ export async function importDerive(
     outDir: filmstripDir,
     analysisOut: path.join(run.dir, 'analysis.wav'),
     facts: { durationMs, hasAudio: facts.hasAudio },
-    // The light copy has a keyframe every two seconds, and no filmstrip
-    // interval is shorter, so decoding keyframes only loses nothing.
-    keyframesOnly: true,
+    // An encoded light copy has a keyframe every two seconds, and no filmstrip
+    // interval is shorter, so decoding keyframes only loses nothing. A remuxed
+    // one keeps the original's keyframes, which can be one for a whole short
+    // video (a brand intro): then the filmstrip got no frame and FFmpeg failed.
+    keyframesOnly: proxy.mode === 'encode',
     onProgress: (percent) => {
       void run.progress.report({ stage: 'preparing', progress: mapPercent(percent, 85, 93) });
     },

@@ -11,12 +11,15 @@
  * A word cut by a part's edge is kept only when more than half of it is
  * inside, so a trim never leaves a sliver of a word on screen.
  *
+ * A brand kit's intro and outro parts (Module 10) are other videos and get
+ * no captions, whatever video the transcript is of.
+ *
  * A word under a bleep (Module 09) is shown masked, its first letter and
  * stars ("f***"), so the ASS writer and the preview, which both read these
  * words, never draw it. The transcript is not changed.
  */
 import { bleepCoversWord, maskBleepedWord } from '../cleanup/bleeps';
-import type { CaptionsTrack, ClipDocument } from '../document/schema';
+import type { CaptionsTrack, ClipDocument, Segment } from '../document/schema';
 import { placeSegments } from '../time/time-map';
 import type { Transcript, TranscriptWord } from '../transcript/types';
 
@@ -37,6 +40,11 @@ export interface CaptionWord {
   sourceStart: number;
   /** Set when a bleep covers the word: `text` is then masked ("f***"). */
   bleeped?: true;
+}
+
+/** A brand kit's intro or outro part (Module 10): another video, played around the clip. */
+function isBrandPart(segment: Pick<Segment, 'role'>): boolean {
+  return segment.role === 'intro' || segment.role === 'outro';
 }
 
 /** The first word whose end is after `ms` (words are sorted by start, and do not overlap much). */
@@ -70,6 +78,8 @@ export function captionWords(
   for (const placed of placeSegments(doc)) {
     const { segment } = placed;
     if (options.sourceId !== undefined && segment.source !== options.sourceId) continue;
+    // A brand intro or outro (Module 10) is another video: never captioned, whatever its source.
+    if (isBrandPart(segment)) continue;
     for (let at = firstEndingAfter(words, segment.sourceIn); at < words.length; at += 1) {
       const word = words[at] as TranscriptWord;
       if (word.start >= segment.sourceOut) break;
@@ -77,7 +87,9 @@ export function captionWords(
       // More than half of the word must play in this part.
       if (inside * 2 <= word.end - word.start) continue;
 
-      const edit = Object.hasOwn(track.edits, String(word.i)) ? track.edits[String(word.i)] : undefined;
+      const edit = Object.hasOwn(track.edits, String(word.i))
+        ? track.edits[String(word.i)]
+        : undefined;
       if (edit?.hidden) continue;
       const text = (edit?.text ?? word.text).trim();
       if (text.length === 0) continue;
@@ -113,6 +125,7 @@ export function clipSourceRanges(
   sourceId?: string,
 ): Array<{ fromMs: number; toMs: number }> {
   const ranges = doc.segments
+    .filter((segment) => !isBrandPart(segment))
     .filter((segment) => sourceId === undefined || segment.source === sourceId)
     .map((segment) => ({ fromMs: segment.sourceIn, toMs: segment.sourceOut }))
     .sort((a, b) => a.fromMs - b.fromMs);

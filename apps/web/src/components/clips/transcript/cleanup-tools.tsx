@@ -8,6 +8,10 @@
  * numbers are the real result: the cuts are tried on the document as the
  * slider moves, so "4.2 seconds" is exactly how much shorter the clip gets.
  * **Remove** applies every cut as one undo step.
+ *
+ * Module 10: the same step records the cleanup on the clip (`meta.cleanup`:
+ * the slider's shortest pause, or that fillers went), so Save As Recipe
+ * reads it back.
  */
 import { AudioLinesIcon } from '@animateicons/react/lucide/audio-lines-icon';
 import { EraserIcon } from '@animateicons/react/lucide/eraser-icon';
@@ -44,6 +48,7 @@ import {
   noPausesLine,
   pausesLine,
   spokenLength,
+  withCleanupNote,
 } from './transcript-model';
 
 /** Applies a change made from the latest document; false when it was refused (the sentence is shown). */
@@ -114,7 +119,8 @@ function RemoveSilences({
     if (!found || found.cuts.length === 0) return;
     const count = found.cuts.length;
     const applied = onApply(
-      (doc) => removeSourceRanges(doc, sourceId, found.cuts),
+      (doc) =>
+        withCleanupNote(removeSourceRanges(doc, sourceId, found.cuts), { silencesMinMs: minMs }),
       (before, after) =>
         cleanupToast('pauses', count, outputDuration(before) - outputDuration(after)),
     );
@@ -220,7 +226,7 @@ function RemoveFillers({
   const remove = () => {
     if (cuts.length === 0) return;
     const applied = onApply(
-      (doc) => removeSourceRanges(doc, sourceId, cuts),
+      (doc) => withCleanupNote(removeSourceRanges(doc, sourceId, cuts), { fillers: true }),
       (before, after) =>
         cleanupToast('fillers', count, outputDuration(before) - outputDuration(after)),
     );

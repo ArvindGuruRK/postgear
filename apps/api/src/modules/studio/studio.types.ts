@@ -144,6 +144,17 @@ export interface BrandKitView {
   ctaText: string | null;
   ctaUrl: string | null;
   source: 'MANUAL' | 'EXTRACTED';
+  /**
+   * Sprint 13, Module 10: what the kit adds to a clip (Clips' kit page sets
+   * them; Studio's screens ignore them). `clipLogoAssetId` is the API's own
+   * copy of the logo for clips, read only.
+   */
+  clipLogoPosition: string | null;
+  clipCaptionStyleId: string | null;
+  clipIntroVideoId: string | null;
+  clipOutroVideoId: string | null;
+  clipOutroText: string | null;
+  clipLogoAssetId: string | null;
   createdAt: string;
   /** The editor compares this with a design's `brand.kitVersion` to offer Update From Kit. */
   updatedAt: string;

@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@postgear/ui';
 import {
+  applyBrandKit,
   type ClipDocument,
   createClipDocument,
   defaultSoundItem,
@@ -652,5 +653,45 @@ describe('the hook (Module 09)', () => {
     setup();
     expect(screen.queryByTestId('clip-hook-label')).toBeNull();
     expect(screen.queryByTestId('clip-hook-delete')).toBeNull();
+  });
+});
+
+describe('the brand kit intro and outro (Module 10)', () => {
+  const branded = () =>
+    applyBrandKit(clip(), {
+      id: '33333333-3333-4333-8333-333333333333',
+      name: 'Acme Kit',
+      logo: null,
+      logoPosition: null,
+      captionStyleId: null,
+      intro: {
+        videoId: '44444444-4444-4444-8444-444444444444',
+        durationMs: 3_000,
+        width: 1920,
+        height: 1080,
+      },
+      outro: {
+        kind: 'video',
+        video: {
+          videoId: '55555555-5555-4555-8555-555555555555',
+          durationMs: 4_000,
+          width: 1280,
+          height: 720,
+        },
+      },
+    });
+
+  it('labels the intro and outro bars on the Video row', () => {
+    setup({ document: branded() });
+    const parts = screen.getAllByTestId('clip-part');
+    expect(parts).toHaveLength(3);
+    expect(parts[0]).toHaveAttribute('data-brand', 'intro');
+    expect(parts[0]).toHaveAccessibleName('Intro, from 0 seconds, 3 seconds long');
+    expect(parts[2]).toHaveAttribute('data-brand', 'outro');
+    expect(parts[1]).not.toHaveAttribute('data-brand');
+    expect(screen.getAllByTestId('clip-brand-part-label').map((chip) => chip.textContent)).toEqual([
+      'Intro',
+      'Outro',
+    ]);
   });
 });

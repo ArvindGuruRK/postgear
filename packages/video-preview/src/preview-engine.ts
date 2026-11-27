@@ -29,6 +29,16 @@
  *   re-sought otherwise; the playhead moves to the new end when the clip got
  *   shorter than it. A new address (signed addresses expire) loads at the
  *   current moment and carries on.
+ * - **More than one video** (Sprint 13, Module 10; Module 11's montage). A
+ *   brand kit's intro and outro, or a montage's parts, come from other
+ *   videos: `setExtraSources` gives each of those document sources its own
+ *   address, and every other source id plays the main one (`setSource`).
+ *   Each element holds the address of the part it is placed on, so the
+ *   back one loads and seeks the next part's video ahead of the join. A
+ *   join between two videos is always a hand-over (a cut, so the sound
+ *   fades in there). A part whose video has no address, or an expired or
+ *   failed one, reports its error when the playhead reaches it; seeking to
+ *   a playable part, or a fresh address, clears it.
  * - **Bleeps** (Sprint 13, Module 09): on every document change the engine
  *   hands the clip's bleeps in output ms to the audio layer, which mutes the
  *   video's own sound inside each and plays the 1 kHz tone inside bleep-mode
@@ -80,6 +90,8 @@ import type {
 export interface PreviewEngineOptions {
   document?: ClipDocument | null;
   source?: PreviewSource | null;
+  /** The addresses of the document's other videos, by source id (see `setExtraSources`). */
+  extraSources?: Readonly<Record<string, PreviewSource | null>> | null;
   /**
    * Keep the cost spike's numbers on the snapshot (`stats`). Development
    * only: it adds a clock read per frame.
@@ -128,6 +140,10 @@ type FrameCallbackVideo = HTMLVideoElement & {
 
 interface Slot {
   el: FrameCallbackVideo;
+  /** The address the element holds, or null. */
+  url: string | null;
+  /** The extra source (by id) whose address it holds, or null for the main one. */
+  extraId: string | null;
   /** The part this element is placed on (its `key`), or null. */
   partKey: string | null;
   /** The video moment it was asked to show, in ms of source time, or null. */
@@ -178,6 +194,17 @@ export class PreviewEngine {
   /** The clip's bleeps in output ms. */
   private bleeps: BleepRange[] = [];
   private source: PreviewSource | null = null;
+  /** Addresses of the document's other videos, by source id (Module 10). */
+  private extras: Record<string, PreviewSource | null> = {};
+  /** An extra video that failed to load, by source id, with the address that failed. */
+  private readonly failures = new Map<string, { url: string; error: PreviewError }>();
+  /** Picture sizes seen per address, for a source not on the front element. */
+  private readonly pictureSizes = new Map<string, { width: number; height: number }>();
+  /**
+   * The source id of the part whose video cannot play, when that is what
+   * `error` reports. Null when the error (if any) is the main video's.
+   */
+  private partErrorSource: string | null = null;
 
   private readonly slots: [Slot, Slot];
   private front: 0 | 1 = 0;
@@ -236,6 +263,9 @@ export class PreviewEngine {
     this.audio.attachVideos?.(this.slots.map((slot) => slot.el));
     if (options.document) {
       this.setDocument(options.document);
+    }
+    if (options.extraSources) {
+      this.setExtraSources(options.extraSources);
     }
     if (options.source !== undefined) {
       this.setSource(options.source);
@@ -341,7 +371,7 @@ export class PreviewEngine {
       this.publish();
       return;
     }
-    if (!this.source || this.error) {
+    if (!this.canSeekVideo()) {
       // No picture to draw, but text and stickers still show where they are.
       this.updateLayers('seek');
       this.publish();
@@ -358,7 +388,7 @@ export class PreviewEngine {
     const still = this.parts.find((part) => part.key === previous.key);
     if (still && this.wantPlaying && !this.seekPending && this.holdingFor === null) {
       this.playingIndex = still.index;
-      const media = this.mediaMsOf(this.slots[this.front].el);
+      const media = this.mediaMsOf(this.slots[this.front]);
       this.clockMs = outputAt(still, media);
       this.prepareBack(nextHandover(this.parts, still.index));
       this.publish();
@@ -379,7 +409,8 @@ export class PreviewEngine {
       frontSlot.ready &&
       frontSlot.targetMs !== null &&
       Math.abs(frontSlot.targetMs - target) < 1 &&
-      part.sourceId === previous.sourceId
+      part.sourceId === previous.sourceId &&
+      frontSlot.url === this.urlOf(part.sourceId)
     ) {
       this.playingIndex = part.index;
       frontSlot.partKey = part.key;
@@ -406,6 +437,7 @@ export class PreviewEngine {
       return;
     }
     this.source = source;
+    this.partErrorSource = null;
     this.stopClock();
     this.audio.silence();
     this.ready = false;
@@ -423,6 +455,8 @@ export class PreviewEngine {
       for (const slot of this.slots) {
         slot.el.removeAttribute('src');
         slot.el.load();
+        slot.url = null;
+        slot.extraId = null;
       }
       this.error = previewError('missing_source');
       this.publish();
@@ -437,10 +471,92 @@ export class PreviewEngine {
     }
     this.error = null;
     for (const slot of this.slots) {
-      slot.el.src = url;
+      // An element on another video keeps it; it is placed again below.
+      if (slot.extraId === null) {
+        slot.el.src = url;
+        slot.url = url;
+      }
     }
     if (this.parts.length > 0) {
       this.seekFront(this.clockMs);
+    }
+    this.publish();
+  }
+
+  /**
+   * The addresses of the document's other videos (a brand kit's intro and
+   * outro, a montage's parts), keyed by the document's source id. Every
+   * source id not in the map plays the main address (`setSource`). Null for
+   * an id means that video has no address: its parts report
+   * `missing_source` when the playhead reaches them. Safe at any time: only
+   * the elements on a source whose address changed are loaded again (the
+   * same address after a failure is a retry), at the current moment.
+   */
+  setExtraSources(sources: Readonly<Record<string, PreviewSource | null>> | null): void {
+    if (this.destroyed) return;
+    const previous = this.extras;
+    const next: Record<string, PreviewSource | null> = { ...(sources ?? {}) };
+    const changed = new Set<string>();
+    for (const id of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+      const had = id in previous;
+      const has = id in next;
+      const before = had ? (previous[id]?.url ?? null) : undefined;
+      const after = has ? (next[id]?.url ?? null) : undefined;
+      if (before !== after || this.failures.has(id) || this.partErrorSource === id) {
+        changed.add(id);
+      }
+    }
+    this.extras = next;
+    for (const id of changed) this.failures.delete(id);
+    if (changed.size === 0 || this.parts.length === 0 || !this.canSeekVideo()) {
+      return;
+    }
+    const frontSlot = this.slots[this.front];
+    const playing = this.parts[this.playingIndex];
+    const touches = (slot: Slot): boolean => {
+      if (slot.extraId !== null && changed.has(slot.extraId)) return true;
+      const part = this.parts.find((entry) => entry.key === slot.partKey);
+      return part !== undefined && changed.has(part.sourceId);
+    };
+    if (
+      this.partErrorSource !== null ||
+      touches(frontSlot) ||
+      (playing !== undefined && changed.has(playing.sourceId))
+    ) {
+      // The video under the playhead changed: load it again in place, as a
+      // new main address does.
+      this.stopClock();
+      this.audio.silence();
+      this.ready = false;
+      this.holdingFor = null;
+      this.stalled = false;
+      for (const slot of this.slots) {
+        if (!touches(slot)) continue;
+        slot.partKey = null;
+        slot.targetMs = null;
+        slot.ready = false;
+        slot.el.pause();
+      }
+      if (this.partErrorSource !== null) {
+        this.error = null;
+        this.partErrorSource = null;
+      }
+      this.seekFront(this.clockMs);
+      this.publish();
+      return;
+    }
+    const back = this.backSlot();
+    if (touches(back)) {
+      back.partKey = null;
+      back.targetMs = null;
+      back.ready = false;
+      if (!back.el.paused) back.el.pause();
+    }
+    if (this.holdingFor !== null) {
+      const held = this.parts.find((part) => part.key === this.holdingFor);
+      if (held) this.join(held);
+    } else {
+      this.prepareBack(nextHandover(this.parts, this.playingIndex));
     }
     this.publish();
   }
@@ -514,7 +630,7 @@ export class PreviewEngine {
       this.publish();
       return;
     }
-    if (this.source && !this.error) {
+    if (this.canSeekVideo()) {
       this.seekFront(target);
     }
     this.publish();
@@ -552,7 +668,7 @@ export class PreviewEngine {
     }
     const pending = this.scrubTarget;
     this.scrubTarget = null;
-    if (pending !== null && this.source && !this.error) {
+    if (pending !== null && this.canSeekVideo()) {
       this.seekFront(pending);
     }
     this.applySound(this.slots[this.front], this.parts[this.playingIndex]);
@@ -607,6 +723,8 @@ export class PreviewEngine {
     video.preservesPitch = true;
     const slot: Slot = {
       el: video,
+      url: null,
+      extraId: null,
       partKey: null,
       targetMs: null,
       targetOutputMs: 0,
@@ -637,23 +755,79 @@ export class PreviewEngine {
     return this.slots[this.front === 0 ? 1 : 0];
   }
 
-  private offsetMs(): number {
-    return this.source?.offsetMs ?? 0;
+  /** Video moments can be played: a main address, and no error other than one part's own. */
+  private canSeekVideo(): boolean {
+    return this.source !== null && (this.error === null || this.partErrorSource !== null);
+  }
+
+  /** Where a document source plays from: its own extra address, or the main one. */
+  private bindingOf(sourceId: string): { extraId: string | null; source: PreviewSource | null } {
+    if (Object.hasOwn(this.extras, sourceId)) {
+      return { extraId: sourceId, source: this.extras[sourceId] ?? null };
+    }
+    return { extraId: null, source: this.source };
+  }
+
+  private urlOf(sourceId: string): string | null {
+    return this.bindingOf(sourceId).source?.url ?? null;
+  }
+
+  /**
+   * Why `part`'s own video cannot play, or null. Only an extra source is
+   * checked here: the main address reports its own problems on `setSource`.
+   */
+  private problemOf(part: PreviewPart): PreviewError | null {
+    const { extraId, source } = this.bindingOf(part.sourceId);
+    if (extraId === null) return null;
+    if (!source?.url) return previewError('missing_source');
+    if (isExpired(source, Date.now())) return previewError('source_expired');
+    const failure = this.failures.get(extraId);
+    return failure && failure.url === source.url ? failure.error : null;
+  }
+
+  /** Stops on part `index`, whose video (`sourceId`) cannot play, and reports why. */
+  private reportPartError(index: number, sourceId: string, error: PreviewError): void {
+    const frontSlot = this.slots[this.front];
+    this.playingIndex = index;
+    this.inSync = false;
+    this.ready = false;
+    // A seek still running on the front element is for a moment no longer shown.
+    frontSlot.partKey = null;
+    frontSlot.targetMs = null;
+    frontSlot.ready = false;
+    this.setError(error, sourceId);
+  }
+
+  private offsetOf(slot: Slot): number {
+    const source = slot.extraId === null ? this.source : (this.extras[slot.extraId] ?? null);
+    return source?.offsetMs ?? 0;
   }
 
   /** The video moment an element shows, in source ms. */
-  private mediaMsOf(el: HTMLVideoElement): number {
-    return el.currentTime * 1000 - this.offsetMs();
+  private mediaMsOf(slot: Slot): number {
+    return slot.el.currentTime * 1000 - this.offsetOf(slot);
   }
 
-  /** Asks an element to show `sourceMs` of `part`. Before its metadata, the seek waits for it. */
+  /**
+   * Asks an element to show `sourceMs` of `part`, loading the part's own
+   * video first when it holds another. Before its metadata, the seek waits
+   * for it.
+   */
   private placeSlot(slot: Slot, part: PreviewPart, sourceMs: number, outputMs: number): void {
+    const { extraId, source } = this.bindingOf(part.sourceId);
+    const url = source?.url ?? null;
+    if (url !== null && slot.url !== url) {
+      // A new address starts loading at once (its metadata resets the element).
+      slot.el.src = url;
+      slot.url = url;
+    }
+    slot.extraId = extraId;
     slot.partKey = part.key;
     slot.targetMs = sourceMs;
     slot.targetOutputMs = outputMs;
     slot.ready = false;
     if (slot.el.readyState >= 1) {
-      slot.el.currentTime = (sourceMs + this.offsetMs()) / 1000;
+      slot.el.currentTime = (sourceMs + this.offsetOf(slot)) / 1000;
     }
   }
 
@@ -661,6 +835,16 @@ export class PreviewEngine {
   private seekFront(outputMs: number): void {
     const part = partAt(this.parts, outputMs);
     if (!part || !this.source) return;
+    const problem = this.problemOf(part);
+    if (problem) {
+      this.reportPartError(part.index, part.sourceId, problem);
+      return;
+    }
+    if (this.partErrorSource !== null) {
+      // Away from the part that could not play: the error goes with it.
+      this.error = null;
+      this.partErrorSource = null;
+    }
     this.stopClock();
     const frontSlot = this.slots[this.front];
     if (!frontSlot.el.paused) frontSlot.el.pause();
@@ -684,7 +868,15 @@ export class PreviewEngine {
       return;
     }
     const part = this.parts[index] as PreviewPart;
-    if (back.partKey === part.key && back.targetMs === part.sourceIn) {
+    if (
+      back.partKey === part.key &&
+      back.targetMs === part.sourceIn &&
+      back.url === this.urlOf(part.sourceId)
+    ) {
+      return;
+    }
+    if (this.problemOf(part)) {
+      // Its video cannot play: the join reports it.
       return;
     }
     if (!back.el.paused) back.el.pause();
@@ -783,7 +975,7 @@ export class PreviewEngine {
         slot.lastPresented === null ? 1 : Math.max(0, presented - slot.lastPresented);
       slot.lastPresented = presented;
     }
-    this.advance(metadata.mediaTime * 1000 - this.offsetMs());
+    this.advance(metadata.mediaTime * 1000 - this.offsetOf(slot));
     if (
       this.wantPlaying &&
       this.isFront(slot) &&
@@ -800,7 +992,7 @@ export class PreviewEngine {
     if (this.destroyed || !this.wantPlaying || this.holdingFor !== null || this.seekPending) {
       return;
     }
-    this.advance(this.mediaMsOf(this.slots[this.front].el));
+    this.advance(this.mediaMsOf(this.slots[this.front]));
     if (this.wantPlaying && this.holdingFor === null && this.tickFrame === null) {
       this.tickFrame = this.frames.request(() => this.onAnimationFrame());
     }
@@ -842,6 +1034,13 @@ export class PreviewEngine {
 
   /** At a join: hand over to the back element if it is ready, or hold the last frame. */
   private join(next: PreviewPart): void {
+    const problem = this.problemOf(next);
+    if (problem) {
+      this.holdingFor = null;
+      this.clockMs = next.outStart;
+      this.reportPartError(next.index, next.sourceId, problem);
+      return;
+    }
     const back = this.backSlot();
     if (back.partKey === next.key && back.ready) {
       this.handover(next);
@@ -894,7 +1093,7 @@ export class PreviewEngine {
   private settleOnFront(): void {
     const part = this.parts[this.playingIndex];
     if (!part) return;
-    const media = this.mediaMsOf(this.slots[this.front].el);
+    const media = this.mediaMsOf(this.slots[this.front]);
     if (media >= part.sourceIn && media < part.sourceOut) {
       this.clockMs = outputAt(part, media);
       this.inSync = true;
@@ -916,7 +1115,7 @@ export class PreviewEngine {
       }
       const target = this.scrubTarget;
       this.scrubTarget = null;
-      if (this.source && !this.error) {
+      if (this.canSeekVideo()) {
         this.seekFront(target);
       }
     });
@@ -930,7 +1129,7 @@ export class PreviewEngine {
     const started = this.measure ? this.now() : 0;
     let state: FrameState;
     try {
-      state = frameState(this.doc, at, { sources: this.sourcePictures(frontSlot.el) });
+      state = frameState(this.doc, at, { sources: this.sourcePictures(frontSlot) });
     } catch {
       this.setError(previewError('draw'));
       return false;
@@ -974,15 +1173,26 @@ export class PreviewEngine {
     }
   }
 
-  private sourcePictures(el: HTMLVideoElement): Record<string, SourcePicture> {
-    const picture: SourcePicture = {
-      width: el.videoWidth || 0,
-      height: el.videoHeight || 0,
-      fps: this.source?.fps && this.source.fps > 0 ? this.source.fps : 0,
-    };
+  /**
+   * Each source's own picture size and frame rate: from the front element
+   * when it holds that source's video, else as last seen on either element
+   * (0 until then).
+   */
+  private sourcePictures(slot: Slot): Record<string, SourcePicture> {
+    const { el } = slot;
     const map: Record<string, SourcePicture> = {};
     for (const entry of this.doc?.sources ?? []) {
-      map[entry.id] = picture;
+      const { extraId, source } = this.bindingOf(entry.id);
+      const url = source?.url ?? null;
+      const onFront = extraId === null ? slot.extraId === null : url !== null && slot.url === url;
+      const size = onFront
+        ? { width: el.videoWidth || 0, height: el.videoHeight || 0 }
+        : ((url !== null ? this.pictureSizes.get(url) : undefined) ?? { width: 0, height: 0 });
+      map[entry.id] = {
+        width: size.width,
+        height: size.height,
+        fps: source?.fps && source.fps > 0 ? source.fps : 0,
+      };
     }
     return map;
   }
@@ -1012,8 +1222,10 @@ export class PreviewEngine {
     }
   }
 
-  private setError(error: PreviewError): void {
+  /** Stops and reports `error`; `sourceId` names the extra video it is about (null: the main one). */
+  private setError(error: PreviewError, sourceId: string | null = null): void {
     this.error = error;
+    this.partErrorSource = sourceId;
     this.wantPlaying = false;
     this.stalled = false;
     this.seekPending = false;
@@ -1030,9 +1242,15 @@ export class PreviewEngine {
 
   private onLoadedMetadata(slot: Slot): void {
     if (this.destroyed) return;
+    if (slot.url !== null && slot.el.videoWidth > 0 && slot.el.videoHeight > 0) {
+      this.pictureSizes.set(slot.url, {
+        width: slot.el.videoWidth,
+        height: slot.el.videoHeight,
+      });
+    }
     // A seek asked for before the metadata is made now.
     if (slot.targetMs !== null && !slot.ready) {
-      slot.el.currentTime = (slot.targetMs + this.offsetMs()) / 1000;
+      slot.el.currentTime = (slot.targetMs + this.offsetOf(slot)) / 1000;
     }
   }
 
@@ -1094,10 +1312,35 @@ export class PreviewEngine {
 
   private onError(slot: Slot): void {
     if (this.destroyed) return;
+    if (slot.extraId !== null) {
+      this.onExtraError(slot, slot.extraId);
+      return;
+    }
     const error = mediaErrorOf(slot.el.error, this.source, Date.now());
     if (!error) return;
     this.ready = false;
     this.setError(error);
+  }
+
+  /**
+   * An extra video failed: remembered against its address, and reported now
+   * when its part is on screen or being waited for, else when the playhead
+   * reaches it.
+   */
+  private onExtraError(slot: Slot, sourceId: string): void {
+    const error = mediaErrorOf(slot.el.error, this.extras[sourceId] ?? null, Date.now());
+    if (!error) return;
+    if (slot.url !== null) this.failures.set(sourceId, { url: slot.url, error });
+    const waitedFor = this.holdingFor !== null && this.holdingFor === slot.partKey;
+    if (this.isFront(slot) || waitedFor) {
+      const part = partAt(this.parts, this.clockMs);
+      this.holdingFor = null;
+      this.reportPartError(part?.index ?? this.playingIndex, sourceId, error);
+      return;
+    }
+    slot.partKey = null;
+    slot.targetMs = null;
+    slot.ready = false;
   }
 
   // ------------------------------------------------------------- snapshot

@@ -279,15 +279,69 @@ describe('Clip Setup', () => {
     expect(clipSetupSchema.safeParse(setup).success).toBe(true);
   });
 
-  it('holds later modules switches off and refuses unknown keys', () => {
+  it('refuses unknown keys and bad values', () => {
     const setup = defaultClipSetup(600_000);
     expect(clipSetupSchema.safeParse({ ...setup, action: true }).success).toBe(true);
-    expect(clipSetupSchema.safeParse({ ...setup, silences: true }).success).toBe(false);
-    expect(clipSetupSchema.safeParse({ ...setup, hookTitle: true }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, extra: 1 }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, genre: 'sports' }).success).toBe(false);
     expect(clipSetupSchema.safeParse({ ...setup, range: { fromMs: 0, toMs: 2_000 } }).success).toBe(
       false,
+    );
+  });
+
+  it('opens Module 10: silences, hook title, a recipe and a brand kit', () => {
+    const setup = defaultClipSetup(600_000);
+    expect(setup).toMatchObject({
+      silences: false,
+      hookTitle: false,
+      recipeId: null,
+      brandKitId: null,
+    });
+    const kit = '0b3e4c1a-2f5d-4e6a-9b7c-8d9e0f1a2b3c';
+    for (const recipeId of ['starter-social-edit', kit, null]) {
+      expect(
+        clipSetupSchema.safeParse({
+          ...setup,
+          silences: true,
+          hookTitle: true,
+          recipeId,
+          brandKitId: kit,
+        }).success,
+      ).toBe(true);
+    }
+    expect(clipSetupSchema.safeParse({ ...setup, recipeId: 'bad id!' }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, recipeId: 'x'.repeat(65) }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, recipeId: '' }).success).toBe(false);
+    // A Studio kit id: a uuid, or a readable one for a kit seeded by hand; never free text.
+    expect(
+      clipSetupSchema.safeParse({ ...setup, brandKitId: 'seed-brand-kit-lotus' }).success,
+    ).toBe(true);
+    expect(clipSetupSchema.safeParse({ ...setup, brandKitId: 'kit one' }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, brandKitId: '' }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, silences: 'yes' }).success).toBe(false);
+    expect(clipSetupSchema.safeParse({ ...setup, hookTitle: null }).success).toBe(false);
+  });
+
+  it('still reads a setup stored before Module 10', () => {
+    const stored = {
+      range: { fromMs: 0, toMs: 600_000 },
+      language: 'auto',
+      request: '',
+      genre: 'auto',
+      length: 'auto',
+      ratio: '9:16',
+      captions: { on: false, styleId: 'bold-pop' },
+      action: false,
+      follow: false,
+      silences: false,
+      hookTitle: false,
+      recipeId: null,
+      brandKitId: null,
+    };
+    expect(clipSetupSchema.safeParse(stored).success).toBe(true);
+    // Prices do not change: silences and hook titles are free.
+    expect(setupPrice({ ...stored, action: false }, 3)).toEqual(
+      setupPrice(defaultClipSetup(600_000), 3),
     );
   });
 

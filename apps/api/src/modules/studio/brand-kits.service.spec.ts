@@ -56,6 +56,12 @@ function kitRow(overrides: Partial<BrandKitRow> = {}): BrandKitRow {
     ctaText: null,
     ctaUrl: null,
     source: BrandKitSource.MANUAL,
+    clipLogoPosition: null,
+    clipCaptionStyleId: null,
+    clipIntroVideoId: null,
+    clipOutroVideoId: null,
+    clipOutroText: null,
+    clipLogoAssetId: null,
     createdById: USER,
     createdAt: new Date('2026-10-01T00:00:00Z'),
     updatedAt: new Date('2026-10-02T00:00:00Z'),
@@ -711,6 +717,14 @@ describe('brand kits', () => {
       ctaText: 'Book a call',
       ctaUrl: 'acme.com/book',
       createdById: 'user-2',
+      clip: {
+        clipLogoPosition: null,
+        clipCaptionStyleId: null,
+        clipIntroVideoId: null,
+        clipOutroVideoId: null,
+        clipOutroText: null,
+        clipLogoAssetId: null,
+      },
     });
     expect(view).toMatchObject({
       id: 'kit-new',
@@ -784,6 +798,67 @@ describe('brand kits', () => {
       description: null,
     });
     expect(media.findViews).not.toHaveBeenCalled();
+  });
+
+  // Sprint 13, Module 10: the kit's clip fields go through Studio's update too.
+  it('writes the clip fields an edit sends, and shows all six back', async () => {
+    const { service, repository } = setup();
+    repository.findBrandKit.mockResolvedValue(kitRow());
+    repository.updateBrandKit.mockResolvedValue(
+      kitRow({
+        clipLogoPosition: 'top-right',
+        clipOutroText: 'See you soon',
+        clipLogoAssetId: 'a-1',
+      }),
+    );
+
+    const view = await service.update(ORG, 'kit-1', {
+      clipLogoPosition: 'top-right',
+      clipOutroText: 'See you soon',
+    });
+
+    expect(repository.updateBrandKit).toHaveBeenCalledWith(ORG, 'kit-1', {
+      clipLogoPosition: 'top-right',
+      clipOutroText: 'See you soon',
+    });
+    expect(view).toMatchObject({
+      clipLogoPosition: 'top-right',
+      clipCaptionStyleId: null,
+      clipIntroVideoId: null,
+      clipOutroVideoId: null,
+      clipOutroText: 'See you soon',
+      clipLogoAssetId: 'a-1',
+    });
+  });
+
+  it('says a kit that is gone could not be found when only clip fields are sent', async () => {
+    const { service, repository } = setup();
+    expect(
+      await refusal(service.update(ORG, 'kit-x', { clipLogoPosition: 'top-left' })),
+    ).toMatchObject({ status: 404, message: STUDIO_MESSAGES.BRAND_KIT_NOT_FOUND });
+    expect(repository.updateBrandKit).not.toHaveBeenCalled();
+  });
+
+  it('forgets the clips copy of the logo when the logo changes, and keeps it when it does not', async () => {
+    const { service, repository, media } = setup();
+    media.findViews.mockResolvedValue(new Map([['media-2', mediaView({ id: 'media-2' })]]));
+    repository.findBrandKit.mockResolvedValue(
+      kitRow({ logoMediaId: 'media-1', clipLogoAssetId: 'asset-old' }),
+    );
+
+    await service.update(ORG, 'kit-1', { logoMediaId: 'media-2' });
+    expect(repository.updateBrandKit).toHaveBeenLastCalledWith(ORG, 'kit-1', {
+      logoMediaId: 'media-2',
+      clipLogoAssetId: null,
+    });
+
+    repository.findBrandKit.mockResolvedValue(
+      kitRow({ logoMediaId: 'media-2', clipLogoAssetId: 'asset-old' }),
+    );
+    await service.update(ORG, 'kit-1', { logoMediaId: 'media-2' });
+    expect(repository.updateBrandKit).toHaveBeenLastCalledWith(ORG, 'kit-1', {
+      logoMediaId: 'media-2',
+    });
   });
 
   it('says a kit that is gone could not be found', async () => {

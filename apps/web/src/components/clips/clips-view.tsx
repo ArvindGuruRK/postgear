@@ -14,7 +14,8 @@
  *   YouTube open the saved channels of that platform in a dialog, and
  *   `?tab=streams` opens it for every platform.
  *
- * The actions row carries the storage meter on the right (2026-11-20: no
+ * The actions row carries the storage meter and (Sprint 13, Module 10) the
+ * Recipes And Brand Kit link on the right (2026-11-20: no
  * Simulated sticker and no AI minutes chip on the home; the chip lives on a
  * video's Find Clips panel), and on the left Back and the list's name on a
  * list. When the video tools
@@ -61,6 +62,7 @@ import { useVideos } from './home/use-videos';
 import { VideosTab, videoCardActions } from './home/videos-tab';
 import { ClipsTab as ClipsLibraryTab } from './library/clips-tab';
 import { RecentClips } from './library/recent-clips';
+import { kitHref } from './kit/kit-model';
 import { useClipsList } from './library/use-clips-list';
 import { useClipsStatus } from './use-clips-status';
 import { clipEditHref } from './video/video-clip-list';
@@ -300,6 +302,10 @@ export function ClipsView({
         )}
         <PageActions>
           {status ? <StorageMeter status={status} onSeeWhatUsesSpace={seeWhatUsesSpace} /> : null}
+          {/* Module 10: the workspace's recipes and its brand kits for clips. */}
+          <ActionLink href={kitHref(orgId)} data-testid="clips-kit-link">
+            Recipes And Brand Kit
+          </ActionLink>
         </PageActions>
       </div>
 

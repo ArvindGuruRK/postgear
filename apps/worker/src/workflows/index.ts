@@ -11,6 +11,8 @@ export { analyticsSyncWorkflow } from './analytics-sync.workflow';
 export { automationRunWorkflow } from './automation-run.workflow';
 // Sprint 12: Clips (on the media, media-quick and render queues).
 export {
+  // Sprint 13, Module 10: Auto-Edit Video.
+  clipAutoEditWorkflow,
   clipDownloadWorkflow,
   // Sprint 13, Module 07: finding faces.
   clipFacesWorkflow,

@@ -47,6 +47,8 @@ describe('a clip job has a hard time limit from the contract', () => {
   it('names a finite limit of at most six hours for every kind but listening, which has seven', () => {
     // Sprint 13 adds listening, faces, translating and voice.
     expect([...KINDS].sort()).toEqual([
+      // Module 10: Auto-Edit Video.
+      'AUTO_EDIT',
       'DOWNLOAD',
       'FACES',
       'HIGHLIGHTS',

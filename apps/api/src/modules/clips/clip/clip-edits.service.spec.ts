@@ -161,6 +161,53 @@ describe('ClipEditsService.patch', () => {
     expect(past).toMatchObject({ status: 422, body: { code: 'clip_document_invalid' } });
   });
 
+  it('Module 10: saves a document that also plays another READY video of the workspace (an intro), inside its length', async () => {
+    const INTRO = '88888888-8888-4888-8888-888888888888';
+    const withIntro = (toMs: number): ClipDocument => {
+      const base = doc();
+      return {
+        ...base,
+        sources: [...base.sources, { id: 'src_intro', videoId: INTRO }],
+        segments: [
+          {
+            id: 'seg_intro',
+            source: 'src_intro',
+            sourceIn: 0,
+            sourceOut: toMs,
+            speed: 1,
+            volume: 1,
+            role: 'intro',
+          },
+          ...base.segments,
+        ],
+      };
+    };
+    const tables = seed();
+    tables.videos.push(videoRow({ id: INTRO, status: 'READY', durationMs: 3_000 }));
+    const { service } = setup(tables);
+    await expect(
+      service.patch(TEST_ORG, CLIP, { revision: 1, document: withIntro(3_000) }),
+    ).resolves.toBeDefined();
+    const past = await refusal(
+      service.patch(TEST_ORG, CLIP, { revision: 2, document: withIntro(4_000) }),
+    );
+    expect(past).toMatchObject({ status: 422, body: { code: 'clip_document_invalid' } });
+
+    const other = seed();
+    other.videos.push(
+      videoRow({
+        id: INTRO,
+        organizationId: 'seed-second-org',
+        status: 'READY',
+        durationMs: 3_000,
+      }),
+    );
+    const refused = await refusal(
+      setup(other).service.patch(TEST_ORG, CLIP, { revision: 1, document: withIntro(3_000) }),
+    );
+    expect(refused).toMatchObject({ status: 422, body: { code: 'clip_document_invalid' } });
+  });
+
   it("saves captions only when they name a transcript of this clip's video in this workspace", async () => {
     const tables = seed();
     const transcriptOf = (id: string, organizationId: string, videoId: string) =>

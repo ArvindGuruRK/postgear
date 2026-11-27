@@ -34,9 +34,8 @@ import type { PrivateStorage } from '@postgear/storage';
 import {
   type ClipDocument,
   captionsTrackOf,
-  documentRange,
   fingerprintMatches,
-  outputDuration,
+  renderedDuration,
   parseClipDocument,
   parseSegmentAssetMeta,
   safeParseClipDocument,
@@ -59,7 +58,7 @@ import {
   toClipView,
   videoNotFound,
 } from './clip-item.service';
-import { followsOnOpen, withoutFollowOnOpen } from './clip-meta';
+import { hasOpenMarks, withoutFollowOnOpen } from './clip-meta';
 import { scheduledClipIds } from './clip-state';
 import { storedDocumentRange } from './sharp-source';
 
@@ -103,18 +102,19 @@ export class ClipEditsService {
       else if (clip.status === ClipStatus.NEW) data.status = ClipStatus.DRAFT;
 
       if (document) {
-        const video = await tx.clipVideo.findFirst({
-          where: { id: clip.videoId, organizationId: orgId },
-          select: { durationMs: true },
+        const videoIds = [...new Set([clip.videoId, ...document.sources.map((s) => s.videoId)])];
+        const videos = await tx.clipVideo.findMany({
+          where: { id: { in: videoIds }, organizationId: orgId },
+          select: { id: true, durationMs: true, status: true, deletedAt: true },
         });
-        this.assertDocumentFits(clipId, clip, document, video?.durationMs ?? null);
+        this.assertDocumentFits(clipId, clip, document, videos);
         await this.assertCaptionsBelong(tx, orgId, clip, document);
         data.document = document as unknown as Prisma.InputJsonValue;
         data.ratio = document.canvas.ratio;
-        data.durationMs = outputDuration(document);
-        // Module 08: the first document save ends Follow The Speaker's first-open mark,
+        data.durationMs = renderedDuration(document);
+        // Modules 08 and 10: the first document save ends the first-open marks (follow, camera),
         // so a person who turned it off is never overridden on the next open.
-        if (followsOnOpen(clip.meta)) data.meta = withoutFollowOnOpen(clip.meta);
+        if (hasOpenMarks(clip.meta)) data.meta = withoutFollowOnOpen(clip.meta);
       } else if (clip.lastExportedRevision === clip.revision) {
         // A rename or a hide: the export still shows exactly this clip.
         data.lastExportedRevision = clip.revision + 1;
@@ -174,7 +174,7 @@ export class ClipEditsService {
         document: parsed.doc as unknown as Prisma.InputJsonValue,
         revision: 1,
         ratio: parsed.doc.canvas.ratio,
-        durationMs: outputDuration(parsed.doc),
+        durationMs: renderedDuration(parsed.doc),
         createdById: userId,
       },
     });
@@ -297,16 +297,36 @@ export class ClipEditsService {
     }
   }
 
-  /** The document plays only this clip's video, and stays inside it. */
+  /**
+   * The document plays this clip's video and (Module 10) other live, READY
+   * videos of the same workspace (a brand kit's intro or outro; Module 11's
+   * montage), and every part stays inside its own video. The clip's own
+   * video may have been removed meanwhile (its parts are still checked
+   * against the stored length).
+   */
   private assertDocumentFits(
     clipId: string,
     clip: Pick<Clip, 'videoId'>,
     document: ClipDocument,
-    videoDurationMs: number | null,
+    videos: ReadonlyArray<{
+      id: string;
+      durationMs: number | null;
+      status: string;
+      deletedAt: Date | null;
+    }>,
   ): void {
-    const foreign = document.sources.some((source) => source.videoId !== clip.videoId);
-    const range = documentRange(document);
-    const past = videoDurationMs !== null && range !== null && range.toMs > videoDurationMs;
+    const byId = new Map(videos.map((video) => [video.id, video]));
+    const sourceVideo = new Map(document.sources.map((source) => [source.id, source.videoId]));
+    const foreign = document.sources.some((source) => {
+      if (source.videoId === clip.videoId) return false;
+      const video = byId.get(source.videoId);
+      return !video || video.deletedAt !== null || video.status !== 'READY';
+    });
+    const past = document.segments.some((segment) => {
+      const videoId = sourceVideo.get(segment.source);
+      const durationMs = videoId ? (byId.get(videoId)?.durationMs ?? null) : null;
+      return durationMs !== null && segment.sourceOut > durationMs;
+    });
     if (foreign || past) {
       this.logger.warn(
         JSON.stringify({

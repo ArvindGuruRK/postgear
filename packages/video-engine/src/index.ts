@@ -22,11 +22,14 @@
  * - `links/`: what a pasted link is, channel handles, canonical links.
  * - `render/`: `frameState` (the one definition of what is on screen),
  *   `buildRenderPlan`, `compileFfmpeg` and `buildAss`.
+ * - `recipes/`: Sprint 13 (Module 10): recipes, the five starters, applying one.
+ * - `brand/`: Sprint 13 (Module 10): the brand kit for clips (logo, intro, outro).
  * - `jobs.ts`, `errors.ts`, `quality.ts`, `export.ts`, `pricing.ts`, `assets.ts`, `library.ts`: the
  *   contracts the API, the worker and the web share.
  */
 
 export * from './assets';
+export * from './brand';
 export * from './canvas';
 export * from './captions';
 export * from './cleanup';
@@ -55,6 +58,7 @@ export * from './library';
 export * from './links';
 export * from './pricing';
 export * from './quality';
+export * from './recipes';
 export * from './render';
 export * from './signals';
 export * from './sources';

@@ -1,0 +1,56 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`a branded clip in the render plan compiles every segment to one format, then the card after the finished clip: branded graph 1`] = `
+"[0:v]trim=start=0.000:end=2.000,crop=406:720:438:0:exact=1,scale=1080:1920:flags=bicubic,setpts=PTS-STARTPTS,fps=30,setsar=1,format=yuv420p[v0];
+[0:a]atrim=start=0.000:end=2.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,afade=t=out:st=1.985:d=0.015[a0];
+[1:v]trim=start=1.000:end=7.000,crop=608:1080:656:0:exact=1,scale=1080:1920:flags=bicubic,setpts=PTS-STARTPTS,fps=30,setsar=1,format=yuv420p[v1];
+[1:a]atrim=start=1.000:end=7.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,afade=t=in:st=0:d=0.015[a1];
+[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac];
+[vc]fps=30,format=yuv420p[sp0];
+[2:v]format=rgba,scale=152:152:flags=bicubic,loop=loop=-1:size=1:start=0,setpts=N/(30*TB)[st0];
+[sp0][st0]overlay=x=778:y=192:enable='between(t,0.000,7.999)':shortest=1:format=yuv420[sp1];
+[sp1]fade=t=out:st=7.500:d=0.500,tpad=stop=-1:stop_mode=clone,trim=end=8.000,setpts=PTS-STARTPTS[vbody];
+[ac]afade=t=out:st=7.500:d=0.500,apad=whole_dur=8.000,atrim=end=8.000,asetpts=PTS-STARTPTS[abody];
+color=c=0x101820:s=1080x1920:r=30:d=2.000,format=yuv420p,setsar=1[kcb];
+[3:v]format=rgba,scale=388:388:flags=bicubic,loop=loop=-1:size=1:start=0,setpts=N/(30*TB)[kcl];
+[kcb][kcl]overlay=x=346:y=682:format=yuv420:shortest=1,ass=filename=card-closing.ass:fontsdir=fonts[vkc];
+anullsrc=r=48000:cl=stereo,atrim=duration=2.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[akc];
+[vbody][abody][vkc][akc]concat=n=2:v=1:a=1[vout][aout]
+"
+`;
+
+exports[`a branded clip in the render plan compiles every segment to one format, then the card after the finished clip: card ass 1`] = `
+"[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+YCbCr Matrix: None
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: S1,PGF b6708d 700,102.97,&H003BD4FF,&H003BD4FF,&H00000000,&H66000000,700,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,S1,,76,76,0,,{\\an5\\pos(540,1192.8)\\org(540,1192.8)}Thanks \\{for\\} watching
+"
+`;
+
+exports[`an opening card and a part with its own layout joins the opening card before the clip, drawn in its hook look: opening card graph 1`] = `
+"[0:v]trim=start=0.000:end=3.000,crop=608:1080:656:0:exact=1,scale=1080:1920:flags=bicubic,setpts=PTS-STARTPTS,fps=30,setsar=1,format=yuv420p[v0];
+[0:a]atrim=start=0.000:end=3.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,afade=t=out:st=2.985:d=0.015[a0];
+[1:v]trim=start=1.000:end=4.000,split=2[vb1][vf1];
+[vb1]crop=608:1080:656:0:exact=1,scale=108:192:flags=bilinear,gblur=sigma=3:steps=2,scale=1080:1920:flags=bicubic,setsar=1[vbb1];
+[vf1]crop=1920:1080:0:0:exact=1,scale=1080:608:flags=bicubic,setsar=1[vff1];
+[vbb1][vff1]overlay=x=0:y=656:format=yuv420:shortest=1,setpts=PTS-STARTPTS,fps=30,setsar=1,format=yuv420p[v1];
+[1:a]atrim=start=1.000:end=4.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,afade=t=in:st=0:d=0.015[a1];
+[v0][a0][v1][a1]concat=n=2:v=1:a=1[vc][ac];
+[vc]fps=30,format=yuv420p,tpad=stop=-1:stop_mode=clone,trim=end=6.000,setpts=PTS-STARTPTS[vbody];
+[ac]apad=whole_dur=6.000,atrim=end=6.000,asetpts=PTS-STARTPTS[abody];
+color=c=0xFFFFFF:s=1080x1920:r=30:d=2.000,format=yuv420p,setsar=1,ass=filename=card-opening.ass:fontsdir=fonts[vko];
+anullsrc=r=48000:cl=stereo,atrim=duration=2.000,asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[ako];
+[vko][ako][vbody][abody]concat=n=2:v=1:a=1[vout][aout]
+"
+`;

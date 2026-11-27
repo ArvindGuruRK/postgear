@@ -52,6 +52,8 @@ export function lostJobCode(job: Pick<ClipJob, 'kind' | 'input'>, timedOut = fal
   if (job.kind === ClipJobKind.IMPORT) return 'import_failed';
   if (job.kind === ClipJobKind.HIGHLIGHTS) return 'highlights_failed';
   if (job.kind === ClipJobKind.DOWNLOAD) return 'download_failed';
+  // Sprint 13, Module 10: "We could not finish the edit."
+  if (job.kind === ClipJobKind.AUTO_EDIT) return 'auto_edit_failed';
   if (job.kind === ClipJobKind.RENDER) {
     const proof = (job.input as { proof?: unknown } | null)?.proof === true;
     return proof ? 'preview_failed' : 'export_failed';

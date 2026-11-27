@@ -28,6 +28,7 @@
 import { z } from 'zod';
 import type { ClipDocument, TextStyle } from '../document/schema';
 import { BADGE } from '../document/sticker';
+import { cardHasText, cardTextStyle } from './card-style';
 
 /** The manifest's file name inside the fonts folder. */
 export const FONT_MANIFEST_FILE = 'manifest.json';
@@ -109,8 +110,16 @@ function familyKey(family: string): string {
 }
 
 /** Every font family the clip's text uses, sorted, each once. */
-export function fontsNeeded(doc: Pick<ClipDocument, 'tracks'>): string[] {
+export function fontsNeeded(
+  doc: Pick<ClipDocument, 'tracks'> & Partial<Pick<ClipDocument, 'cards'>>,
+): string[] {
   const families = new Map<string, string>();
+  // Module 10: a card's line is drawn in its own font too.
+  for (const card of [doc.cards?.opening, doc.cards?.closing]) {
+    if (!card || !cardHasText(card)) continue;
+    const font = cardTextStyle(card).font;
+    if (!families.has(familyKey(font))) families.set(familyKey(font), font.trim());
+  }
   for (const track of doc.tracks) {
     if (track.kind !== 'overlay') {
       continue;
@@ -139,7 +148,9 @@ export function fontsNeeded(doc: Pick<ClipDocument, 'tracks'>): string[] {
  */
 export function checkFonts(manifest: FontManifest | null, wanted: readonly string[]): string[] {
   const have = new Set(
-    (manifest?.fonts ?? []).filter((entry) => !entry.fallback).map((entry) => familyKey(entry.family)),
+    (manifest?.fonts ?? [])
+      .filter((entry) => !entry.fallback)
+      .map((entry) => familyKey(entry.family)),
   );
   const missing: string[] = [];
   const seen = new Set<string>();
@@ -250,7 +261,12 @@ export function textBoxMetrics(
   }
   const em = lineHeightEm(entry);
   const size = style.size * scale;
-  return { entry, lineHeightEm: em, lineHeightPx: size * em, assFontSize: assFontSize(entry, size) };
+  return {
+    entry,
+    lineHeightEm: em,
+    lineHeightPx: size * em,
+    assFontSize: assFontSize(entry, size),
+  };
 }
 
 /** Whether a code point is in a sorted range list. */
@@ -315,7 +331,11 @@ export type TextRunsResult =
  * Tamil or Hindi cluster is never cut in two. Runs of the same font are
  * merged. Fails with the characters nobody can draw.
  */
-export function textRuns(text: string, main: FontManifestEntry, manifest: FontManifest): TextRunsResult {
+export function textRuns(
+  text: string,
+  main: FontManifestEntry,
+  manifest: FontManifest,
+): TextRunsResult {
   const fallbacks = [
     ...new Set(manifest.fonts.filter((entry) => entry.fallback).map((entry) => entry.fontId)),
   ].map((fontId) => {

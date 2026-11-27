@@ -19,7 +19,9 @@
  *   hatches what lies past it), and (Module 08) the same signed light copy,
  *   filmstrip and waveform the video page reads, so the editor's dock draws
  *   pictures and sound. An AI clip (Module 16) is made with no sharp range;
- *   its first read starts the SEGMENT job (`firstOpenSegment`).
+ *   its first read starts the SEGMENT job (`firstOpenSegment`). Module 10
+ *   adds `extraSources`: the light copy of every other video the document
+ *   plays (a brand kit's intro or outro).
  * - **More video** (Module 09 section 3): a trim past the sharp range asks
  *   for a wider one. Nothing is fetched when a sharp range or an open job
  *   already covers it, or when the platform copy is gone; otherwise a
@@ -35,9 +37,10 @@ import { HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/commo
 import {
   type Clip,
   ClipJobKind,
+  type ClipOrigin,
   type ClipJob,
   type ClipVideo,
-  type Prisma,
+  Prisma,
   prisma,
 } from '@postgear/db';
 import {
@@ -48,7 +51,7 @@ import {
   formatClipLength,
   HANDLE_MS,
   heldRange,
-  outputDuration,
+  renderedDuration,
   pickSharpSource,
   type SourceRange,
   safeParseClipDocument,
@@ -65,7 +68,13 @@ import { ClipJobsRepository, OPEN_JOB_STATUSES } from '../jobs/clip-jobs.reposit
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipPlaybackService } from '../videos/clip-playback.service';
-import { NO_VIDEO_MEDIA, signVideoMedia, type VideoMedia } from '../videos/clip-video-media';
+import type { SignedAddress } from '../videos/clip-playback.service';
+import {
+  NO_VIDEO_MEDIA,
+  signOnce,
+  signVideoMedia,
+  type VideoMedia,
+} from '../videos/clip-video-media';
 import { type ClipVideoView, toVideoView } from '../videos/clip-video-view';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { ClipRetentionService } from '../retention/clip-retention.service';
@@ -138,6 +147,20 @@ export interface ClipDetail extends VideoMedia {
    * what More Video fetches.
    */
   held: SourceRange | null;
+  /**
+   * Module 10: the light copy of every OTHER video the document plays (a
+   * brand kit's intro or outro), keyed by the document's source id. Empty for
+   * a clip of one video; a removed, deleted or unready video is left out.
+   */
+  extraSources: Record<string, ExtraSourceMedia>;
+}
+
+/** One more video's light copy for the editor's preview (Module 10). */
+export interface ExtraSourceMedia {
+  videoId: string;
+  playback: SignedAddress;
+  proxy: VideoMedia['proxy'];
+  durationMs: number;
 }
 
 @Injectable()
@@ -161,11 +184,7 @@ export class ClipItemService {
   ): Promise<{ clip: ClipView; job: ClipJobView | null }> {
     await this.limits.assertEnabled(orgId);
 
-    const video = await this.videos.findLive(orgId, body.videoId);
-    if (!video) throw videoNotFound();
-    if (video.status !== 'READY' || video.durationMs === null) {
-      throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
-    }
+    const video = await this.readyVideo(orgId, body.videoId);
 
     const whole = 'whole' in body;
     if (whole && video.durationMs > CLIP_MAX_MS) {
@@ -196,32 +215,95 @@ export class ClipItemService {
       throw error;
     }
 
-    const clipId = randomUUID();
-    const range = documentRange(document);
+    const { clip, job } = await this.insertClip(orgId, userId, {
+      clipId: randomUUID(),
+      video,
+      document,
+      title: whole ? wholeTitle(video.title) : clipTitle(video.title, fromMs),
+    });
+    return { clip: toClipView(clip), job: job ? toJobView(job) : null };
+  }
+
+  /**
+   * The workspace's live video, READY with a known length: 404
+   * `video_not_found`, 409 `video_not_ready`. Shared with Module 10's
+   * Auto-Edit, which makes its clip through `insertClip`.
+   */
+  async readyVideo(orgId: string, videoId: string): Promise<ClipVideo & { durationMs: number }> {
+    const video = isUuid(videoId) ? await this.videos.findLive(orgId, videoId) : null;
+    if (!video) throw videoNotFound();
+    if (video.status !== 'READY' || video.durationMs === null) {
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
+    }
+    return { ...video, durationMs: video.durationMs };
+  }
+
+  /**
+   * Writes a new clip and, in the same transaction, the SEGMENT job that
+   * fetches its range sharp (none when a stored sharp range covers it or the
+   * platform copy is gone), then starts the job. The one way a clip row is
+   * made from a document: `create` (a range, or Edit Whole Video) and Module
+   * 10's Auto-Edit (`ClipRecipeApplierService`, with its origin, its first
+   * meta and the range to fetch, which is the main video's stretch before a
+   * recipe cut it or a brand kit added an intro).
+   *
+   * Idempotent on `clipId`: when that clip already exists in the workspace
+   * it is answered as it is (`created: false`), with no job.
+   */
+  async insertClip(
+    orgId: string,
+    userId: string | null,
+    input: {
+      clipId: string;
+      video: ClipVideo;
+      document: ClipDocument;
+      title: string;
+      origin?: ClipOrigin;
+      meta?: Prisma.InputJsonValue;
+      /** The stretch of the video to fetch sharp; the document's own range when left out. */
+      segmentRange?: SourceRange | null;
+    },
+  ): Promise<{ clip: Clip; job: ClipJob | null; created: boolean }> {
+    const { clipId, video, document } = input;
+    const existing = await prisma.clip.findFirst({ where: { id: clipId, organizationId: orgId } });
+    if (existing) return { clip: existing, job: null, created: false };
+
+    const range = input.segmentRange === undefined ? documentRange(document) : input.segmentRange;
     const segmentJob = range ? await this.segmentJobFor(orgId, userId, video, clipId, range) : null;
 
-    const { clip, job } = await serializable(async (tx) => {
-      const clip = await tx.clip.create({
-        data: {
-          id: clipId,
-          organizationId: orgId,
-          videoId: video.id,
-          title: whole ? wholeTitle(video.title) : clipTitle(video.title, fromMs),
-          document: document as unknown as Prisma.InputJsonValue,
-          revision: 1,
-          ratio: document.canvas.ratio,
-          durationMs: outputDuration(document),
-          createdById: userId,
-        },
+    let written: { clip: Clip; job: ClipJob | null };
+    try {
+      written = await serializable(async (tx) => {
+        const clip = await tx.clip.create({
+          data: {
+            id: clipId,
+            organizationId: orgId,
+            videoId: video.id,
+            title: input.title,
+            document: document as unknown as Prisma.InputJsonValue,
+            revision: 1,
+            ratio: document.canvas.ratio,
+            durationMs: renderedDuration(document),
+            createdById: userId,
+            ...(input.origin ? { origin: input.origin } : {}),
+            ...(input.meta !== undefined ? { meta: input.meta } : {}),
+          },
+        });
+        const job = segmentJob ? await this.jobsRepository.create(segmentJob, tx) : null;
+        return { clip, job };
       });
-      const job = segmentJob ? await this.jobsRepository.create(segmentJob, tx) : null;
-      return { clip, job };
-    });
+    } catch (error) {
+      // Two calls for the same id at once: the second answers the first one's clip.
+      if (!isUniqueViolation(error)) throw error;
+      const winner = await prisma.clip.findFirst({ where: { id: clipId, organizationId: orgId } });
+      if (!winner) throw error;
+      return { clip: winner, job: null, created: false };
+    }
 
     // Module 19: making a clip counts as using its video (at most one write a day).
     await this.retention.touchVideo(orgId, video.id);
-    if (job) await this.jobs.start(job);
-    return { clip: toClipView(clip), job: job ? toJobView(job) : null };
+    if (written.job) await this.jobs.start(written.job);
+    return { ...written, created: true };
   }
 
   async get(orgId: string, clipId: string): Promise<ClipDetail> {
@@ -243,12 +325,13 @@ export class ClipItemService {
         ...NO_VIDEO_MEDIA,
         sharp: 'gone',
         held: null,
+        extraSources: view.document ? await this.extraSources(orgId, clip, view.document) : {},
       };
     }
 
     const assets = await this.videos.assetsOf(orgId, live.id);
     const source = sharpSourceFor(view.document, assets);
-    const [media, open] = await Promise.all([
+    const [media, open, extraSources] = await Promise.all([
       live.status === 'READY'
         ? signVideoMedia(assets, (key) => this.playback.address(key))
         : Promise.resolve(NO_VIDEO_MEDIA),
@@ -260,6 +343,7 @@ export class ClipItemService {
           status: { in: [...OPEN_JOB_STATUSES] },
         },
       }),
+      this.extraSources(orgId, clip, view.document),
     ]);
 
     let sharp: SharpState = source?.kind === 'segment' ? 'ready' : open > 0 ? 'fetching' : 'gone';
@@ -272,7 +356,61 @@ export class ClipItemService {
       if (await this.firstOpenSegment(orgId, clip, live, view.document, assets)) sharp = 'fetching';
     }
     const held = heldRange(documentRange(view.document), assets);
-    return { clip: view, video: toVideoView(live), ...media, sharp, held };
+    return { clip: view, video: toVideoView(live), ...media, sharp, held, extraSources };
+  }
+
+  /**
+   * Module 10: the signed light copy, proxy size and length of every source
+   * of the document that is not the clip's own video (a brand kit's intro or
+   * outro), keyed by source id. Each video is the workspace's, live and
+   * READY with a light copy; any other is left out, never an error.
+   */
+  private async extraSources(
+    orgId: string,
+    clip: Pick<Clip, 'videoId'>,
+    document: ClipDocument,
+  ): Promise<Record<string, ExtraSourceMedia>> {
+    const others = document.sources.filter((source) => source.videoId !== clip.videoId);
+    if (others.length === 0) return {};
+    const ids = [...new Set(others.map((source) => source.videoId))];
+    const [videos, assets] = await Promise.all([
+      prisma.clipVideo.findMany({
+        where: {
+          id: { in: ids },
+          organizationId: orgId,
+          deletedAt: null,
+          status: 'READY',
+        },
+        select: { id: true, durationMs: true },
+      }),
+      prisma.clipAsset.findMany({
+        where: { organizationId: orgId, videoId: { in: ids }, kind: 'PROXY' },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
+    ]);
+    const sign = signOnce((key) => this.playback.address(key));
+    const byVideo = new Map<string, Promise<ExtraSourceMedia | null>>();
+    for (const video of videos) {
+      if (video.durationMs === null) continue;
+      const durationMs = video.durationMs;
+      byVideo.set(
+        video.id,
+        signVideoMedia(
+          assets.filter((asset) => asset.videoId === video.id),
+          sign,
+        ).then((media) =>
+          media.playback
+            ? { videoId: video.id, playback: media.playback, proxy: media.proxy, durationMs }
+            : null,
+        ),
+      );
+    }
+    const out: Record<string, ExtraSourceMedia> = {};
+    for (const source of others) {
+      const media = await byVideo.get(source.videoId);
+      if (media) out[source.id] = media;
+    }
+    return out;
   }
 
   /**
@@ -413,7 +551,7 @@ export class ClipItemService {
    */
   private async segmentJobFor(
     orgId: string,
-    userId: string,
+    userId: string | null,
     video: ClipVideo,
     clipId: string,
     range: SourceRange,
@@ -495,6 +633,11 @@ function segmentRangeOf(input: unknown): SourceRange | null {
   return typeof fromMs === 'number' && typeof toMs === 'number' && fromMs < toMs
     ? { fromMs, toMs }
     : null;
+}
+
+/** A unique key refused the insert (the same clip id written twice at once). */
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
 
 /** A clip as the browser sees it; `scheduled` says whether one of its post groups still has a post waiting. */

@@ -153,7 +153,9 @@ export function facesCoverClip(
   doc: Pick<ClipDocument, 'segments'>,
   meta: FaceData['meta'],
 ): boolean {
-  const range = documentRange(doc);
+  // Module 10: a brand intro or outro plays another video, so it needs no faces from this one.
+  const own = doc.segments.filter((s) => s.role !== 'intro' && s.role !== 'outro');
+  const range = documentRange({ segments: own.length > 0 ? own : doc.segments });
   return range === null || faceFileCovers(meta, range.fromMs, range.toMs);
 }
 

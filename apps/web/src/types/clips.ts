@@ -174,6 +174,8 @@ export interface ClipMetaView {
   seen?: string;
   /** Module 08: the editor follows the speaker the first time the clip opens. */
   followOnOpen?: 'speaker';
+  /** Module 10: the editor runs Detect Camera quietly the first time the clip opens. */
+  cameraOnOpen?: boolean;
 }
 
 /** One clip with its document (`GET /clips/:clipId`, `POST /clips`). */
@@ -260,6 +262,21 @@ export interface ClipDetail {
   sharp: ClipSharpState;
   /** The stretch held sharp around the clip, in the video's time; null when nothing sharp touches it. */
   held: { fromMs: number; toMs: number } | null;
+  /**
+   * Module 10: the light copy of every OTHER video the document plays (a
+   * brand kit's intro or outro; Module 11's montage videos), keyed by the
+   * document's source id. Empty for a clip of one video. A source whose
+   * video was removed is left out (the editor then says the clip cannot play).
+   */
+  extraSources: Record<string, ExtraSourceMedia>;
+}
+
+/** One more video's light copy for the preview (Module 10). */
+export interface ExtraSourceMedia {
+  videoId: string;
+  playback: SignedAddress;
+  proxy: { width: number; height: number; fps: number } | null;
+  durationMs: number;
 }
 
 /** The plan's Clips values `GET /clips/status` carries, as the resolver answered them. */

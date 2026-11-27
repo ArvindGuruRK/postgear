@@ -3,12 +3,13 @@
  * their price in AI minutes. Pure.
  *
  * The setup travels in the request, is checked here, and is kept on the run
- * (`ClipHighlightRun.params.setup`). Switches later modules own (Remove
- * Silences, Hook Title, a recipe, a brand kit) are in the shape now and held
- * off: the module that builds each one opens it, so no later change renames
- * anything. Look For Action is Module 06's; Follow The Speaker is Module
- * 08's: free (no line in the price), and refused on a wide shape, where
- * there is nothing to follow inside the picture.
+ * (`ClipHighlightRun.params.setup`). Look For Action is Module 06's; Follow
+ * The Speaker is Module 08's: free (no line in the price), and refused on a
+ * wide shape, where there is nothing to follow inside the picture. Module 10
+ * opens Remove Silences, Hook Title, a recipe (a starter's id or the
+ * workspace's own, by id) and a brand kit: all free, so the price does not
+ * change. A setup stored before Module 10 (switches off, ids null) still
+ * reads. The recipe's settings with the setup on top are `recipeFromSetup`.
  *
  * The price is one line per step, from the same `aiMinutesCost` the charge
  * uses. Listening is quoted by the transcript (only what was not listened
@@ -52,11 +53,20 @@ export const clipSetupSchema = z
     action: z.boolean(),
     /** Module 08: Follow The Speaker (free; vertical, portrait or square only). */
     follow: z.boolean(),
-    // Owned by later modules; held off until each is built.
-    silences: z.literal(false),
-    hookTitle: z.literal(false),
-    recipeId: z.null(),
-    brandKitId: z.null(),
+    /** Module 10: Remove Silences (free). */
+    silences: z.boolean(),
+    /** Module 10: Add Hook Title from each clip's own AI title (free). */
+    hookTitle: z.boolean(),
+    /** Module 10: a starter recipe's id or one of the workspace's own (a uuid), or none. */
+    recipeId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .nullable(),
+    /** Module 10: the brand kit the run's clips get, or none (a Studio kit's id). */
+    brandKitId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .nullable(),
   })
   .strict()
   // Refused rather than ignored: a stored setup never says it followed what it could not.

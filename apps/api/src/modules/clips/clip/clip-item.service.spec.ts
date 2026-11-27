@@ -312,6 +312,67 @@ describe('ClipItemService.get', () => {
     expect(partly.held).toEqual({ fromMs: 70_000, toMs: 100_000 });
   });
 
+  // Sprint 13, Module 10: a brand intro or outro plays from its own short video.
+  it("signs the workspace's other READY videos a clip plays, and nothing of another workspace", async () => {
+    const tables = seed();
+    const INTRO = '99999999-9999-4999-8999-000000000001';
+    const FOREIGN = '99999999-9999-4999-8999-000000000002';
+    const PENDING = '99999999-9999-4999-8999-000000000003';
+    tables.videos.push(
+      videoRow({ id: INTRO, status: 'READY', durationMs: 3_000 }),
+      videoRow({ id: FOREIGN, organizationId: OTHER_ORG, status: 'READY', durationMs: 3_000 }),
+      videoRow({ id: PENDING, status: 'IMPORTING', durationMs: 3_000 }),
+    );
+    tables.assets.push(
+      assetRow({
+        id: 'p0',
+        kind: 'PROXY',
+        key: 'k/main',
+        meta: { width: 1280, height: 720, fps: 30 },
+      }),
+      assetRow({
+        id: 'p1',
+        videoId: INTRO,
+        kind: 'PROXY',
+        key: 'k/intro',
+        meta: { width: 1080, height: 1920, fps: 30 },
+      }),
+      assetRow({
+        id: 'p2',
+        organizationId: OTHER_ORG,
+        videoId: FOREIGN,
+        kind: 'PROXY',
+        key: 'k/foreign',
+      }),
+      assetRow({ id: 'p3', videoId: PENDING, kind: 'PROXY', key: 'k/pending' }),
+    );
+    const clip = tables.clips[0];
+    if (!clip) throw new Error('no clip');
+    const doc = clip.document as unknown as { sources: { id: string; videoId: string }[] };
+    doc.sources.push(
+      { id: 'intro', videoId: INTRO },
+      { id: 'foreign', videoId: FOREIGN },
+      { id: 'pending', videoId: PENDING },
+    );
+    const { service } = setup(tables);
+
+    const detail = await service.get(TEST_ORG, CLIP);
+
+    expect(Object.keys(detail.extraSources)).toEqual(['intro']);
+    expect(detail.extraSources.intro).toMatchObject({
+      videoId: INTRO,
+      durationMs: 3_000,
+      playback: { url: 'https://signed/k/intro' },
+      proxy: { width: 1080, height: 1920, fps: 30 },
+    });
+    expect(JSON.stringify(detail)).not.toContain('k/foreign');
+  });
+
+  it('answers no extra sources for a clip of one video', async () => {
+    const { service } = setup();
+    expect((await service.get(TEST_ORG, CLIP)).extraSources).toEqual({});
+  });
+
   it("answers 404 for another workspace's clip and for a word", async () => {
     const { service } = setup();
     expect(await refusal(service.get(OTHER_ORG, CLIP))).toMatchObject({ status: 404 });

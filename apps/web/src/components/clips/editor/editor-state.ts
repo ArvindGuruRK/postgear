@@ -14,9 +14,10 @@
  * - **The selection and the open tab are not in history**: Undo never moves
  *   the panel, and a selection that pointed at something an undo took away is
  *   cleared.
- * - **`meta` belongs to every version alike.** It holds editor facts (the
- *   shape question was answered) that must survive an undo, so an undo or
- *   redo carries the current `meta` onto the version it lands on.
+ * - **`meta.shapeChosen` belongs to every version alike.** It is an editor
+ *   fact (the shape question was answered) that must survive an undo, so an
+ *   undo or redo carries it onto the version it lands on. `meta.cleanup`
+ *   (Module 10) describes the version's own cuts and stays with it.
  *
  * Pure: no React, no clock (the action carries `now`), so it is tested as
  * plain functions.
@@ -227,12 +228,30 @@ export function chooseShape(doc: ClipDocument, ratio: Ratio, videoSize: CanvasSi
 // Reducer
 // ---------------------------------------------------------------------------
 
-/** Lands an undo or redo: the current `meta` comes along, and a vanished selection is cleared. */
+/**
+ * The `meta` a version lands with after an undo or redo: the editor's facts
+ * from the current one (the shape question was answered), and the version's
+ * own record of its cleanup (Module 10: an undone Remove Silences takes its
+ * note with it, so Save As Recipe never reads back a cut that is not there).
+ */
+function landedMeta(
+  target: ClipDocumentMeta | undefined,
+  current: ClipDocumentMeta | undefined,
+): ClipDocumentMeta | undefined {
+  const { shapeChosen: _own, ...rest } = target ?? {};
+  const meta: ClipDocumentMeta =
+    current?.shapeChosen === undefined ? rest : { ...rest, shapeChosen: current.shapeChosen };
+  if (Object.keys(meta).length === 0) return undefined;
+  // The same facts keep the version's own object, so nothing is replaced for nothing.
+  return target && JSON.stringify(target) === JSON.stringify(meta) ? target : meta;
+}
+
+/** Lands an undo or redo: the current editor facts come along, and a vanished selection is cleared. */
 function land(state: EditorState, history: HistoryState<EditorVersion>): EditorState {
   if (history === state.history) return state;
 
-  const meta = editorDocument(state).meta;
   const target = currentEntry(history);
+  const meta = landedMeta(target.document.meta, editorDocument(state).meta);
   const carried = withMeta(target.document, meta);
   const landed =
     carried === target.document

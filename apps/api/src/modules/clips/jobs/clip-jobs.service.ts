@@ -22,6 +22,11 @@
  *   waiting imports, highest priority first, then the oldest; it runs when a
  *   job is made, when any job ends (the worker's `settled` call) and in the
  *   reconcile. The claim is serializable, so two callers never overfill.
+ * - **An Auto-Edit takes its listening with it** (Sprint 13, Module 10).
+ *   Cancelling an AUTO_EDIT job also cancels the listen job it started
+ *   (`listenStarted`) while that one is still open, through the listen job's
+ *   own cancel, which gives its AI minutes back. A listen job it only joined
+ *   belongs to someone else and is left alone.
  */
 import { randomUUID } from 'node:crypto';
 import {
@@ -235,7 +240,36 @@ export class ClipJobsService {
       }
     }
 
+    if (job.kind === ClipJobKind.AUTO_EDIT) await this.cancelListenOf(orgId, job);
+
     return toJobView(await this.require(orgId, jobId));
+  }
+
+  /**
+   * Module 10: the listen job an AUTO_EDIT started, cancelled through its own
+   * path (the minutes come back there). Best-effort: a listen job that ended
+   * meanwhile, or a Temporal hiccup, is logged and never fails the cancel the
+   * person asked for.
+   */
+  private async cancelListenOf(orgId: string, job: ClipJob): Promise<void> {
+    const parsed = CLIP_JOB_INPUT_SCHEMAS.AUTO_EDIT.safeParse(job.input);
+    if (!parsed.success || !parsed.data.listenStarted || !parsed.data.listenJobId) return;
+    const listenJobId = parsed.data.listenJobId;
+    const listen = await this.repository.find(orgId, listenJobId);
+    if (!listen || listen.kind !== ClipJobKind.TRANSCRIBE) return;
+    if (TERMINAL_JOB_STATUSES.has(listen.status)) return;
+    try {
+      await this.cancel(orgId, listenJobId);
+    } catch (error) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'clips.auto_edit.listen_cancel_failed',
+          jobId: job.id,
+          listenJobId,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
   }
 
   /** The row, or a 404 that reads the same for "not yours" and "not there". */

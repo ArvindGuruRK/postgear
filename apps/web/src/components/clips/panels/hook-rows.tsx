@@ -23,7 +23,6 @@ import {
   addHookTitle,
   type ClipDocument,
   canSetHook,
-  documentRange,
   HOOK_STYLE_IDS,
   HOOK_TEXT_STYLES,
   type HookRange,
@@ -54,6 +53,7 @@ import { GroupLabel, NOTE } from '@/components/studio/panel-ui';
 import type { ClipWaveform } from '@/types/clips';
 import type { PlaybackStore } from '../editor/playback';
 import { usePeaks } from '../timeline/timeline-media';
+import { mainDocumentRange } from '../timeline/timeline-model';
 import { Waveform } from '../timeline/waveform';
 import {
   defaultHookRange,
@@ -312,7 +312,7 @@ function HookPicker({
   const perSecond = waveform?.meta.perSecond ?? 0;
   const words = spoken.view?.transcript?.words ?? null;
   const suggestion = useMemo(() => {
-    const range = documentRange(document) ?? undefined;
+    const range = mainDocumentRange(document) ?? undefined;
     const signals =
       peaks && perSecond > 0 ? { peaks: peaksFromWaveform(peaks, perSecond, range) } : null;
     return suggestHook(document, signals, words);

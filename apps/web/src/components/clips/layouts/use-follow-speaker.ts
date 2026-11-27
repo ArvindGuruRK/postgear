@@ -17,7 +17,8 @@
  *   each. The face file stays in memory for them; a clip opened already
  *   following reads it once, quietly, for the strip.
  * - **Follow on first open**: once per mount, when asked (`followOnOpen`),
- *   with the same flow, silent when it fails or finds nobody.
+ *   with the same flow, silent when it fails or finds nobody, and skipped
+ *   when the person changed the layout while the faces loaded.
  */
 import {
   areaCropAt,
@@ -220,6 +221,11 @@ export function useFollowSpeaker({
        * to keep the one the document holds.
        */
       pick?: string | null;
+      /**
+       * The layout (as JSON) the run started from: the first-open run steps
+       * aside when the person changed the layout meanwhile (a recipe, a pick).
+       */
+      onlyIfLayout?: string;
     }) => {
       abort.current?.abort();
       const controller = new AbortController();
@@ -238,6 +244,13 @@ export function useFollowSpeaker({
         if (signal.aborted) return;
         if (!faces) return fail(FOLLOW_FAILED);
         setData(faces);
+        if (
+          options.onlyIfLayout !== undefined &&
+          JSON.stringify(latest.current.document.layout) !== options.onlyIfLayout
+        ) {
+          setPhase({ kind: 'idle' });
+          return;
+        }
 
         let outcome = 'none' as FollowPlan['kind'];
         let people: Person[] = [];
@@ -287,7 +300,12 @@ export function useFollowSpeaker({
     if (!followOnOpen || openRan.current || !available || !shapeFollows) return;
     openRan.current = true;
     if (isFollowing(latest.current.document)) return;
-    void run({ mode: 'speaker', silent: true, refresh: false });
+    void run({
+      mode: 'speaker',
+      silent: true,
+      refresh: false,
+      onlyIfLayout: JSON.stringify(latest.current.document.layout),
+    });
   }, [followOnOpen, available, shapeFollows, run]);
 
   // Not following any more (off, undo): nothing is being fixed or picked.

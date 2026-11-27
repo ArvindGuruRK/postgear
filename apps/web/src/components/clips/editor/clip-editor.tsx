@@ -58,6 +58,12 @@
  *   Add Hook Title, Add Hook Clip and Text To Speech hand their changes to
  *   `editAi`: one undo step each, said in a toast with Undo. The timeline's
  *   hook delete goes the same way.
+ * - **Recipes** (Sprint 13, Module 10): the top bar's menu has Save As
+ *   Recipe and Apply A Recipe (`recipe-dialogs.tsx`); applying is one undo
+ *   step (`use-editor-recipes.ts`), then Follow The Speaker and listening
+ *   run their usual flows. A clip a run made with a Split or Gameplay
+ *   recipe (`meta.cameraOnOpen`) runs Detect Camera quietly on its first
+ *   open, once, after the shape question (`use-camera-on-open.ts`).
  */
 import {
   Alert,
@@ -87,7 +93,6 @@ import {
   defaultStickerItem,
   defaultTextItem,
   disableFollow,
-  documentRange,
   duplicateItem,
   type Fades,
   findItem,
@@ -210,6 +215,7 @@ import { MoreVideoRequester } from '../timeline/more-video';
 import {
   addRefusalSentence,
   itemLabel,
+  mainDocumentRange,
   missingRange,
   removeProblem as removeProblemOf,
   removeSelection,
@@ -247,6 +253,7 @@ import {
   needsShape,
 } from './editor-state';
 import { EditorTopBar } from './editor-top-bar';
+import { usePreviewSources } from './extra-sources';
 import {
   changedSince,
   EXPORT_DONE_SENTENCE,
@@ -259,6 +266,8 @@ import { ExportPanel, useClipExport } from './export-panel';
 import { usePlaybackStore } from './playback';
 import { SendClipDialog, type SendExportRun } from './send-dialog';
 import { composerHref } from './send-model';
+import { recipeSavedSentence } from './recipe-model';
+import { ApplyRecipeDialog, SaveRecipeDialog } from './recipe-dialogs';
 import { ShapeDialog } from './shape-dialog';
 import { Stage } from './stage';
 import { TabRail } from './tab-rail';
@@ -266,7 +275,9 @@ import { TimelineDock } from './timeline-dock';
 import { MeasuredHeights, TransformLayer } from './transform-layer';
 import { centreToTransform, itemFrame, nudgeFrame, type StageItem } from './transform-model';
 import { type DockControls, TransportBar } from './transport-bar';
+import { useCameraOnOpen } from './use-camera-on-open';
 import { useClipAutosave } from './use-clip-autosave';
+import { useEditorRecipes } from './use-editor-recipes';
 
 const subscribeNever = () => () => undefined;
 
@@ -326,7 +337,7 @@ export function ClipEditor({
   // A trim can bring video back up to the video's ends; without the video, only what the clip uses.
   const videoDurationMs =
     detail.video?.durationMs ??
-    documentRange(initialDocument)?.toMs ??
+    mainDocumentRange(initialDocument)?.toMs ??
     outputDuration(initialDocument);
 
   const back = detail.video
@@ -358,9 +369,12 @@ export function ClipEditor({
   );
   // The sounds' layer is made once too; the engine hands it the two videos.
   const [audioLayer] = useState(() => new WebAudioLayer());
+  // Module 10: a brand kit's intro and outro videos, beside the clip's own.
+  const extraSources = usePreviewSources(detail);
   const { engine, containerRef } = usePreviewEngine({
     document: shownDocument,
     source,
+    extraSources,
     overlayLayer,
     audioLayer,
     // The videos' own sound joins the sounds' graph (Video Volume to 200%); the bucket answers CORS.
@@ -477,6 +491,7 @@ export function ClipEditor({
         sharp: fresh.sharp,
         held: fresh.held,
         video: fresh.video,
+        extraSources: fresh.extraSources ?? current.extraSources,
       }));
     } catch {
       // The stage keeps its Try Again; the next press asks again.
@@ -928,6 +943,31 @@ export function ClipEditor({
     onReveal: () => setTab('layouts'),
     onSeek: (ms) => playback.seekMs(ms),
   });
+  // ---- Detect Camera on first open (Sprint 13, Module 10) ---------------------------------
+  useCameraOnOpen({
+    clipId,
+    document,
+    videoSize,
+    enabled: initial.clip.meta?.cameraOnOpen === true && !shapeOpen,
+    available: facesAvailable,
+    onEdit: editLayout,
+  });
+
+  // ---- Recipes (Sprint 13, Module 10) ------------------------------------------------------
+  const [recipeDialog, setRecipeDialog] = useState<'save' | 'apply' | null>(null);
+  const recipes = useEditorRecipes({
+    clipId,
+    videoId: detail.video?.id ?? null,
+    videoDurationMs,
+    videoSize,
+    waveform: detail.waveform,
+    styles: captionStyles,
+    latestDocument: () => latest.current.document,
+    commit,
+    onUndo: () => dispatch({ type: 'undo' }),
+    onFollow: (mode) => (mode === 'both' ? follow.setShowBoth(true) : follow.turnOn()),
+  });
+
   // The front video, for the many-faces picker's thumbnails (drawn in the browser, never uploaded).
   const grabPicture = useCallback(() => {
     const video = engine?.videos[0] ?? null;
@@ -1881,6 +1921,8 @@ export function ClipEditor({
           onTranscript={toggleTranscript}
           onExport={() => setTab('export')}
           exportProgress={exporting.running ? (exporting.job.job?.progress ?? 0) : null}
+          onSaveRecipe={() => setRecipeDialog('save')}
+          onApplyRecipe={() => setRecipeDialog('apply')}
         />
 
         {status === 'conflict' ? (
@@ -2034,6 +2076,19 @@ export function ClipEditor({
         onChoose={chooseFirstShape}
       />
       <EditorShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <SaveRecipeDialog
+        open={recipeDialog === 'save'}
+        onOpenChange={(open) => setRecipeDialog(open ? 'save' : null)}
+        document={document}
+        exportQuality={exporting.quality}
+        styles={captionStyles}
+        onSaved={(recipe) => toast({ title: recipeSavedSentence(recipe.name) })}
+      />
+      <ApplyRecipeDialog
+        open={recipeDialog === 'apply'}
+        onOpenChange={(open) => setRecipeDialog(open ? 'apply' : null)}
+        onApply={recipes.apply}
+      />
       {lastExport?.media ? (
         <SendClipDialog
           open={sendOpen}

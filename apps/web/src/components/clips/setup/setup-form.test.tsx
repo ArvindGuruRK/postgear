@@ -1,11 +1,14 @@
 import { TooltipProvider } from '@postgear/ui';
-import { defaultClipSetup } from '@postgear/video-engine';
+import { defaultClipSetup, STARTER_RECIPES } from '@postgear/video-engine';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import type { ClipVideoDetail, SetupPriceView } from '@/types/clips';
 import { fixtureVideo } from '../clips-fixtures';
 import { SetupForm } from './setup-form';
 import {
+  changedControls,
+  fillFromRecipe,
+  offersSaveAsRecipe,
   ACTION_HELP,
   ACTION_VISION_NOTE,
   actionPriceLabel,
@@ -26,7 +29,14 @@ jest.mock('@/lib/clips-api', () => ({
   startHighlights: jest.fn(),
 }));
 jest.mock('../home/clips-meters', () => ({ AiMinutesChip: () => null }));
+jest.mock('@/lib/clips-recipes-api', () => ({
+  listRecipes: jest.fn(),
+  listClipBrandKits: jest.fn(),
+  createRecipe: jest.fn(),
+}));
 const api = jest.requireMock('@/lib/clips-api') as Record<string, jest.Mock>;
+const recipesApi = jest.requireMock('@/lib/clips-recipes-api') as Record<string, jest.Mock>;
+const KIT_ID = '5b2a9c1e-0000-4000-8000-000000000001';
 
 beforeAll(() => {
   stubBrowserLayout();
@@ -63,7 +73,13 @@ beforeEach(() => {
   jest.useFakeTimers();
   push.mockClear();
   for (const mock of Object.values(api)) mock.mockReset();
+  for (const mock of Object.values(recipesApi)) mock.mockReset();
   api.priceClipSetup?.mockResolvedValue(price(13));
+  // The list answers the starters only: the form's own copy of them stays.
+  recipesApi.listRecipes?.mockResolvedValue({ recipes: [], own: 0, max: 50 });
+  recipesApi.listClipBrandKits?.mockResolvedValue({
+    brandKits: [{ id: KIT_ID, name: 'Client A' }],
+  });
 });
 afterEach(() => jest.useRealTimers());
 
@@ -255,5 +271,130 @@ describe('Clip Setup', () => {
       expect.objectContaining({ captions: expect.objectContaining({ on: false }) }),
     );
     expect(push).toHaveBeenCalledWith(`/org-1/clips/video/${video.id}`);
+  });
+});
+
+describe('recipes on Clip Setup (Module 10)', () => {
+  const social = STARTER_RECIPES.find((recipe) => recipe.id === 'starter-social-edit');
+  if (!social) throw new Error('starter');
+
+  it('fills every control the recipe covers, and keeps the rest', () => {
+    const start = { ...defaultClipSetup(600_000), ratio: '16:9' as const, request: 'jokes' };
+    const filled = fillFromRecipe(start, social.settings);
+    expect(filled).toMatchObject({
+      ratio: '9:16',
+      captions: { on: true, styleId: 'bold-pop' },
+      follow: true,
+      silences: true,
+      hookTitle: true,
+      request: 'jokes',
+      length: 'auto',
+    });
+    const picked = setupReducer(start, {
+      type: 'recipe',
+      recipe: { id: social.id, settings: social.settings, brandKitId: KIT_ID },
+    });
+    expect(picked.recipeId).toBe('starter-social-edit');
+    expect(picked.brandKitId).toBe(KIT_ID);
+    expect(setupReducer(picked, { type: 'recipe', recipe: null }).recipeId).toBeNull();
+  });
+
+  it('marks a control changed after the recipe, and offers Save As Recipe', () => {
+    const start = defaultClipSetup(600_000);
+    const picked = setupReducer(start, {
+      type: 'recipe',
+      recipe: { id: social.id, settings: social.settings, brandKitId: null },
+    });
+    expect(changedControls(picked, social.settings).size).toBe(0);
+    expect(offersSaveAsRecipe(picked, social.settings, start)).toBe(false);
+    const changed = setupReducer(picked, { type: 'silences', on: false });
+    expect([...changedControls(changed, social.settings)]).toEqual(['silences']);
+    expect(offersSaveAsRecipe(changed, social.settings, start)).toBe(true);
+    // A wide shape cannot follow: shape and follow both differ from the recipe.
+    const wide = setupReducer(picked, { type: 'ratio', ratio: '16:9' });
+    expect([...changedControls(wide, social.settings)].sort()).toEqual(['follow', 'ratio']);
+    // With no recipe, Save As Recipe shows once anything differs from the first setup.
+    expect(offersSaveAsRecipe(start, null, start)).toBe(false);
+    expect(
+      offersSaveAsRecipe(setupReducer(start, { type: 'hookTitle', on: true }), null, start),
+    ).toBe(true);
+  });
+
+  it('names the recipe and the new switches in the summary', () => {
+    const on = { ...defaultClipSetup(600_000), silences: true, hookTitle: true };
+    expect(summaryLines(on, null, 'Social Edit')).toEqual(
+      expect.arrayContaining(['Recipe: Social Edit', 'Removing silences', 'Hook title']),
+    );
+  });
+
+  it('a starter tile fills the form, a change shows a dot, and the run sends the ids', async () => {
+    api.startHighlights?.mockResolvedValue({});
+    const video = renderForm(undefined, true);
+    await settle();
+    expect(screen.getByText(social.help)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Social Edit/ }));
+    await settle();
+    expect(screen.getByTestId('clip-setup-silences')).toBeChecked();
+    expect(screen.getByTestId('clip-setup-hook-title')).toBeChecked();
+    expect(screen.getByTestId('clip-setup-captions')).toBeChecked();
+    expect(screen.getByTestId('clip-setup-follow')).toBeChecked();
+    expect(screen.queryByTestId('clip-setup-changed')).toBeNull();
+    expect(screen.queryByTestId('clip-setup-save-recipe')).toBeNull();
+    expect(screen.getByTestId('clip-setup-summary')).toHaveTextContent('Recipe: Social Edit');
+
+    fireEvent.click(screen.getByTestId('clip-setup-hook-title'));
+    await settle();
+    expect(screen.getAllByTestId('clip-setup-changed')).toHaveLength(1);
+    expect(screen.getByTestId('clip-setup-save-recipe')).toBeTruthy();
+
+    await waitFor(() => expect(screen.getByTestId('clip-setup-find')).toBeEnabled());
+    fireEvent.click(screen.getByTestId('clip-setup-find'));
+    await act(async () => undefined);
+    expect(api.startHighlights).toHaveBeenCalledWith(
+      video.id,
+      expect.objectContaining({
+        recipeId: 'starter-social-edit',
+        brandKitId: null,
+        silences: true,
+        hookTitle: false,
+      }),
+    );
+  });
+
+  it('saves the setup as a recipe and picks it', async () => {
+    recipesApi.createRecipe?.mockImplementation(async (input: { name: string }) => ({
+      id: '7c2a9c1e-0000-4000-8000-000000000001',
+      name: input.name,
+      description: '',
+      settings: { version: 1, ratio: '9:16', hookTitle: { on: true, look: 'hook-bold' } },
+      builtIn: false,
+      brandKitId: null,
+      createdById: null,
+      createdByName: null,
+      createdAt: null,
+      updatedAt: null,
+    }));
+    renderForm();
+    await settle();
+    fireEvent.click(screen.getByTestId('clip-setup-hook-title'));
+    await settle();
+    fireEvent.click(screen.getByTestId('clip-setup-save-recipe'));
+    fireEvent.change(await screen.findByPlaceholderText('Enter your recipe name'), {
+      target: { value: 'My Shorts' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save Recipe' }));
+    });
+    expect(recipesApi.createRecipe).toHaveBeenCalledWith({
+      name: 'My Shorts',
+      settings: expect.objectContaining({
+        version: 1,
+        ratio: '9:16',
+        hookTitle: expect.objectContaining({ on: true }),
+      }),
+      brandKitId: null,
+    });
+    await settle();
+    expect(screen.getByTestId('clip-setup-summary')).toHaveTextContent('Recipe: My Shorts');
   });
 });

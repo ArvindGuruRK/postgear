@@ -14,23 +14,32 @@
  * Look For Action (Module 06) shows its price before it is switched on, and
  * says so when stills are shown to AI. Follow The Speaker (Module 08) is free,
  * shown for Vertical and Square only, and off while faces cannot be found.
- * Switches later modules own (Remove Silences, Hook Title, recipes, brand
- * kits) are not shown until they exist.
+ *
+ * Module 10: the **Recipe** picker (None, the Starter Recipes, the
+ * workspace's own) and the **Brand Kit** picker open the second card, with
+ * the five starters as small tiles under them. Picking a recipe fills every
+ * control it covers; a control changed afterwards shows a small dot, and
+ * **Save As Recipe** appears under the picker once anything differs. Remove
+ * Silences and Hook Title are free switches. The run carries the recipe's
+ * and the kit's ids.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
+import { BookmarkIcon } from '@animateicons/react/lucide/bookmark-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import {
   Alert,
   Button,
+  ChoiceTiles,
   MotionIcon,
   PageActions,
   Segmented,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
-  Slider,
   Spinner,
   SummaryBox,
   Textarea,
@@ -43,21 +52,37 @@ import {
   defaultClipSetup,
   formatClipLength,
   type Genre,
+  RECIPE_NAME_MAX,
   type Ratio,
+  type RecipeView,
+  recipeFromSetup,
+  STARTER_RECIPES,
   TRANSCRIPT_LANGUAGES,
 } from '@postgear/video-engine';
 import { TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useReducer, useState } from 'react';
 import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui';
 import { ActionLink } from '@/components/home/home-actions';
 import { ApiError } from '@/lib/api';
 import { priceClipSetup, startHighlights } from '@/lib/clips-api';
+import { createRecipe, listClipBrandKits, listRecipes } from '@/lib/clips-recipes-api';
 import type { ClipVideoDetail, SetupPriceView } from '@/types/clips';
+import type { ClipBrandKitView } from '@/types/clips-recipes';
 import { AiMinutesChip } from '../home/clips-meters';
+import { NameDialog } from '../layouts/name-dialog';
 import { clipErrorSentence } from '../library/clip-actions';
 import { LanguageSelect } from '../panels/captions-panel';
+import { RangeControl } from './range-control';
 import {
+  CHANGED_MARK,
+  changedControls,
+  HOOK_TITLE_HELP,
+  offersSaveAsRecipe,
+  RECIPE_HELP,
+  SETUP_RECIPE_PLACEHOLDER,
+  SILENCES_HELP,
+  type SetupControl,
   GENRE_HELP,
   GENRE_OPTIONS,
   HONEST_LINE,
@@ -83,6 +108,35 @@ const NOTE = 'm-0 font-sans text-xs text-ink type-muted';
 const LABEL = 'font-sans text-sm font-bold text-ink';
 /** The price is asked for again this long after the last change. */
 const PRICE_DELAY_MS = 300;
+const NONE = 'none';
+
+/** The five starters as the picker knows them before the list arrives (and if it never does). */
+const STARTER_VIEWS: RecipeView[] = STARTER_RECIPES.map((starter) => ({
+  id: starter.id,
+  name: starter.name,
+  description: starter.help,
+  settings: starter.settings,
+  builtIn: true,
+  brandKitId: null,
+  createdById: null,
+  createdByName: null,
+  createdAt: null,
+  updatedAt: null,
+}));
+
+/** The small dot by a control the user changed after picking a recipe. */
+function ChangedDot({ shown }: { shown: boolean }) {
+  if (!shown) return null;
+  return (
+    <span
+      className="inline-block h-2 w-2 shrink-0 rounded-full bg-actionPrimary"
+      title={CHANGED_MARK}
+      data-testid="clip-setup-changed"
+    >
+      <span className="sr-only">{CHANGED_MARK}</span>
+    </span>
+  );
+}
 
 export function SetupForm({
   orgId,
@@ -101,6 +155,11 @@ export function SetupForm({
   const { video } = detail;
   const durationMs = video.durationMs ?? 0;
   const [setup, dispatch] = useReducer(setupReducer, durationMs, defaultClipSetup);
+  const [initialSetup] = useState(() => defaultClipSetup(durationMs));
+  // Module 10: the workspace's recipes (the starters first) and its brand kits.
+  const [recipes, setRecipes] = useState<RecipeView[]>(STARTER_VIEWS);
+  const [kits, setKits] = useState<ClipBrandKitView[]>([]);
+  const [savingRecipe, setSavingRecipe] = useState(false);
   const [price, setPrice] = useState<SetupPriceView | null>(null);
   const [pricing, setPricing] = useState(true);
   const [problem, setProblem] = useState<string | null>(null);
@@ -118,6 +177,11 @@ export function SetupForm({
     style: useId(),
     summary: useId(),
     look: useId(),
+    recipe: useId(),
+    brandKit: useId(),
+    starters: useId(),
+    silences: useId(),
+    hookTitle: useId(),
   };
   const videoHref = `/${encodeURIComponent(orgId)}/clips/video/${encodeURIComponent(video.id)}`;
 
@@ -144,6 +208,64 @@ export function SetupForm({
       clearTimeout(timer);
     };
   }, [setup, video.id]);
+
+  // The recipes and kits, once (a list that does not load leaves the starters and None).
+  useEffect(() => {
+    const abort = new AbortController();
+    listRecipes({ signal: abort.signal })
+      .then((view) => {
+        if (!abort.signal.aborted && view.recipes.length > 0) setRecipes(view.recipes);
+      })
+      .catch(() => undefined);
+    listClipBrandKits({ signal: abort.signal })
+      .then((view) => {
+        if (!abort.signal.aborted) setKits(view.brandKits);
+      })
+      .catch(() => undefined);
+    return () => abort.abort();
+  }, []);
+
+  const picked = useMemo(
+    () =>
+      setup.recipeId ? (recipes.find((recipe) => recipe.id === setup.recipeId) ?? null) : null,
+    [recipes, setup.recipeId],
+  );
+  const changed = useMemo(() => changedControls(setup, picked?.settings ?? null), [setup, picked]);
+  const dot = (control: SetupControl) => <ChangedDot shown={changed.has(control)} />;
+  const canSaveRecipe = offersSaveAsRecipe(setup, picked?.settings ?? null, initialSetup);
+  const pickRecipe = useCallback(
+    (id: string) => {
+      const recipe = id === NONE ? null : (recipes.find((one) => one.id === id) ?? null);
+      dispatch({
+        type: 'recipe',
+        recipe: recipe
+          ? { id: recipe.id, settings: recipe.settings, brandKitId: recipe.brandKitId }
+          : null,
+      });
+    },
+    [recipes],
+  );
+  const saveRecipe = async (name: string): Promise<string | null> => {
+    const cleaned = name.replace(/\s+/g, ' ').trim();
+    if (!cleaned) return 'Enter a name for the recipe.';
+    try {
+      const recipe = await createRecipe({
+        name: cleaned,
+        settings: recipeFromSetup(setup, picked?.settings ?? null),
+        brandKitId: setup.brandKitId,
+      });
+      setRecipes((current) => [...current, recipe]);
+      dispatch({
+        type: 'recipe',
+        recipe: { id: recipe.id, settings: recipe.settings, brandKitId: recipe.brandKitId },
+      });
+      return null;
+    } catch (cause) {
+      return clipErrorSentence(cause);
+    }
+  };
+  const starterRecipes = recipes.filter((recipe) => recipe.builtIn);
+  const ownRecipes = recipes.filter((recipe) => !recipe.builtIn);
 
   const shortfall = shortfallSentence(price);
   const styleName = useMemo(
@@ -206,8 +328,11 @@ export function SetupForm({
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <span id={ids.genre} className={LABEL}>
-                  Genre
+                <span className="flex items-center gap-2">
+                  <span id={ids.genre} className={LABEL}>
+                    Genre
+                  </span>
+                  {dot('genre')}
                 </span>
                 <Select
                   value={setup.genre}
@@ -229,33 +354,106 @@ export function SetupForm({
             </div>
             <div className="flex flex-col gap-2">
               <span className={LABEL}>Range</span>
-              <Slider
-                value={[setup.range.fromMs, setup.range.toMs]}
-                min={0}
-                max={Math.max(3_000, durationMs)}
-                step={1_000}
-                minStepsBetweenThumbs={3}
-                thumbs={[
-                  { 'aria-label': 'Start', 'aria-valuetext': formatClipLength(setup.range.fromMs) },
-                  { 'aria-label': 'End', 'aria-valuetext': formatClipLength(setup.range.toMs) },
-                ]}
-                onValueChange={([fromMs, toMs]) => {
-                  if (fromMs !== undefined && toMs !== undefined) {
-                    dispatch({ type: 'range', fromMs, toMs });
-                  }
-                }}
-                data-testid="clip-setup-range"
+              <RangeControl
+                fromMs={setup.range.fromMs}
+                toMs={setup.range.toMs}
+                durationMs={durationMs}
+                onChange={(fromMs, toMs) => dispatch({ type: 'range', fromMs, toMs })}
+                testId="clip-setup-range"
               />
-              <div className="flex justify-between font-sans text-xs tabular-nums text-ink type-muted">
-                <span>{formatClipLength(setup.range.fromMs)}</span>
-                <span>{formatClipLength(setup.range.toMs)}</span>
-              </div>
               <p className={NOTE}>{RANGE_HELP}</p>
             </div>
           </AnalyticsPanel>
 
           <AnalyticsPanel aria-labelledby={ids.look} className="flex flex-col gap-4 p-4">
             <PanelHeader id={ids.look} title="What To Make" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <span id={ids.recipe} className={LABEL}>
+                  Recipe
+                </span>
+                <Select value={setup.recipeId ?? NONE} onValueChange={pickRecipe}>
+                  <SelectTrigger aria-labelledby={ids.recipe} data-testid="clip-setup-recipe">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>None</SelectItem>
+                    <SelectGroup>
+                      <SelectLabel>Starter Recipes</SelectLabel>
+                      {starterRecipes.map((recipe) => (
+                        <SelectItem key={recipe.id} value={recipe.id}>
+                          {recipe.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {ownRecipes.length > 0 ? (
+                      <SelectGroup>
+                        <SelectLabel>My Recipes</SelectLabel>
+                        {ownRecipes.map((recipe) => (
+                          <SelectItem key={recipe.id} value={recipe.id}>
+                            {recipe.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <span id={ids.brandKit} className={LABEL}>
+                  Brand Kit
+                </span>
+                <Select
+                  value={setup.brandKitId ?? NONE}
+                  onValueChange={(id) =>
+                    dispatch({ type: 'brandKit', brandKitId: id === NONE ? null : id })
+                  }
+                >
+                  <SelectTrigger aria-labelledby={ids.brandKit} data-testid="clip-setup-brand-kit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>None</SelectItem>
+                    {kits.map((kit) => (
+                      <SelectItem key={kit.id} value={kit.id}>
+                        {kit.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span id={ids.starters} className="sr-only">
+                Starter Recipes
+              </span>
+              <ChoiceTiles<string>
+                labelledBy={ids.starters}
+                options={starterRecipes.map((recipe) => ({
+                  value: recipe.id,
+                  label: recipe.name,
+                  line:
+                    STARTER_RECIPES.find((starter) => starter.id === recipe.id)?.help ??
+                    recipe.description,
+                }))}
+                value={setup.recipeId ?? ''}
+                onValueChange={pickRecipe}
+              />
+              <p className={NOTE}>{RECIPE_HELP}</p>
+              {canSaveRecipe ? (
+                <div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSavingRecipe(true)}
+                    data-testid="clip-setup-save-recipe"
+                  >
+                    <MotionIcon icon={BookmarkIcon} className="h-4 w-4" />
+                    Save As Recipe
+                  </Button>
+                </div>
+              ) : null}
+            </div>
             <div className="flex flex-col gap-2">
               <label htmlFor={ids.request} className={LABEL}>
                 What should we look for?
@@ -286,8 +484,11 @@ export function SetupForm({
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              <span id={ids.length} className={LABEL}>
-                Clip Length
+              <span className="flex items-center gap-2">
+                <span id={ids.length} className={LABEL}>
+                  Clip Length
+                </span>
+                {dot('length')}
               </span>
               <Segmented<ClipLength>
                 labelledBy={ids.length}
@@ -297,8 +498,11 @@ export function SetupForm({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <span id={ids.shape} className={LABEL}>
-                Shape
+              <span className="flex items-center gap-2">
+                <span id={ids.shape} className={LABEL}>
+                  Shape
+                </span>
+                {dot('ratio')}
               </span>
               <Segmented<Ratio>
                 labelledBy={ids.shape}
@@ -317,9 +521,12 @@ export function SetupForm({
                 onCheckedChange={(on) => dispatch({ type: 'captions', on })}
                 data-testid="clip-setup-captions"
               />
-              <label htmlFor={ids.captions} className={`${LABEL} flex-1`}>
-                Captions
-              </label>
+              <span className="flex flex-1 items-center gap-2">
+                <label htmlFor={ids.captions} className={LABEL}>
+                  Captions
+                </label>
+                {dot('captions')}
+              </span>
               {setup.captions.on ? (
                 <Select
                   value={setup.captions.styleId}
@@ -379,9 +586,12 @@ export function SetupForm({
                   onCheckedChange={(on) => dispatch({ type: 'follow', on })}
                   data-testid="clip-setup-follow"
                 />
-                <label htmlFor={ids.follow} className={`${LABEL} flex-1`}>
-                  Follow The Speaker
-                </label>
+                <span className="flex flex-1 items-center gap-2">
+                  <label htmlFor={ids.follow} className={LABEL}>
+                    Follow The Speaker
+                  </label>
+                  {dot('follow')}
+                </span>
                 <span className="type-label text-xs text-ink type-muted">Free</span>
               </div>
               <p className={NOTE}>
@@ -390,6 +600,45 @@ export function SetupForm({
               </p>
             </AnalyticsPanel>
           ) : null}
+
+          <AnalyticsPanel className="flex flex-col gap-4 p-4" data-testid="clip-setup-cleanup-card">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <Toggle
+                  id={ids.silences}
+                  checked={setup.silences}
+                  onCheckedChange={(on) => dispatch({ type: 'silences', on })}
+                  data-testid="clip-setup-silences"
+                />
+                <span className="flex flex-1 items-center gap-2">
+                  <label htmlFor={ids.silences} className={LABEL}>
+                    Remove Silences
+                  </label>
+                  {dot('silences')}
+                </span>
+                <span className="type-label text-xs text-ink type-muted">Free</span>
+              </div>
+              <p className={NOTE}>{SILENCES_HELP}</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <Toggle
+                  id={ids.hookTitle}
+                  checked={setup.hookTitle}
+                  onCheckedChange={(on) => dispatch({ type: 'hookTitle', on })}
+                  data-testid="clip-setup-hook-title"
+                />
+                <span className="flex flex-1 items-center gap-2">
+                  <label htmlFor={ids.hookTitle} className={LABEL}>
+                    Hook Title
+                  </label>
+                  {dot('hookTitle')}
+                </span>
+                <span className="type-label text-xs text-ink type-muted">Free</span>
+              </div>
+              <p className={NOTE}>{HOOK_TITLE_HELP}</p>
+            </div>
+          </AnalyticsPanel>
         </div>
 
         <AnalyticsPanel
@@ -399,8 +648,8 @@ export function SetupForm({
         >
           <PanelHeader id={ids.summary} title="Summary" />
           <SummaryBox
-            title={summaryLines(setup, styleName)[0]}
-            notes={summaryLines(setup, styleName).slice(1)}
+            title={summaryLines(setup, styleName, picked?.name ?? null)[0]}
+            notes={summaryLines(setup, styleName, picked?.name ?? null).slice(1)}
             rowsLabel="Price in AI minutes"
             rows={
               price
@@ -451,6 +700,20 @@ export function SetupForm({
           <p className={NOTE}>{PAY_FOR_LOOKING}</p>
         </AnalyticsPanel>
       </div>
+      <NameDialog
+        open={savingRecipe}
+        onOpenChange={setSavingRecipe}
+        title="Save As Recipe"
+        description="Saves these choices as a recipe for the whole workspace."
+        label="Recipe name"
+        placeholder={SETUP_RECIPE_PLACEHOLDER}
+        initial=""
+        maxLength={RECIPE_NAME_MAX}
+        submitLabel="Save Recipe"
+        busyLabel="Saving"
+        onSubmit={saveRecipe}
+        testId="clip-setup-save-recipe-dialog"
+      />
     </div>
   );
 }

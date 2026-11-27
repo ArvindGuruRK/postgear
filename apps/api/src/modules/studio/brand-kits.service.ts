@@ -54,6 +54,7 @@ import {
 import { BROWSER_POOL } from '../../common/browser/browser-pool.module';
 import { securityLogger } from '../../common/logging/security-logger';
 import type { Env } from '../../config/env';
+import { checkClipBrandFields, namesClipBrandField } from '../clips/brand-kits/clip-brand-fields';
 import { MediaService, type MediaView } from '../media/media.service';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -180,6 +181,18 @@ export class BrandKitsService {
     if (body.logoMediaId !== undefined) {
       data.logoMediaId = await this.verifyLogo(orgId, body.logoMediaId);
     }
+    if (namesClipBrandField(body)) {
+      // Sprint 13, Module 10: the clip fields, by the same rules as the clips kit page.
+      if (!(await this.repository.findBrandKit(orgId, id))) {
+        throw new NotFoundException(STUDIO_MESSAGES.BRAND_KIT_NOT_FOUND);
+      }
+      Object.assign(data, await checkClipBrandFields(orgId, body));
+    }
+
+    const before =
+      data.logoMediaId !== undefined ? await this.repository.findBrandKit(orgId, id) : null;
+    // A new logo makes the clips copy of the old one stale: the next use copies the new one.
+    if (before && before.logoMediaId !== data.logoMediaId) data.clipLogoAssetId = null;
 
     const saved = await this.repository.updateBrandKit(orgId, id, data);
     if (!saved) throw new NotFoundException(STUDIO_MESSAGES.BRAND_KIT_NOT_FOUND);
@@ -213,6 +226,14 @@ export class BrandKitsService {
       ctaText: source.ctaText,
       ctaUrl: source.ctaUrl,
       createdById: userId,
+      clip: {
+        clipLogoPosition: source.clipLogoPosition,
+        clipCaptionStyleId: source.clipCaptionStyleId,
+        clipIntroVideoId: source.clipIntroVideoId,
+        clipOutroVideoId: source.clipOutroVideoId,
+        clipOutroText: source.clipOutroText,
+        clipLogoAssetId: source.clipLogoAssetId,
+      },
     });
 
     return this.toView(row, await this.logoViews(orgId, [row]));
@@ -546,6 +567,12 @@ export class BrandKitsService {
       ctaText: row.ctaText,
       ctaUrl: row.ctaUrl,
       source: row.source,
+      clipLogoPosition: row.clipLogoPosition,
+      clipCaptionStyleId: row.clipCaptionStyleId,
+      clipIntroVideoId: row.clipIntroVideoId,
+      clipOutroVideoId: row.clipOutroVideoId,
+      clipOutroText: row.clipOutroText,
+      clipLogoAssetId: row.clipLogoAssetId,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

@@ -24,6 +24,7 @@
  * browser preview, the API and the worker all read it.
  */
 import { z } from 'zod';
+import { BRAND_VIDEO_MAX_MS } from '../brand/types';
 import { CANVAS_FPS, CANVASES, RATIOS } from '../canvas';
 import { hasEmoji } from './emoji';
 import {
@@ -122,24 +123,6 @@ export const speedSchema = z.union([
   z.literal(SPEEDS[5]),
 ]);
 
-export const segmentSchema = z
-  .object({
-    id: idSchema,
-    source: idSchema,
-    sourceIn: msSchema,
-    sourceOut: msSchema,
-    speed: speedSchema,
-    volume: z.number().min(0).max(VOLUME_MAX),
-    /**
-     * Version 2: `hook` marks a part played first as the clip's opening (a
-     * stretch of the video that also plays later, Module 09). Absent for an
-     * ordinary part. A hook is a part like any other to the time map.
-     */
-    role: z.literal('hook').optional(),
-  })
-  .strict()
-  .refine((s) => s.sourceIn < s.sourceOut, 'A part must end after it starts');
-
 export const LAYOUT_KINDS = [
   'fullscreen',
   'blurred',
@@ -202,6 +185,39 @@ const layoutFields = {
 
 /** A layout as it was before Follow The Speaker (Module 08): what switching it off gives back. */
 export const savedLayoutSchema = z.object(layoutFields).strict();
+
+/**
+ * The roles a part can play (version 2). Absent for an ordinary part.
+ *
+ * - `hook` (Module 09): a stretch of the video played first as the clip's
+ *   opening (it also plays later). A part like any other to the time map.
+ * - `intro`, `outro` (Module 10): a brand kit's own short video, played
+ *   before or after the clip. Captions and bleeps skip them; they carry a
+ *   `layoutOverride` (their own video, cover-fitted), since the clip's
+ *   layout frames another video.
+ */
+export const SEGMENT_ROLES = ['hook', 'intro', 'outro'] as const;
+export type SegmentRole = (typeof SEGMENT_ROLES)[number];
+
+export const segmentSchema = z
+  .object({
+    id: idSchema,
+    source: idSchema,
+    sourceIn: msSchema,
+    sourceOut: msSchema,
+    speed: speedSchema,
+    volume: z.number().min(0).max(VOLUME_MAX),
+    role: z.enum(SEGMENT_ROLES).optional(),
+    /**
+     * Version 2 (Module 10, used by Module 11's montage): this part's own
+     * layout, in place of the document's. Its crops are keyed in the part's
+     * own source time like the document's. Never followed (`follow` is not
+     * part of the shape).
+     */
+    layoutOverride: savedLayoutSchema.optional(),
+  })
+  .strict()
+  .refine((s) => s.sourceIn < s.sourceOut, 'A part must end after it starts');
 
 /**
  * Version 2: Follow The Speaker (Module 08). The crops it works out are
@@ -389,7 +405,10 @@ export const stickerRefSchema = z.union([
         .max(BADGE_NAME_MAX)
         .refine((name) => name.trim().length > 0, 'A Follow Badge needs a name')
         // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
-        .refine((name) => !/[\u0000-\u001f\u007f]/.test(name), 'A Follow Badge name is one plain line')
+        .refine(
+          (name) => !/[\u0000-\u001f\u007f]/.test(name),
+          'A Follow Badge name is one plain line',
+        )
         .refine((name) => !hasEmoji(name), 'Emoji are stickers, not text'),
     })
     .strict(),
@@ -412,6 +431,11 @@ export const stickerItemSchema = z
      * its last frame until the item ends. A still one ignores it.
      */
     loop: z.boolean(),
+    /**
+     * Version 2: the brand kit's logo (Module 10). Added and removed with the
+     * kit's Logo switch; otherwise an ordinary sticker.
+     */
+    brand: z.literal(true).optional(),
   })
   .strict();
 
@@ -491,7 +515,10 @@ export const captionsTrackSchema = z
     sizePx: z.number().min(CAPTION_SIZE_MIN).max(CAPTION_SIZE_MAX),
     maxWords: z.number().int().min(1).max(CAPTION_MAX_WORDS),
     edits: z
-      .record(z.string().regex(/^(?:0|[1-9]\d{0,8})$/, 'A word index is a whole number'), captionEditSchema)
+      .record(
+        z.string().regex(/^(?:0|[1-9]\d{0,8})$/, 'A word index is a whole number'),
+        captionEditSchema,
+      )
       .refine((edits) => Object.keys(edits).length <= MAX_CAPTION_EDITS, {
         message: `A clip keeps up to ${MAX_CAPTION_EDITS} caption changes`,
       }),
@@ -531,7 +558,62 @@ export const trackSchema = z.discriminatedUnion('kind', [
 export const documentMetaSchema = z
   .object({
     shapeChosen: z.boolean().optional(),
+    /**
+     * Module 10: the cleanup this clip had, so Save As Recipe reads it back
+     * (a removed pause is only a cut once made). Set by Remove Silences
+     * (`silencesMinMs`, the slider's value) and Remove Filler Words.
+     */
+    cleanup: z
+      .object({
+        silencesMinMs: z.number().int().min(0).max(10_000).optional(),
+        fillers: z.literal(true).optional(),
+      })
+      .strict()
+      .optional(),
   })
+  .strict();
+
+/** The longest line a card shows. */
+export const CARD_TEXT_MAX = 80;
+/** A card lasts this long (Module 10's outro card, Module 11's title card). */
+export const CARD_MS = 2_000;
+
+/**
+ * Version 2 (Module 10): a scene drawn by the compiler with no video, from a
+ * `color` source, an optional logo and one line of ASS text, with silent
+ * sound. The closing card is a brand kit's outro card; the opening card is
+ * Module 11's montage title. Cards sit OUTSIDE the clip's own time: the
+ * time map, every item and every caption are in the clip's time, and the
+ * render adds the opening card before it and the closing card after it
+ * (`cardsMs`, `renderedDuration`).
+ */
+export const cardSchema = z
+  .object({
+    text: z
+      .string()
+      .max(CARD_TEXT_MAX)
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
+      .refine((text) => !/[\u0000-\u001f\u007f]/.test(text), 'A card line is one plain line')
+      .refine((text) => !hasEmoji(text), 'Emoji are stickers, not text'),
+    background: hexColour,
+    colour: hexColour,
+    /** The kit's logo as the workspace's own sticker asset, or none. */
+    logo: z.object({ asset: uuidSchema }).strict().nullable(),
+    /** A hook look id (`hook-bold`...) the text is drawn in, or null for the plain card text. */
+    look: z
+      .string()
+      .regex(/^[a-z0-9-]{1,40}$/)
+      .nullable(),
+    durationMs: z.literal(CARD_MS),
+  })
+  .strict()
+  .refine(
+    (card) => card.text.trim().length > 0 || card.logo !== null,
+    'A card shows a line or a logo',
+  );
+
+export const cardsSchema = z
+  .object({ opening: cardSchema.optional(), closing: cardSchema.optional() })
   .strict();
 
 /**
@@ -565,6 +647,13 @@ const documentShape = z
     bleeps: z.array(bleepSchema).max(MAX_BLEEPS),
     /** Version 2: the recipe this clip was made with (a starter's id or a workspace recipe). Never drawn. */
     recipeId: idSchema.optional(),
+    /**
+     * Version 2 (Module 10): the brand kit applied to this clip (a Studio kit's
+     * id: a uuid, or a readable one for kits seeded by hand). Never drawn on its own.
+     */
+    brandKitId: idSchema.optional(),
+    /** Version 2 (Module 10): scenes drawn before and after the clip (see `cardSchema`). */
+    cards: cardsSchema.optional(),
     meta: documentMetaSchema.optional(),
   })
   .strict();
@@ -613,6 +702,40 @@ export const clipDocumentSchema = documentShape.superRefine((doc, ctx) => {
     }
     total += out;
   });
+
+  // Module 10: a brand intro opens the clip (a hook part may come before or after it) and an
+  // outro closes it, each at most `BRAND_VIDEO_MAX_MS` long.
+  let introMs = 0;
+  let outroMs = 0;
+  doc.segments.forEach((segment, i) => {
+    const out = segmentOutputMs(segment);
+    if (segment.role === 'intro') {
+      introMs += out;
+      if (doc.segments.slice(0, i).some((s) => s.role !== 'intro' && s.role !== 'hook')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['segments', i, 'role'],
+          message: 'An intro part plays at the start of the clip',
+        });
+      }
+    } else if (segment.role === 'outro') {
+      outroMs += out;
+      if (doc.segments.slice(i + 1).some((s) => s.role !== 'outro')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['segments', i, 'role'],
+          message: 'An outro part plays at the end of the clip',
+        });
+      }
+    }
+  });
+  if (introMs > BRAND_VIDEO_MAX_MS || outroMs > BRAND_VIDEO_MAX_MS) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['segments'],
+      message: `An intro or an outro lasts at most ${BRAND_VIDEO_MAX_MS / 1000} seconds`,
+    });
+  }
 
   if (total < CLIP_MIN_MS || total > CLIP_MAX_MS) {
     ctx.addIssue({
@@ -731,4 +854,6 @@ export type Track = z.infer<typeof trackSchema>;
 export type OverlayItem = TextItem | StickerItem;
 export type TimedItem = TextItem | StickerItem | AudioItem;
 export type ClipDocumentMeta = z.infer<typeof documentMetaSchema>;
+export type ClipCard = z.infer<typeof cardSchema>;
+export type ClipCards = z.infer<typeof cardsSchema>;
 export type ClipDocument = z.infer<typeof clipDocumentSchema>;

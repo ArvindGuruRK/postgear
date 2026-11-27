@@ -20,6 +20,9 @@
  *   address (one hour) while its file is kept (24 hours after it finished).
  *
  * Every route answers 404 for another workspace's clip before anything else.
+ * An export or preview checks every video the document plays (Module 10: a
+ * brand intro or outro is another video): each must be the workspace's,
+ * live and READY, or it is refused as the clip's own video would be.
  */
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { type ClipJob, ClipJobKind, prisma } from '@postgear/db';
@@ -399,6 +402,22 @@ export class ClipExportsService {
       throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'tool_failed', {
         message: CLIPS_MESSAGES.CLIP_UNREADABLE,
       });
+    }
+    // Module 10: every other video the clip plays (a brand intro or outro, Module 11's montage)
+    // is frozen with it and must be live and READY too; a removed one fails like the clip's own.
+    const others = [
+      ...new Set(
+        parsed.doc.sources
+          .map((source) => source.videoId)
+          .filter((videoId) => videoId !== video.id),
+      ),
+    ];
+    for (const videoId of others) {
+      const other = await this.videos.findLive(orgId, videoId, tx);
+      if (!other) throw videoNotFound();
+      if (other.status !== 'READY') {
+        throw new ClipErrorException(HttpStatus.CONFLICT, 'video_not_ready');
+      }
     }
     return { clip, video, doc: parsed.doc };
   }

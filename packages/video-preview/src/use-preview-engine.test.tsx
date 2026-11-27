@@ -1,7 +1,17 @@
 import { render } from '@testing-library/react';
 import { StrictMode, useEffect } from 'react';
 import type { PreviewEngine } from './preview-engine';
-import { clipOf, FakeFrames, type FakeVideo, fakeVideoFactory, part } from './testing';
+import {
+  clipOf,
+  FakeFrames,
+  type FakeVideo,
+  fakeVideoFactory,
+  fullFrameOverride,
+  part,
+  partFrom,
+  TEST_VIDEO_ID,
+} from './testing';
+import type { PreviewSource } from './types';
 import { usePreviewEngine } from './use-preview-engine';
 
 const doc = clipOf([part('a', 10_000, 14_000)]);
@@ -87,6 +97,54 @@ describe('usePreviewEngine', () => {
     expect(engine.videos[0].getAttribute('src')).toBe('https://storage.example/b.mp4');
 
     view.rerender(<Harness create={factory.create} onEngine={onEngine} url={null} />);
+    expect(engine.getSnapshot().error?.code).toBe('missing_source');
+    view.unmount();
+  });
+
+  it('hands the other videos over before the main one, and ignores an equal map made again', () => {
+    const intro = 'https://storage.example/intro.mp4';
+    const branded = clipOf(
+      [
+        partFrom('intro', 'i', 0, 2_000, {
+          role: 'intro',
+          layoutOverride: fullFrameOverride('intro-video'),
+        }),
+        partFrom('src', 'm', 10_000, 14_000),
+      ],
+      {
+        sources: [
+          { id: 'src', videoId: TEST_VIDEO_ID },
+          { id: 'intro', videoId: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d' },
+        ],
+      },
+    );
+    const factory = fakeVideoFactory({ loadOnSrc: true });
+    let current: PreviewEngine | null = null;
+    function Branded({ extras }: { extras: Record<string, PreviewSource | null> }) {
+      const { engine, containerRef } = usePreviewEngine({
+        document: branded,
+        source: { url: 'https://storage.example/a.mp4' },
+        extraSources: extras,
+        createVideo: factory.create,
+        frames: new FakeFrames(),
+      });
+      useEffect(() => {
+        current = engine;
+      }, [engine]);
+      return <div ref={containerRef} />;
+    }
+    const view = render(<Branded extras={{ intro: { url: intro } }} />);
+    const engine = current as PreviewEngine | null;
+    if (!engine) throw new Error('no engine');
+    // The front opens on the intro's own video.
+    expect(engine.videos[0].getAttribute('src')).toBe(intro);
+    expect(engine.videos[1].getAttribute('src')).toBe('https://storage.example/a.mp4');
+
+    const mark = factory.log.length;
+    view.rerender(<Branded extras={{ intro: { url: intro } }} />);
+    expect(factory.log.slice(mark)).toEqual([]);
+
+    view.rerender(<Branded extras={{ intro: null }} />);
     expect(engine.getSnapshot().error?.code).toBe('missing_source');
     view.unmount();
   });

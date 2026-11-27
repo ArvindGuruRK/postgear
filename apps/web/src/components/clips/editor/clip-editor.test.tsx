@@ -215,6 +215,7 @@ function detailOf(
     waveform: null,
     sharp,
     held,
+    extraSources: {},
   };
 }
 

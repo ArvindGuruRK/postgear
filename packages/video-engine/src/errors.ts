@@ -60,6 +60,18 @@ export const CLIP_ERROR_MESSAGES = {
   voice_off: 'Text to speech is not available right now. Everything else still works.',
   voice_language: 'This voice cannot read this language. Pick another voice.',
   voice_unknown: 'This voice is no longer available. Pick another voice.',
+  // Module 10: recipes, the brand kit for clips and Auto-Edit Video.
+  recipe_not_found: 'We could not find this recipe. It may have been deleted.',
+  recipe_built_in: 'Starter recipes cannot be changed. Duplicate it to make your own.',
+  recipe_limit: 'This workspace has 50 recipes, the most it can keep. Delete one first.',
+  recipe_missing_part: 'Part of this recipe no longer exists. We used the closest choice instead.',
+  brand_kit_not_found: 'We could not find this brand kit. It may have been deleted.',
+  brand_video_too_long: 'An intro or outro can be at most 5 seconds long. Pick a shorter video.',
+  brand_video_not_ready: 'This video is still being prepared. Try again when it is ready.',
+  auto_edit_too_long: 'Auto-Edit works on up to 30 minutes at a time. Pick the part you want.',
+  auto_edit_running: 'This video is already being edited. Wait for it to finish.',
+  auto_edit_failed:
+    'We could not finish the edit. Try again: what we heard is kept, so it costs nothing more.',
   video_removed: 'This video was removed after a request from its owner.',
   format_gone: 'This quality is no longer offered for this video. Pick another.',
   downloads_busy: 'Three downloads are already being prepared. Wait for one to finish.',
@@ -69,8 +81,7 @@ export const CLIP_ERROR_MESSAGES = {
   download_expired: 'This download has expired. Prepare it again.',
   download_not_ready: 'This file is still being prepared. Wait for it to finish.',
   download_not_found: 'We could not find this download. It may have been deleted.',
-  download_audio_only:
-    'Media takes videos and pictures. Save the MP3 to your computer instead.',
+  download_audio_only: 'Media takes videos and pictures. Save the MP3 to your computer instead.',
   media_too_big: 'This file is too big for Media. Save it to your computer instead.',
   media_save_failed: 'We could not save this file to Media. Try again.',
   not_an_upload: 'Only a video you uploaded has an original to download.',

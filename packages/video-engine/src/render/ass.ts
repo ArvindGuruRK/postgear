@@ -9,6 +9,7 @@
  */
 import { TEXT_SHADOW } from '../document/text';
 import { CAPTION_LAYER, captionDialogues, captionStyleFields } from './caption-ass';
+import { cardsOf } from './card-plan';
 import type { RenderPlan } from './plan';
 import type { PlanShape, PlanText, PlanTextRun } from './text-plan';
 
@@ -172,7 +173,8 @@ function styleFields(text: PlanText): string {
         ? assColour(backing.colour, backing.opacity)
         : assColour('#000000');
   const borderStyle = backing.kind === 'box' ? 3 : 1;
-  const outline = backing.kind === 'outline' ? backing.width : backing.kind === 'box' ? backing.pad : 0;
+  const outline =
+    backing.kind === 'outline' ? backing.width : backing.kind === 'box' ? backing.pad : 0;
   const shadow = text.shadow ? text.geometry.shadowPx : 0;
   return [
     text.main.assName,
@@ -206,7 +208,10 @@ function fontSwitch(run: PlanTextRun): string {
 }
 
 /** The `Text` field of one text: the placement block, then the runs with their font switches. */
-function dialogueText(text: PlanText, canvasWidth: number): { text: string; marginL: number; marginR: number } {
+function dialogueText(
+  text: PlanText,
+  canvasWidth: number,
+): { text: string; marginL: number; marginR: number } {
   const g = text.geometry;
   const anchorX =
     text.align === 'left' ? g.boxLeft : text.align === 'right' ? g.boxLeft + g.boxWidth : g.cx;
@@ -327,10 +332,61 @@ function shapeStyle(fontName: string): string {
  *   `Outline`; the shadow is the style's `Shadow` and `BackColour`.
  */
 export function buildAss(plan: RenderPlan): AssFile[] {
+  const main = mainAss(plan);
+  // Module 10: each card with a line has its own small file, on the card's own clock.
+  const cards = cardsOf(plan.cards).flatMap((card) =>
+    card.text && card.assFile
+      ? [{ name: card.assFile, content: cardAss(card.text, plan.canvas) }]
+      : [],
+  );
+  return main ? [main, ...cards] : cards;
+}
+
+/** A card's line as its own ASS file: the same writer as the clip's texts, one style, one event. */
+export function cardAss(text: PlanText, canvas: { width: number; height: number }): string {
+  const line = dialogueText(text, canvas.width);
+  return assContent(
+    canvas,
+    [`Style: S1,${styleFields(text)}`],
+    [
+      `Dialogue: 0,${assTime(text.startMs)},${assTime(text.endMs)},S1,,` +
+        `${line.marginL},${line.marginR},0,,${line.text}`,
+    ],
+  );
+}
+
+/** The whole text of an ASS file from its style and event lines. */
+function assContent(
+  canvas: { width: number; height: number },
+  styles: string[],
+  events: string[],
+): string {
+  return [
+    '[Script Info]',
+    'ScriptType: v4.00+',
+    `PlayResX: ${canvas.width}`,
+    `PlayResY: ${canvas.height}`,
+    'WrapStyle: 0',
+    'ScaledBorderAndShadow: yes',
+    'YCbCr Matrix: None',
+    '',
+    '[V4+ Styles]',
+    STYLE_FORMAT,
+    ...styles,
+    '',
+    '[Events]',
+    EVENT_FORMAT,
+    ...events,
+    '',
+  ].join('\n');
+}
+
+/** The clip's own file (`captions.ass`): its texts, badges and captions, or null when it has none. */
+function mainAss(plan: RenderPlan): AssFile | null {
   const shapes = plan.shapes ?? [];
   const captions = plan.captions ?? null;
   if (plan.texts.length === 0 && shapes.length === 0 && !captions) {
-    return [];
+    return null;
   }
   const styles = new Map<string, string>();
   const lines: Array<{ layer: number; order: number; line: string }> = [];
@@ -381,23 +437,10 @@ export function buildAss(plan: RenderPlan): AssFile[] {
     .sort((a, b) => a.layer - b.layer || a.order - b.order)
     .map((entry) => entry.line);
 
-  const content = [
-    '[Script Info]',
-    'ScriptType: v4.00+',
-    `PlayResX: ${plan.canvas.width}`,
-    `PlayResY: ${plan.canvas.height}`,
-    'WrapStyle: 0',
-    'ScaledBorderAndShadow: yes',
-    'YCbCr Matrix: None',
-    '',
-    '[V4+ Styles]',
-    STYLE_FORMAT,
-    ...[...styles.entries()].map(([fields, name]) => `Style: ${name},${fields}`),
-    '',
-    '[Events]',
-    EVENT_FORMAT,
-    ...events,
-    '',
-  ].join('\n');
-  return [{ name: ASS_FILE, content }];
+  const content = assContent(
+    plan.canvas,
+    [...styles.entries()].map(([fields, name]) => `Style: ${name},${fields}`),
+    events,
+  );
+  return { name: ASS_FILE, content };
 }

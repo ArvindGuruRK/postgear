@@ -10,15 +10,32 @@
  *
  * While the panel is folded away, Show Panel leads the row.
  *
+ * Sprint 13, Module 10: the overflow menu (More Actions) holds Save As
+ * Recipe and Apply A Recipe.
+ *
  * The name is the clip's, like a file name, not a page title.
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
+import { BookmarkIcon } from '@animateicons/react/lucide/bookmark-icon';
 import { DownloadIcon } from '@animateicons/react/lucide/download-icon';
+import { EllipsisIcon } from '@animateicons/react/lucide/ellipsis-icon';
 import { PanelLeftOpenIcon } from '@animateicons/react/lucide/panel-left-open-icon';
 import { RedoIcon } from '@animateicons/react/lucide/redo-icon';
 import { ScrollTextIcon } from '@animateicons/react/lucide/scroll-text-icon';
 import { UndoIcon } from '@animateicons/react/lucide/undo-icon';
-import { Button, buttonVariants, cn, MotionIcon, Spinner, TooltipHint } from '@postgear/ui';
+import { WandSparklesIcon } from '@animateicons/react/lucide/wand-sparkles-icon';
+import {
+  Button,
+  buttonVariants,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  MotionIcon,
+  Spinner,
+  TooltipHint,
+} from '@postgear/ui';
 import { Check, CloudOff, RefreshCw, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
@@ -46,6 +63,8 @@ export function EditorTopBar({
   onTranscript,
   onExport,
   exportProgress = null,
+  onSaveRecipe,
+  onApplyRecipe,
 }: {
   backHref: string;
   /** "Back To Video", or "Back To Clips" for a clip whose video was deleted. */
@@ -67,6 +86,9 @@ export function EditorTopBar({
   onExport: () => void;
   /** 0 to 100 while an export runs (a small ring in the Export button); null otherwise. */
   exportProgress?: number | null;
+  /** Module 10: the menu's Save As Recipe and Apply A Recipe. */
+  onSaveRecipe?: () => void;
+  onApplyRecipe?: () => void;
 }) {
   return (
     <header
@@ -151,6 +173,37 @@ export function EditorTopBar({
             </Button>
           </TooltipHint>
         </div>
+        {onSaveRecipe || onApplyRecipe ? (
+          <DropdownMenu>
+            <TooltipHint label="More Actions" side="bottom">
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="More Actions"
+                  className={ICON_BUTTON}
+                  data-testid="clip-editor-more"
+                >
+                  <MotionIcon icon={EllipsisIcon} className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipHint>
+            <DropdownMenuContent align="end">
+              {onSaveRecipe ? (
+                <DropdownMenuItem onSelect={onSaveRecipe} data-testid="clip-menu-save-recipe">
+                  <MotionIcon icon={BookmarkIcon} className="h-4 w-4" />
+                  Save As Recipe
+                </DropdownMenuItem>
+              ) : null}
+              {onApplyRecipe ? (
+                <DropdownMenuItem onSelect={onApplyRecipe} data-testid="clip-menu-apply-recipe">
+                  <MotionIcon icon={WandSparklesIcon} className="h-4 w-4" />
+                  Apply A Recipe
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
         <Button
           size="sm"
           onClick={onExport}

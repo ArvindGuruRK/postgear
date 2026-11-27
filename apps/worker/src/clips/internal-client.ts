@@ -16,6 +16,8 @@
  */
 import {
   CLIP_INTERNAL_ROUTES,
+  type ClipApplyRecipeAnswer,
+  type ClipAutoEditAnswer,
   type ClipChargeImportAnswer,
   type ClipChargeImportBody,
   type ClipCheckStillsAnswer,
@@ -24,6 +26,7 @@ import {
   type ClipFinishExportBody,
   type ClipFinishSaveDownloadAnswer,
   type ClipPickMomentsAnswer,
+  type ClipRecipeJobBody,
   type ClipFinishSaveDownloadBody,
   type ClipReconcileAnswer,
   type ClipReverseAnswer,
@@ -59,6 +62,10 @@ export interface ClipInternalClient {
   checkStills(jobId: string, body: ClipCheckStillsBody): Promise<ClipCheckStillsAnswer>;
   /** Module 08: Follow The Speaker for the run's clips (marks, faces for the best three). */
   followSpeaker(jobId: string, body: ClipFollowSpeakerBody): Promise<ClipFollowSpeakerAnswer>;
+  /** Module 10: an AUTO_EDIT job's last stage: the whole-video clip made with its recipe (idempotent). */
+  autoEdit(jobId: string, body: ClipRecipeJobBody): Promise<ClipAutoEditAnswer>;
+  /** Module 10: a Find Clips run's recipe applied to its new clips (counts only). */
+  applyRecipe(jobId: string, body: ClipRecipeJobBody): Promise<ClipApplyRecipeAnswer>;
   finishExport(jobId: string, body: ClipFinishExportBody): Promise<ClipFinishExportAnswer>;
   /** Module 18: Save To Media's copy becomes a Media row. */
   finishSaveDownload(
@@ -136,6 +143,8 @@ export function createClipInternalClient(config: ClipInternalClientConfig): Clip
     pickMoments: (jobId, body) => call(CLIP_INTERNAL_ROUTES.pickMoments(jobId), body),
     checkStills: (jobId, body) => call(CLIP_INTERNAL_ROUTES.checkStills(jobId), body),
     followSpeaker: (jobId, body) => call(CLIP_INTERNAL_ROUTES.followSpeaker(jobId), body),
+    autoEdit: (jobId, body) => call(CLIP_INTERNAL_ROUTES.autoEdit(jobId), body),
+    applyRecipe: (jobId, body) => call(CLIP_INTERNAL_ROUTES.applyRecipe(jobId), body),
     finishExport: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishExport(jobId), body),
     finishSaveDownload: (jobId, body) => call(CLIP_INTERNAL_ROUTES.finishSaveDownload(jobId), body),
     async settled(jobId, body) {

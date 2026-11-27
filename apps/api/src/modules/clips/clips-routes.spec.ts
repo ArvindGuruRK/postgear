@@ -73,6 +73,12 @@ import { ClipVoiceRepository } from './voice/clip-voice.repository';
 import { ClipVoiceService } from './voice/clip-voice.service';
 import { ClipWordListRepository } from './word-list/clip-word-list.repository';
 import { ClipWordListService } from './word-list/clip-word-list.service';
+import { ClipBrandKitsRepository } from './brand-kits/clip-brand-kits.repository';
+import { ClipBrandKitsService } from './brand-kits/clip-brand-kits.service';
+import { ClipApplyRecipeService } from './recipes/clip-apply-recipe.service';
+import { ClipRecipeApplierService } from './recipes/clip-recipe-applier.service';
+import { ClipRecipesRepository } from './recipes/clip-recipes.repository';
+import { ClipRecipesService } from './recipes/clip-recipes.service';
 
 const TOKEN = 'test-internal-token';
 const CLIP_ID = '55555555-5555-4555-8555-555555555555';
@@ -363,6 +369,41 @@ describe('Clips routes', () => {
           clipId,
           attempt,
         }),
+      })
+      // Sprint 13, Module 10: recipes, Apply A Recipe, the brand kit for clips, the applier.
+      .overrideProvider(ClipRecipesRepository)
+      .useValue({})
+      .overrideProvider(ClipRecipesService)
+      .useValue({
+        list: async () => ({ reached: 'recipes' }),
+        create: async () => ({ reached: 'recipe-create' }),
+        update: async (_org: string, id: string) => ({ reached: 'recipe-update', id }),
+        remove: async (_org: string, id: string) => ({ reached: 'recipe-delete', id }),
+        duplicate: async (_org: string, _user: string, id: string) => ({
+          reached: 'recipe-duplicate',
+          id,
+        }),
+      })
+      .overrideProvider(ClipApplyRecipeService)
+      .useValue({
+        prepare: async (_org: string, _user: string, clipId: string, recipeId: string) => ({
+          reached: 'apply-recipe',
+          clipId,
+          recipeId,
+        }),
+      })
+      .overrideProvider(ClipRecipeApplierService)
+      .useValue({
+        createAutoEditClip: async () => ({ reached: 'auto-edit' }),
+        applyToRun: async (org: string, jobId: string) => ({ reached: 'apply-run', jobId, org }),
+      })
+      .overrideProvider(ClipBrandKitsRepository)
+      .useValue({})
+      .overrideProvider(ClipBrandKitsService)
+      .useValue({
+        list: async () => ({ reached: 'brand-kits' }),
+        update: async (_org: string, id: string) => ({ reached: 'brand-kit-update', id }),
+        use: async (_org: string, id: string) => ({ id }),
       })
       .compile();
 
@@ -860,9 +901,22 @@ describe('Clips routes', () => {
       .post(`/clips/videos/${video}/highlights`)
       .send({ setup: { ...setup, ratio: '16:9', follow: true } })
       .expect(400);
+    // Module 10: Remove Silences and Hook Title are real switches; a recipe id must look like one.
+    expect(
+      (
+        await request(server)
+          .post(`/clips/videos/${video}/highlights`)
+          .send({ setup: { ...setup, silences: true, hookTitle: true } })
+          .expect(202)
+      ).body.setup,
+    ).toMatchObject({ silences: true, hookTitle: true });
     await request(server)
       .post(`/clips/videos/${video}/highlights`)
-      .send({ setup: { ...setup, silences: true } })
+      .send({ setup: { ...setup, silences: 'yes' } })
+      .expect(400);
+    await request(server)
+      .post(`/clips/videos/${video}/highlights`)
+      .send({ setup: { ...setup, recipeId: 'not a recipe!' } })
       .expect(400);
     await request(server)
       .post(`/clips/videos/${video}/highlights`)
@@ -912,5 +966,119 @@ describe('Clips routes', () => {
       .send({ organizationId: 'seed-demo-org' })
       .expect(200);
     expect(answer.body).toEqual({ reached: 'follow', jobId: job, org: 'seed-demo-org' });
+  });
+
+  it('sends /clips/recipes to the recipes controller, not the clip controller (Module 10)', async () => {
+    const server = app.getHttpServer();
+    const id = '88888888-8888-4888-8888-888888888888';
+    expect((await request(server).get('/clips/recipes').expect(200)).body).toEqual({
+      reached: 'recipes',
+    });
+    expect(
+      (
+        await request(server)
+          .post('/clips/recipes')
+          .send({ name: 'Mine', settings: { version: 1 } })
+          .expect(201)
+      ).body,
+    ).toEqual({ reached: 'recipe-create' });
+    expect(
+      (await request(server).patch(`/clips/recipes/${id}`).send({ name: 'New' }).expect(200)).body,
+    ).toEqual({ reached: 'recipe-update', id });
+    expect((await request(server).delete(`/clips/recipes/${id}`).expect(200)).body).toEqual({
+      reached: 'recipe-delete',
+      id,
+    });
+    expect(
+      (await request(server).post('/clips/recipes/starter-reframe/duplicate').expect(201)).body,
+    ).toEqual({ reached: 'recipe-duplicate', id: 'starter-reframe' });
+    // Strict bodies: unknown keys, settings the engine refuses, an empty patch.
+    await request(server)
+      .post('/clips/recipes')
+      .send({ name: 'Mine', settings: { version: 1 }, extra: 1 })
+      .expect(400);
+    await request(server)
+      .post('/clips/recipes')
+      .send({ name: 'Mine', settings: { version: 2 } })
+      .expect(400);
+    await request(server)
+      .post('/clips/recipes')
+      .send({ name: '   ', settings: { version: 1 } })
+      .expect(400);
+    await request(server).patch(`/clips/recipes/${id}`).send({}).expect(400);
+  });
+
+  it('sends apply-recipe of a clip id to Apply A Recipe (Module 10)', async () => {
+    const server = app.getHttpServer();
+    const answer = await request(server)
+      .post(`/clips/${CLIP_ID}/apply-recipe`)
+      .send({ recipeId: 'starter-captions-only' })
+      .expect(200);
+    expect(answer.body).toEqual({
+      reached: 'apply-recipe',
+      clipId: CLIP_ID,
+      recipeId: 'starter-captions-only',
+    });
+    await request(server).post(`/clips/${CLIP_ID}/apply-recipe`).send({}).expect(400);
+    await request(server)
+      .post(`/clips/${CLIP_ID}/apply-recipe`)
+      .send({ recipeId: 'starter-reframe', extra: true })
+      .expect(400);
+  });
+
+  it('sends /clips/brand-kits to the brand kit controller, not the clip controller (Module 10)', async () => {
+    const server = app.getHttpServer();
+    const id = '99999999-9999-4999-8999-999999999999';
+    expect((await request(server).get('/clips/brand-kits').expect(200)).body).toEqual({
+      reached: 'brand-kits',
+    });
+    expect(
+      (
+        await request(server)
+          .patch(`/clips/brand-kits/${id}`)
+          .send({ clipLogoPosition: 'top-right' })
+          .expect(200)
+      ).body,
+    ).toEqual({ reached: 'brand-kit-update', id });
+    expect((await request(server).post(`/clips/brand-kits/${id}/use`).expect(200)).body).toEqual({
+      brandKit: { id },
+    });
+    await request(server).patch(`/clips/brand-kits/${id}`).send({}).expect(400);
+    await request(server)
+      .patch(`/clips/brand-kits/${id}`)
+      .send({ name: 'Studio field' })
+      .expect(400);
+    await request(server)
+      .patch(`/clips/brand-kits/${id}`)
+      .send({ clipOutroText: 'x'.repeat(81) })
+      .expect(400);
+    await request(server)
+      .patch(`/clips/brand-kits/${id}`)
+      .send({ clipOutroText: 'Two\nlines' })
+      .expect(400);
+  });
+
+  it('runs the Module 10 internal routes only with the worker token', async () => {
+    const server = app.getHttpServer();
+    const job = '77777777-7777-4777-8777-777777777777';
+    await request(server)
+      .post(`/internal/clips/jobs/${job}/apply-recipe`)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(401);
+    await request(server)
+      .post(`/internal/clips/jobs/${job}/auto-edit`)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(401);
+    await request(server)
+      .post(`/internal/clips/jobs/${job}/apply-recipe`)
+      .set('X-PostGear-Internal', TOKEN)
+      .send({ organizationId: 'seed-demo-org', extra: 1 })
+      .expect(400);
+    const answer = await request(server)
+      .post(`/internal/clips/jobs/${job}/apply-recipe`)
+      .set('X-PostGear-Internal', TOKEN)
+      .send({ organizationId: 'seed-demo-org' })
+      .expect(200);
+    expect(answer.body).toEqual({ reached: 'apply-run', jobId: job, org: 'seed-demo-org' });
   });
 });

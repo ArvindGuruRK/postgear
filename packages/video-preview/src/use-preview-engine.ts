@@ -9,8 +9,12 @@
  * - Under StrictMode React mounts, unmounts and mounts again: the first
  *   engine is destroyed and a second one made, so no engine outlives its
  *   component and none is ever used after `destroy()`.
- * - The document and the address are handed over whenever they change; the
- *   engine keeps its playhead across both.
+ * - The document and the addresses are handed over whenever they change;
+ *   the engine keeps its playhead across them. The other videos' addresses
+ *   (`extraSources`, Module 10) go in before the main one, so a clip that
+ *   opens on a brand intro seeks the intro's own video from the start. They
+ *   are compared by their contents, so a map made anew on every render does
+ *   not reload anything.
  *
  * The hook itself does not subscribe to the clock, so the component that
  * owns the stage does not re-render on every frame. Read the time through
@@ -22,9 +26,39 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PreviewEngine, type PreviewEngineOptions } from './preview-engine';
 import type { PreviewSource } from './types';
 
-export interface UsePreviewEngineOptions extends Omit<PreviewEngineOptions, 'document' | 'source'> {
+export interface UsePreviewEngineOptions
+  extends Omit<PreviewEngineOptions, 'document' | 'source' | 'extraSources'> {
   document: ClipDocument | null;
   source: PreviewSource | null;
+  /** The document's other videos, by source id (`PreviewEngine.setExtraSources`). */
+  extraSources?: Readonly<Record<string, PreviewSource | null>> | null;
+}
+
+type ExtraEntry = [id: string, source: PreviewSource | null];
+
+/** The map's contents as one string, in key order, so an equal map made again changes nothing. */
+function extraSourcesKey(sources: UsePreviewEngineOptions['extraSources']): string {
+  const entries: ExtraEntry[] = Object.keys(sources ?? {})
+    .sort()
+    .map((id) => {
+      const source = sources?.[id] ?? null;
+      return [
+        id,
+        source
+          ? {
+              url: source.url,
+              expiresAt: source.expiresAt ?? null,
+              offsetMs: source.offsetMs ?? 0,
+              fps: source.fps ?? null,
+            }
+          : null,
+      ];
+    });
+  return JSON.stringify(entries);
+}
+
+function extraSourcesFrom(key: string): Record<string, PreviewSource | null> {
+  return Object.fromEntries(JSON.parse(key) as ExtraEntry[]);
 }
 
 export interface UsePreviewEngine {
@@ -43,7 +77,12 @@ export function usePreviewEngine(options: UsePreviewEngineOptions): UsePreviewEn
   creation.current = options;
 
   useEffect(() => {
-    const { document: _document, source: _source, ...fixed } = creation.current;
+    const {
+      document: _document,
+      source: _source,
+      extraSources: _extraSources,
+      ...fixed
+    } = creation.current;
     const made = new PreviewEngine(fixed);
     live.current = made;
     if (container.current) {
@@ -65,6 +104,12 @@ export function usePreviewEngine(options: UsePreviewEngineOptions): UsePreviewEn
       engine.setDocument(doc);
     }
   }, [engine, doc]);
+
+  const extraKey = extraSourcesKey(options.extraSources);
+  useEffect(() => {
+    if (!engine) return;
+    engine.setExtraSources(extraSourcesFrom(extraKey));
+  }, [engine, extraKey]);
 
   const url = source?.url ?? null;
   const expiresAt = source?.expiresAt ?? null;

@@ -122,6 +122,12 @@ export const CLIP_TRANSCRIBE_WORKFLOW = 'clipTranscribeWorkflow';
 export const CLIP_FACES_WORKFLOW = 'clipFacesWorkflow';
 export const CLIP_TRANSLATE_WORKFLOW = 'clipTranslateWorkflow';
 export const CLIP_SPEECH_WORKFLOW = 'clipSpeechWorkflow';
+/**
+ * Module 10: Auto-Edit Video. Waits for the video's listen job (its own
+ * TRANSCRIBE job and charge) and then asks the API to make the whole-video
+ * clip with the recipe applied. No charge of its own.
+ */
+export const CLIP_AUTO_EDIT_WORKFLOW = 'clipAutoEditWorkflow';
 
 // --- Waiting-caller helpers (no row: the API waits for the answer) -------------
 
@@ -158,7 +164,8 @@ export type ClipJobKindName =
   | 'TRANSCRIBE'
   | 'FACES'
   | 'TRANSLATE'
-  | 'SPEECH';
+  | 'SPEECH'
+  | 'AUTO_EDIT';
 
 /** Which workflow runs a job of each kind. */
 export const CLIP_JOB_WORKFLOWS: Readonly<Record<ClipJobKindName, string>> = Object.freeze({
@@ -171,6 +178,7 @@ export const CLIP_JOB_WORKFLOWS: Readonly<Record<ClipJobKindName, string>> = Obj
   FACES: CLIP_FACES_WORKFLOW,
   TRANSLATE: CLIP_TRANSLATE_WORKFLOW,
   SPEECH: CLIP_SPEECH_WORKFLOW,
+  AUTO_EDIT: CLIP_AUTO_EDIT_WORKFLOW,
 });
 
 /** Which queue each kind runs on. */
@@ -184,6 +192,7 @@ export const CLIP_JOB_QUEUES: Readonly<Record<ClipJobKindName, string>> = Object
   FACES: MEDIA_TASK_QUEUE,
   TRANSLATE: MEDIA_TASK_QUEUE,
   SPEECH: MEDIA_TASK_QUEUE,
+  AUTO_EDIT: MEDIA_TASK_QUEUE,
 });
 
 export function clipJobWorkflowId(jobId: string): string {
@@ -253,6 +262,9 @@ export const CLIP_JOB_TIMEOUTS_MS: Readonly<Record<ClipJobKindName, number>> = O
   FACES: 60 * 60_000,
   TRANSLATE: 30 * 60_000,
   SPEECH: 30 * 60_000,
+  // Module 10: most of it is waiting for the listen job (at most 30 minutes
+  // of sound, well inside the listen job's own limit), then one apply call.
+  AUTO_EDIT: 3 * 60 * 60_000,
 });
 
 /** Long activities heartbeat at least this often; a dead worker is noticed within it. */
@@ -534,6 +546,19 @@ export const CLIP_INTERNAL_ROUTES = {
    * failure never fails the run.
    */
   followSpeaker: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/follow-speaker`,
+  /**
+   * Sprint 13, Module 10: an AUTO_EDIT job's last stage. The API makes the
+   * whole-video clip with the recipe applied (idempotent on the job's
+   * `clipId`) and answers `{ clipId, skipped, noSpeech }`.
+   */
+  autoEdit: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/auto-edit`,
+  /**
+   * Sprint 13, Module 10: a Find Clips run whose setup has a recipe (or
+   * silences, a hook title or a brand kit). The API applies it to the run's
+   * new clips and answers `{ applied, skipped }`. Called once after
+   * `followSpeaker`; a failure never fails the run.
+   */
+  applyRecipe: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/apply-recipe`,
   /** A finished export becomes a Media row, the clip is marked exported, the notification written. */
   finishExport: (jobId: string) => `${CLIP_INTERNAL_PREFIX}/jobs/${jobId}/finish-export`,
   /**
@@ -565,6 +590,30 @@ export const CLIP_INTERNAL_ROUTES = {
    */
   sweep: `${CLIP_INTERNAL_PREFIX}/sweep`,
 } as const;
+
+/** Module 10: what both recipe routes take. */
+export interface ClipRecipeJobBody {
+  organizationId: string;
+}
+
+/** Module 10: one part of a recipe not applied (mirrors the engine's `RecipeSkip`). */
+export interface ClipAutoEditSkip {
+  part: string;
+  reason: string;
+}
+
+/** Module 10: `POST .../auto-edit`. */
+export interface ClipAutoEditAnswer {
+  clipId: string;
+  skipped: ClipAutoEditSkip[];
+  noSpeech: boolean;
+}
+
+/** Module 10: `POST .../apply-recipe`. */
+export interface ClipApplyRecipeAnswer {
+  applied: number;
+  skipped: number;
+}
 
 /** Module 19: what one sweep pass did, part by part (counts only). */
 export interface ClipSweepAnswer {

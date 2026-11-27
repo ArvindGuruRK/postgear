@@ -8,6 +8,10 @@
  *   time the clip opens (one writer of the document: the editor), and the
  *   API takes the mark away on the clip's first document save, so a person
  *   who turns it off is never overridden on the next open.
+ * - `cameraOnOpen` (Module 10): `true` on a clip a recipe gave a Split or
+ *   Gameplay layout with a Camera area. The editor runs Detect Camera the
+ *   first time the clip opens; the first document save ends it like the
+ *   follow mark (`withoutFollowOnOpen` takes both away).
  *
  * Only these keys reach a view, each checked; anything else stored is kept
  * as it is but never shown.
@@ -22,6 +26,8 @@ export interface ClipMetaView {
   seen?: string;
   /** Module 08: the editor follows the speaker when the clip first opens. */
   followOnOpen?: typeof FOLLOW_ON_OPEN;
+  /** Module 10: the editor finds the camera box when the clip first opens. */
+  cameraOnOpen?: true;
 }
 
 function record(raw: unknown): Record<string, unknown> | null {
@@ -38,6 +44,7 @@ export function clipMetaView(raw: unknown): ClipMetaView | null {
   if (typeof value.seen === 'string' && value.seen.trim())
     view.seen = value.seen.trim().slice(0, 200);
   if (value.followOnOpen === FOLLOW_ON_OPEN) view.followOnOpen = FOLLOW_ON_OPEN;
+  if (value.cameraOnOpen === true) view.cameraOnOpen = true;
   return Object.keys(view).length > 0 ? view : null;
 }
 
@@ -51,8 +58,29 @@ export function withFollowOnOpen(raw: unknown): Prisma.InputJsonValue {
   return { ...(record(raw) ?? {}), followOnOpen: FOLLOW_ON_OPEN } as Prisma.InputJsonValue;
 }
 
-/** The stored meta without the follow mark: the other keys kept, or no meta at all when none is left. */
+/** Module 10: true when the stored meta asks the editor to find the camera box on open. */
+export function camerasOnOpen(raw: unknown): boolean {
+  return record(raw)?.cameraOnOpen === true;
+}
+
+/** Module 10: the stored meta with the camera mark added, every other key kept. */
+export function withCameraOnOpen(raw: unknown): Prisma.InputJsonValue {
+  return { ...(record(raw) ?? {}), cameraOnOpen: true } as Prisma.InputJsonValue;
+}
+
+/** True when the stored meta carries a first-open mark (follow, or the camera). */
+export function hasOpenMarks(raw: unknown): boolean {
+  return followsOnOpen(raw) || camerasOnOpen(raw);
+}
+
+/**
+ * The stored meta without the first-open marks (follow and, Module 10, the
+ * camera): the other keys kept, or no meta at all when none is left.
+ */
 export function withoutFollowOnOpen(raw: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull {
-  const { followOnOpen: _gone, ...rest } = record(raw) ?? {};
+  const { followOnOpen: _gone, cameraOnOpen: _camera, ...rest } = record(raw) ?? {};
   return Object.keys(rest).length > 0 ? (rest as Prisma.InputJsonValue) : Prisma.DbNull;
 }
+
+/** `withoutFollowOnOpen` by the name that says what it does since Module 10. */
+export const withoutOpenMarks = withoutFollowOnOpen;

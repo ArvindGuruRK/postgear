@@ -5,6 +5,10 @@
  * reducer; every change asks the API for the price again. The lines, the
  * button's label and the "you have too few AI minutes" sentence are worked
  * out here.
+ *
+ * Module 10: a recipe fills every control it covers (`fillFromRecipe`); a
+ * control changed afterwards is marked (`changedControls`), and Save As
+ * Recipe is offered under the picker once anything differs.
  */
 import { refusalMessage } from '@postgear/entitlements';
 import {
@@ -17,6 +21,7 @@ import {
   GENRE_LABELS,
   type Genre,
   type Ratio,
+  type RecipeSettings,
   SETUP_STEP_LABELS,
   type SetupStep,
 } from '@postgear/video-engine';
@@ -64,7 +69,15 @@ export type SetupAction =
   | { type: 'captions'; on: boolean }
   | { type: 'captionStyle'; styleId: string }
   | { type: 'action'; on: boolean }
-  | { type: 'follow'; on: boolean };
+  | { type: 'follow'; on: boolean }
+  | { type: 'silences'; on: boolean }
+  | { type: 'hookTitle'; on: boolean }
+  /** Module 10: a recipe picked (it fills what it covers), or None. */
+  | {
+      type: 'recipe';
+      recipe: { id: string; settings: RecipeSettings; brandKitId: string | null } | null;
+    }
+  | { type: 'brandKit'; brandKitId: string | null };
 
 export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
   switch (action.type) {
@@ -89,8 +102,109 @@ export function setupReducer(setup: ClipSetup, action: SetupAction): ClipSetup {
       return { ...setup, action: action.on };
     case 'follow':
       return { ...setup, follow: action.on && canFollow(setup.ratio) };
+    case 'silences':
+      return { ...setup, silences: action.on };
+    case 'hookTitle':
+      return { ...setup, hookTitle: action.on };
+    case 'recipe': {
+      if (!action.recipe) return { ...setup, recipeId: null };
+      const filled = fillFromRecipe(setup, action.recipe.settings);
+      return {
+        ...filled,
+        recipeId: action.recipe.id,
+        // A recipe that names a kit brings it; one that does not keeps the kit picked.
+        brandKitId: action.recipe.brandKitId ?? setup.brandKitId,
+      };
+    }
+    case 'brandKit':
+      return { ...setup, brandKitId: action.brandKitId };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Module 10: recipes on Clip Setup
+// ---------------------------------------------------------------------------
+
+/** The controls a recipe can fill (and that show a dot once changed). */
+export type SetupControl =
+  | 'ratio'
+  | 'length'
+  | 'genre'
+  | 'captions'
+  | 'follow'
+  | 'silences'
+  | 'hookTitle';
+
+/** The setup with every control the recipe covers filled from it; the rest kept. */
+export function fillFromRecipe(setup: ClipSetup, settings: RecipeSettings): ClipSetup {
+  const ratio = settings.ratio ?? setup.ratio;
+  return {
+    ...setup,
+    ratio,
+    length: settings.clipLength ?? setup.length,
+    genre: settings.genre ?? setup.genre,
+    captions: settings.captions
+      ? { on: settings.captions.on, styleId: settings.captions.styleId }
+      : setup.captions,
+    follow: (settings.follow ? settings.follow.on : setup.follow) && canFollow(ratio),
+    silences: settings.silences ? settings.silences.on : setup.silences,
+    hookTitle: settings.hookTitle ? settings.hookTitle.on : setup.hookTitle,
+  };
+}
+
+/** The controls the recipe covers that now differ from what it filled in. */
+export function changedControls(
+  setup: ClipSetup,
+  settings: RecipeSettings | null,
+): ReadonlySet<SetupControl> {
+  const changed = new Set<SetupControl>();
+  if (!settings) return changed;
+  const filled = fillFromRecipe(setup, settings);
+  if (settings.ratio && setup.ratio !== settings.ratio) changed.add('ratio');
+  if (settings.clipLength && setup.length !== settings.clipLength) changed.add('length');
+  if (settings.genre && setup.genre !== settings.genre) changed.add('genre');
+  if (
+    settings.captions &&
+    (setup.captions.on !== settings.captions.on ||
+      (settings.captions.on && setup.captions.styleId !== settings.captions.styleId))
+  ) {
+    changed.add('captions');
+  }
+  if (settings.follow && setup.follow !== filled.follow) changed.add('follow');
+  if (settings.silences && setup.silences !== settings.silences.on) changed.add('silences');
+  if (settings.hookTitle && setup.hookTitle !== settings.hookTitle.on) changed.add('hookTitle');
+  return changed;
+}
+
+/**
+ * Whether Save As Recipe is offered: a recipe was picked and a control it
+ * covers changed, or none was picked and a control differs from the page's
+ * first setup.
+ */
+export function offersSaveAsRecipe(
+  setup: ClipSetup,
+  settings: RecipeSettings | null,
+  initial: ClipSetup,
+): boolean {
+  if (settings) return changedControls(setup, settings).size > 0;
+  return (
+    setup.ratio !== initial.ratio ||
+    setup.length !== initial.length ||
+    setup.genre !== initial.genre ||
+    setup.captions.on !== initial.captions.on ||
+    (setup.captions.on && setup.captions.styleId !== initial.captions.styleId) ||
+    setup.follow !== initial.follow ||
+    setup.silences !== initial.silences ||
+    setup.hookTitle !== initial.hookTitle
+  );
+}
+
+/** Module 10: the new switches' help lines. */
+export const SILENCES_HELP = 'Cuts the long pauses out of every clip.';
+export const HOOK_TITLE_HELP = 'Puts a short title from the clip at its start.';
+export const RECIPE_HELP = 'A recipe fills in the choices below. Change any of them after.';
+export const CHANGED_MARK = 'Changed from the recipe';
+export const SETUP_RECIPE_PLACEHOLDER = 'Enter your recipe name';
 
 /** Module 06: Look For Action's help line, and the one added when stills are shown to AI. */
 export const ACTION_HELP =
@@ -147,16 +261,23 @@ export function shortfallSentence(
 }
 
 /** The summary's first lines: the stretch, the shape and length, the captions. */
-export function summaryLines(setup: ClipSetup, styleName: string | null): string[] {
+export function summaryLines(
+  setup: ClipSetup,
+  styleName: string | null,
+  recipeName: string | null = null,
+): string[] {
   const ratio = SETUP_RATIOS.find((one) => one.value === setup.ratio)?.label ?? setup.ratio;
   const length = CLIP_LENGTH_LABELS[setup.length].toLowerCase();
   const lines = [
     `${formatClipLength(setup.range.toMs - setup.range.fromMs)} of video`,
     `${ratio}, ${setup.length === 'auto' ? 'any length' : length}`,
   ];
+  if (recipeName) lines.push(`Recipe: ${recipeName}`);
   if (setup.captions.on) lines.push(`Captions: ${styleName ?? 'On'}`);
   if (setup.action) lines.push('Looking for action');
   if (setup.follow) lines.push('Following the speaker');
+  if (setup.silences) lines.push('Removing silences');
+  if (setup.hookTitle) lines.push('Hook title');
   if (setup.genre !== 'auto') lines.push(`Genre: ${GENRE_LABELS[setup.genre]}`);
   return lines;
 }

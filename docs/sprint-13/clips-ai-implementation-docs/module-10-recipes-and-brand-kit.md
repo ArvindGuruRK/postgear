@@ -1,6 +1,6 @@
 # Module 10: Recipes And Brand Kit
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: M (one session)
+> **Sprint 13, Clips AI** | Status: Done | Size: L (grew from M)
 > **Depends on**: [Module 03](module-03-captions.md), [Module 05](module-05-clip-setup-and-highlights-v2.md)
 > **Stories**: CA-6.1, CA-6.2, CA-6.3 (new: Starter Recipes), CA-6.4 (new: Auto-Edit Video)
 > **Next**: [Module 11](module-11-montage-and-batch-export.md)
@@ -100,14 +100,16 @@ One press on a video makes **one clip over the whole video** with a chosen recip
 
 ## Tasks
 
-- [ ] `recipes/`: the schema, `recipeFromClip`, `applyRecipe`, `describeRecipe`, the five starters, with tests.
-- [ ] `ClipRecipe` and its routes; `apply-recipe`; the starters in the list and `duplicate`.
-- [ ] Auto-Edit Video: the route, the `AUTO_EDIT` origin, the dialog and the video page button, the AI minutes charge and reversal.
-- [ ] Save As Recipe and Apply A Recipe in the editor; the setup picker.
-- [ ] The kit page with both tabs.
-- [ ] Brand kit fields; `applyBrandKit`; intro and outro segments and the outro card in the compiler (`color` source plus ASS text); the per-clip toggles.
-- [ ] Compiler checks (single frames with `ffmpeg -ss ... -frames:v 1`); title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `recipes/`: the schema, `recipeFromClip`, `applyRecipe`, `describeRecipe`, the five starters, with tests.
+- [x] `ClipRecipe` and its routes; `apply-recipe`; the starters in the list and `duplicate`.
+- [x] Auto-Edit Video: the route, the `AUTO_EDIT` origin, the dialog and the video page button, the AI minutes charge and reversal.
+- [x] Save As Recipe and Apply A Recipe in the editor; the setup picker.
+- [x] The kit page with both tabs.
+- [x] Brand kit fields; `applyBrandKit`; intro and outro segments and the outro card in the compiler (`color` source plus ASS text); the per-clip toggles.
+- [x] Compiler checks (single frames with `ffmpeg -ss ... -frames:v 1`); title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log.
+- [x] Faces for Split and Gameplay clips made by a setup (Module 07's deferral): `Clip.meta.cameraOnOpen`, read on the first open with `faceCameraCrop`, quiet, one layout step, and skipped when the person changed the layout meanwhile.
+- [ ] A logo on a real kit, seen in an export (the seeded kit has no logo; the logo copy, the sticker and the card are covered by tests and the real FFmpeg parity test). Check once a kit with a logo exists.
 
 ## Tests
 

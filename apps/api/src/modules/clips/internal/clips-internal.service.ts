@@ -21,19 +21,28 @@
  *   serializable transaction, so a retried call answers the same row; a call
  *   for a download that is not saving (deleted, or never asked) is a 409.
  * - **settled**: a job ended; start the workspace's waiting imports.
+ * - **auto-edit** and **apply-recipe** (Sprint 13, Module 10): an AUTO_EDIT
+ *   job's clip, and a Find Clips run's recipe on its clips, both made by
+ *   `ClipRecipeApplierService`.
  * - Tenancy: every job is looked up by its id AND the workspace the body
  *   names, so a mixed-up call is a 404, never a write to another workspace.
  */
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { ClipJobKind, ClipJobStatus, type Prisma, prisma } from '@postgear/db';
 import type {
+  ClipApplyRecipeAnswer,
+  ClipAutoEditAnswer,
   ClipChargeImportAnswer,
   ClipFinishExportAnswer,
   ClipFinishSaveDownloadAnswer,
   ClipReverseAnswer,
   ClipSettledAnswer,
 } from '@postgear/scheduling';
-import { type DownloadMedia, downloadOutputSchema } from '@postgear/video-engine';
+import {
+  autoEditInputSchema,
+  type DownloadMedia,
+  downloadOutputSchema,
+} from '@postgear/video-engine';
 import { UsageService } from '../../entitlements/usage.service';
 import { MediaService } from '../../media/media.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -44,6 +53,7 @@ import { serializable } from '../clips.tx';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipRecipeApplierService } from '../recipes/clip-recipe-applier.service';
 import { exportReadyNotice } from './clip-notices';
 import type {
   ChargeImportBody,
@@ -66,7 +76,47 @@ export class ClipsInternalService {
     private readonly usage: UsageService,
     private readonly media: MediaService,
     private readonly notifications: NotificationsService,
+    // Sprint 13, Module 10: Auto-Edit's clip and a run's recipe (optional only for older specs).
+    @Optional() private readonly recipes?: ClipRecipeApplierService,
   ) {}
+
+  /**
+   * Module 10, `POST .../auto-edit`: an AUTO_EDIT job's last stage. The job
+   * must be this workspace's AUTO_EDIT job and still open; its input names
+   * the clip id, so a retried call answers the clip already made (also once
+   * the job is closed). A closed job whose clip was never made is a 409.
+   */
+  async autoEdit(jobId: string, body: OrgOnlyBody): Promise<ClipAutoEditAnswer> {
+    const job = await this.requireJob(body.organizationId, jobId);
+    if (job.kind !== ClipJobKind.AUTO_EDIT || !this.recipes) throw jobNotFound();
+    const input = autoEditInputSchema.safeParse(job.input);
+    if (!input.success) throw jobNotFound();
+    if (!OPEN.includes(job.status)) {
+      const made = await prisma.clip.findFirst({
+        where: { id: input.data.clipId, organizationId: body.organizationId },
+        select: { id: true },
+      });
+      if (!made) {
+        throw new ConflictException({ message: CLIPS_MESSAGES.JOB_FINISHED, code: 'job_finished' });
+      }
+    }
+    return this.recipes.createAutoEditClip(body.organizationId, job.createdById, {
+      clipId: input.data.clipId,
+      videoId: input.data.videoId,
+      recipeId: input.data.recipeId,
+      range: input.data.range,
+    });
+  }
+
+  /**
+   * Module 10, `POST .../apply-recipe`: a Find Clips run's recipe (with its
+   * setup on top) on the run's new clips. The job must be this workspace's
+   * HIGHLIGHTS job (checked by the applier, as the follow route does).
+   */
+  async applyRecipe(jobId: string, body: OrgOnlyBody): Promise<ClipApplyRecipeAnswer> {
+    if (!isUuid(jobId) || !this.recipes) throw jobNotFound();
+    return this.recipes.applyToRun(body.organizationId, jobId);
+  }
 
   async chargeImport(jobId: string, body: ChargeImportBody): Promise<ClipChargeImportAnswer> {
     const job = await this.requireJob(body.organizationId, jobId);

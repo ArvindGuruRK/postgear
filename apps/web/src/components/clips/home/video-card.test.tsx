@@ -8,6 +8,13 @@ import { VideoCard, type VideoCardActions } from './video-card';
 
 jest.mock('@/lib/clips-api', () => ({ getVideo: jest.fn() }));
 jest.mock('../use-clip-job', () => ({ useClipJob: jest.fn() }));
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('@/lib/clips-recipes-api', () => ({
+  listRecipes: jest.fn(async () => ({ recipes: [], own: 0, max: 50 })),
+  autoEditPrice: jest.fn(() => new Promise(() => undefined)),
+  startAutoEdit: jest.fn(),
+}));
+jest.mock('./clips-meters', () => ({ AiMinutesChip: () => null }));
 
 const { getVideo } = jest.requireMock('@/lib/clips-api') as { getVideo: jest.Mock };
 const { useClipJob } = jest.requireMock('../use-clip-job') as { useClipJob: jest.Mock };
@@ -201,6 +208,29 @@ describe('VideoCard', () => {
     );
     await screen.findByRole('menuitem', { name: 'Delete Video' });
     expect(screen.queryByRole('menuitem', { name: 'Download Original' })).not.toBeInTheDocument();
+  });
+
+  it('offers Auto-Edit Video on a ready video and opens its dialog (Module 10)', async () => {
+    renderCard(FIXTURE_CARDS.ready);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `More for ${FIXTURE_CARDS.ready.video.title}` }),
+      { key: 'Enter' },
+    );
+    const item = await screen.findByRole('menuitem', { name: 'Auto-Edit Video' });
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    expect(await screen.findByTestId('clip-auto-edit')).toBeInTheDocument();
+  });
+
+  it('has no Auto-Edit Video in the playground', async () => {
+    renderCard(FIXTURE_CARDS.ready, actions(), false);
+    fireEvent.keyDown(
+      screen.getByRole('button', { name: `More for ${FIXTURE_CARDS.ready.video.title}` }),
+      { key: 'Enter' },
+    );
+    await screen.findByRole('menuitem', { name: 'Delete Video' });
+    expect(screen.queryByRole('menuitem', { name: 'Auto-Edit Video' })).not.toBeInTheDocument();
   });
 });
 
