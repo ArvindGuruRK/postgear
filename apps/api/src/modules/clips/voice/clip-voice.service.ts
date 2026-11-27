@@ -1,14 +1,16 @@
 /**
  * Text To Speech (Sprint 13, Module 09), behind `CLIPS_TTS` (default off).
  *
- * `voices()` (`GET /clips/voices`): the voices on offer, and whether a voice
- * can be made right now (`CLIPS_TTS` on and the media service up).
+ * `voices()` (`GET /clips/voices`): the voices on offer (the media service's
+ * own list, `MediaVoices`), and whether a voice can be made right now
+ * (`CLIPS_TTS` on, the media service up and its speaker able to speak).
  *
  * `make()` (`POST /clips/:clipId/voice` `{ text, voiceId, revision }`):
  * 1. Off (`CLIPS_TTS` false, or the media service down): 503 `voice_off`.
  * 2. The clip must be the workspace's (a plain 404 otherwise).
- * 3. The line's script must be one the voice reads (Latin, Devanagari,
- *    Tamil): 422 `voice_language` otherwise.
+ * 3. The voice must be one the media service offers now (422
+ *    `voice_unknown` otherwise: its speaker changed), and the line's script
+ *    one it reads (Latin, Devanagari, Tamil): 422 `voice_language` otherwise.
  * 4. **The same line and voice again is one charge**: a SPEECH job of this
  *    clip with the same voice and line that is still running, or finished and
  *    its sound is still in the workspace, is answered as it is (no job, no
@@ -44,6 +46,7 @@ import { ClipJobsRepository, OPEN_JOB_STATUSES } from '../jobs/clip-jobs.reposit
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { MediaServiceProbe } from '../status/media-service.probe';
+import { MediaVoices } from '../status/media-voices.client';
 import {
   AI_MINUTES_METER,
   type MeterView,
@@ -110,6 +113,7 @@ export class ClipVoiceService {
     private readonly limits: ClipLimitsGuard,
     private readonly usage: UsageService,
     private readonly mediaService: MediaServiceProbe,
+    private readonly mediaVoices: MediaVoices,
     config: ConfigService<Env, true>,
   ) {
     this.enabled = config.get('CLIPS_TTS', { infer: true }) === 'true';
@@ -117,8 +121,11 @@ export class ClipVoiceService {
 
   /** `GET /clips/voices`. */
   async voices(): Promise<{ enabled: boolean; voices: VoiceView[] }> {
-    const enabled = this.enabled && (await this.mediaService.state()) === 'ok';
-    return { enabled, voices: voiceViews() };
+    if (!this.enabled || (await this.mediaService.state()) !== 'ok') {
+      return { enabled: false, voices: [] };
+    }
+    const { voices } = await this.mediaVoices.list();
+    return { enabled: voices.length > 0, voices: voiceViews(voices) };
   }
 
   /** `POST /clips/:clipId/voice`: see the file comment. */
@@ -129,14 +136,23 @@ export class ClipVoiceService {
     body: MakeVoiceInput,
   ): Promise<VoiceOutcome> {
     await this.limits.assertEnabled(orgId);
-    if (!this.enabled || (await this.mediaService.state()) !== 'ok') {
+    const offered =
+      this.enabled && (await this.mediaService.state()) === 'ok'
+        ? (await this.mediaVoices.list()).voices
+        : [];
+    if (offered.length === 0) {
       throw new ClipErrorException(HttpStatus.SERVICE_UNAVAILABLE, 'voice_off', {
         message: CLIP_VOICE_MESSAGES.OFF,
       });
     }
     const clip = await this.items.requireClip(orgId, clipId);
-    const voice = findVoice(body.voiceId);
-    if (!voice || !voiceReads(voice.languages, body.text)) {
+    const voice = findVoice(offered, body.voiceId);
+    if (!voice) {
+      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'voice_unknown', {
+        message: CLIP_VOICE_MESSAGES.UNKNOWN,
+      });
+    }
+    if (!voiceReads(voice.languages, body.text)) {
       throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'voice_language', {
         message: CLIP_VOICE_MESSAGES.LANGUAGE,
       });

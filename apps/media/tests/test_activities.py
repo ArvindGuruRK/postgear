@@ -34,6 +34,7 @@ def test_health_answers_the_contract_shape(
     assert parsed.simulation is True
     assert parsed.task_queue == "postgear-media-py"
     assert parsed.bindings.transcriber.state == "simulation"
+    assert parsed.bindings.speaker.state == "simulation"
     assert "contractVersion" in result
 
 
@@ -44,6 +45,7 @@ def test_health_without_simulation_reports_off_bindings(
     # No key for the hosted lane and no model libraries in the base install.
     assert report.bindings.transcriber.state == "off"
     assert report.bindings.faces.state == "off"
+    assert (report.bindings.speaker.state, report.bindings.speaker.name) == ("off", "kokoro")
     assert report.models_present is False
 
 

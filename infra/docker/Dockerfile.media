@@ -5,12 +5,18 @@
 #
 #   docker build -f infra/docker/Dockerfile.media -t postgear-media:local .
 #   docker build -f infra/docker/Dockerfile.media --build-arg GROUPS=ml -t postgear-media:ml .
+#   docker build -f infra/docker/Dockerfile.media --build-arg VOICE=kokoro -t postgear-media:voice .
 #
 # Two variants from one file:
 # - slim (the default): the base packages only. Enough for MEDIA_SIMULATION,
 #   which answers every activity from recorded files. No model library.
 # - full (`--build-arg GROUPS=ml`): adds the `ml` dependency group (speech to
 #   text, faces, motion). No PyTorch, no graphics card libraries.
+# - `--build-arg VOICE=kokoro` (either variant) adds the voice program
+#   (apps/media/voice-program, Module 09) in its own environment beside the
+#   service's. It is GPL-3.0-or-later (espeak-ng inside it), and the service
+#   only runs it as a separate program. Like the worker image's FFmpeg, keep an
+#   image with it in a private registry. Without it the voice is `off`.
 #
 # Model files are never in the image: MEDIA_MODEL_DIR is a volume, filled once
 # at deploy (Module 15). The image runs as a non-root user and needs only the
@@ -27,6 +33,7 @@ FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 FROM ${PYTHON_IMAGE} AS build
 ARG GROUPS=""
+ARG VOICE=""
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_NO_DEV=1 \
@@ -43,6 +50,12 @@ COPY apps/media/src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked ${GROUPS:+--group ${GROUPS}}
 
+# The voice program's own environment (empty unless VOICE=kokoro).
+COPY apps/media/voice-program ./voice-program
+RUN --mount=type=cache,target=/root/.cache/uv \
+    if [ "$VOICE" = "kokoro" ]; then uv sync --locked --no-editable --project voice-program; \
+    else mkdir -p voice-program/.venv; fi
+
 FROM ${PYTHON_IMAGE} AS runtime
 # tini reaps anything a library starts; curl is the health check's only tool.
 RUN apt-get update \
@@ -55,6 +68,7 @@ RUN apt-get update \
 WORKDIR /app/apps/media
 COPY --from=build --chown=postgear:postgear /app/apps/media/.venv ./.venv
 COPY --from=build --chown=postgear:postgear /app/apps/media/src ./src
+COPY --from=build --chown=postgear:postgear /app/apps/media/voice-program/.venv ./voice-program/.venv
 # The recorded answers MEDIA_SIMULATION reads are part of the package (src/postgear_media/simulation).
 
 ENV PATH="/app/apps/media/.venv/bin:${PATH}" \
@@ -63,7 +77,8 @@ ENV PATH="/app/apps/media/.venv/bin:${PATH}" \
     NODE_ENV=production \
     MEDIA_URL=http://0.0.0.0:8100 \
     MEDIA_SCRATCH_DIR=/var/lib/postgear/media-scratch \
-    MEDIA_MODEL_DIR=/var/lib/postgear/media-models
+    MEDIA_MODEL_DIR=/var/lib/postgear/media-models \
+    MEDIA_VOICE_PROGRAM=/app/apps/media/voice-program/.venv/bin/postgear-voice
 
 VOLUME ["/var/lib/postgear/media-scratch", "/var/lib/postgear/media-models"]
 USER postgear

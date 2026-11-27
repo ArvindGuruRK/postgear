@@ -8,7 +8,8 @@
     "transcriber": { "state": "maybe", "name": "simulation" },
     "faces": { "state": "simulation", "name": "simulation" },
     "motion": { "state": "simulation", "name": "simulation" },
-    "stills": { "state": "simulation", "name": "simulation" }
+    "stills": { "state": "simulation", "name": "simulation" },
+    "speaker": { "state": "simulation", "name": "simulation" }
   },
   "modelsPresent": false
 }

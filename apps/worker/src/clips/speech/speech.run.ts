@@ -7,8 +7,8 @@
  *    line is stored as the speech text file (so it never rides in a Temporal
  *    payload or its history) and the Python input is built (keys only).
  * 2. `mediaPySpeak` (Python, on `postgear-media-py`): reads the line, speaks
- *    it (only the simulated binding exists; the real one is parked by the
- *    licence decision) and stores a WAV at the job's key.
+ *    it (the simulated speaker, or Kokoro run as its own program beside the
+ *    service) and stores a WAV at the job's key.
  * 3. `finishSpeech` (here): the WAV is made the editor's AAC `.m4a` with its
  *    peaks, exactly as an uploaded sound is (`convertUploadedSound`), and
  *    kept as the workspace's own sound (an AUDIO asset, `purpose: 'sound'`,

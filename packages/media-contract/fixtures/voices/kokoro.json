@@ -1,0 +1,80 @@
+{
+  "speaker": {
+    "state": "live",
+    "name": "kokoro"
+  },
+  "voices": [
+    {
+      "id": "kokoro-heart",
+      "name": "Heart",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-bella",
+      "name": "Bella",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-sarah",
+      "name": "Sarah",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-michael",
+      "name": "Michael",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-fenrir",
+      "name": "Fenrir",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-puck",
+      "name": "Puck",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-emma",
+      "name": "Emma (British)",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-george",
+      "name": "George (British)",
+      "languages": [
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-alpha",
+      "name": "Alpha (Hindi)",
+      "languages": [
+        "hi",
+        "en"
+      ]
+    },
+    {
+      "id": "kokoro-omega",
+      "name": "Omega (Hindi)",
+      "languages": [
+        "hi",
+        "en"
+      ]
+    }
+  ]
+}

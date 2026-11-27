@@ -73,7 +73,7 @@ After this module the Effects tab has four AI rows. **Bleep Bad Words** finds sw
 - [x] The Bleep row with My Words.
 - [x] The hook title route, the three hook text looks (drawn by `buildAss`), the row.
 - [x] `setHook`, `removeHook`, `suggestHook`; the row and the timeline label.
-- [x] The text-to-speech licence-chain check in the Decision Log (D13-06); then the Kokoro provider, route, job and row, or the item parked in Module 17. (The chain fails in-process because espeak-ng is GPL: the real Kokoro binding is parked for Module 17; the route, the SPEECH job, the row and a simulated voice are built behind `CLIPS_TTS`.)
+- [x] The text-to-speech licence-chain check in the Decision Log (D13-06); then the Kokoro provider, route, job and row, or the item parked in Module 17. (The chain fails in-process because espeak-ng is GPL, so Kokoro runs as its own program: `apps/media/voice-program`, GPL-3.0-or-later, called by the media service with a file in and a file out and never imported. Built after the owner's OK on 2026-11-27, with ten voices, a sample each, `MEDIA_SPEAKER`, the media service's `GET /voices` as the only voice list, and a live check: two real voices made and added, a cancel stopping the program and giving the minute back.)
 - [x] Title-case test green.
 - [x] `verify-change`; update the Progress table and the Decision Log.
 

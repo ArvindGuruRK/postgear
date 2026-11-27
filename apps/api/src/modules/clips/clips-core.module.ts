@@ -17,6 +17,7 @@ import { ClipJobsService } from './jobs/clip-jobs.service';
 import { ClipLimitsGuard } from './limits/clip-limits.guard';
 import { ClipRetentionService } from './retention/clip-retention.service';
 import { MediaServiceProbe } from './status/media-service.probe';
+import { MediaVoices } from './status/media-voices.client';
 import { ClipTranscriptStore } from './transcripts/clip-transcript-store';
 import { ClipTranscriptsService } from './transcripts/clip-transcripts.service';
 import { ClipPlaybackService } from './videos/clip-playback.service';
@@ -34,6 +35,7 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     ClipRetentionService,
     // Sprint 13: listening and the words, shared by the transcript routes and a clip's captions.
     MediaServiceProbe,
+    MediaVoices,
     ClipTranscriptStore,
     ClipTranscriptsService,
   ],
@@ -48,6 +50,7 @@ import { ClipVideosRepository } from './videos/clip-videos.repository';
     ClipVideosRepository,
     ClipRetentionService,
     MediaServiceProbe,
+    MediaVoices,
     ClipTranscriptStore,
     ClipTranscriptsService,
   ],

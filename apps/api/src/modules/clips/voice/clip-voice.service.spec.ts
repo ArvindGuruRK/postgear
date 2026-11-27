@@ -17,7 +17,10 @@ import type { ClipItemService } from '../clip/clip-item.service';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import type { MediaServiceProbe } from '../status/media-service.probe';
+import type { MediaVoices, SpeakerVoices } from '../status/media-voices.client';
 import {
   assetRow,
   clipRow,
@@ -102,8 +105,21 @@ function fakeLedger(limit: number) {
   return { usage, entries, used };
 }
 
+/** The media service's list under simulation: the shared fixture Python answers. */
+const SIMULATED = JSON.parse(
+  readFileSync(
+    path.join(
+      __dirname,
+      '../../../../../../packages/media-contract/fixtures/voices/simulated.json',
+    ),
+    'utf8',
+  ),
+) as { speaker: { name: string }; voices: SpeakerVoices['voices'] };
+
 let idCount = 0;
-function setup(options: { tts?: boolean; service?: 'ok' | 'off'; limit?: number } = {}) {
+function setup(
+  options: { tts?: boolean; service?: 'ok' | 'off'; limit?: number; voices?: SpeakerVoices } = {},
+) {
   const tables: FakeTables = emptyTables();
   tables.clips.push(clipRow({ id: CLIP }));
   mockDb = fakeClipDb(tables);
@@ -151,6 +167,11 @@ function setup(options: { tts?: boolean; service?: 'ok' | 'off'; limit?: number 
     limits as unknown as ClipLimitsGuard,
     ledger.usage as unknown as UsageService,
     { state: jest.fn(async () => options.service ?? 'ok') } as unknown as MediaServiceProbe,
+    {
+      list: jest.fn(
+        async () => options.voices ?? { speaker: SIMULATED.speaker.name, voices: SIMULATED.voices },
+      ),
+    } as unknown as MediaVoices,
     config as never,
   );
   return { service, tables, scheduling, limits, ...ledger };
@@ -199,8 +220,30 @@ describe('ClipVoiceService.voices', () => {
         { id: 'sim-stone', name: 'Stone', languages: ['en'], sampleUrl: null },
       ],
     });
-    expect((await setup({ tts: false }).service.voices()).enabled).toBe(false);
+    expect(await setup({ tts: false }).service.voices()).toEqual({ enabled: false, voices: [] });
     expect((await setup({ service: 'off' }).service.voices()).enabled).toBe(false);
+  });
+
+  it("offers the media service's own voices, and none while its speaker cannot speak", async () => {
+    const kokoro = {
+      speaker: 'kokoro',
+      voices: [{ id: 'kokoro-heart', name: 'Heart', languages: ['en'] }],
+    };
+    expect(await setup({ voices: kokoro }).service.voices()).toEqual({
+      enabled: true,
+      voices: [
+        {
+          id: 'kokoro-heart',
+          name: 'Heart',
+          languages: ['en'],
+          sampleUrl: '/clips/voice-samples/kokoro-heart.m4a',
+        },
+      ],
+    });
+    expect(await setup({ voices: { speaker: 'kokoro', voices: [] } }).service.voices()).toEqual({
+      enabled: false,
+      voices: [],
+    });
   });
 });
 
@@ -288,7 +331,11 @@ describe('ClipVoiceService.make', () => {
   });
 
   it('off answers 503 voice_off, before any row or charge', async () => {
-    for (const options of [{ tts: false }, { service: 'off' as const }]) {
+    for (const options of [
+      { tts: false },
+      { service: 'off' as const },
+      { voices: { speaker: 'kokoro', voices: [] } },
+    ]) {
       const { service, tables, usage } = setup(options);
       const answer = await refusal(service.make(TEST_ORG, TEST_USER, CLIP, body()));
       expect(answer).toMatchObject({ status: 503, body: { code: 'voice_off' } });
@@ -318,6 +365,22 @@ describe('ClipVoiceService.make', () => {
       body({ voiceId: 'sim-meadow', text: 'यह सबसे अच्छा हिस्सा है' }),
     );
     expect(hindi.reused).toBe(false);
+  });
+
+  it('a voice the media service no longer offers answers 422 voice_unknown', async () => {
+    const { service, tables, usage } = setup();
+    const answer = await refusal(
+      service.make(TEST_ORG, TEST_USER, CLIP, body({ voiceId: 'kokoro-heart' })),
+    );
+    expect(answer).toMatchObject({
+      status: 422,
+      body: {
+        code: 'voice_unknown',
+        message: 'This voice is no longer available. Pick another voice.',
+      },
+    });
+    expect(tables.jobs).toHaveLength(0);
+    expect(usage.consume).not.toHaveBeenCalled();
   });
 
   it('a short ledger answers 402 and takes the row back, nothing left charged', async () => {

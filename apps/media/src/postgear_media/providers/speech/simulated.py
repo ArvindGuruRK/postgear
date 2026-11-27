@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 import sys
 from array import array
+from collections.abc import Callable
 
 from postgear_media.providers.speech.base import Spoken, Voice
 
@@ -53,7 +54,7 @@ def _beep(frequency: int) -> array[int]:
 
 
 class SimulatedSpeaker:
-    """The only built binding. See the file comment."""
+    """The simulated binding. See the file comment."""
 
     name = "simulation"
 
@@ -74,7 +75,12 @@ class SimulatedSpeaker:
             self._cache[frequency] = found
         return found
 
-    def speak(self, text: str, voice_id: str) -> Spoken:
+    def speak(
+        self,
+        text: str,
+        voice_id: str,
+        tick: Callable[[], None] | None = None,  # noqa: ARG002 - it is quick
+    ) -> Spoken:
         base = _BASE_HZ[voice_id]  # KeyError for a voice this binding does not have
         parts: list[bytes] = []
         for character in text:

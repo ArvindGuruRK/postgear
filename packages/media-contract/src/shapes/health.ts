@@ -13,7 +13,7 @@ export const mediaPyHealthInput = z
   .strictObject({ version: contractVersion })
   .meta({ id: 'MediaPyHealthInput', title: 'MediaPyHealthInput' });
 
-const binding = z
+export const binding = z
   .strictObject({
     /** `simulation` answers from recorded files, `live` runs the real library, `off` cannot run. */
     state: z.enum(BINDING_STATES),
@@ -39,6 +39,8 @@ export const mediaPyHealthOutput = z
       faces: binding,
       motion: binding,
       stills: binding,
+      /** Module 09: the voice Text To Speech uses (`simulation`, or `kokoro` run as its own program). */
+      speaker: binding,
     }),
     /** Whether the model files a live binding needs are on this box. */
     modelsPresent: z.boolean(),

@@ -1011,7 +1011,7 @@ export function listVoices(options: { signal?: AbortSignal } = {}): Promise<Clip
 
 /**
  * Makes a voice from a line (charged in AI minutes; the same line and voice
- * again is one charge). 503 `voice_off`, 422 `voice_language`, 402
+ * again is one charge). 503 `voice_off`, 422 `voice_unknown` or `voice_language`, 402
  * `clips_ai_minutes_used`, each with a sentence.
  */
 export function makeVoice(

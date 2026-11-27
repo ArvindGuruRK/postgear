@@ -13,7 +13,9 @@
     "contract:generate": "node scripts/run-uv.js run python -m postgear_media.contract.generate",
     "clean": "rm -rf .venv .mypy_cache .ruff_cache .pytest_cache",
     "listen-benchmark": "node scripts/run-uv.js run --group ml python -m postgear_media.simulation.benchmark",
-    "transcripts:build": "node scripts/run-uv.js run python -m postgear_media.simulation.build_transcripts"
+    "transcripts:build": "node scripts/run-uv.js run python -m postgear_media.simulation.build_transcripts",
+    "voice:setup": "node scripts/run-uv.js sync --frozen --project voice-program",
+    "voice:samples": "node scripts/run-uv.js run python scripts/make_voice_samples.py"
   },
   "dependencies": {
     "@postgear/media-contract": "*"

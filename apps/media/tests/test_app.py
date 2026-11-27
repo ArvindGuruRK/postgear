@@ -59,3 +59,20 @@ def test_ready_is_503_while_temporal_cannot_be_reached(
     assert health.status_code == 200
     assert ready.status_code == 503
     assert ready.json()["checks"]["worker"] in {"starting", "retrying"}
+
+
+def test_voices_need_the_token_and_answer_the_speakers_list(
+    make_settings: Callable[..., Settings],
+) -> None:
+    settings = make_settings(media_internal_token=TOKEN, media_simulation=True)
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/voices").status_code == 401
+        assert client.get("/voices", headers={"X-PostGear-Internal": "wrong"}).status_code == 401
+        voices = client.get("/voices", headers={"X-PostGear-Internal": TOKEN})
+    assert voices.status_code == 200
+    assert voices.json()["speaker"] == {"state": "simulation", "name": "simulation"}
+    assert [voice["id"] for voice in voices.json()["voices"]] == [
+        "sim-river",
+        "sim-meadow",
+        "sim-stone",
+    ]

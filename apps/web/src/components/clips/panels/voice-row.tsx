@@ -32,6 +32,7 @@ import {
   addMadeVoice,
   madeVoiceOf,
   VOICE_ADDED,
+  VOICE_GONE_SENTENCE,
   VOICE_LANGUAGE_SENTENCE,
   VOICE_MAKING,
   VOICE_NO_OUTPUT,
@@ -73,7 +74,10 @@ export function VoiceRow({
   const depsRef = useRef(deps);
   depsRef.current = deps;
 
+  // The voices; asked again when the media service no longer offers the picked one.
+  const [voicesAsk, setVoicesAsk] = useState(0);
   useEffect(() => {
+    void voicesAsk;
     const abort = new AbortController();
     depsRef.current
       .voices(abort.signal)
@@ -81,13 +85,17 @@ export function VoiceRow({
         if (abort.signal.aborted) return;
         setEnabled(view.enabled);
         setVoices(view.voices);
-        setVoiceId((current) => current ?? view.voices[0]?.id ?? null);
+        setVoiceId((current) =>
+          current && view.voices.some((voice) => voice.id === current)
+            ? current
+            : (view.voices[0]?.id ?? null),
+        );
       })
       .catch((cause) => {
         if (!abort.signal.aborted) setProblem(problemOf(cause));
       });
     return () => abort.abort();
-  }, []);
+  }, [voicesAsk]);
 
   // One sample at a time; leaving the row stops it.
   const stopSample = useRef<(() => void) | null>(null);
@@ -160,8 +168,13 @@ export function VoiceRow({
       const known =
         cause instanceof ApiError && cause.code === 'voice_language'
           ? { text: VOICE_LANGUAGE_SENTENCE, plans: false }
-          : problemOf(cause);
+          : cause instanceof ApiError && cause.code === 'voice_unknown'
+            ? { text: VOICE_GONE_SENTENCE, plans: false }
+            : problemOf(cause);
       setProblem(known);
+      if (cause instanceof ApiError && cause.code === 'voice_unknown') {
+        setVoicesAsk((value) => value + 1);
+      }
     } finally {
       setBusy(false);
     }

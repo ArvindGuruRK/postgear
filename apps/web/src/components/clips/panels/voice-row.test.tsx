@@ -17,6 +17,8 @@ import type { ClipJobEvent, ClipJobView } from '@/types/clips';
 import { PlaybackStore } from '../editor/playback';
 import { useClipJob } from '../use-clip-job';
 import type { AiEffectsDeps } from './ai-effects-deps';
+import { ApiError } from '@/lib/api';
+import { VOICE_GONE_SENTENCE } from './ai-effects-model';
 import { TOO_MANY_SOUNDS } from './audio-model';
 import { VoiceRow } from './voice-row';
 
@@ -174,5 +176,30 @@ describe('Text To Speech with the real job hook', () => {
     });
     expect(await screen.findByTestId('clip-voice-problem')).toHaveTextContent(TOO_MANY_SOUNDS);
     expect(screen.queryByTestId('clip-voice-progress')).toBeNull();
+  });
+
+  it('says a voice is gone and asks for the voices again, picking one that is offered', async () => {
+    const given = deps([]);
+    const lists = [
+      [{ id: 'sim-river', name: 'River', languages: ['en'], sampleUrl: null }],
+      [{ id: 'kokoro-heart', name: 'Heart', languages: ['en'], sampleUrl: null }],
+    ];
+    (given.voices as jest.Mock).mockImplementation(async () => ({
+      enabled: true,
+      voices: lists.shift() ?? [],
+    }));
+    (given.makeVoice as jest.Mock).mockRejectedValueOnce(
+      new ApiError('This voice is no longer available. Pick another voice.', 422, 'voice_unknown'),
+    );
+    render(<Harness deps={given} playback={new PlaybackStore()} />);
+    await screen.findByRole('radio', { name: 'River' });
+    fireEvent.change(screen.getByPlaceholderText('Enter your words'), { target: { value: 'Hi' } });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('clip-voice-make'));
+    });
+    expect(await screen.findByTestId('clip-voice-problem')).toHaveTextContent(VOICE_GONE_SENTENCE);
+    expect(await screen.findByRole('radio', { name: 'Heart' })).toBeChecked();
+    expect(screen.queryByRole('radio', { name: 'River' })).toBeNull();
+    expect(given.voices).toHaveBeenCalledTimes(2);
   });
 });

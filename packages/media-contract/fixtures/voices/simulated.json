@@ -1,4 +1,8 @@
 {
+  "speaker": {
+    "state": "simulation",
+    "name": "simulation"
+  },
   "voices": [
     {
       "id": "sim-river",

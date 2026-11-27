@@ -244,6 +244,8 @@ export function hookRefusalSentence(code: HookRefusalCode): string {
 export const VOICE_TEXT_MAX = 500;
 export const VOICE_PLACEHOLDER = 'Enter your words';
 export const VOICE_LANGUAGE_SENTENCE = 'This voice cannot read this language. Pick another voice.';
+/** 422 `voice_unknown`: the media service's speaker changed; the row asks for the voices again. */
+export const VOICE_GONE_SENTENCE = 'This voice is no longer available. Pick another voice.';
 export const VOICE_UNSAVED = 'Your latest changes are not saved yet. Try again in a moment.';
 export const VOICE_OFF_NOTE =
   'Making a voice is not available right now. Everything else still works.';

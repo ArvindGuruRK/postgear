@@ -3,8 +3,9 @@
 - `GET /health`: the process is up. Open, touches nothing.
 - `GET /ready`: the worker is polling and storage answers; 503 otherwise.
 - `GET /tools`: the `mediaPyHealth` report (versions and bindings).
+- `GET /voices`: the voices Text To Speech can use here (`VoiceList`, Module 09).
 
-`/ready` and `/tools` need `MEDIA_INTERNAL_TOKEN` in `X-PostGear-Internal`
+`/ready`, `/tools` and `/voices` need `MEDIA_INTERNAL_TOKEN` in `X-PostGear-Internal`
 (required in production; without one locally they stay open to this machine).
 
 The lifespan runs the Temporal worker as a supervised background task: if
@@ -26,7 +27,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from postgear_media.activities.base import answer
-from postgear_media.activities.health import health_report
+from postgear_media.activities.health import health_report, voice_list
 from postgear_media.core.logging import configure_logging, get_logger
 from postgear_media.core.settings import MEDIA_PY_TASK_QUEUE, Settings, get_settings
 from postgear_media.core.storage import create_private_storage
@@ -143,6 +144,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/tools", dependencies=[Depends(internal_only)])
     def tools() -> dict[str, Any]:
         return answer(health_report(active))
+
+    @app.get("/voices", dependencies=[Depends(internal_only)])
+    def voices() -> dict[str, Any]:
+        return answer(voice_list(active))
 
     return app
 

@@ -100,6 +100,7 @@ class Bindings(BaseModel):
     )
     faces: Binding
     motion: Binding
+    speaker: Binding
     stills: Binding
     transcriber: Binding
 
@@ -195,6 +196,29 @@ class VisualSimulationHint(BaseModel):
     )
     force: Literal["fail", "slow"] | None
     sample: Sample | None
+
+
+class VoiceInfo(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    id: Annotated[
+        str, Field(max_length=32, pattern="^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,3}$")
+    ]
+    languages: Annotated[
+        list[Literal["en", "hi", "ta"]], Field(max_length=3, min_length=1)
+    ]
+    name: Annotated[str, Field(max_length=40, min_length=1)]
+
+
+class VoiceList(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        populate_by_name=True,
+    )
+    speaker: Binding
+    voices: Annotated[list[VoiceInfo], Field(max_length=64)]
 
 
 class HeardFile(BaseModel):
@@ -574,6 +598,7 @@ class MediaContract(BaseModel):
     file_speech_text_file: Annotated[
         SpeechTextFile | None, Field(alias="file_SpeechTextFile")
     ] = None
+    http_voice_list: Annotated[VoiceList | None, Field(alias="http_VoiceList")] = None
     media_py_detect_faces_input: Annotated[
         MediaPyDetectFacesInput | None, Field(alias="mediaPyDetectFaces_input")
     ] = None

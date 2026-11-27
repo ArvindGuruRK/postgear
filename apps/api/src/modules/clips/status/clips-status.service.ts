@@ -48,6 +48,7 @@ import { gigabytesToBytes } from '../clips.units';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { ClipSampleLink } from '../videos/clip-sample';
 import { type AiServiceState, MediaServiceProbe } from './media-service.probe';
+import { MediaVoices } from './media-voices.client';
 
 const ANSWER_CACHE_MS = 60_000;
 const OFFLINE_CACHE_MS = 15_000;
@@ -129,8 +130,9 @@ export interface ClipsAiStatus {
   /** Module 07: Detect Camera can find faces right now (free; the media service is on). */
   faces: boolean;
   /**
-   * Module 09: Text To Speech can make a voice right now (`CLIPS_TTS` on and
-   * the media service up). False hides the Effects tab's voice row.
+   * Module 09: Text To Speech can make a voice right now (`CLIPS_TTS` on, the
+   * media service up and its speaker offering voices). False hides the
+   * Effects tab's voice row.
    */
   voice: boolean;
 }
@@ -164,6 +166,7 @@ export class ClipsStatusService {
     config: ConfigService<Env, true>,
     private readonly sample: ClipSampleLink,
     private readonly mediaService: MediaServiceProbe,
+    private readonly mediaVoices: MediaVoices,
   ) {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
@@ -184,6 +187,8 @@ export class ClipsStatusService {
     const limits = Object.fromEntries(
       CLIPS_STATUS_LIMIT_KEYS.map((key) => [key, values[key]]),
     ) as ClipsStatusLimits;
+    const voice =
+      this.tts && aiService === 'ok' && (await this.mediaVoices.list()).voices.length > 0;
     const limitGb = limits['clips.storage_gb'];
     const usedBytes = byKind.videos + byKind.downloads + byKind.library;
     const limitBytes = typeof limitGb === 'number' ? gigabytesToBytes(limitGb) : null;
@@ -209,7 +214,7 @@ export class ClipsStatusService {
         action: aiService === 'ok',
         actionVision: this.actionVision,
         faces: aiService === 'ok',
-        voice: this.tts && aiService === 'ok',
+        voice,
       },
     };
   }

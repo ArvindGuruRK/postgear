@@ -204,7 +204,12 @@ def test_a_force_is_ignored_outside_simulation(tmp_path: Path) -> None:
         def voices(self) -> tuple[Voice, ...]:
             return (Voice(id="sim-river", name="River", languages=("en",)),)
 
-        def speak(self, text: str, voice_id: str) -> Spoken:  # noqa: ARG002
+        def speak(
+            self,
+            text: str,  # noqa: ARG002
+            voice_id: str,  # noqa: ARG002
+            tick: Callable[[], None] | None = None,  # noqa: ARG002
+        ) -> Spoken:
             return Spoken(pcm=b"\x00\x00" * 24_000, sample_rate=24_000)
 
     storage = LocalPrivateStorage(tmp_path / "private")
@@ -220,7 +225,10 @@ def test_a_force_is_ignored_outside_simulation(tmp_path: Path) -> None:
 # --- The binding and the activity ----------------------------------------------------
 
 
-def test_outside_simulation_the_speaker_is_off(make_settings: Callable[..., Settings]) -> None:
+def test_outside_simulation_without_kokoro_the_speaker_is_off(
+    make_settings: Callable[..., Settings],
+) -> None:
+    # No voice program and no model files under tmp_path.
     with pytest.raises(ApplicationError) as caught:
         get_speaker(make_settings(media_simulation=False))
     assert caught.value.type == "MEDIA_BINDING_OFF"

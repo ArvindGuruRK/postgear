@@ -117,7 +117,7 @@ def speak(payload: MediaPySpeakInput, deps: SpeechDeps) -> MediaPySpeakOutput:
         text = _read_text(deps.storage, text_key, folder)
         deps.checkpoint({"characters": len(text)})
         _simulation_force(payload, deps)
-        spoken = speaker.speak(text, voice_id)
+        spoken = speaker.speak(text, voice_id, lambda: deps.checkpoint(None))
         if spoken.sample_rate != SAMPLE_RATE or not 0 < spoken.duration_ms <= MAX_MS:
             raise ApplicationError(
                 "The speaker made a sound the contract does not take", type="MEDIA_TOOL_FAILED"

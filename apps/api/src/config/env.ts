@@ -403,10 +403,10 @@ const envSchema = z
     // Module 06: Look For Action also shows stills of each burst to the AI
     // model. Off by default (D13-07); a run keeps the value it started with.
     CLIPS_ACTION_VISION: blankAsUnset(z.enum(['true', 'false']).default('false')),
-    // Module 09: Text To Speech. Off by default (D13-06): only an open-source
-    // voice whose whole licence chain passes may be used, and the real one
-    // (Kokoro) is parked, so only the simulated voice can speak. Off, the
-    // voice route answers 503 `voice_off` and the editor hides the row.
+    // Module 09: Text To Speech. Off by default. The voices are the media
+    // service's own (`GET /voices`: the simulated speaker, or Kokoro run as
+    // its own program, D13-06). Off, the voice route answers 503 `voice_off`
+    // and the editor hides the row.
     CLIPS_TTS: blankAsUnset(z.enum(['true', 'false']).default('false')),
     // Which platforms may be imported from and browsed. YouTube is switched on
     // in production only after the legal read (D12-15): one value to change.

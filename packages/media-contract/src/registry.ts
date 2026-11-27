@@ -11,7 +11,12 @@ import { z } from 'zod/v4';
 import { MEDIA_CONTRACT_VERSION, MEDIA_PY_ACTIVITY_NAMES } from './names';
 import { faceTracksFile, mediaPyDetectFacesInput, mediaPyDetectFacesOutput } from './shapes/faces';
 import { mediaPyHealthInput, mediaPyHealthOutput } from './shapes/health';
-import { mediaPySpeakInput, mediaPySpeakOutput, speechTextFile } from './shapes/speech';
+import {
+  mediaPySpeakInput,
+  mediaPySpeakOutput,
+  speechTextFile,
+  voiceList,
+} from './shapes/speech';
 import { heardFile, mediaPyTranscribeInput, mediaPyTranscribeOutput } from './shapes/transcribe';
 import {
   mediaPyMotionInput,
@@ -42,7 +47,7 @@ export const MEDIA_PY_CONTRACT = {
   },
   [MEDIA_PY_ACTIVITY_NAMES.motion]: { input: mediaPyMotionInput, output: mediaPyMotionOutput },
   [MEDIA_PY_ACTIVITY_NAMES.stills]: { input: mediaPyStillsInput, output: mediaPyStillsOutput },
-  // Module 09: a typed line made into a voice (simulated binding only).
+  // Module 09: a typed line made into a voice.
   [MEDIA_PY_ACTIVITY_NAMES.speak]: { input: mediaPySpeakInput, output: mediaPySpeakOutput },
 } as const satisfies Record<string, ActivityShapes>;
 
@@ -59,6 +64,14 @@ export const MEDIA_FILE_SHAPES = {
 } as const satisfies Record<string, z.ZodType>;
 
 export type MediaFileName = keyof typeof MEDIA_FILE_SHAPES;
+
+/**
+ * Answers of the service's own HTTP routes that the API reads (never an
+ * activity). Fixtures live in `fixtures/voices/`.
+ */
+export const MEDIA_HTTP_SHAPES = {
+  VoiceList: voiceList,
+} as const satisfies Record<string, z.ZodType>;
 
 export type MediaPyContract = typeof MEDIA_PY_CONTRACT;
 export type ContractActivityName = keyof MediaPyContract;
@@ -135,21 +148,22 @@ export function buildContractSchema(): JsonObject {
     }
   }
 
-  for (const [fileName, schema] of Object.entries(MEDIA_FILE_SHAPES) as Array<
-    [string, z.ZodType]
-  >) {
-    const name = shapeName(schema);
-    if (name !== fileName)
-      throw new Error(`The file shape ${fileName} must carry its name as its id`);
-    const json = z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'output' }) as JsonObject;
-    const nested = isObject(json.$defs) ? json.$defs : {};
-    const { $defs: _defs, ...root } = json;
-    for (const [key, value] of Object.entries(nested)) {
-      if (isObject(value)) add(key, value);
+  const addNamed = (prefix: string, shapes: Record<string, z.ZodType>) => {
+    for (const [shapeKey, schema] of Object.entries(shapes)) {
+      const name = shapeName(schema);
+      if (name !== shapeKey) throw new Error(`The shape ${shapeKey} must carry its name as its id`);
+      const json = z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'output' }) as JsonObject;
+      const nested = isObject(json.$defs) ? json.$defs : {};
+      const { $defs: _defs, ...root } = json;
+      for (const [key, value] of Object.entries(nested)) {
+        if (isObject(value)) add(key, value);
+      }
+      add(name, root);
+      properties[`${prefix}_${name}`] = { $ref: `#/$defs/${name}` };
     }
-    add(name, root);
-    properties[`file_${name}`] = { $ref: `#/$defs/${name}` };
-  }
+  };
+  addNamed('file', MEDIA_FILE_SHAPES);
+  addNamed('http', MEDIA_HTTP_SHAPES);
 
   return sortKeys({
     $schema: 'https://json-schema.org/draft/2020-12/schema',

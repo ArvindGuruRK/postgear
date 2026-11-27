@@ -46,6 +46,7 @@ def make_settings(tmp_path: Path) -> Callable[..., Settings]:
             "upload_directory": str(tmp_path / "uploads"),
             "media_model_dir": str(tmp_path / "models"),
             "media_scratch_dir": str(tmp_path / "scratch"),
+            "media_voice_program": str(tmp_path / "voice-program" / "postgear-voice"),
             "media_run_worker": False,
         }
         values.update(overrides)

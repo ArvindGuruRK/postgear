@@ -22,6 +22,7 @@ from temporalio.exceptions import ApplicationError
 
 from postgear_media.core.settings import Settings
 from postgear_media.providers.speech.base import Speaker
+from postgear_media.providers.speech.kokoro import kokoro_ready
 from postgear_media.providers.transcribe.base import Transcriber
 from postgear_media.providers.vision.mediapipe_faces import face_model_path
 
@@ -44,6 +45,7 @@ class ProviderTable:
     faces: BindingInfo
     motion: BindingInfo
     stills: BindingInfo
+    speaker: BindingInfo
     models_present: bool
 
 
@@ -74,6 +76,21 @@ def _faces(settings: Settings) -> BindingInfo:
     return BindingInfo("live" if live else "off", "mediapipe")
 
 
+def _speaker(settings: Settings) -> BindingInfo:
+    """Module 09. `MEDIA_SPEAKER=kokoro` speaks for real even under simulation.
+
+    Kokoro is local, free and reaches no network, so it is the one binding a
+    person may hear for real while everything else simulates. `auto` follows
+    `MEDIA_SIMULATION`. Kokoro is live only when its program and both model
+    files are on this box (never downloaded here).
+    """
+    choice = settings.media_speaker
+    if choice == "simulation" or (choice == "auto" and settings.simulation):
+        return BindingInfo("simulation", "simulation")
+    ready = kokoro_ready(settings.voice_program, settings.model_root)
+    return BindingInfo("live" if ready else "off", "kokoro")
+
+
 def build_provider_table(settings: Settings) -> ProviderTable:
     """The bindings this process will use."""
     if settings.simulation:
@@ -83,6 +100,7 @@ def build_provider_table(settings: Settings) -> ProviderTable:
             faces=sim,
             motion=sim,
             stills=sim,
+            speaker=_speaker(settings),
             models_present=_models_present(settings),
         )
     has_cv = _installed("cv2")
@@ -91,6 +109,7 @@ def build_provider_table(settings: Settings) -> ProviderTable:
         faces=_faces(settings),
         motion=BindingInfo("live" if has_cv else "off", "opencv"),
         stills=BindingInfo("live" if has_cv else "off", "opencv"),
+        speaker=_speaker(settings),
         models_present=_models_present(settings),
     )
 
@@ -154,20 +173,27 @@ def reset_transcribers() -> None:
 
 
 def get_speaker(settings: Settings) -> Speaker:
-    """The speaker this process uses (Module 09).
+    """The speaker this process uses (Module 09): see `_speaker`.
 
-    Only the simulated binding exists. Outside simulation there is no speaker:
-    the real one (Kokoro through `kokoro-onnx`) is parked by the licence
-    decision and, if ever built, runs as its own program (see
-    `providers/speech/base.py`). So a real run fails at once with a plain,
-    non-retryable `MEDIA_BINDING_OFF` instead of retrying.
+    A Kokoro that is not ready (no voice program, or no model files) raises a
+    plain, non-retryable `MEDIA_BINDING_OFF` at once instead of retrying.
     """
-    if settings.simulation:
+    info = _speaker(settings)
+    if info.state == "simulation":
         from postgear_media.providers.speech.simulated import SimulatedSpeaker  # noqa: PLC0415
 
         return SimulatedSpeaker()
-    raise ApplicationError(
-        "No voice can speak on this service: the real voice is parked",
-        type="MEDIA_BINDING_OFF",
-        non_retryable=True,
-    )
+    if info.state == "off":
+        raise ApplicationError(
+            "The kokoro voice cannot run on this service",
+            type="MEDIA_BINDING_OFF",
+            non_retryable=True,
+        )
+    from postgear_media.providers.speech.kokoro import KokoroSpeaker  # noqa: PLC0415
+
+    return KokoroSpeaker(settings.voice_program, settings.model_root, settings.scratch_root)
+
+
+def speaker_is_simulated(settings: Settings) -> bool:
+    """True when the simulated speaker answers (only it reads the forcing switch)."""
+    return _speaker(settings).state == "simulation"

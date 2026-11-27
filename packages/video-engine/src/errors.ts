@@ -59,6 +59,7 @@ export const CLIP_ERROR_MESSAGES = {
   voice_failed: 'We could not make the voice. Your AI minutes were given back.',
   voice_off: 'Text to speech is not available right now. Everything else still works.',
   voice_language: 'This voice cannot read this language. Pick another voice.',
+  voice_unknown: 'This voice is no longer available. Pick another voice.',
   video_removed: 'This video was removed after a request from its owner.',
   format_gone: 'This quality is no longer offered for this video. Pick another.',
   downloads_busy: 'Three downloads are already being prepared. Wait for one to finish.',

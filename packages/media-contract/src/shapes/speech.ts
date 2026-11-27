@@ -14,12 +14,17 @@
  * `clips/<org>/library/<job hex>.<json|wav|m4a>`, because a made voice
  * belongs to the workspace, not to a video.
  *
- * Only the simulated Speaker binding is built: the real one (Kokoro through
- * `kokoro-onnx`) is parked by the licence decision (its phonemiser,
- * espeak-ng, is GPL-3.0 and would load inside our process).
+ * Two Speaker bindings: the simulated one (a tone pattern whose length follows
+ * the text) and Kokoro, which runs as **its own program** beside the service
+ * (`apps/media/voice-program`, GPL-3.0-or-later, because `kokoro-onnx` loads
+ * espeak-ng inside whatever process imports it). The service never imports it.
+ *
+ * `VoiceList` is the service's `GET /voices` answer: the voices of the binding
+ * it runs, which is the only list the API offers.
  */
 import { z } from 'zod/v4';
 import { contractVersion, orgId, storageKey, uuid } from './common';
+import { binding } from './health';
 
 /** The rate every made voice is written at (Kokoro's own rate, kept for the simulated binding). */
 export const SPEECH_SAMPLE_RATE = 24_000;
@@ -74,6 +79,28 @@ export const speechTextFile = z
   })
   .meta({ id: 'SpeechTextFile', title: 'SpeechTextFile' });
 
+/** The spoken languages a voice can read (the API matches a line's script to them). */
+export const VOICE_LANGUAGES = ['en', 'hi', 'ta'] as const;
+
+/** One voice on offer: its id, a name a person reads, and the languages it reads. */
+export const voiceInfo = z
+  .strictObject({
+    id: voiceId,
+    name: z.string().min(1).max(40),
+    languages: z.array(z.enum(VOICE_LANGUAGES)).min(1).max(VOICE_LANGUAGES.length),
+  })
+  .meta({ id: 'VoiceInfo' });
+
+/** `GET /voices`: the speaker the service runs and its voices (none while it is `off`). */
+export const voiceList = z
+  .strictObject({
+    speaker: binding,
+    voices: z.array(voiceInfo).max(64),
+  })
+  .meta({ id: 'VoiceList', title: 'VoiceList' });
+
+export type VoiceInfo = z.infer<typeof voiceInfo>;
+export type VoiceList = z.infer<typeof voiceList>;
 export type MediaPySpeakInput = z.infer<typeof mediaPySpeakInput>;
 export type MediaPySpeakOutput = z.infer<typeof mediaPySpeakOutput>;
 export type SpeechTextFile = z.infer<typeof speechTextFile>;

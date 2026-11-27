@@ -1,21 +1,21 @@
 """What every speaker is: a typed line and a voice in, a WAV out (Module 09).
 
-**The real binding is parked (D13-06, the licence decision).** The candidate,
-Kokoro through `kokoro-onnx`, has Apache-2.0 weights and an MIT wrapper, but
-its phonemiser path (espeak-ng through phonemizer) is GPL-3.0, and
-`kokoro-onnx` loads espeak-ng as a library inside the calling process. That
-link fails for use inside this service. If it is ever built (Module 17, after
-the owner's own licence read), it must run as **its own small program** that
-this service calls with a file in and a file out, behind this same interface,
-never imported here. Nothing in this package downloads a model or a voice.
+Two bindings:
 
-The only binding today is `SimulatedSpeaker` (`simulated.py`): a deterministic
-tone pattern whose length follows the text, so every step around it (the job,
-the charge, the sound in the library, the editor) runs for real.
+- `SimulatedSpeaker` (`simulated.py`): a deterministic tone pattern whose
+  length follows the text, so every step around it (the job, the charge, the
+  sound in the library, the editor) runs with no model.
+- `KokoroSpeaker` (`kokoro.py`): Kokoro v1.0 through `kokoro-onnx`. Its
+  phonemiser, espeak-ng, is GPL-3.0 and `kokoro-onnx` loads it inside the
+  calling process, so Kokoro runs as **its own program**
+  (`apps/media/voice-program`, GPL-3.0-or-later) that this service calls with
+  a file in and a file out, never imported here. Nothing in this package
+  downloads a model or a voice.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -51,5 +51,9 @@ class Speaker(Protocol):
     def voices(self) -> tuple[Voice, ...]:
         """The voices this binding offers."""
 
-    def speak(self, text: str, voice_id: str) -> Spoken:
-        """The line spoken in the voice. Raises `KeyError` for a voice it does not have."""
+    def speak(self, text: str, voice_id: str, tick: Callable[[], None] | None = None) -> Spoken:
+        """The line spoken in the voice. Raises `KeyError` for a voice it does not have.
+
+        A slow binding calls `tick` while it works (the heartbeat, which raises
+        when the job is cancelled).
+        """

@@ -34,6 +34,11 @@ from postgear_media.core.settings import MEDIA_PY_TASK_QUEUE, Settings, get_sett
 
 log = get_logger("worker")
 
+#: The longest gap between heartbeats the SDK sends. A cancel reaches an
+#: activity only in a heartbeat's answer, so this is how quickly a cancelled
+#: step stops (the SDK's default is 60 seconds; the Node clip workers use 5).
+HEARTBEAT_THROTTLE = timedelta(seconds=2)
+
 #: Every activity this service serves. A module adds its function here.
 ACTIVITIES: Sequence[Callable[..., Any]] = (
     media_py_health,
@@ -64,6 +69,8 @@ def build_worker(
         activity_executor=executor,
         max_concurrent_activities=settings.media_max_activities,
         graceful_shutdown_timeout=timedelta(minutes=2),
+        max_heartbeat_throttle_interval=HEARTBEAT_THROTTLE,
+        default_heartbeat_throttle_interval=HEARTBEAT_THROTTLE,
     )
 
 

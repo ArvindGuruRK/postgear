@@ -8,7 +8,8 @@
     "transcriber": { "state": "live", "name": "faster-whisper" },
     "faces": { "state": "off", "name": "mediapipe" },
     "motion": { "state": "live", "name": "opencv" },
-    "stills": { "state": "live", "name": "opencv" }
+    "stills": { "state": "live", "name": "opencv" },
+    "speaker": { "state": "live", "name": "kokoro" }
   },
   "modelsPresent": true
 }

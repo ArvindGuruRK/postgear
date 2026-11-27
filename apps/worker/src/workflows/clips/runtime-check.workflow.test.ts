@@ -35,6 +35,7 @@ const health: MediaPyHealthOutput = {
     faces: { state: 'simulation', name: 'simulation' },
     motion: { state: 'simulation', name: 'simulation' },
     stills: { state: 'off', name: 'opencv' },
+    speaker: { state: 'live', name: 'kokoro' },
   },
   modelsPresent: false,
 };
@@ -90,6 +91,7 @@ describe('clipRuntimeCheckWorkflow and the Python service', () => {
         faces: 'simulation',
         motion: 'simulation',
         stills: 'off',
+        speaker: 'live',
       },
     });
   });

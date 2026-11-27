@@ -377,6 +377,9 @@
             "motion": {
               "$ref": "#/$defs/Binding"
             },
+            "speaker": {
+              "$ref": "#/$defs/Binding"
+            },
             "stills": {
               "$ref": "#/$defs/Binding"
             },
@@ -388,7 +391,8 @@
             "transcriber",
             "faces",
             "motion",
-            "stills"
+            "stills",
+            "speaker"
           ],
           "type": "object"
         },
@@ -991,6 +995,59 @@
       "maxLength": 32,
       "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+){0,3}$",
       "type": "string"
+    },
+    "VoiceInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/VoiceId"
+        },
+        "languages": {
+          "items": {
+            "enum": [
+              "en",
+              "hi",
+              "ta"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "languages"
+      ],
+      "type": "object"
+    },
+    "VoiceList": {
+      "additionalProperties": false,
+      "properties": {
+        "speaker": {
+          "$ref": "#/$defs/Binding"
+        },
+        "voices": {
+          "items": {
+            "$ref": "#/$defs/VoiceInfo"
+          },
+          "maxItems": 64,
+          "type": "array"
+        }
+      },
+      "required": [
+        "speaker",
+        "voices"
+      ],
+      "title": "VoiceList",
+      "type": "object"
     }
   },
   "$id": "https://postgear.local/media-contract.json",
@@ -1008,6 +1065,9 @@
     },
     "file_SpeechTextFile": {
       "$ref": "#/$defs/SpeechTextFile"
+    },
+    "http_VoiceList": {
+      "$ref": "#/$defs/VoiceList"
     },
     "mediaPyDetectFaces_input": {
       "$ref": "#/$defs/MediaPyDetectFacesInput"

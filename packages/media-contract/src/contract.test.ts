@@ -11,6 +11,7 @@ import {
   contractSchemaText,
   MEDIA_ERROR_TYPES,
   MEDIA_FILE_SHAPES,
+  MEDIA_HTTP_SHAPES,
   MEDIA_NON_RETRYABLE_ERRORS,
   MEDIA_PY_ACTIVITY_NAMES,
   MEDIA_PY_CONTRACT,
@@ -195,23 +196,41 @@ describe('the speech payloads carry no text (Module 09)', () => {
   });
 });
 
-describe('the simulated voices fixture (read by the API and by pytest)', () => {
-  const fixture = readJson(join(FIXTURES, 'voices', 'simulated.json')) as {
-    voices: Array<{ id: string; name: string; languages: string[] }>;
-  };
+describe('the voice lists (`GET /voices` answers; read by the API and by pytest)', () => {
+  const lists = files(join(FIXTURES, 'voices'));
 
-  it('lists voices whose ids are valid voice ids, no two alike', () => {
-    const ids = fixture.voices.map((voice) => voice.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ids) expect(voiceId.safeParse(id).success).toBe(true);
+  it('has the simulated, the Kokoro and the off list', () => {
+    expect(lists.sort()).toEqual(['kokoro.json', 'off.json', 'simulated.json']);
   });
 
-  it('gives every voice a name and at least one language', () => {
-    for (const voice of fixture.voices) {
+  it.each(lists)('%s parses as a VoiceList', (name) => {
+    const payload = readJson(join(FIXTURES, 'voices', name));
+    expect(MEDIA_HTTP_SHAPES.VoiceList.parse(payload)).toEqual(payload);
+  });
+
+  it.each(lists)('%s has no two voices alike and a name and language for each', (name) => {
+    const list = MEDIA_HTTP_SHAPES.VoiceList.parse(readJson(join(FIXTURES, 'voices', name)));
+    const ids = list.voices.map((voice) => voice.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const voice of list.voices) {
+      expect(voiceId.safeParse(voice.id).success).toBe(true);
       expect(voice.name.length).toBeGreaterThan(0);
       expect(voice.languages.length).toBeGreaterThan(0);
-      for (const language of voice.languages) expect(['en', 'hi', 'ta']).toContain(language);
     }
+  });
+
+  it('refuses a voice with a path for an id, or with no language', () => {
+    const shape = MEDIA_HTTP_SHAPES.VoiceList;
+    const speaker = { state: 'live', name: 'kokoro' };
+    const voice = { id: 'kokoro-heart', name: 'Heart', languages: ['en'] };
+    expect(shape.safeParse({ speaker, voices: [voice] }).success).toBe(true);
+    expect(shape.safeParse({ speaker, voices: [{ ...voice, id: '../x' }] }).success).toBe(false);
+    expect(shape.safeParse({ speaker, voices: [{ ...voice, languages: [] }] }).success).toBe(
+      false,
+    );
+    expect(shape.safeParse({ speaker, voices: [{ ...voice, languages: ['fr'] }] }).success).toBe(
+      false,
+    );
   });
 });
 

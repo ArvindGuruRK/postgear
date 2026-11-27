@@ -211,14 +211,23 @@ describe('the thumbnail route', () => {
           !/(clip-thumbnails\.service|channel-list\.cache|clip-links\.controller)\.ts$/.test(file),
       )
       .map((file) => path.relative(CLIPS_SRC, file).split(path.sep).join('/'));
-    // Sprint 13: the media service probe is the one other caller. It asks only our own
-    // configured `MEDIA_URL` for `/ready`, never an address a person gave, and follows no redirect.
-    expect(callers).toEqual(['status/media-service.probe.ts']);
-    const probe = readFileSync(path.join(CLIPS_SRC, 'status', 'media-service.probe.ts'), 'utf8');
-    expect(probe).toContain("new URL('/ready', base)");
-    expect(probe).toContain("redirect: 'error'");
-    expect(probe.match(/this\.fetcher\(/g)).toHaveLength(1);
-    expect(probe).toContain('this.fetcher(this.readyUrl,');
+    // Sprint 13: the media service probe and its voice list are the other callers. They ask
+    // only our own configured `MEDIA_URL` for `/ready` and `/voices`, never an address a
+    // person gave, and follow no redirect.
+    expect(callers.sort()).toEqual([
+      'status/media-service.probe.ts',
+      'status/media-voices.client.ts',
+    ]);
+    for (const [file, route, url] of [
+      ['media-service.probe.ts', '/ready', 'this.readyUrl'],
+      ['media-voices.client.ts', '/voices', 'this.voicesUrl'],
+    ]) {
+      const source = readFileSync(path.join(CLIPS_SRC, 'status', file), 'utf8');
+      expect(source).toContain(`new URL('${route}', base)`);
+      expect(source).toContain("redirect: 'error'");
+      expect(source.match(/this\.fetcher\(/g)).toHaveLength(1);
+      expect(source).toContain(`this.fetcher(${url},`);
+    }
     const helper = readFileSync(
       path.join(CLIPS_SRC, 'channels', 'listers', 'lister-http.ts'),
       'utf8',

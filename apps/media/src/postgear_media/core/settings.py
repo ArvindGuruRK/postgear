@@ -29,6 +29,7 @@ MEDIA_PY_TASK_QUEUE = "postgear-media-py"
 
 SIMULATION_IN_PRODUCTION = "MEDIA_SIMULATION cannot be enabled in production"
 TOKEN_REQUIRED = "MEDIA_INTERNAL_TOKEN is required in production"  # noqa: S105 - a message
+SIMULATED_SPEAKER_IN_PRODUCTION = "MEDIA_SPEAKER=simulation cannot be used in production"
 
 
 class Settings(BaseSettings):
@@ -73,12 +74,19 @@ class Settings(BaseSettings):
     whisper_model: str = "large-v3-turbo"
     groq_api_key: SecretStr | None = None
 
+    #: Module 09: `auto` follows MEDIA_SIMULATION; `kokoro` speaks for real even
+    #: under simulation (it is local, free and reaches no network).
+    media_speaker: Literal["auto", "kokoro", "simulation"] = "auto"
+    media_voice_program: str | None = None
+
     @model_validator(mode="after")
     def _refuse_simulation_in_production(self) -> Settings:
         if self.node_env == "production" and self.simulation:
             raise ValueError(SIMULATION_IN_PRODUCTION)
         if self.node_env == "production" and self.media_internal_token is None:
             raise ValueError(TOKEN_REQUIRED)
+        if self.node_env == "production" and self.media_speaker == "simulation":
+            raise ValueError(SIMULATED_SPEAKER_IN_PRODUCTION)
         return self
 
     @property
@@ -101,6 +109,13 @@ class Settings(BaseSettings):
         if self.media_model_dir:
             return Path(self.media_model_dir).resolve()
         return REPO_ROOT / ".cache" / "media-models"
+
+    @property
+    def voice_program(self) -> Path:
+        """The voice program: `MEDIA_VOICE_PROGRAM`, or the one `npm run voice:setup` builds."""
+        if self.media_voice_program:
+            return Path(self.media_voice_program).resolve()
+        return REPO_ROOT / "apps" / "media" / "voice-program" / ".venv" / "bin" / "postgear-voice"
 
     @property
     def private_directory(self) -> Path:

@@ -92,4 +92,5 @@ addopts = "-q --strict-markers"
 markers = [
   "ml: needs the ml group (skipped unless it is installed)",
   "temporal: needs a Temporal server on TEMPORAL_HOST (skipped when it cannot be reached)",
+  "voice: runs the real voice program (skipped unless it and the Kokoro files are on this box)",
 ]

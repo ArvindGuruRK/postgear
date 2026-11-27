@@ -7,7 +7,7 @@
  *   A word route: `ClipItemModule` registers this controller before
  *   `GET /clips/:clipId` (`clips-routes.spec.ts` holds it).
  * - `POST /clips/:clipId/voice` `{ text, voiceId, revision }`: 202
- *   `{ job, price, reused, meter }`. 503 `voice_off`, 422 `voice_language`,
+ *   `{ job, price, reused, meter }`. 503 `voice_off`, 422 `voice_unknown` or `voice_language`,
  *   402 `clips_ai_minutes_used`. The same line and voice again answers the
  *   same job with no second charge.
  */
