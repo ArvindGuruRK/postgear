@@ -34,6 +34,7 @@ export const REFUSAL_CODES = [
   'clips_ai_minutes_used',
   'clips_downloads_today',
   'channel_limit',
+  'members_editor_seats_full',
 ] as const;
 
 /** A refusal code. */
@@ -100,6 +101,10 @@ export const REFUSAL_MESSAGES: Readonly<Record<RefusalCode, RefusalTemplate>> = 
   channel_limit: {
     template: 'Your plan allows {n} channel{s}. Remove one to add another.',
     fallback: "You have reached your plan's channel limit. Remove one to add another.",
+  },
+  members_editor_seats_full: {
+    template: 'No editor seats left. Remove an editor or change your plan.',
+    fallback: 'No editor seats left. Remove an editor or change your plan.',
   },
 });
 

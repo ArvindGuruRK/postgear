@@ -41,9 +41,13 @@ import {
   MAX_CAPTION_LENGTH,
   MAX_HANDLE_LENGTH,
   MAX_LIST_ITEMS,
+  MAX_SCHEDULE_ROWS,
+  MAX_SCHEDULE_TEXT_LENGTH,
   MAX_SLIDES,
   MAX_TEXT_LENGTH,
+  MAX_TIME_ZONE_LENGTH,
   SLOT_IDS,
+  TWITCH_LOGIN_PATTERN,
 } from './types';
 import { isKnownFont } from './typography';
 
@@ -136,10 +140,55 @@ export const designFontsSchema = z
   })
   .strict();
 
+/**
+ * One day of a schedule (Sprint 13): three short lines of plain text and the
+ * Off mark. One line each, because a row is one line on the picture.
+ */
+export const scheduleRowSchema = z
+  .object({
+    day: oneLine(MAX_SCHEDULE_TEXT_LENGTH),
+    time: oneLine(MAX_SCHEDULE_TEXT_LENGTH),
+    title: oneLine(MAX_SCHEDULE_TEXT_LENGTH),
+    off: z.boolean().optional(),
+  })
+  .strict();
+
+/** An ISO date, "2026-11-23", that is a real day of the calendar. */
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a date like 2026-11-23.')
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }, 'Enter a date like 2026-11-23.');
+
+/**
+ * Where a schedule design's week came from (Sprint 13). The zone is checked
+ * for shape only (a name the engine's `Intl` may not know falls back to UTC
+ * when it is drawn): the API, which fetches with it, checks it against
+ * `Intl.supportedValuesOf` itself.
+ */
+export const scheduleSourceSchema = z
+  .object({
+    source: z.enum(['twitch', 'manual']),
+    login: z.string().regex(TWITCH_LOGIN_PATTERN, 'That is not a Twitch name.').nullable(),
+    timeZone: z
+      .string()
+      .min(1)
+      .max(MAX_TIME_ZONE_LENGTH)
+      .regex(/^[A-Za-z0-9_+\-/]+$/, 'That is not a time zone.'),
+    weekStart: isoDate,
+    fetchedAt: z.string().datetime().nullable(),
+    hour12: z.boolean(),
+    vacationUntil: z.string().datetime().nullable().optional(),
+  })
+  .strict();
+
 export const elementStateSchema = z
   .object({
     text: plainText.optional(),
     items: z.array(plainText).max(MAX_LIST_ITEMS).optional(),
+    rows: z.array(scheduleRowSchema).max(MAX_SCHEDULE_ROWS).optional(),
     mediaId: rowId.nullable().optional(),
     hidden: z.boolean().optional(),
     offset: z
@@ -227,6 +276,9 @@ export const designSlideSchema = z
       if (state.items && slot.maxItems !== undefined && state.items.length > slot.maxItems) {
         issue([id, 'items'], `That list holds up to ${slot.maxItems} items.`);
       }
+      if (state.rows !== undefined && slot.kind !== 'rows') {
+        issue([id, 'rows'], 'That element is not a schedule.');
+      }
       if (state.mediaId !== undefined && slot.kind !== 'image' && slot.kind !== 'logo') {
         issue([id, 'mediaId'], 'That element does not hold a picture.');
       }
@@ -305,6 +357,7 @@ export const designDocumentSchema = z
     handle: oneLine(MAX_HANDLE_LENGTH).default(''),
     caption: z.string().max(MAX_CAPTION_LENGTH).transform(clean),
     slides: z.array(designSlideSchema).min(1).max(MAX_SLIDES),
+    schedule: scheduleSourceSchema.optional(),
   })
   .strict()
   .superRefine((document, context) => {
@@ -386,6 +439,9 @@ const UPGRADE_STEPS: Record<number, UpgradeStep> = {
     fonts: null,
     brand: isRecord(document.brand) ? { ...document.brand, fonts: null } : document.brand,
   }),
+  // 3 (Sprint 13) added the `rows` slot and the optional schedule source. A
+  // design saved before has neither, so it moves up untouched.
+  2: (document) => ({ ...document, schemaVersion: 3 }),
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

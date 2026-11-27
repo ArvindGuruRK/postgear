@@ -45,16 +45,23 @@
  * still has the final say, and its message is shown if it disagrees. A save
  * or delete is announced (`announcePostsChanged`), so the calendar or queue
  * under the modal shows it at once.
+ *
+ * ## Editors (Sprint 13, Module 14)
+ *
+ * An Editor saves drafts only (`composerAccess`): the time, Next Available,
+ * Repeat and the split button are not drawn, Save As Draft is the main
+ * action, and a faded Add To Calendar says why with the one sentence. A
+ * scheduled post they open is read only. The API refuses the rest with
+ * `editor_forbidden`, whose sentence is the toast.
  */
-import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { ExpandIcon } from '@animateicons/react/lucide/expand-icon';
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { GlobeIcon } from '@animateicons/react/lucide/globe-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
-import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { ShrinkIcon } from '@animateicons/react/lucide/shrink-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
+import { EDITOR_FORBIDDEN_SENTENCE } from '@postgear/entitlements';
 import {
   documentFromText,
   settingsFieldsFor,
@@ -82,10 +89,6 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   MotionIcon,
   Tabs,
   TabsList,
@@ -111,15 +114,20 @@ import { announcePostsChanged } from '@/lib/post-events';
 import type { Channel, ProviderSummary } from '@/types/channel';
 import type { MediaItem } from '@/types/media';
 import type { PostDetail, PostPart } from '@/types/post';
+import { useOptionalWorkspace } from '../navigation/workspace-provider';
 import { ViewPublishedPost, viewPublishedLabel } from '../posts/view-published-post';
 import { buildReport, queueBlockers, renderDraftParts } from './channel-report';
 import { AiLabelControl, postHasVideo } from './composer-ai-label';
 import { ComposerChannels } from './composer-channels';
 import { fetchNextSlot, NextAvailableButton, type SlotPick, slotText } from './composer-next-slot';
 import { RepeatControl } from './composer-repeat';
+import { SaveActions } from './composer-save-actions';
 import { SettingsBar, type SettingsBlock } from './composer-settings';
 import {
+  composerAccess,
   composerReducer,
+  EDITOR_FORBIDDEN_CODE,
+  EDITOR_SCHEDULED_NOTICE,
   effectiveParts,
   initialComposerState,
   isCustomized,
@@ -210,6 +218,7 @@ export function Composer({
 }: ComposerProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const role = useOptionalWorkspace()?.role ?? null;
 
   const channelsById = useMemo(
     () => new Map(channels.map((channel) => [channel.id, channel])),
@@ -331,7 +340,9 @@ export function Composer({
   const blockers = queueBlockers(reports);
   const dirty = isDirty(state);
   const publishDate = isValidPublishAt(state.publishAt) ? new Date(state.publishAt) : null;
-  const locked = state.savedState === 'PUBLISHED';
+  // Published posts are read only to everyone; an Editor also reads, and does
+  // not change, a post that is not a draft (Module 14).
+  const { draftsOnly, published, locked } = composerAccess(role, state.savedState);
   // With no channel connected the post can still be written and previewed
   // (2026-10-21): only saving and scheduling wait, via `noChannels` below.
   // What the right-hand preview shows then is the general one.
@@ -516,7 +527,9 @@ export function Composer({
       } catch (cause) {
         const message =
           cause instanceof ApiError
-            ? cause.message
+            ? cause.code === EDITOR_FORBIDDEN_CODE
+              ? EDITOR_FORBIDDEN_SENTENCE
+              : cause.message
             : 'The post could not be saved. Please try again.';
 
         // The API's settings check names the channel ("YouTube (Acme): ..."):
@@ -610,9 +623,8 @@ export function Composer({
   const scopeChannel = state.scope === SHARED ? null : channelsById.get(state.scope);
   const queued = state.savedState === 'QUEUE';
   const noChannels = state.selected.length === 0;
-  const title = locked ? 'Published Post' : state.group ? 'Edit Post' : 'Create Post';
+  const title = published ? 'Published Post' : state.group ? 'Edit Post' : 'Create Post';
   const newPostHref = `/${orgId}/composer`;
-  const busy = saving !== null;
   const primaryLabel =
     saving === 'QUEUE'
       ? 'Saving…'
@@ -687,14 +699,14 @@ export function Composer({
           <div className="flex h-16 shrink-0 items-center gap-3 border-b-2 border-outline px-5">
             <DialogTitle className="truncate text-xl">{title}</DialogTitle>
             {state.group ? (
-              <Badge variant={locked ? 'success' : 'primary'}>
-                {locked ? 'Published' : queued ? 'Queued' : 'Draft'}
+              <Badge variant={published ? 'success' : 'primary'}>
+                {published ? 'Published' : queued ? 'Queued' : 'Draft'}
               </Badge>
             ) : null}
             <div className="ms-auto flex shrink-0 items-center gap-2">
               {/* A published post takes no template, so its place goes to
                   the post itself, on its platform (2026-11-14). */}
-              {locked && state.published.length > 0 ? (
+              {published && state.published.length > 0 ? (
                 <ViewPublishedPost
                   links={state.published}
                   className={buttonVariants({ variant: 'secondary', size: 'sm' })}
@@ -752,9 +764,13 @@ export function Composer({
           >
             {loadError ? <Alert variant="danger">{loadError}</Alert> : null}
 
-            {locked ? (
+            {published ? (
               <Alert variant="warning">
                 This post has been published. It can be read here but no longer changed.
+              </Alert>
+            ) : locked ? (
+              <Alert variant="warning" data-testid="composer-editor-locked">
+                {EDITOR_SCHEDULED_NOTICE}
               </Alert>
             ) : null}
 
@@ -988,11 +1004,14 @@ export function Composer({
             onTagDeleted={(tagId) => dispatch({ type: 'tagDeleted', tagId })}
             disabled={locked}
           />
-          <RepeatControl
-            value={state.intervalInDays}
-            onChange={(value) => dispatch({ type: 'setRepeat', value })}
-            disabled={locked}
-          />
+          {/* Repeating is scheduling: not for an Editor (Module 14). */}
+          {draftsOnly ? null : (
+            <RepeatControl
+              value={state.intervalInDays}
+              onChange={(value) => dispatch({ type: 'setRepeat', value })}
+              disabled={locked}
+            />
+          )}
           {postHasVideo(state.shared, state.custom) || state.madeWithAi ? (
             <AiLabelControl
               value={state.madeWithAi}
@@ -1053,66 +1072,42 @@ export function Composer({
             </button>
           ) : null}
 
-          <NextAvailableButton
-            channels={selectedChannels}
-            disabled={locked}
-            onPick={(at, seed) => {
-              const value = toLocalInputValue(at);
-              dispatch({ type: 'setPublishAt', value });
-              setSlotPick({ seed, channelIds: [...state.selected], value });
-            }}
-            onError={(message) => toast({ variant: 'danger', title: message })}
+          {/* The time and Next Available (Module 13) are scheduling, which an
+              Editor does not do (Module 14): their drafts keep the default time. */}
+          {draftsOnly ? null : (
+            <>
+              <NextAvailableButton
+                channels={selectedChannels}
+                disabled={locked}
+                onPick={(at, seed) => {
+                  const value = toLocalInputValue(at);
+                  dispatch({ type: 'setPublishAt', value });
+                  setSlotPick({ seed, channelIds: [...state.selected], value });
+                }}
+                onError={(message) => toast({ variant: 'danger', title: message })}
+              />
+
+              <PublishAt
+                value={state.publishAt}
+                onChange={(value) => dispatch({ type: 'setPublishAt', value })}
+                disabled={locked}
+                channelId={state.selected[0] ?? null}
+                group={state.group}
+              />
+            </>
+          )}
+
+          <SaveActions
+            draftsOnly={draftsOnly}
+            saving={saving}
+            locked={locked}
+            noChannels={noChannels}
+            queued={queued}
+            primaryLabel={primaryLabel}
+            onSaveDraft={() => void save('DRAFT')}
+            onSchedule={() => void save('QUEUE')}
+            onPostNow={() => void save('QUEUE', { publishNow: true })}
           />
-
-          <PublishAt
-            value={state.publishAt}
-            onChange={(value) => dispatch({ type: 'setPublishAt', value })}
-            disabled={locked}
-            channelId={state.selected[0] ?? null}
-            group={state.group}
-          />
-
-          {/* Nothing to save until there is somewhere to post it: the main
-              button says so, the reference's "check the circles above". */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Button
-              variant="secondary"
-              onClick={() => void save('DRAFT')}
-              disabled={busy || locked || noChannels}
-              className="px-4 sm:px-6"
-            >
-              {saving === 'DRAFT' ? 'Saving…' : queued ? 'Move To Drafts' : 'Save As Draft'}
-            </Button>
-
-            {/* The reference's split button: the main action, and a chevron
-                for publishing at once. */}
-            <div className="flex">
-              <Button
-                onClick={() => void save('QUEUE')}
-                disabled={busy || locked || noChannels}
-                className="rounded-e-none px-4 sm:min-w-40 sm:px-6"
-              >
-                {primaryLabel}
-              </Button>
-              <DropdownMenu modal>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    aria-label="More ways to publish"
-                    disabled={busy || locked || noChannels}
-                    className="rounded-s-none border-s-0 px-2.5"
-                  >
-                    <MotionIcon icon={ChevronDownIcon} strokeWidth={3} className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="end" className="w-44">
-                  <DropdownMenuItem onSelect={() => void save('QUEUE', { publishNow: true })}>
-                    <MotionIcon icon={SendIcon} className="h-4 w-4" />
-                    Post Now
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
         </div>
       </div>
 

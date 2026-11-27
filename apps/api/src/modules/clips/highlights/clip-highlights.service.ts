@@ -201,7 +201,7 @@ export class ClipHighlightsService {
       const charge = await this.usage.consume(orgId, AI_MINUTES_METER, price, {
         idempotencyKey: signalsChargeKey(jobId),
         refId: jobId,
-        meta: { step: 'signals', videoId: video.id },
+        meta: { step: 'signals', videoId: video.id, by: userId },
       });
 
       const outcome = await serializable(async (tx) => {
@@ -329,7 +329,7 @@ export class ClipHighlightsService {
       const read = await this.usage.consume(orgId, AI_MINUTES_METER, line('read'), {
         idempotencyKey: readChargeKey(jobId),
         refId: jobId,
-        meta: { step: 'read', videoId: video.id },
+        meta: { step: 'read', videoId: video.id, by: userId },
       });
       let state = read.state;
       let signalsEntry: string | null = null;
@@ -337,7 +337,7 @@ export class ClipHighlightsService {
         const signals = await this.usage.consume(orgId, AI_MINUTES_METER, line('signals'), {
           idempotencyKey: signalsChargeKey(jobId),
           refId: jobId,
-          meta: { step: 'signals', videoId: video.id },
+          meta: { step: 'signals', videoId: video.id, by: userId },
         });
         signalsEntry = signals.entryId;
         state = signals.state;
@@ -348,7 +348,7 @@ export class ClipHighlightsService {
         const action = await this.usage.consume(orgId, AI_MINUTES_METER, line('action'), {
           idempotencyKey: actionChargeKey(jobId),
           refId: jobId,
-          meta: { step: 'action', videoId: video.id },
+          meta: { step: 'action', videoId: video.id, by: userId },
         });
         actionEntry = action.entryId;
         state = action.state;

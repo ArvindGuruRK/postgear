@@ -50,6 +50,7 @@ export const TIER_SEED: Readonly<Record<Tier, TierValues>> = Object.freeze({
     'clips.downloads_per_day': 5,
     'clips.queue_priority': 'low',
     'clips.browse_channels': 1,
+    'members.editors_max': 0,
   }),
   STANDARD: Object.freeze({
     'clips.enabled': true,
@@ -65,6 +66,7 @@ export const TIER_SEED: Readonly<Record<Tier, TierValues>> = Object.freeze({
     'clips.downloads_per_day': 20,
     'clips.queue_priority': 'normal',
     'clips.browse_channels': 3,
+    'members.editors_max': 1,
   }),
   PRO: Object.freeze({
     'clips.enabled': true,
@@ -80,6 +82,7 @@ export const TIER_SEED: Readonly<Record<Tier, TierValues>> = Object.freeze({
     'clips.downloads_per_day': 20,
     'clips.queue_priority': 'normal',
     'clips.browse_channels': 5,
+    'members.editors_max': 3,
   }),
   TEAM: Object.freeze({
     'clips.enabled': true,
@@ -95,6 +98,7 @@ export const TIER_SEED: Readonly<Record<Tier, TierValues>> = Object.freeze({
     'clips.downloads_per_day': 50,
     'clips.queue_priority': 'high',
     'clips.browse_channels': 10,
+    'members.editors_max': 10,
   }),
   ULTIMATE: Object.freeze({
     'clips.enabled': true,
@@ -110,6 +114,7 @@ export const TIER_SEED: Readonly<Record<Tier, TierValues>> = Object.freeze({
     'clips.downloads_per_day': 100,
     'clips.queue_priority': 'high',
     'clips.browse_channels': 20,
+    'members.editors_max': 25,
   }),
 });
 

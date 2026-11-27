@@ -97,6 +97,8 @@ export interface GroupWrite {
    * workflow step writes `AUTOMATION`.
    */
   creationMethod?: 'WEB' | 'AUTOMATION';
+  /** Sprint 13 Module 14: the person who saved, on created rows only (an edit never changes it). */
+  createdById?: string;
   channels: {
     integrationId: string;
     customized: boolean;
@@ -785,6 +787,7 @@ export class PostsRepository {
             madeWithAi: data.madeWithAi ?? false,
             group: write.group,
             creationMethod: write.creationMethod ?? 'WEB',
+            ...(write.createdById ? { createdById: write.createdById } : {}),
             organization: { connect: { id: write.orgId } },
             // The workspace and liveness are part of the connect, not just a
             // check the service made earlier: a channel from another workspace,

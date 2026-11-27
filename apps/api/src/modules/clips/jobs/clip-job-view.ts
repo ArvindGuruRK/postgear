@@ -15,6 +15,7 @@ import {
   type ClipPlatformId,
   clipErrorMessage,
   estimateEtaSeconds,
+  isEmoteTooBigSentence,
   jobLabel,
   type ProgressSample,
   type RecipeSkip,
@@ -76,6 +77,8 @@ export function errorOf(raw: unknown): ClipError | null {
       | undefined;
     return { code, message: clipErrorMessage(code, platform) };
   }
+  // Module 14: the too-big sentence names the site and the size; only one we write is kept.
+  if (code === 'emote_too_big' && isEmoteTooBigSentence(message)) return { code, message };
   return { code, message: clipErrorMessage(code) };
 }
 
@@ -134,6 +137,16 @@ function resultOf(kind: ClipJobKind, raw: unknown): ClipJobView['result'] {
         clipId: value.clipId,
         skipped: value.skipped.map((skip) => ({ part: skip.part, reason: skip.reason })),
         noSpeech: value.noSpeech,
+      };
+    }
+    case 'EMOTE': {
+      const value = output as z.infer<(typeof CLIP_JOB_OUTPUT_SCHEMAS)['EMOTE']>;
+      // Module 14: counts only; the files and their links come from GET /clips/emotes/:jobId.
+      return {
+        platform: value.platform,
+        files: value.files.length,
+        kept: value.files.filter((file) => file.fits).length,
+        sharp: value.sharp,
       };
     }
   }

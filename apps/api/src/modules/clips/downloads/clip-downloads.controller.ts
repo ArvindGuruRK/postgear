@@ -3,7 +3,7 @@
  * no public downloader route or page, and none may be added (research 07,
  * "What We Never Do").
  *
- * `@Roles(ADMIN, USER)`: any member of the workspace downloads. Every
+ * `@Roles(ADMIN, USER, EDITOR)`: any member of the workspace downloads. Every
  * handler scopes on `@CurrentOrg()`; a job id from the URL is checked
  * against the workspace and the kind in the service, so another
  * workspace's download, or a job of another kind, is a plain 404.
@@ -49,7 +49,7 @@ import { type StartDownloadInput, startDownloadSchema } from './clip-downloads.s
 import { ClipDownloadsService } from './clip-downloads.service';
 
 @Controller('clips/downloads')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipDownloadsController {

@@ -20,6 +20,7 @@ jest.mock('@postgear/db', () => ({
       count: jest.fn(),
       delete: jest.fn(),
       upsert: jest.fn(),
+      update: jest.fn(),
     },
   },
 }));
@@ -30,7 +31,10 @@ import { prisma } from '@postgear/db';
 import type { EntitlementsService } from '../billing/entitlements.service';
 import type { MailService } from '../mail/mail.service';
 import type { RedisService } from '../redis/redis.service';
+import type { EditorSeatsService } from './editor-seats.service';
 import { InviteTokenService } from './invite-token.service';
+import { securityLogger } from '../../common/logging/security-logger';
+import { EntitlementRefusedException } from '../entitlements/entitlement-refused.exception';
 import { INVITE_MESSAGES, OrgService } from './org.service';
 
 type PrismaMock = {
@@ -44,6 +48,7 @@ type PrismaMock = {
     count: jest.Mock;
     delete: jest.Mock;
     upsert: jest.Mock;
+    update: jest.Mock;
   };
 };
 
@@ -61,6 +66,7 @@ interface Harness {
   mail: { sendWorkspaceInvitation: jest.Mock; linkTo: jest.Mock; sendActivation: jest.Mock };
   entitlements: { startTrial: jest.Mock };
   redis: { get: jest.Mock; rawClient: { set: jest.Mock; del: jest.Mock } | null };
+  seats: { assertRoom: jest.Mock; state: jest.Mock };
 }
 
 function harness(options: { redis?: 'up' | 'none' } = {}): Harness {
@@ -77,13 +83,15 @@ function harness(options: { redis?: 'up' | 'none' } = {}): Harness {
     rawClient:
       options.redis === 'none' ? null : { set: jest.fn().mockResolvedValue('OK'), del: jest.fn() },
   };
+  const seats = { assertRoom: jest.fn().mockResolvedValue(undefined), state: jest.fn() };
   const service = new OrgService(
     mail as unknown as MailService,
     entitlements as unknown as EntitlementsService,
     tokens,
     redis as unknown as RedisService,
+    seats as unknown as EditorSeatsService,
   );
-  return { service, mail, entitlements, redis };
+  return { service, mail, entitlements, redis, seats };
 }
 
 beforeEach(() => {
@@ -575,6 +583,183 @@ describe('OrgService.removeMember', () => {
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 'user-bob' },
       data: { onboardingCompletedAt: null, onboardingStep: 1 },
+    });
+  });
+});
+
+describe('Editor seats and member events (Module 14)', () => {
+  const refused = new EntitlementRefusedException(
+    'members_editor_seats_full',
+    'No editor seats left. Remove an editor or change your plan.',
+  );
+  let log: jest.SpyInstance;
+
+  beforeEach(() => {
+    log = jest.spyOn(securityLogger, 'log').mockImplementation(() => undefined);
+    prismaMock.userOrganization.findFirst.mockResolvedValue(null);
+    prismaMock.userOrganization.create.mockResolvedValue({ id: 'm-new' });
+    prismaMock.user.updateMany.mockResolvedValue({ count: 0 });
+  });
+
+  afterEach(() => log.mockRestore());
+
+  it('checks a seat softly when an Editor is invited, and not for a member', async () => {
+    const { service, seats } = harness();
+    await service.createInvite('org-1', 'user-admin', {
+      role: 'EDITOR',
+      sendEmail: false,
+      email: 'ed@example.com',
+    });
+    expect(seats.assertRoom).toHaveBeenCalledWith('org-1');
+
+    seats.assertRoom.mockClear();
+    await service.createInvite('org-1', 'user-admin', { role: 'USER', sendEmail: false });
+    expect(seats.assertRoom).not.toHaveBeenCalled();
+  });
+
+  it('refuses an Editor invite with no seat left, before any link exists', async () => {
+    const { service, seats, mail } = harness();
+    seats.assertRoom.mockRejectedValue(refused);
+    await expect(
+      service.createInvite('org-1', 'user-admin', {
+        role: 'EDITOR',
+        sendEmail: true,
+        email: 'ed@example.com',
+      }),
+    ).rejects.toBe(refused);
+    expect(mail.linkTo).not.toHaveBeenCalled();
+    expect(mail.sendWorkspaceInvitation).not.toHaveBeenCalled();
+  });
+
+  it('round-trips an Editor link bound to its address, and the mail names the role', async () => {
+    const { service, mail } = harness();
+    const { url } = await service.createInvite('org-1', 'user-admin', {
+      role: 'EDITOR',
+      sendEmail: true,
+      email: 'Ed@Example.com',
+    });
+    const verified = tokens.verify(url.split('/invite/')[1]);
+    expect(verified).toMatchObject({
+      ok: true,
+      payload: { role: 'EDITOR', email: 'ed@example.com' },
+    });
+    expect(mail.sendWorkspaceInvitation).toHaveBeenCalledWith(
+      'ed@example.com',
+      expect.objectContaining({ role: 'EDITOR' }),
+    );
+    expect(log).toHaveBeenCalledWith('member.invited', {
+      actorId: 'user-admin',
+      orgId: 'org-1',
+      role: 'EDITOR',
+      emailed: true,
+    });
+  });
+
+  it('checks the seat again at accept, inside the transaction that writes the membership', async () => {
+    const { service, seats } = harness();
+    const { token } = tokens.sign({ orgId: 'org-1', role: 'EDITOR', email: 'ada@example.com' });
+
+    await expect(service.acceptInvite(token, ada)).resolves.toEqual({ ...ORG, role: 'EDITOR' });
+
+    expect(seats.assertRoom).toHaveBeenCalledWith('org-1', prismaMock);
+    expect(prismaMock.userOrganization.create).toHaveBeenCalledWith({
+      data: { userId: 'user-ada', organizationId: 'org-1', role: 'EDITOR' },
+    });
+    expect(log).toHaveBeenCalledWith('member.joined', {
+      actorId: 'user-ada',
+      targetId: 'user-ada',
+      orgId: 'org-1',
+      role: 'EDITOR',
+    });
+  });
+
+  it('refuses the accept with the seat sentence and frees the link for later', async () => {
+    const { service, seats, redis } = harness();
+    seats.assertRoom.mockRejectedValue(refused);
+    const { token } = tokens.sign({ orgId: 'org-1', role: 'EDITOR', email: 'ada@example.com' });
+
+    await expect(service.acceptInvite(token, ada)).rejects.toBe(refused);
+    expect(prismaMock.userOrganization.create).not.toHaveBeenCalled();
+    expect(redis.rawClient?.del).toHaveBeenCalled();
+  });
+
+  it("refuses an Editor link opened by a different account's address", async () => {
+    const { service, seats } = harness();
+    const { token } = tokens.sign({ orgId: 'org-1', role: 'EDITOR', email: 'ed@example.com' });
+
+    await expect(service.acceptInvite(token, ada)).rejects.toThrow(INVITE_MESSAGES.WRONG_EMAIL);
+    expect(seats.assertRoom).not.toHaveBeenCalled();
+  });
+
+  it('still accepts links signed before Editors existed (ADMIN or USER)', async () => {
+    const { service, seats } = harness();
+    const { token } = tokens.sign({ orgId: 'org-1', role: 'USER' });
+
+    await expect(service.acceptInvite(token, ada)).resolves.toEqual({ ...ORG, role: 'USER' });
+    expect(seats.assertRoom).not.toHaveBeenCalled();
+  });
+
+  it('takes a seat under the lock when a member becomes an Editor', async () => {
+    const { service, seats } = harness();
+    prismaMock.userOrganization.findFirst.mockResolvedValue({
+      id: 'm-2',
+      role: 'USER',
+      disabled: false,
+    });
+
+    await service.changeRole('org-1', 'user-bob', 'EDITOR' as never, 'user-admin');
+
+    expect(seats.assertRoom).toHaveBeenCalledWith('org-1', prismaMock, 'user-bob');
+    expect(prismaMock.userOrganization.update).toHaveBeenCalledWith({
+      where: { id: 'm-2' },
+      data: { role: 'EDITOR' },
+    });
+    expect(log).toHaveBeenCalledWith('member.role_changed', {
+      actorId: 'user-admin',
+      targetId: 'user-bob',
+      orgId: 'org-1',
+      role: 'EDITOR',
+      from: 'USER',
+    });
+  });
+
+  it('refuses the role change when no seat is left, changing nothing', async () => {
+    const { service, seats } = harness();
+    seats.assertRoom.mockRejectedValue(refused);
+    prismaMock.userOrganization.findFirst.mockResolvedValue({
+      id: 'm-2',
+      role: 'USER',
+      disabled: false,
+    });
+
+    await expect(service.changeRole('org-1', 'user-bob', 'EDITOR' as never)).rejects.toBe(refused);
+    expect(prismaMock.userOrganization.update).not.toHaveBeenCalled();
+  });
+
+  it('needs no new seat for an Editor who stays an Editor, or one who leaves the role', async () => {
+    const { service, seats } = harness();
+    prismaMock.userOrganization.findFirst.mockResolvedValue({
+      id: 'm-2',
+      role: 'EDITOR',
+      disabled: false,
+    });
+    await service.changeRole('org-1', 'user-bob', 'EDITOR' as never);
+    await service.changeRole('org-1', 'user-bob', 'USER' as never);
+    expect(seats.assertRoom).not.toHaveBeenCalled();
+  });
+
+  it('logs a removal with its actor and the removed role', async () => {
+    const { service } = harness();
+    prismaMock.userOrganization.findFirst.mockResolvedValue({ id: 'm-2', role: 'EDITOR' });
+    prismaMock.userOrganization.count.mockResolvedValue(1);
+
+    await service.removeMember('org-1', 'user-bob', 'user-admin');
+
+    expect(log).toHaveBeenCalledWith('member.removed', {
+      actorId: 'user-admin',
+      targetId: 'user-bob',
+      orgId: 'org-1',
+      role: 'EDITOR',
     });
   });
 });

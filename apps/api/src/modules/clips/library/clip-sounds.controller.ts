@@ -66,7 +66,7 @@ class SoundTooBigFilter implements ExceptionFilter {
 }
 
 @Controller('clips/sounds')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipSoundsController {

@@ -14,6 +14,7 @@ import { ArrowUp10Icon } from '@animateicons/react/lucide/arrow-up-1-0-icon';
  */
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { XIcon } from '@animateicons/react/lucide/x-icon';
+import { canSchedule } from '@postgear/entitlements';
 import {
   Alert,
   Badge,
@@ -40,6 +41,7 @@ import { toSummary } from '@/components/calendar/calendar-view';
 import { ChannelSelect } from '@/components/channels/channel-select';
 import type { Channel } from '@/types/channel';
 import type { PostSummary, QueuePage } from '@/types/post';
+import { useWorkspace } from '../navigation/workspace-provider';
 import { DeletePostDialog } from '../posts/delete-post-dialog';
 import { PostDetailDialog } from '../posts/post-detail-dialog';
 import { RescheduleDialog } from '../posts/reschedule-dialog';
@@ -77,6 +79,9 @@ export function QueueView({
   const queue = useQueue(initialPage, new URLSearchParams(initialParams));
   const actions = usePostActions();
   const mounted = useMounted();
+  // An Editor (Module 14) reads the queue: no Post Now or Reschedule, and
+  // Delete for drafts only. Opening a post in the composer stays.
+  const draftsOnly = !canSchedule(useWorkspace().role);
 
   const [open, setOpen] = useState<PostSummary | null>(null);
   const [rescheduling, setRescheduling] = useState<PostSummary | null>(null);
@@ -273,6 +278,7 @@ export function QueueView({
                   post={post}
                   now={queue.now}
                   onOpen={setOpen}
+                  draftsOnly={draftsOnly}
                   onPublishNow={(target) => void publishNow(target)}
                   onReschedule={setRescheduling}
                   onDelete={setDeleting}
@@ -297,6 +303,7 @@ export function QueueView({
         post={open}
         now={queue.now}
         busy={actions.busy !== null}
+        draftsOnly={draftsOnly}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         onPublishNow={(post) => void publishNow(post)}
         onReschedule={setRescheduling}

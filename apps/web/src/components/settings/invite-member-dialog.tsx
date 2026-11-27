@@ -12,6 +12,15 @@
  * Nobody joins until they open the link and accept, so this dialog never
  * says anyone "was added".
  *
+ * ## Editors (Sprint 13, Module 14)
+ *
+ * The role is the form's main choice, so it is `ChoiceTiles`: Member, Admin,
+ * Editor. Picking Editor says what an Editor may do, makes the address
+ * required (the API binds an Editor link to it) and shows the plan's seats
+ * from `GET /orgs/:id/seats`. With none left, sending is blocked and the
+ * dialog says why; the API's 402 says the same if it refuses anyway (a seat
+ * taken in another tab).
+ *
  * ## When the clipboard refuses
  *
  * Writing to the clipboard after a network round trip can be refused (an
@@ -19,9 +28,11 @@
  * dialog, selectable, rather than lost: it is the only copy the admin gets.
  */
 import { CopyIcon } from '@animateicons/react/lucide/copy-icon';
+import { isEditor } from '@postgear/entitlements';
 import {
   Button,
   Checkbox,
+  ChoiceTiles,
   Dialog,
   DialogClose,
   DialogContent,
@@ -35,19 +46,23 @@ import {
   FormLabel,
   Input,
   MotionIcon,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Stack,
   Text,
   toast,
 } from '@postgear/ui';
 import { type FormEvent, useEffect, useId, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
-import type { InviteLink, InviteRole } from '@/types/team';
-import { INVITE_ROLES, inviteEmailProblem } from './team-view-model';
+import type { EditorSeats, InviteLink, InviteRole, SeatsResponse } from '@/types/team';
+import {
+  EDITOR_EMAIL_HELP,
+  EDITOR_ROLE_LINE,
+  EDITOR_SEATS_FULL,
+  editorSeatLine,
+  editorSeatsFull,
+  INVITE_ROLES,
+  inviteEmailProblem,
+  refusalMessage,
+} from './team-view-model';
 
 interface InviteMemberDialogProps {
   open: boolean;
@@ -70,27 +85,47 @@ export function InviteMemberDialog({
   const [error, setError] = useState<string | null>(null);
   /** Set only when the clipboard refused: the link to copy by hand. */
   const [uncopied, setUncopied] = useState<string | null>(null);
+  /** The plan's Editor seats; null until read, or when they could not be (the API still checks). */
+  const [seats, setSeats] = useState<EditorSeats | null>(null);
 
-  // A fresh form each time it opens.
+  // A fresh form each time it opens, with the seats as they are now.
   useEffect(() => {
-    if (open) {
-      setEmail('');
-      setRole('USER');
-      setSendEmail(true);
-      setWorking(false);
-      setError(null);
-      setUncopied(null);
+    if (!open) {
+      return;
     }
-  }, [open]);
+
+    setEmail('');
+    setRole('USER');
+    setSendEmail(true);
+    setWorking(false);
+    setError(null);
+    setUncopied(null);
+    setSeats(null);
+
+    let live = true;
+    api<SeatsResponse>(`/orgs/${orgId}/seats`)
+      .then((response) => {
+        if (live) setSeats(response.editors);
+      })
+      .catch(() => {
+        // No seat line then; the invite itself is still checked by the API.
+      });
+    return () => {
+      live = false;
+    };
+  }, [open, orgId]);
+
+  const editor = isEditor(role);
+  const seatsFull = editorSeatsFull(role, seats);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (working) {
+    if (working || seatsFull) {
       return;
     }
 
-    const problem = inviteEmailProblem(email, sendEmail);
+    const problem = inviteEmailProblem(email, sendEmail, role);
     if (problem) {
       setError(problem);
       return;
@@ -127,7 +162,9 @@ export function InviteMemberDialog({
         setUncopied(url);
       }
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'We could not create the invitation.');
+      setError(
+        cause instanceof ApiError ? refusalMessage(cause) : 'We could not create the invitation.',
+      );
     } finally {
       setWorking(false);
     }
@@ -193,7 +230,7 @@ export function InviteMemberDialog({
 
             <Stack gap="md" className="mt-4">
               <FormField>
-                <FormLabel htmlFor={`${id}-email`} required={sendEmail}>
+                <FormLabel htmlFor={`${id}-email`} required={sendEmail || editor}>
                   Email
                 </FormLabel>
                 <Input
@@ -201,13 +238,15 @@ export function InviteMemberDialog({
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="teammate@company.com"
+                  placeholder="Enter your teammate's email"
                   autoComplete="off"
                   autoFocus
                   variant={error ? 'error' : 'default'}
                 />
                 {error ? (
                   <FormErrorMessage>{error}</FormErrorMessage>
+                ) : editor ? (
+                  <FormHelperText>{EDITOR_EMAIL_HELP}</FormHelperText>
                 ) : sendEmail ? null : (
                   <FormHelperText>
                     Optional. When set, only this address can use the link.
@@ -216,21 +255,30 @@ export function InviteMemberDialog({
               </FormField>
 
               <FormField>
-                <FormLabel htmlFor={`${id}-role`}>Role</FormLabel>
-                {/* Radix Select is always modal (it has no `modal` prop to turn
-                    off), so its list sits above the dialog and takes focus. */}
-                <Select value={role} onValueChange={(value) => setRole(value as InviteRole)}>
-                  <SelectTrigger id={`${id}-role`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INVITE_ROLES.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormLabel id={`${id}-role`}>Role</FormLabel>
+                <ChoiceTiles
+                  labelledBy={`${id}-role`}
+                  options={INVITE_ROLES}
+                  value={role}
+                  onValueChange={(next: InviteRole) => {
+                    setRole(next);
+                    setError(null);
+                  }}
+                />
+                {editor ? (
+                  <div className="flex flex-col gap-1" data-testid="invite-editor-notes">
+                    <FormHelperText>{EDITOR_ROLE_LINE}</FormHelperText>
+                    {seatsFull ? (
+                      <FormErrorMessage data-testid="invite-seats">
+                        {EDITOR_SEATS_FULL}
+                      </FormErrorMessage>
+                    ) : seats ? (
+                      <FormHelperText data-testid="invite-seats">
+                        {editorSeatLine(seats)}
+                      </FormHelperText>
+                    ) : null}
+                  </div>
+                ) : null}
               </FormField>
 
               <label htmlFor={`${id}-send`} className="flex items-center gap-3">
@@ -254,7 +302,7 @@ export function InviteMemberDialog({
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={working}>
+              <Button type="submit" disabled={working || seatsFull}>
                 {working ? 'Creating…' : sendEmail ? 'Send Invitation' : 'Copy Link'}
               </Button>
             </DialogFooter>

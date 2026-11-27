@@ -130,10 +130,17 @@ function titleDuration(value: string): string {
 export interface InvitationProps {
   workspaceName: string;
   inviterName: string;
-  role: 'ADMIN' | 'USER';
+  /** Sprint 13 Module 14 adds the Editor seat. */
+  role: 'ADMIN' | 'USER' | 'EDITOR';
   link: string;
   expiresAt: Date;
 }
+
+const INVITE_ROLE_NAMES: Record<InvitationProps['role'], { name: string; article: string }> = {
+  ADMIN: { name: 'Admin', article: 'an admin' },
+  USER: { name: 'Member', article: 'a member' },
+  EDITOR: { name: 'Editor', article: 'an editor' },
+};
 
 export function workspaceInvitationEmail(
   context: EmailContext,
@@ -141,8 +148,7 @@ export function workspaceInvitationEmail(
 ): RenderedEmail {
   const workspace = oneLine(props.workspaceName, LIMITS.name) || 'a workspace';
   const inviter = oneLine(props.inviterName, LIMITS.name) || 'Someone';
-  const roleName = props.role === 'ADMIN' ? 'Admin' : 'Member';
-  const article = props.role === 'ADMIN' ? 'an admin' : 'a member';
+  const { name: roleName, article } = INVITE_ROLE_NAMES[props.role] ?? INVITE_ROLE_NAMES.USER;
   const expires = props.expiresAt.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',

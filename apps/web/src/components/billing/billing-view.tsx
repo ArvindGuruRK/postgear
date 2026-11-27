@@ -27,6 +27,7 @@
  * is read once on mount and then cleared with `history.replaceState`, so a
  * reload does not replay it and the island is not remounted.
  */
+import { canManageBilling } from '@postgear/entitlements';
 import {
   Alert,
   AlertDescription,
@@ -83,7 +84,7 @@ export function BillingView({
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { role } = useWorkspace();
-  const canManage = role !== 'USER';
+  const canManage = canManageBilling(role);
 
   const [data, setData] = useState<SubscriptionResponse | null>(initial);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -307,8 +308,8 @@ export function BillingView({
       {status?.mode === 'simulation' ? (
         <Alert data-testid="billing-simulated">
           <AlertDescription>
-            Billing is simulated (<code className="font-bold">BILLING_SIMULATION=true</code>): no card
-            is charged and no Stripe account is used. Checkout, plan changes and cancellations
+            Billing is simulated (<code className="font-bold">BILLING_SIMULATION=true</code>): no
+            card is charged and no Stripe account is used. Checkout, plan changes and cancellations
             still run through the real webhook handler, a second or two later.
           </AlertDescription>
         </Alert>

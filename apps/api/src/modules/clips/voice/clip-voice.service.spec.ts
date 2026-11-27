@@ -267,7 +267,7 @@ describe('ClipVoiceService.make', () => {
     expect(usage.consume).toHaveBeenCalledWith(TEST_ORG, 'clips.ai_minutes_per_month', 1, {
       idempotencyKey: key,
       refId: tables.jobs[0]?.id,
-      meta: { step: 'voice', clipId: CLIP },
+      meta: { step: 'voice', clipId: CLIP, by: TEST_USER },
     });
   });
 

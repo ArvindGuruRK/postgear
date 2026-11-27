@@ -26,6 +26,7 @@
  */
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
+import { canManageApiKeys } from '@postgear/entitlements';
 import {
   Badge,
   Button,
@@ -77,7 +78,7 @@ interface ApiKeysManagerProps {
 
 export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
   const { role } = useWorkspace();
-  const canManage = role !== 'USER';
+  const canManage = canManageApiKeys(role);
   const mounted = useMounted();
 
   const [keys, setKeys] = useState<ApiKeyView[] | null>(initialKeys);
@@ -97,7 +98,8 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
     } catch (cause) {
       toast({
         title: "Couldn't refresh the list",
-        description: cause instanceof ApiError ? cause.message : 'Reload the page to see the latest keys.',
+        description:
+          cause instanceof ApiError ? cause.message : 'Reload the page to see the latest keys.',
       });
     }
   }
@@ -105,7 +107,12 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
   return (
     <Stack gap="lg">
       <PageActions>
-        <Link href={docs} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5">
+        <Link
+          href={docs}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5"
+        >
           API reference
           <MotionIcon icon={ExternalLinkIcon} className="h-4 w-4" />
         </Link>
@@ -145,7 +152,9 @@ export function ApiKeysManager({ initialKeys }: ApiKeysManagerProps) {
           icon={KeyRound}
           title="No API keys yet"
           description="Create a key to call the PostGear API from your own code: list channels, create posts, read analytics."
-          action={canManage ? { label: 'Create Key', onClick: () => setCreateOpen(true) } : undefined}
+          action={
+            canManage ? { label: 'Create Key', onClick: () => setCreateOpen(true) } : undefined
+          }
         />
       ) : (
         <Table>

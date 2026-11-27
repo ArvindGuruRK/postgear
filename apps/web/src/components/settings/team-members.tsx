@@ -18,7 +18,13 @@
  *
  * The role comes from `useWorkspace()` and is presentation only; the API
  * refuses anything the page should not have offered, and that refusal (the
- * last-admin rule included) is shown as a toast.
+ * last-admin rule and the Editor seat cap included) is shown as a toast.
+ *
+ * ## Editor seats (Sprint 13, Module 14)
+ *
+ * Admins read `GET /orgs/:id/seats` here too: after a downgrade that leaves
+ * more Editors than the plan allows, a warning says how many to remove.
+ * Nobody is disabled; new Editors are refused until the count fits.
  *
  * ## Which workspace
  *
@@ -38,6 +44,7 @@
  */
 import { UserPlusIcon } from '@animateicons/react/lucide/user-plus-icon';
 import {
+  Alert,
   Button,
   Card,
   ErrorState,
@@ -54,9 +61,9 @@ import {
 } from '@postgear/ui';
 import { Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError, api } from '@/lib/api';
-import type { InviteRole, TeamMember } from '@/types/team';
+import type { EditorSeats, InviteRole, SeatsResponse, TeamMember } from '@/types/team';
 import { useWorkspace } from '../navigation/workspace-provider';
 import { UserAvatar } from '../profile/user-avatar';
 import { InviteMemberDialog } from './invite-member-dialog';
@@ -68,7 +75,9 @@ import {
   canManageTeam,
   canRemove,
   displayName,
+  editorsOverCap,
   INVITE_ROLES,
+  refusalMessage,
   roleLabel,
   roleWithArticle,
 } from './team-view-model';
@@ -94,6 +103,30 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
   const [leaveOpen, setLeaveOpen] = useState(false);
   /** Rows with a role change in flight, so a second pick waits for the first. */
   const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
+  /** Admins only: the plan's Editor seats, for the over-the-cap warning. */
+  const [seats, setSeats] = useState<EditorSeats | null>(null);
+
+  // Read again when the invite dialog closes or the list changes, since both
+  // can move the count.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a changed `members` list is the reload trigger
+  useEffect(() => {
+    if (!canManage || inviteOpen) {
+      return;
+    }
+    let live = true;
+    api<SeatsResponse>(`/orgs/${orgId}/seats`)
+      .then((response) => {
+        if (live) setSeats(response.editors);
+      })
+      .catch(() => {
+        // No warning then: it is advice, and the API enforces the cap.
+      });
+    return () => {
+      live = false;
+    };
+  }, [canManage, inviteOpen, orgId, members]);
+
+  const overCap = seats ? editorsOverCap(seats) : null;
 
   async function refresh() {
     try {
@@ -144,7 +177,7 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
     } catch (cause) {
       setRoleLocally(member.userId, previous);
       toast({
-        title: cause instanceof ApiError ? cause.message : 'We could not change that role.',
+        title: cause instanceof ApiError ? refusalMessage(cause) : 'We could not change that role.',
         variant: 'danger',
       });
     } finally {
@@ -165,6 +198,12 @@ export function TeamMembers({ orgId, initialMembers, currentUserId }: TeamMember
             Invite Member
           </Button>
         </PageActions>
+      ) : null}
+
+      {overCap ? (
+        <Alert variant="warning" data-testid="team-editors-over-cap">
+          {overCap}
+        </Alert>
       ) : null}
 
       {members === null ? (

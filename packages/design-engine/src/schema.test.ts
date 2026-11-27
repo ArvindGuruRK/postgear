@@ -448,18 +448,30 @@ describe('upgrade', () => {
     expect(upgrade(value)).toEqual(value);
   });
 
-  it('moves a version 1 design to version 2 by adding no art and no fonts, and nothing else', () => {
+  it('moves a version 1 design up by adding no art and no fonts, and nothing else', () => {
     const stored = structuredClone(VERSION_1);
 
+    // Version 2 added the art and the fonts; version 3 (Sprint 13) added
+    // nothing a design must hold, so the version number is all it changes.
     expect(upgrade(VERSION_1)).toEqual({
       ...VERSION_1,
-      schemaVersion: 2,
+      schemaVersion: 3,
       art: null,
       fonts: null,
       brand: { ...VERSION_1.brand, fonts: null },
     });
     // The stored row is only read, never changed in place.
     expect(VERSION_1).toEqual(stored);
+  });
+
+  it('moves a version 2 design to version 3 untouched but for the number', () => {
+    const version2 = { ...structuredClone(document()), schemaVersion: 2 };
+    const upgraded = upgrade(version2) as DesignDocument;
+
+    expect(DESIGN_SCHEMA_VERSION).toBe(3);
+    expect(upgraded).toEqual({ ...version2, schemaVersion: 3 });
+    expect(upgraded).not.toHaveProperty('schedule');
+    expect(parseDesignDocument(version2)).toEqual({ ...document(), schemaVersion: 3 });
   });
 
   it('reads a version 1 design as the same design at the current version', () => {
@@ -506,5 +518,116 @@ describe('parseDesignDocument', () => {
   it('reports a version failure as a result rather than a throw, when asked safely', () => {
     const result = safeParseDesignDocument({ schemaVersion: 99 });
     expect(result.ok).toBe(false);
+  });
+});
+
+/**
+ * Sprint 13, the Schedule Maker: the `rows` slot and the design's schedule
+ * source are as strict as everything else a browser may send.
+ */
+describe('schedules', () => {
+  const week = () => [
+    { day: 'Mon', time: '7 PM', title: 'Minecraft' },
+    { day: 'Tue', time: '', title: '', off: true },
+    { day: 'Wed', time: '8 PM', title: 'Just Chatting' },
+    { day: 'Thu', time: '', title: '', off: true },
+    { day: 'Fri', time: '7 PM', title: 'Minecraft, 10 PM Chat' },
+    { day: 'Sat', time: '3 PM', title: 'Variety' },
+    { day: 'Sun', time: '', title: '', off: true },
+  ];
+
+  const source = () => ({
+    source: 'twitch' as const,
+    login: 'simstreamer',
+    timeZone: 'Asia/Kolkata',
+    weekStart: '2026-11-23',
+    fetchedAt: '2026-11-28T10:00:00.000Z',
+    hour12: true,
+  });
+
+  function scheduleDesign(rows: unknown = week(), schedule: unknown = source()): unknown {
+    counter = 0;
+    const base = documentFromPreset({
+      presetId: 'schedule-week-clean-blue',
+      format: 'portrait',
+      newId: stableId,
+    });
+    const slide = base.slides[0];
+    return {
+      ...base,
+      schedule,
+      slides: [{ ...slide, elements: { ...slide.elements, schedule: { rows } } }],
+    };
+  }
+
+  it('accepts a week of seven rows and its source', () => {
+    const result = designDocumentSchema.safeParse(scheduleDesign());
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.schedule?.timeZone).toBe('Asia/Kolkata');
+      expect(result.data.slides[0].elements.schedule?.rows).toHaveLength(7);
+    }
+  });
+
+  it('refuses eight rows', () => {
+    expect(accepts(scheduleDesign([...week(), { day: 'Mon', time: '', title: 'Extra' }]))).toBe(
+      false,
+    );
+  });
+
+  it('refuses a title longer than a row can hold', () => {
+    const rows = week();
+    rows[0] = { ...rows[0], title: 'x'.repeat(201) };
+    expect(accepts(scheduleDesign(rows))).toBe(false);
+    rows[0] = { ...rows[0], title: 'x'.repeat(200) };
+    expect(accepts(scheduleDesign(rows))).toBe(true);
+  });
+
+  it('refuses a row with a field it does not know, or a field of the wrong kind', () => {
+    const extra = week();
+    (extra[0] as Record<string, unknown>).color = '#FF0000';
+    expect(accepts(scheduleDesign(extra))).toBe(false);
+
+    const wrong = week();
+    (wrong[0] as Record<string, unknown>).off = 'yes';
+    expect(accepts(scheduleDesign(wrong))).toBe(false);
+  });
+
+  it('reads a pasted line break in a row as a space', () => {
+    const rows = week();
+    rows[0] = { ...rows[0], title: 'Minecraft\nHardcore' };
+    const result = designDocumentSchema.safeParse(scheduleDesign(rows));
+    expect(result.success && result.data.slides[0].elements.schedule?.rows?.[0].title).toBe(
+      'Minecraft Hardcore',
+    );
+  });
+
+  it('refuses rows on an element that is not a schedule', () => {
+    const value = document();
+    (value.slides[0].elements as Record<string, unknown>).headline = { rows: week() };
+    expect(accepts(value)).toBe(false);
+  });
+
+  it('refuses a source with an unknown field, a bad login, zone or date', () => {
+    expect(accepts(scheduleDesign(week(), { ...source(), extra: true }))).toBe(false);
+    expect(accepts(scheduleDesign(week(), { ...source(), login: 'No Spaces Allowed' }))).toBe(
+      false,
+    );
+    expect(accepts(scheduleDesign(week(), { ...source(), timeZone: '../../etc' }))).toBe(false);
+    expect(accepts(scheduleDesign(week(), { ...source(), weekStart: '2026-02-30' }))).toBe(false);
+    expect(accepts(scheduleDesign(week(), { ...source(), source: 'kick' }))).toBe(false);
+    expect(
+      accepts(
+        scheduleDesign(week(), { ...source(), source: 'manual', login: null, fetchedAt: null }),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a break, and no break, on the source', () => {
+    expect(
+      accepts(scheduleDesign(week(), { ...source(), vacationUntil: '2026-11-30T00:00:00.000Z' })),
+    ).toBe(true);
+    expect(accepts(scheduleDesign(week(), { ...source(), vacationUntil: null }))).toBe(true);
+    expect(accepts(scheduleDesign(week(), { ...source(), vacationUntil: 'soon' }))).toBe(false);
   });
 });

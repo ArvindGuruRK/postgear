@@ -183,6 +183,8 @@ describe.each(LAYOUTS.map((layout) => [layoutKey(layout), layout] as const))('%s
       brandName: 'brandName',
       handle: 'handle',
       pageNumber: 'slideNumber',
+      // Sprint 13: a schedule's zone line is the design's, worked out from its schedule.
+      ...(layout.role === 'schedule' ? { subheadline: 'scheduleZone' as const } : {}),
     };
 
     for (const slot of layout.slots) {
@@ -215,7 +217,15 @@ describe.each(LAYOUTS.map((layout) => [layoutKey(layout), layout] as const))('%s
         expect(slot.alignable).toBeFalsy();
         expect(slot.colorable).toBeFalsy();
       }
-      if (slot.kind === 'text' || slot.kind === 'list') expect(slot.type).toBeDefined();
+      if (slot.kind === 'text' || slot.kind === 'list' || slot.kind === 'rows') {
+        expect(slot.type).toBeDefined();
+      }
+      if (slot.kind === 'rows') {
+        expect(slot.id).toBe('schedule');
+        expect(slot.resizable || slot.alignable || slot.colorable).toBeFalsy();
+      } else {
+        expect(slot.columns).toBeUndefined();
+      }
       if (slot.defaultHidden) expect(slot.optional).toBe(true);
       expect(slot.label.trim()).not.toBe('');
     }
@@ -471,5 +481,72 @@ describe('the Signature family', () => {
     }
 
     expect(clashes).toEqual([]);
+  });
+});
+
+/**
+ * Sprint 13's stream week. The rules above already hold it to everything
+ * every layout keeps; these pin what Module 14 promises: the six slots, the
+ * zone line, one column of seven in a tall shape and two in a landscape.
+ */
+describe('the schedule layout', () => {
+  const week = () => {
+    const layout = findLayout('schedule-week@1');
+    if (!layout) throw new Error('schedule-week@1 is missing.');
+    return layout;
+  };
+
+  it('is schedule-week@1, the schedule role, and draws in every format', () => {
+    const layout = week();
+    expect(layoutKey(layout)).toBe('schedule-week@1');
+    expect(layout.role).toBe('schedule');
+    expect(defaultLayoutFor('schedule')).toBe(layout);
+    expect([...layout.formats].sort()).toEqual([...FORMAT_IDS].sort());
+  });
+
+  it('is not offered by Add Slide, whose roles stay the six it had', () => {
+    expect(SLIDE_ROLES).not.toContain('schedule');
+  });
+
+  it('has the six slots, with the eyebrow hidden and the zone line bound', () => {
+    const layout = week();
+    expect(layout.slots.map((slot) => slot.id).sort()).toEqual(
+      ['eyebrow', 'handle', 'headline', 'logo', 'schedule', 'subheadline'].sort(),
+    );
+    expect(findSlot(layout, 'eyebrow')?.defaultHidden).toBe(true);
+    expect(findSlot(layout, 'subheadline')?.bind).toBe('scheduleZone');
+    expect(findSlot(layout, 'schedule')?.kind).toBe('rows');
+    expect(findSlot(layout, 'handle')?.bind).toBe('handle');
+  });
+
+  it('fills one column of seven in a tall shape and two in a landscape', () => {
+    const rows = findSlot(week(), 'schedule');
+    expect(rows?.columns?.landscape).toBe(2);
+    for (const format of ['square', 'portrait', 'story'] as FormatId[]) {
+      expect(rows?.columns?.[format] ?? 1).toBe(1);
+    }
+  });
+
+  it('gives each portrait row about a ninth of the week, and keeps the headline top left', () => {
+    const layout = week();
+    const rows = findSlot(layout, 'schedule');
+    const headline = findSlot(layout, 'headline');
+    if (!rows || !headline) throw new Error('The week is missing a slot.');
+
+    const portrait = slotFrame(layout, rows, 'portrait', null);
+    const perRow = (portrait?.rect.h ?? 0) / 7;
+    // A row and its gap, as a share of the slide. The brief says about twelve
+    // percent; the header and the footer take their share first, so a row is
+    // about eight percent here (107 pixels of a 1350 pixel portrait).
+    expect(perRow).toBeGreaterThan(7);
+    expect(perRow).toBeLessThan(13);
+
+    for (const format of ['portrait', 'landscape'] as FormatId[]) {
+      const top = slotFrame(layout, headline, format, null)?.rect;
+      const body = slotFrame(layout, rows, format, null)?.rect;
+      if (!top || !body) throw new Error(`No frame in ${format}.`);
+      expect(top.x).toBeLessThan(20);
+      expect(top.y + top.h).toBeLessThanOrEqual(body.y);
+    }
   });
 });

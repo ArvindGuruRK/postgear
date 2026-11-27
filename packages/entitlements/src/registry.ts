@@ -32,6 +32,7 @@
  * app imports it to lock tiles and draw meters.
  */
 import { CLIPS_ENTITLEMENTS } from './keys/clips';
+import { MEMBERS_ENTITLEMENTS } from './keys/members';
 
 /** What a limit is measured in, for display and for the operator's editor. */
 export type EntitlementUnit = 'minutes' | 'gigabytes' | 'days' | 'count' | 'credits' | 'none';
@@ -43,7 +44,7 @@ export type EntitlementUnit = 'minutes' | 'gigabytes' | 'days' | 'count' | 'cred
 export type EntitlementScope = 'plan' | 'org' | 'both';
 
 /** The module a key belongs to; the operator's Plans table groups rows by it. */
-export type EntitlementGroup = 'clips';
+export type EntitlementGroup = 'clips' | 'members';
 
 /** Singular and plural nouns for a count ("1 download", "5 downloads"). */
 export interface CountNoun {
@@ -137,6 +138,7 @@ export type EntitlementValue = boolean | number | string | null;
  */
 export const REGISTRY = {
   ...CLIPS_ENTITLEMENTS,
+  ...MEMBERS_ENTITLEMENTS,
 } as const;
 
 /** A registry key. */

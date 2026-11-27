@@ -16,6 +16,7 @@
  * the same box as plain text, saying who to ask, rather than a button that
  * would end in a 403.
  */
+import { canManageChannels } from '@postgear/entitlements';
 import { cn } from '@postgear/ui';
 import { Radio } from 'lucide-react';
 import { useState } from 'react';
@@ -43,7 +44,9 @@ function Message({ children }: { children: string }) {
 export function NoChannelsNotice({ providers }: { providers: ProviderSummary[] }) {
   const { role } = useWorkspace();
   const [open, setOpen] = useState(false);
-  const canConnect = role === 'ADMIN' || role === 'SUPERADMIN';
+  // Admin only, as before Module 14 (`canManageChannels`): Editors and
+  // members both see who to ask.
+  const canConnect = canManageChannels(role);
 
   if (!canConnect) {
     return (

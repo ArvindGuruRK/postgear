@@ -1,4 +1,4 @@
-import { findPages, MAX_PAGE_RESULTS, quickActions, SEARCH_PAGES } from './search-pages';
+import { findPages, MAX_PAGE_RESULTS, pagesFor, quickActions, SEARCH_PAGES } from './search-pages';
 
 const ids = (query: string) => findPages(query).map((page) => page.id);
 
@@ -54,5 +54,21 @@ describe('findPages', () => {
 describe('quickActions', () => {
   it('is create post and connect a channel', () => {
     expect(quickActions().map((page) => page.id)).toEqual(['create-post', 'connect-channel']);
+  });
+});
+
+describe('pagesFor', () => {
+  it('does not offer an Editor the pages it may not open (Module 14)', () => {
+    const ids = pagesFor('EDITOR').map((page) => page.id);
+    for (const closed of ['analytics', 'seo', 'channels', 'billing', 'api-keys', 'webhooks']) {
+      expect(ids).not.toContain(closed);
+    }
+    expect(quickActions(pagesFor('EDITOR')).map((page) => page.id)).toEqual(['create-post']);
+    expect(ids).toContain('media');
+  });
+
+  it('offers admins and members every page', () => {
+    expect(pagesFor('ADMIN')).toEqual(SEARCH_PAGES);
+    expect(pagesFor('USER')).toEqual(SEARCH_PAGES);
   });
 });

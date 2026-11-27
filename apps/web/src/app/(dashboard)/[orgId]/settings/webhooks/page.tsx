@@ -6,10 +6,12 @@
  * hooks request renders a retry rather than an empty list, and a failed
  * channels request leaves the filter empty rather than breaking the page.
  */
+import { canManageWebhooks } from '@postgear/entitlements';
 import type { Metadata } from 'next';
 import { WebhooksView } from '@/components/webhooks/webhooks-view';
 import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
+import { getWorkspaceRole } from '@/lib/workspace-role';
 import type { Channel } from '@/types/channel';
 import type { WebhookView } from '@/types/webhooks';
 
@@ -27,14 +29,12 @@ export default async function WebhooksPage({ params }: PageProps<'/[orgId]/setti
   const { orgId } = await params;
   const cookie = await getSessionCookieHeader();
 
-  const [hooks, channels, me] = await Promise.all([
+  const [hooks, channels, role] = await Promise.all([
     serverApi<WebhooksResponse>('/webhooks', { cookie }).catch(() => null),
     serverApi<{ channels: Channel[] }>('/channels', { cookie })
       .then((result) => result.channels)
       .catch(() => [] as Channel[]),
-    serverApi<{ organizations: { id: string; role: string }[] }>('/orgs', { cookie })
-      .then((result) => result.organizations.find((organization) => organization.id === orgId) ?? null)
-      .catch(() => null),
+    getWorkspaceRole(orgId),
   ]);
 
   // Whether http:// / private addresses are allowed is the API's setting,
@@ -44,7 +44,7 @@ export default async function WebhooksPage({ params }: PageProps<'/[orgId]/setti
     <WebhooksView
       initialWebhooks={hooks?.webhooks ?? null}
       channels={channels}
-      canManage={me ? me.role !== 'USER' : false}
+      canManage={canManageWebhooks(role)}
       allowHttp={hooks?.allowPrivateUrls ?? false}
       retryPolicy={hooks?.retryPolicy ?? null}
     />

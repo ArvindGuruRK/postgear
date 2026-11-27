@@ -3,7 +3,7 @@
  *
  * ## Membership, not admin
  *
- * `@Roles(ADMIN, USER)` at the class level makes an active membership mandatory
+ * `@Roles(ADMIN, USER, EDITOR)` at the class level makes an active membership mandatory
  * for every route (without it, a route resolves the workspace only
  * opportunistically), while leaving content work open to every member. Writing
  * posts and managing their images is what a `USER` is for; channel management
@@ -66,7 +66,7 @@ const UPLOAD_OPTIONS = {
 };
 
 @Controller('media')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class MediaController {
   constructor(private readonly media: MediaService) {}
 

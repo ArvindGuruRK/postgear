@@ -23,7 +23,7 @@ export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.USER)
+  @Roles(Role.ADMIN, Role.USER, Role.EDITOR)
   async summary(
     @CurrentOrg() org: ActiveOrg,
     @Query(new ZodQuery(dashboardQuerySchema, 'dashboard/summary')) query: DashboardQuery,

@@ -75,7 +75,7 @@ import { ClipSendService } from './clip-send.service';
 import { ClipsListService } from './clips-list.service';
 
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipItemController {
@@ -251,11 +251,12 @@ export class ClipItemController {
   @Post(':clipId/send')
   @HttpCode(HttpStatus.CREATED)
   send(
+    @CurrentUser() user: AuthenticatedUser,
     @CurrentOrg() org: ActiveOrg,
     @Param('clipId') clipId: string,
     @Body(new ZodBody(sendClipSchema, 'clips/send')) body: SendClipInput,
   ) {
-    return this.sender.send(org.id, clipId, body);
+    return this.sender.send(org.id, clipId, body, { userId: user.id, role: org.role });
   }
 
   /** `{ preview }`: the newest preview with a signed address while its file is kept, or null. */

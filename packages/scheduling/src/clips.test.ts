@@ -1,4 +1,13 @@
-import { clipStorageOverLine } from './clips';
+import {
+  CLIP_EMOTE_STAGES,
+  CLIP_EMOTE_WORKFLOW,
+  CLIP_JOB_QUEUES,
+  CLIP_JOB_TIMEOUTS_MS,
+  CLIP_JOB_WORKFLOWS,
+  CLIP_NON_RETRYABLE,
+  clipStorageOverLine,
+  MEDIA_TASK_QUEUE,
+} from './clips';
 
 describe('clipStorageOverLine (Module 19)', () => {
   it('rounds like the space meter beside it, so the two agree', () => {
@@ -20,5 +29,21 @@ describe('clipStorageOverLine (Module 19)', () => {
 
   it('never prints a negative or broken number', () => {
     expect(clipStorageOverLine(Number.NaN, -1)).toContain("use 0 GB, over your plan's 0 GB");
+  });
+});
+
+describe('the EMOTE kind (Module 14)', () => {
+  it('runs clipEmoteWorkflow on the media queue within thirty minutes', () => {
+    expect(CLIP_JOB_WORKFLOWS.EMOTE).toBe(CLIP_EMOTE_WORKFLOW);
+    expect(CLIP_EMOTE_WORKFLOW).toBe('clipEmoteWorkflow');
+    expect(CLIP_JOB_QUEUES.EMOTE).toBe(MEDIA_TASK_QUEUE);
+    expect(CLIP_JOB_TIMEOUTS_MS.EMOTE).toBe(30 * 60_000);
+    expect([...CLIP_EMOTE_STAGES]).toEqual(['fetching', 'encoding', 'finishing']);
+  });
+
+  it('never retries an emote that is too big, too long or out of range', () => {
+    expect(CLIP_NON_RETRYABLE).toEqual(
+      expect.arrayContaining(['emote_too_big', 'emote_too_long', 'emote_range_invalid']),
+    );
   });
 });

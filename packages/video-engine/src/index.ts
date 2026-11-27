@@ -24,6 +24,7 @@
  * - `render/`: `frameState` (the one definition of what is on screen),
  *   `buildRenderPlan`, `compileFfmpeg` and `buildAss`.
  * - `recipes/`: Sprint 13 (Module 10): recipes, the five starters, applying one.
+ * - `emotes/`: Sprint 13 (Module 14): the Emote Maker's site profiles, size ladder and encode plan.
  * - `brand/`: Sprint 13 (Module 10): the brand kit for clips (logo, intro, outro).
  * - `jobs.ts`, `errors.ts`, `quality.ts`, `export.ts`, `pricing.ts`, `assets.ts`, `library.ts`: the
  *   contracts the API, the worker and the web share.
@@ -37,6 +38,7 @@ export * from './cleanup';
 export * from './document';
 export * from './downloads';
 export * from './effects';
+export * from './emotes';
 export * from './errors';
 export * from './export';
 export * from './highlights';

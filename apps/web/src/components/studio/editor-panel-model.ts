@@ -204,6 +204,12 @@ export function elementPreview(
     const items = document.slides[slideIndex]?.elements[slot.id]?.items ?? [];
     return flat(items.find((item) => item.trim() !== '') ?? '');
   }
+  if (slot.kind === 'rows') {
+    // Sprint 13, a schedule: its first day with a stream.
+    const rows = document.slides[slideIndex]?.elements[slot.id]?.rows ?? [];
+    const first = rows.find((row) => !row.off);
+    return first ? flat(`${first.day} ${first.time} ${first.title}`) : '';
+  }
   return '';
 }
 

@@ -2,19 +2,8 @@
 
 // Per-icon subpaths rather than the `lucide` barrel, so dev compiles the
 // rail's icons and not all of them.
-import { CalendarDaysIcon } from '@animateicons/react/lucide/calendar-days-icon';
-import { ClapperboardIcon } from '@animateicons/react/lucide/clapperboard-icon';
-import { ChartColumnIcon } from '@animateicons/react/lucide/chart-column-icon';
-import { CompassIcon } from '@animateicons/react/lucide/compass-icon';
-import { HouseIcon } from '@animateicons/react/lucide/house-icon';
-import { ImageIcon } from '@animateicons/react/lucide/image-icon';
-import { ListOrderedIcon } from '@animateicons/react/lucide/list-ordered-icon';
-import { PaletteIcon } from '@animateicons/react/lucide/palette-icon';
-import { SearchIcon } from '@animateicons/react/lucide/search-icon';
 import { SettingsIcon } from '@animateicons/react/lucide/settings-icon';
-import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
-import { WorkflowIcon } from '@animateicons/react/lucide/workflow-icon';
-import { type AnimatedIcon, cn } from '@postgear/ui';
+import { cn } from '@postgear/ui';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useState } from 'react';
 import { NotificationBell } from '../notifications/notification-bell';
@@ -23,46 +12,15 @@ import { AccountMenu } from './account-menu';
 import { AppShell } from './app-shell';
 import { DayStreak } from './day-streak';
 import { immersion } from './immersion';
+import { railFor } from './rail';
 import type { SidebarItem } from './sidebar';
+import { useOptionalWorkspace } from './workspace-provider';
 
 // Client wrapper around AppShell so [orgId]/layout.tsx can stay a server
 // component: the only thing that needs the client here is `usePathname`, which
 // decides both which rail entry is active and what the top bar is titled.
 // Deriving the title from the route keeps every page from having to pass one
 // up through the layout, which App Router gives no clean way to do.
-
-/**
- * The rail's sections: Home first (2026-10-19, the Buffer-style dashboard
- * and the page sign-in lands on), then the reference's order: the calendar,
- * the AI (its "Agent"), then the read-and-manage pages. `label` is what fits
- * under a 20px icon in a 64px tile; the top bar shows the page's full name.
- *
- * Studio (Sprint 9) sits right after Media: it makes the images Media keeps.
- * Clips (Sprint 12) follows Studio: long videos into short clips, the other
- * maker of things to post.
- * Workflows (Sprint 10) follows Clips: it puts the other pages to work.
- * Discover (Sprint 11) follows Workflows: what to post about, where the
- * audience is. On a phone the first four stay in the tab bar and the rest,
- * Discover among them, open from More (`TabBar` in sidebar.tsx).
- *
- * Composer and Channels are not here, as in the reference: both are reached
- * from the calendar's channel card (Create Post, Add Channel, the channels
- * page button and each channel's menu) and from Home, and their routes stay
- * as they were.
- */
-const RAIL: Array<{ segment: string; label: string; icon: AnimatedIcon; desktopOnly?: boolean }> = [
-  { segment: 'home', label: 'Home', icon: HouseIcon },
-  { segment: 'calendar', label: 'Calendar', icon: CalendarDaysIcon },
-  { segment: 'ai-copilot', label: 'Copilot', icon: SparklesIcon },
-  { segment: 'queue', label: 'Queue', icon: ListOrderedIcon },
-  { segment: 'analytics', label: 'Analytics', icon: ChartColumnIcon },
-  { segment: 'media', label: 'Media', icon: ImageIcon },
-  { segment: 'studio', label: 'Studio', icon: PaletteIcon },
-  { segment: 'clips', label: 'Clips', icon: ClapperboardIcon, desktopOnly: true },
-  { segment: 'workflows', label: 'Workflows', icon: WorkflowIcon },
-  { segment: 'discover', label: 'Discover', icon: CompassIcon },
-  { segment: 'seo-analyzer', label: 'SEO', icon: SearchIcon },
-];
 
 /** The top bar's h1 for each top-level page. */
 const TITLES: Record<string, string> = {
@@ -86,6 +44,7 @@ const FULL_BLEED = new Set(['calendar']);
 
 export function DashboardShell({ orgId, children }: { orgId: string; children: ReactNode }) {
   const pathname = usePathname();
+  const role = useOptionalWorkspace()?.role ?? null;
   const base = `/${orgId}`;
   // `/acme/settings/billing` → `settings/billing`, whose segment is
   // `settings`; the org's own root → ''.
@@ -119,7 +78,7 @@ export function DashboardShell({ orgId, children }: { orgId: string; children: R
     );
   }
 
-  const navItems: SidebarItem[] = RAIL.map((item) => ({
+  const navItems: SidebarItem[] = railFor(role).map((item) => ({
     label: item.label,
     href: `${base}/${item.segment}`,
     animatedIcon: item.icon,

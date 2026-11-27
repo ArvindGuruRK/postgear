@@ -4,7 +4,7 @@
  *
  * `/clips/brand-kits` is a word route: `ClipBrandKitsModule` is imported by
  * `ClipsModule` before `ClipItemModule`, so `GET /clips/:clipId` never
- * swallows it (`clips-routes.spec.ts`). `@Roles(ADMIN, USER)` like every
+ * swallows it (`clips-routes.spec.ts`). `@Roles(ADMIN, USER, EDITOR)` like every
  * Clips route: any member sets the kit's clip fields (Studio lets any member
  * edit a kit too), scoped by `@CurrentOrg()`.
  */
@@ -28,7 +28,7 @@ import { type ClipBrandKitPatch, clipBrandKitPatchSchema } from './clip-brand-ki
 import { ClipBrandKitsService } from './clip-brand-kits.service';
 
 @Controller('clips/brand-kits')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipBrandKitsController {
   constructor(private readonly kits: ClipBrandKitsService) {}

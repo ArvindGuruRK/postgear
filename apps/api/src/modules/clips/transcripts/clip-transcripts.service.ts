@@ -251,7 +251,7 @@ export class ClipTranscriptsService {
       const charge = await this.usage.consume(orgId, AI_MINUTES_METER, price, {
         idempotencyKey: listenChargeKey(jobId),
         refId: jobId,
-        meta: { step: 'listen', videoId: video.id },
+        meta: { step: 'listen', videoId: video.id, by: userId },
       });
 
       const outcome = await serializable(async (tx) => {

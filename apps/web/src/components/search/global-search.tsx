@@ -28,6 +28,7 @@
  *   every template into every page's top bar.
  */
 import { SearchIcon } from '@animateicons/react/lucide/search-icon';
+import { canViewChannels } from '@postgear/entitlements';
 import {
   Badge,
   Command,
@@ -61,11 +62,12 @@ import type {
   PostSearchResult,
   SearchKind,
 } from '@/types/search';
+import { useOptionalWorkspace } from '../navigation/workspace-provider';
 import { designFormat, designHref, thumbSize } from './design-results';
 import { Highlight, termsOf } from './highlight';
 import { PageIcon } from './page-icon';
 import { clearRecent, readRecent, rememberSearch } from './recent-searches';
-import { findPages, quickActions, type SearchPage } from './search-pages';
+import { findPages, pagesFor, quickActions, type SearchPage } from './search-pages';
 import { cleanQuery, MAX_SEARCH_LENGTH, MIN_SEARCH_LENGTH, useWorkspaceSearch } from './use-search';
 
 const FOCUS =
@@ -112,6 +114,9 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
 
   const cleaned = cleanQuery(query);
   const search = useWorkspaceSearch(query, open);
+  // What this role may open (Module 14): an Editor is not offered Analytics and the like.
+  const role = useOptionalWorkspace()?.role ?? null;
+  const allowed = useMemo(() => pagesFor(role), [role]);
   const terms = useMemo(() => termsOf(cleaned), [cleaned]);
 
   useEffect(() => {
@@ -180,7 +185,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
     setRecent([]);
   }
 
-  const pages = findPages(cleaned);
+  const pages = findPages(cleaned, allowed);
   const data = search.data;
   const posts = data?.posts ?? [];
   const channels = data?.channels ?? [];
@@ -219,7 +224,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
     if (recent.length > 0) {
       entries.push({ value: 'recent-clear', run: forgetRecent });
     }
-    entries.push(...quickActions().map(pageEntry));
+    entries.push(...quickActions(allowed).map(pageEntry));
   } else {
     const pageEntries = pages.map(pageEntry);
 
@@ -231,7 +236,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
       })),
       ...channels.map((channel) => ({
         value: `channel:${channel.id}`,
-        run: () => go(channelHref(base, channel)),
+        run: () => go(channelHref(base, channel, canViewChannels(role))),
       })),
       ...designs.map((design) => ({
         value: `design:${design.id}`,
@@ -344,7 +349,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
                   ) : null}
 
                   <CommandGroup heading="Quick Actions">
-                    {quickActions().map((page) => (
+                    {quickActions(allowed).map((page) => (
                       <CommandItem key={page.id} value={`page:${page.id}`} onSelect={runEntry}>
                         <PageIcon icon={page.icon} />
                         <span className="min-w-0 flex-1 truncate">{page.label}</span>
@@ -481,10 +486,11 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
   );
 }
 
-function channelHref(base: string, channel: ChannelSearchResult): string {
+function channelHref(base: string, channel: ChannelSearchResult, channelsPage: boolean): string {
   // A channel that needs attention is fixed on the Channels page; a healthy
-  // one is looked at through its posts.
-  return needsAttention(channel)
+  // one is looked at through its posts, and so is any channel for a role
+  // with no Channels page (an Editor, Module 14).
+  return channelsPage && needsAttention(channel)
     ? `${base}/channels`
     : `${base}/queue?channel=${encodeURIComponent(channel.id)}`;
 }

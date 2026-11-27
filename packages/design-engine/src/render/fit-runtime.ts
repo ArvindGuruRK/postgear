@@ -83,7 +83,9 @@ export function fitSlots(root: ParentNode): string[] {
       slot.removeAttribute('data-overflow');
     } else {
       slot.setAttribute('data-overflow', 'true');
-      overflowing.push(slot.getAttribute('data-slot') || '');
+      // A schedule's cells share their slot's id: the slot is named once.
+      const id = slot.getAttribute('data-slot') || '';
+      if (overflowing.indexOf(id) === -1) overflowing.push(id);
     }
   }
 

@@ -1,7 +1,7 @@
 /**
  * The notification routes (Sprint 8, contract §5.2).
  *
- * `@Roles(ADMIN, USER)` makes an active membership mandatory while leaving
+ * `@Roles(ADMIN, USER, EDITOR)` makes an active membership mandatory while leaving
  * every member able to read the feed; the workspace is always the one
  * `@CurrentOrg()` resolved from the cookie.
  *
@@ -32,7 +32,7 @@ import { type ListNotificationsQuery, listNotificationsQuerySchema } from './dto
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 

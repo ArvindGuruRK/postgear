@@ -1,6 +1,6 @@
 /**
  * Text To Speech (Sprint 13, Module 09), behind `CLIPS_TTS`.
- * `@Roles(ADMIN, USER)` (Editors are Module 14's decision), scoped on
+ * `@Roles(ADMIN, USER, EDITOR)`, scoped on
  * `@CurrentOrg()`: another workspace's clip is a plain 404.
  *
  * - `GET /clips/voices`: `{ enabled, voices: [{ id, name, languages, sampleUrl }] }`.
@@ -35,7 +35,7 @@ import { type MakeVoiceInput, makeVoiceSchema } from './clip-voice.schema';
 import { ClipVoiceService } from './clip-voice.service';
 
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipVoiceController {
   constructor(private readonly voice: ClipVoiceService) {}

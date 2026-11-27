@@ -204,6 +204,7 @@ const DEFAULT_LABELS: Record<SlotId, string> = {
   pageNumber: 'Slide Number',
   logo: 'Logo',
   image: 'Picture',
+  schedule: 'Schedule',
 };
 
 /** A text slot. */
@@ -270,6 +271,35 @@ export function image(options: {
     resizable: false,
     fit: options.fit ?? 'cover',
     radius: options.radius ?? 0,
+  };
+}
+
+/**
+ * The week of a schedule slide (Sprint 13): one card per day, drawn by
+ * `SlideView`'s rows slot in the theme's own inks (the day on `primary`, the
+ * rest on `surface`), so it has no colour, size or alignment of its own to
+ * offer. `columns` says how many columns the week fills in a format.
+ */
+export function rows(options: {
+  box: Rect;
+  region?: RegionId;
+  label?: string;
+  columns?: SlotDef['columns'];
+}): SlotDef {
+  return {
+    id: 'schedule',
+    kind: 'rows',
+    region: options.region ?? 'body',
+    label: options.label ?? DEFAULT_LABELS.schedule,
+    box: options.box,
+    type: 'list',
+    align: 'start',
+    colorRole: 'onSurface',
+    optional: false,
+    alignable: false,
+    colorable: false,
+    resizable: false,
+    columns: options.columns,
   };
 }
 

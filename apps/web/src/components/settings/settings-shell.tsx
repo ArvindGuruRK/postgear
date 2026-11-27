@@ -9,10 +9,18 @@ import { PlugIcon } from '@animateicons/react/lucide/plug-icon';
 import { SignatureIcon } from '@animateicons/react/lucide/signature-icon';
 import { UsersIcon } from '@animateicons/react/lucide/users-icon';
 import { WebhookIcon } from '@animateicons/react/lucide/webhook-icon';
-import { SettingsNav } from '@postgear/ui';
+import {
+  canUseDiscover,
+  canUseWorkflows,
+  canViewBilling,
+  canViewDeveloperSettings,
+  type RoleInput,
+} from '@postgear/entitlements';
+import { type AnimatedIcon, SettingsNav } from '@postgear/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useRef } from 'react';
+import { useOptionalWorkspace } from '../navigation/workspace-provider';
 
 /**
  * The two-column settings layout: the section nav on the left, the page on
@@ -21,25 +29,46 @@ import { type ReactNode, useEffect, useRef } from 'react';
  *
  * `usePathname` picks the active entry, which is why this is a client
  * component while `settings/layout.tsx` stays a server one.
+ *
+ * `allow` (Sprint 13, Module 14) hides a section from a role the capability
+ * answers no to: an Editor sees Team, Signatures, Notifications and
+ * Appearance only. Each hidden section's own layout refuses a typed address.
  */
-const SECTIONS = [
+interface SettingsSection {
+  segment: string;
+  label: string;
+  icon: AnimatedIcon;
+  allow?: (role: RoleInput) => boolean;
+}
+
+const SECTIONS: readonly SettingsSection[] = [
   { segment: 'team', label: 'Team', icon: UsersIcon },
-  { segment: 'billing', label: 'Billing', icon: CreditCardIcon },
-  { segment: 'api-keys', label: 'API Keys', icon: KeyRoundIcon },
-  { segment: 'webhooks', label: 'Webhooks', icon: WebhookIcon },
+  { segment: 'billing', label: 'Billing', icon: CreditCardIcon, allow: canViewBilling },
+  {
+    segment: 'api-keys',
+    label: 'API Keys',
+    icon: KeyRoundIcon,
+    allow: canViewDeveloperSettings,
+  },
+  { segment: 'webhooks', label: 'Webhooks', icon: WebhookIcon, allow: canViewDeveloperSettings },
   // The apps workflows use (Sprint 10); the page lives under Workflows and
   // this entry redirects there.
-  { segment: 'connections', label: 'Connections', icon: PlugIcon },
+  { segment: 'connections', label: 'Connections', icon: PlugIcon, allow: canUseWorkflows },
   // The workspace's saved sign-offs (2026-10-19), which the composer inserts.
   { segment: 'signatures', label: 'Signatures', icon: SignatureIcon },
   { segment: 'notifications', label: 'Notifications', icon: BellIcon },
   // The workspace's Discover defaults (Sprint 11): its place, languages, news
   // topics and which groups are on. Everyone reads them, admins change them.
-  { segment: 'discover', label: 'Discover', icon: CompassIcon },
+  { segment: 'discover', label: 'Discover', icon: CompassIcon, allow: canUseDiscover },
   // Per user, like Notifications: the mode and light theme follow the person
   // into every workspace.
   { segment: 'appearance', label: 'Appearance', icon: PaletteIcon },
-] as const;
+];
+
+/** The settings sections this role may open, in order. */
+export function settingsSectionsFor(role: RoleInput): readonly SettingsSection[] {
+  return SECTIONS.filter((section) => !section.allow || section.allow(role));
+}
 
 /** Pixels left beside the active tab when the phone strip scrolls to it. */
 const STRIP_PEEK = 16;
@@ -47,8 +76,9 @@ const STRIP_PEEK = 16;
 export function SettingsShell({ orgId, children }: { orgId: string; children: ReactNode }) {
   const pathname = usePathname();
   const base = `/${orgId}/settings`;
+  const role = useOptionalWorkspace()?.role ?? null;
 
-  const items = SECTIONS.map((section) => ({
+  const items = settingsSectionsFor(role).map((section) => ({
     label: section.label,
     href: `${base}/${section.segment}`,
     animatedIcon: section.icon,

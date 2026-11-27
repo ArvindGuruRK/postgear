@@ -30,7 +30,7 @@ import { type CreateMontageInput, createMontageSchema } from './clip-montages.sc
 import { ClipMontagesService } from './clip-montages.service';
 
 @Controller('clips/montages')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipMontagesController {
   constructor(private readonly montages: ClipMontagesService) {}

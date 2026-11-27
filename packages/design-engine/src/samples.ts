@@ -7,6 +7,7 @@
  * only have to show what each slot is for, in roughly the length it wants, so
  * the slide looks like a slide and not a set of empty boxes.
  */
+import { SAMPLE_WEEK } from './presets/schedule';
 import type { DesignSlide, ElementState, SlideLayout, SlotId } from './types';
 
 const SAMPLE_TEXT: Partial<Record<SlotId, string>> = {
@@ -48,6 +49,9 @@ export function sampleState(layout: SlideLayout, slotId: SlotId): ElementState |
     const items = SAMPLE_ITEMS[slot.id] ?? [];
     state.items = items.slice(0, slot.maxItems ?? items.length);
   }
+
+  // A schedule slide added in the editor starts with the gallery's sample week.
+  if (slot.kind === 'rows') state.rows = SAMPLE_WEEK.map((row) => ({ ...row }));
 
   if (slot.optional && slot.defaultHidden) state.hidden = true;
 

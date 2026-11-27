@@ -12,7 +12,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { State } from '@postgear/db';
+import { Role, State } from '@postgear/db';
 import { documentFromText } from '@postgear/social-core';
 import type { ChannelsService, ChannelView } from '../channels/channels.service';
 import type { ClipPostsService } from '../clips/clip/clip-posts.service';
@@ -21,7 +21,10 @@ import type { SchedulingService } from '../scheduling/scheduling.service';
 import type { TagsService } from '../tags/tags.service';
 import type { CreatePostInput } from './dto/posts.schema';
 import type { PostRow, PostsRepository } from './posts.repository';
+import { securityLogger } from '../../common/logging/security-logger';
 import {
+  assertEditorMayWrite,
+  type PostActor,
   PostsService,
   parseCustomized,
   parseImageIds,
@@ -984,6 +987,136 @@ describe('PostsService', () => {
           }),
         ),
       ).rejects.toThrow('Acme: This video is 16 min. YouTube takes up to 15 minutes.');
+    });
+  });
+
+  describe('an Editor (Module 14): drafts only', () => {
+    const editor: PostActor = { userId: 'u-editor', role: Role.EDITOR };
+    const member: PostActor = { userId: 'u-member', role: Role.USER };
+    const forbidden = { status: 403, response: { code: 'editor_forbidden' } };
+    let warn: jest.SpyInstance;
+
+    beforeEach(() => {
+      warn = jest.spyOn(securityLogger, 'warn').mockImplementation(() => undefined);
+      repository.findGroup.mockResolvedValue([row({ group: GROUP, state: State.DRAFT })]);
+    });
+
+    afterEach(() => warn.mockRestore());
+
+    it('creates a draft and records who made it', async () => {
+      await service.create('org_1', input({ state: 'DRAFT' }), { actor: editor });
+      expect(repository.createGroup).toHaveBeenCalledWith(
+        expect.objectContaining({ state: 'DRAFT', createdById: 'u-editor' }),
+      );
+    });
+
+    it('records the maker for every member too', async () => {
+      await service.create('org_1', input({ state: 'QUEUE' }), { actor: member });
+      expect(repository.createGroup).toHaveBeenCalledWith(
+        expect.objectContaining({ state: 'QUEUE', createdById: 'u-member' }),
+      );
+    });
+
+    it('refuses a new post that asks for the queue, before anything is resolved', async () => {
+      await expect(
+        service.create('org_1', input({ state: 'QUEUE' }), { actor: editor }),
+      ).rejects.toMatchObject(forbidden);
+      expect(channels.list).not.toHaveBeenCalled();
+      expect(repository.createGroup).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith('rbac.denied', {
+        userId: 'u-editor',
+        role: Role.EDITOR,
+        reason: 'editor-post-write',
+      });
+    });
+
+    it('refuses a forged draft body that asks to post now', async () => {
+      await expect(
+        service.create('org_1', { ...input({ state: 'DRAFT' }), publishNow: true } as never, {
+          actor: editor,
+        }),
+      ).rejects.toMatchObject(forbidden);
+      expect(repository.createGroup).not.toHaveBeenCalled();
+    });
+
+    it('edits a draft into a draft', async () => {
+      repository.findRoots.mockResolvedValue([
+        { id: 'p1', integrationId: 'ch_x', state: State.DRAFT },
+      ]);
+      await service.update(
+        'org_1',
+        GROUP,
+        { ...input({ state: 'DRAFT' }), expectedUpdatedAt: new Date().toISOString() },
+        editor,
+      );
+      expect(repository.replaceGroup).toHaveBeenCalled();
+    });
+
+    it.each([State.QUEUE, State.PUBLISHED, State.ERROR])(
+      'refuses to edit a post that is %s, even into a draft',
+      async (stored) => {
+        repository.findRoots.mockResolvedValue([
+          { id: 'p1', integrationId: 'ch_x', state: stored },
+        ]);
+        await expect(
+          service.update(
+            'org_1',
+            GROUP,
+            { ...input({ state: 'DRAFT' }), expectedUpdatedAt: new Date().toISOString() },
+            editor,
+          ),
+        ).rejects.toMatchObject(forbidden);
+        expect(repository.replaceGroup).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses to move a draft to the queue', async () => {
+      repository.findRoots.mockResolvedValue([
+        { id: 'p1', integrationId: 'ch_x', state: State.DRAFT },
+      ]);
+      await expect(
+        service.update(
+          'org_1',
+          GROUP,
+          { ...input({ state: 'QUEUE' }), expectedUpdatedAt: new Date().toISOString() },
+          editor,
+        ),
+      ).rejects.toMatchObject(forbidden);
+      expect(repository.replaceGroup).not.toHaveBeenCalled();
+    });
+
+    it('deletes a draft, never a queued post', async () => {
+      repository.deleteGroup.mockResolvedValue('deleted');
+      repository.findRoots.mockResolvedValueOnce([
+        { id: 'p1', integrationId: 'ch_x', state: State.DRAFT },
+      ]);
+      await expect(service.remove('org_1', GROUP, editor)).resolves.toBeUndefined();
+
+      repository.deleteGroup.mockClear();
+      repository.findRoots.mockResolvedValueOnce([
+        { id: 'p1', integrationId: 'ch_x', state: State.QUEUE },
+      ]);
+      await expect(service.remove('org_1', GROUP, editor)).rejects.toMatchObject(forbidden);
+      expect(repository.deleteGroup).not.toHaveBeenCalled();
+    });
+
+    it('can never reschedule or publish, whatever the post', async () => {
+      await expect(
+        service.reschedule('org_1', GROUP, new Date(Date.now() + 3_600_000), editor),
+      ).rejects.toMatchObject(forbidden);
+      await expect(service.publishNow('org_1', GROUP, editor)).rejects.toMatchObject(forbidden);
+      expect(repository.reschedule).not.toHaveBeenCalled();
+      expect(repository.publishNow).not.toHaveBeenCalled();
+      expect(scheduling.publishNow).not.toHaveBeenCalled();
+    });
+
+    it('leaves members and writers with no person (workflows, the public API) alone', () => {
+      const queued = [{ state: State.QUEUE }];
+      expect(() => assertEditorMayWrite(member, queued, { state: 'QUEUE' })).not.toThrow();
+      expect(() => assertEditorMayWrite(undefined, queued, { state: 'QUEUE' })).not.toThrow();
+      expect(() =>
+        assertEditorMayWrite({ userId: 'a', role: Role.ADMIN }, queued, null),
+      ).not.toThrow();
     });
   });
 });

@@ -236,7 +236,7 @@ export class MailService {
     invitation: {
       workspaceName: string;
       inviterName: string;
-      role: 'ADMIN' | 'USER';
+      role: 'ADMIN' | 'USER' | 'EDITOR';
       link: string;
       expiresAt: Date;
     },

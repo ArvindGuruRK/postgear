@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CLIPS_ENTITLEMENTS,
+  MEMBERS_ENTITLEMENTS,
   defaultValue,
   type EntitlementDef,
   enumAtOrBelow,
@@ -29,14 +30,15 @@ import {
   validateValue,
 } from './index';
 
-const MIGRATION = join(
-  __dirname,
-  '..',
-  '..',
-  'db',
-  'prisma',
-  'migrations',
-  '20261117120000_entitlements_and_usage',
+const MIGRATIONS_DIR = join(__dirname, '..', '..', 'db', 'prisma', 'migrations');
+
+/** Sprint 12's seed (the Clips keys). */
+const MIGRATION = join(MIGRATIONS_DIR, '20261117120000_entitlements_and_usage', 'migration.sql');
+
+/** Module 14's seed (`members.editors_max`). */
+const EDITOR_SEATS_MIGRATION = join(
+  MIGRATIONS_DIR,
+  '20261128140100_sprint13_editor_seats_seed',
   'migration.sql',
 );
 
@@ -64,8 +66,11 @@ describe('the registry', () => {
     for (const key of KEYS) {
       expect(REGISTRY[key].key).toBe(key);
     }
-    expect(KEYS).toHaveLength(13);
-    expect(KEYS).toEqual(Object.keys(CLIPS_ENTITLEMENTS));
+    expect(KEYS).toHaveLength(14);
+    expect(KEYS).toEqual([
+      ...Object.keys(CLIPS_ENTITLEMENTS),
+      ...Object.keys(MEMBERS_ENTITLEMENTS),
+    ]);
   });
 
   it('gives every key a default that passes its own validation', () => {
@@ -159,7 +164,7 @@ describe('the seed', () => {
     for (const tier of TIERS) {
       expect(Object.keys(TIER_SEED[tier]).sort()).toEqual([...KEYS].sort());
     }
-    expect(seedRows()).toHaveLength(65);
+    expect(seedRows()).toHaveLength(70);
   });
 
   it('holds only values that pass validation', () => {
@@ -187,14 +192,26 @@ describe('the seed', () => {
   });
 });
 
-describe('the migration agrees with the seed', () => {
+describe('the migrations agree with the seed', () => {
   const sql = readFileSync(MIGRATION, 'utf8');
-  const planRows = rowsOf(sql, 'seed');
-  const logRows = rowsOf(sql, 'seedlog');
+  const seatsSql = readFileSync(EDITOR_SEATS_MIGRATION, 'utf8');
+  const planRows = [...rowsOf(sql, 'seed'), ...rowsOf(seatsSql, 'seed')];
+  const logRows = [...rowsOf(sql, 'seedlog'), ...rowsOf(seatsSql, 'seedlog')];
 
-  it('inserts 65 plan rows and 65 change log rows', () => {
-    expect(planRows).toHaveLength(65);
-    expect(logRows).toHaveLength(65);
+  it('inserts 70 plan rows and 70 change log rows (65 Clips, 5 editor seats)', () => {
+    expect(planRows).toHaveLength(70);
+    expect(logRows).toHaveLength(70);
+    expect(rowsOf(seatsSql, 'seed')).toHaveLength(5);
+  });
+
+  it('seeds editor seats as FREE 0, STANDARD 1, PRO 3, TEAM 10, ULTIMATE 25', () => {
+    expect(rowsOf(seatsSql, 'seed').map((row) => [row.tier, row.value])).toEqual([
+      ['FREE', 0],
+      ['STANDARD', 1],
+      ['PRO', 3],
+      ['TEAM', 10],
+      ['ULTIMATE', 25],
+    ]);
   });
 
   it('inserts exactly the seed, cell for cell', () => {
@@ -214,5 +231,8 @@ describe('the migration agrees with the seed', () => {
 
   it('never overwrites an operator edit', () => {
     expect(sql).toMatch(/ON CONFLICT \("tier", "key"\) DO NOTHING/);
+    // Module 14's seed has no conflict target, so it skips a clash on the id
+    // or on (tier, key) alike.
+    expect(seatsSql.match(/ON CONFLICT DO NOTHING;/g)).toHaveLength(2);
   });
 });

@@ -48,9 +48,12 @@ import {
   MAX_CAPTION_LENGTH,
   MAX_HANDLE_LENGTH,
   MAX_LIST_ITEMS,
+  MAX_SCHEDULE_ROWS,
+  MAX_SCHEDULE_TEXT_LENGTH,
   MAX_SLIDES,
   MAX_TEXT_LENGTH,
   type PresetSlide,
+  type ScheduleRow,
   type SlideBackground,
   type SlideLayout,
   type SlideRole,
@@ -125,6 +128,25 @@ function copyBackground(background: SlideBackground): SlideBackground {
   return { ...background };
 }
 
+/**
+ * A week as a rows slot keeps it: at most seven, each field one line cut to
+ * its limit, and `off` only when it is set. Copies, so a design never shares
+ * a row with a preset or with the caller.
+ */
+export function cleanScheduleRows(rows: readonly ScheduleRow[]): ScheduleRow[] {
+  const field = (value: string) => clampText(singleLine(value ?? ''), MAX_SCHEDULE_TEXT_LENGTH);
+
+  return rows.slice(0, MAX_SCHEDULE_ROWS).map((row) => {
+    const clean: ScheduleRow = {
+      day: field(row.day),
+      time: field(row.time),
+      title: field(row.title),
+    };
+    if (row.off === true) clean.off = true;
+    return clean;
+  });
+}
+
 /** Removes keys set to `undefined`, so "clear this" in a patch really clears it. */
 function defined(state: ElementState): ElementState {
   const result: ElementState = {};
@@ -155,6 +177,8 @@ function allowedBy(slot: SlotDef, state: ElementState): ElementState {
       .slice(0, Math.min(slot.maxItems ?? MAX_LIST_ITEMS, MAX_LIST_ITEMS))
       .map((item) => clampText(item, MAX_TEXT_LENGTH));
   }
+  if (slot.kind !== 'rows') delete next.rows;
+  else if (next.rows) next.rows = cleanScheduleRows(next.rows);
   if (slot.kind !== 'image' && slot.kind !== 'logo') delete next.mediaId;
   if (!slot.optional) delete next.hidden;
   if (!slot.resizable) delete next.size;
@@ -243,6 +267,8 @@ function slideFromPreset(entry: PresetSlide, id: string, origin: number): Design
     if (slot.kind === 'list' && items !== undefined) {
       state.items = items.slice(0, slot.maxItems ?? MAX_LIST_ITEMS);
     }
+    const rows = entry.rows?.[slot.id];
+    if (slot.kind === 'rows' && rows !== undefined) state.rows = cleanScheduleRows(rows);
     if (slot.optional && (slot.defaultHidden || entry.hidden?.includes(slot.id)))
       state.hidden = true;
 
@@ -482,6 +508,7 @@ export function setSlideLayout(
       if (slot.kind === 'list' && old.items) {
         carried.items = old.items.slice(0, slot.maxItems ?? MAX_LIST_ITEMS);
       }
+      if (slot.kind === 'rows' && old.rows) carried.rows = cleanScheduleRows(old.rows);
       if ((slot.kind === 'image' || slot.kind === 'logo') && old.mediaId !== undefined) {
         carried.mediaId = old.mediaId;
       }
@@ -823,9 +850,9 @@ export function resetSlide(document: DesignDocument, id: string): DesignDocument
 /**
  * Restores the whole design to its template: every slide, the theme and the
  * art, with the design's own font choice cleared. The brand (the kit's fonts
- * included), the handle and the caption are the user's, not the template's,
- * so they stay. Slide ids are reused where they can be, so a selection
- * survives.
+ * included), the handle, the caption and a schedule's source (its zone and
+ * where its week came from) are the user's, not the template's, so they
+ * stay. Slide ids are reused where they can be, so a selection survives.
  */
 export function resetDocument(document: DesignDocument): DesignDocument {
   const ids = document.slides.map((slide) => slide.id);
@@ -839,5 +866,7 @@ export function resetDocument(document: DesignDocument): DesignDocument {
     newId: () => ids[next++] ?? slideId(),
   });
 
-  return { ...fresh, caption: document.caption };
+  const restored: DesignDocument = { ...fresh, caption: document.caption };
+  if (document.schedule) restored.schedule = { ...document.schedule };
+  return restored;
 }

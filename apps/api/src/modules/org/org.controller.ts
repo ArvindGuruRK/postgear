@@ -31,6 +31,7 @@ import {
   type InviteMemberBody,
   inviteMemberSchema,
 } from './dto/org.schema';
+import { EditorSeatsService } from './editor-seats.service';
 import { OrgService } from './org.service';
 
 /**
@@ -63,6 +64,7 @@ export class OrgController {
 
   constructor(
     private readonly orgs: OrgService,
+    private readonly editorSeats: EditorSeatsService,
     private readonly jwt: JwtService,
     config: ConfigService,
   ) {
@@ -196,17 +198,29 @@ export class OrgController {
     return this.orgs.createInvite(org.id, user.id, dto);
   }
 
+  /**
+   * Editor seats (Module 14): `{ used, limit, remaining }`, for the invite
+   * dialog's seat line and the Team page's over-the-cap banner.
+   */
+  @Get(':id/seats')
+  @Roles(Role.ADMIN)
+  async seats(@CurrentOrg() org: ActiveOrg, @Param('id') id: string) {
+    this.assertPathIsActive(id, org);
+    return { editors: await this.editorSeats.state(org.id) };
+  }
+
   @Patch(':id/members/:userId')
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   async changeRole(
+    @CurrentUser() user: AuthenticatedUser,
     @CurrentOrg() org: ActiveOrg,
     @Param('id') id: string,
     @Param('userId') targetUserId: string,
     @Body(new ZodBody(changeRoleSchema, 'orgs/change-role')) dto: { role: Role },
   ) {
     this.assertPathIsActive(id, org);
-    await this.orgs.changeRole(org.id, targetUserId, dto.role);
+    await this.orgs.changeRole(org.id, targetUserId, dto.role, user.id);
     return { message: 'Role updated' };
   }
 
@@ -214,12 +228,13 @@ export class OrgController {
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   async removeMember(
+    @CurrentUser() user: AuthenticatedUser,
     @CurrentOrg() org: ActiveOrg,
     @Param('id') id: string,
     @Param('userId') targetUserId: string,
   ) {
     this.assertPathIsActive(id, org);
-    await this.orgs.removeMember(org.id, targetUserId);
+    await this.orgs.removeMember(org.id, targetUserId, user.id);
     return { message: 'Member removed' };
   }
 

@@ -1,5 +1,5 @@
 /**
- * Caption styles (Sprint 13, Module 03). `@Roles(ADMIN, USER)`, scoped on
+ * Caption styles (Sprint 13, Module 03). `@Roles(ADMIN, USER, EDITOR)`, scoped on
  * `@CurrentOrg()`: another workspace's style is a plain 404.
  *
  * - `GET /clips/caption-styles`: `{ styles, defaultStyleId, own, limit }`.
@@ -41,7 +41,7 @@ import {
 import { ClipCaptionStylesService } from './clip-caption-styles.service';
 
 @Controller('clips/caption-styles')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipCaptionStylesController {
   constructor(private readonly styles: ClipCaptionStylesService) {}

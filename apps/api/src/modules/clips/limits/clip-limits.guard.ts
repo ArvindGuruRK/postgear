@@ -215,10 +215,12 @@ export class ClipLimitsGuard {
    * `clips.download:<jobId>`. Throws the typed 402 (`clips_downloads_today`,
    * with the plan's number) past the allowance.
    */
-  chargeDownload(orgId: string, jobId: string): Promise<ConsumeResult> {
+  chargeDownload(orgId: string, jobId: string, by?: string | null): Promise<ConsumeResult> {
     return this.usage.consume(orgId, DOWNLOADS_METER, 1, {
       idempotencyKey: downloadChargeKey(jobId),
       refId: jobId,
+      // Module 14: who spent it (Module 15's cost route reads `meta.by`).
+      ...(by ? { meta: { by } } : {}),
     });
   }
 
@@ -243,11 +245,16 @@ export class ClipLimitsGuard {
    * `clips.import:<jobId>`: a double click, a retried request or a replayed
    * activity charges once. Throws the typed 402 (`clips_minutes_used`).
    */
-  chargeImport(orgId: string, jobId: string, durationMs: number): Promise<ConsumeResult> {
+  chargeImport(
+    orgId: string,
+    jobId: string,
+    durationMs: number,
+    by?: string | null,
+  ): Promise<ConsumeResult> {
     return this.usage.consume(orgId, IMPORT_METER, importMinutes(durationMs), {
       idempotencyKey: importChargeKey(jobId),
       refId: jobId,
-      meta: { durationMs: Math.round(durationMs) },
+      meta: { durationMs: Math.round(durationMs), ...(by ? { by } : {}) },
     });
   }
 

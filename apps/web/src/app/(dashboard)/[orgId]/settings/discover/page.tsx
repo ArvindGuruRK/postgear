@@ -15,12 +15,13 @@
  * The island is keyed by the workspace, so switching workspaces never shows
  * the last one's settings.
  */
+import { canManageWorkspaceSettings } from '@postgear/entitlements';
 import type { Metadata } from 'next';
 import { DiscoverSettingsForm } from '@/components/settings/discover-settings';
 import { serverApi } from '@/lib/api';
 import { getSessionCookieHeader } from '@/lib/session';
+import { getWorkspaceRole } from '@/lib/workspace-role';
 import type { DiscoverSettings, DiscoverStatus } from '@/types/discover';
-import type { Organization } from '@/types/workspace';
 
 export const metadata: Metadata = { title: 'Discover Settings' };
 
@@ -37,12 +38,7 @@ export default async function DiscoverSettingsPage({
     serverApi<{ status: DiscoverStatus }>('/discover/status', { cookie })
       .then((result) => result.status)
       .catch(() => null),
-    serverApi<{ organizations: Organization[] }>('/orgs', { cookie })
-      .then((result) => {
-        const role = result.organizations.find((organization) => organization.id === orgId)?.role;
-        return role === 'ADMIN' || role === 'SUPERADMIN';
-      })
-      .catch(() => false),
+    getWorkspaceRole(orgId).then(canManageWorkspaceSettings),
   ]);
 
   return (

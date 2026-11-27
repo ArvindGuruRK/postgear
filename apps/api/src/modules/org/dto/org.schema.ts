@@ -17,7 +17,7 @@ export const inviteMemberSchema = z
     // SUPERADMIN is deliberately absent from the invitable set. It is a
     // platform-level flag (`User.isSuperAdmin`), not a workspace role anyone
     // should be able to grant through an invitation form.
-    role: z.enum([Role.ADMIN, Role.USER]).default(Role.USER),
+    role: z.enum([Role.ADMIN, Role.USER, Role.EDITOR]).default(Role.USER),
     sendEmail: z.boolean().default(true),
     email: z.preprocess(
       (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -27,6 +27,12 @@ export const inviteMemberSchema = z
   .strict()
   .refine((body) => !body.sendEmail || body.email !== undefined, {
     message: 'email is required to send an invitation',
+    path: ['email'],
+  })
+  // Module 14: an Editor link is always bound to an address, so a seat can
+  // only ever be taken by the person it was meant for.
+  .refine((body) => body.role !== Role.EDITOR || body.email !== undefined, {
+    message: 'email is required to invite an editor',
     path: ['email'],
   });
 
@@ -39,4 +45,6 @@ export type InviteMemberBody = z.infer<typeof inviteMemberSchema>;
  */
 export const acceptInviteSchema = z.object({ token: z.string().min(1).max(2048) }).strict();
 
-export const changeRoleSchema = z.object({ role: z.enum([Role.ADMIN, Role.USER]) }).strict();
+export const changeRoleSchema = z
+  .object({ role: z.enum([Role.ADMIN, Role.USER, Role.EDITOR]) })
+  .strict();

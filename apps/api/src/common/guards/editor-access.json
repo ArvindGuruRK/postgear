@@ -1,0 +1,1248 @@
+{
+  "$comment": "Sprint 13 Module 14: how every API route treats an Editor. allow: @Roles names EDITOR. draft-only: names EDITOR and assertEditorMayWrite allows drafts only. deny: @Roles without EDITOR (403, rbac.denied). open: no @Roles, any signed-in member; reason required. public: @Public, no session; reason says what authorizes it. Checked by editor-access.spec.ts and editor-access.guard.spec.ts; a new route without an entry fails them.",
+  "routes": {
+    "DELETE /automation-connections/:id": {
+      "access": "deny"
+    },
+    "DELETE /automations/:id": {
+      "access": "deny"
+    },
+    "DELETE /automations/:id/pinned/:nodeKey": {
+      "access": "deny"
+    },
+    "DELETE /channels/:id": {
+      "access": "deny"
+    },
+    "DELETE /clips/:clipId": {
+      "access": "allow"
+    },
+    "DELETE /clips/bulk": {
+      "access": "allow"
+    },
+    "DELETE /clips/caption-styles/:id": {
+      "access": "allow"
+    },
+    "DELETE /clips/channels/:id": {
+      "access": "allow"
+    },
+    "DELETE /clips/channels/:id/hidden/:externalId": {
+      "access": "allow"
+    },
+    "DELETE /clips/downloads/:jobId": {
+      "access": "allow"
+    },
+    "DELETE /clips/layouts/:id": {
+      "access": "allow"
+    },
+    "DELETE /clips/library/favourites/:type/:itemId": {
+      "access": "allow"
+    },
+    "DELETE /clips/recipes/:id": {
+      "access": "allow"
+    },
+    "DELETE /clips/sounds/uploads/:assetId": {
+      "access": "allow"
+    },
+    "DELETE /clips/stickers/uploads/:assetId": {
+      "access": "allow"
+    },
+    "DELETE /clips/videos/:videoId": {
+      "access": "allow"
+    },
+    "DELETE /developers/api-keys/:id": {
+      "access": "deny"
+    },
+    "DELETE /discover/competitors/:id": {
+      "access": "deny"
+    },
+    "DELETE /discover/ideas/:id": {
+      "access": "deny"
+    },
+    "DELETE /discover/my-place": {
+      "access": "deny"
+    },
+    "DELETE /media/:id": {
+      "access": "allow"
+    },
+    "DELETE /operator/clips/videos/:videoId": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "DELETE /operator/workspaces/:orgId/overrides/:key": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "DELETE /orgs/:id/members/:userId": {
+      "access": "deny"
+    },
+    "DELETE /posts/:group": {
+      "access": "draft-only"
+    },
+    "DELETE /seo/audits/:id": {
+      "access": "deny"
+    },
+    "DELETE /signatures/:id": {
+      "access": "deny"
+    },
+    "DELETE /studio/brand-kits/:id": {
+      "access": "allow"
+    },
+    "DELETE /studio/designs/:id": {
+      "access": "allow"
+    },
+    "DELETE /studio/designs/:id/shares/:shareId": {
+      "access": "allow"
+    },
+    "DELETE /studio/favourites/:presetId": {
+      "access": "allow"
+    },
+    "DELETE /tags/:id": {
+      "access": "allow"
+    },
+    "DELETE /users/me/avatar": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "DELETE /v1/posts/:id": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "DELETE /webhooks/:id": {
+      "access": "deny"
+    },
+    "GET /ai/credits": {
+      "access": "allow"
+    },
+    "GET /ai/status": {
+      "access": "allow"
+    },
+    "GET /analytics/export": {
+      "access": "deny"
+    },
+    "GET /analytics/overview": {
+      "access": "deny"
+    },
+    "GET /analytics/posts/:group": {
+      "access": "deny"
+    },
+    "GET /analytics/sync": {
+      "access": "deny"
+    },
+    "GET /auth/activate": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "GET /auth/me": {
+      "access": "open",
+      "reason": "The caller's own session; no workspace data."
+    },
+    "GET /auth/oauth/:provider": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "GET /auth/oauth/:provider/callback": {
+      "access": "public",
+      "reason": "OAuth callback: the single-use state carries the user, re-verified before anything is written."
+    },
+    "GET /auth/providers": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "GET /automation-connections": {
+      "access": "deny"
+    },
+    "GET /automation-connections/:id/google/spreadsheets/:spreadsheetId": {
+      "access": "deny"
+    },
+    "GET /automation-connections/:id/google/spreadsheets/:spreadsheetId/header": {
+      "access": "deny"
+    },
+    "GET /automation-connections/:id/picker-token": {
+      "access": "deny"
+    },
+    "GET /automation-connections/oauth/:provider/callback": {
+      "access": "public",
+      "reason": "OAuth callback: the single-use state carries the workspace and user, and the membership is re-verified before anything is written."
+    },
+    "GET /automation-connections/oauth/:provider/start": {
+      "access": "deny"
+    },
+    "GET /automation-runs/:runId": {
+      "access": "deny"
+    },
+    "GET /automation-runs/:runId/events": {
+      "access": "deny"
+    },
+    "GET /automations": {
+      "access": "deny"
+    },
+    "GET /automations/:id": {
+      "access": "deny"
+    },
+    "GET /automations/:id/runs": {
+      "access": "deny"
+    },
+    "GET /automations/:id/versions": {
+      "access": "deny"
+    },
+    "GET /automations/:id/versions/:version": {
+      "access": "deny"
+    },
+    "GET /automations/:id/webhook": {
+      "access": "deny"
+    },
+    "GET /automations/catalog": {
+      "access": "deny"
+    },
+    "GET /automations/templates": {
+      "access": "deny"
+    },
+    "GET /billing/change/preview": {
+      "access": "deny"
+    },
+    "GET /billing/plans": {
+      "access": "deny"
+    },
+    "GET /billing/status": {
+      "access": "deny"
+    },
+    "GET /billing/subscription": {
+      "access": "deny"
+    },
+    "GET /channels": {
+      "access": "open",
+      "reason": "Lists the active workspace's channels so an Editor can pick them on a draft; the answer carries no tokens (channels.service spec)."
+    },
+    "GET /channels/:id/disconnect-preview": {
+      "access": "deny"
+    },
+    "GET /channels/:id/entities": {
+      "access": "deny"
+    },
+    "GET /channels/connect/:provider": {
+      "access": "deny"
+    },
+    "GET /channels/connect/:provider/callback": {
+      "access": "public",
+      "reason": "OAuth callback: the single-use state carries the workspace and user, and the membership is re-verified before anything is written."
+    },
+    "GET /channels/next-slot": {
+      "access": "deny"
+    },
+    "GET /channels/providers": {
+      "access": "open",
+      "reason": "The platforms PostGear supports and whether each is configured; no workspace data."
+    },
+    "GET /clips": {
+      "access": "allow"
+    },
+    "GET /clips/:clipId": {
+      "access": "allow"
+    },
+    "GET /clips/:clipId/exports": {
+      "access": "allow"
+    },
+    "GET /clips/:clipId/faces": {
+      "access": "allow"
+    },
+    "GET /clips/:clipId/previews/latest": {
+      "access": "allow"
+    },
+    "GET /clips/:clipId/words": {
+      "access": "allow"
+    },
+    "GET /clips/brand-kits": {
+      "access": "allow"
+    },
+    "GET /clips/caption-styles": {
+      "access": "allow"
+    },
+    "GET /clips/channels": {
+      "access": "allow"
+    },
+    "GET /clips/channels/:id/streams": {
+      "access": "allow"
+    },
+    "GET /clips/coming-up": {
+      "access": "allow"
+    },
+    "GET /clips/downloads": {
+      "access": "allow"
+    },
+    "GET /clips/downloads/:jobId/file": {
+      "access": "allow"
+    },
+    "GET /clips/emotes/:jobId": {
+      "access": "allow"
+    },
+    "GET /clips/exports/batches": {
+      "access": "allow"
+    },
+    "GET /clips/exports/batches/:batchId": {
+      "access": "allow"
+    },
+    "GET /clips/exports/batches/:batchId/events": {
+      "access": "allow"
+    },
+    "GET /clips/files/:token": {
+      "access": "public",
+      "reason": "A signed, expiring file token is the authority (the private Clips space)."
+    },
+    "GET /clips/jobs/:jobId": {
+      "access": "allow"
+    },
+    "GET /clips/jobs/:jobId/events": {
+      "access": "allow"
+    },
+    "GET /clips/layouts": {
+      "access": "allow"
+    },
+    "GET /clips/library/categories": {
+      "access": "allow"
+    },
+    "GET /clips/library/credits": {
+      "access": "public",
+      "reason": "The open library's attribution list; no workspace data."
+    },
+    "GET /clips/library/sounds": {
+      "access": "allow"
+    },
+    "GET /clips/library/stickers": {
+      "access": "allow"
+    },
+    "GET /clips/links/thumbnail": {
+      "access": "allow"
+    },
+    "GET /clips/recipes": {
+      "access": "allow"
+    },
+    "GET /clips/sounds/files": {
+      "access": "allow"
+    },
+    "GET /clips/sounds/uploads": {
+      "access": "allow"
+    },
+    "GET /clips/status": {
+      "access": "allow"
+    },
+    "GET /clips/stickers/files": {
+      "access": "allow"
+    },
+    "GET /clips/stickers/uploads": {
+      "access": "allow"
+    },
+    "GET /clips/videos": {
+      "access": "allow"
+    },
+    "GET /clips/videos/:videoId": {
+      "access": "allow"
+    },
+    "GET /clips/videos/:videoId/highlights": {
+      "access": "allow"
+    },
+    "GET /clips/videos/:videoId/transcript": {
+      "access": "allow"
+    },
+    "GET /clips/voices": {
+      "access": "allow"
+    },
+    "GET /clips/word-list": {
+      "access": "allow"
+    },
+    "GET /dashboard": {
+      "access": "allow"
+    },
+    "GET /developers/api-keys": {
+      "access": "deny"
+    },
+    "GET /discover/competitors": {
+      "access": "deny"
+    },
+    "GET /discover/competitors/:id/items": {
+      "access": "deny"
+    },
+    "GET /discover/competitors/unseen": {
+      "access": "deny"
+    },
+    "GET /discover/feed": {
+      "access": "deny"
+    },
+    "GET /discover/ideas": {
+      "access": "deny"
+    },
+    "GET /discover/locality": {
+      "access": "deny"
+    },
+    "GET /discover/locality/countries": {
+      "access": "deny"
+    },
+    "GET /discover/locality/guess": {
+      "access": "deny"
+    },
+    "GET /discover/locality/pick": {
+      "access": "deny"
+    },
+    "GET /discover/locality/regions": {
+      "access": "deny"
+    },
+    "GET /discover/locality/search": {
+      "access": "deny"
+    },
+    "GET /discover/my-place": {
+      "access": "deny"
+    },
+    "GET /discover/settings": {
+      "access": "deny"
+    },
+    "GET /discover/status": {
+      "access": "deny"
+    },
+    "GET /entitlements/me": {
+      "access": "allow"
+    },
+    "GET /health": {
+      "access": "public",
+      "reason": "Liveness probe for monitors; no data beyond up or down."
+    },
+    "GET /health/sentry-test": {
+      "access": "open",
+      "reason": "Throws on purpose to prove the Sentry wiring; restricted inside the handler, returns no data."
+    },
+    "GET /mail/unsubscribe": {
+      "access": "public",
+      "reason": "The unsubscribe link carries a signed token."
+    },
+    "GET /media": {
+      "access": "allow"
+    },
+    "GET /media/:id": {
+      "access": "allow"
+    },
+    "GET /media/:id/download": {
+      "access": "allow"
+    },
+    "GET /media/:id/usage": {
+      "access": "allow"
+    },
+    "GET /notifications": {
+      "access": "allow"
+    },
+    "GET /notifications/stream": {
+      "access": "allow"
+    },
+    "GET /notifications/unread": {
+      "access": "allow"
+    },
+    "GET /onboarding/state": {
+      "access": "open",
+      "reason": "The caller's own onboarding, used before any membership exists; writes only the caller's answers or a workspace the caller then owns."
+    },
+    "GET /operator/changes": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/entitlements/plans": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/deny": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/items": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/items/:type/:id": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/misses": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/runs": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/runs/:id": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/library/sources": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/workspaces": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/workspaces/:orgId/entitlements": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /operator/workspaces/:orgId/usage": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "GET /orgs": {
+      "access": "open",
+      "reason": "The caller's own memberships."
+    },
+    "GET /orgs/:id/members": {
+      "access": "open",
+      "reason": "The service checks the caller's own membership of :id; names and roles only (the Team page's list)."
+    },
+    "GET /orgs/:id/seats": {
+      "access": "deny"
+    },
+    "GET /orgs/invites/:token": {
+      "access": "public",
+      "reason": "The signed invite token is the authority; shows the workspace name and the role only."
+    },
+    "GET /posts": {
+      "access": "allow"
+    },
+    "GET /posts/:group": {
+      "access": "allow"
+    },
+    "GET /posts/calendar": {
+      "access": "allow"
+    },
+    "GET /posts/queue": {
+      "access": "allow"
+    },
+    "GET /public/design-shares/:token": {
+      "access": "public",
+      "reason": "A share token or a shipped font file; nothing beyond the shared design."
+    },
+    "GET /public/studio-fonts/:file": {
+      "access": "public",
+      "reason": "A share token or a shipped font file; nothing beyond the shared design."
+    },
+    "GET /scheduling/status": {
+      "access": "allow"
+    },
+    "GET /search": {
+      "access": "allow"
+    },
+    "GET /seo/audits": {
+      "access": "deny"
+    },
+    "GET /seo/audits/:id": {
+      "access": "deny"
+    },
+    "GET /seo/status": {
+      "access": "deny"
+    },
+    "GET /signatures": {
+      "access": "allow"
+    },
+    "GET /signatures/default": {
+      "access": "allow"
+    },
+    "GET /studio/access": {
+      "access": "allow"
+    },
+    "GET /studio/brand-kits": {
+      "access": "allow"
+    },
+    "GET /studio/brand-kits/:id": {
+      "access": "allow"
+    },
+    "GET /studio/designs": {
+      "access": "allow"
+    },
+    "GET /studio/designs/:id": {
+      "access": "allow"
+    },
+    "GET /studio/designs/:id/download": {
+      "access": "allow"
+    },
+    "GET /studio/designs/:id/shares": {
+      "access": "allow"
+    },
+    "GET /studio/favourites": {
+      "access": "allow"
+    },
+    "GET /tags": {
+      "access": "allow"
+    },
+    "GET /users/me": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "GET /users/me/appearance": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "GET /users/me/notification-preferences": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "GET /v1/analytics/overview": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "GET /v1/channels": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "GET /v1/me": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "GET /v1/posts": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "GET /v1/posts/:id": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "GET /webhooks": {
+      "access": "deny"
+    },
+    "GET /webhooks/:id": {
+      "access": "deny"
+    },
+    "GET /webhooks/:id/deliveries": {
+      "access": "deny"
+    },
+    "PATCH /automation-connections/:id": {
+      "access": "deny"
+    },
+    "PATCH /automations/:id": {
+      "access": "deny"
+    },
+    "PATCH /channels/:id": {
+      "access": "deny"
+    },
+    "PATCH /clips/:clipId": {
+      "access": "allow"
+    },
+    "PATCH /clips/brand-kits/:id": {
+      "access": "allow"
+    },
+    "PATCH /clips/bulk": {
+      "access": "allow"
+    },
+    "PATCH /clips/caption-styles/:id": {
+      "access": "allow"
+    },
+    "PATCH /clips/layouts/:id": {
+      "access": "allow"
+    },
+    "PATCH /clips/recipes/:id": {
+      "access": "allow"
+    },
+    "PATCH /clips/videos/:videoId/transcript/words": {
+      "access": "allow"
+    },
+    "PATCH /dashboard/goal": {
+      "access": "deny"
+    },
+    "PATCH /discover/competitors/:id": {
+      "access": "deny"
+    },
+    "PATCH /discover/ideas/:id": {
+      "access": "deny"
+    },
+    "PATCH /discover/settings": {
+      "access": "deny"
+    },
+    "PATCH /operator/library/sources/:id": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "PATCH /orgs/:id/members/:userId": {
+      "access": "deny"
+    },
+    "PATCH /signatures/:id": {
+      "access": "deny"
+    },
+    "PATCH /studio/brand-kits/:id": {
+      "access": "allow"
+    },
+    "PATCH /studio/designs/:id": {
+      "access": "allow"
+    },
+    "PATCH /tags/:id": {
+      "access": "allow"
+    },
+    "PATCH /users/me": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "PATCH /users/me/appearance": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "PATCH /users/me/notification-preferences": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "PATCH /webhooks/:id": {
+      "access": "deny"
+    },
+    "POST /ai/copilot/chat": {
+      "access": "allow"
+    },
+    "POST /ai/generate": {
+      "access": "allow"
+    },
+    "POST /analytics/sync": {
+      "access": "deny"
+    },
+    "POST /auth/login": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "POST /auth/logout": {
+      "access": "open",
+      "reason": "The caller's own session or password; no workspace data."
+    },
+    "POST /auth/password/change": {
+      "access": "open",
+      "reason": "The caller's own session or password; no workspace data."
+    },
+    "POST /auth/password/reset": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "POST /auth/password/reset-request": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "POST /auth/register": {
+      "access": "public",
+      "reason": "Sign-in, sign-up, activation and password reset: there is no session yet; throttled."
+    },
+    "POST /automation-connections": {
+      "access": "deny"
+    },
+    "POST /automation-connections/:id/check": {
+      "access": "deny"
+    },
+    "POST /automation-connections/:id/google/spreadsheets": {
+      "access": "deny"
+    },
+    "POST /automation-runs/:runId/cancel": {
+      "access": "deny"
+    },
+    "POST /automation-runs/:runId/retry": {
+      "access": "deny"
+    },
+    "POST /automation-runs/:runId/reviews/:nodeKey": {
+      "access": "deny"
+    },
+    "POST /automations": {
+      "access": "deny"
+    },
+    "POST /automations/:id/activate": {
+      "access": "deny"
+    },
+    "POST /automations/:id/discard": {
+      "access": "deny"
+    },
+    "POST /automations/:id/duplicate": {
+      "access": "deny"
+    },
+    "POST /automations/:id/pause": {
+      "access": "deny"
+    },
+    "POST /automations/:id/runs": {
+      "access": "deny"
+    },
+    "POST /automations/:id/steps/:nodeKey/test": {
+      "access": "deny"
+    },
+    "POST /automations/:id/test-runs": {
+      "access": "deny"
+    },
+    "POST /automations/:id/validate": {
+      "access": "deny"
+    },
+    "POST /automations/:id/versions/:version/restore": {
+      "access": "deny"
+    },
+    "POST /automations/:id/webhook/secret": {
+      "access": "deny"
+    },
+    "POST /billing/cancel": {
+      "access": "deny"
+    },
+    "POST /billing/change": {
+      "access": "deny"
+    },
+    "POST /billing/checkout": {
+      "access": "deny"
+    },
+    "POST /billing/portal": {
+      "access": "deny"
+    },
+    "POST /billing/resume": {
+      "access": "deny"
+    },
+    "POST /billing/trial": {
+      "access": "deny"
+    },
+    "POST /billing/webhook": {
+      "access": "public",
+      "reason": "Stripe's signed webhook; no session."
+    },
+    "POST /channels/:id/entities": {
+      "access": "deny"
+    },
+    "POST /channels/:id/refresh": {
+      "access": "deny"
+    },
+    "POST /channels/:id/test-post": {
+      "access": "deny"
+    },
+    "POST /clips": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/apply-recipe": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/captions": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/captions/from-file": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/captions/translate": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/duplicate": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/exports": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/faces": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/hook-titles": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/more-video": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/open": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/previews": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/send": {
+      "access": "allow"
+    },
+    "POST /clips/:clipId/voice": {
+      "access": "allow"
+    },
+    "POST /clips/brand-kits/:id/use": {
+      "access": "allow"
+    },
+    "POST /clips/caption-styles": {
+      "access": "allow"
+    },
+    "POST /clips/channels": {
+      "access": "allow"
+    },
+    "POST /clips/channels/:id/refresh": {
+      "access": "allow"
+    },
+    "POST /clips/channels/check": {
+      "access": "allow"
+    },
+    "POST /clips/downloads": {
+      "access": "allow"
+    },
+    "POST /clips/downloads/:jobId/save-to-media": {
+      "access": "allow"
+    },
+    "POST /clips/emotes/export": {
+      "access": "allow"
+    },
+    "POST /clips/exports": {
+      "access": "allow"
+    },
+    "POST /clips/jobs/:jobId/cancel": {
+      "access": "allow"
+    },
+    "POST /clips/layouts": {
+      "access": "allow"
+    },
+    "POST /clips/links/probe": {
+      "access": "allow"
+    },
+    "POST /clips/montages": {
+      "access": "allow"
+    },
+    "POST /clips/recipes": {
+      "access": "allow"
+    },
+    "POST /clips/recipes/:id/duplicate": {
+      "access": "allow"
+    },
+    "POST /clips/sounds/uploads": {
+      "access": "allow"
+    },
+    "POST /clips/stickers/uploads": {
+      "access": "allow"
+    },
+    "POST /clips/videos": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/auto-edit": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/auto-edit/price": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/cancel": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/download-original": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/highlights": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/retry": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/setup/price": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/transcript": {
+      "access": "allow"
+    },
+    "POST /clips/videos/:videoId/transcript/quote": {
+      "access": "allow"
+    },
+    "POST /clips/videos/drive": {
+      "access": "allow"
+    },
+    "POST /clips/videos/uploads": {
+      "access": "allow"
+    },
+    "POST /clips/videos/uploads/:uploadId/complete": {
+      "access": "allow"
+    },
+    "POST /clips/videos/uploads/:uploadId/parts": {
+      "access": "allow"
+    },
+    "POST /developers/api-keys": {
+      "access": "deny"
+    },
+    "POST /developers/api-keys/:id/rotate": {
+      "access": "deny"
+    },
+    "POST /discover/competitors": {
+      "access": "deny"
+    },
+    "POST /discover/competitors/:id/research": {
+      "access": "deny"
+    },
+    "POST /discover/competitors/discover-feeds": {
+      "access": "deny"
+    },
+    "POST /discover/competitors/seen": {
+      "access": "deny"
+    },
+    "POST /discover/ideas": {
+      "access": "deny"
+    },
+    "POST /discover/read": {
+      "access": "deny"
+    },
+    "POST /discover/resolve-link": {
+      "access": "deny"
+    },
+    "POST /internal/automation/ai/hashtags": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/ai/image": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/ai/rewrite": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/ai/text": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/email": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/posts/draft": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/posts/get": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/posts/publish": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/automation/posts/queue": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/apply-recipe": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/auto-edit": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/charge-import": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/check-stills": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/finish-export": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/finish-save-download": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/follow-speaker": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/pick-moments": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/reverse": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/jobs/:jobId/settled": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/reconcile": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/clips/sweep": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/discover/competitors/refresh": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/discover/digest": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /internal/discover/prewarm": {
+      "access": "public",
+      "reason": "Worker only: the internal token header, never a browser session."
+    },
+    "POST /mail/unsubscribe": {
+      "access": "public",
+      "reason": "The unsubscribe link carries a signed token."
+    },
+    "POST /mail/webhooks/resend": {
+      "access": "public",
+      "reason": "The mail provider's signed webhook; no session."
+    },
+    "POST /media": {
+      "access": "allow"
+    },
+    "POST /notifications/read-all": {
+      "access": "allow"
+    },
+    "POST /onboarding/answers": {
+      "access": "open",
+      "reason": "The caller's own onboarding, used before any membership exists; writes only the caller's answers or a workspace the caller then owns."
+    },
+    "POST /onboarding/channels": {
+      "access": "open",
+      "reason": "The caller's own onboarding, used before any membership exists; writes only the caller's answers or a workspace the caller then owns."
+    },
+    "POST /onboarding/profile": {
+      "access": "open",
+      "reason": "The caller's own onboarding, used before any membership exists; writes only the caller's answers or a workspace the caller then owns."
+    },
+    "POST /onboarding/skip": {
+      "access": "open",
+      "reason": "The caller's own onboarding, used before any membership exists; writes only the caller's answers or a workspace the caller then owns."
+    },
+    "POST /onboarding/workspace": {
+      "access": "open",
+      "reason": "The caller's own onboarding, used before any membership exists; writes only the caller's answers or a workspace the caller then owns."
+    },
+    "POST /operator/library/items/:type/:id/hide": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "POST /operator/library/items/:type/:id/publish": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "POST /operator/library/items/:type/:id/remove": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "POST /operator/library/items/:type/:id/restore": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "POST /operator/library/runs/:id/publish": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "POST /operator/workspaces/:orgId/usage/adjust": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "POST /orgs": {
+      "access": "open",
+      "reason": "Creates a new workspace the caller then owns as admin; nothing in the active workspace changes."
+    },
+    "POST /orgs/:id/invites": {
+      "access": "deny"
+    },
+    "POST /orgs/:id/leave": {
+      "access": "open",
+      "reason": "Acts on the caller's own membership row only."
+    },
+    "POST /orgs/:id/switch": {
+      "access": "open",
+      "reason": "Sets the active-workspace cookie only after checking the caller's own membership."
+    },
+    "POST /orgs/invites/accept": {
+      "access": "open",
+      "reason": "The signed invite is the authority; an Editor seat is checked again under the seat lock when the membership is written."
+    },
+    "POST /posts": {
+      "access": "draft-only"
+    },
+    "POST /posts/:group/publish-now": {
+      "access": "deny"
+    },
+    "POST /seo/audits": {
+      "access": "deny"
+    },
+    "POST /signatures": {
+      "access": "deny"
+    },
+    "POST /studio/brand-kits": {
+      "access": "allow"
+    },
+    "POST /studio/brand-kits/:id/duplicate": {
+      "access": "allow"
+    },
+    "POST /studio/brand-kits/extract": {
+      "access": "allow"
+    },
+    "POST /studio/brand-kits/logo": {
+      "access": "allow"
+    },
+    "POST /studio/designs": {
+      "access": "allow"
+    },
+    "POST /studio/designs/:id/duplicate": {
+      "access": "allow"
+    },
+    "POST /studio/designs/:id/export": {
+      "access": "allow"
+    },
+    "POST /studio/designs/:id/send": {
+      "access": "allow"
+    },
+    "POST /studio/designs/:id/shares": {
+      "access": "allow"
+    },
+    "POST /studio/favourites": {
+      "access": "allow"
+    },
+    "POST /studio/schedules/fetch": {
+      "access": "allow"
+    },
+    "POST /tags": {
+      "access": "allow"
+    },
+    "POST /users/me/avatar/upload": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    },
+    "POST /v1/automations/:id/hook": {
+      "access": "public",
+      "reason": "A workflow's secret webhook address is the authority (Sprint 10); no session."
+    },
+    "POST /v1/posts": {
+      "access": "public",
+      "reason": "Public API: an API key, not a role (@ApiKeyAuth). Only an admin can create keys, so an Editor never holds one."
+    },
+    "POST /webhooks": {
+      "access": "deny"
+    },
+    "POST /webhooks/:id/rotate-secret": {
+      "access": "deny"
+    },
+    "POST /webhooks/:id/test": {
+      "access": "deny"
+    },
+    "PUT /automations/:id/pinned/:nodeKey": {
+      "access": "deny"
+    },
+    "PUT /channels/order": {
+      "access": "deny"
+    },
+    "PUT /clips/channels/:id/hidden/:externalId": {
+      "access": "allow"
+    },
+    "PUT /clips/files/:token": {
+      "access": "public",
+      "reason": "A signed, expiring file token is the authority (the private Clips space)."
+    },
+    "PUT /clips/library/favourites": {
+      "access": "allow"
+    },
+    "PUT /clips/word-list": {
+      "access": "allow"
+    },
+    "PUT /discover/my-place": {
+      "access": "deny"
+    },
+    "PUT /operator/entitlements/plans": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "PUT /operator/workspaces/:orgId/overrides/:key": {
+      "access": "open",
+      "reason": "Platform operators only: @PlatformAdmin() checks User.isSuperAdmin (and OPERATOR_EMAILS in production); no workspace role applies."
+    },
+    "PUT /posts/:group": {
+      "access": "draft-only"
+    },
+    "PUT /posts/:group/schedule": {
+      "access": "deny"
+    },
+    "PUT /users/me/avatar/preset": {
+      "access": "open",
+      "reason": "The caller's own account (profile, avatar, appearance, mail preferences); touches no workspace data."
+    }
+  }
+}

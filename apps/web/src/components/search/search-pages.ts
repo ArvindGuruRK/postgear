@@ -5,7 +5,19 @@
  * workspace and instant to find. `keywords` are the other words a person might
  * type for the same place ("plan" for Billing, "theme" for Appearance), so a
  * search finds what they mean and not only what the page is called.
+ *
+ * `pagesFor(role)` (Sprint 13, Module 14) leaves out what the role may not
+ * open, as the rail does: an Editor is not offered Analytics, SEO, Channels,
+ * Billing, API Keys or Webhooks.
  */
+import {
+  canUseSeo,
+  canViewAnalytics,
+  canViewBilling,
+  canViewChannels,
+  canViewDeveloperSettings,
+  type RoleInput,
+} from '@postgear/entitlements';
 
 export type SearchPageIcon =
   | 'home'
@@ -193,6 +205,22 @@ export const MAX_PAGE_RESULTS = 5;
  * section or their keywords. Names that start with the first word come first;
  * otherwise the order above holds. An empty search matches nothing.
  */
+/** Entries a capability closes, by id; every other entry is open to every role. */
+const PAGE_ACCESS: Readonly<Record<string, (role: RoleInput) => boolean>> = {
+  'connect-channel': canViewChannels,
+  analytics: canViewAnalytics,
+  seo: canUseSeo,
+  channels: canViewChannels,
+  billing: canViewBilling,
+  'api-keys': canViewDeveloperSettings,
+  webhooks: canViewDeveloperSettings,
+};
+
+/** The pages and actions this role may open. */
+export function pagesFor(role: RoleInput, pages: SearchPage[] = SEARCH_PAGES): SearchPage[] {
+  return pages.filter((page) => PAGE_ACCESS[page.id]?.(role) ?? true);
+}
+
 export function findPages(query: string, pages: SearchPage[] = SEARCH_PAGES): SearchPage[] {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
 

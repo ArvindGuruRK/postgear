@@ -513,13 +513,23 @@ export function collectionOptions(presets: readonly Preset[] = PRESETS): PresetC
   return PRESET_COLLECTIONS.filter((collection) => worn.has(collection));
 }
 
-/** The collections in the order the gallery shows them, after favourites and the featured. */
-export const COLLECTION_ORDER: readonly PresetCollection[] = ['signature', 'luxury', 'classic'];
+/**
+ * The collections in the order the gallery shows them, after favourites and
+ * the featured. Schedule (Sprint 13) comes last: a week of streams is a
+ * picture for one kind of person, who usually arrives through the Schedule
+ * Maker, not the gallery.
+ */
+export const COLLECTION_ORDER: readonly PresetCollection[] = [
+  'signature',
+  'luxury',
+  'classic',
+  'schedule',
+];
 
 /**
  * The gallery's order (Sprint 9b): a template chosen before the wizard first,
  * then the workspace's favourites, then the featured templates in the order
- * they are featured, then Signature, Luxury and Classic. Within a group the
+ * they are featured, then Signature, Luxury, Classic and Schedule. Within a group the
  * registry's own order holds (the sort is stable), so a new template lands
  * where its collection's file puts it.
  */

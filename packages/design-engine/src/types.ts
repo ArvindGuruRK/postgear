@@ -262,7 +262,15 @@ export type Align = 'start' | 'center' | 'end';
 // ---------------------------------------------------------------------------
 
 /** A slide's job in a carousel. Add Slide groups its choices by this. */
-export type SlideRole = 'cover' | 'content' | 'list' | 'quote' | 'statistic' | 'closing';
+export type SlideRole =
+  | 'cover'
+  | 'content'
+  | 'list'
+  | 'quote'
+  | 'statistic'
+  | 'closing'
+  /** A week of streams (Sprint 13, the Schedule Maker). Not offered by Add Slide. */
+  | 'schedule';
 
 /**
  * The areas of a slide. An element belongs to exactly one and can never leave
@@ -302,7 +310,11 @@ export interface RegionDef {
   label?: string;
 }
 
-export type SlotKind = 'text' | 'list' | 'image' | 'logo';
+/**
+ * `rows` (Sprint 13) holds a week of `ScheduleRow`s: a day, a time and a
+ * title each, drawn as one card per row by `SlideView`.
+ */
+export type SlotKind = 'text' | 'list' | 'image' | 'logo' | 'rows';
 
 /** What a list draws in front of each item. The layout decides, not the user. */
 export type ListMarker = 'number' | 'tick' | 'dot' | 'rule' | 'none';
@@ -328,7 +340,8 @@ export type SlotId =
   | 'handle'
   | 'pageNumber'
   | 'logo'
-  | 'image';
+  | 'image'
+  | 'schedule';
 
 const SLOT_ID_TABLE: Record<SlotId, true> = {
   eyebrow: true,
@@ -347,6 +360,7 @@ const SLOT_ID_TABLE: Record<SlotId, true> = {
   pageNumber: true,
   logo: true,
   image: true,
+  schedule: true,
 };
 
 export const SLOT_IDS = Object.keys(SLOT_ID_TABLE) as [SlotId, ...SlotId[]];
@@ -386,9 +400,13 @@ export interface LogoSpot {
  * - `slideNumber` is counted, never typed, so it is right after every add,
  *   delete and reorder (DS-5: "Slide numbers update at once").
  *
+ * - `scheduleZone` (Sprint 13) is the schedule's time zone line ("All times
+ *   Asia/Kolkata"), or its break ("On a break until Mon 23 Nov"), worked out
+ *   from `DesignDocument.schedule` so changing the zone changes the line.
+ *
  * A bound slot never stores text of its own; the schema refuses it.
  */
-export type SlotBinding = 'brandName' | 'handle' | 'slideNumber';
+export type SlotBinding = 'brandName' | 'handle' | 'slideNumber' | 'scheduleZone';
 
 export interface SlotDef {
   id: SlotId;
@@ -434,6 +452,12 @@ export interface SlotDef {
   fit?: 'cover' | 'contain';
   /** Images: corner rounding as a percentage of the box's short edge. */
   radius?: number;
+  /**
+   * Rows slots: how many columns the rows fill in a format. Absent is one. A
+   * landscape week is two columns, four days on the left and three on the
+   * right; every other shape is one column of seven.
+   */
+  columns?: Partial<Record<FormatId, 1 | 2>>;
 }
 
 export interface SlideLayout {
@@ -556,7 +580,9 @@ export type PresetCategory =
   | 'promotion'
   | 'story'
   | 'event'
-  | 'hiring';
+  | 'hiring'
+  /** Sprint 13: the stream schedule pictures. */
+  | 'schedule';
 
 export const PRESET_CATEGORIES: readonly PresetCategory[] = [
   'tips',
@@ -571,6 +597,7 @@ export const PRESET_CATEGORIES: readonly PresetCategory[] = [
   'story',
   'event',
   'hiring',
+  'schedule',
 ];
 
 export const CATEGORY_LABELS: Record<PresetCategory, string> = {
@@ -586,6 +613,7 @@ export const CATEGORY_LABELS: Record<PresetCategory, string> = {
   story: 'Story',
   event: 'Event',
   hiring: 'Hiring',
+  schedule: 'Schedule',
 };
 
 /** The sample content a preset's slide carries before the user types. */
@@ -593,6 +621,8 @@ export interface PresetSlide {
   layoutId: string;
   text?: Partial<Record<SlotId, string>>;
   items?: Partial<Record<SlotId, string[]>>;
+  /** Rows slots (Sprint 13): the sample week. */
+  rows?: Partial<Record<SlotId, ScheduleRow[]>>;
   /** Slots the preset starts with hidden, over the layout's own default. */
   hidden?: SlotId[];
 }
@@ -600,16 +630,23 @@ export interface PresetSlide {
 /**
  * Which family of the library a preset belongs to, for the gallery's filter:
  * the Sprint 9 originals, the pattern and hand-made art set ported from
- * CarouselClick, and the luxury set.
+ * CarouselClick, the luxury set, and (Sprint 13) the stream schedule
+ * pictures, whose five themes are drawn for a week of rows.
  */
-export type PresetCollection = 'classic' | 'signature' | 'luxury';
+export type PresetCollection = 'classic' | 'signature' | 'luxury' | 'schedule';
 
-export const PRESET_COLLECTIONS: readonly PresetCollection[] = ['classic', 'signature', 'luxury'];
+export const PRESET_COLLECTIONS: readonly PresetCollection[] = [
+  'classic',
+  'signature',
+  'luxury',
+  'schedule',
+];
 
 export const COLLECTION_LABELS: Record<PresetCollection, string> = {
   classic: 'Classic',
   signature: 'Signature',
   luxury: 'Luxury',
+  schedule: 'Schedule',
 };
 
 export interface Preset {
@@ -667,6 +704,49 @@ export interface ElementState {
   font?: FontId;
   /** Logo slots only. */
   placement?: LogoPlacement;
+  /** Rows slots only (Sprint 13): the week, at most `MAX_SCHEDULE_ROWS`. */
+  rows?: ScheduleRow[];
+}
+
+/**
+ * One day of a stream schedule (Sprint 13). Plain text, each field typed or
+ * converted from Twitch's segments by `schedule/rows.ts`: the times are words
+ * on a picture, not instants, so a hand edit is never second-guessed.
+ */
+export interface ScheduleRow {
+  /** "Mon". */
+  day: string;
+  /** "7 PM", or "19:00" on a 24 hour schedule. Empty on a day off. */
+  time: string;
+  /** "Minecraft", or two streams joined: "Minecraft, 10 PM Chat". */
+  title: string;
+  /** A day with no stream: the row reads Off. */
+  off?: boolean;
+}
+
+/**
+ * Where a schedule design's week came from (Sprint 13), kept on the design
+ * so the editor can refresh it from Twitch, switch the clock and change the
+ * zone. Optional: every other design has none.
+ */
+export interface ScheduleSource {
+  source: 'twitch' | 'manual';
+  /** The Twitch login, lower case; null for a week typed by hand. */
+  login: string | null;
+  /** IANA, for example "Asia/Kolkata". The picture prints it. */
+  timeZone: string;
+  /** ISO date of the Monday the week starts on, in `timeZone`. */
+  weekStart: string;
+  /** ISO timestamp of the last fetch from Twitch; null by hand. */
+  fetchedAt: string | null;
+  /** 12 hour ("7 PM") or 24 hour ("19:00") times. */
+  hour12: boolean;
+  /**
+   * When the broadcaster's break ends (ISO timestamp), if Twitch says they
+   * are on one this week. The zone line then reads "On a break until Mon 23
+   * Nov". Absent or null is no break.
+   */
+  vacationUntil?: string | null;
 }
 
 export interface DesignSlide {
@@ -709,8 +789,10 @@ export interface DesignBrand {
 /**
  * The current schema. Bump with every shape change, and extend `upgrade()`.
  * 2 added the background art, the design's fonts and the brand kit's fonts.
+ * 3 (Sprint 13) added the `rows` slot and the optional `schedule`; an older
+ * design has neither, so its upgrade changes nothing but the number.
  */
-export const DESIGN_SCHEMA_VERSION = 2;
+export const DESIGN_SCHEMA_VERSION = 3;
 
 export interface DesignDocument {
   schemaVersion: number;
@@ -731,6 +813,8 @@ export interface DesignDocument {
   /** Written in Preview and carried into the composer on Send. */
   caption: string;
   slides: DesignSlide[];
+  /** A stream schedule's source (Sprint 13). Absent on every other design. */
+  schedule?: ScheduleSource;
 }
 
 export const MAX_SLIDES = 20;
@@ -739,3 +823,15 @@ export const MAX_TEXT_LENGTH = 600;
 export const MAX_CAPTION_LENGTH = 3_000;
 export const MAX_HANDLE_LENGTH = 60;
 export const MAX_BRAND_NAME_LENGTH = 120;
+/** A week: Monday to Sunday, one row a day. */
+export const MAX_SCHEDULE_ROWS = 7;
+/**
+ * One field of a schedule row. A Twitch title is at most 140 characters, and
+ * a joined day (two streams and "+1 more") a little more; anything longer
+ * could never fit one line of a row.
+ */
+export const MAX_SCHEDULE_TEXT_LENGTH = 200;
+/** An IANA zone name ("America/Argentina/ComodRivadavia" is the longest). */
+export const MAX_TIME_ZONE_LENGTH = 64;
+/** A Twitch login: 4 to 25 letters, numbers and underscores. */
+export const TWITCH_LOGIN_PATTERN = /^[a-z0-9_]{4,25}$/;

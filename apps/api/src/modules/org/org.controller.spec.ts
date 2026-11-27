@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
 import { acceptInviteSchema, inviteMemberSchema } from './dto/org.schema';
+import type { EditorSeatsService } from './editor-seats.service';
 import { OrgController } from './org.controller';
 import type { OrgService } from './org.service';
 
@@ -111,7 +112,13 @@ describe('OrgController handlers', () => {
     changeRole: jest.fn(),
     removeMember: jest.fn(),
   };
-  const controller = new OrgController(orgs as unknown as OrgService, jwt, config);
+  const seats = { state: jest.fn() };
+  const controller = new OrgController(
+    orgs as unknown as OrgService,
+    seats as unknown as EditorSeatsService,
+    jwt,
+    config,
+  );
 
   function response() {
     return { cookie: jest.fn(), clearCookie: jest.fn() } as unknown as Response & {
@@ -141,9 +148,10 @@ describe('OrgController handlers', () => {
     ['invite', (c) => c.invite(member, { id: ORG, role: Role.ADMIN }, 'org-2', {} as never)],
     [
       'changeRole',
-      (c) => c.changeRole({ id: ORG, role: Role.ADMIN }, 'org-2', 'u-2', { role: Role.USER }),
+      (c) =>
+        c.changeRole(member, { id: ORG, role: Role.ADMIN }, 'org-2', 'u-2', { role: Role.USER }),
     ],
-    ['removeMember', (c) => c.removeMember({ id: ORG, role: Role.ADMIN }, 'org-2', 'u-2')],
+    ['removeMember', (c) => c.removeMember(member, { id: ORG, role: Role.ADMIN }, 'org-2', 'u-2')],
   ])('%s refuses a page for one workspace while the cookie names another', async (_name, call) => {
     await expect(call(controller)).rejects.toThrow(ConflictException);
     expect(orgs.createInvite).not.toHaveBeenCalled();
@@ -263,5 +271,29 @@ describe('POST /orgs/invites/accept body', () => {
     expect(() => pipe.transform({ token: 'abc.def', role: 'ADMIN' })).toThrow(BadRequestException);
     expect(() => pipe.transform({})).toThrow(BadRequestException);
     expect(() => pipe.transform({ token: 'x'.repeat(4096) })).toThrow(BadRequestException);
+  });
+});
+
+describe('OrgController seats (Module 14)', () => {
+  const seats = { state: jest.fn() };
+  const controller = new OrgController(
+    {} as unknown as OrgService,
+    seats as unknown as EditorSeatsService,
+    jwt,
+    config,
+  );
+
+  it("answers the active workspace's editor seats", async () => {
+    seats.state.mockResolvedValue({ used: 2, limit: 3, remaining: 1 });
+    await expect(controller.seats({ id: ORG, role: Role.ADMIN }, ORG)).resolves.toEqual({
+      editors: { used: 2, limit: 3, remaining: 1 },
+    });
+    expect(seats.state).toHaveBeenCalledWith(ORG);
+  });
+
+  it('refuses a path that is not the active workspace', async () => {
+    await expect(controller.seats({ id: ORG, role: Role.ADMIN }, 'org-2')).rejects.toThrow(
+      ConflictException,
+    );
   });
 });

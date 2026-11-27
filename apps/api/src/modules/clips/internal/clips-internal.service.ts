@@ -136,7 +136,12 @@ export class ClipsInternalService {
       throw new ConflictException({ message: CLIPS_MESSAGES.JOB_FINISHED, code: 'job_finished' });
     }
 
-    const result = await this.limits.chargeImport(body.organizationId, jobId, body.durationMs);
+    const result = await this.limits.chargeImport(
+      body.organizationId,
+      jobId,
+      body.durationMs,
+      job.createdById,
+    );
     const units = await this.entryUnits(body.organizationId, result.entryId);
     return { charged: true, units };
   }

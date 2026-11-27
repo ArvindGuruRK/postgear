@@ -16,6 +16,8 @@
  *   Save To Media on a finished download (`download/save-download.run.ts`).
  * - `clipAutoEdit` (`postgear-media`, Sprint 13 Module 10): waits for the
  *   listen job, then the API makes the clip (`auto-edit/auto-edit.run.ts`).
+ * - `emoteExport` (`postgear-media`, Sprint 13 Module 14): one Emote Maker
+ *   export press, every size down its ladder (`emote/emote.run.ts`).
  *
  * Bookkeeping (run by the workflow after the work finally failed or was
  * cancelled, in a non-cancellable scope; see `job-outcomes.ts`):
@@ -58,6 +60,7 @@ import { type ActivityRun, runClipActivity } from '../activity-kit';
 import { type AutoEditRun, runAutoEdit } from '../auto-edit/auto-edit.run';
 import type { ClipActivityDeps } from '../deps';
 import { type DownloadTools, runDownload } from '../download/download.run';
+import { runEmote } from '../emote/emote.run';
 import { runSaveDownload, saveDownloadFailed } from '../download/save-download.run';
 import { finishFaces, prepareFaces } from '../faces/faces.run';
 import { ClipStepError } from '../failures';
@@ -551,6 +554,39 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
           sleep: options.autoEditSleep,
         });
         return { status: outcome.finished ? 'done' : 'closed' };
+      });
+    },
+
+    /**
+     * Sprint 13, Module 14: one press of an Emote Maker export button. A few
+     * seconds of video made into at most six small files; the API waits up
+     * to 25 seconds for the answer.
+     */
+    async emoteExport(ref: ClipJobWorkflowInput): Promise<ClipWorkResult> {
+      return runClipActivity('emoteExport', ref.jobId, async (activity) => {
+        const { job, input } = await openJob(rows, ref, 'EMOTE');
+        const progress = jobProgress(job.id, { kind: 'EMOTE' });
+        if (!(await start(progress))) return { status: 'closed' };
+
+        return withScratch(deps.scratchRoot, activity.scratchId(job.id), async (dir) => {
+          // The covering file (a sharp range or the light copy) and a few small pictures.
+          await assertFreeDisk(dir, 512 * 1024 * 1024);
+          const outcome = await runEmote({
+            job,
+            input,
+            dir,
+            signal: activity.signal,
+            runTool: deps.runTool,
+            probe: (file, opts) => probeFile(deps.runTool, file, opts),
+            privateStorage: deps.privateStorage,
+            rows,
+            progress,
+            heartbeat: activity.heartbeat,
+            simulated: deps.providers.simulated,
+            attempt: activity.attempt,
+          });
+          return { status: outcome.finished ? 'done' : 'closed' };
+        });
       });
     },
 

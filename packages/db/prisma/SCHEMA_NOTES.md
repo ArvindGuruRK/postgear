@@ -910,3 +910,12 @@ A clip stitched from 2 to 15 other clips (Create Montage). Additive: one enum va
 - **`Integration.postingTimes` stays one JSON list stored as text**; each entry gained `windowMinutes` (0, 5, 15 or 30) and `days` (ISO weekdays, 1 Monday to 7 Sunday). No new table: about thirty readers already parse the list, and a slots table would add a join to each. The migration sets the new default and gives every existing entry a window of 0 and all seven days in one idempotent loop (an entry that already has a key keeps it; a row that is not a JSON list is left for the reader). `readPostingSlots` in `@postgear/automation` fills the same defaults for anything older it meets, so a bare `{ "time": 120 }` still means every day, exact.
 - **`Post.madeWithAi`** (Boolean, default false), written on every row of a group like `intervalInDays`. Providers with a label field send it (`ProviderRules.aiLabel`); the rest ignore it.
 
+
+### `Role.EDITOR`, Editor seats, `ClipJobKind.EMOTE`, `Post.createdById` (Module 14)
+
+Four migrations, `20261128140000` to `20261128140300`:
+
+- **`Role.EDITOR`** sits in a migration of its own (`sprint13_role_editor`): Postgres cannot use a new enum value inside the transaction that adds it, and the seat seed reads the role. An Editor makes clips and designs and saves post drafts; what each role may do is `packages/entitlements/src/capabilities.ts`, and `apps/api/src/common/guards/role-parity.ts` fails the build when that list and this enum differ. The role is never stored for a superadmin and never invited as one.
+- **`members.editors_max`** is a registry key, not a column: the seed migration (`sprint13_editor_seats_seed`) writes one `PlanEntitlement` row per tier (Free 0, Standard 1, Pro 3, Team 10, Ultimate 25) and its "Seed" `EntitlementChange` row. Editors are counted from `UserOrganization` (`role = EDITOR`, `disabled = false`) under a transaction advisory lock on `'editor-seats:' || organizationId`; there is no seat table, and a plan lowered below the count removes nobody.
+- **`ClipJobKind.EMOTE`** (`sprint13_clip_job_emote`): one Emote Maker export. Its input and output live in the job's JSON like every other kind (`packages/video-engine/src/jobs.ts`), and its files expire with the job (24 hours).
+- **`Post.createdById`** (`sprint13_post_created_by`): a plain nullable id with no foreign key, like `Clip.createdById`, so a person leaving keeps their posts. Written on create from the person saving (composer, Send To Composer, Studio Send, the Copilot); null for workflows and the public API. Old rows stay null.

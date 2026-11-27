@@ -14,7 +14,7 @@
  *   every job of the batch, the single job stream's events and shapes;
  *   `@SkipThrottle()` because one long request is not a burst.
  *
- * `@Roles(ADMIN, USER)` and `ClipsEnabledGuard`, as every Clips route; every
+ * `@Roles(ADMIN, USER, EDITOR)` and `ClipsEnabledGuard`, as every Clips route; every
  * handler scopes on `@CurrentOrg()`, and another workspace's batch is a 404
  * checked before a stream opens. Registered in `ClipsModule.controllers`,
  * so before `ClipItemModule`'s `/clips/:clipId` routes (none of which has
@@ -56,7 +56,7 @@ import {
 import { ClipBatchExportsService } from './clip-batch-exports.service';
 
 @Controller('clips/exports')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipBatchExportsController {
   constructor(

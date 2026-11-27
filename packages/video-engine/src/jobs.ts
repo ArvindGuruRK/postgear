@@ -12,6 +12,7 @@
  */
 import { z } from 'zod';
 import { clipDocumentSchema } from './document/schema';
+import { type EmoteJobInput, emoteInputSchema, emoteOutputSchema } from './emotes/schema';
 import { CLIP_PLATFORMS, LINK_KINDS } from './links/types';
 import { EXPORT_QUALITIES } from './quality';
 import { isStarterRecipeId, type RecipeSkip } from './recipes/schema';
@@ -29,6 +30,8 @@ export const CLIP_JOB_KINDS = [
   'SPEECH',
   // Module 10: Auto-Edit Video.
   'AUTO_EDIT',
+  // Module 14: Emote Maker (one export press).
+  'EMOTE',
 ] as const;
 export type ClipJobKind = (typeof CLIP_JOB_KINDS)[number];
 
@@ -57,6 +60,7 @@ export const CLIP_JOB_STAGES = {
   TRANSLATE: ['translating'],
   SPEECH: ['voice'],
   AUTO_EDIT: ['listening', 'applying'],
+  EMOTE: ['fetching', 'encoding', 'finishing'],
 } as const satisfies Record<ClipJobKind, readonly string[]>;
 
 export type ClipJobStage = (typeof CLIP_JOB_STAGES)[ClipJobKind][number];
@@ -81,6 +85,11 @@ const STAGE_LABELS: Record<ClipJobKind, Record<string, string>> = {
   TRANSLATE: { translating: 'Translating the captions' },
   SPEECH: { voice: 'Making the voice' },
   AUTO_EDIT: { listening: 'Listening to what is said', applying: 'Applying your recipe' },
+  EMOTE: {
+    fetching: 'Getting the video',
+    encoding: 'Making the emote',
+    finishing: 'Packing the files',
+  },
 };
 
 export const WAITING_LABEL = 'Waiting for its turn';
@@ -393,6 +402,7 @@ export const CLIP_JOB_INPUT_SCHEMAS = {
   TRANSLATE: translateInputSchema,
   SPEECH: speechInputSchema,
   AUTO_EDIT: autoEditInputSchema,
+  EMOTE: emoteInputSchema,
 } as const;
 
 export type AutoEditInput = z.infer<typeof autoEditInputSchema>;
@@ -417,6 +427,7 @@ export interface ClipJobInputs {
   TRANSLATE: TranslateInput;
   SPEECH: SpeechInput;
   AUTO_EDIT: AutoEditInput;
+  EMOTE: EmoteJobInput;
 }
 
 // --- Outputs ------------------------------------------------------------------
@@ -612,6 +623,7 @@ export const CLIP_JOB_OUTPUT_SCHEMAS = {
   TRANSLATE: translateOutputSchema,
   SPEECH: speechOutputSchema,
   AUTO_EDIT: autoEditOutputSchema,
+  EMOTE: emoteOutputSchema,
 } as const;
 
 export type AutoEditOutput = z.infer<typeof autoEditOutputSchema>;

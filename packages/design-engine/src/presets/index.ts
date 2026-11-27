@@ -15,6 +15,8 @@
  * - **Signature** (`signature.ts`, `originals.ts`): CarouselClick's look, its
  *   generated patterns and its hand-made backgrounds on the signature themes;
  * - **Luxury** (`luxury.ts`): the luxury themes and art.
+ * - **Schedule** (`schedule.ts`, Sprint 13): a week of streams in the five
+ *   schedule themes, which the Schedule Maker opens.
  *
  * The brand name, the handle and the slide numbers are not sample content:
  * they belong to the design (`bindings.ts`), so a preset never writes them.
@@ -39,9 +41,11 @@ import { CLASSIC_PRESETS } from './classic';
 import { CLASSIC_ART_PRESETS } from './classic-art';
 import { LUXURY_PRESETS } from './luxury';
 import { ORIGINAL_PRESETS } from './originals';
+import { SCHEDULE_PRESETS } from './schedule';
 import { SIGNATURE_PRESETS } from './signature';
 
 export { buildPresets, type PresetRow, type PresetShape, slide } from './build';
+export { SAMPLE_WEEK, SCHEDULE_PRESET_BY_THEME, SCHEDULE_PRESETS } from './schedule';
 
 /**
  * The handle a design made from a preset starts with, so the footer reads
@@ -57,6 +61,7 @@ export const PRESETS: Preset[] = [
   ...SIGNATURE_PRESETS,
   ...ORIGINAL_PRESETS,
   ...LUXURY_PRESETS,
+  ...SCHEDULE_PRESETS,
 ];
 
 const BY_ID: ReadonlyMap<string, Preset> = new Map(PRESETS.map((preset) => [preset.id, preset]));

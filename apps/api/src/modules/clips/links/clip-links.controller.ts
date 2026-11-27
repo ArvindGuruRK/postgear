@@ -1,7 +1,7 @@
 /**
  * `/clips/links` (Module 03): the probe and the probe answer's picture.
  *
- * `@Roles(ADMIN, USER)`: any member of the workspace may check a link. The
+ * `@Roles(ADMIN, USER, EDITOR)`: any member of the workspace may check a link. The
  * workspace comes from `@CurrentOrg()`, never from the body.
  *
  * - `POST /clips/links/probe` `{ url }`: 200 `{ probe }`. The answer never
@@ -46,7 +46,7 @@ import { ClipThumbnailsService } from './clip-thumbnails.service';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/links')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipLinksController {

@@ -54,6 +54,7 @@ import {
   MAX_TITLE_LENGTH,
   updateDesignSchema,
 } from './dto/studio.schema';
+import { SCHEDULE_MESSAGES } from './schedules/schedules.messages';
 import { SLIDE_FAILURE_REASONS, STUDIO_MESSAGES } from './studio.messages';
 import { PREMIUM_LOOK_REQUIRED_CODE } from './studio.premium';
 import type {
@@ -714,6 +715,63 @@ describe('create', () => {
     const { service, repository } = setup();
 
     expect(await refusal(service.create(ORG, USER, input))).toMatchObject({ status, message });
+    expect(repository.createDesign).not.toHaveBeenCalled();
+  });
+
+  it('writes the Schedule Maker week over a schedule template, with its source', async () => {
+    const { service, repository } = setup();
+    const rows = [
+      { day: 'Mon', time: '7 PM', title: 'Minecraft' },
+      { day: 'Tue', time: '', title: '', off: true },
+      { day: 'Wed', time: '8 PM', title: 'Just Chatting' },
+      { day: 'Thu', time: '', title: '', off: true },
+      { day: 'Fri', time: '7 PM', title: 'Minecraft, 10 PM Chat' },
+      { day: 'Sat', time: '3 PM', title: 'Variety' },
+      { day: 'Sun', time: '', title: '', off: true },
+    ];
+    const source = {
+      source: 'twitch' as const,
+      login: 'simstreamer',
+      timeZone: 'Asia/Kolkata',
+      weekStart: '2026-11-23',
+      fetchedAt: '2026-11-28T10:00:00.000Z',
+      hour12: true,
+    };
+
+    await service.create(ORG, USER, {
+      presetId: 'schedule-week-cool',
+      format: 'landscape',
+      schedule: { source, rows },
+    });
+
+    const document = repository.createDesign.mock.calls[0][0].document as unknown as DesignDocument;
+    expect(document.schedule).toEqual(source);
+    expect(document.slides[0].elements.schedule?.rows).toEqual(rows);
+    expect(document.format).toBe('landscape');
+  });
+
+  it('refuses a week on a template with no schedule, and writes nothing', async () => {
+    const { service, repository } = setup();
+
+    expect(
+      await refusal(
+        service.create(ORG, USER, {
+          presetId: 'tips-steps-ink',
+          format: 'square',
+          schedule: {
+            source: {
+              source: 'manual',
+              login: null,
+              timeZone: 'UTC',
+              weekStart: '2026-11-23',
+              fetchedAt: null,
+              hour12: true,
+            },
+            rows: [],
+          },
+        }),
+      ),
+    ).toMatchObject({ status: 422, message: SCHEDULE_MESSAGES.TEMPLATE_HAS_NO_SCHEDULE });
     expect(repository.createDesign).not.toHaveBeenCalled();
   });
 

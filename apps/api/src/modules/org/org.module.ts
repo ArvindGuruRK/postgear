@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { EditorSeatsService } from './editor-seats.service';
 import { InviteTokenService } from './invite-token.service';
 import { OrgController } from './org.controller';
 import { OrgService } from './org.service';
@@ -15,9 +17,9 @@ import { OrgService } from './org.service';
  * global guard skips `@Public()` routes. Auth never imports this module.
  */
 @Module({
-  imports: [BillingModule, AuthModule],
+  imports: [BillingModule, AuthModule, EntitlementsModule],
   controllers: [OrgController],
-  providers: [OrgService, InviteTokenService],
+  providers: [OrgService, InviteTokenService, EditorSeatsService],
   exports: [OrgService],
 })
 export class OrgModule {}

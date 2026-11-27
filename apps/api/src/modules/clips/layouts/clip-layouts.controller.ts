@@ -2,7 +2,7 @@
  * Saved layouts (Sprint 12, Module 10 section 6): `GET`, `POST
  * /clips/layouts`, `PATCH` and `DELETE /clips/layouts/:id`.
  *
- * `@Roles(ADMIN, USER)`: any member saves, renames and deletes; the
+ * `@Roles(ADMIN, USER, EDITOR)`: any member saves, renames and deletes; the
  * workspace comes from `@CurrentOrg()` and another workspace's id is a 404.
  * Registered before `ClipItemModule`'s `GET /clips/:clipId` (see
  * `clips.module.ts`), which would otherwise take `GET /clips/layouts`.
@@ -40,7 +40,7 @@ import { ClipLayoutsService } from './clip-layouts.service';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/layouts')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipLayoutsController {

@@ -1,7 +1,7 @@
 /**
  * The AI routes.
  *
- * `@Roles(ADMIN, USER)` makes an active membership mandatory while leaving
+ * `@Roles(ADMIN, USER, EDITOR)` makes an active membership mandatory while leaving
  * every member free to generate, as the posts and media controllers do.
  *
  * ## The streaming handlers
@@ -18,6 +18,10 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@ne
 import { Role } from '@postgear/db';
 import type { Request, Response } from 'express';
 import { type ActiveOrg, CurrentOrg } from '../../common/decorators/current-org.decorator';
+import {
+  type AuthenticatedUser,
+  CurrentUser,
+} from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodBody } from '../../common/pipes/zod-validation.pipe';
 import { openSseStream } from '../../common/sse';
@@ -30,7 +34,7 @@ import {
 } from './dto/ai.schema';
 
 @Controller('ai')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class AiController {
   constructor(private readonly ai: AiService) {}
 
@@ -65,12 +69,13 @@ export class AiController {
   @Post('copilot/chat')
   @HttpCode(HttpStatus.OK)
   async chat(
+    @CurrentUser() user: AuthenticatedUser,
     @CurrentOrg() org: ActiveOrg,
     @Body(new ZodBody(copilotChatSchema, 'ai/copilot/chat')) dto: CopilotChatInput,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    const run = await this.ai.prepareChat(org.id, dto);
+    const run = await this.ai.prepareChat(org.id, dto, { userId: user.id, role: org.role });
     const stream = openSseStream(request, response);
 
     try {

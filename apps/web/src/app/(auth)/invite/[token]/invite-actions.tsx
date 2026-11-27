@@ -4,7 +4,9 @@
  * The signed-in half of the invitation page: join, or switch accounts.
  *
  * Joining calls `POST /orgs/invites/accept`, which also makes the workspace
- * the active one, then opens its Home page. Someone who has not finished
+ * the active one, then opens its Home page, or Clips for an Editor (Sprint 13,
+ * Module 14; `workspaceHome`). With no Editor seat left the API refuses with
+ * a 402, and its sentence is shown above the button. Someone who has not finished
  * onboarding is sent on to it by the dashboard's own gate, already past
  * "Name your workspace" (the API moved them on when they joined).
  *
@@ -16,7 +18,10 @@
 import { Button, FormErrorMessage, Stack, Text } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { refusalMessage } from '@/components/settings/team-view-model';
 import { ApiError, api } from '@/lib/api';
+import { workspaceHome } from '@/lib/workspace-home';
+import type { WorkspaceRole } from '@/types/workspace';
 import { withNext } from '../../login/safe-next';
 
 interface InviteActionsProps {
@@ -54,15 +59,17 @@ export function InviteActions({
     setError(null);
 
     try {
-      const { organization } = await api<{ organization: { id: string } }>('/orgs/invites/accept', {
-        method: 'POST',
-        body: { token },
-      });
-      router.replace(`/${organization.id}/home`);
+      const { organization } = await api<{ organization: { id: string; role?: WorkspaceRole } }>(
+        '/orgs/invites/accept',
+        { method: 'POST', body: { token } },
+      );
+      router.replace(workspaceHome(organization.id, organization.role));
       router.refresh();
     } catch (cause) {
       setError(
-        cause instanceof ApiError ? cause.message : 'Something went wrong. Please try again.',
+        cause instanceof ApiError
+          ? refusalMessage(cause)
+          : 'Something went wrong. Please try again.',
       );
       setWorking(false);
     }

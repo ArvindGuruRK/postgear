@@ -43,6 +43,12 @@ export interface FitInput {
   lineHeight: number;
   /** How far the search may shrink, as a fraction of the starting size. */
   minScale?: number;
+  /**
+   * One line, never wrapped (Sprint 13: a schedule row's cell). Line breaks
+   * read as spaces, and the search shrinks until the line fits the width;
+   * the height only has to hold that one line.
+   */
+  singleLine?: boolean;
   measure: MeasureText;
 }
 
@@ -60,6 +66,13 @@ export interface FitResult {
 /** The smallest a slot may shrink to before it warns instead. */
 export const MIN_FIT_SCALE = 0.62;
 
+/**
+ * The floor for one-line cells (a schedule row's title): further than a
+ * paragraph may go, because a row has no second line to fall back on, and a
+ * title at half size still reads on a 1080 pixel picture.
+ */
+export const MIN_LINE_FIT_SCALE = 0.5;
+
 /** Steps the search tries, largest first. Twelve is enough to look continuous. */
 const STEPS = 12;
 
@@ -72,14 +85,18 @@ const STEPS = 12;
  * wrap can produce when a word hops a line.
  */
 export function fitText(input: FitInput): FitResult {
-  const minScale = input.minScale ?? MIN_FIT_SCALE;
+  const minScale = input.minScale ?? (input.singleLine ? MIN_LINE_FIT_SCALE : MIN_FIT_SCALE);
   const base = input.style.fontSize;
+  const line = input.singleLine ? input.text.replace(/\s*[\r\n]+\s*/g, ' ') : null;
   let last: FitResult | null = null;
 
   for (let step = 0; step < STEPS; step++) {
     const scale = 1 - ((1 - minScale) * step) / (STEPS - 1);
     const fontSize = base * scale;
-    const lines = wrapText(input.text, input.width, { ...input.style, fontSize }, input.measure);
+    const lines =
+      line === null
+        ? wrapText(input.text, input.width, { ...input.style, fontSize }, input.measure)
+        : [line];
     const height = lines.length * fontSize * input.lineHeight;
 
     last = { fontSize, lines, overflows: false, height };

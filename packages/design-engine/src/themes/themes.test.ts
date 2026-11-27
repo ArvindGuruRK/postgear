@@ -27,6 +27,8 @@ import {
   isThemeId,
   LUXURY_THEME_IDS,
   LUXURY_THEMES,
+  SCHEDULE_THEME_IDS,
+  SCHEDULE_THEMES,
   SIGNATURE_THEME_IDS,
   SIGNATURE_THEMES,
   THEMES,
@@ -144,18 +146,22 @@ describe('the collections', () => {
   });
 
   it('puts every theme in exactly one collection', () => {
-    expect([...CLASSIC_THEME_IDS, ...SIGNATURE_THEME_IDS, ...LUXURY_THEME_IDS]).toEqual(
-      THEMES.map((theme) => theme.id),
-    );
+    expect([
+      ...CLASSIC_THEME_IDS,
+      ...SIGNATURE_THEME_IDS,
+      ...LUXURY_THEME_IDS,
+      ...SCHEDULE_THEME_IDS,
+    ]).toEqual(THEMES.map((theme) => theme.id));
 
     for (const id of CLASSIC_THEME_IDS) expect(themeCollection(id)).toBe('classic');
     for (const id of SIGNATURE_THEME_IDS) expect(themeCollection(id)).toBe('signature');
     for (const id of LUXURY_THEME_IDS) expect(themeCollection(id)).toBe('luxury');
+    for (const id of SCHEDULE_THEME_IDS) expect(themeCollection(id)).toBe('schedule');
   });
 
   it('locks the luxury themes to paid plans, and no other', () => {
     for (const theme of LUXURY_THEMES) expect(theme.premium).toBe(true);
-    for (const theme of [...CLASSIC_THEMES, ...SIGNATURE_THEMES]) {
+    for (const theme of [...CLASSIC_THEMES, ...SIGNATURE_THEMES, ...SCHEDULE_THEMES]) {
       expect(theme.premium).not.toBe(true);
     }
   });
@@ -467,6 +473,77 @@ describe('the luxury themes', () => {
     for (const theme of LUXURY_THEMES) {
       for (const style of Object.values(theme.type)) expect(style.italic).toBeFalsy();
     }
+  });
+});
+
+/**
+ * Sprint 13's five schedule looks. A schedule row is a card: the day on
+ * `primary` in `onPrimary`, the time and the title on `surface` in
+ * `onSurface`, and a day off all on `surface`. Those pairs are already in
+ * the AA check above; these hold the collection to what Module 14 names.
+ */
+describe('the schedule themes', () => {
+  const SHIPPED_OFL: ReadonlySet<FontId> = new Set<FontId>([
+    'sora',
+    'outfit',
+    'space-grotesk',
+    'oswald',
+    'anton',
+    'inter',
+  ]);
+
+  it('are the five the Schedule Maker offers, in its order, with their names', () => {
+    expect(SCHEDULE_THEMES.map((theme) => [theme.id, theme.name])).toEqual([
+      ['schedule-clean-blue', 'Clean Blue'],
+      ['schedule-light-blue', 'Light Blue'],
+      ['schedule-cool', 'Cool'],
+      ['schedule-dark', 'Dark'],
+      ['schedule-red', 'Red'],
+    ]);
+  });
+
+  it('take the style and colour family of the brief', () => {
+    expect(SCHEDULE_THEMES.map((theme) => [theme.style, theme.family])).toEqual([
+      ['light', 'blue'],
+      ['colourful', 'teal'],
+      ['colourful', 'purple'],
+      ['dark', 'mono'],
+      ['colourful', 'red'],
+    ]);
+  });
+
+  it('draw every row card where it reads: the day, the time and the title, and a day off', () => {
+    for (const theme of SCHEDULE_THEMES) {
+      const { colors } = theme;
+      expect(contrastRatio(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(AA_CONTRAST);
+      expect(contrastRatio(colors.onSurface, colors.surface)).toBeGreaterThanOrEqual(AA_CONTRAST);
+    }
+  });
+
+  it('set their headings in the faces of the brief, from the shipped OFL fonts', () => {
+    expect(SCHEDULE_THEMES.map((theme) => theme.type.headline.font)).toEqual([
+      'sora',
+      'outfit',
+      'space-grotesk',
+      'oswald',
+      'anton',
+    ]);
+    for (const theme of SCHEDULE_THEMES) {
+      for (const font of fontsOf(theme)) {
+        expect([theme.id, font, SHIPPED_OFL.has(font)]).toEqual([theme.id, font, true]);
+        expect(FONTS[font].licence).toBe('OFL-1.1');
+      }
+    }
+  });
+
+  it('ask each heading face only for a weight it has', () => {
+    const clamped = SCHEDULE_THEMES.flatMap((theme) =>
+      Object.entries(theme.type)
+        .filter(([, style]) => style.face === 'heading')
+        .filter(([, style]) => resolveWeight(style.font, style.weight) !== style.weight)
+        .map(([role, style]) => `${theme.id} ${role}: ${style.font} has no ${style.weight}`),
+    );
+    expect(clamped).toEqual([]);
   });
 });
 

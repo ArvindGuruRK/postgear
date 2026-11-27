@@ -9,7 +9,7 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { ClipsStatusService } from './clips-status.service';
 
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class ClipsStatusController {
   constructor(private readonly clipsStatus: ClipsStatusService) {}
 

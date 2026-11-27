@@ -50,6 +50,8 @@ describe('a clip job has a hard time limit from the contract', () => {
       // Module 10: Auto-Edit Video.
       'AUTO_EDIT',
       'DOWNLOAD',
+      // Module 14: Emote Maker.
+      'EMOTE',
       'FACES',
       'HIGHLIGHTS',
       'IMPORT',

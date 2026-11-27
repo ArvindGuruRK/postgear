@@ -35,6 +35,7 @@ import { CONTENT_LAYOUTS } from './content';
 import { COVER_LAYOUTS } from './covers';
 import { LIST_LAYOUTS } from './lists';
 import { QUOTE_LAYOUTS } from './quotes';
+import { SCHEDULE_LAYOUTS } from './schedule';
 import { SIGNATURE_LAYOUTS } from './signature';
 import { STAT_LAYOUTS } from './stats';
 
@@ -46,6 +47,7 @@ export const LAYOUTS: SlideLayout[] = [
   ...STAT_LAYOUTS,
   ...CLOSING_LAYOUTS,
   ...SIGNATURE_LAYOUTS,
+  ...SCHEDULE_LAYOUTS,
 ];
 
 /** The layout Start From Blank and every fallback use. */
@@ -99,6 +101,11 @@ export function layoutsForRole(role: SlideRole, format: FormatId): SlideLayout[]
   );
 }
 
+/**
+ * The roles Add Slide offers. `schedule` (Sprint 13) is left out on purpose:
+ * a week of streams is its own picture, made by the Schedule Maker or from a
+ * Schedule template, not a slide added to a carousel.
+ */
 export const SLIDE_ROLES: readonly SlideRole[] = [
   'cover',
   'content',
@@ -115,6 +122,7 @@ export const SLIDE_ROLE_LABELS: Record<SlideRole, string> = {
   quote: 'Quote',
   statistic: 'Statistic',
   closing: 'Closing CTA',
+  schedule: 'Schedule',
 };
 
 /** The layout Add Slide uses when only a role is chosen. */
@@ -125,6 +133,7 @@ const DEFAULT_LAYOUT_FOR_ROLE: Record<SlideRole, string> = {
   quote: 'quote-centre',
   statistic: 'stat-big',
   closing: 'closing-cta',
+  schedule: 'schedule-week',
 };
 
 export function defaultLayoutFor(role: SlideRole | undefined): SlideLayout {
@@ -253,6 +262,7 @@ export {
   COVER_LAYOUTS,
   LIST_LAYOUTS,
   QUOTE_LAYOUTS,
+  SCHEDULE_LAYOUTS,
   SIGNATURE_LAYOUTS,
   STAT_LAYOUTS,
 };

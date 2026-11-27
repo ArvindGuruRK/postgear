@@ -37,6 +37,7 @@
  * in the form and in the provider alike. Like a customization, a deselected
  * channel keeps its settings, so an accidental click loses nothing.
  */
+import { canSchedule, type RoleInput } from '@postgear/entitlements';
 import {
   documentFromText,
   emptyDocument,
@@ -655,4 +656,35 @@ export function toSavePayload(
 /** Plain-text starting content, for tests and for anything that seeds a draft. */
 export function textPart(text: string, media: MediaItem[] = []): DraftPart {
   return newPart(documentFromText(text), media);
+}
+
+// --- Editors (Sprint 13, Module 14) -------------------------------------------
+
+/** Over a scheduled post an Editor opens: it can be read, not changed. */
+export const EDITOR_SCHEDULED_NOTICE =
+  'This post is scheduled, so editors can read it here but not change it. Ask an admin to change it.';
+
+/** The API's 403 for an Editor's write that is not a draft edit. */
+export const EDITOR_FORBIDDEN_CODE = 'editor_forbidden';
+
+export interface ComposerAccess {
+  /** The viewer may only save drafts: no time, no schedule, no Post Now, no repeat. */
+  draftsOnly: boolean;
+  /** The post has gone out: read only for everyone. */
+  published: boolean;
+  /** Nothing can be changed: published, or a scheduled post opened by an Editor. */
+  locked: boolean;
+}
+
+/**
+ * What the composer lets this role do with this post. An Editor
+ * (`canSchedule` answers no) writes and saves drafts only, and a post that is
+ * not a draft is read only to them, as the API's `assertEditorMayWrite`
+ * refuses any change to it. Fails closed: no role is drafts only.
+ */
+export function composerAccess(role: RoleInput, savedState: PostState | null): ComposerAccess {
+  const draftsOnly = !canSchedule(role);
+  const published = savedState === 'PUBLISHED';
+  const notDraft = savedState !== null && savedState !== 'DRAFT';
+  return { draftsOnly, published, locked: published || (draftsOnly && notDraft) };
 }

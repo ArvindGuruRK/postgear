@@ -14,6 +14,8 @@ export {
   // Sprint 13, Module 10: Auto-Edit Video.
   clipAutoEditWorkflow,
   clipDownloadWorkflow,
+  // Sprint 13, Module 14: Emote Maker.
+  clipEmoteWorkflow,
   // Sprint 13, Module 07: finding faces.
   clipFacesWorkflow,
   clipHighlightsWorkflow,

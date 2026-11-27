@@ -17,6 +17,9 @@
  * - `clipAutoEditWorkflow` (`postgear-media`, Sprint 13 Module 10): one
  *   `clipAutoEdit` activity (wait for the listen job, then the API makes the
  *   clip with the recipe applied).
+ * - `clipEmoteWorkflow` (`postgear-media`, Sprint 13 Module 14): one
+ *   `emoteExport` activity (every size of one emote down its ladder); a
+ *   failure or a cancel empties its folder and gives the download back.
  * - `clipDownloadWorkflow` (`postgear-media`, Module 18): one `clipDownload`
  *   activity; a failure or a cancel empties its folder and gives back both
  *   charges in the bookkeeping.
@@ -193,6 +196,11 @@ export async function clipSpeechWorkflow(input: ClipJobWorkflowInput): Promise<C
  */
 export async function clipAutoEditWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
   return runClipJob(input, 'AUTO_EDIT', () => workActivities('AUTO_EDIT').clipAutoEdit(input));
+}
+
+/** Sprint 13, Module 14: one Emote Maker export press (no AI minutes, one download unit). */
+export async function clipEmoteWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {
+  return runClipJob(input, 'EMOTE', () => workActivities('EMOTE').emoteExport(input));
 }
 
 export async function clipDownloadWorkflow(input: ClipJobWorkflowInput): Promise<ClipJobOutcome> {

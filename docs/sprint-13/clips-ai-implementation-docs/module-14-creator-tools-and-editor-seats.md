@@ -1,6 +1,6 @@
 # Module 14: Creator Tools And Editor Seats
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: XL (may need two sessions: see "How To Split The Sessions")
+> **Sprint 13, Clips AI** | Status: Done 2026-11-28, one session (the Emote spike's real clips and platform pages wait for the owner) | Size: XL (may need two sessions: see "How To Split The Sessions")
 > **Depends on**: [Module 03](module-03-captions.md) (the map's anchor) and the whole of Sprint 12. In practice it needs only Sprint 12's entitlement registry and operator screen (Modules 01 and 19), its Twitch app-token client (Module 03), `runTool` and the plan-file conventions of the FFmpeg compiler (Modules 02 and 05), the Clips controllers, and Design Studio. It edits every Clips controller written by Sprint 12 and by Modules 01 to 13 of this sprint, so run it after them; the route-matrix test finds anything missed.
 > **Stories**: CA-11.1 Make An Emote, CA-11.2 Make A Stream Schedule Picture, CA-11.3 Invite An Editor, CA-11.4 Work As An Editor
 > **Decisions**: D13-15 (built, Editors cannot schedule or publish in v1), D13-16 (FFmpeg only), D13-02 (the tools cost no AI Minutes)
@@ -57,8 +57,9 @@ No other schema change. `members.max` stays unenforced (research 10 section 12.3
 |---|---|---|---|
 | `canWorkOnClips`, `canUseStudio`, `canUseMedia`, `canUseCopilot`, `canReadCalendar`, `canSaveDrafts`, `canUseTags` | yes | yes | yes |
 | `canSchedule`, `canPublish` | yes | yes | **no** |
-| `canConnectChannels`, `canManageTeam`, `canManageBilling`, `canManageApiKeys`, `canManageWebhooks`, `canManageWorkflows` | yes | no | no |
 | `canViewAnalytics`, `canUseSeo`, `canUseDiscover` | yes | yes | **no** |
+| `canViewBilling`, `canViewChannels`, `canUseWorkflows`, `canConnectChannels`, `canViewDeveloperSettings` (as built: the code already let members do these) | yes | yes | **no** |
+| `canManageChannels`, `canManageTeam`, `canManageBilling`, `canManageApiKeys`, `canManageWebhooks`, `canManageWorkflows`, `canManageWorkspaceSettings` | yes | no | no |
 
 (The ADMIN and USER columns restate what the code does today; read the real decorators first and copy them, do not trust this table over the code.) `SUPERADMIN` behaves as `ADMIN` in a workspace, as today. A type-level check in the API (`satisfies Record<Role, ...>`) fails the build if the Prisma `Role` and this union drift. Research 10 suggested two copies with a parity test; one pure shared file is simpler, and `packages/entitlements` is already imported by both sides. If the package wiring proves awkward, fall back to the two copies and the parity test, and write it in the Decision Log.
 
@@ -97,7 +98,7 @@ No other schema change. `members.max` stays unenforced (research 10 section 12.3
 |---|---|
 | Invite dialog, role tiles | Member, Admin, Editor |
 | Under Editor | Editors can make clips and designs and save post drafts. They cannot connect channels, schedule or publish, see billing or analytics, or invite people. |
-| Seat line | 2 of 3 editor seats used |
+| Seat line | 2 of 3 editor seats used (as built: "0 of 1 editor seat used" at a limit of 1) |
 | No seat | No editor seats left. Remove an editor or change your plan. |
 | Over the cap | You have 5 editors and your plan allows 3. Remove 2 to add more. |
 | Email | {name} invited you to join {workspace} as an editor. |
@@ -234,34 +235,34 @@ export interface ScheduleSource {                                          // De
 ## Tasks
 
 Part A: Editor Seats
-- [ ] Migration 1 (`Role` gains `EDITOR`), migration 2 (`members.editors_max` registry key and seed rows); `db:generate`.
-- [ ] `capabilities.ts` and the type-level role check.
-- [ ] `@Roles` edits: the older nine, every Clips controller, entitlements, studio schedule, emotes; the two handler decorators on posts; the count in the Decision Log.
-- [ ] `assertEditorMayWrite` and its callers (posts, Send To Composer, Module 13 slots, repeat).
-- [ ] `EditorSeatsService`, the advisory lock, soft check at invite, hard check at accept, role change and re-enable checks, `GET /org/seats`.
-- [ ] Invite Zod enums, mail union, address required for Editor, accept step checks the address, old tokens still verify.
-- [ ] `editor-access.json` and the two matrix specs.
-- [ ] Web: capability functions, the six fail-open sites, types and labels, rail, denied pages, Home, composer and calendar for an Editor, invite dialog and Team page copy, over-cap banner.
-- [ ] Four member security events; `meta.by` on `consume` calls.
-- [ ] Part A tests green; commit-ready note in the Progress row.
+- [x] Migration 1 (`Role` gains `EDITOR`), migration 2 (`members.editors_max` registry key and seed rows); `db:generate`.
+- [x] `capabilities.ts` and the type-level role check.
+- [x] `@Roles` edits: the older nine, every Clips controller, entitlements, studio schedule, emotes; the two handler decorators on posts; the count in the Decision Log.
+- [x] `assertEditorMayWrite` and its callers (posts, Send To Composer, Module 13 slots, repeat).
+- [x] `EditorSeatsService`, the advisory lock, soft check at invite, hard check at accept, role change and re-enable checks, `GET /org/seats`.
+- [x] Invite Zod enums, mail union, address required for Editor, accept step checks the address, old tokens still verify.
+- [x] `editor-access.json` and the two matrix specs.
+- [x] Web: capability functions, the six fail-open sites, types and labels, rail, denied pages, Home, composer and calendar for an Editor, invite dialog and Team page copy, over-cap banner.
+- [x] Four member security events; `meta.by` on `consume` calls.
+- [x] Part A tests green; commit-ready note in the Progress row.
 
 Part B: Emote Maker
-- [ ] Spike (three real clips, the FFmpeg option checks, the platform pages) and the Decision Log entry.
-- [ ] `emotes/` profiles, `planEmote`, `nextRung`, bounds schema, their tests.
-- [ ] `EMOTE` kind, scheduling contract entry, `clipEmoteWorkflow`, `emoteExport` activity, the zip writer and its licence note.
-- [ ] `POST /clips/emotes/export`, `GET /clips/emotes/:jobId`, messages, the downloads meter charge and reversal.
-- [ ] The page: source, trim, crop, look, preview, chat preview, export panel, job card, files table; entries in Creator Tools and in a clip's menu.
-- [ ] Title-case test green; `/dev/components` section for the chat preview and the crop box.
+- [ ] Spike (three real clips, the FFmpeg option checks, the platform pages) and the Decision Log entry. **Partly**: the FFmpeg option checks and the size ladder ran on the local samples (Decision Log); the three real clips and the live platform pages were not fetched, by the owner's rule, and wait for the owner.
+- [x] `emotes/` profiles, `planEmote`, `nextRung`, bounds schema, their tests.
+- [x] `EMOTE` kind, scheduling contract entry, `clipEmoteWorkflow`, `emoteExport` activity, the zip writer and its licence note.
+- [x] `POST /clips/emotes/export`, `GET /clips/emotes/:jobId`, messages, the downloads meter charge and reversal.
+- [x] The page: source, trim, crop, look, preview, chat preview, export panel, job card, files table; entries in Creator Tools and in a clip's menu.
+- [x] Title-case test green; `/dev/components` section for the chat preview and the crop box.
 
 Part C: Schedule Maker
-- [ ] Schema v3, types, `rows` slot, `schedule` role, `ScheduleSource`, schema and tests.
-- [ ] `schedule-week@1`, `RowsSlot`, the one-line fit mode, panel table editor.
-- [ ] Five themes, five presets, the "Schedule" category, contrast tests.
-- [ ] `localMidnightToUtc`, `weekRange`, `segmentsToRows` with the daylight saving and midnight tests.
-- [ ] `POST /studio/schedules/fetch`, the Twitch call, cache, throttle, fixtures, simulation.
-- [ ] The wizard page, the open-in-Studio step, Refresh From Twitch, the by-hand tab, Try A Sample.
-- [ ] Keys guide steps and `.env.example` comments.
-- [ ] `verify-change`; update the Progress table, the Decision Log, and the capability matrix table in the sprint doc if the build changed it.
+- [x] Schema v3, types, `rows` slot, `schedule` role, `ScheduleSource`, schema and tests.
+- [x] `schedule-week@1`, `RowsSlot`, the one-line fit mode, panel table editor.
+- [x] Five themes, five presets, the "Schedule" category, contrast tests.
+- [x] `localMidnightToUtc`, `weekRange`, `segmentsToRows` with the daylight saving and midnight tests.
+- [x] `POST /studio/schedules/fetch`, the Twitch call, cache, throttle, fixtures, simulation.
+- [x] The wizard page, the open-in-Studio step, Refresh From Twitch, the by-hand tab, Try A Sample.
+- [x] Keys guide steps and `.env.example` comments.
+- [x] `verify-change`; update the Progress table, the Decision Log, and the capability matrix table in the sprint doc if the build changed it.
 
 ## Tests
 
@@ -316,3 +317,5 @@ With the three simulation flags on, the demo admin and a second browser profile:
 ## Handoff
 
 Module 15 prices EMOTE jobs and the Editor seat in the cost table, reads `meta.by` to show who spent what, and uses `clips.queue_priority`. Module 16 adds the Editor, Emote and Schedule rows to the sweep and their e2e tests. Module 17 holds Editors Can Schedule with an approval step, model-based background removal, a Team activity tab and metering the schedule export. The real-test plan decides whether Editor seats are on and whether Twitch accepts the emote files.
+
+**As built (2026-11-28).** `meta.by` is on every Clips charge; the AI credits ledger (`Credits`) has no user column, so Copilot and Studio AI spending cannot be split by person until Module 15 adds one. Any future route that re-enables a disabled membership must call `EditorSeatsService.assertRoom(orgId, tx)`. The Emote job's limit is 30 minutes (the worker keeps 10 of any limit for cleanup). Studio's export needs Playwright's own Chromium build (1234 for Playwright 1.62.1); this Mac has only 1255, so the local export fails until `npx playwright install chromium` is run (the hand check pointed the API at the installed build through `PLAYWRIGHT_BROWSERS_PATH`).

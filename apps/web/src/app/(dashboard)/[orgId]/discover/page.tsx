@@ -27,13 +27,14 @@
  * that workspace's remembered place instead of carrying the last one over
  * (and drops an open Create Post sheet with it).
  */
+import { canManageWorkspaceSettings } from '@postgear/entitlements';
 import type { Metadata } from 'next';
 import { settingsInScope, tabFrom } from '@/components/discover/discover-model';
 import { DiscoverPage } from '@/components/discover/discover-page';
 import { serverApi } from '@/lib/api';
 import { getActiveOrgId, getSessionCookieHeader } from '@/lib/session';
+import { getWorkspaceRole } from '@/lib/workspace-role';
 import type { DiscoverSettings, DiscoverStatus } from '@/types/discover';
-import type { Organization } from '@/types/workspace';
 
 export const metadata: Metadata = { title: 'Discover' };
 
@@ -54,12 +55,7 @@ export default async function DiscoverRoute({
           .then((result) => result.settings)
           .catch(() => null)
       : Promise.resolve(null),
-    serverApi<{ organizations: Organization[] }>('/orgs', { cookie })
-      .then((result) => {
-        const role = result.organizations.find((organization) => organization.id === orgId)?.role;
-        return role === 'ADMIN' || role === 'SUPERADMIN';
-      })
-      .catch(() => false),
+    getWorkspaceRole(orgId).then(canManageWorkspaceSettings),
   ]);
 
   return (

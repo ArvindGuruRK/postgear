@@ -32,6 +32,7 @@ import {
 import Link from 'next/link';
 import { PlatformIcon, platformLabel } from '@/components/platforms/platform-icon';
 import type { PostSummary } from '@/types/post';
+import { postAbilities } from './post-abilities';
 import {
   describeChannel,
   describePost,
@@ -47,6 +48,7 @@ export function PostDetailDialog({
   post,
   now,
   busy,
+  draftsOnly = false,
   onOpenChange,
   onPublishNow,
   onReschedule,
@@ -56,6 +58,8 @@ export function PostDetailDialog({
   post: PostSummary | null;
   now: Date;
   busy: boolean;
+  /** An Editor (Module 14): no Post Now or Reschedule, Delete for drafts only. */
+  draftsOnly?: boolean;
   onOpenChange: (open: boolean) => void;
   onPublishNow: (post: PostSummary) => void;
   onReschedule: (post: PostSummary) => void;
@@ -67,11 +71,10 @@ export function PostDetailDialog({
 
   const shown = describePost(post, now);
   const when = new Date(post.publishDate);
-  const canPublishNow = post.state === 'QUEUE' || post.state === 'ERROR';
-  const canMove = post.state !== 'PUBLISHED';
   // Once any channel has published, the post can be read and its pending
   // channels moved or retried, but not edited or deleted: the API locks it.
   const locked = hasPublishedChannel(post);
+  const can = postAbilities(post, draftsOnly);
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -163,7 +166,7 @@ export function PostDetailDialog({
               <MotionIcon icon={SquarePenIcon} className="h-4 w-4" />
               {locked ? 'Open' : 'Edit'}
             </Link>
-            {canMove ? (
+            {can.reschedule ? (
               <Button
                 size="sm"
                 variant="secondary"
@@ -174,13 +177,13 @@ export function PostDetailDialog({
                 Reschedule
               </Button>
             ) : null}
-            {canPublishNow ? (
+            {can.publishNow ? (
               <Button size="sm" onClick={() => onPublishNow(post)} disabled={busy}>
                 <MotionIcon icon={SendIcon} className="h-4 w-4" />
                 {post.state === 'ERROR' ? 'Retry Now' : 'Post Now'}
               </Button>
             ) : null}
-            {!locked ? (
+            {can.remove ? (
               <Button
                 size="sm"
                 variant="danger"

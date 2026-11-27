@@ -17,11 +17,25 @@
  * 7. starter templates that open the composer with text in it;
  * 8. from the blog.
  *
+ * For an Editor (Sprint 13, Module 14) Trending Near You is left out: it
+ * reads Discover, which an Editor may not open. No card here reads
+ * `/analytics` (the streak and the goal come from `GET /dashboard`, which
+ * Editors may read), so the four cards stay; their controls follow the
+ * capabilities (`canManageWorkspaceSettings` for the goal, `canManageTeam`
+ * for inviting, `canManageChannels` for connecting).
+ *
  * One column on a phone in the same order. Data: see the page and
  * `use-home-data.ts`; the dialogs here are the same ones the calendar's
  * channel card opens, so connecting or fixing a channel works the same from
  * either place.
  */
+import {
+  canManageChannels,
+  canManageTeam,
+  canManageWorkspaceSettings,
+  canUseDiscover,
+  canViewChannels,
+} from '@postgear/entitlements';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { ConnectChannelDialog } from '@/components/channels/connect-channel-dialog';
@@ -79,8 +93,11 @@ export function HomeView({
 }) {
   const router = useRouter();
   const { role, user, organizations } = useWorkspace();
-  // Presentation only: the API's RolesGuard is the real check.
-  const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
+  // Presentation only: the API's RolesGuard is the real check. Each was one
+  // "admin" flag before Module 14 and still answers yes for admins only.
+  const canEditGoal = canManageWorkspaceSettings(role);
+  const canInvite = canManageTeam(role);
+  const canConnect = canManageChannels(role);
   const atChannelLimit = limit !== null && limit.used >= limit.max;
 
   const now = useClock();
@@ -120,7 +137,8 @@ export function HomeView({
           credits={credits}
           pending={pending}
           mounted={now !== null}
-          canManage={canManage}
+          canEditGoal={canEditGoal}
+          canInvite={canInvite}
           members={members}
           memberLimit={memberLimit}
           onSaveGoal={dashboard.saveGoal}
@@ -131,7 +149,8 @@ export function HomeView({
       <FirstSteps
         orgId={orgId}
         steps={dashboard.firstSteps}
-        canManage={canManage}
+        canManage={canConnect}
+        canViewChannels={canViewChannels(role)}
         atChannelLimit={atChannelLimit}
         onConnect={() => setConnectOpen(true)}
       />
@@ -147,14 +166,14 @@ export function HomeView({
       <HomeBanners
         orgId={orgId}
         banners={banners}
-        canManage={canManage}
+        canManage={canConnect}
         onConnect={() => setConnectOpen(true)}
         onReconnect={reconnect}
         onFinishSetup={setSetupChannel}
         onRetryStats={dashboard.reload}
       />
 
-      <TrendingNearYou orgId={orgId} />
+      {canUseDiscover(role) ? <TrendingNearYou orgId={orgId} /> : null}
 
       <TemplatesRow orgId={orgId} />
 

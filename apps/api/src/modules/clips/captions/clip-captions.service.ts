@@ -409,7 +409,7 @@ export class ClipCaptionsService {
     const charge = await this.usage.consume(orgId, AI_MINUTES_METER, price, {
       idempotencyKey: `clips.ai:translate:${attemptId}`,
       refId: attemptId,
-      meta: { step: 'translate', clipId: context.clip.id, language },
+      meta: { step: 'translate', clipId: context.clip.id, language, by: userId },
     });
 
     let kept = false;

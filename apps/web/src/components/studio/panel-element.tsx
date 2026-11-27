@@ -12,6 +12,9 @@
  *   the same on every slide; a slide number is counted, so it has no field.
  * - A list: one row per item, Add Item up to the slot's limit and a remove
  *   button per row. A list keeps at least one row.
+ * - A schedule (Sprint 13): the week's seven rows, the clock, the time zone
+ *   and Refresh From Twitch (`schedule-field.tsx`). Its time zone line is
+ *   worked out from the schedule, so it has no field of its own.
  * - Size, alignment and colour where the slot offers them. A colour that does
  *   not read on its background says so, with Fix Contrast.
  * - Font, for an element with words (Sprint 9b): its own family over the
@@ -120,6 +123,7 @@ import {
 } from './editor-panel-model';
 import { type ApplyChange, withText } from './editor-state';
 import { FontSelect } from './font-select';
+import { ScheduleField } from './schedule-field';
 import {
   CustomColorField,
   GroupLabel,
@@ -405,6 +409,9 @@ function ElementEditor({
         />
       ) : null}
       {slot.kind === 'list' ? <ListField slide={slide} slot={slot} onChange={onChange} /> : null}
+      {slot.kind === 'rows' ? (
+        <ScheduleField document={document} slide={slide} slot={slot} onChange={onChange} />
+      ) : null}
 
       {hasWords && tooLong ? (
         <Alert variant="warning" role="status" className="flex-col gap-1">
@@ -546,6 +553,16 @@ function TextField({
   }
 
   const value = slotText(document, index, slot);
+
+  if (slot.bind === 'scheduleZone') {
+    // Sprint 13: worked out from the schedule, so it changes with the zone.
+    return (
+      <p className={NOTE}>
+        {`This line follows the schedule's time zone${value ? ` (${value})` : ''}. Change the zone on the Schedule element.`}
+      </p>
+    );
+  }
+
   const type = (text: string) =>
     onChange((latest) => withText(latest, slideId, slotId, text), {
       coalesceKey: `text:${slideId}:${slotId}`,

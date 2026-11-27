@@ -28,13 +28,14 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { State } from '@postgear/db';
+import { Role, State } from '@postgear/db';
 import { type PublishStatus, parsePublishStatus } from '@postgear/scheduling';
 import {
   IntegrationManager,
@@ -181,6 +182,68 @@ export interface CreatePostOptions {
   group?: string;
   /** Who made the post; the composer's `WEB` when absent. */
   creationMethod?: 'WEB' | 'AUTOMATION';
+  /** The person saving, when a person is (Module 14): checked by `assertEditorMayWrite`, stored as `createdById`. */
+  actor?: PostActor;
+}
+
+/**
+ * The person behind a post write (Sprint 13, Module 14). Absent for writers
+ * that are not a workspace member: a workflow step (internal token) and the
+ * public API (an API key, which only an admin can create).
+ */
+export interface PostActor {
+  userId: string;
+  role: Role;
+}
+
+/**
+ * What an Editor may do to a post: drafts only (D13-15, Editors cannot
+ * schedule or publish in v1).
+ *
+ * `before` is the stored state of every channel's root row, empty for a new
+ * post. `after` is the state the save asks for, or null for a delete. An
+ * Editor may create a draft, edit a draft into a draft, and delete a draft;
+ * anything else (a body asking for `QUEUE`, "post now", touching a queued,
+ * published or failed post) is a 403 with `code: 'editor_forbidden'`, even
+ * when the post is new. Every other role passes untouched: the route's
+ * `@Roles` list already decided for them.
+ *
+ * Called by every service path that creates, changes or deletes a post on a
+ * person's behalf, so Clips' Send To Composer, Studio's and the Copilot's
+ * drafts inherit it. The two routes that only schedule or publish
+ * (`PUT /posts/:group/schedule`, `POST /posts/:group/publish-now`) also carry
+ * `@Roles(ADMIN, USER)`; this is the second wall behind them.
+ */
+export function assertEditorMayWrite(
+  actor: PostActor | undefined,
+  before: readonly { state: State }[],
+  after: { state: 'DRAFT' | 'QUEUE'; publishNow?: boolean } | null,
+): void {
+  if (actor?.role !== Role.EDITOR) {
+    return;
+  }
+
+  const storedDraftsOnly = before.every((root) => root.state === State.DRAFT);
+  const asksDraft = after === null || (after.state === 'DRAFT' && after.publishNow !== true);
+
+  if (storedDraftsOnly && asksDraft) {
+    return;
+  }
+
+  securityLogger.warn('rbac.denied', {
+    userId: actor.userId,
+    role: actor.role,
+    reason: 'editor-post-write',
+  });
+  throw new ForbiddenException({
+    message: POST_MESSAGES.EDITOR_FORBIDDEN,
+    code: 'editor_forbidden',
+  });
+}
+
+/** Refuses an Editor outright: moving a post in time or publishing it is never a draft edit. */
+function refuseEditor(actor: PostActor | undefined): void {
+  assertEditorMayWrite(actor, [], actor?.role === Role.EDITOR ? { state: 'QUEUE' } : null);
 }
 
 export interface QueuePage {
@@ -269,7 +332,13 @@ export class PostsService {
    * it at once, which is what "Post now" is for and should be asked for by
    * name. A draft may sit anywhere.
    */
-  async reschedule(orgId: string, group: string, publishDate: Date): Promise<PostDetail> {
+  async reschedule(
+    orgId: string,
+    group: string,
+    publishDate: Date,
+    actor?: PostActor,
+  ): Promise<PostDetail> {
+    refuseEditor(actor);
     if (!UUID_PATTERN.test(group)) {
       throw new NotFoundException(POST_MESSAGES.NOT_FOUND);
     }
@@ -302,7 +371,8 @@ export class PostsService {
   }
 
   /** Publishes a queued or failed post as soon as the worker picks it up. */
-  async publishNow(orgId: string, group: string): Promise<PostDetail> {
+  async publishNow(orgId: string, group: string, actor?: PostActor): Promise<PostDetail> {
+    refuseEditor(actor);
     if (!UUID_PATTERN.test(group)) {
       throw new NotFoundException(POST_MESSAGES.NOT_FOUND);
     }
@@ -427,6 +497,9 @@ export class PostsService {
       }
     }
 
+    // Before any lookup: a refused Editor learns nothing about channels or media.
+    assertEditorMayWrite(options.actor, [], input);
+
     const group = options.group ?? randomUUID();
     const { publishNow, ...write } = await this.prepare(orgId, input);
 
@@ -435,6 +508,7 @@ export class PostsService {
       group,
       ...write,
       ...(options.creationMethod ? { creationMethod: options.creationMethod } : {}),
+      ...(options.actor ? { createdById: options.actor.userId } : {}),
     });
     await this.syncClipLinks(orgId, group, mediaIdsOfWrite(write.channels));
 
@@ -471,9 +545,20 @@ export class PostsService {
     return this.repository.listQueuedTimes({ orgId, integrationIds: channelIds, from });
   }
 
-  async update(orgId: string, group: string, input: UpdatePostInput): Promise<PostDetail> {
+  async update(
+    orgId: string,
+    group: string,
+    input: UpdatePostInput,
+    actor?: PostActor,
+  ): Promise<PostDetail> {
     if (!UUID_PATTERN.test(group)) {
       throw new NotFoundException(POST_MESSAGES.NOT_FOUND);
+    }
+
+    // An Editor is checked against the stored post first, before anything is
+    // resolved or written (the repository's own lock comes later).
+    if (actor) {
+      assertEditorMayWrite(actor, await this.repository.findRoots(orgId, group), input);
     }
 
     const { publishNow, ...write } = await this.prepare(orgId, input);
@@ -512,8 +597,9 @@ export class PostsService {
     }
   }
 
-  async remove(orgId: string, group: string): Promise<void> {
+  async remove(orgId: string, group: string, actor?: PostActor): Promise<void> {
     const roots = UUID_PATTERN.test(group) ? await this.repository.findRoots(orgId, group) : [];
+    assertEditorMayWrite(actor, roots, null);
     const outcome = UUID_PATTERN.test(group)
       ? await this.repository.deleteGroup(orgId, group)
       : 'not_found';

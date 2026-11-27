@@ -45,6 +45,7 @@ export function SlotPosts({
           onPreview={handlers.onPreview}
           onStatistics={handlers.onStatistics}
           onDelete={handlers.onDelete}
+          draftsOnly={handlers.draftsOnly}
         />
       ))}
       {overflow ? (

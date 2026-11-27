@@ -9,8 +9,11 @@
 import type { SessionAvatar } from '@/lib/session';
 import type { WorkspaceRole } from './workspace';
 
-/** The two roles a workspace grants; SUPERADMIN is a platform flag, never invited. */
-export type InviteRole = 'ADMIN' | 'USER';
+/**
+ * The roles a workspace grants; SUPERADMIN is a platform flag, never invited.
+ * An Editor invite must name an address (Module 14): the link is bound to it.
+ */
+export type InviteRole = 'ADMIN' | 'USER' | 'EDITOR';
 
 export interface TeamMember {
   membershipId: string;
@@ -29,6 +32,18 @@ export interface TeamMember {
 export interface InviteLink {
   url: string;
   expiresAt: string;
+}
+
+/** `GET /orgs/:id/seats` (admins only, Module 14): the plan's Editor seats. */
+export interface EditorSeats {
+  used: number;
+  limit: number;
+  /** Never below 0, even for a workspace over its cap after a downgrade. */
+  remaining: number;
+}
+
+export interface SeatsResponse {
+  editors: EditorSeats;
 }
 
 /** `GET /orgs/invites/:token`: what the accept page shows. */

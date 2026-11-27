@@ -1,5 +1,5 @@
 /**
- * Add Hook Title (Sprint 13, Module 09). `@Roles(ADMIN, USER)`, the
+ * Add Hook Title (Sprint 13, Module 09). `@Roles(ADMIN, USER, EDITOR)`, the
  * workspace from the org cookie, Clips in the plan; another workspace's
  * clip is a plain 404.
  *
@@ -28,7 +28,7 @@ import { type HookTitlesBody, hookTitlesBodySchema } from './clip-hook-titles.sc
 import { ClipHookTitlesService } from './clip-hook-titles.service';
 
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipHookTitlesController {
   constructor(private readonly hookTitles: ClipHookTitlesService) {}

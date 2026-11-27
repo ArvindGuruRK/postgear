@@ -233,8 +233,8 @@ describe('Row: download (length, minutes, downloads a day)', () => {
   it('is wired: checks, then the daily charge, then the import minutes', () => {
     const downloads = source('downloads/clip-downloads.service.ts');
     expect(downloads).toMatch(/this\.limits\.assertCanDownload\(orgId, durationMs,/);
-    expect(downloads).toMatch(/this\.limits\.chargeDownload\(orgId, jobId\)/);
-    expect(downloads).toMatch(/this\.limits\.chargeImport\(orgId, jobId, durationMs\)/);
+    expect(downloads).toMatch(/this\.limits\.chargeDownload\(orgId, jobId, userId\)/);
+    expect(downloads).toMatch(/this\.limits\.chargeImport\(orgId, jobId, durationMs, userId\)/);
   });
 
   it('refuses a download over the plan length', async () => {

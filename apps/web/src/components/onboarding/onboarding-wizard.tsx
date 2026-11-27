@@ -35,6 +35,8 @@ import {
   TEAM_SIZE_QUESTION,
 } from '@/lib/onboarding-questions';
 import type { SessionAvatar } from '@/lib/session';
+import { workspaceHome } from '@/lib/workspace-home';
+import type { Organization } from '@/types/workspace';
 import { ChoiceGroup, type ChoiceOption, MultiChoiceGroup } from './choice-group';
 import { OnboardingHeader, QuestionScreen } from './onboarding-chrome';
 import { WelcomeScreen } from './welcome-screen';
@@ -292,7 +294,7 @@ export function OnboardingWizard({
       // see `onboardingCompletedAt` set: without it, route gate 2 still holds
       // the stale value and bounces the user straight back to /onboarding.
       router.refresh();
-      router.replace(`/${organizationId}/home`);
+      router.replace(workspaceHome(organizationId, await roleIn(organizationId)));
     } catch (caught) {
       setError(
         caught instanceof ApiError ? caught.message : 'Something went wrong. Please try again.',
@@ -475,4 +477,18 @@ export function OnboardingWizard({
       ) : null}
     </div>
   );
+}
+
+/**
+ * The person's role in the workspace onboarding finished in, so an Editor who
+ * joined by invitation lands on Clips (Module 14). A failed lookup lands on
+ * Home, which every role may open.
+ */
+async function roleIn(organizationId: string): Promise<Organization['role'] | null> {
+  try {
+    const { organizations } = await api<{ organizations: Organization[] }>('/orgs');
+    return organizations.find((organization) => organization.id === organizationId)?.role ?? null;
+  } catch {
+    return null;
+  }
 }

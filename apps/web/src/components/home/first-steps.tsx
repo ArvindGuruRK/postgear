@@ -26,12 +26,15 @@ export function FirstSteps({
   orgId,
   steps,
   canManage,
+  canViewChannels = true,
   atChannelLimit,
   onConnect,
 }: {
   orgId: string;
   steps: DashboardFirstSteps | null;
   canManage: boolean;
+  /** False for an Editor (Module 14): no Channels page, so no link to it. */
+  canViewChannels?: boolean;
   /** The plan's channel limit is reached, so Connect would be refused. */
   atChannelLimit: boolean;
   onConnect: () => void;
@@ -74,13 +77,13 @@ export function FirstSteps({
                 Connect Channel
               </Button>
             </TooltipHint>
-          ) : (
+          ) : canViewChannels ? (
             // Connecting is an admin's job; a member can still see what is there.
             <ActionLink href={`/${orgId}/channels`}>
               <MotionIcon icon={SlidersHorizontalIcon} className="h-4 w-4" />
               View Channels
             </ActionLink>
-          )}
+          ) : null}
         </Step>
         <Step
           number={2}

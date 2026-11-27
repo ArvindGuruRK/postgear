@@ -645,3 +645,16 @@ describe('ChannelsRepository', () => {
     });
   });
 });
+
+describe('the channel list an Editor reads (Module 14)', () => {
+  it('selects no credential column, so GET /channels never carries a token', () => {
+    const select = (
+      new ChannelsRepository() as unknown as { summarySelect(): Record<string, unknown> }
+    ).summarySelect();
+    // `tokenExpiration` is a date the page shows ("reconnect soon"), not a secret.
+    for (const secret of ['token', 'refreshToken', 'customInstanceDetails']) {
+      expect([secret, secret in select]).toEqual([secret, false]);
+    }
+    expect(Object.keys(select).length).toBeGreaterThan(5);
+  });
+});

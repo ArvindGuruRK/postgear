@@ -187,6 +187,26 @@ describe('Clips security: Messages', () => {
         skipped: [{ part: 'captions', reason: 'no_speech' }],
         noSpeech: true,
       },
+      // Module 14: an emote's files are names, never keys.
+      EMOTE: {
+        platform: 'twitch',
+        files: [
+          {
+            name: 'emote-twitch-112.gif',
+            size: 112,
+            format: 'gif',
+            bytes: 76_000,
+            maxBytes: 512_000,
+            fits: true,
+            rung: 1,
+            frames: 60,
+            fps: 20,
+            extra: false,
+          },
+        ],
+        zip: { name: 'emote-twitch.zip', bytes: 76_500 },
+        sharp: false,
+      },
     };
 
     it.each(Object.keys(OUTPUTS) as ClipJob['kind'][])(

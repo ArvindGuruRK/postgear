@@ -49,7 +49,8 @@ const TOKEN_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 /** Separates this key from every other use of `JWT_SECRET`. */
 const KEY_CONTEXT = 'postgear:workspace-invite:v1';
 
-export type InviteRole = typeof Role.ADMIN | typeof Role.USER;
+/** Module 14 adds the Editor seat. Tokens signed before it carry ADMIN or USER and still verify. */
+export type InviteRole = typeof Role.ADMIN | typeof Role.USER | typeof Role.EDITOR;
 
 export interface InvitePayload {
   /** Random; what single use is keyed on. */
@@ -72,7 +73,7 @@ const payloadSchema = z
     v: z.literal(1),
     id: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/),
     orgId: z.string().min(1).max(128),
-    role: z.enum([Role.ADMIN, Role.USER]),
+    role: z.enum([Role.ADMIN, Role.USER, Role.EDITOR]),
     email: z.string().min(3).max(254).optional(),
     exp: z.number().int().positive(),
   })

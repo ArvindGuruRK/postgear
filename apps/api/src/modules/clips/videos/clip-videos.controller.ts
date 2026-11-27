@@ -1,7 +1,7 @@
 /**
  * Videos and uploads (Sprint 12, Module 04).
  *
- * `@Roles(ADMIN, USER)`: any member of the workspace imports, watches and
+ * `@Roles(ADMIN, USER, EDITOR)`: any member of the workspace imports, watches and
  * removes videos. Every handler scopes on `@CurrentOrg()`; ids from the URL
  * are checked against the workspace in the service (another workspace's
  * video is a plain 404). Bodies are validated with `.strict()` Zod schemas.
@@ -64,7 +64,7 @@ import {
 import { ClipVideosService } from './clip-videos.service';
 
 @Controller('clips/videos')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipVideosController {

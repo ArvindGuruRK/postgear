@@ -18,6 +18,7 @@ import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertic
 import { EyeIcon } from '@animateicons/react/lucide/eye-icon';
 import { EyeOffIcon } from '@animateicons/react/lucide/eye-off-icon';
 import { ExternalLinkIcon } from '@animateicons/react/lucide/external-link-icon';
+import { MessageCircleHeartIcon } from '@animateicons/react/lucide/message-circle-heart-icon';
 import { PencilIcon } from '@animateicons/react/lucide/pencil-icon';
 import { SendIcon } from '@animateicons/react/lucide/send-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
@@ -44,11 +45,37 @@ import {
   PopoverContent,
   toast,
 } from '@postgear/ui';
+import Link from 'next/link';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import { ApiError, downloadFile } from '@/lib/api';
 import { deleteClip, duplicateClip, updateClip } from '@/lib/clips-api';
 import type { ClipPublishedPost, ClipSummary, ClipView } from '@/types/clips';
+import { emoteHrefFromPage } from '../emote/emote-model';
+
+/**
+ * Module 14: Make An Emote opens the Emote Maker on the clip's video and
+ * range. The workspace (and, on the video page, the video) comes from the
+ * page's address: the menu's list mounts only once opened, in the browser,
+ * so reading it there never differs from the server's page. A library item
+ * names its own video. No address to read (a test) means no item.
+ */
+function MakeEmoteItem({ clip }: { clip: ClipSummary }) {
+  const href = emoteHrefFromPage(typeof window === 'undefined' ? '' : window.location.pathname, {
+    clipId: clip.id,
+    videoId: 'videoId' in clip && typeof clip.videoId === 'string' ? clip.videoId : null,
+    range: clip.range,
+  });
+  if (!href) return null;
+  return (
+    <DropdownMenuItem asChild>
+      <Link href={href} prefetch={false} data-testid="clip-make-emote">
+        <MotionIcon icon={MessageCircleHeartIcon} className="h-4 w-4" />
+        Make An Emote
+      </Link>
+    </DropdownMenuItem>
+  );
+}
 
 export const MAX_CLIP_TITLE_LENGTH = 200;
 export const DELETE_CLIP_SENTENCE =
@@ -323,6 +350,7 @@ export function ClipMenu({
               Download
             </DropdownMenuItem>
           ) : null}
+          <MakeEmoteItem clip={clip} />
           <DropdownMenuItem onSelect={() => void actions.duplicate(clip)}>
             <MotionIcon icon={CopyIcon} className="h-4 w-4" />
             Duplicate

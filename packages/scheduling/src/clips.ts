@@ -128,6 +128,17 @@ export const CLIP_SPEECH_WORKFLOW = 'clipSpeechWorkflow';
  * clip with the recipe applied. No charge of its own.
  */
 export const CLIP_AUTO_EDIT_WORKFLOW = 'clipAutoEditWorkflow';
+/**
+ * Module 14: Emote Maker. One press of an export button is one EMOTE job on
+ * `postgear-media`: the stretch's file fetched (`fetching`), every size made
+ * down its ladder (`encoding`), the files and a zip stored (`finishing`). The
+ * job's input and output shapes are `emoteInputSchema` and
+ * `emoteOutputSchema` in `@postgear/video-engine`, beside every other kind's.
+ * No AI minutes; one `clips.downloads_per_day` unit, given back on failure.
+ */
+export const CLIP_EMOTE_WORKFLOW = 'clipEmoteWorkflow';
+/** The steps of an EMOTE job, in order (mirrors the engine's `CLIP_JOB_STAGES.EMOTE`). */
+export const CLIP_EMOTE_STAGES = ['fetching', 'encoding', 'finishing'] as const;
 
 // --- Waiting-caller helpers (no row: the API waits for the answer) -------------
 
@@ -165,7 +176,8 @@ export type ClipJobKindName =
   | 'FACES'
   | 'TRANSLATE'
   | 'SPEECH'
-  | 'AUTO_EDIT';
+  | 'AUTO_EDIT'
+  | 'EMOTE';
 
 /** Which workflow runs a job of each kind. */
 export const CLIP_JOB_WORKFLOWS: Readonly<Record<ClipJobKindName, string>> = Object.freeze({
@@ -179,6 +191,7 @@ export const CLIP_JOB_WORKFLOWS: Readonly<Record<ClipJobKindName, string>> = Obj
   TRANSLATE: CLIP_TRANSLATE_WORKFLOW,
   SPEECH: CLIP_SPEECH_WORKFLOW,
   AUTO_EDIT: CLIP_AUTO_EDIT_WORKFLOW,
+  EMOTE: CLIP_EMOTE_WORKFLOW,
 });
 
 /** Which queue each kind runs on. */
@@ -193,6 +206,7 @@ export const CLIP_JOB_QUEUES: Readonly<Record<ClipJobKindName, string>> = Object
   TRANSLATE: MEDIA_TASK_QUEUE,
   SPEECH: MEDIA_TASK_QUEUE,
   AUTO_EDIT: MEDIA_TASK_QUEUE,
+  EMOTE: MEDIA_TASK_QUEUE,
 });
 
 export function clipJobWorkflowId(jobId: string): string {
@@ -265,6 +279,11 @@ export const CLIP_JOB_TIMEOUTS_MS: Readonly<Record<ClipJobKindName, number>> = O
   // Module 10: most of it is waiting for the listen job (at most 30 minutes
   // of sound, well inside the listen job's own limit), then one apply call.
   AUTO_EDIT: 3 * 60 * 60_000,
+  // Module 14: a 3 second stretch made into at most six small files, each down a ladder of at
+  // most six encodes (about 8 s each on the local FFmpeg, so a worst case near five minutes).
+  // The worker keeps ten minutes of any limit for cleanup, so thirty leaves twenty for the work
+  // (the API itself waits only 25 s and then shows the job card).
+  EMOTE: 30 * 60_000,
 });
 
 /** Long activities heartbeat at least this often; a dead worker is noticed within it. */
@@ -327,6 +346,10 @@ export const CLIP_NON_RETRYABLE: readonly string[] = [
   'language_unsupported',
   'captions_off',
   'captions_missing',
+  // Module 14: the same stretch and crop break the same limit every time.
+  'emote_too_big',
+  'emote_too_long',
+  'emote_range_invalid',
 ];
 
 /** The three priorities a job can carry, copied from `clips.queue_priority` at creation. */

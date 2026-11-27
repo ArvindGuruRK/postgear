@@ -15,11 +15,13 @@
  * The API's guard is the real check; this only avoids offering a 403.
  */
 import { getTemplate, listTemplates } from '@postgear/automation';
+import { canManageWorkflows } from '@postgear/entitlements';
 import type { Metadata } from 'next';
 import { previewFromGraph } from '@/components/workflows/list/workflow-preview';
 import { WorkflowsList } from '@/components/workflows/list/workflows-list';
 import { serverApi } from '@/lib/api';
 import { getActiveOrgId, getSessionCookieHeader } from '@/lib/session';
+import { getWorkspaceRole } from '@/lib/workspace-role';
 import type { AutomationListResponse, TemplateWithPicture } from '@/types/workflows';
 
 const EMPTY_PICTURE = { nodes: [], edges: [], stepCount: 0 };
@@ -43,17 +45,13 @@ export default async function WorkflowsPage({
   const cookie = await getSessionCookieHeader();
   const pending = (await getActiveOrgId()) !== orgId;
 
-  const [list, me] = await Promise.all([
+  const [list, role] = await Promise.all([
     pending
       ? null
       : serverApi<AutomationListResponse>('/automations', { cookie }).catch(() => null),
-    serverApi<{ organizations: { id: string; role: string }[] }>('/orgs', { cookie })
-      .then(
-        (result) => result.organizations.find((organization) => organization.id === orgId) ?? null,
-      )
-      .catch(() => null),
+    getWorkspaceRole(orgId),
   ]);
-  const canManage = me?.role === 'ADMIN' || me?.role === 'SUPERADMIN';
+  const canManage = canManageWorkflows(role);
 
   return (
     <WorkflowsList

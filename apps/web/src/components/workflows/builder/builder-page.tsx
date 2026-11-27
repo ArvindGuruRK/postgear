@@ -42,6 +42,7 @@ import {
   type ValidationIssue,
   validateGraph,
 } from '@postgear/automation';
+import { canManageWorkflows } from '@postgear/entitlements';
 import {
   Alert,
   AlertDialog,
@@ -470,7 +471,7 @@ function Builder({
 
   const workspace = useOptionalWorkspace();
   const workspaceName = workspace?.organizations.find((org) => org.id === orgId)?.name;
-  const canManage = canManageProp ?? (workspace ? workspace.role !== 'USER' : false);
+  const canManage = canManageProp ?? canManageWorkflows(workspace?.role);
   const timeZone = useMemo(browserZone, []);
   // A Webhook trigger's sample is the last data it received (Module 13), as
   // in test runs. Asked again each time a step's fields open, so data that
@@ -1491,101 +1492,101 @@ function Builder({
                 />
               </div>
             ) : (
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-              <div ref={canvasBox} className="relative min-h-0 min-w-0 flex-1">
-                <WorkflowCanvas
-                  graph={state.graph}
-                  selection={state.selection}
-                  issues={issuesMap}
-                  summary={summary}
-                  tidying={tidying}
-                  run={testRun.painted}
-                  onRunBadgeClick={openRun}
-                  onConnectRefused={(reason) =>
-                    toast({ title: reason || LOOP_REFUSED, variant: 'warning' })
-                  }
-                  onDropStep={(itemId, at) => {
-                    const item = catalog
-                      ? pickerItems(catalog, { placement: 'panel', hasTrigger }).find(
-                          (entry) => entry.id === itemId,
-                        )
-                      : undefined;
-                    if (item) addItem(item, { position: at });
-                  }}
-                  // The picker is for the place just pressed; Setup and Versions stay open.
-                  onPaneClick={() =>
-                    setDock((current) => (current?.kind === 'picker' ? null : current))
-                  }
-                  empty={empty}
-                >
-                  <CanvasControls
-                    canUndo={state.past.length > 0}
-                    canRedo={state.future.length > 0}
-                    onUndo={() => dispatch({ type: 'undo' })}
-                    onRedo={() => dispatch({ type: 'redo' })}
-                    onTidy={tidy}
-                    locked={locked}
-                    onLock={() => setLocked((value) => !value)}
-                    hasSteps={state.graph.nodes.length > 0}
-                  />
-                  {setupList.length > 0 && state.graph.nodes.length > 0 ? (
-                    <Panel position="top-left" className="m-3!">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        aria-pressed={dock?.kind === 'setup'}
-                        data-testid="finish-setup"
-                        onClick={() =>
-                          dock?.kind === 'setup' ? closeDock() : openDock({ kind: 'setup' })
-                        }
-                      >
-                        <MotionIcon icon={ListChecksIcon} className="h-4 w-4" />
-                        Finish Setup
-                        <Badge variant="danger" className="ms-1 px-1.5">
-                          {setupList.length}
-                        </Badge>
-                      </Button>
-                    </Panel>
-                  ) : null}
-                  <ToolRail
-                    pickerOpen={dock?.kind === 'picker'}
-                    setupOpen={dock?.kind === 'setup'}
-                    onAddStep={() => (dock?.kind === 'picker' ? closeDock() : showSteps())}
-                    onSearch={() => setPalette(true)}
-                    onAddNote={() => addNote()}
-                    onSetup={() =>
-                      dock?.kind === 'setup' ? closeDock() : openDock({ kind: 'setup' })
+              <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <div ref={canvasBox} className="relative min-h-0 min-w-0 flex-1">
+                  <WorkflowCanvas
+                    graph={state.graph}
+                    selection={state.selection}
+                    issues={issuesMap}
+                    summary={summary}
+                    tidying={tidying}
+                    run={testRun.painted}
+                    onRunBadgeClick={openRun}
+                    onConnectRefused={(reason) =>
+                      toast({ title: reason || LOOP_REFUSED, variant: 'warning' })
                     }
-                  />
-                  {state.graph.nodes.length > 0 ? (
-                    <Panel position="bottom-center" className="m-3!">
-                      <TestControls
-                        trigger={trigger}
-                        hasPinnedTrigger={trigger ? pinnedKeys.has(trigger.key) : false}
-                        busy={testRun.busy}
-                        running={testRun.running}
-                        stopping={testRun.stopping}
-                        onStart={(options) => void testRun.start(options)}
-                        onStop={() => void testRun.stop()}
-                        startSignal={startSignal}
-                        startSeen={startSeen}
-                      />
-                    </Panel>
-                  ) : null}
-                </WorkflowCanvas>
+                    onDropStep={(itemId, at) => {
+                      const item = catalog
+                        ? pickerItems(catalog, { placement: 'panel', hasTrigger }).find(
+                            (entry) => entry.id === itemId,
+                          )
+                        : undefined;
+                      if (item) addItem(item, { position: at });
+                    }}
+                    // The picker is for the place just pressed; Setup and Versions stay open.
+                    onPaneClick={() =>
+                      setDock((current) => (current?.kind === 'picker' ? null : current))
+                    }
+                    empty={empty}
+                  >
+                    <CanvasControls
+                      canUndo={state.past.length > 0}
+                      canRedo={state.future.length > 0}
+                      onUndo={() => dispatch({ type: 'undo' })}
+                      onRedo={() => dispatch({ type: 'redo' })}
+                      onTidy={tidy}
+                      locked={locked}
+                      onLock={() => setLocked((value) => !value)}
+                      hasSteps={state.graph.nodes.length > 0}
+                    />
+                    {setupList.length > 0 && state.graph.nodes.length > 0 ? (
+                      <Panel position="top-left" className="m-3!">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          aria-pressed={dock?.kind === 'setup'}
+                          data-testid="finish-setup"
+                          onClick={() =>
+                            dock?.kind === 'setup' ? closeDock() : openDock({ kind: 'setup' })
+                          }
+                        >
+                          <MotionIcon icon={ListChecksIcon} className="h-4 w-4" />
+                          Finish Setup
+                          <Badge variant="danger" className="ms-1 px-1.5">
+                            {setupList.length}
+                          </Badge>
+                        </Button>
+                      </Panel>
+                    ) : null}
+                    <ToolRail
+                      pickerOpen={dock?.kind === 'picker'}
+                      setupOpen={dock?.kind === 'setup'}
+                      onAddStep={() => (dock?.kind === 'picker' ? closeDock() : showSteps())}
+                      onSearch={() => setPalette(true)}
+                      onAddNote={() => addNote()}
+                      onSetup={() =>
+                        dock?.kind === 'setup' ? closeDock() : openDock({ kind: 'setup' })
+                      }
+                    />
+                    {state.graph.nodes.length > 0 ? (
+                      <Panel position="bottom-center" className="m-3!">
+                        <TestControls
+                          trigger={trigger}
+                          hasPinnedTrigger={trigger ? pinnedKeys.has(trigger.key) : false}
+                          busy={testRun.busy}
+                          running={testRun.running}
+                          stopping={testRun.stopping}
+                          onStart={(options) => void testRun.start(options)}
+                          onStop={() => void testRun.stop()}
+                          startSignal={startSignal}
+                          startSeen={startSeen}
+                        />
+                      </Panel>
+                    ) : null}
+                  </WorkflowCanvas>
+                </div>
+                <LogsDock
+                  run={testRun.model}
+                  painted={testRun.painted !== null}
+                  totalSteps={logsSteps}
+                  onClose={testRun.unpaint}
+                  onOpenChange={setLogsOpen}
+                  onOpenReview={setReviewKey}
+                  onReviewAnswered={testRun.refresh}
+                  workflowName={state.name}
+                  activeVersion={live.activeVersion}
+                />
               </div>
-              <LogsDock
-                run={testRun.model}
-                painted={testRun.painted !== null}
-                totalSteps={logsSteps}
-                onClose={testRun.unpaint}
-                onOpenChange={setLogsOpen}
-                onOpenReview={setReviewKey}
-                onReviewAnswered={testRun.refresh}
-                workflowName={state.name}
-                activeVersion={live.activeVersion}
-              />
-            </div>
             )}
             {dock ? (
               <BuilderDock kind={dock.kind} onClose={closeDock}>

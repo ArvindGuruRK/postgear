@@ -1,7 +1,7 @@
 /**
  * Signatures.
  *
- * Reads are open to every member (`@Roles(ADMIN, USER)` on the class), since
+ * Reads are open to every member (`@Roles(ADMIN, USER, EDITOR)` on the class), since
  * the composer inserts them; every write narrows to `@Roles(ADMIN)`, the
  * rule for workspace settings such as webhooks. Every handler scopes
  * on `@CurrentOrg()`; the `:id` in a path is only the signature acted on.
@@ -31,7 +31,7 @@ import { SIGNATURE_MESSAGES } from './signatures.messages';
 import { SignaturesService } from './signatures.service';
 
 @Controller('signatures')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class SignaturesController {
   constructor(private readonly signatures: SignaturesService) {}
 

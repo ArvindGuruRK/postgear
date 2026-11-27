@@ -1,7 +1,7 @@
 /**
  * Find Clips (Sprint 12, Module 16).
  *
- * `@Roles(ADMIN, USER)`: any member who can open a video can look for clips
+ * `@Roles(ADMIN, USER, EDITOR)`: any member who can open a video can look for clips
  * in it (and pays from the workspace's AI minutes). Scoped on
  * `@CurrentOrg()`: another workspace's video is a plain 404.
  *
@@ -48,7 +48,7 @@ import {
 import { ClipHighlightsService } from './clip-highlights.service';
 
 @Controller('clips/videos')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipHighlightsController {

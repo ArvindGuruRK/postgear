@@ -95,6 +95,12 @@ export function slideWords(design: DesignDocument, index: number): string[] {
       for (const item of state?.items ?? []) {
         if (item.trim()) words.push(item.trim());
       }
+    } else if (slot.kind === 'rows') {
+      // Sprint 13, a schedule: each day as it is drawn ("Mon 7 PM Minecraft", "Tue Off").
+      for (const row of state?.rows ?? []) {
+        const said = row.off ? `${row.day} Off` : `${row.day} ${row.time} ${row.title}`;
+        words.push(said.replace(/\s+/g, ' ').trim());
+      }
     } else if (slot.kind === 'text' && slot.bind !== 'slideNumber') {
       const text = slotText(design, index, slot).trim();
       if (text) words.push(text);

@@ -492,6 +492,10 @@ model Post {
   /// Sprint 13 Module 13: the person marked this post Made With AI; providers with an
   /// AI label field (YouTube, Instagram, Facebook Reels) send it.
   madeWithAi     Boolean              @default(false)
+  /// Sprint 13 Module 14: the user who first saved the post (a plain id, as on
+  /// Clip, so deleting a user never touches posts). Null for posts made before
+  /// the column, by a workflow, or through the public API.
+  createdById    String?
   intervalInDays Int?
   error          String?
   createdAt      DateTime             @default(now())
@@ -810,6 +814,10 @@ enum Role {
   SUPERADMIN
   ADMIN
   USER
+  // Sprint 13, Module 14: a seat that makes clips and designs and saves post
+  // drafts, and can do nothing that connects, publishes, bills or invites.
+  // Counted by the `members.editors_max` entitlement.
+  EDITOR
 }
 
 // --- Sprint 2: onboarding survey ------------------------------------------
@@ -1902,6 +1910,8 @@ enum ClipJobKind {
   SPEECH
   // Module 10: Auto-Edit Video (wait for listening, then apply a recipe).
   AUTO_EDIT
+  // Module 14: cut a short stretch into emote files (no AI Minutes).
+  EMOTE
 }
 
 enum ClipJobStatus {

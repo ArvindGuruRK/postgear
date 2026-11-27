@@ -40,6 +40,9 @@ import {
   CLIP_JOB_INPUT_SCHEMAS,
   type ClipJobInputs,
   type ClipPlatformId,
+  EMOTE_PROFILES,
+  emoteOutputsFor,
+  emoteTooBigSentence,
   type RenderInput,
 } from '@postgear/video-engine';
 import { downloadFailureCode } from './download/download.run';
@@ -261,6 +264,9 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
         now,
       );
 
+    case 'EMOTE':
+      return closeEmote(deps, job, 'FAILED', emoteFailureError(job, failure.code), now);
+
     default:
       return deps.rows.closeJob({
         jobId: job.id,
@@ -348,6 +354,9 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
 
     case 'AUTO_EDIT':
       return closeAutoEdit(deps, job, 'CANCELLED', error, now);
+
+    case 'EMOTE':
+      return closeEmote(deps, job, 'CANCELLED', error, now);
 
     default:
       return deps.rows.closeJob({
@@ -549,4 +558,56 @@ async function deleteOriginal(
     org,
     rows.filter((row) => row.kind === 'ORIGINAL' && row.key === originalKey).map((row) => row.id),
   );
+}
+
+/** Module 14: the codes an emote keeps; anything else reads as `emote_failed`. */
+const EMOTE_OWN_CODES = new Set([
+  'emote_too_big',
+  'emote_too_long',
+  'emote_range_invalid',
+  'emote_failed',
+  'timed_out',
+  'cancelled',
+]);
+
+/**
+ * Module 14: the sentence a failed emote shows. Too big names the site and
+ * the size that broke the cap: the first required moving file, which the
+ * worker tries first because it is the largest.
+ */
+export function emoteFailureError(job: JobRow, code: string): ReturnType<typeof storedJobError> {
+  const own = EMOTE_OWN_CODES.has(code) ? code : 'emote_failed';
+  if (own !== 'emote_too_big') return storedJobError(own);
+  const input = inputOf(job, 'EMOTE');
+  if (!input) return storedJobError(own);
+  const profile = EMOTE_PROFILES[input.platform];
+  const first = emoteOutputsFor(profile, input.still).find(
+    (output) => output.extra !== true && output.format !== 'png',
+  );
+  return first
+    ? { code: own, message: emoteTooBigSentence(input.platform, first.size) }
+    : storedJobError(own);
+}
+
+/**
+ * Module 14: a failed or cancelled emote keeps none of its files and gives
+ * back the one download unit its press was charged (`clips.download:<jobId>`).
+ */
+async function closeEmote(
+  deps: OutcomeDeps,
+  job: JobRow,
+  status: 'FAILED' | 'CANCELLED',
+  error: ReturnType<typeof storedJobError>,
+  now: Date,
+): Promise<boolean> {
+  await deps.privateStorage.deletePrefix(clipKeys.exportPrefix(job.organizationId, job.id));
+  const closed = await deps.rows.closeJob({
+    jobId: job.id,
+    organizationId: job.organizationId,
+    status,
+    error,
+    now,
+  });
+  await reverse(deps, job);
+  return closed;
 }

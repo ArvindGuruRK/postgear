@@ -194,7 +194,7 @@ export class ClipVoiceService {
       let charge = await this.usage.consume(orgId, AI_MINUTES_METER, price, {
         idempotencyKey: baseKey,
         refId: jobId,
-        meta: { step: 'voice', clipId: clip.id },
+        meta: { step: 'voice', clipId: clip.id, by: userId },
       });
       if (charge.duplicate) {
         // The key belongs to an earlier job that is gone (its charge given back):
@@ -202,7 +202,7 @@ export class ClipVoiceService {
         charge = await this.usage.consume(orgId, AI_MINUTES_METER, price, {
           idempotencyKey: `${baseKey}:${jobId}`,
           refId: jobId,
-          meta: { step: 'voice', clipId: clip.id },
+          meta: { step: 'voice', clipId: clip.id, by: userId },
         });
       }
       meter = toMeterView(charge.state);

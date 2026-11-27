@@ -1,4 +1,11 @@
-import { approximateMeasure, baseFontSize, fitText, MIN_FIT_SCALE, wrapText } from './fit';
+import {
+  approximateMeasure,
+  baseFontSize,
+  fitText,
+  MIN_FIT_SCALE,
+  MIN_LINE_FIT_SCALE,
+  wrapText,
+} from './fit';
 import { fitScriptSource, fitSlots } from './render/fit-runtime';
 import { themeById } from './themes';
 
@@ -71,6 +78,64 @@ describe('fitText', () => {
     expect(result.fontSize).toBeCloseTo(STYLE.fontSize * MIN_FIT_SCALE, 5);
     // Every word is still there: the user sees too much text, never less text.
     expect(result.lines.join(' ').split('word').length - 1).toBe(200);
+  });
+});
+
+describe('fitText on one line', () => {
+  const style = { fontFamily: 'Inter', fontWeight: 500, fontSize: 40, letterSpacing: 0 };
+
+  it('never wraps: a long line shrinks to the one-line floor, then warns', () => {
+    const short = fitText({
+      text: 'Minecraft',
+      width: 400,
+      height: 60,
+      lineHeight: 1.2,
+      singleLine: true,
+      style,
+      measure: approximateMeasure,
+    });
+    expect(short.lines).toEqual(['Minecraft']);
+    expect(short.overflows).toBe(false);
+    expect(short.fontSize).toBe(40);
+
+    const long = fitText({
+      text: 'Minecraft Hardcore Day One Hundred',
+      width: 600,
+      height: 60,
+      lineHeight: 1.2,
+      singleLine: true,
+      style,
+      measure: approximateMeasure,
+    });
+    expect(long.lines).toHaveLength(1);
+    expect(long.overflows).toBe(false);
+    expect(long.fontSize).toBeLessThan(40);
+    expect(long.fontSize).toBeGreaterThanOrEqual(40 * MIN_LINE_FIT_SCALE);
+
+    const hopeless = fitText({
+      text: 'x'.repeat(200),
+      width: 300,
+      height: 60,
+      lineHeight: 1.2,
+      singleLine: true,
+      style,
+      measure: approximateMeasure,
+    });
+    expect(hopeless.overflows).toBe(true);
+    expect(hopeless.fontSize).toBeCloseTo(40 * MIN_LINE_FIT_SCALE);
+  });
+
+  it('reads a line break as a space', () => {
+    const result = fitText({
+      text: 'Two\nLines',
+      width: 800,
+      height: 60,
+      lineHeight: 1.2,
+      singleLine: true,
+      style,
+      measure: approximateMeasure,
+    });
+    expect(result.lines).toEqual(['Two Lines']);
   });
 });
 

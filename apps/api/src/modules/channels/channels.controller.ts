@@ -10,9 +10,11 @@
  *
  * ## Which routes carry `@Roles()`
  *
- * Reading the channel list and starting a connection are open to any member,
- * because connecting a channel is part of onboarding and blocking it behind
- * `ADMIN` would stop a solo user finishing their own setup. Anything
+ * Reading the channel list is open to any member, Editors included (they pick
+ * channels when saving a draft; the answer carries no tokens). Starting a
+ * connection is open to admins and members, because connecting a channel is
+ * part of onboarding and blocking it behind `ADMIN` would stop a solo user
+ * finishing their own setup; an Editor never connects (Module 14). Anything
  * destructive or configuration-changing (disconnect, rename, posting times,
  * disabling, the channel order, publishing) requires `ADMIN`.
  *
@@ -127,6 +129,8 @@ export class ChannelsController {
    * `sameSite: lax` session cookie is still sent.
    */
   @Get('connect/:provider')
+  // Sprint 13 Module 14: any member may start a connection, an Editor may not.
+  @Roles(Role.ADMIN, Role.USER)
   async connect(
     @Param('provider') provider: string,
     @Query('reconnect') reconnect: string | undefined,
@@ -183,6 +187,7 @@ export class ChannelsController {
 
   /** The pages / channels / boards a half-connected channel can be pointed at. */
   @Get(':id/entities')
+  @Roles(Role.ADMIN, Role.USER)
   async listEntities(@CurrentOrg() org: ActiveOrg | undefined, @Param('id') id: string) {
     if (!org) {
       return { entities: [] };

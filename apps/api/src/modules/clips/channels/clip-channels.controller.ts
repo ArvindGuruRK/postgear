@@ -1,7 +1,7 @@
 /**
  * `/clips/channels` (Module 03, section 5): My Channels.
  *
- * `@Roles(ADMIN, USER)`: any member of the workspace adds, browses and
+ * `@Roles(ADMIN, USER, EDITOR)`: any member of the workspace adds, browses and
  * removes channels. The workspace is `@CurrentOrg()`, never a value from the
  * request, and every row is read through it, so another workspace's channel
  * id answers 404 exactly like a missing one.
@@ -48,7 +48,7 @@ import { ClipChannelsService } from './clip-channels.service';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/channels')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipChannelsController {

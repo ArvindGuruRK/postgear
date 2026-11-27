@@ -2,15 +2,9 @@ import { notFound, redirect } from 'next/navigation';
 import { AppearanceSync } from '@/components/appearance/appearance-sync';
 import { DashboardShell } from '@/components/navigation/dashboard-shell';
 import { SyncActiveWorkspace } from '@/components/navigation/sync-active-workspace';
-import { serverApi } from '@/lib/api';
-import {
-  getActiveOrgId,
-  getSession,
-  getSessionCookieHeader,
-  hasCompletedOnboarding,
-} from '@/lib/session';
+import { getActiveOrgId, getSession, hasCompletedOnboarding } from '@/lib/session';
+import { getOrganizations } from '@/lib/workspace-role';
 import { WorkspaceProvider } from '@/components/navigation/workspace-provider';
-import type { Organization } from '@/types/workspace';
 
 /**
  * **Route gate 2: authenticated but not onboarded → /onboarding.**
@@ -42,8 +36,9 @@ export default async function OrgLayout({ children, modal, params }: LayoutProps
     redirect('/onboarding');
   }
 
-  const cookie = await getSessionCookieHeader();
-  const { organizations } = await serverApi<{ organizations: Organization[] }>('/orgs', { cookie });
+  // Cached for the request (`getOrganizations`): the denied-page gates below
+  // read the same answer rather than asking again.
+  const organizations = await getOrganizations();
   const active = organizations.find((organization) => organization.id === orgId);
 
   // A URL naming a workspace this user is not in renders the 404 rather than

@@ -43,6 +43,7 @@ import {
 import { type Design, DesignStatus, type Prisma } from '@postgear/db';
 import {
   applyCtaDefaults,
+  applySchedule,
   BLANK_PRESET_ID,
   brandColorsSchema,
   type DesignBrand,
@@ -59,6 +60,7 @@ import {
   presetById,
   presetFormats,
   safeParseDesignDocument,
+  scheduleSlotOf,
   setFormat,
   slideId,
   slideMediaIds,
@@ -79,7 +81,7 @@ import { EntitlementsService } from '../billing/entitlements.service';
 import { ChannelsService } from '../channels/channels.service';
 import { MediaService, type MediaView } from '../media/media.service';
 import { createPostSchema, postDocumentSchema } from '../posts/dto/posts.schema';
-import { PostsService } from '../posts/posts.service';
+import { type PostActor, PostsService } from '../posts/posts.service';
 import { kitFonts } from './brand-kits.service';
 import {
   type ArchiveEntry,
@@ -108,6 +110,7 @@ import {
   type UpdateDesignInput,
 } from './dto/studio.schema';
 import { previewPlatforms } from './preview-platforms';
+import { SCHEDULE_MESSAGES } from './schedules/schedules.messages';
 import { SLIDE_FAILURE_REASONS, STUDIO_MESSAGES } from './studio.messages';
 import { hasPremiumLook, PremiumLookRequiredException, premiumLookAdded } from './studio.premium';
 import {
@@ -326,6 +329,13 @@ export class StudioService {
       brand,
     });
     if (kit) built = applyCtaDefaults(built, { text: kit.ctaText, url: kit.ctaUrl });
+    if (input.schedule) {
+      // Sprint 13: the Schedule Maker's week, written over the template's sample.
+      if (!scheduleSlotOf(built)) {
+        throw new UnprocessableEntityException(SCHEDULE_MESSAGES.TEMPLATE_HAS_NO_SCHEDULE);
+      }
+      built = applySchedule(built, input.schedule);
+    }
 
     const document = this.checked(built);
 
@@ -631,7 +641,12 @@ export class StudioService {
    * would only be scaled down again on the way, or refused by a platform's
    * size limit. A current export at 2x is therefore drawn again at 1x.
    */
-  async prepareSend(orgId: string, id: string, input: SendDesignInput): Promise<StudioRun> {
+  async prepareSend(
+    orgId: string,
+    id: string,
+    input: SendDesignInput,
+    actor?: PostActor,
+  ): Promise<StudioRun> {
     const design = await this.require(orgId, id);
     const document = this.documentOf(design);
 
@@ -678,6 +693,8 @@ export class StudioService {
             shared: [{ content, media: mediaIds.map((mediaId) => ({ id: mediaId })) }],
             channels: input.channelIds.map((channelId) => ({ channelId, customized: false })),
           }),
+          // The person sending (Module 14): an Editor's draft is checked and attributed.
+          ...(actor ? ([{ actor }] as const) : ([] as const)),
         );
 
         await this.repository.setDesignStatus(orgId, design.id, DesignStatus.SENT);

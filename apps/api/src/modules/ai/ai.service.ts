@@ -40,7 +40,7 @@ import type {
 } from '@postgear/ai-engine';
 import { securityLogger } from '../../common/logging/security-logger';
 import { ChannelsService, type ChannelView } from '../channels/channels.service';
-import { PostsService } from '../posts/posts.service';
+import { type PostActor, PostsService } from '../posts/posts.service';
 import { describeFailure, isAbortError } from './ai.errors';
 import { AI_MESSAGES } from './ai.messages';
 import { AI_CREDIT_COSTS, type AiCredits, generateCost } from './credits/credits.policy';
@@ -207,7 +207,11 @@ export class AiService {
   }
 
   /** `POST /ai/copilot/chat`, phase one: configured, charged, tools built. */
-  async prepareChat(orgId: string, input: CopilotChatInput): Promise<PreparedRun> {
+  async prepareChat(
+    orgId: string,
+    input: CopilotChatInput,
+    actor?: PostActor,
+  ): Promise<PreparedRun> {
     if (this.engine.mode === 'unconfigured') {
       throw new ServiceUnavailableException(AI_MESSAGES.NOT_CONFIGURED);
     }
@@ -224,6 +228,7 @@ export class AiService {
       creditContext: context,
       channels: this.channels,
       posts: this.posts,
+      ...(actor ? { actor } : {}),
     });
     const agent = this.engine.createCopilot({ orgId }, tools, {
       workspaceName: context.workspaceName,

@@ -1463,6 +1463,51 @@ npx jest --config packages/social-core/jest.config.js ai-label          # each p
 npx jest --config apps/web/jest.config.js posting-slots publisher-upgrades
 ```
 
+**Editor Seats (Module 14, Part A).** A new workspace role, **Editor**: makes clips and designs and saves post drafts, and cannot connect channels, schedule or publish, see billing or analytics, or invite people. Run `npm run migrate:deploy --workspace=packages/db` and `npm run db:generate` (four migrations: `Role.EDITOR`, the `members.editors_max` seed, `ClipJobKind.EMOTE`, `Post.createdById`), then restart the API. Seats are an entitlement: Free 0, Standard 1, Pro 3, Team 10, Ultimate 25, edited on `/operator` (Plans, the **Members** group, or a workspace override).
+
+- **Invite.** Settings, Team, **Invite**: pick **Editor**. The seat line reads "0 of 1 editor seat used" on a Standard workspace. An Editor invite always needs an address (the link only works for that account). Copy the link from the dialog or from the API console (mail is printed there without `RESEND_API_KEY`), and accept it signed in as that address in a second browser profile: the Editor lands on Clips.
+- **No seat.** With the seat taken, a second Editor invite answers "No editor seats left. Remove an editor or change your plan." Raise the number on `/operator` and try again. Accepting is checked again under a lock, so two people racing for the last seat get one seat between them. Changing a member's role to Editor takes a seat too. A disabled Editor frees theirs.
+- **Over the cap.** Lower the number below the Editors you have: nobody is removed, the Team page says "You have N editors and your plan allows M. Remove K to add more.", and new Editors are refused.
+- **As the Editor.** The rail has no Analytics, Workflows, Discover or SEO; Settings has no Billing, Webhooks, API Keys, Connections or Discover. Typing those addresses shows "You do not have access to this page." The composer saves drafts only (no date, Next Available, Add To Calendar or Post Now); the calendar is read only. A direct request is refused too, from the browser console:
+
+```js
+await fetch('http://localhost:3001/posts/<group>/publish-now', { method: 'POST', credentials: 'include' }).then((r) => r.status) // 403
+```
+
+Every route's Editor decision is in `apps/api/src/common/guards/editor-access.json` (allow, deny, draft-only, open with a reason, public with what authorizes it). A new route without an entry fails `editor-access.spec.ts`. Membership changes are logged as `member.invited`, `member.joined`, `member.role_changed` and `member.removed` (ids and roles only).
+
+```bash
+npx jest --config packages/entitlements/jest.config.js          # the key, the seed, capabilities
+npx jest --config apps/api/jest.config.js src/common/guards src/modules/org src/modules/posts
+EDITOR_SEATS_DB_TEST=1 npx dotenv -e .env -- npx jest --config apps/api/jest.config.js editor-seats.race   # five accepts, one seat, real Postgres
+```
+
+**Emote Maker (Module 14, Part B).** Clips, **Creator Tools**, **Emote Maker** (or **Make An Emote** in a clip's menu). Restart the Node worker once after pulling this module (it adds `clipEmoteWorkflow`). Free of AI minutes; each export press takes one of the day's downloads and gives it back if the job fails.
+
+- Pick a video or clip, set a stretch of up to 3.0 s (the trim stops there), drag and resize the square crop over the face (under 112 px it says "This will look soft."), and watch the preview at 112, 56 and 28 px. **Chat Preview** flips between a light and a dark ground; the line you type never leaves the page.
+- **Export For Twitch** gives three GIFs (112, 56, 28 px, each under 512 KB, at most 60 frames) and three still PNGs (each under 25 KB). **Export For 7TV** gives a GIF plus WebP and APNG, **Export For BTTV** one GIF. The files table shows each size and "Under the limit"; **Download All** gives a zip. Files are kept 24 hours.
+- **Remove A Colour**: pick a colour with the eyedropper on a green-screen sample, set Similarity, export: the corners are transparent.
+- A video whose title holds `[simulate:emote-too-big]` walks the size ladder to the end and shows the orange warning naming the site and its limit.
+
+```bash
+npx jest --config packages/video-engine/jest.config.js emotes
+FFMPEG_PATH=$PWD/infra/docker/worker/bin/ffmpeg FFPROBE_PATH=$PWD/infra/docker/worker/bin/ffprobe npx jest --config apps/worker/jest.config.js emote   # real FFmpeg (unquoted paths)
+npx jest --config apps/api/jest.config.js src/modules/clips/emotes
+npx jest --config apps/web/jest.config.js src/components/clips/emote
+```
+
+**Schedule Maker (Module 14, Part C).** Clips, **Creator Tools**, **Schedule Maker** (`/seed-demo-org/clips/tools/schedule`). Under `CLIPS_SIMULATION` (or with no Twitch keys locally) the Twitch names answer from recorded weeks and no Twitch address is reached: `simstreamer` (a full week), `simvacation` ("On a break until ..."), `simnoschedule` (seven Off rows and "This channel has no Twitch schedule. Fill it in by hand."), `simnouser` ("We could not find that Twitch channel."); any other name reads as simstreamer's week.
+
+- Type `simstreamer`, **Read Schedule**, pick a theme and Portrait or Landscape, **Open In Design Studio**. In the editor select the Schedule element: change a title (it stays after a reload), switch to 24 Hour, pick another zone and watch the times move (a week across a daylight saving change keeps true local times). **Refresh From Twitch** asks before replacing edited rows.
+- **Fill It In By Hand** and **Try A Sample** need no network. Export the PNG: exactly 1080 by 1350 (Portrait) or 1920 by 1080 (Landscape).
+- The fetch allows 10 a minute per workspace (429 after). The API log line `studio.schedules.binding` says `simulation`; no log line holds a token, the secret or a stream title. The real Twitch read needs `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` (see `docs/sprint-12/clips-keys-guide.md`, Recipe 1).
+
+```bash
+npx jest --config packages/design-engine/jest.config.js schedule
+npx jest --config apps/api/jest.config.js src/modules/studio/schedules
+npx jest --config apps/web/jest.config.js src/components/clips/schedule src/components/studio/schedule
+```
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

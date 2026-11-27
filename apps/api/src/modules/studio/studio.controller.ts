@@ -1,7 +1,7 @@
 /**
  * The Design Studio routes.
  *
- * `@Roles(ADMIN, USER)` on the class: an active membership is required, and
+ * `@Roles(ADMIN, USER, EDITOR)` on the class: an active membership is required, and
  * every member of a workspace may design, like posting and analysing. The
  * routes that answer without a session (the share page's data and the design
  * fonts) live in `design-shares.controller.ts` and
@@ -113,7 +113,7 @@ class LogoTooLargeFilter implements ExceptionFilter {
 }
 
 @Controller('studio')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class StudioController {
   constructor(
     private readonly studio: StudioService,
@@ -235,13 +235,18 @@ export class StudioController {
   @Post('designs/:id/send')
   @HttpCode(HttpStatus.OK)
   async send(
+    @CurrentUser() user: AuthenticatedUser,
     @CurrentOrg() org: ActiveOrg,
     @Param('id') id: string,
     @Body(new ZodBody(sendDesignSchema, 'studio/designs/send')) dto: SendDesignInput,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    await stream(await this.studio.prepareSend(org.id, id, dto), request, response);
+    await stream(
+      await this.studio.prepareSend(org.id, id, dto, { userId: user.id, role: org.role }),
+      request,
+      response,
+    );
   }
 
   // -------------------------------------------------------------------------

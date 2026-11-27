@@ -53,6 +53,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type { PostSummary } from '@/types/post';
 import { TAG_COLOR_CLASS } from '@/types/tag';
 import { CHANNEL_STACK_HOVER_RING, ChannelStack } from '../posts/channel-stack';
+import { postAbilities } from '../posts/post-abilities';
 import {
   describePost,
   formatClock,
@@ -89,10 +90,16 @@ export function PostCard({
   onStatistics,
   onDelete,
   overlay = false,
+  draftsOnly = false,
 }: {
   post: PostSummary;
   now: Date;
   density?: CardDensity;
+  /**
+   * An Editor (Module 14): the calendar is read only, so no grip and no drag,
+   * and Delete for a draft only. The body still opens the composer.
+   */
+  draftsOnly?: boolean;
   /** The composer, opened on this post: where the card body goes. */
   editHref?: string;
   /** A new post from this one's text and media, in the composer. */
@@ -116,12 +123,13 @@ export function PostCard({
   const repeatsEvery = post.intervalInDays ?? null;
   const tagNames = tags.map((tag) => tag.name).join(', ');
   const links = publishedLinks(post.channels);
+  const can = postAbilities(post, draftsOnly);
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
     useDraggable({
       id: post.group,
       data: { post },
-      disabled: published || overlay,
+      disabled: !can.drag || overlay,
     });
   // Each sensor's activator by input: the finger's on the whole card, the
   // mouse's and the keyboard's on the grip (see the header comment).
@@ -151,7 +159,7 @@ export function PostCard({
           (tags.length > 0 && TAG_COLOR_CLASS[tags[0].color]) || STRIP[shown.tone],
         )}
       >
-        {!published && !overlay ? (
+        {can.drag && !overlay ? (
           <StripAction label="Drag To Reschedule">
             <button
               type="button"
@@ -268,7 +276,7 @@ export function PostCard({
                 </button>
               </StripAction>
             ) : null}
-            {onDelete && !locked ? (
+            {onDelete && can.remove ? (
               <StripAction label="Delete Post">
                 <button
                   type="button"

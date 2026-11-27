@@ -15,7 +15,7 @@ import type { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import type { ClipRecipeApplierService } from '../recipes/clip-recipe-applier.service';
-import { jobRow, TEST_ORG, videoRow } from '../testing/rows';
+import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
 import { ClipReconcileService, lostJobCode } from './clip-reconcile.service';
 import { ClipsInternalService } from './clips-internal.service';
 
@@ -264,7 +264,7 @@ describe('ClipsInternalService.chargeImport', () => {
       units: 1500,
     });
     expect(db.entries).toHaveLength(1);
-    expect(limits.chargeImport).toHaveBeenCalledWith(TEST_ORG, JOB_ID, 90_000);
+    expect(limits.chargeImport).toHaveBeenCalledWith(TEST_ORG, JOB_ID, 90_000, TEST_USER);
   });
 
   it('answers an earlier charge for a job that has since closed, and 409 when there was none', async () => {

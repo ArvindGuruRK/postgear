@@ -20,6 +20,13 @@
  * collision detection picking the slot under the pointer. The overlay renders
  * a copy of the card while the original fades, so the grid never reflows
  * mid-drag.
+ *
+ * ## Editors (Sprint 13, Module 14)
+ *
+ * The calendar is read only to an Editor (`canSchedule` answers no): cards
+ * have no grip and do not drag, the detail dialog has no Reschedule or Post
+ * Now, Statistics is gone (no analytics), and Delete is for drafts. A card
+ * still opens the composer, where a draft is theirs to edit.
  */
 import {
   DndContext,
@@ -34,12 +41,14 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { canSchedule, canViewAnalytics } from '@postgear/entitlements';
 import { ErrorState, Skeleton, useToast } from '@postgear/ui';
 import { useRouter } from 'next/navigation';
 import { useId, useMemo, useState } from 'react';
 import type { ChannelLimit, ProviderSummary } from '@/types/channel';
 import type { PostSummary } from '@/types/post';
 import { PostAnalyticsDialog } from '../analytics/post-analytics-dialog';
+import { useWorkspace } from '../navigation/workspace-provider';
 import { DeletePostDialog } from '../posts/delete-post-dialog';
 import { PostDetailDialog } from '../posts/post-detail-dialog';
 import { RescheduleDialog } from '../posts/reschedule-dialog';
@@ -122,6 +131,9 @@ export function CalendarView({
   const calendar = useCalendar();
   const router = useRouter();
   const { toast } = useToast();
+  const { role } = useWorkspace();
+  const draftsOnly = !canSchedule(role);
+  const showStatistics = canViewAnalytics(role);
   const actions = usePostActions();
   const dndId = useId();
   const mounted = useMounted();
@@ -162,7 +174,8 @@ export function CalendarView({
     const post = (active.data.current as { post?: PostSummary } | undefined)?.post;
     const target = over?.data.current as SlotTarget | undefined;
 
-    if (!post || !target) {
+    // Cards do not drag for an Editor; this only keeps a stray drop inert.
+    if (!post || !target || draftsOnly) {
       return;
     }
 
@@ -249,15 +262,16 @@ export function CalendarView({
       onDuplicate: (post) =>
         router.push(`/${orgId}/composer?duplicate=${encodeURIComponent(post.group)}`),
       onPreview: setOpen,
-      onStatistics: (post) => setStatistics(post.group),
+      ...(showStatistics ? { onStatistics: (post: PostSummary) => setStatistics(post.group) } : {}),
       onDelete: setDeleting,
+      draftsOnly,
       onCreate: (target) => {
         const at = composerTimeFor(target, new Date());
         router.push(`/${orgId}/composer?at=${encodeURIComponent(at.toISOString())}`);
       },
       onShowDay: (day) => goTo(day, 'day'),
     }),
-    [orgId, goTo, router],
+    [orgId, goTo, router, draftsOnly, showStatistics],
   );
 
   // The day view's rows come from the channels in view that can post.
@@ -360,6 +374,7 @@ export function CalendarView({
         post={open}
         now={calendar.now}
         busy={busy}
+        draftsOnly={draftsOnly}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         onPublishNow={(post) => void publishNow(post)}
         onReschedule={setRescheduling}

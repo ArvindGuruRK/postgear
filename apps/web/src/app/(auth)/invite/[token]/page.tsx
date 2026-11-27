@@ -2,7 +2,7 @@ import { buttonVariants, cn, Heading, Stack, Text } from '@postgear/ui';
 import type { Metadata } from 'next';
 import NextLink from 'next/link';
 import { BrandName } from '@/components/brand/brand-mark';
-import { roleWithArticle } from '@/components/settings/team-view-model';
+import { invitedAsSentence } from '@/components/settings/team-view-model';
 import { ApiError, serverApi } from '@/lib/api';
 import { getSession, getSessionCookieHeader } from '@/lib/session';
 import type { InvitePreview } from '@/types/team';
@@ -32,6 +32,9 @@ export const metadata: Metadata = {
  * - **Signed in**: one button, "Join <workspace>", or a way to switch
  *   accounts when the link was sent to another address.
  * - **Not usable** (invalid, expired, used): the API's message, as written.
+ *
+ * An Editor's invitation (Sprint 13, Module 14) names the workspace and the
+ * role in one sentence, and joining lands on Clips rather than Home.
  */
 export default async function InvitePage({ params }: PageProps<'/invite/[token]'>) {
   const { token } = await params;
@@ -81,8 +84,8 @@ export default async function InvitePage({ params }: PageProps<'/invite/[token]'
         {/* A member is not joining, so what the link offers is beside the point. */}
         {preview.alreadyMember ? null : (
           <Text muted>
-            You&apos;ve been invited as {roleWithArticle(preview.role)}. The link works once and
-            expires on {expires}.
+            {invitedAsSentence(preview.workspaceName, preview.role)} The link works once and expires
+            on {expires}.
             {preview.email ? (
               <>
                 {' '}

@@ -1,7 +1,7 @@
 /**
  * Auto-Edit Video (Sprint 13, Module 10).
  *
- * `@Roles(ADMIN, USER)`: any member who can open a video can auto-edit it
+ * `@Roles(ADMIN, USER, EDITOR)`: any member who can open a video can auto-edit it
  * (and pays from the workspace's AI minutes). Scoped on `@CurrentOrg()`:
  * another workspace's video or recipe is a plain 404.
  *
@@ -33,7 +33,7 @@ import { type AutoEditBody, autoEditSchema } from './clip-auto-edit.schema';
 import { ClipAutoEditService } from './clip-auto-edit.service';
 
 @Controller('clips/videos')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipAutoEditController {
   constructor(private readonly autoEdit: ClipAutoEditService) {}

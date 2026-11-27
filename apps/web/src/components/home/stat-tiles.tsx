@@ -70,7 +70,8 @@ export function StatTiles({
   credits,
   pending,
   mounted,
-  canManage,
+  canEditGoal,
+  canInvite,
   members,
   memberLimit,
   onSaveGoal,
@@ -86,7 +87,10 @@ export function StatTiles({
   pending: boolean;
   /** The browser has rendered once, so numbers and dates can use its locale. */
   mounted: boolean;
-  canManage: boolean;
+  /** Admins change the weekly goal (`canManageWorkspaceSettings`). */
+  canEditGoal: boolean;
+  /** Admins invite from the team card (`canManageTeam`). */
+  canInvite: boolean;
   /** Null when the list failed to load. */
   members: TeamMember[] | null;
   /** The plan's seats: null for unlimited, undefined when the plan did not load. */
@@ -104,14 +108,14 @@ export function StatTiles({
       data-testid="home-stats"
     >
       <StreakTile summary={summary} failed={failed} />
-      <GoalTile summary={summary} failed={failed} canEdit={canManage} onSave={onSaveGoal} />
+      <GoalTile summary={summary} failed={failed} canEdit={canEditGoal} onSave={onSaveGoal} />
       <CreditsTile credits={credits} pending={pending} mounted={mounted} />
       <TeamTile
         orgId={orgId}
         members={members}
         limit={memberLimit}
         pending={pending}
-        canManage={canManage}
+        canManage={canInvite}
         onInvite={onInvite}
       />
     </section>

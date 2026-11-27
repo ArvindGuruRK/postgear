@@ -15,6 +15,8 @@
  *   look its patterns and hand-made backgrounds were drawn for. Free.
  * - **Luxury** (`luxury.ts`): PostGear's own deep and ivory grounds with
  *   metallic inks, in the luxury serifs. Premium.
+ * - **Schedule** (`schedule.ts`, Sprint 13): the five stream schedule looks,
+ *   drawn for a week of rows. Free.
  *
  * Each palette states every role, including the three derived inks
  * (`onPrimary`, `onAccent`, `onSurface`). They are written out rather than
@@ -32,18 +34,26 @@
 import type { FontId, PresetCollection, Theme } from '../types';
 import { CLASSIC_THEMES } from './classic';
 import { LUXURY_THEMES } from './luxury';
+import { SCHEDULE_THEMES } from './schedule';
 import { SIGNATURE_THEMES } from './signature';
 
 export { CLASSIC_THEMES } from './classic';
 export { LUXURY_THEMES } from './luxury';
+export { SCHEDULE_THEMES } from './schedule';
 export { SIGNATURE_THEMES } from './signature';
 
 /** Every theme, Classic first so Sprint 9's order is unchanged at the front. */
-export const THEMES: Theme[] = [...CLASSIC_THEMES, ...SIGNATURE_THEMES, ...LUXURY_THEMES];
+export const THEMES: Theme[] = [
+  ...CLASSIC_THEMES,
+  ...SIGNATURE_THEMES,
+  ...LUXURY_THEMES,
+  ...SCHEDULE_THEMES,
+];
 
 export const CLASSIC_THEME_IDS: readonly string[] = CLASSIC_THEMES.map((theme) => theme.id);
 export const SIGNATURE_THEME_IDS: readonly string[] = SIGNATURE_THEMES.map((theme) => theme.id);
 export const LUXURY_THEME_IDS: readonly string[] = LUXURY_THEMES.map((theme) => theme.id);
+export const SCHEDULE_THEME_IDS: readonly string[] = SCHEDULE_THEMES.map((theme) => theme.id);
 
 /**
  * A `Map`, not an object: a stored `themeId` of `"toString"` must miss, and on
@@ -55,6 +65,7 @@ const COLLECTION_BY_ID: ReadonlyMap<string, PresetCollection> = new Map([
   ...CLASSIC_THEME_IDS.map((id) => [id, 'classic'] as const),
   ...SIGNATURE_THEME_IDS.map((id) => [id, 'signature'] as const),
   ...LUXURY_THEME_IDS.map((id) => [id, 'luxury'] as const),
+  ...SCHEDULE_THEME_IDS.map((id) => [id, 'schedule'] as const),
 ]);
 
 export const DEFAULT_THEME_ID = 'ink';

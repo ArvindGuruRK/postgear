@@ -1,7 +1,7 @@
 /**
  * Post tags.
  *
- * `@Roles(ADMIN, USER)`: any member, as in Postiz, since tags label posts and
+ * `@Roles(ADMIN, USER, EDITOR)`: any member, as in Postiz, since tags label posts and
  * every member writes posts. Every handler scopes on `@CurrentOrg()`; the
  * `:id` in a path is only the tag being acted on.
  */
@@ -30,7 +30,7 @@ import { TAG_MESSAGES } from './tags.messages';
 import { TagsService } from './tags.service';
 
 @Controller('tags')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class TagsController {
   constructor(private readonly tags: TagsService) {}
 

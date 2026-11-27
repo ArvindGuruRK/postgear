@@ -48,7 +48,7 @@ import { ClipLibraryService } from './clip-library.service';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/library')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipLibraryController {

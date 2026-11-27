@@ -6,10 +6,12 @@
  * worker and the web app all import it; the database, the cache and the
  * usage ledger live in the API's `modules/entitlements`.
  */
+export * from './capabilities';
 export * from './cycle';
 export * from './display';
 export { formatNumber } from './format-number';
 export * from './keys/clips';
+export * from './keys/members';
 export * from './messages';
 export * from './registry';
 export * from './resolve';

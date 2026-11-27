@@ -1,5 +1,5 @@
 /**
- * A clip's captions (Sprint 13, Module 03). `@Roles(ADMIN, USER)`, scoped on
+ * A clip's captions (Sprint 13, Module 03). `@Roles(ADMIN, USER, EDITOR)`, scoped on
  * `@CurrentOrg()`: another workspace's clip is a plain 404.
  *
  * - `POST /clips/:clipId/captions` `{ styleId?, language? }`: 202
@@ -92,7 +92,7 @@ class CaptionsFileTooBigFilter implements ExceptionFilter {
 }
 
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipCaptionsController {
   constructor(private readonly captions: ClipCaptionsService) {}

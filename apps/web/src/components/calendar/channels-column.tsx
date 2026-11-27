@@ -35,6 +35,7 @@ import { EllipsisVerticalIcon } from '@animateicons/react/lucide/ellipsis-vertic
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { SlidersHorizontalIcon } from '@animateicons/react/lucide/sliders-horizontal-icon';
 import { SquarePenIcon } from '@animateicons/react/lucide/square-pen-icon';
+import { canManageChannels, canViewChannels } from '@postgear/entitlements';
 import {
   ANIMATED_ICON_CLASS,
   cn,
@@ -125,8 +126,10 @@ export function ChannelsColumn({
   const { orgId, channels, channelFilter, toggleChannel, clearChannelFilter } = useCalendar();
   const aiIcon = useIconAnimation();
   // Connecting and disconnecting are ADMIN-only on the API; this only avoids
-  // offering what would come back 403.
-  const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
+  // offering what would come back 403. An Editor does not get the Channels
+  // page either (Module 14), so its link goes too.
+  const canManage = canManageChannels(role);
+  const canOpenChannels = canViewChannels(role);
   const atLimit = limit !== null && limit.used >= limit.max;
   // Add Channel is a neutral tile, so it fills on hover like Button's
   // secondary variant.
@@ -398,14 +401,16 @@ export function ChannelsColumn({
                 </button>
               </TooltipHint>
             ) : null}
-            <ColumnLink
-              href={`/${orgId}/channels`}
-              label="Manage Channels"
-              fill
-              className={cn(TILE, 'w-11')}
-            >
-              <MotionIcon icon={SlidersHorizontalIcon} className="h-4 w-4" />
-            </ColumnLink>
+            {canOpenChannels ? (
+              <ColumnLink
+                href={`/${orgId}/channels`}
+                label="Manage Channels"
+                fill
+                className={cn(TILE, 'w-11')}
+              >
+                <MotionIcon icon={SlidersHorizontalIcon} className="h-4 w-4" />
+              </ColumnLink>
+            ) : null}
           </div>
 
           {/* Always offered (2026-10-21), channels or not: the composer lets a

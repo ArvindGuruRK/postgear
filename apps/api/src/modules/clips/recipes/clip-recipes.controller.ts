@@ -5,7 +5,7 @@
  *
  * `/clips/recipes` is a word route: `ClipRecipesModule` is imported by
  * `ClipsModule` before `ClipItemModule`, so `GET /clips/:clipId` never
- * swallows it (`clips-routes.spec.ts`). `@Roles(ADMIN, USER)` like every
+ * swallows it (`clips-routes.spec.ts`). `@Roles(ADMIN, USER, EDITOR)` like every
  * Clips route: any member saves, renames and deletes the workspace's
  * recipes, as with saved layouts and caption styles.
  */
@@ -42,7 +42,7 @@ import {
 import { ClipRecipesService } from './clip-recipes.service';
 
 @Controller('clips/recipes')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipRecipesController {
   constructor(private readonly recipes: ClipRecipesService) {}
@@ -95,7 +95,7 @@ export class ClipRecipesController {
 
 /** `POST /clips/:clipId/apply-recipe`: deeper than `/clips/:clipId`, so its place does not matter. */
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipApplyRecipeController {
   constructor(private readonly applier: ClipApplyRecipeService) {}

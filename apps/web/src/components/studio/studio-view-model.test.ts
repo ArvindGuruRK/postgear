@@ -438,7 +438,7 @@ describe('the filter choices', () => {
 
     expect(families.length).toBeGreaterThan(0);
     expect(families).toEqual(COLOR_FAMILIES.filter((family) => families.includes(family)));
-    expect(collectionOptions()).toEqual(['classic', 'signature', 'luxury']);
+    expect(collectionOptions()).toEqual(['classic', 'signature', 'luxury', 'schedule']);
     expect(collectionOptions(PRESETS.filter((preset) => !preset.collection))).toEqual(['classic']);
   });
 });
@@ -471,7 +471,8 @@ describe('orderPresets', () => {
   const ids = (presets: Preset[]) => presets.map((preset) => preset.id);
 
   it('goes featured, then Signature, Luxury and Classic, each in registry order', () => {
-    expect(COLLECTION_ORDER).toEqual(['signature', 'luxury', 'classic']);
+    // Sprint 13's Schedule collection comes after them all.
+    expect(COLLECTION_ORDER).toEqual(['signature', 'luxury', 'classic', 'schedule']);
     expect(ids(orderPresets(library, new Set(), null, featured))).toEqual([
       'f-luxury',
       'f-classic',
@@ -517,7 +518,10 @@ describe('orderPresets', () => {
 
     expect(ids(ordered.slice(0, FEATURED_PRESET_IDS.length))).toEqual([...FEATURED_PRESET_IDS]);
     expect(presetCollection(ordered[FEATURED_PRESET_IDS.length] as Preset)).toBe('signature');
-    expect(presetCollection(ordered.at(-1) as Preset)).toBe('classic');
+    // Schedule (Sprint 13) closes the gallery, after the last Classic one.
+    expect(presetCollection(ordered.at(-1) as Preset)).toBe('schedule');
+    const firstSchedule = ordered.findIndex((preset) => presetCollection(preset) === 'schedule');
+    expect(presetCollection(ordered[firstSchedule - 1] as Preset)).toBe('classic');
   });
 });
 

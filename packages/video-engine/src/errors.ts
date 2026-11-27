@@ -129,6 +129,13 @@ export const CLIP_ERROR_MESSAGES = {
   montage_too_long: 'A montage lasts at most 20 minutes. Take out a clip or two.',
   montage_too_many_parts: 'These clips have too many parts for one montage. Take out a clip.',
   montage_video_removed: 'One of the videos in this montage was removed.',
+  // Sprint 13, Module 14: the Emote Maker. `emote_too_big` names the site and size where it
+  // can (`emoteTooBigSentence`); this plain one is for a row read without its input.
+  emote_too_long: 'An emote can be at most 3 seconds long. Pick a shorter stretch.',
+  emote_range_invalid: 'Pick a stretch inside the video and a square inside the picture.',
+  emote_too_big:
+    "This emote is too big for the site's limit. Try a shorter stretch or a smaller crop.",
+  emote_failed: 'We could not make this emote. It was not counted. Try again.',
   // Module 19: the per-person limit on the create routes (30 a minute).
   clips_throttled: 'You are going very quickly. Wait a minute, then try again.',
   // Module 19: a job that ran past its time from the contract.
@@ -204,6 +211,10 @@ export const NON_RETRYABLE_CLIP_CODES: readonly string[] = [
   'language_unsupported',
   'captions_off',
   'captions_missing',
+  // Sprint 13, Module 14: the same stretch and crop break the same limit every time.
+  'emote_too_big',
+  'emote_too_long',
+  'emote_range_invalid',
 ];
 
 /** The error a job row and a view carry. */

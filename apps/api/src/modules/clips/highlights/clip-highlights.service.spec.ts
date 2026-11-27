@@ -245,7 +245,7 @@ describe('POST /clips/videos/:videoId/highlights', () => {
     expect(ledger.usage.consume).toHaveBeenCalledWith(TEST_ORG, 'clips.ai_minutes_per_month', 3, {
       idempotencyKey: signalsChargeKey(job.id),
       refId: job.id,
-      meta: { step: 'signals', videoId: VIDEO },
+      meta: { step: 'signals', videoId: VIDEO, by: TEST_USER },
     });
     expect(signalsChargeKey(job.id)).toBe(`clips.ai:signals:${job.id}`);
     expect(ledger.used()).toBe(3);

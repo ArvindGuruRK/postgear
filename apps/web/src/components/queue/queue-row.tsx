@@ -41,6 +41,7 @@ export function QueueRow({
   orgId,
   post,
   now,
+  draftsOnly = false,
   onOpen,
   onPublishNow,
   onReschedule,
@@ -49,6 +50,8 @@ export function QueueRow({
   orgId: string;
   post: PostSummary;
   now: Date;
+  /** An Editor (Module 14): the row's menu has no Post Now or Reschedule. */
+  draftsOnly?: boolean;
   onOpen: (post: PostSummary) => void;
   onPublishNow: (post: PostSummary) => void;
   onReschedule: (post: PostSummary) => void;
@@ -155,6 +158,7 @@ export function QueueRow({
         <PostActionsMenu
           orgId={orgId}
           post={post}
+          draftsOnly={draftsOnly}
           onPublishNow={onPublishNow}
           onReschedule={onReschedule}
           onDelete={onDelete}

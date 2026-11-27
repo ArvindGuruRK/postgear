@@ -5,7 +5,8 @@
  *
  * - `clips/<orgId>/<videoId>/<kind>-<hex>.<ext>`: a video's files (original,
  *   proxy, poster, filmstrip, signal tracks such as `track-loudness-<hex>.json.gz`).
- * - `clips/<orgId>/exports/<jobId>/<name>.<ext>`: an export while it runs.
+ * - `clips/<orgId>/exports/<jobId>/<name>.<ext>`: an export while it runs, and an
+ *   emote's files and zip (Sprint 13, Module 14), kept until the orphan sweep (24 hours).
  * - `clips/<orgId>/proofs/<jobId>/<name>.<ext>`: a Preview Export, kept 24 hours.
  * - `clips/<orgId>/downloads/<jobId>/<name>.<ext>`: a prepared download, kept 24 hours.
  * - `clips/<orgId>/library/<hex>.<ext>`: a workspace's own stickers and sounds.
@@ -45,6 +46,8 @@ export const CLIP_EXTENSIONS = [
   'json.gz',
   'ass',
   'vtt',
+  // Sprint 13, Module 14: an emote's Download All (stored, not compressed: every file in it is).
+  'zip',
 ] as const;
 
 /** One of the allowed private file extensions. */
@@ -290,6 +293,7 @@ const CLIP_CONTENT_TYPES: Record<ClipExtension, string> = {
   'json.gz': 'application/gzip',
   ass: 'text/plain; charset=utf-8',
   vtt: 'text/vtt; charset=utf-8',
+  zip: 'application/zip',
 };
 
 /** The content type a private file is served with, from its extension. */

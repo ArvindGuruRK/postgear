@@ -21,7 +21,10 @@ import {
   type FormatId,
   fontIdSchema,
   MAX_CAPTION_LENGTH,
+  MAX_SCHEDULE_ROWS,
   MAX_SLIDES,
+  scheduleRowSchema,
+  scheduleSourceSchema,
   upgrade,
 } from '@postgear/design-engine';
 import { z } from 'zod';
@@ -101,6 +104,19 @@ export const createDesignSchema = z
     brandKitId: idSchema.nullable().optional(),
     /** Overrides the preset's own name. */
     title: oneLine(MAX_TITLE_LENGTH, STUDIO_MESSAGES.TITLE_REQUIRED).optional(),
+    /**
+     * Sprint 13, the Schedule Maker: the week to write over a schedule
+     * template's sample, and where it came from. Only a template with a
+     * schedule slide takes one. The engine's own schemas, so the rows are
+     * held to exactly what a saved design may hold.
+     */
+    schedule: z
+      .object({
+        source: scheduleSourceSchema,
+        rows: z.array(scheduleRowSchema).max(MAX_SCHEDULE_ROWS),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

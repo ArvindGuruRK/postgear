@@ -16,6 +16,7 @@
  */
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import type { ConnectionKind } from '@postgear/automation';
+import { canManageWorkflows } from '@postgear/entitlements';
 import {
   Badge,
   Button,
@@ -73,7 +74,7 @@ export function ConnectionPicker({
 }: ConnectionPickerProps) {
   // Outside a workspace (the playground) there is no role: the caller passes `canManage`.
   const role = useOptionalWorkspace()?.role ?? null;
-  const canManage = canManageGiven ?? (role !== null && role !== 'USER');
+  const canManage = canManageGiven ?? canManageWorkflows(role);
   const [loaded, setLoaded] = useState<Connection[] | null>(given ?? null);
   const [failed, setFailed] = useState(false);
   const [dialog, setDialog] = useState<ConnectDialogMode | null>(null);

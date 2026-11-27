@@ -104,6 +104,13 @@ export type SecurityEvent =
   | 'oauth.state_mismatch'
   | 'oauth.succeeded'
   | 'rbac.denied'
+  // Sprint 13, Module 14: membership changes, each with actor, target, role
+  // and org (ids and role names only). No audit table in v1; these lines are
+  // the trail.
+  | 'member.invited'
+  | 'member.joined'
+  | 'member.role_changed'
+  | 'member.removed'
   // Social channel connections (Sprint 3). Namespaced `channel.*` so they stay
   // distinguishable from the `oauth.*` events above, which are sign-in: the two
   // flows share a shape but fail for entirely different reasons.

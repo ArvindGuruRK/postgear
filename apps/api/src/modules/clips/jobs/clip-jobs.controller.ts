@@ -1,7 +1,7 @@
 /**
  * One clip job (Sprint 12, Module 02): its view, its live progress, Cancel.
  *
- * `@Roles(ADMIN, USER)`: any member of the workspace watches and stops the
+ * `@Roles(ADMIN, USER, EDITOR)`: any member of the workspace watches and stops the
  * work done in it. Every handler scopes on `@CurrentOrg()`; another
  * workspace's job is a 404, checked before a stream opens. The stream is
  * server-sent events on a GET, `@SkipThrottle()` because one long request
@@ -29,7 +29,7 @@ import { ClipJobsService } from './clip-jobs.service';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
 
 @Controller('clips/jobs')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 // Module 19: `clips.enabled` on every route, through the resolver.
 @UseGuards(ClipsEnabledGuard)
 export class ClipJobsController {

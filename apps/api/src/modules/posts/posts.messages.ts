@@ -19,4 +19,6 @@ export const POST_MESSAGES = {
   LOCKED: 'This post has already been published and can no longer be changed.',
   CONFLICT:
     'Someone else changed this post after you opened it. Reload to see the latest version before saving.',
+  /** Sprint 13 Module 14: an Editor asked for anything but a draft (`EDITOR_FORBIDDEN_SENTENCE`). */
+  EDITOR_FORBIDDEN: 'Editors cannot do this. Ask an admin.',
 } as const;

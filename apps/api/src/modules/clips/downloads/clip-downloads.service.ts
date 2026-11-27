@@ -152,8 +152,8 @@ export class ClipDownloadsService {
 
     let written = false;
     try {
-      await this.limits.chargeDownload(orgId, jobId);
-      await this.limits.chargeImport(orgId, jobId, durationMs);
+      await this.limits.chargeDownload(orgId, jobId, userId);
+      await this.limits.chargeImport(orgId, jobId, durationMs, userId);
 
       const outcome = await serializable(async (tx) => {
         const found = same(await this.repository.list(orgId, this.since(), tx));

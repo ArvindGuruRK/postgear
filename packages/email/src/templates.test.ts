@@ -134,6 +134,19 @@ describe('user text', () => {
     expect(email.text).toContain('a member');
   });
 
+  it('names the Editor seat (Module 14)', () => {
+    const email = workspaceInvitationEmail(context, {
+      workspaceName: 'Acme',
+      inviterName: 'Ada',
+      role: 'EDITOR',
+      link: 'https://a.test/i',
+      expiresAt: new Date(),
+    });
+
+    expect(email.text).toContain('Ada invited you to join Acme on PostGear as an editor.');
+    expect(email.text).toContain('Role: Editor');
+  });
+
   it('escapes provider errors and caps them in a notification', () => {
     const email = notificationEmail(context, {
       subject: '[PostGear] Could not publish',

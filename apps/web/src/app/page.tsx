@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
-import { serverApi } from '@/lib/api';
-import { getSession, getSessionCookieHeader, hasCompletedOnboarding } from '@/lib/session';
-import type { Organization } from '@/types/workspace';
+import { getSession, hasCompletedOnboarding } from '@/lib/session';
+import { workspaceHome } from '@/lib/workspace-home';
+import { getOrganizations } from '@/lib/workspace-role';
 
 /**
  * Root route: the single place that decides where a visitor belongs.
@@ -24,8 +24,7 @@ export default async function RootPage() {
     redirect('/onboarding');
   }
 
-  const cookie = await getSessionCookieHeader();
-  const { organizations } = await serverApi<{ organizations: Organization[] }>('/orgs', { cookie });
+  const organizations = await getOrganizations();
 
   // Onboarding cannot complete without creating a workspace, so this should be
   // unreachable, but a user whose last membership was revoked would land here,
@@ -35,6 +34,7 @@ export default async function RootPage() {
     redirect('/onboarding');
   }
 
-  // Home, the first entry in the rail, is where a signed-in visitor lands.
-  redirect(`/${organizations[0].id}/home`);
+  // Home, the first entry in the rail, is where a signed-in visitor lands;
+  // an Editor lands on Clips (Module 14).
+  redirect(workspaceHome(organizations[0].id, organizations[0].role));
 }

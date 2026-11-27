@@ -46,6 +46,7 @@ import { CLIPS_TAB_NAMES, type ClipsTab, DEFAULT_CLIPS_TAB } from './clips-model
 import { StorageMeter } from './home/clips-meters';
 import { ComingUp } from './home/coming-up';
 import { CreateTab } from './home/create-tab';
+import { creatorToolsHref } from './emote/emote-model';
 import { DOWNLOAD_EXISTS, DOWNLOAD_STARTED, DownloadsTab } from './home/downloads-tab';
 import { useDrivePicker } from './home/drive-picker';
 import {
@@ -317,6 +318,10 @@ export function ClipsView({
           {/* Module 10: the workspace's recipes and its brand kits for clips. */}
           <ActionLink href={kitHref(orgId)} data-testid="clips-kit-link">
             Recipes And Brand Kit
+          </ActionLink>
+          {/* Module 14: the Emote Maker and the Schedule Maker. */}
+          <ActionLink href={creatorToolsHref(orgId)} data-testid="clips-creator-tools-link">
+            Creator Tools
           </ActionLink>
         </PageActions>
       </div>

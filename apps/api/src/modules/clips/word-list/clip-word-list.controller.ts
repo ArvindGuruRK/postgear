@@ -25,7 +25,7 @@ import { type PutWordListInput, putWordListSchema } from './clip-word-list.schem
 import { ClipWordListService } from './clip-word-list.service';
 
 @Controller('clips/word-list')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipWordListController {
   constructor(private readonly wordList: ClipWordListService) {}

@@ -40,7 +40,7 @@ import { securityLogger } from '../../../common/logging/security-logger';
 import { ChannelsService } from '../../channels/channels.service';
 import { createPostSchema, postDocumentSchema } from '../../posts/dto/posts.schema';
 import { POST_MESSAGES } from '../../posts/posts.messages';
-import { PostsService } from '../../posts/posts.service';
+import { type PostActor, PostsService } from '../../posts/posts.service';
 import { ClipErrorException } from '../clip-error.exception';
 import { isUuid } from '../clips.ids';
 import { documentUsesAiVoice } from './clip-ai-voice';
@@ -66,7 +66,12 @@ export class ClipSendService {
     private readonly clipPosts: ClipPostsService,
   ) {}
 
-  async send(orgId: string, clipId: string, input: SendClipInput): Promise<{ group: string }> {
+  async send(
+    orgId: string,
+    clipId: string,
+    input: SendClipInput,
+    actor?: PostActor,
+  ): Promise<{ group: string }> {
     if (!isUuid(clipId)) throw clipNotFound();
     const clip = await prisma.clip.findFirst({
       where: { id: clipId, organizationId: orgId },
@@ -148,6 +153,7 @@ export class ClipSendService {
         channels: input.channelIds.map((channelId) => ({ channelId, customized: false })),
         ...(madeWithAi ? { madeWithAi: true } : {}),
       }),
+      actor ? { actor } : {},
     );
     await this.clipPosts.syncForPost(orgId, post.group, [media.id]);
     return { group: post.group };

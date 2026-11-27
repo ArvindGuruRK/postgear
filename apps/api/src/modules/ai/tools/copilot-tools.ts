@@ -35,7 +35,7 @@ import { documentFromText } from '@postgear/social-core';
 import { z } from 'zod';
 import type { ChannelsService, ChannelView } from '../../channels/channels.service';
 import { MAX_CHANNELS_PER_POST, MAX_THREAD_PARTS } from '../../posts/dto/posts.schema';
-import type { PostsService } from '../../posts/posts.service';
+import type { PostActor, PostsService } from '../../posts/posts.service';
 import { CopilotToolError, describeFailure } from '../ai.errors';
 import { AI_MESSAGES } from '../ai.messages';
 import { AI_CREDIT_COSTS, generateCost } from '../credits/credits.policy';
@@ -58,6 +58,8 @@ export interface CopilotToolDeps {
   creditContext: CreditContext;
   channels: Pick<ChannelsService, 'list'>;
   posts: Pick<PostsService, 'create'>;
+  /** The person chatting (Module 14): their drafts carry `createdById` and pass `assertEditorMayWrite`. */
+  actor?: PostActor;
 }
 
 // --- Inputs ---------------------------------------------------------------
@@ -288,15 +290,19 @@ function draftPostTool(
       const channels = chosen as ChannelView[];
 
       try {
-        const detail = await deps.posts.create(deps.orgId, {
-          state: 'DRAFT',
-          publishDate: nextFullHour().toISOString(),
-          shared: input.parts.map((text, index) => ({
-            content: documentFromText(text),
-            media: index === 0 ? (input.mediaIds ?? []).map((id) => ({ id })) : [],
-          })),
-          channels: channels.map((channel) => ({ channelId: channel.id, customized: false })),
-        });
+        const detail = await deps.posts.create(
+          deps.orgId,
+          {
+            state: 'DRAFT',
+            publishDate: nextFullHour().toISOString(),
+            shared: input.parts.map((text, index) => ({
+              content: documentFromText(text),
+              media: index === 0 ? (input.mediaIds ?? []).map((id) => ({ id })) : [],
+            })),
+            channels: channels.map((channel) => ({ channelId: channel.id, customized: false })),
+          },
+          deps.actor ? { actor: deps.actor } : {},
+        );
 
         const channelNames = channels.map((channel) => channel.name);
 

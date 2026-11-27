@@ -63,6 +63,38 @@ logging in, so their limits and reviews never mix.
 
 - [ ] Twitch keys set, the log says `helix`.
 
+### The Same Keys For The Schedule Maker (Sprint 13)
+
+The Schedule Maker (Clips, Creator Tools) reads a channel's weekly schedule
+with the same two values: no new variable, and no second application. If the
+application above already exists, skip to step 6 of this list.
+
+1. Sign in at **dev.twitch.tv/console**. Turn on two-factor sign-in if Twitch
+   asks for it.
+2. Click **Register Your Application**.
+3. Give it any name (it must be unique on Twitch).
+4. Set the redirect address to `http://localhost`. The app token flow never
+   sends anyone there; Twitch only requires the field.
+5. Set **Category** to Website Integration and **Client Type** to
+   Confidential, then **Create**.
+6. Open **Manage**, click **New Secret**, and copy the **Client ID** and the
+   secret into `.env` as `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET`.
+7. Restart the API. Its log line `studio.schedules.binding` now says
+   `"mode":"helix"` (it says `"simulation"` without the keys outside
+   production, or under `CLIPS_SIMULATION=true`, and `"off"` in production
+   without them).
+
+An app token needs no user login and no scope: it reads only public data
+(the channel's id and its published schedule). The token and the secret are
+never logged and never sent to the browser; the token is kept in Redis and
+shared with the channel browser.
+
+Arvind: please confirm each step above against the live Twitch console the
+first time you do it, since that page changes, and correct this list where it
+differs.
+
+- [ ] Schedule Maker reads a real channel's week, the log says `helix`.
+
 ## Recipe 2: YouTube Data API Key For Clips
 
 A key from a **separate Google project** from the one used for publishing and

@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { avatarSrc } from '@/lib/avatars';
 import { leaveThen, mayLeave } from '@/lib/leave-guard';
+import { workspaceHome } from '@/lib/workspace-home';
 import { useWorkspace } from './workspace-provider';
 
 /**
@@ -69,7 +70,9 @@ export function AccountMenu() {
       // `refresh()` first so the server components re-read the new cookie
       // rather than replaying the previous workspace's cached render.
       router.refresh();
-      router.push(`/${nextId}/home`);
+      // Home, or Clips for an Editor of that workspace (Module 14).
+      const nextRole = organizations.find((organization) => organization.id === nextId)?.role;
+      router.push(workspaceHome(nextId, nextRole));
     } catch {
       // The API refused: most likely the membership was revoked in another
       // tab. Drop the optimistic selection and let the provider's value stand.

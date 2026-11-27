@@ -48,7 +48,7 @@ import { artById, artColors, artDataUri, artSvg } from '../art';
 import { isTypeable, slotText } from '../bindings';
 import { photoGround, photoOverlayColor, slideGround } from '../brand';
 import { rgba } from '../color';
-import { baseFontSize, MIN_FIT_SCALE } from '../fit';
+import { baseFontSize, MIN_FIT_SCALE, MIN_LINE_FIT_SCALE } from '../fit';
 import { fontStack, resolveWeight } from '../fonts';
 import { formatSpec, shortEdge } from '../formats';
 import { regionGround, slidePalette, slotInk } from '../ink';
@@ -58,13 +58,16 @@ import {
   type Align,
   type DesignDocument,
   type ElementState,
+  type FormatId,
   type ListMarker,
   MAX_BRAND_NAME_LENGTH,
   MAX_HANDLE_LENGTH,
+  MAX_SCHEDULE_ROWS,
   MAX_TEXT_LENGTH,
   type Palette,
   type Rect,
   type RegionId,
+  type ScheduleRow,
   type SlotDef,
   type SlotId,
   type Theme,
@@ -74,6 +77,14 @@ import {
 import { resolveTypeStyle } from '../typography';
 import { EditableText } from './EditableText';
 import { fitSlots } from './fit-runtime';
+import {
+  CELL_PAD_X_EM,
+  CELL_PAD_Y_EM,
+  DAY_WIDTH_EM,
+  ROW_LINE_HEIGHT,
+  rowsGeometry,
+  TIME_WIDTH_EM,
+} from './rows-geometry';
 
 export type SlideMode = 'edit' | 'preview' | 'export';
 
@@ -225,6 +236,23 @@ export function SlideView({
               short={short}
               mode={mode}
               resolveMedia={resolveMedia}
+            />
+          );
+        }
+
+        if (slot.kind === 'rows') {
+          return (
+            <RowsSlot
+              key={slot.id}
+              slot={slot}
+              rows={state?.rows ?? []}
+              rect={frame.rect}
+              format={design.format}
+              palette={palette}
+              dayStyle={resolveTypeStyle(theme, 'cta', design)}
+              rowStyle={resolveTypeStyle(theme, slot.type ?? 'list', design)}
+              short={short}
+              mode={mode}
             />
           );
         }
@@ -638,6 +666,248 @@ function ListItem({
         )}
       </span>
       <span style={{ flex: '1 1 auto', minWidth: 0 }}>{text}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Schedule rows (Sprint 13)
+// ---------------------------------------------------------------------------
+
+/** What a row with no stream says. */
+const OFF_LABEL = 'Off';
+
+interface RowsSlotProps {
+  slot: SlotDef;
+  rows: readonly ScheduleRow[];
+  rect: Rect;
+  format: FormatId;
+  palette: Palette;
+  /** The day column's type: the theme's heading face (its call to action role). */
+  dayStyle: TypeStyle;
+  /** The time and the title: the slot's own role, the body face. */
+  rowStyle: TypeStyle;
+  short: number;
+  mode: SlideMode;
+}
+
+/**
+ * A week of streams: one card per row, the day on `primary` (or on `surface`
+ * for a day off), the time and the title on `surface`. Seven places are laid
+ * out whatever the row count, so a row is the same height in every design;
+ * a landscape fills two columns, four days and then three.
+ *
+ * Every cell is one line, fitted on its own by the page's fitter: a long
+ * title shrinks inside its cell (to `MIN_LINE_FIT_SCALE`) rather than
+ * wrapping into the next row, and still too long it is marked for the
+ * warning, never cut quietly.
+ */
+function RowsSlot({
+  slot,
+  rows,
+  rect,
+  format,
+  palette,
+  dayStyle,
+  rowStyle,
+  short,
+  mode,
+}: RowsSlotProps) {
+  const geometry = rowsGeometry({
+    rect,
+    format,
+    columns: slot.columns?.[format] ?? 1,
+    baseSize: baseFontSize(rowStyle, short),
+  });
+  const { columns, perColumn, size, radius } = geometry;
+
+  if (rows.length === 0) {
+    // An empty week: a dashed box in the editor, so there is something to
+    // click, and nothing at all in a preview or an export.
+    return (
+      <div data-slot={slot.id} style={{ ...at(rect), display: 'flex' }}>
+        {mode === 'edit' ? (
+          <div
+            style={{
+              flex: '1 1 auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: `${Math.max(2, short * 0.003)}px dashed ${rgba(palette.text, 0.35)}`,
+              borderRadius: radius,
+              color: rgba(palette.text, 0.6),
+              font: `600 ${short * 0.022}px ${fontStack('inter')}`,
+            }}
+          >
+            {slot.label}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  const outer: CSSProperties = {
+    ...at(rect),
+    display: 'grid',
+    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+    gridTemplateRows: `repeat(${perColumn}, minmax(0, 1fr))`,
+    gridAutoFlow: 'column',
+    gap: `${geometry.rowGap}px ${geometry.columnGap}px`,
+  };
+
+  return (
+    <div data-slot={slot.id} style={outer}>
+      {rows.slice(0, MAX_SCHEDULE_ROWS).map((row, index) => (
+        <ScheduleRowCard
+          // biome-ignore lint/suspicious/noArrayIndexKey: a row is its day's place in the week.
+          key={index}
+          slotId={slot.id}
+          row={row}
+          size={size}
+          radius={radius}
+          palette={palette}
+          dayStyle={dayStyle}
+          rowStyle={rowStyle}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ScheduleRowCard({
+  slotId,
+  row,
+  size,
+  radius,
+  palette,
+  dayStyle,
+  rowStyle,
+}: {
+  slotId: SlotId;
+  row: ScheduleRow;
+  size: number;
+  radius: number;
+  palette: Palette;
+  dayStyle: TypeStyle;
+  rowStyle: TypeStyle;
+}) {
+  const off = row.off === true;
+  const dayGround = off ? palette.surface : palette.primary;
+  const dayInk = off ? palette.onSurface : palette.onPrimary;
+
+  return (
+    <div
+      data-row={off ? 'off' : 'on'}
+      style={{
+        display: 'flex',
+        minWidth: 0,
+        minHeight: 0,
+        borderRadius: radius,
+        overflow: 'hidden',
+        background: palette.surface,
+        color: palette.onSurface,
+        fontSize: size,
+      }}
+    >
+      <RowCell
+        slotId={slotId}
+        text={row.day}
+        size={size}
+        style={dayStyle}
+        weight={dayStyle.weight}
+        width={`${DAY_WIDTH_EM}em`}
+        align="center"
+        ground={dayGround}
+        ink={dayInk}
+      />
+      {off ? null : (
+        <RowCell
+          slotId={slotId}
+          text={row.time}
+          size={size}
+          style={rowStyle}
+          weight={700}
+          width={`${TIME_WIDTH_EM}em`}
+          align="start"
+        />
+      )}
+      <RowCell
+        slotId={slotId}
+        text={off ? OFF_LABEL : row.title}
+        size={size}
+        style={rowStyle}
+        weight={off ? rowStyle.weight : Math.max(rowStyle.weight, 500)}
+        align="start"
+        grow
+      />
+    </div>
+  );
+}
+
+/**
+ * One cell of a row: a padded ground, and inside it the fitted box the page's
+ * fitter shrinks. The padding sits outside the fitted box so the fitter's
+ * width is the width the words really have.
+ */
+function RowCell({
+  slotId,
+  text,
+  size,
+  style,
+  weight,
+  width,
+  align,
+  grow = false,
+  ground,
+  ink,
+}: {
+  slotId: SlotId;
+  text: string;
+  size: number;
+  style: TypeStyle;
+  weight: number;
+  width?: string;
+  align: Align;
+  grow?: boolean;
+  ground?: string;
+  ink?: string;
+}) {
+  return (
+    <div
+      style={{
+        boxSizing: 'border-box',
+        flex: grow ? '1 1 0' : `0 0 ${width}`,
+        minWidth: 0,
+        display: 'flex',
+        alignItems: 'stretch',
+        padding: `${CELL_PAD_Y_EM}em ${CELL_PAD_X_EM}em`,
+        background: ground,
+        color: ink,
+      }}
+    >
+      <div
+        data-slot={slotId}
+        data-fit={size}
+        data-fit-min={MIN_LINE_FIT_SCALE}
+        style={{
+          flex: '1 1 auto',
+          minWidth: 0,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          fontFamily: fontStack(style.font),
+          fontWeight: resolveWeight(style.font, weight),
+          fontSize: size,
+          lineHeight: ROW_LINE_HEIGHT,
+          letterSpacing: `${style.tracking}em`,
+          textAlign: align === 'center' ? 'center' : 'left',
+        }}
+      >
+        <div data-fit-content="" style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
+          {text}
+        </div>
+      </div>
     </div>
   );
 }

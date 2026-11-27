@@ -25,14 +25,24 @@
  *
  * `StudioService` is exported for the top bar's search, which asks it for
  * designs the way it asks the posts and media modules for theirs.
+ *
+ * The Schedule Maker's fetch (Sprint 13, Module 14) lives in `schedules/`:
+ * its source (Twitch's Helix or the fixtures) is chosen once at boot from
+ * the environment, and its cache and throttle use the global Redis.
  */
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Env } from '../../config/env';
 import { BillingModule } from '../billing/billing.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { MediaModule } from '../media/media.module';
 import { PostsModule } from '../posts/posts.module';
+import { RedisService } from '../redis/redis.service';
 import { BrandKitsService } from './brand-kits.service';
 import { DesignSharesController } from './design-shares.controller';
+import { createScheduleSource } from './schedules/schedule-source.factory';
+import { SchedulesController } from './schedules/schedules.controller';
+import { SchedulesService } from './schedules/schedules.service';
 import { StudioController } from './studio.controller';
 import { StudioRepository } from './studio.repository';
 import { StudioService } from './studio.service';
@@ -40,8 +50,23 @@ import { StudioFontsController } from './studio-fonts.controller';
 
 @Module({
   imports: [BillingModule, ChannelsModule, MediaModule, PostsModule],
-  controllers: [StudioController, DesignSharesController, StudioFontsController],
-  providers: [StudioService, BrandKitsService, StudioRepository],
+  controllers: [
+    StudioController,
+    DesignSharesController,
+    StudioFontsController,
+    SchedulesController,
+  ],
+  providers: [
+    StudioService,
+    BrandKitsService,
+    StudioRepository,
+    {
+      provide: SchedulesService,
+      useFactory: (config: ConfigService<Env, true>, redis: RedisService) =>
+        new SchedulesService(createScheduleSource({ config, redis }), redis),
+      inject: [ConfigService, RedisService],
+    },
+  ],
   exports: [StudioService],
 })
 export class StudioModule {}

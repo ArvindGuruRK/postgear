@@ -1,7 +1,7 @@
 /**
  * Transcripts (Sprint 13, Module 02).
  *
- * `@Roles(ADMIN, USER)`: any member who can open a video can have it listened
+ * `@Roles(ADMIN, USER, EDITOR)`: any member who can open a video can have it listened
  * to (it spends the workspace's AI minutes), read its words and fix them.
  * Editors are added with the Editor role in Module 14 (they caption clips, so
  * these routes are theirs too). Scoped on `@CurrentOrg()`: another
@@ -53,7 +53,7 @@ import {
 import { ClipTranscriptsService } from './clip-transcripts.service';
 
 @Controller('clips/videos')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipTranscriptsController {
   constructor(private readonly transcripts: ClipTranscriptsService) {}

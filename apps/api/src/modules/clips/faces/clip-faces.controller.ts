@@ -1,5 +1,5 @@
 /**
- * Faces in a clip's stretch (Sprint 13, Module 07). `@Roles(ADMIN, USER)`,
+ * Faces in a clip's stretch (Sprint 13, Module 07). `@Roles(ADMIN, USER, EDITOR)`,
  * scoped on `@CurrentOrg()`: another workspace's clip is a plain 404.
  *
  * - `POST /clips/:clipId/faces`: 200 `{ status: 'ready', reused: true }` when
@@ -34,7 +34,7 @@ export const facesReadQuerySchema = z.object({ follow: z.enum(['0', '1']).option
 export type FacesReadQuery = z.infer<typeof facesReadQuerySchema>;
 
 @Controller('clips')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 @UseGuards(ClipsEnabledGuard)
 export class ClipFacesController {
   constructor(private readonly faces: ClipFacesService) {}

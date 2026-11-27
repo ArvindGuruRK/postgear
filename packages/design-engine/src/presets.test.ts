@@ -17,6 +17,7 @@ import {
   fitText,
   type MeasuredStyle,
   MIN_FIT_SCALE,
+  MIN_LINE_FIT_SCALE,
   wrapText,
 } from './fit';
 import { fontStack } from './fonts';
@@ -31,8 +32,10 @@ import {
   presetStyle,
   presetsByCategory,
 } from './presets';
+import { rowsGeometry } from './render/rows-geometry';
 import { SlideView } from './render/SlideView';
 import { designDocumentSchema } from './schema';
+import { emptyWeek } from './schedule';
 import { isThemeId, themeById } from './themes';
 import { type DesignDocument, type ListMarker, PRESET_CATEGORIES } from './types';
 
@@ -246,6 +249,143 @@ describe('sample content', () => {
     }
 
     expect(failures).toEqual([]);
+  });
+});
+
+describe('schedule rows', () => {
+  /**
+   * A schedule row has no second line to fall back on: every cell (the day,
+   * the time, the title) must fit one line once shrunk to the one-line
+   * floor, in the box the renderer gives it, in every format and theme.
+   */
+  it('fit one line per cell in every schedule preset and format', () => {
+    const failures: string[] = [];
+    const schedules = PRESETS.filter((preset) => preset.category === 'schedule');
+    expect(schedules).toHaveLength(5);
+
+    for (const preset of schedules) {
+      const theme = themeById(preset.themeId);
+
+      for (const format of FORMAT_IDS) {
+        const document = documentFromPreset({ presetId: preset.id, format });
+        const slide = document.slides[0];
+        const layout = findLayout(slide.layoutId);
+        const slot = layout?.slots.find((entry) => entry.kind === 'rows');
+        const frame = layout && slot ? slotFrame(layout, slot, format, null) : null;
+        if (!slot || !frame) throw new Error(`${preset.id} has no schedule.`);
+
+        const rows = slide.elements.schedule?.rows ?? [];
+        expect(rows).toHaveLength(7);
+
+        const rowStyle = theme.type[slot.type ?? 'list'];
+        const dayStyle = theme.type.cta;
+        const geometry = rowsGeometry({
+          rect: frame.rect,
+          format,
+          columns: slot.columns?.[format] ?? 1,
+          baseSize: baseFontSize(rowStyle, shortEdge(format)),
+        });
+
+        const cell = (text: string, width: number, style: typeof rowStyle, weight: number) =>
+          fitText({
+            text,
+            width,
+            height: geometry.inner.height,
+            lineHeight: 1.2,
+            singleLine: true,
+            measure: approximateMeasure,
+            style: {
+              fontFamily: fontStack(style.font),
+              fontWeight: weight,
+              fontSize: geometry.size,
+              letterSpacing: style.tracking * geometry.size,
+            },
+          }).overflows;
+
+        for (const row of rows) {
+          const over = [
+            cell(row.day, geometry.inner.day, dayStyle, dayStyle.weight) && 'day',
+            !row.off && cell(row.time, geometry.inner.time, rowStyle, 700) && 'time',
+            cell(row.off ? 'Off' : row.title, geometry.inner.title, rowStyle, 500) && 'title',
+          ].filter(Boolean);
+          for (const part of over) failures.push(`${preset.id} ${format} ${row.day} ${part}`);
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
+
+  it('give a row at least one line of the theme type in portrait and landscape', () => {
+    for (const format of ['portrait', 'landscape'] as const) {
+      const document = documentFromPreset({ presetId: 'schedule-week-clean-blue', format });
+      const layout = findLayout(document.slides[0].layoutId);
+      const slot = layout?.slots.find((entry) => entry.kind === 'rows');
+      const frame = layout && slot ? slotFrame(layout, slot, format, null) : null;
+      if (!slot || !frame) throw new Error('No schedule.');
+
+      const geometry = rowsGeometry({
+        rect: frame.rect,
+        format,
+        columns: slot.columns?.[format] ?? 1,
+        baseSize: baseFontSize(themeById('schedule-clean-blue').type.list, shortEdge(format)),
+      });
+      expect(geometry.columns).toBe(format === 'landscape' ? 2 : 1);
+      expect(geometry.perColumn).toBe(format === 'landscape' ? 4 : 7);
+      // A long title shrinks to half its size at most, so the row's own
+      // type is what a person reads: big enough on a phone.
+      expect(geometry.size * MIN_LINE_FIT_SCALE).toBeGreaterThan(14);
+      expect(geometry.inner.title).toBeGreaterThan(geometry.size * 6);
+    }
+  });
+
+  it('draw seven cards, Off for a day off, and two columns in a landscape', () => {
+    const portrait = documentFromPreset({ presetId: 'schedule-week-dark', format: 'portrait' });
+    const markup = renderToStaticMarkup(
+      createElement(SlideView, { design: portrait, index: 0, mode: 'export' }),
+    );
+    expect(markup.match(/data-row="/g)).toHaveLength(7);
+    expect(markup.match(/data-row="off"/g)).toHaveLength(2);
+    expect(markup).toContain('>Off<');
+    expect(markup).toContain('>Minecraft, 10 PM Chat<');
+    expect(markup).toContain('grid-template-columns:repeat(1, minmax(0, 1fr))');
+
+    const landscape = documentFromPreset({ presetId: 'schedule-week-dark', format: 'landscape' });
+    expect(
+      renderToStaticMarkup(
+        createElement(SlideView, { design: landscape, index: 0, mode: 'export' }),
+      ),
+    ).toContain('grid-template-columns:repeat(2, minmax(0, 1fr))');
+  });
+
+  it('name the zone in the subheadline from the design, and draw an empty week only in the editor', () => {
+    const base = documentFromPreset({ presetId: 'schedule-week-red', format: 'portrait' });
+    const zoned: DesignDocument = {
+      ...base,
+      schedule: {
+        source: 'manual',
+        login: null,
+        timeZone: 'America/New_York',
+        weekStart: '2026-11-23',
+        fetchedAt: null,
+        hour12: true,
+      },
+    };
+    const markup = renderToStaticMarkup(
+      createElement(SlideView, { design: zoned, index: 0, mode: 'export' }),
+    );
+    expect(markup).toContain('All times America/New York');
+
+    const slide = base.slides[0];
+    const empty: DesignDocument = {
+      ...base,
+      slides: [{ ...slide, elements: { ...slide.elements, schedule: { rows: [] } } }],
+    };
+    const edit = (mode: 'edit' | 'export') =>
+      renderToStaticMarkup(createElement(SlideView, { design: empty, index: 0, mode }));
+    expect(edit('edit')).toContain('>Schedule<');
+    expect(edit('export')).not.toContain('>Schedule<');
+    expect(emptyWeek()).toHaveLength(7);
   });
 });
 

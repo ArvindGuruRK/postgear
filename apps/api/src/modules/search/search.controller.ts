@@ -1,7 +1,7 @@
 /**
  * Workspace search.
  *
- * `@Roles(ADMIN, USER)`: any member, since every member can already open the
+ * `@Roles(ADMIN, USER, EDITOR)`: any member, since every member can already open the
  * posts, channels and media this looks through. The workspace comes from
  * `@CurrentOrg()` only; the query string carries nothing but the words.
  */
@@ -14,7 +14,7 @@ import { type SearchQuery, searchQuerySchema } from './dto/search.schema';
 import { SearchService } from './search.service';
 
 @Controller('search')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class SearchController {
   constructor(private readonly search: SearchService) {}
 

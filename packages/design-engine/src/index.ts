@@ -81,6 +81,7 @@ export {
   BLANK_PRESET_ID,
   blankDocument,
   type CreateDocumentInput,
+  cleanScheduleRows,
   type CtaDefaults,
   detachBrandKit,
   documentFromPreset,
@@ -115,6 +116,7 @@ export {
   type MeasuredStyle,
   type MeasureText,
   MIN_FIT_SCALE,
+  MIN_LINE_FIT_SCALE,
   wrapText,
 } from './fit';
 export {
@@ -209,6 +211,9 @@ export {
   presetStyle,
   presetsByCategory,
   SAMPLE_HANDLE,
+  SAMPLE_WEEK,
+  SCHEDULE_PRESET_BY_THEME,
+  SCHEDULE_PRESETS,
 } from './presets';
 export {
   type TypingKeyAction,
@@ -231,6 +236,7 @@ export {
   type SlideViewProps,
 } from './render/SlideView';
 export { sampleElements, sampleState } from './samples';
+export * from './schedule';
 export {
   brandColorsSchema,
   DesignVersionError,
@@ -242,6 +248,8 @@ export {
   fontIdSchema,
   parseDesignDocument,
   safeParseDesignDocument,
+  scheduleRowSchema,
+  scheduleSourceSchema,
   slideBackgroundSchema,
   upgrade,
 } from './schema';
@@ -251,6 +259,8 @@ export {
   fontsOf,
   isThemeId,
   LUXURY_THEME_IDS,
+  SCHEDULE_THEME_IDS,
+  SCHEDULE_THEMES,
   SIGNATURE_THEME_IDS,
   THEMES,
   themeById,

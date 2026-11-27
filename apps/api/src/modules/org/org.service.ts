@@ -7,10 +7,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { type PrismaTransactionClient, prisma, Role } from '@postgear/db';
+import { securityLogger } from '../../common/logging/security-logger';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 import { toSessionAvatar } from '../users/session-avatar';
+import { EditorSeatsService } from './editor-seats.service';
 import { type InvitePayload, type InviteRole, InviteTokenService } from './invite-token.service';
 
 /**
@@ -71,6 +73,7 @@ export class OrgService {
     private readonly entitlements: EntitlementsService,
     private readonly invites: InviteTokenService,
     private readonly redis: RedisService,
+    private readonly seats: EditorSeatsService,
   ) {}
 
   /**
@@ -241,6 +244,12 @@ export class OrgService {
       throw new NotFoundException('Workspace not found');
     }
 
+    // Module 14: the soft seat check, so an admin hears "no seats" before a
+    // link exists. The hard check is at accept, under the seat lock.
+    if (input.role === Role.EDITOR) {
+      await this.seats.assertRoom(organizationId);
+    }
+
     const { token, payload } = this.invites.sign({
       orgId: organizationId,
       role: input.role,
@@ -267,6 +276,13 @@ export class OrgService {
         expiresAt,
       });
     }
+
+    securityLogger.log('member.invited', {
+      actorId: inviterId,
+      orgId: organizationId,
+      role: input.role,
+      emailed: input.sendEmail && payload.email !== undefined,
+    });
 
     return { url, expiresAt };
   }
@@ -355,6 +371,13 @@ export class OrgService {
 
     try {
       await prisma.$transaction(async (tx) => {
+        // Module 14: the hard seat check, inside the transaction that writes
+        // the membership and under the workspace's seat lock, so two people
+        // accepting the last seat at once admit one. A refusal releases the
+        // link below, so it works again once a seat is free.
+        if (payload.role === Role.EDITOR) {
+          await this.seats.assertRoom(payload.orgId, tx);
+        }
         await tx.userOrganization.create({
           data: { userId: caller.id, organizationId: payload.orgId, role: payload.role },
         });
@@ -374,6 +397,13 @@ export class OrgService {
       }
       throw error;
     }
+
+    securityLogger.log('member.joined', {
+      actorId: caller.id,
+      targetId: caller.id,
+      orgId: payload.orgId,
+      role: payload.role,
+    });
 
     return { ...organization, role: payload.role };
   }
@@ -418,10 +448,15 @@ export class OrgService {
    * invitations and settings permanently: recoverable only by direct database
    * access.
    */
-  async changeRole(organizationId: string, targetUserId: string, role: Role): Promise<void> {
+  async changeRole(
+    organizationId: string,
+    targetUserId: string,
+    role: Role,
+    actorId?: string,
+  ): Promise<void> {
     const membership = await prisma.userOrganization.findFirst({
       where: { userId: targetUserId, organizationId },
-      select: { id: true, role: true },
+      select: { id: true, role: true, disabled: true },
     });
 
     if (!membership) {
@@ -432,7 +467,25 @@ export class OrgService {
       await this.assertNotLastAdmin(organizationId, targetUserId);
     }
 
-    await prisma.userOrganization.update({ where: { id: membership.id }, data: { role } });
+    // Module 14: becoming an Editor takes a seat, checked under the same lock
+    // as an accept. A disabled member holds no seat yet: re-enabling them is
+    // what would, and nothing re-enables today (see the Decision Log).
+    if (role === Role.EDITOR && membership.role !== Role.EDITOR && !membership.disabled) {
+      await prisma.$transaction(async (tx) => {
+        await this.seats.assertRoom(organizationId, tx, targetUserId);
+        await tx.userOrganization.update({ where: { id: membership.id }, data: { role } });
+      });
+    } else {
+      await prisma.userOrganization.update({ where: { id: membership.id }, data: { role } });
+    }
+
+    securityLogger.log('member.role_changed', {
+      actorId: actorId ?? null,
+      targetId: targetUserId,
+      orgId: organizationId,
+      role,
+      from: membership.role,
+    });
   }
 
   /**
@@ -443,7 +496,11 @@ export class OrgService {
    * removal, and leaving disabled rows behind would make the member list and
    * seat counting quietly wrong.
    */
-  async removeMember(organizationId: string, targetUserId: string): Promise<void> {
+  async removeMember(
+    organizationId: string,
+    targetUserId: string,
+    actorId?: string,
+  ): Promise<void> {
     const membership = await prisma.userOrganization.findFirst({
       where: { userId: targetUserId, organizationId },
       select: { id: true, role: true },
@@ -460,6 +517,13 @@ export class OrgService {
     await prisma.$transaction(async (tx) => {
       await tx.userOrganization.delete({ where: { id: membership.id } });
       await restartOnboardingIfNoWorkspace(tx, targetUserId);
+    });
+
+    securityLogger.log('member.removed', {
+      actorId: actorId ?? null,
+      targetId: targetUserId,
+      orgId: organizationId,
+      role: membership.role,
     });
   }
 

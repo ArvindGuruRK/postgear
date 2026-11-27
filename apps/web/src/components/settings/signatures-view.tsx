@@ -17,6 +17,7 @@
 import { PencilIcon } from '@animateicons/react/lucide/pencil-icon';
 import { PlusIcon } from '@animateicons/react/lucide/plus-icon';
 import { Trash2Icon } from '@animateicons/react/lucide/trash-2-icon';
+import { canManageWorkspaceSettings } from '@postgear/entitlements';
 import {
   Alert,
   Badge,
@@ -42,7 +43,7 @@ import { SignatureDialog } from './signature-dialog';
 export function SignaturesView({ initialSignatures }: { initialSignatures: Signature[] | null }) {
   const { role } = useWorkspace();
   // Presentation only: the API is what refuses a member's write.
-  const canManage = role === 'ADMIN' || role === 'SUPERADMIN';
+  const canManage = canManageWorkspaceSettings(role);
 
   const [signatures, setSignatures] = useState<Signature[] | null>(initialSignatures);
   const [dialogOpen, setDialogOpen] = useState(false);

@@ -2,7 +2,7 @@
  * `GET /entitlements/me` (Sprint 12): what the active workspace's plan
  * allows, for drawing locks, meters and chips.
  *
- * Any member of the workspace (`@Roles(ADMIN, USER)`); the workspace comes
+ * Any member of the workspace (`@Roles(ADMIN, USER, EDITOR)`); the workspace comes
  * from the org cookie, so no other workspace can be named. Presentation
  * only: every route re-resolves on the server and never trusts a value sent
  * back. `Cache-Control: private, max-age=15` with an ETag, so a page that
@@ -17,7 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { EntitlementResolver } from './entitlement-resolver';
 
 @Controller('entitlements')
-@Roles(Role.ADMIN, Role.USER)
+@Roles(Role.ADMIN, Role.USER, Role.EDITOR)
 export class EntitlementsController {
   constructor(private readonly resolver: EntitlementResolver) {}
 
