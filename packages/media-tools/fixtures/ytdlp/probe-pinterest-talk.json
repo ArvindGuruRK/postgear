@@ -1,0 +1,49 @@
+{
+  "_type": "video",
+  "id": "900000000000000001",
+  "extractor": "Pinterest",
+  "extractor_key": "Pinterest",
+  "webpage_url": "https://www.pinterest.com/pin/900000000000000001/",
+  "title": "PostGear Sample: A Talk On Pinterest",
+  "uploader": "PostGear Samples",
+  "channel": "PostGear Samples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/pinterest/900000000000000001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/pinterest/900000000000000001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "hls-1080",
+      "ext": "mp4",
+      "protocol": "m3u8_native",
+      "vcodec": "avc1.640028",
+      "acodec": "mp4a.40.2",
+      "height": 1080,
+      "width": 1080,
+      "tbr": 3500,
+      "url": "https://media.sim.invalid/hls-1080.m3u8"
+    },
+    {
+      "format_id": "V_720P",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 720,
+      "tbr": 1800,
+      "url": "https://media.sim.invalid/V_720P.mp4"
+    }
+  ]
+}

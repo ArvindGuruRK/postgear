@@ -9,6 +9,7 @@
 
 import type {
   CaptionLook,
+  ChannelPlatformId,
   ClipSetup,
   LibraryCategoryCount,
   LibrarySearchPage,
@@ -320,6 +321,14 @@ export function completeUpload(
   return api(`${uploadPath(uploadId)}/complete`, { method: 'POST', body: { parts } });
 }
 
+/** Module 12 (D13-09): imports a file picked in Google Drive, as an upload. */
+export function importFromDrive(
+  fileId: string,
+  accessToken: string,
+): Promise<{ video: ClipVideoView; job: ClipJobView | null }> {
+  return api('/clips/videos/drive', { method: 'POST', body: { fileId, accessToken } });
+}
+
 // --- Module 06: My Channels --------------------------------------------------------
 
 export async function listChannels(
@@ -333,7 +342,7 @@ export async function listChannels(
 
 /** 422 `channel_not_found` or `link_is_a_video`, 409 `channel_exists`, 402 `channel_limit`. */
 export async function addChannel(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   handle: string,
 ): Promise<ClipChannelView> {
   const { channel } = await api<{ channel: ClipChannelView }>('/clips/channels', {
@@ -345,7 +354,7 @@ export async function addChannel(
 
 /** Resolves a channel name without saving it (the Add dialog's Check); refuses like `addChannel`. */
 export async function checkChannel(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   handle: string,
   options: { signal?: AbortSignal } = {},
 ): Promise<ClipChannelPreview> {

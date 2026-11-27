@@ -18,6 +18,8 @@
  * - `POST /clips/videos/:videoId/download-original` (Module 18): `{ url }`, a
  *   five minute signed address for an uploaded video's own file; uploads only.
  * - `POST /clips/videos/uploads`, `.../uploads/:uploadId/parts`, `.../uploads/:uploadId/complete`.
+ * - `POST /clips/videos/drive` (Sprint 13 Module 12): `{ fileId, accessToken }`
+ *   from Google's picker; 201 `{ video, job }`. 404 when Drive is not offered.
  */
 import {
   Body,
@@ -48,6 +50,8 @@ import { ClipUploadsService } from './clip-uploads.service';
 import {
   type CompleteUploadInput,
   completeUploadSchema,
+  type DriveImportInput,
+  driveImportSchema,
   type ImportVideoInput,
   importVideoSchema,
   type ListVideosQuery,
@@ -123,6 +127,18 @@ export class ClipVideosController {
     @Body(new ZodBody(completeUploadSchema, 'clips/uploads/complete')) body: CompleteUploadInput,
   ) {
     return this.uploads.complete(org.id, user.id, uploadId, body);
+  }
+
+  /** Module 12 (D13-09): a file picked in Google Drive. 404 when Drive is not offered. */
+  @Post('drive')
+  @ClipStart()
+  @HttpCode(HttpStatus.CREATED)
+  importFromDrive(
+    @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodBody(driveImportSchema, 'clips/videos/drive')) body: DriveImportInput,
+  ) {
+    return this.uploads.startFromDrive(org.id, user.id, body);
   }
 
   // --- One video ------------------------------------------------------------------

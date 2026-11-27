@@ -29,7 +29,7 @@ import type {
   ChannelListQuery,
   ChannelPage,
   ChannelRef,
-  ClipPlatformId,
+  ChannelPlatformId,
 } from '@postgear/video-engine';
 import { MAX_LIST_PAGE } from '@postgear/video-engine';
 import { normaliseChannel, normalisePage } from './listers/listed-shapes';
@@ -47,7 +47,7 @@ export interface ListerSet {
   flat: ChannelLister | null;
 }
 
-export type ListerSets = Readonly<Record<ClipPlatformId, ListerSet>>;
+export type ListerSets = Readonly<Record<ChannelPlatformId, ListerSet>>;
 
 export const CHANNEL_LISTER_SETS = Symbol('CHANNEL_LISTER_SETS');
 
@@ -79,7 +79,7 @@ export class ChannelListerSelector {
   constructor(@Inject(CHANNEL_LISTER_SETS) private readonly sets: ListerSets) {}
 
   async resolve(
-    platform: ClipPlatformId,
+    platform: ChannelPlatformId,
     handle: string,
   ): Promise<{ channel: ChannelRef; source: ListingSource }> {
     const { value, source } = await this.run(platform, 'resolve', null, (lister) =>
@@ -93,7 +93,7 @@ export class ChannelListerSelector {
    * first page). `query.cursor` is ignored: the position carries it.
    */
   async list(
-    platform: ClipPlatformId,
+    platform: ChannelPlatformId,
     channel: ChannelRef,
     query: Omit<ChannelListQuery, 'cursor'>,
     position: PagePosition | null,
@@ -114,7 +114,7 @@ export class ChannelListerSelector {
   }
 
   private async run<T>(
-    platform: ClipPlatformId,
+    platform: ChannelPlatformId,
     action: 'resolve' | 'list',
     stayOn: ListingSource | null,
     call: (lister: ChannelLister, source: ListingSource) => Promise<T>,

@@ -31,15 +31,14 @@ export const LINKS = {
   kickSample: 'https://kick.com/simstreamer/videos/00000000-0000-4000-8000-000000000001',
   twitchPrivate: 'https://www.twitch.tv/videos/900000002',
   twitchLive: 'https://www.twitch.tv/videos/900000003',
-  /** Not a platform Clips reads: refused before any probe. */
-  unsupported: 'https://vimeo.com/76979871',
+  /** Not a site Clips reads (Module 12 reads Vimeo): refused before any probe. */
+  unsupported: 'https://www.bilibili.com/video/BV1xx411c7mD',
 } as const;
 
 export const SENTENCES = {
   private: 'This video is private or needs a login, so we cannot read it.',
   live: 'This stream is still live. Come back when it has ended.',
-  unsupported:
-    'We can only read YouTube, Twitch and Kick links for now. You can upload the file instead.',
+  unsupported: 'We cannot read links from this site yet. You can upload the file instead.',
   rights: 'This video is mine, or I have permission to use it.',
   alreadyHere: 'You already have this video.',
   biggerScreen: 'Clips is made for a bigger screen. Open it on a laptop or desktop.',

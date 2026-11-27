@@ -30,7 +30,7 @@ import {
 } from '@postgear/ui';
 import {
   CLIP_ERROR_MESSAGES,
-  type ClipPlatformId,
+  type ChannelPlatformId,
   PLATFORM_NAMES,
   validateHandle,
 } from '@postgear/video-engine';
@@ -67,16 +67,16 @@ export function AddChannelDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgId: string;
-  platforms: readonly ClipPlatformId[];
+  platforms: readonly ChannelPlatformId[];
   /** The platform tab the dialog was opened from. */
-  initialPlatform?: ClipPlatformId;
+  initialPlatform?: ChannelPlatformId;
   onAdded: (channel: ClipChannelView) => void;
   api?: { check: typeof checkChannel; add: typeof addChannel };
 }) {
   const shown = orderedPlatforms(platforms);
   const firstPlatform =
     initialPlatform && shown.includes(initialPlatform) ? initialPlatform : shown[0];
-  const [platform, setPlatform] = useState<ClipPlatformId | undefined>(firstPlatform);
+  const [platform, setPlatform] = useState<ChannelPlatformId | undefined>(firstPlatform);
   const [name, setName] = useState('');
   const [checking, setChecking] = useState(false);
   const [adding, setAdding] = useState(false);

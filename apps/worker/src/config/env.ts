@@ -7,7 +7,7 @@
  * worker itself reads is listed; Prisma reads `DATABASE_URL` on its own.
  */
 import { WORKER_ROLES, type WorkerRole } from '@postgear/scheduling';
-import { CLIP_PLATFORMS } from '@postgear/video-engine';
+import { CLIP_PLATFORMS, DEFAULT_ON_SITES, siteById } from '@postgear/video-engine';
 import { z } from 'zod';
 
 /** Reads an empty or whitespace-only variable as absent, so a schema default applies. */
@@ -194,8 +194,15 @@ const envSchema = z
     MEDIA_SIMULATION: blankAsUnset(z.enum(['true', 'false']).optional()),
     MEDIA_URL: blankAsUnset(z.string().url().default('http://localhost:8100')),
     MEDIA_INTERNAL_TOKEN: blankAsUnset(z.string().min(32).optional()),
-    // The same list as the API's: a paused platform is never fetched from.
-    CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
+    // Which sites may be imported from and browsed (any id of the sites table,
+    // Module 12). The default is every site that is on by default (D13-08):
+    // Sprint 12's three plus nine new ones; TikTok, Instagram, Zoom, Dropbox
+    // and Threads are built but off. YouTube is switched on in production only
+    // after the legal read (D12-15): drop it from the list.
+    // The same list as the API's: a paused site is never fetched from.
+    CLIPS_PLATFORMS: blankAsUnset(
+      commaList(z.enum(CLIP_PLATFORMS)).default(DEFAULT_ON_SITES.join(',')),
+    ),
     // The operator's library ingest refuses to start unless this is true.
     CLIPS_LIBRARY_INGEST: blankAsUnset(z.enum(['true', 'false']).default('false')),
     // Openverse and Freesound sound intake (Module 21), each off until that
@@ -289,6 +296,19 @@ const envSchema = z
         path: ['MEDIA_SIMULATION'],
         message: 'MEDIA_SIMULATION cannot be enabled in production',
       });
+    }
+
+    // Module 12: a site with no yt-dlp extractor (Threads, D13-08) answers only
+    // from its recorded fixture, so it may be switched on under simulation only.
+    if (env.CLIPS_SIMULATION !== 'true') {
+      const unreadable = env.CLIPS_PLATFORMS.filter((id) => siteById(id)?.extractors.length === 0);
+      if (unreadable.length > 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CLIPS_PLATFORMS'],
+          message: `CLIPS_PLATFORMS lists ${unreadable.join(', ')}, which yt-dlp cannot read yet (allowed only with CLIPS_SIMULATION=true)`,
+        });
+      }
     }
 
     if (env.CLIPS_SIMULATION === 'true' && env.NODE_ENV === 'production') {

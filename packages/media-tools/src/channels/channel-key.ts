@@ -8,7 +8,7 @@
  * graph must never reach the process runner (`src/run/`). The yt-dlp
  * argument builder re-exports it from `flat-list.args.ts`.
  */
-import type { ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPlatformId } from '@postgear/video-engine';
 import { ChannelListerError } from './types';
 
 const TWITCH_LOGIN = /^[a-z0-9_]{4,25}$/;
@@ -17,7 +17,7 @@ const YOUTUBE_HANDLE = /^@[A-Za-z0-9._-]{3,30}$/;
 const YOUTUBE_CHANNEL_ID = /^UC[A-Za-z0-9_-]{22}$/;
 
 /** The checked channel name for `platform`, or `channel_not_found` when it cannot be one. */
-export function channelKey(platform: ClipPlatformId, handleOrId: string): string {
+export function channelKey(platform: ChannelPlatformId, handleOrId: string): string {
   const value = handleOrId.trim();
   if (platform === 'twitch') {
     const login = value.toLowerCase();

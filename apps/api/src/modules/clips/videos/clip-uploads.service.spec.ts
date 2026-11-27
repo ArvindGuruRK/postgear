@@ -3,13 +3,19 @@
  * objects in memory: start, sign, complete, the binding to one workspace,
  * a second complete, and a file that turns out bigger than declared.
  */
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
 import { HttpException } from '@nestjs/common';
 import type { ClipAsset, ClipJob, ClipVideo } from '@postgear/db';
+import { decrypt } from '@postgear/db';
+import { createSimulatedDriveFiles, type DriveFiles } from '@postgear/media-tools/drive';
 import { type PrivateStorage, StorageNotFoundError, type UploadedPart } from '@postgear/storage';
 import type { ClipJobsRepository, NewClipJob } from '../jobs/clip-jobs.repository';
 import type { ClipJobsService } from '../jobs/clip-jobs.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
 import { jobRow, TEST_ORG, TEST_USER, videoRow } from '../testing/rows';
+import type { ClipDrive } from './clip-drive';
 import { ClipUploadsService, partPlan, titleFromFileName } from './clip-uploads.service';
 import type { ClipVideosRepository } from './clip-videos.repository';
 import type { ClipVideosService } from './clip-videos.service';
@@ -113,7 +119,7 @@ class FakePrivateStorage {
   }
 }
 
-function build() {
+function build(drive: { files: DriveFiles | null } = { files: null }) {
   const storage = new FakePrivateStorage();
   const repository = {
     findUpload: jest.fn(async (orgId: string, uploadId: string) => {
@@ -188,6 +194,7 @@ function build() {
     jobsRepository as unknown as ClipJobsRepository,
     limits as unknown as ClipLimitsGuard,
     storage as unknown as PrivateStorage,
+    drive as unknown as ClipDrive,
   );
   return { service, storage, jobs, limits };
 }
@@ -303,6 +310,77 @@ describe('ClipUploadsService', () => {
     expect(storage.objects.size).toBe(0);
     expect(store.videos[0]?.deletedAt).not.toBeNull();
     expect(store.jobs).toHaveLength(0);
+  });
+});
+
+describe('a file picked in Google Drive (Module 12)', () => {
+  const TOKEN = 'ya29.simulated-picker-token';
+  let samples: string;
+  const previousKey = process.env.ENCRYPTION_KEY_AES256;
+
+  beforeAll(async () => {
+    process.env.ENCRYPTION_KEY_AES256 = 'd'.repeat(64);
+    samples = await mkdtemp(path.join(tmpdir(), 'drive-spec-'));
+    await writeFile(path.join(samples, 'talk.mp4'), Buffer.alloc(3_000, 1));
+  });
+  afterAll(async () => {
+    process.env.ENCRYPTION_KEY_AES256 = previousKey;
+    await rm(samples, { recursive: true, force: true });
+  });
+
+  const withDrive = () => build({ files: createSimulatedDriveFiles({ samplesDir: samples }) });
+
+  it('makes the video, the ORIGINAL row and the job, with the token sealed in the input', async () => {
+    const { service, jobs, limits } = withDrive();
+    const answer = await service.startFromDrive(TEST_ORG, TEST_USER, {
+      fileId: 'sim-drive-talk-0001',
+      accessToken: TOKEN,
+    });
+
+    expect(answer.video).toMatchObject({ status: 'IMPORTING' });
+    expect(limits.checkUploadStart).toHaveBeenCalledWith(TEST_ORG, 3_000);
+    expect(store.videos[0]).toMatchObject({
+      platform: 'UPLOAD',
+      kind: 'UPLOAD',
+      title: 'PostGear Sample Talk From Drive',
+    });
+    expect(store.assets[0]).toMatchObject({ kind: 'ORIGINAL', bytes: 0n });
+    const input = store.jobs[0]?.input as {
+      origin: { type: string; drive: { fileId: string; token: string } };
+      expectedBytes: number;
+    };
+    expect(input.origin.type).toBe('upload');
+    expect(input.origin.drive.fileId).toBe('sim-drive-talk-0001');
+    expect(input.origin.drive.token).not.toContain(TOKEN);
+    expect(decrypt(input.origin.drive.token)).toBe(TOKEN);
+    expect(input.expectedBytes).toBe(3_000);
+    expect(jobs.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers each Drive refusal with its code and makes nothing', async () => {
+    const { service } = withDrive();
+    const codeOf = (fileId: string) =>
+      service
+        .startFromDrive(TEST_ORG, TEST_USER, { fileId, accessToken: TOKEN })
+        .catch((error: HttpException) => [
+          error.getStatus(),
+          (error.getResponse() as { code: string }).code,
+        ]);
+    expect(await codeOf('sim-drive-denied-0001')).toEqual([422, 'drive_not_connected']);
+    expect(await codeOf('sim-drive-document-01')).toEqual([422, 'upload_not_video']);
+    expect(await codeOf('someone-elses-file-01')).toEqual([404, 'link_not_found']);
+    expect(store.videos).toHaveLength(0);
+    expect(store.jobs).toHaveLength(0);
+  });
+
+  it('is a plain 404 when Drive is not offered', async () => {
+    const { service } = build();
+    await expect(
+      service.startFromDrive(TEST_ORG, TEST_USER, {
+        fileId: 'sim-drive-talk-0001',
+        accessToken: TOKEN,
+      }),
+    ).rejects.toMatchObject({ status: 404 });
   });
 });
 

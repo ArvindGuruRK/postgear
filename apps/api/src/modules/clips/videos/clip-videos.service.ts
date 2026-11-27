@@ -563,7 +563,14 @@ export function replayedOf(points: readonly ReplayedPoint[] | undefined): {
 export function originOf(job: Pick<ClipJob, 'input'> | null): VideoOrigin | null {
   if (!job || typeof job.input !== 'object' || job.input === null) return null;
   const parsed = videoOriginSchema.safeParse((job.input as { origin?: unknown }).origin);
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  const origin = parsed.data;
+  // Module 12: a Drive token is never copied into another job (a retry reads
+  // the stored file, or asks to pick the file again).
+  if (origin.type === 'upload' && origin.drive) {
+    return { ...origin, drive: { fileId: origin.drive.fileId, token: null } };
+  }
+  return origin;
 }
 
 /** Text from a platform: control characters out, whitespace collapsed, capped. */

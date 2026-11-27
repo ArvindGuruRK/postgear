@@ -9,6 +9,7 @@
 export * from './channels';
 export * from './doctor';
 export * from './downloader';
+export * from './drive';
 export * from './ffmpeg';
 export * from './render';
 export * from './run';

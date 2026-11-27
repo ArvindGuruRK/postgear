@@ -1,0 +1,87 @@
+{
+  "_type": "video",
+  "id": "900000101",
+  "extractor": "vimeo",
+  "extractor_key": "Vimeo",
+  "webpage_url": "https://vimeo.com/900000101",
+  "title": "PostGear Sample: A Talk On Vimeo",
+  "uploader": "PostGear Samples",
+  "channel": "PostGear Samples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/vimeo/900000101.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/vimeo/900000101.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "hls-fastly_skyfire-1080p",
+      "ext": "mp4",
+      "protocol": "m3u8_native",
+      "vcodec": "avc1.640028",
+      "acodec": "mp4a.40.2",
+      "height": 1080,
+      "width": 1920,
+      "fps": 30,
+      "tbr": 4200,
+      "url": "https://media.sim.invalid/hls-fastly_skyfire-1080p.m3u8"
+    },
+    {
+      "format_id": "hls-fastly_skyfire-720p",
+      "ext": "mp4",
+      "protocol": "m3u8_native",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 1280,
+      "fps": 30,
+      "tbr": 2400,
+      "url": "https://media.sim.invalid/hls-fastly_skyfire-720p.m3u8"
+    },
+    {
+      "format_id": "http-1080p",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.640028",
+      "acodec": "mp4a.40.2",
+      "height": 1080,
+      "width": 1920,
+      "fps": 30,
+      "tbr": 4400,
+      "url": "https://media.sim.invalid/http-1080p.mp4"
+    },
+    {
+      "format_id": "http-720p",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 1280,
+      "fps": 30,
+      "tbr": 2500,
+      "url": "https://media.sim.invalid/http-720p.mp4"
+    },
+    {
+      "format_id": "http-540p",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 540,
+      "width": 960,
+      "fps": 30,
+      "tbr": 1400,
+      "url": "https://media.sim.invalid/http-540p.mp4"
+    }
+  ]
+}

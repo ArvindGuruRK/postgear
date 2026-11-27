@@ -11,7 +11,7 @@
  *   way around the tick or any refusal.
  */
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@postgear/ui';
-import { type ClipPlatformId, PLATFORM_NAMES } from '@postgear/video-engine';
+import { type ChannelPlatformId, PLATFORM_NAMES } from '@postgear/video-engine';
 import type { ClipImportOutcome, ClipProbe, DownloadStarted } from '@/types/clips';
 import { LinkCard } from '../home/link-card';
 import { ChannelBrowser } from './channel-browser';
@@ -29,11 +29,11 @@ export function BrowseChannelsDialog({
   only,
 }: {
   /** Browse Twitch, Browse Kick: the dialog shows that platform alone. */
-  only?: ClipPlatformId;
+  only?: ChannelPlatformId;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   orgId: string;
-  platforms: readonly ClipPlatformId[];
+  platforms: readonly ChannelPlatformId[];
   disabled: boolean;
   channelsState: ChannelsState;
   onProbed: (url: string, probe: ClipProbe) => void;

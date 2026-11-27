@@ -13,7 +13,7 @@
 import type {
   ChannelPage,
   ChannelRef,
-  ClipPlatformId,
+  ChannelPlatformId,
   ListKind,
   ListPeriod,
   ListSort,
@@ -33,7 +33,7 @@ export interface ChannelListQuery {
 
 /** One platform's lister. */
 export interface ChannelLister {
-  readonly platform: ClipPlatformId;
+  readonly platform: ChannelPlatformId;
   /** A checked handle to the channel. Throws `ChannelListerError` (`channel_not_found` and so on). */
   resolve(handle: string, signal?: AbortSignal): Promise<ChannelRef>;
   /** One page of a list. */
@@ -46,7 +46,7 @@ export const MAX_LIST_PAGE = 50;
 export const MAX_LIST_ITEMS = 1000;
 
 /** The lists each platform has. */
-export const PLATFORM_LIST_KINDS: Readonly<Record<ClipPlatformId, readonly ListKind[]>> =
+export const PLATFORM_LIST_KINDS: Readonly<Record<ChannelPlatformId, readonly ListKind[]>> =
   Object.freeze({
     twitch: Object.freeze(['streams', 'clips'] as ListKind[]),
     kick: Object.freeze(['streams', 'clips'] as ListKind[]),
@@ -87,7 +87,7 @@ export class ChannelListerError extends Error {
 }
 
 /** Throws unless `kind` is a list `platform` has. */
-export function assertListKind(platform: ClipPlatformId, kind: ListKind): void {
+export function assertListKind(platform: ChannelPlatformId, kind: ListKind): void {
   if (!PLATFORM_LIST_KINDS[platform].includes(kind)) {
     throw new ChannelListerError('list_kind_unsupported', { retryable: false });
   }
@@ -143,8 +143,8 @@ export function twitchArchiveExpiry(
  * channel page it lists is built from the checked handle, never pasted text.
  */
 export type ClipListChannelRequest =
-  | { op: 'resolve'; platform: ClipPlatformId; handle: string }
-  | { op: 'list'; platform: ClipPlatformId; channel: ChannelRef; query: ChannelListQuery };
+  | { op: 'resolve'; platform: ChannelPlatformId; handle: string }
+  | { op: 'list'; platform: ChannelPlatformId; channel: ChannelRef; query: ChannelListQuery };
 
 export type ClipListChannelAnswer =
   | { op: 'resolve'; channel: ChannelRef }

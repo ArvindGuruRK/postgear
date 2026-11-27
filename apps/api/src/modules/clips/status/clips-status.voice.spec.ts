@@ -5,6 +5,7 @@
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import type { ClipDrive } from '../videos/clip-drive';
 import type { ClipSampleLink } from '../videos/clip-sample';
 import { ClipsStatusService } from './clips-status.service';
 import type { AiServiceState, MediaServiceProbe } from './media-service.probe';
@@ -34,6 +35,7 @@ function status(options: { tts: boolean; service: AiServiceState; voices: Speake
     { url: null } as unknown as ClipSampleLink,
     { state: jest.fn(async () => options.service) } as unknown as MediaServiceProbe,
     { list } as unknown as MediaVoices,
+    { status: () => ({ available: false }) } as unknown as ClipDrive,
   );
   return { service, list };
 }

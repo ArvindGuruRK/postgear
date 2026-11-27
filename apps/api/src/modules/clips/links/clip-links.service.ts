@@ -43,6 +43,7 @@ import {
   type LinkInfo,
   type LinkRef,
   recogniseLink,
+  uploadOnlyMessage,
 } from '@postgear/video-engine';
 import type { Env } from '../../../config/env';
 import { EntitlementResolver } from '../../entitlements/entitlement-resolver';
@@ -69,6 +70,7 @@ const LINK_REFUSALS = new Set([
   'link_private',
   'link_live',
   'link_not_found',
+  'link_many_videos',
   'platform_paused',
 ]);
 
@@ -96,7 +98,12 @@ export class ClipLinksService implements ClipLinkProber {
   async probe(orgId: string, url: string): Promise<ClipProbeResult> {
     const recognised = recogniseLink(url);
     if (isLinkRefusal(recognised)) {
-      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, recognised.code);
+      // Module 12: a site with no extractor (Riverside, StreamYard) is named in its sentence.
+      throw new ClipErrorException(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        recognised.code,
+        recognised.site ? { message: uploadOnlyMessage(recognised.site) } : {},
+      );
     }
     const link = recognised;
     const { platform } = link;

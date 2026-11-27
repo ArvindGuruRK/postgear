@@ -575,7 +575,7 @@ export async function gatherHighlights(run: HighlightsRun): Promise<Gathered> {
     // Chat that cannot be read is not a failure: the run says which tracks it used.
     const result = await attempt(run, 'chat', () =>
       run.producers.chat({
-        platform: run.link.platform,
+        platform: 'twitch',
         kind: run.link.kind,
         externalId: run.link.externalId,
         durationMs,

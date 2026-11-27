@@ -1393,6 +1393,53 @@ A montage is a snapshot: it copies the clips' parts, layouts, text, sounds, blee
 npx jest --config packages/media-tools/jest.config.js montage-parity   # cut and fade montages on the real FFmpeg
 ```
 
+**More Sources And Platforms (Module 12).** The link box now reads sites beyond YouTube, Twitch and Kick. Run `npm run migrate:deploy --workspace=packages/db` and `npm run db:generate` (a migration adds the new sites to `ClipPlatform`), then restart the API and the Node worker. Every new site answers from recorded fixtures under `CLIPS_SIMULATION`; no real site is ever fetched.
+
+`CLIPS_PLATFORMS` (unset) switches on twelve sites: YouTube, Twitch, Kick, Vimeo, Rumble, Dailymotion, Loom, X, Facebook, LinkedIn, Reddit and Pinterest. TikTok, Instagram, Zoom, Dropbox and Threads are built but off (Threads has no yt-dlp reader yet, so it may be listed only with `CLIPS_SIMULATION=true`). To try an off site, list it, for example `CLIPS_PLATFORMS="youtube,twitch,kick,tiktok"`, and restart the API.
+
+The simulation links (paste them in the link box):
+
+| Link | Answers |
+|---|---|
+| `https://vimeo.com/900000101` | A Vimeo card (the talk sample) |
+| `https://vimeo.com/900000102` | "This video is private or needs a login..." (a password) |
+| `https://rumble.com/v5sim01-postgear-sample-talk.html` | A Rumble card |
+| `https://www.dailymotion.com/video/x9sim01` | A Dailymotion card |
+| `https://www.loom.com/share/5151515151515151515151515151515a` | A Loom card (the two speakers, 4 minutes) |
+| `https://x.com/postgear/status/1900000000000000001` | An X card |
+| `https://x.com/postgear/status/1900000000000000002` | "This post has more than one video. Paste a link to a post with just one." |
+| `https://x.com/postgear/status/1900000000000000003` | Not found (no video in the post) |
+| `https://www.facebook.com/watch/?v=9000000000000001` | A Facebook card |
+| `https://www.facebook.com/watch/?v=9000000000000002` | Private (registered users only) |
+| `https://www.facebook.com/reel/9000000000000003` | A Facebook card, kind Short |
+| `https://www.linkedin.com/posts/postgear-samples_a-sample-video-activity-7200000000000000001-SimA` | A LinkedIn card |
+| `https://www.reddit.com/r/postgear/comments/1simvd1/a_sample/` | A Reddit card (the 10 minute stream sample) |
+| `https://www.reddit.com/r/postgear/comments/1simvd2/a_sample/` | Private (an over 18 post) |
+| `https://www.reddit.com/r/postgear/comments/1simvd3/a_sample/` | More than one video (a gallery) |
+| `https://www.pinterest.com/pin/900000000000000001/` | A Pinterest card |
+| `https://www.threads.com/@postgearsamples/post/SimThread01` | Paused while Threads is off; a Threads card once listed (simulation only) |
+| `https://zoom.us/rec/share/SimZoomRecording0001` | Paused while Zoom is off; a Zoom card once listed |
+| `https://www.tiktok.com/@postgearsamples/video/7300000000000000001` | "TikTok links are paused for now. You can upload the file instead."; a TikTok card once listed |
+| `https://www.instagram.com/reel/SimReel0001/` | Paused while Instagram is off; a card once listed |
+| `https://www.dropbox.com/scl/fi/simdropbox0001/talk.mp4?rlkey=simkey000000001&dl=0` | Paused while Dropbox is off; a card once listed |
+| `https://riverside.fm/studio/anything` (or `streamyard.com`) | "Riverside links cannot be read. Download the recording and upload it instead." |
+| `https://www.bilibili.com/video/BV1xx` | "We cannot read links from this site yet. You can upload the file instead." |
+
+The help line under the field names the first five sites that are on and "and more"; the whole list is in its tooltip. Browse buttons stay YouTube, Twitch and Kick (the only sites with channels).
+
+**Google Drive.** Under `CLIPS_SIMULATION` the home shows **Pick From Google Drive** under the drop area. It opens a stand-in picker with four made-up files (no Google address is reached): Sample Talk and Sample Stream come in like uploads (copied from the local samples); Not Shared With You answers "Google Drive did not let us read this file. Pick it again from Google Drive."; A Google Doc answers the not-a-video sentence. The token is sealed in the job and wiped as soon as the file is stored (and when the job ends). Check in the database that it is gone:
+
+```bash
+docker exec postgear_postgres psql -U postgres -d postgear_db -c "select id, input->'origin'->'drive' from \"ClipJob\" where input->'origin' ? 'drive' order by \"createdAt\" desc limit 3;"
+```
+
+For the real picker see `docs/sprint-12/clips-keys-guide.md`, Recipe 3 (`GOOGLE_DRIVE_PICKER_KEY`, `GOOGLE_DRIVE_APP_ID`, with `CLIPS_SIMULATION="false"`). Without the keys the button is absent.
+
+```bash
+npx jest --config packages/video-engine/jest.config.js sites            # every link shape and canonical address
+npx jest --config packages/media-tools/jest.config.js sites drive       # the probe and error mappers, args, Drive
+```
+
 Simulated translation writes stand-in words in the chosen language; a line that holds `[simulate:translate-short]` makes the model answer one line short, which is refused and the AI minute given back.
 
 ```bash

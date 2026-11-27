@@ -17,7 +17,7 @@
  */
 import { EyeOffIcon } from '@animateicons/react/lucide/eye-off-icon';
 import { Badge, Button, cn, MotionIcon, Skeleton, TooltipHint } from '@postgear/ui';
-import type { ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPlatformId } from '@postgear/video-engine';
 import { Film } from 'lucide-react';
 import { useState } from 'react';
 import type { ClipStreamItem } from '@/types/clips';
@@ -63,7 +63,7 @@ export function StreamRow({
   onShowAgain,
 }: {
   item: ClipStreamItem;
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   orgId: string;
   now: Date;
   /** This row's link is with the probe. */

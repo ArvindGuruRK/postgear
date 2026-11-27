@@ -1,0 +1,49 @@
+{
+  "_type": "video",
+  "id": "7200000000000000001",
+  "extractor": "LinkedIn",
+  "extractor_key": "LinkedIn",
+  "webpage_url": "https://www.linkedin.com/posts/postgear-samples_a-sample-video-activity-7200000000000000001-SimA",
+  "title": "PostGear Sample: A Talk On LinkedIn",
+  "uploader": "PostGear Samples",
+  "channel": "PostGear Samples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/linkedin/7200000000000000001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/linkedin/7200000000000000001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "mp4-640p",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.4D401F",
+      "acodec": "mp4a.40.2",
+      "height": 360,
+      "width": 640,
+      "tbr": 800,
+      "url": "https://media.sim.invalid/mp4-640p.mp4"
+    },
+    {
+      "format_id": "mp4-720p",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 1280,
+      "tbr": 2000,
+      "url": "https://media.sim.invalid/mp4-720p.mp4"
+    }
+  ]
+}

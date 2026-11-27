@@ -1,9 +1,9 @@
 import { channelListUrl, type HandleCheck, validateHandle } from './handles';
-import type { ClipPlatformId } from './types';
+import type { ChannelPlatformId } from './types';
 
 const CHANNEL_ID = 'UCuAXFkgsw1L7xaCfnd5JJOw';
 
-const CASES: [ClipPlatformId, string, HandleCheck][] = [
+const CASES: [ChannelPlatformId, string, HandleCheck][] = [
   // Twitch: 4 to 25 of a-z, 0-9 and _, lower-cased.
   ['twitch', 'Vikram_Plays', { ok: true, platform: 'twitch', handle: 'vikram_plays' }],
   ['twitch', '@vikram', { ok: true, platform: 'twitch', handle: 'vikram' }],

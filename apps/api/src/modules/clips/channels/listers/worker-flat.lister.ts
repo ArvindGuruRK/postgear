@@ -29,7 +29,7 @@ import type {
   ChannelRef,
   ClipListChannelAnswer,
   ClipListChannelRequest,
-  ClipPlatformId,
+  ChannelPlatformId,
 } from '@postgear/video-engine';
 import type { RedisService } from '../../../redis/redis.service';
 import type { ClipQueryOutcome, SchedulingService } from '../../../scheduling/scheduling.service';
@@ -57,7 +57,7 @@ export class WorkerFlatLister implements ChannelLister {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(
-    readonly platform: ClipPlatformId,
+    readonly platform: ChannelPlatformId,
     private readonly deps: WorkerFlatListerDeps,
   ) {
     this.sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));

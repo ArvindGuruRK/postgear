@@ -16,14 +16,14 @@
  * fixed here and the handle has already passed its pattern.
  */
 import { isLinkRefusal, LINK_MAX_LENGTH, recogniseLink } from './recognise';
-import type { ClipPlatformId, ListKind } from './types';
+import type { ChannelPlatformId, ListKind } from './types';
 
 const TWITCH_HANDLE = /^[a-z0-9_]{4,25}$/;
 const YOUTUBE_HANDLE = /^@[A-Za-z0-9._-]{3,30}$/;
 const YOUTUBE_CHANNEL_ID = /^UC[A-Za-z0-9_-]{22}$/;
 const KICK_HANDLE = /^[a-z0-9_-]{1,25}$/;
 
-const HOSTS: Readonly<Record<ClipPlatformId, readonly string[]>> = Object.freeze({
+const HOSTS: Readonly<Record<ChannelPlatformId, readonly string[]>> = Object.freeze({
   youtube: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
   twitch: ['twitch.tv', 'www.twitch.tv', 'm.twitch.tv', 'go.twitch.tv'],
   kick: ['kick.com', 'www.kick.com'],
@@ -65,7 +65,7 @@ export type HandleRefusalCode = 'channel_not_found' | 'link_is_a_video';
 
 /** A checked channel name: what the platform is asked about. */
 export interface ChannelHandle {
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   /** Twitch login (lower case), YouTube `@handle` or `UC...` id, Kick slug (lower case). */
   handle: string;
   /** YouTube only: set when a `UC...` channel id was given instead of a handle. */
@@ -78,7 +78,7 @@ function notFound(): HandleCheck {
   return { ok: false, code: 'channel_not_found' };
 }
 
-function checkName(platform: ClipPlatformId, raw: string): HandleCheck {
+function checkName(platform: ChannelPlatformId, raw: string): HandleCheck {
   let name: string;
   try {
     name = decodeURIComponent(raw);
@@ -109,7 +109,7 @@ function checkName(platform: ClipPlatformId, raw: string): HandleCheck {
 }
 
 /** The name inside a channel link on `platform`, or null when the link is not a channel page. */
-function nameFromLink(platform: ClipPlatformId, url: URL): string | null {
+function nameFromLink(platform: ChannelPlatformId, url: URL): string | null {
   const parts = url.pathname.split('/').filter((part) => part.length > 0);
   const [first, second, third] = parts;
   if (!first) {
@@ -138,7 +138,7 @@ function nameFromLink(platform: ClipPlatformId, url: URL): string | null {
  * (`vikram`, `@priya`) or a channel link. Returns the handle cut down and
  * normalised, or why it cannot be a channel. Never throws.
  */
-export function validateHandle(platform: ClipPlatformId, text: string): HandleCheck {
+export function validateHandle(platform: ChannelPlatformId, text: string): HandleCheck {
   if (typeof text !== 'string') {
     return notFound();
   }

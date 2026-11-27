@@ -4,7 +4,7 @@
  * The simulated lister lists it, and the fixture downloader probes its
  * items, so "list, then import one" works end to end with no network.
  */
-import type { ClipPlatformId, ListKind } from '@postgear/video-engine';
+import type { ChannelPlatformId, ListKind } from '@postgear/video-engine';
 import { z } from 'zod';
 import channelsJson from '../../fixtures/channels/acme.json';
 
@@ -46,7 +46,7 @@ function fixture(): z.infer<typeof fixtureSchema> {
 }
 
 /** The simulated channel on a platform. */
-export function simulatedChannel(platform: ClipPlatformId): SimulatedChannel {
+export function simulatedChannel(platform: ChannelPlatformId): SimulatedChannel {
   return fixture().channels[platform];
 }
 
@@ -54,7 +54,7 @@ export function simulatedChannel(platform: ClipPlatformId): SimulatedChannel {
  * True when `handle` names the simulated channel: `acme` or `simstreamer`
  * (with an `@` on YouTube, optional), any case.
  */
-export function isSimulatedHandle(platform: ClipPlatformId, handle: string): boolean {
+export function isSimulatedHandle(platform: ChannelPlatformId, handle: string): boolean {
   const bare = handle.trim().replace(/^@/, '').toLowerCase();
   const channel = simulatedChannel(platform);
   const names = [channel.handle.replace(/^@/, ''), ...fixture().aliases].map((name) =>
@@ -65,13 +65,13 @@ export function isSimulatedHandle(platform: ClipPlatformId, handle: string): boo
 
 /** A listed item of the simulated channel by its id, whatever list it is on. */
 export function findSimulatedItem(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   externalId: string,
 ): SimulatedItem | null {
   return simulatedChannel(platform).items.find((item) => item.externalId === externalId) ?? null;
 }
 
 /** The items on one list of the simulated channel, in fixture order. */
-export function simulatedItems(platform: ClipPlatformId, kind: ListKind): SimulatedItem[] {
+export function simulatedItems(platform: ChannelPlatformId, kind: ListKind): SimulatedItem[] {
   return simulatedChannel(platform).items.filter((item) => item.list === kind);
 }

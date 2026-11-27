@@ -20,7 +20,7 @@ import {
   ToolError,
   type ToolPaths,
 } from '@postgear/media-tools';
-import { type LinkRef, recogniseLink } from '@postgear/video-engine';
+import { type LinkRef, recogniseLink, siteById } from '@postgear/video-engine';
 import { loadWorkerEnv, type WorkerEnv } from '../config/env';
 import { clipsSimulated } from './config';
 import { createClipProviders } from './providers';
@@ -96,8 +96,20 @@ describe('simulation links with simulation off', () => {
     expect(live.simulated).toBe(false);
     expect(live.downloader.simulated).toBe(false);
 
-    const all = links();
-    expect(all.length).toBeGreaterThanOrEqual(18);
+    const every = links();
+    expect(every.length).toBeGreaterThanOrEqual(18);
+    // Module 12: a site with no yt-dlp reader (Threads) is refused before any tool starts.
+    const unreadable = every.filter(
+      (link) => (siteById(link.platform)?.extractors.length ?? 0) === 0,
+    );
+    for (const link of unreadable) {
+      await expect(live.downloader.probe(link, new AbortController().signal)).rejects.toMatchObject(
+        {
+          code: 'tool_failed',
+        },
+      );
+    }
+    const all = every.filter((link) => !unreadable.includes(link));
     for (const link of all) {
       const outcome = await live.downloader.probe(link, new AbortController().signal).then(
         () => 'answered',

@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import {
   createFixtureDownloader,
   createRunTool,
+  createSimulatedDriveFiles,
   defaultSamplesDir,
   sampleFileName,
   toolPaths,
@@ -93,6 +94,8 @@ describeReal('a real simulated import of the 3 minute sample', () => {
       signal: new AbortController().signal,
       tools: { ...mediaImportTools(runTool), freeDisk: async () => undefined },
       downloader: createFixtureDownloader({ samplesDir, runTool, stepDelayMs: 0 }),
+      drive: createSimulatedDriveFiles({ samplesDir }),
+      openToken: (sealed) => sealed,
       privateStorage: storage as unknown as PrivateStorage,
       internal: { chargeImport: jest.fn() },
       rows,

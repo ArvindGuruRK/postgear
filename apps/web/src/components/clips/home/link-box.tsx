@@ -5,9 +5,11 @@
  * centred card that holds every way to bring a video in, in the order people
  * reach for them.
  *
- * 1. **Which platforms work**: their logos and names, so nobody pastes a link
- *    we cannot read.
- * 2. **The link field** and a full-width **Find Clips**. Typing asks nothing;
+ * 1. **The link field** ("Enter your video link") with a help line under it
+ *    naming the sites that are on ("YouTube, Twitch, Kick, Vimeo, Rumble and
+ *    more", the whole list in a tooltip), so nobody pastes a link we cannot
+ *    read (Module 12: the logo row it replaced could not grow with the sites
+ *    table) and a full-width **Find Clips**. Typing asks nothing;
  *    Enter or Find Clips reads the link (`useLinkProbe`, where a newer read
  *    always wins) and the answer grows under the button: the card's skeleton
  *    with "Reading the link", the link card, or the refusal as a warning
@@ -15,21 +17,29 @@
  *    field, instead of sitting greyed out with no reason.
  * 3. **Upload Your Own Video**: a dashed drop area, full width. A click opens
  *    the file picker; a video dropped on it starts its upload.
- * 4. **Browse** buttons, one per platform switched on, side by side: each
- *    opens that platform's saved channels.
+ * 3b. **Pick From Google Drive** (Sprint 13 Module 12): full width under
+ *    the drop area, only when Drive is offered (`onDrive`).
+ * 4. **Browse** buttons, one per channel site switched on (YouTube, Twitch,
+ *    Kick), side by side: each opens that site's saved channels.
  *
  * When the video tools are not running every way in is off (the alert above
  * says why). Try A Sample was taken off the page on 2026-11-20.
  */
+import { CloudDownloadIcon } from '@animateicons/react/lucide/cloud-download-icon';
 import { SparklesIcon } from '@animateicons/react/lucide/sparkles-icon';
 import { UploadIcon } from '@animateicons/react/lucide/upload-icon';
-import { Button, cn, Input, MotionIcon, useIconAnimation } from '@postgear/ui';
-import { type ClipPlatformId, PLATFORM_NAMES } from '@postgear/video-engine';
+import { Button, cn, Input, MotionIcon, TooltipHint, useIconAnimation } from '@postgear/ui';
+import {
+  type ChannelPlatformId,
+  type ClipPlatformId,
+  isChannelPlatform,
+  PLATFORM_NAMES,
+} from '@postgear/video-engine';
 import { Link2 } from 'lucide-react';
 import { type DragEvent, type FormEvent, useEffect, useId, useState } from 'react';
 import { PlatformIcon } from '@/components/platforms/platform-icon';
 import type { ClipImportOutcome, DownloadStarted } from '@/types/clips';
-import { emptyLinkSentence, linkPlaceholder, orderedPlatforms } from './home-model';
+import { emptyLinkSentence, linkPlaceholder, orderedPlatforms, siteHelpLine } from './home-model';
 import { LinkCard, LinkCardSkeleton } from './link-card';
 import { RefusalAlert } from './refusal-alert';
 import type { LinkProbe } from './use-link-probe';
@@ -46,6 +56,7 @@ export function LinkBox({
   onDownloaded,
   onUpload,
   onDropFiles,
+  onDrive,
   onBrowse,
   children,
 }: {
@@ -63,8 +74,10 @@ export function LinkBox({
   onUpload: () => void;
   /** Videos dropped on the upload area. */
   onDropFiles?: (files: File[]) => void;
-  /** Opens one platform's saved channels; absent, no Browse buttons. */
-  onBrowse?: (platform: ClipPlatformId) => void;
+  /** Module 12: opens the Google Drive picker; absent, no button. */
+  onDrive?: () => void;
+  /** Opens one channel site's saved channels; absent, no Browse buttons. */
+  onBrowse?: (platform: ChannelPlatformId) => void;
   /** The upload rows, drawn inside the card under its buttons. */
   children?: React.ReactNode;
 }) {
@@ -74,6 +87,9 @@ export function LinkBox({
   const [empty, setEmpty] = useState(false);
   const { state } = probe;
   const shown = orderedPlatforms(platforms);
+  const browsable = shown.filter(isChannelPlatform);
+  const helpId = useId();
+  const help = siteHelpLine(platforms);
 
   // A probe shown from elsewhere (a channel row) puts its link in the field.
   useEffect(() => {
@@ -96,23 +112,6 @@ export function LinkBox({
         aria-label="Bring In A Video"
         className="flex flex-col gap-4 rounded-2xl border-2 border-outline bg-chrome p-5 shadow-surfaceMd"
       >
-        {shown.length > 0 ? (
-          <ul
-            aria-label="Works with"
-            className="m-0 flex list-none flex-wrap items-center justify-center gap-2 p-0"
-          >
-            {shown.map((one) => (
-              <li
-                key={one}
-                className="flex items-center gap-1.5 rounded-md border-2 border-outline bg-inset px-2 py-1 font-sans text-xs text-ink type-ui"
-              >
-                <PlatformIcon platform={one} className="h-4 w-4 rounded-[4px]" />
-                {PLATFORM_NAMES[one]}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
         <form onSubmit={submit} noValidate className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label htmlFor={fieldId} className="sr-only">
@@ -135,7 +134,10 @@ export function LinkBox({
                 disabled={disabled}
                 placeholder={linkPlaceholder(platforms)}
                 aria-invalid={empty || undefined}
-                aria-describedby={empty ? errorId : undefined}
+                aria-describedby={
+                  [empty ? errorId : null, help.shown ? helpId : null].filter(Boolean).join(' ') ||
+                  undefined
+                }
                 onChange={(event) => {
                   setUrl(event.target.value);
                   if (empty) setEmpty(false);
@@ -143,6 +145,29 @@ export function LinkBox({
                 className="ps-12"
               />
             </div>
+            {help.shown ? (
+              <p
+                id={helpId}
+                data-testid="clips-link-sites"
+                className="m-0 font-sans text-sm text-ink type-muted"
+              >
+                Works with {help.shown}
+                {help.more ? (
+                  <>
+                    {' '}
+                    <TooltipHint label={`Works with ${help.all}.`} side="bottom">
+                      <button
+                        type="button"
+                        className="rounded-sm underline decoration-dotted underline-offset-2 outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focusRing"
+                      >
+                        and more
+                      </button>
+                    </TooltipHint>
+                  </>
+                ) : null}
+                .
+              </p>
+            ) : null}
             {empty ? (
               <p
                 id={errorId}
@@ -194,18 +219,20 @@ export function LinkBox({
 
         <UploadArea disabled={disabled} onUpload={onUpload} onDropFiles={onDropFiles} />
 
-        {onBrowse && shown.length > 0 ? (
+        {onDrive ? <DriveButton disabled={disabled} onDrive={onDrive} /> : null}
+
+        {onBrowse && browsable.length > 0 ? (
           <div
             className={cn(
               'grid gap-3',
-              shown.length === 1
+              browsable.length === 1
                 ? 'grid-cols-1'
-                : shown.length === 2
+                : browsable.length === 2
                   ? 'grid-cols-2'
                   : 'grid-cols-3',
             )}
           >
-            {shown.map((one) => (
+            {browsable.map((one) => (
               <Button
                 key={one}
                 variant="secondary"
@@ -223,6 +250,25 @@ export function LinkBox({
         {children}
       </section>
     </div>
+  );
+}
+
+/** Pick From Google Drive (Module 12): a file from Drive comes in like an upload. */
+function DriveButton({ disabled, onDrive }: { disabled: boolean; onDrive: () => void }) {
+  const icon = useIconAnimation();
+  return (
+    <Button
+      variant="secondary"
+      size="lg"
+      className="w-full"
+      disabled={disabled}
+      onClick={onDrive}
+      data-testid="clips-drive-button"
+      {...icon.triggers}
+    >
+      <CloudDownloadIcon ref={icon.ref} aria-hidden size={20} className="h-5 w-5 shrink-0" />
+      Pick From Google Drive
+    </Button>
   );
 }
 

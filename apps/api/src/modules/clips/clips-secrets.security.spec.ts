@@ -453,7 +453,7 @@ describe('the cookies file and the proxy', () => {
     expect(offenders.map((file) => path.relative(REPO, file))).toEqual([]);
   });
 
-  it('the API reaches media-tools only through its pure listing entry', () => {
+  it('the API reaches media-tools only through its listing entry and the Drive door (Module 12)', () => {
     const files = sources(path.join(REPO, 'apps', 'api', 'src'));
     const imports = files.flatMap((file) =>
       [
@@ -461,6 +461,15 @@ describe('the cookies file and the proxy', () => {
       ].map((match) => match[1]),
     );
     expect(imports.length).toBeGreaterThan(0);
-    expect([...new Set(imports)]).toEqual(['@postgear/media-tools/listing']);
+    expect([...new Set(imports)].sort()).toEqual([
+      '@postgear/media-tools/drive',
+      '@postgear/media-tools/listing',
+    ]);
+    // The Drive door never sees the cookies file or the proxy either.
+    const drive = readFileSync(
+      path.join(REPO, 'packages', 'media-tools', 'src', 'drive', 'drive.ts'),
+      'utf8',
+    );
+    expect(NAMES.filter((name) => drive.includes(name))).toEqual([]);
   });
 });

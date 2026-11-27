@@ -138,6 +138,7 @@ describe('createFixtureDownloader', () => {
     for (const entry of simulationLinks()) {
       const result = downloader().probe(link(entry.platform, entry.externalId), signal);
       if (entry.stderr) await expect(result).rejects.toBeInstanceOf(DownloaderError);
+      else if (entry.refuses) await expect(result).rejects.toMatchObject({ code: entry.refuses });
       else await expect(result).resolves.toMatchObject({ externalId: entry.externalId });
     }
   });

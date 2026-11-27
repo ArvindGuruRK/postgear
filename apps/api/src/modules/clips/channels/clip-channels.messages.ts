@@ -7,7 +7,7 @@
  * (`channel_limit`) comes from `@postgear/entitlements`. Sentence case, plain
  * words, never a platform's own error.
  */
-import { type ClipPlatformId, PLATFORM_NAMES } from '@postgear/video-engine';
+import { type ChannelPlatformId, PLATFORM_NAMES } from '@postgear/video-engine';
 
 export const CLIP_CHANNELS_MESSAGES = {
   /** A channel id that is not one of this workspace's channels. */
@@ -23,6 +23,6 @@ export const CLIP_CHANNELS_MESSAGES = {
 } as const;
 
 /** "{Platform} lists newest first only." (YouTube's reads as the engine's `list_sort_unsupported`.) */
-export function sortUnsupportedMessage(platform: ClipPlatformId): string {
+export function sortUnsupportedMessage(platform: ChannelPlatformId): string {
   return `${PLATFORM_NAMES[platform]} lists newest first only.`;
 }

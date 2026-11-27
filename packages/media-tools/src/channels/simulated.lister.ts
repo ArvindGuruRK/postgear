@@ -12,7 +12,7 @@
 import type {
   ChannelPage,
   ChannelRef,
-  ClipPlatformId,
+  ChannelPlatformId,
   ListedItem,
   ListPeriod,
 } from '@postgear/video-engine';
@@ -41,7 +41,7 @@ export interface SimulatedListerOptions {
 
 /** The simulated lister for one platform. */
 export function createSimulatedChannelLister(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   options: SimulatedListerOptions = {},
 ): ChannelLister {
   return new SimulatedLister(platform, options.now ?? (() => new Date()));
@@ -57,7 +57,7 @@ const PERIOD_HOURS: Readonly<Record<ListPeriod, number>> = Object.freeze({
 
 class SimulatedLister implements ChannelLister {
   constructor(
-    readonly platform: ClipPlatformId,
+    readonly platform: ChannelPlatformId,
     private readonly now: () => Date,
   ) {}
 

@@ -12,6 +12,7 @@ import type {
   AiCostRate,
   CaptionLook,
   CaptionsTrack,
+  ChannelPlatformId,
   ClipDocument,
   ClipError,
   ClipJobKind,
@@ -154,6 +155,11 @@ export interface ClipVideoView {
 }
 
 /** `POST /clips/videos`: 201 a new import, or 200 `existing: true` with no job. */
+export type ClipDriveStatus =
+  | { available: false }
+  | { available: true; simulated: true; fileId: string }
+  | { available: true; simulated: false; apiKey: string; appId: string; clientId: string };
+
 export interface ClipImportOutcome {
   video: ClipVideoView;
   job: ClipJobView | null;
@@ -324,6 +330,14 @@ export interface ClipsStatus {
   tools: ClipsToolsState;
   simulation: boolean;
   platforms: ClipPlatformId[];
+  /** Module 12: every site with its name and whether it is on (older APIs leave it out). */
+  sites?: { id: ClipPlatformId; name: string; on: boolean }[];
+  /**
+   * Module 12 (D13-09): Google Drive as a source. Simulated: a fake picker
+   * hands out made-up files. Real: the keys for Google's own picker.
+   * Older APIs leave it out (no button).
+   */
+  drive?: ClipDriveStatus;
   storage: { usedBytes: number; limitBytes: number | null };
   /** Values as resolved: read them through `lib/entitlements.ts` helpers, never assume a type. */
   limits: Record<ClipsStatusLimitKey, unknown>;
@@ -627,7 +641,7 @@ export interface ClipChannelList {
 /** One saved channel (`GET /clips/channels`). */
 export interface ClipChannelView {
   id: string;
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   handle: string;
   displayName: string;
   /** The platform's own picture address; the browser loads it directly. */
@@ -643,7 +657,7 @@ export interface ClipChannelView {
 
 /** `POST /clips/channels/check`: the channel a name resolves to, not saved. */
 export interface ClipChannelPreview {
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   handle: string;
   displayName: string;
   avatarUrl: string | null;

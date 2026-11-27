@@ -112,14 +112,38 @@ describe('@postgear/media-tools/listing', () => {
     expect(walked.packages.filter((name) => !ALLOWED_PACKAGES.has(name))).toEqual([]);
   });
 
-  it('is the only part of media-tools the API imports', () => {
+  it('is the only part of media-tools the API imports (with the Drive door, Module 12)', () => {
     const apiSrc = path.join(REPO_ROOT, 'apps', 'api', 'src');
+    const doors = new Set(['@postgear/media-tools/listing', '@postgear/media-tools/drive']);
     const offenders = listSources(apiSrc).flatMap((file) =>
       importsOf(file)
         .filter((name) => name.startsWith('@postgear/media-tools'))
-        .filter((name) => name !== '@postgear/media-tools/listing')
+        .filter((name) => !doors.has(name))
         .map((name) => `${path.relative(REPO_ROOT, file).split(path.sep).join('/')}: ${name}`),
     );
     expect(offenders).toEqual([]);
+  });
+});
+
+/**
+ * Sprint 13 Module 12: `@postgear/media-tools/drive` is the API's second door
+ * (Google Drive's file facts). It may use Node's file and stream modules and
+ * `fetch`, never the process runner or the process module.
+ */
+describe('@postgear/media-tools/drive', () => {
+  const walked = graph(path.join(SRC, 'drive', 'drive.ts'));
+  const NODE_ALLOWED = new Set([
+    'node:fs',
+    'node:fs/promises',
+    'node:path',
+    'node:stream',
+    'node:stream/promises',
+  ]);
+
+  it('never reaches the process runner or the process module', () => {
+    expect(walked.unresolved).toEqual([]);
+    expect(walked.files.filter((file) => file.startsWith(RUN_DIR))).toEqual([]);
+    expect(walked.packages.filter((name) => PROCESS_MODULE.test(name))).toEqual([]);
+    expect(walked.packages.filter((name) => name !== 'zod' && !NODE_ALLOWED.has(name))).toEqual([]);
   });
 });

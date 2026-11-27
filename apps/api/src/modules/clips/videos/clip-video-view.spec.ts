@@ -8,7 +8,7 @@ import { exportFileName } from '../clip/clip-item.service';
 import { sharpSourceFor } from '../clip/sharp-source';
 import { videoRow } from '../testing/rows';
 import { filmstripMetaOf, orderedSheets, toVideoView } from './clip-video-view';
-import { decodeCursor, encodeCursor } from './clip-videos.service';
+import { decodeCursor, encodeCursor, originOf } from './clip-videos.service';
 
 const VIEW_FIELDS = [
   'channelName',
@@ -150,5 +150,24 @@ describe('small helpers', () => {
   it('names an export file safely, always .mp4', () => {
     expect(exportFileName('My/Clip: "best" part')).toBe('My Clip best part.mp4');
     expect(exportFileName('...')).toBe('Clip.mp4');
+  });
+});
+
+describe('originOf (Module 12)', () => {
+  it('never hands a Drive token on to another job', () => {
+    const origin = originOf({
+      input: {
+        origin: {
+          type: 'upload',
+          originalKey: 'clips/org-1/videos/v-1/original.mp4',
+          drive: { fileId: 'sim-drive-talk-0001', token: 'sealed-token' },
+        },
+      },
+    } as never);
+    expect(origin).toEqual({
+      type: 'upload',
+      originalKey: 'clips/org-1/videos/v-1/original.mp4',
+      drive: { fileId: 'sim-drive-talk-0001', token: null },
+    });
   });
 });

@@ -1,6 +1,6 @@
 # Module 12: More Sources And Platforms
 
-> **Sprint 13, Clips AI** | Status: Not started | Size: M (one session)
+> **Sprint 13, Clips AI** | Status: Done | Size: M (one session)
 > **Depends on**: Sprint 12 (Modules 03, 06, 18). No AI module is needed.
 > **Stories**: CA-8.1, CA-8.2
 > **Next**: [Module 13](module-13-publisher-upgrades.md)
@@ -97,13 +97,13 @@ For each, from research 01's table and yt-dlp's current site list (read it again
 
 ## Tasks
 
-- [ ] `links/sites.ts`; the three existing sites moved with their tests green; `ClipPlatform` widened (record how).
-- [ ] The new entries (ten on, four off, including Reddit, Pinterest and Threads) with link shapes, extractors and probe fixtures; quirks as data; the error strings.
-- [ ] `CLIPS_PLATFORMS` and its default; `status.sites`.
-- [ ] The link box placeholder, help line, badge and messages; the downloader check.
-- [ ] Google Drive: the keys guide steps, the picker, the route, the Drive download step, the simulated binding; or park it with a Decision Log row.
-- [ ] Title-case test green.
-- [ ] `verify-change`; update the Progress table and the Decision Log.
+- [x] `links/sites.ts`; the three existing sites moved with their tests green; `ClipPlatform` widened (record how). Done: the Prisma enum kept and 14 values added (migration `20261128090000_sprint13_clip_platform_sites`); YouTube, Twitch and Kick keep their hand-written readers as table rows with no shapes. `ChannelPlatformId` (the three) carries everything about My Channels.
+- [x] The new entries (ten on, four off, including Reddit, Pinterest and Threads) with link shapes, extractors and probe fixtures; quirks as data; the error strings. Note: yt-dlp 2026.10.26 has no Threads extractor, so Threads is built but off and may be switched on under simulation only (logged); nine new sites are on, five off.
+- [x] `CLIPS_PLATFORMS` and its default; `status.sites`.
+- [x] The link box placeholder, help line, badge and messages; the downloader check.
+- [x] Google Drive: the keys guide steps, the picker, the route, the Drive download step, the simulated binding; or park it with a Decision Log row. Built against simulation; the real picker is wired but never run (it needs the Google console steps in the keys guide, Recipe 3).
+- [x] Title-case test green.
+- [x] `verify-change`; update the Progress table and the Decision Log.
 
 ## Tests
 

@@ -1,0 +1,68 @@
+{
+  "_type": "video",
+  "id": "9000000000000001",
+  "extractor": "facebook",
+  "extractor_key": "Facebook",
+  "webpage_url": "https://www.facebook.com/watch/?v=9000000000000001",
+  "title": "PostGear Sample: A Talk On Facebook",
+  "uploader": "PostGear Samples",
+  "channel": "PostGear Samples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/facebook/9000000000000001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/facebook/9000000000000001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "sd",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.4D401E",
+      "acodec": "mp4a.40.2",
+      "height": 360,
+      "width": 640,
+      "tbr": 600,
+      "url": "https://media.sim.invalid/sd.mp4"
+    },
+    {
+      "format_id": "hd",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 1280,
+      "tbr": 2000,
+      "url": "https://media.sim.invalid/hd.mp4"
+    },
+    {
+      "format_id": "1080p-dash",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.640028",
+      "acodec": "none",
+      "height": 1080,
+      "width": 1920,
+      "tbr": 3600,
+      "url": "https://media.sim.invalid/1080p-dash.mp4"
+    },
+    {
+      "format_id": "audio-dash",
+      "ext": "m4a",
+      "protocol": "https",
+      "vcodec": "none",
+      "acodec": "mp4a.40.5",
+      "url": "https://media.sim.invalid/audio-dash.m4a"
+    }
+  ]
+}

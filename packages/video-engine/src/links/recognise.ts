@@ -16,6 +16,7 @@
  * Pure: the `URL` global only.
  */
 import type {
+  ChannelPlatformId,
   ClipPlatformId,
   LinkKind,
   LinkRef,
@@ -23,6 +24,7 @@ import type {
   LinkRefusalCode,
   ListedItem,
 } from './types';
+import { type SiteEntry, siteById, siteForHost, UPLOAD_ONLY_SITES } from './sites';
 
 /** Longer than any real video link; the probe route takes up to 2,000 characters too. */
 export const LINK_MAX_LENGTH = 2_000;
@@ -327,7 +329,34 @@ export function recogniseLink(text: string): LinkRef | LinkRefusal {
   if (KICK_HOSTS.has(host)) {
     return recogniseKick(url);
   }
+  const uploadOnly = UPLOAD_ONLY_SITES[host];
+  if (uploadOnly !== undefined) {
+    return { refused: true, code: 'link_upload_only', site: uploadOnly };
+  }
+  const site = siteForHost(host);
+  if (site && site.shapes.length > 0) {
+    return recogniseSite(site, url, host);
+  }
   return refusal('link_unsupported');
+}
+
+/**
+ * A link on one of Module 12's sites, read through its shapes. A short link
+ * (`fb.watch`, `pin.it`) cannot be read without following it, so it is
+ * refused; any other page of the site is not one video.
+ */
+function recogniseSite(site: SiteEntry, url: URL, host: string): LinkRef | LinkRefusal {
+  if (site.shortHosts?.includes(host)) {
+    return refusal('link_unsupported');
+  }
+  const parts = pathParts(url);
+  for (const shape of site.shapes) {
+    const found = shape.match(parts, url);
+    if (found) {
+      return makeRef(site.id, shape.kind, found.id, found.channel);
+    }
+  }
+  return refusal('link_not_a_video');
 }
 
 /** What `canonicalLinkFor` needs: a link's identity, with or without its address. */
@@ -390,8 +419,23 @@ export function canonicalLinkFor(ref: LinkIdentity): string | null {
       return KICK_VIDEO_ID.test(id) ? `https://kick.com/${channel}/videos/${id}` : null;
     }
     default:
-      return null;
+      return canonicalForSite(ref);
   }
+}
+
+/** Module 12's sites: the first shape of the kind whose patterns the id (and channel) pass. */
+function canonicalForSite(ref: LinkIdentity): string | null {
+  const site = siteById(ref.platform);
+  if (!site) return null;
+  for (const shape of site.shapes) {
+    if (shape.kind !== ref.kind || !shape.idPattern.test(ref.externalId)) continue;
+    if (shape.channelPattern) {
+      if (ref.channel === undefined || !shape.channelPattern.test(ref.channel)) continue;
+      return shape.canonical(ref.externalId, ref.channel);
+    }
+    return shape.canonical(ref.externalId);
+  }
+  return null;
 }
 
 /**
@@ -400,7 +444,7 @@ export function canonicalLinkFor(ref: LinkIdentity): string | null {
  * does not pass the platform's pattern.
  */
 export function linkRefForListedItem(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   item: Pick<ListedItem, 'externalId' | 'kind' | 'channel'>,
 ): LinkRef | null {
   let kind: LinkKind;

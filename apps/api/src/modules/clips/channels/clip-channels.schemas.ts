@@ -5,7 +5,7 @@
  * answer in the service, so the person gets one of our sentences.
  */
 import {
-  CLIP_PLATFORMS,
+  CHANNEL_PLATFORMS,
   LINK_MAX_LENGTH,
   LIST_KINDS,
   LIST_PERIODS,
@@ -19,7 +19,7 @@ const platformSchema = z
   .string()
   .max(16)
   .transform((value) => value.toLowerCase())
-  .pipe(z.enum(CLIP_PLATFORMS));
+  .pipe(z.enum(CHANNEL_PLATFORMS));
 
 export const addChannelSchema = z
   .object({

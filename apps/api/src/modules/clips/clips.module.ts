@@ -28,6 +28,7 @@ import { ClipAutoEditController } from './auto-edit/clip-auto-edit.controller';
 import { ClipAutoEditRepository } from './auto-edit/clip-auto-edit.repository';
 import { ClipAutoEditService } from './auto-edit/clip-auto-edit.service';
 import { ClipBrandKitsModule } from './brand-kits/clip-brand-kits.module';
+import { ClipCaptionStylesModule } from './captions/clip-caption-styles.module';
 import { ClipChannelsModule } from './channels/clip-channels.module';
 import { ClipItemModule } from './clip/clip-item.module';
 import { ClipsCoreModule } from './clips-core.module';
@@ -39,22 +40,22 @@ import { ClipBatchExportsService } from './exports/clip-batch-exports.service';
 import { ClipFilesController } from './files/clip-files.controller';
 import { ClipHighlightsController } from './highlights/clip-highlights.controller';
 import { ClipHighlightsService } from './highlights/clip-highlights.service';
-import { ClipReconcileService } from './internal/clip-reconcile.service';
-import { ClipSweepService } from './retention/clip-sweep.service';
 import { ClipMomentsService } from './highlights/clip-moments.service';
 import { ClipStillsService } from './highlights/clip-stills.service';
+import { ClipReconcileService } from './internal/clip-reconcile.service';
 import { ClipsInternalController } from './internal/clips-internal.controller';
 import { ClipsInternalService } from './internal/clips-internal.service';
 import { ClipJobEventsService } from './jobs/clip-job-events.service';
 import { ClipJobsController } from './jobs/clip-jobs.controller';
-import { ClipCaptionStylesModule } from './captions/clip-caption-styles.module';
 import { ClipLayoutsModule } from './layouts/clip-layouts.module';
 import { ClipLibraryModule } from './library/clip-library.module';
 import { ClipLinksModule } from './links/clip-links.module';
 import { ClipRecipesModule } from './recipes/clip-recipes.module';
+import { ClipSweepService } from './retention/clip-sweep.service';
 import { ClipsStatusController } from './status/clips-status.controller';
 import { ClipsStatusService } from './status/clips-status.service';
 import { ClipTranscriptsController } from './transcripts/clip-transcripts.controller';
+import { ClipDrive } from './videos/clip-drive';
 import { ClipSampleLink } from './videos/clip-sample';
 import { ClipUploadsService } from './videos/clip-uploads.service';
 import { ClipVideosController } from './videos/clip-videos.controller';
@@ -114,6 +115,8 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
     ClipAutoEditService,
     ClipAutoEditRepository,
     ClipUploadsService,
+    // Sprint 13, Module 12: Google Drive as a source.
+    ClipDrive,
     ClipsInternalService,
     ClipReconcileService,
     // Module 19: the cleanup sweep behind `/internal/clips/sweep`.

@@ -90,6 +90,48 @@ Discover's `YOUTUBE_API_KEY` if that is set. Production never borrows it.
 
 ---
 
+## Recipe 3: Google Drive Picker (Sprint 13, Module 12)
+
+This turns on **Pick From Google Drive** on the Clips home. A person picks
+one video in Google's own picker and it comes in like an upload. PostGear
+asks only for the `drive.file` scope (it can read the files the person picks,
+nothing else), never lists a Drive and never keeps a token past the import.
+
+Use the Google Cloud project that already holds the Google login app.
+
+1. In **APIs And Services, Library**, enable the **Google Drive API** and the
+   **Google Picker API**.
+2. In **APIs And Services, Credentials**, choose **Create Credentials, API
+   Key**. Restrict it: **Application restrictions**, Websites, add
+   `http://localhost:3000/*` (and the staging and production web addresses
+   later); **API restrictions**, the Google Picker API only. This key is
+   public by design (it runs in the browser).
+3. Open the login's **OAuth 2.0 Client ID** (Web application) and add
+   `http://localhost:3000` under **Authorised JavaScript origins**.
+4. In **OAuth Consent Screen, Data Access** (or Scopes), add
+   `https://www.googleapis.com/auth/drive.file`. It is a non-sensitive scope,
+   so it needs no security review; while the app is in Testing only the named
+   test users can use it.
+5. Note the **Project number** from the project's **Dashboard** (a long
+   number, not the project id).
+6. In `.env`:
+
+   ```
+   GOOGLE_DRIVE_PICKER_KEY="<the API key from step 2>"
+   GOOGLE_DRIVE_APP_ID="<the project number from step 5>"
+   ```
+
+   `GOOGLE_CLIENT_ID` is the login one, already set. Restart the API.
+
+With `CLIPS_SIMULATION="true"` the button opens a stand-in picker with
+made-up files instead, whatever is set here: set `CLIPS_SIMULATION="false"`
+for the real test.
+
+- [ ] Drive API and Picker API on, key restricted, origin added, `drive.file` on the consent screen.
+- [ ] A real video picked from your own Drive comes in as an upload.
+
+---
+
 ## Going Live (Staging And Production)
 
 Staging and production each get their own values in the host's settings, never

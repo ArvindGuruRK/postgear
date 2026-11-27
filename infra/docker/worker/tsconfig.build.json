@@ -29,6 +29,7 @@
       "@postgear/automation": ["packages/automation/src"],
       "@postgear/media-tools": ["packages/media-tools/src"],
       "@postgear/media-tools/listing": ["packages/media-tools/src/listing.ts"],
+      "@postgear/media-tools/drive": ["packages/media-tools/src/drive/drive.ts"],
       "@postgear/video-engine": ["packages/video-engine/src"],
       "@postgear/entitlements": ["packages/entitlements/src"],
       "@postgear/discover-engine": ["packages/discover-engine/src"],

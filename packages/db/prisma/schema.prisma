@@ -1807,11 +1807,27 @@ model UsageEntry {
 // private storage space and are reached only through signed addresses.
 // See docs/sprint-documents/sprint-12-clips.md and SCHEMA_NOTES.md.
 
+/// Sprint 13 Module 12 kept the enum and added values (the smaller change):
+/// the upper-case twin of `CLIP_PLATFORMS` in video-engine's sites table.
 enum ClipPlatform {
   YOUTUBE
   TWITCH
   KICK
   UPLOAD
+  VIMEO
+  RUMBLE
+  DAILYMOTION
+  LOOM
+  X
+  FACEBOOK
+  LINKEDIN
+  REDDIT
+  PINTEREST
+  THREADS
+  ZOOM
+  TIKTOK
+  INSTAGRAM
+  DROPBOX
 }
 
 enum ClipVideoKind {

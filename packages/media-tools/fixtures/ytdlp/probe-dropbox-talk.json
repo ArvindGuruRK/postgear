@@ -1,0 +1,36 @@
+{
+  "_type": "video",
+  "id": "simdropbox0001",
+  "extractor": "Dropbox",
+  "extractor_key": "Dropbox",
+  "webpage_url": "https://www.dropbox.com/scl/fi/simdropbox0001/talk.mp4?rlkey=simkey000000001&dl=0",
+  "title": "talk",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/dropbox/simdropbox0001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/dropbox/simdropbox0001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "original",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 1280,
+      "tbr": 2000,
+      "url": "https://media.sim.invalid/original.mp4"
+    }
+  ]
+}

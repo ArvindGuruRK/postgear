@@ -56,6 +56,19 @@ export const startUploadSchema = z
   .strict();
 export type StartUploadInput = z.infer<typeof startUploadSchema>;
 
+/**
+ * Module 12 (D13-09): one file picked in Google's Drive picker. The access
+ * token is short-lived and only good for the files the person picked
+ * (`drive.file`); the Zod pipe logs field paths only, never values.
+ */
+export const driveImportSchema = z
+  .object({
+    fileId: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/),
+    accessToken: z.string().min(1).max(4096),
+  })
+  .strict();
+export type DriveImportInput = z.infer<typeof driveImportSchema>;
+
 const partNumber = z.number().int().min(1).max(MAX_PART_NUMBER);
 
 export const signPartsSchema = z

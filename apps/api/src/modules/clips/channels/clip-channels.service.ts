@@ -28,7 +28,7 @@ import type { ClipPlatform } from '@postgear/db';
 import {
   type ChannelRef,
   CLIP_ERROR_MESSAGES,
-  type ClipPlatformId,
+  type ChannelPlatformId,
   type ListedItem,
   type ListKind,
   type ListPeriod,
@@ -70,7 +70,7 @@ interface ListOptions {
 
 const ALL_PERIODS: ListPeriod[] = ['all', 'day', 'week', 'month'];
 
-function listOptions(platform: ClipPlatformId, kind: ListKind): ListOptions {
+function listOptions(platform: ChannelPlatformId, kind: ListKind): ListOptions {
   if (platform === 'twitch' && kind === 'streams')
     return { kind, sorts: ['newest', 'views'], periods: [] };
   // Twitch orders clips by views itself.
@@ -82,7 +82,7 @@ function listOptions(platform: ClipPlatformId, kind: ListKind): ListOptions {
 
 export interface ChannelView {
   id: string;
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   handle: string;
   displayName: string;
   /** The platform's own picture address; the browser loads it, we never copy it. */
@@ -98,7 +98,7 @@ export interface ChannelView {
 
 /** What the Add dialog's Check step shows before anything is saved. */
 export interface CheckedChannelView {
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   handle: string;
   displayName: string;
   /** The platform's own picture address; the browser loads it, we never copy it. */
@@ -134,7 +134,7 @@ export interface StreamsView {
 @Injectable()
 export class ClipChannelsService {
   private readonly logger = new Logger(ClipChannelsService.name);
-  private readonly platforms: ReadonlySet<ClipPlatformId>;
+  private readonly platforms: ReadonlySet<ChannelPlatformId>;
 
   constructor(
     private readonly repository: ClipChannelsRepository,
@@ -412,7 +412,7 @@ export class ClipChannelsService {
   }
 
   private sortFor(
-    platform: ClipPlatformId,
+    platform: ChannelPlatformId,
     options: ListOptions,
     asked: ListSort | undefined,
   ): ListSort {
@@ -427,7 +427,7 @@ export class ClipChannelsService {
     return asked;
   }
 
-  private assertPlatformOn(platform: ClipPlatformId): void {
+  private assertPlatformOn(platform: ChannelPlatformId): void {
     if (!this.platforms.has(platform)) {
       throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'platform_paused', {
         platform,
@@ -436,7 +436,7 @@ export class ClipChannelsService {
   }
 
   /** The failure as an answer: one of our sentences, never a platform's. */
-  private refusal(failure: ListingFailure, platform: ClipPlatformId): ClipErrorException {
+  private refusal(failure: ListingFailure, platform: ChannelPlatformId): ClipErrorException {
     switch (failure.code) {
       case 'channel_not_found':
         return new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'channel_not_found');
@@ -498,11 +498,11 @@ export class ClipChannelsService {
   }
 }
 
-function platformOf(platform: ClipPlatform): ClipPlatformId {
-  return platform.toLowerCase() as ClipPlatformId;
+function platformOf(platform: ClipPlatform): ChannelPlatformId {
+  return platform.toLowerCase() as ChannelPlatformId;
 }
 
-function toChannelRef(platform: ClipPlatformId, row: ChannelRow): ChannelRef {
+function toChannelRef(platform: ChannelPlatformId, row: ChannelRow): ChannelRef {
   const ref: ChannelRef = {
     platform,
     handle: row.handle,
@@ -516,6 +516,6 @@ function toChannelRef(platform: ClipPlatformId, row: ChannelRow): ChannelRef {
 }
 
 /** The id a `ClipVideo` row holds for a listed item (Kick video ids are kept lower case). */
-function videoIdOf(platform: ClipPlatformId, item: ListedItem): string {
+function videoIdOf(platform: ChannelPlatformId, item: ListedItem): string {
   return linkRefForListedItem(platform, item)?.externalId ?? item.externalId;
 }

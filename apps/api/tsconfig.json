@@ -43,6 +43,7 @@
       "@postgear/storage": ["packages/storage/src"],
       // Only the pure listing door; the media-tools root (the process runner) is worker-only.
       "@postgear/media-tools/listing": ["packages/media-tools/src/listing.ts"],
+      "@postgear/media-tools/drive": ["packages/media-tools/src/drive/drive.ts"],
       "@postgear/ai-engine": ["packages/ai-engine/src"],
       "@postgear/email": ["packages/email/src"]
     }

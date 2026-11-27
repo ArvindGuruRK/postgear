@@ -10,6 +10,8 @@ import {
   keptUntilLine,
   keptUntilView,
   linkPlaceholder,
+  PLATFORM_LABELS,
+  siteHelpLine,
   platformList,
   preflightClipUpload,
   preflightLength,
@@ -297,8 +299,29 @@ describe('the link box words', () => {
     expect(platformList(['kick', 'youtube', 'twitch'])).toBe('YouTube, Twitch or Kick');
     expect(platformList(['twitch'])).toBe('Twitch');
     expect(platformList([])).toBe('');
-    expect(linkPlaceholder(['twitch', 'kick'])).toBe('Enter your Twitch or Kick link');
+    // Module 12: one placeholder, whatever is on.
+    expect(linkPlaceholder(['twitch', 'kick'])).toBe('Enter your video link');
     expect(linkPlaceholder([])).toBe('Enter your video link');
+  });
+
+  it('writes the help line: five names and more, the whole list for the tooltip (Module 12)', () => {
+    expect(siteHelpLine(['kick', 'youtube', 'twitch'])).toEqual({
+      shown: 'YouTube, Twitch and Kick',
+      more: false,
+      all: 'YouTube, Twitch and Kick',
+    });
+    expect(siteHelpLine(['twitch'])).toEqual({ shown: 'Twitch', more: false, all: 'Twitch' });
+    expect(siteHelpLine([])).toEqual({ shown: '', more: false, all: '' });
+    const many = siteHelpLine(['reddit', 'youtube', 'vimeo', 'twitch', 'kick', 'rumble', 'x']);
+    expect(many.shown).toBe('YouTube, Twitch, Kick, Vimeo, Rumble');
+    expect(many.more).toBe(true);
+    expect(many.all).toBe('YouTube, Twitch, Kick, Vimeo, Rumble, X and Reddit');
+  });
+
+  it("labels a card's badge with the site's name", () => {
+    expect(PLATFORM_LABELS.vimeo).toBe('Vimeo');
+    expect(PLATFORM_LABELS.x).toBe('X');
+    expect(PLATFORM_LABELS.upload).toBe('Upload');
   });
 });
 

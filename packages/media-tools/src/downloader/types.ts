@@ -77,6 +77,7 @@ export type DownloaderErrorCode =
   | 'link_not_found'
   | 'link_live'
   | 'link_not_a_video'
+  | 'link_many_videos'
   | 'clips_video_too_long'
   | 'too_big'
   | 'format_gone'

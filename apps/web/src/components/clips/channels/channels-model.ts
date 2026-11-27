@@ -6,7 +6,7 @@
  * browser agree.
  */
 import {
-  type ClipPlatformId,
+  type ChannelPlatformId,
   type ListKind,
   type ListPeriod,
   type ListSort,
@@ -25,7 +25,7 @@ export const YOUTUBE_SORT_HINT = 'YouTube lists newest first';
 export const CAPPED_SENTENCE = `Showing the newest ${MAX_LIST_ITEMS.toLocaleString('en-GB')}. Paste a link for older videos.`;
 
 /** The tab names of a channel's lists: Twitch and Kick Streams and Clips; YouTube Videos, Streams and Shorts. */
-export function listName(platform: ClipPlatformId, kind: ListKind): string {
+export function listName(platform: ChannelPlatformId, kind: ListKind): string {
   if (platform === 'youtube' && kind === 'uploads') return 'Videos';
   switch (kind) {
     case 'streams':
@@ -124,14 +124,14 @@ export function updatedLine(iso: string | null | undefined, now: Date): string |
 }
 
 /** "38 streams", "1 clip", "12 videos" for the list's count line. */
-export function countLine(count: number, platform: ClipPlatformId, kind: ListKind): string {
+export function countLine(count: number, platform: ChannelPlatformId, kind: ListKind): string {
   const noun = listName(platform, kind).toLowerCase();
   const singular = noun.endsWith('s') ? noun.slice(0, -1) : noun;
   return count === 1 ? `1 ${singular}` : `${count.toLocaleString('en-GB')} ${noun}`;
 }
 
 /** The canonical link of a row, which Import sends to the probe; null when it cannot be built. */
-export function canonicalLinkOf(platform: ClipPlatformId, item: ClipStreamItem): string | null {
+export function canonicalLinkOf(platform: ChannelPlatformId, item: ClipStreamItem): string | null {
   return linkRefForListedItem(platform, item)?.canonicalUrl ?? null;
 }
 

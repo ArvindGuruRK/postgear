@@ -22,6 +22,8 @@ import {
   type DeriveResult,
   type Downloader,
   DownloaderError,
+  DriveError,
+  type DriveFiles,
   gzipSignalsFile,
   type MediaFacts,
   mapPercent,
@@ -33,6 +35,7 @@ import {
 import {
   CLIP_EXTENSIONS,
   type ClipExtension,
+  contentTypeForClipKey,
   type PrivateStorage,
   StorageNotFoundError,
 } from '@postgear/storage';
@@ -72,6 +75,10 @@ export interface ImportRun {
   signal: AbortSignal;
   tools: ImportTools;
   downloader: Downloader;
+  /** Module 12: Google Drive, for an upload picked there. */
+  drive: DriveFiles;
+  /** Opens the encrypted Drive token from the job input (`@postgear/db` `decrypt`). */
+  openToken(sealed: string): string;
   privateStorage: PrivateStorage;
   internal: Pick<ClipInternalClient, 'chargeImport'>;
   rows: ClipRows;
@@ -181,6 +188,9 @@ export async function importFetch(run: ImportRun): Promise<FetchedVideo> {
   }
 
   const originalKey = input.origin.originalKey;
+  if (input.origin.drive && !(await run.privateStorage.exists(originalKey))) {
+    return fetchFromDrive(run, originalKey, input.origin.drive);
+  }
   const original = (await run.rows.videoAssets(run.organizationId, run.video.id)).find(
     (asset) => asset.kind === 'ORIGINAL' && asset.key === originalKey,
   );
@@ -198,6 +208,68 @@ export async function importFetch(run: ImportRun): Promise<FetchedVideo> {
   throwIfCancelled(signal);
   await progress.report({ stage: 'fetching', progress: 70 });
   return { file, bytes: original?.bytes ?? 0 };
+}
+
+/**
+ * Module 12 (D13-09): an upload picked from Google Drive. The file comes from
+ * Drive into the scratch folder (no bigger than Drive said it was, and never
+ * past the space left), is stored as the ORIGINAL, and the access token is
+ * wiped from the job at once. A retried attempt finds the ORIGINAL stored
+ * and reads it like any upload, so the token is used once.
+ */
+async function fetchFromDrive(
+  run: ImportRun,
+  originalKey: string,
+  drive: { fileId: string; token: string | null },
+): Promise<FetchedVideo> {
+  const { input, dir, signal, progress } = run;
+  if (drive.token === null) throw new ClipStepError('drive_not_connected', { retryable: false });
+  const used = await run.rows.storageUsedBytes(run.organizationId);
+  const left = input.limits.storageBytes - used;
+  if (left <= 0) throw new ClipStepError('clips_storage_full');
+  const declared = input.expectedBytes ?? left;
+  await run.tools.freeDisk(dir, scratchBytesNeeded(declared));
+
+  const file = path.join(dir, `original.${originalExtension(originalKey)}`);
+  let fetched: { path: string; bytes: number };
+  try {
+    fetched = await run.drive.fetch(
+      {
+        fileId: drive.fileId,
+        accessToken: run.openToken(drive.token),
+        outFile: file,
+        maxBytes: Math.min(left, declared),
+      },
+      (bytes) => {
+        if (declared > 0) {
+          void progress.report({
+            stage: 'fetching',
+            progress: mapPercent((bytes / declared) * 100, 0, 60),
+          });
+        }
+      },
+      signal,
+    );
+  } catch (error) {
+    if (error instanceof DriveError) {
+      if (error.code === 'too_big') {
+        throw new ClipStepError(left < declared ? 'clips_storage_full' : 'upload_incomplete', {
+          retryable: false,
+          cause: error,
+        });
+      }
+      throw new ClipStepError(error.code, { retryable: error.retryable, cause: error });
+    }
+    throw error;
+  }
+  throwIfCancelled(signal);
+  await run.privateStorage.putFile(originalKey, fetched.path, contentTypeForClipKey(originalKey));
+  await run.rows.driveFetched(run.organizationId, run.jobId, {
+    key: originalKey,
+    bytes: fetched.bytes,
+  });
+  await progress.report({ stage: 'fetching', progress: 70 });
+  return { file: fetched.path, bytes: fetched.bytes };
 }
 
 // --- 2. Inspect --------------------------------------------------------------------

@@ -15,6 +15,7 @@ import { refusalMessage } from '@postgear/entitlements';
 import { clipStorageOverLine } from '@postgear/scheduling';
 import {
   CLIP_MAX_MS,
+  CLIP_PLATFORMS,
   type ClipPlatformId,
   formatVideoLength,
   PLATFORM_NAMES,
@@ -199,9 +200,10 @@ export function aiMinutesChipView(
 
 // --- The link box -------------------------------------------------------------------
 
-const PLATFORM_ORDER: readonly ClipPlatformId[] = ['youtube', 'twitch', 'kick'];
+/** The sites table's order (Module 12): Sprint 12's three first, then the new ones. */
+const PLATFORM_ORDER: readonly ClipPlatformId[] = CLIP_PLATFORMS;
 
-/** "YouTube, Twitch or Kick", only the platforms switched on, in a fixed order. */
+/** "YouTube, Twitch or Kick", only the sites switched on, in a fixed order. */
 export function platformList(platforms: readonly ClipPlatformId[]): string {
   const names = PLATFORM_ORDER.filter((id) => platforms.includes(id)).map(
     (id) => PLATFORM_NAMES[id],
@@ -211,10 +213,33 @@ export function platformList(platforms: readonly ClipPlatformId[]): string {
   return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
 }
 
-/** The link field's placeholder: "Enter your YouTube, Twitch or Kick link". */
-export function linkPlaceholder(platforms: readonly ClipPlatformId[]): string {
-  const list = platformList(platforms);
-  return list ? `Enter your ${list} link` : 'Enter your video link';
+/** The link field's placeholder (Module 12: one wording, whatever is switched on). */
+export function linkPlaceholder(_platforms?: readonly ClipPlatformId[]): string {
+  return 'Enter your video link';
+}
+
+/** How many site names the help line spells out before "and more". */
+export const SITES_SHOWN = 5;
+
+/**
+ * The help line under the link field (Module 12): "YouTube, Twitch, Kick,
+ * Vimeo, Rumble and more", with every site that is on in `all` for the
+ * tooltip ("YouTube, Twitch, ... and Pinterest"). Five or fewer read in full.
+ */
+export function siteHelpLine(platforms: readonly ClipPlatformId[]): {
+  shown: string;
+  more: boolean;
+  all: string;
+} {
+  const names = PLATFORM_ORDER.filter((id) => platforms.includes(id)).map(
+    (id) => PLATFORM_NAMES[id],
+  );
+  const all =
+    names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  if (names.length <= SITES_SHOWN) return { shown: all, more: false, all };
+  return { shown: names.slice(0, SITES_SHOWN).join(', '), more: true, all };
 }
 
 /**
@@ -236,13 +261,17 @@ export function openTarget(video: {
 
 /** What Find Clips says when it is pressed with an empty field (2026-11-19). */
 export function emptyLinkSentence(platforms: readonly ClipPlatformId[]): string {
+  // Module 12: past three sites the list is under the field, so the sentence stays short.
+  if (platforms.length > 3) return 'Paste the link of one video first.';
   const list = platformList(platforms);
   return list ? `Paste a video link from ${list}.` : 'Paste a video link first.';
 }
 
 /** Platforms in the order the page draws them. */
-export function orderedPlatforms(platforms: readonly ClipPlatformId[]): ClipPlatformId[] {
-  return PLATFORM_ORDER.filter((id) => platforms.includes(id));
+export function orderedPlatforms<T extends ClipPlatformId>(platforms: readonly T[]): T[] {
+  return (PLATFORM_ORDER as readonly ClipPlatformId[]).filter((id): id is T =>
+    (platforms as readonly ClipPlatformId[]).includes(id),
+  );
 }
 
 /** What a refusal adds beside its sentence. */
@@ -253,6 +282,7 @@ export interface RefusalExtras {
 
 const UPLOAD_HELPS: ReadonlySet<string> = new Set([
   'link_unsupported',
+  'link_upload_only',
   'platform_resting',
   'platform_paused',
 ]);
@@ -268,10 +298,9 @@ export function refusalExtras(code: string | undefined): RefusalExtras {
 
 // --- Cards --------------------------------------------------------------------------
 
+/** The card's platform badge: the site's name (Module 12), or Upload. */
 export const PLATFORM_LABELS: Readonly<Record<ClipVideoPlatform, string>> = Object.freeze({
-  youtube: 'YouTube',
-  twitch: 'Twitch',
-  kick: 'Kick',
+  ...PLATFORM_NAMES,
   upload: 'Upload',
 });
 

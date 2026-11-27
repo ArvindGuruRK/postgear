@@ -1,0 +1,71 @@
+{
+  "_type": "video",
+  "id": "1simvd1",
+  "extractor": "Reddit",
+  "extractor_key": "Reddit",
+  "webpage_url": "https://www.reddit.com/comments/1simvd1/",
+  "title": "PostGear Sample: A Talk On Reddit",
+  "uploader": "postgear_samples",
+  "channel": "postgear_samples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/reddit/1simvd1.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/reddit/1simvd1.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "hls-audio",
+      "ext": "mp4",
+      "protocol": "m3u8_native",
+      "vcodec": "none",
+      "acodec": "mp4a.40.2",
+      "url": "https://media.sim.invalid/hls-audio.m3u8"
+    },
+    {
+      "format_id": "hls-1080",
+      "ext": "mp4",
+      "protocol": "m3u8_native",
+      "vcodec": "avc1.640028",
+      "acodec": "none",
+      "height": 1080,
+      "width": 1920,
+      "fps": 30,
+      "tbr": 4800,
+      "url": "https://media.sim.invalid/hls-1080.m3u8"
+    },
+    {
+      "format_id": "hls-720",
+      "ext": "mp4",
+      "protocol": "m3u8_native",
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "height": 720,
+      "width": 1280,
+      "fps": 30,
+      "tbr": 2400,
+      "url": "https://media.sim.invalid/hls-720.m3u8"
+    },
+    {
+      "format_id": "dash-DASH_480",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.4D401E",
+      "acodec": "none",
+      "height": 480,
+      "width": 853,
+      "fps": 30,
+      "tbr": 1200,
+      "url": "https://media.sim.invalid/dash-DASH_480.mp4"
+    }
+  ]
+}

@@ -167,10 +167,31 @@ export const importLimitsSchema = z
   .strict();
 export type ImportLimits = z.infer<typeof importLimitsSchema>;
 
+/**
+ * Module 12 (D13-09): an upload picked from Google Drive. The import's first
+ * step fetches the file into `originalKey` with this token, then carries on
+ * as any upload. `token` is the picker's short-lived access token, encrypted
+ * by the API (`@postgear/db` `encrypt`); it is wiped from the job row as soon
+ * as the file is stored, and when the job ends. Never logged.
+ */
+export const driveOriginSchema = z
+  .object({
+    fileId: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/),
+    token: z.string().min(1).max(8192).nullable(),
+  })
+  .strict();
+export type DriveOrigin = z.infer<typeof driveOriginSchema>;
+
 /** Where the video comes from: a recognised link, or a file the browser uploaded in parts. */
 export const videoOriginSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('link'), link: linkRefSchema }).strict(),
-  z.object({ type: z.literal('upload'), originalKey: storageKey }).strict(),
+  z
+    .object({
+      type: z.literal('upload'),
+      originalKey: storageKey,
+      drive: driveOriginSchema.optional(),
+    })
+    .strict(),
 ]);
 export type VideoOrigin = z.infer<typeof videoOriginSchema>;
 

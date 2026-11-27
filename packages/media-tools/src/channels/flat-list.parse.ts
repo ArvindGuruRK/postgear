@@ -8,7 +8,7 @@
  * never passed on: a listed item carries no download address.
  */
 import type {
-  ClipPlatformId,
+  ChannelPlatformId,
   ListedItem,
   ListedItemKind,
   ListedItemState,
@@ -54,7 +54,7 @@ export interface FlatPlaylistFacts {
 }
 
 export interface FlatListContext {
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   kind: ListKind;
   /** The login or slug the page was built from; clips need it in their canonical link. */
   channelKey: string;

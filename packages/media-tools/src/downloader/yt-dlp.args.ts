@@ -15,6 +15,8 @@ import {
   isLinkRefusal,
   type LinkRef,
   recogniseLink,
+  SITES,
+  siteById,
 } from '@postgear/video-engine';
 import { jsRuntimeArg } from '../run/paths';
 import type { ToolPaths } from '../run/types';
@@ -22,24 +24,25 @@ import { YTDLP_PROGRESS_TEMPLATE } from './progress';
 import { DownloaderError } from './types';
 
 /**
- * The extractors an import may use, per platform. List extractors
- * (`youtube:tab`, `twitch:videos`, `kick:videos` and friends) are never on
+ * The extractors an import may use, per site, read from the sites table
+ * (Module 12: `@postgear/video-engine`'s `SITES`). List extractors
+ * (`youtube:tab`, `twitch:videos`, `vimeo:channel` and friends) are never on
  * this list: only the channel lister has those, in its own builder.
  */
 export const IMPORT_EXTRACTORS: Readonly<Record<ClipPlatformId, readonly string[]>> = Object.freeze(
-  {
-    youtube: Object.freeze(['youtube', 'youtube:clip']),
-    twitch: Object.freeze(['twitch:vod', 'twitch:clips']),
-    kick: Object.freeze(['kick:vod', 'kick:clip']),
-  },
+  Object.fromEntries(SITES.map((site) => [site.id, Object.freeze([...site.extractors])])) as Record<
+    ClipPlatformId,
+    readonly string[]
+  >,
 );
 
-/** Hosts a canonical link may use, per platform (what `recogniseLink` builds). */
-const CANONICAL_HOSTS: Readonly<Record<ClipPlatformId, readonly string[]>> = Object.freeze({
-  youtube: ['www.youtube.com', 'youtube.com', 'm.youtube.com', 'youtu.be'],
-  twitch: ['www.twitch.tv', 'twitch.tv', 'clips.twitch.tv', 'm.twitch.tv'],
-  kick: ['kick.com', 'www.kick.com'],
-});
+/** Hosts a canonical link may use, per site (what `recogniseLink` builds): the site's exact hosts. */
+const CANONICAL_HOSTS: Readonly<Record<ClipPlatformId, readonly string[]>> = Object.freeze(
+  Object.fromEntries(SITES.map((site) => [site.id, site.hosts])) as Record<
+    ClipPlatformId,
+    readonly string[]
+  >,
+);
 
 /** yt-dlp's own network timeout, in seconds. */
 export const YTDLP_SOCKET_TIMEOUT_SEC = 20;
@@ -138,13 +141,22 @@ export function ytDlpBaseArgs(
   platform: ClipPlatformId,
   cookiesPath: string | null,
 ): string[] {
+  const extractors = IMPORT_EXTRACTORS[platform] ?? [];
+  if (extractors.length === 0) {
+    // A site with no extractor (Threads, D13-08) can only be switched on under
+    // simulation (the env check refuses it otherwise), so reaching here is a bug.
+    throw new DownloaderError('tool_failed', {
+      retryable: false,
+      cause: new Error(`No yt-dlp extractor is listed for ${platform}.`),
+    });
+  }
   const args = [
     '--ignore-config',
     '--no-playlist',
     '--no-warnings',
     '--abort-on-unavailable-fragments',
     '--use-extractors',
-    IMPORT_EXTRACTORS[platform].join(','),
+    extractors.join(','),
     '--color',
     'never',
     '--socket-timeout',
@@ -155,7 +167,15 @@ export function ytDlpBaseArgs(
     '3',
     '--restrict-filenames',
   ];
-  args.push(...ytDlpEnvArgs(config, cookiesPath));
+  // The operator's cookies file is a login: only Sprint 12's sites may use it,
+  // never a Module 12 site (no site uses a login, D13-08).
+  const cookies = siteById(platform)?.operatorCookies === true ? cookiesPath : null;
+  args.push(...ytDlpEnvArgs(config, cookies));
+  // Per-site quirks are data on the site's entry (Module 12), never ifs here.
+  const siteArgs = siteById(platform)?.extractorArgs;
+  if (siteArgs) {
+    args.push('--extractor-args', assertArgValue(siteArgs));
+  }
   return args;
 }
 

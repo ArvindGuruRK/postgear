@@ -25,7 +25,19 @@
  * meanwhile (the API cancelled a job whose workflow it could not reach, or
  * the reconcile failed it) answers `closed` and the workflow ends quietly.
  */
+
 import * as path from 'node:path';
+import { decrypt } from '@postgear/db';
+import type {
+  MediaPyDetectFacesInput,
+  MediaPyDetectFacesOutput,
+  MediaPyMotionInput,
+  MediaPySpeakInput,
+  MediaPySpeakOutput,
+  MediaPyStillsInput,
+  MediaPyTranscribeInput,
+  MediaPyTranscribeOutput,
+} from '@postgear/media-contract';
 import {
   assertFreeDisk,
   convertUploadedSound,
@@ -40,16 +52,6 @@ import {
   runFfmpeg,
   withScratch,
 } from '@postgear/media-tools';
-import type {
-  MediaPyDetectFacesInput,
-  MediaPyDetectFacesOutput,
-  MediaPyMotionInput,
-  MediaPySpeakInput,
-  MediaPySpeakOutput,
-  MediaPyStillsInput,
-  MediaPyTranscribeInput,
-  MediaPyTranscribeOutput,
-} from '@postgear/media-contract';
 import type { ClipJobWorkflowInput } from '@postgear/scheduling';
 import { downloadOutputSchema } from '@postgear/video-engine';
 import { type ActivityRun, runClipActivity } from '../activity-kit';
@@ -266,6 +268,8 @@ export function createJobActivities(deps: ClipActivityDeps, options: ClipJobActi
             signal: activity.signal,
             tools: importTools,
             downloader: deps.providers.downloader,
+            drive: deps.providers.drive,
+            openToken: decrypt,
             privateStorage: deps.privateStorage,
             internal: deps.internal,
             rows,

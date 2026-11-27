@@ -2,6 +2,9 @@
  * The Clips home's entry card (2026-11-19 redo): every way in, in
  * StreamLadder's order, with a Find Clips that explains itself.
  */
+
+import { TooltipProvider } from '@postgear/ui';
+import { DEFAULT_ON_SITES } from '@postgear/video-engine';
 import {
   act,
   fireEvent,
@@ -60,15 +63,29 @@ describe('the entry card', () => {
       }) as unknown as MediaQueryList;
   });
 
+  it('offers Pick From Google Drive only when Drive is (Module 12)', () => {
+    renderBox();
+    expect(screen.queryByTestId('clips-drive-button')).toBeNull();
+  });
+
+  it('opens the Drive picker from its button (Module 12)', () => {
+    const onDrive = jest.fn();
+    renderBox({ onDrive });
+    fireEvent.click(screen.getByRole('button', { name: 'Pick From Google Drive' }));
+    expect(onDrive).toHaveBeenCalledTimes(1);
+  });
+
   it('names the platforms, then offers Find Clips, Upload Your Own Video and one Browse each', () => {
     const props = renderBox();
     const card = screen.getByRole('region', { name: 'Bring In A Video' });
-    const works = within(card).getByRole('list', { name: 'Works with' });
-    expect(
-      within(works)
-        .getAllByRole('listitem')
-        .map((item) => item.textContent),
-    ).toEqual(['YouTube', 'Twitch', 'Kick']);
+    // Module 12: the sites are a help line under the field, not a row of logos.
+    expect(within(card).getByTestId('clips-link-sites')).toHaveTextContent(
+      'Works with YouTube, Twitch and Kick.',
+    );
+    expect(within(card).getByLabelText('Video link')).toHaveAttribute(
+      'placeholder',
+      'Enter your video link',
+    );
     expect(within(card).getByRole('button', { name: 'Find Clips' })).toBeEnabled();
     fireEvent.click(within(card).getByRole('button', { name: /Upload Your Own Video/ }));
     expect(props.onUpload).toHaveBeenCalledTimes(1);
@@ -88,12 +105,50 @@ describe('the entry card', () => {
       'Paste a video link from YouTube, Twitch or Kick.',
     );
     expect(field).toHaveAttribute('aria-invalid', 'true');
-    expect(field).toHaveAccessibleDescription('Paste a video link from YouTube, Twitch or Kick.');
+    expect(field).toHaveAccessibleDescription(
+      'Paste a video link from YouTube, Twitch or Kick. Works with YouTube, Twitch and Kick.',
+    );
 
     fireEvent.change(field, { target: { value: 'https://kick.com/acme/videos/1' } });
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Find Clips' }));
     expect(probe.probe).toHaveBeenCalledWith('https://kick.com/acme/videos/1');
+  });
+
+  it('names five sites and lists every site that is on in a tooltip (Module 12)', async () => {
+    const onBrowse = jest.fn();
+    render(
+      <TooltipProvider delayDuration={0}>
+        <LinkBox
+          orgId="org-1"
+          platforms={[...DEFAULT_ON_SITES]}
+          probe={idleProbe()}
+          disabled={false}
+          focusRights={false}
+          onImported={jest.fn()}
+          onUpload={jest.fn()}
+          onBrowse={onBrowse}
+        />
+      </TooltipProvider>,
+    );
+    const help = screen.getByTestId('clips-link-sites');
+    expect(help).toHaveTextContent('Works with YouTube, Twitch, Kick, Vimeo, Rumble and more.');
+    fireEvent.focus(within(help).getByRole('button', { name: 'and more' }));
+    expect(
+      (
+        await screen.findAllByText(
+          'Works with YouTube, Twitch, Kick, Vimeo, Rumble, Dailymotion, Loom, X, Facebook, LinkedIn, Reddit and Pinterest.',
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    // Browse is for sites with channels only.
+    expect(screen.getAllByRole('button', { name: /^Browse / }).map((b) => b.textContent)).toEqual([
+      'Browse YouTube',
+      'Browse Twitch',
+      'Browse Kick',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Find Clips' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Paste the link of one video first.');
   });
 
   it('uploads a video dropped on the upload area', () => {

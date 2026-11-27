@@ -1,0 +1,57 @@
+{
+  "_type": "video",
+  "id": "SimReel0001",
+  "extractor": "Instagram",
+  "extractor_key": "Instagram",
+  "webpage_url": "https://www.instagram.com/reel/SimReel0001/",
+  "title": "PostGear Sample: A Reel",
+  "uploader": "postgearsamples",
+  "channel": "postgearsamples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/instagram/SimReel0001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/instagram/SimReel0001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "dash-1080v",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.640028",
+      "acodec": "none",
+      "height": 1920,
+      "width": 1080,
+      "tbr": 3000,
+      "url": "https://media.sim.invalid/dash-1080v.mp4"
+    },
+    {
+      "format_id": "dash-720v",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "none",
+      "height": 1280,
+      "width": 720,
+      "tbr": 1600,
+      "url": "https://media.sim.invalid/dash-720v.mp4"
+    },
+    {
+      "format_id": "dash-audio",
+      "ext": "m4a",
+      "protocol": "https",
+      "vcodec": "none",
+      "acodec": "mp4a.40.2",
+      "url": "https://media.sim.invalid/dash-audio.m4a"
+    }
+  ]
+}

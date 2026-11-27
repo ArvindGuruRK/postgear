@@ -156,11 +156,11 @@ describe('ClipLinksService.probe', () => {
 
   it('refuses a link it does not read with 422 and the refusal code, before any tool', async () => {
     const { service, scheduling } = setup();
-    const answer = await refusal(service.probe(ORG, 'https://vimeo.com/123456'));
+    const answer = await refusal(service.probe(ORG, 'https://www.bilibili.com/video/BV1xx411c7mD'));
     expect(answer.status).toBe(422);
     expect(answer.body.code).toBe('link_unsupported');
     expect(answer.body.message).toBe(
-      'We can only read YouTube, Twitch and Kick links for now. You can upload the file instead.',
+      'We cannot read links from this site yet. You can upload the file instead.',
     );
     const channel = await refusal(service.probe(ORG, 'https://www.youtube.com/@acme'));
     expect(channel).toMatchObject({ status: 422, body: { code: 'link_not_a_video' } });
@@ -195,6 +195,92 @@ describe('ClipLinksService.probe', () => {
       'Twitch is not answering us right now. Try again in a little while, or upload the file instead.',
     );
     expect(scheduling.runClipQuery).toHaveBeenCalledTimes(BREAKER_THRESHOLD);
+  });
+
+  describe('Module 12 sites', () => {
+    const VIMEO = 'https://vimeo.com/900000101';
+    const vimeoInfo = infoFor({
+      platform: 'vimeo',
+      kind: 'video',
+      externalId: '900000101',
+      canonicalUrl: VIMEO,
+      title: 'A Talk On Vimeo',
+    });
+
+    it('reads a site that is switched on through the same probe', async () => {
+      const { service } = setup({
+        platforms: ['vimeo'],
+        answer: { outcome: 'answered', value: vimeoInfo },
+      });
+      const result = await service.probe(ORG, `${VIMEO}?share=copy`);
+      expect(result.link).toEqual({
+        platform: 'vimeo',
+        kind: 'video',
+        externalId: '900000101',
+        canonicalUrl: VIMEO,
+      });
+      expect(result.info.title).toBe('A Talk On Vimeo');
+    });
+
+    it('pauses each site on its own switch, with the site in the sentence', async () => {
+      const { service, scheduling } = setup({ platforms: ['youtube', 'twitch', 'kick'] });
+      const tiktok = await refusal(
+        service.probe(ORG, 'https://www.tiktok.com/@postgearsamples/video/7300000000000000001'),
+      );
+      expect(tiktok).toMatchObject({
+        status: 422,
+        body: {
+          code: 'platform_paused',
+          message: 'TikTok links are paused for now. You can upload the file instead.',
+        },
+      });
+      const x = await refusal(service.probe(ORG, 'https://x.com/i/status/1900000000000000001'));
+      expect(x.body.message).toBe('X links are paused for now. You can upload the file instead.');
+      expect(scheduling.runClipQuery).not.toHaveBeenCalled();
+    });
+
+    it('names Riverside when its link is pasted, and asks for the file', async () => {
+      const { service, scheduling } = setup();
+      const answer = await refusal(
+        service.probe(ORG, 'https://riverside.fm/studio/postgear/recordings/abc'),
+      );
+      expect(answer).toMatchObject({
+        status: 422,
+        body: {
+          code: 'link_upload_only',
+          message: 'Riverside links cannot be read. Download the recording and upload it instead.',
+        },
+      });
+      expect(scheduling.runClipQuery).not.toHaveBeenCalled();
+    });
+
+    it('answers a post with several videos with its own sentence (422)', async () => {
+      const { service } = setup({
+        platforms: ['x'],
+        answer: { outcome: 'failed', error: workerFailure('link_many_videos', 'x') },
+      });
+      const answer = await refusal(
+        service.probe(ORG, 'https://x.com/i/status/1900000000000000002'),
+      );
+      expect(answer).toMatchObject({
+        status: 422,
+        body: {
+          code: 'link_many_videos',
+          message: 'This post has more than one video. Paste a link to a post with just one.',
+        },
+      });
+    });
+
+    it('rests a new site under its own name', async () => {
+      const { service } = setup({
+        platforms: ['dailymotion'],
+        answer: { outcome: 'failed', error: workerFailure('platform_resting', 'dailymotion') },
+      });
+      const answer = await refusal(service.probe(ORG, 'https://www.dailymotion.com/video/x9sim01'));
+      expect(answer.body.message).toBe(
+        'Dailymotion is not answering us right now. Try again in a little while, or upload the file instead.',
+      );
+    });
   });
 
   it('throttles the eleventh probe in a minute with 429 probe_throttled', async () => {

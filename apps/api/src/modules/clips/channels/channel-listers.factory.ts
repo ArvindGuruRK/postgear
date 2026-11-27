@@ -15,7 +15,7 @@
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { createSimulatedChannelLister } from '@postgear/media-tools/listing';
-import type { ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPlatformId } from '@postgear/video-engine';
 import type { Env } from '../../../config/env';
 import type { RedisService } from '../../redis/redis.service';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
@@ -44,7 +44,7 @@ export function createListerSets(deps: ListerFactoryDeps): ListerSets {
   if (config.get('CLIPS_SIMULATION', { infer: true }) === 'true') {
     logger.log(JSON.stringify({ event: 'clips.channels.bindings', mode: 'simulation' }));
     // Module 20: the forcing channels (`simempty`, `simquota`, `simflaky`) sit in front.
-    const simulated = (platform: ClipPlatformId): ListerSet => ({
+    const simulated = (platform: ChannelPlatformId): ListerSet => ({
       official: withSimulationSwitches(createSimulatedChannelLister(platform)),
       flat: null,
     });
@@ -56,7 +56,7 @@ export function createListerSets(deps: ListerFactoryDeps): ListerSets {
   }
 
   const http = deps.http ?? createListerHttp();
-  const flat = (platform: ClipPlatformId) =>
+  const flat = (platform: ChannelPlatformId) =>
     new WorkerFlatLister(platform, {
       scheduling: deps.scheduling,
       breaker: deps.breaker,

@@ -43,6 +43,9 @@ const RULES: readonly Rule[] = [
       'this content isn’t available, try again later',
       'rate-limited',
       'rate limited',
+      // Module 12 sites (TikTok, Instagram).
+      'ip address is blocked',
+      'your ip address has been blocked',
     ],
   },
   {
@@ -79,6 +82,16 @@ const RULES: readonly Rule[] = [
       'unauthorized_entitlements',
       'you must be logged in',
       'login required',
+      // Module 12 sites: anything behind a login, a password or an adult gate is private.
+      'protected by a password',
+      'video-password',
+      'passcode',
+      'requires authentication',
+      'nsfw',
+      'over 18',
+      'log in to',
+      'logged-in',
+      'this content is not available to you',
     ],
   },
   {
@@ -99,6 +112,14 @@ const RULES: readonly Rule[] = [
       'has been removed',
       'http error 404',
       'http error 410',
+      // Module 12 sites.
+      'no video could be found in this tweet',
+      'this tweet is unavailable',
+      'post is unavailable',
+      'recording has expired',
+      'content has been deleted',
+      'video not available',
+      'the requested file was not found',
     ],
   },
 ];

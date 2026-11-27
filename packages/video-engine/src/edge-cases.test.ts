@@ -15,8 +15,9 @@ import {
 /** The story's row, then the sentence it promises, then the code that carries it. */
 const STORY_ROWS: ReadonlyArray<[string, string, keyof typeof CLIP_ERROR_MESSAGES]> = [
   [
-    'The link is not YouTube, Twitch or Kick',
-    'We can only read YouTube, Twitch and Kick links for now. You can upload the file instead.',
+    // Module 12: more sites, so the sentence no longer names them.
+    'The link is from a site we do not read',
+    'We cannot read links from this site yet. You can upload the file instead.',
     'link_unsupported',
   ],
   [

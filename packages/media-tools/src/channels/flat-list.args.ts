@@ -7,7 +7,7 @@
  * import probe and the download keep refusing lists (Module 03, section 5).
  * One extractor per call, chosen by platform and list, never by the page.
  */
-import type { ClipPlatformId, ListKind, ListPeriod, ListSort } from '@postgear/video-engine';
+import type { ChannelPlatformId, ListKind, ListPeriod, ListSort } from '@postgear/video-engine';
 import {
   YTDLP_SOCKET_TIMEOUT_SEC,
   type YtDlpConfig,
@@ -18,7 +18,7 @@ import { ChannelListerError } from './types';
 
 /** The one listing extractor for each platform's list. */
 export const LISTING_EXTRACTORS: Readonly<
-  Record<ClipPlatformId, Partial<Record<ListKind, string>>>
+  Record<ChannelPlatformId, Partial<Record<ListKind, string>>>
 > = Object.freeze({
   twitch: Object.freeze({ streams: 'twitch:videos', clips: 'twitch:videos:clips' }),
   kick: Object.freeze({ streams: 'kick:videos', clips: 'kick:clips' }),
@@ -51,7 +51,7 @@ const TWITCH_CLIP_RANGE: Readonly<Record<ListPeriod, string>> = Object.freeze({
  * encoded although it was checked, so nothing in it can change the address.
  */
 export function channelPageUrl(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   key: string,
   kind: ListKind,
   options: { sort?: ListSort; period?: ListPeriod } = {},
@@ -93,7 +93,7 @@ export function channelPageUrl(
 }
 
 export interface FlatListArgsInput {
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   /** A Twitch login, Kick slug, YouTube handle or channel id. */
   key: string;
   kind: ListKind;

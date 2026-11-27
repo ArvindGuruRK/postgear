@@ -1,0 +1,60 @@
+{
+  "_type": "video",
+  "id": "7300000000000000001",
+  "extractor": "TikTok",
+  "extractor_key": "TikTok",
+  "webpage_url": "https://www.tiktok.com/@postgearsamples/video/7300000000000000001",
+  "title": "PostGear Sample: A Talk On TikTok",
+  "uploader": "postgearsamples",
+  "channel": "postgearsamples",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/tiktok/7300000000000000001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/tiktok/7300000000000000001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "download",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "h264",
+      "acodec": "aac",
+      "height": 1024,
+      "width": 576,
+      "tbr": 1400,
+      "url": "https://media.sim.invalid/download.mp4"
+    },
+    {
+      "format_id": "bytevc1_1080p_1",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "h265",
+      "acodec": "aac",
+      "height": 1920,
+      "width": 1080,
+      "tbr": 2600,
+      "url": "https://media.sim.invalid/bytevc1_1080p_1.mp4"
+    },
+    {
+      "format_id": "h264_540p_1",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "h264",
+      "acodec": "aac",
+      "height": 1024,
+      "width": 576,
+      "tbr": 1200,
+      "url": "https://media.sim.invalid/h264_540p_1.mp4"
+    }
+  ]
+}

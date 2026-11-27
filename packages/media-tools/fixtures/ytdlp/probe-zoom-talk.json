@@ -1,0 +1,36 @@
+{
+  "_type": "video",
+  "id": "SimZoomRecording0001",
+  "extractor": "zoom",
+  "extractor_key": "Zoom",
+  "webpage_url": "https://zoom.us/rec/share/SimZoomRecording0001",
+  "title": "PostGear Sample: A Zoom Recording",
+  "timestamp": 1767225600,
+  "duration": 180,
+  "is_live": false,
+  "was_live": false,
+  "live_status": "not_live",
+  "availability": "public",
+  "age_limit": 0,
+  "thumbnail": "https://img.sim.invalid/zoom/SimZoomRecording0001.jpg",
+  "thumbnails": [
+    {
+      "url": "https://img.sim.invalid/zoom/SimZoomRecording0001.jpg",
+      "width": 1280,
+      "height": 720
+    }
+  ],
+  "formats": [
+    {
+      "format_id": "view",
+      "ext": "mp4",
+      "protocol": "https",
+      "vcodec": "avc1.64001F",
+      "acodec": "mp4a.40.2",
+      "height": 720,
+      "width": 1280,
+      "tbr": 1200,
+      "url": "https://media.sim.invalid/view.mp4"
+    }
+  ]
+}

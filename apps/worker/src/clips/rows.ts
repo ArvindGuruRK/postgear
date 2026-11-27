@@ -22,6 +22,7 @@ import {
   prisma,
 } from '@postgear/db';
 import type { ClipJobKindName } from '@postgear/scheduling';
+import type { ClipPlatformId } from '@postgear/video-engine';
 import { storedRange, withoutKept } from './highlights/kept';
 import type { ClipNotificationRow } from './notifications';
 
@@ -127,7 +128,7 @@ export interface HighlightRunRow {
 
 /** Where a video came from, for the chat step (Module 16). */
 export interface VideoLinkRow {
-  platform: 'youtube' | 'twitch' | 'kick' | 'upload';
+  platform: ClipPlatformId | 'upload';
   kind: 'video' | 'past_stream' | 'clip' | 'short' | 'upload';
   externalId: string | null;
   /** The light copy's size, for a new clip's framing; null before the import read it. */
@@ -270,6 +271,15 @@ export interface ClipRows {
   deleteAssets(organizationId: string, ids: string[]): Promise<void>;
   /** The storage gauge: `SUM(ClipAsset.bytes)` over the workspace's live videos and clips. */
   storageUsedBytes(organizationId: string): Promise<number>;
+  /**
+   * Module 12: the Drive file is stored (or the job ended), so the access
+   * token is wiped from the job's input and its ORIGINAL row gets its size.
+   */
+  driveFetched(
+    organizationId: string,
+    jobId: string,
+    original: { key: string; bytes: number } | null,
+  ): Promise<void>;
   /** QUEUED or RUNNING jobs of this kind for a clip. */
   openClipJobs(organizationId: string, clipId: string, kind: ClipJobKindName): Promise<number>;
   /** True when a live Media row of the workspace points at this public key. */
@@ -409,6 +419,30 @@ export const prismaClipRows: ClipRows = {
   async deleteAssets(organizationId, ids) {
     if (ids.length === 0) return;
     await prisma.clipAsset.deleteMany({ where: { organizationId, id: { in: ids } } });
+  },
+
+  async driveFetched(organizationId, jobId, original) {
+    const job = await prisma.clipJob.findFirst({
+      where: { id: jobId, organizationId },
+      select: { input: true, videoId: true },
+    });
+    const input = job?.input as { origin?: { drive?: { token?: string | null } } } | null;
+    if (input?.origin?.drive && input.origin.drive.token !== null) {
+      const wiped = {
+        ...input,
+        origin: { ...input.origin, drive: { ...input.origin.drive, token: null } },
+      };
+      await prisma.clipJob.updateMany({
+        where: { id: jobId, organizationId },
+        data: { input: wiped as Prisma.InputJsonValue },
+      });
+    }
+    if (original && job?.videoId) {
+      await prisma.clipAsset.updateMany({
+        where: { organizationId, videoId: job.videoId, kind: 'ORIGINAL', key: original.key },
+        data: { bytes: BigInt(original.bytes) },
+      });
+    }
   },
 
   async storageUsedBytes(organizationId) {

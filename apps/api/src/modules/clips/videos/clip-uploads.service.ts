@@ -24,7 +24,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { type ClipAsset, ClipAssetKind, type Prisma } from '@postgear/db';
+import { type ClipAsset, ClipAssetKind, encrypt, type Prisma } from '@postgear/db';
+import { DriveError, type DriveFileFacts } from '@postgear/media-tools/drive';
 import {
   type ClipExtension,
   clipKeys,
@@ -43,11 +44,13 @@ import type { ClipJobView } from '../jobs/clip-job-view';
 import { ClipJobsRepository } from '../jobs/clip-jobs.repository';
 import { ClipJobsService } from '../jobs/clip-jobs.service';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipDrive } from './clip-drive';
 import { CLIP_RIGHTS_TEXT_VERSION } from './clip-rights';
 import type { ClipVideoView } from './clip-video-view';
 import { ClipVideosRepository, type UploadBinding } from './clip-videos.repository';
 import {
   type CompleteUploadInput,
+  type DriveImportInput,
   type SignPartsInput,
   type StartUploadInput,
   UPLOAD_ID_PATTERN,
@@ -101,7 +104,105 @@ export class ClipUploadsService {
     private readonly jobsRepository: ClipJobsRepository,
     private readonly limits: ClipLimitsGuard,
     @Inject(PRIVATE_STORAGE) private readonly storage: PrivateStorage,
+    private readonly drive: ClipDrive,
   ) {}
+
+  /**
+   * Module 12 (D13-09): a file picked in Google Drive. Its facts (name, type,
+   * size) are read first so the upload rules apply before any row exists;
+   * then the video, its ORIGINAL row and the IMPORT job are made together.
+   * The worker fetches the bytes into the ORIGINAL, wipes the token and
+   * carries on as any upload (charged the same way, once its length is known).
+   * The token is stored encrypted in the job input only, and never logged.
+   */
+  async startFromDrive(
+    orgId: string,
+    userId: string,
+    body: DriveImportInput,
+  ): Promise<{ video: ClipVideoView; job: ClipJobView | null }> {
+    const files = this.drive.files;
+    if (!files) throw new NotFoundException();
+
+    let facts: DriveFileFacts;
+    try {
+      facts = await files.facts(body.fileId, body.accessToken);
+    } catch (error) {
+      if (error instanceof DriveError) {
+        const status =
+          error.code === 'link_not_found'
+            ? HttpStatus.NOT_FOUND
+            : error.code === 'tool_failed'
+              ? HttpStatus.BAD_GATEWAY
+              : HttpStatus.UNPROCESSABLE_ENTITY;
+        throw new ClipErrorException(status, error.code);
+      }
+      throw error;
+    }
+    const extension = UPLOAD_TYPES[facts.mimeType.toLowerCase()];
+    if (!extension) {
+      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'upload_not_video');
+    }
+    await this.limits.checkUploadStart(orgId, facts.bytes);
+
+    const videoId = randomUUID();
+    const key = clipKeys.videoFile(orgId, videoId, ClipAssetKind.ORIGINAL, extension);
+    const limits = await this.limits.importLimits(orgId);
+    const jobRow = await this.jobs.build({
+      id: this.jobs.newJobId(),
+      orgId,
+      userId,
+      kind: 'IMPORT',
+      videoId,
+      input: {
+        videoId,
+        origin: {
+          type: 'upload',
+          originalKey: key,
+          drive: { fileId: body.fileId, token: encrypt(body.accessToken) },
+        },
+        limits,
+        expectedBytes: facts.bytes,
+      },
+    });
+
+    const now = new Date();
+    const job = await serializable(async (tx) => {
+      await tx.clipVideo.create({
+        data: {
+          id: videoId,
+          organizationId: orgId,
+          platform: 'UPLOAD',
+          kind: 'UPLOAD',
+          title: titleFromFileName(facts.name),
+          // Picking the file is the person's own act, as an upload is.
+          rightsConfirmedAt: now,
+          rightsConfirmedById: userId,
+          rightsTextVersion: CLIP_RIGHTS_TEXT_VERSION,
+          createdById: userId,
+        },
+      });
+      await tx.clipAsset.create({
+        data: {
+          organizationId: orgId,
+          videoId,
+          kind: ClipAssetKind.ORIGINAL,
+          key,
+          bytes: 0n,
+          mimeType: contentTypeForClipKey(key),
+          meta: { source: 'drive', declaredBytes: facts.bytes } as Prisma.InputJsonValue,
+        },
+      });
+      return this.jobsRepository.create(jobRow, tx);
+    });
+    this.logger.log(
+      JSON.stringify({ event: 'clips.drive.import', videoId, jobId: job.id, bytes: facts.bytes }),
+    );
+
+    await this.jobs.start(job);
+    const card = await this.repository.findCard(orgId, videoId);
+    if (!card) throw uploadNotFound();
+    return this.videos.cardView(card);
+  }
 
   async start(orgId: string, userId: string, body: StartUploadInput): Promise<UploadStarted> {
     const extension = UPLOAD_TYPES[body.mimeType.toLowerCase()];

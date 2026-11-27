@@ -48,10 +48,10 @@ import type { ClipInternalClient } from './internal-client';
 import { storedJobError } from './job-progress';
 import {
   allImportKeys,
+  allWatchKeys,
   exportMediaKeys,
   facesFileKey,
   heardFileKey,
-  allWatchKeys,
   highlightsSignalsKey,
   segmentKey,
   speechKeys,
@@ -63,6 +63,8 @@ import type { ClipRows, JobRow } from './rows';
 export const DELETE_ORIGINAL_ON: ReadonlySet<string> = new Set([
   'clips_minutes_used',
   'upload_not_video',
+  // Module 12: a Drive file that could not be fetched leaves nothing worth keeping.
+  'drive_not_connected',
 ]);
 
 export interface OutcomeDeps {
@@ -170,6 +172,10 @@ export async function failJob(deps: OutcomeDeps, failure: JobFailure): Promise<b
         if (input?.origin.type === 'upload' && DELETE_ORIGINAL_ON.has(failure.code)) {
           await deleteOriginal(deps, org, videoId, input.origin.originalKey, job.id);
         }
+      }
+      // Module 12: a Drive import's access token never outlives its job.
+      if (input?.origin.type === 'upload' && input.origin.drive) {
+        await deps.rows.driveFetched(org, job.id, null).catch(() => undefined);
       }
       const video = videoId ? await deps.rows.video(org, videoId) : null;
       const closed = await deps.rows.closeJob({
@@ -281,6 +287,10 @@ export async function cancelJob(deps: OutcomeDeps, ref: ClipJobWorkflowInput): P
       if (videoId) {
         // Everything under the video goes, the ORIGINAL of an upload included.
         await deps.privateStorage.deletePrefix(clipKeys.videoPrefix(org, videoId));
+      }
+      // Module 12: a Drive import's access token never outlives its job.
+      if (input?.origin.type === 'upload' && input.origin.drive) {
+        await deps.rows.driveFetched(org, job.id, null).catch(() => undefined);
       }
       const closed = await deps.rows.closeJob({
         jobId: job.id,

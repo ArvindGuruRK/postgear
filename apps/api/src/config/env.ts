@@ -10,7 +10,7 @@
  * validates request bodies in `common/pipes/zod-validation.pipe.ts`: one
  * validation vocabulary across the app.
  */
-import { CLIP_PLATFORMS, recogniseLink } from '@postgear/video-engine';
+import { CLIP_PLATFORMS, DEFAULT_ON_SITES, recogniseLink, siteById } from '@postgear/video-engine';
 import { z } from 'zod';
 
 /**
@@ -111,6 +111,15 @@ const envSchema = z
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     FACEBOOK_CLIENT_ID: z.string().optional(),
     FACEBOOK_CLIENT_SECRET: z.string().optional(),
+    // Sprint 13 Module 12 (D13-09): Google Drive as a Clips source. The
+    // Picker's browser API key and the Google Cloud project number; with the
+    // login's GOOGLE_CLIENT_ID they offer the Google Drive button. Unset:
+    // no button (simulation shows a fake picker instead).
+    GOOGLE_DRIVE_PICKER_KEY: z.string().optional(),
+    GOOGLE_DRIVE_APP_ID: z
+      .string()
+      .regex(/^\d{6,20}$/)
+      .optional(),
 
     // Social *channel* credentials (Sprint 3). All optional, on the same
     // reasoning as the login providers above: a developer with no platform apps
@@ -408,9 +417,14 @@ const envSchema = z
     // its own program, D13-06). Off, the voice route answers 503 `voice_off`
     // and the editor hides the row.
     CLIPS_TTS: blankAsUnset(z.enum(['true', 'false']).default('false')),
-    // Which platforms may be imported from and browsed. YouTube is switched on
-    // in production only after the legal read (D12-15): one value to change.
-    CLIPS_PLATFORMS: blankAsUnset(commaList(z.enum(CLIP_PLATFORMS)).default('youtube,twitch,kick')),
+    // Which sites may be imported from and browsed (any id of the sites table,
+    // Module 12). The default is every site that is on by default (D13-08):
+    // Sprint 12's three plus nine new ones; TikTok, Instagram, Zoom, Dropbox
+    // and Threads are built but off. YouTube is switched on in production only
+    // after the legal read (D12-15): drop it from the list.
+    CLIPS_PLATFORMS: blankAsUnset(
+      commaList(z.enum(CLIP_PLATFORMS)).default(DEFAULT_ON_SITES.join(',')),
+    ),
     // Signs the private file links (`/clips/files/<token>`) of the local
     // storage binding. Optional in development (a fixed development key is
     // used), required in production below.
@@ -584,6 +598,19 @@ const envSchema = z
         path: ['MEDIA_INTERNAL_TOKEN'],
         message: 'MEDIA_INTERNAL_TOKEN is required when NODE_ENV=production',
       });
+    }
+
+    // Module 12: a site with no yt-dlp extractor (Threads, D13-08) answers only
+    // from its recorded fixture, so it may be switched on under simulation only.
+    if (env.CLIPS_SIMULATION !== 'true') {
+      const unreadable = env.CLIPS_PLATFORMS.filter((id) => siteById(id)?.extractors.length === 0);
+      if (unreadable.length > 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CLIPS_PLATFORMS'],
+          message: `CLIPS_PLATFORMS lists ${unreadable.join(', ')}, which yt-dlp cannot read yet (allowed only with CLIPS_SIMULATION=true)`,
+        });
+      }
     }
 
     if (env.NODE_ENV === 'production' && env.CLIPS_SIMULATION === 'true') {

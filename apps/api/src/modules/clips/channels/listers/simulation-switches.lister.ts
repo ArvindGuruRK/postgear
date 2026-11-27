@@ -20,7 +20,7 @@ import {
   type ChannelListQuery,
   type ChannelPage,
   type ChannelRef,
-  type ClipPlatformId,
+  type ChannelPlatformId,
 } from '@postgear/video-engine';
 import { ListingFailure } from './listing-failure';
 
@@ -43,7 +43,7 @@ const DISPLAY_NAMES: Readonly<Record<SimulationChannelName, string>> = {
 
 /** The channel a forcing name stands for on `platform`, or null when it is not one there. */
 export function simulationChannel(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   handleOrId: string,
 ): { name: SimulationChannelName; ref: ChannelRef } | null {
   const bare = handleOrId.trim().replace(/^@/, '').toLowerCase();
@@ -55,7 +55,7 @@ export function simulationChannel(
   return null;
 }
 
-function refFor(platform: ClipPlatformId, name: SimulationChannelName): ChannelRef {
+function refFor(platform: ChannelPlatformId, name: SimulationChannelName): ChannelRef {
   const displayName = DISPLAY_NAMES[name];
   if (platform === 'youtube') {
     const tail = name.padEnd(22, '0');
@@ -87,7 +87,7 @@ export function withSimulationSwitches(inner: ChannelLister): ChannelLister {
 }
 
 class SimulationSwitchesLister implements ChannelLister {
-  readonly platform: ClipPlatformId;
+  readonly platform: ChannelPlatformId;
   /** `simflaky`'s list kinds that have answered once in this process. */
   private readonly answered = new Set<string>();
 

@@ -20,6 +20,7 @@ import type { ClipJob } from '@postgear/db';
 import {
   CLIP_ERROR_MESSAGES,
   CLIP_JOB_STAGES,
+  CHANNEL_PLATFORMS,
   CLIP_PLATFORMS,
   clipErrorMessage,
   jobLabel,
@@ -263,8 +264,8 @@ describe('Clips security: Messages', () => {
       ...CLIP_PLATFORMS.flatMap((platform) => [
         platformRestingMessage(platform),
         platformPausedMessage(platform),
-        sortUnsupportedMessage(platform),
       ]),
+      ...CHANNEL_PLATFORMS.map((platform) => sortUnsupportedMessage(platform)),
       mediaTooBigSentence(412 * 1024 * 1024, 250 * 1024 * 1024),
     ];
 

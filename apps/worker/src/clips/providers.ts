@@ -21,13 +21,16 @@
 import {
   type ChannelLister,
   type ChatSource,
+  createDriveFiles,
   createFixtureDownloader,
   createSignalProducers,
-  createTwitchChatSource,
   createSimulatedChannelLister,
+  createSimulatedDriveFiles,
+  createTwitchChatSource,
   createYtDlpDownloader,
   createYtDlpFlatLister,
   type Downloader,
+  type DriveFiles,
   defaultSamplesDir,
   type RunTool,
   recordedChatSource,
@@ -35,7 +38,7 @@ import {
   type ToolPaths,
   ytDlpConfigFromEnv,
 } from '@postgear/media-tools';
-import type { ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPlatformId } from '@postgear/video-engine';
 import type { WorkerEnv } from '../config/env';
 import { clipsSimulated } from './config';
 
@@ -50,7 +53,9 @@ export class ProviderNotReadyError extends Error {
 export interface ClipProviders {
   readonly simulated: boolean;
   downloader: Downloader;
-  channelLister(platform: ClipPlatformId): ChannelLister;
+  /** Module 12: Google Drive files picked in Google's picker (simulated under CLIPS_SIMULATION). */
+  drive: DriveFiles;
+  channelLister(platform: ChannelPlatformId): ChannelLister;
   /** Module 16: loudness, scenes and chat. */
   signalProducers: SignalProducers;
   /** Module 12: stickers and GIFs. */
@@ -73,8 +78,12 @@ export function createClipProviders(options: ClipProviderOptions): ClipProviders
     ? createFixtureDownloader({ samplesDir: defaultSamplesDir(), runTool })
     : createYtDlpDownloader({ ...ytDlp, paths, runTool, scratchDir: scratchRoot });
 
-  const listers = new Map<ClipPlatformId, ChannelLister>();
-  const channelLister = (platform: ClipPlatformId): ChannelLister => {
+  const drive = simulated
+    ? createSimulatedDriveFiles({ samplesDir: defaultSamplesDir() })
+    : createDriveFiles();
+
+  const listers = new Map<ChannelPlatformId, ChannelLister>();
+  const channelLister = (platform: ChannelPlatformId): ChannelLister => {
     let lister = listers.get(platform);
     if (!lister) {
       lister = simulated
@@ -100,6 +109,7 @@ export function createClipProviders(options: ClipProviderOptions): ClipProviders
   return {
     simulated,
     downloader,
+    drive,
     channelLister,
     signalProducers: createSignalProducers({ runTool, chat }),
     stickerProvider: () => {

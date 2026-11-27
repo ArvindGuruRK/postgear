@@ -245,7 +245,8 @@ const REFUSED: [string, LinkRefusalCode][] = [
   ['https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw/live', 'link_live'],
   ['https://player.twitch.tv/?channel=vikram&parent=example.com', 'link_live'],
   // Other sites, schemes and look-alikes.
-  ['https://vimeo.com/123456789', 'link_unsupported'],
+  // Module 12 reads Vimeo; another site we do not read stands in for it.
+  ['https://www.bilibili.com/video/BV1xx411c7mD', 'link_unsupported'],
   [`http://www.youtube.com/watch?v=${YT}`, 'link_unsupported'],
   [`ftp://www.youtube.com/watch?v=${YT}`, 'link_unsupported'],
   ['javascript:alert(1)', 'link_unsupported'],

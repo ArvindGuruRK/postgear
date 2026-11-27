@@ -10,11 +10,33 @@
  * (Module 20) answer the probe and then fail one kind of fetch
  * (`fetchErrors`), to force a state a hand check could not reach otherwise.
  */
-import type { ClipPlatformId, LinkRef } from '@postgear/video-engine';
+import {
+  CLIP_PLATFORMS,
+  type ChannelPlatformId,
+  isChannelPlatform,
+  type LinkRef,
+} from '@postgear/video-engine';
 import { z } from 'zod';
 import kickStream from '../../fixtures/ytdlp/probe-kick-stream.json';
 import twitchStream from '../../fixtures/ytdlp/probe-twitch-stream.json';
 import youtubeTalk from '../../fixtures/ytdlp/probe-youtube-talk.json';
+// Module 12: one recorded probe per new site, plus a post with two videos and a gallery.
+import vimeoTalk from '../../fixtures/ytdlp/probe-vimeo-talk.json';
+import rumbleTalk from '../../fixtures/ytdlp/probe-rumble-talk.json';
+import dailymotionTalk from '../../fixtures/ytdlp/probe-dailymotion-talk.json';
+import loomTalk from '../../fixtures/ytdlp/probe-loom-talk.json';
+import xTalk from '../../fixtures/ytdlp/probe-x-talk.json';
+import xTwoVideos from '../../fixtures/ytdlp/probe-x-two-videos.json';
+import facebookTalk from '../../fixtures/ytdlp/probe-facebook-talk.json';
+import linkedinTalk from '../../fixtures/ytdlp/probe-linkedin-talk.json';
+import redditTalk from '../../fixtures/ytdlp/probe-reddit-talk.json';
+import redditGallery from '../../fixtures/ytdlp/probe-reddit-gallery.json';
+import pinterestTalk from '../../fixtures/ytdlp/probe-pinterest-talk.json';
+import threadsTalk from '../../fixtures/ytdlp/probe-threads-talk.json';
+import zoomTalk from '../../fixtures/ytdlp/probe-zoom-talk.json';
+import tiktokTalk from '../../fixtures/ytdlp/probe-tiktok-talk.json';
+import instagramTalk from '../../fixtures/ytdlp/probe-instagram-talk.json';
+import dropboxTalk from '../../fixtures/ytdlp/probe-dropbox-talk.json';
 import linksJson from '../../fixtures/simulation/links.json';
 import { findSimulatedItem, type SimulatedItem } from '../channels/simulation-fixture';
 import { SAMPLE_NAMES, type SampleName, sampleDurationMs } from './samples';
@@ -24,6 +46,22 @@ const PROBES: Readonly<Record<string, unknown>> = Object.freeze({
   'youtube-talk': youtubeTalk,
   'twitch-stream': twitchStream,
   'kick-stream': kickStream,
+  'vimeo-talk': vimeoTalk,
+  'rumble-talk': rumbleTalk,
+  'dailymotion-talk': dailymotionTalk,
+  'loom-talk': loomTalk,
+  'x-talk': xTalk,
+  'x-two-videos': xTwoVideos,
+  'facebook-talk': facebookTalk,
+  'linkedin-talk': linkedinTalk,
+  'reddit-talk': redditTalk,
+  'reddit-gallery': redditGallery,
+  'pinterest-talk': pinterestTalk,
+  'threads-talk': threadsTalk,
+  'zoom-talk': zoomTalk,
+  'tiktok-talk': tiktokTalk,
+  'instagram-talk': instagramTalk,
+  'dropbox-talk': dropboxTalk,
 });
 
 /**
@@ -43,7 +81,7 @@ const fetchErrorsSchema = z
 export type SimulationFetchErrors = z.infer<typeof fetchErrorsSchema>;
 
 const linkEntrySchema = z.object({
-  platform: z.enum(['youtube', 'twitch', 'kick']),
+  platform: z.enum(CLIP_PLATFORMS),
   externalId: z.string().min(1),
   url: z.string().url(),
   probe: z.string().optional(),
@@ -51,6 +89,8 @@ const linkEntrySchema = z.object({
   stderr: z.string().optional(),
   overrides: z.record(z.unknown()).optional(),
   fetchErrors: fetchErrorsSchema.optional(),
+  /** Module 12: a recorded probe that is refused on purpose (two videos, a gallery, an adult gate). Tests read it. */
+  refuses: z.enum(['link_many_videos', 'link_private']).optional(),
 });
 
 const linksSchema = z.object({
@@ -106,7 +146,7 @@ function fromEntry(entry: SimulationLinkEntry): SimulationAnswer {
 }
 
 /** The sample and base probe a listed item of the simulated channel imports from. */
-function fromChannelItem(platform: ClipPlatformId, item: SimulatedItem): SimulationAnswer {
+function fromChannelItem(platform: ChannelPlatformId, item: SimulatedItem): SimulationAnswer {
   const talk = platform === 'youtube' && (item.kind === 'upload' || item.kind === 'short');
   const sample: SampleName = talk ? 'talk' : 'stream';
   const base =
@@ -162,6 +202,8 @@ export function resolveSimulationLink(link: LinkRef): SimulationAnswer | null {
     (candidate) => candidate.platform === link.platform && candidate.externalId === link.externalId,
   );
   if (entry) return fromEntry(entry);
+  // Only Sprint 12's three sites have channels (My Channels).
+  if (!isChannelPlatform(link.platform)) return null;
   const item = findSimulatedItem(link.platform, link.externalId);
   if (item) return fromChannelItem(link.platform, item);
   return null;

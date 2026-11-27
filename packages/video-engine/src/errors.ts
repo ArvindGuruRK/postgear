@@ -12,8 +12,11 @@
 import { type ClipPlatformId, PLATFORM_NAMES } from './links/types';
 
 export const CLIP_ERROR_MESSAGES = {
-  link_unsupported:
-    'We can only read YouTube, Twitch and Kick links for now. You can upload the file instead.',
+  // Module 12: the list of sites grew, so the sentence no longer names them (the link box does).
+  link_unsupported: 'We cannot read links from this site yet. You can upload the file instead.',
+  link_many_videos: 'This post has more than one video. Paste a link to a post with just one.',
+  link_upload_only: 'Links from this site cannot be read. Download the recording and upload it instead.',
+  drive_not_connected: 'Google Drive did not let us read this file. Pick it again from Google Drive.',
   link_not_a_video: 'This link is a channel or a list. Paste the link of one video.',
   link_private: 'This video is private or needs a login, so we cannot read it.',
   link_live: 'This stream is still live. Come back when it has ended.',
@@ -148,6 +151,11 @@ export function platformPausedMessage(platform: ClipPlatformId): string {
   return `${PLATFORM_NAMES[platform]} links are paused for now. You can upload the file instead.`;
 }
 
+/** "Riverside links cannot be read..." (Module 12: a site with no extractor at all). */
+export function uploadOnlyMessage(site: string): string {
+  return `${site} links cannot be read. Download the recording and upload it instead.`;
+}
+
 /** The sentence for a code. Platform sentences need the platform; anything unknown reads as a plain failure. */
 export function clipErrorMessage(code: string, platform?: ClipPlatformId): string {
   if (code === 'platform_resting' && platform) {
@@ -174,6 +182,9 @@ export const NON_RETRYABLE_CLIP_CODES: readonly string[] = [
   'link_live',
   'link_unsupported',
   'link_not_a_video',
+  'link_many_videos',
+  'link_upload_only',
+  'drive_not_connected',
   'upload_not_video',
   'clip_range_invalid',
   'clips_video_too_long',

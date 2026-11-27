@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import type { Readable } from 'node:stream';
 import type { Downloader, MediaFacts } from '@postgear/media-tools';
 import { type PrivateStorage, StorageNotFoundError } from '@postgear/storage';
+import { storedRange, withoutKept } from '../highlights/kept';
 import type { ImportTools } from '../import/import.tools';
 import type { ClipNotificationRow } from '../notifications';
 import type {
@@ -17,12 +18,12 @@ import type {
   ClipRow,
   ClipRows,
   CloseJobArgs,
-  FinishHighlightsArgs,
   FinishDownloadArgs,
+  FinishFacesArgs,
+  FinishHighlightsArgs,
   FinishHighlightsResult,
   FinishImportArgs,
   FinishSegmentArgs,
-  FinishFacesArgs,
   FinishSpeechArgs,
   FinishTranscribeArgs,
   FinishTranscribeResult,
@@ -33,7 +34,6 @@ import type {
   VideoLinkRow,
   VideoRow,
 } from '../rows';
-import { storedRange, withoutKept } from '../highlights/kept';
 
 /** A clip as the fake keeps it (Module 16 reads origin, status and the replace rule). */
 export interface FakeClip extends ClipRow {
@@ -127,6 +127,11 @@ export class FakeRows implements ClipRows {
   }
   async deleteAssets(_org: string, ids: string[]) {
     this.assets = this.assets.filter((asset) => !ids.includes(asset.id));
+  }
+  /** Module 12: what the import told the rows after a Drive fetch. */
+  driveCalls: Array<{ jobId: string; original: { key: string; bytes: number } | null }> = [];
+  async driveFetched(_org: string, jobId: string, original: { key: string; bytes: number } | null) {
+    this.driveCalls.push({ jobId, original });
   }
   async storageUsedBytes() {
     return (
@@ -442,7 +447,8 @@ export class FakeRows implements ClipRows {
 
 /** The private space in memory. `failPutAt` makes the Nth `putFile` (1-based) throw. */
 export class FakePrivateStorage
-  implements Pick<PrivateStorage, 'put' | 'putFile' | 'getToFile' | 'delete' | 'deletePrefix'>
+  implements
+    Pick<PrivateStorage, 'put' | 'putFile' | 'getToFile' | 'delete' | 'deletePrefix' | 'exists'>
 {
   objects = new Map<string, Buffer>();
   deleted: string[] = [];
@@ -465,6 +471,9 @@ export class FakePrivateStorage
     this.objects.set(key, body);
     this.onPut?.(key);
     return { key, bytes: body.length };
+  }
+  async exists(key: string) {
+    return this.objects.has(key);
   }
   async getToFile(key: string, filePath: string) {
     const body = this.objects.get(key);

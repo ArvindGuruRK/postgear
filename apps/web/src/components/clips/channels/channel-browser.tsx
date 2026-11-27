@@ -62,7 +62,7 @@ import {
   toast,
 } from '@postgear/ui';
 import {
-  type ClipPlatformId,
+  type ChannelPlatformId,
   type ListKind,
   type ListPeriod,
   type ListSort,
@@ -164,7 +164,7 @@ export function ChannelBrowser({
 }: {
   orgId: string;
   /** The platforms switched on, from `GET /clips/status`. */
-  platforms: readonly ClipPlatformId[];
+  platforms: readonly ChannelPlatformId[];
   /** The video tools are not running: browsing works, Import does not. */
   disabled?: boolean;
   /** The Browse dialog: platform tabs above the chips. */
@@ -173,7 +173,7 @@ export function ChannelBrowser({
    * Browse Twitch, Browse Kick (2026-11-19): one platform only, no platform
    * tabs, and Add A Channel set to it.
    */
-  only?: ClipPlatformId;
+  only?: ChannelPlatformId;
   /** The page's channels (`useChannels`), shared by the Streams tab and the dialog. */
   channelsState: ChannelsState;
   api?: ChannelBrowserApi;
@@ -186,7 +186,7 @@ export function ChannelBrowser({
     () => orderedPlatforms(platforms).filter((one) => only === undefined || one === only),
     [platforms, only],
   );
-  const [platform, setPlatform] = useState<ClipPlatformId | undefined>(only ?? shownPlatforms[0]);
+  const [platform, setPlatform] = useState<ChannelPlatformId | undefined>(only ?? shownPlatforms[0]);
   const narrowed = platformTabs || only !== undefined;
   const [addOpen, setAddOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -297,7 +297,7 @@ export function ChannelBrowser({
   return (
     <div className="flex flex-col gap-4">
       {platformTabs && shownPlatforms.length > 1 && channels.channels.length > 0 ? (
-        <Tabs value={platform} onValueChange={(value) => setPlatform(value as ClipPlatformId)}>
+        <Tabs value={platform} onValueChange={(value) => setPlatform(value as ChannelPlatformId)}>
           <TabsList aria-label="Platform">
             {shownPlatforms.map((one) => (
               <TabsTrigger key={one} value={one}>
@@ -356,7 +356,7 @@ function NoChannels({
   platforms,
   action,
 }: {
-  platforms: readonly ClipPlatformId[];
+  platforms: readonly ChannelPlatformId[];
   action: React.ReactNode;
 }) {
   return (

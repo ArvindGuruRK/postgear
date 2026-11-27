@@ -27,7 +27,7 @@
  */
 import { ArrowLeftIcon } from '@animateicons/react/lucide/arrow-left-icon';
 import { Alert, Button, EmptyState, MotionIcon, PageActions, toast } from '@postgear/ui';
-import type { ClipPlatformId } from '@postgear/video-engine';
+import { type ChannelPlatformId, isChannelPlatform } from '@postgear/video-engine';
 import { Lock, TriangleAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -47,6 +47,7 @@ import { StorageMeter } from './home/clips-meters';
 import { ComingUp } from './home/coming-up';
 import { CreateTab } from './home/create-tab';
 import { DOWNLOAD_EXISTS, DOWNLOAD_STARTED, DownloadsTab } from './home/downloads-tab';
+import { useDrivePicker } from './home/drive-picker';
 import {
   CLIPS_NOT_IN_PLAN_SENTENCE,
   clipsInPlan,
@@ -60,9 +61,9 @@ import { useOpenWhenReady } from './home/use-open-when-ready';
 import { useVideoUpload } from './home/use-video-upload';
 import { useVideos } from './home/use-videos';
 import { VideosTab, videoCardActions } from './home/videos-tab';
+import { kitHref } from './kit/kit-model';
 import { ClipsTab as ClipsLibraryTab } from './library/clips-tab';
 import { RecentClips } from './library/recent-clips';
-import { kitHref } from './kit/kit-model';
 import { useClipsList } from './library/use-clips-list';
 import { useExportAll } from './library/use-export-all';
 import { useClipsStatus } from './use-clips-status';
@@ -115,7 +116,7 @@ export function ClipsView({
   const videos = useVideos(initialSort);
   const probe = useLinkProbe();
   const openings = useOpenWhenReady(orgId);
-  const [browse, setBrowse] = useState<{ open: boolean; only?: ClipPlatformId }>({
+  const [browse, setBrowse] = useState<{ open: boolean; only?: ChannelPlatformId }>({
     open: initialTab === 'streams',
   });
   // Channels are asked for only once the Browse dialog opens.
@@ -130,6 +131,8 @@ export function ClipsView({
   const toolsOk = status?.tools.state === 'ok';
   const disabled = !toolsOk;
   const platforms = status?.platforms ?? [];
+  // Module 12: only Sprint 12's three sites have channels to browse.
+  const channelPlatforms = useMemo(() => platforms.filter(isChannelPlatform), [platforms]);
 
   /** Opens a list (or the home) from its top, with focus on its name. */
   const setTab = useCallback((next: ClipsView) => {
@@ -235,6 +238,9 @@ export function ClipsView({
     [orgId, probe, refreshStatus, router, videos, openings.follow, setTab],
   );
 
+  // Module 12: Pick From Google Drive (a stand-in picker under simulation).
+  const drivePicker = useDrivePicker(status?.drive, disabled, onImported);
+
   const openFilePicker = () => {
     if (!disabled) fileInput.current?.click();
   };
@@ -280,6 +286,8 @@ export function ClipsView({
   return (
     <div className="flex flex-col gap-5">
       <div ref={top} className="flex flex-wrap items-center justify-between gap-3">
+        {drivePicker.dialog}
+
         {tab === 'create' ? (
           <div />
         ) : (
@@ -366,6 +374,7 @@ export function ClipsView({
           onDownloaded={onDownloaded}
           onUpload={openFilePicker}
           onDropFiles={addFiles}
+          onDrive={drivePicker.onPick}
           onBrowse={platforms.length > 0 ? (only) => setBrowse({ open: true, only }) : undefined}
           onAllVideos={() => setTab('videos')}
           onAllDownloads={() => setTab('downloads')}
@@ -411,7 +420,7 @@ export function ClipsView({
         only={browse.only}
         onOpenChange={(open) => setBrowse((current) => ({ ...current, open }))}
         orgId={orgId}
-        platforms={platforms}
+        platforms={channelPlatforms}
         disabled={disabled}
         channelsState={channels}
         onProbed={showFromChannel}

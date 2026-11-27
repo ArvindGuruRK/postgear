@@ -1,0 +1,145 @@
+{
+  "_type": "playlist",
+  "id": "1900000000000000002",
+  "extractor": "twitter",
+  "extractor_key": "Twitter",
+  "title": "PostGear Samples - Two clips in one post",
+  "entries": [
+    {
+      "_type": "video",
+      "id": "1900000000000000002_1",
+      "extractor": "twitter",
+      "extractor_key": "Twitter",
+      "webpage_url": "https://x.com/i/status/1900000000000000001",
+      "title": "PostGear Samples - A short talk",
+      "uploader": "PostGear Samples",
+      "channel": "PostGear Samples",
+      "timestamp": 1767225600,
+      "duration": 180,
+      "is_live": false,
+      "was_live": false,
+      "live_status": "not_live",
+      "availability": "public",
+      "age_limit": 0,
+      "thumbnail": "https://img.sim.invalid/x/1900000000000000001.jpg",
+      "thumbnails": [
+        {
+          "url": "https://img.sim.invalid/x/1900000000000000001.jpg",
+          "width": 1280,
+          "height": 720
+        }
+      ],
+      "formats": [
+        {
+          "format_id": "hls-audio-128000-Audio",
+          "ext": "mp4",
+          "protocol": "m3u8_native",
+          "vcodec": "none",
+          "acodec": "mp4a.40.2",
+          "url": "https://media.sim.invalid/hls-audio-128000-Audio.m3u8"
+        },
+        {
+          "format_id": "hls-2176",
+          "ext": "mp4",
+          "protocol": "m3u8_native",
+          "vcodec": "avc1.640020",
+          "acodec": "none",
+          "height": 720,
+          "width": 1280,
+          "tbr": 2176,
+          "url": "https://media.sim.invalid/hls-2176.m3u8"
+        },
+        {
+          "format_id": "http-2176",
+          "ext": "mp4",
+          "protocol": "https",
+          "vcodec": "avc1.640020",
+          "acodec": "mp4a.40.2",
+          "height": 720,
+          "width": 1280,
+          "tbr": 2176,
+          "url": "https://media.sim.invalid/http-2176.mp4"
+        },
+        {
+          "format_id": "http-950",
+          "ext": "mp4",
+          "protocol": "https",
+          "vcodec": "avc1.4D401E",
+          "acodec": "mp4a.40.2",
+          "height": 360,
+          "width": 640,
+          "tbr": 950,
+          "url": "https://media.sim.invalid/http-950.mp4"
+        }
+      ]
+    },
+    {
+      "_type": "video",
+      "id": "1900000000000000002_2",
+      "extractor": "twitter",
+      "extractor_key": "Twitter",
+      "webpage_url": "https://x.com/i/status/1900000000000000001",
+      "title": "PostGear Samples - A short talk",
+      "uploader": "PostGear Samples",
+      "channel": "PostGear Samples",
+      "timestamp": 1767225600,
+      "duration": 180,
+      "is_live": false,
+      "was_live": false,
+      "live_status": "not_live",
+      "availability": "public",
+      "age_limit": 0,
+      "thumbnail": "https://img.sim.invalid/x/1900000000000000001.jpg",
+      "thumbnails": [
+        {
+          "url": "https://img.sim.invalid/x/1900000000000000001.jpg",
+          "width": 1280,
+          "height": 720
+        }
+      ],
+      "formats": [
+        {
+          "format_id": "hls-audio-128000-Audio",
+          "ext": "mp4",
+          "protocol": "m3u8_native",
+          "vcodec": "none",
+          "acodec": "mp4a.40.2",
+          "url": "https://media.sim.invalid/hls-audio-128000-Audio.m3u8"
+        },
+        {
+          "format_id": "hls-2176",
+          "ext": "mp4",
+          "protocol": "m3u8_native",
+          "vcodec": "avc1.640020",
+          "acodec": "none",
+          "height": 720,
+          "width": 1280,
+          "tbr": 2176,
+          "url": "https://media.sim.invalid/hls-2176.m3u8"
+        },
+        {
+          "format_id": "http-2176",
+          "ext": "mp4",
+          "protocol": "https",
+          "vcodec": "avc1.640020",
+          "acodec": "mp4a.40.2",
+          "height": 720,
+          "width": 1280,
+          "tbr": 2176,
+          "url": "https://media.sim.invalid/http-2176.mp4"
+        },
+        {
+          "format_id": "http-950",
+          "ext": "mp4",
+          "protocol": "https",
+          "vcodec": "avc1.4D401E",
+          "acodec": "mp4a.40.2",
+          "height": 360,
+          "width": 640,
+          "tbr": 950,
+          "url": "https://media.sim.invalid/http-950.mp4"
+        }
+      ]
+    }
+  ]
+}

@@ -24,7 +24,7 @@
  */
 import {
   type ChatMessageWeight,
-  type ClipPlatformId,
+  type ChannelPlatformId,
   chatTrack,
   type LinkKind,
   type SignalTrack,
@@ -43,7 +43,7 @@ const PAGE_TIMEOUT_MS = 15_000;
 
 /** What the chat step asks for. Only a Twitch past broadcast has a chat we read. */
 export interface ChatRequest {
-  platform: ClipPlatformId | 'upload';
+  platform: ChannelPlatformId | 'upload';
   /** `past_stream` for a past broadcast; clips have no chat replay of their own. */
   kind: LinkKind | 'upload';
   externalId: string | null;

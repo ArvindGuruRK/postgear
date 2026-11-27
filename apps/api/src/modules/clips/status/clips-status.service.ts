@@ -38,6 +38,7 @@ import {
   type AiCostKind,
   type AiCostRate,
   type ClipPlatformId,
+  SITES,
   TRANSCRIPT_LANGUAGES,
 } from '@postgear/video-engine';
 import type { Env } from '../../../config/env';
@@ -46,6 +47,7 @@ import { SchedulingService } from '../../scheduling/scheduling.service';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { gigabytesToBytes } from '../clips.units';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipDrive, type ClipDriveStatus } from '../videos/clip-drive';
 import { ClipSampleLink } from '../videos/clip-sample';
 import { type AiServiceState, MediaServiceProbe } from './media-service.probe';
 import { MediaVoices } from './media-voices.client';
@@ -88,10 +90,27 @@ export interface ClipsMeterView {
   cycleEnd: string;
 }
 
+export interface ClipsStatusSite {
+  id: ClipPlatformId;
+  name: string;
+  on: boolean;
+}
+
 export interface ClipsStatus {
   tools: ClipsToolsState;
   simulation: boolean;
   platforms: ClipPlatformId[];
+  /**
+   * Module 12: every site of the table with its name and whether it is on,
+   * for the link box's help line and tooltip. `platforms` stays the ids that
+   * are on, as before.
+   */
+  sites: ClipsStatusSite[];
+  /**
+   * Module 12 (D13-09): whether the Google Drive button shows, and what the
+   * browser needs for Google's picker (public values by design).
+   */
+  drive: ClipDriveStatus;
   storage: { usedBytes: number; limitBytes: number | null };
   /** Module 04: the plan's Clips values. */
   limits: ClipsStatusLimits;
@@ -167,6 +186,7 @@ export class ClipsStatusService {
     private readonly sample: ClipSampleLink,
     private readonly mediaService: MediaServiceProbe,
     private readonly mediaVoices: MediaVoices,
+    private readonly drive: ClipDrive,
   ) {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
@@ -196,6 +216,12 @@ export class ClipsStatusService {
       tools,
       simulation: this.simulation,
       platforms: this.platforms,
+      drive: this.drive.status(),
+      sites: SITES.map((site) => ({
+        id: site.id,
+        name: site.name,
+        on: this.platforms.includes(site.id),
+      })),
       storage: { usedBytes, limitBytes },
       limits,
       meters: { importMinutes: meterView(importMinutes), aiMinutes: meterView(aiMinutes) },

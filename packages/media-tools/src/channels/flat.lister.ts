@@ -12,7 +12,7 @@
  */
 import { mkdir, mkdtemp } from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ChannelPage, ChannelRef, ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPage, ChannelRef, ChannelPlatformId } from '@postgear/video-engine';
 import { removeDirQuietly } from '../downloader/files';
 import type { YtDlpConfig } from '../downloader/yt-dlp.args';
 import { mapYtDlpError } from '../downloader/yt-dlp.errors';
@@ -41,7 +41,7 @@ export interface FlatListerOptions extends Omit<YtDlpConfig, 'cookiesFile'> {
 
 /** The yt-dlp flat lister for one platform. */
 export function createYtDlpFlatLister(
-  platform: ClipPlatformId,
+  platform: ChannelPlatformId,
   options: FlatListerOptions,
 ): ChannelLister {
   return new YtDlpFlatLister(platform, options);
@@ -71,7 +71,7 @@ export function flatListError(error: unknown): ChannelListerError {
 
 class YtDlpFlatLister implements ChannelLister {
   constructor(
-    readonly platform: ClipPlatformId,
+    readonly platform: ChannelPlatformId,
     private readonly options: FlatListerOptions,
   ) {}
 

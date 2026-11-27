@@ -9,14 +9,15 @@
  * row reads as "no filmstrip", never as a broken page.
  */
 import type { ClipAsset, ClipVideo } from '@postgear/db';
-import type {
-  ClipError,
-  ClipPlatformId,
-  FilmstripMeta,
-  LinkKind,
-  PosterMeta,
-  ProxyMeta,
-  WaveformMeta,
+import {
+  CLIP_PLATFORMS,
+  type ClipError,
+  type ClipPlatformId,
+  type FilmstripMeta,
+  type LinkKind,
+  type PosterMeta,
+  type ProxyMeta,
+  type WaveformMeta,
 } from '@postgear/video-engine';
 import { z } from 'zod';
 import { errorOf } from '../jobs/clip-job-view';
@@ -49,10 +50,12 @@ export interface ClipVideoView {
   createdAt: string;
 }
 
+/** Every site's enum value is its id in upper case (Module 12 widened both together). */
 const PLATFORMS: Record<ClipVideo['platform'], ClipVideoPlatform> = {
-  YOUTUBE: 'youtube',
-  TWITCH: 'twitch',
-  KICK: 'kick',
+  ...(Object.fromEntries(CLIP_PLATFORMS.map((id) => [id.toUpperCase(), id])) as Record<
+    Exclude<ClipVideo['platform'], 'UPLOAD'>,
+    ClipPlatformId
+  >),
   UPLOAD: 'upload',
 };
 
@@ -70,11 +73,9 @@ export function platformOf(platform: ClipVideo['platform']): ClipVideoPlatform {
 }
 
 /** The enum value for a probed link's platform. */
-export const PLATFORM_ENUM: Record<ClipPlatformId, ClipVideo['platform']> = {
-  youtube: 'YOUTUBE',
-  twitch: 'TWITCH',
-  kick: 'KICK',
-};
+export const PLATFORM_ENUM: Record<ClipPlatformId, ClipVideo['platform']> = Object.fromEntries(
+  CLIP_PLATFORMS.map((id) => [id, id.toUpperCase()]),
+) as Record<ClipPlatformId, ClipVideo['platform']>;
 
 /** The enum value for a probed link's kind. */
 export const KIND_ENUM: Record<LinkKind, ClipVideo['kind']> = {

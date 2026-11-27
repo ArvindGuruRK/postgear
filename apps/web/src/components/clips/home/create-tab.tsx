@@ -15,7 +15,7 @@
  * uploads, the video list) is owned by the page and passed in, so leaving the
  * home never cancels an upload or forgets the link card.
  */
-import type { ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPlatformId, ClipPlatformId } from '@postgear/video-engine';
 import { useId } from 'react';
 import { AnalyticsPanel, PanelHeader } from '@/components/analytics/analytics-ui';
 import type { ClipImportOutcome, DownloadStarted } from '@/types/clips';
@@ -53,6 +53,7 @@ export function CreateTab({
   onDownloaded,
   onUpload,
   onDropFiles,
+  onDrive,
   onBrowse,
   onAllVideos,
   onAllDownloads,
@@ -78,7 +79,9 @@ export function CreateTab({
   onDownloaded?: (outcome: DownloadStarted) => void;
   onUpload: () => void;
   onDropFiles: (files: File[]) => void;
-  onBrowse?: (platform: ClipPlatformId) => void;
+  /** Module 12: Pick From Google Drive; absent when Drive is not offered. */
+  onDrive?: () => void;
+  onBrowse?: (platform: ChannelPlatformId) => void;
   onAllVideos: () => void;
   onAllDownloads: () => void;
   onDownloadsSettled: () => void;
@@ -107,6 +110,7 @@ export function CreateTab({
         onDownloaded={onDownloaded}
         onUpload={onUpload}
         onDropFiles={onDropFiles}
+        onDrive={onDrive}
         onBrowse={onBrowse}
       >
         {uploadRows.length + openings.openings.length > 0 ? (

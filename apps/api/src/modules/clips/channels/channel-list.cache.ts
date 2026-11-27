@@ -17,7 +17,7 @@
  *   the channel at once without listing keys.
  */
 import { Logger } from '@nestjs/common';
-import type { ChannelPage, ClipPlatformId } from '@postgear/video-engine';
+import type { ChannelPage, ChannelPlatformId } from '@postgear/video-engine';
 import { RedisService } from '../../redis/redis.service';
 import type { ListingSource } from './channel-lister.selector';
 
@@ -42,7 +42,7 @@ export interface LoadedListPage extends CachedListPage {
 }
 
 export interface ListCacheKeyParts {
-  platform: ClipPlatformId;
+  platform: ChannelPlatformId;
   externalId: string;
   kind: string;
   sort: string;
@@ -63,7 +63,7 @@ export function listCacheKey(parts: ListCacheKeyParts): string {
   ].join(':');
 }
 
-export function channelStampKey(platform: ClipPlatformId, externalId: string): string {
+export function channelStampKey(platform: ChannelPlatformId, externalId: string): string {
   return `clipch:stamp:${platform}:${externalId}`;
 }
 

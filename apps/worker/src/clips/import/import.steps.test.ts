@@ -1,7 +1,13 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { DownloaderError, gunzipSignalsFile, ProbeError } from '@postgear/media-tools';
+import {
+  createSimulatedDriveFiles,
+  DownloaderError,
+  type DriveFiles,
+  gunzipSignalsFile,
+  ProbeError,
+} from '@postgear/media-tools';
 import type { PrivateStorage } from '@postgear/storage';
 import type { ImportInput } from '@postgear/video-engine';
 import { ClipStepError } from '../failures';
@@ -60,7 +66,12 @@ afterEach(async () => {
 
 function setup(
   input: ImportInput,
-  options: { probeError?: Error; facts?: ReturnType<typeof sampleFacts>; fetchError?: Error } = {},
+  options: {
+    probeError?: Error;
+    facts?: ReturnType<typeof sampleFacts>;
+    fetchError?: Error;
+    drive?: DriveFiles;
+  } = {},
 ) {
   const rows = new FakeRows();
   rows.jobs.set(JOB_ID, jobRow({ input }));
@@ -83,6 +94,8 @@ function setup(
     signal: controller.signal,
     tools,
     downloader,
+    drive: options.drive ?? createSimulatedDriveFiles({ samplesDir: dir }),
+    openToken: (sealed) => sealed.replace(/^sealed:/, ''),
     privateStorage: storage as unknown as PrivateStorage,
     internal: { chargeImport },
     rows,
@@ -219,6 +232,73 @@ describe('runImport', () => {
     expect(outcome.stored).toBe(true);
     expect(chargeImport).toHaveBeenCalledWith(JOB_ID, { organizationId: ORG, durationMs: 180_000 });
     expect(storage.objects.has(ORIGINAL_KEY)).toBe(true);
+  });
+
+  describe('an upload picked from Google Drive (Module 12)', () => {
+    const driveInput: ImportInput = {
+      ...uploadInput,
+      origin: {
+        type: 'upload',
+        originalKey: ORIGINAL_KEY,
+        drive: { fileId: 'sim-drive-talk-0001', token: 'sealed:ya29.sim' },
+      },
+      expectedBytes: 4_000,
+    };
+
+    it('fetches the file once, stores it as the ORIGINAL, wipes the token, then runs as an upload', async () => {
+      await writeFile(path.join(dir, 'talk.mp4'), Buffer.alloc(4_000, 3));
+      const tokens: string[] = [];
+      const real = createSimulatedDriveFiles({ samplesDir: dir });
+      const drive: DriveFiles = {
+        ...real,
+        fetch: (input, onProgress, signal) => {
+          tokens.push(input.accessToken);
+          return real.fetch(input, onProgress, signal);
+        },
+      };
+      const { run, storage, rows, chargeImport } = setup(driveInput, { drive });
+
+      const outcome = await runImport(run);
+
+      expect(outcome.stored).toBe(true);
+      expect(tokens).toEqual(['ya29.sim']);
+      expect(storage.objects.get(ORIGINAL_KEY)?.length).toBe(4_000);
+      expect(rows.driveCalls).toEqual([
+        { jobId: JOB_ID, original: { key: ORIGINAL_KEY, bytes: 4_000 } },
+      ]);
+      expect(chargeImport).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads a stored ORIGINAL on a retry without asking Drive again', async () => {
+      const drive = { ...createSimulatedDriveFiles({ samplesDir: dir }), fetch: jest.fn() };
+      const { run, storage, rows } = setup(driveInput, { drive });
+      storage.objects.set(ORIGINAL_KEY, Buffer.alloc(4_000, 3));
+      await runImport(run);
+      expect(drive.fetch).not.toHaveBeenCalled();
+      expect(rows.driveCalls).toEqual([]);
+    });
+
+    it('fails with drive_not_connected when the token was refused, or already wiped', async () => {
+      const { run } = setup({
+        ...driveInput,
+        origin: {
+          ...driveInput.origin,
+          drive: { fileId: 'sim-drive-denied-0001', token: 'sealed:x' },
+        },
+      } as ImportInput);
+      await expect(runImport(run)).rejects.toMatchObject({ code: 'drive_not_connected' });
+      const wiped = setup({
+        ...driveInput,
+        origin: { ...driveInput.origin, drive: { fileId: 'sim-drive-talk-0001', token: null } },
+      } as ImportInput);
+      await expect(runImport(wiped.run)).rejects.toMatchObject({ code: 'drive_not_connected' });
+    });
+
+    it('refuses a Drive file bigger than Drive said it was', async () => {
+      await writeFile(path.join(dir, 'talk.mp4'), Buffer.alloc(9_000, 3));
+      const { run } = setup(driveInput);
+      await expect(runImport(run)).rejects.toMatchObject({ code: 'upload_incomplete' });
+    });
   });
 
   it('an upload refused by the minutes meter fails with its code and stores nothing', async () => {

@@ -67,6 +67,8 @@ const rawInfoSchema = z.object({
   section_end: z.number().nullish(),
   formats: z.array(z.unknown()).nullish(),
   heatmap: z.array(z.unknown()).nullish(),
+  /** A post that holds several videos (X, Reddit, Instagram) answers as a playlist. */
+  entries: z.array(z.unknown()).nullish(),
 });
 
 /** Header names a platform may ask us to send with its playlist and segments. */
@@ -355,7 +357,22 @@ export function mapProbeJson(json: unknown, link: LinkRef): ProbeResult {
   if (!parsed.success) {
     throw new DownloaderError('tool_failed', { retryable: false, cause: parsed.error });
   }
-  const info = parsed.data;
+  let info = parsed.data;
+  // Module 12: a post is one link but may hold several videos, which yt-dlp
+  // answers as a playlist. One video in it reads as that video; more is
+  // refused with its own sentence. YouTube, Twitch and Kick never answer a
+  // playlist here (`--no-playlist`), so their behaviour is unchanged.
+  if (info._type === 'playlist' && link.platform !== 'youtube' && link.platform !== 'twitch' && link.platform !== 'kick') {
+    const entries = (info.entries ?? []).filter((entry) => entry !== null);
+    if (entries.length > 1) {
+      throw new DownloaderError('link_many_videos', { retryable: false });
+    }
+    const only = rawInfoSchema.safeParse(entries[0]);
+    if (!only.success || (only.data._type && only.data._type !== 'video')) {
+      throw new DownloaderError('link_not_a_video', { retryable: false });
+    }
+    info = { ...only.data, extractor: only.data.extractor ?? info.extractor };
+  }
   if (info._type && info._type !== 'video') {
     throw new DownloaderError('link_not_a_video', { retryable: false });
   }

@@ -8,7 +8,7 @@
  * A row that does not fit is dropped (logged by the caller as a count);
  * a channel that does not fit is `platform_changed`.
  */
-import type { ChannelPage, ChannelRef, ClipPlatformId, ListedItem } from '@postgear/video-engine';
+import type { ChannelPage, ChannelRef, ChannelPlatformId, ListedItem } from '@postgear/video-engine';
 import { z } from 'zod';
 import { ListingFailure } from './listing-failure';
 
@@ -75,7 +75,7 @@ export function normalisePage(value: unknown): { page: ChannelPage; dropped: num
 }
 
 /** A channel the binding resolved, checked, on the platform that was asked. */
-export function normaliseChannel(platform: ClipPlatformId, value: unknown): ChannelRef {
+export function normaliseChannel(platform: ChannelPlatformId, value: unknown): ChannelRef {
   const parsed = channelRefSchema.safeParse(value);
   if (!parsed.success) throw new ListingFailure('platform_changed');
   const ref: ChannelRef = {
