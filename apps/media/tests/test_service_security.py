@@ -311,6 +311,7 @@ def listen_payload(**overrides: Any) -> Any:
         "durationMs": 300_000,
         "ranges": [{"fromMs": 0, "toMs": 180_000}],
         "language": "auto",
+        "ownMachineOnly": False,
         "simulation": None,
     }
     body.update(overrides)

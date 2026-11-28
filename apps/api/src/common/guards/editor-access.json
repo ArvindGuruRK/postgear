@@ -248,6 +248,9 @@
     "GET /clips/:clipId/previews/latest": {
       "access": "allow"
     },
+    "GET /clips/:clipId/transcript/download": {
+      "access": "allow"
+    },
     "GET /clips/:clipId/words": {
       "access": "allow"
     },
@@ -313,6 +316,9 @@
     "GET /clips/links/thumbnail": {
       "access": "allow"
     },
+    "GET /clips/privacy": {
+      "access": "allow"
+    },
     "GET /clips/recipes": {
       "access": "allow"
     },
@@ -341,6 +347,9 @@
       "access": "allow"
     },
     "GET /clips/videos/:videoId/transcript": {
+      "access": "allow"
+    },
+    "GET /clips/videos/:videoId/transcript/download": {
       "access": "allow"
     },
     "GET /clips/voices": {
@@ -1223,6 +1232,9 @@
     },
     "PUT /clips/library/favourites": {
       "access": "allow"
+    },
+    "PUT /clips/privacy": {
+      "access": "deny"
     },
     "PUT /clips/word-list": {
       "access": "allow"

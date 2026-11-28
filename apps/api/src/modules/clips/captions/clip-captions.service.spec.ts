@@ -841,3 +841,100 @@ describe('a montage', () => {
     expect(ledger.entries).toEqual([]);
   });
 });
+
+describe('Export The Transcript, a clip (Module 17 item 10)', () => {
+  const lines = (body: string) => body.trimEnd().split('\n');
+
+  it("writes the video's words over the clip on the clip's clock before it has captions", async () => {
+    const { service } = setup();
+    const text = await service.download(TEST_ORG, CLIP, 'txt');
+    expect(lines(text.body)).toHaveLength(6);
+    expect(lines(text.body)[0]).toBe('secret120 secret121 secret122 secret123 secret124.');
+    expect(text.body).not.toContain('secret119');
+    expect(text.body).not.toContain('secret150');
+
+    const srtFile = await service.download(TEST_ORG, CLIP, 'srt');
+    // 120 s into the video is the clip's first moment.
+    expect(srtFile.body.startsWith('1\n00:00:00,000 --> ')).toBe(true);
+    expect(srtFile.contentType).toBe('application/x-subrip; charset=utf-8');
+  });
+
+  it("writes what the captions show: a file's words, without a hidden word", async () => {
+    const { service, tables } = setup();
+    const supplied = await service.fromFile(
+      TEST_ORG,
+      CLIP,
+      file(srt([['00:00:01,000', '00:00:03,000', 'My own words']])),
+      {},
+    );
+    saveTrack(tables, supplied.track);
+    expect((await service.download(TEST_ORG, CLIP, 'txt')).body).toBe('My own words\n');
+
+    // The editor's own save writes a hidden word into the track's edits.
+    const first = (await service.words(TEST_ORG, CLIP)).transcript?.words[0]?.i;
+    const stored = tables.clips[0]?.document as unknown as ClipDocument;
+    for (const track of stored.tracks) {
+      if (track.kind === 'captions') track.edits = { [String(first)]: { hidden: true } };
+    }
+    const after = await service.download(TEST_ORG, CLIP, 'srt');
+    expect(after.body).toMatch(/^1\n00:00:0\d,\d{3} --> 00:00:03,000\nown words\n$/);
+  });
+
+  it('masks a bleeped word, as the captions do', async () => {
+    const doc = document();
+    const source = doc.sources[0]?.id as string;
+    const bleeped = {
+      ...doc,
+      bleeps: [{ id: 'bleep1', source, from: 121_000, to: 121_600, mode: 'bleep' as const }],
+    };
+    const { service } = setup({ document: bleeped as ClipDocument });
+    const { body } = await service.download(TEST_ORG, CLIP, 'txt');
+    expect(body).not.toContain('secret121');
+    expect(lines(body)[0]).toMatch(/^secret120 s\*+ secret122/);
+  });
+
+  it('takes a montage, reading each video it plays', async () => {
+    const { service, tables } = setup();
+    const clip = tables.clips[0];
+    if (!clip) throw new Error('no clip');
+    Object.assign(clip, { origin: 'MONTAGE', meta: { videoIds: [] } });
+    const { body, words } = await service.download(TEST_ORG, CLIP, 'txt');
+    expect(words).toBe(30);
+    expect(lines(body)[0]).toBe('secret120 secret121 secret122 secret123 secret124.');
+  });
+
+  it('refuses when nothing was listened to or the captions file is gone, and logs no word', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const bare = setup({ heard: null });
+    expect(await refusal(bare.service.download(TEST_ORG, CLIP, 'txt'))).toMatchObject({
+      status: 409,
+      body: { code: 'transcript_missing' },
+    });
+
+    const { service, tables } = setup();
+    await service.download(TEST_ORG, CLIP, 'srt');
+    const logged = log.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(logged).toContain('clips.transcript.download');
+    expect(logged).not.toContain('secret');
+    log.mockRestore();
+
+    saveTrack(
+      tables,
+      createCaptionsTrack({
+        transcriptAssetId: '99999999-9999-4999-8999-999999999999',
+        language: 'en',
+        styleId: 'clean',
+        look: LOOK as never,
+      }),
+    );
+    expect(await refusal(service.download(TEST_ORG, CLIP, 'txt'))).toMatchObject({
+      status: 409,
+      body: { code: 'transcript_missing' },
+    });
+  });
+
+  it('answers 404 for a clip in another workspace', async () => {
+    const { service } = setup();
+    expect((await refusal(service.download(OTHER_ORG, CLIP, 'txt'))).status).toBe(404);
+  });
+});

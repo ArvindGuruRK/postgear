@@ -1,6 +1,7 @@
 'use client';
 
 import { BellIcon } from '@animateicons/react/lucide/bell-icon';
+import { ClapperboardIcon } from '@animateicons/react/lucide/clapperboard-icon';
 import { CompassIcon } from '@animateicons/react/lucide/compass-icon';
 import { CreditCardIcon } from '@animateicons/react/lucide/credit-card-icon';
 import { KeyRoundIcon } from '@animateicons/react/lucide/key-round-icon';
@@ -14,6 +15,7 @@ import {
   canUseWorkflows,
   canViewBilling,
   canViewDeveloperSettings,
+  canWorkOnClips,
   type RoleInput,
 } from '@postgear/entitlements';
 import { type AnimatedIcon, SettingsNav } from '@postgear/ui';
@@ -31,7 +33,7 @@ import { useOptionalWorkspace } from '../navigation/workspace-provider';
  * component while `settings/layout.tsx` stays a server one.
  *
  * `allow` (Sprint 13, Module 14) hides a section from a role the capability
- * answers no to: an Editor sees Team, Signatures, Notifications and
+ * answers no to: an Editor sees Team, Signatures, Notifications, Clips and
  * Appearance only. Each hidden section's own layout refuses a typed address.
  */
 interface SettingsSection {
@@ -60,6 +62,9 @@ const SECTIONS: readonly SettingsSection[] = [
   // The workspace's Discover defaults (Sprint 11): its place, languages, news
   // topics and which groups are on. Everyone reads them, admins change them.
   { segment: 'discover', label: 'Discover', icon: CompassIcon, allow: canUseDiscover },
+  // Clips (Sprint 13, Module 17 item 26): whether speech always stays on our
+  // own servers. Everyone who makes clips reads it, an admin changes it.
+  { segment: 'clips', label: 'Clips', icon: ClapperboardIcon, allow: canWorkOnClips },
   // Per user, like Notifications: the mode and light theme follow the person
   // into every workspace.
   { segment: 'appearance', label: 'Appearance', icon: PaletteIcon },

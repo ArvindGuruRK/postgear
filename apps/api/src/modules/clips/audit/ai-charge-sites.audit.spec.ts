@@ -104,6 +104,8 @@ describe('where AI minutes are charged', () => {
     expect(others.map(({ file, meter }) => `${file} ${meter}`)).toEqual([
       'modules/clips/limits/clip-limits.guard.ts DOWNLOADS_METER',
       'modules/clips/limits/clip-limits.guard.ts IMPORT_METER',
+      // Module 17 item 25: a schedule picture is one of the day's downloads, not AI minutes.
+      'modules/studio/studio.service.ts SCHEDULE_PICTURE_METER',
     ]);
   });
 

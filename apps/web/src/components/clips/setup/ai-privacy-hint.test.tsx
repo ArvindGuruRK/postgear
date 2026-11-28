@@ -2,7 +2,13 @@ import { TooltipProvider } from '@postgear/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { stubBrowserLayout } from '@/components/workflows/fields/test-dom';
 import type { ClipsHostedLane } from '@/types/clips';
-import { AI_PRIVACY_LINES, AiPrivacyHint, aiPrivacyLines, hostedLaneLine } from './ai-privacy-hint';
+import {
+  AI_PRIVACY_LINES,
+  AiPrivacyHint,
+  aiPrivacyLines,
+  hostedLaneLine,
+  SPEECH_STAYS_HERE_LINE,
+} from './ai-privacy-hint';
 
 beforeAll(() => stubBrowserLayout());
 
@@ -51,6 +57,13 @@ describe('the privacy lines', () => {
     expect(hostedLaneLine({ ...GROQ, aboveMinutes: 0 })).toBe(
       'To turn speech into text, the sound is sent to Groq.',
     );
+  });
+
+  it('say speech stays here, never the provider, for a workspace that keeps it (Module 17 item 26)', () => {
+    const lines = aiPrivacyLines(GROQ, true);
+    expect(lines).toEqual([...AI_PRIVACY_LINES, SPEECH_STAYS_HERE_LINE]);
+    expect(lines.join(' ')).not.toMatch(/Groq/);
+    expect(aiPrivacyLines(OFF, true)).toContain(SPEECH_STAYS_HERE_LINE);
   });
 
   it('are sentences: each starts with a capital and ends with a full stop', () => {

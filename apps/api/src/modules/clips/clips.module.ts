@@ -53,6 +53,8 @@ import { ClipJobsController } from './jobs/clip-jobs.controller';
 import { ClipLayoutsModule } from './layouts/clip-layouts.module';
 import { ClipLibraryModule } from './library/clip-library.module';
 import { ClipLinksModule } from './links/clip-links.module';
+import { ClipPrivacyController } from './privacy/clip-privacy.controller';
+import { ClipPrivacyService } from './privacy/clip-privacy.service';
 import { ClipRecipesModule } from './recipes/clip-recipes.module';
 import { ClipSweepService } from './retention/clip-sweep.service';
 import { ClipsStatusController } from './status/clips-status.controller';
@@ -91,6 +93,7 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
   ],
   controllers: [
     ClipsStatusController,
+    ClipPrivacyController,
     ClipVideosController,
     // Module 16: `/clips/videos/:videoId/highlights`.
     ClipHighlightsController,
@@ -111,6 +114,7 @@ import { ClipWordListModule } from './word-list/clip-word-list.module';
   providers: [
     ClipJobEventsService,
     ClipsStatusService,
+    ClipPrivacyService,
     ClipVideosService,
     ClipHighlightsService,
     // Sprint 13, Module 05: reading a transcript for moments (the internal pick route).

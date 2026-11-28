@@ -715,6 +715,9 @@
         "orgId": {
           "$ref": "#/$defs/OrgId"
         },
+        "ownMachineOnly": {
+          "type": "boolean"
+        },
         "ranges": {
           "items": {
             "$ref": "#/$defs/TimeRange"
@@ -750,6 +753,7 @@
         "durationMs",
         "ranges",
         "language",
+        "ownMachineOnly",
         "simulation"
       ],
       "title": "MediaPyTranscribeInput",

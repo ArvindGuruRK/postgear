@@ -1,6 +1,6 @@
 # Module 17: P2 Backlog (Only When You Decide)
 
-> **Sprint 13, Clips AI** | Status: Parked | Size: as picked
+> **Sprint 13, Clips AI** | Status: In progress (items 3, 9, 10, 18, 25, 26 picked 2026-11-28) | Size: as picked
 > **Depends on**: [Module 16](module-16-hardening-e2e-closeout.md)
 > **Stories**: none yet (each picked item brings its own)
 > **Rule**: nothing here starts without Arvind's word.
@@ -26,7 +26,7 @@ Where research 01 judged a reference product's feature to be a product of its ow
 | 7 | **Auto Sound Effects And Transitions** | A whoosh on a cut, a pop on a sticker | Sound items from the catalogue; depends on Sprint 12 Module 21's transitions for the picture side |
 | 8 | **Enhance Sound** | Cleaner voice: less noise and room echo | A separate sound model on the Python side; a new AUDIO asset the clip can switch to |
 | 9 | **Lower Music Under Speech** | Music drops when someone talks | The `speech` track drives a volume curve on the sound item |
-| 10 | **Export The Transcript** | Download the text or an SRT of a clip or a video | A route that writes from the transcript through the time map |
+| 10 | **Export The Transcript** | Download the text or an SRT of a clip or a video | **Done 2026-11-28** (Decision Log, 17 (item 10)). A route that writes from the transcript through the time map |
 | 11 | **Templates For Titles And Captions** | Saved post titles and captions with a colour label, as StreamLadder's publisher has | PostGear's Signatures are the nearest thing today; this would extend them. Composer work, not Clips |
 | 12 | **Best Times From Analytics** | Suggest posting times from when past posts did well | Needs enough analytics history per channel; feeds Module 13's posting slots |
 | 13 | **Auto-Import And Auto-Clip** | New videos from a connected channel are brought in and clipped with a chosen recipe, ready for review | Builds on Sprint 12 Module 21's auto-import; adds a recipe and a run per new video (the Auto-Edit planner of Module 10 does the clipping); must respect the plan's meters (import minutes and AI Minutes), refuse when they run out, and never post by itself |
@@ -41,8 +41,8 @@ Where research 01 judged a reference product's feature to be a product of its ow
 | 22 | **Emote Extras** | Animated emotes with effects, a flash check that warns about Twitch's rule of 3 flashes a second, sets for a whole emote pack | Small additions on Module 14's `emotes/` profiles |
 | 23 | **A Public Clips API** | `/v1/clips`: create clips, start exports and read their status with an API key | Follows the existing `/v1` API-key routes and the SDK package. Needs per-key meters and the route matrix to list the routes as API-key only. OpusClip has API access |
 | 24 | **An Optional Commercial GIF Provider** | Search a larger GIF and sticker library behind a workspace switch | Added behind Sprint 12 Module 12's `StickerProvider` interface; needs terms that allow storing and re-serving, which is why Klipy was dropped. Off by default, named in the privacy text |
-| 25 | **Metering Schedule Pictures** | Count a schedule picture export against `clips.downloads_per_day` or a Design Studio limit | One `consume` call in Studio's export route; Module 14 left Studio's export alone |
-| 26 | **Per-Workspace Privacy Switch For The Hosted Lane** | A workspace can force listening to stay on our own machine | Decision D13-03's "reopen if"; a setting plus a check in the transcriber choice |
+| 25 | **Metering Schedule Pictures** | Count a schedule picture export against `clips.downloads_per_day` or a Design Studio limit | **Done 2026-11-28** (Decision Log, 17 (item 25)). One `consume` call in Studio's export route; Module 14 left Studio's export alone |
+| 26 | **Per-Workspace Privacy Switch For The Hosted Lane** | A workspace can force listening to stay on our own machine | **Done 2026-11-28** (Decision Log, 17 (item 26)). Decision D13-03's "reopen if"; a setting plus a check in the transcriber choice |
 
 ## Not Planned
 

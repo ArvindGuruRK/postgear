@@ -110,6 +110,8 @@ export class FakeRows implements ClipRows {
   /** Module 16: highlight runs, and where each video came from. */
   runs = new Map<string, HighlightRunRow & { found?: number; tracks?: string[] }>();
   links = new Map<string, VideoLinkRow>();
+  /** Module 17 item 26: workspaces that keep speech on our own machine. */
+  speechHere = new Set<string>();
   async clip(organizationId: string, clipId: string) {
     const clip = this.clips.get(clipId);
     return clip && clip.organizationId === organizationId
@@ -226,6 +228,10 @@ export class FakeRows implements ClipRows {
   async markRunRunning(_organizationId: string, runId: string) {
     const run = this.runs.get(runId);
     if (run && run.status === 'QUEUED') run.status = 'RUNNING';
+  }
+
+  async speechStaysHere(organizationId: string) {
+    return this.speechHere.has(organizationId);
   }
 
   async videoLink(organizationId: string, videoId: string) {

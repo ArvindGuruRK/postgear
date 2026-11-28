@@ -89,7 +89,9 @@ def deps_with(
     )
 
 
-def payload_for(to_ms: int, duration_ms: int = 10 * MINUTE) -> MediaPyTranscribeInput:
+def payload_for(
+    to_ms: int, duration_ms: int = 10 * MINUTE, *, own_machine_only: bool = False
+) -> MediaPyTranscribeInput:
     return MediaPyTranscribeInput.model_validate(
         {
             "version": 1,
@@ -100,6 +102,7 @@ def payload_for(to_ms: int, duration_ms: int = 10 * MINUTE) -> MediaPyTranscribe
             "durationMs": duration_ms,
             "ranges": [{"fromMs": 0, "toMs": to_ms}],
             "language": "auto",
+            "ownMachineOnly": own_machine_only,
             "simulation": None,
         },
     )
@@ -154,6 +157,44 @@ def test_a_job_up_to_the_threshold_stays_on_our_machine_and_a_longer_one_goes_ho
     assert lane_for(2 * MINUTE + 1, deps) == (hosted, own)
     # Without a hosted lane every job is the bound listener alone.
     assert lane_for(600 * MINUTE, deps_with(tmp_path, own, None)) == (own, None)
+
+
+# Module 17 item 26: a workspace that keeps speech on our own machine.
+
+
+def test_a_workspace_that_keeps_speech_here_never_takes_the_hosted_lane(tmp_path: Path) -> None:
+    own, hosted = FakeListener("own"), FakeListener("hosted")
+    deps = deps_with(tmp_path, own, hosted, above_minutes=2)
+    assert lane_for(600 * MINUTE, deps, own_machine_only=True) == (own, None)
+    assert lane_for(MINUTE, deps, own_machine_only=True) == (own, None)
+
+
+def test_a_long_job_that_must_stay_here_is_heard_by_our_machine(tmp_path: Path) -> None:
+    own, hosted = FakeListener("own", max_chunk_ms=5 * MINUTE), FakeListener("hosted")
+    deps = deps_with(tmp_path, own, hosted, above_minutes=2)
+    store_audio(deps, tmp_path)
+    result = transcribe(payload_for(6 * MINUTE, own_machine_only=True), deps)
+
+    assert hosted.chunks == []
+    # Our machine hears the whole six minutes, in its own (overlapping) chunks.
+    assert own.chunks[0][0] == 0 and own.chunks[-1][1] == 6 * MINUTE
+    assert result.model == "own"
+
+
+def test_with_a_hosted_listener_only_the_job_is_refused_before_any_sound_leaves(
+    tmp_path: Path,
+) -> None:
+    groq = FakeListener("groq:whisper-large-v3-turbo")
+    deps = deps_with(tmp_path, groq, None)
+    store_audio(deps, tmp_path)
+    with pytest.raises(ApplicationError) as refused:
+        transcribe(payload_for(MINUTE, own_machine_only=True), deps)
+
+    assert refused.value.type == "MEDIA_BINDING_OFF"
+    assert refused.value.non_retryable
+    assert groq.chunks == []
+    # Without the switch the same service listens through Groq as before.
+    assert transcribe(payload_for(MINUTE), deps).model == "groq:whisper-large-v3-turbo"
 
 
 def test_a_long_job_is_heard_by_the_hosted_lane(tmp_path: Path) -> None:

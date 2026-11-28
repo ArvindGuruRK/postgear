@@ -56,12 +56,15 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { ZodBody, ZodQuery } from '../../../common/pipes/zod-validation.pipe';
 import { ClipStart } from '../limits/clips-create.guard';
 import { ClipsEnabledGuard } from '../limits/clips-enabled.guard';
+import { sendTranscriptDownload } from '../transcripts/transcript-download';
 import {
   type AddCaptionsInput,
   addCaptionsSchema,
   type CaptionsFileFields,
+  type ClipTranscriptDownloadQuery,
   type ClipWordsQuery,
   captionsFileFieldsSchema,
+  clipTranscriptDownloadQuerySchema,
   clipWordsQuerySchema,
   type TranslateCaptionsInput,
   translateCaptionsSchema,
@@ -132,6 +135,17 @@ export class ClipCaptionsController {
     @Query(new ZodQuery(clipWordsQuerySchema, 'clips/words')) query: ClipWordsQuery,
   ) {
     return this.captions.words(org.id, clipId, query.source ?? 'captions');
+  }
+
+  @Get(':clipId/transcript/download')
+  async download(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('clipId') clipId: string,
+    @Query(new ZodQuery(clipTranscriptDownloadQuerySchema, 'clips/transcript/download'))
+    query: ClipTranscriptDownloadQuery,
+    @Res() response: Response,
+  ): Promise<void> {
+    sendTranscriptDownload(response, await this.captions.download(org.id, clipId, query.format));
   }
 
   @Post(':clipId/captions/translate')

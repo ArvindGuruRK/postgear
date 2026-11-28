@@ -5,7 +5,13 @@
   "videoId": "2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b",
   "audioKey": "/var/lib/postgear/analysis.wav",
   "durationMs": 600000,
-  "ranges": [{ "fromMs": 0, "toMs": 60000 }],
+  "ranges": [
+    {
+      "fromMs": 0,
+      "toMs": 60000
+    }
+  ],
   "language": "auto",
+  "ownMachineOnly": false,
   "simulation": null
 }

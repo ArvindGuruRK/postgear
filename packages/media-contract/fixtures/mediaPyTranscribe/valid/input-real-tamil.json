@@ -5,7 +5,13 @@
   "videoId": "2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b",
   "audioKey": "clips/9b2e6c1a-0d4f-4a8b-9c7e-1f2a3b4c5d6e/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/analysis-audio-0123456789abcdef0123456789abcdef.wav",
   "durationMs": 3480000,
-  "ranges": [{ "fromMs": 0, "toMs": 3480000 }],
+  "ranges": [
+    {
+      "fromMs": 0,
+      "toMs": 3480000
+    }
+  ],
   "language": "ta",
+  "ownMachineOnly": false,
   "simulation": null
 }

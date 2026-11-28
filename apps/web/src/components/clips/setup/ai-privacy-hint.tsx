@@ -11,6 +11,8 @@
  *
  * The provider sentence shows only while the media service sends long speech
  * to a hosted listener (`ai.hostedLane` in `GET /clips/status`), and names it.
+ * Module 17 item 26: a workspace that keeps speech here (Settings, Clips) is
+ * told so instead, and never sees the provider sentence.
  * Desktop only, like every Clips screen.
  */
 import { InfoIcon } from '@animateicons/react/lucide/info-icon';
@@ -33,14 +35,27 @@ export function hostedLaneLine(lane: ClipsHostedLane | null | undefined): string
   return `When more than ${lane.aboveMinutes} minutes are listened to at once, the sound is sent to ${lane.providerName} to be turned into text.`;
 }
 
+/** Module 17 item 26: the line for a workspace that keeps every listen here. */
+export const SPEECH_STAYS_HERE_LINE = 'This workspace keeps all speech on our own servers.';
+
 /** Every line the hint shows, in order. */
-export function aiPrivacyLines(lane: ClipsHostedLane | null | undefined): string[] {
+export function aiPrivacyLines(
+  lane: ClipsHostedLane | null | undefined,
+  speechStaysHere = false,
+): string[] {
+  if (speechStaysHere) return [...AI_PRIVACY_LINES, SPEECH_STAYS_HERE_LINE];
   const hosted = hostedLaneLine(lane);
   return hosted ? [...AI_PRIVACY_LINES, hosted] : [...AI_PRIVACY_LINES];
 }
 
-export function AiPrivacyHint({ lane }: { lane?: ClipsHostedLane | null }) {
-  const lines = aiPrivacyLines(lane);
+export function AiPrivacyHint({
+  lane,
+  speechStaysHere = false,
+}: {
+  lane?: ClipsHostedLane | null;
+  speechStaysHere?: boolean;
+}) {
+  const lines = aiPrivacyLines(lane, speechStaysHere);
   return (
     <TooltipHint
       side="bottom"

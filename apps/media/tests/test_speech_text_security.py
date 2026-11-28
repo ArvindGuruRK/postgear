@@ -111,6 +111,7 @@ def listen_payload() -> dict[str, Any]:
         "durationMs": 60_000,
         "ranges": [{"fromMs": 0, "toMs": 30_000}],
         "language": "auto",
+        "ownMachineOnly": False,
         "simulation": None,
     }
 

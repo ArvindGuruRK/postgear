@@ -5,11 +5,14 @@
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import type { ClipPrivacyService } from '../privacy/clip-privacy.service';
 import type { ClipDrive } from '../videos/clip-drive';
 import type { ClipSampleLink } from '../videos/clip-sample';
 import { ClipsStatusService } from './clips-status.service';
 import { type AiServiceState, type MediaServiceProbe, NO_HOSTED_LANE } from './media-service.probe';
 import type { MediaVoices, SpeakerVoices } from './media-voices.client';
+
+const privacy = { speechStaysHere: jest.fn(async () => false) };
 
 const HEART = { id: 'kokoro-heart', name: 'Heart', languages: ['en'] };
 
@@ -39,6 +42,7 @@ function status(options: { tts: boolean; service: AiServiceState; voices: Speake
     } as unknown as MediaServiceProbe,
     { list } as unknown as MediaVoices,
     { status: () => ({ available: false }) } as unknown as ClipDrive,
+    privacy as unknown as ClipPrivacyService,
   );
   return { service, list };
 }

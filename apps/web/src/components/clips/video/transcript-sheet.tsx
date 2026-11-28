@@ -12,7 +12,8 @@
  * from the first word to the last with a little air.
  *
  * With nothing listened to yet the button reads **Listen To This Video**,
- * with its price in AI minutes for the whole length.
+ * with its price in AI minutes for the whole length. Module 17 item 10: the
+ * download button beside Find saves the words as text or subtitles.
  */
 import { ChevronDownIcon } from '@animateicons/react/lucide/chevron-down-icon';
 import { ChevronUpIcon } from '@animateicons/react/lucide/chevron-up-icon';
@@ -42,6 +43,7 @@ import { ApiError } from '@/lib/api';
 import { getVideoTranscript, listenToVideo } from '@/lib/clips-api';
 import type { TranscriptView } from '@/types/clips';
 import { pricedLabel } from '../panels/captions-model';
+import { TranscriptDownloadMenu } from '../transcript/transcript-download-menu';
 import { useClipJob } from '../use-clip-job';
 import { WaitingNote } from '../waiting-note';
 import { queuedOr } from '../waiting-words';
@@ -307,6 +309,13 @@ export function TranscriptSheet({
                 <MotionIcon icon={ChevronDownIcon} className="h-4 w-4" />
               </Button>
             </TooltipHint>
+            {transcript && transcript.words.length > 0 ? (
+              <TranscriptDownloadMenu
+                path={`/clips/videos/${encodeURIComponent(videoId)}/transcript/download`}
+                title="Transcript"
+                onError={(text) => setProblem({ text, plans: false })}
+              />
+            ) : null}
           </div>
 
           {problem ? (

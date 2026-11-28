@@ -47,6 +47,7 @@ import { SchedulingService } from '../../scheduling/scheduling.service';
 import { CLIPS_MESSAGES } from '../clips.messages';
 import { gigabytesToBytes } from '../clips.units';
 import { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import { ClipPrivacyService } from '../privacy/clip-privacy.service';
 import { ClipDrive, type ClipDriveStatus } from '../videos/clip-drive';
 import { ClipSampleLink } from '../videos/clip-sample';
 import {
@@ -167,6 +168,11 @@ export interface ClipsAiStatus {
    * provider only while this is on.
    */
   hostedLane: HostedLaneState;
+  /**
+   * Module 17 item 26: this workspace keeps every listen on our own machine
+   * (Settings, Clips), so the privacy text never names the hosted lane for it.
+   */
+  speechStaysHere: boolean;
 }
 
 /** Module 19: what the video space holds. */
@@ -200,6 +206,7 @@ export class ClipsStatusService {
     private readonly mediaService: MediaServiceProbe,
     private readonly mediaVoices: MediaVoices,
     private readonly drive: ClipDrive,
+    private readonly privacy: ClipPrivacyService,
   ) {
     this.simulation = config.get('CLIPS_SIMULATION', { infer: true }) === 'true';
     this.platforms = [...config.get('CLIPS_PLATFORMS', { infer: true })];
@@ -209,17 +216,26 @@ export class ClipsStatusService {
 
   async status(orgId: string): Promise<ClipsStatus> {
     const now = new Date();
-    const [tools, byKind, values, importMinutes, aiMinutes, aiService, hostedLane] =
-      await Promise.all([
-        this.tools(),
-        this.limits.storageByKind(orgId),
-        this.resolver.getMany(orgId, CLIPS_STATUS_LIMIT_KEYS, now),
-        this.resolver.meter(orgId, IMPORT_MINUTES, now),
-        this.resolver.meter(orgId, AI_MINUTES, now),
-        this.mediaService.state(),
-        // The same cached `/ready` answer as `state()`: one request for both.
-        this.mediaService.hostedLane(),
-      ]);
+    const [
+      tools,
+      byKind,
+      values,
+      importMinutes,
+      aiMinutes,
+      aiService,
+      hostedLane,
+      speechStaysHere,
+    ] = await Promise.all([
+      this.tools(),
+      this.limits.storageByKind(orgId),
+      this.resolver.getMany(orgId, CLIPS_STATUS_LIMIT_KEYS, now),
+      this.resolver.meter(orgId, IMPORT_MINUTES, now),
+      this.resolver.meter(orgId, AI_MINUTES, now),
+      this.mediaService.state(),
+      // The same cached `/ready` answer as `state()`: one request for both.
+      this.mediaService.hostedLane(),
+      this.privacy.speechStaysHere(orgId),
+    ]);
     const limits = Object.fromEntries(
       CLIPS_STATUS_LIMIT_KEYS.map((key) => [key, values[key]]),
     ) as ClipsStatusLimits;
@@ -258,6 +274,7 @@ export class ClipsStatusService {
         faces: aiService === 'ok',
         voice,
         hostedLane: aiService === 'ok' ? hostedLane : NO_HOSTED_LANE,
+        speechStaysHere,
       },
     };
   }

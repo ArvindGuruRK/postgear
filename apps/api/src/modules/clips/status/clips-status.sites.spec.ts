@@ -7,11 +7,14 @@ import { SITES } from '@postgear/video-engine';
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import type { ClipPrivacyService } from '../privacy/clip-privacy.service';
 import type { ClipDrive } from '../videos/clip-drive';
 import type { ClipSampleLink } from '../videos/clip-sample';
 import { ClipsStatusService } from './clips-status.service';
 import { type MediaServiceProbe, NO_HOSTED_LANE } from './media-service.probe';
 import type { MediaVoices } from './media-voices.client';
+
+const privacy = { speechStaysHere: jest.fn(async () => false) };
 
 function status(platforms: string[]) {
   const meter = { used: 0, limit: 10, remaining: 10, cycleEnd: new Date('2026-12-25') };
@@ -37,6 +40,7 @@ function status(platforms: string[]) {
     } as unknown as MediaServiceProbe,
     { list: jest.fn() } as unknown as MediaVoices,
     { status: () => ({ available: false }) } as unknown as ClipDrive,
+    privacy as unknown as ClipPrivacyService,
   );
 }
 

@@ -7,5 +7,6 @@
   "durationMs": 600000,
   "ranges": [],
   "language": "auto",
+  "ownMachineOnly": false,
   "simulation": null
 }

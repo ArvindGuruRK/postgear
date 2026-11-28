@@ -6,9 +6,19 @@
   "audioKey": "clips/seed-demo-org/2f1c8a3e-4b5d-4e6f-8a9b-0c1d2e3f4a5b/analysis-audio-0123456789abcdef0123456789abcdef.wav",
   "durationMs": 600000,
   "ranges": [
-    { "fromMs": 0, "toMs": 60000 },
-    { "fromMs": 180000, "toMs": 240000 }
+    {
+      "fromMs": 0,
+      "toMs": 60000
+    },
+    {
+      "fromMs": 180000,
+      "toMs": 240000
+    }
   ],
   "language": "auto",
-  "simulation": { "sample": "stream", "force": null }
+  "ownMachineOnly": false,
+  "simulation": {
+    "sample": "stream",
+    "force": null
+  }
 }

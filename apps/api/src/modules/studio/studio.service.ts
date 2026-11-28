@@ -29,6 +29,7 @@
  * creates an ordinary draft post through `PostsService`, the same door the AI
  * copilot uses: Studio makes pictures, the composer posts them.
  */
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -79,6 +80,7 @@ import {
 import type { SseStream } from '../../common/sse';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { ChannelsService } from '../channels/channels.service';
+import { UsageService } from '../entitlements/usage.service';
 import { MediaService, type MediaView } from '../media/media.service';
 import { createPostSchema, postDocumentSchema } from '../posts/dto/posts.schema';
 import { type PostActor, PostsService } from '../posts/posts.service';
@@ -160,6 +162,9 @@ class SlideSaveError extends Error {
   }
 }
 
+/** Module 17 item 25: a schedule picture is counted as one of the day's downloads, as an emote is. */
+const SCHEDULE_PICTURE_METER = 'clips.downloads_per_day' as const;
+
 @Injectable()
 export class StudioService {
   private readonly logger = new Logger(StudioService.name);
@@ -181,7 +186,55 @@ export class StudioService {
     private readonly channels: ChannelsService,
     @Inject(BROWSER_POOL) private readonly pool: BrowserPool,
     private readonly entitlements: EntitlementsService,
+    private readonly usage: UsageService,
   ) {}
+
+  // -------------------------------------------------------------------------
+  // Schedule pictures on the day's downloads (Sprint 13, Module 17 item 25)
+  // -------------------------------------------------------------------------
+
+  /**
+   * A design with a schedule slide is a Schedule Maker picture: drawing it
+   * counts one unit of `clips.downloads_per_day`, as an emote does, before a
+   * byte is drawn (the typed 402 past the day's allowance). Other designs are
+   * not metered. Answers the charge's reference, or null when nothing was
+   * charged.
+   */
+  private async chargeSchedulePicture(
+    orgId: string,
+    document: DesignDocument,
+    by: string | undefined,
+  ): Promise<string | null> {
+    if (!scheduleSlotOf(document)) return null;
+    const ref = randomUUID();
+    await this.usage.consume(orgId, SCHEDULE_PICTURE_METER, 1, {
+      idempotencyKey: `studio.schedule-picture:${ref}`,
+      refId: ref,
+      ...(by ? { meta: { by } } : {}),
+    });
+    return ref;
+  }
+
+  /** The charge goes back when the drawing did not finish (a failure, a cancel, a busy design). */
+  private async exportCharged(
+    orgId: string,
+    charge: string | null,
+    draw: () => Promise<string[] | null>,
+  ): Promise<string[] | null> {
+    let saved: string[] | null = null;
+    try {
+      saved = await draw();
+      return saved;
+    } finally {
+      if (charge && saved === null) {
+        await this.usage.reverseAllFor(orgId, charge).catch((error: unknown) => {
+          this.logger.error(
+            `studio.schedule_charge_not_reversed ref=${charge}: ${messageOf(error)}`,
+          );
+        });
+      }
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Premium (Sprint 9b, see `studio.premium.ts`)
@@ -620,15 +673,23 @@ export class StudioService {
    * stream opens; once the status line has been sent, a failure can only be
    * an `error` event.
    */
-  async prepareExport(orgId: string, id: string, input: ExportDesignInput): Promise<StudioRun> {
+  async prepareExport(
+    orgId: string,
+    id: string,
+    input: ExportDesignInput,
+    by?: string,
+  ): Promise<StudioRun> {
     const design = await this.require(orgId, id);
     const document = this.documentOf(design);
 
     await this.assertBrowser();
     this.assertNotExporting(design.id);
+    const charge = await this.chargeSchedulePicture(orgId, document, by);
 
     return async (stream) => {
-      await this.runExport(orgId, design, document, input.imageFormat, input.scale, stream);
+      await this.exportCharged(orgId, charge, () =>
+        this.runExport(orgId, design, document, input.imageFormat, input.scale, stream),
+      );
     };
   }
 
@@ -659,9 +720,12 @@ export class StudioService {
 
     const reusable = await this.reusableExport(orgId, design, document, input.imageFormat);
 
+    // Only a picture drawn now is counted: a reused export was counted when it was drawn.
+    let charge: string | null = null;
     if (!reusable) {
       await this.assertBrowser();
       this.assertNotExporting(design.id);
+      charge = await this.chargeSchedulePicture(orgId, document, actor?.userId);
     }
 
     return async (stream) => {
@@ -676,7 +740,9 @@ export class StudioService {
           reused: true,
         });
       } else {
-        mediaIds = await this.runExport(orgId, design, document, input.imageFormat, 1, stream);
+        mediaIds = await this.exportCharged(orgId, charge, () =>
+          this.runExport(orgId, design, document, input.imageFormat, 1, stream),
+        );
         if (!mediaIds) return;
       }
 

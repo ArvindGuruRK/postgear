@@ -51,6 +51,12 @@ export const mediaPyTranscribeInput = z
     /** The stretches to listen to, in the video's time; they never overlap. */
     ranges: z.array(timeRange).min(1).max(MAX_TRANSCRIBE_RANGES),
     language: languageChoice,
+    /**
+     * Module 17 item 26: the workspace keeps speech on our own machine, so the
+     * hosted lane is never used for this job (with a hosted listener only, the
+     * job is refused with `MEDIA_BINDING_OFF` instead of sending the sound).
+     */
+    ownMachineOnly: z.boolean(),
     simulation: simulationHint.nullable(),
   })
   .meta({ id: 'MediaPyTranscribeInput', title: 'MediaPyTranscribeInput' });

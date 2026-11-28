@@ -50,6 +50,7 @@ from postgear_media.providers.transcribe.base import (
     ListenRequest,
     Transcriber,
     Word,
+    is_hosted_listener,
 )
 from postgear_media.services.audio import cut_chunk, read_facts
 from postgear_media.services.speech_track import SPEECH_RATE_HZ, speech_values
@@ -91,13 +92,29 @@ class _Listened:
     probability: float | None
 
 
-def lane_for(asked_ms: int, deps: TranscribeDeps) -> tuple[Transcriber, Transcriber | None]:
+def lane_for(
+    asked_ms: int, deps: TranscribeDeps, *, own_machine_only: bool = False
+) -> tuple[Transcriber, Transcriber | None]:
     """Who listens to a job asking for `asked_ms` of sound, and who takes over if it fails.
 
     With a hosted lane (`TRANSCRIBER=auto`), a job longer than its threshold goes
     there with our own machine behind it. Everything else is the bound listener
     alone: a short job, `faster-whisper`, `groq` and simulation.
+
+    Module 17 item 26: a workspace that keeps speech here (`ownMachineOnly`)
+    never uses the hosted lane. When the bound listener is itself hosted
+    (`TRANSCRIBER=groq`), there is no machine of ours to listen on, so the job
+    is refused before any sound is sent; the caller gives the minutes back.
     """
+    if own_machine_only:
+        if is_hosted_listener(deps.transcriber):
+            raise ApplicationError(
+                "This workspace keeps speech on our own machine, and this service listens"
+                " only through a hosted service",
+                type="MEDIA_BINDING_OFF",
+                non_retryable=True,
+            )
+        return deps.transcriber, None
     hosted = deps.hosted
     if hosted is not None and asked_ms > hosted.above_ms:
         return hosted.transcriber, deps.transcriber
@@ -334,7 +351,7 @@ def _transcribe(
         facts = read_facts(audio_path)
         ranges = checked_ranges(payload, facts.duration_ms)
         asked_ms = sum(to_ms - from_ms for from_ms, to_ms in ranges)
-        listener, fallback = lane_for(asked_ms, deps)
+        listener, fallback = lane_for(asked_ms, deps, own_machine_only=payload.own_machine_only)
 
         def listen_with(transcriber: Transcriber) -> _Listened:
             return _listen_all(

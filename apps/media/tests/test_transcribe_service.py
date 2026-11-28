@@ -71,6 +71,7 @@ def make_payload(ranges: list[tuple[int, int]], **overrides: Any) -> MediaPyTran
         "durationMs": 300_000,
         "ranges": [{"fromMs": a, "toMs": b} for a, b in ranges],
         "language": "auto",
+        "ownMachineOnly": False,
         "simulation": None,
     }
     body.update(overrides)

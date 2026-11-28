@@ -32,11 +32,12 @@ describe('railFor', () => {
 });
 
 describe('settingsSectionsFor', () => {
-  it('leaves an Editor Team, Signatures, Notifications and Appearance', () => {
+  it('leaves an Editor Team, Signatures, Notifications, Clips and Appearance', () => {
     expect(segments(settingsSectionsFor('EDITOR'))).toEqual([
       'team',
       'signatures',
       'notifications',
+      'clips',
       'appearance',
     ]);
   });
@@ -51,6 +52,7 @@ describe('settingsSectionsFor', () => {
       'signatures',
       'notifications',
       'discover',
+      'clips',
       'appearance',
     ]);
   });

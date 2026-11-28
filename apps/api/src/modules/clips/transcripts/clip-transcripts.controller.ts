@@ -18,6 +18,8 @@
  *   `{ transcript, complete, price }`, fixes applied.
  * - `PATCH /clips/videos/:videoId/transcript/words`: fixes, Replace
  *   Everywhere or taking fixes away; `{ changed, fixes }`.
+ * - `GET /clips/videos/:videoId/transcript/download?format=txt|srt&language`
+ *   (Module 17 item 10): the words as a file (`transcript-download.ts`).
  */
 import {
   Body,
@@ -49,8 +51,11 @@ import {
   fixWordsSchema,
   type ReadTranscriptQuery,
   readTranscriptQuerySchema,
+  type TranscriptDownloadQuery,
+  transcriptDownloadQuerySchema,
 } from './clip-transcripts.schema';
 import { ClipTranscriptsService } from './clip-transcripts.service';
+import { sendTranscriptDownload } from './transcript-download';
 
 @Controller('clips/videos')
 @Roles(Role.ADMIN, Role.USER, Role.EDITOR)
@@ -94,6 +99,17 @@ export class ClipTranscriptsController {
     query: ReadTranscriptQuery,
   ) {
     return this.transcripts.read(org.id, videoId, query);
+  }
+
+  @Get(':videoId/transcript/download')
+  async download(
+    @CurrentOrg() org: ActiveOrg,
+    @Param('videoId') videoId: string,
+    @Query(new ZodQuery(transcriptDownloadQuerySchema, 'clips/transcript/download'))
+    query: TranscriptDownloadQuery,
+    @Res() response: Response,
+  ): Promise<void> {
+    sendTranscriptDownload(response, await this.transcripts.download(org.id, videoId, query));
   }
 
   @Patch(':videoId/transcript/words')

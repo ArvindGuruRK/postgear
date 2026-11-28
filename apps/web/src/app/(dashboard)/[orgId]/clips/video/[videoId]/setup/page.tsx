@@ -53,6 +53,8 @@ export default async function ClipSetupRoute({
         faces={status?.ai?.faces ?? false}
         // Module 15: the privacy hint names the hosted listener only while it is on.
         hostedLane={status?.ai?.hostedLane ?? null}
+        // Module 17 item 26: a workspace that keeps speech here is told so instead.
+        speechStaysHere={status?.ai?.speechStaysHere === true}
       />
     </ClipsDesktopOnly>
   );

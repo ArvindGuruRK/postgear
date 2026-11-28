@@ -5,6 +5,7 @@
  */
 export * from './asset';
 export * from './covered';
+export * from './export';
 export * from './file';
 export * from './fixes';
 export * from './languages';

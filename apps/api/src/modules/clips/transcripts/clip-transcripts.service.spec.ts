@@ -507,6 +507,58 @@ describe('fix', () => {
   });
 });
 
+describe('Export The Transcript, a video (Module 17 item 10)', () => {
+  it('writes the whole transcript as SRT on the video clock, with the video-wide fixes', async () => {
+    const transcript = listened();
+    const { service } = setup({
+      tables: seed((t) =>
+        t.assets.push(transcriptAsset(transcript, [{ at: 63_000, text: 'Arvind,' }])),
+      ),
+      transcript,
+    });
+    const file = await service.download(TEST_ORG, VIDEO, { format: 'srt' });
+    expect(file.contentType).toBe('application/x-subrip; charset=utf-8');
+    expect(file.fileName).toMatch(/\.srt$/);
+    expect(file.words).toBe(60);
+    // A 600 ms gap is no pause, so cues run up to 7 seconds, on the video's clock.
+    expect(file.body.startsWith('1\n00:01:00,000 --> 00:01:06,400\n')).toBe(true);
+    expect(file.body).toContain('Arvind,');
+    expect(file.body).toContain('\n2\n00:01:07,000 --> ');
+    expect(file.body).not.toContain('Arvin, ');
+  });
+
+  it('writes plain text, and logs counts only, never a word', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const transcript = listened();
+    const { service } = setup({
+      tables: seed((t) => t.assets.push(transcriptAsset(transcript))),
+      transcript,
+    });
+    const file = await service.download(TEST_ORG, VIDEO, { format: 'txt' });
+    expect(file.contentType).toBe('text/plain; charset=utf-8');
+    expect(file.body.split(' ')).toHaveLength(60);
+    const lines = log.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(lines).toContain('clips.transcript.download');
+    expect(lines).not.toContain('word1');
+    expect(lines).not.toContain('Arvin');
+    log.mockRestore();
+  });
+
+  it('refuses a video never listened to, and one in another workspace is not found', async () => {
+    const bare = setup();
+    const answer = await refusal(bare.service.download(TEST_ORG, VIDEO, { format: 'txt' }));
+    expect([answer.status, answer.body.code]).toEqual([409, 'transcript_missing']);
+
+    const transcript = listened();
+    const { service } = setup({
+      tables: seed((t) => t.assets.push(transcriptAsset(transcript))),
+      transcript,
+    });
+    const elsewhere = await refusal(service.download(OTHER_ORG, VIDEO, { format: 'srt' }));
+    expect(elsewhere.status).toBe(404);
+  });
+});
+
 it('keeps jobRow imported for the shared fixtures', () => {
   expect(jobRow().organizationId).toBe(TEST_ORG);
 });

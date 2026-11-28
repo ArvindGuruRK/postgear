@@ -453,15 +453,15 @@ short:
    shows only while playing, at half size; the captions routes refuse a montage; bulk Delete was
    confirmed by tests, not pressed live.
 10. **Creator tools**: the Emote spike's real clips and the platforms' upload pages were not read;
-    schedule pictures are not metered (Module 17 item 25); the AI credits ledger has no user column,
+    schedule pictures count as downloads only since Module 17 item 25; the AI credits ledger has no user column,
     so Copilot and Studio AI spending cannot be split by person.
 11. **Costs** use estimated model tokens and pictures; real speeds and bills wait for the real test
     (A-71, A-75). The rented graphics card lane is documented only.
-12. **Module 16 still open**: both e2e suites, `npm run validate`, the look and accessibility pass with
-    its checklist in `docs/design-patterns/`, the performance checks, the `security-review` skill on
-    the diff (not recorded), the hand check, and the commit.
-13. **Old red tests** (listed in §12) were still red at Module 15; whether Module 16's validate clears
-    them is in its Progress row.
+12. **No real screen reader or 200 percent zoom check**: Module 16's accessibility pass ran headless
+    (names, roles, focus and contrast measured, listed in its checklist in `docs/design-patterns/`);
+    the items it left for later are in that checklist.
+13. **Old red tests**: the seven in §12 are still red after Module 16, so `npm run validate` is not
+    green; none is a Sprint 13 rule.
 14. **CI runs none of** the real-FFmpeg parity tests, the two race tests or any e2e suite (as in
     Sprint 12).
 15. **`classifyError`** in `packages/ai-engine/src/model/resilience.ts` still carries the provider's

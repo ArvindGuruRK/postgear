@@ -24,6 +24,11 @@ model Organization {
   // publish. Null means "not set", and the dashboard derives a default from
   // the creator's onboarding answer to "How often do you post on social media?".
   weeklyPostGoal           Int?
+  // Clips (Sprint 13, Module 17 item 26): keep every listen on our own
+  // machine, even when the media service has a hosted lane (TRANSCRIBER=auto
+  // sends long speech to Groq). Only an admin changes it; the worker reads it
+  // right before the sound would leave, and the media service obeys it.
+  clipsSpeechStaysHere     Boolean                   @default(false)
   Comments                 Comments[]
   credits                  Credits[]
   customers                Customer[]

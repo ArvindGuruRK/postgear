@@ -309,6 +309,13 @@ export interface ClipRows {
   /** Module 16: the video's platform, kind and id on it, for the chat step. */
   videoLink(organizationId: string, videoId: string): Promise<VideoLinkRow | null>;
   /**
+   * Module 17 item 26: the workspace keeps every listen on our own machine
+   * (Settings, Clips). Read right before the sound would leave, so a job that
+   * waited in the queue obeys a change made meanwhile. A missing workspace
+   * reads as on: when in doubt, the sound stays.
+   */
+  speechStaysHere(organizationId: string): Promise<boolean>;
+  /**
    * Module 16, one transaction: the job DONE, the run DONE with what it found,
    * this video's unopened AI clips from older runs taken out (status NEW,
    * never exported, never sent), the new clips in, and the SIGNALS file row
@@ -802,6 +809,14 @@ export const prismaClipRows: ClipRows = {
       where: { id: runId, organizationId, status: { in: OPEN } },
       data: { status: ClipJobStatus.RUNNING },
     });
+  },
+
+  async speechStaysHere(organizationId) {
+    const row = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { clipsSpeechStaysHere: true },
+    });
+    return row?.clipsSpeechStaysHere ?? true;
   },
 
   async videoLink(organizationId, videoId) {

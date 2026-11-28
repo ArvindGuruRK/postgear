@@ -1588,6 +1588,19 @@ npm test --workspace=@postgear/media-contract        # the contract: drift, fixt
 MEDIA_PY_LIVE_TEST=1 npx jest --config apps/worker/jest.config.js media-py.live   # a TypeScript workflow calls Python (needs Docker and dev:media)
 ```
 
+**P2 Backlog (Module 17).** Each item picked from the backlog, as built:
+
+- **Export The Transcript** (item 10). On a listened video, open Transcript: the download button beside Next Match offers Text File and Subtitles (SRT); the file is named after the video and holds the whole transcript with your fixes. In the editor's Transcript pane the same button saves exactly what the clip's captions show, on the clip's own clock (cut words, hidden words and bleeps left out). Free, Editors included. With nothing listened yet the button is not there.
+- **Schedule pictures count as downloads** (item 25). In Design Studio, export a design made with the Schedule Maker: it counts one of the day's downloads, and at the day's limit the export says "You have reached today's limit of 3 downloads. It resets at midnight UTC." before drawing anything. Other designs are never counted, and a failed or cancelled export gives its count back.
+- **Keep speech on our own servers** (item 26). Settings, Clips, Speech Privacy: an admin turns it on; everyone else sees it disabled. The line under it says what it changes on this PostGear (locally nothing: simulation never uses a hosted lane). Clip Setup's "i" then reads "This workspace keeps all speech on our own servers." instead of naming a provider. With `TRANSCRIBER=auto` long listens stay on our machine; with `TRANSCRIBER=groq` alone a listen is refused and its minutes come back.
+
+```bash
+npx jest --config packages/video-engine/jest.config.js transcript/export
+npx jest --config apps/api/jest.config.js src/modules/clips/transcripts src/modules/clips/captions src/modules/clips/privacy src/modules/clips/status src/modules/studio
+npx jest --config apps/web/jest.config.js transcript-download-menu clips-privacy-settings ai-privacy-hint
+npm run test --workspace=@postgear/media -- -k hosted_lane
+```
+
 ### The media library
 Open **<http://localhost:3000/seed-demo-org/media>**.
 

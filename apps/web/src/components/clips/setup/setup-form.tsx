@@ -145,6 +145,7 @@ export function SetupForm({
   action = { available: false, vision: false },
   faces = false,
   hostedLane = null,
+  speechStaysHere = false,
 }: {
   orgId: string;
   detail: ClipVideoDetail;
@@ -154,6 +155,8 @@ export function SetupForm({
   faces?: boolean;
   /** Module 15: where long speech goes (`ai.hostedLane`), for the privacy hint beside the chip. */
   hostedLane?: ClipsHostedLane | null;
+  /** Module 17 item 26: the workspace keeps speech on our own servers (`ai.speechStaysHere`). */
+  speechStaysHere?: boolean;
 }) {
   const router = useRouter();
   const { video } = detail;
@@ -676,7 +679,7 @@ export function SetupForm({
           />
           <div className="flex items-center gap-1">
             <AiMinutesChip orgId={orgId} fallback={null} />
-            <AiPrivacyHint lane={hostedLane} />
+            <AiPrivacyHint lane={hostedLane} speechStaysHere={speechStaysHere} />
           </div>
           {shortfall ? (
             <Alert variant="warning" className="items-center" data-testid="clip-setup-shortfall">

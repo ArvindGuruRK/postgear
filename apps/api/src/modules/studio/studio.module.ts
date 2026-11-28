@@ -35,6 +35,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env';
 import { BillingModule } from '../billing/billing.module';
 import { ChannelsModule } from '../channels/channels.module';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { MediaModule } from '../media/media.module';
 import { PostsModule } from '../posts/posts.module';
 import { RedisService } from '../redis/redis.service';
@@ -49,7 +50,7 @@ import { StudioService } from './studio.service';
 import { StudioFontsController } from './studio-fonts.controller';
 
 @Module({
-  imports: [BillingModule, ChannelsModule, MediaModule, PostsModule],
+  imports: [BillingModule, ChannelsModule, EntitlementsModule, MediaModule, PostsModule],
   controllers: [
     StudioController,
     DesignSharesController,

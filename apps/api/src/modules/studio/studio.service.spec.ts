@@ -54,6 +54,7 @@ import {
   MAX_TITLE_LENGTH,
   updateDesignSchema,
 } from './dto/studio.schema';
+import type { UsageService } from '../entitlements/usage.service';
 import { SCHEDULE_MESSAGES } from './schedules/schedules.messages';
 import { SLIDE_FAILURE_REASONS, STUDIO_MESSAGES } from './studio.messages';
 import { PREMIUM_LOOK_REQUIRED_CODE } from './studio.premium';
@@ -291,6 +292,12 @@ function setup(design: DesignRow | null = designRow()) {
     entitlement: jest.fn(async (_orgId: string) => ({ tier: 'STANDARD' })),
   };
 
+  /** Module 17 item 25: the day's downloads meter (a schedule picture is one unit). */
+  const usage = {
+    consume: jest.fn(async () => ({ kind: 'charged', entryId: 'entry-1' })),
+    reverseAllFor: jest.fn(async () => 1),
+  };
+
   const service = new StudioService(
     repository as unknown as StudioRepository,
     media as unknown as MediaService,
@@ -298,9 +305,10 @@ function setup(design: DesignRow | null = designRow()) {
     channels as unknown as ChannelsService,
     pool as unknown as BrowserPool,
     entitlements as unknown as EntitlementsService,
+    usage as unknown as UsageService,
   );
 
-  return { service, repository, media, library, posts, channels, pool, entitlements };
+  return { service, repository, media, library, posts, channels, pool, entitlements, usage };
 }
 
 /** A stream that records every event, and can be told to drop like a closed tab. */
@@ -2207,5 +2215,86 @@ describe('prepareSend', () => {
       savedMediaIds: CURRENT,
     });
     expect(repository.setDesignStatus).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Schedule pictures on the day's downloads (Sprint 13, Module 17 item 25)
+// ---------------------------------------------------------------------------
+
+describe("schedule pictures count on the day's downloads", () => {
+  function scheduleDesign() {
+    const document = documentFromPreset({ presetId: 'schedule-week-cool', format: 'portrait' });
+    return designRow(
+      { format: DesignFormat.PORTRAIT, presetId: 'schedule-week-cool', title: 'Cool Week' },
+      document,
+    );
+  }
+
+  it('charges one download before drawing, with who exported it, and keeps it when the export finishes', async () => {
+    const { service, usage, pool } = setup(scheduleDesign());
+    const { sse, events } = stream();
+    const run = await service.prepareExport(ORG, DESIGN_ID, JPEG_1X, USER);
+
+    // Charged before a byte is drawn.
+    expect(usage.consume).toHaveBeenCalledTimes(1);
+    expect(pool.render).not.toHaveBeenCalled();
+    const [org, meter, units, options] = usage.consume.mock.calls[0] as unknown as [
+      string,
+      string,
+      number,
+      { idempotencyKey: string; refId: string; meta: { by: string } },
+    ];
+    expect([org, meter, units]).toEqual([ORG, 'clips.downloads_per_day', 1]);
+    expect(options.idempotencyKey).toBe(`studio.schedule-picture:${options.refId}`);
+    expect(options.meta).toEqual({ by: USER });
+
+    await run(sse);
+    expect(ofType(events, 'done')).toHaveLength(1);
+    expect(usage.reverseAllFor).not.toHaveBeenCalled();
+  });
+
+  it('gives the download back when the drawing fails', async () => {
+    const { service, usage, pool } = setup(scheduleDesign());
+    pool.render.mockRejectedValue(new Error('Protocol error (Page.captureScreenshot)'));
+    const { sse } = stream();
+    await (await service.prepareExport(ORG, DESIGN_ID, JPEG_1X, USER))(sse);
+    const ref = (
+      usage.consume.mock.calls[0] as unknown as [string, string, number, { refId: string }]
+    )[3].refId;
+    expect(usage.reverseAllFor).toHaveBeenCalledWith(ORG, ref);
+  });
+
+  it('refuses past the allowance before anything is drawn', async () => {
+    const { service, usage, pool } = setup(scheduleDesign());
+    const refused = new Error('No downloads left today.');
+    usage.consume.mockRejectedValueOnce(refused);
+    await expect(service.prepareExport(ORG, DESIGN_ID, JPEG_1X, USER)).rejects.toBe(refused);
+    expect(pool.render).not.toHaveBeenCalled();
+  });
+
+  it('never counts a design that is not a schedule picture', async () => {
+    const { service, usage } = setup();
+    const { sse } = stream();
+    await (await service.prepareExport(ORG, DESIGN_ID, JPEG_1X, USER))(sse);
+    expect(usage.consume).not.toHaveBeenCalled();
+  });
+
+  it('counts a schedule picture Send To Composer draws, by the person sending', async () => {
+    const { service, usage } = setup(scheduleDesign());
+    const { sse } = stream();
+    await (
+      await service.prepareSend(
+        ORG,
+        DESIGN_ID,
+        { channelIds: ['channel-1'], imageFormat: 'jpeg' },
+        { userId: USER, role: 'ADMIN' as never },
+      )
+    )(sse);
+    expect(usage.consume).toHaveBeenCalledTimes(1);
+    expect(
+      (usage.consume.mock.calls[0] as unknown as [string, string, number, { meta: unknown }])[3]
+        .meta,
+    ).toEqual({ by: USER });
   });
 });

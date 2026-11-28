@@ -88,5 +88,15 @@ class HostedLane:
     above_ms: int
 
 
+#: Listeners run by another company, by the name's first part (`groq:<model>`).
+#: The API's cost table reads the same prefix (`isHostedListener`).
+HOSTED_LISTENERS = frozenset({"groq"})
+
+
+def is_hosted_listener(transcriber: Transcriber) -> bool:
+    """Whether this listener sends the sound to another company."""
+    return transcriber.name.split(":", 1)[0] in HOSTED_LISTENERS
+
+
 class TranscriberOffError(RuntimeError):
     """The binding cannot run on this box (no library, no key)."""

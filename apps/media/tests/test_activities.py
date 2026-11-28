@@ -113,6 +113,7 @@ def test_transcribe_activity_answers_the_contract_shape_under_simulation(
         "durationMs": 180_000,
         "ranges": [{"fromMs": 0, "toMs": 60_000}],
         "language": "auto",
+        "ownMachineOnly": False,
         "simulation": {"sample": "talk", "force": None},
     }
     result = ActivityEnvironment().run(media_py_transcribe, payload)
@@ -156,6 +157,7 @@ def test_transcribe_activity_on_the_silent_block_is_no_speech(
             "durationMs": 180_000,
             "ranges": [{"fromMs": 120_000, "toMs": 150_000}],
             "language": "auto",
+            "ownMachineOnly": False,
             "simulation": {"sample": "talk", "force": None},
         },
     )

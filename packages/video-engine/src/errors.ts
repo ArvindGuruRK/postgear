@@ -15,8 +15,10 @@ export const CLIP_ERROR_MESSAGES = {
   // Module 12: the list of sites grew, so the sentence no longer names them (the link box does).
   link_unsupported: 'We cannot read links from this site yet. You can upload the file instead.',
   link_many_videos: 'This post has more than one video. Paste a link to a post with just one.',
-  link_upload_only: 'Links from this site cannot be read. Download the recording and upload it instead.',
-  drive_not_connected: 'Google Drive did not let us read this file. Pick it again from Google Drive.',
+  link_upload_only:
+    'Links from this site cannot be read. Download the recording and upload it instead.',
+  drive_not_connected:
+    'Google Drive did not let us read this file. Pick it again from Google Drive.',
   link_not_a_video: 'This link is a channel or a list. Paste the link of one video.',
   link_private: 'This video is private or needs a login, so we cannot read it.',
   link_live: 'This stream is still live. Come back when it has ended.',
@@ -44,6 +46,8 @@ export const CLIP_ERROR_MESSAGES = {
   language_unsupported: 'We cannot make captions in this language yet. Pick another language.',
   captions_off: 'Captions are not available right now. Everything else still works.',
   transcript_missing: 'This part of the video has not been listened to yet.',
+  // Module 17 item 10: a transcript download with every word hidden or none heard.
+  transcript_empty: 'There are no words to download yet.',
   transcript_range_invalid: 'Pick a part of the video that starts before it ends.',
   captions_file_unreadable:
     'We could not read this captions file. Check that it is an SRT or VTT file.',

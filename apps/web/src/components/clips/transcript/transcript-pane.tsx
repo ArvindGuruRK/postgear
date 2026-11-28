@@ -74,6 +74,7 @@ import { useClipJob } from '../use-clip-job';
 import { WaitingNote } from '../waiting-note';
 import { queuedOr } from '../waiting-words';
 import { type ApplyCut, CleanupTools } from './cleanup-tools';
+import { TranscriptDownloadMenu } from './transcript-download-menu';
 import {
   clipSpan,
   cutToast,
@@ -439,17 +440,26 @@ export function TranscriptPane({
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="m-0 type-heading text-lg text-ink">Transcript</h2>
-        <TooltipHint label="Close Transcript" side="bottom" shortcut={['T']}>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Close Transcript"
-            className="h-9 w-9 px-0"
-            onClick={onClose}
-          >
-            <MotionIcon icon={XIcon} className="h-4 w-4" />
-          </Button>
-        </TooltipHint>
+        <div className="flex items-center gap-1">
+          {heard && !listening ? (
+            <TranscriptDownloadMenu
+              path={`/clips/${encodeURIComponent(clipId)}/transcript/download`}
+              title="Transcript"
+              onError={onNotice}
+            />
+          ) : null}
+          <TooltipHint label="Close Transcript" side="bottom" shortcut={['T']}>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Close Transcript"
+              className="h-9 w-9 px-0"
+              onClick={onClose}
+            >
+              <MotionIcon icon={XIcon} className="h-4 w-4" />
+            </Button>
+          </TooltipHint>
+        </div>
       </div>
       {problem ? (
         <Alert variant="danger" className="items-center" data-testid="clip-transcript-problem">

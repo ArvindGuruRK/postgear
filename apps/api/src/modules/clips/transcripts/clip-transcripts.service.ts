@@ -42,16 +42,17 @@ import {
   isLanguageChoice,
   LANGUAGE_AUTO,
   MAX_LISTEN_RANGES,
-  mergeRanges,
   type MsRange,
+  mergeRanges,
   rangesMs,
   rangesToListen,
   readTranscriptAssetMeta,
   removeFix,
   replaceEverywhere,
-  transcribeInputSchema,
   type TranscriptAssetMeta,
+  type TranscriptFileFormat,
   type TranscriptWord,
+  transcribeInputSchema,
   upsertFix,
   type WordFix,
   wordsInRange,
@@ -70,6 +71,11 @@ import { MediaServiceProbe } from '../status/media-service.probe';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { ClipTranscriptStore } from './clip-transcript-store';
 import type { FixWordsInput } from './clip-transcripts.schema';
+import {
+  type TranscriptDownload,
+  transcriptDownload,
+  WHOLE_TRANSCRIPT,
+} from './transcript-download';
 
 export const AI_MINUTES_METER = 'clips.ai_minutes_per_month' as const;
 
@@ -511,6 +517,36 @@ export class ClipTranscriptsService {
       if (input.success && overlaps(input.data.ranges, ranges)) return job;
     }
     return null;
+  }
+
+  /**
+   * `GET /clips/videos/:videoId/transcript/download` (Module 17 item 10): the
+   * video's whole transcript in one language, fixes applied, as a file.
+   */
+  async download(
+    orgId: string,
+    videoId: string,
+    query: { format: TranscriptFileFormat; language?: string },
+  ): Promise<TranscriptDownload> {
+    const video = await this.requireReadyVideo(orgId, videoId);
+    const row = await this.transcriptRow(orgId, video.id, this.languageOf(query));
+    const view = row ? await this.viewOf(row, WHOLE_TRANSCRIPT) : null;
+    if (!view) throw new ClipErrorException(HttpStatus.CONFLICT, 'transcript_missing');
+    if (view.words.length === 0) {
+      throw new ClipErrorException(HttpStatus.CONFLICT, 'transcript_empty');
+    }
+    const file = transcriptDownload(video.title, view.words, query.format);
+    this.logger.log(
+      JSON.stringify({
+        event: 'clips.transcript.download',
+        orgId,
+        videoId: video.id,
+        format: query.format,
+        words: file.words,
+        cues: file.cues,
+      }),
+    );
+    return file;
   }
 
   private languageOf(request: { language?: string }): string {

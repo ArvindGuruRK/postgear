@@ -187,12 +187,13 @@ export class StudioController {
   @HttpCode(HttpStatus.OK)
   async export(
     @CurrentOrg() org: ActiveOrg,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body(new ZodBody(exportDesignSchema, 'studio/designs/export')) dto: ExportDesignInput,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    await stream(await this.studio.prepareExport(org.id, id, dto), request, response);
+    await stream(await this.studio.prepareExport(org.id, id, dto, user.id), request, response);
   }
 
   /**

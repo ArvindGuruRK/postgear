@@ -152,8 +152,17 @@ describe('prepareTranscribe', () => {
       durationMs: 180_000,
       ranges: [{ fromMs: 60_000, toMs: 120_000 }],
       language: 'auto',
+      ownMachineOnly: false,
       simulation: { sample: 'stream', force: null },
     });
+  });
+
+  it('tells the media service to keep the sound here for a workspace that asks (Module 17 item 26)', async () => {
+    const { run, rows } = setup();
+    rows.speechHere.add(ORG);
+    expect((await prepareTranscribe(run)).ownMachineOnly).toBe(true);
+    rows.speechHere.delete(ORG);
+    expect((await prepareTranscribe(run)).ownMachineOnly).toBe(false);
   });
 
   it('sends no simulation hint when the providers are real', async () => {

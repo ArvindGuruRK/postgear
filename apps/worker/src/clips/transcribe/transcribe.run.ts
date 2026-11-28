@@ -34,9 +34,9 @@ import {
   isTranscriptLanguage,
   mergeTranscript,
   readTranscriptAssetMeta,
+  type TranscribeInput,
   type Transcript,
   TranscriptFileError,
-  type TranscribeInput,
   transcribeOutputSchema,
   transcriptAssetMeta,
 } from '@postgear/video-engine';
@@ -64,7 +64,10 @@ export interface TranscribeRun {
   jobId: string;
   organizationId: string;
   input: TranscribeInput;
-  rows: Pick<ClipRows, 'video' | 'videoAssets' | 'videoLink' | 'finishTranscribe'>;
+  rows: Pick<
+    ClipRows,
+    'video' | 'videoAssets' | 'videoLink' | 'speechStaysHere' | 'finishTranscribe'
+  >;
   privateStorage: PrivateStorage;
   progress: Pick<JobProgress, 'report'>;
   simulated: boolean;
@@ -118,10 +121,11 @@ export function transcriptAssetFor(assets: readonly AssetRow[], language: string
 /** Step 1: the Python activity's input. Throws a permanent `no_speech` for a video with no sound. */
 export async function prepareTranscribe(run: TranscribeRun): Promise<MediaPyTranscribeInput> {
   await run.progress.report({ stage: 'listening', progress: 3 });
-  const [video, link, assets] = await Promise.all([
+  const [video, link, assets, speechStaysHere] = await Promise.all([
     run.rows.video(run.organizationId, run.input.videoId),
     run.rows.videoLink(run.organizationId, run.input.videoId),
     run.rows.videoAssets(run.organizationId, run.input.videoId),
+    run.rows.speechStaysHere(run.organizationId),
   ]);
   if (!video || video.deletedAt || video.status !== 'READY' || video.durationMs === null) {
     throw new ClipStepError('transcribe_failed', { retryable: false });
@@ -138,6 +142,8 @@ export async function prepareTranscribe(run: TranscribeRun): Promise<MediaPyTran
     durationMs: video.durationMs,
     ranges: run.input.ranges.map((range) => ({ fromMs: range.fromMs, toMs: range.toMs })),
     language: run.input.language,
+    // Module 17 item 26: the media service never uses its hosted lane for this job.
+    ownMachineOnly: speechStaysHere,
     simulation: run.simulated ? simulationHint(video, link) : null,
   };
 }

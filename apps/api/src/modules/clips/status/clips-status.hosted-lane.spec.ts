@@ -7,6 +7,7 @@
 import type { EntitlementResolver } from '../../entitlements/entitlement-resolver';
 import type { SchedulingService } from '../../scheduling/scheduling.service';
 import type { ClipLimitsGuard } from '../limits/clip-limits.guard';
+import type { ClipPrivacyService } from '../privacy/clip-privacy.service';
 import type { ClipDrive } from '../videos/clip-drive';
 import type { ClipSampleLink } from '../videos/clip-sample';
 import { ClipsStatusService } from './clips-status.service';
@@ -18,6 +19,8 @@ import {
   NO_HOSTED_LANE,
 } from './media-service.probe';
 import type { MediaVoices } from './media-voices.client';
+
+const privacy = { speechStaysHere: jest.fn(async () => false) };
 
 const GROQ: HostedLaneState = {
   on: true,
@@ -51,6 +54,7 @@ function status(service: AiServiceState, lane: HostedLaneState) {
     probe as unknown as MediaServiceProbe,
     { list: jest.fn(async () => ({ speaker: null, voices: [] })) } as unknown as MediaVoices,
     { status: () => ({ available: false }) } as unknown as ClipDrive,
+    privacy as unknown as ClipPrivacyService,
   );
   return { statusService, probe };
 }
@@ -74,6 +78,17 @@ describe('ClipsStatusService ai.hostedLane', () => {
   it('is off while the media service is off, whatever was last heard', async () => {
     const { statusService } = status('off', GROQ);
     expect((await statusService.status('org-1')).ai.hostedLane).toEqual(NO_HOSTED_LANE);
+  });
+});
+
+describe('ClipsStatusService ai.speechStaysHere (Module 17 item 26)', () => {
+  it('carries the workspace switch beside the lane', async () => {
+    const { statusService } = status('ok', GROQ);
+    privacy.speechStaysHere.mockResolvedValueOnce(true);
+    const ai = (await statusService.status('org-1')).ai;
+    expect(ai.speechStaysHere).toBe(true);
+    expect(ai.hostedLane).toEqual(GROQ);
+    expect(privacy.speechStaysHere).toHaveBeenLastCalledWith('org-1');
   });
 });
 

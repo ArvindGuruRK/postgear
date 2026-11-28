@@ -1,5 +1,6 @@
 /** Request shapes for the transcript routes (Sprint 13, Module 02). Strict, like every Clips body. */
 import { z } from 'zod';
+import { transcriptFormatSchema } from './transcript-download';
 
 const ms = z.coerce
   .number()
@@ -64,3 +65,9 @@ export const fixWordsSchema = z.union([
     .strict(),
 ]);
 export type FixWordsInput = z.infer<typeof fixWordsSchema>;
+
+/** `GET /clips/videos/:videoId/transcript/download` (Module 17 item 10). */
+export const transcriptDownloadQuerySchema = z
+  .object({ format: transcriptFormatSchema, language: language.optional() })
+  .strict();
+export type TranscriptDownloadQuery = z.infer<typeof transcriptDownloadQuerySchema>;

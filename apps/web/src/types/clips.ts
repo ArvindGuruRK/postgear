@@ -394,6 +394,8 @@ export interface ClipsAiStatus {
   voice?: boolean;
   /** Module 15: whether long speech goes to a hosted listener (absent on an older API: read as off). */
   hostedLane?: ClipsHostedLane;
+  /** Module 17 item 26: this workspace keeps every listen on our own servers (Settings, Clips). */
+  speechStaysHere?: boolean;
 }
 
 /** Module 15: `ai.hostedLane`, where long speech is sent to be turned into text. */

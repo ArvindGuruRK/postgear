@@ -1,5 +1,6 @@
 /** Request shapes for a clip's captions routes (Sprint 13, Module 03). Strict, like every Clips body. */
 import { z } from 'zod';
+import { transcriptFormatSchema } from '../transcripts/transcript-download';
 
 const language = z.string().regex(/^(?:auto|[a-z]{2,3})$/, 'A language is "auto" or a short code');
 /** A built-in style's name or one of the workspace's own (a UUID). */
@@ -33,3 +34,9 @@ export const clipWordsQuerySchema = z
   .object({ source: z.enum(['captions', 'spoken']).optional() })
   .strict();
 export type ClipWordsQuery = z.infer<typeof clipWordsQuerySchema>;
+
+/** `GET /clips/:clipId/transcript/download` (Module 17 item 10). */
+export const clipTranscriptDownloadQuerySchema = z
+  .object({ format: transcriptFormatSchema })
+  .strict();
+export type ClipTranscriptDownloadQuery = z.infer<typeof clipTranscriptDownloadQuerySchema>;

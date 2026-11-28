@@ -21,6 +21,7 @@ import {
 import type { ConfigService } from '@nestjs/config';
 import type { EntitlementsService } from '../billing/entitlements.service';
 import type { ChannelsService } from '../channels/channels.service';
+import type { UsageService } from '../entitlements/usage.service';
 import type { MediaService } from '../media/media.service';
 import type { PostsService } from '../posts/posts.service';
 import type { RedisService } from '../redis/redis.service';
@@ -201,6 +202,10 @@ function seed() {
     } as unknown as ChannelsService,
     pool as unknown as BrowserPool,
     { entitlement: jest.fn(async () => ({ tier: 'STANDARD' })) } as unknown as EntitlementsService,
+    {
+      consume: jest.fn(async () => ({ kind: 'charged' })),
+      reverseAllFor: jest.fn(async () => 0),
+    } as unknown as UsageService,
   );
   const kits = new BrandKitsService(
     repository,

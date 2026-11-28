@@ -45,8 +45,11 @@ import {
   aiMinutesCost,
   applyFixes,
   type CaptionsTrack,
-  captionsTrackOf,
+  type CaptionWord,
   type ClipDocument,
+  captionsTrackOf,
+  captionsTracksOf,
+  captionWords,
   clipClockPlacer,
   clipSourceRanges,
   createCaptionsTrack,
@@ -55,21 +58,22 @@ import {
   isBuiltInCaptionStyle,
   isTranscriptLanguage,
   languageName,
-  mergeRanges,
   type MsRange,
+  mergeRanges,
   outputDuration,
   parseSubtitleCues,
   parseSubtitleFile,
   readTranscriptAssetMeta,
   resolveStyle,
-  safeParseClipDocument,
   SUBTITLE_FILE_MAX_BYTES,
   SubtitleFileError,
   type SuppliedTranscript,
+  safeParseClipDocument,
   type Transcript,
+  type TranscriptFileFormat,
+  type TranslationLine,
   transcriptAssetMeta,
   translatedTranscript,
-  type TranslationLine,
   translationLines,
 } from '@postgear/video-engine';
 import { stripControlChars } from '../../../common/sanitize';
@@ -90,6 +94,11 @@ import {
   type TranscriptView,
   toMeterView,
 } from '../transcripts/clip-transcripts.service';
+import {
+  type TranscriptDownload,
+  transcriptDownload,
+  WHOLE_TRANSCRIPT,
+} from '../transcripts/transcript-download';
 import { ClipVideosRepository } from '../videos/clip-videos.repository';
 import { ClipCaptionStylesService } from './clip-caption-styles.service';
 import type { AddCaptionsInput, TranslateCaptionsInput } from './clip-captions.schema';
@@ -234,6 +243,69 @@ export class ClipCaptionsService {
       missing: track !== null && transcript === null,
       price,
     };
+  }
+
+  /**
+   * `GET /clips/:clipId/transcript/download` (Module 17 item 10, see
+   * `transcript-download.ts`): the words the clip's captions show, on the
+   * clip's clock. Unlike the routes above it takes a montage too, one
+   * captions track (or, with none yet, one video) at a time.
+   */
+  async download(
+    orgId: string,
+    clipId: string,
+    format: TranscriptFileFormat,
+  ): Promise<TranscriptDownload> {
+    const clip = await this.items.requireClip(orgId, clipId);
+    const parsed = safeParseClipDocument(clip.document);
+    if (!parsed.ok) {
+      throw new ClipErrorException(HttpStatus.UNPROCESSABLE_ENTITY, 'clip_document_invalid', {
+        message: CLIPS_MESSAGES.CLIP_DOCUMENT_INVALID,
+      });
+    }
+    const doc = parsed.doc;
+    const videoOf = (source: string | undefined): string | null =>
+      source === undefined
+        ? clip.videoId
+        : (doc.sources.find((entry) => entry.id === source)?.videoId ?? null);
+    const tracks = captionsTracksOf(doc);
+    const reads: { track: Pick<CaptionsTrack, 'edits' | 'source'>; asset: string | null }[] =
+      tracks.length > 0
+        ? tracks.map((track) => ({ track, asset: track.transcriptAssetId }))
+        : isMontage(clip)
+          ? doc.sources.map((source) => ({ track: { edits: {}, source: source.id }, asset: null }))
+          : [{ track: { edits: {} }, asset: null }];
+
+    const words: CaptionWord[] = [];
+    let found = 0;
+    for (const read of reads) {
+      const videoId = videoOf(read.track.source);
+      if (!videoId) continue;
+      const row = read.asset
+        ? await this.transcripts.assetRow(orgId, videoId, read.asset)
+        : await this.transcripts.transcriptRow(orgId, videoId, 'auto');
+      const view = row ? await this.transcripts.viewOf(row, WHOLE_TRANSCRIPT) : null;
+      if (!view) continue;
+      found += 1;
+      words.push(...captionWords(doc, read.track, view));
+    }
+    if (found === 0) throw new ClipErrorException(HttpStatus.CONFLICT, 'transcript_missing');
+    if (words.length === 0) throw new ClipErrorException(HttpStatus.CONFLICT, 'transcript_empty');
+
+    words.sort((a, b) => a.start - b.start || a.end - b.end);
+    const file = transcriptDownload(clip.title, words, format);
+    this.logger.log(
+      JSON.stringify({
+        event: 'clips.transcript.download',
+        orgId,
+        clipId: clip.id,
+        format,
+        tracks: found,
+        words: file.words,
+        cues: file.cues,
+      }),
+    );
+    return file;
   }
 
   /** `POST /clips/:clipId/captions/from-file`: see the file comment. */

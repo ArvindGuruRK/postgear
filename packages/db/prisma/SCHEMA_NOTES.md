@@ -929,3 +929,7 @@ Four migrations, `20261128140000` to `20261128140300`:
 - **Two nullable columns, not a field in `output`.** Every kind's output shape is `.strict()` (`packages/video-engine/src/jobs.ts`) and the job view reads it field by field, so a cost inside it would either break every result or need eleven schema edits; a failed or cancelled job (no output) still cost us something. `costCents` is the sum the operator route adds up; `cost` holds the facts it came from (seconds of video, seconds run, provider, units, the price table's date, and whether the units were estimated).
 - Written once when the job ends (the worker's `settled` call), and by the maintenance pass for any finished job still missing it. Never shown to workspace users. Old rows stay null.
 - **`@@index([finishedAt])`** serves the operator's date-range sums.
+
+### `Organization.clipsSpeechStaysHere` (Module 17 item 26, `20261128170000_sprint13_speech_stays_here`)
+
+- **One boolean on the workspace, default false** (today's behaviour). On, every listen in the workspace runs on our own machine even when the media service has a hosted lane. A column, not a `DiscoverSettings`-style table: it is one switch, read in two places (the API's `/clips/privacy` and status, and the worker right before the sound would leave, which reads a missing workspace as on).

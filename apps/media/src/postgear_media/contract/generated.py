@@ -537,6 +537,7 @@ class MediaPyTranscribeInput(BaseModel):
             pattern="^[a-z0-9]{1,36}(?:-[a-z0-9]{1,36}){0,7}$",
         ),
     ]
+    own_machine_only: Annotated[bool, Field(alias="ownMachineOnly")]
     ranges: Annotated[list[TimeRange], Field(max_length=64, min_length=1)]
     simulation: SimulationHint | None
     version: Literal[1]
